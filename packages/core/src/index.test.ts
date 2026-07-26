@@ -7,6 +7,10 @@ import { describe, expect, it } from 'vitest';
 import * as barrel from './index.js';
 import * as configModule from './config/index.js';
 import * as kernelModule from './kernel/index.js';
+import * as carModule from './model/car/index.js';
+import * as modelModule from './model/index.js';
+import * as doorsModule from './physics/doors/index.js';
+import * as motionModule from './physics/motion/index.js';
 import * as randomModule from './random/index.js';
 
 /**
@@ -18,14 +22,17 @@ import * as randomModule from './random/index.js';
  * `@elevator-sim/core` even though the module tests are green.
  *
  * These tests are deliberately structural rather than a hand-maintained name list, so the
- * barrel stays in sync automatically as `physics/`, `model/`, `dispatch/`, `traffic/` and
- * `metrics/` land — add the module to `submodules` below and the coverage check applies to
- * it too.
+ * barrel stays in sync automatically as `dispatch/`, `traffic/` and `metrics/` land — add
+ * the module to `submodules` below and the coverage check applies to it too.
  */
 const submodules = {
   kernel: kernelModule,
   random: randomModule,
   config: configModule,
+  'physics/motion': motionModule,
+  'physics/doors': doorsModule,
+  model: modelModule,
+  'model/car': carModule,
 } satisfies Record<string, Record<string, unknown>>;
 
 const REAL_DATA_DIR = fileURLToPath(new URL('../../../data', import.meta.url));
