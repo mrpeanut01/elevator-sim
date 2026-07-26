@@ -91,6 +91,68 @@ describe('seed-set accounting', () => {
     expect(sharedSeedsOf(overlapping.tuning, overlapping.holdout as never)).toEqual(['4', '8']);
   });
 
+  /*
+   * The construction a per-candidate check cannot see. `leaky` tunes on 201–212 and "holds out"
+   * 1–12 — which are the *reference's* tuning seeds, traffic the search optimized against. Its own
+   * two sets share nothing, so a check that compares each arm against itself passes it, and the page
+   * then prints "DISJOINT — no seed appears in both sets, so the holdout set is genuinely unseen
+   * traffic" over the opposite of that. Measured before the fix: no throw, `disjoint: true`,
+   * `sharedSeeds: []`.
+   *
+   * Leakage is a property of the round: under common random numbers the round shares one set of
+   * traces, so a seed *any* arm tuned on is a seed the search has seen.
+   */
+  it('refuses a holdout set built from another arm’s tuning seeds', () => {
+    const leaky = candidate({
+      candidateId: 'leaky',
+      tuningAwt: REF_TUNING,
+      holdoutAwt: REF_HOLDOUT,
+      tuningSeeds: [201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212],
+      holdoutSeeds: TUNING_SEEDS,
+    });
+
+    // On its own it is clean, and that is exactly the hole: the arm never saw its own holdout seeds.
+    expect(() => assertDisjointSeedSets([leaky])).not.toThrow();
+
+    expect(() => assertDisjointSeedSets([reference, leaky])).toThrow(TuningReportError);
+    expect(() => assertDisjointSeedSets([reference, leaky])).toThrow(/no guard at all/);
+    expect(() => assertDisjointSeedSets([reference, leaky])).toThrow(/round-level property/);
+
+    const accounting = accountSeedSets([reference, leaky], { requireDisjoint: false });
+    expect(accounting.disjoint).toBe(false);
+    expect(accounting.sharedSeeds).toEqual(TUNING_SEEDS.map(String));
+  });
+
+  it('refuses it in the other direction too: a tuning set made of another arm’s holdout seeds', () => {
+    const leaky = candidate({
+      candidateId: 'leaky',
+      tuningAwt: REF_TUNING,
+      // Tunes on the reference's held-out traffic; its own holdout set is untouched.
+      tuningSeeds: HOLDOUT_SEEDS,
+    });
+
+    expect(() => assertDisjointSeedSets([leaky])).not.toThrow();
+    expect(() => assertDisjointSeedSets([reference, leaky])).toThrow(TuningReportError);
+    expect(accountSeedSets([reference, leaky], { requireDisjoint: false }).sharedSeeds).toEqual(
+      HOLDOUT_SEEDS.map(String),
+    );
+  });
+
+  it('names both ends of a leak, because "whose seeds" is the actionable half', () => {
+    const leaky = candidate({
+      candidateId: 'leaky',
+      tuningAwt: REF_TUNING,
+      holdoutAwt: REF_HOLDOUT,
+      tuningSeeds: [201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212],
+      holdoutSeeds: TUNING_SEEDS,
+    });
+
+    expect(() => assertDisjointSeedSets([reference, leaky])).toThrow(/"leaky"'s holdout set/);
+    expect(() => assertDisjointSeedSets([reference, leaky])).toThrow(
+      /tuned on by "predictive-balanced"/,
+    );
+  });
+
   it('accepts the disjoint case and reports both sets', () => {
     const accounting = accountSeedSets([reference]);
 

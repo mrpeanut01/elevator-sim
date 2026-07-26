@@ -33,12 +33,19 @@
  * - **The objective is piecewise constant.** A weight step at or below 0.03 on
  *   `distanceTravelled` produced 100/100 exactly-zero paired differences at `rho = 1` — a
  *   *bit-identical* run. {@link perturbCandidate} therefore steps in fractions of a declared
- *   range and defaults well clear of that width; see its docstring for the arithmetic.
+ *   range and defaults clear of that width **on `weights.*`**. It does not clear it everywhere:
+ *   on `idle.repositionThresholdS` the plateau is ~93 % of the declared range and 8 of 12
+ *   default-step neighbours come back bit-identical. This module guarantees a neighbour is a
+ *   different *point*; whether it is a different *reading* is `tuning/search/plateau.ts`'s to
+ *   detect and to escape. See {@link perturbCandidate}'s module docstring.
  * - **CRN is worth 324× here.** Phase 7 searches the near-neighbour regime, where the measured
  *   variance reduction is 99.69 %. That is why {@link policyNoiseStream} exists: a search that
  *   drew from a trace stream would desynchronize the traces it is comparing.
  * - **The declared box is not the feasible set.** One combination in eight is rejected by
- *   `core`; {@link SearchSpace.validate} asks `core` rather than keeping a list.
+ *   `core`; {@link SearchSpace.validate} asks `core` rather than keeping a list. It is asked on
+ *   the **merged** point — base plus candidate — and it decodes through `SearchSpace.allById`, so
+ *   narrowing a space with {@link subspace} does not make the oracle inert. `vectorSpace`'s
+ *   `reasonFor` is the same question on the CMA-ES decode path, which cannot throw.
  *
  * ## The known-answer case
  *
@@ -81,6 +88,7 @@ export {
   encodeCandidate,
   fromVector,
   parseProfile,
+  reflectInto,
   toVector,
   validateValues,
   vectorDimensions,

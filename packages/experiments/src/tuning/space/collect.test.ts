@@ -21,6 +21,7 @@ import {
   searchSpace,
   subspace,
 } from './collect.js';
+import { policyNoiseStream, sampleCandidate } from './sample.js';
 import { SearchSpaceError } from './types.js';
 import type { Candidate, SearchParameter } from './types.js';
 
@@ -91,6 +92,63 @@ async function declarationSites(): Promise<readonly DeclarationSite[]> {
     }
   }
   return sites;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Authorability, decided independently of the collector
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Whether `core`'s **own** profile parser accepts a profile carrying this row at its declared
+ * default — computed here, sharing no code with `isProfileAuthorable`.
+ *
+ * This exists because the obvious form of the completeness assertion is a tautology.
+ * `collectSearchSpace`'s default `include` *is* `isProfileAuthorable`, so
+ * `expect(SPACE.byId.has(row.id)).toBe(isProfileAuthorable(row))` compares the predicate to
+ * itself and passes however wrong the predicate is. The claim under test is docs/06's — *"every
+ * declared `id` must be authorable into `data/dispatcher-profiles.json` and survive a `loadConfig`
+ * round trip"* — and the only honest referee for it is `parseDispatcherProfiles`, the function
+ * `loadConfig` calls.
+ *
+ * The dotted-path routing is restated here rather than imported for the same reason: it is the
+ * authoring convention docs/06 § Layer 2 states, and reusing `decodeInto` would fold the thing
+ * under test back into the test. Three cases, and they are the whole convention — `weights.<term>`
+ * under `weights`, `constraints.<name>` as membership in `hardConstraints`, everything else as
+ * `profile.<section>.<key>`.
+ */
+function parserAcceptsRow(row: DispatchParameterSpec): boolean {
+  const dot = row.id.indexOf('.');
+  if (dot <= 0 || dot >= row.id.length - 1) return false;
+  const section = row.id.slice(0, dot);
+  const key = row.id.slice(dot + 1);
+  const value = row.default;
+  if (typeof value !== 'number' && typeof value !== 'string' && typeof value !== 'boolean') {
+    return false;
+  }
+
+  const authored: Record<string, unknown> = { id: 'probe', name: 'Probe', weights: {} };
+  if (section === 'weights') authored['weights'] = { [key]: value };
+  else if (section === 'constraints') authored['hardConstraints'] = value === true ? [key] : [];
+  else authored[section] = { [key]: value };
+
+  try {
+    core.parseDispatcherProfiles(
+      {
+        version: 1,
+        terms: core.COST_TERMS.map((term) => ({
+          id: term.id,
+          measures: term.measures,
+          serves: 'authorability referee',
+        })),
+        normalization: { required: true },
+        profiles: [authored],
+      },
+      '<collect.test.ts authorability referee>',
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /* -------------------------------------------------------------------------- *
@@ -171,16 +229,26 @@ describe('every parameter core declares is accounted for', () => {
 
   it('carries every other declared row a dispatcher profile can hold, and only those', async () => {
     // The mechanical half, and there is deliberately no allowlist. A row is in the space exactly
-    // when `isProfileAuthorable` says a profile can hold it — docs/06 § `id` is a path a profile
-    // can actually hold. So a row declared anywhere in `core` is either searchable or
-    // unauthorable, and this asserts the biconditional over every row on disk.
+    // when a profile can hold it — docs/06 § `id` is a path a profile can actually hold.
+    //
+    // The verdict on the right-hand side is computed **here, from `core`'s parser**, not read off
+    // `isProfileAuthorable`. Comparing the space against the collector's own predicate is a
+    // self-comparison: `collectSearchSpace`'s default `include` *is* `isProfileAuthorable`, so
+    // `SPACE.byId.has(row.id) === isProfileAuthorable(row)` holds by construction and cannot fail.
+    // Proven: breaking `isProfileAuthorable` for `answer.maxTransferSeconds` — a real, authorable
+    // dimension then lost from the space — left that form of the loop passing on all 96 rows, and
+    // only the hardcoded count below noticed. {@link parserAcceptsRow} is the independent
+    // criterion, and `catches a dimension the predicate loses` below proves it discriminates.
     const sites = await declarationSites();
     let rows = 0;
+    let authorable = 0;
     for (const site of sites) {
       for (const row of site.rows) {
         rows += 1;
+        const accepted = parserAcceptsRow(row);
+        if (accepted) authorable += 1;
         const where = `${site.file} → ${site.schema} → ${row.id}`;
-        expect(SPACE.byId.has(row.id), where).toBe(isProfileAuthorable(row));
+        expect(SPACE.byId.has(row.id), where).toBe(accepted);
       }
     }
     // Ten schemas, 96 declared rows including the four `answer.*`/`car.*` that
@@ -189,6 +257,44 @@ describe('every parameter core declares is accounted for', () => {
     // does not match — fails rather than silently shrinking the space.
     expect(rows).toBe(96);
     expect(SPACE.parameters.length).toBe(48);
+    // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
+    // always said `false` would satisfy the biconditional above only by accident.
+    expect(authorable).toBeGreaterThan(0);
+    expect(authorable).toBeLessThan(rows);
+  });
+
+  it('has an authorability oracle that discriminates, independently of the collector', async () => {
+    // The negative control the biconditional needs to be worth anything. `parserAcceptsRow` is
+    // built from `core.parseDispatcherProfiles` and the authoring convention docs/06 states; it
+    // shares no code with `isProfileAuthorable`. Here it is shown to answer both ways on rows
+    // whose answer is known, and to disagree with a deliberately broken predicate.
+    const probe = (id: string, extra: Partial<DispatchParameterSpec> = {}): DispatchParameterSpec => ({
+      id,
+      type: 'continuous',
+      range: [0, 5],
+      scale: 'linear',
+      default: 1,
+      description: 'A row invented by this test to check the oracle discriminates.',
+      ...extra,
+    });
+    expect(parserAcceptsRow(probe('weights.waitTime'))).toBe(true);
+    expect(parserAcceptsRow(probe('idle.repositionThresholdS'))).toBe(true);
+    // A section no dispatcher profile has, an unknown key in a real section, and a malformed id.
+    expect(parserAcceptsRow(probe('sim.drainGraceS'))).toBe(false);
+    expect(parserAcceptsRow(probe('idle.notAKnobAnybodyDeclared'))).toBe(false);
+    expect(parserAcceptsRow(probe('nodot'))).toBe(false);
+
+    // And the case that caught the tautology: a space missing a row the parser accepts fails.
+    const sites = await declarationSites();
+    const transfer = sites
+      .flatMap((site) => site.rows)
+      .find((row) => row.id === 'answer.maxTransferSeconds') as DispatchParameterSpec;
+    expect(parserAcceptsRow(transfer)).toBe(true);
+    const without = collectSearchSpace({
+      include: (spec) => isProfileAuthorable(spec) && spec.id !== 'answer.maxTransferSeconds',
+    });
+    expect(without.byId.has('answer.maxTransferSeconds')).toBe(false);
+    expect(without.byId.has('answer.maxTransferSeconds')).not.toBe(parserAcceptsRow(transfer));
   });
 
   it('excludes only sections no dispatcher profile has, and says which', async () => {
@@ -507,5 +613,55 @@ describe('the space asks core what is feasible rather than keeping a list', () =
     const point = new Map(defaultCandidate(SPACE));
     point.set('eligibility.maxLoadFactorForAssignment', 9);
     expect(SPACE.validate(point)).toMatch(/maxLoadFactorForAssignment/);
+  });
+
+  it('keeps the whole index when narrowed, so a merged subspace point decodes whole', () => {
+    // The regression. `subspace` used to rebuild the oracle against the **narrowed** index, so
+    // `decodeInto` dropped every dimension the merge had just supplied from the base and the
+    // oracle answered about a dispatcher nobody proposed.
+    const timing = subspace(SPACE, ['dispatch.assignmentTiming', 'dispatch.deferWindowS']);
+    expect(timing.byId.size).toBe(2);
+    expect(timing.allById.size).toBe(SPACE.parameters.length);
+    expect(timing.defaults.size).toBe(SPACE.defaults.size);
+
+    // A merged point: the base says destination entry, the candidate says deferred. `core`
+    // refuses the combination, and the narrowed space must refuse it too.
+    const merged: Candidate = new Map<string, string | number>([
+      ['dispatch.callType', 'destination-entry'],
+      ['dispatch.assignmentTiming', 'deferred'],
+      ['dispatch.deferWindowS', 1.5],
+    ]);
+    expect(timing.validate(merged)).toMatch(/defers assignment under destination entry/);
+    expect(timing.validate(merged)).toBe(SPACE.validate(merged));
+
+    // And the candidate alone — no base — still validates, because the dimensions it does not
+    // carry are ones the resolver defaults. Narrowing must not manufacture a rejection either.
+    expect(timing.validate(new Map([['dispatch.assignmentTiming', 'immediate']]))).toBeUndefined();
+  });
+
+  it('rejection-samples a subspace against the merged point, not against half a dispatcher', () => {
+    // The path the defect actually shipped on: `sampleCandidate(subspace, rng, { base })` with
+    // validation **on**. Measured before the fix: 24 of 50 draws came back `deferred` under a
+    // `destination-entry` base — the combination this module's docstrings say it rejects one draw
+    // in eight. Every subspace test in the module passed `validate: false`, so nothing saw it.
+    const timing = subspace(SPACE, ['dispatch.assignmentTiming', 'dispatch.deferWindowS']);
+    const base: Candidate = new Map([['dispatch.callType', 'destination-entry']]);
+    const rng = policyNoiseStream(1234);
+    for (let index = 0; index < 50; index += 1) {
+      const candidate = sampleCandidate(timing, rng, { base });
+      expect(candidate.get('dispatch.assignmentTiming'), `draw ${index}`).not.toBe('deferred');
+      // The whole dispatcher the draw describes is one `core` will build.
+      expect(SPACE.validate(new Map([...base, ...candidate])), `draw ${index}`).toBeUndefined();
+    }
+
+    // The rejection is of one *combination*, not of one value: under up-down buttons the same
+    // subspace reaches `deferred` freely, or the search would have lost a dimension.
+    const upDown: Candidate = new Map([['dispatch.callType', 'up-down-buttons']]);
+    const timings = new Set(
+      Array.from({ length: 50 }, () =>
+        sampleCandidate(timing, rng, { base: upDown }).get('dispatch.assignmentTiming'),
+      ),
+    );
+    expect(timings.has('deferred')).toBe(true);
   });
 });

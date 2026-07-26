@@ -34,6 +34,33 @@ import {
   type TrajectoryPoint,
 } from './types.js';
 
+/** How a round is folded in. */
+export interface RecordRoundOptions {
+  /**
+   * Whether the round's evaluations may become {@link SearchRecorder.best}. Defaults to `true`.
+   *
+   * `false` marks a **diagnostic** round: one the search ran to learn something about the
+   * objective rather than to find a winner in. `sepCmaEs`'s plateau probe is the only such round
+   * today — its points are deliberate perturbations of the start point, used as a measuring stick
+   * for the plateau width, and one of them being numerically the lowest thing the search saw says
+   * nothing about where the optimum is.
+   *
+   * This is not a cosmetic distinction. Best-so-far is tracked at the **highest fidelity reached**
+   * (see {@link SearchRecorder.add}), so a diagnostic round run at more replications than the
+   * generations that follow it would pin `best` to a probe point for the rest of the search and
+   * silently discard every generation. Measured before the fix, through the public API alone:
+   * `sepCmaEs({ …, replications: 6, probePlateau: true, probeReplications: 12 })` on a 2-D plateau
+   * evaluated the exact optimum at generation 9 — noiseless objective 0 — and returned
+   * `probe-0-7`, noiseless objective 52. Nothing threw and no note was written. The default
+   * `probeReplications` is a fifth of the round's, which is why it took a non-default call to see
+   * it and why the fix is structural rather than a bound on the option.
+   *
+   * The round is still counted in every other way: its budget, its evaluations, its candidates and
+   * its contribution to the plateau tally. It was run; it cost what it cost.
+   */
+  readonly eligibleForBest?: boolean | undefined;
+}
+
 /** Accumulates rounds into a result. One per search. */
 export class SearchRecorder<C> {
   readonly plateau = new PlateauTally();
@@ -63,14 +90,25 @@ export class SearchRecorder<C> {
    * and candidates are only ever compared against each other at equal fidelity. Written out
    * because the naive version passes every test that does not have a ladder in it, and this
    * repository's own test suite caught it exactly once.
+   *
+   * ## The ceiling is monotone, so a round that is not a search round must say so
+   *
+   * The flip side of "higher fidelity supersedes" is that the ceiling only ever rises: once an
+   * evaluation at `n` replications has been seen, nothing measured below `n` can win again. That
+   * is right for a fidelity ladder, where every rung raises `n` on purpose, and **wrong** for a
+   * round that was never a candidate for the answer. Pass
+   * {@link RecordRoundOptions.eligibleForBest} `false` for those; the failure it prevents, and the
+   * measurement of it, are documented there.
    */
-  add(round: SearchRound<C>): void {
+  add(round: SearchRound<C>, options: RecordRoundOptions = {}): void {
+    const eligible = options.eligibleForBest ?? true;
     this.#rounds.push(round);
     this.plateau.observe(round);
     for (const evaluation of round.evaluations) {
       this.#evaluations.push(evaluation);
       this.#candidateIds.add(evaluation.candidate.id);
       this.#replicationsSpent += evaluation.replications;
+      if (!eligible) continue;
       if (evaluation.replications > this.#bestFidelity) {
         this.#bestFidelity = evaluation.replications;
         this.#best = evaluation;
@@ -121,7 +159,11 @@ export class SearchRecorder<C> {
   finish(method: SearchMethodId, seed: bigint, traceSeed: bigint): SearchResult<C> {
     const best = this.#best;
     if (best === undefined) {
-      throw new SearchError(`${method}: no candidate was ever evaluated, so there is no result.`);
+      throw new SearchError(
+        this.#rounds.length === 0
+          ? `${method}: no candidate was ever evaluated, so there is no result.`
+          : `${method}: ${this.#rounds.length} round(s) ran but every one of them was diagnostic, so no candidate is eligible to be the answer.`,
+      );
     }
     const runnerUp = runnerUpOf(this.#rounds, best);
     return {

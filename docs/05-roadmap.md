@@ -14,10 +14,20 @@ revisited before Phase 0 starts.
 
 **Read this before planning any phase.** The most expensive defect this project has produced is
 not a wrong number. It is a behaviour that is *configurable, unit-tested in isolation, and dead in
-the shipped path* — and it has now happened **four times**, all four in Phase 5, all four
+the shipped path* — and it has now happened **five times**. Four were in Phase 5, all four
 simultaneously: `prepositionPlan`, `CapacityReassignmentMonitor`, `createAuctionPolicy` and the
 whole arrival-model predictor were built correctly, exported, weighted by a shipped profile, and
 called by nothing outside their own module.
+
+**The fifth was Phase 7's `tuning/report`, and it is the instructive one** — because it happened
+*after* both guards below were installed, in a module those guards do not audit. Every function in
+it was exercised by its own suite, `seedSetFromReplications` existed precisely to be the integration
+seam, and its only caller was a test. The lesson is that the question is not "is this symbol
+reachable?" but **"name the non-test caller"** — and for a module whose product is a *measurement*,
+the caller has to be something that actually performs the measurement. `report/holdoutRound.ts` is
+that caller: it is the only code in the repository that runs the held-out seed set, which a search
+structurally cannot do (every round a search runs shares one experiment seed, so the seeds it
+optimizes against are the only seeds it has ever seen).
 
 **The cause was structural, not careless.** Phase 5 partitioned work by module directory and
 `sim/simulation.ts` — the file every one of those modules has to be called *from* — appeared in no
@@ -494,6 +504,46 @@ indistinguishable rather than ranked.
 >
 > See [Traffic & Statistics](03-traffic-and-statistics.md) § *Measured: flat plateaus, not
 > noise*.
+
+**Status: green. The machinery is complete and wired; the acceptance number is measured but
+deliberately not asserted as a gate.** The search space, the three searches, successive halving,
+the Pareto reporting and the held-out validation all land in
+`packages/experiments/src/tuning/`, and the artefact the phase is judged on is produced by
+`runHoldoutRound()` in `report/holdoutRound.ts`, exercised end to end against the real `data/`
+directory by `report/holdoutRound.test.ts`.
+
+| criterion | verdict |
+|---|---|
+| a tuned weight vector beats hand-authored `predictive-balanced` on **held-out** seeds with a paired-t interval excluding zero | **MET as a measurement, NOT as a gate** — at n = 60 on Garden Apartments, `idle.repositionThresholdS` 8 s → 2 s gives **−1.288 s [−2.257, −0.319]** on the holdout seed set, which excludes zero. On the *tuning* seed set the same arm gives **−0.916 [−2.135, +0.303]**, which does not |
+| candidates below the interval half-width are reported as indistinguishable rather than ranked | **MET** — `pareto.ts` places an arm on the front only where another is significantly better on ≥1 objective and significantly worse on none; ties are reported as `indeterminate`, never ordered |
+
+**Why the interval is measured but not asserted.** The sign is stable and the effect is real, but
+significance at a budget a test suite can afford is not reproducible — docs/03's own table prices a
+±0.5 s interval at 141 replications and ±0.25 s at 563. A gate asserting significance at n = 60
+would be a coin flip dressed as an acceptance criterion, which is precisely the failure
+[CLAUDE.md § Statistical discipline](../CLAUDE.md) names. So the suite asserts what is *structural* —
+that the seed sets are disjoint, that every arm ran the same seeds within a set, that the tuned
+parameter demonstrably reaches the dispatcher (`verdict !== 'IDENTICAL'`), and that the page renders
+both fronts — and leaves the number to a run with a real budget. **Producing that number at 50–200
+replications is Phase 8's job**, not a weakening of this criterion.
+
+Three results worth carrying forward:
+
+- **The fifth dead seam was here, and was caught by this phase's own verifier.** `tuning/report` had
+  a full green suite in which *every caller was a test*; `seedSetFromReplications` existed precisely
+  to be the integration seam and nothing outside a test ever called it. `holdoutRound.ts` is the
+  file that calls it, and it is the only thing in the repository that **actually runs the holdout
+  set** — a search cannot, because every round a search runs shares one experiment seed by
+  construction, so the seeds a search optimizes against are by definition the only seeds it has seen.
+- **The piecewise-constant objective shows up in a real run, not just in Phase 3's probe.** Stepping
+  the deadband 8 s → 5 s leaves most replications bit-identical, because the deadband only matters on
+  a run where some reposition decision falls between the two values. An optimizer taking small steps
+  here stalls; this is now a known-answer test rather than a warning.
+- **The `multiRoundIsReachableFromSimulation()` tautology is gone.** It returned the literal `true`
+  and was asserted by a test — coverage that proved `true === true`. It is replaced by
+  `measureMultiRoundReachability()`, which instruments a real `Simulation` through the
+  `createPolicy` hook and reports the round histogram, the withdrawals by reason, and how often the
+  contract net diverged from central argmin.
 
 ---
 

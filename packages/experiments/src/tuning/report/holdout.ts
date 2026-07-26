@@ -120,10 +120,78 @@ export function sharedSeedsOf(
   );
 }
 
+/** One arm's holdout set carrying seeds that some arm — possibly another — tuned on. */
+interface SeedLeak {
+  /** The candidate whose holdout set carries the leaked seeds. */
+  readonly holdoutOf: string;
+  readonly holdoutSetId: string;
+  /** Candidates whose tuning set contains them, in input order. */
+  readonly tunedBy: readonly string[];
+  /** The leaked seeds, in the holdout set's order. */
+  readonly seeds: readonly string[];
+}
+
 /**
- * Refuse a report whose holdout set is not disjoint from its tuning set.
+ * Every seed that appears in some arm's holdout set **and** in some arm's tuning set.
  *
- * @throws TuningReportError naming the shared seeds.
+ * ## Why the union, and not each candidate against itself
+ *
+ * Leakage is a property of the **round**, not of an arm. Under common random numbers every
+ * candidate in a round is evaluated on one shared set of traces, so a seed the search optimized
+ * against on *any* arm is traffic the search has seen — and a holdout set containing it is not
+ * unseen traffic for anybody. Checking each candidate's holdout set against only its own tuning set
+ * misses exactly the construction that matters: an arm whose "holdout" seeds are the reference's
+ * tuning seeds passes that check with nothing shared, and the page then prints *"DISJOINT — no seed
+ * appears in both sets, so the holdout set is genuinely unseen traffic"* over traffic the search
+ * optimized against. Measured, before this was a union.
+ *
+ * The relation is symmetric — a seed in `(∪ tuning) ∩ (∪ holdout)` is a leak whichever arm supplied
+ * which half — so one intersection covers both directions.
+ */
+function seedLeaksOf(candidates: readonly CandidateEvaluation[]): {
+  readonly seeds: readonly string[];
+  readonly leaks: readonly SeedLeak[];
+} {
+  const tunedBy = new Map<string, string[]>();
+  for (const candidate of candidates) {
+    for (const seed of seedsOf(candidate.tuning)) {
+      const owners = tunedBy.get(seed);
+      if (owners === undefined) tunedBy.set(seed, [candidate.candidateId]);
+      else if (!owners.includes(candidate.candidateId)) owners.push(candidate.candidateId);
+    }
+  }
+
+  const seeds: string[] = [];
+  const leaks: SeedLeak[] = [];
+  for (const candidate of candidates) {
+    const holdout = candidate.holdout;
+    if (holdout === undefined) continue;
+    const leaked = seedsOf(holdout).filter((seed) => tunedBy.has(seed));
+    if (leaked.length === 0) continue;
+    const owners: string[] = [];
+    for (const seed of leaked) {
+      if (!seeds.includes(seed)) seeds.push(seed);
+      for (const owner of tunedBy.get(seed) ?? []) {
+        if (!owners.includes(owner)) owners.push(owner);
+      }
+    }
+    leaks.push(
+      Object.freeze({
+        holdoutOf: candidate.candidateId,
+        holdoutSetId: holdout.seedSetId,
+        tunedBy: Object.freeze(owners),
+        seeds: Object.freeze(leaked),
+      }),
+    );
+  }
+  return { seeds: Object.freeze(seeds), leaks: Object.freeze(leaks) };
+}
+
+/**
+ * Refuse a report whose holdout seeds are traffic the search already optimized against — on **any**
+ * arm of the round, not merely on the arm that holds them.
+ *
+ * @throws TuningReportError naming the shared seeds and the arms on both ends of each leak.
  *
  * This throws rather than warning because an overlapping holdout set does not weaken the guard — it
  * **removes** it, and every downstream `generalizes` verdict then reads as evidence for exactly the
@@ -142,23 +210,33 @@ export function assertDisjointSeedSets(candidates: readonly CandidateEvaluation[
         `Candidate "${candidate.candidateId}" declares its sets as ${candidate.tuning.role}/${holdout.role}. The two sets must be declared 'tuning' and 'holdout' respectively; the roles are what every comparison in this module refuses to mix.`,
       );
     }
-    const shared = sharedSeedsOf(candidate.tuning, holdout);
-    if (shared.length > 0) {
-      throw new TuningReportError(
-        `Candidate "${candidate.candidateId}" has ${shared.length} seed${shared.length === 1 ? '' : 's'} in both its tuning set ("${candidate.tuning.seedSetId}") and its holdout set ("${holdout.seedSetId}"): ${shared.slice(0, 8).join(', ')}${shared.length > 8 ? ', …' : ''}. A holdout set that overlaps the tuning set is not a weaker guard against overfitting, it is no guard at all — the search already optimized against those traces (CLAUDE.md § Tuning discipline).`,
-      );
-    }
   }
+
+  const { seeds, leaks } = seedLeaksOf(candidates);
+  if (seeds.length === 0) return;
+  const detail = leaks
+    .map(
+      (leak) =>
+        `"${leak.holdoutOf}"'s holdout set ("${leak.holdoutSetId}") carries ${leak.seeds.length} seed${leak.seeds.length === 1 ? '' : 's'} tuned on by ${leak.tunedBy.map((id) => `"${id}"`).join(', ')}: ${leak.seeds.slice(0, 8).join(', ')}${leak.seeds.length > 8 ? ', …' : ''}`,
+    )
+    .join('; ');
+  throw new TuningReportError(
+    `${seeds.length} seed${seeds.length === 1 ? '' : 's'} appear in both roles across this round — ${detail}. A holdout set that overlaps the tuning set is not a weaker guard against overfitting, it is no guard at all — the search already optimized against those traces (CLAUDE.md § Tuning discipline). Leakage is a round-level property: under common random numbers every arm shares the round's traces, so a seed any arm tuned on is traffic the search has seen.`,
+  );
 }
 
 /**
  * Both seed sets, and the disjointness verdict, for the report header.
  *
- * The header's sets are the **first** candidate's — normally the reference arm, and under common
- * random numbers every arm shares them. The disjointness verdict is **not**: it is computed over
- * every candidate and unions their overlaps, because one leaky arm is enough to make the guard
- * meaningless for that arm, and reading the verdict off the reference alone would report a clean
- * split while the arm that overlapped is the one the page is about.
+ * The header's tuning set is the **first** candidate's — normally the reference arm, and under
+ * common random numbers every arm shares it. The header's holdout set is the first one that
+ * *exists*, so a round in which the reference has no holdout runs but its candidates do still
+ * reports the set they ran on rather than printing `NONE` over it.
+ *
+ * The disjointness verdict is neither: it is the round-level intersection from
+ * {@link assertDisjointSeedSets}, because one leaky arm is enough to make the guard meaningless and
+ * reading the verdict off one arm's own two sets would report a clean split over traffic another
+ * arm optimized against.
  */
 export function accountSeedSets(
   candidates: readonly CandidateEvaluation[],
@@ -169,30 +247,25 @@ export function accountSeedSets(
   }
   if (options.requireDisjoint !== false) assertDisjointSeedSets(candidates);
 
-  const shared: string[] = [];
-  for (const entry of candidates) {
-    const entryHoldout = entry.holdout;
-    if (entryHoldout === undefined) continue;
-    for (const seed of sharedSeedsOf(entry.tuning, entryHoldout)) {
-      if (!shared.includes(seed)) shared.push(seed);
-    }
-  }
+  const shared = seedLeaksOf(candidates).seeds;
 
   const first = candidates[0] as CandidateEvaluation;
   const tuning = summarizeSeedSet(first.tuning);
-  const holdoutEvaluation = first.holdout;
+  const holdoutEvaluation = candidates.find(
+    (candidate) => candidate.holdout !== undefined,
+  )?.holdout;
   if (holdoutEvaluation === undefined) {
     return Object.freeze({
       tuning,
       disjoint: shared.length === 0,
-      sharedSeeds: Object.freeze(shared),
+      sharedSeeds: Object.freeze([...shared]),
     });
   }
   return Object.freeze({
     tuning,
     holdout: summarizeSeedSet(holdoutEvaluation),
     disjoint: shared.length === 0,
-    sharedSeeds: Object.freeze(shared),
+    sharedSeeds: Object.freeze([...shared]),
   });
 }
 

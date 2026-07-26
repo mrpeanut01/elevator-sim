@@ -43,6 +43,17 @@
  * of 20**, losing once on two of the four rows. **Successive halving never lost to random search
  * and beat it in 3, 5, 9 and 2 of 20.**
  *
+ * **How to reproduce it.** Seeds `20260726 + 977·i` for `i` in `[0, 20)`; the arms, budgets and
+ * noise model of `comparison.test.ts`'s `race()` verbatim — random search 79 × 50, the ladder
+ * `DOC_RUNGS`, sep-CMA-ES `⌊3990 / (λ·30)⌋` generations × 30, `noiseSd: 2`, `interactionSd: 0.4`;
+ * the four problems are `plateauProblem(4, 1, 10, [7,3,5,2])`, `plateauProblem(11, 1, 5)`,
+ * `plateauProblem(11, 0.15, 5)` and `sphereProblem(11, 5)`. The committed suite runs the **first
+ * eight** of those seeds and only rows 1, 3 and 4, because twenty seeds × four rows × three
+ * methods is minutes rather than seconds and a test suite is not the place for it; it asserts the
+ * ranking, not the table. So the table above is a measurement this file is responsible for and the
+ * suite is not — worth saying out loud, because an unreproducible number in a docstring outlives
+ * every code review.
+ *
  * So the honest ranking on this problem family is **sep-CMA-ES ≫ successive halving ≥ random
  * search**, and the interesting half of that is the second inequality, not the first.
  *
@@ -104,10 +115,28 @@
  * is designed to hold σ constant under neutral selection, so a textbook CMA-ES on a plateau pins
  * its step size at exactly the value that cannot escape and then reports the point it started from.
  *
- * **The evidence.** `cmaes.test.ts` runs the same optimizer with `plateauInflation: 1` and restarts
- * off — textbook sep-CMA-ES — as a **control that must fail**, and it does: 35 of 40 generations
- * flat, the mean never leaves the starting cell, and a final objective of 72 against the escaped
- * run's 0. Without a failing control the passing test would be evidence of nothing.
+ * **The evidence, and what it does *not* say.** `cmaes.test.ts` runs the same optimizer with
+ * `plateauInflation: 1` **and** restarts off — textbook sep-CMA-ES — as a **control that must
+ * fail**, and it does: 35 of 40 generations flat, the mean never leaves the starting cell, and a
+ * final objective of 72 against the escaped run's 0. Without a failing control the passing test
+ * would be evidence of nothing.
+ *
+ * That control varies two knobs at once, so on its own it proves only that the *pair* matters. The
+ * two escapes turn out to be **independent** — measured on the same 2-D plateau, each one alone
+ * still reaches 0:
+ *
+ * | `plateauInflation` | `stagnationGenerations` | flat generations | noiseless objective |
+ * |---|---|---|---|
+ * | 2 | 8 | 4 | 0 |
+ * | 2 | 0 (restarts off) | 9 | 0 |
+ * | 1 (inflation off) | 8 | 7 | 0 |
+ * | 1 | 0 | 35 | 72 |
+ *
+ * So each mechanism gets its own arm, asserting its own row, and {@link PlateauReport} counts
+ * `inflations` and `restarts` separately so an arm can assert *which* escape fired. With one
+ * `escapes` total and the two-knob control alone, either mechanism could be deleted outright with
+ * the suite fully green — which is the inert-behaviour failure docs/05-roadmap.md's standing
+ * requirement is about, arriving inside the module written to prevent it.
  *
  * **The width is measured, not assumed.** docs/05-roadmap.md: *"Step size has a per-term,
  * per-building floor. Probe it; do not assume 0.03."* {@link probeStepFloor} probes it
@@ -187,6 +216,40 @@
  * they agree. Two halves of one search drawing from different sequences while both claimed
  * reproducibility from one seed is precisely the kind of defect this repository keeps finding
  * after the fact.
+ *
+ * ## 6. OPEN — nothing here is reachable from the package's public surface
+ *
+ * There is no `packages/experiments/src/tuning/index.ts`, and `packages/experiments/src/index.ts`
+ * exports nothing from `tuning/`. Nothing outside `src/tuning/search/*.test.ts` imports
+ * {@link randomSearch}, {@link successiveHalving}, {@link sepCmaEs} or {@link runnerObjective}.
+ * Under docs/05-roadmap.md's **standing requirement** that is the exact failure mode the phase gate
+ * exists to catch — configurable, unit-tested, and called by nothing — and it is a gate blocker,
+ * recorded here rather than left to be rediscovered.
+ *
+ * It is **not** a change this module can land on its own, and the reason is concrete rather than
+ * procedural. `tuning/space` also exports a type named `Candidate` —
+ * `ReadonlyMap<string, ParameterValue>`, a parameter assignment — against this module's
+ * `Candidate<C>`, a configuration under evaluation with an id and an origin. They are the only
+ * collision between the three tuning barrels (checked over all 61 / 61 / 66 exported names; the
+ * runtime-value surfaces are disjoint), and `packages/experiments/src/index.ts` states that it
+ * lists names explicitly *so that a collision between two submodules is a compile error here
+ * rather than a silent shadow*. Resolving it means one of the two modules renaming its type, which
+ * is a decision for whoever owns the `tuning/` barrel, not one for either sibling to take
+ * unilaterally.
+ *
+ * What lands, once that owner exists:
+ *
+ * 1. `packages/experiments/src/tuning/index.ts`, re-exporting `./search/index.js`, `./space/index.js`
+ *    and `./report/index.js` by name, with the `Candidate` collision resolved by an explicit rename
+ *    (`Candidate as SearchCandidate` reads better than renaming the map, which is `space`'s central
+ *    noun).
+ * 2. An explicit named re-export of it from `packages/experiments/src/index.ts`, matching that
+ *    file's stated no-`export *` convention.
+ * 3. `tuning` added to the `submodules` map in `packages/experiments/src/index.test.ts` — without
+ *    it that file's *"adds nothing of its own: every barrel export comes from a module"* assertion
+ *    fails on the newly exported names, so step 2 without step 3 does not compile a green suite.
+ * 4. An assertion there that `randomSearch`, `successiveHalving`, `sepCmaEs` and `runnerObjective`
+ *    are reachable from the package root.
  */
 
 /* -------------------------------------------------------------------------- *
@@ -197,6 +260,7 @@ export {
   DOC_RUNGS,
   SEARCH_DEFAULTS,
   SEARCH_METHODS,
+  SEARCH_METHOD_GATE,
   SEARCH_PARAMETERS,
   SEED_POLICIES,
   SearchError,
@@ -228,6 +292,7 @@ export type {
  * -------------------------------------------------------------------------- */
 
 export {
+  SAMPLE_SEPARATOR,
   SEARCH_STREAM,
   compareEvaluations,
   countDistinctOutcomes,
@@ -253,6 +318,8 @@ export type { DimensionStepFloor, StepFloorProbe, StepFloorProbeOptions } from '
  * -------------------------------------------------------------------------- */
 
 export { SearchRecorder, runnerUpOf } from './result.js';
+
+export type { RecordRoundOptions } from './result.js';
 
 /* -------------------------------------------------------------------------- *
  * The optimizers

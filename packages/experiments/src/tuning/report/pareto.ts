@@ -493,6 +493,14 @@ export function compareObjectives(
  * One `UNQUOTABLE` objective makes the whole pair `'indeterminate'`. That is stricter than ignoring
  * the axis, and deliberately so: dropping an unmeasurable objective from the relation lets a
  * candidate dominate by having failed to measure the axis it would have lost on.
+ *
+ * **This is a verdict about a pair, and it is not a verdict about either candidate.** `'indeterminate'`
+ * says these two cannot be ranked against each other; it does not say either one is unplaceable.
+ * {@link statisticalParetoFront} used to write this pair verdict onto the candidate under
+ * consideration, which meant a single arm that omitted one axis made *every* fully-measured arm
+ * unplaceable and emptied the front — measured as `front: []` over three candidates, with no error
+ * anywhere. Placeability is decided from a candidate's **own** point; see
+ * {@link ParetoEntry.indeterminate}.
  */
 export function dominanceOf(comparisons: readonly ObjectiveComparison[]): DominanceVerdict {
   if (comparisons.length === 0) return 'indeterminate';
@@ -535,8 +543,21 @@ export interface StatisticalFrontInput {
  * report sees are small — docs/06 § *Successive halving on replication count* ends its schedule at
  * **three** candidates.
  *
- * Candidates without replications on the requested seed set are `indeterminate`: absent from the
- * front, absent from the dominated set, and named as unplaceable.
+ * ## Who is unplaceable, and why it is decided one candidate at a time
+ *
+ * A candidate is `indeterminate` — absent from the front, absent from the dominated set, named as
+ * unplaceable — when **its own** measurements cannot place it: no replications on this seed set, or
+ * no usable value on an axis the front is being decided over. It is then out of the relation
+ * entirely: it dominates nothing and nothing dominates it, so the candidates that *did* measure
+ * everything still compete against each other on the evidence they have.
+ *
+ * The alternative — treating one pair's `'indeterminate'` verdict as a fact about the candidate —
+ * was measured and is a wrong answer, not a conservative one. Three candidates, two of them
+ * complete on `(awt, energy)` and one measuring `awt` alone, produced `front: []`, `dominated: []`
+ * and all three `indeterminate`: every fully-measured arm marked unplaceable by the one arm that
+ * declined an axis, printed as `0 of 3 non-dominated` with no error anywhere. The guard that
+ * matters — *nobody reaches the front by failing to measure the axis they would have lost on* —
+ * needs only the incomplete candidate to be excluded, and that is what this does.
  */
 export function statisticalParetoFront(input: StatisticalFrontInput): ParetoFront {
   const objectives = input.objectives ?? TUNING_OBJECTIVES;
@@ -556,10 +577,10 @@ export function statisticalParetoFront(input: StatisticalFrontInput): ParetoFron
 
   /*
    * An objective nobody measured carries no information and, being missing uniformly, can favour
-   * nobody — so it is dropped from the relation and named in `inactiveObjectiveIds` rather than
-   * making every pair `indeterminate`. An objective measured by *some* candidates stays active, and
-   * the pairs that cannot be compared on it stay indeterminate: that is the asymmetric case, where
-   * dropping the axis would let a candidate reach the front by not measuring what it would lose on.
+   * nobody — so it is dropped from the relation and named in `inactiveObjectiveIds`. An objective
+   * measured by *some* candidates stays active, and the candidates that did not measure it become
+   * unplaceable below: dropping the axis instead would let a candidate reach the front by not
+   * measuring what it would have lost on, and marking everybody unplaceable would empty the front.
    */
   const active = objectives.filter((objective) =>
     arms.some((arm) =>
@@ -569,13 +590,28 @@ export function statisticalParetoFront(input: StatisticalFrontInput): ParetoFron
     ),
   );
 
+  const points = arms.map((arm) =>
+    objectivePointOf(arm.candidateId, arm.evaluation?.observations ?? [], objectives),
+  );
+  /*
+   * Placeability, decided from a candidate's own point and nothing else. An unplaceable candidate is
+   * removed from the relation in both directions — it cannot dominate and cannot be dominated — so
+   * the arms that measured every active axis still rank against each other.
+   */
+  const placeable = arms.map(
+    (arm, index) =>
+      arm.evaluation !== undefined &&
+      active.length > 0 &&
+      pointIsComplete(points[index] as ObjectivePoint, active),
+  );
+
   const entries: ParetoEntry[] = [];
   const indistinguishablePairs: IndistinguishablePair[] = [];
 
   for (const [index, arm] of arms.entries()) {
     const evaluation = arm.evaluation;
-    const point = objectivePointOf(arm.candidateId, evaluation?.observations ?? [], objectives);
-    if (evaluation === undefined) {
+    const point = points[index] as ObjectivePoint;
+    const unplaceable = (note: string): void => {
       entries.push(
         Object.freeze({
           candidateId: arm.candidateId,
@@ -584,25 +620,45 @@ export function statisticalParetoFront(input: StatisticalFrontInput): ParetoFron
           dominatedBy: Object.freeze([] as string[]),
           indistinguishableFrom: Object.freeze([] as string[]),
           indeterminate: true,
-          note: `"${arm.candidateId}" has no replications on the ${role} seed set, so it cannot be placed on or off the front`,
+          note,
         }),
+      );
+    };
+
+    if (evaluation === undefined) {
+      unplaceable(
+        `"${arm.candidateId}" has no replications on the ${role} seed set, so it cannot be placed on or off the front, and it neither dominates nor is dominated by anything`,
       );
       continue;
     }
-    const thisArm: ObjectiveArm = { candidateId: arm.candidateId, evaluation };
-
-    const dominatedBy: string[] = [];
-    const indistinguishableFrom: string[] = [];
-    let indeterminate = false;
-
     // No axis was measured by anybody: there is no relation to evaluate, and nothing may be
     // excluded from a front decided on nothing.
-    if (active.length === 0) indeterminate = true;
+    if (active.length === 0) {
+      unplaceable(
+        `no objective was measured by any candidate on the ${role} seed set, so there is no relation to place "${arm.candidateId}" in`,
+      );
+      continue;
+    }
+    if (placeable[index] !== true) {
+      const missing = active
+        .filter((objective) => !Number.isFinite(point.values[objective.id]))
+        .map((objective) => objective.label);
+      unplaceable(
+        `"${arm.candidateId}" produced no usable value for ${missing.join(', ')} on the ${role} seed set, so it cannot be placed on or off the front. It takes no part in the dominance relation in either direction — nobody reaches the front by declining to measure the axis they would have lost on, and nobody is excluded by a rival's missing measurement either.`,
+      );
+      continue;
+    }
+
+    const thisArm: ObjectiveArm = { candidateId: arm.candidateId, evaluation };
+    const dominatedBy: string[] = [];
+    const indistinguishableFrom: string[] = [];
+    const notComparableWith: string[] = [];
 
     for (const [otherIndex, other] of arms.entries()) {
-      if (otherIndex === index || active.length === 0) continue;
+      if (otherIndex === index) continue;
       const otherEvaluation = other.evaluation;
-      if (otherEvaluation === undefined) continue;
+      // An unplaceable rival is out of the relation, in both directions.
+      if (otherEvaluation === undefined || placeable[otherIndex] !== true) continue;
       const otherArm: ObjectiveArm = {
         candidateId: other.candidateId,
         evaluation: otherEvaluation,
@@ -610,7 +666,10 @@ export function statisticalParetoFront(input: StatisticalFrontInput): ParetoFron
       const comparisons = compareObjectives(thisArm, otherArm, active, options);
       const verdict = dominanceOf(comparisons);
       if (verdict === 'dominated-by') dominatedBy.push(other.candidateId);
-      if (verdict === 'indeterminate') indeterminate = true;
+      // Both are placeable and the pair still cannot be ranked: no shared seeds, too few usable
+      // pairs, or too many invalid ones. Neither dominates, and the page says so rather than
+      // letting "nothing dominated it" stand for "nothing could be compared against it".
+      if (verdict === 'indeterminate') notComparableWith.push(other.candidateId);
       if (isIndistinguishable(comparisons)) {
         indistinguishableFrom.push(other.candidateId);
         if (otherIndex > index) {
@@ -630,15 +689,16 @@ export function statisticalParetoFront(input: StatisticalFrontInput): ParetoFron
       Object.freeze({
         candidateId: arm.candidateId,
         point,
-        onFront: !indeterminate && dominatedBy.length === 0,
+        onFront: dominatedBy.length === 0,
         dominatedBy: Object.freeze(dominatedBy),
         indistinguishableFrom: Object.freeze(indistinguishableFrom),
-        indeterminate,
-        ...(indeterminate
-          ? {
-              note: `at least one objective could not be compared for "${arm.candidateId}", so it cannot be placed on or off the front`,
-            }
-          : {}),
+        indeterminate: false,
+        ...(notComparableWith.length === 0
+          ? {}
+          : {
+              notComparableWith: Object.freeze(notComparableWith),
+              note: `no dominance verdict was formed against ${notComparableWith.join(', ')}: the arms are individually placeable but the pairs are not comparable, so "${arm.candidateId}" not being dominated by them is an absence of evidence rather than evidence of absence.`,
+            }),
       }),
     );
   }
@@ -664,6 +724,21 @@ export type BestByObjectiveInput = StatisticalFrontInput;
  * near-neighbour resolution limit is ~0.20 s at n = 100 (docs/03), and a search returning a hundred
  * near-neighbours will routinely have a dozen candidates inside 0.05 s of the leader. Printing the
  * arg-min of those as "the winner" is a coin flip presented as a measurement.
+ *
+ * ## Only `WORSE` separates, and `BETTER` disqualifies
+ *
+ * The paired comparison is run as `(candidate = rival, reference = leader)`, so its verdict is about
+ * the **rival**: `WORSE` means the rival lost to the leader, and `BETTER` means the rival *beat* the
+ * leader. Treating both as "successfully separated" — which this function did until it was measured
+ * — declares a winner a rival has beaten. Constructed: a leader on 12 seeds against a rival that is
+ * 1.0 s better on every one of those 12 and also carries 12 extra, worse seeds; the rival's own mean
+ * is higher, so it loses the arg-min, and the page printed *"leader beats every other candidate on
+ * AWT with a paired interval excluding zero"* while the paired interval said the opposite.
+ *
+ * The point estimates and the paired comparison can only disagree when the arms have different
+ * support, because the means are then over different seed sets while the pairing is over their
+ * intersection. Where they disagree the paired evidence is the one that decides, and there is no
+ * winner: {@link ObjectiveWinner.beatenBy} names who beat the arg-min.
  */
 export function bestByObjective(input: BestByObjectiveInput): readonly ObjectiveWinner[] {
   const objectives = input.objectives ?? TUNING_OBJECTIVES;
@@ -720,18 +795,35 @@ export function bestByObjective(input: BestByObjectiveInput): readonly Objective
       );
 
       const tied: string[] = [];
+      const beaten: string[] = [];
       let beatsEveryone = true;
       for (const entry of scored) {
         if (entry.arm.candidateId === leader.arm.candidateId) continue;
+        // Read as a statement about `entry`: WORSE is the only verdict in which the leader won.
         const comparison = compareObjective(objective, entry.arm, leader.arm, options);
-        if (comparison.verdict === 'BETTER' || comparison.verdict === 'WORSE') continue;
+        if (comparison.verdict === 'WORSE') continue;
         beatsEveryone = false;
-        tied.push(entry.arm.candidateId);
+        if (comparison.verdict === 'BETTER') beaten.push(entry.arm.candidateId);
+        else tied.push(entry.arm.candidateId);
       }
 
+      const inInputOrder = (ids: readonly string[]): readonly string[] =>
+        input.candidates.map((candidate) => candidate.candidateId).filter((id) => ids.includes(id));
       const leadingGroup = input.candidates
         .map((candidate) => candidate.candidateId)
         .filter((id) => id === leader.arm.candidateId || tied.includes(id));
+
+      if (beaten.length > 0) {
+        const beatenBy = inInputOrder(beaten);
+        return Object.freeze({
+          ...head,
+          estimate: leader.estimate,
+          leaderId: leader.arm.candidateId,
+          beatenBy: Object.freeze(beatenBy),
+          tiedWith: Object.freeze(leadingGroup),
+          reason: `no winner on ${objective.label}: "${leader.arm.candidateId}" has the best point estimate, but ${beatenBy.join(', ')} beat${beatenBy.length === 1 ? 's' : ''} it on the seeds they share, with a paired interval excluding zero at ${(confidence * 100).toFixed(0)}%. The two disagree because the arms do not have the same support — the point estimates are means over different seed sets — and the paired interval is the instrument that decides, so nothing here is declared a winner.`,
+        });
+      }
 
       if (beatsEveryone && scored.length > 1) {
         return Object.freeze({
@@ -752,7 +844,7 @@ export function bestByObjective(input: BestByObjectiveInput): readonly Objective
         reason:
           scored.length === 1
             ? `only one candidate produced a quotable ${objective.label}, so "${leader.arm.candidateId}" leads by default rather than by measurement.`
-            : `"${leader.arm.candidateId}" has the best point estimate but cannot be separated from ${leadingGroup.length - 1} other candidate${leadingGroup.length === 2 ? '' : 's'} (${leadingGroup.filter((id) => id !== leader.arm.candidateId).join(', ')}); their differences are inside the noise floor, so no winner is declared and the group is not ranked.`,
+            : `"${leader.arm.candidateId}" has the best point estimate but cannot be separated from ${leadingGroup.length - 1} other candidate${leadingGroup.length === 2 ? '' : 's'} (${leadingGroup.filter((id) => id !== leader.arm.candidateId).join(', ')}); their differences are inside the noise floor, or could not be quoted at all, so no winner is declared and the group is not ranked.`,
       });
     }),
   );

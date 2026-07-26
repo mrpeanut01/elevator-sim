@@ -393,6 +393,60 @@ describe('statistical Pareto front', () => {
     // Much better on AWT, but it cannot be placed while an axis is missing for it alone.
     expect(front.indeterminate).toContain('unmeasured');
     expect(front.front).not.toContain('unmeasured');
+    // And the arm that measured everything is placed on the evidence it has, rather than being
+    // dragged off the front by the one that did not.
+    expect(front.front).toEqual(['measured']);
+  });
+
+  /*
+   * The asymmetric case, in full. Measured before the fix: `front: []`, `dominated: []`,
+   * `indeterminate: ['a', 'b', 'c-no-energy']` — every fully-measured arm marked unplaceable by the
+   * one that declined an axis, rendered as "0 of 3 non-dominated" with every row UNPLACEABLE and no
+   * error anywhere. The cause was a pair's `'indeterminate'` verdict being written onto the
+   * candidate under consideration instead of onto the candidate that was missing the measurement.
+   */
+  it('does not let one candidate’s missing axis empty the front for everybody', () => {
+    const a = armOf('a', BASE_AWT, BASE_ENERGY);
+    const b = armOf('b', shift(BASE_AWT, -2), BASE_ENERGY);
+    const noEnergy = candidate({ candidateId: 'c-no-energy', tuningAwt: shift(BASE_AWT, 5) });
+    const front = statisticalParetoFront({ candidates: [a, b, noEnergy] });
+
+    // Exactly the non-dominated subset of the two complete arms: `b` is better on AWT and WT95 and
+    // bit-identical on energy, so it dominates `a`.
+    expect(front.front).toEqual(['b']);
+    expect(front.dominated).toEqual(['a']);
+    // Only the arm that omitted an axis is unplaceable, and the page says which axis.
+    expect(front.indeterminate).toEqual(['c-no-energy']);
+    const unplaceable = front.entries.find((entry) => entry.candidateId === 'c-no-energy');
+    expect(unplaceable?.note).toContain('Energy (proxy)');
+    expect(unplaceable?.note).toContain('takes no part in the dominance relation');
+    // And it neither dominates nor is dominated: the incomplete arm is out of the relation, not
+    // beaten by it.
+    expect(unplaceable?.dominatedBy).toEqual([]);
+    expect(front.entries.find((entry) => entry.candidateId === 'a')?.indeterminate).toBe(false);
+  });
+
+  it('keeps two arms that share no seeds on the front, and records that they were never compared', () => {
+    const left = candidate({
+      candidateId: 'left',
+      tuningAwt: BASE_AWT,
+      tuningEnergy: BASE_ENERGY,
+    });
+    const right = candidate({
+      candidateId: 'right',
+      tuningAwt: shift(BASE_AWT, -5),
+      tuningEnergy: BASE_ENERGY,
+      tuningSeeds: [201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212],
+    });
+    const front = statisticalParetoFront({ candidates: [left, right] });
+
+    // Both are individually placeable, so neither is unplaceable; but no pairing exists, so no
+    // dominance verdict may be formed and neither excludes the other.
+    expect(front.indeterminate).toEqual([]);
+    expect(front.front).toEqual(['left', 'right']);
+    const entry = front.entries.find((candidateEntry) => candidateEntry.candidateId === 'left');
+    expect(entry?.notComparableWith).toEqual(['right']);
+    expect(entry?.note).toContain('absence of evidence');
   });
 
   it('treats one unquotable objective as indeterminate rather than ignoring the axis', () => {
@@ -434,6 +488,57 @@ describe('bestByObjective', () => {
     expect(awt?.leaderId).toBeDefined();
     expect(awt?.tiedWith).toEqual(expect.arrayContaining(['ref', 'nearly']));
     expect(awt?.reason).toContain('inside the noise floor');
+  });
+
+  /*
+   * The point estimate and the paired comparison disagree only when the arms have different
+   * support — and then the paired one decides. `rival` runs the leader's twelve seeds 1.0 s better
+   * on every one of them, plus twelve extra seeds around 20 s; its own mean is therefore worse
+   * (17.0 against 15.0) and it loses the arg-min.
+   *
+   * Measured before the fix: `winnerId: 'leader'`, with the reason *"leader beats every other
+   * candidate on AWT (mean wait) with a paired interval excluding zero at 95%"* — the page's
+   * headline "who won" line, stating the exact opposite of what the paired interval said. The
+   * cause was `BETTER` (the rival beat the leader) being treated as "successfully separated"
+   * alongside `WORSE`.
+   */
+  it('does not declare a winner that a rival beats on the seeds they share', () => {
+    const shared = wobble(15, 12);
+    const extraSeeds = [201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212];
+    const leader = candidate({ candidateId: 'leader', tuningAwt: shared });
+    const rival = candidate({
+      candidateId: 'rival',
+      tuningAwt: [...shared.map((value) => value - 1), ...wobble(20, 12)],
+      tuningSeeds: [...TUNING_SEEDS, ...extraSeeds],
+    });
+    const winners = bestByObjective({ candidates: [leader, rival] });
+    const awt = winners.find((winner) => winner.objectiveId === AWT_OBJECTIVE_ID);
+
+    // The arg-min of the point estimates is still reported as the leader, and that is all it is.
+    expect(awt?.leaderId).toBe('leader');
+    expect(awt?.winnerId).toBeUndefined();
+    expect(awt?.beatenBy).toEqual(['rival']);
+    expect(awt?.reason).toContain('beats it on the seeds they share');
+    expect(awt?.reason).not.toContain('beats every other candidate');
+    // And the direction is the one the paired interval actually measured.
+    const paired = compareObjective(
+      TUNING_OBJECTIVES[0] as ObjectiveSpec,
+      { candidateId: 'rival', evaluation: rival.tuning },
+      { candidateId: 'leader', evaluation: leader.tuning },
+    );
+    expect(paired.verdict).toBe('BETTER');
+    expect(paired.pairs).toBe(12);
+  });
+
+  it('still names a winner when every rival is significantly worse on the shared seeds', () => {
+    const fast = armOf('fast', shift(BASE_AWT, -1), BASE_ENERGY);
+    const slow = armOf('slow', shift(BASE_AWT, 1), BASE_ENERGY);
+    const awt = bestByObjective({ candidates: [ref, fast, slow] }).find(
+      (winner) => winner.objectiveId === AWT_OBJECTIVE_ID,
+    );
+
+    expect(awt?.winnerId).toBe('fast');
+    expect(awt?.beatenBy).toBeUndefined();
   });
 
   it('says so when an objective has no quotable value at all', () => {

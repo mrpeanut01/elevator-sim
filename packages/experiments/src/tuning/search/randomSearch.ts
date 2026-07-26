@@ -67,6 +67,18 @@ export interface RandomSearchOptions<C> {
    *
    * Included as candidate `incumbent` in the first round, so the winner is compared against it on
    * identical traces at identical fidelity rather than against a number from another study.
+   *
+   * **It adds a candidate rather than occupying one**, so an incumbent costs one extra
+   * `replications` and the total is `(candidates + 1) × replications`. That is the opposite of
+   * `successiveHalving`, where the incumbent takes one of rung 1's declared slots and the budget
+   * stays exactly the documented 3 990 — and the difference is deliberate, because the two options
+   * mean different things: {@link candidates} here is *how many draws to take*, while a rung's
+   * `candidates` is *how wide the rung is*. Honouring the incumbent by taking one draw fewer would
+   * make a random search of `n` candidates not a random search of `n` candidates.
+   *
+   * Both arithmetics are asserted in their own test rather than left to be inferred, because an
+   * unstated budget difference between two methods is exactly what an equal-budget comparison
+   * cannot survive.
    */
   readonly incumbent?: C | undefined;
   readonly seedPolicy?: SeedPolicy | undefined;

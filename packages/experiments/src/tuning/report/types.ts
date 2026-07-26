@@ -324,8 +324,27 @@ export interface ParetoEntry {
    * `c` while `a` and `c` are distinguishable. Printed as pairs for that reason.
    */
   readonly indistinguishableFrom: readonly string[];
-  /** True when some objective was unquotable, so this candidate cannot be placed at all. */
+  /**
+   * True when **this candidate's own** measurements cannot place it: no replications on the seed
+   * set, or no usable value on an axis the front is being decided over.
+   *
+   * Deliberately **not** set because a *rival* could not be measured. A candidate that measured
+   * everything asked of it is placed on the evidence it has; the rival that did not measure is the
+   * one that goes unplaced. Setting this from a pair's verdict — which is what this module did
+   * until the asymmetry was measured — lets a single arm that omitted one axis mark every other
+   * arm unplaceable and empty the front, with no error anywhere.
+   */
   readonly indeterminate: boolean;
+  /**
+   * Rivals against which no dominance verdict could be formed, though both candidates are
+   * placeable: no shared seeds, too few usable pairs, or too many statistically invalid ones.
+   *
+   * Present so that "nothing dominated this candidate" can be read as the two different things it
+   * may be — nothing beat it, or nothing could be compared against it. Rivals that are themselves
+   * unplaceable are not listed: their own entry already says so, and repeating it under every
+   * other candidate is noise.
+   */
+  readonly notComparableWith?: readonly string[] | undefined;
   readonly note?: string | undefined;
 }
 
@@ -345,9 +364,10 @@ export interface ParetoFront {
    *
    * Dropping an axis is dangerous in general — a candidate that fails to measure the objective it
    * would have lost on must not thereby reach the front — so it is only done when the axis is
-   * missing *uniformly*, where by construction it can favour nobody. The asymmetric case (some
-   * candidates measured it, some did not) leaves the axis active and makes the affected pairs
-   * `'indeterminate'`.
+   * missing *uniformly*, where by construction it can favour nobody. In the asymmetric case (some
+   * candidates measured it, some did not) the axis stays active and the candidates that did not
+   * measure it become {@link ParetoEntry.indeterminate}: out of the relation in both directions,
+   * so they cannot reach the front and cannot keep anybody else off it either.
    *
    * Non-empty is a loud finding, not a footnote: with today's simulator `energy` lands here on every
    * report, because nothing records it. See `pareto.ts` § the objective table.
@@ -403,6 +423,17 @@ export interface ObjectiveWinner {
   readonly estimate?: MeanEstimate | undefined;
   /** The candidate with the best point estimate, whether or not it is a winner. */
   readonly leaderId?: string | undefined;
+  /**
+   * Candidates that beat {@link leaderId} on the seeds the two share, with a paired interval
+   * excluding zero. Non-empty means the arg-min of the point estimates is **not** the leader on the
+   * paired evidence, and no winner is declared.
+   *
+   * Reachable whenever two arms do not have the same support — the point estimates are then means
+   * over different seed sets, while the paired comparison is over their intersection, and the two
+   * can disagree. The paired one is the only instrument CLAUDE.md § Statistical discipline admits
+   * for a rank order, so it wins. Empty in the ordinary case, where every arm ran the same seeds.
+   */
+  readonly beatenBy?: readonly string[] | undefined;
   /** The leading group: the leader plus everyone indistinguishable from it, in input order. */
   readonly tiedWith: readonly string[];
   readonly reason: string;

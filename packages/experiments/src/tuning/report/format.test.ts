@@ -26,7 +26,7 @@ import {
   formatTuningReport,
   formatWinners,
 } from './format.js';
-import { TUNING_OBJECTIVES } from './pareto.js';
+import { TUNING_OBJECTIVES, bestByObjective } from './pareto.js';
 import type { CandidateEvaluation, TuningReport } from './types.js';
 import { HOLDOUT_SEEDS, TUNING_SEEDS, candidate, wobble } from './fixtures.test-helper.js';
 
@@ -163,6 +163,11 @@ describe('never a bare mean', () => {
     for (const entry of suppressedFields) {
       expect(entry).not.toMatch(/AWT \(mean wait\)\s+−?\d+\.\d+/);
     }
+    // An arm nothing could be compared against is not excluded from the front — nothing measured it
+    // — so "ON FRONT" has to arrive with the reason attached, or it reads as an endorsement of a
+    // configuration whose queues diverged.
+    expect(flat(page)).toContain('ON FRONT saturated');
+    expect(flat(page)).toContain('absence of evidence rather than evidence of absence');
   });
 
   it('never offers a replication count for an effect indistinguishable from exactly zero', () => {
@@ -272,6 +277,27 @@ describe('best by objective', () => {
     expect(text).toContain('beats every other candidate');
     expect(text).not.toContain('NO SINGLE WINNER · AWT');
   });
+
+  /*
+   * The page's headline "who won" line, on the one input where the arg-min and the paired interval
+   * disagree. Before the fix this rendered as `AWT (mean wait) leader · 15.000 s …` with the reason
+   * "leader beats every other candidate … with a paired interval excluding zero", for a candidate a
+   * rival beat by 1.0 s on every seed the two shared.
+   */
+  it('prints who beat the point-estimate leader instead of crowning it', () => {
+    const shared = wobble(15, 12);
+    const leader = candidate({ candidateId: 'leader', tuningAwt: shared });
+    const rival = candidate({
+      candidateId: 'rival',
+      tuningAwt: [...shared.map((value) => value - 1), ...wobble(20, 12)],
+      tuningSeeds: [...TUNING_SEEDS, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212],
+    });
+    const text = flat(formatWinners(bestByObjective({ candidates: [leader, rival] })));
+
+    expect(text).toContain('NO SINGLE WINNER');
+    expect(text).toContain('BEATEN on shared seeds by rival');
+    expect(text).not.toContain('beats every other candidate');
+  });
 });
 
 /* -------------------------------------------------------------------------- *
@@ -319,6 +345,55 @@ describe('the holdout comparison', () => {
     expect(flat(page)).toContain('NO HOLDOUT SET');
     expect(flat(page)).toContain('nothing on this page meets the Phase 7 acceptance criterion');
     expect(flat(page)).toContain('c · AWT (mean wait) UNQUOTABLE');
+  });
+
+  it('does not claim there is no holdout set on a page that carries one', () => {
+    const page = flat(
+      formatTuningReport(
+        buildTuningReport({
+          reference,
+          candidates: [
+            offset('c-overfit', -2, 0),
+            candidate({
+              candidateId: 'no-hold',
+              tuningAwt: jitter(REF_TUNING.map((value) => value - 1), 0.1),
+              tuningEnergy: REF_ENERGY,
+            }),
+          ],
+        }),
+      ),
+    );
+
+    // The two claims that used to appear on the same page.
+    expect(page).not.toContain('NO HOLDOUT SET');
+    expect(page).toContain('NO HOLDOUT REPLICATIONS FOR: no-hold');
+    expect(page).toContain('hold-b · 12 replications');
+    expect(page).toContain('holdout seed set');
+    expect(page).toContain('UNPLACEABLE no-hold');
+    expect(page).toContain('has no replications on the holdout seed set');
+  });
+
+  it('says a holdout set validated nothing when the reference never ran one', () => {
+    const page = flat(
+      formatTuningReport(
+        buildTuningReport({
+          // The reference has tuning replications only; the candidate has both. Every paired
+          // holdout comparison then needs an arm that does not exist.
+          reference: candidate({
+            candidateId: 'ref',
+            tuningAwt: REF_TUNING,
+            tuningEnergy: REF_ENERGY,
+          }),
+          candidates: [offset('c', -2, -2)],
+        }),
+      ),
+    );
+
+    expect(page).toContain('no candidate could be compared against ref on it');
+    expect(page).toContain('Nothing on this page meets the Phase 7 acceptance criterion');
+    // Not the sentence for a page that ran no holdout set at all: it ran one, and it validated
+    // nothing, and those are different findings.
+    expect(page).not.toContain('No holdout set was run');
   });
 });
 

@@ -269,11 +269,16 @@ export function formatIndistinguishable(pairs: readonly IndistinguishablePair[])
 export function formatWinners(winners: readonly ObjectiveWinner[]): string {
   const lines = ['BEST BY OBJECTIVE'];
   for (const winner of winners) {
+    const beatenBy = winner.beatenBy ?? [];
     const value =
       winner.estimate === undefined
         ? `${SUPPRESSED_LABEL} — ${winner.reason}`
         : winner.winnerId === undefined
-          ? `NO SINGLE WINNER${PART}${winner.leaderId ?? 'no leader'} leads at ${formatMeanEstimate(winner.estimate, winner.precision, winner.unit)}`
+          ? `NO SINGLE WINNER${PART}${winner.leaderId ?? 'no leader'} leads at ${formatMeanEstimate(winner.estimate, winner.precision, winner.unit)}${
+              beatenBy.length === 0
+                ? ''
+                : `${PART}BEATEN on shared seeds by ${beatenBy.join(', ')}`
+            }`
           : `${winner.winnerId}${PART}${formatMeanEstimate(winner.estimate, winner.precision, winner.unit)}`;
     lines.push(field(winner.label, value));
     lines.push(continuation(winner.reason));
@@ -420,6 +425,15 @@ function conclusionOf(report: TuningReport): string {
     ),
   ];
 
+  /*
+   * "A holdout set exists" and "a candidate was measured on it against the reference" are different
+   * facts, and a page may have the first without the second: a paired comparison needs both arms on
+   * the same seeds, so a reference with no holdout replications leaves every candidate unvalidated
+   * however many of them ran one. Reporting the second as though it followed from the first would
+   * put a generalization sentence on a page where nothing was generalized.
+   */
+  const measuredOnHoldout = report.holdout.some((assessment) => assessment.holdout !== undefined);
+
   if (report.seedSets.holdout === undefined) {
     parts.push(
       `No holdout set was run, so nothing on this page meets the Phase 7 acceptance criterion, which is a claim about held-out seeds. ${report.front.front.length} of ${report.front.entries.length} candidates are non-dominated on the tuning seeds alone.`,
@@ -427,6 +441,10 @@ function conclusionOf(report: TuningReport): string {
   } else if (!report.seedSets.disjoint) {
     parts.push(
       `The holdout set shares ${report.seedSets.sharedSeeds.length} seed(s) with the tuning set, so it validates nothing. No conclusion about generalization can be drawn from this page.`,
+    );
+  } else if (!measuredOnHoldout) {
+    parts.push(
+      `A holdout set was run, but no candidate could be compared against ${report.reference.candidateId} on it — a paired comparison needs both arms on the same seeds. Nothing on this page meets the Phase 7 acceptance criterion, which is a claim about held-out seeds.`,
     );
   } else if (generalizing.length === 0) {
     parts.push(

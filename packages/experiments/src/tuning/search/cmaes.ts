@@ -45,12 +45,35 @@
  * | **tie inflation** | a generation with `distinctOutcomes === 1` | σ × `plateauInflation`, and the generation's uninformative ranking is **discarded** rather than applied |
  * | **IPOP restart** | `stagnationGenerations` without a strict improvement, or σ at the box | fresh mean, σ reset, population doubled |
  *
- * The second is the load-bearing one and the least obvious. Discarding the update matters as much
- * as inflating σ: applying a recombination over an arbitrary ordering moves the mean for no
- * reason, and the resulting random walk is what makes a stalled CMA-ES look like it is still
- * working. `cmaes.test.ts` runs the same optimizer with `plateauInflation: 1` as a control and
- * asserts it does **not** escape, so the mechanism is shown to be load-bearing rather than
- * asserted to be.
+ * Tie inflation is the least obvious of the three. Discarding the update matters as much as
+ * inflating σ: applying a recombination over an arbitrary ordering moves the mean for no reason,
+ * and the resulting random walk is what makes a stalled CMA-ES look like it is still working.
+ *
+ * ## How the escapes are tested, and what an earlier version of this comment got wrong
+ *
+ * The two escapes are **independent**, and measured on the 2-D plateau `cmaes.test.ts` uses —
+ * cells 2 wide on a box 10 wide, started deep inside one at `[1, 1]` with σ₀ a tenth of a cell —
+ * *either one alone reaches the optimum*:
+ *
+ * | `plateauInflation` | `stagnationGenerations` | flat generations | noiseless objective at the winner |
+ * |---|---|---|---|
+ * | 2 | 8 | 4 | **0** |
+ * | 2 | 0 (restarts off) | 9 | **0** |
+ * | 1 (inflation off) | 8 | 7 | **0** |
+ * | 1 | 0 | 35 | **72** — never left the starting cell |
+ *
+ * So a control that switches **both** off, and an assertion that *something* escaped, cannot tell
+ * the two apart: each mechanism can be deleted outright with the other still carrying the run, and
+ * a suite written that way stays green while a documented behaviour goes inert. That is precisely
+ * the failure docs/05-roadmap.md's standing requirement exists to catch, and this comment
+ * previously claimed a proof — *"runs the same optimizer with `plateauInflation: 1` as a control"*
+ * — that the test did not deliver, because that control also switched restarts off.
+ *
+ * The tests are therefore one arm **per mechanism**, each asserting the row above: tie inflation
+ * with restarts off must still reach 0, restarts with inflation off must still reach 0, and both
+ * off must stall at 72. `PlateauReport.inflations` and `PlateauReport.restarts` are counted
+ * separately so each arm can assert that its own mechanism fired and the other did not — a single
+ * `escapes` total is exactly the ambiguity that let this go unnoticed.
  *
  * ## Coordinates
  *
@@ -66,7 +89,14 @@ import type { Rng } from '@elevator-sim/core';
 
 import { probeStepFloor } from './plateau.js';
 import { SearchRecorder } from './result.js';
-import { normalizeSearchSeed, rankEvaluations, runRound, searchRng, traceSeedFor } from './round.js';
+import {
+  countDistinctOutcomes,
+  normalizeSearchSeed,
+  rankEvaluations,
+  runRound,
+  searchRng,
+  traceSeedFor,
+} from './round.js';
 import {
   SEARCH_DEFAULTS,
   SearchError,
@@ -82,7 +112,12 @@ export interface SepCmaEsOptions<C> {
   readonly space: VectorSpace<C>;
   readonly objective: Objective<C>;
   readonly seed: number | string | bigint;
-  /** Generations to run. Budget is `generations × population × replications`, plus any probe. */
+  /**
+   * Generations to run. Budget is `generations × population × replications`, plus any probe.
+   *
+   * Defaults to {@link SEARCH_DEFAULTS.generations}, which is where the constant lives so that the
+   * search's own knobs are data like every other tunable (CLAUDE.md invariants 7 and 8).
+   */
   readonly generations?: number | undefined;
   readonly replications?: number | undefined;
   /** Population λ. Defaults to Hansen's `4 + ⌊3 ln n⌋`. */
@@ -106,6 +141,16 @@ export interface SepCmaEsOptions<C> {
   readonly stepFloorFraction?: number | undefined;
   /** Spend one round measuring the plateau width before generation 1. */
   readonly probePlateau?: boolean | undefined;
+  /**
+   * Replications per probe point. Defaults to a fifth of {@link replications}, minimum two.
+   *
+   * Deliberately unconstrained relative to {@link replications}: the probe's test is *equality of
+   * sample vectors*, not an interval, so more replications buy sensitivity to a decision flip that
+   * shows up in only some traces, and there are objectives where spending more here than on a
+   * generation is the right call. The probe round is recorded as **diagnostic** — it cannot become
+   * the search's answer at any fidelity (see `result.ts`'s `RecordRoundOptions`), which is what
+   * makes that freedom safe.
+   */
   readonly probeReplications?: number | undefined;
   /** Evaluated alongside generation 1 so the winner has something to be compared against. */
   readonly incumbent?: C | undefined;
@@ -171,7 +216,7 @@ export async function sepCmaEs<C>(options: SepCmaEsOptions<C>): Promise<SearchRe
   const n = space.dimensions.length;
   if (n === 0) throw new SearchError('sepCmaEs: the space has no dimensions to search.', 'space');
 
-  const generations = options.generations ?? 20;
+  const generations = options.generations ?? SEARCH_DEFAULTS.generations;
   const replications = options.replications ?? SEARCH_DEFAULTS.replications;
   const sigma0 = options.initialStepFraction ?? SEARCH_DEFAULTS.initialStepFraction;
   const inflation = options.plateauInflation ?? SEARCH_DEFAULTS.plateauInflation;
@@ -221,7 +266,10 @@ export async function sepCmaEs<C>(options: SepCmaEsOptions<C>): Promise<SearchRe
       round,
       replications: options.probeReplications ?? Math.max(2, Math.floor(replications / 5)),
     });
-    recorder.add(probe.round);
+    // Diagnostic, not a search round. Its points are perturbations of the start used as a
+    // measuring stick; one of them being the lowest number the search ever saw is not a finding.
+    // See `RecordRoundOptions.eligibleForBest` for what happens when this is forgotten.
+    recorder.add(probe.round, { eligibleForBest: false });
     round += 1;
     stepFloor = probe.dimensions.map((entry, index) => {
       const dimension = space.dimensions[index];
@@ -270,6 +318,9 @@ export async function sepCmaEs<C>(options: SepCmaEsOptions<C>): Promise<SearchRe
   let bestScore = Number.POSITIVE_INFINITY;
   let sinceImprovement = 0;
   let restarts = 0;
+  // Counted here rather than read off the tally, because the tally also observes the probe round
+  // and "3 of 40 generations were flat" must not silently include a round that was not one.
+  let flatGenerations = 0;
 
   for (let generation = 0; generation < generations; generation += 1) {
     const { strategy } = dist;
@@ -304,24 +355,29 @@ export async function sepCmaEs<C>(options: SepCmaEsOptions<C>): Promise<SearchRe
     round += 1;
 
     const offspring = executed.evaluations.filter((evaluation) => evaluation.candidate.id !== 'incumbent');
-    const distinct = countDistinct(offspring);
+    // `countDistinctOutcomes` rather than a local re-implementation: keying a plateau class is
+    // `round.ts`'s job and had been done twice, with the copy here joining samples on the empty
+    // string, so `[1, 23]` and `[12, 3]` hashed alike and two genuinely different generations read
+    // as one flat one.
+    const distinct = countDistinctOutcomes(offspring);
     const roundBest = rankEvaluations(offspring)[0];
     const improved = roundBest !== undefined && roundBest.score < bestScore;
     if (improved && roundBest !== undefined) bestScore = roundBest.score;
 
     /* --- plateau: the generation carried no direction --------------------- */
     if (distinct <= 1 && offspring.length > 1) {
+      flatGenerations += 1;
       sinceImprovement += 1;
       if (inflation > 1) {
         dist.sigma = Math.min(dist.sigma * inflation, 1);
-        recorder.plateau.escaped();
+        recorder.plateau.inflated();
       }
       applyStepFloor(dist, stepFloor, sigmaMin);
       dist.generationsInRun += 1;
       if (stagnation > 0 && sinceImprovement >= stagnation) {
         dist = restart(dist, random, space, toUnit, sigma0, maxPopulation, n);
         applyStepFloor(dist, stepFloor, sigmaMin);
-        recorder.plateau.escaped();
+        recorder.plateau.restarted();
         sinceImprovement = 0;
         restarts += 1;
       }
@@ -335,16 +391,16 @@ export async function sepCmaEs<C>(options: SepCmaEsOptions<C>): Promise<SearchRe
     if (stagnation > 0 && (sinceImprovement >= stagnation || dist.sigma >= 1)) {
       dist = restart(dist, random, space, toUnit, sigma0, maxPopulation, n);
       applyStepFloor(dist, stepFloor, sigmaMin);
-      recorder.plateau.escaped();
+      recorder.plateau.restarted();
       sinceImprovement = 0;
       restarts += 1;
     }
   }
 
   const report = recorder.plateau.report();
-  if (report.flatRounds > 0) {
+  if (flatGenerations > 0) {
     recorder.note(
-      `${report.flatRounds} of ${recorder.rounds.length} generations came back bit-identical across every offspring. Those generations carried no direction: their ranking was discarded rather than applied, and the step was ${inflation > 1 ? `inflated ×${inflation}` : 'left alone (tie inflation disabled)'}.`,
+      `${flatGenerations} of ${generations} generations came back bit-identical across every offspring. Those generations carried no direction: their ranking was discarded rather than applied, and the step was ${inflation > 1 ? `inflated ×${inflation} (${report.inflations} time(s))` : 'left alone (tie inflation disabled)'}.`,
     );
   }
   if (restarts > 0) recorder.note(`${restarts} IPOP restart(s).`);
@@ -358,12 +414,6 @@ export async function sepCmaEs<C>(options: SepCmaEsOptions<C>): Promise<SearchRe
 
 function clamp(value: number, min: number, max: number): number {
   return value < min ? min : value > max ? max : value;
-}
-
-function countDistinct<C>(evaluations: readonly Evaluation<C>[]): number {
-  const keys = new Set<string>();
-  for (const evaluation of evaluations) keys.add(evaluation.samples.join(''));
-  return keys.size;
 }
 
 /**

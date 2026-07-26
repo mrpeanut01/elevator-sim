@@ -234,8 +234,21 @@ export function buildTuningReport(input: TuningReportInput): TuningReport {
       ? {}
       : { maxInvalidFraction: input.maxInvalidFraction }),
   });
-  const hasHoldout = everyone.every((candidate) => candidate.holdout !== undefined);
-  const holdoutFront = hasHoldout
+  /*
+   * Two different facts, and collapsing them into one `every()` was a wrong answer in both
+   * directions: it printed "NO HOLDOUT SET" over a page carrying real holdout verdicts, and it
+   * dropped the holdout front — the artefact docs/05-roadmap.md § Phase 7 acceptance is about —
+   * for the arms that *did* run one, because one unrelated arm did not.
+   *
+   * The front is computed whenever anybody has holdout replications. The arms that have none are
+   * marked unplaceable on it by `statisticalParetoFront`, with that reason on the page, which is
+   * the honest rendering of "this arm was not measured there".
+   */
+  const missingHoldout = everyone
+    .filter((candidate) => candidate.holdout === undefined)
+    .map((candidate) => candidate.candidateId);
+  const anyHoldout = missingHoldout.length < everyone.length;
+  const holdoutFront = anyHoldout
     ? statisticalParetoFront({
         candidates: everyone,
         objectives,
@@ -300,7 +313,8 @@ export function buildTuningReport(input: TuningReportInput): TuningReport {
         objectives,
         summaries,
         comparisons,
-        hasHoldout,
+        anyHoldout,
+        missingHoldout,
         seedSetsDisjoint: seedSets.disjoint,
         sharedSeeds: seedSets.sharedSeeds,
         referenceId: input.reference.candidateId,
@@ -359,7 +373,10 @@ interface NotesInput {
   readonly objectives: readonly ObjectiveSpec[];
   readonly summaries: readonly CandidateSummary[];
   readonly comparisons: readonly CandidateComparisons[];
-  readonly hasHoldout: boolean;
+  /** Whether **any** arm carries holdout replications. */
+  readonly anyHoldout: boolean;
+  /** Arms with none, in input order. Non-empty alongside `anyHoldout` is the partial case. */
+  readonly missingHoldout: readonly string[];
   readonly seedSetsDisjoint: boolean;
   readonly sharedSeeds: readonly string[];
   readonly referenceId: string;
@@ -374,9 +391,13 @@ interface NotesInput {
 function notesFor(input: NotesInput): string[] {
   const notes: string[] = [];
 
-  if (!input.hasHoldout) {
+  if (!input.anyHoldout) {
     notes.push(
       'NO HOLDOUT SET. Every number on this page was measured on the seeds the search optimized against, so none of it is evidence that a tuned weight vector generalizes. With common random numbers the whole round shares one set of passenger traces, and with enough candidates something fits those traces better than the reference does — the paired interval cannot detect that, and a disjoint seed set is the only instrument that can (CLAUDE.md § Tuning discipline; docs/06 § Guardrails).',
+    );
+  } else if (input.missingHoldout.length > 0) {
+    notes.push(
+      `NO HOLDOUT REPLICATIONS FOR: ${input.missingHoldout.join(', ')}. This page does carry a holdout set, and the arms that ran on it are validated against traffic the search never saw; these are not. Their tuning-set numbers stand unvalidated, they reach no generalization verdict, and they are marked unplaceable on the holdout front rather than dropped from it — an arm that was not measured on held-out seeds is not thereby non-dominated there. Nothing about the arms that did run one is weakened by their absence (CLAUDE.md § Tuning discipline; docs/06 § Guardrails).`,
     );
   }
   if (!input.seedSetsDisjoint) {

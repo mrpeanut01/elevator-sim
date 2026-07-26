@@ -27,7 +27,7 @@
  * draw, ask {@link SearchSpace.validate}, redraw if it says no. Uniform over the feasible
  * region, deterministic in the seed, and it holds no rule of its own.
  *
- * ## Plateaus: why the neighbourhood step defaults where it does
+ * ## Plateaus: what the step defaults buy, and — precisely — what they do not
  *
  * The objective is **piecewise constant**, not merely noisy. Phase 3 measured it: a weight
  * perturbation at or below **0.03** on `distanceTravelled` produced 100 of 100 exactly-zero
@@ -37,26 +37,58 @@
  * parent, and a search built on it stalls with a perfectly clean-looking zero gradient.
  *
  * So {@link perturbCandidate} works in **fractions of a dimension's declared range**, and its
- * default step of 0.15 is chosen to sit well clear of the measured floor: on `weights.*`, whose
- * range is `[0, 5]`, 0.15 is a 0.75-wide standard deviation against a plateau of 0.03 — 25×.
- * The measured 0.03 is *per-term and per-building* and docs/05 says so explicitly (*"Step size
- * has a per-term, per-building floor. Probe it; do not assume 0.03"*), which is the other reason
- * the step is relative to the range rather than absolute: a step expressed in a term's own units
- * would have to be re-derived for every term.
+ * default step of 0.15 sits well clear of that measured floor **on the dimension family it was
+ * measured on**: `weights.*` ranges over `[0, 5]`, so 0.15 is a 0.75-wide standard deviation
+ * against a plateau of 0.03 — 25×. The measured 0.03 is *per-term and per-building* and docs/05
+ * says so explicitly (*"Step size has a per-term, per-building floor. Probe it; do not assume
+ * 0.03"*), which is also why the step is relative to the range rather than absolute: a step in a
+ * term's own units would have to be re-derived for every term.
  *
- * Two further consequences, both implemented here rather than left to the caller:
+ * ## The guarantee is **value**-distinctness. It is not objective-distinctness.
+ *
+ * That 25× does not generalize, and on the dimension Phase 7 is scored on it fails. Measured on
+ * garden-apartments, `predictive-balanced`, seed 4242, 1800 s, comparing `summary.waiting.meanS`
+ * exactly: twelve default-step neighbours of the shipped 8 s deadband over
+ * `subspace(space, ['idle.repositionThresholdS'])` produced **8 bit-identical runs**. The
+ * objective is a step function there — the plateau runs roughly `[4, 60]`, some 93 % of the
+ * declared `[0, 60]` range, and a 9 s sigma cannot clear it. Only neighbours that landed below
+ * about 4 s moved the number at all.
+ *
+ * So state the guarantee exactly, because the difference is 50–200 replications an evaluation:
+ *
+ * - **This module guarantees a neighbour is a different *point*.** `candidatesEqual` compares
+ *   encoded values, and {@link perturbCandidate} redraws until they differ. That is a property of
+ *   the space, checkable without running anything.
+ * - **It cannot guarantee a different *reading*.** Whether two points fall in the same cell of the
+ *   objective's partition is only knowable by running the simulator, which this module does not
+ *   do and must not do. That question belongs to `tuning/search/plateau.ts`, which owns it
+ *   properly: `sameOutcome`/`isFlat` detect a bit-identical round *exactly and for free* from
+ *   samples a round was going to produce anyway, `probeStepFloor` measures the per-dimension width
+ *   geometrically in one CRN-paired round, and `PlateauTally` records the escape the search makes
+ *   in response. A caller that wants to escape a plateau grows `step` — that is what the option is
+ *   for — on evidence only a search has.
+ *
+ * Two consequences of the weaker, honest guarantee are still implemented here rather than left to
+ * the caller, because both are decidable on values alone:
  *
  * - **An integer dimension never perturbs by zero.** Rounding a small step to 0 is the plateau in
  *   miniature and produces a "neighbour" that is the same point.
- * - **A perturbation that lands on the parent is reported, not hidden.** {@link perturbCandidate}
- *   redraws when the result equals its parent, so a caller that asked for a neighbour gets one.
+ * - **A perturbation that lands on the parent is redrawn, not returned.** So a caller that asked
+ *   for a neighbour gets a distinct point, even when the draw happened to reproduce the parent.
  */
 
 import { StreamSet } from '@elevator-sim/core';
 import type { DispatcherProfile, Rng } from '@elevator-sim/core';
 
 import { readerFor } from './collect.js';
-import { candidateProfile, candidatesEqual, fromVector, toVector, vectorDimensions } from './encode.js';
+import {
+  candidateProfile,
+  candidatesEqual,
+  fromVector,
+  reflectInto,
+  toVector,
+  vectorDimensions,
+} from './encode.js';
 import type { VectorDimension } from './encode.js';
 import { isActive } from './types.js';
 import type {
@@ -269,6 +301,15 @@ export interface PerturbOptions extends SampleOptions {
    * bit-identical run rather than a small improvement. Refining by shrinking the step is the
    * failure mode docs/05 § Phase 7 names: *"Anything gradient-ish or small-perturbation will
    * stall."*
+   *
+   * **Growing it is the escape ladder, and it is the caller's to climb.** The default clears the
+   * measured plateau on `weights.*` by 25× and does *not* clear it on
+   * `idle.repositionThresholdS`, where 8 of 12 default-step neighbours come back bit-identical
+   * (see the plateau section on this module). Only a search knows that has happened —
+   * `tuning/search/plateau.ts`'s `isFlat` says so exactly, from samples the round already
+   * produced — so a flat round is answered by calling this function again with a larger `step`
+   * and recording the escape on `PlateauTally`. This module cannot detect the condition without
+   * running the simulator, and it does not run the simulator.
    */
   readonly step?: number | undefined;
   /**
@@ -290,8 +331,13 @@ export interface PerturbOptions extends SampleOptions {
  * gone inactive would carry it into the profile, where the resolver would read it and the search
  * would be crediting a knob it believes is off.
  *
- * The result is never equal to its parent: a draw that lands on the parent is redrawn, because a
- * neighbour that *is* the parent evaluates to a bit-identical run and tells the search nothing.
+ * The result is never equal to its parent **as a point**: a draw that reproduces the parent's
+ * values is redrawn, because a candidate identical to its parent costs a whole evaluation to
+ * learn nothing. `candidatesEqual` compares encoded values, which is the only kind of
+ * distinctness a space can check — it is *not* a promise that the run comes back different. On
+ * `idle.repositionThresholdS` two-thirds of default-step neighbours are value-distinct and
+ * objective-identical; see the plateau section on this module, and
+ * `tuning/search/plateau.ts` for the side that can tell.
  *
  * @throws SearchSpaceError if no feasible, distinct neighbour was drawn within `maxAttempts`.
  */
@@ -384,18 +430,14 @@ function numericStep(parameter: NumericParameter, value: number, rng: Rng, step:
   if (parameter.scale === 'log') {
     const low = Math.log(parameter.min);
     const high = Math.log(parameter.max);
-    const moved = reflect(Math.log(value) + rng.normal(0, step * (high - low)), low, high);
+    const moved = reflectInto(Math.log(value) + rng.normal(0, step * (high - low)), low, high);
     return clampNumber(Math.exp(moved), parameter);
   }
-  return reflect(value + rng.normal(0, step * (parameter.max - parameter.min)), parameter.min, parameter.max);
-}
-
-/** Fold a value back into `[low, high]` by reflection, however far outside it started. */
-function reflect(value: number, low: number, high: number): number {
-  const span = high - low;
-  if (!(span > 0)) return low;
-  const folded = Math.abs((value - low) % (2 * span));
-  return low + (folded > span ? 2 * span - folded : folded);
+  return reflectInto(
+    value + rng.normal(0, step * (parameter.max - parameter.min)),
+    parameter.min,
+    parameter.max,
+  );
 }
 
 /* -------------------------------------------------------------------------- *
@@ -440,6 +482,35 @@ export function candidateSampler(
  * cell it landed in. It is idempotent — one further round trip moves nothing — which is what a
  * search needs when it updates its distribution from what was evaluated rather than from what was
  * proposed.
+ *
+ * ## `decode` returns a point; `reasonFor` says whether it is a runnable one
+ *
+ * The declared box is **not** the feasible set, and CMA-ES leaves the box constantly. Over 500
+ * proposals shaped like a real generation — mean at the box centre, sigma half the box width —
+ * **63 decoded to points `SearchSpace.validate` refuses** (destination entry with deferred
+ * assignment, an out-of-range dwell ceiling) and a further tranche to points a *car* refuses. That
+ * is about one proposal in eight, and `decode` returns every one of them looking exactly like a
+ * runnable point.
+ *
+ * It has to. A decoder that threw would hand CMA-ES an exception where it expects a score, which
+ * is the failure docs/06 names. So the feasibility answer is a **separate call the optimizer makes
+ * on the point it decoded**, and it is `reasonFor`:
+ *
+ * ```ts
+ * const port = vectorSpace(space, { base, feasible: buildingFeasibility(space, building, specs) });
+ * const candidate = port.decode(proposal);
+ * const reason = port.reasonFor(candidate);
+ * if (reason !== undefined) return infeasible(reason);   // rank it last; do not run it
+ * ```
+ *
+ * `reasonFor` asks {@link SearchSpace.validate} and then `options.feasible`, in that order, on the
+ * merged point — the same two oracles, in the same order, on the same merge that
+ * {@link sampleCandidate} rejection-samples against. Before it existed, `vectorSpace` accepted the
+ * whole of {@link SampleOptions} — `feasible` included — and threaded it only into `sample`;
+ * `decode` read `base` and nothing else, so a caller who wired a building oracle into the port got
+ * it silently ignored on the one path CMA-ES actually uses. That is the repository's signature
+ * *"configurable, tested in isolation, inert on the shipped path"* shape, and this is the seam it
+ * was hiding in.
  */
 export function vectorSpace(
   space: SearchSpace,
@@ -449,6 +520,7 @@ export function vectorSpace(
   sample(random: Rng): Candidate;
   encode(candidate: Candidate): readonly number[];
   decode(vector: readonly number[]): Candidate;
+  reasonFor(candidate: Candidate): string | undefined;
 } {
   const base = options.base;
   return {
@@ -456,6 +528,7 @@ export function vectorSpace(
     sample: (random) => sampleCandidate(space, random, options),
     encode: (candidate) => toVector(space, candidate),
     decode: (vector) => fromVector(space, vector, base === undefined ? {} : { base }),
+    reasonFor: (candidate) => rejection(space, options, mergedWith(base, candidate)),
   };
 }
 

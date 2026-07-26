@@ -7,7 +7,7 @@ import {
   successiveHalving,
   type SuccessiveHalvingResult,
 } from './successiveHalving.js';
-import { DOC_RUNGS, SearchError, type Rung } from './types.js';
+import { DOC_RUNGS, SearchError, type Objective, type Rung } from './types.js';
 
 const SEED = 20_260_726;
 
@@ -97,6 +97,43 @@ describe('successiveHalving', () => {
       const later = perRung[index]?.samples ?? [];
       expect(later.slice(0, earlier.length)).toEqual([...earlier]);
     }
+  });
+
+  /**
+   * The other side of `prefixVerified`, which had no test at all: the property is *checked*, not
+   * assumed, and the check has to be able to fail. Under the `'fixed'` seed policy a survivor's
+   * higher-fidelity samples must begin with its lower-fidelity ones, because the runner seeds a
+   * replication from `(experimentSeed, replicationIndex)` and nothing else. An objective that
+   * quietly re-draws instead of extending breaks the pairing between rungs, and a ladder of
+   * unpaired rungs reshuffles its ranking at every step for reasons unrelated to the candidates.
+   */
+  it('reports the prefix property as broken when the objective does not honour it', async () => {
+    const problem = sphereProblem(2);
+    /* Legal in every other way — CRN holds *within* each round, the replication counts are
+       honoured — but rung 2 restarts the sample vector rather than extending rung 1's. */
+    const reshuffles: Objective<readonly number[]> = (request) =>
+      request.candidates.map((candidate) => ({
+        candidateId: candidate.id,
+        samples: Array.from(
+          { length: request.replications },
+          (_, index) => problem.fn(candidate.value) + index + request.round * 1_000,
+        ),
+        traceDigests: Array.from({ length: request.replications }, (_, index) => `r${request.round}-${index}`),
+      }));
+
+    const result = await successiveHalving({
+      space: problem.space,
+      objective: reshuffles,
+      seed: SEED,
+      rungs: [
+        { candidates: 9, replications: 4 },
+        { candidates: 3, replications: 12 },
+      ],
+    });
+
+    expect(result.prefixVerified).toBe(false);
+    expect(result.notes.some((note) => note.includes('not paired'))).toBe(true);
+    expect(result.notes.some((note) => note.includes('wiring defect in the objective'))).toBe(true);
   });
 
   it("gives that property up under 'per-round', and says so rather than claiming it", async () => {

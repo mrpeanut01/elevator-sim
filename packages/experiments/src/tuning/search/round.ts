@@ -270,15 +270,30 @@ export function rankEvaluations<C>(evaluations: readonly Evaluation<C>[]): reado
  * -------------------------------------------------------------------------- */
 
 /**
+ * The separator {@link outcomeKey} joins samples on.
+ *
+ * It has to be a character no `Number.prototype.toString` can produce, or the key is ambiguous:
+ * joined on the empty string, `[1, 23]` and `[12, 3]` both render as `"123"` and two candidates
+ * that ran differently are read as one plateau class. Written as an escape and named, because the
+ * literal control character is invisible in a diff and in a terminal — which is how a second,
+ * subtly different copy of this function came to exist in `cmaes.ts` and go unnoticed.
+ */
+export const SAMPLE_SEPARATOR = '\u0001';
+
+/**
  * The key two evaluations share iff their runs were bit-identical.
  *
  * Exact string equality of the sample vector, not a tolerance. On this objective that is the
  * right test and a tolerance would be the wrong one: below the decision-flip threshold the
  * difference is *exactly* zero over every replication, and above it the difference is a real
  * effect however small. There is no intermediate regime for an epsilon to live in.
+ *
+ * **This is the only place a plateau class is keyed.** `plateau.ts` and `cmaes.ts` both call it
+ * rather than joining a sample vector themselves; the one that did not agreed with this function
+ * on every vector a test had ever handed it and disagreed on `[1, 23]` versus `[12, 3]`.
  */
 export function outcomeKey(samples: readonly number[]): string {
-  return samples.join('');
+  return samples.join(SAMPLE_SEPARATOR);
 }
 
 /** Distinct plateau classes among a set of evaluations. `1` means the whole set was flat. */

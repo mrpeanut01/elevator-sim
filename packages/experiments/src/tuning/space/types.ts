@@ -347,6 +347,25 @@ export interface SearchSpace {
   /** `parameters.map(p => p.id)`, for a quick membership test and for reporting. */
   readonly ids: readonly string[];
   /**
+   * Every dimension the *full* collection found, by id — kept whole through `subspace` exactly as
+   * {@link defaults} is, and for the same reason.
+   *
+   * `byId` is what a space **searches**. `allById` is what a candidate can **mean**. The two
+   * differ only after `subspace`, and the difference is load-bearing: a subspace search draws over
+   * `byId` and is judged over `allById`, because `sampleCandidate` merges the base — the
+   * incumbent, as a candidate — into the point it hands the oracle, and *half a dispatcher cannot
+   * be judged*.
+   *
+   * Decoding that merged point against the **narrowed** index drops every base dimension it
+   * carries, which leaves {@link validate} inert for exactly the subspace-plus-incumbent search
+   * this module documents as its main use. Measured, before the fix: over
+   * `subspace(space, ['dispatch.assignmentTiming', 'dispatch.deferWindowS'])` against a
+   * `{ dispatch.callType: 'destination-entry' }` base, **24 of 50** validated draws came back
+   * `deferred` — the one combination `createPolicyFor` refuses, and the one this module's own
+   * docstrings claim it rejects one draw in eight.
+   */
+  readonly allById: ReadonlyMap<string, SearchParameter>;
+  /**
    * The default of every dimension the *full* collection found, including ones this space has
    * been narrowed away from.
    *
@@ -363,6 +382,13 @@ export interface SearchSpace {
    * module maintains. It decodes the values into a profile, parses that profile through
    * `parseDispatcherProfiles`, and builds a policy from it with `createPolicyFor`. Whatever
    * `core` refuses, this refuses, with `core`'s own message.
+   *
+   * Decoding goes through {@link allById}, **not** {@link byId}, so a merged subspace point is
+   * decoded whole. See {@link allById} for what breaks when it is not.
+   *
+   * It is building-independent: it asks whether a group controller can be built. Two declared
+   * `answer.*` rows are only decidable against a *car* — see `buildingFeasibility`, which a
+   * search wires in beside this one.
    *
    * It exists because the declared box is **not** the feasible set, and an optimizer sampling
    * each row independently will leave the box. There is exactly one such constraint today and

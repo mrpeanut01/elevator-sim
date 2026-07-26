@@ -297,6 +297,7 @@ export function collectSearchSpace(options: CollectOptions = {}): SearchSpace {
     parameters: Object.freeze(parameters),
     byId,
     ids: Object.freeze(parameters.map((parameter) => parameter.id)),
+    allById: byId,
     defaults,
     validate: (values: Candidate) => validateValues(byId, values),
   });
@@ -320,15 +321,21 @@ export function searchSpace(): SearchSpace {
  * -------------------------------------------------------------------------- */
 
 /**
- * A space restricted to some of its dimensions, keeping gate order and the **whole** default map.
+ * A space restricted to some of its dimensions, keeping gate order, the **whole** default map and
+ * the **whole** parameter index.
  *
  * Keeping `defaults` whole is the point: a gate outside the narrowed set must stay readable, or
  * every dimension it gates deactivates and the narrowed search silently becomes narrower still.
  *
- * The feasibility oracle is rebuilt against the narrowed index, so validating a subspace
- * candidate decodes only the dimensions the subspace carries — and a search over a subspace
- * should validate the *merged* point (base plus candidate) rather than the candidate alone,
- * which is what `sampleCandidate` does when it is given a base.
+ * Keeping `allById` whole is the same point applied to feasibility, and it is the fix for a real
+ * defect. A search over a subspace validates the *merged* point — base plus candidate — because
+ * half a dispatcher cannot be judged, and that is what `sampleCandidate` does when it is given a
+ * base. The oracle was previously rebuilt against the **narrowed** index, so `decodeInto` dropped
+ * every base dimension the merge had just added and the oracle answered a question about a
+ * dispatcher nobody proposed. Measured: 24 of 50 validated draws over
+ * `subspace(space, ['dispatch.assignmentTiming', 'dispatch.deferWindowS'])` against a
+ * `destination-entry` base came back `deferred`, which `createPolicyFor` refuses outright. So the
+ * narrowed space validates against {@link SearchSpace.allById} and only *draws* from `byId`.
  */
 export function subspace(
   space: SearchSpace,
@@ -355,8 +362,9 @@ export function subspace(
     parameters: Object.freeze(parameters),
     byId,
     ids: Object.freeze(parameters.map((parameter) => parameter.id)),
+    allById: space.allById,
     defaults: space.defaults,
-    validate: (values: Candidate) => validateValues(byId, values),
+    validate: (values: Candidate) => validateValues(space.allById, values),
   });
 }
 

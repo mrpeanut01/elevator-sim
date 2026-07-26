@@ -1,9 +1,20 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fileURLToPath } from 'node:url';
 
-import { StreamSet } from '@elevator-sim/core';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { activeParameters, defaultCandidate, isActive, readerFor, searchSpace, subspace } from './collect.js';
-import { candidatesEqual } from './encode.js';
+import { StreamSet, loadConfig, runSimulation } from '@elevator-sim/core';
+import type { DispatcherProfile, LoadedConfig, ResolvedBuilding } from '@elevator-sim/core';
+
+import {
+  activeParameters,
+  candidateFromProfile,
+  defaultCandidate,
+  isActive,
+  readerFor,
+  searchSpace,
+  subspace,
+} from './collect.js';
+import { buildingFeasibility, candidatesEqual, toVector } from './encode.js';
 import {
   candidateSampler,
   materializer,
@@ -26,6 +37,15 @@ const SEED = 20_260_726;
 /** One draw, sampled without the feasibility check where the check is not what is under test. */
 const draw = (seed = SEED, count = 200): readonly Candidate[] =>
   sampleCandidates(SPACE, policyNoiseStream(seed), count, { validate: false });
+
+/** The repository's real `data/` directory, the same one the Phase 3 and Phase 5 gates use. */
+const DATA_DIR = fileURLToPath(new URL('../../../../../data', import.meta.url));
+
+let CONFIG: LoadedConfig;
+
+beforeAll(async () => {
+  CONFIG = await loadConfig(DATA_DIR);
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -317,6 +337,114 @@ describe('a neighbour is a different point, by a step above the plateau width', 
     expect(steps.filter((step) => step <= 0.03).length / steps.length).toBeLessThan(0.05);
   });
 
+  it('states the same step arithmetic on an integer and on a log dimension', () => {
+    // The 25× above is one dimension family, and the docstring used to generalize from it. Two
+    // more kinds, measured beside it, so the reader can see what "0.15 of the declared range"
+    // means where the range is not `[0, 5]` and the geometry is not linear.
+    const rng = policyNoiseStream(SEED);
+
+    // **Integer.** `auction.rounds` spans `[1, 8]`, so 0.15 of its range is a sigma of 1.05 —
+    // about one whole unit. Measured from the midpoint: **84.5 %** of neighbours move by exactly
+    // 1, the largest move is 3, and none is 0. There is no finer step available on an integer
+    // dimension and none is wanted; the unit *is* the floor, and "shrink the step to refine" has
+    // no meaning here at all.
+    const rounds = SPACE.byId.get('auction.rounds') as NumericParameter;
+    expect(rounds.type).toBe('integer');
+    expect([rounds.min, rounds.max]).toStrictEqual([1, 8]);
+    expect(0.15 * (rounds.max - rounds.min)).toBeCloseTo(1.05, 10);
+    const from = Math.round((rounds.min + rounds.max) / 2);
+    const integerSteps = Array.from(
+      { length: 2000 },
+      () => Math.abs((perturbValue(rounds, from, rng, 0.15) as number) - from),
+    );
+    expect(integerSteps.every((step) => step >= 1)).toBe(true);
+    expect(Math.max(...integerSteps)).toBeLessThanOrEqual(4);
+    const adjacent = integerSteps.filter((step) => step === 1).length / integerSteps.length;
+    expect(adjacent).toBeGreaterThan(0.75);
+    expect(adjacent).toBeLessThan(0.92);
+
+    // **Log.** The step is 0.15 of the *log* range, so it is a **ratio** step: sigma is
+    // `0.15 × ln(86400/600) = 0.745`, and the median absolute move is `0.6745 × sigma = 0.503`
+    // in log space — a factor of about 1.65 either way. Read as a fraction of the linear range
+    // it would be meaningless; the whole reason the scale is declared is that it is not one.
+    const cycle = SPACE.byId.get('idle.predictorCycleS') as NumericParameter;
+    expect(cycle.scale).toBe('log');
+    const parent = Math.sqrt(cycle.min * cycle.max);
+    const ratios = Array.from({ length: 2000 }, () =>
+      Math.abs(Math.log((perturbValue(cycle, parent, rng, 0.15) as number) / parent)),
+    ).sort((a, b) => a - b);
+    const medianRatio = Math.exp(ratios[Math.floor(ratios.length / 2)] as number);
+    expect(medianRatio).toBeGreaterThan(1.4);
+    expect(medianRatio).toBeLessThan(1.9);
+
+    // **And the known-answer dimension, where the arithmetic does not save it.**
+    // `idle.repositionThresholdS` is `[0, 60]`, so sigma is 9 s — against a measured objective
+    // plateau of roughly `[4, 60]`, some 56 s wide. That is a step **six times smaller** than the
+    // flat region, not 25 times larger than it. The next test runs the simulator and shows what
+    // that costs.
+    const deadband = SPACE.byId.get('idle.repositionThresholdS') as NumericParameter;
+    expect([deadband.min, deadband.max]).toStrictEqual([0, 60]);
+    const sigma = 0.15 * (deadband.max - deadband.min);
+    expect(sigma).toBe(9);
+    expect(sigma / (deadband.max - 4)).toBeLessThan(0.2);
+  });
+
+  it('guarantees a distinct point and not a distinct reading, on the known-answer dimension', () => {
+    // The claim this module may make, and the claim it may not, separated by a measurement.
+    //
+    // Garden Apartments, `predictive-balanced`, seed 4242, 1800 s, comparing
+    // `summary.waiting.meanS` with `===`. Twelve default-step neighbours of the shipped 8 s
+    // deadband: every one of them is a **different point** — that is `candidatesEqual`, and it is
+    // what `perturbCandidate` promises — and a majority come back as a **bit-identical run**,
+    // which it does not promise and could not without running the simulator. The objective is a
+    // step function on this dimension; only neighbours below about 4 s move it at all.
+    //
+    // At 50–200 replications an evaluation, that is most of a round spent learning nothing, and
+    // it is `tuning/search/plateau.ts`'s `isFlat` that can see it happening.
+    const garden = CONFIG.buildingsById.get('garden-apartments') as ResolvedBuilding;
+    const profile = CONFIG.dispatcherProfilesById.get('predictive-balanced') as DispatcherProfile;
+    const incumbent = candidateFromProfile(SPACE, profile);
+    const deadband = subspace(SPACE, ['idle.repositionThresholdS']);
+    const materialize = materializer(deadband, profile);
+
+    const awt = (candidate: Candidate, id: string): number =>
+      runSimulation({
+        building: garden,
+        dispatcherProfile: materialize(candidate, id),
+        trafficProfiles: CONFIG.trafficProfiles,
+        elevatorSpecs: CONFIG.elevatorSpecs,
+        seed: 4242,
+        durationS: 1800,
+      }).summary.waiting.meanS;
+
+    // The incumbent's own 8 s, which is left as shipped so Phase 7 has a ground truth.
+    const parent: Candidate = new Map([['idle.repositionThresholdS', 8]]);
+    expect(incumbent.get('idle.repositionThresholdS')).toBe(8);
+    const parentAwt = awt(parent, 'parent');
+
+    const rng = policyNoiseStream(4242);
+    let identical = 0;
+    let moved = 0;
+    for (let index = 0; index < 12; index += 1) {
+      const child = perturbCandidate(deadband, parent, rng, { base: incumbent });
+      // The guarantee: a different point, every time.
+      expect(candidatesEqual(child, parent), `neighbour ${index}`).toBe(false);
+      const value = child.get('idle.repositionThresholdS') as number;
+      expect(value, `neighbour ${index}`).not.toBe(8);
+      // The non-guarantee: often the same reading.
+      if (awt(child, `child-${index}`) === parentAwt) identical += 1;
+      else moved += 1;
+    }
+    expect(identical + moved).toBe(12);
+    // A majority land on the plateau — the point of the test, and the reason the module docstring
+    // may not claim a step "25× clear" of it in general.
+    expect(identical, 'no default-step neighbour was bit-identical').toBeGreaterThanOrEqual(6);
+    // And the dimension is not simply inert: some neighbours do move the objective, so a search
+    // over it is worth running. If this ever reads 0, the plateau claim is understated, not
+    // overstated, and the docstring must be re-measured either way.
+    expect(moved, 'the dimension read as completely inert').toBeGreaterThan(0);
+  }, 120_000);
+
   it('refuses a step of zero, which is a neighbourhood of one point', () => {
     const rng = policyNoiseStream(SEED);
     const parent = sampleCandidate(SPACE, rng);
@@ -472,6 +600,85 @@ describe('the space satisfies the ports a search declares', () => {
 
   it('refuses a point of the wrong length rather than padding it', () => {
     expect(() => vectorSpace(SPACE).decode([1, 2, 3])).toThrow(SearchSpaceError);
+  });
+
+  it('reports why a decoded point is not runnable, rather than returning it unmarked', () => {
+    // `decode` cannot throw — an exception is a score CMA-ES cannot interpret — so the box's
+    // infeasible corners come back looking exactly like runnable points. Before `reasonFor`,
+    // `vectorSpace` accepted the whole of `SampleOptions`, `feasible` included, and threaded it
+    // only into `sample`; a caller who wired a building oracle into the port got it silently
+    // ignored on the one path CMA-ES uses. Roughly one proposal in eight is affected.
+    const port = vectorSpace(SPACE);
+    const centre = toVector(SPACE, defaultCandidate(SPACE));
+
+    // A feasible point reports nothing.
+    expect(port.reasonFor(port.decode(centre))).toBeUndefined();
+
+    // The one combination `core` refuses, reached from the box rather than hand-built: push
+    // `dispatch.callType` onto destination entry and `dispatch.assignmentTiming` onto deferred.
+    const corner = [...centre];
+    const callType = SPACE.byId.get('dispatch.callType') as SearchParameter;
+    const timing = SPACE.byId.get('dispatch.assignmentTiming') as SearchParameter;
+    if (callType.type !== 'categorical' || timing.type !== 'categorical') {
+      throw new Error('dispatch.callType and dispatch.assignmentTiming are categorical');
+    }
+    corner[SPACE.ids.indexOf('dispatch.callType')] =
+      callType.values.indexOf('destination-entry') + 0.5;
+    corner[SPACE.ids.indexOf('dispatch.assignmentTiming')] = timing.values.indexOf('deferred') + 0.5;
+    const decoded = port.decode(corner);
+    expect(decoded.get('dispatch.callType')).toBe('destination-entry');
+    expect(decoded.get('dispatch.assignmentTiming')).toBe('deferred');
+    expect(port.reasonFor(decoded)).toMatch(/defers assignment under destination entry/);
+
+    // And the caller's own oracle is asked too, on the merged point — the option `vectorSpace`
+    // has always accepted and never used.
+    const building = CONFIG.buildingsById.get('midtown-office') as ResolvedBuilding;
+    const withBuilding = vectorSpace(SPACE, {
+      feasible: buildingFeasibility(SPACE, building, CONFIG.elevatorSpecs),
+    });
+    const dwell = [...centre];
+    const policy = SPACE.byId.get('answer.dwellPolicy') as SearchParameter;
+    if (policy.type !== 'categorical') throw new Error('answer.dwellPolicy is categorical');
+    dwell[SPACE.ids.indexOf('answer.dwellPolicy')] = policy.values.indexOf('adaptive') + 0.5;
+    dwell[SPACE.ids.indexOf('answer.maxDwellS')] = 4;
+    const adaptive = withBuilding.decode(dwell);
+    expect(adaptive.get('answer.maxDwellS')).toBe(4);
+    // The space alone cannot see it: the constraint is against a *car*.
+    expect(SPACE.validate(adaptive)).toBeUndefined();
+    expect(withBuilding.reasonFor(adaptive)).toMatch(/maxDwellS/);
+    // Without the oracle wired in, the same point reads as runnable — which is what the whole
+    // CMA-ES path used to do with the oracle wired in.
+    expect(port.reasonFor(adaptive)).toBeUndefined();
+  });
+
+  it('reports a below-box proposal rather than folding it onto an inadmissible endpoint', () => {
+    // The two halves of the same defect. `answer.bypassLoadThreshold` declares `[0, 1]` and
+    // `resolveLoadSensor` refuses `0`, so the old clamping fold manufactured an infeasible point
+    // out of an ordinary below-box proposal — 67 of 500 CMA-ES-shaped proposals decoded to exactly
+    // `0`. Reflection stops manufacturing it; `reasonFor` is what answers for the corners of the
+    // box that are genuinely infeasible.
+    const building = CONFIG.buildingsById.get('midtown-office') as ResolvedBuilding;
+    const port = vectorSpace(SPACE, {
+      feasible: buildingFeasibility(SPACE, building, CONFIG.elevatorSpecs),
+    });
+    const centre = toVector(SPACE, defaultCandidate(SPACE));
+    const index = SPACE.ids.indexOf('answer.bypassLoadThreshold');
+
+    let zeros = 0;
+    for (let step = 1; step <= 200; step += 1) {
+      const vector = [...centre];
+      vector[index] = -(step / 200);
+      const value = port.decode(vector).get('answer.bypassLoadThreshold') as number;
+      if (value === 0) zeros += 1;
+      expect(value, `proposal ${step}`).toBeGreaterThan(0);
+    }
+    expect(zeros).toBe(0);
+
+    // And when a point genuinely is at the inadmissible endpoint, it is *reported*, not returned
+    // as a runnable point. This is the value the fold used to invent.
+    const atZero = new Map(defaultCandidate(SPACE));
+    atZero.set('answer.bypassLoadThreshold', 0);
+    expect(port.reasonFor(atZero)).toMatch(/bypassLoadThreshold/);
   });
 
   it('materializes a candidate under the id the search gave it', () => {

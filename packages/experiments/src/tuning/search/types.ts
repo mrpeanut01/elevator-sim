@@ -252,10 +252,25 @@ export interface PlateauReport {
   /** Candidates that were bit-identical to the round's best. */
   readonly tiedWithBest: number;
   /**
-   * Deliberate escapes: step-size inflations and restarts.
+   * Step-size inflations: generations whose whole offspring set was bit-identical, on which σ was
+   * multiplied up and the uninformative ranking discarded.
+   *
+   * Counted **separately** from {@link restarts} because the two are separate mechanisms with
+   * separate failure modes, and a single total cannot tell them apart. A test asserting only that
+   * *something* escaped passes when either one is deleted, which is how a mechanism ends up inert
+   * with a green suite — the defect shape docs/05-roadmap.md's standing requirement exists to
+   * catch. `cmaes.test.ts` runs one arm with each mechanism alone and asserts the counter that
+   * arm's mechanism increments *and* that the other stays at zero.
+   */
+  readonly inflations: number;
+  /** IPOP restarts: fresh mean, σ reset, population doubled. */
+  readonly restarts: number;
+  /**
+   * Deliberate escapes, `inflations + restarts`.
    *
    * Zero for a method that does not take local steps — random search cannot stall on a plateau
-   * because it never asks a plateau for a direction.
+   * because it never asks a plateau for a direction. Kept as the headline count a report prints;
+   * anything that has to know *which* mechanism fired reads the two counters above.
    */
   readonly escapes: number;
   /** Per-dimension plateau width, when it was measured rather than assumed. */
@@ -363,6 +378,19 @@ export const SEED_POLICIES = ['fixed', 'per-round'] as const;
 
 export type SeedPolicy = (typeof SEED_POLICIES)[number];
 
+/**
+ * The search's own tunables.
+ *
+ * **Every key here has a row in {@link SEARCH_PARAMETERS} and vice versa**, and `types.test.ts`
+ * derives one set from the other rather than trusting a reader to keep two hand-written lists in
+ * step. That test is the enforcement of CLAUDE.md invariant 8 at this level: an optimizer's own
+ * knobs are as much a tunable as a dispatcher's, and a knob whose default lives only as a literal
+ * in a function body has moved the hand-guessing one level up rather than removed it.
+ *
+ * A knob whose default is *derived* rather than constant is deliberately absent from both lists —
+ * `population` (Hansen's `4 + ⌊3 ln n⌋`), `batchSize` (all candidates in one round) and
+ * `probeReplications` (a fifth of the round's) have no constant to declare.
+ */
 export const SEARCH_DEFAULTS = Object.freeze({
   /**
    * Candidates a random search draws. 100, the width of docs/06's first rung.
@@ -406,6 +434,15 @@ export const SEARCH_DEFAULTS = Object.freeze({
   /** Cap on population doubling across restarts. */
   maxPopulation: 64,
   /**
+   * Generations sep-CMA-ES runs. Budget is `generations × population × replications`.
+   *
+   * Twenty is a *shape*, not a measurement: at Hansen's λ for an eleven-weight space it lands the
+   * total near docs/06's 3 990-replication ladder, which is what makes the three methods
+   * comparable at equal budget in `comparison.test.ts`. It lives here rather than as a literal in
+   * `sepCmaEs` because CLAUDE.md invariant 7 does not exempt the optimizer from its own rule.
+   */
+  generations: 20,
+  /**
    * Smallest step the continuous optimizer will take in a coordinate, as a fraction of its range,
    * when no floor has been measured by `probeStepFloor`.
    *
@@ -414,8 +451,6 @@ export const SEARCH_DEFAULTS = Object.freeze({
    * per-building and "probe it; do not assume 0.03". Measure it and pass the result in.
    */
   stepFloorFraction: 0.01,
-  /** Confidence the runner-up comparison is reported at. */
-  confidence: 0.95,
 } as const);
 
 /** Parameter kinds a generic optimizer understands. See docs/06-parameterization-and-tuning.md. */
@@ -441,10 +476,33 @@ export interface SearchParameterSpec {
 }
 
 /**
+ * The id an `activeWhen` gate names when a knob belongs to one optimizer rather than to all three.
+ *
+ * It is deliberately **not** a row of {@link SEARCH_PARAMETERS} and has no entry in
+ * {@link SEARCH_DEFAULTS}: choosing a method is choosing which of three exported functions to
+ * call, not setting a value on one of them, and a default nobody reads is the dead-schema defect
+ * this file has already shipped once. Its legal values are exactly {@link SEARCH_METHODS}, and
+ * `types.test.ts` checks every gate against that list — an `activeWhen` referring to a knob or a
+ * method that does not exist is a gate the optimizer silently reads as *not satisfied*
+ * (docs/06 § `activeWhen`), which turns a live dimension into one nobody searches.
+ */
+export const SEARCH_METHOD_GATE = 'search.method';
+
+/**
  * Every knob the search itself owns (CLAUDE.md invariant 8).
  *
  * A search is a tunable too, and a phase that tunes a dispatcher with an untunable, undeclared
  * optimizer has moved the hand-guessed constants one level up rather than removed them.
+ *
+ * **This list and {@link SEARCH_DEFAULTS} are one thing written twice**, and `types.test.ts` holds
+ * them to it: the id set must be exactly `search.<key>` over `Object.keys(SEARCH_DEFAULTS)`, every
+ * `default` must be the identical value, and every declared `range` must contain it. Before that
+ * test the two lists were maintained by hand and had already drifted — `search.confidence` was
+ * declared, exported, documented as *"the level the best-versus-runner-up paired difference is
+ * reported at"*, and read by nothing anywhere in the repository, because `result.ts` deliberately
+ * reports the paired differences and leaves the interval to `tuning/report`. It has been deleted
+ * rather than wired: a knob that changes no behaviour is worse than a missing one, because an
+ * optimizer will spend a dimension on it.
  */
 export const SEARCH_PARAMETERS: readonly SearchParameterSpec[] = Object.freeze([
   {
@@ -455,6 +513,7 @@ export const SEARCH_PARAMETERS: readonly SearchParameterSpec[] = Object.freeze([
     default: SEARCH_DEFAULTS.randomCandidates,
     description:
       'Candidates a random search draws. Defaults to the width of the successive-halving ladder it is the baseline for, so the two are comparable at equal budget.',
+    activeWhen: { [SEARCH_METHOD_GATE]: ['random'] },
   },
   {
     id: 'search.replications',
@@ -463,7 +522,8 @@ export const SEARCH_PARAMETERS: readonly SearchParameterSpec[] = Object.freeze([
     scale: 'log',
     default: SEARCH_DEFAULTS.replications,
     description:
-      'Replications per candidate at a fixed fidelity. Fifty is the documented floor for a value that will be compared against another value.',
+      'Replications per candidate at a fixed fidelity. Fifty is the documented floor for a value that will be compared against another value. Inert under successive halving, which takes its fidelity from the rung table instead.',
+    activeWhen: { [SEARCH_METHOD_GATE]: ['random', 'sep-cmaes'] },
   },
   {
     id: 'search.seedPolicy',
@@ -481,7 +541,7 @@ export const SEARCH_PARAMETERS: readonly SearchParameterSpec[] = Object.freeze([
     default: SEARCH_DEFAULTS.initialStepFraction,
     description:
       'Initial sep-CMA-ES step size as a fraction of each range. Must start above the plateau width: the measured decision-flip threshold is 0.6 % of the weight box, and starting below it stalls on generation one.',
-    activeWhen: { 'search.method': ['sep-cmaes'] },
+    activeWhen: { [SEARCH_METHOD_GATE]: ['sep-cmaes'] },
   },
   {
     id: 'search.plateauInflation',
@@ -490,18 +550,18 @@ export const SEARCH_PARAMETERS: readonly SearchParameterSpec[] = Object.freeze([
     scale: 'linear',
     default: SEARCH_DEFAULTS.plateauInflation,
     description:
-      'Factor sigma is multiplied by when a generation comes back bit-identical. 1 disables plateau escape, which is the control the plateau test uses to prove the mechanism is load-bearing.',
-    activeWhen: { 'search.method': ['sep-cmaes'] },
+      'Factor sigma is multiplied by when a generation comes back bit-identical. 1 disables tie inflation, one of the two independent plateau escapes; measured on a 2-D plateau at cell width 2, tie inflation with restarts switched off still reaches the optimum (fn = 0), and switching both off leaves the search in its starting cell at fn = 72.',
+    activeWhen: { [SEARCH_METHOD_GATE]: ['sep-cmaes'] },
   },
   {
     id: 'search.stagnationGenerations',
     type: 'integer',
-    range: [1, 1_000],
-    scale: 'log',
+    range: [0, 1_000],
+    scale: 'linear',
     default: SEARCH_DEFAULTS.stagnationGenerations,
     description:
-      'Generations without a strict improvement before an IPOP restart. Short on purpose: on a piecewise-constant objective a run of identical generations means a wide plateau, not convergence.',
-    activeWhen: { 'search.method': ['sep-cmaes'] },
+      'Generations without a strict improvement before an IPOP restart; 0 disables restarts, the other of the two independent plateau escapes. Short on purpose: on a piecewise-constant objective a run of identical generations means a wide plateau, not convergence.',
+    activeWhen: { [SEARCH_METHOD_GATE]: ['sep-cmaes'] },
   },
   {
     id: 'search.maxPopulation',
@@ -510,7 +570,17 @@ export const SEARCH_PARAMETERS: readonly SearchParameterSpec[] = Object.freeze([
     scale: 'log',
     default: SEARCH_DEFAULTS.maxPopulation,
     description: 'Ceiling on the population doubling an IPOP restart applies.',
-    activeWhen: { 'search.method': ['sep-cmaes'] },
+    activeWhen: { [SEARCH_METHOD_GATE]: ['sep-cmaes'] },
+  },
+  {
+    id: 'search.generations',
+    type: 'integer',
+    range: [1, 100_000],
+    scale: 'log',
+    default: SEARCH_DEFAULTS.generations,
+    description:
+      'Generations sep-CMA-ES runs. Total budget is generations x population x replications, plus one round if the plateau width is probed.',
+    activeWhen: { [SEARCH_METHOD_GATE]: ['sep-cmaes'] },
   },
   {
     id: 'search.stepFloorFraction',
@@ -520,14 +590,6 @@ export const SEARCH_PARAMETERS: readonly SearchParameterSpec[] = Object.freeze([
     default: SEARCH_DEFAULTS.stepFloorFraction,
     description:
       'Fallback smallest step per coordinate, as a fraction of its range, used when no plateau width has been measured. A guess, and documented as one: probeStepFloor measures the real per-term figure.',
-    activeWhen: { 'search.method': ['sep-cmaes'] },
-  },
-  {
-    id: 'search.confidence',
-    type: 'continuous',
-    range: [0.5, 0.999],
-    scale: 'linear',
-    default: SEARCH_DEFAULTS.confidence,
-    description: 'Confidence level the best-versus-runner-up paired difference is reported at.',
+    activeWhen: { [SEARCH_METHOD_GATE]: ['sep-cmaes'] },
   },
 ]);

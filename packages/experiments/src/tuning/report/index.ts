@@ -40,6 +40,16 @@
  * printed and never interpreted, which keeps this module as free of elevator-specific knowledge as
  * the self-describing parameter schema keeps the optimizer.
  *
+ * {@link runHoldoutRound} is the file that produces one, and it is the seam docs/05-roadmap.md
+ * § *Standing requirement* says must have a named owner. It re-runs the finalists rather than
+ * reading them out of a `SearchResult`, for two reasons that are both structural: a search's
+ * `Evaluation.samples` is one scalarized number per replication with no seed, no `awtIsValid` and no
+ * per-objective triple, and **no search ever runs a holdout set** — every round it runs is one
+ * experiment seed shared by every candidate, which is what makes the comparison paired and is
+ * exactly why those seeds cannot also be the unseen ones. `holdoutRound.test.ts` drives the whole
+ * path against the real `data/` directory, so the acceptance artefact this phase is judged on is
+ * produced by a code path rather than described by one.
+ *
  * ## One open seam, stated rather than papered over
  *
  * **The energy axis is not measured anywhere in the simulator.** `core`'s `RunSummary` carries no
@@ -141,6 +151,20 @@ export type {
   SeedSetFromReplicationsOptions,
   TuningReportInput,
 } from './build.js';
+
+/* -------------------------------------------------------------------------- *
+ * The driver — the file the report is called from, and the only thing in the
+ * repository that runs a holdout seed set. See `holdoutRound.ts`.
+ * -------------------------------------------------------------------------- */
+
+export { candidateEvaluationsOf, holdoutRoundSpec, runHoldoutRound } from './holdoutRound.js';
+
+export type {
+  CandidateEvaluationsInput,
+  HoldoutRound,
+  HoldoutRoundInput,
+  TuningArm,
+} from './holdoutRound.js';
 
 /* -------------------------------------------------------------------------- *
  * Formatting

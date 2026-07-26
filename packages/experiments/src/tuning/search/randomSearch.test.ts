@@ -144,6 +144,53 @@ describe('randomSearch', () => {
     expect(result.runnerUp?.pairedDifferences).toHaveLength(6);
   });
 
+  /**
+   * The two methods treat an incumbent differently, on purpose, and the difference was documented
+   * in neither place and asserted in neither: here `candidates` is *how many draws to take*, so an
+   * incumbent **adds** a candidate; a rung's `candidates` is *how wide the rung is*, so there the
+   * incumbent **occupies** a slot and `successiveHalving`'s budget stays exactly docs/06's 3 990.
+   * Honouring an incumbent by taking one draw fewer would make a random search of `n` candidates
+   * not a random search of `n` candidates.
+   *
+   * Both arithmetics are pinned, because an unstated budget difference between two methods is
+   * precisely what an equal-budget comparison cannot survive. (`comparison.test.ts` runs neither
+   * method with an incumbent, so the published table is unaffected either way — which is a reason
+   * to state the rule, not a reason to leave it unstated.)
+   */
+  it('adds the incumbent to the draws rather than displacing one, and says so in the budget', async () => {
+    const problem = sphereProblem(2, 10, [7, 3]);
+    const objective = (): ReturnType<typeof syntheticObjective>['objective'] =>
+      syntheticObjective({ fn: problem.fn, noiseSd: 0.5 }).objective;
+
+    const without = await randomSearch({
+      space: problem.space,
+      objective: objective(),
+      seed: SEED,
+      candidates: 20,
+      replications: 3,
+    });
+    const with_ = await randomSearch({
+      space: problem.space,
+      objective: objective(),
+      seed: SEED,
+      candidates: 20,
+      replications: 3,
+      incumbent: [0, 0],
+    });
+
+    expect(without.candidatesEvaluated).toBe(20);
+    expect(without.replicationsSpent).toBe(20 * 3);
+    expect(with_.candidatesEvaluated).toBe(21);
+    expect(with_.replicationsSpent).toBe(21 * 3);
+
+    /* And the twenty draws are the same twenty: the incumbent does not perturb the seeded stream. */
+    const drawsOf = (result: SearchResult<readonly number[]>): readonly string[] =>
+      result.evaluations
+        .filter((evaluation) => evaluation.candidate.id !== 'incumbent')
+        .map((evaluation) => JSON.stringify(evaluation.candidate.value));
+    expect(drawsOf(with_)).toEqual(drawsOf(without));
+  });
+
   it('refuses a budget that is not one', async () => {
     const problem = sphereProblem(2);
     const objective = syntheticObjective({ fn: problem.fn }).objective;

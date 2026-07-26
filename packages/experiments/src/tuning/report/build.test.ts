@@ -172,6 +172,62 @@ describe('the anti-overfitting guards', () => {
     expect(report.holdout.every((assessment) => assessment.verdict === 'unquotable')).toBe(true);
   });
 
+  /*
+   * "Every arm has a holdout set" and "any arm has one" are different facts, and collapsing them
+   * into one `every()` was wrong in both directions at once. Measured before the fix, on a round of
+   * reference + `c-overfit` (16 holdout replications each) + `no-hold` (none): `notes[0]` read
+   * "NO HOLDOUT SET. Every number on this page was measured on the seeds the search optimized
+   * against…" while `seedSets.holdout` was present, the holdout assessments carried real
+   * per-objective verdicts and the conclusion reported a held-out result — the same page asserting
+   * both. And `holdoutFront` was dropped, so the artefact the Phase 7 acceptance criterion is about
+   * disappeared for the two arms that had one because a third arm did not.
+   */
+  it('keeps the holdout front for the arms that ran one when another arm did not', () => {
+    const noHoldout = candidate({
+      candidateId: 'no-hold',
+      tuningAwt: jitter(REF_TUNING.map((value) => value - 1), 0.1),
+      tuningEnergy: REF_ENERGY,
+    });
+    const report = buildTuningReport({ reference, candidates: [overfitted, noHoldout] });
+    const notes = report.notes.join(' ');
+
+    expect(notes).not.toContain('NO HOLDOUT SET');
+    expect(notes).toContain('NO HOLDOUT REPLICATIONS FOR: no-hold');
+    expect(notes).toContain('Nothing about the arms that did run one is weakened');
+
+    // The front on the holdout seeds survives, and names the one arm it could not place.
+    expect(report.holdoutFront).toBeDefined();
+    expect(report.holdoutFront?.indeterminate).toEqual(['no-hold']);
+    expect(report.holdoutFront?.front.length).toBeGreaterThan(0);
+    expect(report.holdoutFront?.entries).toHaveLength(3);
+
+    // The per-candidate guard already worked per candidate; it stays that way.
+    expect(
+      report.holdout.filter((assessment) => assessment.candidateId === 'c-overfit' && assessment.objectiveId === 'awt')[0]
+        ?.verdict,
+    ).toBe('overfitted');
+    expect(
+      report.holdout.filter((assessment) => assessment.candidateId === 'no-hold' && assessment.objectiveId === 'awt')[0]
+        ?.verdict,
+    ).toBe('unquotable');
+  });
+
+  it('does not empty the front when one candidate omits an objective', () => {
+    const noEnergy = candidate({
+      candidateId: 'c-no-energy',
+      tuningAwt: jitter(REF_TUNING.map((value) => value + 5), 0.1),
+      holdoutAwt: jitter(REF_HOLDOUT.map((value) => value + 5), 0.1),
+    });
+    const report = buildTuningReport({ reference, candidates: [honest, noEnergy] });
+
+    // The energy axis stays active — nobody wins by declining to measure it — and the arm that
+    // declined is the only one that cannot be placed.
+    expect(report.front.activeObjectiveIds).toContain(ENERGY_OBJECTIVE_ID);
+    expect(report.front.indeterminate).toEqual(['c-no-energy']);
+    expect(report.front.front).toContain('c-honest');
+    expect(report.front.front.length).toBeGreaterThan(0);
+  });
+
   it('notes an empty energy axis rather than letting the front look three-dimensional', () => {
     const noEnergyReference = candidate({
       candidateId: 'ref',
@@ -242,6 +298,17 @@ describe('the anti-overfitting guards', () => {
     const summary = report.candidates[0];
 
     expect(report.notes.join(' ')).toContain('Saturated replications present in: saturated');
+    /*
+     * One invalid replication makes every pair on a saturation-invalidated axis unquotable at the
+     * default `maxInvalidFraction: 0`, so no dominance verdict exists in either direction. Neither
+     * arm is unplaceable — each is placeable on its own point — and neither is excluded, because
+     * nothing measured either against the other. That reading is only safe because it is stated:
+     * the entry carries the reason, and the arm's own wait statistics are suppressed beside it.
+     */
+    const entry = report.front.entries.find((candidateEntry) => candidateEntry.candidateId === 'saturated');
+    expect(entry?.notComparableWith).toEqual(['predictive-balanced']);
+    expect(entry?.note).toContain('absence of evidence');
+    expect(entry?.dominatedBy).toEqual([]);
     expect(summary?.tuning.statisticallyValid).toBe(false);
     expect(summary?.tuning.metrics.find((metric) => metric.metricId === 'awt')?.suppressed).toBe(
       true,

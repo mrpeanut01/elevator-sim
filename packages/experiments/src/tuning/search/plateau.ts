@@ -88,7 +88,8 @@ export class PlateauTally {
   #flatRounds = 0;
   #roundsWithTies = 0;
   #tiedWithBest = 0;
-  #escapes = 0;
+  #inflations = 0;
+  #restarts = 0;
   #stepFloor: readonly number[] | undefined;
 
   /** Fold in a completed round. */
@@ -107,9 +108,23 @@ export class PlateauTally {
     }
   }
 
-  /** Record a deliberate escape: a step-size inflation or a restart. */
-  escaped(): void {
-    this.#escapes += 1;
+  /**
+   * Record a step-size inflation on a bit-identical generation.
+   *
+   * Separate from {@link restarted} on purpose, and the separation is the point. The two escapes
+   * are independent — measured on a 2-D plateau of cell width 2, each one *on its own* reaches the
+   * optimum and switching both off leaves the search in its starting cell — so a single `escapes`
+   * counter cannot tell a test which mechanism fired, and a test asserting `escapes > 0` passes
+   * with either mechanism deleted. That is how a load-bearing behaviour goes inert against a green
+   * suite, which is the recurring defect docs/05-roadmap.md's standing requirement names.
+   */
+  inflated(): void {
+    this.#inflations += 1;
+  }
+
+  /** Record an IPOP restart. See {@link inflated} for why the two are counted apart. */
+  restarted(): void {
+    this.#restarts += 1;
   }
 
   /** Record a measured per-dimension plateau width. */
@@ -122,7 +137,9 @@ export class PlateauTally {
       flatRounds: this.#flatRounds,
       roundsWithTies: this.#roundsWithTies,
       tiedWithBest: this.#tiedWithBest,
-      escapes: this.#escapes,
+      inflations: this.#inflations,
+      restarts: this.#restarts,
+      escapes: this.#inflations + this.#restarts,
       ...(this.#stepFloor === undefined ? {} : { stepFloor: this.#stepFloor }),
     };
   }

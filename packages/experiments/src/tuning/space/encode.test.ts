@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { createPolicyFor, loadConfig, runSimulation } from '@elevator-sim/core';
+import { createPolicyFor, loadConfig, resolveDoorConfig, runSimulation } from '@elevator-sim/core';
 import type { DispatcherProfile, LoadedConfig } from '@elevator-sim/core';
 
 import { candidateFromProfile, defaultCandidate, searchSpace, subspace } from './collect.js';
@@ -17,11 +17,15 @@ import {
   candidateProfile,
   candidatesEqual,
   decodeCandidate,
+  decodeInto,
   encodeCandidate,
+  fromVector,
+  reflectInto,
+  toVector,
 } from './encode.js';
 import { policyNoiseStream, sampleCandidate, sampleCandidates } from './sample.js';
 import { SearchSpaceError } from './types.js';
-import type { Candidate, ProfileSource } from './types.js';
+import type { Candidate, NumericParameter, ProfileSource } from './types.js';
 
 const SPACE = searchSpace();
 const SEED = 20_260_726;
@@ -350,5 +354,146 @@ describe('a decoded candidate is a profile loadConfig accepts and a policy build
 
     point.set('answer.maxDwellS', 20);
     expect(feasible(point)).toBeUndefined();
+  });
+
+  it('reads the whole merged point on a subspace, not the sliver the subspace searches', () => {
+    // The regression, wired exactly as `buildingFeasibility`'s own docstring prescribes: narrow
+    // the search to the dwell ceiling, start from the `predictive-balanced` incumbent — which
+    // authors `dwellPolicy: adaptive` — and hand the oracle to `sampleCandidate`.
+    //
+    // Before the fix the oracle decoded against the **narrowed** index, so the `adaptive` the
+    // merge supplied was dropped, `resolveDoorConfig` applied its own `fixed` default, and the
+    // constraint never fired: 200 of 200 draws accepted, 4 of them profiles that throw at car
+    // construction. A search sees a throw where it expects a score.
+    const building = CONFIG.buildingsById.get('midtown-office') as NonNullable<
+      ReturnType<typeof CONFIG.buildingsById.get>
+    >;
+    const profile = CONFIG.dispatcherProfilesById.get('predictive-balanced') as DispatcherProfile;
+    const incumbent = candidateFromProfile(SPACE, profile);
+    expect(incumbent.get('answer.dwellPolicy')).toBe('adaptive');
+
+    const dwell = subspace(SPACE, ['answer.maxDwellS']);
+    const feasible = buildingFeasibility(dwell, building, CONFIG.elevatorSpecs);
+    const wholeSpace = buildingFeasibility(SPACE, building, CONFIG.elevatorSpecs);
+
+    // A ceiling below the car's own hall dwell, merged onto the adaptive incumbent. Both oracles
+    // must give the same answer; the narrowed one used to give none.
+    const tooLow: Candidate = new Map([...incumbent, ['answer.maxDwellS', 4.85]]);
+    expect(feasible(tooLow)).toMatch(/maxDwellS/);
+    expect(feasible(tooLow)).toBe(wholeSpace(tooLow));
+
+    const clear: Candidate = new Map([...incumbent, ['answer.maxDwellS', 20]]);
+    expect(feasible(clear)).toBeUndefined();
+
+    // And end to end through the sampler: every draw it accepts materializes to a profile whose
+    // cars actually build.
+    const rng = policyNoiseStream(4242);
+    for (let index = 0; index < 200; index += 1) {
+      const candidate = sampleCandidate(dwell, rng, { base: incumbent, feasible });
+      const merged: Candidate = new Map([...incumbent, ...candidate]);
+      const built = candidateProfile(SPACE, merged, { id: `dwell-${index}` });
+      for (const bank of building.banks) {
+        for (const car of bank.cars) {
+          expect(() => resolveDoorConfig(car, built.answer), `draw ${index}`).not.toThrow();
+        }
+      }
+    }
+  });
+
+  it('takes the incumbent profile as a base, for what a candidate cannot carry', () => {
+    // The other half of the same hole: a subspace candidate merged onto a base *candidate* still
+    // says nothing about a profile field no declared dimension covers. `options.base` is the
+    // incumbent profile itself, so the oracle judges the dispatcher the run will actually build.
+    const building = CONFIG.buildingsById.get('midtown-office') as NonNullable<
+      ReturnType<typeof CONFIG.buildingsById.get>
+    >;
+    const adaptive: ProfileSource = {
+      id: 'adaptive-base',
+      name: 'Adaptive base',
+      weights: {},
+      answer: { dwellPolicy: 'adaptive', dwellAdaptationGain: 0.4 },
+    };
+    const dwell = subspace(SPACE, ['answer.maxDwellS']);
+    const ceiling: Candidate = new Map([['answer.maxDwellS', 4.85]]);
+
+    // No base: the candidate alone says nothing about the dwell policy, and `fixed` is feasible.
+    expect(buildingFeasibility(dwell, building, CONFIG.elevatorSpecs)(ceiling)).toBeUndefined();
+    // With the base: the same ceiling is the one `resolveDoorConfig` refuses.
+    expect(
+      buildingFeasibility(dwell, building, CONFIG.elevatorSpecs, { base: adaptive })(ceiling),
+    ).toMatch(/maxDwellS/);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The real-vector embedding
+ * -------------------------------------------------------------------------- */
+
+describe('the vector fold reflects rather than clamping onto an endpoint', () => {
+  it('never manufactures the one endpoint core refuses', () => {
+    // `answer.bypassLoadThreshold` declares `[0, 1]` and `resolveLoadSensor` requires it strictly
+    // positive, so `0` is a point of the declared box that no car will run. A clamping fold turns
+    // every below-box proposal into exactly that value: measured at 67 of 500 CMA-ES-shaped
+    // proposals. Reflection puts them back inside on a continuum, and the count is zero.
+    const bypass = SPACE.byId.get('answer.bypassLoadThreshold') as NumericParameter;
+    expect([bypass.min, bypass.max]).toStrictEqual([0, 1]);
+
+    const index = SPACE.ids.indexOf('answer.bypassLoadThreshold');
+    const centre = toVector(SPACE, defaultCandidate(SPACE));
+    let zeros = 0;
+    let belowBox = 0;
+    for (let step = 1; step <= 400; step += 1) {
+      const vector = [...centre];
+      // Deterministically below the box, by a hair and by a mile. Nothing random: the defect was
+      // a fold, and a fold is a function.
+      vector[index] = -(step / 400);
+      belowBox += 1;
+      const value = fromVector(SPACE, vector).get('answer.bypassLoadThreshold') as number;
+      expect(value, `proposal ${step}`).toBeGreaterThan(0);
+      expect(value, `proposal ${step}`).toBeLessThanOrEqual(1);
+      if (value === 0) zeros += 1;
+    }
+    expect(belowBox).toBe(400);
+    expect(zeros).toBe(0);
+
+    // The reflection is the fold, not a nudge: a coordinate 0.25 below the low bound comes back
+    // 0.25 above it.
+    const reflected = [...centre];
+    reflected[index] = -0.25;
+    expect(fromVector(SPACE, reflected).get('answer.bypassLoadThreshold')).toBeCloseTo(0.25, 12);
+    expect(reflectInto(-0.25, 0, 1)).toBeCloseTo(0.25, 12);
+    expect(reflectInto(1.25, 0, 1)).toBeCloseTo(0.75, 12);
+    expect(reflectInto(0.4, 0, 1)).toBe(0.4);
+  });
+
+  it('decodes a non-finite coordinate to the declared default, not to an endpoint', () => {
+    // A `NaN` coordinate is not a point of the box and no fold means anything for it. Folding to
+    // the low bound would put `answer.bypassLoadThreshold` at 0 again — an infeasible value that
+    // reads like a decision the optimizer made.
+    const index = SPACE.ids.indexOf('answer.bypassLoadThreshold');
+    const vector = [...toVector(SPACE, defaultCandidate(SPACE))];
+    vector[index] = Number.NaN;
+    const value = fromVector(SPACE, vector).get('answer.bypassLoadThreshold');
+    expect(value).toBe(SPACE.defaults.get('answer.bypassLoadThreshold'));
+    expect(value).toBe(0.8);
+  });
+
+  it('does not duplicate a hard constraint when a merged point decodes through the whole index', () => {
+    // `buildingFeasibility` decodes a merged subspace point against `allById`, so a constraint the
+    // narrowed space does not search can reach `applyPatch` in the patch. Taking the declared set
+    // from the narrowed list would keep the base's copy and append the patch's.
+    const idle = subspace(SPACE, (parameter) => parameter.section === 'idle');
+    const base: ProfileSource = {
+      id: 'base',
+      name: 'Base',
+      weights: {},
+      hardConstraints: ['noDirectionReversal'],
+    };
+    const merged = applyPatch(
+      idle,
+      base,
+      decodeInto(SPACE.allById, new Map([['constraints.noDirectionReversal', true]])),
+    );
+    expect(merged['hardConstraints']).toStrictEqual(['noDirectionReversal']);
   });
 });

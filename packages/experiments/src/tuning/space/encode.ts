@@ -264,8 +264,12 @@ export function applyPatch(
   }
 
   if (patch.hardConstraints !== undefined) {
+    // Read off `allById`, not `parameters`: a merged subspace point decodes through the whole
+    // index (see `buildingFeasibility`), so a constraint the narrowed space does not *search* can
+    // still appear in the patch. Taking the declared set from the narrowed list would then keep
+    // the base's copy **and** append the patch's, and the profile would carry it twice.
     const declared = new Set(
-      space.parameters
+      [...space.allById.values()]
         .filter((parameter) => parameter.section === CONSTRAINTS_SECTION)
         .map((parameter) => parameter.key),
     );
@@ -410,6 +414,10 @@ export function validateValues(
   byId: ReadonlyMap<string, SearchParameter>,
   values: Candidate,
 ): string | undefined {
+  // `byId` here is always the **whole** index — `SearchSpace.allById`, which `subspace` carries
+  // through unnarrowed. A narrowed index would silently drop every dimension a merged
+  // subspace point carries from its base, and the oracle would answer about a dispatcher nobody
+  // proposed. See `SearchSpace.allById`.
   const patch = decodeInto(byId, values);
   const authored: Record<string, unknown> = {
     id: 'candidate',
@@ -466,9 +474,26 @@ export function validateValues(
  * So it belongs here, as a hook a search wires up once against the building it is tuning on:
  *
  * ```ts
- * const feasible = buildingFeasibility(space, building, config.elevatorSpecs);
- * const candidate = sampleCandidate(space, rng, { feasible });
+ * const feasible = buildingFeasibility(space, building, config.elevatorSpecs, { base: incumbent });
+ * const candidate = sampleCandidate(space, rng, { base: candidateFromProfile(space, incumbent), feasible });
  * ```
+ *
+ * ## The whole dispatcher, or the answer is about something else
+ *
+ * Both constraints are **conditional on a value the candidate may not carry**: the dwell ceiling
+ * only binds under `answer.dwellPolicy: adaptive`, and the bypass threshold is checked against
+ * `answer.overloadThreshold`. So this decodes through {@link SearchSpace.allById} — the whole
+ * index, which `subspace` carries through unnarrowed — and merges onto `options.base`, the
+ * incumbent profile.
+ *
+ * Neither was true before, and the hole was measured with this function wired exactly as the
+ * block above prescribes: a `subspace(space, ['answer.maxDwellS'])` search over the
+ * `predictive-balanced` incumbent (which authors `dwellPolicy: adaptive`) accepted **200 of 200**
+ * draws on `midtown-office`, of which **4** materialize to profiles whose `resolveDoorConfig`
+ * throws `dwellPolicy "adaptive" requires maxDwellS >= the larger base dwell`. Decoding against
+ * the narrowed index dropped the `adaptive` the merge had just supplied, `resolveDoorConfig`
+ * applied its own `fixed` default, and the constraint never fired — a search seeing a throw where
+ * it expects a score, which is the exact failure this function exists to prevent.
  *
  * Like {@link validateValues} it holds no rule of its own — it calls `resolveDoorConfig` and
  * `resolveLoadSensor`, which are the same functions `Car` calls, and reports their messages.
@@ -477,11 +502,21 @@ export function buildingFeasibility(
   space: SearchSpace,
   building: ResolvedBuilding,
   elevatorSpecs?: ElevatorSpecs | undefined,
+  options: { readonly base?: ProfileSource | undefined } = {},
 ): (values: Candidate) => string | undefined {
   return (values) => {
     let profile: DispatcherProfile;
     try {
-      profile = candidateProfile(space, values, { id: 'feasibility-probe' });
+      const merged = applyPatch(
+        space,
+        options.base ?? EMPTY_BASE,
+        decodeInto(space.allById, values),
+      );
+      profile = parseProfile({
+        ...merged,
+        id: 'feasibility-probe',
+        name: 'Feasibility probe',
+      });
     } catch (error) {
       return messageOf(error);
     }
@@ -601,6 +636,22 @@ function coordinateOf(parameter: SearchParameter, value: ParameterValue): number
  * floored categorical both move the coordinate to the centre of the cell they landed in. It *is*
  * idempotent — one more round trip changes nothing — which is the property a search needs when it
  * re-encodes what it decoded.
+ *
+ * ## The fold **reflects**; it does not clamp — and it is still not a feasibility check
+ *
+ * Clamping piles every out-of-box proposal onto the two endpoints, and an endpoint of a declared
+ * range is not always a value `core` will run. `answer.bypassLoadThreshold` declares `[0, 1]` and
+ * `resolveLoadSensor` requires it strictly positive, so a clamping fold *manufactures* an
+ * infeasible point out of a perfectly ordinary proposal: measured at **67 of 500** CMA-ES-shaped
+ * proposals (mean at box centre, sigma half the box width) decoding to exactly `0`. Reflection —
+ * the same fold {@link perturbValue} already uses at a bound, and for the same reason — puts them
+ * back inside on a continuum instead, and the count goes to zero.
+ *
+ * Reflection is a repair, not an oracle. The declared box still contains points `core` refuses:
+ * on the same 500 proposals, 63 were refused by `SearchSpace.validate` outright. **Nothing here
+ * checks that**, because a decoder that threw would be a score CMA-ES cannot interpret. The
+ * caller must ask — `vectorSpace(space, options).reasonFor(candidate)` is that question, and
+ * `cmaes.ts` is where it has to be asked.
  */
 export function fromVector(
   space: SearchSpace,
@@ -624,25 +675,47 @@ export function fromVector(
 
 function valueOf(parameter: SearchParameter, coordinate: number): ParameterValue {
   const [low, high] = boxOf(parameter);
-  const clamped = Number.isFinite(coordinate) ? Math.min(high, Math.max(low, coordinate)) : low;
+  // A non-finite coordinate is not a point of the box and there is no fold that means anything for
+  // it. It decodes to the dimension's **declared default** — the value the resolver would apply
+  // anyway — rather than to an endpoint, because an endpoint is a value somebody might then read
+  // as a decision the optimizer made.
+  const folded = Number.isFinite(coordinate)
+    ? reflectInto(coordinate, low, high)
+    : coordinateOf(parameter, parameter.default);
   switch (parameter.type) {
     case 'continuous':
-      // Clamped again after the exponential, not only in log coordinates: `exp(log(1800))` is
+      // Clamped after the exponential, not only in box coordinates: `exp(log(1800))` is
       // `1800.0000000000005`, which is outside a declared range the profile schema will enforce.
       return parameter.scale === 'log'
-        ? Math.min(parameter.max, Math.max(parameter.min, Math.exp(clamped)))
-        : clamped;
+        ? Math.min(parameter.max, Math.max(parameter.min, Math.exp(folded)))
+        : Math.min(parameter.max, Math.max(parameter.min, folded));
     case 'integer': {
-      const natural = parameter.scale === 'log' ? Math.exp(clamped) : clamped;
+      const natural = parameter.scale === 'log' ? Math.exp(folded) : folded;
       return Math.min(parameter.max, Math.max(parameter.min, Math.round(natural)));
     }
     case 'categorical': {
-      const index = Math.min(parameter.values.length - 1, Math.max(0, Math.floor(clamped)));
+      const index = Math.min(parameter.values.length - 1, Math.max(0, Math.floor(folded)));
       return parameter.values[index] as string;
     }
     case 'boolean':
-      return clamped >= 1;
+      return folded >= 1;
   }
+}
+
+/**
+ * Fold a value back into `[low, high]` by reflection, however far outside it started.
+ *
+ * One implementation, used by both folds this module owns: {@link fromVector}'s, which reads a
+ * coordinate a continuous optimizer proposed, and `perturbValue`'s, which reads a Gaussian step.
+ * Reflection rather than clamping in both, for the reason `perturbValue` states and
+ * {@link fromVector} measures: clamping concentrates probability on the two endpoints, and an
+ * endpoint of a declared range is sometimes a value `core` refuses to run.
+ */
+export function reflectInto(value: number, low: number, high: number): number {
+  const span = high - low;
+  if (!(span > 0)) return low;
+  const folded = Math.abs((value - low) % (2 * span));
+  return low + (folded > span ? 2 * span - folded : folded);
 }
 
 /* -------------------------------------------------------------------------- *

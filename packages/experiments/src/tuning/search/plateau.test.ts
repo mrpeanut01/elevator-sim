@@ -59,7 +59,7 @@ describe('detecting a plateau', () => {
     const tally = new PlateauTally();
     tally.observe(round([evaluation('a', [5, 5]), evaluation('b', [5, 5]), evaluation('c', [9, 9])]));
     tally.observe(round([evaluation('d', [1, 1]), evaluation('e', [1, 1])]));
-    tally.escaped();
+    tally.inflated();
     const report = tally.report();
     expect(report.flatRounds).toBe(1);
     expect(report.roundsWithTies).toBe(2);
@@ -69,6 +69,33 @@ describe('detecting a plateau', () => {
 
     tally.measured([0.2, 0.4]);
     expect(tally.report().stepFloor).toEqual([0.2, 0.4]);
+  });
+
+  /**
+   * Regression: `escapes` used to be a single counter incremented by one `escaped()` method, so a
+   * report could say that *something* escaped and nothing could say **what**. `cmaes.ts` has two
+   * independent escapes, either of which reaches the optimum on its own, so a test asserting only
+   * `escapes > 0` passes with either mechanism deleted — which is how a load-bearing behaviour
+   * goes inert against a green suite.
+   */
+  it('counts the two escape mechanisms apart, and totals them into escapes', () => {
+    const tally = new PlateauTally();
+    expect(tally.report()).toMatchObject({ inflations: 0, restarts: 0, escapes: 0 });
+
+    tally.inflated();
+    tally.inflated();
+    tally.inflated();
+    tally.restarted();
+
+    const report = tally.report();
+    expect(report.inflations).toBe(3);
+    expect(report.restarts).toBe(1);
+    expect(report.escapes).toBe(4);
+    /* The whole point: the total alone cannot distinguish these two tallies, and the split can. */
+    const onlyRestarts = new PlateauTally();
+    for (let i = 0; i < 4; i += 1) onlyRestarts.restarted();
+    expect(onlyRestarts.report().escapes).toBe(report.escapes);
+    expect(onlyRestarts.report().inflations).not.toBe(report.inflations);
   });
 });
 
