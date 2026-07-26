@@ -335,8 +335,11 @@ describe('sealed-bid single round is the centralized argmin, proved not asserted
                 const context = waiting === 0 ? undefined : { waitingPassengers: waiting };
 
                 const central = createDispatchPolicy(authored);
-                const auction = createAuctionPolicy(authored);
-                // Default options: rounds 1, reserve inert. The control arm.
+                // The control arm, forced. `data/dispatcher-profiles.json` now ships a profile
+                // that authors `auction.rounds: 3`, and this test's whole subject is the
+                // single-round equivalence, so the round budget is set here rather than taken from
+                // whatever the profile happens to declare. Everything else is the profile's.
+                const auction = createAuctionPolicy(authored, { auction: { rounds: 1 } });
                 expect(auction.config.auction.rounds).toBe(1);
 
                 const lifecycle = central.register(subject, 0, context);
@@ -916,15 +919,32 @@ describe('resolveAuctionConfig', () => {
   });
 
   it('takes the profile’s section, and lets options override it', () => {
-    const authored = { ...waitTimeProfile(), auction: { rounds: 4, reserveMarginalDelayS: 30 } };
+    const authored = {
+      ...waitTimeProfile(),
+      auction: { aggregation: 'contract-net' as const, rounds: 4, reserveMarginalDelayS: 30 },
+    };
     expect(resolveAuctionConfig(authored).auction).toEqual({
+      aggregation: 'contract-net',
       rounds: 4,
       reserveMarginalDelayS: 30,
     });
     expect(resolveAuctionConfig(authored, { auction: { rounds: 2 } }).auction).toEqual({
+      aggregation: 'contract-net',
       rounds: 2,
       reserveMarginalDelayS: 30,
     });
+    // The selector defaults like every other field: a profile that never mentions an aggregation
+    // is the centralized argmin, which is what keeps `createPolicyFor` on the weighted-cost policy
+    // for every profile authored before the section existed.
+    expect(resolveAuctionConfig(waitTimeProfile()).auction.aggregation).toBe('central-argmin');
+  });
+
+  it('rejects an aggregation that names no policy factory', () => {
+    expect(() =>
+      resolveAuctionConfig(waitTimeProfile(), {
+        auction: { aggregation: 'swarm' as unknown as 'contract-net' },
+      }),
+    ).toThrow(/auction\.aggregation/);
   });
 
   it('rejects a round budget the aggregation cannot honour', () => {

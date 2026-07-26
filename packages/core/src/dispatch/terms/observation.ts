@@ -35,10 +35,13 @@
  * `policy.score()` on a real building and demands a non-zero raw and a spread between candidate
  * cars.
  *
- * One link is still missing, and it is outside this module: `sim/simulation.ts` builds no group
- * context, so a full `runSimulation` supplies neither fact and `zoned-uppeak` still produces
- * byte-identical AWT at `zoneAffinity` weights of 0.3, 0 and 50. See `liveness.test.ts` for what
- * that costs to close.
+ * Every link in that chain is now joined, including the last one: `Simulation.#dispatchBank`
+ * resolves a `groupContext` once per dispatch pass and shares it across the calls in the pass, so a
+ * full `runSimulation` supplies both facts. It used not to, and the cost was exact rather than
+ * approximate — `zoned-uppeak` produced **byte-identical** runs at `zoneAffinity` weights of 0.3, 0
+ * and 50, and was bit-identical to `eta` on every building in the Phase 5 benchmark. Counted
+ * through the shipped engine on `midtown-office`, `zoneAffinity` went from 0 non-zero evaluations
+ * in 437 to 372 in 495. `sim/seam.test.ts` is the test that fails if the link is dropped again.
  *
  * ## Absent still means inert, and that is deliberate
  *

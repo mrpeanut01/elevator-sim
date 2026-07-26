@@ -29,7 +29,9 @@ import {
   AFTER_FLOOR,
   BEFORE_FLOOR,
   SHIFT_AT_S,
+  auditForecastCausalityInRun,
   measurePredictorLag,
+  type ForecastCausalityAudit,
   type PredictorLagStudy,
 } from './predictorLag.js';
 
@@ -100,4 +102,74 @@ describe('Phase 5 — the demand predictor lags its cause and never leads it', (
     expect(last?.argmaxFloorId).toBe(AFTER_FLOOR);
     expect(last?.after).toBeGreaterThan(last?.before ?? Infinity);
   });
+});
+
+/**
+ * The same question asked of the **runner**, which is the half the shift study cannot reach.
+ *
+ * `measurePredictorLag` proves the estimator cannot see a shift coming. It says nothing about which
+ * arrivals the *simulation* hands it, and that is where clairvoyance would actually have to enter:
+ * a run loop that observed a passenger at trace-generation time instead of at `arrivedAt` would give
+ * a perfectly causal model a perfectly clairvoyant input, and every assertion above would still pass.
+ *
+ * Two measurements, on 100 real replications of Midtown Office under mixed traffic:
+ *
+ * | measurement | result |
+ * |---|---|
+ * | forecast queries whose `fromT` preceded the newest observation | **0 of 34 422** |
+ * | corr(forecast, arrivals in the preceding 300 s) | 0.614 |
+ * | corr(forecast, arrivals in the *following* 300 s) | 0.324 |
+ * | partial corr(forecast, next 300 s **given every arrival so far**) | **−0.0139 [−0.0315, +0.0036]** |
+ *
+ * The last row is the decisive one. The forecast tracks the past twice as closely as the future — a
+ * lagging indicator, as a causal one must be — and once every arrival the run had already produced is
+ * partialled out, **nothing about the future is left**. A forecast that leaked the trace would keep
+ * predictive power there; this one has none to keep.
+ *
+ * The interval is over **replications**, not over queries. The first version of this audit pooled all
+ * 34 422 queries as if they were independent and produced a half-width about three times too narrow —
+ * it disagreed with itself between budgets, reading `+0.022 ± 0.011` at n = 12 and `−0.008 ± 0.008` at
+ * n = 25. Queries seconds apart in one run see nearly the same floor counts. Batching to one number
+ * per replication makes the answer stable across n = 12, 25, 50 and 100, and it contains zero at all
+ * four.
+ */
+describe('Phase 5 — the wired predictor is fed the past and only the past', () => {
+  let auditCache: ForecastCausalityAudit | undefined;
+  const audit = async (): Promise<ForecastCausalityAudit> => {
+    auditCache ??= await auditForecastCausalityInRun({ replications: 12 });
+    return auditCache;
+  };
+
+  it('is actually connected: the run feeds arrivals and serves forecasts', async () => {
+    // Zero on either counter is the failure this whole phase exists because of. A predictor nobody
+    // observes into and nobody queries is indistinguishable, in every metric, from no predictor.
+    const result = await audit();
+    expect(result.observations).toBeGreaterThan(0);
+    expect(result.queries).toBeGreaterThan(0);
+  }, 900_000);
+
+  it('never answers a forecast for a time earlier than something it has already seen', async () => {
+    const result = await audit();
+    expect(result.backwardQueries).toBe(0);
+    expect(result.maxObservationLeadS).toBeLessThanOrEqual(0);
+  }, 900_000);
+
+  it('knows nothing about the future that the observed past does not already imply', async () => {
+    const result = await audit();
+    // Lagging, not leading: the forecast tracks what has happened more closely than what is about to.
+    expect(result.correlationWithPast).toBeGreaterThan(result.correlationWithFuture);
+    // And the residual predictive power, once the past is removed, contains zero.
+    expect(Math.abs(result.partialCorrelationWithFutureGivenPast)).toBeLessThanOrEqual(
+      result.partialHalfWidth * 2,
+    );
+    expect(result.causal).toBe(true);
+    console.log(
+      `Wired path, ${result.replications} replications of ${result.building}: ` +
+        `${result.observations} observations, ${result.queries} queries, ${result.backwardQueries} backwards. ` +
+        `corr(forecast, past) ${result.correlationWithPast.toFixed(4)}, ` +
+        `corr(forecast, future) ${result.correlationWithFuture.toFixed(4)}, ` +
+        `partial(future | past) ${result.partialCorrelationWithFutureGivenPast.toFixed(4)} ` +
+        `± ${result.partialHalfWidth.toFixed(4)} over ${result.partialSamples} samples.`,
+    );
+  }, 900_000);
 });

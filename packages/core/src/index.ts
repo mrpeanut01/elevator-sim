@@ -14,25 +14,37 @@
  * submodule is a deliberate act of widening the package's public surface and a future
  * name collision between modules is a compile error here rather than a silent shadow.
  *
- * ## Phase 5: what is exported, and what it can and cannot be used to measure
+ * ## Phase 5: what is exported, and what a `runSimulation` objective can measure
  *
- * Everything Phase 5 built is reachable from this barrel. Four of its behaviours are still not
- * reachable from `runSimulation`, and that distinction is the single most important thing to
- * carry out of this phase:
+ * Everything Phase 5 built is reachable from this barrel **and reachable from `runSimulation`**.
+ * State it here rather than only in `dispatch/policies/index.ts`, because this file is the first
+ * thing a consumer reads and it spent a whole phase saying the opposite: four behaviours were
+ * exported, unit-tested and dead in the shipped path, and this table said so. The wiring is in
+ * `sim/` and `config/`; the table below is the one in `dispatch/policies/index.ts`, restated for
+ * the barrel's audience:
  *
- * | behaviour | on this barrel? | runs inside `runSimulation`? |
+ * | behaviour | on this barrel? | how a run reaches it |
  * |---|---|---|
- * | the nine new cost terms | yes | yes — except `zoneAffinity` and `predictedDemand`, which evaluate to `0` for every car |
- * | {@link AuctionDispatchPolicy} / {@link runAuction} | yes | **no** — `SimulationConfig` has no policy hook |
- * | {@link CapacityReassignmentMonitor} | yes | **no** — `sim/` never calls `policy.reconsider` |
- * | {@link prepositionPlan} / {@link createArrivalModel} | yes | **no** — `Simulation.#park` supplies no forecast |
- * | {@link groupContext} | yes | **no** — `Simulation.#dispatchBank` passes waiting counts only |
+ * | the nine new cost terms | yes | stage 3, `zoneAffinity` and `predictedDemand` included — both are priced off the group context `#dispatchBank` resolves once per pass |
+ * | {@link AuctionDispatchPolicy} / {@link runAuction} | yes | `auction.aggregation` in the profile names a factory in `dispatch/policies/registry.ts`; `Simulation` builds every bank through {@link createPolicyFor} |
+ * | {@link CapacityReassignmentMonitor} | yes | one per bank, swept from `Simulation.#finishStop` once the doors have shut and the load has settled |
+ * | {@link resolvePrepositionContext} / {@link repositionContextFor} / {@link createArrivalModel} | yes | `Simulation.#park` is called **per car**, so it resolves the bank's context once and derives that car's `RepositionContext` from it; one {@link ArrivalModel} per bank, fed in `#admit` |
+ * | {@link prepositionPlan} | **exported, not called** | the per-bank convenience wrapper over the two functions above. The run cannot use it without taking a forecast per car instead of per bank, so it has no caller — recorded in `dispatch/deadCode.test.ts`'s allowlist rather than left to read as wired |
+ * | {@link groupContext} | yes | `Simulation.#dispatchBank` resolves it once per pass and shares it across the calls in the pass |
  *
- * The four obstructions are enumerated with their one-line fixes in `dispatch/policies/index.ts`
- * as gaps 2 to 5. An optimizer that reads {@link POLICY_PARAMETERS} or
- * {@link PREDICTOR_PARAMETERS} off this barrel and searches them against a `runSimulation`
- * objective will measure exactly zero on those dimensions until the gaps close. Export is not
- * reachability, and the Phase 5 benchmark measured the difference rather than assuming it.
+ * Measured through the shipped engine on `midtown-office` at seed 20 260 726, one replication each:
+ * 660 predictor observations and 1 149 forecast reads under `predictive-balanced` (29 and 73 on
+ * `garden-apartments`); 44 load crossings with 9 call migrations under `capacity-aware` against 44
+ * crossings and 0 migrations under `eta`; `auction-multi-round` resolving `rounds: 3` through
+ * `loadConfig` and holding more than one round in 922 of 2 398 auctions, 194 of them landing
+ * somewhere other than the argmin; and `zoneAffinity` showing cross-car spread in 142 of
+ * `zoned-uppeak`'s 144 decisions.
+ *
+ * So an optimizer that reads {@link POLICY_PARAMETERS} or {@link PREDICTOR_PARAMETERS} off this
+ * barrel and searches them against a `runSimulation` objective is searching live dimensions. The
+ * guard that keeps it that way is `sim/seam.test.ts`, and it is behavioural rather than a symbol
+ * search: two configurations the docs say must differ have to produce different car trajectories.
+ * A symbol search would have caught none of the four original gaps.
  *
  * ## The one deliberate name collision
  *
@@ -90,6 +102,7 @@ export type {
  * -------------------------------------------------------------------------- */
 
 export {
+  AGGREGATIONS,
   ASSIGNMENT_MODES,
   ASSIGNMENT_TIMINGS,
   BUILDING_TYPES,
@@ -138,6 +151,7 @@ export {
 
 export type {
   AccessZone,
+  Aggregation,
   AnswerStageConfig,
   ArrivalProcessConfig,
   AssignmentMode,
@@ -618,15 +632,18 @@ export {
   CapacityReassignmentMonitor,
   MAX_AUCTION_ROUNDS,
   POLICY_DEFAULTS,
+  POLICY_FACTORIES,
   POLICY_PARAMETERS,
   POLICY_PARAMETER_IDS,
   WITHDRAWAL_REASONS,
+  aggregationOf,
   bandRange,
   bidsFrom,
   carSnapshotsById,
   consideredCalls,
   contiguousZones,
   createAuctionPolicy,
+  createPolicyFor,
   fixedForecast,
   groupContext,
   hasMigrations,
@@ -638,6 +655,7 @@ export {
   peakReassignments,
   policyParameter,
   prepositionPlan,
+  profileAsPolicySource,
   repositionContextFor,
   resolveAuctionConfig,
   resolvePrepositionContext,
@@ -658,6 +676,7 @@ export type {
   CallMigration,
   CapacityReassignmentResult,
   DemandForecastSource,
+  DispatchPolicyFactory,
   GroupContextOptions,
   GroupObservationContext,
   LoadCrossing,
@@ -923,6 +942,7 @@ export type {
   SimulationDemandOptions,
   SimulationResult,
   SimulationStatus,
+  StageActivity,
   TimeoutPolicy,
   TransferArrivalPayload,
   UndeliveredJourney,

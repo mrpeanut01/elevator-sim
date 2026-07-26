@@ -69,8 +69,15 @@
  * two specifiers resolve to the same module.
  */
 
-import { createArrivalModel } from '@elevator-sim/core';
-import type { ArrivalModel, Direction } from '@elevator-sim/core';
+import { Simulation, createArrivalModel } from '@elevator-sim/core';
+import type { ArrivalModel, Direction, DispatcherProfile, ResolvedBank } from '@elevator-sim/core';
+
+import { estimateMean } from '../reports/statistics.js';
+import { intervalContainsZero, type MeanEstimate } from '../reports/types.js';
+import { replicationSeed } from '../runner/crn.js';
+import { loadResources } from '../validation/harness.js';
+
+import { BENCHMARK_SEED } from './suite.js';
 
 /** Garden Apartments' floors, in shaft order. The building the pre-positioning criterion names. */
 export const GARDEN_FLOOR_IDS: readonly string[] = Object.freeze(['G', '2', '3', '4', '5', '6']);
@@ -216,5 +223,279 @@ export function measurePredictorLag(model?: ArrivalModel): PredictorLagStudy {
     anticipatorySamples: Object.freeze(anticipatory),
     atShift,
     causal: anticipatory.length === 0 && lagS !== undefined && lagS >= bucketWidthS,
+  });
+}
+
+/* -------------------------------------------------------------------------- *
+ * The same question, asked of the wired path instead of the model
+ * -------------------------------------------------------------------------- */
+
+/**
+ * What the wired-path audit measured.
+ *
+ * {@link measurePredictorLag} puts the *model* in front of a synthetic shift. That is the sharper
+ * test of the estimator and the weaker test of the **runner**, because the runner is what decides
+ * which arrivals the model is told about and when. This audit closes that half: it drives a real
+ * `Simulation`, intercepts every `observe` and every `expectedDemandByFloor` the run actually makes,
+ * and asks two questions of them.
+ */
+export interface ForecastCausalityAudit {
+  readonly building: string;
+  readonly profileId: string;
+  readonly replications: number;
+  /** Arrivals the run fed to its arrival models. Zero would mean the predictor is disconnected. */
+  readonly observations: number;
+  /** Forecast queries the run served from them. */
+  readonly queries: number;
+  /**
+   * Queries whose `fromT` preceded the newest observation the model had already folded in.
+   *
+   * **Must be zero.** A forecast answered for a time earlier than something it has already seen is a
+   * forecast that has read the future, and `ArrivalModel` throws rather than return one — so a
+   * non-zero count here would mean the guard had been removed.
+   */
+  readonly backwardQueries: number;
+  /** `max(lastObservedAt - queryTime)` over every query. Must be `<= 0`. */
+  readonly maxObservationLeadS: number;
+  /** Mean Pearson r between the forecast over floors and arrivals in the preceding horizon. */
+  readonly correlationWithPast: number;
+  /** The same against arrivals in the *following* horizon. */
+  readonly correlationWithFuture: number;
+  /**
+   * Partial correlation of the forecast with the future, **controlling for every arrival the run had
+   * already produced**.
+   *
+   * The decisive leakage statistic. A causal forecast is a function of the observed past, so once the
+   * past is partialled out nothing about the future may remain — this must sit at zero. A forecast
+   * that leaked the trace would keep predictive power here even after the past is removed.
+   */
+  readonly partialCorrelationWithFutureGivenPast: number;
+  /**
+   * 95 % **paired-t interval over replications** on
+   * {@link partialCorrelationWithFutureGivenPast}, from {@link estimateMean}.
+   *
+   * The unit of independence is the *replication*, not the query. Two forecast queries seconds apart
+   * in the same run see almost the same floor counts, so an interval computed over queries would be
+   * an interval over a few thousand copies of a few dozen facts — it came out roughly three times too
+   * narrow when this audit was first written, and disagreed with itself between budgets. Each
+   * replication contributes one number: the mean of its own per-query partial correlations.
+   */
+  readonly partialEstimate: MeanEstimate;
+  /** Half-width of {@link partialEstimate}. Kept for callers that only want the number. */
+  readonly partialHalfWidth: number;
+  /** Per-query samples behind the per-replication means. Reported, never used as an `n`. */
+  readonly partialSamples: number;
+  /**
+   * `true` when no query ran backwards and {@link partialEstimate} contains zero.
+   *
+   * Contains-zero rather than is-small: this is the same rule every other verdict in the benchmark
+   * uses, and it is the rule that would go false if the forecast ever started carrying information
+   * the observed past did not already have.
+   */
+  readonly causal: boolean;
+}
+
+export interface ForecastCausalityOptions {
+  readonly building?: string | undefined;
+  readonly profileId?: string | undefined;
+  readonly replications?: number | undefined;
+  readonly durationS?: number | undefined;
+  readonly arrivalRatePctPop5min?: number | undefined;
+  readonly horizonS?: number | undefined;
+  readonly seed?: number | string | undefined;
+}
+
+function pearson(a: readonly number[], b: readonly number[]): number {
+  const n = a.length;
+  if (n < 2) return Number.NaN;
+  const meanA = a.reduce((total, value) => total + value, 0) / n;
+  const meanB = b.reduce((total, value) => total + value, 0) / n;
+  let sab = 0;
+  let saa = 0;
+  let sbb = 0;
+  for (let i = 0; i < n; i += 1) {
+    const da = (a[i] as number) - meanA;
+    const db = (b[i] as number) - meanB;
+    sab += da * db;
+    saa += da * da;
+    sbb += db * db;
+  }
+  return sab / Math.sqrt(saa * sbb);
+}
+
+function meanOfFinite(values: readonly number[]): number {
+  const finite = values.filter((value) => Number.isFinite(value));
+  return finite.length === 0
+    ? Number.NaN
+    : finite.reduce((total, value) => total + value, 0) / finite.length;
+}
+
+/**
+ * Drive a real run, intercept the predictor, and measure whether its forecast knows anything about
+ * the future that the observed past does not already imply.
+ *
+ * Mixed traffic on purpose: a pure up-peak puts every origin at one entrance, and a forecast over a
+ * one-point distribution has no ranking to get right or wrong. The demand split here spreads origins
+ * across the whole shaft, which is the only condition under which "does the forecast track the right
+ * floor" is a question with content.
+ *
+ * The interception is through `SimulationConfig.createPredictor`, whose contract is exactly this —
+ * *"a model handed in here is fed by the run loop on real arrivals and by nothing else"* — so the
+ * model under audit is the one the shipped path builds, wrapped rather than replaced.
+ */
+export async function auditForecastCausalityInRun(
+  options: ForecastCausalityOptions = {},
+): Promise<ForecastCausalityAudit> {
+  const resources = await loadResources();
+  const buildingId = options.building ?? 'midtown-office';
+  const profileId = options.profileId ?? 'predictive-balanced';
+  const replications = options.replications ?? 25;
+  const horizonS = options.horizonS ?? 300;
+  const building = resources.buildingsById.get(buildingId);
+  if (building === undefined) throw new Error(`No building "${buildingId}" in data/buildings.`);
+  const profile = resources.dispatcherProfilesById.get(profileId);
+  if (profile === undefined) {
+    throw new Error(`data/dispatcher-profiles.json has no profile "${profileId}".`);
+  }
+
+  let observations = 0;
+  let queries = 0;
+  let backwardQueries = 0;
+  let maxObservationLeadS = -Infinity;
+  // One entry per replication, not per query. See ForecastCausalityAudit.partialEstimate.
+  const pastR: number[] = [];
+  const futureR: number[] = [];
+  const partialPerReplication: number[] = [];
+  let partialSamples = 0;
+
+  for (let index = 0; index < replications; index += 1) {
+    const pastThisRun: number[] = [];
+    const futureThisRun: number[] = [];
+    const partialThisRun: number[] = [];
+    let lastObservedAt = -Infinity;
+    const samples: { at: number; forecast: ReadonlyMap<string, number> }[] = [];
+
+    const simulation = new Simulation({
+      building,
+      dispatcherProfile: profile,
+      trafficProfiles: resources.trafficProfiles,
+      elevatorSpecs: resources.elevatorSpecs,
+      seed: replicationSeed(options.seed ?? BENCHMARK_SEED, index),
+      durationS: options.durationS ?? 1800,
+      reportWindow: 'full-run',
+      onTimeout: 'report',
+      demand: {
+        directionalSplit: { incoming: 0.34, outgoing: 0.33, interfloor: 0.33 },
+        arrivalRatePctPop5min: options.arrivalRatePctPop5min ?? 2,
+        peakWindowS: 300,
+      },
+      createPredictor: (bank: ResolvedBank, forProfile: DispatcherProfile): ArrivalModel => {
+        const model = createArrivalModel({
+          floorIds: bank.servesFloors,
+          ...(forProfile.idle === undefined ? {} : { idle: forProfile.idle }),
+        });
+        // A recording wrapper, not a replacement: every call is forwarded, and the only additions
+        // are counters. Nothing here can teach the model anything the run did not.
+        return {
+          get config() {
+            return model.config;
+          },
+          get observedArrivals() {
+            return model.observedArrivals;
+          },
+          get lastObservedAt() {
+            return model.lastObservedAt;
+          },
+          observe(floorId: string, direction: Direction, at: number) {
+            observations += 1;
+            lastObservedAt = Math.max(lastObservedAt, at);
+            return model.observe(floorId, direction, at);
+          },
+          rate(floorId: string, direction: Direction, at: number) {
+            return model.rate(floorId, direction, at);
+          },
+          forecast(floorId: string, direction: Direction, fromT: number, h?: number | undefined) {
+            return model.forecast(floorId, direction, fromT, h);
+          },
+          expectedDemandByFloor(fromT: number, h?: number | undefined) {
+            const value = model.expectedDemandByFloor(fromT, h);
+            queries += 1;
+            maxObservationLeadS = Math.max(maxObservationLeadS, lastObservedAt - fromT);
+            if (lastObservedAt > fromT) backwardQueries += 1;
+            samples.push({ at: fromT, forecast: value });
+            return value;
+          },
+          reset() {
+            model.reset();
+          },
+        } as ArrivalModel;
+      },
+    });
+    simulation.run();
+
+    const arrivals = simulation.trace.passengers.map((passenger) => ({
+      floorId: passenger.originFloorId,
+      at: passenger.arrivalTimeS,
+    }));
+    const seen = new Set<number>();
+    for (const sample of samples) {
+      const key = Math.round(sample.at);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const floors = [...sample.forecast.keys()];
+      const f = floors.map((id) => sample.forecast.get(id) as number);
+      const countIn = (id: string, from: number, to: number): number =>
+        arrivals.filter((entry) => entry.floorId === id && entry.at >= from && entry.at < to).length;
+      const past = floors.map((id) => countIn(id, sample.at - horizonS, sample.at));
+      const future = floors.map((id) => countIn(id, sample.at, sample.at + horizonS));
+      // Everything the run had generated before this instant: what the model has actually had the
+      // chance to fold in, which is a longer memory than one horizon.
+      const cumulative = floors.map((id) => countIn(id, -Infinity, sample.at));
+
+      const rp = pearson(f, past);
+      const rf = pearson(f, future);
+      if (Number.isFinite(rp)) pastThisRun.push(rp);
+      if (Number.isFinite(rf)) futureThisRun.push(rf);
+
+      const rc = pearson(f, cumulative);
+      const cf = pearson(cumulative, future);
+      if (
+        Number.isFinite(rc) &&
+        Number.isFinite(rf) &&
+        Number.isFinite(cf) &&
+        Math.abs(rc) < 0.99 &&
+        Math.abs(cf) < 0.99
+      ) {
+        const partial = (rf - rc * cf) / Math.sqrt((1 - rc * rc) * (1 - cf * cf));
+        if (Number.isFinite(partial)) partialThisRun.push(partial);
+      }
+    }
+
+    // Collapse the run to one number per statistic. A replication is the independent unit; the
+    // queries inside it are not.
+    partialSamples += partialThisRun.length;
+    if (pastThisRun.length > 0) pastR.push(meanOfFinite(pastThisRun));
+    if (futureThisRun.length > 0) futureR.push(meanOfFinite(futureThisRun));
+    if (partialThisRun.length > 0) partialPerReplication.push(meanOfFinite(partialThisRun));
+  }
+
+  const partialEstimate = estimateMean(partialPerReplication, { confidence: 0.95 });
+
+  return Object.freeze({
+    building: buildingId,
+    profileId,
+    replications,
+    observations,
+    queries,
+    backwardQueries,
+    maxObservationLeadS,
+    correlationWithPast: meanOfFinite(pastR),
+    correlationWithFuture: meanOfFinite(futureR),
+    partialCorrelationWithFutureGivenPast: partialEstimate.mean,
+    partialEstimate,
+    partialHalfWidth: partialEstimate.halfWidth,
+    partialSamples,
+    causal:
+      backwardQueries === 0 && maxObservationLeadS <= 0 && intervalContainsZero(partialEstimate),
   });
 }

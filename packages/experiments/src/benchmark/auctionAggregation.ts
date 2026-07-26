@@ -34,22 +34,23 @@
  * Whatever value autonomy has must come from a car doing something a central scorer cannot express —
  * which is the second question.
  *
- * ## Answer 2 — multi-round diverges, and it cannot be benchmarked on AWT today
+ * ## Answer 2 — multi-round diverges, and it now has a wait-time result as well
  *
- * With `rounds = 3` and `reserveMarginalDelayS = 25` — the settings
- * `data/dispatcher-profiles.json`'s `auction` `$comment` names for the contract-net arm — the
- * aggregation *does* reallocate: measured on the same ensemble, a provisional winner withdraws and
- * the contract moves to a different car on a measurable fraction of states, so the two aggregations
- * are genuinely different policies and not the same policy twice. {@link AuctionEnsembleResult}
- * reports the rate.
+ * With `rounds = 3` and `reserveMarginalDelayS = 25` — the settings {@link MULTI_ROUND_PROFILE}
+ * authors — the aggregation *does* reallocate: measured on the same ensemble, a provisional winner
+ * withdraws and the contract moves to a different car on a measurable fraction of states, so the two
+ * aggregations are genuinely different policies and not the same policy twice.
+ * {@link AuctionEnsembleResult} reports the rate.
  *
- * **But no AWT interval can be quoted for it, and the obstruction is structural.** `SimulationConfig`
- * has no policy hook: `Simulation` builds each bank's controller with `createDispatchPolicy`, whose
- * return type is `WeightedCostDispatchPolicy`, so an `AuctionDispatchPolicy` cannot be injected into
- * a run. `core/dispatch/policies/index.ts` records this as gap 2 and gives the one-field fix. Until
- * it lands, the multi-round arm exists at decision level and nowhere else, and the honest report is
- * that **the aggregation question is answered in the direction theory predicts for one round and is
- * unmeasured on AWT for more than one.** A divergence rate is not a wait-time result and must not be
+ * **And the rate is no longer all there is.** This section used to read *"no AWT interval can be
+ * quoted for it, and the obstruction is structural — `SimulationConfig` has no policy hook"*. It
+ * has one, and it is not the hook that mattered: `config/schema.ts` carries the `auction` section
+ * and `dispatch/policies/registry.ts` maps `auction.aggregation` to a policy factory, so
+ * `Simulation` builds whichever aggregation a profile names, from data. Both arms are shipped
+ * profiles, `auction-multi-round` resolves `rounds: 3` through `loadConfig` with no options object,
+ * and both appear in {@link ARM_PROFILES} with paired-t intervals against the baseline like every
+ * other arm. The divergence rate below is now the *mechanism* behind a wait-time result rather than
+ * a substitute for one — which is still the rule: a divergence rate is not an AWT result and is not
  * quoted as one.
  *
  * ## Why a randomized ensemble rather than a fixture, and why it is honest
@@ -74,11 +75,11 @@
  * `./policies/index.js` from `dispatch/index.ts` and the package barrel, and both imports reverted
  * to `from '@elevator-sim/core'` unchanged. Nothing else moved — same module, same numbers.
  *
- * The *other* obstruction is still here and is not an export problem: `SimulationConfig` has no
- * policy factory (gap 2), so an {@link AuctionDispatchPolicy} still cannot be injected into a run
- * and the multi-round arm still has no wait-time result. `auctionAggregation.test.ts` asserts that
- * against `core`'s own source, so the day it is fixed the test fails and this module is owed a real
- * paired-t comparison.
+ * The *other* obstruction is gone too, and it was never an export problem either: the aggregation is
+ * a profile field, so `Simulation` builds an auction policy for a profile that names one. The
+ * tripwire {@link multiRoundIsReachableFromSimulation} was written to go red the day that landed,
+ * and `auctionAggregation.test.ts` now asserts it the other way round — behaviourally, by requiring
+ * the two shipped profiles to produce observably different journeys through `runSimulation`.
  */
 
 import {
@@ -112,8 +113,19 @@ import type { AuctionOutcome } from '@elevator-sim/core';
 
 import { DATA_DIR } from '../validation/harness.js';
 
-/** The profile the aggregation study runs on. One profile, two option sets — see its `$comment`. */
+/** The control arm: sealed bid, one round, provably the centralized argmin. */
 export const AUCTION_PROFILE = 'auction';
+
+/**
+ * The treatment arm, authored as a profile.
+ *
+ * It differs from {@link AUCTION_PROFILE} in its `auction` section and in nothing else, so a
+ * paired-t interval between the two is an interval on the aggregation. That is only expressible
+ * because `config/schema.ts` carries the section and `dispatch/policies/registry.ts` selects the
+ * factory from it; while it did not, both arms had to be built from one profile through an options
+ * object and neither could be run through `runSimulation` at all.
+ */
+export const MULTI_ROUND_PROFILE = 'auction-multi-round';
 
 /** The contract-net settings `data/dispatcher-profiles.json` names for the multi-round arm. */
 export const CONTRACT_NET = Object.freeze({ rounds: 3, reserveMarginalDelayS: 25 });
@@ -464,12 +476,21 @@ function randomState(
   });
 }
 
-/** Whether `AuctionDispatchPolicy` can be reached from a full `runSimulation` yet. See gap 2. */
+/**
+ * Whether `AuctionDispatchPolicy` can be reached from a full `runSimulation`.
+ *
+ * It can. `Simulation` builds every bank's controller through `createPolicyFor`, a frozen table
+ * keyed on the profile's own `auction.aggregation`, so a profile declaring `contract-net` runs its
+ * contract net inside a real run and `auction-multi-round` is an authored arm rather than an
+ * options object. This used to return `false` and the test below asserted the absence structurally
+ * against core's source; both are now the other way round, and the wait-time interval this module
+ * could not quote is a paired-t comparison of the two shipped auction profiles.
+ *
+ * Kept as a function rather than deleted so a caller that branched on it still compiles, and so the
+ * claim stays testable rather than becoming a sentence in a doc comment.
+ */
 export function multiRoundIsReachableFromSimulation(): boolean {
-  // `SimulationConfig` carries no policy factory: `Simulation` builds every bank's controller with
-  // `createDispatchPolicy`, typed to `WeightedCostDispatchPolicy`. Asserted structurally in
-  // `auctionAggregation.test.ts` against core's own source, so this cannot rot into a stale `false`.
-  return false;
+  return true;
 }
 
 /** A tiny profile guard so a caller cannot accidentally study a non-auction weight vector. */

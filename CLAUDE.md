@@ -8,8 +8,12 @@ An elevator traffic simulator for designing and benchmarking smart dispatch algo
 Read [`docs/00-project-brief.md`](docs/00-project-brief.md) first, then
 [`docs/01-architecture.md`](docs/01-architecture.md).
 
-**Current status: pre-implementation.** Research and architecture are captured; no code
-yet. Work proceeds by the phases in [`docs/05-roadmap.md`](docs/05-roadmap.md).
+**Current status: Phases 0–5 landed and green.** Work proceeds by the phases in
+[`docs/05-roadmap.md`](docs/05-roadmap.md), which carries each phase's acceptance verdict and the
+measurements behind it. Read its **Standing requirement — the integration seam has an owner** before
+planning work: a behaviour that is configurable, unit-tested in isolation and never called from
+`sim/simulation.ts` passes every other check this repository runs, and has already shipped four
+times.
 
 ## Non-negotiable invariants
 

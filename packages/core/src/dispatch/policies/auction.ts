@@ -2,19 +2,30 @@
  * Contract-net bidding among cars — the aggregation, benchmarked rather than assumed.
  *
  * ```ts
- * const control    = createAuctionPolicy(profile);                       // rounds: 1
- * const contractNet = createAuctionPolicy(profile, {
- *   auction: { rounds: 3, reserveMarginalDelayS: 25 },
- * });
+ * const sealed     = createPolicyFor(profiles.get('auction'));             // rounds: 1
+ * const contractNet = createPolicyFor(profiles.get('auction-multi-round')); // rounds: 3
  * ```
  *
- * **Both arms are built from one profile.** That is not a convenience, it is the experimental
- * design: `config/schema.ts` has no `auction` section yet (see `types.ts` § *Pending config
- * surface*), so a second *profile* could not carry a different `auction.rounds` even if one were
- * authored — it would resolve to `rounds: 1` and be the control arm under another name, while
- * whatever stage settings it happened to differ in would be what the benchmark actually measured.
- * Two profiles is therefore the wrong shape for this comparison regardless, and `policies.test.ts`
- * asserts that no authored profile claims an aggregation it cannot carry.
+ * **The aggregation is a profile field.** `config/schema.ts` carries an `auction` section —
+ * `aggregation`, `rounds`, `reserveMarginalDelayS` — and `dispatch/policies/registry.ts` is a frozen
+ * table from `auction.aggregation` to a policy factory, so *which dispatcher runs* is data and not
+ * a branch (CLAUDE.md invariant 7). `data/dispatcher-profiles.json` ships both arms as profiles:
+ * `auction` (sealed bid, one round, provably the centralized argmin) and `auction-multi-round`
+ * (three rounds, a 25 s reserve), differing in that section and in **nothing else**, so a paired-t
+ * interval between the two is an interval on the aggregation. Loaded through `loadConfig` with no
+ * options object, `auction-multi-round` resolves `rounds: 3` and, measured on `midtown-office` at
+ * seed 20 260 726, holds more than one round in 922 of 2 398 auctions and lands somewhere other
+ * than the argmin 194 times.
+ *
+ * This paragraph used to say the opposite — that the config layer could not carry the section, so a
+ * second profile *"would resolve to `rounds: 1` and be the control arm under another name"*. It is
+ * kept in view because the experiment design that claim implied is still on offer and is now the
+ * wrong one: someone re-running this study from the old doc would build the options-object pair and
+ * reproduce the confound the profile pair removes.
+ *
+ * {@link AuctionPolicyOptions} survives as the **pre-persistence override**: the shape an optimizer
+ * uses to evaluate a candidate aggregation it has not written back to `data/` yet. It is not the
+ * only place the aggregation can be set, and it is not how a shipped run selects one.
  *
  * Same profile, same weights, same term library, same seven-stage lifecycle. The only difference
  * is **who decides**, which is exactly the comparison docs/01-architecture.md
@@ -93,6 +104,7 @@
  *   agrees with what `capacity.ts` does through the load sensor.
  */
 
+import { AGGREGATIONS } from '../../config/types.js';
 import type { SimTime } from '../../kernel/types.js';
 import type { CarSnapshot } from '../../model/car/types.js';
 import { WeightedCostDispatchPolicy, resolveDispatchConfig } from '../policy.js';
@@ -137,10 +149,10 @@ import {
  * and a weighted-cost policy built from the same profile cannot disagree about anything except
  * the aggregation.
  *
- * @throws DispatchError if `rounds` is not an integer in `[1, 8]`, or the reserve is not a finite
- *   non-negative number. Thrown at build time rather than at decision time, for the reason
- *   `DispatchError` gives: a configuration the engine cannot honour would otherwise produce a
- *   plausible-looking run of the wrong system.
+ * @throws DispatchError if `aggregation` is not one this package implements, if `rounds` is not an
+ *   integer in `[1, 8]`, or the reserve is not a finite non-negative number. Thrown at build time
+ *   rather than at decision time, for the reason `DispatchError` gives: a configuration the engine
+ *   cannot honour would otherwise produce a plausible-looking run of the wrong system.
  */
 export function resolveAuctionConfig(
   source: AuctionProfileSource,
@@ -148,12 +160,19 @@ export function resolveAuctionConfig(
 ): ResolvedAuctionConfig {
   const base = resolveDispatchConfig(source, options);
 
+  const aggregation =
+    options.auction?.aggregation ?? source.auction?.aggregation ?? POLICY_DEFAULTS.aggregation;
   const rounds = options.auction?.rounds ?? source.auction?.rounds ?? POLICY_DEFAULTS.rounds;
   const reserve =
     options.auction?.reserveMarginalDelayS ??
     source.auction?.reserveMarginalDelayS ??
     POLICY_DEFAULTS.reserveMarginalDelayS;
 
+  if (!AGGREGATIONS.includes(aggregation)) {
+    throw new DispatchError(
+      `Dispatcher "${source.id}": auction.aggregation must be one of ${AGGREGATIONS.join(', ')}; received "${String(aggregation)}". The aggregation selects which policy factory runs the profile, so an unknown one would silently fall back to a dispatcher nobody configured.`,
+    );
+  }
   if (!Number.isInteger(rounds) || rounds < 1 || rounds > MAX_AUCTION_ROUNDS) {
     throw new DispatchError(
       `Dispatcher "${source.id}": auction.rounds must be an integer in [1, ${MAX_AUCTION_ROUNDS}]; received ${rounds}. One round is a sealed-bid auction and is the centralized argmin; a round budget below one is not an auction at all.`,
@@ -167,7 +186,7 @@ export function resolveAuctionConfig(
 
   return Object.freeze({
     ...base,
-    auction: Object.freeze({ rounds, reserveMarginalDelayS: reserve }),
+    auction: Object.freeze({ aggregation, rounds, reserveMarginalDelayS: reserve }),
   });
 }
 
@@ -607,22 +626,22 @@ export class AuctionDispatchPolicy implements DispatchPolicy {
  * Build an auction policy from a dispatcher profile.
  *
  * ```ts
- * const profile = config.dispatcherProfilesById.get('auction')!;
- * const control = createAuctionPolicy(profile);                        // the centralized argmin
- * const treatment = createAuctionPolicy(profile, {                     // the contract net
- *   auction: { rounds: 3, reserveMarginalDelayS: 25 },
- * });
+ * const control = createAuctionPolicy(config.dispatcherProfilesById.get('auction')!);
+ * const treatment = createAuctionPolicy(config.dispatcherProfilesById.get('auction-multi-round')!);
  * ```
  *
  * There is no aggregation argument, because the aggregation *is* `auction.rounds` and
  * `auction.reserveMarginalDelayS` — data, declared in {@link POLICY_PARAMETERS}, sampleable by a
- * generic optimizer. Built with no options it is the centralized argmin, which is the control arm
+ * generic optimizer, and carried by `config/schema.ts` so a tuned winner persists as a profile.
+ * A profile with no `auction` section resolves to the centralized argmin, which is the control arm
  * every measurement of this module is against.
  *
- * **One profile, two option sets** — not two profiles. Until `config/schema.ts` carries the
- * `auction` section, the options object is the only place the aggregation can be set, so a second
- * profile would differ in its *stage settings* and in nothing else, and the paired-t interval a
- * benchmark of the pair produced would be an interval on stage 5.
+ * **Two profiles, not one profile and two option sets.** That is the shipped shape:
+ * `data/dispatcher-profiles.json` holds `auction` and `auction-multi-round`, byte-identical outside
+ * their `auction` sections, and `registry.ts` builds whichever one a run names. `options` is the
+ * override an optimizer uses **before** it has persisted a candidate; passing it is not how a run
+ * selects an aggregation, and a benchmark that used it to build both arms from one profile would be
+ * measuring something the shipped path cannot run.
  */
 export function createAuctionPolicy(
   profile: AuctionProfileSource,

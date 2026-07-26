@@ -87,10 +87,18 @@ describe('Phase 5 — the operating points are the highest at which an interval 
       if (spec.admissibleReplications !== undefined) {
         expect(spec.replications).toBeLessThan(spec.admissibleReplications);
       }
-      // Nothing but the baseline ever loses its AWT on any of these three cases. That is the
-      // finding the ceiling is a consequence of: `nearest-car` is the only shipped profile that
-      // diverges at any of these design points.
-      expect([...firstInvalidByArm.keys()].filter((arm) => arm !== BASELINE_PROFILE)).toEqual([]);
+      // Every other arm stays quotable **at the budget the benchmark actually uses**, which is the
+      // property the ceiling exists to protect. It used to be the stronger claim — that nothing but
+      // the baseline ever loses its AWT anywhere in 1000 replications — and that stopped being true
+      // when `zoned-uppeak` started parking: `idle.parkingStrategy: zone-center` disperses the bank
+      // instead of leaving every car where it last served somebody, which on Secure Tower's
+      // access-zoned up-peak costs enough on one tail replication (index 683 of 1000) to lose its
+      // AWT. Well above the 500 the case is measured at, and reported rather than hidden.
+      for (const [arm, index] of firstInvalidByArm) {
+        if (arm === BASELINE_PROFILE) continue;
+        expect(index, `${spec.label}: ${arm} loses its AWT inside the measured budget`)
+          .toBeGreaterThanOrEqual(spec.replications);
+      }
     }
   }, TIMEOUT_MS);
 
@@ -143,7 +151,11 @@ describe('Phase 5 — the operating points are the highest at which an interval 
     // in a footnote.
     expect(fourRow).toContain('predictive-balanced:0 ');
     expect(fourRow).toContain(`${BASELINE_PROFILE}:52*`);
-    expect(fourRow.split(' ').filter((token) => token.endsWith('*')).length).toBe(8);
+    // Every arm but that one. Counted against the profile library rather than hard-coded, so a
+    // profile added to `data/` is covered without an edit here.
+    expect(fourRow.split(' ').filter((token) => token.endsWith('*')).length).toBe(
+      ALL_PROFILES.length - 1,
+    );
   }, TIMEOUT_MS);
 
   it('reports why Garden Apartments is reported over the full run and not the peak 5 minutes', async () => {

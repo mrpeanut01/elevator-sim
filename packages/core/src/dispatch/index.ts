@@ -63,14 +63,22 @@
  * a compile error rather than a wrong number. That is why one may keep the bare name here and
  * neither may there.
  *
- * ## What is exported and still cannot run inside `runSimulation`
+ * ## Everything exported here runs inside `runSimulation`
  *
- * `policies/` and `predictor/` are on the package surface as of Phase 5, and four of their
- * behaviours are still unreachable from a full run because of missing wiring in `sim/` and
- * `config/` — gaps 2 to 5, enumerated with their one-line fixes in `policies/index.ts`. Exporting
- * them does not close those gaps. A Phase 7 optimizer reading `POLICY_PARAMETERS` or
- * `PREDICTOR_PARAMETERS` off this barrel will find tunables that a `runSimulation` measurement
- * cannot presently move; read that module's table before spending a replication budget on them.
+ * `policies/` and `predictor/` are on the package surface and all four of their behaviours are
+ * reachable from a full run: `Simulation` builds every bank's controller through
+ * {@link createPolicyFor}, sweeps a `CapacityReassignmentMonitor` after every stop, resolves a
+ * {@link groupContext} per dispatch pass and a preposition context per park. Every tunable a
+ * Phase 7 optimizer reads off `POLICY_PARAMETERS` or `PREDICTOR_PARAMETERS` can move a
+ * `runSimulation` measurement — with one documented exception it must honour rather than discover:
+ * `auction.rounds` and `auction.reserveMarginalDelayS` are inert under
+ * `auction.aggregation: central-argmin`, which both declare in their `activeWhen`.
+ *
+ * `sim/seam.test.ts` is what keeps that true. It asserts, behaviourally rather than by grepping for
+ * a symbol, that every `idle.parkingStrategy` produces a different run from `stay`, that the two
+ * aggregations differ, that sealed-bid is bit-identical to the central argmin, that the load edge
+ * fires, and that every weighted cost term produces a non-zero value with spread across candidate
+ * cars inside a real run.
  */
 
 /* -------------------------------------------------------------------------- *
@@ -270,15 +278,18 @@ export {
   CapacityReassignmentMonitor,
   MAX_AUCTION_ROUNDS,
   POLICY_DEFAULTS,
+  POLICY_FACTORIES,
   POLICY_PARAMETERS,
   POLICY_PARAMETER_IDS,
   WITHDRAWAL_REASONS,
+  aggregationOf,
   bandRange,
   bidsFrom,
   carSnapshotsById,
   consideredCalls,
   contiguousZones,
   createAuctionPolicy,
+  createPolicyFor,
   fixedForecast,
   groupContext,
   hasMigrations,
@@ -290,6 +301,7 @@ export {
   peakReassignments,
   policyParameter,
   prepositionPlan,
+  profileAsPolicySource,
   repositionContextFor,
   resolveAuctionConfig,
   resolvePrepositionContext,
@@ -310,6 +322,7 @@ export type {
   CallMigration,
   CapacityReassignmentResult,
   DemandForecastSource,
+  DispatchPolicyFactory,
   GroupContextOptions,
   GroupObservationContext,
   LoadCrossing,

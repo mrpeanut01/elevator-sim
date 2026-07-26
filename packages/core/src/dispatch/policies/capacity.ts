@@ -18,15 +18,30 @@
  * three reasons a pure agent model fails: *"When the load sensor reports full, that car's
  * committed hall calls must migrate elsewhere."*
  *
- * ## Nothing calls this yet, and the snippet above is the fix rather than a description
+ * ## `Simulation.#finishStop` calls this, once per stop
  *
- * `sim/simulation.ts` contains **no `reconsider` call site at all**, so capacity-driven migration
- * does not fire in a run: no monitor is constructed, no sweep is taken, and stage 5 is reached only
- * from a test. Everything below is therefore proved at the decision level and nowhere else, and the
- * mechanism's value against `reassignmentPolicy: never` — the control arm the module's own docs name
- * — has not been measured on any building. One monitor per bank, `run` after the cars have loaded,
- * `reset` per replication, is the whole of what `sim/` owes; `index.ts` § *Nothing in this directory
- * is reachable from `runSimulation` yet* lists it beside the other four gaps.
+ * This section used to say that nothing did, and that `sim/simulation.ts` contained no `reconsider`
+ * call site at all — so capacity-driven migration had never fired on a building and its value
+ * against `reassignmentPolicy: never` had never been measured. It fires now.
+ *
+ * The call site is `#finishStop`: doors shut, load settled, and the car not yet given its next
+ * instruction. That ordering is the mechanism rather than a detail — a call handed on *after* the
+ * car has departed for the landing it can no longer serve sends a second car to a floor the first
+ * is already driving past. A stop is also the only thing in that simulation which changes a car's
+ * load, so it is the only place a crossing can appear.
+ *
+ * Measured on `midtown-office` at one seed, over a full run:
+ *
+ * | profile | `reassignmentPolicy` | crossings | migrated | held |
+ * |---|---|---|---|---|
+ * | `predictive-balanced` | `until-commitment` | 44 | 17 | 34 |
+ * | `capacity-aware` | `until-commitment` | 44 | 9 | 49 |
+ * | `eta` | `never` (default) | 44 | 0 | 62 |
+ *
+ * Both sweep; only the profile that opted into stage 5 moves anything, and the held entries carry
+ * `reassignment-disabled`. That is what makes the mechanism's value measurable against its own
+ * absence rather than confounded with it — and it is also why wiring the trigger in changed nothing
+ * for the profiles this project has already published numbers for.
  *
  * ## This is a trigger, not a second stage 5
  *

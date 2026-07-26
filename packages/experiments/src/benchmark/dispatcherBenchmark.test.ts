@@ -6,54 +6,59 @@
  * the verdict**. Both halves are asserted here, because reporting the first without the second would
  * be true and misleading.
  *
- * ## The verdict: 8 of 8, on all three buildings, on all four metrics
+ * ## The verdict: 9 of 9, and one arm that is also WORSE somewhere
  *
  * Every arm in `data/dispatcher-profiles.json` beats `nearest-car` with a 95 % paired-t interval
- * excluding zero — not on one building but on all three, and not on AWT alone but on WT95, % > 60 s
- * and TTD too. There is exactly one exception in 96 cells: `predictive-balanced`'s AWT on Garden
- * Apartments, which is `-0.22 s [-0.46, +0.03]` and therefore INDISTINGUISHABLE (it would need
- * n ≈ 620; the budget was 500).
+ * excluding zero on at least one building. Nine arms, because the aggregation is a profile field
+ * now and the file ships `auction` and `auction-multi-round`. There are two cells in 108 that are
+ * not `BETTER`, both named in the assertions below: `predictive-balanced`'s AWT on Garden Apartments
+ * is `-0.23 s [-0.47, +0.02]` and therefore INDISTINGUISHABLE (it would need n ≈ 579; the budget was
+ * 500), and `zoned-uppeak` on Secure Tower is **WORSE** on all four metrics.
  *
  * The margins are not marginal. On Midtown Office up-peak the spread is `nearest-car` 22.70 s against
- * `eta` 15.90 s — a **30 % improvement**, comfortably above the 8–12 % Phase 3 measured as the
- * resolution limit at n = 100, and above it at every budget these buildings admit.
+ * `eta` 15.90 s and `zoned-uppeak` 14.54 s — a **30 % to 36 % improvement**, comfortably above the
+ * 8–12 % Phase 3 measured as the resolution limit at n = 100, and above it at every budget these
+ * buildings admit.
  *
- * ## The caveat: three arms are the same dispatcher
+ * ## The caveat: what the arms share, and what they no longer share
  *
- * `eta`, `fairness-first` and `zoned-uppeak` produce **bit-identical runs** on Midtown Office and
- * Secure Tower — every metric, every replication, `rho = 1`, paired interval `[0, 0]`. On Garden
- * Apartments at n = 500 `fairness-first` finally separates (by 0.01 s), leaving `eta ≡ zoned-uppeak`.
- * So a third of the arms that "beat the baseline" beat it with `eta`'s `waitTime` term and with
- * nothing of their own:
+ * This section used to read *"three arms are the same dispatcher"* — `eta ≡ fairness-first ≡
+ * `zoned-uppeak` on the up-peak buildings, `rho = 1`, interval `[0, 0]`, every metric, every
+ * replication — and gave the cause as `Simulation.#dispatchBank` passing
+ * `{ waitingPassengers, waitingMassKg }` and no `zoneFloorIdsByCarId`, so that `zoneAffinity`
+ * evaluated to 0 for every car. The runner resolves a group context now, and the test at the bottom
+ * of this file refutes the old claim: `zoned-uppeak` is bit-identical to `eta` **nowhere**. Measured
+ * through the shipped engine on Midtown Office, `zoneAffinity` went from 0 non-zero evaluations in
+ * 437 to 355 in 472, with cross-car spread in 142 of the profile's 144 decisions.
  *
- * | arm | its signature mechanism | why it contributes nothing |
- * |---|---|---|
- * | `zoned-uppeak` | `zoneAffinity: 0.3` | `Simulation.#dispatchBank` passes `{ waitingPassengers, waitingMassKg }` and no `zoneFloorIdsByCarId`, so `zoneAffinity` evaluates to 0 for every car. `waitTime: 0.7` alone has the same `argmin` as `waitTime: 1.0` — scaling a single-term cost cannot move an `argmin`. Its `split-demand` at 10 waiting does not trigger at 1 % of population |
- * | `fairness-first` | `starvation: 0.5` | `starvation` is the age of the oldest *committed hall call this car would push back*. At these loads a car rarely holds one, so the term is 0 for every candidate — and a term equal across candidates cannot move an `argmin` either. Its `until-commitment` reassignment never finds an improvement above its 2 s hysteresis |
+ * What survives is `eta ≡ fairness-first` on the two up-peak cases, and it is correct rather than a
+ * gap: `starvation` is the age of the oldest *committed hall call this car would push back*, and at
+ * an up-peak lobby no car holds one, so the term is 0 for every candidate and a term equal across
+ * candidates cannot move an `argmin`. On Garden Apartments at n = 500 nothing is identical to
+ * anything.
  *
- * Both are correct code being handed a context that makes them inert, and neither is a defect in this
- * suite's arithmetic — `IDENTICAL` is exactly the verdict `verdict.ts` exists to be able to give. The
- * honest reading of the criterion is therefore: **it is met, and it is met too easily, because
- * `nearest-car` is a weak enough baseline that a single wait-time term clears it by 30 %.** A
- * criterion that separated the arms from each other would not have been met by three of them.
+ * ## `zoned-uppeak` is the best arm on two buildings and the worst on the third
+ *
+ * The live weight cuts both ways, which is the finding. `zoned-uppeak` beats the baseline by
+ * **−35.9 % AWT on Midtown** and **−38.9 % on Garden** — the largest margins in the study — and is
+ * **+8.9 % WORSE on Secure Tower**, on AWT, WT95, % > 60 s and TTD alike. The cause decomposes to
+ * the cost term rather than the parking strategy, and the decomposition is in the assertion below.
+ * The weight is left at the hand-authored `0.3` rather than tuned down to make a gate pass.
  *
  * ## And one arm is worse than the simplest arm
  *
- * `predictive-balanced` — eleven weighted terms, deferred assignment, split demand, adaptive dwell,
+ * `predictive-balanced` — ten weighted terms, deferred assignment, split demand, adaptive dwell,
  * reassignment on deceleration — beats the baseline and **loses to `eta`** on AWT everywhere:
- * `+3.22 s [+2.81, +3.63]` on Midtown, `+1.97 s [+1.75, +2.18]` on Secure Tower, `+1.06 s
- * [+0.95, +1.18]` on Garden. It buys that with TTD, where it is the best arm on Midtown (`-11.76 s`
- * against the baseline against `eta`'s `-10.31 s`; the paired difference against `eta` is
- * `-1.44 s [-2.12, -0.77]`). That is a real Pareto trade and docs/06 § *Do not scalarize too early*
- * predicted it exactly: more terms is not more performance on the metric you happen to be reading.
+ * `+3.00 s [+2.60, +3.41]` on Midtown, `+1.76 s [+1.55, +1.98]` on Secure Tower, `+1.05 s
+ * [+0.94, +1.17]` on Garden. It buys that with TTD, where it is better than `eta` on Midtown
+ * (`-1.14 s [-1.79, -0.49]` paired). That is a real Pareto trade and docs/06 § *Do not scalarize too
+ * early* predicted it exactly: more terms is not more performance on the metric you happen to be
+ * reading.
  *
  * It also has the study's most interesting single property, visible only in the saturation census and
  * not in any interval: **at 4 % of population per 5 minutes on Midtown Office, `predictive-balanced`
- * is the only profile in the library that does not saturate.** The baseline diverges on 52
- * replications in 100, `eta` on 8, `auction` on 7, `zoned-uppeak` on 4, `capacity-aware` on 1, and
- * `predictive-balanced` on **0**. So the arm that loses to `eta` by 3 s at 1 % load is the arm still
- * standing at 4 ×, and no AWT interval can express that because every other arm's mean has been
- * suppressed. See `saturationCensus.test.ts`.
+ * is the only profile in the library that does not saturate.** See `saturationCensus.test.ts` for
+ * the census as it stands.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -104,26 +109,43 @@ describe('Phase 5 criterion — each dispatcher against nearest-car', () => {
         `${outcome.armId} never beat ${BASELINE_PROFILE} on any building`,
       ).toBe(true);
     }
-    // And nothing loses to the baseline anywhere. Asserted so that a future change which makes an
-    // arm worse cannot hide behind a win on some other metric.
-    for (const outcome of outcomes) {
-      expect(outcome.worseOn, `${outcome.armId} is WORSE than the baseline somewhere`).toEqual([]);
-    }
+    // Where an arm loses to the baseline, it is named rather than averaged away — a change that
+    // makes an arm worse must not hide behind a win on some other metric. There is exactly one such
+    // arm and its regression is a finding rather than a defect: `zoned-uppeak` is WORSE than
+    // `nearest-car` on Secure Tower, on all four metrics, and BETTER on the other two buildings by
+    // the largest margins in the study (−35.9 % AWT on Midtown, −38.9 % on Garden).
+    //
+    // The cause is decomposable and was measured: with `zoneAffinity` weighted at 0 and everything
+    // else held (seed 20260726, 60 replications, Secure Tower up-peak 2 %), the same profile runs at
+    // 14.29 s against `eta`'s 15.37 — better than the field. With the weight restored it runs at 23.78. So the
+    // regression is the **cost term**, not the parking strategy, and it is a regression that could
+    // not exist before this phase because the term evaluated to zero for every car in every run.
+    // A static contiguous partition prices a car for being outside a band on a building whose
+    // *access* zoning already partitions the population differently, and the two disagree.
+    // `weights.zoneAffinity: 0.3` was hand-authored and never measurable; it is left as authored
+    // rather than tuned down to make this assertion pass.
+    const worse = outcomes.filter((outcome) => outcome.worseOn.length > 0);
+    expect(worse.map((outcome) => outcome.armId)).toEqual(['zoned-uppeak']);
+    expect(worse[0]?.worseOn.map((entry) => entry.caseId)).toEqual(['secure-up-peak']);
   }, TIMEOUT_MS);
 
-  it('measures every arm as BETTER on AWT except predictive-balanced on Garden', async () => {
+  it('measures every arm as BETTER on AWT except two named cells', async () => {
     const results = await benchmark();
-    const indistinguishable: string[] = [];
+    const notBetter: string[] = [];
     for (const result of results) {
       for (const arm of result.arms) {
         const cell = arm.cell('awtS');
-        if (cell.verdict !== 'BETTER') indistinguishable.push(`${result.caseId}/${arm.armId}`);
+        if (cell.verdict !== 'BETTER') notBetter.push(`${result.caseId}/${arm.armId}`);
       }
     }
-    // Exactly one cell of 24 fails to clear zero, and it is the pre-positioning profile on the
-    // building the pre-positioning criterion is about. That is not a coincidence — see
-    // `prepositioning.test.ts`.
-    expect(indistinguishable).toEqual(['garden-residential/predictive-balanced']);
+    // Two cells of 27, both named and both explained. `predictive-balanced` on Garden is below the
+    // resolution limit at this budget — the building the pre-positioning criterion is about, which
+    // is not a coincidence; see `prepositioning.test.ts`. `zoned-uppeak` on Secure Tower is WORSE,
+    // and the assertion above decomposes why.
+    expect(notBetter).toEqual([
+      'garden-residential/predictive-balanced',
+      'secure-up-peak/zoned-uppeak',
+    ]);
 
     const garden = results.find((result) => result.caseId === 'garden-residential') as CaseResult;
     const cell = armOf(garden, 'predictive-balanced').cell('awtS');
@@ -141,24 +163,37 @@ describe('Phase 5 criterion — each dispatcher against nearest-car', () => {
   it('improves the tail as well as the mean — WT95 and % > 60 s on every case', async () => {
     // The reason both are in `BENCHMARK_METRICS`. A dispatcher that pulled the mean down while
     // leaving the tail alone would pass an AWT-only gate, and the tail is what passengers call bad.
+    // One cell is exempt, by name, and it is the same cell the AWT assertion names: `zoned-uppeak`
+    // on Secure Tower is worse on the tail as well as the mean. Exempting it by id rather than
+    // loosening the assertion keeps every other cell held to `BETTER`.
+    const EXEMPT = 'secure-up-peak/zoned-uppeak';
     for (const result of await benchmark()) {
       for (const arm of result.arms) {
-        expect(arm.cell('wt95S').verdict, `${result.caseId}/${arm.armId} WT95`).toBe('BETTER');
-        expect(arm.cell('pctOverLongWait').verdict, `${result.caseId}/${arm.armId} %>60s`).toBe(
-          'BETTER',
-        );
+        const cellId = `${result.caseId}/${arm.armId}`;
+        if (cellId === EXEMPT) continue;
+        expect(arm.cell('wt95S').verdict, `${cellId} WT95`).toBe('BETTER');
+        expect(arm.cell('pctOverLongWait').verdict, `${cellId} %>60s`).toBe('BETTER');
       }
     }
-    // And the strongest single statement in the study: on the up-peak cases the baseline is the only
-    // dispatcher in the library that makes anybody wait more than a minute at all.
+    // And the statement that used to be the strongest single one in the study: on the up-peak cases
+    // the baseline was the only dispatcher in the library that made anybody wait more than a minute
+    // at all. `zoned-uppeak` is now the second — 0.13 % of passengers on Midtown and 8.5 % on Secure
+    // Tower — and it is the only one, so it is named rather than absorbed into a looser bound. Both
+    // are the live `zoneAffinity` weight: the arm is still far better than the baseline on Midtown
+    // (−98.2 % on this metric) and worse than it on Secure Tower.
     for (const caseId of ['midtown-up-peak', 'secure-up-peak']) {
       const result = (await benchmark()).find((entry) => entry.caseId === caseId) as CaseResult;
       expect(result.baselineMeans.pctOverLongWait).toBeGreaterThan(0);
-      for (const arm of result.arms) expect(arm.means.pctOverLongWait).toBe(0);
+      for (const arm of result.arms) {
+        if (arm.armId === 'zoned-uppeak') continue;
+        expect(arm.means.pctOverLongWait, `${result.caseId}/${arm.armId}`).toBe(0);
+      }
+      const zoned = result.arms.find((arm) => arm.armId === 'zoned-uppeak') as (typeof result.arms)[number];
+      expect(zoned.means.pctOverLongWait, `${caseId}/zoned-uppeak`).toBeGreaterThan(0);
     }
   }, TIMEOUT_MS);
 
-  it('finds three arms bit-identical to eta — the criterion is met by a term that never fires', async () => {
+  it('finds zoned-uppeak no longer bit-identical to eta, and fairness-first still correctly is', async () => {
     const results = await benchmark();
     const classes = new Map<string, readonly (readonly string[])[]>();
     for (const result of results) {
@@ -174,14 +209,23 @@ describe('Phase 5 criterion — each dispatcher against nearest-car', () => {
             .join('; ') || 'none'),
       );
     }
-    // `zoned-uppeak` is `eta` on every case: `zoneAffinity` is never given a partition to price
-    // against, and a single-term cost scaled by 0.7 has `eta`'s `argmin`.
+    // This assertion used to run the other way, and it was the sharpest evidence in the whole gate
+    // that something was disconnected: `zoned-uppeak` was `eta` on **every** case — `rho = 1`,
+    // interval `[0, 0]`, every metric, every replication — because `zoneAffinity` was never given a
+    // partition to price against and a single-term cost scaled by 0.7 has `eta`'s `argmin`. An arm
+    // that is bit-identical to another arm is not indistinguishable at this budget; it is the same
+    // dispatcher under two names, and no budget changes that.
+    //
+    // It is no longer identical anywhere. The runner resolves the partition and hands it to stage 3,
+    // so the weight prices something, and the profile's `zone-center` parking moves cars as well.
     for (const result of results) {
-      const withEta = result.identityClasses.find((members) => members.includes('eta'));
-      expect(withEta, `${result.caseId} lost the eta identity class`).toContain('zoned-uppeak');
+      const withEta = result.identityClasses.find((members) => members.includes('eta')) ?? [];
+      expect(withEta, `${result.caseId} still has zoned-uppeak ≡ eta`).not.toContain('zoned-uppeak');
     }
-    // On the two up-peak cases `fairness-first` joins them, because `starvation` is zero for every
-    // candidate when no car holds a committed hall call the new one would delay.
+    // `fairness-first` remains identical to `eta` on the two up-peak cases, and that is correct
+    // rather than a gap: `starvation` is zero for every candidate when no car holds a committed hall
+    // call the new one would delay, which is what an up-peak lobby looks like. A term with no
+    // information must contribute no cost.
     for (const caseId of ['midtown-up-peak', 'secure-up-peak']) {
       const found = classes.get(caseId) ?? [];
       expect(found.some((members) => members.includes('fairness-first'))).toBe(true);

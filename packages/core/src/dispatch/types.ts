@@ -687,7 +687,7 @@ export interface ResolvedDispatchConfig {
    * Term id to weight for terms the library declares but no phase implements yet.
    *
    * Carried rather than rejected so every profile in `data/dispatcher-profiles.json` builds a
-   * working policy today: `predictive-balanced` weights eleven terms and Phase 2 implements
+   * working policy today: `predictive-balanced` weights ten terms and Phase 2 implemented
    * three. They contribute nothing to a score, and a caller that needs to know can read this.
    * A *misspelled* term never reaches here — `dispatcherProfilesSchema` already rejects a
    * weight whose id is not in the `terms` library.

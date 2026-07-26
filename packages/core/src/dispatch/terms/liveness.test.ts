@@ -30,15 +30,15 @@
  * ## What this file does **not** claim, stated so nobody reads more into it
  *
  * It proves the terms are live through the **policy**, given a caller that supplies what it holds.
- * It does not prove they are live through `sim/simulation.ts`, and two of them are not: the run
- * loop calls `policy.dispatch(..., { waitingPassengers, waitingMassKg })` and builds no group
- * context, so a full `runSimulation` supplies neither fact and a profile weighting `zoneAffinity`
- * produces **byte-identical AWT at weights of 0.3, 0 and 50** — measured on `zoned-uppeak` against
- * `midtown-office`, and unchanged by this work. Closing it costs one line at that call site
- * (`policies/groupContext.ts` already resolves both facts from the snapshots it is handed), plus,
- * for `predictedDemand`, a predictor instantiated and fed by the run loop — which is a determinism
- * question and belongs with whoever owns the loop. Until then the `zoneAffinity` weight in a
- * shipped profile is still decoration, whatever this file proves about the term.
+ * It does not prove they are live through `sim/simulation.ts`, and for a whole phase two of them
+ * were not: the run loop called `policy.dispatch(..., { waitingPassengers, waitingMassKg })`, built
+ * no group context, and a profile weighting `zoneAffinity` produced **byte-identical AWT at weights
+ * of 0.3, 0 and 50** on `midtown-office`. That is closed — `#dispatchBank` resolves a
+ * `groupContext` per pass and `#park` resolves the bank's preposition context — but the claim this
+ * file makes is still the narrower one, deliberately. **`sim/seam.test.ts` is where the run-level
+ * claim lives**: it wraps the real policy through `SimulationConfig.createPolicy` and requires every
+ * weighted term to produce a non-zero raw *and* a spread across candidate cars inside a full
+ * `runSimulation`. Two files, two claims, and neither can be mistaken for the other.
  */
 
 import { describe, expect, it } from 'vitest';

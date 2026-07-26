@@ -69,6 +69,7 @@ export {
 export { loadConfig } from './loader.js';
 
 export {
+  AGGREGATIONS,
   ASSIGNMENT_MODES,
   ASSIGNMENT_TIMINGS,
   BUILDING_TYPES,
@@ -82,6 +83,7 @@ export {
 
 export type {
   AccessZone,
+  Aggregation,
   AnswerStageConfig,
   ArrivalProcessConfig,
   AssignmentMode,

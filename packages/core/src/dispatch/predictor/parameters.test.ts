@@ -91,17 +91,15 @@ describe('PREDICTOR_PARAMETERS', () => {
     expect(predictorParameterValue(resolvePredictorConfig(), 'weights.waitTime')).toBeUndefined();
   });
 
-  it('says which ids a profile can actually author, by parsing them (2 of 6 today)', () => {
+  it('every declared id is authorable as a profile path — all six, by parsing them', () => {
     // `id` is documented as "the dotted path in data/dispatcher-profiles.json, so a tuned winner is
-    // written back as a profile without translation". For four of the six that is false today:
-    // `idleStageSchema` is a `z.strictObject` carrying only `predictorHorizonS` and
-    // `predictorLearningRate`, so the other four are rejected as unrecognized keys. An optimizer can
-    // sample all six through `ArrivalModelOptions.idle`, find an optimum, and then be unable to
-    // write it down — invariant 8 met on 2 of 6 dimensions.
-    //
-    // The gap was recorded in a doc comment and stayed open, so it is recorded here instead: this
-    // test pins the *exact* current classification and goes red the moment either layer moves, in
-    // either direction. `it.fails` below states what the answer should be.
+    // written back as a profile without translation". For four of the six that used to be false:
+    // `idleStageSchema` carried only `predictorHorizonS` and `predictorLearningRate`, so the other
+    // four were rejected as unrecognized keys and an optimizer could sample all six through
+    // `ArrivalModelOptions.idle`, find an optimum, and then be unable to write it down — invariant 8
+    // met on 2 of 6 dimensions. This test was two: a pinned `{2 true, 4 false}` classification and
+    // an `it.fails` stating what the answer should be. The four rows landed, so both collapse into
+    // this one, which goes red if any of them is ever removed again.
     const authorable = (id: string): boolean =>
       dispatcherProfileSchema.safeParse({
         id: 'probe',
@@ -116,55 +114,49 @@ describe('PREDICTOR_PARAMETERS', () => {
     expect(classified).toStrictEqual({
       'idle.predictorHorizonS': true,
       'idle.predictorLearningRate': true,
-      // The four rows `config/schema.ts` owes. `PredictorIdleSource` spells them out verbatim.
-      'idle.predictorBucketWidthS': false,
-      'idle.predictorCycleS': false,
-      'idle.predictorPriorRatePerS': false,
-      'idle.predictorPriorStrength': false,
+      'idle.predictorBucketWidthS': true,
+      'idle.predictorCycleS': true,
+      'idle.predictorPriorRatePerS': true,
+      'idle.predictorPriorStrength': true,
     });
 
-    // And the rejection really is the missing row rather than a bad probe value, which would make
-    // the four look unauthorable for a reason nobody needs to fix.
+    // Still strict about everything else: the section admits the declared knobs and nothing more,
+    // so a misspelled one is a load-time error rather than a silently defaulted dimension.
     const rejected = dispatcherProfileSchema.safeParse({
       id: 'probe',
       name: 'Probe',
       weights: {},
-      idle: { predictorCycleS: 3600 },
+      idle: { predictorCycleSeconds: 3600 },
     });
     expect(rejected.success).toBe(false);
     expect(rejected.error?.issues[0]?.message).toMatch(/Unrecognized key/);
   });
 
-  it.fails('every declared id is authorable as a profile path — the four rows are still owed', () => {
-    // Deliberately `it.fails`: this is the assertion the docs already claim holds, and it does not.
-    // It passes as an *expected* failure today and turns the build red the moment
-    // `idleStageSchema` gains the four rows — at which point delete this test and fix the
-    // classification above. A doc comment could not do that.
-    for (const parameter of PREDICTOR_PARAMETERS) {
-      const result = dispatcherProfileSchema.safeParse({
-        id: 'probe',
-        name: 'Probe',
-        weights: {},
-        idle: { [parameter.id.slice('idle.'.length)]: PROBES[parameter.id] ?? 0 },
-      });
-      expect(result.success, parameter.id).toBe(true);
-    }
-  });
-
-  it('records that the config layer accepts a learning rate the model rejects', () => {
-    // The same two files, a second disagreement, and this one fails at *run* time rather than load
-    // time: `predictorLearningRate` is typed `fraction` = `z.number().min(0).max(1)`, so a profile
-    // authoring 0 loads clean and then throws inside `createArrivalModel`. A config layer that
+  it('rejects at load time the learning rate the model rejects at build time', () => {
+    // The same two files, a second disagreement, and it used to fail at *run* time rather than load
+    // time: `predictorLearningRate` was typed `fraction` = `z.number().min(0).max(1)`, so a profile
+    // authoring 0 loaded clean and then threw inside `createArrivalModel`. A config layer that
     // accepts a value the model refuses is a profile that can be committed and cannot be run.
-    // `positive.max(1)` is the row that closes it; until then the split is pinned here.
+    // `z.number().gt(0).max(1)` is the row that closed it; both halves are asserted here so neither
+    // can drift back.
     const loaded = dispatcherProfileSchema.safeParse({
       id: 'probe',
       name: 'Probe',
       weights: {},
       idle: { predictorLearningRate: 0 },
     });
-    expect(loaded.success).toBe(true);
+    expect(loaded.success).toBe(false);
     expect(() => resolvePredictorConfig({ predictorLearningRate: 0 })).toThrow(/never learn/);
+    // And the top of the interval is still admitted: `1` is "forget everything but the last
+    // bucket", which is a legitimate setting and not an error.
+    expect(
+      dispatcherProfileSchema.safeParse({
+        id: 'probe',
+        name: 'Probe',
+        weights: {},
+        idle: { predictorLearningRate: 1 },
+      }).success,
+    ).toBe(true);
     // The declared range starts at 0.01, so a schema-honouring optimizer never samples into the
     // gap. It is a hand-authored profile that falls in, which is why it is worth a test at all.
     expect(predictorParameter('idle.predictorLearningRate')?.range?.[0]).toBeGreaterThan(0);

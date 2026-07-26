@@ -38,10 +38,13 @@ import type {
   DirectionalSplit,
   DispatcherProfile,
   ElevatorSpecs,
+  ResolvedBank,
   ResolvedBuilding,
   TrafficProfiles,
 } from '../config/types.js';
-import type { DispatchPolicyOptions } from '../dispatch/types.js';
+import type { AuctionPolicyOptions } from '../dispatch/policies/types.js';
+import type { ArrivalModel } from '../dispatch/predictor/types.js';
+import type { DispatchPolicy } from '../dispatch/types.js';
 import type { SimTime } from '../kernel/types.js';
 import type { SummarizeOptions, WindowSelection } from '../metrics/summarize.js';
 import type { ReportWindow, RunRecord, RunSummary } from '../metrics/types.js';
@@ -294,7 +297,41 @@ export interface SimulationConfig {
   readonly reportWindow?: WindowSelection | undefined;
   readonly demand?: SimulationDemandOptions | undefined;
   /** Weight/constraint overrides applied after the profile. For a fixture or an optimizer. */
-  readonly dispatcherOptions?: DispatchPolicyOptions | undefined;
+  readonly dispatcherOptions?: AuctionPolicyOptions | undefined;
+  /**
+   * Build this run's group controllers, one per bank, instead of `createPolicyFor`.
+   *
+   * **Not how a dispatcher is chosen.** Which policy runs a profile is `auction.aggregation` and
+   * a frozen lookup table (`dispatch/policies/registry.ts`), so a shipped run selects its
+   * aggregation as data and nothing here compares a profile id (CLAUDE.md invariant 7). This hook
+   * exists for the two jobs data cannot do: instrumenting a real run — wrapping the policy to
+   * count what each cost term actually evaluated to, which is the only honest way to check a term
+   * is not inert through the shipped path — and injecting a policy an optimizer has not yet
+   * persisted as a profile.
+   *
+   * The policy it returns must be deterministic and must draw no random numbers outside the
+   * injected `StreamSet`, exactly as a shipped one must; a hook that broke either would break
+   * every comparison made with the run.
+   */
+  readonly createPolicy?:
+    | ((profile: DispatcherProfile, options: AuctionPolicyOptions) => DispatchPolicy)
+    | undefined;
+  /**
+   * Build this bank's arrival model, instead of one from the profile's `idle.predictor*` values.
+   *
+   * The same escape hatch, for the predictor. Returning `undefined` runs the bank **with no
+   * forecast at all**, which is what `parkingStrategy: predicted-demand` answers `no-forecast` to
+   * and what leaves `predictedDemand` inert — the control arm for any measurement of what the
+   * forecast is worth.
+   *
+   * A model handed in here is fed by the run loop on real arrivals and by nothing else, exactly
+   * as one the run built would be. It must not be given a prior derived from the trace: see
+   * `dispatch/predictor/types.ts` for why that is the one form of clairvoyance no structural
+   * property of that module can detect.
+   */
+  readonly createPredictor?:
+    | ((bank: ResolvedBank, profile: DispatcherProfile) => ArrivalModel | undefined)
+    | undefined;
   /** Identity of this replication. Defaults to `<buildingId>-<dispatcherId>-<seed>`. */
   readonly runId?: string | undefined;
   /** Index of this replication within its batch, when it belongs to one. */

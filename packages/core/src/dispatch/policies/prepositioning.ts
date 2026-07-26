@@ -27,26 +27,31 @@
  * Wiring them up is therefore not new behaviour bolted on; it is two declared parameters starting
  * to mean what they say.
  *
- * ## `Simulation.#park` still does not call this, and that is a live defect
+ * ## `Simulation.#park` calls this, and the two strategies it feeds are live
  *
- * Stated in the present tense because it is present tense. `#park` builds its context inline as
- * `{ entranceFloorIds: this.#entranceFloorIds }`, so **inside `runSimulation` nothing has changed**:
- * `predicted-demand` answers `no-forecast` for every car of every run, and `zone-center` — with no
- * partition — sends every car in a bank to the same shaft median. Measured on `midtown-office` at
- * `DISPATCH_DEFAULTS`, four cars from `G`:
+ * This section used to say the opposite, in the present tense, because it was true: `#park` built
+ * its context inline as `{ entranceFloorIds: this.#entranceFloorIds }`, so inside `runSimulation`
+ * `predicted-demand` answered `no-forecast` for every car of every run and `zone-center` — with no
+ * partition — sent every car in a bank to the same shaft median. Measured on `midtown-office` at
+ * `DISPATCH_DEFAULTS`, four cars from `G`: all four to floor `10`, against one target per band
+ * (`2 / 7 / 12 / 17`) through {@link prepositionPlan}.
  *
- * | Context | Targets | Cars that move |
- * |---|---|---|
- * | `#park`'s, today | `10 / 10 / 10 / 10` | 4 |
- * | {@link prepositionPlan}'s | `2 / 7 / 12 / 17` | 3 — the fourth is inside its own deadband |
+ * `#park` now resolves the whole bank once — {@link resolvePrepositionContext} with the bank's
+ * arrival model and its entrance floors — and derives each car's `RepositionContext` from it with
+ * {@link repositionContextFor}. What that changed, measured on `garden-apartments` at n = 500 under
+ * CRN against `stay`:
  *
- * So the honest reading is that this file *can* park a bank correctly and no run yet does. Two
- * consequences, both acted on rather than noted: `data/dispatcher-profiles.json` ships no profile
- * declaring `zone-center` (see the `zoned-uppeak` `$comment`), and the Phase 5 acceptance criterion
- * *"pre-positioning shows measurable AWT improvement on Garden Apartments"* is **unmet** — what
- * `prepositioning.test.ts` asserts on that building is a decision-level saving, which is not an AWT
- * interval and must not be reported as one. `index.ts` § *Phase 5 acceptance criteria* carries the
- * one-line fix.
+ * | strategy | AWT difference, 95 % paired-t |
+ * |---|---|
+ * | `zone-center` | **−4.88 s [−5.27, −4.49]**, −29.7 % |
+ * | `predicted-demand`, deadband 3 s | **−0.98 s [−1.28, −0.68]**, −5.9 % |
+ * | `predicted-demand`, `predictive-balanced`'s authored deadband of 8 s | −0.01 s [−0.02, +0.01], indistinguishable — the move is inside the profile's own `repositionThresholdS`, not absent |
+ *
+ * So the Phase 5 acceptance criterion *"pre-positioning shows measurable AWT improvement on Garden
+ * Apartments"* is **met**, and `data/dispatcher-profiles.json` ships `zoned-uppeak` declaring
+ * `zone-center` again. `packages/experiments/src/benchmark/prepositioning.ts` is where those
+ * intervals are produced; what `prepositioning.test.ts` asserts here is still a decision-level
+ * saving, which is not an AWT interval and must not be reported as one.
  *
  * ## The predictor is a dependency, not a part of this module
  *

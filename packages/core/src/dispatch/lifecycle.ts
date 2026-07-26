@@ -694,9 +694,12 @@ function parkingCandidates(
 
   if (strategy === 'predicted-demand') {
     const forecast = context.demandForecast;
-    // Phase 5 lands the learned per-floor arrival model. Until then a caller may supply a
-    // forecast and the strategy works exactly as designed; with none it says so rather than
-    // silently degrading into `lobby` and reporting a parking result nobody configured.
+    // The forecast is the learned per-floor arrival model, one per bank, which `Simulation`
+    // builds in `#buildPredictors` and feeds in `#admit`. With none — a caller driving this
+    // directly, or `createPredictor` returning `undefined` — the strategy says so rather than
+    // silently degrading into `lobby` and reporting a parking result nobody configured. That
+    // `no-forecast` answer is not hypothetical: it is what every run returned for the whole of
+    // Phase 5 while `#park` supplied no context, and it is observationally identical to `stay`.
     if (forecast === undefined) return { floors: [], reason: 'no-forecast' };
     let best: ServedFloor | undefined;
     let bestWeight = 0;
@@ -733,15 +736,35 @@ function parkingCandidates(
  * | `zone-center` | demand uniform over the operational zone, or over the shaft when none is given |
  * | `predicted-demand` | the supplied forecast — the strategy has no opinion of its own |
  *
- * An explicit `demandForecast` always wins: a caller that has measured demand outranks any
- * belief implied by a strategy name.
+ * ## The strategy's own belief outranks a supplied forecast, and that ordering is load-bearing
+ *
+ * This used to read the other way — an explicit `demandForecast` won, on the argument that a
+ * caller which has measured demand outranks a belief implied by a name. That argument holds for a
+ * caller that supplies a forecast *because it wants one used*. It stops holding the moment a
+ * forecast is present in **every** run, which is what wiring the arrival model into the runner
+ * did: `lobby` was then scored against whatever the predictor believed, and at cold start the
+ * predictor believes almost nothing, so its estimate is near-uniform over the shaft. A
+ * near-uniform demand model puts the best park in the middle of the shaft, the deadband vetoes
+ * every trip to the terminal, and `parkingStrategy: lobby` silently stops parking at the lobby —
+ * the exact failure the paragraph above warns about, arrived at from the other direction.
+ *
+ * It is not a small effect and it is not only a number: `analytical/validation.test.ts`
+ * reproduces the closed form's *"all L cars shuttle from the main terminal"* condition **with**
+ * `idle.parkingStrategy: 'lobby'`, so a lobby strategy that does not return cars to the lobby
+ * breaks the correctness oracle rather than merely moving a statistic. Measured on Garden
+ * Apartments, the interval's divergence from the Barney/CIBSE closed form went from +7.5 % to
+ * +8.7 % with the forecast overriding the strategy.
+ *
+ * So the ordering is: **a strategy that carries its own demand model uses it**, and the supplied
+ * forecast is what the strategy that has *no* opinion — `predicted-demand`, whose whole content is
+ * the forecast — is scored against. A caller that genuinely wants a measured forecast to decide
+ * where cars wait asks for it by name, by setting `parkingStrategy: predicted-demand`, which is
+ * the declared categorical for exactly that request.
  */
 function responseWeights(
   config: ResolvedDispatchConfig,
   context: RepositionContext,
 ): ReadonlyMap<string, number> | undefined {
-  if (context.demandForecast !== undefined) return context.demandForecast;
-
   const strategy = config.idle.parkingStrategy;
   if (strategy === 'lobby') {
     return new Map((context.entranceFloorIds ?? []).map((id) => [id, 1]));
@@ -749,6 +772,7 @@ function responseWeights(
   if (strategy === 'zone-center' && context.zoneFloorIds !== undefined) {
     return new Map(context.zoneFloorIds.map((id) => [id, 1]));
   }
+  if (context.demandForecast !== undefined) return context.demandForecast;
   // Uniform over everything the shaft serves.
   return undefined;
 }

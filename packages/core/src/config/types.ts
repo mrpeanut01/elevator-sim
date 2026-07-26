@@ -266,6 +266,28 @@ export type DwellPolicy = (typeof DWELL_POLICIES)[number];
 export const PARKING_STRATEGIES = ['stay', 'lobby', 'zone-center', 'predicted-demand'] as const;
 export type ParkingStrategy = (typeof PARKING_STRATEGIES)[number];
 
+/**
+ * **Who** aggregates the prices the one cost engine produces (lifecycle stage 4).
+ *
+ * Not *what* a car is worth — that is `engine`, there is one of them, and both values below
+ * compute it identically through the same term library and the same `Car.estimateCost()`.
+ * docs/01-architecture.md § *The resolution: auction dispatch is a policy, not an architecture*
+ * is explicit that contract-net bidding differs from central control in the aggregation alone,
+ * so this is the field that selects it and `engine` is left meaning the cost function.
+ *
+ * | Value | Aggregation |
+ * |---|---|
+ * | `central-argmin` | the group controller minimises over every eligible car's price |
+ * | `contract-net` | each car bids and may take its bid back; see `auction.rounds` |
+ *
+ * A **declarative selector**, and it has to be: a policy chosen by `if (profile.id === …)`
+ * would be CLAUDE.md invariant 7's exact failure. `dispatch/policies/registry.ts` is a frozen
+ * record keyed by this value, so adding an aggregation is a row in a table and selecting one is
+ * a lookup.
+ */
+export const AGGREGATIONS = ['central-argmin', 'contract-net'] as const;
+export type Aggregation = (typeof AGGREGATIONS)[number];
+
 /** Call registration, assignment and reassignment knobs (lifecycle stages 1, 4, 5). */
 export interface DispatchStageConfig extends Commented {
   /** Determines whether the destination is known at call time. */
@@ -313,8 +335,46 @@ export interface IdleStageConfig extends Commented {
   readonly repositionEnergyWeight?: number | undefined;
   /** How far ahead the demand forecast looks, seconds. */
   readonly predictorHorizonS?: number | undefined;
-  /** Adaptation speed of the per-floor arrival model. */
+  /**
+   * Adaptation speed of the per-floor arrival model, `(0, 1]`.
+   *
+   * Strictly positive: a learning rate of zero is a model that can never learn, and
+   * `createArrivalModel` refuses one. The schema used to accept `0` and the model then threw at
+   * construction — a value that loads clean and cannot run.
+   */
   readonly predictorLearningRate?: number | undefined;
+  /** Width of one time-of-day bucket in the arrival model, seconds. */
+  readonly predictorBucketWidthS?: number | undefined;
+  /** Period over which the arrival model's time-of-day pattern repeats, seconds. */
+  readonly predictorCycleS?: number | undefined;
+  /** Prior arrival rate per (floor, direction) before any arrival is seen, arrivals per second. */
+  readonly predictorPriorRatePerS?: number | undefined;
+  /** Strength of that prior, in pseudo-observations of a completed bucket. */
+  readonly predictorPriorStrength?: number | undefined;
+}
+
+/**
+ * Which aggregation runs stage 4, and the two knobs the decentralized one adds.
+ *
+ * Authored as `profiles[].auction` in `data/dispatcher-profiles.json`. Absent, a profile is the
+ * centralized argmin — the control arm — so a run that configures nothing cannot silently get a
+ * contract net.
+ *
+ * The resolved shape and every default live in `dispatch/policies/`; this is only what a profile
+ * may write. See {@link Aggregation}.
+ */
+export interface AuctionStageConfig extends Commented {
+  /** Who aggregates the bids. Defaults to `central-argmin`. */
+  readonly aggregation?: Aggregation | undefined;
+  /**
+   * Maximum bidding rounds; one more than the number of withdrawals the auction may take.
+   *
+   * `1` is a sealed-bid single-round auction and is provably the centralized argmin. Inert under
+   * `aggregation: central-argmin`, which holds no auction at all.
+   */
+  readonly rounds?: number | undefined;
+  /** A bidder's own ceiling on the delay it will impose on its committed passengers, seconds. */
+  readonly reserveMarginalDelayS?: number | undefined;
 }
 
 /** A dispatcher: a weight vector over the cost-term library plus stage settings. */
@@ -331,6 +391,8 @@ export interface DispatcherProfile extends Commented {
   readonly dispatch?: DispatchStageConfig | undefined;
   readonly answer?: AnswerStageConfig | undefined;
   readonly idle?: IdleStageConfig | undefined;
+  /** Stage 4's aggregation. Absent is the centralized argmin. */
+  readonly auction?: AuctionStageConfig | undefined;
 }
 
 /** Fuzzy traffic-pattern detector. Hysteresis prevents detector oscillation. */

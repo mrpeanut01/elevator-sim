@@ -77,11 +77,11 @@
     },
     {
       "id": "predictive-balanced",
+      "$comment": "Ten weighted terms, not the eleven this profile used to carry. It weighted rideTime at 0.3 while authoring no dispatch.callType, so it ran at the up-down-buttons default, where a landing call carries no destination and rideTimeTerm.activeWhen declares the term inert. Counted through the shipped engine at seed 20260726, rideTime was non-zero on 0 of 7435 evaluations on midtown-office and 0 of 56 on garden-apartments, with cross-car spread in 0 of 2156 decisions — a weight that is decoration in every shipped configuration, which is the exact 'configurable, tested in isolation, dead in the shipped path' shape one level up from code into data. The weight is dropped rather than the callType changed: saturating normalization maps a raw 0 to 0, so removing it leaves every score bit-identical and no published number moves, whereas destination entry would have changed the profile's whole passenger model. A profile that wants rideTime must also author callType destination-entry or mobile-credential, and policies.test.ts now enforces that mechanically for every profile in this file, from each term's own activeWhen.",
       "name": "Predictive balanced",
       "engine": "weighted-cost",
       "weights": {
         "waitTime": 1.0,
-        "rideTime": 0.3,
         "detourPenalty": 0.4,
         "existingCallDelay": 0.5,
         "directionReversal": 0.8,
@@ -118,8 +118,8 @@
     },
     {
       "id": "auction",
-      "$comment": "Contract-net bidding: every car prices the contract from its own estimateCost() and the group allocates from the bids. ONE profile, deliberately, because the aggregation is auction.rounds and config/schema.ts has no auction section yet — so a second profile could not carry a different aggregation, it would resolve to rounds = 1 and be this profile under another name. Both arms of the comparison are therefore built from THIS profile: createAuctionPolicy(profile) is rounds = 1, the sealed-bid single round, which IS the centralized argmin over the same weight vector and is the control arm; createAuctionPolicy(profile, { auction: { rounds: 3, reserveMarginalDelayS: 25 } }) is the contract net, in which a provisional winner may take its bid back on its own reserve price or because winning would push it over its own hall-call bypass threshold while another bidder stays under. Same weights, same seven stages, same everything except who aggregates — which is what makes a paired-t interval between them an interval on the aggregation. Comparing two different profiles instead would measure whatever stage settings they differed in and exactly zero aggregation, and a benchmark of sealed-bid against the weighted-cost engine must return exactly zero. reassignmentPolicy is until-commitment on both arms: a car that may hand a contract back must also be allowed to lose one, and a stage-5 setting that differed between the arms would be the confound.",
-      "name": "Contract-net auction",
+      "$comment": "Contract-net bidding: every car prices the contract from its own estimateCost() and the group allocates from the bids. The control arm, and it is the control arm as DATA: auction.aggregation names the policy factory (dispatch/policies/registry.ts) and auction.rounds = 1 is a sealed-bid single round, which IS the centralized argmin over the same weight vector \u2014 auction.ts proves the equality against the weighted-cost policy over a deterministic sweep, so a benchmark of this profile against the same weights under central-argmin must return exactly zero. Its treatment arm is auction-multi-round, which differs in auction.rounds and auction.reserveMarginalDelayS and in NOTHING else, so a paired-t interval between the two is an interval on the aggregation rather than on whatever stage settings two unrelated profiles happened to differ in. reassignmentPolicy is until-commitment on both arms: a car that may hand a contract back must also be allowed to lose one, and a stage-5 setting that differed between the arms would be the confound.",
+      "name": "Contract-net auction, sealed bid",
       "role": "auction",
       "weights": { "waitTime": 1.0, "existingCallDelay": 0.4, "loadFactor": 0.3 },
       "dispatch": {
@@ -128,16 +128,36 @@
         "commitmentPoint": "on-deceleration",
         "reassignmentHysteresisS": 3.0,
         "maxReassignmentsPerCall": 3
-      }
+      },
+      "auction": { "aggregation": "contract-net", "rounds": 1 }
+    },
+    {
+      "id": "auction-multi-round",
+      "$comment": "The treatment arm of the aggregation comparison, and the only profile in this file that holds more than one bidding round. A provisional winner may take its bid back on its own reserve price \u2014 25 s of delay to the passengers it is already committed to, which is reachable on every building in data/buildings/ where the 600 s default is not \u2014 or because winning would push it over its own hall-call bypass threshold while another bidder stays under. Both are a car REFUSING work the group's own objective says it should take, which is the one thing a central argmin cannot express and the whole of the agent-autonomy hypothesis docs/01-architecture.md asks to be benchmarked rather than assumed. Every field outside the auction section is byte-identical to the auction profile on purpose: two arms that differ in anything else measure that instead.",
+      "name": "Contract-net auction, multi-round",
+      "role": "auction",
+      "weights": { "waitTime": 1.0, "existingCallDelay": 0.4, "loadFactor": 0.3 },
+      "dispatch": {
+        "assignmentTiming": "immediate",
+        "reassignmentPolicy": "until-commitment",
+        "commitmentPoint": "on-deceleration",
+        "reassignmentHysteresisS": 3.0,
+        "maxReassignmentsPerCall": 3
+      },
+      "auction": { "aggregation": "contract-net", "rounds": 3, "reserveMarginalDelayS": 25 }
     },
     {
       "id": "zoned-uppeak",
-      "$comment": "Operational zoning — the third kind, a dispatcher strategy and not building fabric. The bank is partitioned into one contiguous band per in-service car; zoneAffinity prices a car's deviation from its band. The partition is computed per decision by the dispatcher, never stored on a car: a car that owned its zone could not be re-zoned when a neighbour goes out of service. Split-demand at ten is the up-peak half — a lobby landing above one carload is two cars, not one car twice. parkingStrategy is stay, NOT zone-center, and that is a measured decision rather than a default: Simulation.#park builds its RepositionContext from entranceFloorIds alone, so zone-center gets no partition, every car computes the same shaft median, and on midtown-office at DISPATCH_DEFAULTS all four cars are sent to floor 10 — the outcome zoning.ts itself calls worse than not parking. Through prepositionPlan, which supplies the partition, the same bank gets one target per band, 2/7/12/17, and three cars move (the fourth is inside its own deadband). When #park passes repositionContextFor(car, resolvePrepositionContext(...)), set parkingStrategy back to zone-center with repositionThresholdS 2 and repositionEnergyWeight 0.1; policies.test.ts asserts today that no shipped profile sends two cars of a bank to one floor under the context the runner actually supplies.",
+      "$comment": "Operational zoning \u2014 the third kind, a dispatcher strategy and not building fabric. The bank is partitioned into one contiguous band per in-service car; zoneAffinity prices a car's deviation from its band, and parkingStrategy zone-center parks each car in the middle of ITS OWN band. Both facts come from the group controller: Simulation resolves the partition once per decision through contiguousZones and hands it to stage 3 on the observation and to stage 7 on the reposition context. The partition is never stored on a car \u2014 a car that owned its zone could not be re-zoned when a neighbour goes out of service. Split-demand at ten is the up-peak half: a lobby landing above one carload is two cars, not one car twice. repositionThresholdS 2 with repositionEnergyWeight 0.1 is the deadband a zone-center hop has to clear; at the 5 s default the whole shaft is inside it and the strategy would be indistinguishable from stay.",
       "name": "Operational zoning, up-peak",
       "role": "zoning",
       "weights": { "waitTime": 0.7, "zoneAffinity": 0.3 },
       "dispatch": { "assignmentMode": "split-demand", "splitThresholdPassengers": 10 },
-      "idle": { "parkingStrategy": "stay" }
+      "idle": {
+        "parkingStrategy": "zone-center",
+        "repositionThresholdS": 2,
+        "repositionEnergyWeight": 0.1
+      }
     }
   ],
   "patternSwitching": {

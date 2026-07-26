@@ -129,32 +129,23 @@ export interface ResolvedPredictorConfig {
  * module states exactly what it needs and a real `IdleStageConfig` satisfies it without a cast
  * and without a runtime import.
  *
- * ## Pending config surface
+ * ## The config surface, complete
  *
- * `idleStageSchema` in `config/schema.ts` carries `predictorHorizonS` and
- * `predictorLearningRate` already. It does **not** carry the other four, so a profile in
- * `data/dispatcher-profiles.json` declaring one is rejected at load time today and only
- * {@link ArrivalModelOptions.idle} can set it. The config layer owes:
+ * `idleStageSchema` in `config/schema.ts` carries all six — `predictorHorizonS`,
+ * `predictorLearningRate`, `predictorBucketWidthS`, `predictorCycleS`, `predictorPriorRatePerS`,
+ * `predictorPriorStrength` — and `IdleStageConfig` declares the same six, so every `id` in
+ * {@link PREDICTOR_PARAMETERS} really is the dotted path of a value a profile can author and an
+ * optimizer can persist its winner as a profile. It used to carry two of the six, so four were
+ * rejected as unrecognized keys at load time and reachable only through
+ * {@link ArrivalModelOptions.idle}: invariant 8 met on 2 of 6 dimensions.
  *
- * ```ts
- * // config/schema.ts, idleStageSchema
- * predictorBucketWidthS: positive.optional(),
- * predictorCycleS: positive.optional(),
- * predictorPriorRatePerS: nonNegative.optional(),
- * predictorPriorStrength: nonNegative.optional(),
- * // config/types.ts, IdleStageConfig — the same four, as `readonly …?: number | undefined`
- * ```
+ * The second disagreement in the same two files is closed too: `predictorLearningRate` was typed
+ * `fraction` = `z.number().min(0).max(1)`, so a profile authoring `0` **loaded clean and then
+ * threw** inside `createArrivalModel`, which rejects a learning rate that can never learn. It is
+ * `z.number().gt(0).max(1)` now, and both halves are asserted in `parameters.test.ts` so neither
+ * layer can drift back.
  *
- * There is a second disagreement in the same two files: `predictorLearningRate` is typed
- * `fraction` = `z.number().min(0).max(1)`, so a profile authoring `0` **loads clean and then
- * throws** inside `createArrivalModel`, which rejects a learning rate that can never learn. The
- * config layer accepts a value the model refuses; `positive.max(1)` — or `z.number().gt(0).max(1)`
- * — is the row that makes the two layers agree.
- *
- * Until that lands, an optimizer honouring {@link PREDICTOR_PARAMETERS} can search all six
- * through this object but can persist only two as a profile. This module owns neither file, so
- * the gap is recorded rather than papered over — the same treatment `EligibilityStageConfig`
- * gives its two — but recorded *executably*: `parameters.test.ts` parses every declared id and
+ * Recorded *executably* rather than in prose: `parameters.test.ts` parses every declared id and
  * every boundary value through the real `dispatcherProfileSchema`, so the day either row changes
  * the build says so instead of this comment going stale.
  */

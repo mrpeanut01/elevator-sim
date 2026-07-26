@@ -26,32 +26,21 @@
  * a profile — an `=== 'some-profile-id'` that puts behaviour in code the config claims to own.
  * There is no such comparison in this directory.
  *
- * ## Pending config surface
+ * ## The aggregation is data, and it is now authorable as data
  *
- * `dispatcherProfileSchema` in `config/schema.ts` is strict and has no `auction` section, so a
- * profile in `data/dispatcher-profiles.json` carrying one is **rejected at load time today**
- * and only {@link AuctionPolicyOptions.auction} can set these two values. The config layer owes:
+ * `dispatcherProfileSchema` carries an `auction` section — `aggregation`, `rounds`,
+ * `reserveMarginalDelayS` — so a profile in `data/dispatcher-profiles.json` declares which
+ * aggregation runs it and a tuned winner is persisted as a profile rather than reachable only
+ * through {@link AuctionPolicyOptions}. `registry.ts` looks the factory up by
+ * `auction.aggregation` in a frozen record; nothing anywhere compares a profile id or a strategy
+ * name (CLAUDE.md invariant 7).
  *
- * ```ts
- * // config/schema.ts
- * const auctionStageSchema = z.strictObject({
- *   $comment: comment,
- *   rounds: z.number().int().min(1).max(8).optional(),
- *   reserveMarginalDelayS: nonNegative.optional(),
- * });
- * // ...and one row in dispatcherProfileSchema:
- * auction: auctionStageSchema.optional(),
- *
- * // config/types.ts, DispatcherProfile
- * readonly auction?: AuctionStageConfig | undefined;
- * ```
- *
- * Until that lands, an optimizer honouring {@link POLICY_PARAMETERS} can still search both
- * values through the options object but cannot persist a winner as a profile. This module owns
- * neither file, so the gap is **recorded rather than papered over** — the same treatment
- * `EligibilityStageConfig` gives `eligibility.*` and `DOOR_PARAMETERS` gives
- * `answer.maxReopensPerStop`. {@link AuctionProfileSource} already accepts the section, so the
- * schema addition is additive and changes nothing here.
+ * That is what makes the two arms of the aggregation comparison two **profiles**: `auction`
+ * declares `contract-net` at `rounds: 1` (the sealed-bid control, provably the central argmin)
+ * and `auction-multi-round` declares the same everything at `rounds: 3` with a live reserve. They
+ * differ in the aggregation and in nothing else, which is what makes a paired-t interval between
+ * them an interval on the aggregation. {@link AuctionPolicyOptions} remains as the override an
+ * optimizer uses before it has persisted a candidate.
  *
  * ## Conventions (see CLAUDE.md)
  *
@@ -63,6 +52,7 @@
  * - Every value handed back is frozen.
  */
 
+import type { Aggregation, AuctionStageConfig } from '../../config/types.js';
 import type { SimTime } from '../../kernel/types.js';
 import type { CarSnapshot, CostEstimate } from '../../model/car/types.js';
 import type {
@@ -82,44 +72,38 @@ import type {
  * -------------------------------------------------------------------------- */
 
 /**
- * The auction's two tunables, as a profile would author them.
+ * The aggregation's three tunables, as a profile authors them.
+ *
+ * Declared in `config/types.ts` alongside `DispatchStageConfig`, `AnswerStageConfig` and
+ * `IdleStageConfig`, because it is a section of `data/dispatcher-profiles.json` and belongs where
+ * the other sections are; re-exported here so this module's vocabulary is complete in one place.
  *
  * Deliberately small. An auction that needed a dozen knobs would be a second dispatcher rather
  * than a second *aggregation*, and the comparison this module exists to make — does letting cars
  * decide for themselves ever beat a central argmin? — is only clean if everything except the
  * aggregation is held fixed.
+ *
+ * - `aggregation` selects **who decides**, and is the key `registry.ts` looks the policy factory
+ *   up by. Absent, `central-argmin`: a run that configures nothing cannot silently get a contract
+ *   net.
+ * - `rounds` — **`1` is a sealed-bid single-round auction and is provably the centralized
+ *   argmin** (see {@link AuctionOutcome.divergedFromArgmin} and the equivalence proof in
+ *   `auction.test.ts`). With one round there is no round to reallocate a declined contract into,
+ *   so both withdrawal rules are inert and the winner is the lowest bid.
+ * - `reserveMarginalDelayS` is the genuinely decentralized rule, and the reason it is a *reserve*
+ *   rather than an eligibility filter is the whole hypothesis under test. A central scorer can
+ *   express the same arithmetic — `existingCallDelay` is a declared cost term, and
+ *   `eligibility.maxLoadFactorForAssignment` a declared hard filter. What it cannot express is a
+ *   car **refusing** work the group's own objective says it should take. Default 600 s, which is
+ *   unreachable on any building in `data/buildings/` and therefore inert — the same construction
+ *   `eligibility.maxLoadFactorForAssignment: 1` uses.
  */
-export interface AuctionStageConfig {
-  /**
-   * Maximum number of bidding rounds; equivalently, one more than the number of withdrawals the
-   * auction may take.
-   *
-   * **`1` is a sealed-bid single-round auction and is provably the centralized argmin** — see
-   * {@link AuctionOutcome.divergedFromArgmin} and the equivalence proof in `auction.test.ts`.
-   * With one round there is no round to reallocate a declined contract into, so both withdrawal
-   * rules are inert and the winner is the lowest bid, which is what the central scorer picks.
-   */
-  readonly rounds?: number | undefined;
-  /**
-   * A bidder's own ceiling on the delay it will impose on **its already-committed passengers**,
-   * seconds. Above it the car declines the contract.
-   *
-   * This is the genuinely decentralized rule, and the reason it is a *reserve* rather than an
-   * eligibility filter is the whole hypothesis under test. A central scorer can express the same
-   * arithmetic — `existingCallDelay` is a declared cost term, and
-   * `eligibility.maxLoadFactorForAssignment` is a declared hard filter. What it cannot express is
-   * a car **refusing** work the group's own objective says it should take. The interesting
-   * question is whether that ever wins, and it is a measurement, not a claim.
-   *
-   * Default 600 s, which is unreachable on any building in `data/buildings/` and therefore
-   * inert — the same way `eligibility.maxLoadFactorForAssignment` is inert at 1.0. A profile
-   * opts into the behaviour; a run that did not configure it cannot silently benefit from it.
-   */
-  readonly reserveMarginalDelayS?: number | undefined;
-}
+export type { AuctionStageConfig };
 
 /** {@link AuctionStageConfig} with defaults applied and every value checked. */
 export interface ResolvedAuctionStage {
+  /** Who aggregates. The selector, resolved, so it is visible in a persisted record. */
+  readonly aggregation: Aggregation;
   readonly rounds: number;
   readonly reserveMarginalDelayS: number;
 }

@@ -14,12 +14,11 @@
  * than reported (docs/03-traffic-and-statistics.md).
  *
  * **What this file does *not* establish, stated up front.** The full-run half runs each profile
- * once, through the central argmin, because `SimulationConfig` has no policy hook and an
- * `AuctionDispatchPolicy` cannot be injected into `runSimulation` at all (`index.ts` § *Nothing in
- * this directory is reachable from `runSimulation` yet*). The two-aggregation half runs one
- * *decision* per profile, and at the default `rounds: 1` that is literally the same computation as
- * the central argmin — which is what it asserts. So "a profile that deadlocks under the contract
- * net" is **not** covered by anything here, and no claim in this file is about AWT.
+ * once, through whichever aggregation the profile declares — `auction.aggregation` selects the
+ * policy factory, so `auction-multi-round` really does run its contract net inside
+ * `runSimulation`. What is still absent here is any *comparison*: one replication per profile
+ * proves a configuration terminates and clears its landings, and nothing in this file is a claim
+ * about AWT. The paired-t intervals live in `packages/experiments/src/benchmark/`.
  *
  * ## A weight that resolves is not a weight that contributes
  *
@@ -56,18 +55,28 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { loadConfig } from '../../config/loader.js';
 import { dispatcherProfileSchema } from '../../config/schema.js';
+import { AGGREGATIONS } from '../../config/types.js';
 import type { DispatcherProfile, LoadedConfig, ResolvedBuilding } from '../../config/types.js';
 import type { CarSnapshot } from '../../model/car/types.js';
-import { runSimulation } from '../../sim/simulation.js';
+import { Simulation, runSimulation } from '../../sim/simulation.js';
 import { DISPATCH_PARAMETER_IDS, dispatchParameter } from '../parameters.js';
-import { createDispatchPolicy } from '../policy.js';
-import type { DispatchCall, DispatchDecision } from '../types.js';
+import { createDispatchPolicy, resolveDispatchConfig } from '../policy.js';
+import { COST_TERMS, COST_TERMS_BY_ID } from '../terms/index.js';
+import type { DispatchCall, DispatchDecision, RepositionContext } from '../types.js';
 
-import { createAuctionPolicy, resolveAuctionConfig } from './auction.js';
+import { AuctionDispatchPolicy, createAuctionPolicy, resolveAuctionConfig } from './auction.js';
 import { board, call, clockAt, hallCall, makeCar, snapshotAt } from './fixtures.test-helper.js';
 import { groupContext } from './groupContext.js';
 import { MAX_AUCTION_ROUNDS, POLICY_DEFAULTS, POLICY_PARAMETERS, POLICY_PARAMETER_IDS, policyParameter } from './parameters.js';
-import { fixedForecast, movesOf, prepositionPlan } from './prepositioning.js';
+import { POLICY_FACTORIES, createPolicyFor } from './registry.js';
+import {
+  fixedForecast,
+  movesOf,
+  prepositionPlan,
+  repositionContextFor,
+  resolvePrepositionContext,
+} from './prepositioning.js';
+import type { DemandForecastSource } from './types.js';
 
 const REAL_DATA_DIR = fileURLToPath(new URL('../../../../../data', import.meta.url));
 const POLICIES_DIR = fileURLToPath(new URL('.', import.meta.url));
@@ -104,16 +113,80 @@ const BANK: readonly CarSnapshot[] = [
 /**
  * The context `Simulation.#park` actually supplies, verbatim.
  *
- * `simulation.ts:#park` builds `{ entranceFloorIds: this.#entranceFloorIds }` and nothing else, so a
- * profile's stage 7 must be sane against *this*, not against the richer context
- * `prepositionPlan` can build. When `#park` starts passing
- * `repositionContextFor(car, resolvePrepositionContext(...))`, widen this constant and the
- * `zone-center` profiles may come back.
+ * `simulation.ts:#park` now builds
+ * `repositionContextFor(car, resolvePrepositionContext(snapshots, at, { entranceFloorIds,
+ * predictor }))`, so a profile's stage 7 is judged against the partition and the forecast a real
+ * run supplies — which is what makes `zone-center` a shipped strategy rather than a declared one.
+ * The entrance list is Midtown Office's, matching the `BANK` fixture's shaft.
+ *
+ * It used to be `{ entranceFloorIds }` alone, and the two tests below that use it measured a bank
+ * collapsing onto one floor because of it.
  */
-const RUNNER_PARK_CONTEXT = Object.freeze({ entranceFloorIds: Object.freeze(['P1', 'G']) });
+const RUNNER_PARK_ENTRANCES: readonly string[] = Object.freeze(['P1', 'G']);
+
+/** One car's stage-7 context, resolved exactly as the runner resolves it, for a whole bank. */
+function runnerParkContext(
+  cars: readonly CarSnapshot[],
+  car: CarSnapshot,
+  predictor?: DemandForecastSource | undefined,
+): RepositionContext {
+  return repositionContextFor(
+    car,
+    resolvePrepositionContext(cars, 0, {
+      entranceFloorIds: RUNNER_PARK_ENTRANCES,
+      ...(predictor === undefined ? {} : { predictor }),
+    }),
+  );
+}
 
 /** A forecast concentrated high and thin low, so `predictedDemand` can separate two cars. */
 const DEMAND_FORECAST = fixedForecast(new Map([['18', 30], ['3', 4]]));
+
+/* -------------------------------------------------------------------------- *
+ * `activeWhen`, read off a profile — the mechanical form of "this weight is live"
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The value a profile gives a dotted tunable path, resolved rather than as authored.
+ *
+ * The *resolved* configuration is the right source: `rideTimeTerm.activeWhen` names
+ * `dispatch.callType`, and a profile that authors no `dispatch` section still runs at
+ * `DISPATCH_DEFAULTS.callType` — a gate has to be judged against what the run will do, not against
+ * what the file happens to spell out. Sections `resolveDispatchConfig` does not own (`auction`)
+ * fall back to the authored profile, so a term gated on an aggregation would be handled here
+ * without this helper needing to know that any such term exists.
+ */
+function settingAt(profile: DispatcherProfile, path: string): unknown {
+  const resolved = resolveDispatchConfig(profile) as unknown as Record<string, unknown>;
+  const authored = profile as unknown as Record<string, unknown>;
+  for (const root of [resolved, authored]) {
+    let cursor: unknown = root;
+    for (const key of path.split('.')) {
+      if (typeof cursor !== 'object' || cursor === null) {
+        cursor = undefined;
+        break;
+      }
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    if (cursor !== undefined) return cursor;
+  }
+  return undefined;
+}
+
+/** Term ids this profile weights above zero whose own `activeWhen` its settings do not satisfy. */
+function unsatisfiedGatesOf(profile: DispatcherProfile): readonly string[] {
+  const dead: string[] = [];
+  for (const [termId, weight] of Object.entries(profile.weights)) {
+    if (weight === 0) continue;
+    const term = COST_TERMS_BY_ID.get(termId);
+    if (term?.activeWhen === undefined) continue;
+    const satisfied = Object.entries(term.activeWhen).every(([path, admitted]) =>
+      admitted.includes(String(settingAt(profile, path))),
+    );
+    if (!satisfied) dead.push(termId);
+  }
+  return dead;
+}
 
 interface ContributionScenario {
   readonly name: string;
@@ -315,19 +388,77 @@ describe('every profile in data/dispatcher-profiles.json', () => {
       if (inert.length > 0) inertByProfile[profile.id] = inert;
     }
 
-    // Exactly one exception, and it is the term's own declared condition rather than a defect:
-    // `rideTimeTerm.activeWhen` is `{ dispatch.callType: ['destination-entry',
-    // 'mobile-credential'] }`, and `predictive-balanced` authors no `callType`, so under
-    // `up-down-buttons` no landing call carries a destination and the term is 0 for every car. The
-    // next test proves that is the reason by flipping the one setting.
-    expect(inertByProfile).toEqual({ 'predictive-balanced': ['rideTime'] });
+    // No exceptions. There used to be exactly one, carried here as an allowance:
+    // `predictive-balanced` weighted `rideTime` at 0.3 while authoring no `dispatch.callType`, so it
+    // ran at the `up-down-buttons` default where `rideTimeTerm.activeWhen` declares the term inert,
+    // and the weight priced nothing on any shipped run of either single-leg building. An allowance
+    // list is the wrong instrument for that: it records one known-dead weight and licenses the next
+    // one. The weight is gone from `data/dispatcher-profiles.json` (bit-identically — a saturating
+    // map sends raw 0 to 0, so no published number moved) and the *general* rule is asserted
+    // mechanically below, off each term's own `activeWhen`.
+    expect(inertByProfile).toEqual({});
   });
 
-  it('makes the one inert weight bite the moment its declared condition is met', () => {
-    // Which is what turns the exception above from an excuse into a diagnosis. Same profile, same
-    // fixture, one stage setting changed — the one `rideTimeTerm.activeWhen` names.
-    const profile = profiles.find((candidate) => candidate.id === 'predictive-balanced');
-    expect(profile).toBeDefined();
+  it('lets no profile weight a term its own stage settings make inert', () => {
+    // The rule the allowance list above used to stand in for, stated once and derived rather than
+    // enumerated: a term that declares `activeWhen` is asking for a stage setting, and a profile
+    // that pays a weight without authoring that setting has bought nothing. It is invariant 8 read
+    // in the other direction — the schema already says when each dimension is live, so honouring it
+    // is mechanical, and a human reading the profile is the only party the declaration was not
+    // already protecting.
+    //
+    // Every gate is read from the profile's *resolved* configuration, so a setting inherited from
+    // `DISPATCH_DEFAULTS` counts exactly as one written out, and an authored section this resolver
+    // does not own (`auction`) still answers from the profile itself.
+    const violations: string[] = [];
+    for (const profile of profiles) {
+      for (const [termId, weight] of Object.entries(profile.weights)) {
+        if (weight === 0) continue;
+        const term = COST_TERMS_BY_ID.get(termId);
+        if (term?.activeWhen === undefined) continue;
+        for (const [path, admitted] of Object.entries(term.activeWhen)) {
+          const actual = settingAt(profile, path);
+          if (admitted.includes(String(actual))) continue;
+          violations.push(
+            `${profile.id} weights ${termId} at ${String(weight)} but its ${path} is ` +
+              `"${String(actual)}", and the term declares activeWhen ${path} ∈ ` +
+              `{${admitted.join(', ')}}`,
+          );
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+
+    // Not vacuous, in both directions. At least one shipped term declares a gate at all, and a
+    // profile that violates it is caught — otherwise this passes forever on an empty loop.
+    const gated = COST_TERMS.filter((term) => term.activeWhen !== undefined);
+    expect(gated.map((term) => term.id)).toContain('rideTime');
+    const offender: DispatcherProfile = {
+      id: 'gate-violator',
+      name: 'Weights rideTime under up-down-buttons',
+      weights: { waitTime: 1, rideTime: 0.3 },
+      dispatch: { callType: 'up-down-buttons' },
+    };
+    expect(unsatisfiedGatesOf(offender)).toEqual(['rideTime']);
+    expect(
+      unsatisfiedGatesOf({ ...offender, dispatch: { callType: 'destination-entry' } }),
+    ).toEqual([]);
+  });
+
+  it('makes a weight its stage settings gate off bite the moment the declared condition is met', () => {
+    // Which is what makes the rule above a diagnosis rather than a prohibition. Same profile, same
+    // fixture, one stage setting changed — the one `rideTimeTerm.activeWhen` names. `rideTime` is
+    // added back onto `predictive-balanced`'s weights here on purpose: this is the measurement that
+    // says dropping it from the shipped file cost nothing, because the term only ever had a value to
+    // contribute under a `callType` that profile does not author.
+    const authoredProfile = profiles.find((candidate) => candidate.id === 'predictive-balanced');
+    expect(authoredProfile).toBeDefined();
+    expect(authoredProfile?.weights.rideTime, 'the dead weight is back in the shipped file')
+      .toBeUndefined();
+    const profile: DispatcherProfile | undefined =
+      authoredProfile === undefined
+        ? undefined
+        : { ...authoredProfile, weights: { ...authoredProfile.weights, rideTime: 0.3 } };
     const scenario = contributionScenarios()[1];
     expect(scenario).toBeDefined();
     const subject = {
@@ -363,19 +494,20 @@ describe('every profile in data/dispatcher-profiles.json', () => {
     expect(rideTimeOf('destination-entry')).toBeGreaterThan(0);
   });
 
-  it('scores two of those terms at zero inside runSimulation, because nothing there builds a group context', () => {
-    // The gap the test above deliberately does not paper over, pinned so it is measured rather than
-    // discovered. `Simulation.#dispatchBank` calls `policy.dispatch(callId, snapshots, at,
-    // { waitingPassengers: waiting.count })` — two counts and nothing else — so `zoneFloorIdsByCarId`
-    // and `demandForecast` are absent in every real run and the two terms that read them are 0 for
-    // every car. `zoned-uppeak`'s argmin is then exactly `eta`'s, and `predictive-balanced` pays for
-    // a `predictedDemand` weight it does not get.
+  it('scores both of those terms above zero inside runSimulation, now that the runner builds a group context', () => {
+    // This assertion used to say the opposite, and said it deliberately: `Simulation.#dispatchBank`
+    // called `policy.dispatch(callId, snapshots, at, { waitingPassengers, waitingMassKg })` — two
+    // counts and nothing else — so `zoneFloorIdsByCarId` and `demandForecast` were absent in every
+    // real run, `zoneAffinity` and `predictedDemand` were 0 for every car, `zoned-uppeak`'s argmin
+    // was exactly `eta`'s, and `predictive-balanced` paid for a `predictedDemand` weight it did not
+    // get. The runner now resolves both facts once per dispatch pass through `groupContext` and
+    // shares them across the calls in the pass, so the two terms price for real.
     //
-    // Not a defect in this directory and not worked around here: `groupContext` produces both fields
-    // and the test above proves they price. What is missing is one call in `sim/`, and until it lands
-    // this assertion is the honest statement of what a benchmark of `zoned-uppeak` today measures.
+    // Kept as the *contrast* rather than deleted: withholding the group facts must still produce
+    // zero, or "the term is live" would be untestable — a term that scored non-zero on no
+    // information would be inventing one.
     const scenario = contributionScenarios()[0] as ContributionScenario;
-    const runnerContext = { waitingPassengers: scenario.waitingPassengers };
+    const withoutGroupFacts = { waitingPassengers: scenario.waitingPassengers };
 
     for (const [profileId, termId] of [
       ['zoned-uppeak', 'zoneAffinity'],
@@ -383,14 +515,16 @@ describe('every profile in data/dispatcher-profiles.json', () => {
     ] as const) {
       const profile = profiles.find((candidate) => candidate.id === profileId) as DispatcherProfile;
       const policy = createDispatchPolicy(profile);
-      const scores = policy.score(scenario.call, scenario.cars, scenario.at, runnerContext);
-      for (const score of scores) {
+
+      const bare = policy.score(scenario.call, scenario.cars, scenario.at, withoutGroupFacts);
+      for (const score of bare) {
         const term = score.terms.find((candidate) => candidate.termId === termId);
         expect(term, `${profileId} does not weight ${termId}`).toBeDefined();
-        expect(term?.contribution, `${profileId}/${termId} under the runner's context`).toBe(0);
+        expect(term?.contribution, `${profileId}/${termId} with no group facts`).toBe(0);
       }
 
-      // And with the group context it is not zero — same profile, same cars, same instant.
+      // The context the runner really builds — `groupContext(snapshots, at, { predictor })` — same
+      // profile, same cars, same instant.
       const withGroup = policy.score(
         scenario.call,
         scenario.cars,
@@ -412,20 +546,18 @@ describe('every profile in data/dispatcher-profiles.json', () => {
 
   it('ships no profile whose stage 7 collapses a bank under the context the runner supplies', () => {
     // `zone-center` with no partition sends every car in a bank to the same shaft median — the
-    // outcome `zoning.ts` calls worse than not parking — and `Simulation.#park` supplies no
-    // partition. Measured before this profile changed: all four Midtown cars to floor 10. So the bar
-    // a shipped profile has to clear is its behaviour against RUNNER_PARK_CONTEXT, not against the
-    // richer context `prepositionPlan` can build.
+    // outcome `zoning.ts` calls worse than not parking — and `Simulation.#park` used to supply no
+    // partition, sending all four Midtown cars to floor 10. It now resolves the partition and the
+    // forecast for the whole bank, so the bar a shipped profile has to clear is its behaviour
+    // against exactly that context.
     //
     // Entrance floors are exempt: sending a whole bank to the lobby is `lobby`'s entire intent.
-    const cars = BANK.map((car) => car);
     for (const profile of profiles) {
       const policy = createDispatchPolicy(profile);
-      const targets = cars
-        .map((car) => policy.reposition(car, 0, RUNNER_PARK_CONTEXT))
+      const targets = BANK.map((car) => policy.reposition(car, 0, runnerParkContext(BANK, car)))
         .filter((decision) => decision.move && decision.targetFloorId !== undefined)
         .map((decision) => decision.targetFloorId as string)
-        .filter((floorId) => !RUNNER_PARK_CONTEXT.entranceFloorIds.includes(floorId));
+        .filter((floorId) => !RUNNER_PARK_ENTRANCES.includes(floorId));
 
       expect(
         targets.length,
@@ -434,31 +566,33 @@ describe('every profile in data/dispatcher-profiles.json', () => {
     }
   });
 
-  it('parks the same bank on distinct floors once a partition is supplied', () => {
-    // The other half, so the guard above cannot be satisfied by a strategy that simply never parks.
-    // `zone-center` is not broken; it is unwired. Given the partition `prepositionPlan` builds, the
-    // same profile that collapsed spreads across distinct floors.
+  it('parks the same bank on distinct floors, and would collapse it without the partition', () => {
+    // The other half, so the guard above cannot be satisfied by a strategy that simply never parks:
+    // the shipped `zone-center` profile must actually spread a bank out, and the impoverished
+    // context must still be the thing that collapses it. Both are asserted, because "does not
+    // collapse" and "parks at all" fail identically in a summary.
     const zoned = profiles.find((candidate) => candidate.id === 'zoned-uppeak') as DispatcherProfile;
-    const policy = createDispatchPolicy({
-      ...zoned,
-      idle: { ...zoned.idle, parkingStrategy: 'zone-center' },
-    });
+    expect(zoned.idle?.parkingStrategy, 'the shipped profile no longer declares zone-center').toBe(
+      'zone-center',
+    );
+    const policy = createDispatchPolicy(zoned);
 
     // Four cars standing at the lobby, which is what an up-peak bank looks like before it disperses.
     const lobbyBank = ['A', 'B', 'C', 'D'].map((id) => snapshotAt(id, '0'));
 
+    const entrancesOnly = { entranceFloorIds: RUNNER_PARK_ENTRANCES };
     const collapsed = lobbyBank
-      .map((car) => policy.reposition(car, 0, RUNNER_PARK_CONTEXT))
+      .map((car) => policy.reposition(car, 0, entrancesOnly))
       .filter((decision) => decision.move && decision.targetFloorId !== undefined)
       .map((decision) => decision.targetFloorId as string);
-    const spread = movesOf(prepositionPlan(policy, lobbyBank, 0, RUNNER_PARK_CONTEXT)).map(
+    const spread = movesOf(prepositionPlan(policy, lobbyBank, 0, entrancesOnly)).map(
       (decision) => decision.targetFloorId,
     );
 
-    // Every car moves, and all four to the same floor.
+    // Every car moves, and all four to the same floor, when nobody supplies a partition.
     expect(collapsed.length, 'the unwired context still moves the whole bank').toBe(lobbyBank.length);
     expect(new Set(collapsed).size, 'the unwired context still collapses').toBe(1);
-    // With the partition, one floor per car that moves, and more than one floor.
+    // With the partition — which is what the runner now resolves — one floor per car that moves.
     expect(new Set(spread).size, 'the wired context still spreads').toBeGreaterThan(1);
     expect(new Set(spread).size).toBe(spread.length);
   });
@@ -506,9 +640,12 @@ describe('every profile in data/dispatcher-profiles.json', () => {
     const zoned = resolveAuctionConfig(byId.get('zoned-uppeak') as DispatcherProfile);
     expect(zoned.dispatch.assignmentMode).toBe('split-demand');
     expect(zoned.dispatch.splitThresholdPassengers).toBe(10);
-    // Not `zone-center`, and the two tests above are why: `Simulation.#park` supplies no partition,
-    // so declaring it would ship a profile that sends a whole bank to one floor.
-    expect(zoned.idle.parkingStrategy).toBe('stay');
+    // `zone-center`, and the two tests above are why it may be: `Simulation.#park` resolves the
+    // partition for the whole bank, so the strategy spreads a bank rather than collapsing it. The
+    // deadband comes down with it — at the 5 s default the whole shaft is inside it and the
+    // strategy would be indistinguishable from `stay`.
+    expect(zoned.idle.parkingStrategy).toBe('zone-center');
+    expect(zoned.idle.repositionThresholdS).toBe(2);
 
     const predictive = byId.get('predictive-balanced') as DispatcherProfile;
     expect(resolveAuctionConfig(predictive).idle.parkingStrategy).toBe('predicted-demand');
@@ -530,45 +667,56 @@ describe('every profile in data/dispatcher-profiles.json', () => {
  * -------------------------------------------------------------------------- */
 
 describe('the aggregation comparison isolates the aggregation', () => {
-  it('cannot be authored as data at all yet, and this goes red the day it can', () => {
-    // The tripwire. `dispatcherProfileSchema` is strict and has no `auction` section, so a profile
-    // carrying one is rejected at load time — which is why a *second* auction profile could not
-    // express a different aggregation and would resolve to the control arm under another name. That
-    // was the defect: a profile named "multi-round with bid withdrawal" that resolved to
-    // `rounds: 1`, differing from its own control only in stage 5, so the paired-t interval a
-    // benchmark of the pair produced was an interval on reassignment and measured exactly zero
-    // aggregation.
+  it('is authored as data, and every profile declares the aggregation it runs under', () => {
+    // This assertion used to be the reverse — a tripwire asserting `dispatcherProfileSchema` had no
+    // `auction` section — because while it did not, a *second* auction profile could not express a
+    // different aggregation and would resolve to the control arm under another name. That was the
+    // defect: a profile named "multi-round with bid withdrawal" that resolved to `rounds: 1`,
+    // differing from its own control only in stage 5, so the paired-t interval a benchmark of the
+    // pair produced was an interval on reassignment and measured exactly zero aggregation.
     //
-    // When `config/schema.ts` gains the section (the rows it owes are in `types.ts` § Pending config
-    // surface), this assertion fails. That is the point: the fix is to author the treatment arm as a
-    // profile and replace this test with one asserting the authored value, and a green suite must
-    // not be able to hide the gap in the meantime.
+    // The section landed, so the tripwire is replaced by the assertion it was holding a place for.
     const base = profiles.find((candidate) => candidate.id === 'auction') as DispatcherProfile;
     const parsed = dispatcherProfileSchema.safeParse({
       ...base,
-      auction: { rounds: 3, reserveMarginalDelayS: 25 },
+      auction: { aggregation: 'contract-net', rounds: 3, reserveMarginalDelayS: 25 },
     });
-    expect(parsed.success, 'config/schema.ts now carries an auction section — author it').toBe(false);
+    expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
 
-    // ...and therefore every authored profile resolves to the default aggregation. Nothing in the
-    // data file claims an aggregation it cannot carry.
+    // Every profile resolves to an aggregation it actually declares, and every profile that never
+    // mentions one is the centralized argmin — the default that keeps a run from silently getting
+    // an auction it did not ask for.
+    const declared = new Map(
+      profiles.map((profile) => [profile.id, resolveAuctionConfig(profile).auction]),
+    );
+    expect(declared.get('auction')?.aggregation).toBe('contract-net');
+    expect(declared.get('auction-multi-round')?.aggregation).toBe('contract-net');
     for (const profile of profiles) {
-      expect(resolveAuctionConfig(profile).auction, profile.id).toEqual({
-        rounds: POLICY_DEFAULTS.rounds,
-        reserveMarginalDelayS: POLICY_DEFAULTS.reserveMarginalDelayS,
-      });
+      const resolved = declared.get(profile.id);
+      expect(resolved?.aggregation, profile.id).toBe(
+        profile.auction?.aggregation ?? POLICY_DEFAULTS.aggregation,
+      );
+      if (profile.auction === undefined) {
+        expect(resolved, profile.id).toEqual({
+          aggregation: POLICY_DEFAULTS.aggregation,
+          rounds: POLICY_DEFAULTS.rounds,
+          reserveMarginalDelayS: POLICY_DEFAULTS.reserveMarginalDelayS,
+        });
+      }
     }
   });
 
-  it('builds both arms from one profile, differing in nothing but auction.rounds', () => {
-    const base = profiles.find((candidate) => candidate.id === 'auction') as DispatcherProfile;
-    const control = resolveAuctionConfig(base);
-    const treatment = resolveAuctionConfig(base, {
-      auction: { rounds: 3, reserveMarginalDelayS: 25 },
-    });
+  it('builds both arms as profiles, differing in nothing but the auction section', () => {
+    const control = resolveAuctionConfig(
+      profiles.find((candidate) => candidate.id === 'auction') as DispatcherProfile,
+    );
+    const treatment = resolveAuctionConfig(
+      profiles.find((candidate) => candidate.id === 'auction-multi-round') as DispatcherProfile,
+    );
 
     // Every resolved section outside `auction` must be identical, or the interval is an interval on
-    // whichever one differs. This is the assertion the two-profile arrangement could not make.
+    // whichever one differs. This is the assertion the one-profile-two-option-sets arrangement made
+    // by construction and that two *authored* profiles have to earn.
     for (const section of ['dispatch', 'answer', 'idle', 'eligibility', 'normalization'] as const) {
       expect(treatment[section], section).toEqual(control[section]);
     }
@@ -577,6 +725,28 @@ describe('the aggregation comparison isolates the aggregation', () => {
     expect(treatment.constraints).toEqual(control.constraints);
     expect(control.auction.rounds).toBe(1);
     expect(treatment.auction.rounds).toBe(3);
+    expect(treatment.auction.reserveMarginalDelayS).toBe(25);
+    // And both are aggregated by the same factory, so the only difference a run can see is the
+    // round budget and the reserve.
+    expect(control.auction.aggregation).toBe('contract-net');
+    expect(treatment.auction.aggregation).toBe('contract-net');
+  });
+
+  it('selects the policy by a table keyed on the declared aggregation, never by a name', () => {
+    // CLAUDE.md invariant 7, at the level above a weight vector. The registry is total over
+    // `AGGREGATIONS` and every row is reachable from data.
+    expect(Object.keys(POLICY_FACTORIES).sort()).toEqual([...AGGREGATIONS].sort());
+    for (const profile of profiles) {
+      const policy = createPolicyFor(profile);
+      const expected =
+        (profile.auction?.aggregation ?? POLICY_DEFAULTS.aggregation) === 'contract-net';
+      expect(policy instanceof AuctionDispatchPolicy, profile.id).toBe(expected);
+    }
+    expect(() =>
+      createPolicyFor(profiles[0] as DispatcherProfile, {
+        auction: { aggregation: 'swarm' as unknown as 'contract-net' },
+      }),
+    ).toThrow(/auction\.aggregation/);
   });
 
   it('makes the treatment arm allocate somewhere the control arm does not', () => {
@@ -609,67 +779,123 @@ describe('the aggregation comparison isolates the aggregation', () => {
 });
 
 /* -------------------------------------------------------------------------- *
- * The wiring gaps, enforced rather than described
+ * The seam, guarded rather than described
  * -------------------------------------------------------------------------- */
 
-describe('nothing in dispatch/policies is reachable from runSimulation, and that is asserted', () => {
-  // A gap recorded only in a docstring rots two ways: it stays after it is fixed, so the module
-  // understates itself, or it is quietly worked around and the docstring becomes the only evidence
-  // that anything is missing. Both have the same shape as the defect this phase was reviewed for — a
-  // declared thing that does nothing — so the four gaps are pinned here instead.
+describe('every behaviour in dispatch/policies is reachable from runSimulation', () => {
+  // This block used to assert the opposite, symbol by symbol: that `simulation.ts` contained no
+  // `groupContext`, no `.reconsider(`, no `CapacityReassignmentMonitor` and no `createPolicy`, and
+  // that `sim/types.ts` had no policy hook. Those were tripwires on gaps, written to go red the day
+  // the wiring landed. It has landed, so they are replaced by the assertions they were holding a
+  // place for — and by BEHAVIOURAL ones rather than grep, because a grep for a symbol proves a call
+  // site exists and not that anything reaches it. Four times in this project a behaviour has been
+  // configurable, unit-tested and dead in the shipped path; a symbol search would have caught none
+  // of them once someone imported the name and never called it.
   //
-  // Every assertion below FAILS the day the corresponding wiring lands. That is deliberate and it is
-  // the point: whoever lands it must come back and (a) delete the assertion, (b) correct
-  // `index.ts` § *Nothing in this directory is reachable from `runSimulation` yet*, and (c) write the
-  // measurement the wiring makes possible — for `#park`, the Garden Apartments AWT interval that
-  // Phase 5 asks for and `prepositioning.test.ts` currently substitutes a decision-level surrogate
-  // for.
+  // The run-level guards live in `sim/seam.test.ts`, which asserts observable differences between
+  // configurations. What is asserted here is the narrower claim this directory can make on its own:
+  // that the runner *does* call in, measured through the counters `Simulation` keeps.
   const SIM_DIR = fileURLToPath(new URL('../../sim', import.meta.url));
   let simulation: string;
-  let simTypes: string;
 
   beforeAll(async () => {
     simulation = await readFile(join(SIM_DIR, 'simulation.ts'), 'utf8');
-    simTypes = await readFile(join(SIM_DIR, 'types.ts'), 'utf8');
   });
 
-  it('has no policy hook on SimulationConfig, so an auction cannot enter a run', () => {
-    expect(simTypes, 'SimulationConfig now has createPolicy — inject the auction and measure it').not.toContain(
-      'createPolicy',
+  it('feeds an arrival model and consults it, on a building where parking dominates', () => {
+    const garden = config.buildingsById.get('garden-apartments') as ResolvedBuilding;
+    const predictive = profiles.find(
+      (candidate) => candidate.id === 'predictive-balanced',
+    ) as DispatcherProfile;
+    const run = new Simulation({
+      building: garden,
+      dispatcherProfile: predictive,
+      trafficProfiles: config.trafficProfiles,
+      elevatorSpecs: config.elevatorSpecs,
+      seed: 20260726,
+      onTimeout: 'report',
+    });
+    run.run();
+
+    // One arrival observed per generated leg, and never more: the model is fed on real arrivals
+    // only, at the moment somebody begins waiting, and never from the trace.
+    expect(run.stageActivity.predictorObservations).toBeGreaterThan(0);
+    expect(run.stageActivity.predictorObservations).toBeLessThanOrEqual(
+      run.trace.passengerCount * garden.banks.length,
     );
-    expect(simulation).not.toContain('createAuctionPolicy');
-  });
-
-  it('has no reconsider call site, so capacity-driven migration never fires', () => {
-    // The gap the report on this module did not disclose. `capacity.ts`'s whole subject is stage 5,
-    // and `simulation.ts` never asks a policy to reconsider anything, so the mechanism has never run
-    // on a building and its value against `reassignmentPolicy: never` is unmeasured.
-    expect(simulation, 'simulation.ts now reconsiders — wire the monitor and measure it').not.toContain(
-      '.reconsider(',
+    // And the forecast is a real one: every floor the bank serves is reported on, cold-start
+    // included, because "no evidence" is not "no demand".
+    const forecast = run.predictors.get(garden.banks[0]?.id as string);
+    expect(forecast, 'no arrival model was built for the bank').toBeDefined();
+    expect(forecast?.expectedDemandByFloor(run.trace.durationS).size).toBe(
+      garden.banks[0]?.servesFloors.length,
     );
-    expect(simulation).not.toContain('CapacityReassignmentMonitor');
   });
 
-  it('builds its reposition context inline, so no forecast and no partition reach stage 7', () => {
-    const remedy =
-      'simulation.ts now builds a reposition context — restore zone-center on zoned-uppeak and write the Garden Apartments AWT interval Phase 5 asks for';
-    for (const symbol of ['repositionContextFor', 'prepositionPlan', 'resolvePrepositionContext']) {
-      expect(simulation, remedy).not.toContain(symbol);
+  it('runs the load-driven stage-5 sweep, and migrates only for a profile that opted in', () => {
+    // The mechanism and its control arm in one assertion. `capacity-aware` declares
+    // `reassignmentPolicy: until-commitment`; `eta` leaves it at the `never` default. Both cross
+    // their bypass thresholds on an up-peak Midtown run — the sweep runs for both — and only the
+    // one that opted into stage 5 moves a call. A migration count of zero for `eta` is the
+    // mechanism being *off*, which is what makes its value measurable against its own absence; a
+    // crossing count of zero would be the mechanism never having run at all, and the two used to
+    // look identical.
+    const activity = (profileId: string) => {
+      const run = new Simulation({
+        building: midtown,
+        dispatcherProfile: profiles.find(
+          (candidate) => candidate.id === profileId,
+        ) as DispatcherProfile,
+        trafficProfiles: config.trafficProfiles,
+        elevatorSpecs: config.elevatorSpecs,
+        seed: 20260726,
+        onTimeout: 'report',
+      });
+      run.run();
+      return run.stageActivity;
+    };
+
+    const optedIn = activity('capacity-aware');
+    expect(optedIn.capacityCrossings, 'no car ever crossed its threshold').toBeGreaterThan(0);
+    expect(optedIn.capacityMigrations, 'stage 5 never moved a call').toBeGreaterThan(0);
+
+    const control = activity('eta');
+    expect(control.capacityCrossings, 'the sweep did not run for the control arm').toBeGreaterThan(0);
+    expect(control.capacityMigrations, 'reassignmentPolicy: never still migrated').toBe(0);
+    expect(control.capacityHeld, 'the control arm looked at no call').toBeGreaterThan(0);
+  });
+
+  it('builds each bank through the registry, so an authored aggregation runs', () => {
+    const multi = profiles.find(
+      (candidate) => candidate.id === 'auction-multi-round',
+    ) as DispatcherProfile;
+    const run = new Simulation({
+      building: midtown,
+      dispatcherProfile: multi,
+      trafficProfiles: config.trafficProfiles,
+      elevatorSpecs: config.elevatorSpecs,
+      seed: 20260726,
+      onTimeout: 'report',
+    });
+    run.run();
+
+    for (const [bankId, policy] of run.policies) {
+      expect(policy instanceof AuctionDispatchPolicy, bankId).toBe(true);
+      expect((policy as AuctionDispatchPolicy).config.auction.rounds, bankId).toBe(3);
     }
-    // And the inline construction is still exactly the one the two parking tests above measure.
-    expect(simulation).toContain('entranceFloorIds: this.#entranceFloorIds');
   });
 
-  it('builds its dispatch context from two counts, so zoneAffinity and predictedDemand stay zero', () => {
-    const remedy =
-      'simulation.ts now builds a group context — delete the runner-context assertion above, which asserts these two terms score zero in a run';
-    for (const symbol of [
-      'groupContext',
-      'withLandingCounts',
-      'zoneFloorIdsByCarId',
-      'demandForecast',
-    ]) {
-      expect(simulation, remedy).not.toContain(symbol);
+  it('never reads a clock or a profile id in the run loop', () => {
+    // The two invariants the wiring above is most likely to have broken, checked on the source it
+    // was added to. CLAUDE.md invariants 3 and 7.
+    const code = simulation.replaceAll(/\/\*[\S\s]*?\*\//gu, '').replaceAll(/\/\/.*$/gmu, '');
+    for (const forbidden of ['Date.now', 'performance.now', 'setTimeout', 'Math.random']) {
+      expect(code, `simulation.ts uses ${forbidden}`).not.toContain(forbidden);
+    }
+    for (const profile of profiles) {
+      expect(code, `simulation.ts names the profile "${profile.id}"`).not.toContain(
+        `'${profile.id}'`,
+      );
     }
   });
 });
@@ -870,10 +1096,19 @@ describe('the schema and the aggregation agree about what is tunable', () => {
     }
 
     // And the range a Phase 7 optimizer samples still covers every round the resolver accepts, so
-    // the dimension is searchable even though the condition is not machine-readable.
+    // the dimension is searchable even though *this* half of the condition is not machine-readable.
     expect(policyParameter('auction.rounds')?.range).toEqual([1, MAX_AUCTION_ROUNDS]);
-    expect(policyParameter('auction.reserveMarginalDelayS')?.activeWhen).toBeUndefined();
-    // The condition is stated where it cannot be misread, since it cannot be evaluated.
+    // The half that IS machine-readable is declared, and by the one rule the rest of the schema
+    // uses: both knobs are inert under `auction.aggregation: central-argmin`, which holds no
+    // auction at all, and `auction.aggregation` is a categorical so the gate is evaluable.
+    for (const id of ['auction.rounds', 'auction.reserveMarginalDelayS'] as const) {
+      expect(policyParameter(id)?.activeWhen, id).toEqual({
+        'auction.aggregation': ['contract-net'],
+      });
+    }
+    // The remaining half — the reserve is also inert at one round — gates on an integer with no
+    // `values`, which no generic optimizer can evaluate. It is stated where it cannot be misread
+    // instead, and asserted behaviourally above.
     expect(policyParameter('auction.reserveMarginalDelayS')?.description).toContain(
       'auction.rounds is 1',
     );

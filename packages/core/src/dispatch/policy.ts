@@ -114,7 +114,7 @@ import {
  * A weight on a term the library *declares* but no phase implements is not rejected; it lands
  * in {@link ResolvedDispatchConfig.pendingWeights}. Every profile in
  * `data/dispatcher-profiles.json` must build a working policy today, and
- * `predictive-balanced` weights eleven of the twelve declared terms.
+ * `predictive-balanced` weights ten of the twelve declared terms.
  */
 export function resolveDispatchConfig(
   source: DispatcherProfileSource,

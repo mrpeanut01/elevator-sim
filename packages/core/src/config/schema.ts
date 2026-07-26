@@ -13,6 +13,7 @@
 import { z } from 'zod';
 
 import {
+  AGGREGATIONS,
   ASSIGNMENT_MODES,
   ASSIGNMENT_TIMINGS,
   BUILDING_TYPES,
@@ -464,7 +465,29 @@ const idleStageSchema = z.strictObject({
   repositionThresholdS: nonNegative.optional(),
   repositionEnergyWeight: nonNegative.optional(),
   predictorHorizonS: positive.optional(),
-  predictorLearningRate: fraction.optional(),
+  // `gt(0)`, not `fraction`: `createArrivalModel` rejects a learning rate of zero, because a model
+  // that can never learn is an inert predictor that still reports a forecast. A `fraction` here
+  // accepted `0`, so the profile loaded clean and the model threw at construction — the config
+  // layer admitting a value the model refuses.
+  predictorLearningRate: z.number().gt(0).max(1).optional(),
+  predictorBucketWidthS: positive.optional(),
+  predictorCycleS: positive.optional(),
+  predictorPriorRatePerS: nonNegative.optional(),
+  predictorPriorStrength: nonNegative.optional(),
+});
+
+/**
+ * Stage 4's aggregation, as a profile authors it.
+ *
+ * `aggregation` is the declarative selector `dispatch/policies/registry.ts` looks the policy
+ * factory up by, so "which dispatcher" stays data (CLAUDE.md invariant 7) and a tuned winner is
+ * persistable as a profile rather than reachable only through an options object.
+ */
+const auctionStageSchema = z.strictObject({
+  $comment: comment,
+  aggregation: z.enum(AGGREGATIONS).optional(),
+  rounds: z.number().int().min(1).max(8).optional(),
+  reserveMarginalDelayS: nonNegative.optional(),
 });
 
 export const dispatcherProfileSchema = z.strictObject({
@@ -478,6 +501,7 @@ export const dispatcherProfileSchema = z.strictObject({
   dispatch: dispatchStageSchema.optional(),
   answer: answerStageSchema.optional(),
   idle: idleStageSchema.optional(),
+  auction: auctionStageSchema.optional(),
 });
 
 export const dispatcherProfilesSchema = z

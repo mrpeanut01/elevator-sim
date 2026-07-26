@@ -23,33 +23,30 @@
  * both stage 3 (`predictedDemand`) and stage 7 (`parkingStrategy: predicted-demand`) read"* — and
  * two resolutions would be two futures the bank disagreed about.
  *
- * ## The channel is open; the runner does not use it
+ * ## The channel is open, and the runner uses it
  *
- * `DispatchContext` declares `zoneFloorIdsByCarId` and `demandForecast`, and
- * `lifecycle.observationFor` forwards both onto the `DispatchObservation`, so a
- * {@link GroupObservationContext} handed to `policy.dispatch` **does** reach the terms. That is
- * measured, not assumed: `policies.test.ts` scores every authored profile on a fixture bank through
- * this function and asserts that each weighted term produces a non-zero contribution for at least
- * one car, `zoneAffinity` included. On a four-car bank with a call at floor 9, the zoned profile
- * prices `zoneAffinity` at `0.000 / 0.035 / 0.120 / 0.133` and the ranking it produces is *not* the
- * `waitTime`-only ranking.
- *
- * What is missing is a **caller**. `Simulation.#dispatchBank` passes `{ waitingPassengers }` and
- * nothing else, so inside `runSimulation` both fields are absent and both terms evaluate to zero —
- * inert, not wrong, which is the behaviour `terms/observation.ts` deliberately chose for a term with
- * no information, but it does mean a profile weighting either term scores in a real run as though
- * that weight were absent. `sim/` does not belong to this module, so the gap is recorded rather than
- * forced; what it owes is one call per dispatch pass, resolved once and shared across the calls in
- * the pass:
+ * `DispatchContext` declares `zoneFloorIdsByCarId` and `demandForecast`, `lifecycle.observationFor`
+ * forwards both onto the `DispatchObservation`, and `Simulation.#dispatchBank` now calls this
+ * function **once per dispatch pass** and shares the result across the calls in the pass:
  *
  * ```ts
  * // sim/simulation.ts, #dispatchBank — once per pass, not once per call
- * const group = groupContext(snapshots, at, { predictor: this.#predictor(bank.id) });
- * // ...then per call:
- * policy.dispatch(lifecycle.callId, snapshots, at, withLandingCounts(group, waiting.count));
+ * group ??= groupContext(snapshots, at, { predictor: this.#predictors.get(bank.id) });
+ * policy.dispatch(lifecycle.callId, snapshots, at, withLandingCounts(group, waiting.count, waiting.massKg));
  * ```
  *
- * The shapes already match end to end: `zoneAssignment` returns exactly the map
+ * It used to pass `{ waitingPassengers, waitingMassKg }` and nothing else, so inside `runSimulation`
+ * both fields were absent and both terms evaluated to zero — inert, not wrong, which is the
+ * behaviour `terms/observation.ts` deliberately chose for a term with no information, but it meant a
+ * profile weighting either term scored in a real run as though that weight were absent. Counted
+ * through the shipped engine on `midtown-office`, one seed:
+ *
+ * | term | non-zero evaluations before | after |
+ * |---|---|---|
+ * | `zoneAffinity` (`zoned-uppeak`) | 0 of 437 | **372 of 495**, with spread across cars in 150 of 151 decisions |
+ * | `predictedDemand` (`predictive-balanced`) | 0 of 7 057 | **7 435 of 7 435** |
+ *
+ * The shapes match end to end: `zoneAssignment` returns exactly the map
  * `TermObservation.zoneFloorIdsByCarId` declares, and `DemandForecastSource.expectedDemandByFloor`
  * returns exactly the map `TermObservation.demandForecast` declares — it is the predictor's own
  * method, so the forecast a term reads and the forecast stage 7 parks against are literally the same

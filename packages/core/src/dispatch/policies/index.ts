@@ -7,20 +7,15 @@
  *   CapacityReassignmentMonitor,
  *   POLICY_PARAMETERS,
  *   prepositionPlan,
- * } from '@elevator-sim/core';   // ← not yet: this barrel is not re-exported. See below.
+ * } from '@elevator-sim/core';
  * ```
  *
- * **This barrel is not on the package surface yet.** `dispatch/index.ts` does not re-export it and
- * neither does `core/src/index.ts`, so nothing here — `createAuctionPolicy`,
- * {@link CapacityReassignmentMonitor}, {@link prepositionPlan}, {@link POLICY_PARAMETERS} — is
- * importable from `@elevator-sim/core` today. That matters most for the schema: a Phase 7 optimizer
- * reads `*_PARAMETERS` off the package, and one registry per module joined at the consumer is this
- * codebase's convention (`DISPATCH_PARAMETERS` defers `answer.bypassLoadThreshold` to
- * `LOAD_SENSOR_PARAMETERS` the same way), so `auction.rounds` is discoverable through
- * `AuctionDispatchPolicy.parameters` — which concatenates both registries and is asserted to — and
- * through `POLICY_PARAMETERS` **once this barrel is exported**. Both index files belong to the
- * verifier; the two lines they owe are `export * from './policies/index.js'` in `dispatch/index.ts`
- * and the matching explicit re-export block in `core/src/index.ts`.
+ * On the package surface: `dispatch/index.ts` and `core/src/index.ts` both re-export this barrel
+ * explicitly. That matters most for the schema — a Phase 7 optimizer reads `*_PARAMETERS` off the
+ * package, and one registry per module joined at the consumer is this codebase's convention
+ * (`DISPATCH_PARAMETERS` defers `answer.bypassLoadThreshold` to `LOAD_SENSOR_PARAMETERS` the same
+ * way), so `auction.*` is discoverable through {@link POLICY_PARAMETERS} and through
+ * `AuctionDispatchPolicy.parameters`, which concatenates both registries and is asserted to.
  *
  * ## What is a policy and what is an architecture
  *
@@ -37,11 +32,12 @@
  * | `zoning.ts` | operational zoning, the third kind | service and access zoning, which are not this |
  * | `prepositioning.ts` | a forecast and a zone for stage 7 | the reposition arithmetic and its two knobs |
  *
- * Four behaviours, **one new tunable pair** (`auction.*`). The other three add no parameter at all,
- * because they make declared parameters that were inert actually bite — `dispatch.reassignmentPolicy`
- * and its three companions for capacity migration, `idle.parkingStrategy`'s `zone-center` and
- * `predicted-demand` for stage 7. A behaviour that needed a new knob to work was not wired up; it
- * was reimplemented, and `parameters.ts` records that test.
+ * Four behaviours, **one new tunable section** (`auction.*`: the aggregation selector and the two
+ * knobs the decentralized one adds). The other three add no parameter at all, because they make
+ * declared parameters that were inert actually bite — `dispatch.reassignmentPolicy` and its three
+ * companions for capacity migration, `idle.parkingStrategy`'s `zone-center` and `predicted-demand`
+ * for stage 7. A behaviour that needed a new knob to work was not wired up; it was reimplemented,
+ * and `parameters.ts` records that test.
  *
  * ## Nothing here reads a profile id
  *
@@ -52,61 +48,42 @@
  * integer tunable and is what every such parameter needs somewhere; branching on a profile's own
  * id is the failure the invariant names.
  *
- * ## Nothing in this directory is reachable from `runSimulation` yet
+ * ## Everything in this directory is reachable from `runSimulation`
  *
- * State this first and plainly, because everything below is qualified by it. **All four behaviours
- * are proved at the decision level and none of them runs inside `runSimulation`.** The gaps are all
- * in `sim/`, `config/` — files this module does not own — and every one is additive. None is worked
- * around here, because working around it would mean a second implementation of a stage inside a
- * policy, which is the thing this directory exists not to be.
+ * State this first and plainly, because it was the reverse for the whole of Phase 5 and everything
+ * below used to be qualified by it. All four behaviours now run inside `runSimulation`, and the
+ * wiring is in `sim/` and `config/` — files this module does not own and did not work around.
  *
- * | Behaviour | Reachable from a full run? | What it waits on |
- * |---|---|---|
- * | `auction.ts` | **no** | `SimulationConfig` has no policy hook (gap 2) |
- * | `capacity.ts` | **no** | `simulation.ts` contains no `reconsider` call site at all (gap 3) |
- * | `prepositioning.ts` | **no** | `Simulation.#park` builds its context inline (gap 4) |
- * | `zoning.ts` / `groupContext.ts` | **no** | `Simulation.#dispatchBank` passes `{waitingPassengers}` only (gap 5) |
+ * | Behaviour | How a run reaches it |
+ * |---|---|
+ * | `auction.ts` | `auction.aggregation` in the profile names a factory in `registry.ts`; `Simulation` builds every bank through {@link createPolicyFor} |
+ * | `capacity.ts` | one {@link CapacityReassignmentMonitor} per bank, swept from `Simulation.#finishStop` once the doors have shut and the load has settled |
+ * | `prepositioning.ts` | `Simulation.#park` resolves the bank's context and derives each car's `RepositionContext` from it |
+ * | `zoning.ts` / `groupContext.ts` | `Simulation.#dispatchBank` resolves {@link groupContext} once per pass and shares it across the calls in the pass |
  *
- * 1. **`config/schema.ts` has no `auction` section**, so `auction.rounds` and
- *    `auction.reserveMarginalDelayS` can only be set through {@link AuctionPolicyOptions} and a
- *    tuned winner cannot be persisted as a profile. The exact rows it owes are in `types.ts`
- *    § *Pending config surface*, next to the identical note `EligibilityStageConfig` carries.
- *    Consequence, and the reason it is listed first: a *profile* cannot declare an aggregation, so
- *    `data/dispatcher-profiles.json` ships **one** auction profile and both arms of the aggregation
- *    comparison are built from it. Two profiles would differ in stage settings and in nothing else.
- * 2. **`SimulationConfig` has no policy hook.** `Simulation` builds its group controllers with
- *    `createDispatchPolicy`, whose return type is `WeightedCostDispatchPolicy`, so an auction
- *    policy cannot be injected into a full run and the two aggregations cannot yet be compared
- *    with a paired-t interval on a real building. {@link AuctionDispatchPolicy} implements
- *    `DispatchPolicy` in full precisely so that the fix is one optional field:
+ * The five gaps this section used to enumerate are closed:
  *
- *    ```ts
- *    // sim/types.ts, SimulationConfig
- *    readonly createPolicy?:
- *      | ((profile: DispatcherProfile, options: DispatchPolicyOptions) => DispatchPolicy)
- *      | undefined;
- *    // sim/simulation.ts, replacing the createDispatchPolicy call
- *    (config.createPolicy ?? createDispatchPolicy)(profile, config.dispatcherOptions ?? {})
- *    ```
- * 3. **{@link CapacityReassignmentMonitor} has no caller.** `simulation.ts` never calls
- *    `policy.reconsider`, so capacity-driven migration — stage 5's whole reason for existing, and
- *    the mechanism docs/06 § Stage 5 names as what makes capacity-aware bypass work — never fires
- *    in a run. One call site after the cars have loaded is the fix:
- *    `monitor.run(policy, snapshots, at)`, one monitor per bank, `reset()` per replication.
- * 4. **`Simulation.#park` builds its `RepositionContext` inline** from `{ entranceFloorIds }`, so
- *    `predicted-demand` answers `no-forecast` for every car of every run and `zone-center` sends a
- *    whole bank to one floor. Measured on `midtown-office` at `DISPATCH_DEFAULTS`, four cars from
- *    `G`: **all four move to floor `10`** through `#park`, against one target per band — `2 / 7 /
- *    12 / 17` — through {@link prepositionPlan}, three of them taken and the fourth inside its own
- *    deadband. The fix is `repositionContextFor(car, resolvePrepositionContext(snapshots, at,
- *    { entranceFloorIds, predictor }))`. Until it lands, no shipped profile declares `zone-center`
- *    — see the `zoned-uppeak` `$comment` in `data/dispatcher-profiles.json`.
- * 5. **`Simulation.#dispatchBank` passes `{ waitingPassengers }` only.** `DispatchContext` and
- *    `lifecycle.observationFor` *do* carry and forward `zoneFloorIdsByCarId` and `demandForecast`
- *    now, and {@link groupContext} produces exactly those two — measured live in
- *    `policies.test.ts`. But nothing in `sim/` calls it, so in a real run `zoneAffinity` and
- *    `predictedDemand` evaluate to zero for every car. The fix is one `groupContext(...)` per
- *    dispatch pass, shared across the calls in the pass.
+ * 1. **`config/schema.ts` carries an `auction` section** — `aggregation`, `rounds`,
+ *    `reserveMarginalDelayS` — so a tuned winner is persistable as a profile and
+ *    `data/dispatcher-profiles.json` ships **two** auction profiles that differ in that section and
+ *    in nothing else. {@link AuctionPolicyOptions} remains the override an optimizer uses before it
+ *    has persisted a candidate.
+ * 2. **`SimulationConfig` selects the policy from data.** `auction.aggregation` is a declared
+ *    categorical and `POLICY_FACTORIES` is a frozen record keyed on it, so "which dispatcher" is
+ *    config and not a branch (CLAUDE.md invariant 7). `SimulationConfig.createPolicy` exists
+ *    alongside it as the instrumentation and unpersisted-candidate hook, never as the selector.
+ * 3. **{@link CapacityReassignmentMonitor} has a caller.** Measured on `midtown-office` at one
+ *    seed: 44 load crossings and 17 call migrations under `predictive-balanced`, and 44 crossings
+ *    with 0 migrations under `eta` — the sweep runs for both, and only the profile that declared
+ *    `reassignmentPolicy: until-commitment` moves anything, which is what makes the mechanism's
+ *    value measurable against its own absence.
+ * 4. **`Simulation.#park` builds its context from the whole bank.** `predicted-demand` and
+ *    `zone-center` both move cars: on `garden-apartments` at n = 500 under CRN, `zone-center` is
+ *    −4.88 s AWT [−5.27, −4.49] against `stay` and `predicted-demand` is −0.98 s [−1.28, −0.68]
+ *    once its deadband is inside what a six-floor shaft can pay for.
+ * 5. **`Simulation.#dispatchBank` builds a group context.** `zoneAffinity` went from 0 non-zero
+ *    evaluations in 437 to 372 in 495 on a real `zoned-uppeak` run, and `predictedDemand` from 0 in
+ *    7 057 to 7 435 in 7 435 on `predictive-balanced`.
  *
  * ## Phase 5 acceptance criteria: what is met and what is not
  *
@@ -115,7 +92,7 @@
  * | Criterion | Status |
  * |---|---|
  * | *each dispatcher beats `nearest-car` with a paired-t interval excluding zero on at least one building* | **not established by this module.** It is a `runSimulation` measurement and belongs with the replication runner; nothing here reports an AWT interval |
- * | *pre-positioning shows measurable AWT improvement on Garden Apartments* | **unmet, and unwritable today** — gap 4. `prepositioning.test.ts` asserts the decision-level surrogate instead: on `garden-apartments`, a forecast turns `no-forecast` into a park with a 15.3 s per-call anticipated saving. That is a statement about stage 7's arithmetic, **not** an AWT interval, and it must not be reported as one |
+ * | *pre-positioning shows measurable AWT improvement on Garden Apartments* | **met, and measured by `packages/experiments/src/benchmark/prepositioning.ts` rather than here.** What `prepositioning.test.ts` asserts in this directory is still the decision-level surrogate — a forecast turning `no-forecast` into a park with a 15.3 s per-call anticipated saving — which is a statement about stage 7's arithmetic and **not** an AWT interval. It must not be reported as one |
  *
  * Phase 3 measured why the distinction matters: against a structurally different baseline the
  * smallest AWT difference detectable at n = 100 is ~8% of AWT, and ~12% at 80% power. A
@@ -139,6 +116,15 @@ export {
 } from './auction.js';
 
 export type { BidSource } from './auction.js';
+
+export {
+  POLICY_FACTORIES,
+  aggregationOf,
+  createPolicyFor,
+  profileAsPolicySource,
+} from './registry.js';
+
+export type { DispatchPolicyFactory } from './registry.js';
 
 /* -------------------------------------------------------------------------- *
  * Stage 5 — capacity-driven reassignment

@@ -185,7 +185,7 @@ describe('the weighted sum', () => {
   });
 
   it('ignores a weight on a term no phase implements', () => {
-    // `predictive-balanced` weights eleven of twelve declared terms; Phase 2 implements three.
+    // `predictive-balanced` weights ten of the twelve declared terms; Phase 2 implemented three.
     const context = contextFor(snapshotAt('A', '0'), call('5'));
     const withPending = scoreCar(
       context,

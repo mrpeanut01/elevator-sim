@@ -46,6 +46,8 @@
 
 export { Simulation, runSimulation } from './simulation.js';
 
+export type { StageActivity } from './simulation.js';
+
 /* -------------------------------------------------------------------------- *
  * Events
  * -------------------------------------------------------------------------- */

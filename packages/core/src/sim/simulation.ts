@@ -75,10 +75,20 @@ import type {
   ResolvedBuilding,
 } from '../config/types.js';
 import {
-  createDispatchPolicy,
+  CapacityReassignmentMonitor,
+  createArrivalModel,
+  createPolicyFor,
+  groupContext,
+  repositionContextFor,
+  resolvePrepositionContext,
+  withLandingCounts,
+  type ArrivalModel,
+  type CallContextSource,
+  type DemandForecastSource,
   type DispatchCall,
   type DispatchDecision,
-  type WeightedCostDispatchPolicy,
+  type DispatchPolicy,
+  type GroupObservationContext,
 } from '../dispatch/index.js';
 import { SimKernel, type SimTime } from '../kernel/index.js';
 import { MetricsRecorder } from '../metrics/recorder.js';
@@ -246,6 +256,67 @@ function callIdOf(bankId: string, floorId: string, direction: Direction): string
   return `${bankId}#${floorId}:${direction}`;
 }
 
+/**
+ * One bank's forecast, taken at most once per instant per observation.
+ *
+ * `prepositioning.ts` requires **one forecast per bank, not one per car** — *"asking the predictor
+ * once per car would let two cars in one bank be placed against two different forecasts"* — and
+ * stage 7 is decided per car, so something has to hold the answer between them. This does, and it
+ * is a cache rather than a policy: the model's `expectedDemandByFloor` is pure, so the answer is a
+ * function of `(observations, fromT)` alone and re-asking with both unchanged cannot produce a
+ * different number.
+ *
+ * The key is `(fromT, observedArrivals)`. `observe` increments the count on every call — `count`
+ * is a positive integer — so an unchanged count means no observation happened and the model state
+ * is bit-identical. Nothing here is approximate; a stale entry is impossible rather than unlikely.
+ *
+ * A caller-supplied `horizonS` bypasses the cache entirely. Nothing in the runner passes one — the
+ * model answers over its own `idle.predictorHorizonS`, which `PREDICTOR_PARAMETERS` declares and
+ * the runner deliberately does not — so the path exists only so the wrapper cannot lie about a
+ * question it was actually asked.
+ */
+class BankDemandForecast implements DemandForecastSource {
+  readonly model: ArrivalModel;
+  #fromT: SimTime | undefined;
+  #arrivals = -1;
+  #value: ReadonlyMap<string, number> | undefined;
+
+  constructor(model: ArrivalModel) {
+    this.model = model;
+  }
+
+  expectedDemandByFloor(
+    fromT: SimTime,
+    horizonS?: number | undefined,
+  ): ReadonlyMap<string, number> {
+    if (horizonS !== undefined) return this.model.expectedDemandByFloor(fromT, horizonS);
+    if (
+      this.#value !== undefined &&
+      this.#fromT === fromT &&
+      this.#arrivals === this.model.observedArrivals
+    ) {
+      return this.#value;
+    }
+    const value = this.model.expectedDemandByFloor(fromT);
+    this.#fromT = fromT;
+    this.#arrivals = this.model.observedArrivals;
+    this.#value = value;
+    return value;
+  }
+}
+
+/** What stage 5's load-driven trigger and the predictor actually did, for a caller that asks. */
+export interface StageActivity {
+  /** Arrivals fed to the arrival models, summed over banks. Zero means no predictor was built. */
+  readonly predictorObservations: number;
+  /** Cars observed crossing their own hall-call bypass threshold, summed over banks. */
+  readonly capacityCrossings: number;
+  /** Calls stage 5 moved off a car that had just filled up. */
+  readonly capacityMigrations: number;
+  /** Calls it looked at and left where they were, with a gate that kept them. */
+  readonly capacityHeld: number;
+}
+
 /* -------------------------------------------------------------------------- *
  * The simulation
  * -------------------------------------------------------------------------- */
@@ -273,7 +344,16 @@ export class Simulation {
   readonly #entranceFloorIds: readonly string[];
   readonly #deadlineS: SimTime;
 
-  readonly #policies = new Map<string, WeightedCostDispatchPolicy>();
+  readonly #policies = new Map<string, DispatchPolicy>();
+  /**
+   * Bank id to its learned arrival model, wrapped so one forecast serves a whole decision.
+   *
+   * Empty when the profile's `idle` section configures no predictor path — see
+   * {@link Simulation.#buildPredictors} for why "one per bank" and not one per building.
+   */
+  readonly #predictors = new Map<string, BankDemandForecast>();
+  /** Bank id to its load-sensor comparator, the rising edge that triggers stage 5. */
+  readonly #capacityMonitors = new Map<string, CapacityReassignmentMonitor>();
   readonly #carsById = new Map<string, Car>();
   readonly #activeCalls = new Map<string, ActiveCall>();
   /** Every leg ever materialized, by leg id. The denominator of the conservation audit. */
@@ -293,6 +373,9 @@ export class Simulation {
 
   readonly #warnings: string[] = [];
   #transfers = 0;
+  #capacityCrossings = 0;
+  #capacityMigrations = 0;
+  #capacityHeld = 0;
   /** How often the drain deadline refused to schedule something. `> 0` means it really bit. */
   #deadlineTruncations = 0;
   #ran = false;
@@ -373,12 +456,17 @@ export class Simulation {
     for (const car of this.#building.cars) this.#carsById.set(car.id, car);
 
     /* ---- one group controller per bank (docs/01-architecture.md) ---- */
+    // Which policy is **data**: `auction.aggregation` names a factory in
+    // `dispatch/policies/registry.ts`, so `contract-net` is a profile field and not a branch here
+    // (CLAUDE.md invariant 7). `config.createPolicy` is the instrumentation and optimizer hook,
+    // never how a shipped run chooses.
+    const buildPolicy = config.createPolicy ?? createPolicyFor;
+    const policyOptions = config.dispatcherOptions ?? {};
     for (const bank of this.#building.banks) {
-      this.#policies.set(
-        bank.id,
-        createDispatchPolicy(profile, config.dispatcherOptions ?? {}),
-      );
+      this.#policies.set(bank.id, buildPolicy(profile, policyOptions));
+      this.#capacityMonitors.set(bank.id, new CapacityReassignmentMonitor());
     }
+    this.#buildPredictors(config, profile);
 
     this.#factory = new PassengerFactory({
       streams: this.#streams,
@@ -441,9 +529,121 @@ export class Simulation {
     });
   }
 
+  /**
+   * One learned arrival model per bank, over the floors that bank serves.
+   *
+   * **Per bank, not per building**, and the reason is the shrinkage chain rather than tidiness.
+   * `createArrivalModel` estimates a landing's rate by shrinking it toward a *building-level*
+   * pooled rate, so the set of floors the model is built over decides what "the building is busy"
+   * means for every cold-start estimate it produces. A model built over a whole tower would shrink
+   * a low-rise bank's landings toward a mean taken over floors that bank cannot reach — on
+   * Mixed-Use High-Rise, office landings toward a pool half of which is residential. A bank is
+   * also the unit a group controller allocates over (docs/01-architecture.md), and the forecast is
+   * read by exactly two consumers, both per bank: stage 7's `predicted-demand` and stage 3's
+   * `predictedDemand`. Floors outside the bank are filtered out by both anyway — `parkingCandidates`
+   * iterates `car.shaft.floors` and `demandMisalignmentM` skips floors the shaft does not serve —
+   * so a building-wide model would buy nothing and cost the pooled rate its meaning.
+   *
+   * It also makes the write path check itself: `observe` throws for a floor the model was not built
+   * for, so feeding a bank an arrival at a landing it does not serve is an error rather than a
+   * silent no-op.
+   *
+   * A model is built for every bank, always. The predictor tunables all have defaults, and a run
+   * that weights neither `predictedDemand` nor `predicted-demand` simply never reads the forecast
+   * — which costs one forecast per dispatch pass and buys the property the next paragraph is
+   * about. `config.createPredictor` may return `undefined` to run a bank with no model at all,
+   * which is the control arm for measuring what the forecast is worth.
+   *
+   * ## The model is fed identically whatever the dispatcher does, with one honest exception
+   *
+   * Common random numbers require that the two arms of a paired comparison see the same world
+   * (docs/03-traffic-and-statistics.md § Part 4). Observations are taken in {@link #admit}, the one
+   * place a passenger begins waiting, at the passenger's own `arrivedAt` — which for a first leg is
+   * the trace's batch time, a pure function of `(seed, config)` and untouchable by any dispatcher.
+   * So on a single-leg building every arm feeds its predictor a **byte-identical** observation
+   * sequence and a predictive arm is CRN-paired against a non-predictive one on equal terms.
+   *
+   * The exception is a **sky-lobby transfer**: the second leg of a journey begins waiting when the
+   * first leg's car put it down, which is a time the dispatcher decides. On a building that
+   * declares any `isTransferFloor` two arms therefore observe the same *first* legs at the same
+   * times and the continuation legs at different ones. That does not break causality (a transfer
+   * arrival is a real arrival, observed after it happened) and it does not break determinism, but
+   * it does mean the predictor is one more thing that differs between arms there, so a paired
+   * difference on those buildings is a difference in dispatch **plus** whatever the divergent
+   * observation stream did to the forecast.
+   *
+   * **Which buildings those are is derived, never listed.** `seam.test.ts` partitions
+   * `BUILDING_IDS` on `building.transferFloors.length === 0` and asserts identity on one side and
+   * divergence on the other, so a building that grows or loses a sky lobby cannot leave a stale
+   * list behind in this comment. As `data/buildings/` ships today the identical side is
+   * `midtown-office` and `garden-apartments` — which is where the Phase 5 pre-positioning
+   * criterion lives — and the divergent side is `mixed-use-high-rise`, `vertical-city` **and
+   * `secure-tower`**, whose screened lobby `G` is an `isTransferFloor`. Secure Tower is easy to
+   * mistake for single-leg because almost all of it is: measured at seed 20 260 726, 3 of its 396
+   * journeys are multi-leg and `conservation.transfers` is 0 under `nearest-car` against 3 under
+   * `eta`. A handful of dispatcher-dependent transfers is still dispatcher-dependent, so the
+   * `secure-up-peak` benchmark case carries this caveat and the two single-leg cases do not.
+   */
+  #buildPredictors(config: SimulationConfig, profile: DispatcherProfile): void {
+    for (const bank of this.#building.banks) {
+      const resolvedBank = requireBank(this.#resolved, bank.id);
+      const model =
+        config.createPredictor === undefined
+          ? createArrivalModel({
+              floorIds: bank.servesFloors,
+              ...(profile.idle === undefined ? {} : { idle: profile.idle }),
+            })
+          : config.createPredictor(resolvedBank, profile);
+      if (model === undefined) continue;
+      this.#predictors.set(bank.id, new BankDemandForecast(model));
+    }
+  }
+
   /** The trace this run is driven by. Available before {@link run} for CRN checks. */
   get trace(): PassengerTrace {
     return this.#trace;
+  }
+
+  /**
+   * The group controllers this run built, by bank id.
+   *
+   * Exposed so a caller can read what a policy decided — the auction outcomes, the lifecycles —
+   * without the run having to copy them into the result. Read-only by convention: the run holds
+   * the same objects and mutating one mid-run would desynchronize the books.
+   */
+  get policies(): ReadonlyMap<string, DispatchPolicy> {
+    return this.#policies;
+  }
+
+  /**
+   * The arrival models this run built, by bank id, as the read-only face.
+   *
+   * `DemandForecastSource` and not `ArrivalModel`, deliberately: a caller that could `observe`
+   * would be teaching the predictor something the simulation never saw, which is the one shape a
+   * clairvoyant result takes that no aggregate metric would flag.
+   */
+  get predictors(): ReadonlyMap<string, DemandForecastSource> {
+    return this.#predictors;
+  }
+
+  /**
+   * What the two load-driven stages actually did — the counters that tell "off" from "never fired".
+   *
+   * A capacity migration count of zero and a mechanism that is not wired look identical in an AWT
+   * mean, which is precisely how this project lost four behaviours to a missing call site. So the
+   * run counts them and a test can assert on them.
+   */
+  get stageActivity(): StageActivity {
+    let predictorObservations = 0;
+    for (const forecast of this.#predictors.values()) {
+      predictorObservations += forecast.model.observedArrivals;
+    }
+    return Object.freeze({
+      predictorObservations,
+      capacityCrossings: this.#capacityCrossings,
+      capacityMigrations: this.#capacityMigrations,
+      capacityHeld: this.#capacityHeld,
+    });
   }
 
   /** The building, with its runtime cars. Available before {@link run} for fixtures. */
@@ -599,7 +799,54 @@ export class Simulation {
     // The leg carries its own `arrivedAt`; there is no second clock to pass in, and a runner
     // that supplied one could put the record and the model a fraction of a second apart.
     this.#recorder.recordArrival(passenger);
+    this.#observeArrival(passenger);
     this.#building.requireFloor(passenger.originFloorId).addWaiting(passenger);
+  }
+
+  /**
+   * Tell every bank that could carry this passenger that somebody has **just arrived** at its
+   * landing.
+   *
+   * The one place the predictor learns anything, and it is here rather than in `#openCalls` for a
+   * reason that is arithmetic rather than taste. `#openCalls` knows the *standing queue*, and
+   * observing a queue on every press would re-observe everybody still waiting: one person waiting
+   * through five batches would be counted five times, and a landing nobody collects would appear
+   * to receive unbounded demand. {@link #admit} fires exactly once per leg, which is once per real
+   * arrival, so the model sees each person exactly once and the counts it divides by a bucket width
+   * are genuine arrival counts.
+   *
+   * ## Causality
+   *
+   * The passenger is already on the landing when this runs: `arrivedAt` is a time that has
+   * happened, never a scheduled one, and the model has no way to express a future arrival even if
+   * somebody wanted it to (`dispatch/predictor/types.ts` § *Causality is expressed in the type
+   * system*). The trace is never handed over — the run holds it, and this function takes one
+   * passenger.
+   *
+   * Observations are monotone because the kernel is: `arrivedAt` is the batch's own scheduled time
+   * for a first leg and the event time for a transfer leg, and the kernel processes events in
+   * `(time, sequence)` order. `observe` would throw if that ever stopped being true, which is the
+   * check rather than the assumption.
+   *
+   * ## Which banks
+   *
+   * Every bank that serves the origin floor **and can carry this passenger** — the same
+   * `#bankCanCarry` predicate that decides which banks get a hall call for them. A bank learns the
+   * demand it could actually answer: teaching a low-rise bank about a passenger going to floor 38
+   * would put weight on a landing whose demand that bank can never serve, and the repositioning
+   * stage would park for it.
+   *
+   * A passenger no bank can carry is a routing failure, and `#openCalls` throws for it a moment
+   * later with a far better message than a predictor could give; this simply observes nothing.
+   */
+  #observeArrival(passenger: Passenger): void {
+    if (this.#predictors.size === 0) return;
+    for (const bank of this.#building.banksServing(passenger.originFloorId)) {
+      const forecast = this.#predictors.get(bank.id);
+      if (forecast === undefined) continue;
+      if (!this.#bankCanCarry(bank, passenger)) continue;
+      forecast.model.observe(passenger.originFloorId, passenger.direction, passenger.arrivedAt);
+    }
   }
 
   /**
@@ -695,6 +942,13 @@ export class Simulation {
         // assignment actually moves — a call priced against a car that has since taken on
         // another stop is priced against a car that no longer exists.
         let snapshots: readonly CarSnapshot[] | undefined;
+        // The two facts only the group controller holds — the operational partition and the
+        // arrival forecast — resolved once and shared by every call in the pass. Not per call: a
+        // twelve-term weight vector must cost one forecast, and two calls decided at the same
+        // instant must be scored against the same partition or the bank disagrees with itself
+        // (`policies/groupContext.ts`). It survives a snapshot invalidation because neither fact
+        // depends on who holds which call.
+        let group: GroupObservationContext | undefined;
         for (const lifecycle of policy.calls) {
           const active = this.#activeCalls.get(lifecycle.callId);
           if (active === undefined) {
@@ -707,10 +961,13 @@ export class Simulation {
             continue;
           }
           snapshots ??= this.#snapshots(bank, at);
-          const decision = policy.dispatch(lifecycle.callId, snapshots, at, {
-            waitingPassengers: waiting.count,
-            waitingMassKg: waiting.massKg,
-          });
+          group ??= this.#groupContext(bank.id, snapshots, at);
+          const decision = policy.dispatch(
+            lifecycle.callId,
+            snapshots,
+            at,
+            withLandingCounts(group, waiting.count, waiting.massKg),
+          );
           if (this.#applyDecision(active, decision)) snapshots = undefined;
           if (decision.outcome === 'deferred') {
             if (decision.dueAt !== undefined) this.#scheduleTick(bankId, decision.dueAt);
@@ -743,7 +1000,7 @@ export class Simulation {
    *
    * @returns `true` if any car's commitments actually changed.
    */
-  #applyDecision(active: ActiveCall, decision: DispatchDecision): boolean {
+  #applyDecision(active: ActiveCall, decision: Pick<DispatchDecision, 'carIds'>): boolean {
     const next = decision.carIds;
     let changed = false;
     for (const carId of active.carIds) {
@@ -1398,6 +1655,13 @@ export class Simulation {
 
     this.#syncButton(car.floorId, 'up');
     this.#syncButton(car.floorId, 'down');
+
+    // Stage 5's load edge. A stop is the only thing in this simulation that changes a car's load,
+    // so this is where a crossing can be observed, and it is before `#stepCar` sends the car on:
+    // the whole mechanism is that a car which has just filled up gives up the landings it can no
+    // longer serve *before* it drives past them.
+    if (this.#reassignOnLoad(bank, at)) dirty.add(bank.id);
+
     for (const bankId of dirty) this.#dispatchBank(bankId, at);
   }
 
@@ -1428,16 +1692,37 @@ export class Simulation {
    * Suppressed once demand has stopped: a park during the drain tail cannot improve any
    * statistic — there are no future calls left to answer sooner — and it would put empty cars
    * on the move for as long as the deadline allows.
+   *
+   * ## The context is the bank's, not the car's
+   *
+   * This used to pass `{ entranceFloorIds }` and nothing else, and the two strategies that need
+   * more were dead in consequence: `predicted-demand` answered `no-forecast` for every car of every
+   * run — 500 of 500 paired differences of exactly zero against `stay` on Garden Apartments — and
+   * `zone-center` gave every car in a bank the same shaft median, which `zoning.ts` calls worse
+   * than not parking.
+   *
+   * Now the whole bank is resolved once through `resolvePrepositionContext` — the partition from
+   * `contiguousZones`, the forecast from this bank's arrival model — and each car's
+   * `RepositionContext` is a view onto it. One forecast per bank per instant, never one per car:
+   * two cars placed against two different futures is a bug that presents as unstable parking.
+   * {@link BankDemandForecast} is what makes "once" true across the several `#park` calls one
+   * instant produces.
    */
   #park(car: Car, at: SimTime): void {
     if (at > this.#trace.durationS) return;
     const policy = this.#policies.get(car.bankId);
+    const bank = this.#building.bankById(car.bankId);
     /* c8 ignore next -- every car's bank has a policy. */
-    if (policy === undefined) return;
+    if (policy === undefined || bank === undefined) return;
 
-    const decision = policy.reposition(car.snapshot(at), at, {
+    const forecast = this.#predictors.get(bank.id);
+    const resolved = resolvePrepositionContext(this.#snapshots(bank, at), at, {
       entranceFloorIds: this.#entranceFloorIds,
+      ...(forecast === undefined ? {} : { predictor: forecast }),
     });
+
+    const me = car.snapshot(at);
+    const decision = policy.reposition(me, at, repositionContextFor(me, resolved));
     if (!decision.move || decision.targetFloorId === undefined) return;
     this.#depart(car, decision.targetFloorId, at);
   }
@@ -1531,6 +1816,20 @@ export class Simulation {
    * demonstrate the result docs/01-architecture.md is after — that access control is cheaper
    * when authorization and optimization happen in the same step.
    *
+   * The **destination is on the call for exactly the same reason**, and gated the same way. The
+   * runner knows where the head of the queue is going — it generated them — and
+   * `DispatchCall.destinationFloorId` is the field for it. `costRequestFor` forwards it only under
+   * `destination-entry` and `mobile-credential` and drops it under `up-down-buttons`, so a
+   * conventional run cannot accidentally price a journey nobody declared, and no shipped profile's
+   * behaviour changes by one bit. What it does change is that `rideTime` — a term that returns 0
+   * whenever the destination is unknown, and whose `activeWhen` says so — can now be non-zero
+   * *through the run loop* rather than only through a hand-built call, which is the difference
+   * between a term that is live and a term that merely could be.
+   *
+   * This is not destination dispatch: the passenger model, the landing panel and the "which car do
+   * I walk to" constraint are Phase 6. It is the same honest disclosure the credential already
+   * gets, one field earlier than the profile may be allowed to read it.
+   *
    * The **head** of the queue rather than a set: a landing call is one button, pressed by one
    * person, and the head is the one who pressed it first. FIFO makes that deterministic.
    */
@@ -1542,9 +1841,11 @@ export class Simulation {
     bank: Bank<Car>,
   ): DispatchCall & HallCall {
     let credentialGroup: string | undefined;
+    let destinationFloorId: string | undefined;
     for (const passenger of floor.waiting(direction)) {
       if (!this.#bankCanCarry(bank, passenger)) continue;
       credentialGroup = passenger.credentialGroup;
+      destinationFloorId = passenger.destinationFloorId;
       break;
     }
     return Object.freeze({
@@ -1554,10 +1855,11 @@ export class Simulation {
       direction,
       registeredAt,
       ...(credentialGroup === undefined ? {} : { credentialGroup }),
+      ...(destinationFloorId === undefined ? {} : { destinationFloorId }),
     });
   }
 
-  #policy(bankId: string): WeightedCostDispatchPolicy {
+  #policy(bankId: string): DispatchPolicy {
     const policy = this.#policies.get(bankId);
     /* c8 ignore next 3 -- every bank gets a policy in the constructor. */
     if (policy === undefined) {
@@ -1568,6 +1870,88 @@ export class Simulation {
 
   #snapshots(bank: Bank<Car>, at: SimTime): readonly CarSnapshot[] {
     return bank.cars.map((car) => car.snapshot(at));
+  }
+
+  /**
+   * Stage 3's group facts for one bank at one instant: the operational partition and the forecast.
+   *
+   * The two things a cost term cannot own. `zoneAffinity` prices a car's deviation from its
+   * operational zone, and `predictedDemand` prices where a route ends against where demand is
+   * expected; both read the fact off the observation, because a term is a pure function and cannot
+   * hold a learned model or a partition (CLAUDE.md invariant 1). Absent, both are correctly zero —
+   * and were zero in every run this project has ever measured, which made a `zoneAffinity` weight
+   * decoration and a `predictedDemand` weight a paid-for dimension that could not move an argmin.
+   *
+   * The partition is `contiguousZones` over the cars supplied, keyed on car id, so it is stable for
+   * the run. The forecast is this bank's own model, taken once — `groupContext` calls
+   * `expectedDemandByFloor(at)` and {@link BankDemandForecast} answers from cache when it can.
+   */
+  #groupContext(
+    bankId: string,
+    snapshots: readonly CarSnapshot[],
+    at: SimTime,
+  ): GroupObservationContext {
+    const forecast = this.#predictors.get(bankId);
+    return groupContext(snapshots, at, forecast === undefined ? {} : { predictor: forecast });
+  }
+
+  /**
+   * **Stage 5, triggered by the load sensor.** A car that has just crossed its own hall-call bypass
+   * threshold hands the calls it holds back to the group.
+   *
+   * docs/06 § Stage 5 states the mechanism exactly — *"when a car crosses its load threshold, its
+   * uncommitted calls migrate"* — and docs/01 § *Why not pure agent-per-elevator* names it as the
+   * second of the three reasons a pure agent model fails. Until now `simulation.ts` contained no
+   * `reconsider` call site at all, so it had never run on a building.
+   *
+   * Called from {@link #finishStop}: doors shut, the load is settled, and the car has not yet been
+   * given its next instruction. That ordering is the whole point — a call handed on *after* the car
+   * has departed for the landing it can no longer serve is a second car sent to the same floor.
+   *
+   * **Every gate is the policy's.** `reassignmentPolicy`, `commitmentPoint`,
+   * `reassignmentHysteresisS` and `maxReassignmentsPerCall` are checked inside
+   * `policy.reconsider`; re-checking any of them here would be a latch implemented twice. Under the
+   * default `reassignmentPolicy: never` every call comes back `retained`, so a profile that has not
+   * opted into stage 5 is bit-identical to one run without this call — which is what makes the
+   * mechanism's value measurable against its own absence rather than confounded with it.
+   *
+   * Each call is re-priced against the **live** landing count and this bank's group context, not
+   * against the count its lifecycle accumulated: the queue is what it is now, and the car that
+   * should take it is the one that is best now.
+   *
+   * @returns whether any call actually left a car, so the caller can re-run the bank.
+   */
+  #reassignOnLoad(bank: Bank<Car>, at: SimTime): boolean {
+    const monitor = this.#capacityMonitors.get(bank.id);
+    const policy = this.#policies.get(bank.id);
+    /* c8 ignore next -- every bank gets both in the constructor. */
+    if (monitor === undefined || policy === undefined) return false;
+
+    const snapshots = this.#snapshots(bank, at);
+    const group = this.#groupContext(bank.id, snapshots, at);
+    const contextFor: CallContextSource = (lifecycle) => {
+      const active = this.#activeCalls.get(lifecycle.callId);
+      if (active === undefined) return group;
+      const waiting = this.#eligibleWaiting(bank, active);
+      return withLandingCounts(group, waiting.count, waiting.massKg);
+    };
+
+    const result = monitor.run(policy, snapshots, at, contextFor);
+    this.#capacityCrossings += result.crossings.length;
+    this.#capacityMigrations += result.migrated.length;
+    this.#capacityHeld += result.held.length;
+    if (result.migrated.length === 0) return false;
+
+    // Only the migrations are applied. A `held` entry is a call the policy left exactly where it
+    // was, and pushing its car list back through `#applyDecision` would be a release and an
+    // immediate re-assign of the same commitment — a no-op that resets nothing but is one more way
+    // for the runner's record and the policy's to drift apart.
+    for (const migration of result.migrated) {
+      const active = this.#activeCalls.get(migration.callId);
+      if (active === undefined) continue;
+      this.#applyDecision(active, { carIds: migration.toCarIds });
+    }
+    return true;
   }
 
   /** Service zoning and access zoning, both checked, neither merged into the other. */

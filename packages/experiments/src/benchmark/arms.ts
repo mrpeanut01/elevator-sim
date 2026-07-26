@@ -55,12 +55,15 @@
  * is a claim about `eta` too, and because `eta` turns out to be the yardstick the interesting arms
  * fail against.
  *
- * `data/dispatcher-profiles.json` ships **one** auction profile, not the `auction-sealed` /
- * `auction-multiround` pair a reader might expect, and its `$comment` explains why: the aggregation
- * is `auction.rounds`, `config/schema.ts` has no `auction` section, so a second profile could not
- * carry a different aggregation. The single `auction` row in the table below is therefore the
- * sealed-bid arm — see `auctionAggregation.ts` for the proof that this is what it is, and for what
- * cannot be measured about the multi-round arm and why.
+ * `data/dispatcher-profiles.json` ships **two** auction profiles, and that is why {@link ARM_PROFILES}
+ * has nine entries rather than eight. `config/schema.ts` carries an `auction` section and
+ * `dispatch/policies/registry.ts` selects the policy factory from `auction.aggregation`, so the
+ * aggregation is a profile field: `auction` is sealed bid at one round (provably the centralized
+ * argmin) and `auction-multi-round` is three rounds with a 25 s reserve, identical everywhere else.
+ * The pair therefore yields a paired-t interval **on the aggregation**, which is what the previous
+ * design — both arms built from one profile through an options object, because the config layer
+ * could not carry the section — could not produce at all. See `auctionAggregation.ts` for the
+ * equivalence proof and for the decision-level divergence rate.
  */
 
 import type { TrafficArmSpec } from '../runner/types.js';
@@ -88,6 +91,7 @@ export const ARM_PROFILES: readonly string[] = Object.freeze([
   'capacity-aware',
   'predictive-balanced',
   'auction',
+  'auction-multi-round',
   'zoned-uppeak',
 ]);
 
