@@ -5,11 +5,20 @@
  * RNG, `Car.estimateCost()` stays pure, and nothing in this package may import `viz`.
  *
  * Phase 0 lands three modules — `kernel/`, `random/` and `config/`. Phase 1 adds
- * `physics/motion`, `physics/doors` and `model/` (including `model/car/`). Their names are
+ * `physics/motion`, `physics/doors` and `model/` (including `model/car/`). Phase 2 completes
+ * the loop with `traffic/`, `dispatch/`, `metrics/`, `analytical/` and `sim/`. Their names are
  * re-exported explicitly rather than with `export *`, so that adding an export to a
  * submodule is a deliberate act of widening the package's public surface and a future
  * name collision between modules is a compile error here rather than a silent shadow.
- * `dispatch/`, `traffic/` and `metrics/` join this list as those modules land.
+ *
+ * ## The one deliberate name collision
+ *
+ * `HANDLING_CAPACITY_WINDOW_S` (= 300) is declared independently by both `metrics/` and
+ * `analytical/`, and that duplication is structural rather than an oversight: `analytical/`
+ * is the correctness oracle and may not import from the thing it audits, so it cannot share
+ * the constant. Only the `metrics/` binding is re-exported below. `index.test.ts` compares
+ * the barrel's value against *both* modules', so if the two ever drift apart the guard fails
+ * rather than silently preferring one.
  *
  * ## Note on Node built-ins
  *
@@ -346,3 +355,403 @@ export type {
   ServedFloorInit,
   WeighedOccupant,
 } from './model/car/index.js';
+
+/* -------------------------------------------------------------------------- *
+ * traffic/ — passenger demand generation. Produces an immutable trace up front
+ * from the `arrivals`/`origins`/`destinations`/`passengerMass` streams, so the
+ * same seed yields the same passengers regardless of what the elevators then do
+ * — the common-random-numbers mechanism Phase 3 depends on (invariants 2, 5).
+ * -------------------------------------------------------------------------- */
+
+export {
+  CREDENTIAL_ASSIGNMENTS,
+  DEMAND_LEVELS,
+  DEMAND_SOURCE_KINDS,
+  DEMAND_TEMPLATE_IDS,
+  DIRECTION_CATEGORIES,
+  INTERFLOOR_WEIGHTINGS,
+  RoutePlanner,
+  SECONDS_PER_5MIN,
+  SUPPORTED_BATCH_DISTRIBUTIONS,
+  TRAFFIC_DEFAULTS,
+  TRAFFIC_PARAMETERS,
+  TrafficError,
+  batchesPerSecond,
+  constantDemandTemplate,
+  drawBatchSize,
+  drawGeometricBatchSize,
+  expectedPassengers,
+  generateTrace,
+  inReportWindow,
+  integratedIntensityS,
+  intensityAt,
+  legDestinations,
+  passengersPer5Min,
+  passengersPerSecond,
+  planDemand,
+  resolveDemandTemplate,
+  riseAndFallTemplate,
+  routeOf,
+  routeTopologyOf,
+  sampleBatchArrivalTimes,
+  toPassengerInit,
+  transferFloorsOf,
+} from './traffic/index.js';
+
+export type {
+  ArrivalEvent,
+  BatchArrivalOptions,
+  ConstantDemandOptions,
+  CredentialAssignment,
+  DemandConfig,
+  DemandLevel,
+  DemandPhase,
+  DemandPlan,
+  DemandSource,
+  DemandSourceKind,
+  DemandTemplateId,
+  DemandTemplateOverrides,
+  DemandTemplateSpec,
+  DestinationWeight,
+  DirectionCategory,
+  EntranceShare,
+  GeneratedPassenger,
+  InterfloorWeighting,
+  PassengerTrace,
+  ResolvedDemandTemplate,
+  RiseAndFallOptions,
+  RouteTopology,
+  TraceLeg,
+  TrafficConfig,
+  TrafficParameterSpec,
+  TrafficParameterType,
+} from './traffic/index.js';
+
+/* -------------------------------------------------------------------------- *
+ * dispatch/ — the group controller. ONE engine:
+ *   cost(car, call) = Σᵢ wᵢ · normalize(termᵢ(car, call))
+ * Every strategy in `data/dispatcher-profiles.json` is a weight vector over that
+ * sum. There is no `NearestCarDispatcher` and nothing here reads a profile id
+ * (invariant 7); `policy.test.ts` proves it by scrambling every id and asserting
+ * no decision moves. A new strategy is a config entry, never a new class.
+ * -------------------------------------------------------------------------- */
+
+export {
+  ANSWER_REASONS,
+  CALL_STAGES,
+  COST_TERMS,
+  COST_TERMS_BY_ID,
+  DECISION_OUTCOMES,
+  DECISION_REASONS,
+  DECLARED_TERM_IDS,
+  DISPATCH_DEFAULTS,
+  DISPATCH_PARAMETERS,
+  DISPATCH_PARAMETER_IDS,
+  DispatchError,
+  HARD_CONSTRAINT_IDS,
+  IMPLEMENTED_TERM_IDS,
+  INELIGIBILITY_REASONS,
+  NORMALIZATION_DEFAULTS,
+  NORMALIZATION_SCALE_IDS,
+  PARK_CALL_HORIZON,
+  REPOSITION_REASONS,
+  WeightedCostDispatchPolicy,
+  answerDecisionFor,
+  assessDirectionReversal,
+  assignmentWidth,
+  batchKeyOf,
+  bestScore,
+  boundedNormalize,
+  clearsHysteresis,
+  compareScores,
+  costRequestFor,
+  costTerm,
+  createDispatchPolicy,
+  directionReversalTerm,
+  directionReversals,
+  dispatchParameter,
+  dispatchParameterValue,
+  distanceTravelledTerm,
+  expectedResponseSeconds,
+  filterEligible,
+  isCommitted,
+  isDeclaredTerm,
+  isImplementedTerm,
+  landingShare,
+  marginalDistanceM,
+  moveSeconds,
+  newLifecycle,
+  normalizeTerm,
+  observationFor,
+  pathLengthM,
+  rankScores,
+  repositionDecisionFor,
+  requestForCar,
+  requestForShare,
+  resolveDispatchConfig,
+  resolveNormalization,
+  routeStartHeightM,
+  saturatingNormalize,
+  scoreCar,
+  scoreableAt,
+  tunablePathsOf,
+  waitTimeSeconds,
+  waitTimeTerm,
+  withBypassOverridden,
+  withLifecycle,
+} from './dispatch/index.js';
+
+export type {
+  AnswerDecision,
+  AnswerReason,
+  BoundedNormalization,
+  CallLifecycle,
+  CallStage,
+  CarScore,
+  CostTermDefinition,
+  DecisionOutcome,
+  DecisionReason,
+  DispatchCall,
+  DispatchContext,
+  DispatchDecision,
+  DispatchObservation,
+  DispatchParameterSpec,
+  DispatchParameterType,
+  DispatchPolicy,
+  DispatchPolicyOptions,
+  DispatcherProfileSource,
+  EligibilityStageConfig,
+  EligibilityVerdict,
+  HardConstraintId,
+  IneligibilityReason,
+  NormalizationMode,
+  NormalizationScaleId,
+  RepositionContext,
+  RepositionDecision,
+  RepositionReason,
+  ResolvedAnswerStage,
+  ResolvedConstraints,
+  ResolvedDispatchConfig,
+  ResolvedDispatchStage,
+  ResolvedEligibilityStage,
+  ResolvedIdleStage,
+  ResolvedNormalization,
+  ReversalAssessment,
+  SaturatingNormalization,
+  ScoreBreakdown,
+  TermContext,
+  TermNormalization,
+} from './dispatch/index.js';
+
+/* -------------------------------------------------------------------------- *
+ * metrics/ — recorder → RunRecord → RunSummary. The record is the seed-bearing
+ * dataset that gets persisted (invariant 5); the summary is a pure function of
+ * it, so Phase 3 can re-window or re-threshold a stored run without
+ * re-simulating. Nothing here reads a clock (3) or draws a number (2).
+ * -------------------------------------------------------------------------- */
+
+export {
+  DEFAULT_DEPARTURE_GAP_S,
+  DEFAULT_DESIGN_LOAD_FACTOR,
+  DEFAULT_LOAD_FACTOR_EDGES,
+  DEFAULT_LONG_WAIT_THRESHOLD_S,
+  DEFAULT_MAX_UNSERVED_FRACTION,
+  DEFAULT_PERCENTILE_METHOD,
+  DEFAULT_QUEUE_SAMPLE_COUNT,
+  DEFAULT_WAIT_HISTOGRAM_BIN_S,
+  HANDLING_CAPACITY_WINDOW_S,
+  METRICS_PARAMETERS,
+  METRICS_SCHEMA_VERSION,
+  MetricsError,
+  MetricsRecorder,
+  PEAK_WINDOW_S,
+  PERCENTILE_METHODS,
+  QUEUE_SERIES_SOURCES,
+  SATURATION_DEFAULTS,
+  SATURATION_VERDICTS,
+  achievedIntervalOf,
+  assertWindow,
+  buildJourneys,
+  countAbove,
+  detectSaturation,
+  fractionAbove,
+  fullRunWindow,
+  handlingCapacityOf,
+  histogram,
+  legDurations,
+  legSecondsOf,
+  linearTrend,
+  loadFactorStatistics,
+  loadSampleSchema,
+  mean,
+  median,
+  parseRunRecord,
+  passengerRecordSchema,
+  peakArrivalWindow,
+  percentile,
+  percentileOfSorted,
+  percentiles,
+  queueLengthSeries,
+  queueSampleSchema,
+  reportWindowSchema,
+  resolveWindow,
+  rideSecondsOf,
+  runRecordSchema,
+  runSeed,
+  sampleStdDev,
+  selectJourneysInWindow,
+  selectLegsInWindow,
+  serializeRunRecord,
+  sortedAscending,
+  summarizeDurations,
+  summarizeRun,
+  summarizeWaiting,
+  waitPercentile,
+  waitSecondsOf,
+  weightedHistogram,
+  windowContains,
+  windowContainsArrival,
+  windowContainsJourney,
+  windowDurationS,
+} from './metrics/index.js';
+
+export type {
+  BoardingDetails,
+  DurationStatistics,
+  DurationSummaryOptions,
+  HandlingCapacity,
+  Histogram,
+  HistogramBin,
+  HistogramOptions,
+  IntervalOptions,
+  IntervalStatistics,
+  JourneyRecord,
+  LinearTrend,
+  LoadFactorOptions,
+  LoadFactorStatistics,
+  LoadReading,
+  LoadSample,
+  MetricsParameterSpec,
+  MetricsParameterType,
+  MetricsRecorderOptions,
+  PassengerRecord,
+  PeakWindowOptions,
+  PercentileMethod,
+  QueueSample,
+  QueueSeriesOptions,
+  QueueSeriesSource,
+  RecordablePassenger,
+  ReportWindow,
+  RunCounts,
+  RunRecord,
+  RunSummary,
+  SaturationDiagnosis,
+  SaturationOptions,
+  SaturationThresholds,
+  SaturationVerdict,
+  SeedSource,
+  SerializeOptions,
+  SummarizeOptions,
+  TrendPoint,
+  WaitOptions,
+  WaitStatistics,
+  WeightedValue,
+  WindowSelection,
+} from './metrics/index.js';
+
+/* -------------------------------------------------------------------------- *
+ * analytical/ — the closed-form Barney/CIBSE up-peak round trip time, and the
+ * project's primary correctness oracle (CLAUDE.md § Correctness oracle).
+ * Independent of the simulation BY CONSTRUCTION: it imports config types only,
+ * never the kernel, model, physics or dispatcher — not even to reuse a motion
+ * profile. Read CLOSED_FORM_ASSUMPTIONS and CLOSED_FORM_COMPARISON_RULE before
+ * quoting any agreement figure; "within a few percent" only means something
+ * once the disagreements are enumerated in advance.
+ *
+ * `HANDLING_CAPACITY_WINDOW_S` is intentionally not re-exported here — see the
+ * collision note in this file's header.
+ * -------------------------------------------------------------------------- */
+
+export {
+  ANALYTICAL_DEFAULTS,
+  ANALYTICAL_ERROR_CODES,
+  ANALYTICAL_PARAMETERS,
+  AnalyticalError,
+  CLOSED_FORM_ASSUMPTIONS,
+  CLOSED_FORM_COMPARISON_RULE,
+  IMPLAUSIBLE_PERCENT_POPULATION_5MIN,
+  UP_PEAK_WARNING_CODES,
+  analyzeUpPeak,
+  deriveUpPeakTerms,
+  expectedStops,
+  handlingCapacity5Min,
+  highestReversalFloor,
+  interval,
+  passengerTransferSecondsFor,
+  percentPopulation,
+  roundTripTime,
+} from './analytical/index.js';
+
+export type {
+  AnalyticalErrorCode,
+  AnalyticalParameterSpec,
+  AnalyticalParameterType,
+  ClosedFormAssumption,
+  ClosedFormBias,
+  ClosedFormComparisonRule,
+  ResolvedRoundTripTerms,
+  RoundTripResult,
+  RoundTripTerms,
+  StopTimeBreakdown,
+  UpPeakAnalysis,
+  UpPeakOptions,
+  UpPeakTerms,
+  UpPeakWarning,
+  UpPeakWarningCode,
+} from './analytical/index.js';
+
+/* -------------------------------------------------------------------------- *
+ * sim/ — the run loop. Seed + building + dispatcher profile + demand template
+ * in, one replication out. Event-driven throughout: no tick, no wall clock
+ * (invariant 3), ties broken by (time, sequence) (invariant 4). Every journey
+ * is delivered or named in `result.undelivered`, and a run whose books do not
+ * balance throws rather than reporting a number.
+ * -------------------------------------------------------------------------- */
+
+export {
+  SIMULATION_STATUSES,
+  SIM_DEFAULTS,
+  SIM_EVENT_TYPES,
+  SIM_EVENT_TYPE_IDS,
+  SIM_PARAMETERS,
+  Simulation,
+  SimulationError,
+  TIMEOUT_POLICIES,
+  UNDELIVERED_REASONS,
+  batchArrivalEvent,
+  carArrivedEvent,
+  carDoorEvent,
+  dispatchTickEvent,
+  queueSampleEvent,
+  runSimulation,
+  transferArrivalEvent,
+} from './sim/index.js';
+
+export type {
+  BatchArrivalPayload,
+  CarEventPayload,
+  ConservationAudit,
+  DispatchTickPayload,
+  QueueSamplePayload,
+  SimEventType,
+  SimParameterSpec,
+  SimParameterType,
+  SimulationConfig,
+  SimulationDemandOptions,
+  SimulationResult,
+  SimulationStatus,
+  TimeoutPolicy,
+  TransferArrivalPayload,
+  UndeliveredJourney,
+  UndeliveredReason,
+} from './sim/index.js';

@@ -45,9 +45,15 @@ up-peak, there is a bug. It is the best free validation available.
 RTT = 2·H·tv + (S+1)·ts + 2·P·tp        round trip time
 S   = N·(1 − ((N−1)/N)^P)                expected stops among N floors
 INT = RTT / L                            interval, L = cars in group
-HC5 = 300·P / RTT                        persons handled per 5 minutes
+HC5 = 300·P·L / RTT = 300·P / INT        persons handled per 5 minutes, whole group
 %POP = HC5 / population × 100            handling capacity as % of population
 ```
+
+`HC5` is the **group** figure: `L` cars each complete `300/RTT` round trips in the window
+and carry `P` people on each. Dropping `L` gives the per-car figure, which is what `%POP`
+must not be measured with — on Midtown Office that reads 1.50% of population per 5 minutes
+against the 11–15% office target above, instead of the correct 6.01%. CIBSE Guide D and
+Barney both write it as `UPPHC = 300·P / INT`.
 
 | Term | Meaning |
 |---|---|
