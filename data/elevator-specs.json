@@ -1,0 +1,126 @@
+{
+  "$comment": "Elevator class reference data. See docs/02-elevator-reference.md for sources and rationale.",
+  "version": 1,
+  "units": {
+    "speed": "m/s",
+    "acceleration": "m/s^2",
+    "jerk": "m/s^3",
+    "time": "s",
+    "mass": "kg",
+    "distance": "m"
+  },
+  "conventions": {
+    "personsPerRatedLoadUS": "ratedLoadLb / 150",
+    "personsPerRatedLoadEN81": "ratedLoadKg / 75",
+    "designLoadFactor": 0.8,
+    "$comment": "designLoadFactor 0.8 is the universal traffic-analysis assumption: cars fill to 80% of rated capacity, not 100%. Using 1.0 makes the simulator systematically optimistic."
+  },
+  "classes": [
+    {
+      "id": "hydraulic",
+      "name": "Hydraulic",
+      "ratedSpeedMps": { "min": 0.5, "max": 0.75, "typical": 0.63 },
+      "maxRiseM": 18,
+      "maxFloors": 6,
+      "acceleration": { "typical": 0.6, "max": 0.8 },
+      "jerk": { "typical": 0.8, "max": 1.2 },
+      "capacityLbRange": [1600, 3500],
+      "application": "Low-rise, low duty, freight"
+    },
+    {
+      "id": "mrl-gearless-low",
+      "name": "MRL gearless (low speed)",
+      "ratedSpeedMps": { "min": 1.0, "max": 1.75, "typical": 1.6 },
+      "maxRiseM": 76,
+      "maxFloors": 25,
+      "acceleration": { "typical": 0.9, "max": 1.0 },
+      "jerk": { "typical": 1.2, "max": 1.6 },
+      "capacityLbRange": [2000, 3500],
+      "application": "Mid-rise residential and office"
+    },
+    {
+      "id": "geared-traction",
+      "name": "Geared traction",
+      "ratedSpeedMps": { "min": 1.75, "max": 2.5, "typical": 2.5 },
+      "maxRiseM": 76,
+      "maxFloors": 25,
+      "acceleration": { "typical": 1.0, "max": 1.2 },
+      "jerk": { "typical": 1.4, "max": 1.6 },
+      "capacityLbRange": [2500, 4000],
+      "application": "Mid-rise"
+    },
+    {
+      "id": "gearless-traction",
+      "name": "Gearless traction",
+      "ratedSpeedMps": { "min": 2.5, "max": 7.0, "typical": 4.0 },
+      "maxRiseM": 600,
+      "maxFloors": 60,
+      "acceleration": { "typical": 1.0, "max": 1.2 },
+      "jerk": { "typical": 1.4, "max": 1.6 },
+      "capacityLbRange": [3000, 4000],
+      "application": "High-rise local"
+    },
+    {
+      "id": "high-speed-gearless",
+      "name": "High-speed gearless",
+      "ratedSpeedMps": { "min": 7.0, "max": 10.0, "typical": 8.0 },
+      "maxRiseM": 600,
+      "maxFloors": 100,
+      "acceleration": { "typical": 1.1, "max": 1.2 },
+      "jerk": { "typical": 1.2, "max": 1.5 },
+      "capacityLbRange": [3500, 5000],
+      "application": "Express / shuttle"
+    },
+    {
+      "id": "ultra-high-speed",
+      "name": "Ultra high-speed",
+      "ratedSpeedMps": { "min": 10.0, "max": 20.5, "typical": 10.0 },
+      "maxRiseM": 700,
+      "maxFloors": 130,
+      "acceleration": { "typical": 1.2, "max": 1.5 },
+      "jerk": { "typical": 1.2, "max": 1.5 },
+      "capacityLbRange": [3500, 5000],
+      "doubleDeckPersonsPerDeck": [12, 14],
+      "application": "Supertall shuttle, observation"
+    }
+  ],
+  "codeMinimumSpeedByRise": [
+    { "riseFtRange": [24, 44], "minSpeedFpm": 200, "minSpeedMps": 1.0 },
+    { "riseFtRange": [44, 100], "minSpeedFpm": 350, "minSpeedMps": 1.75 },
+    { "riseFtRange": [100, null], "minSpeedFpm": 500, "minSpeedMps": 2.5 }
+  ],
+  "capacities": [
+    { "ratedLoadLb": 1000, "ratedLoadKg": 450, "personsUS": 6, "use": "Small residential" },
+    { "ratedLoadLb": 1600, "ratedLoadKg": 730, "personsUS": 10, "use": "Residential standard" },
+    { "ratedLoadLb": 2500, "ratedLoadKg": 1150, "personsUS": 16, "use": "Office standard" },
+    { "ratedLoadLb": 3000, "ratedLoadKg": 1350, "personsUS": 20, "use": "Office / high-rise" },
+    { "ratedLoadLb": 3500, "ratedLoadKg": 1600, "personsUS": 23, "use": "High-rise, ADA stretcher" },
+    { "ratedLoadLb": 4000, "ratedLoadKg": 1800, "personsUS": 26, "use": "Service / high-rise" }
+  ],
+  "doors": {
+    "centerOpening": { "openS": 1.8, "closeS": 3.0 },
+    "sideOpening": { "openS": 2.5, "closeS": 4.0 },
+    "dwellCarCallS": { "min": 2, "max": 4, "typical": 3 },
+    "dwellHallCallS": { "min": 4, "max": 7, "typical": 5 }
+  },
+  "timing": {
+    "motorStartDelayS": 0.5,
+    "levelingSettleS": { "min": 0.5, "max": 1.0, "typical": 0.7 },
+    "passengerTransferS": {
+      "office": 1.2,
+      "residential": 1.75,
+      "hotel": 1.5,
+      "$comment": "Per passenger, per direction. ISO 4190-6 uses 1.75s for residential."
+    }
+  },
+  "loadSensor": {
+    "hallCallBypassThreshold": 0.8,
+    "overloadAlarmThreshold": 1.1,
+    "$comment": "Fractions of rated load. Bypass at 80% is the real production feature behind 'skip floors that have been called'."
+  },
+  "realWorldAnchors": [
+    { "building": "Shanghai Tower", "speedMps": 20.5, "note": "World's fastest (Mitsubishi)" },
+    { "building": "Burj Khalifa", "speedMps": 10.0, "note": "Floor 124 in ~60s; world's fastest double-deck" },
+    { "building": "Shanghai World Financial Center", "speedMps": 10.0, "note": "Double-deck shuttles to 240m sky lobby" }
+  ]
+}

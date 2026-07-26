@@ -1,0 +1,49 @@
+{
+  "$comment": "Primary validation building. Simulated interval and handling capacity under pure up-peak must match the closed-form RTT calculation within a few percent.",
+  "id": "midtown-office",
+  "name": "Midtown Office",
+  "type": "office",
+  "trafficProfile": "office-standard",
+  "floors": [
+    { "id": "G", "index": 0, "heightM": 0.0, "population": 0, "isEntrance": true, "label": "Lobby" },
+    { "id": "P1", "index": -1, "heightM": -3.5, "population": 0, "isEntrance": true, "label": "Garage" },
+    { "id": "2", "index": 2, "heightM": 5.0, "population": 90 },
+    { "id": "3", "index": 3, "heightM": 8.8, "population": 90 },
+    { "id": "4", "index": 4, "heightM": 12.6, "population": 90 },
+    { "id": "5", "index": 5, "heightM": 16.4, "population": 90 },
+    { "id": "6", "index": 6, "heightM": 20.2, "population": 90 },
+    { "id": "7", "index": 7, "heightM": 24.0, "population": 90 },
+    { "id": "8", "index": 8, "heightM": 27.8, "population": 90 },
+    { "id": "9", "index": 9, "heightM": 31.6, "population": 90 },
+    { "id": "10", "index": 10, "heightM": 35.4, "population": 90 },
+    { "id": "11", "index": 11, "heightM": 39.2, "population": 90 },
+    { "id": "12", "index": 12, "heightM": 43.0, "population": 90 },
+    { "id": "13", "index": 13, "heightM": 46.8, "population": 90 },
+    { "id": "14", "index": 14, "heightM": 50.6, "population": 90 },
+    { "id": "15", "index": 15, "heightM": 54.4, "population": 90 },
+    { "id": "16", "index": 16, "heightM": 58.2, "population": 90 },
+    { "id": "17", "index": 17, "heightM": 62.0, "population": 90 },
+    { "id": "18", "index": 18, "heightM": 65.8, "population": 90 },
+    { "id": "19", "index": 19, "heightM": 69.6, "population": 90 },
+    { "id": "20", "index": 20, "heightM": 73.4, "population": 90 }
+  ],
+  "totalPopulation": 1710,
+  "banks": [
+    {
+      "id": "main",
+      "name": "Main bank",
+      "servesFloors": ["P1", "G", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"],
+      "cars": [
+        { "id": "A", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" },
+        { "id": "B", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" },
+        { "id": "C", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" },
+        { "id": "D", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" }
+      ]
+    }
+  ],
+  "accessZones": [],
+  "notes": [
+    "Two ground-level entrances (lobby and garage) deliberately break the single-source assumption baked into naive up-peak reasoning.",
+    "Uniform 90-person floors keep the analytical RTT comparison clean."
+  ]
+}

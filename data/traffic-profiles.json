@@ -1,0 +1,78 @@
+{
+  "$comment": "Passenger demand profiles by building type. See docs/03-traffic-and-statistics.md.",
+  "version": 1,
+  "arrivalProcess": {
+    "type": "poisson-batch",
+    "$comment": "Passengers arrive in groups, not singly. Batch size materially changes loading and stop patterns."
+  },
+  "profiles": [
+    {
+      "id": "office-prestige",
+      "name": "Prestige office",
+      "governingPeak": "up-peak",
+      "arrivalRatePctPop5min": { "min": 15, "max": 17, "typical": 16 },
+      "targetIntervalS": 25,
+      "targetAvgWaitS": 20,
+      "batchSize": { "distribution": "geometric", "mean": 1.4 },
+      "directionalSplit": { "incoming": 0.85, "outgoing": 0.05, "interfloor": 0.10 }
+    },
+    {
+      "id": "office-standard",
+      "name": "Standard office",
+      "governingPeak": "up-peak",
+      "arrivalRatePctPop5min": { "min": 11, "max": 15, "typical": 12 },
+      "targetIntervalS": 30,
+      "targetAvgWaitS": 25,
+      "batchSize": { "distribution": "geometric", "mean": 1.4 },
+      "directionalSplit": { "incoming": 0.85, "outgoing": 0.05, "interfloor": 0.10 }
+    },
+    {
+      "id": "residential",
+      "name": "Residential",
+      "governingPeak": "down-peak-am",
+      "arrivalRatePctPop5min": { "min": 3, "max": 7, "typical": 5 },
+      "targetIntervalS": 70,
+      "targetAvgWaitS": 55,
+      "batchSize": { "distribution": "geometric", "mean": 1.8 },
+      "directionalSplit": { "incoming": 0.15, "outgoing": 0.75, "interfloor": 0.10 },
+      "$comment": "PM inverts to up-peak. Larger batches: families travel together."
+    },
+    {
+      "id": "hotel",
+      "name": "Hotel",
+      "governingPeak": "two-way",
+      "arrivalRatePctPop5min": { "min": 10, "max": 15, "typical": 12 },
+      "targetIntervalS": 40,
+      "targetAvgWaitS": 35,
+      "batchSize": { "distribution": "geometric", "mean": 2.0 },
+      "directionalSplit": { "incoming": 0.40, "outgoing": 0.40, "interfloor": 0.20 }
+    }
+  ],
+  "demandTemplates": [
+    {
+      "id": "rise-and-fall",
+      "name": "CIBSE rise-and-fall template",
+      "recommended": true,
+      "durationMin": 30,
+      "reportWindow": "peak-5min",
+      "shape": "ramp up to peak, hold, ramp down",
+      "$comment": "Use this. Each replication generates an independent passenger set, satisfying the independence condition required for confidence intervals."
+    },
+    {
+      "id": "constant-iso",
+      "name": "ISO 8100-32 constant demand",
+      "recommended": false,
+      "durationMin": 120,
+      "discardFirstMin": 15,
+      "discardLastMin": 5,
+      "$comment": "Single long run. Incompatible with confidence intervals across replications because waiting times within one run are correlated. Supported for cross-checking only."
+    }
+  ],
+  "passengerMass": {
+    "distribution": "normal",
+    "meanKg": 75,
+    "stdDevKg": 15,
+    "minKg": 20,
+    "$comment": "Drives the load sensor. Must be a distribution, not a constant, or the load sensor has nothing to measure."
+  }
+}
