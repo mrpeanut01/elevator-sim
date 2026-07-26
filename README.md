@@ -49,8 +49,33 @@ Machine-readable configuration lives in [`data/`](data/).
 
 ## Status
 
-**Pre-implementation.** Research and architecture are captured; no code yet.
-See the [Roadmap](docs/05-roadmap.md) for the build sequence.
+**Phases 0–3 and 5 are landed and green; Phase 7 is built but not yet accepted.** Three packages
+(`core`, `experiments`, `cli`), 115 test files, 2,442 passing tests, `tsc -b` clean.
+
+| Phase | Status |
+|---|---|
+| 0 — Foundation | ✅ DES kernel, per-source RNG streams, config loading |
+| 1 — Physics & model | ✅ S-curve motion, doors, load sensor, pure `estimateCost()` |
+| 2 — Traffic & dispatch | ✅ Poisson batch arrivals, weighted-cost engine, RTT oracle |
+| 3 — Experiment infra | ✅ Replication runner, CRN, sequential stopping, paired-t |
+| 5 — Smart dispatch | ✅ Twelve cost terms, auction, predictor, benchmark suite |
+| CLI | ✅ `list`, `run`, `compare`, `watch` |
+| 7 — Automated tuning | ⚠️ Built and tested, **not accepted** — no non-test caller reaches it |
+| 4 — Visualization | ⬜ Not started |
+| 6 — Destination dispatch & learned control | ⬜ Not started |
+| 8 — Testing campaign | ⬜ Not started |
+
+Try it:
+
+```bash
+npm install && npm run build
+npm run sim -- list
+npm run sim -- run --building garden-apartments --dispatcher eta --seed 42
+npm run sim -- watch --building garden-apartments --dispatcher nearest-car --speed 10
+```
+
+See the [Roadmap](docs/05-roadmap.md) for per-phase acceptance verdicts and the measurements behind
+them, and the [Handoff brief](docs/07-handoff.md) for current state and open debt.
 
 ## License
 

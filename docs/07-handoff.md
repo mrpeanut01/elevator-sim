@@ -1,10 +1,19 @@
 # Handoff — resuming at Phase 6
 
-Written at a deliberate pause. Phases 0–5 and 7 are complete; **Phases 6, 4 and 8 remain**.
+Written at a deliberate pause. **Phases 0–3 and 5 are complete. Phase 7 is built and tested but
+NOT accepted** — see the register below. **Phases 4, 6 and 8 remain.** (Phase 4 was never
+started; an earlier draft of this line said "Phases 0–5", which wrongly swept it in.)
 
 This document exists so work can resume cold without re-deriving anything. Everything
 below was measured by this project, not assumed. Where a published figure turned out not
 to hold here, that is recorded too — several did not.
+
+> **Read [`08-review-findings.md`](08-review-findings.md) before planning.** A whole-system
+> review on 2026-07-26 produced **21 findings — 1 critical, 13 major, 7 minor**, none of which
+> the test suite can catch. The critical one blocks Phase 7's acceptance: the entire `tuning/`
+> module has no non-test caller. Several of the majors are inert tunables that a Phase 7 search
+> would waste its budget on, so the register should be worked before any tuning campaign, not
+> after.
 
 ---
 
@@ -17,7 +26,7 @@ to hold here, that is recorded too — several did not.
 | 2 — Traffic & dispatch | ✅ Poisson batch arrivals, weighted-cost engine, RTT oracle |
 | 3 — Experiment infra | ✅ Replication runner, CRN, sequential stopping, paired-t |
 | 5 — Smart dispatch | ✅ Twelve cost terms, auction, predictor, benchmark suite |
-| 7 — Automated tuning | ✅ Search space, successive halving, Pareto reporting |
+| 7 — Automated tuning | ⚠️ Built & tested, **NOT accepted** — no non-test caller reaches it |
 | CLI | ✅ `list`, `run`, `compare`, `watch` |
 | **6 — Destination dispatch & learned control** | ⬜ **NOT STARTED** |
 | **4 — Visualization** | ⬜ **NOT STARTED** |

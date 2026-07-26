@@ -505,12 +505,48 @@ indistinguishable rather than ranked.
 > See [Traffic & Statistics](03-traffic-and-statistics.md) § *Measured: flat plateaus, not
 > noise*.
 
-**Status: green. The machinery is complete and wired; the acceptance number is measured but
-deliberately not asserted as a gate.** The search space, the three searches, successive halving,
-the Pareto reporting and the held-out validation all land in
-`packages/experiments/src/tuning/`, and the artefact the phase is judged on is produced by
-`runHoldoutRound()` in `report/holdoutRound.ts`, exercised end to end against the real `data/`
-directory by `report/holdoutRound.test.ts`.
+**Status: NOT ACCEPTED — the phase is blocked by the sixth instance of this document's own standing
+requirement.** The machinery is built and correct; it is reachable from nothing. This section
+previously read *"green. The machinery is complete and wired"*, and that verdict was wrong: it was
+reached by verifying the seam *inside* `tuning/report` and never checking the seam at the package
+boundary.
+
+**What is actually true.** There is no `packages/experiments/src/tuning/index.ts`;
+`packages/experiments/src/index.ts` exports nothing from `tuning/`; and every importer of
+`randomSearch`, `successiveHalving`, `sepCmaEs`, `runnerObjective` and `runHoldoutRound` is either a
+`*.test.ts` in the same directory or a barrel re-export — and this document is explicit that
+**a barrel re-export is not a caller**. The CLI exposes `list|run|compare|watch` and no tuning
+command. Nothing a user or an experiment can invoke reaches any of it.
+
+**The module said so itself.** `tuning/search/index.ts` § 6 is titled *"OPEN — nothing here is
+reachable from the package's public surface"* and calls it "a gate blocker, recorded here rather
+than left to be rediscovered." That was honest and correct; the phase was accepted anyway, over the
+module's own written objection. That is the failure worth learning from — the fifth instance was
+caught by a verifier, and the sixth was *reported by the code itself* and then overridden at the
+acceptance step.
+
+**Why the existing guards did not catch it.** `dispatch/deadCode.test.ts` sets
+`AUDITED_MODULES = ['core/src/dispatch/policies', 'core/src/dispatch/predictor']`. It is a
+`packages/core` test and cannot see `packages/experiments` at all, so the mechanical audit was
+structurally incapable of covering `tuning/` no matter what it contained.
+
+**To accept this phase**, three things, none of which is a rewrite:
+
+1. A `tuning/index.ts` barrel and a re-export from `packages/experiments/src/index.ts`, resolving
+   the `Candidate` name collision between `tuning/space` (a parameter assignment) and
+   `tuning/search` (a configuration under evaluation) that `search/index.ts` § 6 documents as the
+   concrete blocker.
+2. A **real caller** — the natural one is a CLI `tune` command, which also gives the phase a
+   user-visible surface and is how the acceptance number gets produced at a real budget.
+3. An experiments-side dead-code audit mirroring `deadCode.test.ts`, with `AUDITED_MODULES`
+   extended to `experiments/src/tuning/{search,space,report}`, so a seventh instance fails a test
+   rather than waiting for a reviewer.
+
+What *is* done and verified, and does not need redoing: the search space, the three searches,
+successive halving, plateau detection, the Pareto reporting and the held-out validation round are
+built, individually tested, and `runHoldoutRound()` is exercised end to end against the real `data/`
+directory by `report/holdoutRound.test.ts`. The acceptance measurement below was produced by that
+path and stands.
 
 | criterion | verdict |
 |---|---|
