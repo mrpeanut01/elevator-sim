@@ -14,6 +14,7 @@
 import { describe, expect, it } from 'vitest';
 
 import * as barrel from './index.js';
+import * as benchmarkModule from './benchmark/index.js';
 import * as oracleModule from './oracle/index.js';
 import * as reportsModule from './reports/index.js';
 import * as runnerModule from './runner/index.js';
@@ -24,6 +25,7 @@ const submodules = {
   runner: runnerModule,
   reports: reportsModule,
   oracle: oracleModule,
+  benchmark: benchmarkModule,
 } satisfies Record<string, Record<string, unknown>>;
 
 /**
@@ -131,5 +133,68 @@ describe('Phase 3 is usable through the barrel alone', () => {
     expect(barrel.isReplicationMetric('awtS')).toBe(true);
     expect(barrel.isReplicationMetric('not-a-metric')).toBe(false);
     expect(barrel.HEADLINE_METRIC_ID.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Phase 5's contribution to the surface is a *vocabulary*, and it is the part a later phase is
+ * most likely to re-derive from memory and get wrong in the optimistic direction. So the barrel is
+ * asserted to carry the four distinctions rather than merely to compile.
+ */
+describe('Phase 5 verdict vocabulary is usable through the barrel alone', () => {
+  const cell = (candidate: readonly number[], baseline: readonly number[], quotable = true) =>
+    barrel.compareCell({
+      metric: 'awtS',
+      armId: 'arm',
+      baselineId: 'baseline',
+      candidate,
+      baseline,
+      quotable,
+    });
+
+  it('separates IDENTICAL from INDISTINGUISHABLE — the distinction no budget collapses', () => {
+    const baseline = [16.1, 15.4, 17.2, 16.8, 15.9, 16.4, 17.0, 15.7, 16.2, 16.6];
+
+    /* Bit-identical arms. Not an effect too small to see; no effect. Three of Phase 5's eight
+       shipped profiles land here against `eta`, so this is a real case and not a corner. */
+    expect(cell(baseline, baseline).verdict).toBe('IDENTICAL');
+
+    /* A difference swamped by its own spread: below resolution at this budget, which is not the
+       same as absent and is emphatically not a win. */
+    const noisy = baseline.map((value, index) => value + (index % 2 === 0 ? 3.4 : -3.1));
+    expect(cell(noisy, baseline).verdict).toBe('INDISTINGUISHABLE');
+  });
+
+  it('calls a real effect BETTER or WORSE by its sign, negative being better', () => {
+    const baseline = [16.1, 15.4, 17.2, 16.8, 15.9, 16.4, 17.0, 15.7, 16.2, 16.6];
+    expect(cell(baseline.map((value) => value - 2), baseline).verdict).toBe('BETTER');
+    expect(cell(baseline.map((value) => value + 2), baseline).verdict).toBe('WORSE');
+  });
+
+  it('refuses to quote a mean whose cell saturated, whatever the interval says', () => {
+    const baseline = [16.1, 15.4, 17.2, 16.8, 15.9, 16.4, 17.0, 15.7, 16.2, 16.6];
+    const better = baseline.map((value) => value - 2);
+
+    /* Same samples, same interval — the only change is that a queue diverged. UNQUOTABLE
+       short-circuits the arithmetic, because an interval over an invalidated AWT is not a weaker
+       result, it is not a result (CLAUDE.md § Statistical discipline). */
+    expect(cell(better, baseline, false).verdict).toBe('UNQUOTABLE');
+    expect(barrel.CELL_VERDICTS).toContain('UNQUOTABLE');
+  });
+
+  it('answers an INDISTINGUISHABLE cell with the n it would need, from its own observed spread', () => {
+    /* `n >= (z · s_D / |d|)²`, computed rather than guessed. */
+    expect(barrel.replicationsToResolve(1, 10)).toBe(385);
+    /* A difference that is exactly zero has no n that resolves it — `undefined`, never a number. */
+    expect(barrel.replicationsToResolve(0, 10)).toBeUndefined();
+    /* And no spread needs no budget. */
+    expect(barrel.replicationsToResolve(1, 0)).toBe(1);
+  });
+
+  it('carries the arms and the baseline as data, so a profile cannot be dropped in code', () => {
+    expect(barrel.BASELINE_PROFILE).toBe('nearest-car');
+    expect(barrel.ARM_PROFILES).not.toContain(barrel.BASELINE_PROFILE);
+    expect(barrel.ARM_PROFILES.length).toBeGreaterThan(0);
+    expect(barrel.BENCHMARK_CASES.length).toBeGreaterThan(0);
   });
 });

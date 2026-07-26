@@ -7,11 +7,11 @@
  * difference is declared only through a paired-t interval that excludes zero, and a saturated
  * configuration has its wait statistics suppressed rather than averaged.
  *
- * May depend on `@elevator-sim/core`; nothing in `core` may depend on this package. Four modules
- * are re-exported below — `stats`, `runner/`, `reports/` and `oracle/` — with names listed
- * explicitly rather than with `export *`, matching `core`'s barrel: adding an export becomes a
- * deliberate widening of the package's public surface, and a name collision between two submodules
- * is a compile error here rather than a silent shadow.
+ * May depend on `@elevator-sim/core`; nothing in `core` may depend on this package. Five modules
+ * are re-exported below — `stats`, `runner/`, `reports/`, `oracle/` and Phase 5's `benchmark/` —
+ * with names listed explicitly rather than with `export *`, matching `core`'s barrel: adding an
+ * export becomes a deliberate widening of the package's public surface, and a name collision
+ * between two submodules is a compile error here rather than a silent shadow.
  *
  * ## Where `stats` lives
  *
@@ -55,6 +55,28 @@
  * `validation/index.js` for a Phase 5 or Phase 7 comparison inside this package, and the paired-t
  * plumbing it is built from — `estimateMean`, `pairedDifferenceEstimate`, `halfWidthStoppingRule` —
  * is exported here, so nothing needs the gate's own barrel in order to reuse the method.
+ *
+ * ## Why `benchmark/` *is* here, when `validation/` is not
+ *
+ * `src/benchmark/` is the Phase 5 acceptance gate and shares `validation/`'s harness, so the same
+ * reasoning would seem to keep it off the surface. It is exported anyway, for a reason that does
+ * not apply to `validation/`: what Phase 6 and Phase 7 must reuse is not the gate's *assertions* but
+ * its **vocabulary for what a paired interval is allowed to be called**. {@link classify} is the
+ * function that refuses to call a point estimate a win; {@link replicationsToResolve} is what turns
+ * an INDISTINGUISHABLE cell into the `n` it would need; {@link CELL_VERDICTS} distinguishes
+ * `IDENTICAL` (bit-identical arms, no budget changes it) from `INDISTINGUISHABLE` (below resolution
+ * at this budget) — a distinction Phase 3 measured the need for and that three of Phase 5's eight
+ * arms turned out to require. A later phase that re-implements those from memory will get them
+ * subtly wrong in the optimistic direction, which is exactly the failure CLAUDE.md § Statistical
+ * discipline names. The gate's suites still live in `*.test.ts` files and are not exported.
+ *
+ * `runBenchmark`, `runTailStudy`, `runPrepositioningStudy`, `measurePredictorLag` and
+ * `measureAuctionAggregation` come with it — they read the real `data/` directory and are as
+ * environment-bound as `validation/`'s harness, so treat them as executables, not as library calls.
+ * `benchmark/index.ts` is the phase's written report; read it before quoting any number from here.
+ * In particular, three of the eight arms are bit-identical to `eta` in a real run and the
+ * pre-positioning criterion measured **exactly zero**, both for wiring reasons recorded as gaps 2–5
+ * in `core/dispatch/policies/index.ts`.
  *
  * ## Note on Node built-ins
  *
@@ -298,3 +320,109 @@ export type {
   ReplicationStatistic,
   RoundTripReconciliation,
 } from './oracle/index.js';
+
+/* -------------------------------------------------------------------------- *
+ * benchmark/ — the Phase 5 acceptance gate: eight shipped dispatcher profiles
+ * against `nearest-car` on three buildings under common random numbers, plus the
+ * four studies the criteria cannot express on their own (stage 7 in isolation,
+ * the tail terms one load step up, the predictor's causality, the auction's
+ * aggregation).
+ *
+ * Nothing here tunes a weight, loosens a tolerance or drops a losing arm; a test
+ * asserts that the arm list is exactly the shipped profile set. Every verdict is
+ * a paired-t interval at 95 %, and a cell whose interval contains zero is
+ * reported as INDISTINGUISHABLE with the `n` it would need — never as a point
+ * estimate that happens to have the right sign.
+ *
+ * Two things to read before quoting a number: `benchmark/index.ts`, which is the
+ * phase's written report, and the note above on why this module is exported
+ * where `validation/` is not.
+ *
+ * **One name held back: `DecisionOutcome`.** `benchmark/auctionAggregation.ts`
+ * exports a type of that name for one randomized decision state and what the two
+ * aggregations did with it. `@elevator-sim/core` exports an unrelated
+ * `DecisionOutcome` — the `assigned` / `deferred` / … verdict of a dispatch
+ * decision. They do not collide here, because this barrel re-exports nothing from
+ * `core`; they would collide in any file that imported from both packages, and
+ * TypeScript would resolve it silently to whichever import came last. Same
+ * reasoning as the `canonicalJson` omission above: a name whose wrong resolution
+ * is not a compile error does not go on the surface. It stays reachable at
+ * `benchmark/auctionAggregation.js`.
+ * -------------------------------------------------------------------------- */
+
+export {
+  AFTER_FLOOR,
+  ARM_PROFILES,
+  ARRIVAL_EVERY_S,
+  AUCTION_PROFILE,
+  BASELINE_PROFILE,
+  BEFORE_FLOOR,
+  BENCHMARK_CASES,
+  BENCHMARK_METRICS,
+  BENCHMARK_SEED,
+  CELL_VERDICTS,
+  CONTRACT_NET,
+  CONTROL_STRATEGY,
+  ENSEMBLE_BUILDINGS,
+  ENSEMBLE_SEED,
+  GARDEN_FLOOR_IDS,
+  METRIC_LABELS,
+  PREPOSITIONING_PROFILE,
+  RUN_DURATION_S,
+  SAMPLE_EVERY_S,
+  SHIFT_AT_S,
+  STUDIED_PARKING_STRATEGIES,
+  TAIL_ARMS,
+  TAIL_LOADS,
+  TAIL_METRICS,
+  TAIL_REFERENCE,
+  armOf,
+  armsWithVerdict,
+  benchmarkCase,
+  cellNote,
+  classify,
+  compareCell,
+  criterionOutcomes,
+  formatBenchmark,
+  formatCase,
+  formatInterval,
+  formatRelative,
+  formatTailStudy,
+  identityClassesOf,
+  measureAuctionAggregation,
+  measurePredictorLag,
+  multiRoundIsReachableFromSimulation,
+  padVerdict,
+  parkingArmId,
+  parkingVariant,
+  replicationsToResolve,
+  requireAuctionProfile,
+  runBenchmark,
+  runBenchmarkCase,
+  runPrepositioningStudy,
+  runTailStudy,
+  twoEntranceUpPeak,
+  verdictCounts,
+} from './benchmark/index.js';
+
+export type {
+  ArmResult,
+  AuctionEnsembleOptions,
+  AuctionEnsembleResult,
+  BenchmarkCase,
+  BenchmarkRunOptions,
+  CaseResult,
+  CellComparison,
+  CellComparisonInput,
+  CellVerdict,
+  CriterionOutcome,
+  DecisionState,
+  ForecastSample,
+  PredictorLagStudy,
+  PrepositioningOptions,
+  PrepositioningStudy,
+  TailCell,
+  TailRow,
+  TailStudy,
+  TailStudyOptions,
+} from './benchmark/index.js';

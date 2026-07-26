@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveCar } from '../../config/resolveCar.js';
-import type { ElevatorSpecs, ResolvedCar } from '../../config/types.js';
-import { Car } from '../../model/car/car.js';
-import { estimateCost } from '../../model/car/estimateCost.js';
-import { createShaft, type CarShaft, type CarSnapshot } from '../../model/car/types.js';
-import { hallCallId, type Direction } from '../../model/types.js';
-import { costRequestFor, observationFor } from '../lifecycle.js';
-import { resolveDispatchConfig } from '../policy.js';
-import type { DispatchCall, TermContext } from '../types.js';
+import type { CarSnapshot } from '../../model/car/types.js';
+import { normalizeTerm, resolveNormalization } from '../normalize.js';
 
+import {
+  DESTINATION_CONFIG,
+  FLOOR_PITCH_M,
+  call,
+  clockAt,
+  contextFor,
+  hallCall,
+  makeCar,
+  passengerTo,
+  tamperProof,
+} from './fixtures.test-helper.js';
 import {
   COST_TERMS,
   COST_TERMS_BY_ID,
@@ -24,113 +28,29 @@ import {
   waitTimeSeconds,
 } from './index.js';
 
-/* -------------------------------------------------------------------------- *
- * Fixtures
- *
- * V = 2.0 m/s, A = 1.0 m/s^2, J = 1.0 m/s^3, floors 4 m apart at indices 0..20, so floor N
- * is at 4N metres. Chosen to match `estimateCost.test.ts` so a hand-checked travel time in
- * one file is the same number in the other.
- * -------------------------------------------------------------------------- */
-
-const REFERENCE_SPECS: ElevatorSpecs = {
-  version: 1,
-  units: { speed: 'm/s' },
-  conventions: {
-    personsPerRatedLoadUS: 'ratedLoadLb / 150',
-    personsPerRatedLoadEN81: 'ratedLoadKg / 75',
-    designLoadFactor: 0.8,
-  },
-  classes: [
-    {
-      id: 'round-numbers',
-      name: 'Round numbers',
-      ratedSpeedMps: { min: 0.5, max: 10, typical: 2.0 },
-      maxRiseM: 600,
-      maxFloors: 100,
-      acceleration: { typical: 1.0, max: 1.2 },
-      jerk: { typical: 1.0, max: 1.6 },
-      capacityLbRange: [1000, 4000],
-      application: 'Test fixture',
-    },
-  ],
-  codeMinimumSpeedByRise: [],
-  capacities: [{ ratedLoadLb: 3000, ratedLoadKg: 1350, personsUS: 20, use: 'Office' }],
-  doors: {
-    centerOpening: { openS: 2.0, closeS: 3.0 },
-    sideOpening: { openS: 2.5, closeS: 4.0 },
-    dwellCarCallS: { min: 2, max: 4, typical: 3 },
-    dwellHallCallS: { min: 4, max: 7, typical: 5 },
-  },
-  timing: {
-    motorStartDelayS: 0.5,
-    levelingSettleS: { min: 0.5, max: 1.0, typical: 0.5 },
-    passengerTransferS: { office: 1.2, residential: 1.75, hotel: 1.5 },
-  },
-  loadSensor: { hallCallBypassThreshold: 0.8, overloadAlarmThreshold: 1.1 },
-  realWorldAnchors: [],
-};
-
-const SPEC: ResolvedCar = resolveCar(
-  { id: 'A', spec: 'round-numbers', ratedLoadLb: 3000 },
-  REFERENCE_SPECS,
-);
-
-const FLOOR_PITCH_M = 4;
-
-function plainShaft(count = 21): CarShaft {
-  return createShaft(
-    Array.from({ length: count }, (_, index) => ({
-      id: String(index),
-      index,
-      heightM: index * FLOOR_PITCH_M,
-    })),
-  );
-}
-
-interface Clock {
-  now(): number;
-  set(t: number): void;
-}
-
-function clockAt(start = 0): Clock {
-  let time = start;
-  return {
-    now: () => time,
-    set: (t: number) => {
-      time = t;
-    },
-  };
-}
-
-function makeCar(id = 'A', homeFloorId = '0', clock: Clock = clockAt(0), shaft = plainShaft()): Car {
-  return new Car({ id, bankId: 'low', spec: SPEC, shaft, homeFloorId, clock });
-}
-
-function call(floorId: string, direction: Direction, registeredAt = 0): DispatchCall {
-  return {
-    id: hallCallId(floorId, direction),
-    floorId,
-    floorIndex: Number(floorId),
-    direction,
-    registeredAt,
-  };
-}
-
-const CONFIG = resolveDispatchConfig({ id: 'probe', name: 'Probe', weights: {} });
-
-function contextFor(car: CarSnapshot, subject: DispatchCall, at = 0): TermContext {
-  const observation = observationFor(subject);
-  const request = costRequestFor(subject, CONFIG, observation);
-  return { car, call: subject, request, estimate: estimateCost(car, request), at, observation };
-}
+const SCALES = resolveNormalization();
 
 /* -------------------------------------------------------------------------- *
  * The registry
  * -------------------------------------------------------------------------- */
 
 describe('the cost-term registry', () => {
-  it('implements the three terms Phase 2 owes, in a fixed order', () => {
-    expect(IMPLEMENTED_TERM_IDS).toEqual(['waitTime', 'distanceTravelled', 'directionReversal']);
+  it('implements all twelve terms of the library, in the order the data file declares them', () => {
+    expect(IMPLEMENTED_TERM_IDS).toEqual([
+      'waitTime',
+      'rideTime',
+      'detourPenalty',
+      'existingCallDelay',
+      'directionReversal',
+      'loadFactor',
+      'stopCount',
+      'distanceTravelled',
+      'starvation',
+      'zoneAffinity',
+      'predictedDemand',
+      'crowding',
+    ]);
+    expect(IMPLEMENTED_TERM_IDS).toEqual(DECLARED_TERM_IDS);
   });
 
   it('indexes every term by its id', () => {
@@ -142,20 +62,17 @@ describe('the cost-term registry', () => {
     expect(COST_TERMS_BY_ID.size).toBe(COST_TERMS.length);
   });
 
-  it('reports a term no phase has implemented as absent rather than throwing', () => {
-    // `predictive-balanced` weights eleven terms; a policy built from it must still work.
-    expect(costTerm('predictedDemand')).toBeUndefined();
-    expect(isImplementedTerm('predictedDemand')).toBe(false);
-  });
-
-  it('separates “declared but pending” from “not a term at all”', () => {
-    // The distinction the resolver needs: a pending term is carried, a typo is rejected. If
-    // the two collapsed, a misspelled weight would score every car at zero in silence.
+  it('still separates “declared but pending” from “not a term at all”', () => {
+    // The library happens to be complete, so nothing is pending today. The distinction must
+    // survive that: a pending term is carried, a typo is rejected. If the two collapsed, a future
+    // declared-but-unimplemented term would be treated as a misspelling — and a misspelled weight
+    // scores every car at zero, which decides by car id in silence.
     expect(isDeclaredTerm('predictedDemand')).toBe(true);
-    expect(isImplementedTerm('predictedDemand')).toBe(false);
-    expect(isDeclaredTerm('waitTime')).toBe(true);
+    expect(isImplementedTerm('predictedDemand')).toBe(true);
     expect(isDeclaredTerm('waitTiem')).toBe(false);
     expect(isDeclaredTerm('waittime')).toBe(false);
+    expect(costTerm('waitTiem')).toBeUndefined();
+    expect(isImplementedTerm('waitTiem')).toBe(false);
   });
 
   it('declares every implemented term, and declares each id once', () => {
@@ -170,26 +87,122 @@ describe('the cost-term registry', () => {
       expect(term.id).not.toBe('');
       expect(term.measures).not.toBe('');
       expect(typeof term.evaluate).toBe('function');
+      expect(Object.isFrozen(term), term.id).toBe(true);
       if (term.normalization.mode === 'bounded') {
-        expect(term.normalization.fullScale).toBeGreaterThan(0);
+        expect(term.normalization.fullScale, term.id).toBeGreaterThan(0);
       } else {
-        expect(['waitTimeS', 'distanceM']).toContain(term.normalization.scale);
+        expect(['waitTimeS', 'distanceM'], term.id).toContain(term.normalization.scale);
       }
     }
   });
 
-  it('leaves the snapshot untouched — terms are pure (CLAUDE.md invariant 1)', () => {
-    const car = makeCar();
-    car.registerCarCall('8');
-    const snapshot = car.snapshot(0);
-    const before = JSON.stringify(car.serialize());
+  it('lets a term declare the configuration its weight is live under', () => {
+    // `parameters.ts` copies this onto the derived `weights.<id>` row, so a term that can only be
+    // priced under some stage setting says so once, here, and no file has to name it (invariants 7
+    // and 8 together). `rideTime` is the case: no destination, no in-car time, no live dimension.
+    // `parameters.test.ts` checks the condition is satisfiable — that the gate exists, is
+    // categorical, and admits the values named.
+    expect(costTerm('rideTime')?.activeWhen).toEqual({
+      'dispatch.callType': ['destination-entry', 'mobile-credential'],
+    });
 
-    const context = contextFor(snapshot, call('5', 'up'));
     for (const term of COST_TERMS) {
-      for (let i = 0; i < 200; i += 1) term.evaluate(context);
+      if (term.activeWhen === undefined) continue;
+      expect(Object.isFrozen(term.activeWhen), term.id).toBe(true);
+      const conditions = Object.entries(term.activeWhen);
+      expect(conditions.length, term.id).toBeGreaterThan(0);
+      for (const [parameterId, values] of conditions) {
+        // A dotted parameter path, never a term id: a condition on another term would be a
+        // dependency between costs, which the weighted sum has no way to express.
+        expect(parameterId, term.id).toContain('.');
+        expect(values.length, `${term.id} → ${parameterId}`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('returns a finite, non-negative number from every term on every plausible context', () => {
+    // The contract `scoreCar` enforces at runtime, asserted here across a spread of car states so
+    // a term that can produce a NaN or a bonus fails in this file rather than mid-replication.
+    for (const context of probeContexts()) {
+      for (const term of COST_TERMS) {
+        const raw = term.evaluate(context);
+        expect(Number.isFinite(raw), `${term.id} raw=${raw}`).toBe(true);
+        expect(raw, term.id).toBeGreaterThanOrEqual(0);
+
+        const normalized = normalizeTerm(term, raw, SCALES);
+        expect(normalized, term.id).toBeGreaterThanOrEqual(0);
+        expect(normalized, term.id).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Purity — CLAUDE.md invariant 1
+ * -------------------------------------------------------------------------- */
+
+describe('every cost term is pure', () => {
+  it('leaves the car bit-identical after a thousand evaluations of every term', () => {
+    // The roadmap's acceptance form of invariant 1: the dispatcher calls these thousands of times
+    // per decision to evaluate hypotheticals it will not commit to.
+    const car = makeCar('A', '4');
+    car.assignHallCall(hallCall('16', 'up', 0));
+    car.registerCarCall('8');
+    car.board(passengerTo('12'), 0);
+    car.board(passengerTo('12'), 0);
+
+    const before = JSON.stringify(car.serialize());
+    const context = contextFor(car.snapshot(0), call('6', 'up', 0, '14'), {
+      config: DESTINATION_CONFIG,
+      waitingPassengers: 9,
+      zoneFloorIdsByCarId: new Map([['A', ['8', '9', '10']]]),
+      demandForecast: new Map([
+        ['0', 4],
+        ['16', 1],
+      ]),
+    });
+
+    for (let i = 0; i < 1000; i += 1) {
+      for (const term of COST_TERMS) term.evaluate(context);
     }
 
     expect(JSON.stringify(car.serialize())).toBe(before);
+  });
+
+  it('cannot write to a snapshot even when every reachable object is sealed against it', () => {
+    // The complementary proof, and the same harness `estimateCost.test.ts` uses: the test above
+    // says nothing changed, this one says nothing *could* have, by making every write a term might
+    // attempt throw — including through the shaft's lookup maps, which `Object.freeze` does not
+    // protect.
+    const car = makeCar('A', '4');
+    car.assignHallCall(hallCall('16', 'up', 0));
+    car.board(passengerTo('12'), 0);
+
+    const hardened = tamperProof(car.snapshot(0));
+    const context = contextFor(hardened, call('6', 'up', 0, '14'), {
+      config: DESTINATION_CONFIG,
+      waitingPassengers: 9,
+      zoneFloorIdsByCarId: new Map([['A', ['8', '9', '10']]]),
+      demandForecast: new Map([['0', 4]]),
+    });
+
+    for (const term of COST_TERMS) {
+      expect(() => {
+        for (let i = 0; i < 1000; i += 1) term.evaluate(context);
+      }, term.id).not.toThrow();
+    }
+  });
+
+  it('returns the same number on the thousandth call as on the first', () => {
+    // Determinism, which purity implies and a cache could break: nothing a term reads may change
+    // because a term read it.
+    const context = probeContexts()[0] as ReturnType<typeof contextFor>;
+    for (const term of COST_TERMS) {
+      const first = term.evaluate(context);
+      for (let i = 0; i < 1000; i += 1) {
+        expect(term.evaluate(context), term.id).toBe(first);
+      }
+    }
   });
 });
 
@@ -286,7 +299,9 @@ describe('distanceTravelled', () => {
     const car = makeCar('A', '7');
     car.registerCarCall('2');
     for (const floorId of ['0', '2', '7', '9', '20']) {
-      expect(marginalDistanceM(contextFor(car.snapshot(0), call(floorId, 'up')))).toBeGreaterThanOrEqual(0);
+      expect(
+        marginalDistanceM(contextFor(car.snapshot(0), call(floorId, 'up'))),
+      ).toBeGreaterThanOrEqual(0);
     }
   });
 
@@ -365,3 +380,66 @@ describe('directionReversal', () => {
     expect(assessment.reversals).toBe(0);
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * Probes
+ * -------------------------------------------------------------------------- */
+
+/** A spread of car states and calls wide enough to exercise every branch of every term. */
+function probeContexts(): readonly ReturnType<typeof contextFor>[] {
+  const contexts: ReturnType<typeof contextFor>[] = [];
+
+  const idle = makeCar('A', '0');
+  const holding = makeCar('B', '10');
+  holding.assignHallCall(hallCall('4', 'down', 0));
+  holding.assignHallCall(hallCall('18', 'up', 30));
+  const carrying = makeCar('C', '6');
+  for (let i = 0; i < 9; i += 1) carrying.board(passengerTo('14'), 0);
+  const clock = clockAt(0);
+  const flying = makeCar('D', '0', clock);
+  flying.registerCarCall('16');
+  flying.departFor('16', 0);
+  clock.set(5);
+
+  const zones: ReadonlyMap<string, readonly string[]> = new Map([
+    ['A', ['0', '1', '2', '3']],
+    ['B', ['10', '11', '12']],
+    ['C', ['6', '7']],
+  ]);
+  const demandForecast: ReadonlyMap<string, number> = new Map([
+    ['0', 6],
+    ['12', 2],
+    ['20', 1],
+  ]);
+
+  for (const [car, at] of [
+    [idle.snapshot(120), 120],
+    [holding.snapshot(120), 120],
+    [carrying.snapshot(120), 120],
+    [flying.snapshot(5), 5],
+  ] as const) {
+    for (const floorId of ['0', '4', '9', '14', '20']) {
+      for (const direction of ['up', 'down'] as const) {
+        contexts.push(
+          contextFor(car, call(floorId, direction, 0), {
+            at,
+            waitingPassengers: 7,
+            zoneFloorIdsByCarId: zones,
+            demandForecast,
+          }),
+        );
+        contexts.push(
+          contextFor(car, call(floorId, direction, 0, '11'), {
+            at,
+            config: DESTINATION_CONFIG,
+            waitingPassengers: 22,
+            zoneFloorIdsByCarId: zones,
+            demandForecast,
+          }),
+        );
+      }
+    }
+  }
+
+  return contexts;
+}

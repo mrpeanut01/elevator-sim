@@ -10,7 +10,7 @@ import {
   tunablePathsOf,
 } from './parameters.js';
 import { createDispatchPolicy, resolveDispatchConfig } from './policy.js';
-import { COST_TERMS } from './terms/index.js';
+import { COST_TERMS, costTerm } from './terms/index.js';
 import type { DispatcherProfileSource, ResolvedDispatchConfig } from './types.js';
 
 /**
@@ -23,7 +23,24 @@ import type { DispatcherProfileSource, ResolvedDispatchConfig } from './types.js
 const PROBE_PROFILE: DispatcherProfileSource = {
   id: 'probe',
   name: 'Probe',
-  weights: { waitTime: 0.55, distanceTravelled: 0.25, directionReversal: 0.2 },
+  // All twelve, each a different value: the schema derives one row per implemented term, and a
+  // probe that skipped a term would not notice a row wired to the wrong weight. `callType` below
+  // is `mobile-credential` deliberately — it is what makes `weights.rideTime`'s `activeWhen`
+  // satisfied, so the probe is taken in the configuration where every weight is live.
+  weights: {
+    waitTime: 0.55,
+    rideTime: 0.35,
+    detourPenalty: 0.45,
+    existingCallDelay: 0.65,
+    directionReversal: 0.2,
+    loadFactor: 0.75,
+    stopCount: 0.85,
+    distanceTravelled: 0.25,
+    starvation: 0.95,
+    zoneAffinity: 1.05,
+    predictedDemand: 1.15,
+    crowding: 1.35,
+  },
   hardConstraints: ['noDirectionReversal'],
   dispatch: {
     callType: 'mobile-credential',
@@ -55,8 +72,17 @@ const PROBE_VALUES: ReadonlyMap<string, number | string | boolean> = new Map<
   number | string | boolean
 >([
   ['weights.waitTime', 0.55],
-  ['weights.distanceTravelled', 0.25],
+  ['weights.rideTime', 0.35],
+  ['weights.detourPenalty', 0.45],
+  ['weights.existingCallDelay', 0.65],
   ['weights.directionReversal', 0.2],
+  ['weights.loadFactor', 0.75],
+  ['weights.stopCount', 0.85],
+  ['weights.distanceTravelled', 0.25],
+  ['weights.starvation', 0.95],
+  ['weights.zoneAffinity', 1.05],
+  ['weights.predictedDemand', 1.15],
+  ['weights.crowding', 1.35],
   ['normalization.waitTimeS', 95],
   ['normalization.distanceM', 44],
   ['constraints.noDirectionReversal', true],
@@ -226,16 +252,18 @@ describe('the schema and the engine agree about what is tunable', () => {
     );
   });
 
-  it('does not declare knobs no phase reads yet', () => {
-    // `predictorHorizonS` and `predictorLearningRate` belong to the Phase 5 learned arrival
-    // model; the eight unimplemented cost terms likewise change no decision today. Declaring
-    // either would break the rule above and send the optimizer hunting a dead dimension.
+  it('does not declare knobs no phase reads yet, or knobs another schema owns', () => {
+    // `predictorHorizonS` and `predictorLearningRate` are declared by `PREDICTOR_PARAMETERS`, not
+    // here, for the same reason the door and load-sensor knobs are declared by theirs: one source
+    // of truth each, or an optimizer sees a dimension twice.
+    //
+    // The twelve `weights.*` rows are no longer on this list. All twelve terms are implemented and
+    // `liveness.test.ts` proves each can change a decision through `policy.score()`, which is the
+    // condition for declaring a weight tunable at all. `weights.rideTime` is the one that needs a
+    // qualifier, and it carries it as `activeWhen` rather than by being withheld.
     for (const absent of [
       'idle.predictorHorizonS',
       'idle.predictorLearningRate',
-      'weights.rideTime',
-      'weights.starvation',
-      'weights.predictedDemand',
       // Owned by LOAD_SENSOR_PARAMETERS and DOOR_PARAMETERS: one source of truth each.
       'answer.bypassLoadThreshold',
       'answer.overloadThreshold',
@@ -246,21 +274,49 @@ describe('the schema and the engine agree about what is tunable', () => {
     }
   });
 
+  it('gates weights.rideTime on a call type that carries a destination', () => {
+    // The condition CLAUDE.md invariant 8 exists for. Under `up-down-buttons` no landing call
+    // carries a destination, `rideTime` returns 0 for every car, and its weight is one of twelve
+    // dimensions an optimizer would search for nothing — against a measured resolution floor of
+    // ~1.3 s, 8% of AWT, at n = 100. Declared by the term itself (`rideTimeTerm.activeWhen`) and
+    // copied here by `WEIGHT_PARAMETERS`, so this file names no term of its own accord.
+    const row = dispatchParameter('weights.rideTime');
+    expect(row?.activeWhen).toEqual({
+      'dispatch.callType': ['destination-entry', 'mobile-credential'],
+    });
+    expect(row?.activeWhen).toEqual(costTerm('rideTime')?.activeWhen);
+
+    // And it is the only one: every other term prices something a bare up/down button already
+    // knows, so withholding or gating it would hide a live dimension.
+    const gated = DISPATCH_PARAMETERS.filter(
+      (parameter) => parameter.id.startsWith('weights.') && parameter.activeWhen !== undefined,
+    ).map((parameter) => parameter.id);
+    expect(gated).toEqual(['weights.rideTime']);
+  });
+
   it('reports an unknown id rather than guessing', () => {
     expect(dispatchParameterValue(PROBED, 'dispatch.nonsense')).toBeUndefined();
     expect(dispatchParameterValue(PROBED, 'nonsense.batchWindowS')).toBeUndefined();
     expect(dispatchParameterValue(PROBED, 'batchWindowS')).toBeUndefined();
   });
 
-  it('surfaces a pending term’s weight without declaring it as tunable', () => {
-    // The optimizer must not see it, but a caller inspecting a profile should.
+  it('surfaces every weight a profile carries, and only weights that are terms', () => {
+    // This pinned the pre-Phase-5 state: `starvation` was declared, unimplemented, carried in
+    // `pendingWeights`, and deliberately hidden from the schema so the optimizer would not search
+    // a dead dimension. It is implemented now, so the honest assertion is the other one — a weight
+    // a profile carries is both readable and declared, and nothing is quietly parked out of sight.
     const config = resolveDispatchConfig({
       id: 'p',
       name: 'P',
       weights: { waitTime: 1, starvation: 0.7 },
     });
     expect(dispatchParameterValue(config, 'weights.starvation')).toBe(0.7);
-    expect(DISPATCH_PARAMETER_IDS.has('weights.starvation')).toBe(false);
+    expect(DISPATCH_PARAMETER_IDS.has('weights.starvation')).toBe(true);
+    expect(config.pendingWeights.size).toBe(0);
+
+    // A term id nothing implements is a typo, and `resolveDispatchConfig` throws on it rather than
+    // scoring every car at zero. Reading one back is still `undefined`, not a guess.
+    expect(dispatchParameterValue(config, 'weights.waitTiem')).toBeUndefined();
   });
 });
 

@@ -313,6 +313,28 @@ export interface DispatchObservation {
   readonly waitingPassengers: number;
   /** Their total mass, kilograms, or `undefined` when nobody weighed them. */
   readonly waitingMassKg: number | undefined;
+  /**
+   * Car id to the floor ids of that car's **operational** zone, for `zoneAffinity`.
+   *
+   * Operational zoning only — the third kind, the dispatcher's own dynamic partitioning
+   * (docs/01-architecture.md § Security zones are three different things). Service zoning is
+   * `car.shaft` and access zoning is `ServedFloor.permittedCredentialGroups`; neither belongs
+   * here and neither is a cost. Produced by `policies/groupContext.ts`, which owns the
+   * partition, and absent when no operational zoning is configured — which is not the same as
+   * an empty zone, and leaves `zoneAffinity` inert rather than making every floor a deviation.
+   */
+  readonly zoneFloorIdsByCarId?: ReadonlyMap<string, readonly string[]> | undefined;
+  /**
+   * Floor id to expected arrivals over the predictor's horizon, for `predictedDemand`.
+   *
+   * The return of `DemandForecast.expectedDemandByFloor(at)`, unchanged, and exactly what
+   * `RepositionContext.demandForecast` declares — so one forecast per decision is read by both
+   * stage 3 and stage 7 and a run cannot park against one future while scoring its calls
+   * against another. A cost term is pure and cannot own a learned model, so the forecast is
+   * resolved once by whoever holds the predictor and handed in here. Absent means nobody
+   * supplied one, and `predictedDemand` is then inert rather than guessing.
+   */
+  readonly demandForecast?: ReadonlyMap<string, number> | undefined;
 }
 
 /**
@@ -351,6 +373,17 @@ export interface CostTermDefinition {
   /** What the term measures, mirroring the `terms` library entry. */
   readonly measures: string;
   readonly normalization: TermNormalization;
+  /**
+   * The stage settings under which this term can change a decision at all, copied onto its
+   * `weights.<id>` row in `DISPATCH_PARAMETERS` (CLAUDE.md invariant 8).
+   *
+   * Declared by the term rather than listed in the schema, because only the term knows what it
+   * needs: `rideTime` reads `request.destinationFloorId`, which exists only under
+   * `dispatch.callType: destination-entry` or `mobile-credential`, so under the default call
+   * type its weight is a dimension an optimizer would search for nothing. Keeping the condition
+   * here is also what stops `parameters.ts` naming a term, which invariant 7 forbids.
+   */
+  readonly activeWhen?: Readonly<Record<string, readonly string[]>> | undefined;
   /** Pure. Non-negative. Never `NaN`. */
   readonly evaluate: (context: TermContext) => number;
 }
@@ -447,6 +480,16 @@ export interface DispatchContext {
   readonly waitingPassengers?: number | undefined;
   /** Their total mass, kilograms. */
   readonly waitingMassKg?: number | undefined;
+  /**
+   * Car id to the floor ids of that car's operational zone. Forwarded to
+   * {@link DispatchObservation.zoneFloorIdsByCarId}; `policies/groupContext.ts` builds it.
+   */
+  readonly zoneFloorIdsByCarId?: ReadonlyMap<string, readonly string[]> | undefined;
+  /**
+   * Floor id to expected arrivals over the predictor's horizon. Forwarded to
+   * {@link DispatchObservation.demandForecast}; resolve it once per dispatch pass, not per call.
+   */
+  readonly demandForecast?: ReadonlyMap<string, number> | undefined;
 }
 
 /* -------------------------------------------------------------------------- *

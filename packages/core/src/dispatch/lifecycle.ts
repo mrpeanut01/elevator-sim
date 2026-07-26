@@ -133,16 +133,40 @@ export function costRequestFor(
   });
 }
 
-/** What the policy knows about who is waiting, with the call's own declaration as the fallback. */
+/**
+ * What the policy knows about who is waiting, with the call's own declaration as the fallback.
+ *
+ * `group` carries the two facts **only the group controller holds** — the operational partition
+ * and the arrival forecast — straight through to the terms that price them. They are forwarded
+ * rather than resolved here for the reason `terms/observation.ts` gives: a cost term is a pure
+ * function and cannot own a partition or a learned model, so both are resolved once per dispatch
+ * pass by whoever owns them (`policies/groupContext.ts`) and shared by every term and every car.
+ * Dropping them, which this function used to do, left `zoneAffinity` and `predictedDemand`
+ * scoring zero for every car in every shipped configuration: weighted, configurable, and unable
+ * to change a decision.
+ *
+ * Fields are omitted rather than set to `undefined`, so the frozen observation records what was
+ * actually known and `exactOptionalPropertyTypes` stays honest.
+ */
 export function observationFor(
   call: DispatchCall,
   waitingPassengers?: number | undefined,
   waitingMassKg?: number | undefined,
+  group?:
+    | {
+        readonly zoneFloorIdsByCarId?: ReadonlyMap<string, readonly string[]> | undefined;
+        readonly demandForecast?: ReadonlyMap<string, number> | undefined;
+      }
+    | undefined,
 ): DispatchObservation {
   const waiting = waitingPassengers ?? call.waitingPassengers ?? 0;
   return Object.freeze({
     waitingPassengers: Math.max(0, waiting),
     waitingMassKg: waitingMassKg ?? call.waitingMassKg,
+    ...(group?.zoneFloorIdsByCarId === undefined
+      ? {}
+      : { zoneFloorIdsByCarId: group.zoneFloorIdsByCarId }),
+    ...(group?.demandForecast === undefined ? {} : { demandForecast: group.demandForecast }),
   });
 }
 

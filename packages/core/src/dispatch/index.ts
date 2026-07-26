@@ -39,10 +39,38 @@
  * | `lifecycle.ts` | stages 1, 2, 4, 5, 6 and 7 as pure functions |
  * | `policy.ts` | the state that sequences them, and `DispatcherProfile` → working policy |
  * | `parameters.ts` | the self-describing schema Phase 7 searches (CLAUDE.md invariant 8) |
+ * | `policies/` | Phase 5: the aggregation (`auction`), the stage-5 capacity monitor, operational zoning, stage-7 pre-positioning |
+ * | `predictor/` | Phase 5: the learned per-floor arrival model that stage 7 and `predictedDemand` read |
  *
  * Names are re-exported explicitly rather than with `export *`, as in the package barrel, so
  * widening this module's public surface is a deliberate act and a future collision is a
  * compile error here rather than a silent shadow.
+ *
+ * ## Phase 5 widened this barrel, and one name had to be disambiguated
+ *
+ * `terms/observation.ts` and `policies/zoning.ts` each export a `zoneFloorIdsFor`, and they are
+ * different operations rather than two spellings of one:
+ *
+ * - `zoning.zoneFloorIdsFor(cars, carId)` **computes** a contiguous partition of a bank's shafts
+ *   and answers which band a car owns. It is the operational-zoning primitive, and it keeps the
+ *   bare name because it is the one a consumer calls.
+ * - `observation.zoneFloorIdsFor(observation, carId)` **looks up** a band the group controller
+ *   already decided and put on a {@link DispatchObservation}. It is re-exported here as
+ *   {@link observedZoneFloorIdsFor}.
+ *
+ * Unlike `experiments`' two `canonicalJson`s — where picking one would hand a caller the other's
+ * semantics silently — these two take unrelated first arguments, so reaching for the wrong one is
+ * a compile error rather than a wrong number. That is why one may keep the bare name here and
+ * neither may there.
+ *
+ * ## What is exported and still cannot run inside `runSimulation`
+ *
+ * `policies/` and `predictor/` are on the package surface as of Phase 5, and four of their
+ * behaviours are still unreachable from a full run because of missing wiring in `sim/` and
+ * `config/` — gaps 2 to 5, enumerated with their one-line fixes in `policies/index.ts`. Exporting
+ * them does not close those gaps. A Phase 7 optimizer reading `POLICY_PARAMETERS` or
+ * `PREDICTOR_PARAMETERS` off this barrel will find tunables that a `runSimulation` measurement
+ * cannot presently move; read that module's table before spending a replication budget on them.
  */
 
 /* -------------------------------------------------------------------------- *
@@ -82,21 +110,53 @@ export {
   COST_TERMS_BY_ID,
   DECLARED_TERM_IDS,
   IMPLEMENTED_TERM_IDS,
+  STARVATION_HALF_COST_S,
+  addedStopCount,
   assessDirectionReversal,
+  compareRoutes,
   costTerm,
+  crowdingTerm,
+  demandForecastOf,
+  demandMisalignmentM,
+  detourPassengerSeconds,
+  detourPenaltyTerm,
   directionReversalTerm,
   directionReversals,
   distanceTravelledTerm,
+  existingCallDelaySeconds,
+  existingCallDelayTerm,
   isDeclaredTerm,
   isImplementedTerm,
+  loadFactorTerm,
   marginalDistanceM,
+  oldestDelayedCallAgeS,
   pathLengthM,
+  predictedDemandTerm,
+  resultingLoadFactor,
+  rideTimeSeconds,
+  rideTimeTerm,
+  routeComparison,
+  routeEndHeightM,
   routeStartHeightM,
+  spareSeatsOnArrival,
+  starvationSeconds,
+  starvationTerm,
+  stopCountTerm,
+  unservedQueueFraction,
   waitTimeSeconds,
   waitTimeTerm,
+  zoneAffinityTerm,
+  zoneDeviationM,
+  // Disambiguated against `policies/zoning.ts` — see this file's header.
+  zoneFloorIdsFor as observedZoneFloorIdsFor,
 } from './terms/index.js';
 
-export type { ReversalAssessment } from './terms/index.js';
+export type {
+  DelayedStop,
+  ExpectedDemandByFloor,
+  ReversalAssessment,
+  RouteComparison,
+} from './terms/index.js';
 
 /* -------------------------------------------------------------------------- *
  * The seven-stage lifecycle
@@ -193,3 +253,106 @@ export type {
   TermContext,
   TermNormalization,
 } from './types.js';
+
+/* -------------------------------------------------------------------------- *
+ * policies/ — Phase 5. What the aggregation, the capacity edge, operational
+ * zoning and pre-positioning add on top of the one engine. Four behaviours, one
+ * new tunable pair (`auction.*`); the other three make declared-but-inert
+ * parameters bite rather than inventing knobs. Nothing here reads a profile id
+ * (invariant 7) and `policies.test.ts` greps the directory to prove it.
+ *
+ * Read `policies/index.ts` § *Nothing in this directory is reachable from
+ * `runSimulation` yet* before quoting any of it in a run-level result.
+ * -------------------------------------------------------------------------- */
+
+export {
+  AuctionDispatchPolicy,
+  CapacityReassignmentMonitor,
+  MAX_AUCTION_ROUNDS,
+  POLICY_DEFAULTS,
+  POLICY_PARAMETERS,
+  POLICY_PARAMETER_IDS,
+  WITHDRAWAL_REASONS,
+  bandRange,
+  bidsFrom,
+  carSnapshotsById,
+  consideredCalls,
+  contiguousZones,
+  createAuctionPolicy,
+  fixedForecast,
+  groupContext,
+  hasMigrations,
+  heldBy,
+  loadCrossings,
+  movesOf,
+  observedContext,
+  parkingFloorIds,
+  peakReassignments,
+  policyParameter,
+  prepositionPlan,
+  repositionContextFor,
+  resolveAuctionConfig,
+  resolvePrepositionContext,
+  runAuction,
+  withLandingCounts,
+  zoneAssignment,
+  zoneFloorIdsFor,
+} from './policies/index.js';
+
+export type {
+  AuctionOutcome,
+  AuctionPolicyOptions,
+  AuctionProfileSource,
+  AuctionStageConfig,
+  Bid,
+  BidSource,
+  CallContextSource,
+  CallMigration,
+  CapacityReassignmentResult,
+  DemandForecastSource,
+  GroupContextOptions,
+  GroupObservationContext,
+  LoadCrossing,
+  OperationalZone,
+  ParkableGroup,
+  PrepositionContext,
+  ReassignableGroup,
+  ResolvedAuctionConfig,
+  ResolvedAuctionStage,
+  ResolvedPrepositionContext,
+  Withdrawal,
+  WithdrawalReason,
+  ZoneAssignment,
+} from './policies/index.js';
+
+/* -------------------------------------------------------------------------- *
+ * predictor/ — Phase 5. The learned arrival model behind
+ * `parkingStrategy: predicted-demand` and the `predictedDemand` cost term.
+ *
+ * It cannot see the future because it cannot reach the trace: every import in
+ * this directory is type-only and none leaves it, so at runtime the emitted
+ * module imports nothing outside `predictor/`. Information enters through
+ * `observe(floor, direction, at)` and no other door, the estimator folds
+ * completed buckets only, and a read for a time before the last observation
+ * throws. `causality.test.ts` reads this module's own source to keep it that way.
+ * -------------------------------------------------------------------------- */
+
+export {
+  PREDICTOR_DEFAULTS,
+  PREDICTOR_PARAMETERS,
+  PREDICTOR_PARAMETER_IDS,
+  PredictorError,
+  createArrivalModel,
+  predictorParameter,
+  predictorParameterValue,
+  resolvePredictorConfig,
+  tunablePredictorPathsOf,
+} from './predictor/index.js';
+
+export type {
+  ArrivalModel,
+  ArrivalModelOptions,
+  DemandForecast,
+  PredictorIdleSource,
+  ResolvedPredictorConfig,
+} from './predictor/index.js';

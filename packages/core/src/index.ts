@@ -6,10 +6,33 @@
  *
  * Phase 0 lands three modules — `kernel/`, `random/` and `config/`. Phase 1 adds
  * `physics/motion`, `physics/doors` and `model/` (including `model/car/`). Phase 2 completes
- * the loop with `traffic/`, `dispatch/`, `metrics/`, `analytical/` and `sim/`. Their names are
+ * the loop with `traffic/`, `dispatch/`, `metrics/`, `analytical/` and `sim/`. Phase 5 widens
+ * `dispatch/` rather than adding a module: nine more cost terms, plus `dispatch/policies/`
+ * (aggregation, the stage-5 capacity monitor, operational zoning, stage-7 pre-positioning) and
+ * `dispatch/predictor/` (the learned arrival model). Their names are
  * re-exported explicitly rather than with `export *`, so that adding an export to a
  * submodule is a deliberate act of widening the package's public surface and a future
  * name collision between modules is a compile error here rather than a silent shadow.
+ *
+ * ## Phase 5: what is exported, and what it can and cannot be used to measure
+ *
+ * Everything Phase 5 built is reachable from this barrel. Four of its behaviours are still not
+ * reachable from `runSimulation`, and that distinction is the single most important thing to
+ * carry out of this phase:
+ *
+ * | behaviour | on this barrel? | runs inside `runSimulation`? |
+ * |---|---|---|
+ * | the nine new cost terms | yes | yes — except `zoneAffinity` and `predictedDemand`, which evaluate to `0` for every car |
+ * | {@link AuctionDispatchPolicy} / {@link runAuction} | yes | **no** — `SimulationConfig` has no policy hook |
+ * | {@link CapacityReassignmentMonitor} | yes | **no** — `sim/` never calls `policy.reconsider` |
+ * | {@link prepositionPlan} / {@link createArrivalModel} | yes | **no** — `Simulation.#park` supplies no forecast |
+ * | {@link groupContext} | yes | **no** — `Simulation.#dispatchBank` passes waiting counts only |
+ *
+ * The four obstructions are enumerated with their one-line fixes in `dispatch/policies/index.ts`
+ * as gaps 2 to 5. An optimizer that reads {@link POLICY_PARAMETERS} or
+ * {@link PREDICTOR_PARAMETERS} off this barrel and searches them against a `runSimulation`
+ * objective will measure exactly zero on those dimensions until the gaps close. Export is not
+ * reachability, and the Phase 5 benchmark measured the difference rather than assuming it.
  *
  * ## The one deliberate name collision
  *
@@ -434,6 +457,14 @@ export type {
  * sum. There is no `NearestCarDispatcher` and nothing here reads a profile id
  * (invariant 7); `policy.test.ts` proves it by scrambling every id and asserting
  * no decision moves. A new strategy is a config entry, never a new class.
+ *
+ * Phase 5 completed the twelve-term library and added `policies/` and
+ * `predictor/` beneath this module. It added exactly one new tunable pair
+ * (`auction.*`); the rest of Phase 5 is weight vectors in
+ * `data/dispatcher-profiles.json` and existing categorical parameters made to
+ * bite. `zoneFloorIdsFor` from `terms/observation.ts` arrives here as
+ * `observedZoneFloorIdsFor` — see `dispatch/index.ts` for why the other one
+ * keeps the bare name.
  * -------------------------------------------------------------------------- */
 
 export {
@@ -455,7 +486,9 @@ export {
   NORMALIZATION_SCALE_IDS,
   PARK_CALL_HORIZON,
   REPOSITION_REASONS,
+  STARVATION_HALF_COST_S,
   WeightedCostDispatchPolicy,
+  addedStopCount,
   answerDecisionFor,
   assessDirectionReversal,
   assignmentWidth,
@@ -463,42 +496,66 @@ export {
   bestScore,
   boundedNormalize,
   clearsHysteresis,
+  compareRoutes,
   compareScores,
   costRequestFor,
   costTerm,
   createDispatchPolicy,
+  crowdingTerm,
+  demandForecastOf,
+  demandMisalignmentM,
+  detourPassengerSeconds,
+  detourPenaltyTerm,
   directionReversalTerm,
   directionReversals,
   dispatchParameter,
   dispatchParameterValue,
   distanceTravelledTerm,
+  existingCallDelaySeconds,
+  existingCallDelayTerm,
   expectedResponseSeconds,
   filterEligible,
   isCommitted,
   isDeclaredTerm,
   isImplementedTerm,
   landingShare,
+  loadFactorTerm,
   marginalDistanceM,
   moveSeconds,
   newLifecycle,
   normalizeTerm,
   observationFor,
+  observedZoneFloorIdsFor,
+  oldestDelayedCallAgeS,
   pathLengthM,
+  predictedDemandTerm,
   rankScores,
   repositionDecisionFor,
   requestForCar,
   requestForShare,
   resolveDispatchConfig,
   resolveNormalization,
+  resultingLoadFactor,
+  rideTimeSeconds,
+  rideTimeTerm,
+  routeComparison,
+  routeEndHeightM,
   routeStartHeightM,
   saturatingNormalize,
   scoreCar,
   scoreableAt,
+  spareSeatsOnArrival,
+  starvationSeconds,
+  starvationTerm,
+  stopCountTerm,
   tunablePathsOf,
+  unservedQueueFraction,
   waitTimeSeconds,
   waitTimeTerm,
   withBypassOverridden,
   withLifecycle,
+  zoneAffinityTerm,
+  zoneDeviationM,
 } from './dispatch/index.js';
 
 export type {
@@ -511,6 +568,7 @@ export type {
   CostTermDefinition,
   DecisionOutcome,
   DecisionReason,
+  DelayedStop,
   DispatchCall,
   DispatchContext,
   DispatchDecision,
@@ -522,6 +580,7 @@ export type {
   DispatcherProfileSource,
   EligibilityStageConfig,
   EligibilityVerdict,
+  ExpectedDemandByFloor,
   HardConstraintId,
   IneligibilityReason,
   NormalizationMode,
@@ -537,10 +596,115 @@ export type {
   ResolvedIdleStage,
   ResolvedNormalization,
   ReversalAssessment,
+  RouteComparison,
   SaturatingNormalization,
   ScoreBreakdown,
   TermContext,
   TermNormalization,
+} from './dispatch/index.js';
+
+/* -------------------------------------------------------------------------- *
+ * dispatch/policies — Phase 5. What changes when you change *who aggregates*
+ * rather than *what is aggregated*: contract-net bidding beside the central
+ * scorer (so the agent-autonomy hypothesis is benchmarked rather than assumed),
+ * the load-sensor edge that triggers stage-5 migration, operational zoning —
+ * the third kind, distinct from service and access zoning — and stage 7's
+ * pre-positioning plan. All four reuse the term library and the seven stages
+ * unchanged; none reads a profile id (invariant 7).
+ * -------------------------------------------------------------------------- */
+
+export {
+  AuctionDispatchPolicy,
+  CapacityReassignmentMonitor,
+  MAX_AUCTION_ROUNDS,
+  POLICY_DEFAULTS,
+  POLICY_PARAMETERS,
+  POLICY_PARAMETER_IDS,
+  WITHDRAWAL_REASONS,
+  bandRange,
+  bidsFrom,
+  carSnapshotsById,
+  consideredCalls,
+  contiguousZones,
+  createAuctionPolicy,
+  fixedForecast,
+  groupContext,
+  hasMigrations,
+  heldBy,
+  loadCrossings,
+  movesOf,
+  observedContext,
+  parkingFloorIds,
+  peakReassignments,
+  policyParameter,
+  prepositionPlan,
+  repositionContextFor,
+  resolveAuctionConfig,
+  resolvePrepositionContext,
+  runAuction,
+  withLandingCounts,
+  zoneAssignment,
+  zoneFloorIdsFor,
+} from './dispatch/index.js';
+
+export type {
+  AuctionOutcome,
+  AuctionPolicyOptions,
+  AuctionProfileSource,
+  AuctionStageConfig,
+  Bid,
+  BidSource,
+  CallContextSource,
+  CallMigration,
+  CapacityReassignmentResult,
+  DemandForecastSource,
+  GroupContextOptions,
+  GroupObservationContext,
+  LoadCrossing,
+  OperationalZone,
+  ParkableGroup,
+  PrepositionContext,
+  ReassignableGroup,
+  ResolvedAuctionConfig,
+  ResolvedAuctionStage,
+  ResolvedPrepositionContext,
+  Withdrawal,
+  WithdrawalReason,
+  ZoneAssignment,
+} from './dispatch/index.js';
+
+/* -------------------------------------------------------------------------- *
+ * dispatch/predictor — Phase 5. The learned per-floor, per-direction,
+ * per-time-of-day arrival model that `parkingStrategy: predicted-demand` and the
+ * `predictedDemand` cost term read.
+ *
+ * It is built so that peeking is unavailable rather than merely forbidden: every
+ * import in that directory is type-only and none leaves it, so the emitted module
+ * cannot reach `traffic/`, the generator or the kernel. Facts enter through
+ * `observe(floor, direction, at)`; the estimator folds *completed* buckets only,
+ * and a read for a time earlier than the last observation throws rather than
+ * quietly answering about a bucket that has since advanced. A predictor with the
+ * trace is an oracle, and an oracle anticipates nothing (invariants 2, 3).
+ * -------------------------------------------------------------------------- */
+
+export {
+  PREDICTOR_DEFAULTS,
+  PREDICTOR_PARAMETERS,
+  PREDICTOR_PARAMETER_IDS,
+  PredictorError,
+  createArrivalModel,
+  predictorParameter,
+  predictorParameterValue,
+  resolvePredictorConfig,
+  tunablePredictorPathsOf,
+} from './dispatch/index.js';
+
+export type {
+  ArrivalModel,
+  ArrivalModelOptions,
+  DemandForecast,
+  PredictorIdleSource,
+  ResolvedPredictorConfig,
 } from './dispatch/index.js';
 
 /* -------------------------------------------------------------------------- *

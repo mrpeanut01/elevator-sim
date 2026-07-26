@@ -41,18 +41,39 @@
     },
     {
       "id": "energy-aware",
+      "$comment": "The energy proxy is stopCount plus distanceTravelled, and the cheapest joule is the one an empty car never spends: parkingStrategy stay is the whole of this profile's stage 7. A longer adaptive dwell trades a little wait for fewer stops, which is the same trade in the door machine.",
       "name": "Energy aware",
-      "weights": { "waitTime": 0.6, "stopCount": 0.3, "distanceTravelled": 0.1 }
+      "weights": { "waitTime": 0.6, "stopCount": 0.3, "distanceTravelled": 0.1 },
+      "answer": { "dwellPolicy": "adaptive", "dwellAdaptationGain": 0.2, "maxDwellS": 10 },
+      "idle": { "parkingStrategy": "stay" }
     },
     {
       "id": "fairness-first",
+      "$comment": "Weighting starvation is only half of fairness; the other half is keeping a call movable for as long as possible, so this profile takes the latest commitment point and the largest reassignment budget of any profile here, and turns on the sole-eligible-car override so a floor served by one shaft cannot be skipped indefinitely on load.",
       "name": "Fairness first",
-      "weights": { "waitTime": 0.5, "starvation": 0.5 }
+      "weights": { "waitTime": 0.5, "starvation": 0.5 },
+      "dispatch": {
+        "reassignmentPolicy": "until-commitment",
+        "commitmentPoint": "on-door-open",
+        "reassignmentHysteresisS": 2.0,
+        "maxReassignmentsPerCall": 4
+      },
+      "answer": { "allowBypassIfSoleEligibleCar": true }
     },
     {
       "id": "capacity-aware",
+      "$comment": "The profile the capacity mechanisms are named for, so it declares all three: split-demand for parallel service at a heavy landing, until-commitment reassignment so a car crossing its bypass threshold hands its uncommitted calls on, and the sole-eligible-car override so the guard against a starved floor is on while it does.",
       "name": "Capacity aware",
-      "weights": { "waitTime": 0.7, "loadFactor": 0.2, "crowding": 0.1 }
+      "weights": { "waitTime": 0.7, "loadFactor": 0.2, "crowding": 0.1 },
+      "dispatch": {
+        "assignmentMode": "split-demand",
+        "splitThresholdPassengers": 12,
+        "reassignmentPolicy": "until-commitment",
+        "commitmentPoint": "on-deceleration",
+        "reassignmentHysteresisS": 3.0,
+        "maxReassignmentsPerCall": 2
+      },
+      "answer": { "allowBypassIfSoleEligibleCar": true }
     },
     {
       "id": "predictive-balanced",
@@ -94,6 +115,29 @@
         "repositionEnergyWeight": 0.2,
         "predictorHorizonS": 300
       }
+    },
+    {
+      "id": "auction",
+      "$comment": "Contract-net bidding: every car prices the contract from its own estimateCost() and the group allocates from the bids. ONE profile, deliberately, because the aggregation is auction.rounds and config/schema.ts has no auction section yet — so a second profile could not carry a different aggregation, it would resolve to rounds = 1 and be this profile under another name. Both arms of the comparison are therefore built from THIS profile: createAuctionPolicy(profile) is rounds = 1, the sealed-bid single round, which IS the centralized argmin over the same weight vector and is the control arm; createAuctionPolicy(profile, { auction: { rounds: 3, reserveMarginalDelayS: 25 } }) is the contract net, in which a provisional winner may take its bid back on its own reserve price or because winning would push it over its own hall-call bypass threshold while another bidder stays under. Same weights, same seven stages, same everything except who aggregates — which is what makes a paired-t interval between them an interval on the aggregation. Comparing two different profiles instead would measure whatever stage settings they differed in and exactly zero aggregation, and a benchmark of sealed-bid against the weighted-cost engine must return exactly zero. reassignmentPolicy is until-commitment on both arms: a car that may hand a contract back must also be allowed to lose one, and a stage-5 setting that differed between the arms would be the confound.",
+      "name": "Contract-net auction",
+      "role": "auction",
+      "weights": { "waitTime": 1.0, "existingCallDelay": 0.4, "loadFactor": 0.3 },
+      "dispatch": {
+        "assignmentTiming": "immediate",
+        "reassignmentPolicy": "until-commitment",
+        "commitmentPoint": "on-deceleration",
+        "reassignmentHysteresisS": 3.0,
+        "maxReassignmentsPerCall": 3
+      }
+    },
+    {
+      "id": "zoned-uppeak",
+      "$comment": "Operational zoning — the third kind, a dispatcher strategy and not building fabric. The bank is partitioned into one contiguous band per in-service car; zoneAffinity prices a car's deviation from its band. The partition is computed per decision by the dispatcher, never stored on a car: a car that owned its zone could not be re-zoned when a neighbour goes out of service. Split-demand at ten is the up-peak half — a lobby landing above one carload is two cars, not one car twice. parkingStrategy is stay, NOT zone-center, and that is a measured decision rather than a default: Simulation.#park builds its RepositionContext from entranceFloorIds alone, so zone-center gets no partition, every car computes the same shaft median, and on midtown-office at DISPATCH_DEFAULTS all four cars are sent to floor 10 — the outcome zoning.ts itself calls worse than not parking. Through prepositionPlan, which supplies the partition, the same bank gets one target per band, 2/7/12/17, and three cars move (the fourth is inside its own deadband). When #park passes repositionContextFor(car, resolvePrepositionContext(...)), set parkingStrategy back to zone-center with repositionThresholdS 2 and repositionEnergyWeight 0.1; policies.test.ts asserts today that no shipped profile sends two cars of a bank to one floor under the context the runner actually supplies.",
+      "name": "Operational zoning, up-peak",
+      "role": "zoning",
+      "weights": { "waitTime": 0.7, "zoneAffinity": 0.3 },
+      "dispatch": { "assignmentMode": "split-demand", "splitThresholdPassengers": 10 },
+      "idle": { "parkingStrategy": "stay" }
     }
   ],
   "patternSwitching": {

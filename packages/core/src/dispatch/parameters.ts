@@ -121,7 +121,14 @@ export const DISPATCH_DEFAULTS = Object.freeze({
  * The schema
  * -------------------------------------------------------------------------- */
 
-/** One `weights.<termId>` row per implemented term, in registry order. */
+/**
+ * One `weights.<termId>` row per implemented term, in registry order.
+ *
+ * `activeWhen` is carried through from the term's own definition, never decided here: a term
+ * knows what it needs to be able to change a decision, and a condition written in this file
+ * would have to name terms, which invariant 7 forbids. `rideTime` is the term that has one —
+ * it can only be priced when the call carries a destination.
+ */
 const WEIGHT_PARAMETERS: readonly DispatchParameterSpec[] = COST_TERMS.map((term) => ({
   id: `weights.${term.id}`,
   type: 'continuous' as const,
@@ -129,6 +136,7 @@ const WEIGHT_PARAMETERS: readonly DispatchParameterSpec[] = COST_TERMS.map((term
   scale: 'linear' as const,
   default: 0,
   description: `Weight on the normalized ${term.id} term — ${term.measures.toLowerCase()}${term.unit === '' ? '' : `, raw unit ${term.unit}`}. Zero removes the term from the sum entirely.`,
+  ...(term.activeWhen === undefined ? {} : { activeWhen: term.activeWhen }),
 }));
 
 /**

@@ -1,0 +1,233 @@
+/**
+ * The predictor's self-describing parameter schema — CLAUDE.md invariant 8.
+ *
+ * `dispatch/parameters.ts` records why these six were not declared in Phase 2:
+ *
+ * > `idle.predictorHorizonS`, `idle.predictorLearningRate` — declared by **nobody, yet**.
+ * > *Phase 5 owns the learned arrival model. Nothing in Phase 2 reads either, so declaring them
+ * > would violate rule 2 above and send the optimizer hunting a dimension with no effect. They
+ * > land with the predictor.*
+ *
+ * This is that landing. The same two rules apply and are asserted in both directions by
+ * `parameters.test.ts`:
+ *
+ * 1. **Nothing hidden.** Every field of {@link ResolvedPredictorConfig} is declared. A knob the
+ *    model reads but does not declare is invisible to a Phase 7 optimizer, which will then
+ *    report a tuned winner that is only optimal at whatever the hidden value happened to be.
+ * 2. **Nothing spurious.** Every declared parameter resolves to a field the model actually
+ *    reads. Each evaluation costs 50–200 replications, and a noisy objective will happily
+ *    attribute a difference to a dimension that does nothing.
+ *
+ * ## Why the ranges cannot be sampled into an invalid combination
+ *
+ * A generic optimizer samples each row independently, so any constraint *between* two rows is a
+ * constraint it will violate. There is deliberately none here: `predictorBucketWidthS` need not
+ * divide `predictorCycleS`, because the last bucket of a cycle is allowed to be short and is
+ * priced at its own width. The alternative — rejecting an indivisible pair — would make a large
+ * part of the declared box throw, and an optimizer cannot tell a throw from a bad score.
+ */
+
+import type { DispatchParameterSpec } from '../types.js';
+
+import type { ResolvedPredictorConfig } from './types.js';
+
+/* -------------------------------------------------------------------------- *
+ * Defaults
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Every predictor default, in one frozen object.
+ *
+ * The single source of truth: {@link PREDICTOR_PARAMETERS} quotes these rather than repeating
+ * the numbers, and `resolvePredictorConfig` applies them, so the declared schema and the
+ * resolver cannot disagree.
+ *
+ * Unlike `DISPATCH_DEFAULTS`, these do **not** describe the simplest thing that works — an
+ * inert predictor is not a predictor, and a model that has to be configured before it forecasts
+ * anything would make `parkingStrategy: predicted-demand` report `no-forecast` by default. They
+ * describe a working five-minute-resolution daily model, and the profile that wants a different
+ * one says so.
+ */
+export const PREDICTOR_DEFAULTS = Object.freeze({
+  /**
+   * 300 s, the value `predictive-balanced` already authors in
+   * `data/dispatcher-profiles.json → idle.predictorHorizonS`.
+   *
+   * Also the right order of magnitude on its own terms: a car repositioning across a 20-floor
+   * shaft takes tens of seconds, so a horizon shorter than a minute forecasts demand the car
+   * cannot reach in time, and one much longer than five minutes averages over a demand pattern
+   * that has moved on.
+   */
+  predictorHorizonS: 300,
+  /**
+   * 0.3 — the newest completed bucket gets 30% of the weight, giving an effective memory of
+   * about `1 / 0.3` ≈ 3.3 buckets.
+   *
+   * Deliberately fast. A `rise-and-fall` replication is 30 minutes
+   * (docs/03-traffic-and-statistics.md § The independence condition), which at the default
+   * bucket width is **five completed buckets**. A textbook 0.05 would leave the prior in charge
+   * for the whole run, and a predictor that has not moved by the end of the measurement window
+   * cannot be shown to help.
+   */
+  predictorLearningRate: 0.3,
+  /**
+   * 300 s — the five-minute interval all elevator demand figures are quoted in (CIBSE Guide D
+   * up-peak percentages, `data/traffic-profiles.json`), so one bucket is one canonical demand
+   * measurement.
+   */
+  predictorBucketWidthS: 300,
+  /**
+   * 86 400 s. Demand in a building repeats daily: the morning up-peak, the lunch two-way peak
+   * and the evening down-peak are properties of the hour, which is what makes a *time-of-day*
+   * model worth learning at all rather than a single running rate.
+   */
+  predictorCycleS: 86_400,
+  /**
+   * 0.005 arrivals/s per (floor, direction) — about 18 per hour, a plausible off-peak rate for
+   * one landing.
+   *
+   * The **level** is close to inert by construction: a uniform prior ranks no floor above
+   * another, so it cancels out of every comparison the repositioning stage makes, and the
+   * `predictedDemand` term normalizes before weighting. What it must not be is zero — a zero
+   * prior makes the cold-start forecast zero everywhere, which is indistinguishable from "no
+   * demand anywhere" and would park cars by floor-id order for the first minutes of every run.
+   */
+  predictorPriorRatePerS: 0.005,
+  /**
+   * 2 pseudo-observations. Two completed buckets of real evidence at a floor outweigh the prior
+   * there.
+   *
+   * The knob that decides how fast the model is allowed to believe itself. Zero trusts the
+   * first bucket completely, which on a landing that saw one passenger in five minutes is a
+   * rate estimate with a 100% coefficient of variation; large numbers hold the prior past the
+   * end of a 30-minute replication and make the model inert.
+   */
+  predictorPriorStrength: 2,
+} as const);
+
+/* -------------------------------------------------------------------------- *
+ * The schema
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The schema for every predictor tunable.
+ *
+ * `id` is the dotted path in `data/dispatcher-profiles.json`, so a tuned winner is written back
+ * as a profile without translation — **for two of the six today**. `dispatcherProfileSchema`
+ * rejects the other four as unrecognized keys under `idle`, so an optimizer can sample all six
+ * through {@link PredictorIdleSource} and persist only `predictorHorizonS` and
+ * `predictorLearningRate`. That is invariant 8 met on 2 of 6 dimensions, and prose has already
+ * failed to close it once, so `parameters.test.ts` now runs every id through the real schema: one
+ * test pins exactly which parse and which do not, and a second is marked `it.fails` and turns the
+ * build red the moment the four rows land. See {@link PredictorIdleSource} for the rows the config
+ * layer owes; this module owns neither file.
+ *
+ * Every row is `activeWhen: { 'idle.parkingStrategy': ['predicted-demand'] }` **except** the
+ * horizon and learning rate, which the `predictedDemand` cost term reads regardless of where
+ * cars park. A forecast informs two independent mechanisms, and marking the shared knobs
+ * conditional on the parking strategy would tell an optimizer to stop tuning them for a
+ * profile that scores on `predictedDemand` and parks with `stay`.
+ */
+export const PREDICTOR_PARAMETERS: readonly DispatchParameterSpec[] = Object.freeze([
+  {
+    id: 'idle.predictorHorizonS',
+    type: 'continuous',
+    range: [30, 3600],
+    scale: 'log',
+    default: PREDICTOR_DEFAULTS.predictorHorizonS,
+    unit: 's',
+    description:
+      'How far ahead the demand forecast looks, seconds. The forecast is an expected arrival count over this window, so the horizon sets what "likely to appear soon" means: short enough that the estimate is about the demand a repositioning car can still get in front of, long enough that a car has time to travel there. Log scale because the interesting range spans two orders of magnitude.',
+  },
+  {
+    id: 'idle.predictorLearningRate',
+    type: 'continuous',
+    range: [0.01, 1],
+    scale: 'log',
+    default: PREDICTOR_DEFAULTS.predictorLearningRate,
+    description:
+      'Weight the exponentially-weighted moving average puts on the newest completed bucket, in (0, 1]. Effective memory is about 1 / rate buckets, and it also caps how much evidence any one level of the model is allowed to accumulate, so a low rate is both slow to adapt and slow to trust itself. 1.0 keeps only the most recent bucket; 0 would be a model that can never learn and is rejected rather than accepted as an inert predictor.',
+  },
+  {
+    id: 'idle.predictorBucketWidthS',
+    type: 'continuous',
+    range: [30, 1800],
+    scale: 'log',
+    default: PREDICTOR_DEFAULTS.predictorBucketWidthS,
+    unit: 's',
+    description:
+      'Width of one time-of-day bucket, seconds — the resolution of the learned pattern and the exposure window a rate estimate is computed over. Narrow buckets resolve a sharper peak but each holds fewer arrivals, so the estimate is noisier: a landing seeing 18 arrivals an hour puts 1.5 in a five-minute bucket and 0.25 in a one-minute bucket. Need not divide the cycle; a short final bucket is priced at its own width.',
+  },
+  {
+    id: 'idle.predictorCycleS',
+    type: 'continuous',
+    range: [600, 86_400],
+    scale: 'log',
+    default: PREDICTOR_DEFAULTS.predictorCycleS,
+    unit: 's',
+    description:
+      'Period over which the time-of-day pattern is assumed to repeat, seconds. A day for an office; a shift length for a building whose demand turns over faster than that. It is what makes the model per-time-of-day rather than a single running rate. Inert only while the cycle is longer than the whole span the model is observed and queried over, which at the 86 400 s default is every replication this project runs: no bucket-of-day recurs, so the per-bucket cells never accumulate and the model leans on its per-landing estimate. Below that span it is live, and not marginally — on 30 minutes of observations a 600 s cycle and the default differ by about 30% in the same forecast, because a bucket-of-day now comes round several times inside one replication. So it is worth searching exactly when the cycle is shorter than the run, and searching it against a fixed run length is searching a real dimension rather than a plateau. activeWhen cannot express the condition, because it is the run length rather than another parameter.',
+  },
+  {
+    id: 'idle.predictorPriorRatePerS',
+    type: 'continuous',
+    range: [0, 0.1],
+    scale: 'linear',
+    default: PREDICTOR_DEFAULTS.predictorPriorRatePerS,
+    unit: 'arrivals/s',
+    description:
+      'Prior arrival rate per (floor, direction) before any evidence, arrivals per second. Uniform, so it ranks no floor above another and cancels out of the comparisons the repositioning stage makes; its job is to keep the cold-start forecast positive and finite rather than zero everywhere, which would be read as "no demand anywhere". An explicit per-floor prior overrides it.',
+  },
+  {
+    id: 'idle.predictorPriorStrength',
+    type: 'continuous',
+    range: [0, 20],
+    scale: 'linear',
+    default: PREDICTOR_DEFAULTS.predictorPriorStrength,
+    description:
+      'Strength of the prior, in pseudo-observations of a completed bucket, and the same weight used at every level of the backoff chain. It buys the cold start: with strength 2 a floor needs two completed buckets of evidence before it outweighs the prior, and until then a single lucky passenger cannot make one landing look like the busiest in the building. 0 trusts the first bucket completely; large values hold the prior past the end of a 30-minute replication.',
+  },
+] as const satisfies readonly DispatchParameterSpec[]);
+
+/** Every declared id, for a quick membership test. */
+export const PREDICTOR_PARAMETER_IDS: ReadonlySet<string> = new Set(
+  PREDICTOR_PARAMETERS.map((parameter) => parameter.id),
+);
+
+/** A declared parameter by id. */
+export function predictorParameter(id: string): DispatchParameterSpec | undefined {
+  return PREDICTOR_PARAMETERS.find((parameter) => parameter.id === id);
+}
+
+/* -------------------------------------------------------------------------- *
+ * Reading a parameter back out of a resolved config
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The value a resolved config holds for a declared parameter id, or `undefined` if the id is
+ * not one of the declared ones.
+ *
+ * What makes invariant 8 checkable rather than aspirational: an optimizer reads back what it
+ * sampled, and `parameters.test.ts` proves a probe value written into an `idle` section reaches
+ * the field the model reads.
+ */
+export function predictorParameterValue(
+  config: ResolvedPredictorConfig,
+  id: string,
+): number | undefined {
+  if (!id.startsWith('idle.')) return undefined;
+  const key = id.slice('idle.'.length);
+  if (!Object.hasOwn(config, key)) return undefined;
+  const value = (config as unknown as Readonly<Record<string, unknown>>)[key];
+  return typeof value === 'number' ? value : undefined;
+}
+
+/**
+ * Every `idle.<key>` path the resolved config exposes as a tunable, in a stable order.
+ *
+ * The counterpart of {@link predictorParameterValue}: it enumerates what the model reads so a
+ * test can assert {@link PREDICTOR_PARAMETERS} covers all of it and nothing else.
+ */
+export function tunablePredictorPathsOf(config: ResolvedPredictorConfig): readonly string[] {
+  return Object.freeze(Object.keys(config).map((key) => `idle.${key}`));
+}

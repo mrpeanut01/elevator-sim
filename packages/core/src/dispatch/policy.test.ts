@@ -21,7 +21,7 @@ import { Passenger } from '../model/passenger.js';
 import { hallCallId, type Direction, type HallCall } from '../model/types.js';
 
 import { createDispatchPolicy, resolveDispatchConfig } from './policy.js';
-import { DECLARED_TERM_IDS } from './terms/index.js';
+import { DECLARED_TERM_IDS, IMPLEMENTED_TERM_IDS, isDeclaredTerm } from './terms/index.js';
 import {
   DispatchError,
   type DispatchCall,
@@ -191,20 +191,26 @@ describe('every dispatcher in data/dispatcher-profiles.json', () => {
     }
   });
 
-  it('carries weights on terms no phase has implemented instead of rejecting them', () => {
-    // `predictive-balanced` weights eleven of the twelve declared terms; Phase 2 implements
-    // three. Rejecting it would make "load every profile" unmeetable until Phase 5.
+  it('resolves every weight a profile authors, in registry order, with nothing left pending', () => {
+    // This test pinned the pre-Phase-5 state, where `predictive-balanced` weighted eleven of the
+    // twelve declared terms and only three were implemented, so eight landed in `pendingWeights`.
+    // All twelve are implemented now: every authored weight must resolve, and a weight the engine
+    // silently parked would be a profile scoring less than it says it does.
     const predictive = file.profiles.find((profile) => profile.id === 'predictive-balanced');
     expect(predictive).toBeDefined();
 
     const config = resolveDispatchConfig(predictive as DispatcherProfile);
-    expect([...config.weights.keys()]).toEqual(['waitTime', 'distanceTravelled', 'directionReversal']);
-    expect([...config.pendingWeights.keys()]).toEqual(
-      expect.arrayContaining(['rideTime', 'loadFactor', 'starvation', 'predictedDemand']),
+    const authored = Object.keys(predictive?.weights ?? {});
+    expect(config.pendingWeights.size).toBe(0);
+    expect(config.weights.size).toBe(authored.length);
+    // Registry order, not the profile's key order: two profiles weighting the same terms must
+    // accumulate them in the same sequence to get bit-identical costs.
+    expect([...config.weights.keys()]).toEqual(
+      IMPLEMENTED_TERM_IDS.filter((id) => authored.includes(id)),
     );
-    expect(config.weights.size + config.pendingWeights.size).toBe(
-      Object.keys(predictive?.weights ?? {}).length,
-    );
+    for (const [id, weight] of config.weights) {
+      expect(weight, id).toBe((predictive?.weights as Record<string, number>)[id]);
+    }
   });
 
   it('resolves each profile’s declared stage settings rather than silently defaulting them', () => {
@@ -1093,16 +1099,28 @@ describe('resolveDispatchConfig', () => {
     ).toThrow(/waittime/);
   });
 
-  it('still carries a weight the library declares but no phase implements', () => {
-    // The distinction that makes the rejection safe: `starvation` is real and pending,
-    // `waitTiem` is a typo. Rejecting both would make `predictive-balanced` unloadable.
+  it('keeps the distinction that makes rejecting a typo safe', () => {
+    // `starvation` used to be declared-but-unimplemented and was carried in `pendingWeights`; it
+    // is implemented now, so it resolves. The distinction the rejection rests on is unchanged and
+    // is what this asserts: a *declared* id is a term and is honoured, an undeclared one is a
+    // misspelling and throws, because a weight nothing reads scores every car at zero and hands
+    // the decision to the car-id tie-break in silence.
     const config = resolveDispatchConfig({
       id: 'p',
       name: 'P',
       weights: { waitTime: 1, starvation: 0.7 },
     });
-    expect([...config.weights.keys()]).toEqual(['waitTime']);
-    expect([...config.pendingWeights.entries()]).toEqual([['starvation', 0.7]]);
+    expect([...config.weights.entries()]).toEqual([
+      ['waitTime', 1],
+      ['starvation', 0.7],
+    ]);
+    expect(config.pendingWeights.size).toBe(0);
+    expect(isDeclaredTerm('starvation')).toBe(true);
+
+    expect(() =>
+      resolveDispatchConfig({ id: 'p', name: 'P', weights: { waitTime: 1, starvatoin: 0.7 } }),
+    ).toThrow(/starvatoin/);
+    expect(isDeclaredTerm('starvatoin')).toBe(false);
   });
 
   it('rejects an engine this package does not implement', () => {

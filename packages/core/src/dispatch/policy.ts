@@ -340,7 +340,12 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
     at: SimTime,
     context?: DispatchContext | undefined,
   ): CallLifecycle {
-    const observation = observationFor(call, context?.waitingPassengers, context?.waitingMassKg);
+    const observation = observationFor(
+      call,
+      context?.waitingPassengers,
+      context?.waitingMassKg,
+      context,
+    );
 
     const existing = this.#lifecycles.get(call.id);
     if (existing !== undefined) {
@@ -389,7 +394,12 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
     at: SimTime,
     context?: DispatchContext | undefined,
   ): readonly EligibilityVerdict[] {
-    const observation = observationFor(call, context?.waitingPassengers, context?.waitingMassKg);
+    const observation = observationFor(
+      call,
+      context?.waitingPassengers,
+      context?.waitingMassKg,
+      context,
+    );
     return this.#priceLanding(call, cars, at, observation).verdicts;
   }
 
@@ -399,7 +409,12 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
     at: SimTime,
     context?: DispatchContext | undefined,
   ): readonly CarScore[] {
-    const observation = observationFor(call, context?.waitingPassengers, context?.waitingMassKg);
+    const observation = observationFor(
+      call,
+      context?.waitingPassengers,
+      context?.waitingMassKg,
+      context,
+    );
     return this.#priceLanding(call, cars, at, observation).scores;
   }
 
@@ -556,6 +571,7 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
       call,
       context?.waitingPassengers ?? lifecycle.waitingPassengers,
       context?.waitingMassKg ?? lifecycle.waitingMassKg,
+      context,
     );
     const assigned = lifecycle.carIds.length > 0;
 
