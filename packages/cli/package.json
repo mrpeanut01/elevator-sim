@@ -1,0 +1,32 @@
+{
+  "name": "@elevator-sim/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless batch entry point for simulation runs and experiment sweeps.",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "elevator-sim": "./dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "tsc -b --clean"
+  },
+  "dependencies": {
+    "@elevator-sim/core": "*",
+    "@elevator-sim/experiments": "*"
+  }
+}

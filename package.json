@@ -1,0 +1,29 @@
+{
+  "name": "elevator-sim",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A configurable elevator traffic simulator for designing and benchmarking smart dispatch algorithms.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=26"
+  },
+  "workspaces": [
+    "packages/core",
+    "packages/experiments",
+    "packages/cli"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "tsc -b --clean",
+    "rebuild": "tsc -b --clean && tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}

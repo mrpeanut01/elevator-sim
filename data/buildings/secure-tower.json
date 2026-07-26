@@ -1,0 +1,77 @@
+{
+  "$comment": "Access control x dispatch. Every above-ground floor sits inside an access zone, so the dispatcher's eligibility filter must intersect service zoning (which shafts reach the floor) with access zoning (which credentials may reach it) on every single call. The executive floor is reachable by exactly one bank and exactly two credential groups.",
+  "id": "secure-tower",
+  "name": "Secure Tower",
+  "type": "office",
+  "trafficProfile": "office-standard",
+  "floors": [
+    { "id": "G", "index": 0, "heightM": 0.0, "population": 0, "isEntrance": true, "isTransferFloor": true, "label": "Lobby (screened)" },
+    { "id": "2", "index": 2, "heightM": 5.4, "population": 44 },
+    { "id": "3", "index": 3, "heightM": 9.3, "population": 44 },
+    { "id": "4", "index": 4, "heightM": 13.2, "population": 44 },
+    { "id": "5", "index": 5, "heightM": 17.1, "population": 44 },
+    { "id": "6", "index": 6, "heightM": 21.0, "population": 44 },
+    { "id": "7", "index": 7, "heightM": 24.9, "population": 44 },
+    { "id": "8", "index": 8, "heightM": 28.8, "population": 44 },
+    { "id": "9", "index": 9, "heightM": 32.7, "population": 34 },
+    { "id": "10", "index": 10, "heightM": 36.6, "population": 34 },
+    { "id": "11", "index": 11, "heightM": 40.5, "population": 34 },
+    { "id": "12", "index": 12, "heightM": 44.4, "population": 34 },
+    { "id": "13", "index": 13, "heightM": 48.3, "population": 34 },
+    { "id": "14", "index": 14, "heightM": 52.2, "population": 34 },
+    { "id": "15", "index": 15, "heightM": 56.1, "population": 34 },
+    { "id": "16", "index": 16, "heightM": 60.0, "population": 36 },
+    { "id": "17", "index": 17, "heightM": 63.9, "population": 36 },
+    { "id": "18", "index": 18, "heightM": 67.8, "population": 36 },
+    { "id": "19", "index": 19, "heightM": 71.7, "population": 36 },
+    { "id": "20", "index": 20, "heightM": 75.6, "population": 36 },
+    { "id": "21", "index": 21, "heightM": 79.5, "population": 36 },
+    { "id": "22", "index": 22, "heightM": 83.4, "population": 36 },
+    { "id": "23", "index": 23, "heightM": 87.3, "population": 26 },
+    { "id": "24", "index": 24, "heightM": 91.2, "population": 26 },
+    { "id": "25", "index": 25, "heightM": 95.1, "population": 26 },
+    { "id": "26", "index": 26, "heightM": 99.0, "population": 26 },
+    { "id": "27", "index": 27, "heightM": 102.9, "population": 26 },
+    { "id": "28", "index": 28, "heightM": 106.8, "population": 26 },
+    { "id": "29", "index": 29, "heightM": 110.7, "population": 26 },
+    { "id": "30", "index": 30, "heightM": 114.6, "population": 12, "label": "Executive" }
+  ],
+  "totalPopulation": 992,
+  "banks": [
+    {
+      "id": "low",
+      "name": "Low bank",
+      "servesFloors": ["G", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"],
+      "cars": [
+        { "id": "A", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
+        { "id": "B", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
+        { "id": "C", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" }
+      ]
+    },
+    {
+      "id": "high",
+      "name": "High bank",
+      "servesFloors": ["G", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30"],
+      "cars": [
+        { "id": "D", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
+        { "id": "E", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
+        { "id": "F", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" }
+      ]
+    }
+  ],
+  "accessZones": [
+    { "id": "tenant-alpha", "floors": ["2", "3", "4", "5", "6", "7", "8"], "credentialGroups": ["tenant-alpha-staff", "tenant-alpha-visitor", "facilities", "security"] },
+    { "id": "tenant-bravo", "floors": ["9", "10", "11", "12", "13", "14", "15"], "credentialGroups": ["tenant-bravo-staff", "facilities", "security"] },
+    { "id": "tenant-charlie", "floors": ["16", "17", "18", "19", "20", "21", "22"], "credentialGroups": ["tenant-charlie-staff", "tenant-charlie-visitor", "facilities", "security"] },
+    { "id": "tenant-delta", "floors": ["23", "24", "25", "26", "27", "28", "29"], "credentialGroups": ["tenant-delta-staff", "facilities", "security"] },
+    { "id": "executive", "floors": ["30"], "credentialGroups": ["exec", "exec-escort"] }
+  ],
+  "notes": [
+    "Access zoning is the point of this building, not decoration: only the lobby is unrestricted. Every other floor belongs to exactly one zone, so no call can be scored without an access check, and a naive dispatcher that filters on servesFloors alone will assign cars to trips the passenger may not legally take.",
+    "The executive floor deliberately excludes the 'facilities' and 'security' groups that every tenant zone grants. There is no universal credential, so an implementation cannot short-circuit the check with a building-wide allow-list.",
+    "Tenant zones do not align with bank boundaries by accident: alpha (2-8) and bravo (9-15) are low-bank only, charlie (16-22) and delta (23-29) plus executive (30) are high-bank only. An interfloor trip such as 6 -> 18 is legal by credential only for holders of both tenant groups, and is physically impossible without a lobby transfer regardless. The eligibility filter is the intersection of service zoning and access zoning, never either one alone.",
+    "G is the only floor served by both banks, so it is flagged isTransferFloor as well as isEntrance. Every interfloor journey that crosses the low/high boundary changes cars there - 6 -> 18 is low bank 6 -> G, then high bank G -> 18 - and without the flag the first leg would terminate at G instead of joining the second, so time-to-destination would be wrong for exactly the trips this building exists to make awkward. Ground lobbies are not implicitly transfer-capable: the flag is declared here, in mixed-use-high-rise and in vertical-city rather than inferred from isEntrance.",
+    "Occupancy is deliberately low-density (26-44 per floor; secure floor plates run 18-20 m2 per person). Each bank is sized to roughly 85% of its up-peak handling capacity under office-standard (12% of population per 5 min): low bank 546 occupants against ~3 cars x 16 design passengers, high bank 446. Switching trafficProfile to office-prestige (16%) pushes both banks past capacity and should trip the saturation flag rather than produce an AWT confidence interval.",
+    "4 m/s over a 114.6 m rise is faster than a 30-storey tower strictly needs. That is intentional: adjacent-floor hops of 3.9 m never come close to rated speed, so this building is a second check on the jerk-limited motion profile alongside Garden Apartments."
+  ]
+}

@@ -86,3 +86,43 @@ dispatcher applies dynamically. See
 ```
 
 Floors not covered by any access zone are unrestricted.
+
+## Transfer floors and per-floor traffic
+
+| Field | On | Meaning |
+|---|---|---|
+| `isTransferFloor` | floor | Sky lobby. A passenger alighting here is re-injected as a new arrival on the next leg while keeping its original journey identity, so time-to-destination spans both trips. Parallels `isEntrance`. |
+| `trafficProfile` | floor, range | Overrides the building-level `trafficProfile` for arrivals originating on that floor. A mixed-use tower cannot express "office down-peak and residential up-peak overlap" with one building-level profile. |
+| `label` | range | Applies to every floor the range expands to, same meaning as `label` on an explicit floor. |
+
+Used by [`mixed-use-high-rise.json`](mixed-use-high-rise.json) (sky lobby at 31, residential
+floors on the `residential` profile) and [`vertical-city.json`](vertical-city.json) (three
+two-level sky lobbies, hotel and residential ranges).
+
+## Double-deck cars
+
+```json
+{
+  "id": "shuttle",
+  "servesFloors": ["G", "2", "26", "27"],
+  "servesFloorPairs": [["G", "2"], ["26", "27"]],
+  "cars": [
+    { "id": "S1", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0,
+      "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000,
+      "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening" }
+  ]
+}
+```
+
+| Field | On | Meaning |
+|---|---|---|
+| `doubleDeck` | car | Two decks, one floor apart, that open simultaneously. Absent means single-deck. |
+| `deckSeparationM` | car | Vertical distance between the decks. |
+| `ratedLoadLbPerDeck` | car | Per-deck rating; `ratedLoadLb` stays the whole-car rating and is twice this. Persons per deck follows the usual `ratedLoadLb / 150`. |
+| `servesFloorPairs` | bank | The floor pairs served simultaneously. First element is the lower deck, second the upper. `servesFloors` is the flattened union. |
+
+Every pair must be exactly `deckSeparationM` apart in `heightM` — a pair that is not is a
+physically impossible car, and load-time validation should reject it. Which deck a
+passenger boards is a dispatch decision whenever more than one deck can reach their
+destination, and is forced whenever the destination's local bank is anchored to a single
+lobby level.

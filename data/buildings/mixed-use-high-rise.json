@@ -1,0 +1,94 @@
+{
+  "$comment": "The main event. The sky lobby at 31 is the only connection between the ground lobby and everything above it, so office and residential demand contend for the same four shuttles. The scenario the shipped data actually encodes is the morning overlap, and it needs nothing that is not declared: office-standard drives 85% incoming up into 2-31 while the residential override on 32-60 (governingPeak down-peak-am, 75% outgoing) drives residents down through the same sky lobby, giving the shuttles a genuine two-way peak. Time-to-destination, not average waiting time, is the metric that matters here: a residential journey is two trips plus a transfer.",
+  "id": "mixed-use-high-rise",
+  "name": "Mixed-Use High-Rise",
+  "type": "mixed-use",
+  "trafficProfile": "office-standard",
+  "floors": [
+    { "id": "G", "index": 0, "heightM": 0.0, "population": 0, "isEntrance": true, "isTransferFloor": true, "label": "Ground lobby / retail level 1" },
+    { "id": "31", "index": 31, "heightM": 126.0, "population": 260, "isTransferFloor": true, "label": "Sky lobby (amenity, conference, restaurant)" }
+  ],
+  "floorRanges": [
+    {
+      "fromIndex": 2,
+      "toIndex": 5,
+      "startHeightM": 6.0,
+      "floorToFloorM": 5.0,
+      "populationPerFloor": 28,
+      "idPattern": "{index}",
+      "label": "Retail"
+    },
+    {
+      "fromIndex": 6,
+      "toIndex": 30,
+      "startHeightM": 26.0,
+      "floorToFloorM": 4.0,
+      "populationPerFloor": 46,
+      "idPattern": "{index}",
+      "label": "Office"
+    },
+    {
+      "fromIndex": 32,
+      "toIndex": 60,
+      "startHeightM": 132.0,
+      "floorToFloorM": 3.2,
+      "populationPerFloor": 26,
+      "idPattern": "{index}",
+      "label": "Residential",
+      "trafficProfile": "residential"
+    }
+  ],
+  "totalPopulation": 2276,
+  "banks": [
+    {
+      "id": "shuttle",
+      "name": "Sky lobby shuttle",
+      "servesFloors": ["G", "31"],
+      "cars": [
+        { "id": "S1", "spec": "high-speed-gearless", "ratedSpeedMps": 8.0, "ratedLoadLb": 4000, "doorType": "centerOpening" },
+        { "id": "S2", "spec": "high-speed-gearless", "ratedSpeedMps": 8.0, "ratedLoadLb": 4000, "doorType": "centerOpening" },
+        { "id": "S3", "spec": "high-speed-gearless", "ratedSpeedMps": 8.0, "ratedLoadLb": 4000, "doorType": "centerOpening" },
+        { "id": "S4", "spec": "high-speed-gearless", "ratedSpeedMps": 8.0, "ratedLoadLb": 4000, "doorType": "centerOpening" }
+      ]
+    },
+    {
+      "id": "office-local",
+      "name": "Retail and office local bank",
+      "servesFloors": ["G", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30"],
+      "cars": [
+        { "id": "O1", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
+        { "id": "O2", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
+        { "id": "O3", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
+        { "id": "O4", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
+        { "id": "O5", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
+        { "id": "O6", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
+        { "id": "O7", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
+        { "id": "O8", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" }
+      ]
+    },
+    {
+      "id": "residential-local",
+      "name": "Residential local bank",
+      "servesFloors": ["31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60"],
+      "cars": [
+        { "id": "R1", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening" },
+        { "id": "R2", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening" },
+        { "id": "R3", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening" },
+        { "id": "R4", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening" }
+      ]
+    }
+  ],
+  "accessZones": [
+    { "id": "office-tenants", "floors": ["6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30"], "credentialGroups": ["office-staff", "office-visitor", "facilities"] },
+    { "id": "residences", "floors": ["32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60"], "credentialGroups": ["resident", "resident-guest", "facilities"] }
+  ],
+  "notes": [
+    "Two floors are served by more than one bank and both are flagged isTransferFloor. The sky lobby at 31 (shuttle + residential-local) is the only path between the ground lobby and floors 32-60: a resident coming home rides shuttle G->31, alights, is re-injected at 31, and rides residential-local 31->their floor. The ground lobby G (shuttle + office-local) is the matching join for every journey that changes banks at street level - 45->20 is residential-local 45->31, shuttle 31->G, office-local G->20, and 18->31 is office-local 18->G, shuttle G->31. Without the flag on G the leg arriving there terminates the journey, so the office-standard interfloor share (10% of demand) either disappears or reappears as a phantom arrival, and TTD is wrong for every trip between the office and residential halves. Retail (2-5), office (6-30) and the sky lobby itself are reachable directly from G and involve no transfer.",
+    "Floor 31 carries a population of 260 on purpose. The sky lobby is also the building's amenity level (conference centre, restaurant, fitness), so office traffic uses the shuttles too. That is what makes the overlap a genuine contention rather than two independent flows: in the morning the 260 amenity occupants pull 85% incoming traffic up from G to 31 on the same four shuttles that residents leaving floors 32-60 are riding down, and a two-way peak costs a shuttle far more than the sum of two one-way peaks.",
+    "Traffic profile is per-floor, not per-building. Floors 32-60 override to 'residential' (5% of population per 5 min, geometric batches of mean 1.8, split 15/75/10 incoming/outgoing/interfloor); everything else runs office-standard (12%, 85/5/10). A single building-level profile cannot express the overlapping-peaks scenario this building exists to test. Scoping: the config module defines a floor's override as governing demand originating on that floor, so 'residential' governs the 75% outgoing and 10% interfloor components of floors 32-60 - 85% of residential demand and the whole of the encoded morning scenario. The remaining 15% incoming originates at G; whether an entrance-origin leg is attributed to its destination floor's profile is a config-module decision that is not yet declared, and this building is deliberately built so that no headline result depends on which way it lands.",
+    "The evening inversion is NOT encoded, and this building no longer claims it. data/traffic-profiles.json declares 'residential' with governingPeak 'down-peak-am' and mentions the PM inversion only in a $comment, and the building schema has no time-of-day or scenario selector. Encoding the 18:00 case means declaring a 'residential-pm' profile (up-peak split) in traffic-profiles.json and selecting it through the same per-floor override field - data, not code, per CLAUDE.md invariant 7. Recorded here rather than asserted in prose: a building that names the scenario its data can actually express is worth more than one that describes a scenario nothing implements.",
+    "Sizing: office-local carries 1262 occupants (retail 112 + office 1150) on 8 cars, about 90% of up-peak handling capacity - busy, not saturated. The four shuttles are generously sized against residential demand alone and become the constraint only during the overlap, which is the failure mode worth measuring. Residential-local at 2.5 m/s is deliberately unhurried; its shaft spans only 95.6 m from the sky lobby to floor 60.",
+    "The shuttle run is 126 m. At 8 m/s with a = 1.1 m/s2 and j = 1.2 m/s3 a car spends most of that distance accelerating or decelerating and only briefly holds rated speed, so this building is a strong test of the S-curve profile: assuming rated speed for the whole run overstates shuttle capacity by a wide margin.",
+    "Retail floors sit inside the office bank rather than getting a dedicated group, which is both common and irritating in real buildings: one- and two-floor shopper hops inject stops into an office bank that is trying to run an express down-peak. Good material for operational (dynamic) zoning."
+  ]
+}

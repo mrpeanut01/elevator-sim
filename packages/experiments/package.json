@@ -1,0 +1,28 @@
+{
+  "name": "@elevator-sim/experiments",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Replication runner, common-random-numbers manager, statistics and result persistence.",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "tsc -b --clean"
+  },
+  "dependencies": {
+    "@elevator-sim/core": "*"
+  }
+}
