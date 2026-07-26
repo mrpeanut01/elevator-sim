@@ -24,6 +24,7 @@ import { DIRECTIONS } from '../model/types.js';
 import {
   METRICS_SCHEMA_VERSION,
   MetricsError,
+  type CarTimings,
   type LoadSample,
   type PassengerRecord,
   type QueueSample,
@@ -76,6 +77,24 @@ export const loadSampleSchema = z.strictObject({
   massKg: z.number().min(0),
 });
 
+/**
+ * Door and motion timings of the cars at the terminal.
+ *
+ * Non-negative rather than positive: a zero door time is a legitimate knock-out configuration
+ * (`analytical/`'s validation drives exactly that to isolate the closed form's omissions), and
+ * rejecting it here would refuse to persist a run the simulator can run.
+ */
+export const carTimingsSchema = z.strictObject({
+  doorOpenS: z.number().min(0),
+  doorCloseS: z.number().min(0),
+  dwellHallCallS: z.number().min(0),
+  dwellCarCallS: z.number().min(0),
+  fullLoadTransferS: z.number().min(0),
+  nearestFloorFlightS: z.number().min(0).optional(),
+  motorStartDelayS: z.number().min(0).optional(),
+  levelingSettleS: z.number().min(0).optional(),
+});
+
 export const queueSampleSchema = z.strictObject({
   at: simTime,
   waiting: z.number().min(0),
@@ -94,6 +113,7 @@ export const runRecordSchema = z.strictObject({
   replication: z.number().int().min(0).optional(),
   population: z.number().min(0).optional(),
   carIds: z.array(identifier).optional(),
+  carTimings: carTimingsSchema.optional(),
   startedAt: simTime,
   endedAt: simTime,
   reportWindow: reportWindowSchema.optional(),
@@ -180,5 +200,6 @@ type Conforms<Expected, Actual extends Expected> = Actual;
 type _ReportWindowConforms = Conforms<ReportWindow, z.infer<typeof reportWindowSchema>>;
 type _PassengerRecordConforms = Conforms<PassengerRecord, z.infer<typeof passengerRecordSchema>>;
 type _LoadSampleConforms = Conforms<LoadSample, z.infer<typeof loadSampleSchema>>;
+type _CarTimingsConforms = Conforms<CarTimings, z.infer<typeof carTimingsSchema>>;
 type _QueueSampleConforms = Conforms<QueueSample, z.infer<typeof queueSampleSchema>>;
 type _RunRecordConforms = Conforms<RunRecord, z.infer<typeof runRecordSchema>>;

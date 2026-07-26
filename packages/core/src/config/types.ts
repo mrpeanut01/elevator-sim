@@ -449,6 +449,16 @@ export interface CarConfig extends Commented {
   readonly motorStartDelayS?: number | undefined;
   /** Seconds. Defaults to the typical levelling time. */
   readonly levelingSettleS?: number | undefined;
+  /**
+   * Seconds per passenger per direction through the doorway.
+   *
+   * Defaults to `timing.passengerTransferS[<building type>]` — office 1.2, residential 1.75,
+   * hotel 1.5. Declare it on the car when the building type has no row in that table
+   * (`mixed-use`), or when one bank of a mixed tower serves a different population than the
+   * building as a whole. There is no code-side default: an unstated value on a type the table
+   * does not cover is an error, not the office figure.
+   */
+  readonly passengerTransferS?: number | undefined;
   /** Two decks, one floor apart, that open simultaneously. Absent means single-deck. */
   readonly doubleDeck?: boolean | undefined;
   /** Vertical distance between the decks, metres. Required when `doubleDeck` is set. */
@@ -540,6 +550,19 @@ export interface ResolvedCar {
   readonly dwellHallCallS: number;
   readonly motorStartDelayS: number;
   readonly levelingSettleS: number;
+  /**
+   * Seconds per passenger per direction through the doorway; the `2·P·tp` term of the
+   * round-trip time, and the term that term is most sensitive to.
+   *
+   * Present when it could be resolved: either the car declared it, or the resolver was told
+   * which building type the car is being resolved for
+   * (`ResolveCarOptions.buildingType` → `timing.passengerTransferS[type]`). Absent otherwise —
+   * `resolveCar` is reachable without a building (fixtures, a bare class lookup), and the one
+   * thing it must never do is invent the office value for a residential car. A consumer that
+   * finds it absent must resolve it itself, or say out loud that it is running on
+   * `CAR_DEFAULTS`.
+   */
+  readonly passengerTransferS?: number | undefined;
   /** False unless the car config declares `doubleDeck`. */
   readonly doubleDeck: boolean;
   /** Metres between the decks. Present only on double-deck cars. */

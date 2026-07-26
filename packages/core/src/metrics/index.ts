@@ -36,6 +36,7 @@
  */
 
 export {
+  DEPARTURE_GAP_BASES,
   METRICS_SCHEMA_VERSION,
   MetricsError,
   PERCENTILE_METHODS,
@@ -54,6 +55,8 @@ export {
 } from './types.js';
 
 export type {
+  CarTimings,
+  DepartureGapBasis,
   DurationStatistics,
   HandlingCapacity,
   Histogram,
@@ -115,6 +118,8 @@ export type {
 export {
   DEFAULT_DEPARTURE_GAP_S,
   DEFAULT_DESIGN_LOAD_FACTOR,
+  DEPARTURE_GAP_REOPEN_MARGIN,
+  FALLBACK_DEPARTURE_GAP_S,
   DEFAULT_LOAD_FACTOR_EDGES,
   DEFAULT_LONG_WAIT_THRESHOLD_S,
   DEFAULT_MAX_UNSERVED_FRACTION,
@@ -126,6 +131,7 @@ export {
   achievedIntervalOf,
   assertWindow,
   buildJourneys,
+  departureGapBracket,
   detectSaturation,
   fullRunWindow,
   handlingCapacityOf,
@@ -133,6 +139,7 @@ export {
   loadFactorStatistics,
   peakArrivalWindow,
   queueLengthSeries,
+  resolveDepartureGapS,
   resolveWindow,
   selectJourneysInWindow,
   selectLegsInWindow,
@@ -142,6 +149,7 @@ export {
 } from './summarize.js';
 
 export type {
+  DepartureGapBracket,
   IntervalOptions,
   LoadFactorOptions,
   PeakWindowOptions,
@@ -153,6 +161,7 @@ export type {
 } from './summarize.js';
 
 export {
+  carTimingsSchema,
   loadSampleSchema,
   parseRunRecord,
   passengerRecordSchema,

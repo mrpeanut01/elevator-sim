@@ -1,5 +1,5 @@
 {
-  "$comment": "Simplest case. Parking policy dominates here: traffic is sparse enough that idle car position matters more than assignment cleverness. Also demonstrates that faster elevators do NOT help when travel distances are too short to reach rated speed.",
+  "$comment": "Simplest case. Parking policy dominates here: traffic is sparse enough that idle car position matters more than assignment cleverness. Not a speed negative control — see notes; the hydraulic car does reach its 0.63 m/s rated speed inside one 3.0 m floor pitch.",
   "id": "garden-apartments",
   "name": "Garden Apartments",
   "type": "residential",
@@ -26,7 +26,9 @@
   ],
   "accessZones": [],
   "notes": [
-    "Passenger transfer time should use the residential value (1.75s) — luggage, strollers, carts.",
-    "Useful as a negative control: increasing ratedSpeedMps here should produce little or no AWT improvement."
+    "Passenger transfer time uses the residential value, 1.75 s per passenger per direction — luggage, strollers, carts (ISO 4190-6). It is resolved from the building type: elevator-specs.json -> timing.passengerTransferS.residential. Neither car overrides it, so if a car here ever reports 1.2 s, the type is not reaching the car and the round trip is understated by about 5 % (the Phase 2 gate found exactly that).",
+    "CORRECTED, and it was wrong in the other direction: this building is NOT a speed negative control. At v = 0.63 m/s, a = 0.6 m/s^2, j = 0.8 m/s^3 the jerk-limited profile reaches rated speed after about 1.14 m of travel (v^2/a alone is 0.66 m), so a 3.0 m floor pitch is spent mostly at rated speed and the hop is speed-limited, not acceleration-limited. Verified with packages/core/src/physics/motion: a single-floor hop takes 6.562 s at 0.63 m/s and 5.417 s at 1.00 m/s, and the modelled round trip at 8 passengers falls from 124.9 s to 111.1 s, an 11 % improvement. Raising ratedSpeedMps here helps, and a test that expected it not to would be pinning a bug.",
+    "Speed does stop paying beyond about 1.6 m/s, and for the stated reason rather than the claimed one: at 1.6 m/s the car needs roughly 5.5 m to reach rated speed, so single-floor hops become jerk- and acceleration-limited (5.285 s, barely better than 1.00 m/s) even though the 15 m express run keeps improving (25.6 s to 12.8 s). The floor pitch sets the threshold, so quote the threshold, not a blanket claim.",
+    "The real speed negative control in this repository is Midtown Office: 2.5 m/s against a 3.8 m pitch needs about 8.05 m to reach rated speed, so a single-floor hop never gets there at all (4.678 s, peaking at 1.63 m/s) and is unchanged by raising rated speed to 4 m/s."
   ]
 }

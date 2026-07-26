@@ -9,12 +9,22 @@
  *
  * ## The verdict this file encodes
  *
- * **Read literally, the criterion is NOT met on Midtown Office.** At the closed form's own
- * design point the simulated interval is ~28 % long and the achieved handling capacity ~24 %
- * low. Read as the roadmap intends — *does the simulator reproduce the physical system the
- * formula describes* — it **is** met, because every second of that 24–28 % is attributable,
- * with no fitted constant anywhere, to two simplifications `CLOSED_FORM_ASSUMPTIONS` already
- * enumerates as `bias: 'under'`, and charging them closes the gap to under 1 %.
+ * **Read literally, the criterion is met on NEITHER shipped building.** At the closed form's own
+ * design point Midtown Office's simulated interval is ~28 % long and its achieved handling
+ * capacity ~23 % low; Garden Apartments' are ~7.5 % long and ~7.1 % low. Read as the roadmap
+ * intends — *does the simulator reproduce the physical system the formula describes* — it **is**
+ * met on both, because every second of those gaps is attributable, with no fitted constant
+ * anywhere, to simplifications `CLOSED_FORM_ASSUMPTIONS` already enumerates as `bias: 'under'`,
+ * and charging them closes the gap to under 1 % on both buildings — Midtown **0.001 %**
+ * (196.815 s simulated against 196.813 s), Garden **0.69 %** (127.953 s against 127.072 s).
+ *
+ * Garden's figures are worth reading twice, because this file used to record them as +1.7 % /
+ * −2.0 % and call the criterion passed there. It was not passed; it was *cancelled*. Defect 2
+ * below made the simulation ~7 s fast while the closed form's omissions made it ~14 s slow, and
+ * the two nearly annihilated. Fixing defect 2 removed the cancellation and left the real
+ * divergence visible. **Agreement with the textbook expression got worse and agreement with the
+ * physical system got better, for the same reason and in the same change** — which is the whole
+ * argument for why the second reading is the one the roadmap means.
  *
  * The full reasoning, the replication statistics and the two defects this gate turned up are
  * in the Phase 2 validation report. What follows is the machine-checkable part of it.
@@ -42,17 +52,20 @@
  *    figure. This is the decisive test: it cannot be satisfied by a compensating error,
  *    because it changes the simulator's inputs and not the comparison.
  *
- * ## Two defects this gate found
+ * ## Two defects this gate found — both now fixed
  *
- * Both are recorded at the bottom of this file, and both bias results *optimistically*, which
+ * Both are recorded at the bottom of this file, and both biased results *optimistically*, which
  * is the direction CLAUDE.md § Statistical discipline warns about.
  *
- * - `metrics/summarize.ts` `DEFAULT_DEPARTURE_GAP_S = 10` is **shorter than a door reopen at
- *   the terminal** on every shipped building, so one loading is counted as two departures and
- *   the achieved interval reads low.
- * - `Car.passengerTransferS` is never supplied by the runner, so **every building runs at the
+ * - `metrics/summarize.ts` `DEFAULT_DEPARTURE_GAP_S = 10` was **shorter than a door reopen at
+ *   the terminal** on every shipped building, so one loading was counted as two departures and
+ *   the achieved interval read low. **Fixed**: the threshold is now derived from the building's
+ *   door timings — see the last describe block — and `sim/simulation.ts` attaches those timings to
+ *   every record it writes, so the derivation runs on the production path and not only here.
+ * - `Car.passengerTransferS` was never supplied by the runner, so **every building ran at the
  *   office value of 1.2 s** — including residential Garden Apartments, whose reference data
- *   and whose own `notes` field both say 1.75 s.
+ *   and whose own `notes` field both say 1.75 s. **Fixed** in `resolveCar`, in `resolveBuilding`,
+ *   and per car in the two mixed-use building files.
  *
  * ## Note on where this file lives
  *
@@ -114,6 +127,16 @@ const KNOCKOUT_REPLICATIONS = 48;
  * comfortably inside that plateau.
  */
 const OVERLOAD_FACTOR = 1.3;
+
+/**
+ * The departure-clustering threshold `metrics/summarize.ts` shipped when this gate found defect 1.
+ *
+ * Kept as a literal rather than read from `metrics/` — the module now derives the threshold from
+ * the building's door timings and its remaining constant is a *fallback* — so the measurements
+ * below stay a record of what the defect cost instead of quietly re-measuring the current
+ * default against itself.
+ */
+const LEGACY_DEPARTURE_GAP_S = 10;
 
 /** Monte Carlo draws for {@link kinematicRoundTrip}. Standard error on RTT is then ~0.1 %. */
 const MONTE_CARLO_DRAWS = 20_000;
@@ -258,8 +281,10 @@ interface RoundTrip {
  * band on both buildings (nothing at all between 20 s and 30 s on Midtown, nothing between
  * 20 s and 30 s on Garden across 128 runs), and the midpoint sits inside it.
  *
- * **This is where a defect lives.** `DEFAULT_DEPARTURE_GAP_S` is 10 s, which is *below* the
- * bare reopen cost of 9.8 s on Midtown and 11.5 s on Garden — see the last describe block.
+ * **This is where a defect lived.** The shipped default was 10 s, *below* the bare reopen cost of
+ * 9.8 s on Midtown and 11.5 s on Garden. `metrics/summarize.ts` now derives the same bracket this
+ * function computes (`departureGapBracket`), so the two agree by construction — asserted in the
+ * last describe block.
  */
 function departureGapFor(car: Car, analysis: UpPeakAnalysis, building: ResolvedBuilding): {
   readonly maxReopenS: number;
@@ -458,7 +483,8 @@ interface Measurement {
 
   /** Mean and standard deviation **over replications**, not over trips. */
   readonly intervalS: { readonly mean: number; readonly sd: number };
-  readonly intervalAtDefaultGapS: { readonly mean: number; readonly sd: number };
+  /** The same interval reconstructed at the 10 s threshold that shipped before defect 1 was fixed. */
+  readonly intervalAtLegacyGapS: { readonly mean: number; readonly sd: number };
   readonly intervalCoV: { readonly mean: number; readonly sd: number };
   readonly handlingCapacityPctPop: { readonly mean: number; readonly sd: number };
   readonly roundTripAllS: { readonly mean: number; readonly sd: number };
@@ -491,7 +517,7 @@ function measure(caseSpec: Case, replications: number = REPLICATIONS): Measureme
   );
 
   const intervals: number[] = [];
-  const intervalsDefault: number[] = [];
+  const intervalsLegacy: number[] = [];
   const covs: number[] = [];
   const perRunRoundTripAll: number[] = [];
   const perRunRoundTripFull: number[] = [];
@@ -511,7 +537,15 @@ function measure(caseSpec: Case, replications: number = REPLICATIONS): Measureme
     intervals.push(
       achievedIntervalOf(result.record.passengers, { window, departureGapS: gap.gapS }).meanS,
     );
-    intervalsDefault.push(result.summary.achievedInterval.meanS);
+    // Explicitly 10 s, not `result.summary.achievedInterval.meanS`: since defect 1 was fixed the
+    // summary derives this threshold from the doors, so reading it off the summary would compare
+    // the derived gap against itself and the measurement below would silently become 0 %.
+    intervalsLegacy.push(
+      achievedIntervalOf(result.record.passengers, {
+        window,
+        departureGapS: LEGACY_DEPARTURE_GAP_S,
+      }).meanS,
+    );
     covs.push(
       achievedIntervalOf(result.record.passengers, { window, departureGapS: gap.gapS })
         .coefficientOfVariation,
@@ -578,7 +612,7 @@ function measure(caseSpec: Case, replications: number = REPLICATIONS): Measureme
     results,
     gap,
     intervalS: summarise(intervals),
-    intervalAtDefaultGapS: summarise(intervalsDefault),
+    intervalAtLegacyGapS: summarise(intervalsLegacy),
     intervalCoV: summarise(covs),
     handlingCapacityPctPop: summarise(
       results.map((r) => r.summary.handlingCapacity.pctPopulationPer5Min ?? Number.NaN),
@@ -819,10 +853,11 @@ describe('Midtown Office, pure up-peak, 4 cars', () => {
       expect(CLOSED_FORM_COMPARISON_RULE.oneSidedUnderIds).toContain(id);
     }
 
-    // The residual. Measured: 196.8 s simulated against 196.9 s corrected — 0.03 %. The band is
-    // 4 %, which is "a few percent" as the roadmap words it, and it is not slack for a bug: the
-    // corrections are computed from `travelTime` and `dwellSecondsFor` over the reference data,
-    // with no free parameter to absorb one.
+    // The residual. Measured: 196.815 s simulated against 196.813 s corrected — **0.001 %**, on a
+    // 197 s round trip. The band is 4 %, which is "a few percent" as the roadmap words it, and it
+    // is not slack for a bug: the corrections are computed from `travelTime` and `dwellSecondsFor`
+    // over the reference data, with no free parameter to absorb one. Garden's counterpart is
+    // 0.69 % — see 'is out by the same two omissions' in the next describe block.
     const residual = divergence(m.roundTripFullS.mean, m.correctedRoundTripS);
     expect(Math.abs(residual)).toBeLessThan(0.04);
   });
@@ -956,23 +991,78 @@ describe('Garden Apartments, pure up-peak, 2 hydraulic cars', () => {
     // distance the car needs to reach rated speed*, v²/a, and a 0.63 m/s hydraulic needs
     // 0.66 m while a 2.5 m/s geared traction needs 6.25 m.
     //
-    // Measured: Garden INT +1.7 %, HC −2.0 %, RTT +6.2 %.
-    //           Midtown INT +27.7 %, HC −24.2 %, RTT +31.6 %.
+    // Measured, at the 1.75 s residential transfer time now in force (128 replications):
+    //   Garden  INT +7.5 %, %POP −7.1 %, RTT +12.6 %.
+    //   Midtown INT +27.5 %, %POP −23.2 %, RTT +31.6 %.
+    // The ordering survives — Garden is still better than half of Midtown's divergence — but by
+    // a much smaller margin than the +6.2 % this test recorded while the transfer-time defect
+    // was live. See the block below for why that number was flattering.
     const gardenRtt = Math.abs(divergence(m.roundTripFullS.mean, m.analysis.result.roundTripTimeS));
     const midtownRtt = Math.abs(
       divergence(midtown.roundTripFullS.mean, midtown.analysis.result.roundTripTimeS),
     );
     expect(gardenRtt).toBeLessThan(midtownRtt / 2);
+  });
 
-    // Which means Garden Apartments — a building the roadmap does not name — passes the
-    // criterion as literally written on both headline metrics, while the building it does name
-    // does not.
-    expect(Math.abs(divergence(m.intervalS.mean, m.analysis.result.intervalS))).toBeLessThan(0.06);
-    expect(
-      Math.abs(
-        divergence(m.handlingCapacityPctPop.mean, m.analysis.result.percentPopulation5Min),
-      ),
-    ).toBeLessThan(0.06);
+  it('does NOT meet "within a few percent" either, once the transfer-time defect is removed', () => {
+    // **This is a recorded residual, not a passing criterion.** It used to be the latter, and the
+    // reason it looked like one is worth keeping written down.
+    //
+    // While the runner charged every building the office 1.2 s, Garden's simulated round trip was
+    // 120.6 s against a 113.6 s closed form evaluated at the residential 1.75 s. The two errors
+    // pointed in opposite directions: the missing 0.55 s per passenger made the simulation ~7 s
+    // *short*, and the closed form's jerk-limited-flight and minimum-dwell omissions
+    // (`constant-transit-speed`, `no-minimum-dwell`, both `bias: 'under'`) made it ~14 s short of
+    // the physical truth. They very nearly cancelled, and Garden came out at INT +1.7 % / %POP
+    // −2.0 % — inside "a few percent" by coincidence, on a building whose transfer time was wrong.
+    //
+    // With the defect fixed the cancellation is gone and the real divergence is visible:
+    //
+    // |  | before (tp = 1.2 s, buggy) | after (tp = 1.75 s, correct) |
+    // |---|---|---|
+    // | simulated RTT | 120.6 s | **128.0 s** |
+    // | INT vs closed form | +1.7 % | **+7.5 %** |
+    // | %POP vs closed form | −2.0 % | **−7.1 %** |
+    //
+    // So **neither** shipped building meets the roadmap's Phase 2 criterion read literally, and
+    // Garden no longer offers the escape hatch this file previously claimed for it. What *did*
+    // improve is the measurement that actually tests the simulator: against the closed form's own
+    // model evaluated with real physics, the residual fell from +0.84 % to +0.69 % — asserted in
+    // 'is out by the same two omissions' below. That is the honest reading: agreement with the
+    // *textbook expression* got worse, agreement with the *physical system it describes* got
+    // better, and both moved for the same reason.
+    //
+    // The bound here is 8 %, sitting just above the measured 7.5 %, so a regression that made this
+    // worse still fails. Do not raise it further to accommodate a change: 7.5 % is attributable,
+    // term by term, to assumptions already enumerated in `CLOSED_FORM_ASSUMPTIONS`, and anything
+    // beyond it is not.
+    const intervalError = divergence(m.intervalS.mean, m.analysis.result.intervalS);
+    const capacityError = divergence(
+      m.handlingCapacityPctPop.mean,
+      m.analysis.result.percentPopulation5Min,
+    );
+
+    // Signs first: they are what makes this a documented divergence rather than noise. A longer
+    // round trip both stretches the interval and lowers the achieved capacity.
+    expect(intervalError).toBeGreaterThan(0.05);
+    expect(intervalError).toBeLessThan(0.08);
+    expect(capacityError).toBeLessThan(-0.05);
+    expect(capacityError).toBeGreaterThan(-0.08);
+
+    // And the two are the same finding seen twice: INT and %POP are algebraically linked through
+    // RTT (%POP = 300·P·L / (RTT·pop)), so their divergences must be near mirror images once the
+    // load is matched. If they ever stopped being, one of the two metrics would be wrong.
+    expect(Math.abs(intervalError + capacityError)).toBeLessThan(0.015);
+
+    // The mechanism, by id, so this residual cannot be re-read as an unexplained gap.
+    for (const id of ['constant-transit-speed', 'no-minimum-dwell'] as const) {
+      expect(CLOSED_FORM_ASSUMPTIONS.find((entry) => entry.id === id)?.bias).toBe('under');
+    }
+    // Why the correction was smaller than 2·P·Δtp, which is why the gate's ~125 s prediction
+    // undershot the measured 128.0 s.
+    expect(CLOSED_FORM_ASSUMPTIONS.find((entry) => entry.id === 'uniform-transfer-time')?.bias).toBe(
+      'either',
+    );
   });
 
   it('explains that ordering by the acceleration distance, v²/a, against the interfloor rise', () => {
@@ -1016,22 +1106,31 @@ describe('Garden Apartments, pure up-peak, 2 hydraulic cars', () => {
     expect(flightExcessS).toBeLessThan(midtown.corrected.flightS - midtown.matched.result.travelTimeS);
 
     // Residual, with the Monte Carlo run at `car.passengerTransferS` — the value the simulator
-    // actually charges. Measured: 120.6 s simulated against 119.6 s corrected, +0.8 %.
+    // actually charges. **This is the measurement that got better when the defect was fixed**, and
+    // it is the one that tests the simulator rather than the textbook expression:
     //
-    // Run instead at the 1.75 s the reference data specifies for a residential building, the
-    // corrected figure is 127.1 s and the residual is −5.1 %. That 6 s gap is not modelling
-    // slack; it is the defect recorded in the last describe block.
+    // | tp in force | simulated RTT | corrected closed form | residual |
+    // |---|---|---|---|
+    // | 1.2 s (the defect) | 120.6 s | 119.6 s | +0.84 % |
+    // | 1.75 s (correct) | **128.0 s** | **127.1 s** | **+0.69 %** |
+    //
+    // Both sides moved together, by ~7.4 s, because both now charge the residential transfer time.
+    // That is the strongest single piece of evidence that the fix was a fix: an independent model
+    // of the same round trip, sharing no code with the run loop, tracked the simulator to within
+    // 0.7 % after the change and 0.8 % before it. If the transfer time had been wired to the wrong
+    // place, or double-charged, this residual would have moved instead of holding.
     const residual = divergence(m.roundTripFullS.mean, m.correctedRoundTripS);
     expect(Math.abs(residual)).toBeLessThan(0.04);
   });
 
   it('collapses onto the textbook figure under the same knock-out', () => {
     // Sanity: the same intervention works here, and to a much smaller extent, because there was
-    // much less to remove. The band is wider than Midtown's because Garden's simulated round
-    // trip is additionally short by the transfer-time defect (~6 s on a ~115 s trip).
+    // much less to remove. The band stays wider than Midtown's for a reason that is no longer the
+    // transfer time — that is fixed, and both sides of this comparison now charge 1.75 s — but the
+    // residual express-run and stop-ordering detail, plus the fact that knocking out the minimum
+    // dwell removes proportionally more from a building whose stops are lightly loaded (8 people
+    // over 5 floors) than from one whose stops are not.
     const both = knockout(GARDEN, { ...NO_ACCELERATION_LIMIT, ...NO_MINIMUM_DWELL });
-    // Measured: 107.2 s simulated against 115.7 s closed form, −7.3 %; of which ~6.5 % is the
-    // transfer-time defect and the rest the residual express-run and stop-ordering detail.
     expect(Math.abs(divergence(both.simulatedRoundTripS, both.closedFormRoundTripS))).toBeLessThan(0.1);
   }, 120_000);
 });
@@ -1042,7 +1141,14 @@ describe('Garden Apartments, pure up-peak, 2 hydraulic cars', () => {
 
 describe('defects found by the Phase 2 acceptance gate', () => {
   /**
-   * ## Defect 1 — `DEFAULT_DEPARTURE_GAP_S` is shorter than a door reopen
+   * ## Defect 1 — `DEFAULT_DEPARTURE_GAP_S` was shorter than a door reopen — **FIXED**
+   *
+   * Fixed in `metrics/summarize.ts`: the threshold is now `departureGapBracket(CarTimings)`, the
+   * midpoint of `(openS + max(dwell, P·tp) + closeS, shortest round trip)`, derived per building
+   * from the same door timings this file computes below, with `FALLBACK_DEPARTURE_GAP_S` for
+   * records that carry no timings and `IntervalStatistics.departureGapBasis` saying which was
+   * used. The measurements here are kept as the record of what the defect cost, and are now taken
+   * at an explicit 10 s rather than off the summary. What follows describes the defect as found.
    *
    * `metrics/summarize.ts` reconstructs a terminal departure by splitting a car's boardings
    * wherever they are more than `departureGapS` apart, and justifies its 10 s default with
@@ -1070,24 +1176,41 @@ describe('defects found by the Phase 2 acceptance gate', () => {
    * the 10 s default Garden's reported interval and its reported handling capacity, computed
    * from the same record, imply round trips 20 % apart.
    *
-   * Fix: raise the default, and derive it from the door timings rather than fixing it — the
-   * bracket is `[openS + maxDwell + closeS, shortest round trip]`, both computable.
+   * Fix, as applied: derive it from the door timings rather than fixing it — the bracket is
+   * `(openS + max(dwell, P·tp) + closeS, shortest round trip)`, both computable, and both
+   * computed by `metrics/summarize.ts`'s `departureGapBracket`. The internal inconsistency above
+   * is now a permanent guard in `metrics/consistency.test.ts`, on both buildings.
    */
-  it('defect 1: the departure-clustering default is below the terminal door reopen cycle', async () => {
-    const { DEFAULT_DEPARTURE_GAP_S } = await import('../metrics/summarize.js');
+  it('defect 1: the 10 s threshold was below the terminal door reopen cycle', async () => {
+    const { FALLBACK_DEPARTURE_GAP_S, departureGapBracket } = await import('../metrics/summarize.js');
 
     for (const caseSpec of [MIDTOWN, GARDEN]) {
       const building = buildingOf(caseSpec.buildingId);
       const analysis = analyzeUpPeak(building, config.elevatorSpecs, { bankId: 'main' });
       const car = carOf(caseSpec);
+      const gap = departureGapFor(car, analysis, building);
 
-      // The cheapest possible reopen: nobody transfers, so the dwell is the policy dwell.
+      // The cheapest possible reopen: nobody transfers, so the dwell is the policy dwell. Even
+      // that is above the threshold that shipped.
       const bareReopenS = car.doorConfig.openS + car.doorConfig.dwellHallCallS + car.doorConfig.closeS;
-      expect(bareReopenS).toBeGreaterThan(DEFAULT_DEPARTURE_GAP_S - 0.5);
+      expect(bareReopenS).toBeGreaterThan(LEGACY_DEPARTURE_GAP_S - 0.5);
 
       // And a real reopen after a full load is far longer still.
-      const loadedReopenS = departureGapFor(car, analysis, building).maxReopenS;
-      expect(loadedReopenS).toBeGreaterThan(2 * DEFAULT_DEPARTURE_GAP_S);
+      expect(gap.maxReopenS).toBeGreaterThan(2 * LEGACY_DEPARTURE_GAP_S);
+
+      // Fixed: `metrics/` now derives the threshold from these same door timings, and the
+      // fallback it keeps for records that carry none clears the reopen on both buildings.
+      const derived = departureGapBracket({
+        doorOpenS: car.doorConfig.openS,
+        doorCloseS: car.doorConfig.closeS,
+        dwellHallCallS: car.doorConfig.dwellHallCallS,
+        dwellCarCallS: car.doorConfig.dwellCarCallS,
+        fullLoadTransferS:
+          analysis.roundTripTerms.passengersPerTrip * analysis.roundTripTerms.passengerTransferS,
+      });
+      expect(derived.maxReopenS).toBeCloseTo(gap.maxReopenS, 9);
+      expect(FALLBACK_DEPARTURE_GAP_S).toBeGreaterThan(gap.maxReopenS);
+      expect(FALLBACK_DEPARTURE_GAP_S).toBeLessThan(gap.minRoundTripS);
     }
   });
 
@@ -1095,11 +1218,11 @@ describe('defects found by the Phase 2 acceptance gate', () => {
     const m = measure(GARDEN, 32);
     // Fewer replications: this is a bias, not a mean, and it does not need 128 runs to see.
     // Measured at 32 seeds: 52.3 s at the default against 57.7 s at the derived gap.
-    expect(divergence(m.intervalAtDefaultGapS.mean, m.intervalS.mean)).toBeLessThan(-0.05);
+    expect(divergence(m.intervalAtLegacyGapS.mean, m.intervalS.mean)).toBeLessThan(-0.05);
 
     // The inconsistency, stated as such: the interval at the default gap and the handling
     // capacity from the same record imply two different round trips.
-    const fromInterval = m.intervalAtDefaultGapS.mean * m.analysis.roundTripTerms.carsInGroup;
+    const fromInterval = m.intervalAtLegacyGapS.mean * m.analysis.roundTripTerms.carsInGroup;
     const fromCapacity =
       (300 * m.passengersAll.mean * m.analysis.roundTripTerms.carsInGroup) /
       ((m.handlingCapacityPctPop.mean / 100) * m.analysis.roundTripTerms.population);
@@ -1107,34 +1230,43 @@ describe('defects found by the Phase 2 acceptance gate', () => {
   }, 60_000);
 
   /**
-   * ## Defect 2 — the runner never applies the building's passenger transfer time
+   * ## Defect 2 — the runner never applied the building's passenger transfer time — **FIXED**
    *
    * `elevator-specs.json → timing.passengerTransferS` is a per-building-type table:
-   * office 1.2 s, residential 1.75 s, hotel 1.5 s. `analytical/upPeak.ts` reads it, and
-   * `data/buildings/garden-apartments.json` says in its own `notes` field *"Passenger transfer
-   * time should use the residential value (1.75s) — luggage, strollers, carts."*
+   * office 1.2 s, residential 1.75 s, hotel 1.5 s. `analytical/upPeak.ts` read it; nothing on the
+   * simulation side did. `Car.passengerTransferS` existed and was settable through `CarInit`, but
+   * **nothing ever set it**: `resolveCar` did not derive it, `Simulation`'s `createCar` did not
+   * pass it, and it fell through to `CAR_DEFAULTS.passengerTransferS`, whose own comment says
+   * *"1.2 s is the office value"*. Every building therefore ran at the office figure — including
+   * residential Garden Apartments, whose own `notes` field says 1.75 s.
    *
-   * `Car.passengerTransferS` exists and is settable through `CarInit`, but **nothing ever sets
-   * it**: `resolveCar` does not derive it, `Simulation`'s `createCar` does not pass it, and it
-   * falls through to `CAR_DEFAULTS.passengerTransferS`, whose own comment says *"1.2 s is the
-   * office value"*. Every building therefore runs at the office figure.
+   * As found, measured on Garden Apartments over 128 replications:
    *
-   * Consequences, measured on Garden Apartments over 128 replications:
-   *
-   * - the simulated round trip is **5.9 % short** (120.6 s where 127.1 s is correct),
-   * - the achieved handling capacity is **4.4 % optimistic** (34.5 %POP where 33.1 % is correct),
-   * - and the error is **invisible on Midtown Office**, because 1.2 s is the office value —
+   * - the simulated round trip was **5.7 % short** (120.6 s where 128.0 s is correct),
+   * - the achieved handling capacity was **5.4 % optimistic** (34.5 %POP where 32.7 % is correct),
+   * - and the error was **invisible on Midtown Office**, because 1.2 s is the office value —
    *   which is precisely why an acceptance gate that only ran the named building would ship it.
    *
-   * A hotel building would be understated by the same mechanism at 1.5 s. The effect is
-   * systematically optimistic, which is the direction CLAUDE.md § Statistical discipline
+   * The effect was systematically optimistic, the direction CLAUDE.md § Statistical discipline
    * singles out.
    *
-   * Fix: carry `passengerTransferS` onto `ResolvedCar` from
-   * `specs.timing.passengerTransferS[building.type]` in `resolveCar`, allow a per-car override
-   * in `CarConfig` as the other timings already are, and pass it in `Simulation`'s `createCar`.
+   * **Fixed in three places**, and it took all three:
+   *
+   * 1. `config/resolveCar.ts` resolves `passengerTransferS` from
+   *    `specs.timing.passengerTransferS[buildingType]`, refusing to default for a type the table
+   *    has no row for.
+   * 2. `config/parse.ts`'s `resolveBuilding` passes the building type down, so every
+   *    `ResolvedCar` `loadConfig` returns carries the value. Without this the derivation existed
+   *    but was unreachable through the real loader, and only `Simulation` knew the answer.
+   * 3. `data/buildings/mixed-use-high-rise.json` and `vertical-city.json` declare it **per car**,
+   *    because `mixed-use` has no row on purpose — see `CLOSED_FORM_ASSUMPTIONS`
+   *    `uniform-transfer-time`.
+   *
+   * The tests below pin the fixed behaviour on all five shipped buildings. They deliberately do
+   * not branch on whether the defect is present: a conditional assertion is how a fix gets
+   * un-made without anything failing.
    */
-  it('defect 2: every building runs at the office passenger transfer time', () => {
+  it('defect 2 fixed: every shipped building runs at its own transfer time, off a built Car', () => {
     const table = config.elevatorSpecs.timing.passengerTransferS;
     expect(table.office).toBeCloseTo(1.2, 9);
     expect(table.residential).toBeCloseTo(1.75, 9);
@@ -1147,31 +1279,28 @@ describe('defects found by the Phase 2 acceptance gate', () => {
     const closedForm = analyzeUpPeak(garden, config.elevatorSpecs, { bankId: 'main' });
     expect(closedForm.roundTripTerms.passengerTransferS).toBeCloseTo(table.residential, 9);
 
-    // What the simulator uses.
-    const simulated = carOf(GARDEN).passengerTransferS;
+    // What the simulator uses, read off a constructed `Car` — the object that actually charges
+    // the seconds, not the config it came from.
+    expect(carOf(GARDEN).passengerTransferS).toBeCloseTo(table.residential, 9);
+    // The two sides of the oracle now agree on `tp`, which is the whole point of the fix.
+    expect(carOf(GARDEN).passengerTransferS).toBeCloseTo(
+      closedForm.roundTripTerms.passengerTransferS,
+      9,
+    );
 
-    if (simulated !== table.residential) {
-      // KNOWN DEFECT, unfixed. Recorded rather than tolerated: this assertion says exactly what
-      // the wrong value is and where it comes from, so a fix cannot land silently. When
-      // `resolveCar`/`Simulation` start supplying the building-type value this branch stops
-      // being taken and the `else` below pins the correct behaviour instead.
-      expect(simulated).toBeCloseTo(CAR_DEFAULTS.passengerTransferS, 9);
-      expect(simulated).toBeCloseTo(table.office, 9);
-      expect(simulated).toBeLessThan(closedForm.roundTripTerms.passengerTransferS);
-    } else {
-      expect(simulated).toBeCloseTo(table.residential, 9);
-    }
-
-    // Either way, Midtown is unaffected: the office value is the default.
+    // Midtown is unaffected — 1.2 s either way — which is exactly why it could not have caught
+    // this, and why the gate had to run a second building.
     expect(carOf(MIDTOWN).passengerTransferS).toBeCloseTo(table.office, 9);
+    expect(CAR_DEFAULTS.passengerTransferS).toBeCloseTo(table.office, 9);
   });
 
-  it('defect 2: understates the Garden Apartments round trip by about 6 %', () => {
+  it('defect 2 fixed: the 0.55 s per passenger is worth ~7 s of Garden round trip', () => {
+    // The size of what was missing, through the closed form's own model rather than through a
+    // simulation, so it is attributable to `tp` alone: same car, same heights, same draws, one
+    // number changed.
     const garden = buildingOf('garden-apartments');
     const table = config.elevatorSpecs.timing.passengerTransferS;
     const car = carOf(GARDEN);
-    if (car.passengerTransferS === table.residential) return; // fixed; nothing to quantify
-
     const analysis = analyzeUpPeak(garden, config.elevatorSpecs, { bankId: 'main' });
     const heightsM = analysis.upperFloorIds.map((id) => {
       const heightM = garden.floorsById.get(id)?.heightM;
@@ -1187,14 +1316,30 @@ describe('defects found by the Phase 2 acceptance gate', () => {
       seed: 4_242,
     } as const;
 
-    const asBuilt = kinematicRoundTrip({ ...shared, passengerTransferS: car.passengerTransferS });
+    const asDefaulted = kinematicRoundTrip({ ...shared, passengerTransferS: table.office });
     const asSpecified = kinematicRoundTrip({ ...shared, passengerTransferS: table.residential });
 
-    // Measured: 118.0 s as built against 125.0 s as specified — the simulator is 5.6 % fast,
-    // and the whole of the difference is dwell, not flight.
-    expect(asBuilt.roundTripS).toBeLessThan(asSpecified.roundTripS);
-    expect(Math.abs(divergence(asBuilt.roundTripS, asSpecified.roundTripS))).toBeGreaterThan(0.03);
-    expect(asBuilt.flightS).toBeCloseTo(asSpecified.flightS, 6);
-    expect(asSpecified.dwellS - asBuilt.dwellS).toBeGreaterThan(1.5);
+    // Measured at P = 8: 117.9 s at the office default against 124.9 s at the residential value.
+    // The whole of the difference is dwell; flight is bit-identical, as it must be.
+    expect(asDefaulted.roundTripS).toBeLessThan(asSpecified.roundTripS);
+    expect(Math.abs(divergence(asDefaulted.roundTripS, asSpecified.roundTripS))).toBeGreaterThan(0.03);
+    expect(asDefaulted.flightS).toBeCloseTo(asSpecified.flightS, 6);
+    expect(asSpecified.dwellS - asDefaulted.dwellS).toBeGreaterThan(1.5);
+
+    // And **less than 2·P·Δtp**, which is the `uniform-transfer-time` assumption in seconds: the
+    // minimum dwell absorbs part of the increase at every lightly loaded upstairs stop, so the
+    // linear term overstates what raising `tp` actually costs.
+    const linearPredictionS = 2 * 8 * (table.residential - table.office);
+    expect(asSpecified.roundTripS - asDefaulted.roundTripS).toBeLessThan(linearPredictionS);
+
+    // This 124.9 s figure is the *whole* provenance of the "~125 s once corrected" prediction the
+    // gate made, and it is why that prediction undershot the 128.0 s the fix actually produced: it
+    // is evaluated at exactly P = 8, while the simulator carries P ≈ 8.4 on its full trips.
+    // Re-evaluated at the load actually carried the same model says 127.1 s, against 128.0 s
+    // measured — so the prediction's mechanism was right and only its operating point was off.
+    // `CLOSED_FORM_COMPARISON_RULE.precondition` is exactly this trap, stated in advance.
+    expect(asSpecified.roundTripS).toBeGreaterThan(124);
+    expect(asSpecified.roundTripS).toBeLessThan(126);
+    expect(CLOSED_FORM_COMPARISON_RULE.precondition).toContain('Matched load');
   });
 });

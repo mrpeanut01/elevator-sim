@@ -44,6 +44,7 @@ import type { CredentialGroup, Direction } from '../model/types.js';
 import {
   METRICS_SCHEMA_VERSION,
   MetricsError,
+  type CarTimings,
   type LoadReading,
   type LoadSample,
   type PassengerRecord,
@@ -116,6 +117,17 @@ export interface MetricsRecorderOptions {
    * are picked up either way, so this is only ever additive.
    */
   readonly carIds?: readonly string[] | undefined;
+  /**
+   * Door and motion timings of the cars serving the terminal — see {@link CarTimings}.
+   *
+   * Recorded because the achieved interval **derives its departure-clustering threshold from
+   * them**: a reopen at the terminal leaves `openS + max(dwell, P·tp) + closeS` between two
+   * boardings of the same load (around 20 s on the shipped buildings), and a threshold below
+   * that counts one loading as two departures and reports the interval short. Supply the worst
+   * case across the cars serving the terminal. Omit it and the interval falls back to a
+   * constant and says so — see `IntervalStatistics.departureGapBasis`.
+   */
+  readonly carTimings?: CarTimings | undefined;
   /** Simulated time the run starts. Defaults to `0`. */
   readonly startedAt?: SimTime | undefined;
   /** The window this run intends to be reported over, when the demand template names one. */
@@ -167,6 +179,7 @@ export class MetricsRecorder {
   readonly #replication: number | undefined;
   readonly #population: number | undefined;
   readonly #carIds: readonly string[] | undefined;
+  readonly #carTimings: CarTimings | undefined;
   readonly #startedAt: SimTime;
   readonly #reportWindow: ReportWindow | undefined;
   readonly #metadata: Readonly<Record<string, string | number | boolean>> | undefined;
@@ -193,6 +206,8 @@ export class MetricsRecorder {
     this.#replication = options.replication;
     this.#population = options.population;
     this.#carIds = options.carIds === undefined ? undefined : Object.freeze([...options.carIds]);
+    this.#carTimings =
+      options.carTimings === undefined ? undefined : Object.freeze({ ...options.carTimings });
     this.#startedAt = options.startedAt ?? 0;
     if (!Number.isFinite(this.#startedAt)) {
       throw new MetricsError(`Run start time must be finite; received ${this.#startedAt}.`);
@@ -465,6 +480,7 @@ export class MetricsRecorder {
       ...(this.#replication === undefined ? {} : { replication: this.#replication }),
       ...(this.#population === undefined ? {} : { population: this.#population }),
       ...(this.#carIds === undefined ? {} : { carIds: this.#carIds }),
+      ...(this.#carTimings === undefined ? {} : { carTimings: this.#carTimings }),
       startedAt: this.#startedAt,
       endedAt,
       ...(this.#reportWindow === undefined

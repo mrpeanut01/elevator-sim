@@ -4,8 +4,14 @@ import { StreamSet } from '../random/streams.js';
 
 import { MetricsRecorder, type RecordablePassenger } from './recorder.js';
 import { parseRunRecord, serializeRunRecord } from './serialization.js';
-import { summarizeRun } from './summarize.js';
-import { METRICS_SCHEMA_VERSION, MetricsError, runSeed, type RunRecord } from './types.js';
+import { departureGapBracket, summarizeRun } from './summarize.js';
+import {
+  METRICS_SCHEMA_VERSION,
+  MetricsError,
+  runSeed,
+  type CarTimings,
+  type RunRecord,
+} from './types.js';
 
 const SEED = 20260726;
 
@@ -38,6 +44,16 @@ function populatedRecord(streams: StreamSet): RunRecord {
     replication: 7,
     population: 1200,
     carIds: ['car-0', 'car-1', 'car-2'],
+    carTimings: {
+      doorOpenS: 1.8,
+      doorCloseS: 3.0,
+      dwellHallCallS: 5.0,
+      dwellCarCallS: 3.0,
+      fullLoadTransferS: 14.4,
+      nearestFloorFlightS: 4.9,
+      motorStartDelayS: 0.5,
+      levelingSettleS: 0.4,
+    },
     reportWindow: { id: 'peak-5min', startS: 600, endS: 900 },
     metadata: { sweep: 'speed-3.5', crn: true, round: 2 },
   });
@@ -104,6 +120,25 @@ describe('RunRecord round-trips through JSON with its seed intact', () => {
     expect(summarizeRun(restored, { window: 'full-run' })).toEqual(
       summarizeRun(record, { window: 'full-run' }),
     );
+  });
+
+  it('carries the car timings the achieved interval derives its threshold from', () => {
+    // Without these on the record, a re-analysis of a stored run falls back to a constant and the
+    // achieved interval can read short by 15 % — see `interval.test.ts`. So they have to survive
+    // the trip to disk, and the restored record has to derive the same threshold.
+    const restored = parseRunRecord(serializeRunRecord(record));
+    expect(restored.carTimings).toEqual(record.carTimings);
+
+    const interval = summarizeRun(restored).achievedInterval;
+    expect(interval.departureGapBasis).toBe('derived');
+    expect(interval.departureGapS).toBe(
+      departureGapBracket(record.carTimings as CarTimings).gapS,
+    );
+
+    // And a record written without them still parses and still summarizes — saying so.
+    const { carTimings: _dropped, ...withoutTimings } = record;
+    const bare = parseRunRecord(serializeRunRecord(withoutTimings as RunRecord));
+    expect(summarizeRun(bare).achievedInterval.departureGapBasis).toBe('fallback');
   });
 
   it('keeps every sample and every leg', () => {

@@ -33,11 +33,33 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { analyzeUpPeak } from '../analytical/upPeak.js';
 import { loadConfig } from '../config/loader.js';
-import type { ElevatorSpecs, LoadedConfig, ResolvedBuilding } from '../config/types.js';
+import type {
+  ElevatorSpecs,
+  FloorConfig,
+  LoadedConfig,
+  ResolvedBank,
+  ResolvedBuilding,
+  ResolvedCar,
+} from '../config/types.js';
+import { CAR_DEFAULTS } from '../model/car/index.js';
+import { travelTime } from '../physics/motion/index.js';
 
 import { MetricsRecorder, type RecordablePassenger } from './recorder.js';
-import { achievedIntervalOf, handlingCapacityOf, summarizeRun } from './summarize.js';
-import { MetricsError, type PassengerRecord, type ReportWindow } from './types.js';
+import {
+  DEPARTURE_GAP_REOPEN_MARGIN,
+  FALLBACK_DEPARTURE_GAP_S,
+  achievedIntervalOf,
+  departureGapBracket,
+  handlingCapacityOf,
+  resolveDepartureGapS,
+  summarizeRun,
+} from './summarize.js';
+import {
+  MetricsError,
+  type CarTimings,
+  type PassengerRecord,
+  type ReportWindow,
+} from './types.js';
 
 const REAL_DATA_DIR = fileURLToPath(new URL('../../../../data', import.meta.url));
 
@@ -107,8 +129,8 @@ describe('achievedIntervalOf — a departure is a car leaving, not a passenger b
   });
 
   it('separates two trips by the same car and joins a slow load into one', () => {
-    // Boardings 8 s apart — a slow, obstructed load — are still one departure at the default
-    // 10 s threshold; a return trip 200 s later is a second.
+    // Boardings 8 s apart — a slow, obstructed load — are still one departure at the fallback
+    // threshold; a return trip 200 s later is a second.
     const slowLoad = [
       boarding({ passengerId: 's1', carId: 'c1', boardedAt: 10, arrivedAt: 0 }),
       boarding({ passengerId: 's2', carId: 'c1', boardedAt: 18, arrivedAt: 0 }),
@@ -223,8 +245,342 @@ describe('achievedIntervalOf — a departure is a car leaving, not a passenger b
     expect(summary.achievedInterval.departureCount).toBe(3);
     expect(summary.achievedInterval.meanS).toBeCloseTo(40, 12);
     expect(summary.achievedInterval.terminalFloorId).toBe('G');
-    expect(summary.achievedInterval.departureGapS).toBe(10);
+    // This record carries no `carTimings`, so the threshold is the fallback and says so.
+    expect(summary.achievedInterval.departureGapS).toBe(FALLBACK_DEPARTURE_GAP_S);
+    expect(summary.achievedInterval.departureGapBasis).toBe('fallback');
   });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The clustering threshold is derived from the doors, not chosen
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Midtown-Office-shaped timings: its real doors and its closed-form load, with plausible motion
+ * overheads. Written out rather than loaded so the arithmetic below is checkable by eye; the
+ * real per-bank figures are surveyed against `data/` in the last describe block.
+ */
+const MIDTOWN_TIMINGS: CarTimings = {
+  doorOpenS: 1.8,
+  doorCloseS: 3.0,
+  dwellHallCallS: 5.0,
+  dwellCarCallS: 3.0,
+  fullLoadTransferS: 12.8 * 1.2, // P·tp at the design load
+  nearestFloorFlightS: 4.9,
+  motorStartDelayS: 0.5,
+  levelingSettleS: 0.4,
+};
+
+describe('departureGapBracket — the threshold is a function of the doors', () => {
+  it('brackets the reopen cycle below and the shortest round trip above', () => {
+    const bracket = departureGapBracket(MIDTOWN_TIMINGS);
+
+    // openS + max(5.0, 3.0, 15.36) + closeS. The transfer sets the dwell, not the policy value,
+    // and this is the number the old 10 s default was under by a factor of two.
+    expect(bracket.maxReopenS).toBeCloseTo(1.8 + 15.36 + 3.0, 10);
+    expect(bracket.maxReopenS).toBeGreaterThan(2 * 10);
+
+    // Two legs (close, start, fly, settle, open) plus a stop's dwell at each end.
+    const legS = 3.0 + 0.5 + 4.9 + 0.4 + 1.8;
+    expect(bracket.minRoundTripS).toBeCloseTo(2 * legS + 5.0 + 3.0, 10);
+
+    expect(bracket.basis).toBe('bracket-midpoint');
+    expect(bracket.gapS).toBeCloseTo((bracket.maxReopenS + (bracket.minRoundTripS as number)) / 2, 10);
+    expect(bracket.gapS).toBeGreaterThan(bracket.maxReopenS);
+    expect(bracket.gapS).toBeLessThan(bracket.minRoundTripS as number);
+  });
+
+  it('the bare policy dwell is not the bound — a full load holds the doors far longer', () => {
+    // The defect's root cause in one assertion: reasoning about a reopen from the *policy* dwell
+    // alone gets 9.8 s, and the dwell a stop actually earns is max(policy, transfer).
+    const bareReopenS =
+      MIDTOWN_TIMINGS.doorOpenS + MIDTOWN_TIMINGS.dwellHallCallS + MIDTOWN_TIMINGS.doorCloseS;
+    expect(bareReopenS).toBeCloseTo(9.8, 10);
+    expect(departureGapBracket(MIDTOWN_TIMINGS).maxReopenS).toBeGreaterThan(2 * bareReopenS);
+  });
+
+  it('falls back to a margin above the reopen bound when the flight time is unknown', () => {
+    const { nearestFloorFlightS: _flight, ...noFlight } = MIDTOWN_TIMINGS;
+    const bracket = departureGapBracket(noFlight);
+
+    expect(bracket.basis).toBe('reopen-margin');
+    expect(bracket.minRoundTripS).toBeUndefined();
+    expect(bracket.gapS).toBeCloseTo(bracket.maxReopenS * (1 + DEPARTURE_GAP_REOPEN_MARGIN), 10);
+    // Still inside the real bracket, which is the property that matters.
+    expect(bracket.gapS).toBeGreaterThan(bracket.maxReopenS);
+    expect(bracket.gapS).toBeLessThan(departureGapBracket(MIDTOWN_TIMINGS).minRoundTripS as number);
+  });
+
+  it('refuses to invent a threshold when no threshold can work', () => {
+    // A hypothetical machine whose doors dawdle longer than its round trip. There is no value
+    // that separates a reopen from a return, and reporting one anyway would be the defect this
+    // whole derivation exists to prevent — in the other direction.
+    expect(() =>
+      departureGapBracket({ ...MIDTOWN_TIMINGS, fullLoadTransferS: 60, nearestFloorFlightS: 1 }),
+    ).toThrow(MetricsError);
+  });
+
+  it('rejects timings that are not finite and non-negative', () => {
+    expect(() => departureGapBracket({ ...MIDTOWN_TIMINGS, doorOpenS: Number.NaN })).toThrow(
+      MetricsError,
+    );
+    expect(() => departureGapBracket({ ...MIDTOWN_TIMINGS, dwellHallCallS: -1 })).toThrow(
+      MetricsError,
+    );
+    expect(() => departureGapBracket({ ...MIDTOWN_TIMINGS, nearestFloorFlightS: -1 })).toThrow(
+      MetricsError,
+    );
+    // Zero is legitimate: the knock-out configurations `analytical/`'s validation runs drive
+    // door times to zero deliberately.
+    expect(() =>
+      departureGapBracket({ ...MIDTOWN_TIMINGS, doorOpenS: 0, doorCloseS: 0 }),
+    ).not.toThrow();
+  });
+
+  it('resolves in the order explicit, derived, fallback — and reports which', () => {
+    expect(resolveDepartureGapS({ departureGapS: 42, carTimings: MIDTOWN_TIMINGS })).toEqual({
+      gapS: 42,
+      basis: 'explicit',
+    });
+    expect(resolveDepartureGapS({ carTimings: MIDTOWN_TIMINGS })).toEqual({
+      gapS: departureGapBracket(MIDTOWN_TIMINGS).gapS,
+      basis: 'derived',
+    });
+    expect(resolveDepartureGapS({})).toEqual({
+      gapS: FALLBACK_DEPARTURE_GAP_S,
+      basis: 'fallback',
+    });
+    expect(() => resolveDepartureGapS({ departureGapS: -1 })).toThrow(MetricsError);
+  });
+
+  it('a door reopen inside one loading is not a second departure', () => {
+    // The synthetic case the defect was invisible in. One car, one load, one reopen: eight
+    // people board, the doors start to close, a straggler puts a hand in, and the last two board
+    // after the reopen — `openS + dwell + closeS = 20.16 s` later. Then the car goes away and
+    // comes back 190 s after that.
+    const bracket = departureGapBracket(MIDTOWN_TIMINGS);
+    const reopenS = bracket.maxReopenS;
+    const legs = [
+      ...Array.from({ length: 8 }, (_, i) =>
+        boarding({ passengerId: `first-${i}`, carId: 'c1', boardedAt: 100 + i * 1.2 }),
+      ),
+      // Post-reopen boardings: 20.16 s after the last pre-reopen one.
+      boarding({ passengerId: 'late-0', carId: 'c1', boardedAt: 108.4 + reopenS }),
+      boarding({ passengerId: 'late-1', carId: 'c1', boardedAt: 109.6 + reopenS }),
+      // The genuine next departure of the same car, one round trip later.
+      ...Array.from({ length: 8 }, (_, i) =>
+        boarding({ passengerId: `next-${i}`, carId: 'c1', boardedAt: 300 + reopenS + i * 1.2 }),
+      ),
+    ];
+    const window: ReportWindow = { id: 'w', startS: 0, endS: 600 };
+
+    const derived = achievedIntervalOf(legs, { window, carTimings: MIDTOWN_TIMINGS });
+    expect(derived.departureGapBasis).toBe('derived');
+    expect(derived.departureCount).toBe(2);
+    expect(derived.meanS).toBeCloseTo(300 + reopenS + 8.4 - (109.6 + reopenS), 9);
+
+    // The fallback constant gets the same answer on this building — that is what makes it a
+    // usable fallback — and the value that shipped before the fix does not.
+    expect(achievedIntervalOf(legs, { window }).departureCount).toBe(2);
+    expect(achievedIntervalOf(legs, { window, departureGapS: 10 }).departureCount).toBe(3);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The fallback constant, against every building the project ships
+ * -------------------------------------------------------------------------- */
+
+describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracket', () => {
+  let config: LoadedConfig;
+
+  beforeAll(async () => {
+    config = await loadConfig(REAL_DATA_DIR);
+  }, 60_000);
+
+  /**
+   * `tp` for a car, as the simulator will actually charge it.
+   *
+   * Every car in `data/buildings` now carries a resolved `passengerTransferS` — the building
+   * type's row for a single-use building, an authored per-car value for the two mixed-use towers
+   * — so this reads the value and does not invent one.
+   *
+   * **This function used to substitute the slowest row for `mixed-use`**, which made the survey
+   * below model a building that did not exist: it charged those cars 1.75 s while the simulator
+   * charged them 1.2 s, and at 1.2 s both of this file's structural claims are false (the maximum
+   * reopen across all 14 banks drops to 28.8 s against a 29.0 s minimum ceiling, so a constant
+   * *is* safe on every shipped bank, and no bracket is empty). The premise is now true of the
+   * data rather than assumed by the test. See `data/buildings/mixed-use-high-rise.json`'s notes
+   * for why the shuttles are authored at 1.75 s.
+   */
+  function transferOf(car: ResolvedCar, building: ResolvedBuilding): number {
+    const { passengerTransferS } = car;
+    if (passengerTransferS === undefined) {
+      throw new Error(
+        `car "${car.id}" in building "${building.id}" carries no resolved passengerTransferS. ` +
+          'resolveBuilding derives it from the building type and the two mixed-use towers declare ' +
+          'it per car; a car without one means one of those two paths has regressed.',
+      );
+    }
+    return passengerTransferS;
+  }
+
+  /**
+   * `CarTimings` for one bank, assembled the way a runner would: door timings and the machine's
+   * fixed overheads off the resolved cars, `P·tp` off the design load, and the first hop's
+   * flight time from the project's own jerk-limited `travelTime`.
+   */
+  function timingsOf(building: ResolvedBuilding, bank: ResolvedBank): CarTimings | undefined {
+    const cars = bank.cars;
+    if (cars.length === 0) return undefined;
+
+    const served = bank.servesFloors
+      .map((id) => building.floorsById.get(id))
+      .filter((floor): floor is FloorConfig => floor !== undefined)
+      .sort((a, b) => a.heightM - b.heightM);
+    const terminal = served.find((floor) => floor.isEntrance) ?? served[0];
+    if (terminal === undefined) return undefined;
+    const nearest = served.find((floor) => floor.heightM > terminal.heightM);
+    if (nearest === undefined) return undefined;
+
+    const worst = (of: (car: ResolvedCar) => number): number => Math.max(...cars.map(of));
+    const transferS = worst((car) => transferOf(car, building));
+    const fastest = cars.reduce((a, b) => (b.ratedSpeedMps > a.ratedSpeedMps ? b : a));
+
+    return {
+      doorOpenS: worst((car) => car.doorOpenS),
+      doorCloseS: worst((car) => car.doorCloseS),
+      dwellHallCallS: worst((car) => car.dwellHallCallS),
+      dwellCarCallS: worst((car) => car.dwellCarCallS),
+      fullLoadTransferS: worst((car) => car.designCapacityPersons) * transferS,
+      // The *shortest* first hop, flown by the *fastest* car: both pull the upper bound of the
+      // bracket down, which is the conservative direction for a check that must not pass by
+      // accident.
+      nearestFloorFlightS: travelTime(nearest.heightM - terminal.heightM, fastest),
+      motorStartDelayS: Math.min(...cars.map((car) => car.motorStartDelayS)),
+      levelingSettleS: Math.min(...cars.map((car) => car.levelingSettleS)),
+    };
+  }
+
+  interface Row {
+    readonly id: string;
+    readonly maxReopenS: number;
+    /** `undefined` when the bracket is empty: no threshold at all can work on that bank. */
+    readonly minRoundTripS: number | undefined;
+  }
+
+  function everyBankBracket(): readonly Row[] {
+    const rows: Row[] = [];
+    for (const [buildingId, building] of config.buildingsById) {
+      for (const bank of building.banks) {
+        const timings = timingsOf(building, bank);
+        if (timings === undefined) continue;
+        const id = `${buildingId}/${bank.id}`;
+
+        // Dropping the flight time isolates the reopen bound, which always exists.
+        const { nearestFloorFlightS: _drop, ...reopenOnly } = timings;
+        const maxReopenS = departureGapBracket(reopenOnly).maxReopenS;
+        let minRoundTripS: number | undefined;
+        try {
+          minRoundTripS = departureGapBracket(timings).minRoundTripS;
+        } catch (error) {
+          // An empty bracket is a legitimate verdict about a bank, not a failure here: a
+          // 19-person car whose first hop is one floor can hold its doors longer than it takes
+          // to go up and come back. Recorded, and asserted about below.
+          expect(error).toBeInstanceOf(MetricsError);
+        }
+        rows.push({ id, maxReopenS, minRoundTripS });
+      }
+    }
+    // Guard against a vacuous pass if the fixtures or the bank shapes change.
+    expect(rows.length).toBeGreaterThanOrEqual(8);
+    return rows;
+  }
+
+  it('the value that shipped before the fix was under every shipped bank’s reopen bound', () => {
+    // The defect, machine-checked across all of `data/buildings` rather than argued from two of
+    // them: 10 s could not have been right anywhere.
+    for (const row of everyBankBracket()) {
+      expect(row.maxReopenS, row.id).toBeGreaterThan(10);
+    }
+  }, 60_000);
+
+  it('the fallback is inside the bracket of every bank Phase 2 measures an interval on', () => {
+    // The banks a single-terminal up-peak is defined on, which is where an achieved interval is
+    // a meaningful number at all — both Phase 2 buildings and both zones of the secure tower.
+    const measured = new Set([
+      'midtown-office/main',
+      'garden-apartments/main',
+      'secure-tower/low',
+      'secure-tower/high',
+    ]);
+    const rows = everyBankBracket().filter((row) => measured.has(row.id));
+    expect(rows.map((row) => row.id).sort()).toEqual([...measured].sort());
+
+    for (const row of rows) {
+      // If reference data ever moves the fallback out of one of these brackets, supply
+      // `CarTimings` for that building — do not retune the constant to make this pass.
+      expect(row.minRoundTripS, row.id).toBeDefined();
+      expect(FALLBACK_DEPARTURE_GAP_S, row.id).toBeGreaterThan(row.maxReopenS);
+      expect(FALLBACK_DEPARTURE_GAP_S, row.id).toBeLessThan(row.minRoundTripS as number);
+    }
+  }, 60_000);
+
+  it('and no constant is safe on all of them, which is why the derivation is not optional', () => {
+    // A mixed-use tower's shuttle takes longer to load a full car than Midtown Office's whole
+    // shortest round trip takes to complete, so those two brackets do not overlap: no single
+    // number can serve both buildings. This is the assertion that stops the fallback from being
+    // read as the answer, and it cannot be satisfied by moving the constant.
+    //
+    // **These assertions rest entirely on the authored transfer times**, so the exact figures are
+    // pinned rather than left implicit. At the uniform office 1.2 s the worst reopen across all
+    // fourteen banks is 28.8 s against a 29.0 s minimum ceiling — a constant *would* be safe
+    // everywhere by 0.2 s, no bracket would be empty, and every claim below would be false. The
+    // difference is that the shuttles and the residential banks are authored at 1.75 s and the
+    // hotel zone at 1.5 s. `transferOf` reads those values; it does not supply them.
+    const rows = everyBankBracket();
+    const detail = rows
+      .map((row) => `${row.id} (${row.maxReopenS.toFixed(1)}, ${row.minRoundTripS?.toFixed(1) ?? 'empty'})`)
+      .join('; ');
+    const ceilings = rows
+      .map((row) => row.minRoundTripS)
+      .filter((value): value is number => value !== undefined);
+
+    // The survey is the whole shipped set, not a subset that happens to prove the point.
+    expect(rows.length, detail).toBe(14);
+
+    // 39.8 s — a 20-person shuttle at 1.75 s — against a 29.0 s floor on Midtown Office.
+    expect(Math.max(...rows.map((row) => row.maxReopenS)), detail).toBeCloseTo(39.8, 6);
+    expect(Math.min(...ceilings), detail).toBeCloseTo(29.0, 1);
+    expect(Math.max(...rows.map((row) => row.maxReopenS)), detail).toBeGreaterThan(
+      Math.min(...ceilings),
+    );
+
+    // Five of the fourteen sit at or above the fallback, so on those it would split one loading
+    // into two departures — the original defect, in the banks the fallback does not cover.
+    const unsafe = rows.filter((row) => FALLBACK_DEPARTURE_GAP_S <= row.maxReopenS);
+    expect(unsafe.map((row) => row.id).sort(), detail).toEqual([
+      'mixed-use-high-rise/residential-local',
+      'mixed-use-high-rise/shuttle',
+      'vertical-city/shuttle',
+      'vertical-city/zone-5-local',
+      'vertical-city/zone-6-local',
+    ]);
+
+    // Stronger still, and worth stating in a test rather than in prose: on some banks *no*
+    // threshold works, because a full load's dwell outlasts a one-floor round trip. An achieved
+    // interval on those needs a car-position series, not boarding times — see
+    // `departureGapBracket`'s @throws. `sim/simulation.ts` meets this as a `MetricsError`, reports
+    // it as `departureGapBasis: 'unmeasurable'` and publishes no interval, which is the correct
+    // outcome: an interval that cannot be measured must not be reported.
+    expect(
+      rows.filter((row) => row.minRoundTripS === undefined).map((row) => row.id).sort(),
+      detail,
+    ).toEqual([
+      'mixed-use-high-rise/residential-local',
+      'vertical-city/shuttle',
+      'vertical-city/zone-6-local',
+    ]);
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *

@@ -38,6 +38,13 @@
  * {@link achievedIntervalOf} of its `INT`. docs/05-roadmap.md asks for both to match
  * `analytical/` "within a few percent" under pure up-peak, so both are computed from the same
  * record, in the same units, over the same window.
+ *
+ * They must also agree with **each other**: `HC5 = 300·P·L/RTT` and `INT = RTT/L` are the same
+ * statement, so the round trip the interval implies and the one the throughput implies have to
+ * match. `metrics/consistency.test.ts` asserts that on both Phase 2 buildings, with `P` taken
+ * from the record's load samples so the check is not circular. It is worth more than either
+ * comparison against the closed form: it caught a departure-clustering threshold that was
+ * shorter than a door reopen, which no agreement-within-a-few-percent band did.
  */
 
 import type { SimTime } from '../kernel/types.js';
@@ -63,6 +70,8 @@ import {
   windowContainsArrival,
   windowContainsJourney,
   windowDurationS,
+  type CarTimings,
+  type DepartureGapBasis,
   type DurationStatistics,
   type HandlingCapacity,
   type IntervalStatistics,
@@ -737,15 +746,303 @@ export function handlingCapacityOf(
  * -------------------------------------------------------------------------- */
 
 /**
- * Longest pause between two boardings by the same car that still counts as one departure.
+ * The window in which a departure-clustering threshold is safe, derived from a building's own
+ * timings rather than chosen.
  *
- * **10 s.** Loading is a passenger every 1–2 s and a door reopen adds a few more; a car does
- * not come back to the terminal inside a round trip, which is tens of seconds at minimum. Any
- * value between "a slow transfer" and "a fast round trip" gives the same answer, which is why
- * a fixed default is safe — and it is declared in {@link METRICS_PARAMETERS} for the cases
- * where it is not.
+ * A run record stores boardings, not departures, so a departure is reconstructed by splitting a
+ * car's terminal boardings wherever they are far enough apart. "Far enough" has to sit between
+ * two real quantities:
+ *
+ * - **above** the longest pause *inside* one loading. That is a door reopen — a late arrival
+ *   puts a hand in the doors — and a reopen costs `openS + dwell + closeS`, because the doors
+ *   must finish closing before they can start opening again. The dwell it earns is
+ *   `max(policy dwell, transfer seconds)`, so a full load's transfer usually sets it.
+ * - **below** the shortest genuine round trip: out to the nearest served floor and back, two
+ *   flights plus two stops' worth of fixed overhead.
+ *
+ * A threshold under the first counts one loading as two departures and reports an interval that
+ * is too short — flatteringly, which is the direction CLAUDE.md § Statistical discipline warns
+ * about. A threshold over the second merges two round trips and reports one that is too long.
+ * *Between* them the answer is genuinely insensitive to the exact value, which is what makes
+ * {@link DepartureGapBracket.gapS} defensible.
+ *
+ * On the two buildings Phase 2 is validated against, with `P` the integer design load:
+ *
+ * | | `openS` | dwell | `P·tp` | `closeS` | max reopen | min round trip | derived gap |
+ * |---|---|---|---|---|---|---|---|
+ * | Midtown Office · main | 1.8 | 5.0 | 12 × 1.20 = 14.4 | 3.0 | **19.2 s** | 29.0 s | 24.1 s |
+ * | Garden Apartments · main | 2.5 | 5.0 | 8 × 1.75 = 14.0 | 4.0 | **20.5 s** | 36.5 s | 28.5 s |
+ *
+ * (Those `min round trip` figures come from the cars' rated kinematics. The runner flies them
+ * under the dispatcher profile's comfort envelope, which is slower — 30.5 s and a 24.8 s gap on
+ * Midtown. Either lands in the same empty band, which is the point of a bracket.)
+ *
+ * Both max-reopen figures are about twice the 10 s the default used to be — and so is the
+ * *bare* reopen at the policy dwell, 9.8 s and 11.5 s. The gap histogram over 128 replications
+ * of each is cleanly bimodal about the bracket: a spike at exactly that bare reopen cost,
+ * nothing between ~20 s and ~30 s, then real round trips. That empty band is the bracket,
+ * measured.
+ *
+ * **The bracket can be empty**, and on three of the fourteen shipped banks it is — a 20-person car
+ * whose first served floor is one floor up can hold its doors longer than it takes to go up and
+ * come back:
+ *
+ * | bank | `P·tp` | max reopen | min round trip |
+ * |---|---|---|---|
+ * | Mixed-Use High-Rise · residential-local | 16 × 1.75 = 28.0 | 32.8 s | 31.3 s |
+ * | Vertical City · shuttle | 20 × 1.75 = 35.0 | 39.8 s | 30.0 s |
+ * | Vertical City · zone-6-local | 16 × 1.75 = 28.0 | 32.8 s | 30.0 s |
+ *
+ * That is a real limit of reconstructing departures from boarding times, not a tuning problem —
+ * see the `@throws` on {@link departureGapBracket}. `achievedIntervalOf` reports it as
+ * `departureGapBasis: 'unmeasurable'` and returns no interval.
+ *
+ * Both mixed-use towers' **terminals** land there too, for a second reason: the worst case is
+ * taken across every bank serving the terminal, and at Mixed-Use's ground lobby a shuttle holding
+ * its doors 39.8 s shares the floor with an office-local car whose whole round trip is 31.3 s. Two
+ * banks with duty cycles that different do not have one achieved interval between them, whatever
+ * threshold is chosen, so refusing to report one is the correct answer rather than a limitation.
  */
-export const DEFAULT_DEPARTURE_GAP_S = 10;
+export interface DepartureGapBracket {
+  /** `openS + max(hall dwell, car dwell, P·tp) + closeS`, seconds. The lower bound. */
+  readonly maxReopenS: number;
+  /**
+   * Terminal to the nearest served floor and back, seconds — the upper bound. `undefined` when
+   * {@link CarTimings.nearestFloorFlightS} was not supplied, in which case there is nothing to
+   * check the threshold against from above.
+   */
+  readonly minRoundTripS: number | undefined;
+  /** The threshold to use: the bracket midpoint, or a margin above the reopen bound. */
+  readonly gapS: number;
+  /** Which of those two {@link gapS} is. */
+  readonly basis: 'bracket-midpoint' | 'reopen-margin';
+}
+
+/**
+ * Fraction above {@link DepartureGapBracket.maxReopenS} to sit when there is no upper bound.
+ *
+ * Any value strictly above the reopen bound separates a reopen from a return, so this margin is
+ * only insurance against the bound itself being slightly understated — an adaptive dwell that
+ * ran longer than its policy value, say. 25 % of a ~20 s reopen is ~5 s, which stays far below
+ * the shortest round trip any shipped building has (30.5 s, on the building with the *fastest*
+ * cars and the *shortest* first hop).
+ */
+export const DEPARTURE_GAP_REOPEN_MARGIN = 0.25;
+
+/**
+ * The departure-clustering threshold this building's doors imply. See {@link DepartureGapBracket}.
+ *
+ * Pure, and total on well-formed input: every timing must be finite and non-negative.
+ *
+ * @throws MetricsError if a timing is not finite and non-negative, or if the bracket is empty —
+ *   the longest reopen is at least the shortest round trip, so **no** threshold can separate
+ *   the two and departures cannot be reconstructed from boarding times at all. That is a
+ *   statement about the building, not about this function: it needs a car-position series
+ *   instead. Three of the fourteen shipped banks are in that position, and so are both mixed-use
+ *   towers' terminals — see the table on {@link DepartureGapBracket}. A caller measuring a metric
+ *   rather than asking for a bracket should let `achievedIntervalOf` report it as
+ *   `departureGapBasis: 'unmeasurable'` instead of catching this.
+ */
+export function departureGapBracket(timings: CarTimings): DepartureGapBracket {
+  const attempt = bracketOrEmpty(timings);
+  if (attempt.kind === 'empty') {
+    throw new MetricsError(
+      `The longest door reopen (${attempt.maxReopenS.toFixed(2)} s) is not shorter than the shortest ` +
+        `round trip (${attempt.minRoundTripS.toFixed(2)} s), so no clustering threshold can tell a reopen ` +
+        'from a car that left and came back. Reconstruct departures from car motion instead of ' +
+        'from boarding times.',
+    );
+  }
+  return attempt.bracket;
+}
+
+/** What {@link departureGapBracket} computes, before deciding whether to throw about it. */
+type BracketAttempt =
+  | { readonly kind: 'bracket'; readonly bracket: DepartureGapBracket }
+  | { readonly kind: 'empty'; readonly maxReopenS: number; readonly minRoundTripS: number };
+
+/**
+ * The bracket, or the verdict that there is none, without throwing about the latter.
+ *
+ * Two callers need the same arithmetic and disagree only about what an empty bracket *means*:
+ * {@link departureGapBracket} treats it as an exception because its job is to hand back a
+ * threshold, and {@link resolveDepartureGapS} treats it as an answer because its job is to
+ * report how an interval was measured. A malformed timing is a caller bug either way, so that
+ * still throws from here.
+ */
+function bracketOrEmpty(timings: CarTimings): BracketAttempt {
+  const required = [
+    ['doorOpenS', timings.doorOpenS],
+    ['doorCloseS', timings.doorCloseS],
+    ['dwellHallCallS', timings.dwellHallCallS],
+    ['dwellCarCallS', timings.dwellCarCallS],
+    ['fullLoadTransferS', timings.fullLoadTransferS],
+  ] as const;
+  const optional = [
+    ['nearestFloorFlightS', timings.nearestFloorFlightS],
+    ['motorStartDelayS', timings.motorStartDelayS],
+    ['levelingSettleS', timings.levelingSettleS],
+  ] as const;
+  for (const [name, value] of required) {
+    if (!Number.isFinite(value) || (value as number) < 0) {
+      throw new MetricsError(
+        `Car timing ${name} must be a finite, non-negative number of seconds; received ${value}.`,
+      );
+    }
+  }
+  for (const [name, value] of optional) {
+    if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
+      throw new MetricsError(
+        `Car timing ${name} must be a finite, non-negative number of seconds when supplied; received ${value}.`,
+      );
+    }
+  }
+
+  const maxReopenS =
+    timings.doorOpenS +
+    Math.max(timings.dwellHallCallS, timings.dwellCarCallS, timings.fullLoadTransferS) +
+    timings.doorCloseS;
+
+  if (timings.nearestFloorFlightS === undefined) {
+    return {
+      kind: 'bracket',
+      bracket: {
+        maxReopenS,
+        minRoundTripS: undefined,
+        gapS: maxReopenS * (1 + DEPARTURE_GAP_REOPEN_MARGIN),
+        basis: 'reopen-margin',
+      },
+    };
+  }
+
+  // The absent motion terms default to 0 rather than to a typical value: that shortens the
+  // shortest round trip, which tightens the bracket. Erring toward "these two are too close to
+  // separate" is the safe direction for a check whose job is to refuse a bad threshold.
+  const legS =
+    timings.doorCloseS +
+    (timings.motorStartDelayS ?? 0) +
+    timings.nearestFloorFlightS +
+    (timings.levelingSettleS ?? 0) +
+    timings.doorOpenS;
+  const minRoundTripS = 2 * legS + timings.dwellHallCallS + timings.dwellCarCallS;
+
+  if (!(maxReopenS < minRoundTripS)) return { kind: 'empty', maxReopenS, minRoundTripS };
+  return {
+    kind: 'bracket',
+    bracket: {
+      maxReopenS,
+      minRoundTripS,
+      gapS: (maxReopenS + minRoundTripS) / 2,
+      basis: 'bracket-midpoint',
+    },
+  };
+}
+
+/**
+ * Departure-clustering threshold for a record that does not carry its {@link CarTimings}.
+ *
+ * **A fallback, not a derivation.** The honest value is `departureGapBracket(...)` off the
+ * cars that ran; this exists so a record written without timings — an old one, a synthetic
+ * one, a hand-built fixture — still produces a number instead of an exception, and it announces
+ * itself through {@link IntervalStatistics.departureGapBasis} as `fallback`.
+ *
+ * **No run the simulator performs reaches it.** `sim/simulation.ts` assembles `CarTimings` off the
+ * cars it built and attaches them to every record, so every shipped building reports either
+ * `derived` (Midtown Office 24.1 s, Garden Apartments 28.5 s, Secure Tower 27.4 s) or
+ * `unmeasurable` (both mixed-use towers). That was not true when this constant was introduced —
+ * the recorder was constructed without `carTimings`, so every real run reported `fallback` and
+ * this value, and the derivation below ran only in tests. `sim/simulation.test.ts` now asserts the
+ * basis is `derived` on Midtown and Garden so the wiring cannot be dropped again.
+ *
+ * **26.5 s** — the midpoint of the *intersection* of the brackets of every bank an achieved
+ * interval is currently measured on:
+ *
+ * | building / bank | max reopen | min round trip |
+ * |---|---|---|
+ * | Midtown Office · main | 19.2 s | 29.0 s |
+ * | Garden Apartments · main | 20.5 s | 36.5 s |
+ * | Secure Tower · low | 24.0 s | 30.8 s |
+ * | Secure Tower · high | 24.0 s | 59.4 s |
+ * | **intersection** | **24.0 s** | **29.0 s** |
+ *
+ * `metrics/interval.test.ts` re-derives that table from `data/` and asserts this constant lies
+ * inside every row of it, so reference data that invalidates it fails a test instead of quietly
+ * biasing an interval. Fix such a failure by supplying {@link CarTimings}, **not** by retuning
+ * this number.
+ *
+ * The margin is 2.5 s either side, and it does not extend to the rest of `data/buildings`. The same
+ * test surveys all fourteen shipped banks at the transfer time each car is actually charged, and
+ * the survey does not overlap:
+ *
+ * - the mixed-use towers' shuttles reopen for up to **39.8 s** (a 20-person car at the residential
+ *   1.75 s), which is longer than Midtown Office's *entire* shortest round trip of 29.0 s;
+ * - **three of the fourteen** — Mixed-Use's `residential-local`, Vertical City's `shuttle` and
+ *   `zone-6-local` — have no valid bracket at all;
+ * - and this constant is at or below the reopen bound of **five** of them (both shuttles, both
+ *   residential locals and Vertical City's hotel zone), so using it there would split one loading
+ *   into two departures, which is the original defect.
+ *
+ * **No constant can cover an arbitrary building.** That is asserted too, so this cannot be mistaken
+ * for the answer. Those assertions are load-bearing and they are only true because every car in
+ * `data/buildings` declares or resolves its own `passengerTransferS`: at a uniform office 1.2 s the
+ * worst reopen across all fourteen banks falls to 28.8 s against a 29.0 s minimum ceiling, no
+ * bracket is empty, and a single constant *would* be safe everywhere by a 0.2 s margin. The
+ * survey previously modelled 1.75 s on cars the simulator charged 1.2 s, which made the premise an
+ * assumption of the test rather than a property of the data. It is now a property of the data.
+ *
+ * The previous value, 10 s, was below the reopen bound of *every* bank in `data/buildings`, so
+ * any loading that reopened counted as two departures and the interval read short —
+ * flatteringly. Measured over 16 replications at a 1800 s peak: Midtown Office 44.3 s against
+ * 47.8 s (−7.4 %), Garden Apartments 51.4 s against 60.2 s (−14.6 %). That is the defect this
+ * constant replaces. On both of those buildings this fallback and the derived threshold return
+ * the *same* interval to the last decimal — which is what a value inside the bracket means.
+ */
+export const FALLBACK_DEPARTURE_GAP_S = 26.5;
+
+/**
+ * @deprecated Renamed to {@link FALLBACK_DEPARTURE_GAP_S}, which says what it is. Kept as an
+ * alias so existing importers keep compiling; there is no separate "default" any more —
+ * a threshold is either derived from {@link CarTimings} or it is this fallback.
+ */
+export const DEFAULT_DEPARTURE_GAP_S = FALLBACK_DEPARTURE_GAP_S;
+
+/**
+ * {@link achievedIntervalOf}'s threshold, and where it came from. Pure.
+ *
+ * Four outcomes, matching {@link DepartureGapBasis}. The one that needs explaining is
+ * `unmeasurable`: when {@link CarTimings} are supplied and {@link departureGapBracket} rejects
+ * them because the bracket is empty, that is **not** an error in the caller's request — it is the
+ * honest answer to it. The building cannot have its departures reconstructed from boarding times
+ * at any threshold, so this returns `NaN` and lets `achievedIntervalOf` report no interval.
+ * Falling back to {@link FALLBACK_DEPARTURE_GAP_S} there would be the worst option available:
+ * that constant is inside no bracket on such a building, so the number would be meaningless *and*
+ * indistinguishable from the cases where it is sound.
+ *
+ * `departureGapBracket` itself still throws, and callers who want the bracket rather than a
+ * metric still get the exception.
+ */
+export function resolveDepartureGapS(options: {
+  readonly departureGapS?: number | undefined;
+  readonly carTimings?: CarTimings | undefined;
+}): { readonly gapS: number; readonly basis: DepartureGapBasis } {
+  if (options.departureGapS !== undefined) {
+    if (!Number.isFinite(options.departureGapS) || options.departureGapS < 0) {
+      throw new MetricsError(
+        `Departure gap must be a non-negative number of seconds; received ${options.departureGapS}.`,
+      );
+    }
+    return { gapS: options.departureGapS, basis: 'explicit' };
+  }
+  if (options.carTimings !== undefined) {
+    const attempt = bracketOrEmpty(options.carTimings);
+    // A malformed timing still throws out of `bracketOrEmpty`; only the empty-bracket *verdict*
+    // degrades, and it degrades to `NaN` rather than to the fallback constant.
+    return attempt.kind === 'empty'
+      ? { gapS: Number.NaN, basis: 'unmeasurable' }
+      : { gapS: attempt.bracket.gapS, basis: 'derived' };
+  }
+  return { gapS: FALLBACK_DEPARTURE_GAP_S, basis: 'fallback' };
+}
 
 export interface IntervalOptions {
   readonly window: ReportWindow;
@@ -755,7 +1052,16 @@ export interface IntervalOptions {
    * {@link IntervalStatistics.terminalFloorId}.
    */
   readonly terminalFloorIds?: readonly string[] | undefined;
-  /** Departure clustering threshold. Default {@link DEFAULT_DEPARTURE_GAP_S}. */
+  /**
+   * Timings of the cars serving the terminal, which the clustering threshold is derived from.
+   * Overrides `RunRecord.carTimings`. Ignored when {@link departureGapS} is given.
+   */
+  readonly carTimings?: CarTimings | undefined;
+  /**
+   * Departure clustering threshold, seconds. Overrides the derivation — pass it to re-threshold
+   * a stored run, or when the timings are not to hand. Absent both, the derivation runs off
+   * {@link carTimings}, and absent that too, {@link FALLBACK_DEPARTURE_GAP_S}.
+   */
   readonly departureGapS?: number | undefined;
   readonly percentileMethod?: PercentileMethod | undefined;
 }
@@ -781,7 +1087,13 @@ interface Departure {
  * are the gaps between successive departures once every car's departures are merged and
  * sorted.
  *
- * Two deliberate choices:
+ * **The threshold is derived, not chosen** — see {@link departureGapBracket}. The pause a door
+ * reopen leaves inside one loading is `openS + max(dwell, P·tp) + closeS`, around 20 s on both
+ * shipped buildings, so a plausible-sounding constant splits one loading into two departures
+ * and reports an interval up to 18 % short. Supply {@link CarTimings} (on the record or in
+ * these options) and this is computed from the doors that ran.
+ *
+ * Three deliberate choices:
  *
  * - **Boardings, not arrivals at the floor.** A car that stops at the lobby and takes nobody
  *   has not made a trip; the interval that matters to a waiting passenger is between the
@@ -789,6 +1101,17 @@ interface Departure {
  * - **Legs without a `carId` are skipped**, and reported in the difference between
  *   {@link IntervalStatistics.boardingCount} and the window's boardings. A departure is a
  *   *car* leaving, and there is no honest way to reconstruct one without knowing which car.
+ * - **The provenance of the threshold is reported**, on
+ *   {@link IntervalStatistics.departureGapBasis}. A `fallback` interval and a `derived` one are
+ *   not equally trustworthy and the number alone does not say which it is.
+ *
+ * And one case where the honest answer is no answer: when the supplied {@link CarTimings} prove
+ * the bracket is empty, **no interval is reported at all** — every duration is `NaN`, the counts
+ * are 0 and the basis is `unmeasurable`. Both mixed-use towers' terminals are in that position,
+ * because a shuttle holding its doors for a full 20-person load at 1.75 s outlasts the shortest
+ * round trip an office-local car beside it can make. Reporting
+ * {@link FALLBACK_DEPARTURE_GAP_S} there would be a number from outside every bracket, dressed as
+ * a measurement.
  *
  * The spread matters as much as the mean here — see {@link IntervalStatistics}.
  */
@@ -797,13 +1120,23 @@ export function achievedIntervalOf(
   options: IntervalOptions,
 ): IntervalStatistics {
   const window = assertWindow(options.window);
-  const departureGapS = options.departureGapS ?? DEFAULT_DEPARTURE_GAP_S;
-  if (!Number.isFinite(departureGapS) || departureGapS < 0) {
-    throw new MetricsError(
-      `Departure gap must be a non-negative number of seconds; received ${departureGapS}.`,
-    );
-  }
+  const { gapS: departureGapS, basis: departureGapBasis } = resolveDepartureGapS(options);
   const percentileMethod = options.percentileMethod ?? DEFAULT_PERCENTILE_METHOD;
+
+  // No threshold exists on this building, so no grouping is attempted. Returning the empty
+  // statistics is not a degraded measurement — it is the absence of one, which is what the
+  // caller must see rather than a plausible number derived from nothing.
+  if (departureGapBasis === 'unmeasurable') {
+    return Object.freeze({
+      ...summarizeDurations([], { percentileMethod }),
+      departureCount: 0,
+      carCount: 0,
+      boardingCount: 0,
+      coefficientOfVariation: Number.NaN,
+      departureGapS,
+      departureGapBasis,
+    });
+  }
 
   const boarded = records.filter(
     (record) => record.boardedAt !== undefined && windowContains(window, record.boardedAt),
@@ -873,6 +1206,7 @@ export function achievedIntervalOf(
     boardingCount,
     coefficientOfVariation,
     departureGapS,
+    departureGapBasis,
   });
 }
 
@@ -956,7 +1290,15 @@ export interface SummarizeOptions {
   readonly maxUnservedFraction?: number | undefined;
   /** Terminal floor(s) for the achieved interval. See {@link IntervalOptions}. */
   readonly terminalFloorIds?: readonly string[] | undefined;
-  /** Departure clustering threshold for the achieved interval, seconds. */
+  /**
+   * Car timings the departure-clustering threshold is derived from, overriding
+   * `RunRecord.carTimings`. See {@link CarTimings} and {@link departureGapBracket}.
+   */
+  readonly carTimings?: CarTimings | undefined;
+  /**
+   * Departure clustering threshold for the achieved interval, seconds. Overrides the
+   * derivation — see {@link IntervalOptions.departureGapS}.
+   */
   readonly departureGapS?: number | undefined;
 }
 
@@ -1021,11 +1363,15 @@ export function summarizeRun(record: RunRecord, options: SummarizeOptions = {}):
 
   const handlingCapacity = handlingCapacityOf(record.passengers, window, record.population);
 
+  // The record's own timings are the honest source; options override them so a stored run can
+  // be re-thresholded without being re-simulated.
+  const carTimings = options.carTimings ?? record.carTimings;
   const achievedInterval = achievedIntervalOf(record.passengers, {
     window,
     ...(options.terminalFloorIds === undefined
       ? {}
       : { terminalFloorIds: options.terminalFloorIds }),
+    ...(carTimings === undefined ? {} : { carTimings }),
     ...(options.departureGapS === undefined ? {} : { departureGapS: options.departureGapS }),
     ...(options.percentileMethod === undefined
       ? {}
@@ -1215,12 +1561,12 @@ export const METRICS_PARAMETERS: readonly MetricsParameterSpec[] = [
   {
     id: 'metrics.departureGapS',
     type: 'continuous',
-    range: [0, 120],
+    range: [10, 120],
     scale: 'linear',
-    default: DEFAULT_DEPARTURE_GAP_S,
+    default: FALLBACK_DEPARTURE_GAP_S,
     unit: 's',
     description:
-      'Longest pause between two boardings by the same car at the terminal that still counts as one departure, when reconstructing the achieved interval from boarding times.',
+      'Longest pause between two boardings by the same car at the terminal that still counts as one departure, when reconstructing the achieved interval from boarding times. Leave it unset and it is derived from the cars\u2019 own door timings, which is the only way to get it right on an arbitrary building: the pause a door reopen leaves inside one loading is openS + max(dwell, P\u22c5tp) + closeS, about 20 s on the shipped buildings. The declared default is the fallback for records that carry no timings; the range runs from a bare reopen at the bottom to a slow round trip at the top, and every value in it is wrong on some building, which is why the derivation exists.',
   },
   {
     id: 'metrics.saturation.minSamples',

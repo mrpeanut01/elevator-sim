@@ -600,6 +600,14 @@ export const CLOSED_FORM_ASSUMPTIONS: readonly ClosedFormAssumption[] = [
     bias: 'under',
   },
   {
+    id: 'uniform-transfer-time',
+    assumption:
+      'tp is one number for the whole building, charged linearly as 2·P·tp: every passenger costs the same, and P of them cost P times as much.',
+    divergence:
+      'The simulator charges max(policy dwell, transfer seconds) per stop, so the linear term is only reached where enough people transfer at once to outlast the dwell floor. The boarding stop always does; upstairs stops with one or two alighting often do not. Raising tp therefore lengthens a simulated round trip by *less* than 2·P·Δtp — measured on Garden Apartments, moving tp from the office 1.2 s to the residential 1.75 s added 7.34 s where 2·P·Δtp predicts 9.24 s. tp is also not building-wide in a mixed tower: data/buildings/mixed-use-high-rise.json declares 1.2 s on the office bank and 1.75 s on the residential bank and the shuttle, so no single closed-form tp describes it and elevator-specs.json has no mixed-use row on purpose.',
+    bias: 'either',
+  },
+  {
     id: 'single-deck',
     assumption: 'One car body serving one floor at a time.',
     divergence:
@@ -657,6 +665,7 @@ export const CLOSED_FORM_COMPARISON_RULE: ClosedFormComparisonRule = {
     'uniform-floor-populations',
     'full-car-every-trip',
     'fractional-capacity',
+    'uniform-transfer-time',
     'single-deck',
   ],
 };

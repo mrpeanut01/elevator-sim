@@ -10,9 +10,18 @@
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import type { DispatcherProfile, LoadedConfig } from '../config/types.js';
-import { buildJourneys } from '../metrics/summarize.js';
-import { Car } from '../model/car/index.js';
+import { passengerTransferSecondsFor } from '../analytical/upPeak.js';
+import { parseBuilding, resolveBuilding } from '../config/parse.js';
+import { findPassengerTransferS } from '../config/resolveCar.js';
+import { ConfigError, ISSUE_CODES } from '../config/schema.js';
+import type { BuildingConfig, DispatcherProfile, LoadedConfig, ResolvedBuilding } from '../config/types.js';
+import {
+  FALLBACK_DEPARTURE_GAP_S,
+  buildJourneys,
+  departureGapBracket,
+  summarizeRun,
+} from '../metrics/summarize.js';
+import { CAR_DEFAULTS, Car } from '../model/car/index.js';
 import type { PassengerRecord } from '../metrics/types.js';
 
 import {
@@ -985,6 +994,396 @@ describe('the loop is driven by config, never by a profile id (invariant 7)', ()
     expect(parkedAtLobby).toBeGreaterThan(0);
     expect(parkResult.summary.waiting.meanS).toBeLessThan(stayResult.summary.waiting.meanS);
   });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The building's passenger transfer time reaches the cars
+ *
+ * REGRESSION, and the reason this section is end-to-end rather than a resolver unit test.
+ * `tp` is a property of the *building* — office 1.2 s, hotel 1.5 s, residential 1.75 s
+ * (`elevator-specs.json → timing.passengerTransferS`, ISO 4190-6) — and the wiring used to
+ * stop one step short of the only object that spends it. `Car.passengerTransferS` existed and
+ * `CarInit` accepted it, but `resolveCar` never derived it and this constructor never passed
+ * it, so every car in every building ran at `CAR_DEFAULTS.passengerTransferS` = 1.2 s.
+ *
+ * Measured on Garden Apartments (residential, so 1.75 s): the simulated round trip came out
+ * 119.0 s where 125.8 s is correct, ~5.4 % short, and handling capacity correspondingly
+ * optimistic. Midtown Office was unaffected *because 1.2 s is the office value*, which is
+ * exactly why checking the ResolvedCar — or checking only the named acceptance building —
+ * would have shipped it. So these tests read the number off constructed `Car`s and then
+ * prove it is actually charged at a stop.
+ * -------------------------------------------------------------------------- */
+
+describe('passenger transfer time reaches the car it is charged on', () => {
+  /** Every `Car` the runner builds for a building, constructed but never run. */
+  const carsFor = (buildingId: string): readonly Car[] =>
+    new Simulation(baseConfig(buildingId, 'nearest-car')).building.cars;
+
+  /** Garden Apartments with `passengerTransferS` stated on every car. */
+  function gardenWithTransfer(passengerTransferS: number) {
+    const base = config.buildingsById.get('garden-apartments');
+    if (base === undefined) throw new Error('no garden-apartments');
+    const authored = {
+      ...base.config,
+      banks: base.config.banks.map((bank) => ({
+        ...bank,
+        cars: bank.cars.map((car) => ({ ...car, passengerTransferS })),
+      })),
+    };
+    return resolveBuilding(
+      parseBuilding(structuredClone(authored), 'garden-variant.json'),
+      config.elevatorSpecs,
+      {
+        file: 'garden-variant.json',
+        trafficProfileIds: new Set(config.trafficProfiles.profiles.map((p) => p.id)),
+      },
+    );
+  }
+
+  it('gives every Garden Apartments car the residential value, not the office default', () => {
+    const table = config.elevatorSpecs.timing.passengerTransferS;
+    const cars = carsFor('garden-apartments');
+
+    expect(cars.length).toBe(2);
+    for (const car of cars) {
+      // The building's own `notes` field asks for exactly this.
+      expect(car.passengerTransferS).toBe(1.75);
+      expect(car.passengerTransferS).toBe(table.residential);
+      // The defect, stated so it cannot come back quietly.
+      expect(car.passengerTransferS).not.toBe(CAR_DEFAULTS.passengerTransferS);
+      expect(car.passengerTransferS).not.toBe(table.office);
+    }
+  });
+
+  it('gives every shipped building the transfer time its type calls for', () => {
+    const table = config.elevatorSpecs.timing.passengerTransferS;
+    const byBuilding = new Map(
+      BUILDING_IDS.map((id) => [id, [...new Set(carsFor(id).map((car) => car.passengerTransferS))]]),
+    );
+
+    expect(byBuilding.get('garden-apartments')).toEqual([table.residential]);
+    expect(byBuilding.get('midtown-office')).toEqual([table.office]);
+    expect(byBuilding.get('secure-tower')).toEqual([table.office]);
+    // `mixed-use` has no row in the table on purpose: a mixed tower's banks serve populations
+    // that transfer at different speeds, so there is no honest building-wide answer. Those two
+    // buildings therefore declare `passengerTransferS` **per car**, and the values that come back
+    // are several — which is the observable difference between "resolved per bank" and the single
+    // silent 1.2 s default that used to apply to all 51 of these cars.
+    expect(byBuilding.get('mixed-use-high-rise')?.slice().sort()).toEqual([
+      table.office,
+      table.residential,
+    ]);
+    expect(byBuilding.get('vertical-city')?.slice().sort()).toEqual([
+      table.office,
+      table.hotel,
+      table.residential,
+    ]);
+    // And no shipped car falls back to the code default any more. The default still exists for a
+    // hand-built `ResolvedCar`; nothing in `data/` reaches it.
+    for (const [id, values] of byBuilding) {
+      expect(values.length, id).toBeGreaterThan(0);
+      for (const value of values) expect(Number.isFinite(value), id).toBe(true);
+    }
+  });
+
+  it('gives each mixed-use bank the transfer time of the population it serves', () => {
+    // The per-bank detail, because the point of authoring these is that they differ *within* a
+    // building. An office-local bank at the residential value would overstate its round trip; a
+    // residential bank at the office value understates it, which is the original defect.
+    const table = config.elevatorSpecs.timing.passengerTransferS;
+    const byBank = (buildingId: string): Record<string, number> => {
+      const out: Record<string, number> = {};
+      for (const car of carsFor(buildingId)) out[car.bankId] = car.passengerTransferS;
+      return out;
+    };
+
+    expect(byBank('mixed-use-high-rise')).toEqual({
+      // Feeds floors 32–60, so residents are aboard every trip; the slower value is also the
+      // conservative one, and understating `tp` is the optimistic direction.
+      shuttle: table.residential,
+      'office-local': table.office,
+      'residential-local': table.residential,
+    });
+    expect(byBank('vertical-city')).toEqual({
+      shuttle: table.residential,
+      'zone-1-local': table.office,
+      'zone-2-local': table.office,
+      'zone-3-local': table.office,
+      'zone-4-local': table.office,
+      'zone-5-local': table.hotel,
+      'zone-6-local': table.residential,
+    });
+  });
+
+  it('reads the same table the closed-form oracle reads', () => {
+    // Two readers of one datum. If they ever disagree, the simulator and its own oracle are
+    // measuring different buildings, and the Phase 2 acceptance comparison is meaningless.
+    for (const type of ['office', 'residential', 'hotel', 'mixed-use'] as const) {
+      expect(findPassengerTransferS(config.elevatorSpecs, type)).toBe(
+        passengerTransferSecondsFor(config.elevatorSpecs, type),
+      );
+    }
+  });
+
+  /** `vertical-city`'s authored config with `passengerTransferS` removed from every car. */
+  function verticalCityWithoutTransfer(): BuildingConfig {
+    const base = config.buildingsById.get('vertical-city');
+    if (base === undefined) throw new Error('no vertical-city');
+    return parseBuilding(
+      structuredClone({
+        ...base.config,
+        banks: base.config.banks.map((bank) => ({
+          ...bank,
+          cars: bank.cars.map(({ passengerTransferS: _drop, ...car }) => car),
+        })),
+      }),
+      'vertical-city-stripped.json',
+    );
+  }
+
+  it('refuses the config outright when a mixed-use car states no transfer time', () => {
+    // The strongest form of the guarantee, and the one that closes the config layer: a mixed-use
+    // building whose cars do not declare `tp` is not loadable at all. Before `resolveBuilding`
+    // passed the building type down, this resolved happily with the field absent and the answer
+    // existed only inside `Simulation`.
+    let thrown: unknown;
+    try {
+      resolveBuilding(verticalCityWithoutTransfer(), config.elevatorSpecs, {
+        file: 'vertical-city-stripped.json',
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(ConfigError);
+    const issues = (thrown as ConfigError).issues;
+    // One per car, all of them located, rather than the first one.
+    expect(issues).toHaveLength(35);
+    for (const issue of issues) {
+      expect(issue.code).toBe(ISSUE_CODES.missingPassengerTransfer);
+      expect(issue.path).toMatch(/^banks\[\d+]\.cars\[\d+]\.passengerTransferS$/);
+    }
+    expect(issues[0]?.message).toContain('mixed-use');
+  });
+
+  it('says out loud when a hand-built car reaches the runner with no transfer time', () => {
+    // The remaining reachable path, now that the loader refuses: a `ResolvedBuilding` assembled
+    // without the config layer — which is what a fixture is. `Simulation` must still be loud here
+    // rather than spend a silent 1.2 s, because that silence *was* the defect.
+    const base = config.buildingsById.get('vertical-city');
+    if (base === undefined) throw new Error('no vertical-city');
+    const building: ResolvedBuilding = {
+      ...base,
+      banks: base.banks.map((bank) => ({
+        ...bank,
+        cars: bank.cars.map(({ passengerTransferS: _drop, ...car }) => car),
+      })),
+    };
+
+    const result = new Simulation({
+      ...baseConfig('vertical-city', 'nearest-car', { durationS: 300, onTimeout: 'report' }),
+      building,
+    }).run();
+
+    const said = result.warnings.filter((warning) =>
+      warning.includes('passenger transfer time is undetermined'),
+    );
+    expect(said).toHaveLength(1);
+    expect(said[0]).toContain('vertical-city');
+    expect(said[0]).toContain('mixed-use');
+    // Naming the fallback is the point: a silent 1.2 s is what caused the defect.
+    expect(said[0]).toContain(String(CAR_DEFAULTS.passengerTransferS));
+  });
+
+  it('is silent on every shipped building, because every one of them answers', () => {
+    for (const id of BUILDING_IDS) {
+      const result = runSimulation(
+        baseConfig(id, 'nearest-car', { durationS: 300, onTimeout: 'report' }),
+      );
+      expect(
+        result.warnings.filter((warning) => warning.includes('passenger transfer time')),
+        id,
+      ).toEqual([]);
+    }
+  }, 120_000);
+
+  it('lets a car state its own value, which beats the type default', () => {
+    const cars = new Simulation({
+      ...baseConfig('garden-apartments', 'nearest-car'),
+      building: gardenWithTransfer(1.2),
+    }).building.cars;
+
+    for (const car of cars) expect(car.passengerTransferS).toBe(1.2);
+  });
+
+  it('charges it at every stop: the same trace costs more at 1.75 s than at 1.2 s', () => {
+    // The value being *present* on the car proves nothing about it being spent. Two runs of
+    // the same seed differ in one number, so the passenger population is identical (common
+    // random numbers) and every second of difference is door dwell.
+    //
+    // Run under up-peak at the group's handling capacity, not at the residential 3–7 % rate.
+    // The dwell granted at a stop is `max(policy dwell, transfer)`, and with one or two
+    // passengers aboard the 5 s hall-call dwell covers the transfer entirely — `tp` is real
+    // but latent. It binds when cars leave the lobby loaded, which is also the operating point
+    // the round-trip-time oracle describes.
+    const upPeak = {
+      demand: {
+        directionalSplit: { incoming: 1, outgoing: 0, interfloor: 0 },
+        arrivalRatePctPop5min: 45,
+        peakWindowS: 900,
+      },
+    } as const;
+    const asBuilt = new Simulation({
+      ...baseConfig('garden-apartments', 'collective', upPeak),
+      building: gardenWithTransfer(1.2),
+    }).run();
+    const asSpecified = runSimulation(baseConfig('garden-apartments', 'collective', upPeak));
+
+    expect(asSpecified.trace.passengers).toEqual(asBuilt.trace.passengers);
+    expect(asSpecified.conservation.delivered).toBe(asBuilt.conservation.delivered);
+
+    const rideS = (result: SimulationResult): number => {
+      const rides = result.record.passengers.flatMap((leg) =>
+        leg.boardedAt === undefined || leg.alightedAt === undefined
+          ? []
+          : [leg.alightedAt - leg.boardedAt],
+      );
+      expect(rides.length).toBeGreaterThan(0);
+      return rides.reduce((sum, ride) => sum + ride, 0) / rides.length;
+    };
+
+    // Measured: 59.8 s mean ride at 1.75 s against 54.6 s at 1.2 s, on identical passengers.
+    // Loaded cars at 0.55 s more per passenger per direction cost seconds per stop, which is
+    // the whole point — it is not a rounding difference, and it is systematically optimistic
+    // in the direction CLAUDE.md § Statistical discipline singles out.
+    expect(rideS(asSpecified)).toBeGreaterThan(rideS(asBuilt) + 3);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The departure-clustering threshold, on the path that actually reports numbers
+ *
+ * REGRESSION, and the reason these assertions are on `summary` rather than on
+ * `departureGapBracket`. The bracket derivation was written, documented and unit-tested, and
+ * `MetricsRecorder` was constructed **without** `carTimings`, so `record.carTimings` was
+ * `undefined` on all five shipped buildings and every achieved interval the project could report
+ * came back `departureGapBasis: 'fallback'` with `departureGapS: 26.5`. Functionally the shipped
+ * constant had gone from 10 s to 26.5 s and the derivation ran only in tests — the difference
+ * between the defect being fixed and the defect being re-parameterised.
+ *
+ * `metrics/interval.test.ts` proves 26.5 s is not a general answer: five of the fourteen shipped
+ * banks are at or above their own reopen bound at it. So "inside four hand-checked brackets" is
+ * the whole of what a constant buys, and that is not what the interval's correctness may rest on.
+ * -------------------------------------------------------------------------- */
+
+describe('the achieved interval derives its threshold from the cars that ran', () => {
+  const upPeak = {
+    demand: {
+      directionalSplit: { incoming: 1, outgoing: 0, interfloor: 0 },
+      arrivalRatePctPop5min: 20,
+      peakWindowS: 900,
+    },
+    onTimeout: 'report',
+  } as const;
+
+  it('reports a DERIVED basis on both Phase 2 buildings, and on the secure tower', () => {
+    for (const id of ['midtown-office', 'garden-apartments', 'secure-tower'] as const) {
+      const result = runSimulation(baseConfig(id, 'collective', upPeak));
+      const interval = result.summary.achievedInterval;
+
+      // The wiring, asserted where it is observable. If `MetricsRecorder` loses `carTimings`
+      // again, this is the assertion that fails.
+      expect(result.record.carTimings, id).toBeDefined();
+      expect(interval.departureGapBasis, id).toBe('derived');
+      expect(interval.departureGapS, id).not.toBe(FALLBACK_DEPARTURE_GAP_S);
+
+      // And it is the bracket midpoint of the record's own timings, not any other number.
+      const bracket = departureGapBracket(result.record.carTimings!);
+      expect(interval.departureGapS, id).toBeCloseTo(bracket.gapS, 9);
+      expect(bracket.basis, id).toBe('bracket-midpoint');
+      expect(interval.departureGapS, id).toBeGreaterThan(bracket.maxReopenS);
+      expect(interval.departureGapS, id).toBeLessThan(bracket.minRoundTripS as number);
+    }
+  }, 120_000);
+
+  it('lands where the fallback also landed, which is what makes the fallback defensible', () => {
+    // The derived threshold and 26.5 s are both inside these buildings' brackets, so they must
+    // return the *same* interval. This is the check that says the wiring did not silently change
+    // the answer — it changed what the answer rests on. A run where these differ means the
+    // constant was outside the bracket, which is the defect this whole mechanism replaced.
+    for (const id of ['midtown-office', 'garden-apartments'] as const) {
+      const result = runSimulation(baseConfig(id, 'collective', upPeak));
+      const derived = result.summary.achievedInterval;
+      // The *same* terminal set the run summarized with — Midtown declares two entrances, so
+      // taking `terminalFloorId` (which is undefined for two) and letting the busiest floor be
+      // inferred would compare two different populations of boardings and prove nothing.
+      const building = config.buildingsById.get(id);
+      if (building === undefined) throw new Error(`no ${id}`);
+      const terminalFloorIds = building.entranceFloors.map((floor) => floor.id);
+      const atFallback = summarizeRun(result.record, {
+        window: result.reportWindow,
+        terminalFloorIds,
+        departureGapS: FALLBACK_DEPARTURE_GAP_S,
+      }).achievedInterval;
+
+      expect(atFallback.departureGapBasis, id).toBe('explicit');
+      expect(atFallback.boardingCount, id).toBe(derived.boardingCount);
+      expect(derived.departureCount, id).toBe(atFallback.departureCount);
+      expect(derived.meanS, id).toBeCloseTo(atFallback.meanS, 9);
+    }
+  }, 120_000);
+
+  it('reports NO interval on the mixed-use towers, and says why in warnings', () => {
+    // Their ground lobbies are served by two banks whose duty cycles differ by more than the
+    // bracket can span: a shuttle holds its doors 39.8 s for a 20-person load at 1.75 s while an
+    // office-local car beside it completes a whole round trip in 31.3 s. There is no threshold that
+    // separates a reopen from a return there, so the honest output is no number at all — not the
+    // fallback, which lies outside every bracket on these buildings.
+    for (const id of ['mixed-use-high-rise', 'vertical-city'] as const) {
+      const result = runSimulation(baseConfig(id, 'collective', upPeak));
+      const interval = result.summary.achievedInterval;
+
+      // The timings are present — this is a verdict reached *from* them, not their absence.
+      expect(result.record.carTimings, id).toBeDefined();
+      expect(interval.departureGapBasis, id).toBe('unmeasurable');
+      expect(Number.isNaN(interval.departureGapS), id).toBe(true);
+      expect(Number.isNaN(interval.meanS), id).toBe(true);
+      expect(interval.departureCount, id).toBe(0);
+      // Explicitly not the fallback dressed up as a measurement.
+      expect(interval.departureGapS, id).not.toBe(FALLBACK_DEPARTURE_GAP_S);
+
+      const said = result.warnings.filter((warning) =>
+        warning.includes('achieved interval cannot be measured'),
+      );
+      expect(said, id).toHaveLength(1);
+      expect(said[0], id).toContain(id);
+      // The two numbers that make the bracket empty, so the warning is diagnosable on its own.
+      expect(said[0], id).toMatch(/39\.80 s|32\.80 s/);
+    }
+  }, 120_000);
+
+  it('derives the timings from the cars, including a per-car transfer override', () => {
+    // `fullLoadTransferS` is `designCapacityPersons · passengerTransferS`, so the two fixes meet
+    // here: if `passengerTransferS` stopped reaching the car, this bound would drop and the
+    // threshold would move back towards the value that under-counted departures.
+    const result = runSimulation(baseConfig('garden-apartments', 'collective', upPeak));
+    const timings = result.record.carTimings;
+    expect(timings).toBeDefined();
+
+    const cars = new Simulation(baseConfig('garden-apartments', 'collective')).building.cars;
+    const worstTransferS = Math.max(
+      ...cars.map((car) => car.spec.designCapacityPersons * car.passengerTransferS),
+    );
+    expect(timings?.fullLoadTransferS).toBeCloseTo(worstTransferS, 9);
+    // 8 persons x 1.75 s residential. At the office 1.2 s it would be 9.6 s, below the 5 s hall
+    // dwell's own contribution and a materially smaller reopen bound.
+    expect(timings?.fullLoadTransferS).toBeCloseTo(14, 9);
+
+    // Jerk-limited, never rise / ratedSpeed: a 3.0 m hop at 0.63 m/s "rated" is 4.76 s on paper
+    // and 6.56 s in the physics, and the naive figure would shrink the bracket from above.
+    const naiveS = 3.0 / 0.63;
+    expect(timings?.nearestFloorFlightS).toBeGreaterThan(naiveS);
+    expect(timings?.nearestFloorFlightS).toBeCloseTo(6.5619, 3);
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *

@@ -168,9 +168,18 @@ describe('sequential stopping', () => {
     const spec = specOf({
       id: 'stop-early',
       traffic: [GARDEN_HEALTHY],
-      // A generous half-width target: ±20 s on a mean around 28 s with a standard deviation
-      // around 11 s is reached almost immediately, which is what "stops early" has to mean if the
-      // test is to distinguish the rule firing from the cap being hit.
+      // A generous half-width target: ±20 s is reached after two checks, which is what "stops
+      // early" has to mean if the test is to distinguish the rule firing from the cap being hit.
+      //
+      // RECALIBRATED. Garden Apartments is residential, so its cars now run at the building's
+      // own passenger transfer time, 1.75 s, instead of the office 1.2 s every building used to
+      // fall through to (`Simulation` never passed `tp` to the car). Slower loading raises both
+      // the mean and the spread of AWT on this arm — measured 31.8 s with a standard deviation
+      // of 14.5 s, against ~28 s and ~11 s before — so the first check at 4 replications lands
+      // at a half-width of 21.96 s, just outside the target, and the second at 8 replications
+      // reaches 9.70 s. The rule still fires 52 replications short of the cap; what changed is
+      // that the *first* evaluation is no longer the satisfying one, so the assertions below
+      // read the evaluation that actually stopped the cell rather than assuming it is index 0.
       replication: { minReplications: 4, maxReplications: 60, checkEvery: 4, confidence: 0.9, acceptableRange: 20 },
     });
     const result = await runExperiment(spec, config, { stoppingRule: docStoppingRule });
@@ -181,11 +190,18 @@ describe('sequential stopping', () => {
     expect(cell.stopping.replicationsRun).toBeLessThan(60);
     expect(cell.replications).toHaveLength(cell.stopping.replicationsRun);
 
-    const [evaluation] = cell.stopping.evaluations;
+    // Early, not merely "before the cap": the rule fires within the first few checks.
+    expect(cell.stopping.evaluations.length).toBeLessThanOrEqual(3);
+    const evaluation = cell.stopping.evaluations.at(-1);
     expect(evaluation?.verdict.stop).toBe(true);
     expect(evaluation?.verdict.halfWidth).toBeLessThan(20);
     expect(evaluation?.verdict.distribution).toBe('t');
     expect(evaluation?.finiteSamples).toBe(evaluation?.replications);
+    // Every earlier check must have declined; a rule that "stops" twice is not sequential.
+    for (const earlier of cell.stopping.evaluations.slice(0, -1)) {
+      expect(earlier.verdict.stop).toBe(false);
+      expect(earlier.verdict.halfWidth).toBeGreaterThanOrEqual(20);
+    }
   }, 60_000);
 
   it('runs to the cap when the target half-width is out of reach', async () => {

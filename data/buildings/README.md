@@ -99,6 +99,42 @@ Used by [`mixed-use-high-rise.json`](mixed-use-high-rise.json) (sky lobby at 31,
 floors on the `residential` profile) and [`vertical-city.json`](vertical-city.json) (three
 two-level sky lobbies, hotel and residential ranges).
 
+## Passenger transfer time
+
+`passengerTransferS` — seconds per passenger per direction — is the term the round trip is most
+sensitive to after travel, and it is a property of the **population**, not of the hardware. It is
+normally resolved from the building `type` against
+[`../elevator-specs.json`](../elevator-specs.json) → `timing.passengerTransferS`: office 1.2 s,
+hotel 1.5 s, residential 1.75 s (ISO 4190-6 — luggage, strollers, carts). A car may state its own
+value, which wins.
+
+| Field | On | Meaning |
+|---|---|---|
+| `passengerTransferS` | car | Overrides the building type's row. **Required** on every car of a `mixed-use` building. |
+
+**There is no `mixed-use` row, on purpose.** A mixed tower's banks serve populations that load at
+different speeds, so no single building-wide figure describes it, and the loader raises a
+`missing-passenger-transfer` error rather than defaulting — refusing to guess, because the office
+value on a residential car understates the round trip by about 6 % and understating it is the
+optimistic direction [CLAUDE.md § Statistical discipline](../../CLAUDE.md) warns about. So both
+mixed-use buildings declare the value per car:
+
+| Building | Bank | `passengerTransferS` |
+|---|---|---|
+| `mixed-use-high-rise` | `office-local` (retail 2–5, office 6–30) | 1.2 |
+| | `residential-local` (31, 32–60) | 1.75 |
+| | `shuttle` (G ↔ 31) | 1.75 — it is the only route to 32–60, so residents ride it every trip |
+| `vertical-city` | `zone-1`…`zone-4-local` (office) | 1.2 |
+| | `zone-5-local` (hotel) | 1.5 |
+| | `zone-6-local` (residential) | 1.75 |
+| | `shuttle` (all four sky lobbies) | 1.75 — it feeds the hotel and residential zones too |
+
+Where a bank carries more than one population, the **slower** value is chosen: understating the
+transfer time flatters the result, and a shuttle that a resident boards is a residential trip for
+as long as they are aboard. That choice is visible downstream — it is what makes those shuttles'
+full-load door hold 39.8 s, which is longer than Midtown Office's entire shortest round trip, and
+therefore why no single departure-clustering constant can serve every building.
+
 ## Double-deck cars
 
 ```json

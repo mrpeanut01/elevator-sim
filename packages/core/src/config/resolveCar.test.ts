@@ -5,18 +5,40 @@ import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { parseElevatorSpecs } from './parse.js';
-import { findElevatorSpec, personsAtRatedLoad, resolveCar } from './resolveCar.js';
+import { parseBuilding, parseElevatorSpecs } from './parse.js';
+import {
+  findElevatorSpec,
+  findPassengerTransferS,
+  personsAtRatedLoad,
+  resolveCar,
+} from './resolveCar.js';
 import { ConfigError, ISSUE_CODES } from './schema.js';
-import type { CarConfig, ElevatorSpecs } from './types.js';
+import type { BuildingConfig, BuildingType, CarConfig, ElevatorSpecs } from './types.js';
 
 /** The real reference data: resolution must work against what ships, not a fixture. */
 const SPECS_FILE = fileURLToPath(new URL('../../../../data/elevator-specs.json', import.meta.url));
+const BUILDINGS_DIR = fileURLToPath(new URL('../../../../data/buildings/', import.meta.url));
+
+/** Every building the project ships. */
+const BUILDING_FILES = [
+  'garden-apartments.json',
+  'midtown-office.json',
+  'mixed-use-high-rise.json',
+  'secure-tower.json',
+  'vertical-city.json',
+] as const;
 
 let specs: ElevatorSpecs;
+let buildings: readonly BuildingConfig[];
 
 beforeAll(async () => {
   specs = parseElevatorSpecs(JSON.parse(await readFile(SPECS_FILE, 'utf8')), SPECS_FILE);
+  buildings = await Promise.all(
+    BUILDING_FILES.map(async (name) => {
+      const file = `${BUILDINGS_DIR}${name}`;
+      return parseBuilding(JSON.parse(await readFile(file, 'utf8')), file);
+    }),
+  );
 });
 
 function expectConfigError(fn: () => unknown): ConfigError {
@@ -119,6 +141,185 @@ describe('resolveCar', () => {
       designCapacityPersons: 8,
       doorOpenS: 2.5,
       doorCloseS: 4.0,
+    });
+  });
+
+  /* ------------------------------------------------------------------ *
+   * Passenger transfer time
+   *
+   * REGRESSION. `tp` is a property of the building, not of the hardware: office 1.2 s,
+   * hotel 1.5 s, residential 1.75 s (`elevator-specs.json → timing.passengerTransferS`,
+   * ISO 4190-6). It used to be derived nowhere at all — `resolveCar` never read the table
+   * and `Simulation` never passed it — so every car in every building fell through to
+   * `CAR_DEFAULTS.passengerTransferS`, which *is* the office figure. Garden Apartments ran a
+   * round trip ~5.6 % short and a handling capacity ~4 % optimistic, and Midtown Office
+   * looked perfect throughout, because 1.2 s was correct there by coincidence. `2·P·tp` is
+   * the term the round trip is most sensitive to, so the error is not a rounding detail.
+   * ------------------------------------------------------------------ */
+  describe('passenger transfer time', () => {
+    it('reads the shipped table by building type, and has no row for mixed-use', () => {
+      // The values live in data, not in code (CLAUDE.md invariant 7).
+      expect(findPassengerTransferS(specs, 'office')).toBe(1.2);
+      expect(findPassengerTransferS(specs, 'residential')).toBe(1.75);
+      expect(findPassengerTransferS(specs, 'hotel')).toBe(1.5);
+      // Deliberate: a mixed tower's banks serve populations that transfer at different
+      // speeds, so there is no honest building-wide answer. `undefined` means "nobody has
+      // said", never "assume office".
+      expect(findPassengerTransferS(specs, 'mixed-use')).toBeUndefined();
+    });
+
+    it('derives it from the building type the car is being resolved for', () => {
+      const car: CarConfig = { id: 'A', spec: 'hydraulic' };
+      const forType = (type: BuildingType): number | undefined =>
+        resolveCar(car, specs, { buildingType: type, buildingId: `a-${type}-building` })
+          .passengerTransferS;
+
+      expect(forType('office')).toBe(1.2);
+      expect(forType('residential')).toBe(1.75);
+      expect(forType('hotel')).toBe(1.5);
+    });
+
+    it('resolves every shipped building to the transfer time its type calls for', () => {
+      const resolvedByBuilding = new Map<string, readonly (number | undefined)[]>();
+      const refused: string[] = [];
+
+      for (const building of buildings) {
+        const cars = building.banks.flatMap((bank) => bank.cars);
+        expect(cars.length).toBeGreaterThan(0);
+        try {
+          resolvedByBuilding.set(
+            building.id,
+            cars.map(
+              (car) =>
+                resolveCar(car, specs, {
+                  buildingType: building.type,
+                  buildingId: building.id,
+                }).passengerTransferS,
+            ),
+          );
+        } catch (error) {
+          if (!(error instanceof ConfigError)) throw error;
+          refused.push(building.id);
+        }
+      }
+
+      // Residential: 1.75 s, which is what garden-apartments' own `notes` field asks for.
+      expect(resolvedByBuilding.get('garden-apartments')).toEqual([1.75, 1.75]);
+      // Office: 1.2 s. The value the whole repository used to run at, here on purpose.
+      expect(new Set(resolvedByBuilding.get('midtown-office'))).toEqual(new Set([1.2]));
+      expect(new Set(resolvedByBuilding.get('secure-tower'))).toEqual(new Set([1.2]));
+
+      // Mixed-use: **satisfied per car, not refused.** The two mixed towers now declare
+      // `passengerTransferS` on every car, which is the only correct way to answer for a building
+      // whose banks serve populations that load at different speeds. This assertion used to read
+      // `expect(refused).toEqual([...both towers])` — that was true of the data as authored then,
+      // and the refusal path is still exercised: see the next test, and
+      // `parse.test.ts` § 'refuses a mixed-use building whose cars declare none'.
+      expect(refused).toEqual([]);
+      // Office locals at 1.2 s, residential banks and the shuttles at 1.75 s.
+      expect(new Set(resolvedByBuilding.get('mixed-use-high-rise'))).toEqual(new Set([1.2, 1.75]));
+      // Plus the hotel zone at 1.5 s — three populations in one shaft group.
+      expect(new Set(resolvedByBuilding.get('vertical-city'))).toEqual(new Set([1.2, 1.5, 1.75]));
+
+      // And nothing anywhere in `data/` is left undetermined.
+      for (const [id, values] of resolvedByBuilding) {
+        for (const value of values) expect(typeof value, id).toBe('number');
+      }
+    });
+
+    it('still refuses a mixed-use car that declares nothing, rather than defaulting', () => {
+      // The path the assertion above used to cover. Kept as its own test so that authoring a
+      // value into `data/` cannot quietly retire the guarantee: a mixed-use car with no stated
+      // transfer time is an error, and specifically not the 1.2 s office figure.
+      const mixed = buildings.find((building) => building.type === 'mixed-use');
+      expect(mixed).toBeDefined();
+      const car = mixed?.banks[0]?.cars[0];
+      expect(car?.passengerTransferS).toBeDefined();
+
+      const { passengerTransferS: _stated, ...silent } = car as CarConfig;
+      let thrown: unknown;
+      try {
+        resolveCar(silent, specs, { buildingType: 'mixed-use', buildingId: mixed?.id });
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(ConfigError);
+      expect((thrown as ConfigError).issues[0]?.code).toBe(ISSUE_CODES.missingPassengerTransfer);
+      expect((thrown as ConfigError).issues[0]?.message).toContain('Refusing to default');
+    });
+
+    it('lets a car override the type default', () => {
+      const resolved = resolveCar(
+        { id: 'A', spec: 'hydraulic', passengerTransferS: 2 },
+        specs,
+        { buildingType: 'residential', buildingId: 'garden-apartments' },
+      );
+
+      expect(resolved.passengerTransferS).toBe(2);
+      expect(resolved.passengerTransferS).not.toBe(findPassengerTransferS(specs, 'residential'));
+    });
+
+    it('takes the car override even for a type the table has no row for', () => {
+      // The stated remedy for mixed-use has to actually work, or the error above is a wall.
+      const resolved = resolveCar(
+        { id: 'R1', spec: 'geared-traction', passengerTransferS: 1.75 },
+        specs,
+        { buildingType: 'mixed-use', buildingId: 'vertical-city' },
+      );
+
+      expect(resolved.passengerTransferS).toBe(1.75);
+    });
+
+    it('refuses a building type with no transfer time rather than defaulting to office', () => {
+      const error = expectConfigError(() =>
+        resolveCar({ id: 'S1', spec: 'gearless-traction' }, specs, {
+          file: '/data/buildings/vertical-city.json',
+          path: 'banks[0].cars[0]',
+          buildingType: 'mixed-use',
+          buildingId: 'vertical-city',
+        }),
+      );
+
+      expect(error.issues).toHaveLength(1);
+      expect(error.issues[0]).toMatchObject({
+        file: '/data/buildings/vertical-city.json',
+        path: 'banks[0].cars[0].passengerTransferS',
+        code: ISSUE_CODES.missingPassengerTransfer,
+      });
+      // The message has to name the building and the type, or it is unactionable.
+      expect(error.message).toContain('vertical-city');
+      expect(error.message).toContain('mixed-use');
+      expect(error.message).toContain('passengerTransferS');
+    });
+
+    it('refuses an unrecognised building type the same way', () => {
+      // A type that is not in `BUILDING_TYPES` at all — a hand-built config, or a type added
+      // to the buildings schema and not to the reference table. Silence here is how the
+      // original defect survived; the cast is the point of the test.
+      const error = expectConfigError(() =>
+        resolveCar({ id: 'A', spec: 'hydraulic' }, specs, {
+          buildingType: 'aquarium' as BuildingType,
+          buildingId: 'the-aquarium',
+        }),
+      );
+
+      expect(error.issues[0]?.code).toBe(ISSUE_CODES.missingPassengerTransfer);
+      expect(error.message).toContain('aquarium');
+      expect(error.message).toContain('the-aquarium');
+    });
+
+    it('leaves it absent, never 1.2, when no building type is supplied', () => {
+      // `resolveCar` is reachable without a building (a fixture, a bare class lookup). The
+      // one thing it must not do there is invent the office value for a residential car.
+      const resolved = resolveCar({ id: 'A', spec: 'hydraulic' }, specs);
+
+      expect(resolved.passengerTransferS).toBeUndefined();
+      expect(Object.hasOwn(resolved, 'passengerTransferS')).toBe(false);
+    });
+
+    it('still carries a car override with no building type in play', () => {
+      const resolved = resolveCar({ id: 'A', spec: 'hydraulic', passengerTransferS: 1.6 }, specs);
+      expect(resolved.passengerTransferS).toBe(1.6);
     });
   });
 

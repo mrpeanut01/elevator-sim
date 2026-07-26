@@ -27,8 +27,9 @@ import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { parseBuilding, parseElevatorSpecs, resolveBuilding } from './parse.js';
+import { resolveCar } from './resolveCar.js';
 import { ConfigError, ISSUE_CODES } from './schema.js';
-import type { ElevatorSpecs } from './types.js';
+import type { ElevatorSpecs, ResolvedBuilding, ResolvedCar } from './types.js';
 
 const CONFIG_DIR = fileURLToPath(new URL('.', import.meta.url));
 const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
@@ -351,5 +352,118 @@ describe('resolveBuilding rejects a shaft whose heights disagree with its floor 
 
     expect(error).toBeInstanceOf(ConfigError);
     expect(error.message).toContain('Invalid building "tower"');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. resolveBuilding resolves the passenger transfer time onto every car
+// ---------------------------------------------------------------------------
+
+/**
+ * REGRESSION. `resolveCar` derives `passengerTransferS` from
+ * `specs.timing.passengerTransferS[buildingType]` and throws `missing-passenger-transfer` for a
+ * type the table has no row for — but `resolveBuilding` did not pass the type down, so **every
+ * `ResolvedCar` `loadConfig` returned had the field absent** and neither the derivation nor its
+ * error was reachable through the real loader. Only `Simulation` re-derived the value.
+ *
+ * That is the same shape as the defect it was meant to close: a number that exists in the data and
+ * reaches nothing. It also means any other consumer of `ResolvedCar` — an optimizer, a report, the
+ * analytical path — silently got `undefined` where it should have got either the right answer or an
+ * exception. These tests assert the value is present at the *config* layer, which is the layer
+ * whose job it is to answer "what transfer time does this car use".
+ */
+describe('resolveBuilding resolves passengerTransferS onto every ResolvedCar', () => {
+  let specs: ElevatorSpecs;
+
+  beforeAll(async () => {
+    specs = parseElevatorSpecs(JSON.parse(await readFile(SPECS_FILE, 'utf8')), SPECS_FILE);
+  });
+
+  async function resolveShipped(id: string): Promise<ResolvedBuilding> {
+    const file = join(REPO_ROOT, 'data', 'buildings', `${id}.json`);
+    return resolveBuilding(parseBuilding(JSON.parse(await readFile(file, 'utf8')), file), specs, {
+      file,
+    });
+  }
+
+  const carsOf = (building: ResolvedBuilding): readonly ResolvedCar[] =>
+    building.banks.flatMap((bank) => bank.cars);
+
+  it('gives Garden Apartments’ cars the residential 1.75 s, off the resolved config alone', () => {
+    // The assertion the reviewer asked for by name, and the one that fails if `resolveBuilding`
+    // stops passing the building type. Note it never constructs a `Simulation`: the point is that
+    // the config layer answers on its own.
+    return resolveShipped('garden-apartments').then((garden) => {
+      expect(garden.type).toBe('residential');
+      for (const car of carsOf(garden)) {
+        expect(Object.hasOwn(car, 'passengerTransferS'), car.id).toBe(true);
+        expect(car.passengerTransferS, car.id).toBe(1.75);
+        expect(car.passengerTransferS, car.id).toBe(specs.timing.passengerTransferS.residential);
+      }
+    });
+  });
+
+  it('resolves every shipped building’s cars, by type or by per-car declaration', async () => {
+    const expected: Record<string, readonly number[]> = {
+      'garden-apartments': [1.75],
+      'midtown-office': [1.2],
+      'secure-tower': [1.2],
+      // `mixed-use` has no row in the reference table on purpose, so these declare per car.
+      'mixed-use-high-rise': [1.2, 1.75],
+      'vertical-city': [1.2, 1.5, 1.75],
+    };
+
+    for (const [id, values] of Object.entries(expected)) {
+      const building = await resolveShipped(id);
+      const cars = carsOf(building);
+      expect(cars.length, id).toBeGreaterThan(0);
+      for (const car of cars) {
+        expect(Object.hasOwn(car, 'passengerTransferS'), `${id}/${car.id}`).toBe(true);
+      }
+      expect([...new Set(cars.map((car) => car.passengerTransferS))].sort(), id).toEqual(values);
+    }
+  }, 30_000);
+
+  it('refuses a mixed-use building whose cars declare none, one issue per car', async () => {
+    // The error `resolveCar` has always been able to raise, now reachable through the loader. It
+    // must be an error and never a default: the office value on a residential car understates the
+    // round trip by ~6 %, which is the optimistic direction.
+    const file = join(REPO_ROOT, 'data', 'buildings', 'mixed-use-high-rise.json');
+    const authored = JSON.parse(await readFile(file, 'utf8')) as {
+      banks: { cars: Record<string, unknown>[] }[];
+    };
+    for (const bank of authored.banks) {
+      for (const car of bank.cars) delete car['passengerTransferS'];
+    }
+
+    let error: ConfigError | undefined;
+    try {
+      resolveBuilding(parseBuilding(authored, file), specs, { file });
+    } catch (thrown) {
+      if (!(thrown instanceof ConfigError)) throw thrown;
+      error = thrown;
+    }
+
+    expect(error).toBeInstanceOf(ConfigError);
+    expect(error?.issues).toHaveLength(16);
+    for (const issue of error?.issues ?? []) {
+      expect(issue.code).toBe(ISSUE_CODES.missingPassengerTransfer);
+      expect(issue.path).toMatch(/^banks\[\d+]\.cars\[\d+]\.passengerTransferS$/);
+    }
+    // Actionable: names the type, the values to choose from, and why refusing to guess.
+    expect(error?.issues[0]?.message).toContain('mixed-use');
+    expect(error?.issues[0]?.message).toContain('residential 1.75');
+    expect(error?.issues[0]?.message).toContain('Refusing to default');
+  });
+
+  it('leaves it absent when no building type is supplied, rather than guessing', () => {
+    // `resolveCar`'s documented contract, still intact: absent means "nobody has said", never
+    // "assume office". `resolveBuilding` always has a type, so this is the direct-caller path.
+    const car = resolveCar(
+      { id: 'A', spec: 'geared-traction', ratedLoadLb: 2500 },
+      specs,
+      { file: 'x.json' },
+    );
+    expect(Object.hasOwn(car, 'passengerTransferS')).toBe(false);
   });
 });

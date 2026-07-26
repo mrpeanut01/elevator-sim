@@ -45,10 +45,10 @@
       "name": "Sky lobby shuttle",
       "servesFloors": ["G", "31"],
       "cars": [
-        { "id": "S1", "spec": "high-speed-gearless", "ratedSpeedMps": 8.0, "ratedLoadLb": 4000, "doorType": "centerOpening" },
-        { "id": "S2", "spec": "high-speed-gearless", "ratedSpeedMps": 8.0, "ratedLoadLb": 4000, "doorType": "centerOpening" },
-        { "id": "S3", "spec": "high-speed-gearless", "ratedSpeedMps": 8.0, "ratedLoadLb": 4000, "doorType": "centerOpening" },
-        { "id": "S4", "spec": "high-speed-gearless", "ratedSpeedMps": 8.0, "ratedLoadLb": 4000, "doorType": "centerOpening" }
+        { "id": "S1", "spec": "high-speed-gearless", "ratedSpeedMps": 8.0, "ratedLoadLb": 4000, "doorType": "centerOpening", "passengerTransferS": 1.75 },
+        { "id": "S2", "spec": "high-speed-gearless", "ratedSpeedMps": 8.0, "ratedLoadLb": 4000, "doorType": "centerOpening", "passengerTransferS": 1.75 },
+        { "id": "S3", "spec": "high-speed-gearless", "ratedSpeedMps": 8.0, "ratedLoadLb": 4000, "doorType": "centerOpening", "passengerTransferS": 1.75 },
+        { "id": "S4", "spec": "high-speed-gearless", "ratedSpeedMps": 8.0, "ratedLoadLb": 4000, "doorType": "centerOpening", "passengerTransferS": 1.75 }
       ]
     },
     {
@@ -56,14 +56,14 @@
       "name": "Retail and office local bank",
       "servesFloors": ["G", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30"],
       "cars": [
-        { "id": "O1", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "O2", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "O3", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "O4", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "O5", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "O6", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "O7", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "O8", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" }
+        { "id": "O1", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "O2", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "O3", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "O4", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "O5", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "O6", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "O7", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "O8", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.2 }
       ]
     },
     {
@@ -71,10 +71,10 @@
       "name": "Residential local bank",
       "servesFloors": ["31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60"],
       "cars": [
-        { "id": "R1", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "R2", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "R3", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "R4", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening" }
+        { "id": "R1", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.75 },
+        { "id": "R2", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.75 },
+        { "id": "R3", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.75 },
+        { "id": "R4", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.75 }
       ]
     }
   ],
@@ -89,6 +89,7 @@
     "The evening inversion is NOT encoded, and this building no longer claims it. data/traffic-profiles.json declares 'residential' with governingPeak 'down-peak-am' and mentions the PM inversion only in a $comment, and the building schema has no time-of-day or scenario selector. Encoding the 18:00 case means declaring a 'residential-pm' profile (up-peak split) in traffic-profiles.json and selecting it through the same per-floor override field - data, not code, per CLAUDE.md invariant 7. Recorded here rather than asserted in prose: a building that names the scenario its data can actually express is worth more than one that describes a scenario nothing implements.",
     "Sizing: office-local carries 1262 occupants (retail 112 + office 1150) on 8 cars, about 90% of up-peak handling capacity - busy, not saturated. The four shuttles are generously sized against residential demand alone and become the constraint only during the overlap, which is the failure mode worth measuring. Residential-local at 2.5 m/s is deliberately unhurried; its shaft spans only 95.6 m from the sky lobby to floor 60.",
     "The shuttle run is 126 m. At 8 m/s with a = 1.1 m/s2 and j = 1.2 m/s3 a car spends most of that distance accelerating or decelerating and only briefly holds rated speed, so this building is a strong test of the S-curve profile: assuming rated speed for the whole run overstates shuttle capacity by a wide margin.",
-    "Retail floors sit inside the office bank rather than getting a dedicated group, which is both common and irritating in real buildings: one- and two-floor shopper hops inject stops into an office bank that is trying to run an express down-peak. Good material for operational (dynamic) zoning."
+    "Retail floors sit inside the office bank rather than getting a dedicated group, which is both common and irritating in real buildings: one- and two-floor shopper hops inject stops into an office bank that is trying to run an express down-peak. Good material for operational (dynamic) zoning.",
+    "Passenger transfer time is declared per car, not inherited from the building type. A mixed-use building has no single tp: elevator-specs.json -> timing.passengerTransferS deliberately has no 'mixed-use' row, because office occupants transfer at 1.2 s and residents at 1.75 s (ISO 4190-6 - luggage, strollers, carts) and averaging them models neither. So office-local (retail 2-5 + office 6-30) declares 1.2 s and residential-local (sky lobby 31 + floors 32-60) declares 1.75 s. The shuttle declares 1.75 s even though it also carries office traffic to the amenity level: it is the only route to floors 32-60, so residents are on it every trip, and understating tp understates the round trip - the optimistic direction CLAUDE.md warns about. That choice is what makes this bank's full-load door hold 1.8 + (20 x 1.75) + 3.0 = 39.8 s, longer than Midtown Office's entire shortest round trip, which is why no single departure-clustering constant can serve every building and metrics/summarize.ts derives the threshold instead (see metrics/interval.test.ts)."
   ]
 }

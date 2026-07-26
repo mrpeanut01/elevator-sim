@@ -145,7 +145,7 @@ Three distinct kinds of determinism, routinely conflated:
 | Kind | Decision |
 |---|---|
 | **Stochastic model** — passenger arrivals are random | **Required.** A single run measures one arbitrary scenario. |
-| **Reproducible input streams** — same seed → same passenger list | **Keep.** Nearly free, and worth a 5–20× efficiency multiplier via CRN. |
+| **Reproducible input streams** — same seed → same passenger list | **Keep.** Nearly free, and worth up to a 300×+ efficiency multiplier via CRN between closely related alternatives — though only ~1.8× between structurally different dispatchers. See the measured table below. |
 | **Deterministic execution order** — no async agent races | **Keep.** Buys almost nothing to relax; costs replayability. |
 
 ### Dedicated random streams per source
@@ -171,7 +171,26 @@ streams, the arrival stream emits an identical passenger list regardless of what
 elevators do.
 
 That is also the precise cost of execution-order nondeterminism: not impurity, but
-desynchronized CRN and a 5–20× loss of statistical power per comparison.
+desynchronized CRN and a large loss of statistical power per comparison.
+
+**Measured, and the size of the prize is regime-dependent.** The Phase 3 gate measured what
+per-source streams are actually worth on Midtown Office up-peak at n = 100, varying only how
+similar the two dispatchers are:
+
+| Comparison | rho | Variance reduction | Fewer runs |
+|---|---|---|---|
+| One weight nudged (Phase 7's neighbourhood) | 0.9969 | 99.69% | 324× |
+| Halfway between two dispatchers | 0.9027 | 89.77% | 9.8× |
+| `eta` vs `nearest-car` (Phase 5's comparison) | 0.6083 | 43.75% | 1.8× |
+
+Two things follow for this document's argument. First, the determinism decisions above are
+*more* justified than the original 5–20× estimate suggested, not less: in the regime an
+automated tuner works in, synchronized streams are worth two orders of magnitude. Second, the
+bottom row's ceiling is set by unequal marginal variances rather than by synchronization —
+`eta` and `nearest-car` have variances of 12.56 s² and 69.76 s², so `(sd_A − sd_B)²` caps that
+comparison at 71.92% however perfect the streams are. Byte-identical trace digests confirmed
+the streams were never the problem there. Full derivation and the practical budgeting rule in
+[Traffic & Statistics § Part 4](03-traffic-and-statistics.md#measured-the-reduction-depends-entirely-on-how-similar-the-two-arms-are).
 
 ### Parallelism
 
@@ -187,22 +206,39 @@ attributable to the policy rather than to the world.
 
 ## Module layout
 
+As built through Phase 3. `viz/` is Phase 4 and **is not on disk yet**.
+
 ```
 packages/
 ├── core/                  — headless simulation, zero rendering coupling
-│   ├── kernel/            — discrete-event queue, clock, RNG streams
-│   ├── physics/           — S-curve motion profiles, door state machine
-│   ├── model/             — Car, Bank, Building, Floor, Passenger
-│   ├── dispatch/          — DispatchPolicy interface + implementations
-│   ├── traffic/           — passenger generation, demand profiles
-│   └── metrics/           — per-run recording, distributions
+│   ├── kernel/            — discrete-event queue, clock, deterministic tie-breaking
+│   ├── random/            — RNG and the per-source StreamSet
+│   ├── physics/           — S-curve motion profiles (motion/), door state machine (doors/)
+│   ├── model/             — Car (car/), Bank, Building, Floor, Passenger
+│   ├── dispatch/          — DispatchPolicy, scoring engine, cost term library (terms/)
+│   ├── traffic/           — passenger generation, demand profiles, routing
+│   ├── analytical/        — closed-form Barney/CIBSE RTT, the correctness oracle
+│   ├── config/            — data/*.json loading, schema, floorRange expansion
+│   ├── sim/               — the assembled simulation and its end-to-end suites
+│   └── metrics/           — per-run recording, distributions, saturation
 ├── experiments/           — replication runner, CRN manager, statistics
-│   ├── runner/            — parallel replication execution
-│   ├── stats/             — CI, sequential stopping, paired-t
-│   └── reports/           — result persistence and re-analysis
-├── viz/                   — web visualization, consumes core
+│   ├── runner/            — parallel replication execution, CRN, sequential stopping
+│   ├── reports/           — persistence, replay, re-analysis, and the interval arithmetic
+│   ├── oracle/            — closed-form against measured round trip, reconciled term by term
+│   └── validation/        — the Phase 3 acceptance gate
+├── viz/                   — web visualization, consumes core            (Phase 4, not yet present)
 └── cli/                   — headless batch entry point
 ```
+
+> **Layout note — `experiments/stats/` does not exist.** This doc previously placed the
+> statistics layer at `packages/experiments/src/stats/`. Phase 3 landed that code in
+> **`reports/statistics.ts`** (sample moments, t and normal quantiles, `estimateMean`,
+> `pairedDifferenceEstimate`) and **`runner/stopping.ts`** (the sequential half-width rule);
+> no `stats/` directory was ever created. The package boundary is where the original intent is
+> honoured: `packages/experiments/src/index.ts` exports the statistical surface under its own
+> `stats` heading, so a caller imports the names the design promised regardless of which file
+> they come from. **Consolidating them into a `stats/` module is outstanding, not done.** Doing
+> it would change which file the names come from and not one name a caller imports.
 
 ## Non-negotiable invariants
 

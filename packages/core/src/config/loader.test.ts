@@ -647,8 +647,13 @@ describe('resolveBuilding', () => {
         banks: [
           {
             id: 'high',
+            // `passengerTransferS` is declared because this fixture is `mixed-use`, a type
+            // `elevator-specs.json → timing.passengerTransferS` has no row for on purpose. A
+            // mixed-use car that declares none is a hard `ConfigError` — see
+            // `parse.test.ts` § resolveBuilding resolves passengerTransferS. Incidental to what
+            // this test is about (floorRanges), and stated rather than worked around.
+            cars: [{ id: 'A', spec: 'high-speed-gearless', passengerTransferS: 1.75 }],
             servesFloors: ['G', '32', '45', '60'],
-            cars: [{ id: 'A', spec: 'high-speed-gearless' }],
           },
         ],
       },

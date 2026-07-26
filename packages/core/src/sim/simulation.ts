@@ -67,6 +67,7 @@
  *   is delivered, or it is named in {@link SimulationResult.undelivered}. Anything else throws.
  */
 
+import { findPassengerTransferS } from '../config/resolveCar.js';
 import type {
   DispatcherProfile,
   FloorConfig,
@@ -81,9 +82,16 @@ import {
 } from '../dispatch/index.js';
 import { SimKernel, type SimTime } from '../kernel/index.js';
 import { MetricsRecorder } from '../metrics/recorder.js';
-import { PEAK_WINDOW_S, summarizeRun } from '../metrics/summarize.js';
-import type { ReportWindow, RunRecord, RunSummary } from '../metrics/types.js';
-import { Car, isAccessPermitted, shaftForBank, type CarSnapshot } from '../model/car/index.js';
+import { PEAK_WINDOW_S, departureGapBracket, summarizeRun } from '../metrics/summarize.js';
+import { MetricsError } from '../metrics/types.js';
+import type { CarTimings, ReportWindow, RunRecord, RunSummary } from '../metrics/types.js';
+import {
+  CAR_DEFAULTS,
+  Car,
+  isAccessPermitted,
+  shaftForBank,
+  type CarSnapshot,
+} from '../model/car/index.js';
 import {
   DIRECTIONS,
   Passenger,
@@ -95,6 +103,7 @@ import {
   type Floor,
   type HallCall,
 } from '../model/index.js';
+import { travelTime } from '../physics/motion/index.js';
 import { StreamSet } from '../random/index.js';
 import { generateTrace, toPassengerInit } from '../traffic/generator.js';
 import type { GeneratedPassenger, PassengerTrace, TrafficConfig } from '../traffic/types.js';
@@ -309,9 +318,46 @@ export class Simulation {
     const loadSensorSpec = config.elevatorSpecs?.loadSensor;
     const answer = profile.answer;
 
+    /* ---- the building's passenger transfer time (`tp`) ---- */
+    // `2·P·tp` is the term the round trip is most sensitive to, and `tp` is a property of the
+    // *building*, not of the hardware: office 1.2 s, hotel 1.5 s, residential 1.75 s (ISO
+    // 4190-6, via `elevator-specs.json → timing.passengerTransferS`). It used to reach no car
+    // at all — `resolveCar` never derived it and this constructor never passed it — so every
+    // building ran at `CAR_DEFAULTS.passengerTransferS`, which *is* the office figure. Garden
+    // Apartments' round trip came out ~5 % short and its handling capacity ~4 % optimistic,
+    // and Midtown Office looked perfect, because 1.2 s was right there by accident.
+    //
+    // `resolveBuilding` now resolves the value onto each `ResolvedCar`, so `spec.passengerTransferS`
+    // is normally the whole answer and the two lines below are the safety net for a
+    // `ResolvedBuilding` assembled by hand rather than by the loader. A car that states its own
+    // value wins; otherwise the building type's row is used. A type with no row (`mixed-use`,
+    // deliberately: its banks serve populations that load at different speeds) is reported in
+    // `warnings` and left to `CAR_DEFAULTS` — loud, and never a silent 1.2 s. Every building in
+    // `data/buildings` now declares or derives one, so this warning fires on no shipped
+    // configuration; `sim/simulation.test.ts` asserts that.
+    const typeTransferS =
+      config.elevatorSpecs === undefined
+        ? undefined
+        : findPassengerTransferS(config.elevatorSpecs, resolved.type);
+    if (typeTransferS === undefined) {
+      const unstated = resolved.banks.flatMap((bank) =>
+        bank.cars.filter((car) => car.passengerTransferS === undefined).map((car) => car.id),
+      );
+      if (unstated.length > 0) {
+        const why =
+          config.elevatorSpecs === undefined
+            ? 'no elevatorSpecs were supplied to this run'
+            : `elevator-specs.json → timing.passengerTransferS has no entry for building type "${resolved.type}"`;
+        this.#warnings.push(
+          `passenger transfer time is undetermined for building "${resolved.id}": ${why}, and car(s) ${unstated.join(', ')} declare none, so they run at the ${CAR_DEFAULTS.passengerTransferS} s default — the office value. Supply elevatorSpecs, or declare passengerTransferS on the car.`,
+        );
+      }
+    }
+
     this.#building = createBuilding<Car>(resolved, {
-      createCar: (spec, context) =>
-        new Car({
+      createCar: (spec, context) => {
+        const passengerTransferS = spec.passengerTransferS ?? typeTransferS;
+        return new Car({
           id: `${context.bankId}-${spec.id}`,
           bankId: context.bankId,
           spec,
@@ -320,7 +366,9 @@ export class Simulation {
           clock: kernel,
           ...(answer === undefined ? {} : { answer }),
           ...(loadSensorSpec === undefined ? {} : { loadSensorSpec }),
-        }),
+          ...(passengerTransferS === undefined ? {} : { passengerTransferS }),
+        });
+      },
     });
     for (const car of this.#building.cars) this.#carsById.set(car.id, car);
 
@@ -350,6 +398,32 @@ export class Simulation {
     this.#runId =
       config.runId ?? `${resolved.id}-${profile.id}-${this.#streams.masterSeed.toString()}`;
 
+    /* ---- the door and motion timings the achieved interval is measured with ---- */
+    // Without these the recorder writes a record with no `carTimings`, `achievedIntervalOf`
+    // falls back to `FALLBACK_DEPARTURE_GAP_S`, and every interval this project reports rests on
+    // one constant happening to sit inside four hand-checked brackets. That is what shipped
+    // before: `departureGapBracket` was real, tested code that nothing outside the tests ever
+    // called. Derived here, off the cars that were actually built, so the production path and
+    // the test path compute the same number from the same source.
+    const carTimings = terminalCarTimings(resolved, this.#building, this.#entranceFloorIds);
+    if (carTimings === undefined) {
+      this.#warnings.push(
+        `no car timings could be assembled for building "${resolved.id}": ${this.#entranceFloorIds.length === 0 ? 'it flags no entrance floor' : `no bank serving an entrance floor (${this.#entranceFloorIds.join(', ')}) also serves a floor above it`}. The achieved interval will fall back to a constant departure-clustering threshold and report departureGapBasis "fallback".`,
+      );
+    } else {
+      // Computed here purely to say so out loud at construction. `achievedIntervalOf` reaches the
+      // same verdict from the same timings and reports it as `departureGapBasis: 'unmeasurable'`
+      // with no interval, but a warning is what a caller reading `result.warnings` will see.
+      try {
+        departureGapBracket(carTimings);
+      } catch (error) {
+        if (!(error instanceof MetricsError)) throw error;
+        this.#warnings.push(
+          `the achieved interval cannot be measured on building "${resolved.id}": ${error.message} The cars serving its entrance floor(s) ${this.#entranceFloorIds.join(', ')} hold their doors for up to ${carTimings.doorOpenS + Math.max(carTimings.dwellHallCallS, carTimings.dwellCarCallS, carTimings.fullLoadTransferS) + carTimings.doorCloseS} s at a full load. No interval is reported for this run rather than a fallback number that lies outside every bracket on this building.`,
+        );
+      }
+    }
+
     this.#recorder = new MetricsRecorder({
       seed: this.#streams,
       runId: this.#runId,
@@ -361,6 +435,7 @@ export class Simulation {
       carIds: this.#building.cars.map((car) => car.id),
       startedAt: 0,
       reportWindow: this.#reportWindow,
+      ...(carTimings === undefined ? {} : { carTimings }),
       ...(config.replication === undefined ? {} : { replication: config.replication }),
       ...(config.metadata === undefined ? {} : { metadata: config.metadata }),
     });
@@ -1944,6 +2019,116 @@ function requireBank(building: ResolvedBuilding, bankId: string): ResolvedBank {
     throw new SimulationError(`Building "${building.id}" declares no bank "${bankId}".`);
   }
   return bank;
+}
+
+/**
+ * The {@link CarTimings} the achieved interval's departure-clustering threshold is derived from.
+ *
+ * Assembled off the **runtime cars**, not off the config, so the numbers are the ones the doors
+ * and the machine actually ran with — including a `passengerTransferS` a car overrode. Scoped to
+ * the cars whose bank serves at least one entrance floor, because those are the cars whose
+ * boardings `achievedIntervalOf` groups into departures (`#finish` passes the entrance floors as
+ * `terminalFloorIds`).
+ *
+ * **Worst case in both directions**, per {@link CarTimings}: the largest door, dwell and
+ * full-load transfer times, which push the reopen bound *up*; and the shortest first hop flown by
+ * the fastest car, which pulls the round-trip bound *down*. Both narrow the bracket, so a
+ * threshold that survives is safe for every car in it. Where two banks share a terminal — Secure
+ * Tower's low and high zones, Mixed-Use's shuttle and office-local — the worst case is taken
+ * across both, which is why a bank whose shuttles hold their doors for 39.8 s can make the whole
+ * terminal unmeasurable. That is the correct verdict: those two banks' departures are genuinely
+ * not separable in a single boarding series.
+ *
+ * The hop is measured from **every** entrance floor, not only the lowest. Midtown Office's cars
+ * serve a basement entrance 3.5 m below the lobby, and a P1→G→P1 round trip is a real short
+ * excursion that a threshold has to stay under.
+ *
+ * `undefined` when there is nothing to measure: no entrance floor, or no bank that serves an
+ * entrance also serving a floor above it.
+ */
+function terminalCarTimings(
+  resolved: ResolvedBuilding,
+  building: Building<Car>,
+  entranceFloorIds: readonly string[],
+): CarTimings | undefined {
+  if (entranceFloorIds.length === 0) return undefined;
+  const entrances = new Set(entranceFloorIds);
+
+  const heightOf = (floorId: string): number | undefined =>
+    resolved.floorsById.get(floorId)?.heightM;
+
+  /** The shortest rise from any served entrance to the next floor above it that the bank serves. */
+  const shortestRiseM = (bank: ResolvedBank): number | undefined => {
+    const heights = bank.servesFloors
+      .map((id) => heightOf(id))
+      .filter((height): height is number => height !== undefined)
+      .sort((a, b) => a - b);
+    let best: number | undefined;
+    for (const floorId of bank.servesFloors) {
+      if (!entrances.has(floorId)) continue;
+      const from = heightOf(floorId);
+      if (from === undefined) continue;
+      const above = heights.find((height) => height > from);
+      if (above === undefined) continue;
+      const rise = above - from;
+      if (best === undefined || rise < best) best = rise;
+    }
+    return best;
+  };
+
+  let doorOpenS = 0;
+  let doorCloseS = 0;
+  let dwellHallCallS = 0;
+  let dwellCarCallS = 0;
+  let fullLoadTransferS = 0;
+  let nearestFloorFlightS: number | undefined;
+  let motorStartDelayS: number | undefined;
+  let levelingSettleS: number | undefined;
+  let seen = false;
+
+  for (const bank of resolved.banks) {
+    if (!bank.servesFloors.some((floorId) => entrances.has(floorId))) continue;
+    const riseM = shortestRiseM(bank);
+    for (const car of building.cars) {
+      if (car.bankId !== bank.id) continue;
+      seen = true;
+      doorOpenS = Math.max(doorOpenS, car.doorConfig.openS);
+      doorCloseS = Math.max(doorCloseS, car.doorConfig.closeS);
+      dwellHallCallS = Math.max(dwellHallCallS, car.doorConfig.dwellHallCallS);
+      dwellCarCallS = Math.max(dwellCarCallS, car.doorConfig.dwellCarCallS);
+      fullLoadTransferS = Math.max(
+        fullLoadTransferS,
+        car.spec.designCapacityPersons * car.passengerTransferS,
+      );
+      motorStartDelayS =
+        motorStartDelayS === undefined
+          ? car.spec.motorStartDelayS
+          : Math.min(motorStartDelayS, car.spec.motorStartDelayS);
+      levelingSettleS =
+        levelingSettleS === undefined
+          ? car.spec.levelingSettleS
+          : Math.min(levelingSettleS, car.spec.levelingSettleS);
+      if (riseM === undefined) continue;
+      // Jerk-limited, never `rise / ratedSpeed`: no car reaches rated speed on a one-floor hop,
+      // and using the naive figure would understate the round trip and shrink the bracket from
+      // above (CLAUDE.md § Modeling rules).
+      const flightS = travelTime(riseM, car.constraints);
+      nearestFloorFlightS =
+        nearestFloorFlightS === undefined ? flightS : Math.min(nearestFloorFlightS, flightS);
+    }
+  }
+
+  if (!seen || nearestFloorFlightS === undefined) return undefined;
+  return Object.freeze({
+    doorOpenS,
+    doorCloseS,
+    dwellHallCallS,
+    dwellCarCallS,
+    fullLoadTransferS,
+    nearestFloorFlightS,
+    ...(motorStartDelayS === undefined ? {} : { motorStartDelayS }),
+    ...(levelingSettleS === undefined ? {} : { levelingSettleS }),
+  });
 }
 
 /**

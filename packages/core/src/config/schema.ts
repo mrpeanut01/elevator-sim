@@ -65,6 +65,8 @@ export const ISSUE_CODES = {
   unknownCostTerm: 'unknown-cost-term',
   emptyBank: 'empty-bank',
   invalidConvention: 'invalid-convention',
+  /** The building type has no row in `timing.passengerTransferS` and no car stated one. */
+  missingPassengerTransfer: 'missing-passenger-transfer',
 } as const;
 
 /** Stable codes for non-fatal diagnostics. */
@@ -565,6 +567,10 @@ export const carConfigSchema = z.strictObject({
   dwellHallCallS: positive.optional(),
   motorStartDelayS: nonNegative.optional(),
   levelingSettleS: nonNegative.optional(),
+  // Per passenger, per direction. Defaults to timing.passengerTransferS[building type];
+  // stated here for a building type that table has no row for, or for a bank whose
+  // population transfers differently from the rest of the building.
+  passengerTransferS: positive.optional(),
   doubleDeck: z.boolean().optional(),
   deckSeparationM: positive.optional(),
   ratedLoadLbPerDeck: positive.optional(),

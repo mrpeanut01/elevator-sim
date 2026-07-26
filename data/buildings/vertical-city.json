@@ -80,14 +80,14 @@
       "servesFloors": ["G", "2", "26", "27", "51", "52", "76", "77"],
       "servesFloorPairs": [["G", "2"], ["26", "27"], ["51", "52"], ["76", "77"]],
       "cars": [
-        { "id": "S1", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0, "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000, "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening" },
-        { "id": "S2", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0, "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000, "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening" },
-        { "id": "S3", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0, "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000, "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening" },
-        { "id": "S4", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0, "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000, "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening" },
-        { "id": "S5", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0, "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000, "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening" },
-        { "id": "S6", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0, "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000, "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening" },
-        { "id": "S7", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0, "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000, "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening" },
-        { "id": "S8", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0, "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000, "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening" }
+        { "id": "S1", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0, "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000, "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening", "passengerTransferS": 1.75 },
+        { "id": "S2", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0, "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000, "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening", "passengerTransferS": 1.75 },
+        { "id": "S3", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0, "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000, "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening", "passengerTransferS": 1.75 },
+        { "id": "S4", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0, "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000, "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening", "passengerTransferS": 1.75 },
+        { "id": "S5", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0, "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000, "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening", "passengerTransferS": 1.75 },
+        { "id": "S6", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0, "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000, "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening", "passengerTransferS": 1.75 },
+        { "id": "S7", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0, "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000, "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening", "passengerTransferS": 1.75 },
+        { "id": "S8", "spec": "ultra-high-speed", "ratedSpeedMps": 10.0, "ratedLoadLb": 4000, "ratedLoadLbPerDeck": 2000, "doubleDeck": true, "deckSeparationM": 4.5, "doorType": "centerOpening", "passengerTransferS": 1.75 }
       ]
     },
     {
@@ -95,11 +95,11 @@
       "name": "Zone 1 local (opens at both ground lobby levels)",
       "servesFloors": ["G", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"],
       "cars": [
-        { "id": "Z1-A", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening" },
-        { "id": "Z1-B", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening" },
-        { "id": "Z1-C", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening" },
-        { "id": "Z1-D", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening" },
-        { "id": "Z1-E", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening" }
+        { "id": "Z1-A", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "Z1-B", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "Z1-C", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "Z1-D", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "Z1-E", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 }
       ]
     },
     {
@@ -107,11 +107,11 @@
       "name": "Zone 2 local (opens at both ground lobby levels)",
       "servesFloors": ["G", "2", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25"],
       "cars": [
-        { "id": "Z2-A", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3500, "doorType": "centerOpening" },
-        { "id": "Z2-B", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3500, "doorType": "centerOpening" },
-        { "id": "Z2-C", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3500, "doorType": "centerOpening" },
-        { "id": "Z2-D", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3500, "doorType": "centerOpening" },
-        { "id": "Z2-E", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3500, "doorType": "centerOpening" }
+        { "id": "Z2-A", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "Z2-B", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "Z2-C", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "Z2-D", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "Z2-E", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 }
       ]
     },
     {
@@ -119,10 +119,10 @@
       "name": "Zone 3 local (sky lobby A, lower level)",
       "servesFloors": ["26", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38"],
       "cars": [
-        { "id": "Z3-A", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3500, "doorType": "centerOpening" },
-        { "id": "Z3-B", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3500, "doorType": "centerOpening" },
-        { "id": "Z3-C", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3500, "doorType": "centerOpening" },
-        { "id": "Z3-D", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3500, "doorType": "centerOpening" }
+        { "id": "Z3-A", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "Z3-B", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "Z3-C", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "Z3-D", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 }
       ]
     },
     {
@@ -130,10 +130,10 @@
       "name": "Zone 4 local (sky lobby A, upper level)",
       "servesFloors": ["27", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50"],
       "cars": [
-        { "id": "Z4-A", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening" },
-        { "id": "Z4-B", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening" },
-        { "id": "Z4-C", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening" },
-        { "id": "Z4-D", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening" }
+        { "id": "Z4-A", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "Z4-B", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "Z4-C", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 },
+        { "id": "Z4-D", "spec": "gearless-traction", "ratedSpeedMps": 3.0, "ratedLoadLb": 3500, "doorType": "centerOpening", "passengerTransferS": 1.2 }
       ]
     },
     {
@@ -141,12 +141,12 @@
       "name": "Zone 5 hotel local (sky lobby B, both levels)",
       "servesFloors": ["51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75"],
       "cars": [
-        { "id": "Z5-A", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "Z5-B", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "Z5-C", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "Z5-D", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "Z5-E", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "Z5-F", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening" }
+        { "id": "Z5-A", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.5 },
+        { "id": "Z5-B", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.5 },
+        { "id": "Z5-C", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.5 },
+        { "id": "Z5-D", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.5 },
+        { "id": "Z5-E", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.5 },
+        { "id": "Z5-F", "spec": "gearless-traction", "ratedSpeedMps": 4.0, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.5 }
       ]
     },
     {
@@ -154,9 +154,9 @@
       "name": "Zone 6 residential local (sky lobby C, both levels)",
       "servesFloors": ["76", "77", "78", "79", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "90", "91", "92", "93", "94", "95", "96", "97", "98", "99", "100"],
       "cars": [
-        { "id": "Z6-A", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "Z6-B", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening" },
-        { "id": "Z6-C", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening" }
+        { "id": "Z6-A", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.75 },
+        { "id": "Z6-B", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.75 },
+        { "id": "Z6-C", "spec": "gearless-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 3000, "doorType": "centerOpening", "passengerTransferS": 1.75 }
       ]
     }
   ],
@@ -175,6 +175,7 @@
     "Capacity sizing, roughly 80-88% of up-peak handling capacity per bank: zone 1 1,080 occupants on 5 cars, zone 2 935 on 5, zone 3 770 on 4, zone 4 768 on 4, zone 5 828 on 6 (hotel transfer time is 1.5 s, and two-way hotel traffic is less efficient than one-way office traffic), zone 6 506 on 3. The eight shuttles move about 320 passengers per 5 minutes against a combined above-lobby peak near 250, so the shuttle group has headroom - the interesting queue forms at the sky lobbies during the return leg, not at the ground lobby.",
     "10 m/s shuttles reach rated speed on the G to 76 run (303 m) but barely hold it on G to 26 (105.6 m), where roughly 90 m of the trip is acceleration and deceleration. Any conclusion about shuttle speed drawn without the jerk-limited profile will be wrong for the lower sky lobby and right for the upper one, which is exactly the trap docs/00-project-brief.md warns about.",
     "Per-deck capacity: ratedLoadLbPerDeck 2000 gives 2000/150 = 13 persons per deck, inside the [12, 14] doubleDeckPersonsPerDeck band the ultra-high-speed class declares in data/elevator-specs.json, and the loader cross-checks exactly that. The whole-car ratedLoadLb of 4000 is the sum of the two decks and must never be divided by 150 to obtain a per-deck figure - that yields 26 per deck, 53 per car, and doubles this building's shuttle handling capacity, which would invalidate the sky-lobby contention result the building exists to produce. data/buildings/README.md currently states the wrong form of that rule; the loader implements the right one.",
-    "Fields doubleDeck, deckSeparationM, ratedLoadLbPerDeck, servesFloorPairs, isTransferFloor and the per-floor trafficProfile override are declared in packages/core/src/config/schema.ts and documented in data/buildings/README.md. This building is the most deferrable in the set; the other four cover the algorithmic ground without a double-deck model."
+    "Fields doubleDeck, deckSeparationM, ratedLoadLbPerDeck, servesFloorPairs, isTransferFloor and the per-floor trafficProfile override are declared in packages/core/src/config/schema.ts and documented in data/buildings/README.md. This building is the most deferrable in the set; the other four cover the algorithmic ground without a double-deck model.",
+    "Passenger transfer time is declared per car, not inherited from the building type. There is no 'mixed-use' row in elevator-specs.json -> timing.passengerTransferS on purpose, because this tower's zones serve three populations that load at different speeds. Zones 1-4 are office and declare 1.2 s; zone 5 is hotel and declares 1.5 s (which is also what the capacity-sizing note above already assumed); zone 6 is residential and declares 1.75 s (ISO 4190-6). The double-deck shuttles declare 1.75 s because they feed every zone above the lobby including the residential one, and understating tp understates the round trip - the optimistic direction. Before this was declared, every car in this building silently ran at the 1.2 s office default, including the residential zone."
   ]
 }

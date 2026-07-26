@@ -87,6 +87,69 @@ CIBSE's recommended ~10 runs would have reported ~5.6 s against a converged ~5.0
 
 **Budget 50–200 replications per configuration, not 10.**
 
+### Where the "measured" numbers in this doc come from
+
+Everything below labelled **measured** was produced by the Phase 3 acceptance gate
+(`packages/experiments/src/validation/`) against the real `data/` directory and the real
+simulator, at one fixed operating point:
+
+| | |
+|---|---|
+| Building | Midtown Office; `eta` = `{waitTime: 1}`, `nearest-car` = `{distanceTravelled: 1}` |
+| Traffic | pure up-peak, all incoming through the main entrance, 900 s horizon, peak 300 s reported |
+| Arrival rate | **1% of population per 5 minutes** |
+| Replications | n = 100 per cell, fixed rather than adaptive, so a measured variance is a variance over a known `n` |
+| Interval | 95% paired-t for a published comparison; 90% for the stopping rule |
+
+The **1%** needs saying out loud, because Part 1 targets 11–15% for an office. A cell's AWT
+interval is suppressed if *any* replication saturated, and at n = 100 that is a demanding
+test — at 2% this building's `eta` already saturates one replication in a hundred. 1% is the
+rate at which both dispatchers come back 0/100 saturated, so the gate quotes only statistics
+these rules permit quoting. That is an *operating point*, not a loosened tolerance, but the
+consequence is real: the numbers below are measured in a **lightly loaded** regime. Treat the
+ratios and the method as transferable; re-measure the absolute waits at whatever rate a study
+actually uses.
+
+### Measured: the replication budget is a function of the target precision, not a constant
+
+50–200 is sound, but it is not a property of the simulator — it is a property of the
+precision you ask for. A 400-replication reference sample of `eta` on Midtown up-peak:
+
+| | |
+|---|---|
+| Mean AWT | 15.80 s |
+| Sample sd | 3.60 s |
+| Coefficient of variation | **23%** |
+
+From that `s`, the replications a 90% interval on the mean requires:
+
+| Target half-width | as % of AWT | Required n |
+|---|---|---|
+| ±2 s | 12.7% | **9** |
+| ±1 s | 6.3% | 36 |
+| ±0.8 s | 5.1% | 55 |
+| ±0.5 s | 3.2% | 141 |
+| ±0.4 s | 2.5% | 220 |
+| ±0.25 s | 1.6% | 563 |
+
+So **50–200 replications corresponds to a ±0.5 s to ±0.8 s target** on this configuration —
+and this doc's own worked example of ±2 s at 90% is satisfied at **n = 9** by projection, with
+the sequential rule's unconstrained crossing landing at **n = 10**. That is precisely the run
+count the section above calls a 12% error. The two pieces of guidance were in tension because
+the worked target was far looser than the accuracy the budget exists to buy.
+
+Both survive, for different jobs:
+
+- **±2 s at n ≈ 10 is fine for a loose absolute estimate** of a single configuration.
+- **It is not fine for a comparison.** Peters & Abbi's 12% error is exactly the reason: ten
+  runs misplace the mean by more than the gap between two decent dispatchers. Keep the
+  50-replication floor for anything that will be compared against anything else.
+
+The runner is already built this way: `RUNNER_DEFAULTS.minReplications` is 50 and the stopping
+rule is not consulted below it, so the policy floor dominates and a default sweep spends
+50–200 replications whatever the rule computes. **State the target precision, then let the
+rule pick `n`** — do not quote a flat run count.
+
 ### AWT is lognormal, but approximate it as normal
 
 Average waiting time can never be ≤ 0 and has a long right tail, making it lognormal.
@@ -153,6 +216,136 @@ Independent runs give `Cov = 0`. CRN induces positive correlation, so the covari
 subtracts and the variance of the *difference* collapses. Published reductions reach
 **~94%** — roughly **5–20× fewer runs** for equal confidence on a comparison.
 
+### Measured: the reduction depends entirely on how similar the two arms are
+
+That published figure is reachable on this simulator, but it is **regime-dependent** and the
+range is enormous. Same building, same traffic, same n = 100, same metric — varying only how
+far the candidate sits from the baseline. Since `eta` is `{waitTime: 1}` and `nearest-car` is
+`{distanceTravelled: 1}`, adding `distanceTravelled` to `eta` walks continuously from one to
+the other:
+
+| Comparison | rho | Variance reduction | Implied fewer runs |
+|---|---|---|---|
+| `eta` vs `eta` + 0.1·`distanceTravelled` | 0.9969 | **99.69%** | 324× |
+| `eta` vs `eta` + 0.8·`distanceTravelled` | 0.9027 | 89.77% | 9.8× |
+| `eta` vs `nearest-car` | 0.6083 | **43.75%** | 1.8× |
+
+Read that as a direct instruction about budget:
+
+- **Phase 7's search neighbourhood** — candidates differing by one nudged weight — *is* the
+  regime the ~94% / 5–20× claim describes. It holds there with room to spare. The same figure
+  in [Parameterization & Tuning § Use common random numbers](06-parameterization-and-tuning.md#use-common-random-numbers-across-candidates)
+  is therefore correct as written, because an optimization round compares near-neighbours.
+- **Phase 5's dispatcher-vs-baseline comparisons** are the bottom row, where the claim is
+  **wrong by an order of magnitude**: CRN buys 1.8×, not 5–20×.
+
+**Budget replications according to how similar the arms are.** Structurally different
+dispatchers need close to the independent-sampling run count. Do not assume a comparison is
+cheap merely because it is paired.
+
+#### Why the bottom row cannot be fixed
+
+The obvious suspicion is broken synchronization. It was investigated and ruled out:
+
+- per-replication trace digests are **byte-identical** across the two arms, so both really did
+  see the same passenger populations;
+- two independent estimators of the unpaired variance agree to **3.21%** — 79.68 s² measured
+  over six disjoint baseline seed sets, against 82.32 s² implied algebraically by
+  `Var(A) + Var(B)` from the paired runs alone. The six estimates span 68 to 85 s², which is
+  also why one of them is not quotable on its own.
+
+Against `Var(A − B) = 46.31 s²` under CRN, those two baselines put the reduction at **41.88%
+empirical** and **43.75% algebraic**. The table above quotes the algebraic figure because it
+uses only the paired runs and so cannot be biased by which seed set the independent baseline
+happened to draw.
+
+The cause is **unequal marginal variances**:
+
+| | AWT mean | Var |
+|---|---|---|
+| `nearest-car` | 23.06 s | 69.76 s² |
+| `eta` | 16.20 s | 12.56 s² |
+
+Since `Var(A − B) = Var(A) + Var(B) − 2·rho·sd_A·sd_B`, even at **rho = 1** the difference
+retains `(sd_A − sd_B)² = 23.12 s²` of the 82.32 s² total. **71.92% is therefore the hard
+ceiling** on that comparison however perfect the synchronization becomes. 94% was never
+reachable there, and no amount of stream discipline would have found it.
+
+A corollary worth carrying into Phase 5: a dispatcher that is *more variable* than its
+baseline is intrinsically harder to compare against it, independently of how much better its
+mean is. Reducing variance is itself worth points.
+
+### Measured: the resolution limit is two numbers, not one
+
+"What is the smallest improvement we can detect?" has two answers here, roughly **10× apart at
+the same budget**, separated by the same similarity axis as the table above. Power curve, 11
+rungs × 10 disjoint seed sets, n = 100, 95% paired-t, base AWT 15.72 s.
+
+**Near-neighbour arms** (one weight nudged, rho 0.98–1.00):
+
+| Effect | as % of AWT | Detected |
+|---|---|---|
+| 0.089 s | 0.57% | 3/10 |
+| 0.134 s | 0.85% | 6/10 |
+| **0.200 s** | **1.27%** | **8/10 — 80% power** |
+| **0.265 s** | **1.69%** | **10/10** |
+
+**Structurally different dispatchers** (rho ≈ 0.61, s_D = 6.81 s): the paired half-width at
+n = 100 is **1.33 s**, so
+
+| | Effect | as % of AWT |
+|---|---|---|
+| detectable at all | ~1.3 s | 8.5% |
+| 80% power | ~1.9 s | 12% |
+
+This is the number Phase 5 needs *before* it starts. Its acceptance criterion is "each
+dispatcher beats `NearestCarDispatcher` with a paired-t interval excluding zero" — at n = 100
+on this operating point that demands roughly a **12% AWT improvement**. Anything smaller is
+not a failed dispatcher; it is below the apparatus's resolution at that budget, and the honest
+report is **indistinguishable**, not "no better". To resolve less, raise `n`: the detectable
+effect falls as `1/sqrt(n)`, so 4× the replications buys 2× the resolution.
+
+That is the whole difference between *"our dispatcher is better"* and *"better than we can
+measure"* — and only the second is defensible without checking the half-width first.
+
+### Measured: flat plateaus, not noise — read this before writing an optimizer
+
+A weight perturbation below the threshold at which it flips a dispatch decision produces a
+**bit-identical run**. Not a small effect — *no* effect:
+
+| `distanceTravelled` weight added to `eta` | Exactly-zero paired differences | rho | Effect |
+|---|---|---|---|
+| 0.01 | **100/100** | 1.000000 | exactly 0 |
+| 0.02 | **100/100** | 1.000000 | exactly 0 |
+| 0.03 | **100/100** | 1.000000 | exactly 0 |
+| 0.035 | 98/100 | 0.998314 | 0.026 s |
+| 0.04 | 98/100 | 0.998314 | 0.026 s |
+| 0.06 | 97/100 | 0.998126 | 0.033 s |
+| 0.10 | 95/100 | 0.996918 | 0.058 s |
+
+The mechanism is not subtle and will not go away: dispatch is an `argmin` over a handful of
+cars, ranked by `(cost, carId)`. A weight change that reorders no car's cost changes nothing
+downstream, and the simulator is deterministic, so the two runs agree bit for bit. The
+objective surface is **piecewise constant — a staircase, not a slope.** Note that 0.035 and
+0.04 are identical to *each other* as well: the plateaus continue well past the first step.
+
+What a Phase 7 optimizer author must design for:
+
+1. **Flat regions are expected, not a bug.** A candidate scoring *exactly* the baseline is the
+   normal consequence of too small a step, and it is detectable for free: paired differences
+   that are exactly zero, `rho = 1`.
+2. **Finite-difference gradients are undefined there.** Any method estimating a gradient from
+   small perturbations reads the slope as zero and stalls. Prefer methods that need no
+   gradient — random search, CMA-ES with a step size above the plateau width, Bayesian
+   optimization on a coarser grid.
+3. **Step size has a floor.** On this configuration a `distanceTravelled` step must exceed
+   ~0.03 to do anything at all. That floor is per-term, per-building and per-traffic, so
+   **probe it** rather than trusting this number.
+4. **The paired difference is sparse.** Even at a clearly significant 0.3 weight step, ~90 of
+   100 replications are still exactly zero and the entire effect is carried by the few where a
+   decision flipped. Estimators assuming a dense, roughly normal difference are working
+   against the actual shape of the data.
+
 ### Use a paired-t interval
 
 Compute the confidence interval on the **differences**, not two separate intervals.
@@ -191,7 +384,21 @@ replayed exactly and results re-analyzed without re-simulating.
 Percentile confidence intervals require substantially more replications than mean CIs.
 If WT95 is a headline metric, factor that into the stopping rule.
 
+**Measured**, on the same 400-replication reference sample as Part 3: WT95 has a mean of
+29.17 s and an sd of 4.43 s, so at a common ±1 s target and 90% it needs **n ≈ 54** against
+AWT's 36 — about 1.5× the budget. Its coefficient of variation is actually *lower* than AWT's
+(15% against 23%); the extra cost comes from the wider absolute spread, so compare the two at
+an absolute target rather than a percentage one.
+
 ## Sources
+
+Where a section above is labelled **measured**, it qualifies a published figure with what this
+simulator does at its own operating point. **None of the sources below is being contradicted.**
+The ~94% CRN reduction is reproduced here (99.69%) in the regime it describes — closely related
+alternatives — and the 50–200 replication budget is right for the ±0.5 s to ±0.8 s precision it
+implicitly assumes. What the gate established is which regime this project's own comparisons
+fall into, and that is a fact about Midtown Office and these dispatchers rather than about the
+literature. Re-measure before carrying any of these numbers to another building or arrival rate.
 
 - [Determining the Number of Simulations Required for Statistically Valid Results — Abbi & Peters, 9th Symposium on Lift & Escalator Technologies](https://download.peters-research.com/library/Determining_the_Number_of_Simulations_Required_for_Statistically_Valid_Results.pdf)
 - [Traffic Analysis Based on the Up-Peak Round Trip Time Method — Peters Research](https://liftescalatorlibrary.org/paper_indexing/papers/00000036.pdf)

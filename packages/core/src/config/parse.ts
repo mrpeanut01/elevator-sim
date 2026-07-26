@@ -309,7 +309,18 @@ export function resolveBuilding(
       const carPath = `${at}.cars[${carIndex}]`;
       let resolved: ResolvedCar;
       try {
-        resolved = resolveCar(car, specs, { file, path: carPath });
+        // The building type is passed so `passengerTransferS` is resolved *here*, at the config
+        // layer, and not left for each consumer to re-derive. Omitting it was a real defect:
+        // every `ResolvedCar` `loadConfig` returned had the field absent, so the only thing that
+        // knew a residential car transfers at 1.75 s was `Simulation`, and any other consumer —
+        // an optimizer, a report, the analytical path — silently got nothing instead of the
+        // `missing-passenger-transfer` error that exists to stop exactly that.
+        resolved = resolveCar(car, specs, {
+          file,
+          path: carPath,
+          buildingType: building.type,
+          buildingId: building.id,
+        });
       } catch (error) {
         if (!(error instanceof ConfigError)) throw error;
         issues.push(...error.issues);
