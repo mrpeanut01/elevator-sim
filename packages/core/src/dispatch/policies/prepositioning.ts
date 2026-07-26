@@ -184,6 +184,24 @@ export type ParkableGroup = Pick<DispatchPolicy, 'reposition'>;
  * does nothing" in a summary.
  *
  * Pure with respect to the policy and the cars. It does query the predictor, once.
+ *
+ * ## Deliberate public API. The run does not call this, and that is correct.
+ *
+ * Stated here rather than only in `dispatch/deadCode.test.ts`'s allowlist, because the reader who
+ * needs to know is the one looking at this function. `Simulation.#park` is called **per car**, so
+ * it resolves the bank context once with {@link resolvePrepositionContext} and derives each car's
+ * with {@link repositionContextFor} — which is this body, unrolled across several calls so the
+ * forecast is taken once for the bank rather than once per car. Both halves are live and asserted
+ * live by the audit; this wrapper over them is not, and cannot become live without making the run
+ * query the predictor per car, which is the bug the "one forecast per bank" section above exists
+ * to prevent.
+ *
+ * So it is the **bank-level** entry point, for a caller that has a whole bank in hand and no
+ * per-car loop: a report, a Phase 7 objective over stage 7, or a test. {@link parkingFloorIds}
+ * reads what it returns and is allowlisted for the same reason. It is exported from three barrels
+ * and imported by no production file, which is exactly the state all four Phase 5 dead behaviours
+ * were in — the difference is that this one has a reason, recorded in two places, and the audit
+ * asserts the reason has not lapsed.
  */
 export function prepositionPlan(
   policy: ParkableGroup,

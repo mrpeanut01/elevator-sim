@@ -120,7 +120,9 @@ The stop decision and what happens at the floor.
 | `dwellPolicy` | `fixed` \| `adaptive` | |
 | `dwellAdaptationGain` | float | Extends dwell with hall queue length |
 | `reopenOnLateArrival` | bool | Models the door-hold button and photo-eye |
+| `maxReopensPerStop` | 0–20 | Reopens honoured at one stop before the doors close regardless; the anti-hold-forever rule |
 | `maxDwellS` | seconds | Ceiling on adaptive dwell |
+| `maxTransferSeconds` | seconds | Ceiling on the transfer-driven part of a stop |
 
 ### Stage 7: Idle repositioning
 
@@ -259,8 +261,93 @@ Supported types: `continuous`, `integer`, `categorical`, `boolean`.
 `activeWhen` expresses conditional parameters, so the optimizer does not waste evaluations
 tuning a knob that is inert under the current configuration.
 
+### `activeWhen` has two forms and **one** evaluation rule
+
+A condition is either the **values** that make the knob live, for a categorical or boolean
+gate, or an inclusive **numeric interval**, for an integer or continuous one:
+
+```json
+{
+  "id": "auction.reserveMarginalDelayS",
+  "type": "continuous",
+  "range": [0, 600],
+  "activeWhen": {
+    "auction.aggregation": ["contract-net"],
+    "auction.rounds": { "min": 2 }
+  }
+}
+```
+
+`activeWhen` is a **conjunction**: every condition must hold. Both forms evaluate through one
+function — `activeWhenSatisfied` in `dispatch/parameters.ts` — and an optimizer implements it
+once:
+
+- **value list:** the gate's current value is in the list (a boolean gate compares as `"true"` /
+  `"false"`).
+- **interval:** the gate's current value is a finite number within `[min, max]`, either bound
+  optional.
+- **either:** a gate that cannot be read — absent, or the wrong runtime type — is **not**
+  satisfied. Guessing would activate a knob whose condition nobody evaluated.
+
+The numeric form exists because the value-list form could not express a real gate.
+`auction.reserveMarginalDelayS` is inert while `auction.rounds` is 1 — a single-round auction has
+no later round to reallocate a declined contract into — and `auction.rounds` is an integer with a
+range and no `values`. Encoding that as `["2", …, "8"]` satisfies the shape and none of the
+semantics: an optimizer comparing its own sampled `3` against the string `"3"` never activates the
+reserve. So the parameter shipped **ungated on that half**, and a search that sampled `rounds = 1`
+spent 50–200 replications an evaluation on a dimension that cannot move the objective. A gate
+whose evaluation rule differs from every other gate is exactly the elevator-specific knowledge
+this schema exists to remove.
+
+### `id` is a path a profile can actually hold
+
+The contract's other half: **every declared `id` must be authorable into
+`data/dispatcher-profiles.json` and survive a `loadConfig` round trip.** A parameter an optimizer
+can sample but not write back is a dimension it searched for nothing; one it can write but never
+sample is a knob the tuned result silently depends on. `dispatch/parameters.test.ts` asserts both
+directions over every row in all three dispatch schemas, and it has caught the gap three times:
+four predictor rows that `idleStageSchema` rejected as unrecognized keys, and the whole of
+`eligibility.*` and `normalization.*`, which had no profile section at all and were reachable only
+through an options object.
+
+The one declared id whose authored form is **not** its dotted path is
+`constraints.noDirectionReversal`, which is written as membership in the `hardConstraints` array —
+because a set-valued parameter is not something a generic optimizer can sample, and a boolean per
+constraint is. That translation is one line, and it is asserted rather than assumed.
+
 **This schema is the contract.** A generic optimizer reads it, samples valid
 configurations, and never needs a line of elevator-specific code.
+
+### A description is machine-readable, so a false one is a wrong answer
+
+`description` is the field a search reads to decide **where to spend budget**, and it is the one
+part of the schema nothing type-checks. Two failures have shipped, both of the same kind — a
+description asserting a dimension is inert when it is not:
+
+- `idle.predictorCycleS` said *"on a 30-minute replication no value of this parameter changes any
+  forecast"* and *"do not spend a search budget on this dimension"*. Measured on 20 floors after
+  1 800 s of identical observations, the forecast at floor 5 runs `600 → 13.742`,
+  `900 → 11.797`, `1 200 → 10.650`, `1 500 → 10.550`, `1 800 → 10.650` against the default's
+  `12.674` — a **30 % spread**. It is inert only above the whole span the model is observed and
+  queried over (`2 400` and `3 600` are bit-identical to `86 400`), which is a fact about the run
+  length and not about the parameter.
+- `idle.predictorPriorRatePerS` said the uniform prior *"cancels out of the comparisons the
+  repositioning stage makes"*. True of the argmax and false of everything else: stage 7 scores a
+  park by a **demand-weighted mean** response time, so a uniform additive term changes the weights
+  it averages over. The busiest-to-quietest forecast ratio runs 27.6 at a prior of 0, 14.6 at the
+  default and 2.3 at the top of the range, and through a real run on Garden Apartments at a 2 s
+  deadband a prior of 0.0005 changes the journeys on 2 of 3 seeds and moves AWT by up to 1.6 s.
+
+Both were rewritten to what is true, with the measurement in the text. **An inertness claim in a
+description is a measurement, and it is only worth writing once it has been made** — an optimizer
+is the one consumer of this schema that cannot detect being lied to, because a dimension it was
+told not to search produces no evidence that it should have been searched.
+
+The two honest inertness claims that survive are conditional and hold by construction: a
+single-term profile is invariant to its own normalization reference, because the map is strictly
+increasing and a lone term is ranked by its raw value (measured: `nearest-car` is bit-identical at
+`distanceM` 5 and 200; `eta` at `waitTimeS` 10 and 180; `energy-aware` and `predictive-balanced`
+diverge on both).
 
 ---
 
@@ -269,6 +356,37 @@ configurations, and never needs a line of elevator-specific code.
 The objective is **noisy** — see [Traffic & Statistics](03-traffic-and-statistics.md).
 A naive optimizer will happily chase statistical noise and report a winner that is
 indistinguishable from the baseline. Everything below exists to prevent that.
+
+### Pick a non-saturating reference arm — not `nearest-car`
+
+Every candidate is scored against a reference, and the reference's own behaviour caps what the
+search can resolve. **Use `collective` or `eta`. Do not use `nearest-car`.**
+
+`nearest-car` is the only shipped profile that **saturates** inside the measured replication
+budget — its queues grow without bound on the up-peak buildings, and a saturated arm has no
+quotable AWT mean at all (CLAUDE.md § Statistical discipline: *flag it and suppress the AWT
+interval*). Phase 5 measured the consequence: it capped Midtown Office at **n = 287**
+replications, because the replications above that index had lost their AWT. A capped replication
+budget is a capped resolution, and on Midtown that leaves a permanent floor of about **0.8 s** —
+four times the ~0.20 s (1.3 % of AWT) that a near-neighbour comparison reaches at n = 100 with
+CRN. Phase 7 searches exactly the near-neighbour regime, so a reference that costs a factor of
+four in resolution costs the search most of what it is trying to see.
+
+`eta` and `collective` do not saturate on any measured building and lose their AWT in no
+replication of 1 000. `eta` is the better default: `collective` carries the
+`noDirectionReversal` hard constraint, so a candidate that differs from it in a weight is not
+differing in only a weight.
+
+Two further facts about the reference, both measured and both per-building:
+
+- **CRN pairing quality is a property of the building, not a constant.** Garden Apartments pairs
+  at `rho = 0.90` against `nearest-car`'s regime; Midtown Office at `rho = 0.62`. Between
+  near-neighbour weight vectors — Phase 7's actual regime — `rho` reaches 0.997 and the variance
+  reduction 99.69 % (324×), against 43.75 % (1.8×) between structurally different dispatchers.
+  Budget from the pairing you measure, not from the headline.
+- **A reference arm that is bit-identical to a candidate is one arm under two names.** An interval
+  of exactly `[0, 0]` with `rho = 1` is a wiring bug or a step below the plateau width, never a
+  small effect.
 
 ### Use common random numbers across candidates
 
@@ -366,6 +484,16 @@ evaluate the assembled controller end-to-end on a full day.
 ```
 
 Everything above is data. Changing any of it requires no rebuild — which is the whole point.
+
+> **`idle.repositionThresholdS: 8` in this example is not a recommendation, and it is deliberately
+> left where it is.** Phase 5 measured it as the binding constraint on predictive pre-positioning:
+> at 8 s the forecast reaches every reposition decision, the deadband vetoes every move, and the
+> arm is bit-identical to `stay`. The sweep on Garden Apartments at n = 300
+> ([Roadmap § Phase 5](05-roadmap.md)) has an **interior optimum**, with the curve turning back up
+> below it as repositioning churn sets in. `DISPATCH_DEFAULTS.repositionThresholdS` was corrected;
+> the shipped `predictive-balanced` profile was **not**, on purpose — it is Phase 7's known-answer
+> case, and an optimizer that independently rediscovers the optimum on this dimension has
+> validated itself. Do not hand-edit it.
 
 ---
 

@@ -77,17 +77,22 @@
  *
  * The *other* obstruction is gone too, and it was never an export problem either: the aggregation is
  * a profile field, so `Simulation` builds an auction policy for a profile that names one. The
- * tripwire {@link multiRoundIsReachableFromSimulation} was written to go red the day that landed,
- * and `auctionAggregation.test.ts` now asserts it the other way round — behaviourally, by requiring
- * the two shipped profiles to produce observably different journeys through `runSimulation`.
+ * tripwire that recorded the obstruction used to be a function returning the literal `true`, with a
+ * test asserting it; a test that cannot fail is worse than no test, because it reads as coverage.
+ * {@link measureMultiRoundReachability} replaces it with the measurement it was standing in for —
+ * a real run of a `rounds: 3` profile resolved through `loadConfig`, counting the auctions that
+ * actually held a second bidding round.
  */
 
 import {
+  AuctionDispatchPolicy,
   Car,
   Passenger,
+  Simulation,
   StreamSet,
   bestScore,
   createDispatchPolicy,
+  createPolicyFor,
   createShaft,
   hallCallId,
   loadConfig,
@@ -476,21 +481,142 @@ function randomState(
   });
 }
 
+/** What a real run did with a profile's round budget. */
+export interface MultiRoundReachability {
+  readonly profileId: string;
+  /** `auction.rounds` as `loadConfig` resolved it from `data/`, with no options object. */
+  readonly resolvedRounds: number;
+  /** Which policy class `createPolicyFor` selected from the profile's `auction.aggregation`. */
+  readonly policyClass: string;
+  /** Calls that reached stage 4 and therefore held an auction. */
+  readonly auctionsHeld: number;
+  /** Rounds held, to how many auctions. `{1: n}` means every auction closed in one round. */
+  readonly roundHistogram: Readonly<Record<number, number>>;
+  /** Auctions that took at least one bid withdrawal and re-ran. **The measurement.** */
+  readonly auctionsPastRoundOne: number;
+  /** Withdrawals accepted, by reason, across every auction the run held. */
+  readonly withdrawalsByReason: Readonly<Record<string, number>>;
+  /** Auctions whose winner was not the central argmin. */
+  readonly divergedFromArgmin: number;
+}
+
 /**
- * Whether `AuctionDispatchPolicy` can be reached from a full `runSimulation`.
+ * Run a profile through a full simulation and **count the bidding rounds it actually held**.
  *
- * It can. `Simulation` builds every bank's controller through `createPolicyFor`, a frozen table
- * keyed on the profile's own `auction.aggregation`, so a profile declaring `contract-net` runs its
- * contract net inside a real run and `auction-multi-round` is an authored arm rather than an
- * options object. This used to return `false` and the test below asserted the absence structurally
- * against core's source; both are now the other way round, and the wait-time interval this module
- * could not quote is a paired-t comparison of the two shipped auction profiles.
+ * This replaces a function that returned the literal `true`. That version was written as a
+ * tripwire against the day the policy hook landed, was flipped to `true` when it did, and was then
+ * asserted by a test — which is a test that cannot fail, and reads as coverage while proving that
+ * `true === true`. The failure mode it was supposed to catch is precisely the one Phase 5 shipped
+ * four times: a behaviour that is configured, exported and called by nothing in the run loop.
  *
- * Kept as a function rather than deleted so a caller that branched on it still compiles, and so the
- * claim stays testable rather than becoming a sentence in a doc comment.
+ * So the claim is measured instead, on the only evidence that can distinguish the two: whether a
+ * real `Simulation` — built from a profile `loadConfig` parsed out of `data/`, with **no options
+ * object** — held any auction past round 1. `rounds: 3` reaching the run loop and a contract net
+ * that never re-runs are different findings, and only one of them means the aggregation is wired.
+ *
+ * Instrumented through `SimulationConfig.createPolicy`, which `sim/types.ts` documents as existing
+ * for exactly this — *"wrapping the policy to count what each cost term actually evaluated to,
+ * which is the only honest way to check a term is not inert through the shipped path"*. The wrapper
+ * changes no decision: it calls `createPolicyFor`, the same frozen table keyed on
+ * `auction.aggregation` that an uninstrumented run uses, and reads
+ * `AuctionDispatchPolicy.auction(callId)` immediately after each stage-4 call. Reading the policies
+ * *after* the run would count nothing — a lifecycle is deleted when its call completes, so a
+ * finished run's `calls` is empty, which is itself a way this measurement could have quietly
+ * reported zero and been believed.
  */
-export function multiRoundIsReachableFromSimulation(): boolean {
-  return true;
+export async function measureMultiRoundReachability(
+  profileId: string = MULTI_ROUND_PROFILE,
+  options: { readonly buildingId?: string; readonly seed?: number; readonly config?: LoadedConfig } = {},
+): Promise<MultiRoundReachability> {
+  const config = options.config ?? (await loadConfig(DATA_DIR));
+  const buildingId = options.buildingId ?? 'midtown-office';
+  const building = config.buildingsById.get(buildingId);
+  if (building === undefined) throw new Error(`No building "${buildingId}" in ${DATA_DIR}.`);
+  const profile = config.dispatcherProfilesById.get(profileId);
+  if (profile === undefined) {
+    throw new Error(`data/dispatcher-profiles.json has no profile "${profileId}".`);
+  }
+
+  const roundHistogram: Record<number, number> = {};
+  const withdrawalsByReason: Record<string, number> = {};
+  let auctionsHeld = 0;
+  let pastRoundOne = 0;
+  let diverged = 0;
+  let policyClass = 'none';
+  let resolvedRounds = Number.NaN;
+
+  const record = (outcome: AuctionOutcome | undefined): void => {
+    if (outcome === undefined) return;
+    auctionsHeld += 1;
+    roundHistogram[outcome.rounds] = (roundHistogram[outcome.rounds] ?? 0) + 1;
+    if (outcome.rounds > 1) pastRoundOne += 1;
+    if (outcome.divergedFromArgmin) diverged += 1;
+    for (const withdrawal of outcome.withdrawals) {
+      withdrawalsByReason[withdrawal.reason] = (withdrawalsByReason[withdrawal.reason] ?? 0) + 1;
+    }
+  };
+
+  const simulation = new Simulation({
+    building,
+    dispatcherProfile: profile,
+    trafficProfiles: config.trafficProfiles,
+    elevatorSpecs: config.elevatorSpecs,
+    seed: options.seed ?? ENSEMBLE_SEED,
+    onTimeout: 'report',
+    createPolicy: (bankProfile, policyOptions) => {
+      // The same factory an uninstrumented run uses, selected from `auction.aggregation` — this
+      // hook must not be a second way to choose a dispatcher (CLAUDE.md invariant 7).
+      const policy = createPolicyFor(bankProfile, policyOptions);
+      policyClass = policy.constructor.name;
+      if (!(policy instanceof AuctionDispatchPolicy)) return policy;
+      resolvedRounds = policy.config.auction.rounds;
+      return countingAuctions(policy, record);
+    },
+  });
+  simulation.run();
+
+  return Object.freeze({
+    profileId,
+    resolvedRounds,
+    policyClass,
+    auctionsHeld,
+    roundHistogram: Object.freeze(roundHistogram),
+    auctionsPastRoundOne: pastRoundOne,
+    withdrawalsByReason: Object.freeze(withdrawalsByReason),
+    divergedFromArgmin: diverged,
+  });
+}
+
+/**
+ * The same policy, reporting every auction it holds to `record`.
+ *
+ * A `Proxy` rather than a delegating class, deliberately: `AuctionDispatchPolicy` carries private
+ * fields, so a hand-written wrapper would have to re-implement all eight stages and any method it
+ * forgot would silently change the run. The proxy forwards every property to the real policy with
+ * the real policy as the receiver, so the private state stays reachable, and adds nothing to any
+ * method except a read of `auction(callId)` after the two stages that hold one.
+ *
+ * `instanceof` still answers `AuctionDispatchPolicy`, because a proxy shares its target's
+ * prototype.
+ */
+function countingAuctions(
+  policy: AuctionDispatchPolicy,
+  record: (outcome: AuctionOutcome | undefined) => void,
+): AuctionDispatchPolicy {
+  const observed: ReadonlySet<string> = new Set(['dispatch', 'reconsider']);
+  return new Proxy(policy, {
+    get(target, property, _receiver) {
+      const value = Reflect.get(target, property, target) as unknown;
+      if (typeof value !== 'function') return value;
+      const method = (value as (...args: readonly unknown[]) => unknown).bind(target);
+      if (!observed.has(property as string)) return method;
+      return (...args: readonly unknown[]): unknown => {
+        const result = method(...args);
+        record(target.auction(args[0] as string));
+        return result;
+      };
+    },
+  });
 }
 
 /** A tiny profile guard so a caller cannot accidentally study a non-auction weight vector. */

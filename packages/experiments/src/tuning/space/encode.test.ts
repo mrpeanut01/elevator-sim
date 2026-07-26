@@ -1,0 +1,354 @@
+import { cp, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { beforeAll, describe, expect, it } from 'vitest';
+
+import { createPolicyFor, loadConfig, runSimulation } from '@elevator-sim/core';
+import type { DispatcherProfile, LoadedConfig } from '@elevator-sim/core';
+
+import { candidateFromProfile, defaultCandidate, searchSpace, subspace } from './collect.js';
+import {
+  PROFILE_OBJECT_SECTIONS,
+  PROFILE_SECTIONS,
+  applyPatch,
+  buildingFeasibility,
+  candidateProfile,
+  candidatesEqual,
+  decodeCandidate,
+  encodeCandidate,
+} from './encode.js';
+import { policyNoiseStream, sampleCandidate, sampleCandidates } from './sample.js';
+import { SearchSpaceError } from './types.js';
+import type { Candidate, ProfileSource } from './types.js';
+
+const SPACE = searchSpace();
+const SEED = 20_260_726;
+
+/** The repository's real `data/` directory, the same one the Phase 3 and Phase 5 gates use. */
+const DATA_DIR = fileURLToPath(new URL('../../../../../data', import.meta.url));
+
+let CONFIG: LoadedConfig;
+
+beforeAll(async () => {
+  CONFIG = await loadConfig(DATA_DIR);
+});
+
+/* -------------------------------------------------------------------------- *
+ * The round trip
+ * -------------------------------------------------------------------------- */
+
+describe('a candidate survives the trip to a profile and back, exactly', () => {
+  it('is exact over a thousand random candidates', () => {
+    // The claim docs/06 makes about `id`: a winner is written back as a profile *without
+    // translation*. A thousand random points rather than a probe table, because a probe table is
+    // a list, and the row somebody forgets to add is the one nothing checks.
+    //
+    // Feasibility is switched off here on purpose. This test is about the encoding, and drawing
+    // without it exercises the combinations the feasibility oracle would otherwise remove — the
+    // encoding has to be exact on those too, or a search could not report why one was rejected.
+    const candidates = sampleCandidates(SPACE, policyNoiseStream(SEED), 1000, { validate: false });
+    let numbers = 0;
+    for (const [index, candidate] of candidates.entries()) {
+      const roundTripped = encodeCandidate(SPACE, decodeCandidate(SPACE, candidate));
+      expect(candidatesEqual(roundTripped, candidate), `candidate ${index}`).toBe(true);
+      for (const [id, value] of candidate) {
+        // `toBe`, not `toBeCloseTo`. Nothing in the encoding rounds, rescales or re-derives; a
+        // value that came back close but not equal would mean it had been through arithmetic
+        // that nobody asked for.
+        expect(roundTripped.get(id), `${id} in candidate ${index}`).toBe(value);
+        if (typeof value === 'number') numbers += 1;
+      }
+    }
+    expect(numbers).toBeGreaterThan(30_000);
+  });
+
+  it('is exact over a narrowed space, where most dimensions are absent', () => {
+    const idle = subspace(SPACE, (parameter) => parameter.section === 'idle');
+    const base: Candidate = new Map([['idle.parkingStrategy', 'predicted-demand']]);
+    for (const candidate of sampleCandidates(idle, policyNoiseStream(SEED), 200, {
+      base,
+      validate: false,
+    })) {
+      const patch = decodeCandidate(idle, candidate);
+      expect(Object.keys(patch)).toStrictEqual(['idle']);
+      expect(candidatesEqual(encodeCandidate(idle, patch), candidate)).toBe(true);
+    }
+  });
+
+  it('keeps a weight of zero, which is a decision and not an absence', () => {
+    // A term weighted `0` is removed from the sum; a term the profile never mentions has no
+    // weight at all. The two resolve identically today and are different statements, and a
+    // membership test written with truthiness would silently turn the first into the second.
+    const point: Candidate = new Map([
+      ['weights.waitTime', 0],
+      ['weights.distanceTravelled', 1],
+    ]);
+    const patch = decodeCandidate(SPACE, point);
+    expect(patch.weights).toStrictEqual({ waitTime: 0, distanceTravelled: 1 });
+    expect(candidatesEqual(encodeCandidate(SPACE, patch), point)).toBe(true);
+  });
+
+  it('round-trips the one id whose authored form is not its dotted path', () => {
+    // `constraints.noDirectionReversal` is a boolean in the space and a membership in
+    // `hardConstraints` in the file, because a set-valued parameter is not something a generic
+    // optimizer can sample. Both directions, both values, and the absent case.
+    const on: Candidate = new Map([['constraints.noDirectionReversal', true]]);
+    const off: Candidate = new Map([['constraints.noDirectionReversal', false]]);
+    expect(decodeCandidate(SPACE, on).hardConstraints).toStrictEqual(['noDirectionReversal']);
+    expect(decodeCandidate(SPACE, off).hardConstraints).toStrictEqual([]);
+    expect(candidatesEqual(encodeCandidate(SPACE, decodeCandidate(SPACE, on)), on)).toBe(true);
+    expect(candidatesEqual(encodeCandidate(SPACE, decodeCandidate(SPACE, off)), off)).toBe(true);
+
+    // A candidate that never searched the constraint must not acquire one, in either direction.
+    const silent = decodeCandidate(SPACE, new Map([['weights.waitTime', 1]]));
+    expect(Object.hasOwn(silent, 'hardConstraints')).toBe(false);
+    expect(encodeCandidate(SPACE, silent).has('constraints.noDirectionReversal')).toBe(false);
+  });
+
+  it('emits only the sections a profile has, and refuses one it does not', () => {
+    // The authored keys are the space's sections with the one translation applied: `constraints`
+    // is written as `hardConstraints`, which is the whole of the exception docs/06 records.
+    const authoredKeys = [
+      'weights',
+      'hardConstraints',
+      ...PROFILE_OBJECT_SECTIONS,
+    ];
+    expect(PROFILE_SECTIONS).toStrictEqual(['weights', 'constraints', ...PROFILE_OBJECT_SECTIONS]);
+    const patch = decodeCandidate(SPACE, defaultCandidate(SPACE));
+    for (const section of Object.keys(patch)) expect(authoredKeys).toContain(section);
+
+    // A dimension whose section no profile has would otherwise be dropped here and look
+    // authorable — which is how `sim.drainGraceS` first got into the space.
+    const impossible = subspace(SPACE, []) as unknown as typeof SPACE;
+    const stray = new Map([
+      [
+        'sim.drainGraceS',
+        3600,
+      ],
+    ]);
+    expect(() =>
+      decodeCandidate(
+        {
+          ...impossible,
+          parameters: [],
+          byId: new Map([
+            [
+              'sim.drainGraceS',
+              {
+                id: 'sim.drainGraceS',
+                section: 'sim',
+                key: 'drainGraceS',
+                type: 'continuous' as const,
+                min: 0,
+                max: 1,
+                scale: 'linear' as const,
+                default: 0,
+                description: 'a section no dispatcher profile has',
+                declaredBy: [],
+              },
+            ],
+          ]),
+        },
+        stray,
+      ),
+    ).toThrow(/no place for/);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Reading an existing profile
+ * -------------------------------------------------------------------------- */
+
+describe('a shipped profile reads as a candidate', () => {
+  it('fills what predictive-balanced does not author with the declared default', () => {
+    const profile = CONFIG.dispatcherProfilesById.get('predictive-balanced') as DispatcherProfile;
+    const incumbent = candidateFromProfile(SPACE, profile);
+
+    // Authored, and read back as authored.
+    expect(incumbent.get('weights.waitTime')).toBe(1);
+    expect(incumbent.get('dispatch.assignmentTiming')).toBe('deferred');
+    expect(incumbent.get('idle.parkingStrategy')).toBe('predicted-demand');
+    expect(incumbent.get('answer.dwellPolicy')).toBe('adaptive');
+
+    // **The known-answer case.** `predictive-balanced` authors an 8 s deadband, which vetoes
+    // every reposition it might make; Phase 5's sweep on Garden Apartments at n = 300 has an
+    // interior optimum at 2 s. It is deliberately left as shipped so Phase 7 has a ground truth,
+    // so this assertion is a guard against somebody "fixing" the data file: the incumbent the
+    // optimizer starts from must still be the 8.
+    expect(incumbent.get('idle.repositionThresholdS')).toBe(8);
+    const deadband = SPACE.byId.get('idle.repositionThresholdS');
+    expect(deadband?.type === 'continuous' ? [deadband.min, deadband.max] : undefined).toStrictEqual(
+      [0, 60],
+    );
+
+    // Not authored, so the resolver's default is what the profile actually runs.
+    expect(profile.weights['rideTime']).toBeUndefined();
+    expect(incumbent.get('normalization.waitTimeS')).toBe(60);
+    expect(incumbent.get('idle.predictorLearningRate')).toBe(0.3);
+    expect(incumbent.get('auction.aggregation')).toBe('central-argmin');
+
+    // Inactive under this profile: it is `up-down-buttons`, so no landing call carries a
+    // destination and `rideTime` cannot change a decision. One dimension of twelve, not searched.
+    expect(incumbent.has('weights.rideTime')).toBe(false);
+    // `central-argmin` holds no auction, so neither auction knob is live.
+    expect(incumbent.has('auction.rounds')).toBe(false);
+    expect(incumbent.has('auction.reserveMarginalDelayS')).toBe(false);
+  });
+
+  it('reads every shipped profile as a feasible candidate', () => {
+    for (const profile of CONFIG.dispatcherProfilesById.values()) {
+      const candidate = candidateFromProfile(SPACE, profile);
+      expect(SPACE.validate(candidate), profile.id).toBeUndefined();
+    }
+  });
+
+  it('is strict where encodeCandidate is strict, and lenient where it fills', () => {
+    const bare: ProfileSource = { id: 'bare', name: 'Bare', weights: {} };
+    expect([...encodeCandidate(SPACE, bare).keys()]).toStrictEqual([]);
+    expect(candidateFromProfile(SPACE, bare).size).toBe(defaultCandidate(SPACE).size);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Merging
+ * -------------------------------------------------------------------------- */
+
+describe('a patch merges onto a base without dropping what it did not touch', () => {
+  it('merges field by field within a section', () => {
+    // A search narrowed to the deadband must not delete the incumbent's predictor horizon, which
+    // is what replacing the `idle` object wholesale would do — and the winner would then be
+    // optimal at a horizon nobody chose.
+    const base = CONFIG.dispatcherProfilesById.get('predictive-balanced') as DispatcherProfile;
+    const deadband = subspace(SPACE, ['idle.repositionThresholdS']);
+    const merged = applyPatch(SPACE, base, decodeCandidate(deadband, new Map([['idle.repositionThresholdS', 2]])));
+    const idle = merged['idle'] as Record<string, unknown>;
+    expect(idle['repositionThresholdS']).toBe(2);
+    expect(idle['predictorHorizonS']).toBe(300);
+    expect(idle['parkingStrategy']).toBe('predicted-demand');
+    expect(merged['weights']).toStrictEqual(base.weights);
+  });
+
+  it('merges weights rather than replacing them', () => {
+    const base = CONFIG.dispatcherProfilesById.get('predictive-balanced') as DispatcherProfile;
+    const merged = applyPatch(SPACE, base, decodeCandidate(SPACE, new Map([['weights.waitTime', 2]])));
+    const weights = merged['weights'] as Record<string, number>;
+    expect(weights['waitTime']).toBe(2);
+    expect(weights['crowding']).toBe(0.3);
+  });
+
+  it('keeps a hard constraint the space does not declare', () => {
+    // There is one declared constraint today, and the point is what happens when there are two:
+    // a search that never knew about the second must not silently drop it.
+    const base: ProfileSource = {
+      id: 'base',
+      name: 'Base',
+      weights: {},
+      hardConstraints: ['noDirectionReversal', 'someLaterRule'],
+    };
+    const merged = applyPatch(
+      SPACE,
+      base,
+      decodeCandidate(SPACE, new Map([['constraints.noDirectionReversal', false]])),
+    );
+    expect(merged['hardConstraints']).toStrictEqual(['someLaterRule']);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * A candidate as a profile the loader accepts
+ * -------------------------------------------------------------------------- */
+
+describe('a decoded candidate is a profile loadConfig accepts and a policy builds from', () => {
+  it('parses every random candidate through the real profile parser', () => {
+    // `candidateProfile` validates through `parseDispatcherProfiles`, the function `loadConfig`
+    // itself calls. So "this parses" and "`loadConfig` would accept this" are one statement.
+    const candidates = sampleCandidates(SPACE, policyNoiseStream(SEED), 200);
+    for (const [index, candidate] of candidates.entries()) {
+      const profile = candidateProfile(SPACE, candidate, { id: `cand-${index}` });
+      expect(profile.id).toBe(`cand-${index}`);
+      // And the profile reads back as the candidate it came from, so the trip through the
+      // parser changed nothing.
+      expect(candidatesEqual(encodeCandidate(SPACE, profile), candidate)).toBe(true);
+      expect(() => createPolicyFor(profile)).not.toThrow();
+    }
+  });
+
+  it('is loaded from disk by loadConfig and builds a working policy', async () => {
+    // The whole round trip, through the filesystem: write the winner into a copy of `data/`,
+    // load that directory the way every run loads it, and build the group controller from what
+    // came back. A profile that only ever existed in memory has not been shown to be shippable.
+    const candidate = sampleCandidate(SPACE, policyNoiseStream(SEED), {
+      feasible: buildingFeasibility(
+        SPACE,
+        CONFIG.buildingsById.get('garden-apartments') ?? [...CONFIG.buildingsById.values()][0]!,
+        CONFIG.elevatorSpecs,
+      ),
+    });
+    const written = candidateProfile(SPACE, candidate, { id: 'tuned-winner', name: 'Tuned winner' });
+
+    const dir = await mkdtemp(join(tmpdir(), 'elevator-sim-space-'));
+    await cp(DATA_DIR, dir, { recursive: true });
+    const file = join(dir, 'dispatcher-profiles.json');
+    const authored = JSON.parse(await readFile(file, 'utf8')) as { profiles: unknown[] };
+    authored.profiles.push(written);
+    await writeFile(file, JSON.stringify(authored, null, 2), 'utf8');
+
+    const reloaded = await loadConfig(dir);
+    const fromDisk = reloaded.dispatcherProfilesById.get('tuned-winner') as DispatcherProfile;
+    expect(fromDisk).toBeDefined();
+
+    // Nothing was lost on the way through JSON and the parser.
+    expect(candidatesEqual(encodeCandidate(SPACE, fromDisk), candidate)).toBe(true);
+
+    const policy = createPolicyFor(fromDisk);
+    expect(policy.engine).toBe('weighted-cost');
+    expect(policy.id).toBe('tuned-winner');
+    expect(policy.parameters.length).toBeGreaterThan(0);
+
+    // And it runs. A policy that builds and then cannot serve a passenger is not a working one,
+    // and this is the only assertion in the module that exercises the shipped path end to end.
+    const building = reloaded.buildingsById.get('garden-apartments');
+    expect(building).toBeDefined();
+    const result = runSimulation({
+      building: building as NonNullable<typeof building>,
+      dispatcherProfile: fromDisk,
+      trafficProfiles: reloaded.trafficProfiles,
+      elevatorSpecs: reloaded.elevatorSpecs,
+      seed: SEED,
+      durationS: 300,
+    });
+    expect(result.summary.counts.arrivals).toBeGreaterThan(0);
+    expect(result.summary.counts.alighted).toBeGreaterThan(0);
+  }, 60_000);
+
+  it('refuses to build a profile from an infeasible candidate, with core’s reason', () => {
+    const point = new Map(defaultCandidate(SPACE));
+    point.set('normalization.waitTimeS', -1);
+    expect(() => candidateProfile(SPACE, point, { id: 'broken' })).toThrow(SearchSpaceError);
+    expect(() => candidateProfile(SPACE, point, { id: 'broken' })).toThrow(/not authorable/);
+  });
+
+  it('checks the car-level constraints the space alone cannot see', () => {
+    // `answer.maxDwellS` under adaptive dwell must clear the car's own hall dwell, which is a
+    // property of the *building* and so cannot be an `activeWhen`. Declared range is `[4, 30]`
+    // and hall dwell reaches 7, so a uniform draw is infeasible on some cars a few per cent of
+    // the time — and the failure lands at car construction, where a search sees a throw rather
+    // than a score.
+    const building = CONFIG.buildingsById.get('midtown-office');
+    const feasible = buildingFeasibility(
+      SPACE,
+      building as NonNullable<typeof building>,
+      CONFIG.elevatorSpecs,
+    );
+    const point = new Map(defaultCandidate(SPACE));
+    point.set('answer.dwellPolicy', 'adaptive');
+    point.set('answer.dwellAdaptationGain', 0.4);
+    point.set('answer.maxDwellS', 4);
+    expect(feasible(point)).toMatch(/maxDwellS/);
+
+    point.set('answer.maxDwellS', 20);
+    expect(feasible(point)).toBeUndefined();
+  });
+});

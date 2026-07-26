@@ -86,11 +86,19 @@ export const PREDICTOR_DEFAULTS = Object.freeze({
    * 0.005 arrivals/s per (floor, direction) — about 18 per hour, a plausible off-peak rate for
    * one landing.
    *
-   * The **level** is close to inert by construction: a uniform prior ranks no floor above
-   * another, so it cancels out of every comparison the repositioning stage makes, and the
-   * `predictedDemand` term normalizes before weighting. What it must not be is zero — a zero
-   * prior makes the cold-start forecast zero everywhere, which is indistinguishable from "no
-   * demand anywhere" and would park cars by floor-id order for the first minutes of every run.
+   * This comment used to say the **level** was "close to inert by construction", because a
+   * uniform prior ranks no floor above another. That is true of the *argmax* and false of
+   * everything else stage 7 computes. `expectedResponseSeconds` takes a **demand-weighted mean**
+   * of the response time from a candidate park to every served floor, so a uniform additive term
+   * changes the weights it averages over: measured on 20 floors after 1 800 s of identical
+   * observations, the busiest-to-quietest forecast ratio runs 27.6 at a prior of 0, 14.6 at the
+   * default and 2.3 at the top of the declared range. Through a real run on Garden Apartments at
+   * the 2 s deadband where repositioning actually fires, a prior of 0.0005 changes the journeys
+   * on 2 of 3 seeds and moves AWT by +0.68 s and +1.59 s. It is a live dimension.
+   *
+   * What it must not be is zero — a zero prior makes the cold-start forecast zero everywhere,
+   * which is indistinguishable from "no demand anywhere" and would park cars by floor-id order
+   * for the first minutes of every run.
    */
   predictorPriorRatePerS: 0.005,
   /**
@@ -112,21 +120,30 @@ export const PREDICTOR_DEFAULTS = Object.freeze({
 /**
  * The schema for every predictor tunable.
  *
- * `id` is the dotted path in `data/dispatcher-profiles.json`, so a tuned winner is written back
- * as a profile without translation — **for two of the six today**. `dispatcherProfileSchema`
- * rejects the other four as unrecognized keys under `idle`, so an optimizer can sample all six
- * through {@link PredictorIdleSource} and persist only `predictorHorizonS` and
- * `predictorLearningRate`. That is invariant 8 met on 2 of 6 dimensions, and prose has already
- * failed to close it once, so `parameters.test.ts` now runs every id through the real schema: one
- * test pins exactly which parse and which do not, and a second is marked `it.fails` and turns the
- * build red the moment the four rows land. See {@link PredictorIdleSource} for the rows the config
- * layer owes; this module owns neither file.
+ * `id` is the dotted path in `data/dispatcher-profiles.json`, so a tuned winner is written back as
+ * a profile without translation — **for all six**. This paragraph used to say "for two of the six
+ * today", because `idleStageSchema` rejected the other four as unrecognized keys under `idle`: an
+ * optimizer could sample all six and persist two, which is invariant 8 met on 2 of 6 dimensions.
+ * All six rows are in the schema, and `dispatch/parameters.test.ts` runs every declared id in every
+ * dispatch schema through the real profile parser and back out of the real resolver, so the claim
+ * is asserted rather than written down.
  *
- * Every row is `activeWhen: { 'idle.parkingStrategy': ['predicted-demand'] }` **except** the
- * horizon and learning rate, which the `predictedDemand` cost term reads regardless of where
- * cars park. A forecast informs two independent mechanisms, and marking the shared knobs
- * conditional on the parking strategy would tell an optimizer to stop tuning them for a
- * profile that scores on `predictedDemand` and parks with `stay`.
+ * ## No row carries an `activeWhen`, and that is the honest answer rather than an omission
+ *
+ * This paragraph used to claim four of the six were gated on
+ * `{ 'idle.parkingStrategy': ['predicted-demand'] }`. None of them is, and none should be. A
+ * forecast informs **two independent mechanisms** — where an idle car parks (stage 7) and the
+ * `predictedDemand` cost term (stage 3) — so every one of these six is live when *either* the
+ * parking strategy is `predicted-demand` *or* `weights.predictedDemand` is above zero.
+ *
+ * That is a **disjunction**, and `DispatchParameterSpec.activeWhen` is a conjunction of
+ * conditions: every entry must hold. There is no form that expresses "either of these". Gating on
+ * the parking strategy alone would be worse than not gating, because it would tell an optimizer to
+ * stop tuning the forecast for a profile that scores on `predictedDemand` and parks with `stay` —
+ * a live dimension declared dead, which is the failure this schema's `description` fields have
+ * already had twice. So the condition is stated here and the rows stay ungated: an optimizer that
+ * over-searches a dimension wastes budget, one that skips a live dimension reports a winner that
+ * is only optimal at whatever the default happened to be.
  */
 export const PREDICTOR_PARAMETERS: readonly DispatchParameterSpec[] = Object.freeze([
   {
@@ -176,7 +193,7 @@ export const PREDICTOR_PARAMETERS: readonly DispatchParameterSpec[] = Object.fre
     default: PREDICTOR_DEFAULTS.predictorPriorRatePerS,
     unit: 'arrivals/s',
     description:
-      'Prior arrival rate per (floor, direction) before any evidence, arrivals per second. Uniform, so it ranks no floor above another and cancels out of the comparisons the repositioning stage makes; its job is to keep the cold-start forecast positive and finite rather than zero everywhere, which would be read as "no demand anywhere". An explicit per-floor prior overrides it.',
+      'Prior arrival rate per (floor, direction) before any evidence, arrivals per second. Uniform, so it never ranks one floor above another and the argmax parkingStrategy: predicted-demand picks is insensitive to it — but it is NOT inert, and the description said it was until it was measured. Stage 7 scores a park by a demand-weighted mean response time, so a uniform additive term changes the weights that mean averages over: the busiest-to-quietest forecast ratio runs 27.6 at a prior of 0, 14.6 at the 0.005 default and 2.3 at the top of this range, and through a real run on garden-apartments at a 2 s deadband a prior of 0.0005 changes the journeys on 2 of 3 seeds and moves AWT by up to 1.6 s. Search it. Its other job is to keep the cold-start forecast positive and finite rather than zero everywhere, which would be read as "no demand anywhere". An explicit per-floor prior overrides it.',
   },
   {
     id: 'idle.predictorPriorStrength',

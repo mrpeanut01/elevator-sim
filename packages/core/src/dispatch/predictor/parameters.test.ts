@@ -276,6 +276,48 @@ describe('PREDICTOR_PARAMETERS', () => {
     // the query at t = 1800 is bucket 0 of the second cycle, so the cell has already come round.
     expect(read(1800)).not.toBe(reference);
   });
+
+  it('idle.predictorPriorRatePerS shapes the forecast, so the description may not call it inert', () => {
+    // The second false inertness claim in this file, and the same class of error as the one above.
+    // The description said the uniform prior "cancels out of the comparisons the repositioning
+    // stage makes". True of the *argmax* — which is all `parkingStrategy: predicted-demand` reads
+    // when it picks a target — and false of everything else stage 7 computes:
+    // `lifecycle.ts → expectedResponseSeconds` takes a **demand-weighted mean** of the response
+    // time from a candidate park to every served floor, so a uniform additive term changes the
+    // weights that mean averages over, and the deadband comparison moves with it.
+    //
+    // Measured here as the ratio between the busiest landing and a quiet one, which is the shape
+    // the weighting actually sees. An optimizer told this dimension was inert would leave it at
+    // whatever the default happened to be and report a winner optimal only there.
+    const tower: readonly string[] = Array.from({ length: 20 }, (_, index) => String(index + 1));
+    const shape = (rate: number): { busiest: number; quiet: number } => {
+      const predictor = createArrivalModel({
+        floorIds: tower,
+        idle: { predictorPriorRatePerS: rate },
+      });
+      for (let at = 0; at < 1800; at += 7) {
+        predictor.observe(at % 2 === 0 ? '5' : '2', at % 3 === 0 ? 'down' : 'up', at);
+      }
+      const forecast = predictor.expectedDemandByFloor(1800, 300);
+      return { busiest: forecast.get('5') ?? 0, quiet: forecast.get('1') ?? 0 };
+    };
+
+    const ratio = (rate: number): number => {
+      const { busiest, quiet } = shape(rate);
+      return busiest / quiet;
+    };
+    // 27.6 → 14.6 → 2.3 across the declared range [0, 0.1]. Not a rounding difference.
+    expect(ratio(0)).toBeCloseTo(27.557, 2);
+    expect(ratio(PREDICTOR_DEFAULTS.predictorPriorRatePerS)).toBeCloseTo(14.627, 2);
+    expect(ratio(0.1)).toBeCloseTo(2.329, 2);
+    expect(ratio(0) / ratio(0.1)).toBeGreaterThan(10);
+
+    // And the description must not have quietly reverted to claiming otherwise. The word is what a
+    // Phase 7 optimizer reads; there is no type that can check it, so a test does.
+    const description = predictorParameter('idle.predictorPriorRatePerS')?.description ?? '';
+    expect(description).not.toMatch(/cancels out/);
+    expect(description).toMatch(/NOT inert/);
+  });
 });
 
 describe('PREDICTOR_DEFAULTS', () => {

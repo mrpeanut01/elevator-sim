@@ -591,27 +591,18 @@ export interface RepositionContext {
 /**
  * The eligibility stage as docs/06-parameterization-and-tuning.md § Stage 2 declares it.
  *
- * ## Pending config surface
+ * ## The config surface, now landed
  *
- * `dispatcherProfileSchema` in `config/schema.ts` has no `eligibility` section, so a profile
- * in `data/dispatcher-profiles.json` carrying one is rejected at load time today and only
- * {@link DispatchPolicyOptions.eligibility} can set these two. The config layer owes:
+ * This block used to record a gap: `dispatcherProfileSchema` had no `eligibility` section, so a
+ * profile carrying one was rejected at load time and only {@link DispatchPolicyOptions.eligibility}
+ * could set these two. An optimizer honouring {@link DISPATCH_PARAMETERS} could therefore *search*
+ * both values and could not *persist* a winner — invariant 8 met on the sampling half only, which
+ * is the same defect as a declared-but-unread knob arriving one step later.
  *
- * ```ts
- * // config/schema.ts, dispatcherProfileSchema
- * eligibility: z.strictObject({
- *   $comment: comment,
- *   allowOppositeDirectionPickup: z.boolean().optional(),
- *   maxLoadFactorForAssignment: fraction.optional(),
- * }).optional(),
- * // config/types.ts, DispatcherProfile
- * readonly eligibility?: EligibilityStageConfig | undefined;
- * ```
- *
- * Until that lands, an optimizer honouring {@link DISPATCH_PARAMETERS} can still search both
- * values through the options object but cannot persist a winner as a profile. This module
- * owns neither file, so the gap is recorded rather than papered over — the same treatment
- * `DOOR_PARAMETERS` gives `answer.maxReopensPerStop`.
+ * `config/schema.ts` now carries `eligibilityStageSchema` and `config/types.ts` carries
+ * `ProfileEligibilityConfig`, so both values are authorable as `profiles[].eligibility` and
+ * survive a `loadConfig` round trip. `dispatch/parameters.test.ts` asserts that for **every**
+ * declared id in all three dispatch schemas, in both directions, so the gap cannot reopen quietly.
  */
 export interface EligibilityStageConfig {
   /** Whether a car may take a call it will arrive at facing the wrong way. */
@@ -825,6 +816,42 @@ export interface DispatchPolicy {
 export type DispatchParameterType = 'continuous' | 'integer' | 'categorical' | 'boolean';
 
 /**
+ * A numeric gate: the inclusive interval of another parameter's value that makes this one live.
+ *
+ * The second of the two `activeWhen` forms, and it exists because the first cannot express a
+ * real gate the schema needs. `auction.reserveMarginalDelayS` is inert while `auction.rounds`
+ * is 1 — a single-round auction has no later round to reallocate a declined contract into — and
+ * `auction.rounds` is an **integer with a range and no `values`**, so the value-list form could
+ * only encode it as `['2', '3', …]`: a list of strings compared against a sampled number, which
+ * every honest evaluator gets wrong in one of two ways (never active, or thrown). The parameter
+ * therefore shipped **ungated**, and an optimizer spent budget on a dead dimension whenever it
+ * sampled `rounds = 1`.
+ *
+ * At least one bound must be present. Omitting one means unbounded on that side, so
+ * `{ min: 2 }` reads "live at 2 and above". Bounds are inclusive, matching
+ * {@link DispatchParameterSpec.range}, which is also inclusive.
+ *
+ * Evaluated by `isParameterActive` in `dispatch/parameters.ts` — **the** evaluation rule, shared
+ * by both forms, so an optimizer implements one function and not one per parameter.
+ */
+export interface ActiveWhenRange {
+  /** Inclusive lower bound. Omitted means unbounded below. */
+  readonly min?: number | undefined;
+  /** Inclusive upper bound. Omitted means unbounded above. */
+  readonly max?: number | undefined;
+}
+
+/**
+ * One `activeWhen` condition on one other parameter.
+ *
+ * Either the **values** that make this parameter live — for a `categorical` or `boolean` gate,
+ * which is what every gate in the schema was until the auction reserve needed one — or an
+ * inclusive numeric **interval**, for an `integer` or `continuous` gate. A condition is
+ * satisfied when the gate's current value is in the list, or inside the interval.
+ */
+export type ActiveWhenCondition = readonly string[] | ActiveWhenRange;
+
+/**
  * A self-describing tunable, in the same shape as `DoorParameterSpec` and `CarParameterSpec`.
  *
  * The shape is repeated rather than shared for the reason `CarParameterSpec` gives: it is the
@@ -846,8 +873,16 @@ export interface DispatchParameterSpec {
   /** SI unit, or omitted for a dimensionless quantity. */
   readonly unit?: string | undefined;
   readonly description: string;
-  /** Parameter id to the values that make this parameter live. */
-  readonly activeWhen?: Readonly<Record<string, readonly string[]>> | undefined;
+  /**
+   * Parameter id to the condition on it that makes **this** parameter live. Every condition
+   * must hold.
+   *
+   * Two forms, one evaluation rule (`isParameterActive` in `dispatch/parameters.ts`): a list of
+   * admitted values for a categorical or boolean gate, or an {@link ActiveWhenRange} for an
+   * integer or continuous one. The second form landed because `auction.reserveMarginalDelayS`
+   * is inert while `auction.rounds` is 1 and no list of strings can say so about an integer.
+   */
+  readonly activeWhen?: Readonly<Record<string, ActiveWhenCondition>> | undefined;
 }
 
 /**
@@ -872,7 +907,7 @@ export interface DispatchPolicyOptions {
  *
  * Declared structurally, as `physics/doors` does with `DoorAnswerSource`, so this module
  * states exactly what it needs from a profile and a real `DispatcherProfile` satisfies it
- * without a cast — including the `eligibility` section the config schema does not carry yet.
+ * without a cast.
  */
 export interface DispatcherProfileSource {
   readonly id: string;
@@ -880,6 +915,16 @@ export interface DispatcherProfileSource {
   readonly engine?: string | undefined;
   readonly weights: Readonly<Record<string, number>>;
   readonly hardConstraints?: readonly string[] | undefined;
+  /**
+   * This dispatcher's normalization half-cost points.
+   *
+   * Authorable per profile, and overridden by {@link DispatchPolicyOptions.normalization} when a
+   * fixture or an optimizer supplies one. Both are declared in {@link DISPATCH_PARAMETERS}, so
+   * both must be writable back into a profile.
+   */
+  readonly normalization?:
+    | { readonly waitTimeS?: number | undefined; readonly distanceM?: number | undefined }
+    | undefined;
   readonly dispatch?:
     | {
         readonly callType?: CallType | undefined;

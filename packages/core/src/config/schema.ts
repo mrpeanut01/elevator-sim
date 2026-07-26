@@ -448,6 +448,39 @@ const dispatchStageSchema = z.strictObject({
   maxReassignmentsPerCall: z.number().int().min(0).optional(),
 });
 
+/**
+ * Stage 2's hard filters, as a profile authors them.
+ *
+ * `DISPATCH_PARAMETERS` has declared both rows since Phase 2 and this section did not exist, so
+ * an optimizer could sample `eligibility.*`, find an optimum through `DispatchPolicyOptions`, and
+ * then be unable to write it down — invariant 8 met on the sampling half and not the persisting
+ * half, which is the same defect as a knob that is declared and unread, one step later.
+ * `dispatch/parameters.test.ts` now asserts every declared id round-trips through this schema.
+ */
+const eligibilityStageSchema = z.strictObject({
+  $comment: comment,
+  allowOppositeDirectionPickup: z.boolean().optional(),
+  // Not `fraction`: the declared range is [0, 1.2], because a projected load *on arrival* may
+  // legitimately exceed rated load and a profile must be able to say it will still assign.
+  maxLoadFactorForAssignment: nonNegative.max(1.2).optional(),
+});
+
+/**
+ * The half-cost points of the two saturating normalization maps, as a profile authors them.
+ *
+ * Distinct from the file-level `normalization.required`, which says whether normalization is
+ * mandatory at all; these are the per-dispatcher references `DISPATCH_PARAMETERS` declares as
+ * `normalization.waitTimeS` and `normalization.distanceM`. They were reachable only through
+ * `DispatchPolicyOptions` for the same reason `eligibility` was, and are authorable for the same
+ * one: a parameter an optimizer can sample and cannot persist is a dimension it searches for
+ * nothing.
+ */
+const profileNormalizationSchema = z.strictObject({
+  $comment: comment,
+  waitTimeS: positive.optional(),
+  distanceM: positive.optional(),
+});
+
 const answerStageSchema = z.strictObject({
   $comment: comment,
   bypassLoadThreshold: fraction.optional(),
@@ -457,6 +490,13 @@ const answerStageSchema = z.strictObject({
   dwellAdaptationGain: nonNegative.optional(),
   reopenOnLateArrival: z.boolean().optional(),
   maxDwellS: positive.optional(),
+  // The two `answer.*` ids `DOOR_PARAMETERS` declares and this section did not carry. Both are
+  // read by `resolveDoorConfig` off `DoorAnswerSource`, which is `profile.answer` verbatim, so
+  // they were live knobs an optimizer could sample through `DoorConfigOverrides` and could not
+  // persist as a profile. `physics/doors/types.ts` recorded the exact two rows it was owed; these
+  // are they.
+  maxReopensPerStop: z.number().int().min(0).max(20).optional(),
+  maxTransferSeconds: nonNegative.optional(),
 });
 
 const idleStageSchema = z.strictObject({
@@ -498,7 +538,9 @@ export const dispatcherProfileSchema = z.strictObject({
   engine: z.string().min(1).optional(),
   weights: z.record(identifier, z.number()),
   hardConstraints: z.array(identifier).optional(),
+  normalization: profileNormalizationSchema.optional(),
   dispatch: dispatchStageSchema.optional(),
+  eligibility: eligibilityStageSchema.optional(),
   answer: answerStageSchema.optional(),
   idle: idleStageSchema.optional(),
   auction: auctionStageSchema.optional(),

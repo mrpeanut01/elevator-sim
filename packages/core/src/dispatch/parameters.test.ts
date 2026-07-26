@@ -1,21 +1,64 @@
 import { describe, expect, it } from 'vitest';
 
+import { dispatcherProfileSchema } from '../config/schema.js';
+import { LOAD_SENSOR_PARAMETERS } from '../model/car/loadSensor.js';
+import { DOOR_PARAMETERS } from '../physics/doors/types.js';
+
 import { NORMALIZATION_DEFAULTS } from './normalize.js';
 import {
   DISPATCH_DEFAULTS,
   DISPATCH_PARAMETERS,
   DISPATCH_PARAMETER_IDS,
+  activeWhenSatisfied,
   dispatchParameter,
   dispatchParameterValue,
+  isActiveWhenRange,
+  isParameterActive,
   tunablePathsOf,
 } from './parameters.js';
+import { resolveAuctionConfig } from './policies/auction.js';
+import { POLICY_PARAMETERS, policyParameter } from './policies/parameters.js';
+import type { AuctionProfileSource } from './policies/types.js';
 import { createDispatchPolicy, resolveDispatchConfig } from './policy.js';
+import { resolvePredictorConfig } from './predictor/arrivalModel.js';
+import {
+  PREDICTOR_PARAMETERS,
+  PREDICTOR_PARAMETER_IDS,
+  predictorParameter,
+  predictorParameterValue,
+} from './predictor/parameters.js';
+import type { PredictorIdleSource } from './predictor/types.js';
 import { COST_TERMS, costTerm } from './terms/index.js';
-import type { DispatcherProfileSource, ResolvedDispatchConfig } from './types.js';
+import type {
+  DispatchParameterSpec,
+  DispatcherProfileSource,
+  ResolvedDispatchConfig,
+} from './types.js';
 
 /**
- * A profile whose every tunable differs from its default, plus the option overrides for the
- * sections `config/schema.ts` does not carry yet.
+ * Every dispatch tunable this package declares, in one list.
+ *
+ * The three schemas partition by module — the lifecycle's, the aggregation's, the arrival
+ * model's — but they share one namespace of dotted profile paths and one `activeWhen` namespace,
+ * so the contracts that are about the *namespace* have to be asserted over the union. Checking
+ * each file against itself is how `auction.reserveMarginalDelayS` came to gate on an id no rule
+ * in its own file could see.
+ */
+const EVERY_PARAMETER: readonly DispatchParameterSpec[] = Object.freeze([
+  ...DISPATCH_PARAMETERS,
+  ...POLICY_PARAMETERS,
+  ...PREDICTOR_PARAMETERS,
+]);
+
+/** A declared parameter by id, whichever of the three schemas declares it. */
+const declared = (id: string): DispatchParameterSpec | undefined =>
+  dispatchParameter(id) ?? policyParameter(id) ?? predictorParameter(id);
+
+/**
+ * A profile whose every tunable differs from its default, with `normalization` supplied as an
+ * override so this fixture also exercises the `overrides > profile > defaults` precedence. Both
+ * sections it once could only reach through options — `eligibility` and `normalization` — are
+ * authorable now, and the authorability suite below proves that per id.
  *
  * Every value here is deliberately *not* the default: an assertion that a probe survives is
  * worthless if the probe happens to equal what the resolver would have produced anyway.
@@ -160,17 +203,74 @@ describe('the parameter schema is well formed', () => {
     // An optimizer skips a parameter whose activeWhen is unmet. A condition naming a
     // parameter that does not exist, or a value that parameter cannot take, would either
     // disable the knob forever or be ignored — both silently.
-    for (const parameter of DISPATCH_PARAMETERS) {
-      for (const [conditionId, values] of Object.entries(parameter.activeWhen ?? {})) {
-        const gate = dispatchParameter(conditionId);
-        expect(gate, `${parameter.id} → ${conditionId}`).toBeDefined();
-        expect(gate?.type, `${parameter.id} → ${conditionId}`).toBe('categorical');
-        expect(values.length).toBeGreaterThan(0);
-        for (const value of values) {
-          expect(gate?.values, `${parameter.id} → ${conditionId}=${value}`).toContain(value);
+    //
+    // Asserted over **all three** dispatch schemas at once, because a gate crosses them:
+    // `auction.reserveMarginalDelayS` in POLICY_PARAMETERS gates on `auction.rounds` in the same
+    // file and on nothing in this one, and a rule checked per-file would let a gate name an id no
+    // schema declares as long as it did so from the right file.
+    for (const parameter of EVERY_PARAMETER) {
+      for (const [conditionId, condition] of Object.entries(parameter.activeWhen ?? {})) {
+        const where = `${parameter.id} → ${conditionId}`;
+        const gate = declared(conditionId);
+        expect(gate, where).toBeDefined();
+
+        if (isActiveWhenRange(condition)) {
+          // The numeric form. It exists because `auction.rounds` is an integer with a range and
+          // no `values`, so no list of strings can say "live at two rounds and above".
+          expect(gate?.type, `${where} is not a numeric gate`).toMatch(/^(?:integer|continuous)$/);
+          const [low, high] = gate?.range as readonly [number, number];
+          expect(condition.min !== undefined || condition.max !== undefined, where).toBe(true);
+          if (condition.min !== undefined && condition.max !== undefined) {
+            expect(condition.min, where).toBeLessThanOrEqual(condition.max);
+          }
+          // A gate that admits both ends of the gate's own range can never be false, which reads
+          // as a condition and is decoration. One that admits neither disables the knob forever.
+          expect(activeWhenSatisfied(condition, low) && activeWhenSatisfied(condition, high), where)
+            .toBe(false);
+          expect(activeWhenSatisfied(condition, low) || activeWhenSatisfied(condition, high), where)
+            .toBe(true);
+          continue;
         }
+
+        expect(gate?.type, where).toBe('categorical');
+        expect(condition.length, where).toBeGreaterThan(0);
+        for (const value of condition) {
+          expect(gate?.values, `${where}=${value}`).toContain(value);
+          expect(activeWhenSatisfied(condition, value), `${where}=${value}`).toBe(true);
+        }
+        // And it does gate: a value the gate admits that this condition does not must exist, or
+        // the condition is satisfied by every configuration and is not a condition.
+        const excluded = (gate?.values ?? []).filter((value) => !condition.includes(value));
+        expect(excluded.length, `${where} admits every value the gate can take`).toBeGreaterThan(0);
       }
     }
+  });
+
+  it('is one evaluation rule, not one per form', () => {
+    // The property CLAUDE.md invariant 8 turns on: an optimizer implements `activeWhenSatisfied`
+    // once and every gate in every dispatch schema evaluates through it. Both forms, and the two
+    // ways a read can fail.
+    expect(activeWhenSatisfied(['deferred'], 'deferred')).toBe(true);
+    expect(activeWhenSatisfied(['deferred'], 'immediate')).toBe(false);
+    expect(activeWhenSatisfied(['true'], true)).toBe(true);
+    expect(activeWhenSatisfied({ min: 2 }, 2)).toBe(true);
+    expect(activeWhenSatisfied({ min: 2 }, 1)).toBe(false);
+    expect(activeWhenSatisfied({ min: 2, max: 4 }, 5)).toBe(false);
+    expect(activeWhenSatisfied({ max: 4 }, -1)).toBe(true);
+    // A gate that could not be read is never satisfied. Guessing would silently activate a knob
+    // whose condition nobody evaluated.
+    expect(activeWhenSatisfied({ min: 2 }, undefined)).toBe(false);
+    expect(activeWhenSatisfied({ min: 2 }, 'contract-net')).toBe(false);
+    expect(activeWhenSatisfied(['contract-net'], undefined)).toBe(false);
+    expect(activeWhenSatisfied({ min: 2 }, Number.NaN)).toBe(false);
+
+    // A parameter with no activeWhen is always live; a conjunction needs every condition.
+    expect(isParameterActive(dispatchParameter('dispatch.callType') as DispatchParameterSpec, () =>
+      undefined,
+    )).toBe(true);
+    const deferWindow = dispatchParameter('dispatch.deferWindowS') as DispatchParameterSpec;
+    expect(isParameterActive(deferWindow, () => 'deferred')).toBe(true);
+    expect(isParameterActive(deferWindow, () => 'immediate')).toBe(false);
   });
 
   it('declares one weight per implemented term and no more', () => {
@@ -317,6 +417,202 @@ describe('the schema and the engine agree about what is tunable', () => {
     // A term id nothing implements is a typo, and `resolveDispatchConfig` throws on it rather than
     // scoring every car at zero. Reading one back is still `undefined`, not a guess.
     expect(dispatchParameterValue(config, 'weights.waitTiem')).toBeUndefined();
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Authorability — the other half of invariant 8, in both directions
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A value inside the declared range or value set and **different from the default**, derived from
+ * the spec alone.
+ *
+ * Generic on purpose: a hand-written probe table has to be extended when a row lands, and the row
+ * that is forgotten is exactly the one nothing checks. Everything here is `type` plus `range` or
+ * `values`, which is all docs/06 promises an optimizer.
+ */
+function probeFor(parameter: DispatchParameterSpec): number | string | boolean {
+  if (parameter.type === 'boolean') return parameter.default !== true;
+  if (parameter.type === 'categorical') {
+    const other = (parameter.values ?? []).find((value) => value !== parameter.default);
+    if (other === undefined) throw new Error(`${parameter.id} has one admissible value`);
+    return other;
+  }
+  const [low, high] = parameter.range as readonly [number, number];
+  const midpoint = parameter.type === 'integer' ? Math.round((low + high) / 2) : (low + high) / 2;
+  if (midpoint !== parameter.default) return midpoint;
+  return parameter.type === 'integer' ? (midpoint < high ? midpoint + 1 : midpoint - 1) : (low + midpoint) / 2;
+}
+
+/** The profile a single probe is authored into, as JSON a `data/` file could hold verbatim. */
+function profileWith(id: string, probe: number | string | boolean): Record<string, unknown> {
+  const base: Record<string, unknown> = { id: 'probe', name: 'Probe', weights: {} };
+  const dot = id.indexOf('.');
+  const section = id.slice(0, dot);
+  const key = id.slice(dot + 1);
+  if (section === 'weights') return { ...base, weights: { [key]: probe } };
+  // The one declared parameter whose authored form is not its dotted path: a hard constraint is a
+  // named rule in a list, because `hardConstraints` is a set and `constraints.*` is the boolean
+  // per member that a generic optimizer can actually sample. `parameters.ts` records the trade.
+  if (section === 'constraints') {
+    return { ...base, hardConstraints: probe === true ? [key] : [] };
+  }
+  return { ...base, [section]: { [key]: probe } };
+}
+
+/**
+ * Read a probe back out of whichever resolver owns the section.
+ *
+ * The parsed profile is passed as the raw parsed object rather than as one interface, because the
+ * three resolvers declare three structural views of it — `DispatcherProfileSource`,
+ * `AuctionProfileSource`, `PredictorIdleSource` — and the point of the test is that one authored
+ * JSON object satisfies all three.
+ */
+function readBack(
+  id: string,
+  profile: Readonly<Record<string, unknown>>,
+): number | string | boolean | undefined {
+  if (id.startsWith('auction.')) {
+    const resolved = resolveAuctionConfig(profile as unknown as AuctionProfileSource, {});
+    const key = id.slice('auction.'.length);
+    return (resolved.auction as unknown as Readonly<Record<string, number | string>>)[key];
+  }
+  if (PREDICTOR_PARAMETER_IDS.has(id)) {
+    return predictorParameterValue(
+      resolvePredictorConfig(profile['idle'] as PredictorIdleSource | undefined),
+      id,
+    );
+  }
+  return dispatchParameterValue(
+    resolveDispatchConfig(profile as unknown as DispatcherProfileSource),
+    id,
+  );
+}
+
+describe('every declared tunable is authorable as a profile, and every authorable field is declared', () => {
+  it('parses a probe for every declared id through the real profile schema and reads it back', () => {
+    // The round trip an optimizer performs at the end of a search: take the winner, write it into
+    // `data/dispatcher-profiles.json`, load it. A parameter it can sample but not persist is a
+    // dimension it searched for nothing, which is the same defect as a declared-but-unread knob
+    // arriving one step later.
+    //
+    // This used to be false for six of the declared ids. Four predictor rows were rejected by
+    // `idleStageSchema` as unrecognized keys and landed in Phase 5's wiring step; `eligibility.*`
+    // had no section in the profile schema at all and `normalization.*` had none either, so both
+    // could only be reached through `DispatchPolicyOptions` — searchable, unpersistable. All three
+    // sections exist now, and this test is the reason they cannot quietly stop existing.
+    for (const parameter of EVERY_PARAMETER) {
+      const probe = probeFor(parameter);
+      expect(probe, `${parameter.id}: probe equals its default`).not.toEqual(parameter.default);
+
+      const authored = profileWith(parameter.id, probe);
+      const parsed = dispatcherProfileSchema.safeParse(authored);
+      expect(
+        parsed.success,
+        `${parameter.id} is not authorable: ${JSON.stringify(authored)} → ${parsed.error?.issues[0]?.message ?? ''}`,
+      ).toBe(true);
+
+      const profile = parsed.data as Readonly<Record<string, unknown>>;
+      expect(readBack(parameter.id, profile), `${parameter.id} did not survive the round trip`)
+        .toEqual(probe);
+    }
+  });
+
+  it('declares every field the profile schema admits — nothing authorable is invisible', () => {
+    // The reverse direction, derived from the schema rather than from a list, so a section that
+    // gains a field fails here until something declares it. A field an optimizer can write but
+    // never sample is a knob whose value the tuned result silently depends on.
+    const sections = ['normalization', 'dispatch', 'eligibility', 'answer', 'idle', 'auction'];
+    const undeclared: string[] = [];
+    for (const section of sections) {
+      const field = (dispatcherProfileSchema.shape as Readonly<Record<string, unknown>>)[section];
+      expect(field, `dispatcherProfileSchema has no ${section} section`).toBeDefined();
+      const shape = (field as unknown as { unwrap: () => { shape: Record<string, unknown> } })
+        .unwrap().shape;
+      for (const key of Object.keys(shape)) {
+        if (key === '$comment') continue;
+        const id = `${section}.${key}`;
+        if (declared(id) !== undefined) continue;
+        undeclared.push(id);
+      }
+    }
+    // The only authorable dispatch fields no dispatch schema declares, each because **another**
+    // schema owns the number and two declarations of one knob is two sources of truth. Asserted as
+    // an exact set, so a field that stops being owned elsewhere shows up here rather than nowhere.
+    // Every one of them is declared by `DOOR_PARAMETERS` or `LOAD_SENSOR_PARAMETERS`, checked
+    // below rather than asserted by comment.
+    expect(undeclared.sort()).toStrictEqual(
+      [
+        // LOAD_SENSOR_PARAMETERS: the load cell owns them; the dispatcher reads their effect.
+        'answer.bypassLoadThreshold',
+        'answer.overloadThreshold',
+        // DOOR_PARAMETERS: the door machine implements dwell and the reopen budget.
+        'answer.dwellAdaptationGain',
+        'answer.dwellPolicy',
+        'answer.maxDwellS',
+        'answer.maxReopensPerStop',
+        'answer.maxTransferSeconds',
+        'answer.reopenOnLateArrival',
+      ].sort(),
+    );
+    const elsewhere = new Set([
+      ...DOOR_PARAMETERS.map((parameter) => parameter.id),
+      ...LOAD_SENSOR_PARAMETERS.map((parameter) => parameter.id),
+    ]);
+    for (const id of undeclared) {
+      expect(elsewhere.has(id), `${id} is authorable and no schema at all declares it`).toBe(true);
+    }
+  });
+
+  it('makes the answer-stage ids another schema owns authorable too', () => {
+    // Same defect, one module over, and `config/schema.ts` is where both halves of it live.
+    // `physics/doors/types.ts` recorded that `answerStageSchema` listed neither
+    // `answer.maxReopensPerStop` nor `answer.maxTransferSeconds` while `resolveDoorConfig` read
+    // both off `DoorAnswerSource` — which is `profile.answer` verbatim, handed to every `Car` the
+    // run builds. So they were live knobs, declared by `DOOR_PARAMETERS`, samplable only through
+    // an options object. A dotted id is a promise that a profile can hold the value, whichever
+    // schema declares the row.
+    for (const parameter of [...DOOR_PARAMETERS, ...LOAD_SENSOR_PARAMETERS]) {
+      if (!parameter.id.startsWith('answer.')) continue; // `car.*` ids are authored on a car
+      const probe = probeFor(parameter);
+      const parsed = dispatcherProfileSchema.safeParse(profileWith(parameter.id, probe));
+      expect(
+        parsed.success,
+        `${parameter.id} is declared as an answer-stage id and no profile can hold it: ${parsed.error?.issues[0]?.message ?? ''}`,
+      ).toBe(true);
+    }
+  });
+
+  it('authors a hard constraint as a named rule, which is the one id that is not its own path', () => {
+    // `constraints.noDirectionReversal` is declared as a boolean because a set-valued parameter is
+    // not something a generic optimizer can sample. It is authored as a membership in
+    // `hardConstraints`, and the mapping is one line in `profileWith` above — recorded here so the
+    // exception is a documented translation rather than an id that quietly fails to round-trip.
+    const on = dispatcherProfileSchema.parse(profileWith('constraints.noDirectionReversal', true));
+    const off = dispatcherProfileSchema.parse(profileWith('constraints.noDirectionReversal', false));
+    expect(dispatchParameterValue(resolveDispatchConfig(on as never), 'constraints.noDirectionReversal')).toBe(true);
+    expect(dispatchParameterValue(resolveDispatchConfig(off as never), 'constraints.noDirectionReversal')).toBe(false);
+  });
+
+  it('still rejects a misspelled knob rather than defaulting it', () => {
+    // Strictness is what makes the round trip meaningful: a section that accepted anything would
+    // pass the test above for a parameter nothing reads.
+    for (const authored of [
+      { idle: { repositionThreshold: 3 } },
+      { eligibility: { maxLoadFactor: 0.5 } },
+      { normalization: { waitTime: 60 } },
+      { auction: { round: 3 } },
+    ]) {
+      const parsed = dispatcherProfileSchema.safeParse({
+        id: 'probe',
+        name: 'Probe',
+        weights: {},
+        ...authored,
+      });
+      expect(parsed.success, JSON.stringify(authored)).toBe(false);
+      expect(parsed.error?.issues[0]?.message).toMatch(/Unrecognized key/);
+    }
   });
 });
 

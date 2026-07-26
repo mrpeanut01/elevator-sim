@@ -1,0 +1,427 @@
+/**
+ * `elevator-sim run` — one replication, one summary.
+ *
+ * Two things this command refuses to do, both from CLAUDE.md § Statistical discipline:
+ *
+ * - **A saturated run does not get a quotable AWT — or a quotable anything built on it.** The
+ *   banner is loud and the number is replaced by the word SUPPRESSED, because a mean waiting
+ *   time for a system whose queues grow without bound is not a measurement of anything. Time to
+ *   destination goes with it: it *contains* that wait, so leaving it on screen would just move
+ *   the unquotable number down four lines and put it in normal weight.
+ * - **An unmeasurable achieved interval prints the word, not a constant.** Both mixed-use towers
+ *   return `departureGapBasis: 'unmeasurable'`; there is no threshold that can separate a door
+ *   reopen from a departure there, and `FALLBACK_DEPARTURE_GAP_S` would be a number with no
+ *   referent.
+ *
+ * And one thing it always does: print the seed, so any interesting run replays exactly
+ * (invariant 5).
+ */
+
+import {
+  SimulationError,
+  Simulation,
+  type LoadedConfig,
+  type SimulationConfig,
+  type SimulationResult,
+} from '@elevator-sim/core';
+
+import {
+  numberFlag,
+  parseArgs,
+  rejectPositionals,
+  requiredStringFlag,
+  stringFlag,
+  type FlagSpec,
+  type ParsedArgs,
+} from '../args.js';
+import {
+  loadData,
+  randomSeed,
+  requireBuilding,
+  requireDispatcher,
+  requireTrafficProfile,
+  resolveDataDir,
+  withTrafficProfile,
+} from '../data.js';
+import { EXIT_INTERNAL } from '../errors.js';
+import {
+  ABSENT,
+  clock,
+  count,
+  duration,
+  fractionAsPct,
+  num,
+  pct,
+  renderAchievedInterval,
+  renderAwt,
+  renderSaturation,
+  secs,
+} from '../format.js';
+import { BINARY, printCommandHelp, wrap, type CommandHelp } from '../help.js';
+import { field, heading, type Output } from '../output.js';
+
+export const RUN_FLAGS: readonly FlagSpec[] = [
+  {
+    name: 'building',
+    kind: 'string',
+    placeholder: '<id>',
+    summary: 'which building to simulate',
+    required: true,
+  },
+  {
+    name: 'dispatcher',
+    kind: 'string',
+    placeholder: '<id>',
+    summary: 'which dispatcher profile to run',
+    required: true,
+  },
+  {
+    name: 'traffic',
+    kind: 'string',
+    placeholder: '<id>',
+    summary: 'override the building’s traffic profile',
+    defaultText: 'the building’s own',
+  },
+  {
+    name: 'seed',
+    kind: 'integer',
+    placeholder: '<n>',
+    summary: 'master seed; the run replays exactly from it',
+    min: 0,
+    defaultText: 'random, and printed',
+  },
+  {
+    name: 'duration',
+    kind: 'number',
+    placeholder: '<s>',
+    summary: 'demand horizon in simulated seconds',
+    min: 1,
+    defaultText: 'the demand template’s own (1800 s)',
+  },
+  {
+    name: 'template',
+    kind: 'string',
+    placeholder: '<id>',
+    summary: 'demand template',
+    choices: ['rise-and-fall', 'constant-iso'],
+    defaultText: 'rise-and-fall',
+  },
+  {
+    name: 'rate',
+    kind: 'number',
+    placeholder: '<pct>',
+    summary: 'arrival rate as % of population per 5 min, overriding the profile',
+    min: 0,
+  },
+  {
+    name: 'window',
+    kind: 'string',
+    placeholder: '<id>',
+    summary: 'window the summary is computed over',
+    choices: ['peak-5min', 'full-run'],
+    defaultText: 'the demand template’s own',
+  },
+  { name: 'data', kind: 'string', placeholder: '<dir>', summary: 'data directory to read' },
+  { name: 'no-color', kind: 'boolean', summary: 'never emit ANSI colour' },
+  { name: 'help', kind: 'boolean', aliases: ['h'], summary: 'show this help' },
+];
+
+export const RUN_HELP: CommandHelp = {
+  name: 'run',
+  usage: `${BINARY} run --building <id> --dispatcher <id> [--traffic <id>] [--seed <n>] [--duration <s>]`,
+  summary: 'run one simulation and print its summary',
+  description: [
+    'One replication: a seed, a building, a dispatcher profile and a demand template in; AWT, ' +
+      'WT95, % waiting over 60 s, TTD, achieved interval, handling capacity and load factor out.',
+    'One replication is a data point, not a result. To decide whether one dispatcher is better ' +
+      'than another, use `compare`, which pairs replications under common random numbers and ' +
+      'reports a confidence interval.',
+  ],
+  flags: RUN_FLAGS,
+  examples: [
+    `${BINARY} run --building garden-apartments --dispatcher eta --seed 42`,
+    `${BINARY} run --building midtown-office --dispatcher predictive-balanced --traffic office-prestige`,
+    `${BINARY} run --building midtown-office --dispatcher eta --rate 20   # push it towards saturation`,
+  ],
+};
+
+export async function runCommand(
+  out: Output,
+  argv: readonly string[],
+  errOut: Output = out,
+): Promise<number> {
+  const context = `${BINARY} run`;
+  const parsed = parseArgs(argv, RUN_FLAGS, context);
+  rejectPositionals(parsed, context);
+  if (parsed.values['help'] === true) {
+    printCommandHelp(out, RUN_HELP);
+    return 0;
+  }
+
+  const config = await loadData(resolveDataDir(stringFlag(parsed, 'data')));
+  const plan = planRun(config, parsed);
+
+  let result: SimulationResult;
+  try {
+    result = new Simulation(plan.simulation).run();
+  } catch (error) {
+    if (error instanceof SimulationError && error.result !== undefined) {
+      // A diagnostic that precedes a non-zero exit belongs on stderr: `run … > results.txt`
+      // should leave the reason on the screen rather than bury it in an otherwise empty file.
+      errOut.line();
+      errOut.line(
+        errOut.palette.red(errOut.palette.bold('The simulation refused to report this run.')),
+      );
+      errOut.line(wrap(error.message, Math.min(errOut.columns - 2, 92), '  '));
+      errOut.line();
+      errOut.line(`  seed ${plan.seedText} — pass it back with --seed to reproduce exactly.`);
+      errOut.line();
+      return EXIT_INTERNAL;
+    }
+    throw error;
+  }
+
+  printRunReport(out, plan, result);
+  return 0;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Planning
+ * -------------------------------------------------------------------------- */
+
+export interface RunPlan {
+  readonly simulation: SimulationConfig;
+  readonly buildingName: string;
+  readonly buildingId: string;
+  readonly buildingType: string;
+  readonly dispatcherName: string;
+  readonly dispatcherId: string;
+  readonly trafficProfileId: string;
+  readonly trafficProfileName: string;
+  readonly seedText: string;
+  readonly commandLine: string;
+}
+
+export function planRun(config: LoadedConfig, parsed: ParsedArgs): RunPlan {
+  const buildingId = requiredStringFlag(parsed, 'building');
+  const dispatcherId = requiredStringFlag(parsed, 'dispatcher');
+  const base = requireBuilding(config, buildingId);
+  const profile = requireDispatcher(config, dispatcherId, '--dispatcher');
+  const trafficId = stringFlag(parsed, 'traffic') ?? base.trafficProfile;
+  const traffic = requireTrafficProfile(config, trafficId);
+  const building = withTrafficProfile(base, trafficId);
+
+  const seed = numberFlag(parsed, 'seed') ?? randomSeed();
+  const durationS = numberFlag(parsed, 'duration');
+  const template = stringFlag(parsed, 'template');
+  const rate = numberFlag(parsed, 'rate');
+  const window = stringFlag(parsed, 'window');
+
+  const simulation: SimulationConfig = {
+    building,
+    dispatcherProfile: profile,
+    trafficProfiles: config.trafficProfiles,
+    elevatorSpecs: config.elevatorSpecs,
+    seed,
+    // A run that cannot clear its demand is a measurement of saturation, not a crash. Report it
+    // and let the summary's own saturation test decide what may be quoted.
+    onTimeout: 'report',
+    ...(durationS === undefined ? {} : { durationS }),
+    ...(template === 'constant-iso' || template === 'rise-and-fall'
+      ? { demandTemplate: template }
+      : {}),
+    ...(rate === undefined ? {} : { demand: { arrivalRatePctPop5min: rate } }),
+    ...(window === 'full-run' || window === 'peak-5min' ? { reportWindow: window } : {}),
+  };
+
+  const parts = [
+    `${BINARY} run`,
+    `--building ${buildingId}`,
+    `--dispatcher ${dispatcherId}`,
+    ...(stringFlag(parsed, 'traffic') === undefined ? [] : [`--traffic ${trafficId}`]),
+    `--seed ${seed}`,
+    ...(durationS === undefined ? [] : [`--duration ${durationS}`]),
+    ...(template === undefined ? [] : [`--template ${template}`]),
+    ...(rate === undefined ? [] : [`--rate ${rate}`]),
+    ...(window === undefined ? [] : [`--window ${window}`]),
+  ];
+
+  return {
+    simulation,
+    buildingId,
+    buildingName: base.name,
+    buildingType: base.type,
+    dispatcherId,
+    dispatcherName: profile.name,
+    trafficProfileId: trafficId,
+    trafficProfileName: traffic.name,
+    seedText: String(seed),
+    commandLine: parts.join(' '),
+  };
+}
+
+/* -------------------------------------------------------------------------- *
+ * Reporting
+ * -------------------------------------------------------------------------- */
+
+export function printRunReport(out: Output, plan: RunPlan, result: SimulationResult): void {
+  const { bold, dim, red, yellow, green, cyan } = out.palette;
+  const summary = result.summary;
+  const awt = renderAwt(summary);
+  const interval = renderAchievedInterval(summary.achievedInterval);
+
+  heading(out, 'Run');
+  field(out, 'building', `${plan.buildingName}  ${dim(`(${plan.buildingId}, ${plan.buildingType})`)}`);
+  field(out, 'dispatcher', `${plan.dispatcherName}  ${dim(`(${plan.dispatcherId})`)}`);
+  field(out, 'traffic', `${plan.trafficProfileName}  ${dim(`(${plan.trafficProfileId})`)}`);
+  field(
+    out,
+    'window',
+    `${summary.window.id}  ${dim(`[${clock(summary.window.startS)} – ${clock(summary.window.endS)}), ${duration(summary.windowSeconds)}`)}`,
+  );
+  field(out, 'horizon', `${duration(result.demandEndedAt)} of demand, run ended ${clock(result.endedAt)}`);
+  field(out, 'seed', bold(cyan(plan.seedText)));
+  field(
+    out,
+    'status',
+    result.status === 'completed'
+      ? green('completed')
+      : yellow(`${result.status} — ${count(result.undelivered.length)} still in the system`),
+  );
+
+  const saturation = renderSaturation(summary);
+  if (saturation !== undefined) {
+    out.line();
+    out.line(red(bold('  ██  SATURATED — this configuration cannot clear its demand.')));
+    out.line(red(`      ${saturation}`));
+    out.line(
+      red('      The average waiting time is SUPPRESSED and must not be quoted for this run.'),
+    );
+    out.line(dim('      Lower --rate, add cars, or treat this as the capacity limit it is.'));
+  } else if (!awt.quotable) {
+    out.line();
+    out.line(yellow(bold('  !!  This run has no reportable average waiting time.')));
+    out.line(yellow(`      ${awt.reason ?? ''}`));
+  }
+
+  heading(out, 'Waiting');
+  field(out, 'AWT', awt.quotable ? bold(awt.text) : red(bold(awt.text)), 24);
+  if (!awt.quotable && awt.reason !== undefined) {
+    out.line(dim(`  ${' '.repeat(24)}${awt.reason}`));
+  }
+  field(
+    out,
+    'WT95',
+    awt.quotable ? secs(summary.waiting.p95S, 2) : red('SUPPRESSED'),
+    24,
+  );
+  field(
+    out,
+    'waits over 60 s',
+    awt.quotable
+      ? `${pct(summary.waiting.pctOverLongWait, 1)}  ${dim(`(${count(summary.waiting.overLongWaitCount)} of ${count(summary.waiting.count)} served)`)}`
+      : red('SUPPRESSED'),
+    24,
+  );
+  field(
+    out,
+    'longest wait',
+    awt.quotable ? secs(summary.waiting.maxS, 1) : red('SUPPRESSED'),
+    24,
+  );
+  if (summary.waiting.unservedCount > 0) {
+    field(
+      out,
+      'never served',
+      yellow(
+        `${count(summary.waiting.unservedCount)} of ${count(summary.waiting.arrivalCount)} arrivals in the window`,
+      ),
+      24,
+    );
+  }
+
+  heading(out, 'Journey');
+  // TTD is a waiting statistic wearing a different name. Core defines it as arrival at the first
+  // landing to alighting at the final one, *including every transfer wait*, and it is averaged
+  // over the journeys that completed — so under saturation it is both divergent and measured on
+  // the survivors. Printing it three lines under a banner that says the waiting time must not be
+  // quoted would hand the reader the only quotable-looking wait on the screen.
+  //
+  // A non-finite value keeps its dash: "nobody was served in this window" is a different
+  // statement from "this number exists and must not be repeated", and `--rate 0` deserves the
+  // first one.
+  const journey = (value: number): string =>
+    awt.quotable ? secs(value, 2) : Number.isFinite(value) ? red(bold('SUPPRESSED')) : ABSENT;
+  field(out, 'TTD (mean)', journey(summary.timeToDestination.meanS), 24);
+  field(out, 'TTD (95th pct)', journey(summary.timeToDestination.p95S), 24);
+  field(out, 'in-car time (mean)', secs(summary.rideTime.meanS, 2), 24);
+  // Only worth saying when something was actually withheld: on an empty window every line above
+  // is already a dash, and there is nothing for the note to explain.
+  if (!awt.quotable && Number.isFinite(summary.timeToDestination.meanS)) {
+    out.line(
+      dim(
+        `  ${' '.repeat(24)}time to destination contains the suppressed wait; in-car time does not`,
+      ),
+    );
+  }
+
+  heading(out, 'Group');
+  field(
+    out,
+    'achieved interval',
+    interval.quotable ? interval.text : yellow(interval.text),
+    24,
+  );
+  if (!interval.quotable && interval.reason !== undefined) {
+    out.line(dim(`  ${' '.repeat(24)}${interval.reason}`));
+  }
+  field(
+    out,
+    'handling capacity',
+    `${num(summary.handlingCapacity.personsPer5Min, 1)} persons / 5 min` +
+      (summary.handlingCapacity.pctPopulationPer5Min === undefined
+        ? ''
+        : `  ${dim(`(${pct(summary.handlingCapacity.pctPopulationPer5Min, 2)} of population)`)}`),
+    24,
+  );
+  field(
+    out,
+    'demand offered',
+    `${num(summary.handlingCapacity.offeredPer5Min, 1)} persons / 5 min`,
+    24,
+  );
+  field(
+    out,
+    'mean car load',
+    `${fractionAsPct(summary.loadFactor.meanLoadFactor, 1)} of rated  ${dim(`(design ${fractionAsPct(summary.loadFactor.designLoadFactor, 0)}, peak ${fractionAsPct(summary.loadFactor.maxLoadFactor, 0)})`)}`,
+    24,
+  );
+
+  heading(out, 'Passengers');
+  field(
+    out,
+    'whole run',
+    `${count(result.conservation.generated)} generated · ${count(result.conservation.delivered)} delivered · ${count(result.conservation.undelivered)} undelivered`,
+    24,
+  );
+  field(
+    out,
+    'in the window',
+    `${count(summary.counts.arrivals)} arrived · ${count(summary.counts.boarded)} boarded · ${count(summary.counts.alighted)} alighted`,
+    24,
+  );
+
+  if (result.warnings.length > 0) {
+    heading(out, 'Warnings');
+    for (const warning of result.warnings.slice(0, 6)) {
+      out.line(yellow(`  • ${warning}`));
+    }
+    if (result.warnings.length > 6) {
+      out.line(dim(`  … and ${count(result.warnings.length - 6)} more`));
+    }
+  }
+
+  out.line();
+  out.line(`  ${dim('reproduce:')} ${cyan(plan.commandLine)}`);
+  out.line();
+}

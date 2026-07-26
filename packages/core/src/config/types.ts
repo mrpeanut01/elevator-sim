@@ -309,6 +309,38 @@ export interface DispatchStageConfig extends Commented {
   readonly maxReassignmentsPerCall?: number | undefined;
 }
 
+/**
+ * Hard constraints on which cars may serve a call at all (lifecycle stage 2).
+ *
+ * Not costs: a car either can serve the call or cannot. Service zoning, access zoning and
+ * `carMode` are the other three stage-2 inputs and are deliberately **not** here — they are
+ * building fabric and car state, not tunables.
+ *
+ * Named `Profile…` rather than `EligibilityStageConfig` because `dispatch/types.ts` already
+ * exports that name for the same two fields as the *policy* reads them, and the package barrel
+ * exports both modules. This is the authoring shape; that one is the resolver's input.
+ */
+export interface ProfileEligibilityConfig extends Commented {
+  /** Whether a car may take a call it will arrive at facing the wrong way. */
+  readonly allowOppositeDirectionPickup?: boolean | undefined;
+  /** Refuse assignment when the projected load on arrival would exceed this fraction. */
+  readonly maxLoadFactorForAssignment?: number | undefined;
+}
+
+/**
+ * The half-cost points of this dispatcher's normalization maps.
+ *
+ * Per-profile, and distinct from {@link DispatcherProfiles.normalization}, which only says
+ * whether normalization is required at all. A single-term profile is invariant to its own
+ * reference; these bite when two terms trade.
+ */
+export interface ProfileNormalizationConfig extends Commented {
+  /** Wait, in seconds, that normalizes to 0.5. */
+  readonly waitTimeS?: number | undefined;
+  /** Added travel, in metres, that normalizes to 0.5. */
+  readonly distanceM?: number | undefined;
+}
+
 /** The stop decision and what happens at the floor (lifecycle stage 6). */
 export interface AnswerStageConfig extends Commented {
   /** Load fraction at which the car stops taking new hall calls. */
@@ -324,6 +356,10 @@ export interface AnswerStageConfig extends Commented {
   readonly reopenOnLateArrival?: boolean | undefined;
   /** Ceiling on adaptive dwell, seconds. */
   readonly maxDwellS?: number | undefined;
+  /** Reopens honoured at one stop before the doors close regardless. Declared by `DOOR_PARAMETERS`. */
+  readonly maxReopensPerStop?: number | undefined;
+  /** Ceiling on the transfer-driven part of a stop, seconds. Declared by `DOOR_PARAMETERS`. */
+  readonly maxTransferSeconds?: number | undefined;
 }
 
 /** Where cars go when idle (lifecycle stage 7). Dominates sparse-traffic buildings. */
@@ -388,7 +424,11 @@ export interface DispatcherProfile extends Commented {
   readonly weights: Readonly<Record<string, number>>;
   /** Non-negotiable rules the scorer applies before weighting. */
   readonly hardConstraints?: readonly string[] | undefined;
+  /** This dispatcher's normalization references. Absent uses `NORMALIZATION_DEFAULTS`. */
+  readonly normalization?: ProfileNormalizationConfig | undefined;
   readonly dispatch?: DispatchStageConfig | undefined;
+  /** Stage 2's hard filters. */
+  readonly eligibility?: ProfileEligibilityConfig | undefined;
   readonly answer?: AnswerStageConfig | undefined;
   readonly idle?: IdleStageConfig | undefined;
   /** Stage 4's aggregation. Absent is the centralized argmin. */

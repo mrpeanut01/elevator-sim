@@ -725,7 +725,7 @@ export {
   ENSEMBLE_BUILDINGS,
   ENSEMBLE_SEED,
   measureAuctionAggregation,
-  multiRoundIsReachableFromSimulation,
+  measureMultiRoundReachability,
   requireAuctionProfile,
 } from './auctionAggregation.js';
 

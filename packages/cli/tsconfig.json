@@ -3,7 +3,11 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
-    "tsBuildInfoFile": "dist/.tsbuildinfo"
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    // This package is the one that is allowed to touch the process: argv, stdout, the wall
+    // clock and the filesystem. `core` needs none of that, so its ambient types are declared
+    // here rather than in the shared base.
+    "types": ["node"]
   },
   "include": ["src/**/*.ts"],
   "references": [{ "path": "../core" }, { "path": "../experiments" }]

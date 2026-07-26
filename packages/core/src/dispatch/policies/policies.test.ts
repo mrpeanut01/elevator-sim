@@ -59,10 +59,21 @@ import { AGGREGATIONS } from '../../config/types.js';
 import type { DispatcherProfile, LoadedConfig, ResolvedBuilding } from '../../config/types.js';
 import type { CarSnapshot } from '../../model/car/types.js';
 import { Simulation, runSimulation } from '../../sim/simulation.js';
-import { DISPATCH_PARAMETER_IDS, dispatchParameter } from '../parameters.js';
+import {
+  DISPATCH_PARAMETER_IDS,
+  activeWhenSatisfied,
+  dispatchParameter,
+  isActiveWhenRange,
+  isParameterActive,
+} from '../parameters.js';
 import { createDispatchPolicy, resolveDispatchConfig } from '../policy.js';
 import { COST_TERMS, COST_TERMS_BY_ID } from '../terms/index.js';
-import type { DispatchCall, DispatchDecision, RepositionContext } from '../types.js';
+import type {
+  DispatchCall,
+  DispatchDecision,
+  DispatchParameterSpec,
+  RepositionContext,
+} from '../types.js';
 
 import { AuctionDispatchPolicy, createAuctionPolicy, resolveAuctionConfig } from './auction.js';
 import { board, call, clockAt, hallCall, makeCar, snapshotAt } from './fixtures.test-helper.js';
@@ -1045,36 +1056,53 @@ describe('the schema and the aggregation agree about what is tunable', () => {
   });
 
   it('evaluates every activeWhen by the same rule the rest of the schema does', () => {
-    // Verbatim the contract `dispatch/parameters.test.ts` asserts for every row in
-    // DISPATCH_PARAMETERS: the gate must exist, be categorical, and admit each listed value. There
-    // is one evaluation rule for the whole schema or there is elevator-specific knowledge in it
-    // (CLAUDE.md invariant 8).
+    // The contract `dispatch/parameters.test.ts` asserts for every row in DISPATCH_PARAMETERS,
+    // restated here for this module's rows. There is one evaluation rule for the whole schema or
+    // there is elevator-specific knowledge in it (CLAUDE.md invariant 8) — and that rule is
+    // `activeWhenSatisfied`, which takes both declared forms.
     //
-    // This suite previously checked only that the dependency id was known and the value list
-    // non-empty, which let `auction.reserveMarginalDelayS` gate on `auction.rounds` — an integer
-    // with a range and no `values` — using the stringified numbers ['2'…'8']. That gate satisfies the
-    // shape and none of the semantics: a generic optimizer evaluates `gate.values.includes('2')`
-    // against `undefined` and either throws or disables the reserve forever, and one comparing its
-    // own sampled 3 against '3' never activates it. It is gone; see `parameters.ts` § Why the reserve
-    // carries no activeWhen. This assertion is what stops it, or anything like it, coming back.
+    // The list form must name a categorical and every listed value must be one it admits. The
+    // range form must name an integer or continuous gate and must actually gate: an interval that
+    // covered the gate's whole declared range would be a condition that can never be false, which
+    // reads as a gate and is decoration.
     for (const parameter of POLICY_PARAMETERS) {
-      for (const [dependency, values] of Object.entries(parameter.activeWhen ?? {})) {
+      for (const [dependency, condition] of Object.entries(parameter.activeWhen ?? {})) {
         const gate = policyParameter(dependency) ?? dispatchParameter(dependency);
         expect(gate, `${parameter.id} → ${dependency}`).toBeDefined();
+
+        if (isActiveWhenRange(condition)) {
+          expect(gate?.type, `${parameter.id} → ${dependency} is not numeric`).toMatch(
+            /^(?:integer|continuous)$/,
+          );
+          const [low, high] = gate?.range as readonly [number, number];
+          expect(
+            condition.min !== undefined || condition.max !== undefined,
+            `${parameter.id} → ${dependency} bounds nothing`,
+          ).toBe(true);
+          // Excludes at least one value the gate can take, and admits at least one.
+          expect(activeWhenSatisfied(condition, low) && activeWhenSatisfied(condition, high)).toBe(
+            false,
+          );
+          expect(activeWhenSatisfied(condition, low) || activeWhenSatisfied(condition, high)).toBe(
+            true,
+          );
+          continue;
+        }
+
         expect(gate?.type, `${parameter.id} → ${dependency} is not categorical`).toBe('categorical');
-        expect(values.length, `${parameter.id} activeWhen ${dependency}`).toBeGreaterThan(0);
-        for (const value of values) {
+        expect(condition.length, `${parameter.id} activeWhen ${dependency}`).toBeGreaterThan(0);
+        for (const value of condition) {
           expect(gate?.values, `${parameter.id} → ${dependency}=${value}`).toContain(value);
         }
       }
     }
   });
 
-  it('keeps the reserve inert at one round — asserted on the aggregation, not on a value list', () => {
-    // The condition the deleted gate tried to express, measured instead. A reserve of zero seconds
-    // declines every bidder that would delay anybody, so if `rounds: 1` were not inert this would
-    // withdraw; and the second half proves the fixture can in fact produce a withdrawal, so the
-    // first half is not passing because nothing was over the reserve.
+  it('keeps the reserve inert at one round — declared as a numeric gate and measured', () => {
+    // The condition that used to be inexpressible, now both declared and measured. A reserve of
+    // zero seconds declines every bidder that would delay anybody, so if `rounds: 1` were not
+    // inert this would withdraw; and the second half proves the fixture can in fact produce a
+    // withdrawal, so the first half is not passing because nothing was over the reserve.
     const authored = { id: 'p', name: 'P', weights: { waitTime: 1 } };
     const subject = call('5', 'up');
     const context = { waitingPassengers: 2 };
@@ -1095,22 +1123,30 @@ describe('the schema and the aggregation agree about what is tunable', () => {
       expect(policy.auction(subject.id)?.withdrawals.length, `rounds ${rounds}`).toBe(expected);
     }
 
-    // And the range a Phase 7 optimizer samples still covers every round the resolver accepts, so
-    // the dimension is searchable even though *this* half of the condition is not machine-readable.
+    // And the range a Phase 7 optimizer samples still covers every round the resolver accepts.
     expect(policyParameter('auction.rounds')?.range).toEqual([1, MAX_AUCTION_ROUNDS]);
-    // The half that IS machine-readable is declared, and by the one rule the rest of the schema
-    // uses: both knobs are inert under `auction.aggregation: central-argmin`, which holds no
-    // auction at all, and `auction.aggregation` is a categorical so the gate is evaluable.
-    for (const id of ['auction.rounds', 'auction.reserveMarginalDelayS'] as const) {
-      expect(policyParameter(id)?.activeWhen, id).toEqual({
-        'auction.aggregation': ['contract-net'],
-      });
-    }
-    // The remaining half — the reserve is also inert at one round — gates on an integer with no
-    // `values`, which no generic optimizer can evaluate. It is stated where it cannot be misread
-    // instead, and asserted behaviourally above.
-    expect(policyParameter('auction.reserveMarginalDelayS')?.description).toContain(
-      'auction.rounds is 1',
-    );
+    // Both knobs are inert under `auction.aggregation: central-argmin`, which holds no auction at
+    // all. `auction.rounds` carries only that condition.
+    expect(policyParameter('auction.rounds')?.activeWhen).toEqual({
+      'auction.aggregation': ['contract-net'],
+    });
+    // The reserve carries both halves, and `activeWhen` is a conjunction. The second half is the
+    // numeric form, which exists because a gate on an integer cannot be a list of strings.
+    expect(policyParameter('auction.reserveMarginalDelayS')?.activeWhen).toEqual({
+      'auction.aggregation': ['contract-net'],
+      'auction.rounds': { min: 2 },
+    });
+
+    // And it evaluates, by the one shared rule, to exactly the behaviour measured above: dead at
+    // one round, live at two, dead under the centralized argmin whatever the round budget is.
+    const reserve = policyParameter('auction.reserveMarginalDelayS') as DispatchParameterSpec;
+    const at = (aggregation: string, rounds: number): boolean =>
+      isParameterActive(reserve, (id) =>
+        id === 'auction.aggregation' ? aggregation : id === 'auction.rounds' ? rounds : undefined,
+      );
+    expect(at('contract-net', 1)).toBe(false);
+    expect(at('contract-net', 2)).toBe(true);
+    expect(at('contract-net', MAX_AUCTION_ROUNDS)).toBe(true);
+    expect(at('central-argmin', 3)).toBe(false);
   });
 });

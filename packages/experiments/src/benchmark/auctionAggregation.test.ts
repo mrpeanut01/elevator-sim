@@ -42,7 +42,7 @@ import {
   ENSEMBLE_BUILDINGS,
   MULTI_ROUND_PROFILE,
   measureAuctionAggregation,
-  multiRoundIsReachableFromSimulation,
+  measureMultiRoundReachability,
   type AuctionEnsembleResult,
 } from './auctionAggregation.js';
 
@@ -117,17 +117,43 @@ describe('Phase 5 — auction aggregation against the centralized argmin', () =>
     expect(result.waivedCount).toBeGreaterThan(0);
   }, TIMEOUT_MS);
 
-  it('reaches multi-round from runSimulation, so the aggregation has a wait-time interval', async () => {
-    // This test used to assert the opposite, against core's own source: that `SimulationConfig`
-    // carried no policy factory and that `Simulation` built every bank controller with
-    // `createDispatchPolicy`. It was written to fail the day the hook landed, and this is that day.
+  it('holds more than one bidding round inside a real run, from a profile loadConfig parsed', async () => {
+    // The assertion this test used to open with was `expect(multiRoundIsReachableFromSimulation())
+    // .toBe(true)` against a function whose whole body was `return true`. It could not fail, and a
+    // test that cannot fail is worse than no test: it reads as coverage for exactly the property
+    // Phase 5 got wrong four times — a behaviour that is configured, exported, and called by
+    // nothing in the run loop.
     //
-    // What replaces it is behavioural rather than textual, because a grep for a symbol proves a
-    // call site exists and not that anything reaches it. Two profiles that differ only in their
-    // `auction` section are run on a real building, and the contract net must produce an observably
-    // different set of journeys — otherwise the aggregation is one dispatcher measured twice, which
-    // is exactly what a renamed profile would look like.
-    expect(multiRoundIsReachableFromSimulation()).toBe(true);
+    // What replaces it is the measurement it was standing in for. `auction-multi-round` is built
+    // from `data/` through `loadConfig` with **no options object**, run through a real
+    // `Simulation`, and the auctions it held are counted. Three things have to be true and each
+    // fails differently: the profile's `rounds: 3` has to survive the config layer, the
+    // aggregation has to select `AuctionDispatchPolicy`, and — the one that cannot be faked by
+    // wiring alone — some auction has to actually take a withdrawal and re-run.
+    const reach = await measureMultiRoundReachability(MULTI_ROUND_PROFILE);
+    console.log(
+      `${reach.profileId}: ${reach.policyClass} resolved rounds = ${reach.resolvedRounds}; ` +
+        `${reach.auctionsHeld} auctions, ${reach.auctionsPastRoundOne} past round 1, ` +
+        `histogram ${JSON.stringify(reach.roundHistogram)}, ` +
+        `withdrawals ${JSON.stringify(reach.withdrawalsByReason)}, ` +
+        `${reach.divergedFromArgmin} diverged from the argmin.`,
+    );
+    expect(reach.policyClass).toBe('AuctionDispatchPolicy');
+    expect(reach.resolvedRounds).toBe(CONTRACT_NET.rounds);
+    expect(reach.auctionsHeld).toBeGreaterThan(0);
+    expect(
+      reach.auctionsPastRoundOne,
+      'every auction closed in one round — the round budget reaches the run loop but the contract net never re-runs',
+    ).toBeGreaterThan(0);
+
+    // And the control arm, which differs only in its `auction` section: one round, so no auction
+    // may ever hold a second. Without this the assertion above would also pass for a run that held
+    // extra rounds for some reason other than the profile.
+    const sealed = await measureMultiRoundReachability(AUCTION_PROFILE);
+    expect(sealed.resolvedRounds).toBe(1);
+    expect(sealed.auctionsHeld).toBeGreaterThan(0);
+    expect(sealed.auctionsPastRoundOne).toBe(0);
+    expect(sealed.divergedFromArgmin).toBe(0);
 
     const config = await loadResources();
     const building = config.buildingsById.get('midtown-office');
@@ -149,12 +175,12 @@ describe('Phase 5 — auction aggregation against the centralized argmin', () =>
         .join('|');
     };
 
-    const sealed = journeysOf(AUCTION_PROFILE);
+    const sealedJourneys = journeysOf(AUCTION_PROFILE);
     const contractNet = journeysOf(MULTI_ROUND_PROFILE);
     expect(
       contractNet,
       'the multi-round profile produced a byte-identical run to the sealed-bid one — the aggregation is not reaching the run loop',
-    ).not.toBe(sealed);
+    ).not.toBe(sealedJourneys);
 
     console.log(
       `${MULTI_ROUND_PROFILE} runs its contract net inside runSimulation and allocates differently ` +

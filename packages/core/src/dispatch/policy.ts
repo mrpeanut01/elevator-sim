@@ -172,6 +172,8 @@ export function resolveDispatchConfig(
   const eligibility = source.eligibility;
   const answer = source.answer;
   const idle = source.idle;
+  const waitTimeReference = options.normalization?.waitTimeS ?? source.normalization?.waitTimeS;
+  const distanceReference = options.normalization?.distanceM ?? source.normalization?.distanceM;
 
   const config: ResolvedDispatchConfig = {
     id: source.id,
@@ -183,7 +185,14 @@ export function resolveDispatchConfig(
     constraints: Object.freeze({
       noDirectionReversal: hardConstraints.includes('noDirectionReversal'),
     }),
-    normalization: resolveNormalization(options.normalization),
+    // `overrides > profile > defaults`, the same precedence every other stage uses. The profile
+    // half is what makes `normalization.waitTimeS` and `normalization.distanceM` persistable as
+    // data: both are declared tunables, and a tunable an optimizer can sample but not write back
+    // into a profile is a dimension it searches for nothing.
+    normalization: resolveNormalization({
+      ...(waitTimeReference === undefined ? {} : { waitTimeS: waitTimeReference }),
+      ...(distanceReference === undefined ? {} : { distanceM: distanceReference }),
+    }),
     dispatch: Object.freeze({
       callType,
       batchWindowS: nonNegative(

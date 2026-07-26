@@ -123,6 +123,8 @@ export type {
   PassengerMassConfig,
   PassengerTransferTimes,
   PatternDetectorConfig,
+  ProfileEligibilityConfig,
+  ProfileNormalizationConfig,
   PatternSwitchingConfig,
   ReassignmentPolicy,
   RealWorldAnchor,

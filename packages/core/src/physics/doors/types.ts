@@ -463,27 +463,19 @@ export const DOOR_DEFAULTS = Object.freeze({
  * docs/02-elevator-reference.md § Door parameters. `car.*` ids resolve against a car in a
  * building config; `answer.*` ids against a dispatcher profile's answer stage.
  *
- * ## Pending config surface
+ * ## The config surface, now landed
  *
- * `answer.maxReopensPerStop` and `answer.maxTransferSeconds` are read from the answer stage
- * by `resolveDoorConfig` (see {@link DoorAnswerSource}) but `answerStageSchema` in
- * `config/schema.ts` is a `z.strictObject` that does not list either key, so a profile in
- * `data/dispatcher-profiles.json` carrying one is currently rejected at load time and only
- * {@link DoorConfigOverrides} can set them. The config layer owes these two fields:
+ * `answer.maxReopensPerStop` and `answer.maxTransferSeconds` are read from the answer stage by
+ * `resolveDoorConfig` (see {@link DoorAnswerSource}), which `Simulation` supplies as
+ * `profile.answer` verbatim — so both were live knobs. `answerStageSchema` in `config/schema.ts`
+ * is a `z.strictObject` and listed neither, so a profile carrying one was rejected at load time
+ * and only {@link DoorConfigOverrides} could set them: searchable, unpersistable, which is
+ * invariant 8 met on one half.
  *
- * ```ts
- * // config/schema.ts, answerStageSchema
- * maxReopensPerStop: z.number().int().min(0).max(20).optional(),
- * maxTransferSeconds: nonNegative.optional(),
- * // config/types.ts, AnswerStageConfig
- * readonly maxReopensPerStop?: number | undefined;
- * readonly maxTransferSeconds?: number | undefined;
- * ```
- *
- * plus their rows in docs/06-parameterization-and-tuning.md § Stage 6. Until they land, an
- * optimizer that honours this schema can still search both values through
- * `DoorConfigOverrides`, but cannot persist a winner as a profile. This module owns neither
- * file, so the gap is recorded here rather than papered over.
+ * Both keys are in `answerStageSchema` and in `AnswerStageConfig` now, and
+ * `dispatch/parameters.test.ts` asserts that **every** `answer.*` id declared by this schema or by
+ * `LOAD_SENSOR_PARAMETERS` parses as a profile — so the gap cannot reopen without a red test
+ * rather than a doc comment nobody reads.
  */
 export const DOOR_PARAMETERS: readonly DoorParameterSpec[] = [
   {

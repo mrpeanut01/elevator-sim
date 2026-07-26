@@ -25,37 +25,41 @@
  * behaviours here add **no parameter at all** — they make declared parameters that were inert
  * actually bite. A behaviour that needed a new knob to work was not wired up; it was reimplemented.
  *
- * ## The gate the two auction knobs carry, and the half of the condition that still cannot be gated
+ * ## The gate the two auction knobs carry — both halves of it, now declared
  *
  * Both `auction.rounds` and `auction.reserveMarginalDelayS` are inert under
  * `auction.aggregation: central-argmin`, which holds no auction at all, and both declare exactly
- * that: `activeWhen: { 'auction.aggregation': ['contract-net'] }`.
+ * that: `activeWhen: { 'auction.aggregation': ['contract-net'] }`. `auction.aggregation` is a
+ * categorical, like every other gate the schema had — `dispatch.assignmentTiming`,
+ * `dispatch.reassignmentPolicy`, `idle.parkingStrategy`.
  *
- * That gate is **evaluable by the one rule the rest of the schema uses**, which is the property
- * that matters. `DispatchParameterSpec.activeWhen` maps a parameter id to *the values that make
- * this knob live*, and `dispatch/parameters.test.ts` states the contract every row obeys: the gate
- * must exist, `gate.type` must be `'categorical'`, and each listed value must appear in
- * `gate.values`. Every other gate in the schema names a categorical —
- * `dispatch.assignmentTiming`, `dispatch.reassignmentPolicy`, `idle.parkingStrategy` — and
- * `auction.aggregation` is one too.
+ * The reserve has a **second** condition, and this file used to record it as inexpressible. It is
+ * also inert while `auction.rounds` is 1, because a single-round auction has no later round to
+ * reallocate a declined contract into. `auction.rounds` is an **integer with a range and no
+ * `values`**, so the value-list form could only encode the condition as
+ * `{ 'auction.rounds': ['2', … , '8'] }`, which satisfies the shape and none of the semantics: an
+ * optimizer comparing its own sampled `3` against the string `'3'` never activates the reserve,
+ * and one evaluating `gate.values.includes(…)` against a gate that has no `values` throws. So the
+ * parameter shipped ungated on that half, and an optimizer that sampled `rounds = 1` spent its
+ * budget — 50 to 200 replications an evaluation — on a dimension that cannot move the objective.
  *
- * The reserve has a *second* condition that still cannot be expressed: it is also inert while
- * `auction.rounds` is 1, because a single-round auction has no round to reallocate a declined
- * contract into. `auction.rounds` is an **integer with a range and no `values`**, so a gate on it
- * — `{ 'auction.rounds': ['2', … , '8'] }` — satisfies the shape and none of the semantics: an
- * optimizer implementing the contract evaluates `gate.values.includes('2')` against `undefined`
- * and either throws or treats the reserve as permanently inactive, and one comparing its own
- * sampled `3` against the string `'3'` never activates it. A gate whose evaluation rule differs
- * from every other gate in the schema is exactly the elevator-specific knowledge CLAUDE.md
- * invariant 8 exists to remove.
+ * `DispatchParameterSpec.activeWhen` now carries a second form, {@link ActiveWhenRange}, and
+ * **one** evaluation rule covers both: `activeWhenSatisfied` in `dispatch/parameters.ts` takes a
+ * condition and the gate's current value and answers, whichever form the condition is. The
+ * reserve declares the whole of its condition —
  *
- * So that half is stated where an optimizer can only ignore it rather than misread it — in the
- * `description` — and asserted **behaviourally**: `policies.test.ts` runs the same reserve at
- * `rounds: 1` and at `rounds: 2` and requires no withdrawal in the first case and one in the
- * second. The follow-up it still owes, in a file this module does not own: give
- * `DispatchParameterSpec.activeWhen` a numeric-threshold form — `{ id, atLeast }` alongside the
- * value list — and update both suites, so there is **one** evaluation rule and the second half of
- * the gate can be declared too.
+ * ```ts
+ * activeWhen: {
+ *   'auction.aggregation': ['contract-net'],
+ *   'auction.rounds': { min: 2 },
+ * }
+ * ```
+ *
+ * — and `activeWhen` is a conjunction, so both must hold. `dispatch/parameters.test.ts` states the
+ * contract every row obeys in both forms, and `policies.test.ts` keeps the **behavioural**
+ * assertion that motivated the declaration: the same reserve at `rounds: 1` takes no withdrawal
+ * and at `rounds: 2` takes one, so the gate is a measured fact about the mechanism rather than a
+ * claim about it.
  */
 
 import { AGGREGATIONS } from '../../config/types.js';
@@ -139,9 +143,15 @@ export const POLICY_PARAMETERS: readonly DispatchParameterSpec[] = Object.freeze
     scale: 'linear',
     default: POLICY_DEFAULTS.reserveMarginalDelayS,
     unit: 's',
-    activeWhen: { 'auction.aggregation': ['contract-net'] },
+    activeWhen: {
+      'auction.aggregation': ['contract-net'],
+      // The numeric half of the gate. A single-round auction has no later round to reallocate a
+      // declined contract into, so no withdrawal is ever taken and the reserve cannot move the
+      // objective at any value. Declared rather than described since `ActiveWhenRange` landed.
+      'auction.rounds': { min: 2 },
+    },
     description:
-      'A bidder’s own ceiling on the delay it will impose on the passengers it is already committed to. Above it the car declines the contract, whatever the group’s objective says. Distinct from the existingCallDelay cost term and from eligibility.maxLoadFactorForAssignment in exactly one way, and it is the way the agent-autonomy hypothesis turns on: those are the group deciding, this is a car refusing. Inert at the 600 s default, which no building in data/buildings/ can reach, and inert at any value while auction.rounds is 1: a single-round auction has no second round to reallocate a declined contract into, so no withdrawal is taken. An optimizer sampling this dimension at rounds = 1 is sampling a dimension that cannot move the objective.',
+      'A bidder’s own ceiling on the delay it will impose on the passengers it is already committed to. Above it the car declines the contract, whatever the group’s objective says. Distinct from the existingCallDelay cost term and from eligibility.maxLoadFactorForAssignment in exactly one way, and it is the way the agent-autonomy hypothesis turns on: those are the group deciding, this is a car refusing. Inert at the 600 s default: the largest marginal delay measured across 2 981 bids on midtown-office, garden-apartments and secure-tower is 47.8 s, so no bidder on any shipped building reaches it. Its other two inert conditions are declared rather than described — aggregation must be contract-net, and rounds must be 2 or more.',
   },
 ] as const);
 

@@ -27,10 +27,10 @@
  * | Parameter | Declared by | Why not here |
  * |---|---|---|
  * | `answer.bypassLoadThreshold`, `answer.overloadThreshold` | `LOAD_SENSOR_PARAMETERS` | the load cell owns them; the dispatcher reads their effect (`isBypassingHallCalls`), not the knob |
- * | `answer.dwellPolicy`, `dwellAdaptationGain`, `maxDwellS`, `reopenOnLateArrival` | `DOOR_PARAMETERS` | the door machine implements dwell; a second declaration is a second source of truth |
+ * | `answer.dwellPolicy`, `dwellAdaptationGain`, `maxDwellS`, `reopenOnLateArrival`, `maxReopensPerStop`, `maxTransferSeconds` | `DOOR_PARAMETERS` | the door machine implements dwell; a second declaration is a second source of truth |
  * | `car.*` physics | `CAR_PARAMETERS`, `config/schema.ts` | Layer 1, not dispatch |
- * | `idle.predictorHorizonS`, `idle.predictorLearningRate` | nobody, yet | **Phase 5 owns the learned arrival model. Nothing in Phase 2 reads either, so declaring them would violate rule 2 above and send the optimizer hunting a dimension with no effect.** They land with the predictor. |
- * | `weights.rideTime` and the other eight pending terms | nobody, yet | same reason: a weight on an unimplemented term changes no decision. Phase 5 adds a row per term as each lands |
+ * | `idle.predictor*`, all six | `PREDICTOR_PARAMETERS` | the arrival model owns them. This row used to read *"declared by nobody, yet"*, which was correct in Phase 2 — nothing read either, so declaring them would have violated rule 2 — and stopped being correct when the predictor landed. They are declared, gated and round-trip-tested there |
+ * | `auction.aggregation`, `auction.rounds`, `auction.reserveMarginalDelayS` | `POLICY_PARAMETERS` | stage 4's aggregation is a policy this module does not implement; the reserve carries the schema's only numeric `activeWhen` |
  * | `dispatch.hardConstraints` as an array | — | exposed instead as the boolean `constraints.noDirectionReversal`, because a set-valued parameter is not something a generic optimizer can sample, and a boolean per constraint is |
  * | `PARK_CALL_HORIZON` | — | **degenerate with `idle.repositionEnergyWeight`.** It enters the reposition test only as a divisor of that weight, so two knobs would move one ratio — the same argument `normalize.ts` makes for a bounded term's `fullScale`. Fixed in `lifecycle.ts` and documented there |
  * | `carMode`, service zoning, access zoning | — | **state and building fabric, not tunables.** docs/06 lists all three under stage 2, and the eligibility filter reads all three — through `Car.estimateCost()`, which owns them. An optimizer must not be handed a knob that sets a car out of service or moves a shaft |
@@ -54,7 +54,12 @@ import {
 
 import { NORMALIZATION_DEFAULTS } from './normalize.js';
 import { COST_TERMS } from './terms/index.js';
-import type { DispatchParameterSpec, ResolvedDispatchConfig } from './types.js';
+import type {
+  ActiveWhenCondition,
+  ActiveWhenRange,
+  DispatchParameterSpec,
+  ResolvedDispatchConfig,
+} from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * Defaults
@@ -142,9 +147,12 @@ const WEIGHT_PARAMETERS: readonly DispatchParameterSpec[] = COST_TERMS.map((term
 /**
  * The schema for every dispatch tunable (CLAUDE.md invariant 8).
  *
- * `id` is the dotted path in `data/dispatcher-profiles.json`, so a tuned winner is written
- * back as a profile without translation. `eligibility.*` is the one section the config schema
- * does not carry yet — see {@link EligibilityStageConfig} for the exact rows it owes.
+ * `id` is the dotted path in `data/dispatcher-profiles.json`, so a tuned winner is written back as
+ * a profile without translation — for **every** row, which used to be false for four of them.
+ * `eligibility.*` and `normalization.*` had no section in `dispatcherProfileSchema`, so both were
+ * searchable through `DispatchPolicyOptions` and unpersistable. `parameters.test.ts` now takes
+ * every declared id through the real schema and back out of the real resolver, so a row cannot be
+ * added without a path a profile can hold.
  */
 export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
   ...WEIGHT_PARAMETERS,
@@ -158,7 +166,7 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     default: NORMALIZATION_DEFAULTS.waitTimeS,
     unit: 's',
     description:
-      'Half-cost point of the saturating waitTime map: a wait of this many seconds normalizes to 0.5. Changes the curvature of the map, not its gain, so it is not recoverable by rescaling weights.waitTime. Default is the 60 s threshold the % > 60 s metric reports against.',
+      'Half-cost point of the saturating waitTime map: a wait of this many seconds normalizes to 0.5. Changes the curvature of the map, not its gain, so it is not recoverable by rescaling weights.waitTime. Default is the 60 s threshold the % > 60 s metric reports against. Like normalization.distanceM it is inert on a profile whose only weighted term is waitTime, because the map is strictly increasing and a single-term ranking is invariant to it — measured: eta runs bit-identically at 10 s and at 180 s, while predictive-balanced does not. It bites when wait trades against another term.',
   },
   {
     id: 'normalization.distanceM',
@@ -168,7 +176,7 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     default: NORMALIZATION_DEFAULTS.distanceM,
     unit: 'm',
     description:
-      'Half-cost point of the saturating distanceTravelled map: this many added metres normalizes to 0.5. About nine floor-to-floor heights by default. A single-term profile is invariant to it; it matters when distance trades against wait.',
+      'Half-cost point of the saturating distanceTravelled map: this many added metres normalizes to 0.5. About nine floor-to-floor heights by default. A single-term profile is invariant to it, because the map is strictly increasing and a lone term is ranked by its raw value — measured: nearest-car runs bit-identically at 5 m and at 200 m on midtown-office, while energy-aware and predictive-balanced both diverge. It matters when distance trades against another term.',
   },
 
   /* ---- hard constraints (stage 2) ---- */
@@ -345,6 +353,63 @@ export const DISPATCH_PARAMETER_IDS: ReadonlySet<string> = new Set(
 /** A declared parameter by id. */
 export function dispatchParameter(id: string): DispatchParameterSpec | undefined {
   return DISPATCH_PARAMETERS.find((parameter) => parameter.id === id);
+}
+
+/* -------------------------------------------------------------------------- *
+ * activeWhen — one evaluation rule for both forms
+ * -------------------------------------------------------------------------- */
+
+/** Whether a condition is the numeric form rather than the value-list form. */
+export function isActiveWhenRange(condition: ActiveWhenCondition): condition is ActiveWhenRange {
+  return !Array.isArray(condition);
+}
+
+/**
+ * Whether one `activeWhen` condition is satisfied by the gate's current value.
+ *
+ * **The** rule, and deliberately only one: an optimizer implements this function once and every
+ * gate in every schema — `DISPATCH_PARAMETERS`, `POLICY_PARAMETERS`, `PREDICTOR_PARAMETERS` —
+ * evaluates through it. A gate whose evaluation differed from every other gate would be exactly
+ * the elevator-specific knowledge CLAUDE.md invariant 8 exists to remove, which is why the
+ * auction reserve's numeric condition became a declared form rather than a sentence in a
+ * `description`.
+ *
+ * A value the gate does not have — `undefined`, or the wrong runtime type for the condition —
+ * is **not** satisfied. Guessing would silently activate a knob whose gate could not be read.
+ */
+export function activeWhenSatisfied(
+  condition: ActiveWhenCondition,
+  value: number | string | boolean | undefined,
+): boolean {
+  if (isActiveWhenRange(condition)) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return false;
+    if (condition.min !== undefined && value < condition.min) return false;
+    if (condition.max !== undefined && value > condition.max) return false;
+    return true;
+  }
+  if (value === undefined) return false;
+  return condition.includes(typeof value === 'string' ? value : String(value));
+}
+
+/**
+ * Whether a parameter is live in a configuration, given a way to read any other parameter.
+ *
+ * `read` is handed the gate's **id** and returns whatever that id currently holds; an optimizer
+ * passes its own sampled configuration, a test passes {@link dispatchParameterValue} bound to a
+ * resolved config. Every condition must hold — `activeWhen` is a conjunction, which is what lets
+ * `auction.reserveMarginalDelayS` require both a `contract-net` aggregation *and* more than one
+ * round.
+ */
+export function isParameterActive(
+  parameter: DispatchParameterSpec,
+  read: (id: string) => number | string | boolean | undefined,
+): boolean {
+  const conditions = parameter.activeWhen;
+  if (conditions === undefined) return true;
+  for (const [id, condition] of Object.entries(conditions)) {
+    if (!activeWhenSatisfied(condition, read(id))) return false;
+  }
+  return true;
 }
 
 /* -------------------------------------------------------------------------- *

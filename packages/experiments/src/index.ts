@@ -396,7 +396,7 @@ export {
   identityClassesOf,
   measureAuctionAggregation,
   measurePredictorLag,
-  multiRoundIsReachableFromSimulation,
+  measureMultiRoundReachability,
   padVerdict,
   parkingArmId,
   parkingVariant,

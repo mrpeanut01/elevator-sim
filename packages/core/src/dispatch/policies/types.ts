@@ -127,7 +127,14 @@ export interface AuctionProfileSource extends DispatcherProfileSource {
   readonly auction?: AuctionStageConfig | undefined;
 }
 
-/** {@link DispatchPolicyOptions} plus the aggregation the config schema cannot carry yet. */
+/**
+ * {@link DispatchPolicyOptions} plus the aggregation.
+ *
+ * The comment here used to read *"the aggregation the config schema cannot carry yet"*. It carries
+ * it — `auctionStageSchema` — so this is an **override** applied after a profile, for a fixture or
+ * an optimizer with an unpersisted candidate, exactly like every other field of the base type. It
+ * is not the way an aggregation is chosen; `auction.aggregation` in the profile is.
+ */
 export interface AuctionPolicyOptions extends DispatchPolicyOptions {
   readonly auction?: AuctionStageConfig | undefined;
 }
