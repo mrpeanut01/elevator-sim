@@ -52,13 +52,21 @@ First end-to-end simulation.
 - Poisson batch arrival generator against `traffic-profiles.json`
 - Rise-and-fall demand template with peak-5-minute reporting window
 - `DispatchPolicy` interface
-- `NearestCarDispatcher` and `CollectiveDispatcher` (conventional up/down collective)
+- **Weighted-cost scoring engine** driven entirely by config — see
+  [Parameterization & Tuning](06-parameterization-and-tuning.md). Nearest-car and
+  collective are weight vectors in `dispatcher-profiles.json`, not classes.
+- Cost term library: `waitTime`, `distanceTravelled`, `directionReversal`, with
+  normalization
+- The seven-stage call lifecycle wired as config: registration, eligibility, scoring,
+  assignment, reassignment, answering, repositioning
 - Metrics recording: AWT, WT95, % > 60 s, TTD, load factor distribution
 
 **Acceptance:** Midtown Office under pure up-peak produces interval and handling capacity
 matching the closed-form Barney/CIBSE RTT calculation within a few percent. This is the
 project's primary correctness oracle — see
 [Traffic & Statistics § Part 2](03-traffic-and-statistics.md#part-2-the-analytical-baseline).
+Additionally: nearest-car and collective behavior are reproduced purely by swapping
+config, with no dispatcher-specific code paths.
 
 ---
 
@@ -97,10 +105,13 @@ comparison. Any stored run replays to identical results from its seed.
 
 The actual point of the project.
 
-- `ETADispatcher` — estimated-time-of-arrival minimization
-- `ZonedDispatcher` — static and dynamic floor partitioning
+- Remaining cost terms: `detourPenalty`, `existingCallDelay`, `loadFactor`, `stopCount`,
+  `starvation`, `zoneAffinity`, `predictedDemand`, `crowding`
+- ETA, zoned, energy-aware, and fairness-first strategies — all **weight vectors**, no new
+  classes
 - `AuctionDispatcher` — contract-net bidding among cars, so the agent-autonomy hypothesis
-  gets benchmarked rather than assumed
+  gets benchmarked rather than assumed. Uses the same term library; only the aggregation
+  differs.
 - Predictive pre-positioning: learned arrival model per floor per time-of-day
 - Capacity-aware reassignment when a car crosses the bypass threshold
 - Parallel service: dispatcher splits demand at heavy floors across multiple cars
@@ -125,11 +136,35 @@ Mixed-Use High-Rise, with paired-t intervals excluding zero.
 
 ---
 
+## Phase 7 — Automated tuning
+
+Search the parameter space instead of hand-guessing weights. Full design in
+[Parameterization & Tuning](06-parameterization-and-tuning.md).
+
+- Self-describing parameter schema (`continuous` / `integer` / `categorical` / `boolean`,
+  with `activeWhen` for conditional parameters) so a generic optimizer needs no
+  elevator-specific code
+- Common random numbers across candidates within an optimization round
+- Successive halving on replication count as the fidelity dimension
+- Random search baseline, Bayesian optimization, CMA-ES; OCBA for final selection
+- Held-out traffic seeds for validation
+- Pareto front reporting over (AWT, energy, WT95)
+- Fuzzy traffic-pattern detector with hysteresis, driving per-pattern weight sets
+
+**Acceptance:** a tuned weight vector beats the hand-authored `predictive-balanced`
+profile on **held-out seeds** with a paired-t interval excluding zero. Candidates whose
+difference falls below the confidence-interval half-width are reported as
+indistinguishable rather than ranked.
+
+---
+
 ## Sequencing notes
 
 - **Phases 0–3 are strictly sequential.** Phase 3 must land before any dispatcher
   comparison is reported, or the project will produce confident nonsense.
 - **Phase 4 can run in parallel with Phase 3** once Phase 2 is complete.
 - **Phase 5 dispatchers are parallelizable** among themselves once Phase 3 is done.
+- **Phase 7 depends on Phase 3, not on Phase 5 or 6.** Once the scoring engine and the
+  replication runner exist, tuning can proceed against whatever terms are implemented.
 - Vertical City and double-deck are the most deferrable scope. The other four buildings
   cover most of the algorithmic ground.

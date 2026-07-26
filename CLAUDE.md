@@ -27,6 +27,14 @@ violations as bugs, and reject changes that introduce them.
    insertion order into a hash structure.
 5. **Every persisted run record carries its seed**, so any run replays exactly.
 6. **`core/` never depends on `viz/`.** The core must build and test with `viz` absent.
+7. **Anything tunable is data, not code.** Dispatch strategies are weight vectors in
+   `data/dispatcher-profiles.json`, not classes. If you find yourself writing
+   `if (strategy === 'nearest-car')`, stop — that belongs in config. Only a genuinely new
+   *cost term* justifies new code. See
+   [Parameterization & Tuning](docs/06-parameterization-and-tuning.md).
+8. **Every tunable declares its schema** — type, range, default, and `activeWhen` for
+   conditional parameters — so a generic optimizer can search the space without
+   elevator-specific knowledge.
 
 ## Statistical discipline
 
@@ -65,6 +73,18 @@ proven otherwise.
 - **Passengers arrive in batches**, not one at a time.
 - **The three kinds of zoning are distinct concepts** — service (physical), access
   (credential), operational (dispatcher strategy). Never collapse them into one field.
+- **Normalize cost terms before weighting.** Raw `waitTime` (0–120 s) and `stopCount`
+  (0–20) on the same scale produce uninterpretable weights and an unsearchable space.
+
+## Tuning discipline
+
+- **Hold out traffic seeds.** Tune on one seed set, validate on a disjoint one, or you
+  overfit the weight vector to specific passenger traces and the gain vanishes on new
+  traffic.
+- **Use common random numbers across candidates** within an optimization round.
+- **Do not scalarize too early.** Report the Pareto front over (AWT, energy, WT95); the
+  energy-versus-wait tradeoff is the operator's call, not a constant to bake in.
+- **Tune per traffic pattern.** The optimum for up-peak is not the optimum for down-peak.
 
 ## Conventions
 
@@ -80,6 +100,7 @@ proven otherwise.
 
 - [`data/elevator-specs.json`](data/elevator-specs.json) — elevator classes, capacities, timings
 - [`data/traffic-profiles.json`](data/traffic-profiles.json) — demand profiles by building type
+- [`data/dispatcher-profiles.json`](data/dispatcher-profiles.json) — cost term library and dispatcher weight vectors
 - [`data/buildings/`](data/buildings/) — test building configs; see its README for the schema
 
 Reference values come from CIBSE Guide D, ISO 8100-32, and published lift-engineering

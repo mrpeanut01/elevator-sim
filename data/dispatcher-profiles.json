@@ -1,0 +1,115 @@
+{
+  "$comment": "Dispatcher configurations. Every strategy here is a weight vector over the same scoring engine — adding a strategy is a config entry, not a class. See docs/06-parameterization-and-tuning.md.",
+  "version": 1,
+  "terms": [
+    { "id": "waitTime", "measures": "Estimated wait for the new passenger", "serves": "AWT" },
+    { "id": "rideTime", "measures": "Estimated in-car time for the new passenger", "serves": "TTD" },
+    { "id": "detourPenalty", "measures": "Added delay imposed on already-onboard passengers", "serves": "Fairness to boarded" },
+    { "id": "existingCallDelay", "measures": "Added delay to other already-assigned calls", "serves": "Global optimality" },
+    { "id": "directionReversal", "measures": "Penalty for reversing travel direction", "serves": "Collective behavior" },
+    { "id": "loadFactor", "measures": "Penalty rising as the car approaches capacity", "serves": "Capacity awareness" },
+    { "id": "stopCount", "measures": "Number of stops added", "serves": "Energy, ride annoyance" },
+    { "id": "distanceTravelled", "measures": "Metres of travel added", "serves": "Energy proxy" },
+    { "id": "starvation", "measures": "Escalating penalty on the longest-waiting call", "serves": "WT95, % > 60s" },
+    { "id": "zoneAffinity", "measures": "Deviation from the car's assigned zone", "serves": "Zoning strategies" },
+    { "id": "predictedDemand", "measures": "Misalignment with forecast future calls", "serves": "Pre-positioning" },
+    { "id": "crowding", "measures": "Hall queue length at the pickup floor", "serves": "Parallel service" }
+  ],
+  "normalization": {
+    "required": true,
+    "$comment": "Normalize every term to a comparable scale before weighting. Without it, waitTime (0-120s) and stopCount (0-20) yield uninterpretable weights and an unsearchable space."
+  },
+  "profiles": [
+    {
+      "id": "nearest-car",
+      "name": "Nearest car",
+      "role": "baseline",
+      "weights": { "distanceTravelled": 1.0 }
+    },
+    {
+      "id": "eta",
+      "name": "Minimum estimated wait",
+      "role": "baseline",
+      "weights": { "waitTime": 1.0 }
+    },
+    {
+      "id": "collective",
+      "name": "Conventional collective",
+      "role": "baseline",
+      "weights": { "waitTime": 1.0 },
+      "hardConstraints": ["noDirectionReversal"]
+    },
+    {
+      "id": "energy-aware",
+      "name": "Energy aware",
+      "weights": { "waitTime": 0.6, "stopCount": 0.3, "distanceTravelled": 0.1 }
+    },
+    {
+      "id": "fairness-first",
+      "name": "Fairness first",
+      "weights": { "waitTime": 0.5, "starvation": 0.5 }
+    },
+    {
+      "id": "capacity-aware",
+      "name": "Capacity aware",
+      "weights": { "waitTime": 0.7, "loadFactor": 0.2, "crowding": 0.1 }
+    },
+    {
+      "id": "predictive-balanced",
+      "name": "Predictive balanced",
+      "engine": "weighted-cost",
+      "weights": {
+        "waitTime": 1.0,
+        "rideTime": 0.3,
+        "detourPenalty": 0.4,
+        "existingCallDelay": 0.5,
+        "directionReversal": 0.8,
+        "loadFactor": 0.6,
+        "stopCount": 0.2,
+        "distanceTravelled": 0.1,
+        "starvation": 0.7,
+        "predictedDemand": 0.4,
+        "crowding": 0.3
+      },
+      "dispatch": {
+        "assignmentTiming": "deferred",
+        "deferWindowS": 1.5,
+        "assignmentMode": "split-demand",
+        "splitThresholdPassengers": 12,
+        "reassignmentPolicy": "until-commitment",
+        "commitmentPoint": "on-deceleration",
+        "reassignmentHysteresisS": 4.0,
+        "maxReassignmentsPerCall": 3
+      },
+      "answer": {
+        "bypassLoadThreshold": 0.8,
+        "allowBypassIfSoleEligibleCar": false,
+        "dwellPolicy": "adaptive",
+        "dwellAdaptationGain": 0.4,
+        "maxDwellS": 12
+      },
+      "idle": {
+        "parkingStrategy": "predicted-demand",
+        "repositionThresholdS": 8,
+        "repositionEnergyWeight": 0.2,
+        "predictorHorizonS": 300
+      }
+    }
+  ],
+  "patternSwitching": {
+    "$comment": "Per-pattern weight sets. The optimum for up-peak is not the optimum for down-peak. Hysteresis prevents detector oscillation.",
+    "patternDetector": {
+      "type": "fuzzy",
+      "inputs": ["lobbyArrivalRate", "interfloorRate", "downPeakRate", "timeOfDay"],
+      "patterns": ["up-peak", "down-peak", "two-way", "interfloor", "idle"],
+      "hysteresisS": 120
+    },
+    "weightSetsByPattern": {
+      "up-peak": "capacity-aware",
+      "down-peak": "fairness-first",
+      "two-way": "predictive-balanced",
+      "interfloor": "eta",
+      "idle": "energy-saver"
+    }
+  }
+}

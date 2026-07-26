@@ -43,6 +43,7 @@ This project exists to make those comparisons rigorous.
 | [Traffic & Statistics](docs/03-traffic-and-statistics.md) | Demand profiles, RTT math, replication methodology, CRN, stopping rules |
 | [Test Buildings](docs/04-test-buildings.md) | Five reference buildings from low-rise to supertall |
 | [Roadmap](docs/05-roadmap.md) | Phased development plan |
+| [Parameterization & Tuning](docs/06-parameterization-and-tuning.md) | How to tweak every model without recoding, and how to search for an optimum |
 
 Machine-readable configuration lives in [`data/`](data/).
 
