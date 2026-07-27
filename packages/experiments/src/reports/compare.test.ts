@@ -186,14 +186,26 @@ describe('convergence is reported as what it is', () => {
     expect(report.convergence.status).not.toBe('converged');
   });
 
-  it('records which quantile family the half-width came from', () => {
+  it('records which quantile family the half-width came from — t, at every n', () => {
+    // CHANGED 2026-07-27 (review finding #14). This assertion previously required
+    // `large.convergence.method` to be `'z'` at n = 30, and in doing so pinned the defect: the
+    // convergence report's `method` is copied off the *published* metric estimate, and a
+    // published interval is Student-t at n − 1 at every n (docs/03 § Part 4). The `n > 25` normal
+    // approximation belongs to the sequential stopping rule (docs/03 § Part 3) and is still
+    // tested, as itself, in `statistics.test.ts` § "halfWidthQuantile".
+    //
+    // The old assertion could only pass while a nominal 95 % interval covered 93.9 %, so it was
+    // not a weaker statement of the same claim — it was the bug, written down.
     const small = buildCandidateReport('a', observations([1, 2, 3]));
     const large = buildCandidateReport(
       'b',
       observations(Array.from({ length: 30 }, (_, index) => 5 + index * 0.01)),
     );
     expect(small.convergence.method).toBe('t');
-    expect(large.convergence.method).toBe('z');
+    expect(large.convergence.method).toBe('t');
+    /* And it is the estimate's own family, not a re-derivation: df travels with it. */
+    expect(large.metrics.find((metric) => metric.metricId === 'awt')?.estimate?.degreesOfFreedom)
+      .toBe(29);
   });
 });
 

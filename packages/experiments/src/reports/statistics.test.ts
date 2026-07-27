@@ -8,6 +8,7 @@
  * this implementation's own output.
  */
 
+import { Pcg32 } from '@elevator-sim/core';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -91,10 +92,16 @@ describe('studentTQuantile', () => {
   });
 });
 
-describe('halfWidthQuantile', () => {
-  it('uses the t-distribution up to n = 25 and the normal approximation above it', () => {
-    // docs/03-traffic-and-statistics.md § "Sequential stopping rule" prescribes exactly this
-    // split; it is not a house preference.
+describe('halfWidthQuantile — the sequential stopping rule’s quantile, and only that', () => {
+  it('still uses the t-distribution up to n = 25 and the normal approximation above it', () => {
+    // docs/03-traffic-and-statistics.md § Part 3 "Sequential stopping rule" (doc lines ~177-182)
+    // prescribes exactly this split; it is not a house preference, and it is deliberately NOT
+    // changed by the fix for review finding #14. The crossover is correct where it came from: it
+    // decides when a run loop stops, where being 5 % optimistic costs replications, not validity.
+    //
+    // This test exists to make that intent explicit. If it ever fails, the stopping rule's rule
+    // has been edited — which is a different decision from the published interval's, and needs
+    // its own argument.
     const atCrossover = halfWidthQuantile(T_DISTRIBUTION_MAX_N, 0.95);
     const pastCrossover = halfWidthQuantile(T_DISTRIBUTION_MAX_N + 1, 0.95);
     expect(atCrossover.method).toBe('t');
@@ -103,8 +110,61 @@ describe('halfWidthQuantile', () => {
     expect(pastCrossover.quantile).toBeCloseTo(1.959963984540054, 9);
   });
 
+  it('is not what any published interval reaches for', () => {
+    // The whole of review finding #14 in four lines: the two rules disagree above n = 25, and
+    // `estimateMean` follows the published one. `quantileUsedBy` reads the quantile back off an
+    // estimate as halfWidth / standardError, which is the only external evidence of the family
+    // there is — and exactly what a reader re-deriving the interval by hand would do.
+    const n = T_DISTRIBUTION_MAX_N + 1;
+    const stoppingRule = halfWidthQuantile(n, 0.95).quantile;
+    const published = quantileUsedBy(estimateMean(Array.from({ length: n }, (_, i) => i)));
+    expect(published).toBeGreaterThan(stoppingRule);
+    expect(published - stoppingRule).toBeGreaterThan(0.09);
+  });
+
   it('refuses a confidence given as a percentage', () => {
     expect(() => halfWidthQuantile(10, 95)).toThrow(/strictly inside \(0, 1\)/);
+  });
+});
+
+/** The quantile an estimate actually used, recovered from the interval it published. */
+const quantileUsedBy = (estimate: { halfWidth: number; standardError: number }): number =>
+  estimate.halfWidth / estimate.standardError;
+
+describe('the published interval is Student-t at n − 1, at every n', () => {
+  it('is t(n − 1) on both sides of the stopping rule’s crossover', () => {
+    // docs/03-traffic-and-statistics.md § Part 4 "Use a paired-t interval" states one formula,
+    // D̄ ± t[n-1, conf] · s_D/√n, with no n in the choice of family. Published t values:
+    // t(24, .975) = 2.063899, t(25, .975) = 2.059539, t(99, .975) = 1.984217.
+    for (const [n, expected] of [
+      [25, 2.063898561628025],
+      [26, 2.0595385527532946],
+      [100, 1.9842169515086827],
+    ] as const) {
+      const estimate = estimateMean(Array.from({ length: n }, (_, index) => index), {
+        confidence: 0.95,
+      });
+      expect(estimate.method, `n = ${n}`).toBe('t');
+      expect(estimate.degreesOfFreedom, `n = ${n}`).toBe(n - 1);
+      expect(quantileUsedBy(estimate), `n = ${n}`).toBeCloseTo(expected, 9);
+    }
+  });
+
+  it('converges on the normal quantile from above, so t everywhere costs almost nothing', () => {
+    // The reason there is no efficiency case for the z crossover on a published interval.
+    const large = quantileUsedBy(estimateMean(Array.from({ length: 2000 }, (_, i) => i)));
+    const z = normalQuantile(0.975);
+    expect(large).toBeGreaterThan(z);
+    expect(large - z).toBeLessThan(0.003);
+  });
+
+  it('honours a non-default confidence with the t quantile, not a z one', () => {
+    // The finding #19 operating point: 80 % at n = 30 is t(29, .9) = 1.3114336, not z = 1.2815516.
+    const estimate = estimateMean(Array.from({ length: 30 }, (_, index) => index), {
+      confidence: 0.8,
+    });
+    expect(estimate.method).toBe('t');
+    expect(quantileUsedBy(estimate)).toBeCloseTo(1.3114336, 6);
   });
 });
 
@@ -206,6 +266,124 @@ describe('pairedDifferenceEstimate', () => {
 
   it('refuses series of different lengths', () => {
     expect(() => pairedDifferenceEstimate([1, 2], [1])).toThrow(/one pair per replication/);
+  });
+
+  it('uses t(n − 1) past the stopping rule’s crossover, where it used to switch to z', () => {
+    // Review finding #14, pinned at the exact n it names. At n = 26 the shipped code returned
+    // z = 1.9599640 with `method: 'z'` and `degreesOfFreedom: NaN`; the doc's § Part 4 formula
+    // wants t(25, .975) = 2.0595386.
+    //
+    // The differences are 0, 1, 2, … 25, whose sample standard deviation is exactly
+    // sqrt(sum (i - 12.5)^2 / 25) = sqrt(1462.5 / 25) = sqrt(58.5) = 7.6485292.
+    const n = 26;
+    const candidate = Array.from({ length: n }, (_, index) => index);
+    const baseline = candidate.map(() => 0);
+    const estimate = pairedDifferenceEstimate(candidate, baseline, { confidence: 0.95 });
+
+    expect(estimate.n).toBe(n);
+    expect(estimate.method).toBe('t');
+    expect(estimate.degreesOfFreedom).toBe(25);
+
+    const sD = Math.sqrt(58.5);
+    expect(estimate.stdDev).toBeCloseTo(sD, 9);
+    const T_25 = 2.0595385527532946;
+    expect(estimate.halfWidth).toBeCloseTo((T_25 * sD) / Math.sqrt(n), 9);
+
+    // And the half-width the bug produced, so the two are never confused again: 4.83 % narrower.
+    const Z_95 = 1.959963984540054;
+    const buggyHalfWidth = (Z_95 * sD) / Math.sqrt(n);
+    expect(buggyHalfWidth / estimate.halfWidth).toBeCloseTo(0.9517, 4);
+  });
+
+  it('never reports the normal approximation, at any replication count', () => {
+    // The structural half of the fix: `estimateMean` names `publishedIntervalQuantile`, whose
+    // return type cannot say 'z'. This asserts the behaviour that type is protecting, across the
+    // crossover and well past the documented 50-200 budget.
+    for (const n of [2, 25, 26, 50, 100, 200, 500]) {
+      const estimate = pairedDifferenceEstimate(
+        Array.from({ length: n }, (_, index) => Math.sin(index)),
+        Array.from({ length: n }, () => 0),
+        { confidence: 0.95 },
+      );
+      expect(estimate.method, `n = ${n}`).toBe('t');
+      expect(estimate.degreesOfFreedom, `n = ${n}`).toBe(n - 1);
+    }
+  });
+});
+
+describe('the published interval covers what it says it covers', () => {
+  /**
+   * A nominal 95 % interval must contain the true mean 95 % of the time. Under the shipped z
+   * quantile it did not: at n = 26 the analytic coverage was 93.876 %, a 6.12 % false-positive
+   * rate against a declared 5 %, which is the failure mode CLAUDE.md § Statistical discipline
+   * names first — "reporting confident nonsense".
+   *
+   * The RNG is a named PCG32 stream at a fixed seed, per CLAUDE.md invariant 2. No global RNG,
+   * so this test's verdict is a pure function of the source and reproduces exactly.
+   */
+  const COVERAGE_SEED = 20_260_727;
+  /** PCG32 stream selector. Named and fixed, so this draw is one identified stream, not "the" RNG. */
+  const COVERAGE_STREAM_ID = 1;
+  const TRIALS = 100_000;
+  const N = 26;
+  const Z_95 = 1.959963984540054;
+
+  it('covers 95 % of the time at n = 26, where the normal approximation covered 93.9 %', () => {
+    const rng = new Pcg32(COVERAGE_SEED, COVERAGE_STREAM_ID);
+    let coveredByShipped = 0;
+    let coveredByNormalApproximation = 0;
+
+    for (let trial = 0; trial < TRIALS; trial += 1) {
+      /* i.i.d. N(0, 1) paired differences: the true mean is exactly zero, so "covered" is
+         "the interval contains zero". */
+      const differences = Array.from({ length: N }, () => rng.normal(0, 1));
+      const zeros = differences.map(() => 0);
+      const estimate = pairedDifferenceEstimate(differences, zeros, { confidence: 0.95 });
+
+      if (estimate.lower <= 0 && estimate.upper >= 0) coveredByShipped += 1;
+
+      /* The same sample, intervalled the way the bug did it. */
+      const buggyHalfWidth = Z_95 * estimate.standardError;
+      if (Math.abs(estimate.mean) <= buggyHalfWidth) coveredByNormalApproximation += 1;
+    }
+
+    const shipped = coveredByShipped / TRIALS;
+    const buggy = coveredByNormalApproximation / TRIALS;
+
+    /* The Monte-Carlo standard error at 100 000 trials is 0.069 %, so ±0.3 % is ±4.3 SE: wide
+       enough never to flake, and nowhere near wide enough to admit 93.9 %. */
+    expect(shipped).toBeGreaterThan(0.947);
+    expect(shipped).toBeLessThan(0.953);
+
+    /* And the bug, measured on the same 100 000 samples: materially under-covering. */
+    expect(buggy).toBeLessThan(0.943);
+    expect(shipped - buggy).toBeGreaterThan(0.008);
+
+    console.log(
+      `[coverage] n=${N}, ${TRIALS} trials: published t(25) interval covers ${(shipped * 100).toFixed(3)} %, the pre-fix z interval covers ${(buggy * 100).toFixed(3)} % of the same samples`,
+    );
+    /* 100 000 inversions of the t CDF is a few seconds; the default 5 s timeout is not the
+       statement being made here. */
+  }, 60_000);
+
+  it('covers exactly 95 % analytically, which is the claim the Monte-Carlo estimates', () => {
+    // Coverage of `mean ± q·s/√n` under normal differences is P(|T_{n-1}| ≤ q) = 2·F_{n-1}(q) − 1,
+    // exactly, and needs no sampling. This is the figure review finding #14 reports as 93.876 %
+    // for the shipped z interval; the same arithmetic on the shipped code now returns 95.000 %.
+    for (const n of [26, 30, 40, 100, 200]) {
+      const estimate = pairedDifferenceEstimate(
+        Array.from({ length: n }, (_, index) => index),
+        Array.from({ length: n }, () => 0),
+        { confidence: 0.95 },
+      );
+      const q = estimate.halfWidth / estimate.standardError;
+      expect(2 * studentTCdf(q, n - 1) - 1, `n = ${n}`).toBeCloseTo(0.95, 9);
+
+      /* What the normal approximation covered at the same n, for the record. */
+      const underCoverage = 2 * studentTCdf(Z_95, n - 1) - 1;
+      expect(underCoverage, `n = ${n}`).toBeLessThan(0.95);
+    }
+    expect(2 * studentTCdf(Z_95, 25) - 1).toBeCloseTo(0.93876, 5);
   });
 });
 
