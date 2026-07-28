@@ -66,14 +66,16 @@ import type {
  * |---|---|
  * | 1 | Wave 1's first shape. |
  * | 2 | `VizProgress.served` / `Frame.served` renamed {@link VizProgress.boardedLegs}, because the counter counts **leg boardings** and the header called them people. See `packages/viz/DECISIONS-T8.md`. |
+ * | 3 | {@link VizRecording.legs} added — the per-leg array `UX.md` § 7.2 and `DECISIONS.md` D15 reserved for the wave that acquires a consumer. Wave 2 is that wave: `src/frame/overlay.ts` reads it for the windowed figures the live metrics overlay shows, and `landingAssignmentsAt` reads its `carId`/`bankId` for `RV-T3`. See `packages/viz/DECISIONS-T11.md`. |
  *
- * Nothing in wave 1 *reads* this number: the schema guard that used to exist checked a value
- * that could only ever match, because the only producer of a recording in the shipped path is
- * `recordRun` in the same build. It was deleted rather than kept as decoration. The version is
- * carried because it is what a wave-2 file-load path will check, and bumping it is how a
- * deliberate contract change is recorded — see `UX.md` § 7.
+ * Wave 1 *read* this number nowhere, and said so: the guard that existed compared a recording's
+ * version with the constant compiled into the same bundle, which in the shipped path could not
+ * differ. Wave 2 gives it the reader it was always waiting for —
+ * {@link readRecordingDocument} in `src/record/document.ts`, on the **file-load** path, where
+ * a recording arrives from somewhere other than this build and the versions genuinely can
+ * disagree (`UX.md` `PB-07`/`PB-15`).
  */
-export const VIZ_SCHEMA_VERSION = 2;
+export const VIZ_SCHEMA_VERSION = 3;
 
 /* -------------------------------------------------------------------------- *
  * Geometry
@@ -188,6 +190,55 @@ export interface VizProgress {
 }
 
 /* -------------------------------------------------------------------------- *
+ * Legs
+ * -------------------------------------------------------------------------- */
+
+/**
+ * One passenger leg, kept whole rather than folded away.
+ *
+ * ## Why this exists, and why it did not exist in wave 1
+ *
+ * {@link VizProgress} is a *fold*: three cumulative step functions over the whole run. A fold
+ * answers "how many have boarded by now" and nothing else. Every windowed figure the project
+ * actually reports — a rolling mean wait, a per-bank split, the longest wait currently standing
+ * on a landing — needs the individual legs back, and `foldPassengers` had already thrown them
+ * away. `UX.md` § 7.2 and `DECISIONS.md` D15 both record that the recording's field set is
+ * expected to grow for exactly this, as a deliberate {@link VIZ_SCHEMA_VERSION} bump.
+ *
+ * Wave 1 deliberately did **not** add it, because nothing would have read it, and a field with
+ * no consumer is this repository's signature defect. It is added here *with* its consumers, in
+ * one change: `src/frame/overlay.ts` (`overlayAt`, `landingAssignmentsAt`) and the overlay
+ * panel `src/render/overlay.ts` draws from them.
+ *
+ * ## What is deliberately not here
+ *
+ * `massKg`, `journeyId`, `legIndex`, `credentialGroup`, `destinationFloorId` and `alightedAt`
+ * are all on `PassengerRecord` and none of them is copied. Nothing in this package reads them,
+ * and copying them "while we are here" is how a contract acquires six fields and one consumer.
+ *
+ * ## Ordering
+ *
+ * {@link VizRecording.legs} is sorted by `(arrivedAt, passengerId)`. Strictly ordered, and by
+ * nothing that a hash structure's iteration order could decide — invariant 4's rule applied to a
+ * display artefact, the same one `foldPassengers` applies to the landings.
+ */
+export interface VizLeg {
+  /** Identity of this leg. The tie-break that makes the array's order total. */
+  readonly passengerId: string;
+  /** Where the wait happened — the landing this leg registered a call at. */
+  readonly originFloorId: string;
+  readonly direction: Direction;
+  /** When the wait began. The window membership key, exactly as in `PassengerRecord`. */
+  readonly arrivedAt: SimTime;
+  /** When the wait ended. `undefined` for a leg nobody ever served. */
+  readonly boardedAt?: SimTime | undefined;
+  /** The car that served this leg. `undefined` while unserved. */
+  readonly carId?: string | undefined;
+  /** The bank that served this leg. `undefined` while unserved. */
+  readonly bankId?: string | undefined;
+}
+
+/* -------------------------------------------------------------------------- *
  * The recording
  * -------------------------------------------------------------------------- */
 
@@ -235,6 +286,8 @@ export interface VizRecording {
   readonly floors: readonly VizFloor[];
   readonly shafts: readonly VizShaft[];
   readonly landings: readonly VizLanding[];
+  /** Every passenger leg, sorted by `(arrivedAt, passengerId)`. See {@link VizLeg}. */
+  readonly legs: readonly VizLeg[];
   readonly progress: VizProgress;
   readonly summary: VizSummary;
   /** Non-fatal diagnostics from the run, for the viewer's warning strip. */

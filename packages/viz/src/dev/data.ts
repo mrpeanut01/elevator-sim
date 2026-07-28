@@ -20,17 +20,37 @@ import {
   parseElevatorSpecs,
   parseTrafficProfiles,
   resolveBuilding,
+  type BuildingConfig,
   type DispatcherProfile,
   type ElevatorSpecs,
   type ResolvedBuilding,
   type TrafficProfiles,
 } from '@elevator-sim/core';
 
+/**
+ * A building as both the runner and the editor need it.
+ *
+ * The runner needs the {@link ResolvedBuilding}; the editor needs the **authored** document,
+ * because `ResolvedBuilding` is a one-way projection — floor ranges are already expanded, cars
+ * already carry their class's defaults, and re-serialising one would produce a file that is a
+ * legal building but not the file anybody wrote. `ED-T9` asks for a round trip through the same
+ * JSON `loadConfig` reads, and that is what {@link BuildingEntry.config} is.
+ */
+export interface BuildingEntry {
+  readonly file: string;
+  readonly config: BuildingConfig;
+  readonly resolved: ResolvedBuilding;
+}
+
 export interface BrowserResources {
   readonly elevatorSpecs: ElevatorSpecs;
   readonly trafficProfiles: TrafficProfiles;
   readonly dispatcherProfiles: readonly DispatcherProfile[];
   readonly buildings: readonly ResolvedBuilding[];
+  /** The same buildings, with the document each was parsed from. */
+  readonly entries: readonly BuildingEntry[];
+  /** Declared traffic-profile ids, so the editor cross-checks `trafficProfile` as the loader does. */
+  readonly trafficProfileIds: ReadonlySet<string>;
   readonly warnings: readonly string[];
 }
 
@@ -58,16 +78,44 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
     (warning) => warning.message,
   );
 
+  const trafficProfileIds = new Set(trafficProfiles.profiles.map((profile) => profile.id));
+
   const manifest = manifestRaw as { readonly files: readonly { name: string; data: unknown }[] };
-  const buildings = manifest.files.map((entry) =>
-    resolveBuilding(parseBuilding(entry.data, entry.name), elevatorSpecs, { file: entry.name }),
-  );
+  const entries: BuildingEntry[] = manifest.files.map((entry) => {
+    const config = parseBuilding(entry.data, entry.name);
+    return {
+      file: entry.name,
+      config,
+      resolved: resolveBuilding(config, elevatorSpecs, { file: entry.name, trafficProfileIds }),
+    };
+  });
+  const buildings = entries.map((entry) => entry.resolved);
 
   return {
     elevatorSpecs,
     trafficProfiles,
     dispatcherProfiles: dispatchers.profiles,
     buildings,
+    entries,
+    trafficProfileIds,
     warnings: [...warnings, ...buildings.flatMap((b) => b.warnings.map((w) => w.message))],
   };
+}
+
+/**
+ * Resolve a building the editor produced, against the same specs and profile ids the loader used.
+ *
+ * A thin wrapper on purpose. `resolveBuilding` is the only thing in the project allowed to decide
+ * what a building means, and an edited building must go through exactly the same door as a
+ * shipped one — otherwise "Run this building" would be running something the loader would have
+ * rejected, which is the one outcome `ED-T8` exists to rule out.
+ */
+export function resolveEdited(
+  resources: BrowserResources,
+  building: BuildingConfig,
+): ResolvedBuilding {
+  return resolveBuilding(building, resources.elevatorSpecs, {
+    file: `${building.id}.json`,
+    trafficProfileIds: resources.trafficProfileIds,
+  });
 }

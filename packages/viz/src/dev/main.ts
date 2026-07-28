@@ -1,41 +1,81 @@
 /**
- * The dev viewer: the shipped, non-test caller of everything this package exports.
+ * The viewer: the shipped, non-test caller of everything this package exports.
  *
  * The roadmap's standing requirement is that a behaviour must name a caller which is not one of
- * its own tests. This file is that caller. It loads `data/` over HTTP, runs a replication,
- * records it, and drives {@link Playback} from `requestAnimationFrame` — so `recordRun`,
- * `frameAt`, `Playback`, `buildLayout` and `drawScene` are all exercised by the product rather
- * than only by a suite.
+ * its own tests. This file is that caller for the run viewer and the playback transport, and it
+ * mounts `dev/editor.ts`, which is that caller for the building editor. Every module added in
+ * wave 2 is reached from here:
  *
- * It is deliberately small. Wave 2 builds the real viewer — a proper transport, a metrics
- * overlay, the building editor — against the contract this file proves is sufficient. Every
- * state it lacks is enumerated in `UX.md` rather than left to be discovered.
+ * | Module | Reached from |
+ * |---|---|
+ * | `frame/overlay.ts` | {@link tick}, every animation frame, and the landing selector |
+ * | `render/overlay.ts` | `drawScene`, via `SceneInput.overlay` |
+ * | `render/describeFrame.ts` | the canvas's `aria-label` and the live region |
+ * | `record/document.ts` | **Load recording** (`readRecordingDocument`) and **Verify replay** (`verifyReplay`) |
+ * | `editor*.ts` | `dev/editor.ts`, mounted below |
+ *
+ * ## Two surfaces, one page
+ *
+ * A tablist rather than two documents, because the editor's whole payoff is `ED-04`: a valid
+ * edit goes straight to a run without a reload, keeping the seed and the dispatcher the reader
+ * had already chosen.
  */
 
-import { SimulationError, type SimulationConfig } from '@elevator-sim/core';
+import { SimulationError, type BuildingConfig, type SimulationConfig } from '@elevator-sim/core';
 
 import type { VizRecording } from '../contract/types.js';
 import { frameSequence, serializeFrames } from '../frame/sequence.js';
+import { landingAssignmentsAt, overlayAt, type LandingAssignment } from '../frame/overlay.js';
 import { recordRun } from '../record/recordRun.js';
+import { readRecordingDocument, verifyReplay } from '../record/document.js';
 import { Playback } from '../playback/playback.js';
 import { systemClock } from '../playback/clock.js';
 import { buildLayout } from '../render/layout.js';
-import { drawScene, type Canvas2DLike } from '../render/canvas.js';
-import { loadBrowserResources, type BrowserResources } from './data.js';
+import { drawScene, type Canvas2DLike, type SceneSelection } from '../render/canvas.js';
+import { describeFrame } from '../render/describeFrame.js';
+import { mountEditor } from './editor.js';
+import { loadBrowserResources, resolveEdited, type BrowserResources } from './data.js';
 
-const SPEEDS = [1, 5, 10, 30, 60, 120] as const;
+/** `PB-T1`: ×1 … ×120, and `[`/`]` step this ladder — `KB-07`. */
+const SPEEDS = [1, 2, 5, 10, 30, 60, 120] as const;
+/** Width reserved for the live metrics panel. Dropped below this viewport width — `RS-03`. */
+const OVERLAY_WIDTH_PX = 250;
+const OVERLAY_MIN_VIEWPORT_PX = 900;
+/** One display frame at 60 Hz, in simulated seconds at the current speed — `KB-06`, `PB-08`. */
+const FRAME_S = 1 / 60;
 
 interface Elements {
   readonly canvas: HTMLCanvasElement;
   readonly building: HTMLSelectElement;
   readonly dispatcher: HTMLSelectElement;
+  readonly duration: HTMLInputElement;
   readonly speed: HTMLSelectElement;
   readonly seed: HTMLInputElement;
   readonly run: HTMLButtonElement;
   readonly verify: HTMLButtonElement;
+  readonly copyProvenance: HTMLButtonElement;
+  readonly saveRecording: HTMLButtonElement;
+  readonly loadRecording: HTMLInputElement;
+  readonly bankFilter: HTMLSelectElement;
+  readonly landingSelect: HTMLSelectElement;
+  readonly exportPng: HTMLButtonElement;
   readonly playPause: HTMLButtonElement;
+  readonly stepBack: HTMLButtonElement;
+  readonly stepForward: HTMLButtonElement;
+  readonly loop: HTMLInputElement;
   readonly scrub: HTMLInputElement;
   readonly status: HTMLElement;
+  readonly error: HTMLElement;
+  readonly banner: HTMLElement;
+  readonly description: HTMLElement;
+  readonly tabViewer: HTMLButtonElement;
+  readonly tabEditor: HTMLButtonElement;
+  readonly panelViewer: HTMLElement;
+  readonly panelEditor: HTMLElement;
+  readonly confirm: HTMLDialogElement;
+  readonly confirmMessage: HTMLElement;
+  readonly confirmOk: HTMLButtonElement;
+  readonly confirmCancel: HTMLButtonElement;
 }
 
 function elements(): Elements {
@@ -48,14 +88,40 @@ function elements(): Elements {
     canvas: find<HTMLCanvasElement>('stage'),
     building: find<HTMLSelectElement>('building'),
     dispatcher: find<HTMLSelectElement>('dispatcher'),
+    duration: find<HTMLInputElement>('duration'),
     speed: find<HTMLSelectElement>('speed'),
     seed: find<HTMLInputElement>('seed'),
     run: find<HTMLButtonElement>('run'),
     verify: find<HTMLButtonElement>('verify'),
+    copyProvenance: find<HTMLButtonElement>('copy-provenance'),
+    saveRecording: find<HTMLButtonElement>('save-recording'),
+    loadRecording: find<HTMLInputElement>('load-recording'),
+    bankFilter: find<HTMLSelectElement>('bank-filter'),
+    landingSelect: find<HTMLSelectElement>('landing-select'),
+    exportPng: find<HTMLButtonElement>('export-png'),
     playPause: find<HTMLButtonElement>('play-pause'),
+    stepBack: find<HTMLButtonElement>('step-back'),
+    stepForward: find<HTMLButtonElement>('step-forward'),
+    loop: find<HTMLInputElement>('loop'),
     scrub: find<HTMLInputElement>('scrub'),
     status: find<HTMLElement>('status'),
+    error: find<HTMLElement>('error'),
+    banner: find<HTMLElement>('banner'),
+    description: find<HTMLElement>('frame-description'),
+    tabViewer: find<HTMLButtonElement>('tab-viewer'),
+    tabEditor: find<HTMLButtonElement>('tab-editor'),
+    panelViewer: find<HTMLElement>('panel-viewer'),
+    panelEditor: find<HTMLElement>('panel-editor'),
+    confirm: find<HTMLDialogElement>('confirm'),
+    confirmMessage: find<HTMLElement>('confirm-message'),
+    confirmOk: find<HTMLButtonElement>('confirm-ok'),
+    confirmCancel: find<HTMLButtonElement>('confirm-cancel'),
   };
+}
+
+/** `KB-14` — the reader has asked for no motion beyond the simulation itself. */
+function prefersReducedMotion(): boolean {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 async function main(): Promise<void> {
@@ -63,13 +129,44 @@ async function main(): Promise<void> {
   ui.status.textContent = 'loading data…';
 
   let resources: BrowserResources;
-  try {
-    resources = await loadBrowserResources();
-  } catch (error) {
-    ui.status.textContent = `could not load data/: ${message(error)}`;
-    return;
-  }
+  const load = async (): Promise<boolean> => {
+    try {
+      resources = await loadBrowserResources();
+      return true;
+    } catch (error) {
+      // RV-17: what failed, and a Retry that refetches without a page reload (RV-21).
+      ui.error.replaceChildren(
+        `could not load data/: ${message(error)} `,
+        (() => {
+          const retry = document.createElement('button');
+          retry.type = 'button';
+          retry.textContent = 'Retry';
+          retry.addEventListener('click', () => {
+            void (async () => {
+              ui.error.textContent = '';
+              ui.status.textContent = 'loading data…';
+              if (await load()) start();
+            })();
+          });
+          return retry;
+        })(),
+      );
+      ui.error.focus();
+      return false;
+    }
+  };
+  if (!(await load())) return;
 
+  let started = false;
+  function start(): void {
+    if (started) return;
+    started = true;
+    boot(ui, resources);
+  }
+  start();
+}
+
+function boot(ui: Elements, resources: BrowserResources): void {
   for (const building of resources.buildings) {
     ui.building.append(new Option(`${building.name} (${building.id})`, building.id));
   }
@@ -80,39 +177,121 @@ async function main(): Promise<void> {
     ui.speed.append(new Option(`×${String(speed)}`, String(speed)));
   }
   ui.speed.value = '10';
-  ui.status.textContent = 'ready — press Run';
 
   let playback: Playback | undefined;
   let recording: VizRecording | undefined;
-  /** The config that produced {@link recording}, kept so Verify replay can re-run exactly it. */
   let lastConfig: SimulationConfig | undefined;
+  /** A building the editor handed over, outside `data/`. */
+  let adhocBuilding: BuildingConfig | undefined;
+  let selection: SceneSelection | undefined;
+  let assignments: readonly LandingAssignment[] = [];
+  let lastDescription = '';
+  /**
+   * Identity of the option set currently in the landing selector, so it is not rebuilt blindly.
+   *
+   * The sentinel is not the empty string: an empty assignment list *also* keys to the empty
+   * string, so starting there made the very first repopulate look like a no-op and left
+   * `index.html`'s placeholder option in place for the whole run. Found by driving the viewer,
+   * where the landing selector offered exactly one choice and `RV-T3` was unreachable through
+   * the UI it shipped with.
+   */
+  const NO_OPTIONS_YET = 'not-populated-yet';
+  let landingOptionsKey = NO_OPTIONS_YET;
 
-  const runOnce = (): void => {
-    const building = resources.buildings.find((candidate) => candidate.id === ui.building.value);
+  /* ------------------------------------------------------------------ *
+   * Deep link — RV-03, and RV-02's "previous run's seed preserved"
+   * ------------------------------------------------------------------ */
+
+  const params = new URLSearchParams(window.location.search);
+  applyParam(ui.building, params.get('building'));
+  applyParam(ui.dispatcher, params.get('dispatcher'));
+  if (params.get('seed') !== null) ui.seed.value = params.get('seed') ?? '';
+  if (params.get('duration') !== null) ui.duration.value = params.get('duration') ?? '900';
+  if (params.get('speed') !== null) applyParam(ui.speed, params.get('speed'));
+
+  function syncUrl(): void {
+    const next = new URLSearchParams({
+      building: ui.building.value,
+      dispatcher: ui.dispatcher.value,
+      seed: ui.seed.value,
+      duration: ui.duration.value,
+      speed: ui.speed.value,
+    });
+    window.history.replaceState(null, '', `?${next.toString()}`);
+  }
+
+  function fail(text: string): void {
+    // KB-11: focus moves to the message so it is announced, and so the reader is at the control
+    // that needs changing rather than wherever they pressed.
+    ui.error.textContent = text;
+    ui.error.focus();
+  }
+
+  function clearError(): void {
+    ui.error.textContent = '';
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Running
+   * ------------------------------------------------------------------ */
+
+  function runOnce(): void {
+    const resolvedBuilding = resources.buildings.find(
+      (candidate) => candidate.id === ui.building.value,
+    );
     const dispatcherProfile = resources.dispatcherProfiles.find(
       (candidate) => candidate.id === ui.dispatcher.value,
     );
-    if (building === undefined || dispatcherProfile === undefined) {
-      ui.status.textContent = 'pick a building and a dispatcher first.';
+    if (dispatcherProfile === undefined) {
+      fail('pick a dispatcher first.');
       return;
     }
+    const building = adhocBuilding === undefined ? resolvedBuilding : undefined;
+    const adhoc = adhocBuilding;
+    if (building === undefined && adhoc === undefined) {
+      fail('pick a building first.');
+      return;
+    }
+
     const seedText = ui.seed.value.trim();
     let seed: bigint;
     try {
       seed = seedText === '' ? randomSeed() : BigInt(seedText);
     } catch {
-      ui.status.textContent = `"${seedText}" is not a whole number; a seed must be one.`;
+      fail(`"${seedText}" is not a whole number; a seed must be one.`);
       return;
     }
+    // RV-02: the seed is written back before the run, so pressing Run again after changing the
+    // dispatcher compares like with like rather than drawing a fresh seed.
     ui.seed.value = seed.toString();
 
+    const durationS = Number(ui.duration.value);
+    if (!Number.isFinite(durationS) || durationS <= 0) {
+      fail('duration must be a positive number of simulated seconds.');
+      return;
+    }
+
+    let resolved = building;
+    if (adhoc !== undefined) {
+      try {
+        resolved = resolveEdited(resources, adhoc);
+      } catch (error) {
+        fail(`the edited building could not be resolved: ${message(error)}`);
+        return;
+      }
+    }
+    if (resolved === undefined) {
+      fail('pick a building first.');
+      return;
+    }
+
     const config: SimulationConfig = {
-      building,
+      building: resolved,
       dispatcherProfile,
       trafficProfiles: resources.trafficProfiles,
       elevatorSpecs: resources.elevatorSpecs,
       seed,
-      durationS: 900,
+      durationS,
       /**
        * `report`, not the kernel's default `throw`.
        *
@@ -124,102 +303,445 @@ async function main(): Promise<void> {
        * message and an empty canvas rather than the playback UX.md RV-01 promises.
        *
        * `report` gives the viewer the recording it has to be able to draw, and the run's
-       * `timed-out` status and undelivered count are shown in the status line rather than
-       * swallowed — UX.md RV-16. Nothing about the statistics moves: `awtIsValid` still comes
-       * from the summary and still suppresses the mean.
+       * `timed-out` status and undelivered count now lead the canvas banner as well as the
+       * status line — UX.md RV-16. Nothing about the statistics moves: `awtIsValid` still comes
+       * from the summary and still suppresses every mean, in the header and in the overlay.
        */
       onTimeout: 'report',
     };
 
-    ui.status.textContent = 'simulating…';
+    ui.status.textContent = `simulating ${resolved.name} for ${String(durationS)} s — this blocks the page for about a second…`;
     lastConfig = config;
+    clearError();
     try {
       recording = recordRun(config).recording;
     } catch (error) {
       recording = undefined;
       playback = undefined;
-      ui.status.textContent =
+      fail(
         error instanceof SimulationError
-          ? `the simulation refused to report this run: ${error.message}`
-          : `run failed: ${message(error)}`;
+          ? `the simulation refused to report this run (seed ${seed.toString()}): ${error.message}`
+          : `run failed (seed ${seed.toString()}): ${message(error)}`,
+      );
+      ui.status.textContent = 'no run on screen.';
       return;
     }
+    adopt(recording);
+    syncUrl();
+  }
 
-    playback = new Playback(recording, systemClock(), {
+  /** Put a recording on screen, from a run or from a file. */
+  function adopt(next: VizRecording): void {
+    recording = next;
+    selection = undefined;
+    playback = new Playback(next, systemClock(), {
       speed: Number(ui.speed.value),
-      autoplay: true,
+      // KB-14: a reader who has asked for reduced motion gets the first frame and a Play button,
+      // not a building that starts moving on its own.
+      autoplay: !prefersReducedMotion(),
+      loop: ui.loop.checked,
     });
-    ui.playPause.textContent = 'Pause';
-    ui.status.textContent = statusLine(recording);
-  };
+    ui.playPause.textContent = playback.state === 'playing' ? 'Pause' : 'Play';
+    ui.status.textContent = statusLine(next);
+    ui.banner.textContent = `${next.buildingName} · ${next.dispatcherProfileId} · seed ${next.seed}`;
+    populateBankFilter(next);
+    landingOptionsKey = NO_OPTIONS_YET;
+    populateLandings(next, next.startedAt);
+  }
+
+  function populateBankFilter(next: VizRecording): void {
+    const banks = [...new Set(next.shafts.map((shaft) => shaft.bankId))].sort((a, b) =>
+      a.localeCompare(b),
+    );
+    ui.bankFilter.replaceChildren(new Option('all banks', ''));
+    for (const bank of banks) ui.bankFilter.append(new Option(bank, bank));
+    ui.bankFilter.disabled = banks.length < 2;
+  }
 
   /**
-   * Phase 4's acceptance criterion, on a button.
+   * Rebuild the landing selector from the assignments now in force.
    *
-   * The recording on screen is serialised through JSON, the run is re-simulated from the *same
-   * seed*, and the two frame sequences are compared byte for byte at a real playback rate. Same
-   * check `src/replay/replay.test.ts` runs, reachable by a human — which is what stops
-   * `frameSequence` from becoming another behaviour that is configurable, unit-tested and never
-   * called from a shipped path.
+   * Rebuilt as playback advances rather than once at load, because "which landings have somebody
+   * standing at them" is a property of the *instant*. The first version of this populated the
+   * list at `startedAt`, where nobody is waiting yet, so the control offered exactly one option —
+   * "none" — for the whole run and `RV-T3` was unreachable through the UI it shipped with.
+   *
+   * Skipped when the option set is unchanged, so the reader's open dropdown is not rebuilt under
+   * their cursor sixty times a second.
    */
-  const verifyReplay = (): void => {
+  function populateLandings(next: VizRecording, at: number): void {
+    assignments = landingAssignmentsAt(next, at);
+    const wanted = assignments
+      .map(
+        (assignment) =>
+          `${assignment.floorId} ${assignment.direction} ${String(assignment.waiting)}`,
+      )
+      .join('|');
+    if (wanted === landingOptionsKey) return;
+    landingOptionsKey = wanted;
+    const chosen = ui.landingSelect.value;
+    ui.landingSelect.replaceChildren(new Option('no landing selected', ''));
+    for (const assignment of assignments) {
+      ui.landingSelect.append(
+        new Option(
+          `${assignment.floorId} ${assignment.direction} — ${String(assignment.waiting)} waiting` +
+            (assignment.answeredByCarId === undefined
+              ? ' (unassigned)'
+              : ` → ${assignment.answeredByCarId}`),
+          assignment.floorId,
+        ),
+      );
+    }
+    if (assignments.some((assignment) => assignment.floorId === chosen)) {
+      ui.landingSelect.value = chosen;
+    }
+    ui.landingSelect.disabled = assignments.length === 0;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Verify, save, load — PB-05, PB-07, PB-15, PB-16, PB-17
+   * ------------------------------------------------------------------ */
+
+  function verifyReplayControl(): void {
     if (recording === undefined || lastConfig === undefined) {
-      ui.status.textContent = 'run something first, then verify it replays.';
+      fail('run something first, then verify it replays.');
       return;
     }
     const options = { fps: 30, speed: 10 } as const;
-    const original = serializeFrames(
-      frameSequence(JSON.parse(JSON.stringify(recording)) as VizRecording, options),
-    );
-    let replayed: string;
+    const stored = JSON.parse(JSON.stringify(recording)) as VizRecording;
+    const original = serializeFrames(frameSequence(stored, options));
+    let fresh: VizRecording;
     try {
-      replayed = serializeFrames(frameSequence(recordRun(lastConfig).recording, options));
+      fresh = recordRun(lastConfig).recording;
     } catch (error) {
-      ui.status.textContent = `replay failed: ${message(error)}`;
+      fail(`replay failed: ${message(error)}`);
       return;
     }
-    const frames = frameSequence(recording, options).length;
-    ui.status.textContent =
-      replayed === original
-        ? `replay verified — ${String(frames)} frames identical from seed ${recording.seed}`
-        : `REPLAY MISMATCH from seed ${recording.seed}: the same seed produced a different picture.`;
-  };
+    const verdict = verifyReplay(stored, fresh);
+    const framesMatch = serializeFrames(frameSequence(fresh, options)) === original;
+    const frames = frameSequence(stored, options).length;
+    if (verdict.matches && framesMatch) {
+      clearError();
+      ui.status.textContent = `replay verified — ${String(frames)} frames identical from seed ${stored.seed} (fingerprint ${verdict.storedFingerprint})`;
+      return;
+    }
+    // PB-16: named fingerprints, and the stored recording stays on screen.
+    fail(
+      framesMatch
+        ? `${verdict.message} (the frame sequences matched but the recordings did not)`
+        : verdict.message,
+    );
+  }
 
-  ui.run.addEventListener('click', runOnce);
-  ui.verify.addEventListener('click', verifyReplay);
-  ui.playPause.addEventListener('click', () => {
+  function saveRecording(): void {
+    if (recording === undefined) {
+      fail('run something first, then save it.');
+      return;
+    }
+    const blob = new Blob([JSON.stringify(recording)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${recording.buildingId}-${recording.seed}.viz.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    ui.status.textContent = `saved ${anchor.download} (schema ${String(recording.schemaVersion)})`;
+  }
+
+  ui.loadRecording.addEventListener('change', (event) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file === undefined) return;
+    void file.text().then((text) => {
+      const result = readRecordingDocument(text);
+      if (!result.ok) {
+        // PB-15/17/18: the previous run stays on screen and another file can be chosen without
+        // a page reload — the input is not disabled and nothing was torn down.
+        const failure = result.failure;
+        fail(
+          failure.kind === 'parse'
+            ? `${file.name} is not valid JSON: ${failure.message}${failure.position === undefined ? '' : ` (byte ${String(failure.position)})`}`
+            : `${file.name}: ${failure.message}`,
+        );
+        return;
+      }
+      clearError();
+      lastConfig = undefined; // a loaded recording cannot be re-simulated without its config
+      adopt(result.recording);
+      ui.status.textContent = `loaded ${file.name} — ${statusLine(result.recording)}`;
+    });
+  });
+
+  function copyProvenance(): void {
+    if (recording === undefined) {
+      fail('run something first, then copy its provenance.');
+      return;
+    }
+    // RV-T7: the form the CLI accepts, so a reviewer can paste it into a shell.
+    const line =
+      `npm run sim -- run --building ${recording.buildingId} --dispatcher ${recording.dispatcherProfileId}` +
+      ` --seed ${recording.seed} --duration ${String(Math.round(recording.endedAt - recording.startedAt))}`;
+    void navigator.clipboard
+      .writeText(line)
+      .then(() => {
+        ui.status.textContent = `copied: ${line}`;
+      })
+      .catch(() => {
+        // Clipboard permission is not guaranteed; showing the line is the fallback that works.
+        ui.status.textContent = `could not use the clipboard. Copy this: ${line}`;
+      });
+  }
+
+  function exportPng(): void {
+    if (recording === undefined) {
+      fail('run something first, then export it.');
+      return;
+    }
+    // RS-08: the seed and the clock are already burned into the header the canvas drew, so the
+    // exported bitmap carries its own provenance.
+    const url = ui.canvas.toDataURL('image/png');
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${recording.buildingId}-${recording.seed}-${Math.round(playback?.simTimeS ?? 0)}s.png`;
+    anchor.click();
+    ui.status.textContent = `exported ${anchor.download}`;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Transport
+   * ------------------------------------------------------------------ */
+
+  function togglePlay(): void {
     playback?.toggle();
     ui.playPause.textContent = playback?.state === 'playing' ? 'Pause' : 'Play';
+  }
+
+  /** One display frame at the current speed — `PB-08`, `KB-06`. Pauses first, as the row says. */
+  function stepFrame(direction: 1 | -1): void {
+    if (playback === undefined) return;
+    playback.pause();
+    ui.playPause.textContent = 'Play';
+    playback.seekBy(direction * FRAME_S * playback.speed);
+  }
+
+  function stepSpeed(direction: 1 | -1): void {
+    const index = SPEEDS.indexOf(Number(ui.speed.value) as (typeof SPEEDS)[number]);
+    const next = SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, index + direction))];
+    if (next === undefined) return;
+    ui.speed.value = String(next);
+    playback?.setSpeed(next);
+    syncUrl();
+  }
+
+  ui.run.addEventListener('click', runOnce);
+  ui.verify.addEventListener('click', verifyReplayControl);
+  ui.copyProvenance.addEventListener('click', copyProvenance);
+  ui.saveRecording.addEventListener('click', saveRecording);
+  ui.exportPng.addEventListener('click', exportPng);
+  ui.playPause.addEventListener('click', togglePlay);
+  ui.stepForward.addEventListener('click', () => {
+    stepFrame(1);
+  });
+  ui.stepBack.addEventListener('click', () => {
+    stepFrame(-1);
   });
   ui.speed.addEventListener('change', () => {
     playback?.setSpeed(Number(ui.speed.value));
+    syncUrl();
+  });
+  ui.loop.addEventListener('change', () => {
+    // `Playback` takes `loop` at construction, so the setting is applied by re-anchoring a new
+    // transport at the current instant rather than by adding a mutable flag to the transport.
+    if (recording === undefined || playback === undefined) return;
+    const at = playback.simTimeS;
+    const wasPlaying = playback.state === 'playing';
+    playback = new Playback(recording, systemClock(), {
+      speed: playback.speed,
+      startAtS: at,
+      autoplay: wasPlaying,
+      loop: ui.loop.checked,
+    });
   });
   ui.scrub.addEventListener('input', () => {
     playback?.seekToProgress(Number(ui.scrub.value) / 1000);
   });
+  ui.building.addEventListener('change', () => {
+    adhocBuilding = undefined;
+    syncUrl();
+  });
+  ui.dispatcher.addEventListener('change', syncUrl);
+  ui.landingSelect.addEventListener('change', () => {
+    selection = undefined;
+    const floorId = ui.landingSelect.value;
+    if (floorId === '') return;
+    const assignment = assignments.find((candidate) => candidate.floorId === floorId);
+    if (assignment === undefined) return;
+    selection = {
+      floorId: assignment.floorId,
+      answeredByCarId: assignment.answeredByCarId,
+      answeredInS: assignment.answeredInS,
+      waiting: assignment.waiting,
+      oldestWaitS: assignment.oldestWaitS,
+    };
+  });
 
-  // Keyboard: space toggles, arrows nudge. The full inventory is in UX.md; this is the subset
-  // the foundation needs to prove the transport is drivable without a mouse.
+  // KB-03/04/05/06/07 — and KB-08: never while a field has focus.
   window.addEventListener('keydown', (event) => {
+    const target = event.target;
+    if (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLSelectElement ||
+      target instanceof HTMLTextAreaElement
+    ) {
+      return;
+    }
+    if (ui.panelEditor.hidden === false) return;
     if (playback === undefined) return;
-    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
-    if (event.key === ' ') {
-      event.preventDefault();
-      playback.toggle();
-      ui.playPause.textContent = playback.state === 'playing' ? 'Pause' : 'Play';
-    } else if (event.key === 'ArrowRight') {
-      playback.seekBy(event.shiftKey ? 60 : 5);
-    } else if (event.key === 'ArrowLeft') {
-      playback.seekBy(event.shiftKey ? -60 : -5);
-    } else if (event.key === 'Home') {
-      playback.reset();
-      ui.playPause.textContent = 'Play';
+    switch (event.key) {
+      case ' ':
+        event.preventDefault();
+        togglePlay();
+        break;
+      case 'ArrowRight':
+        playback.seekBy(event.shiftKey ? 60 : 5);
+        break;
+      case 'ArrowLeft':
+        playback.seekBy(event.shiftKey ? -60 : -5);
+        break;
+      case 'Home':
+        playback.reset();
+        ui.playPause.textContent = 'Play';
+        break;
+      case 'End':
+        playback.seekTo(playback.recording.endedAt);
+        break;
+      case ',':
+        stepFrame(-1);
+        break;
+      case '.':
+        stepFrame(1);
+        break;
+      case '[':
+        stepSpeed(-1);
+        break;
+      case ']':
+        stepSpeed(1);
+        break;
+      default:
+        break;
     }
   });
 
+  /* ------------------------------------------------------------------ *
+   * Tabs — KB-01 (roving tabindex, arrow keys)
+   * ------------------------------------------------------------------ */
+
+  function selectTab(which: 'viewer' | 'editor'): void {
+    const viewer = which === 'viewer';
+    ui.tabViewer.setAttribute('aria-selected', String(viewer));
+    ui.tabEditor.setAttribute('aria-selected', String(!viewer));
+    ui.tabViewer.tabIndex = viewer ? 0 : -1;
+    ui.tabEditor.tabIndex = viewer ? -1 : 0;
+    ui.panelViewer.hidden = !viewer;
+    ui.panelEditor.hidden = viewer;
+    if (!viewer) editor.refresh();
+  }
+
+  ui.tabViewer.addEventListener('click', () => {
+    selectTab('viewer');
+  });
+  ui.tabEditor.addEventListener('click', () => {
+    selectTab('editor');
+  });
+  for (const [tab, other, which] of [
+    [ui.tabViewer, ui.tabEditor, 'editor'],
+    [ui.tabEditor, ui.tabViewer, 'viewer'],
+  ] as const) {
+    tab.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+      event.preventDefault();
+      selectTab(which);
+      other.focus();
+    });
+  }
+
+  /* ------------------------------------------------------------------ *
+   * The editor — ED-04 hands a building back to the viewer
+   * ------------------------------------------------------------------ */
+
+  const editor = mountEditor({
+    resources,
+    onRun: (building) => {
+      adhocBuilding = building;
+      selectTab('viewer');
+      ui.tabViewer.focus();
+      runOnce();
+    },
+    /**
+     * A modal question. Resolves `true` to proceed — `KB-12`.
+     *
+     * `<dialog>.showModal()` gives the focus trap and the focus restore for nothing, which is why
+     * it is used rather than a hand-built overlay. What it does **not** give reliably is the
+     * `close` event: in the automation context this was driven through, a form submit closed the
+     * dialog and set `returnValue` without firing `close` at all, so a promise waiting only on
+     * that event never settled and every confirm flow hung silently — the worst possible failure
+     * for a dialog, because the page looks fine and one code path simply stops.
+     *
+     * So the outcome is taken from whichever of four signals arrives first, and a latch makes the
+     * promise settle exactly once. That is not defensive padding; it is the difference between a
+     * dialog that works in one browser and one that works.
+     */
+    confirm: (text, okLabel) =>
+      new Promise<boolean>((resolve) => {
+        ui.confirmMessage.textContent = text;
+        // The affirmative button says what it does. It said "Discard" for every question, which
+        // on "Open it anyway?" was simply the wrong verb.
+        ui.confirmOk.textContent = okLabel;
+
+        let settled = false;
+        const finish = (value: boolean): void => {
+          if (settled) return;
+          settled = true;
+          ui.confirm.removeEventListener('close', onClose);
+          ui.confirm.removeEventListener('cancel', onCancel);
+          ui.confirmOk.removeEventListener('click', onOk);
+          ui.confirmCancel.removeEventListener('click', onCancel);
+          if (ui.confirm.open) ui.confirm.close();
+          resolve(value);
+        };
+        const onClose = (): void => {
+          finish(ui.confirm.returnValue === 'ok');
+        };
+        const onCancel = (): void => {
+          finish(false);
+        };
+        const onOk = (): void => {
+          finish(true);
+        };
+
+        ui.confirm.addEventListener('close', onClose);
+        ui.confirm.addEventListener('cancel', onCancel); // Escape
+        ui.confirmOk.addEventListener('click', onOk);
+        ui.confirmCancel.addEventListener('click', onCancel);
+        ui.confirm.showModal();
+      }),
+  });
+
+  // ED-23: warned before navigation, and only when there is something to lose.
+  window.addEventListener('beforeunload', (event) => {
+    if (!editor.isDirty()) return;
+    event.preventDefault();
+  });
+
+  /* ------------------------------------------------------------------ *
+   * The draw loop
+   * ------------------------------------------------------------------ */
+
   const ctx = ui.canvas.getContext('2d');
   if (ctx === null) {
-    ui.status.textContent = 'this browser has no 2D canvas context.';
+    // RV-19: explained in text, not thrown into the console.
+    ui.status.textContent =
+      'this browser has no 2D canvas context, so the building cannot be drawn. The run still works and the frame description below is produced.';
     return;
   }
   // `CanvasRenderingContext2D.fillStyle` is `string | CanvasGradient | CanvasPattern`, which is
@@ -227,6 +749,8 @@ async function main(): Promise<void> {
   // the renderer only ever *writes* strings, never reads a style back — and it is what keeps
   // `render/canvas.ts` free of DOM types and therefore testable under Node.
   const surface = ctx as unknown as Canvas2DLike;
+
+  let landingRefreshAt = -Infinity;
 
   const tick = (): void => {
     const ratio = window.devicePixelRatio || 1;
@@ -243,15 +767,63 @@ async function main(): Promise<void> {
     }
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
 
-    if (playback !== undefined && recording !== undefined) {
+    if (playback !== undefined && recording !== undefined && !ui.panelViewer.hidden) {
       const frame = playback.frame();
+      const bank = ui.bankFilter.value;
+      // RV-06: a bank filter, applied to the *layout* rather than to the frame, so the cars that
+      // are hidden are hidden from the picture and not from the metrics.
+      const shafts =
+        bank === '' ? recording.shafts : recording.shafts.filter((shaft) => shaft.bankId === bank);
+      const wantsOverlay = cssWidth >= OVERLAY_MIN_VIEWPORT_PX;
       const layout = buildLayout({
         width: cssWidth,
         height: cssHeight,
         floors: recording.floors,
-        shafts: recording.shafts,
+        shafts,
+        overlayWidthPx: wantsOverlay ? OVERLAY_WIDTH_PX : 0,
       });
-      drawScene(surface, { recording, frame, layout });
+      const metrics = overlayAt(recording, frame.simTimeS);
+      drawScene(surface, {
+        recording,
+        frame,
+        layout,
+        overlay: wantsOverlay ? metrics : undefined,
+        selection,
+        unservedFloorIds: unservedFloors(recording),
+      });
+
+      // KB-13: the canvas is not a hole in the page. Updated at most twice a second, because a
+      // live region that changes 60 times a second is unusable rather than accessible.
+      const description = describeFrame({ recording, frame, metrics });
+      if (description !== lastDescription) {
+        lastDescription = description;
+        ui.canvas.setAttribute('aria-label', description);
+      }
+
+      if (frame.simTimeS - landingRefreshAt > 1 || frame.simTimeS < landingRefreshAt) {
+        landingRefreshAt = frame.simTimeS;
+        // Only while the reader is not holding the control open, for KB-10's reason.
+        if (document.activeElement === ui.landingSelect) {
+          assignments = landingAssignmentsAt(recording, frame.simTimeS);
+        } else {
+          populateLandings(recording, frame.simTimeS);
+        }
+        if (selection !== undefined) {
+          const fresh = assignments.find((candidate) => candidate.floorId === selection?.floorId);
+          selection =
+            fresh === undefined
+              ? { floorId: selection.floorId, waiting: 0 }
+              : {
+                  floorId: fresh.floorId,
+                  answeredByCarId: fresh.answeredByCarId,
+                  answeredInS: fresh.answeredInS,
+                  waiting: fresh.waiting,
+                  oldestWaitS: fresh.oldestWaitS,
+                };
+        }
+      }
+
+      // KB-10: the scrub position is written only while the reader is not holding it.
       if (document.activeElement !== ui.scrub) {
         ui.scrub.value = String(Math.round(playback.progress * 1000));
       }
@@ -261,7 +833,41 @@ async function main(): Promise<void> {
   };
   requestAnimationFrame(tick);
 
+  // The live region is updated on a slow cadence of its own, so a screen reader is not read a
+  // new sentence every animation frame.
+  window.setInterval(() => {
+    if (ui.panelViewer.hidden) return;
+    ui.description.textContent = lastDescription;
+  }, 2000);
+
+  // The transport is disabled until there is something to play — UX.md § B.3's empty state.
+  for (const control of [ui.playPause, ui.stepBack, ui.stepForward, ui.scrub, ui.exportPng]) {
+    control.disabled = true;
+  }
+  const enable = (): void => {
+    for (const control of [ui.playPause, ui.stepBack, ui.stepForward, ui.scrub, ui.exportPng]) {
+      control.disabled = recording === undefined;
+    }
+  };
+  ui.run.addEventListener('click', enable);
+  ui.loadRecording.addEventListener('change', () => {
+    window.setTimeout(enable, 0);
+  });
+
+  ui.status.textContent = 'ready — press Run, or open the building editor';
   runOnce();
+  enable();
+}
+
+/** Floor ids no shaft in this recording serves — `RV-08`'s unassignable landings. */
+function unservedFloors(recording: VizRecording): readonly string[] {
+  const served = new Set(recording.shafts.flatMap((shaft) => shaft.servedFloorIds));
+  return recording.floors.map((floor) => floor.id).filter((id) => !served.has(id));
+}
+
+function applyParam(select: HTMLSelectElement, value: string | null): void {
+  if (value === null) return;
+  if ([...select.options].some((option) => option.value === value)) select.value = value;
 }
 
 function statusLine(recording: VizRecording): string {
@@ -276,6 +882,10 @@ function statusLine(recording: VizRecording): string {
     parts.push(`${recording.status.toUpperCase()} — ${String(summary.undelivered)} undelivered`);
   }
   parts.push(`${String(summary.generated)} generated, ${String(summary.delivered)} delivered`);
+  if (summary.generated === 0) {
+    // RV-11: an explanation, not an empty chart.
+    parts.push('no passengers were generated in this window — nothing to watch');
+  }
   parts.push(
     suppressed
       ? `AWT suppressed${summary.awtInvalidReason === undefined ? '' : ` — ${summary.awtInvalidReason}`}`

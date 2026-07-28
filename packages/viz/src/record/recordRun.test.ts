@@ -211,6 +211,65 @@ describe.each(BUILDING_IDS)('%s — a recording describes where the cars actuall
   }, 300_000);
 });
 
+describe.each(BUILDING_IDS)('%s — the per-leg array (schema 3)', (buildingId) => {
+  it('carries exactly the run’s own legs, sorted, with the fields its consumers read', () => {
+    const { recording, result } = recordRun(breadthConfig(config, buildingId));
+    const passengers = result.record.passengers;
+    expect(recording.legs).toHaveLength(passengers.length);
+    expect(recording.legs.length).toBeGreaterThan(0);
+
+    const byId = new Map(passengers.map((passenger) => [passenger.passengerId, passenger]));
+    for (const leg of recording.legs) {
+      const source = byId.get(leg.passengerId);
+      expect(source).toBeDefined();
+      expect(leg.originFloorId).toBe(source?.originFloorId);
+      expect(leg.direction).toBe(source?.direction);
+      expect(leg.arrivedAt).toBe(source?.arrivedAt);
+      expect(leg.boardedAt).toBe(source?.boardedAt);
+      expect(leg.carId).toBe(source?.carId);
+      expect(leg.bankId).toBe(source?.bankId);
+    }
+
+    // Sorted by `(arrivedAt, passengerId)`. `overlayAt` breaks out of its scan on the first leg
+    // that has not arrived, so an unsorted array would silently under-count rather than fail.
+    // Compared pairwise rather than by sorting stringified keys: `arrivedAt` is a float, and
+    // string order puts "1016.6" before "9.5".
+    const outOfOrder: string[] = [];
+    for (let i = 1; i < recording.legs.length; i += 1) {
+      const previous = recording.legs[i - 1];
+      const current = recording.legs[i];
+      if (previous === undefined || current === undefined) continue;
+      const ordered =
+        previous.arrivedAt < current.arrivedAt ||
+        (previous.arrivedAt === current.arrivedAt &&
+          previous.passengerId.localeCompare(current.passengerId) <= 0);
+      if (!ordered) {
+        outOfOrder.push(
+          `${previous.passengerId}@${String(previous.arrivedAt)} before ${current.passengerId}@${String(current.arrivedAt)}`,
+        );
+      }
+    }
+    expect(outOfOrder).toEqual([]);
+  }, 300_000);
+
+  it('agrees with the fold it did not replace', () => {
+    // Two independent projections of the same passengers: the step-series fold and the leg
+    // array. They are built by different code, so agreement is evidence.
+    const { recording } = recordRun(breadthConfig(config, buildingId));
+    const boarded = recording.legs.filter((leg) => leg.boardedAt !== undefined).length;
+    expect(stepValueAt(recording.progress.boardedLegs, recording.endedAt)).toBe(boarded);
+    expect(stepValueAt(recording.progress.waiting, recording.endedAt)).toBe(
+      recording.legs.length - boarded,
+    );
+  }, 300_000);
+
+  it('survives a JSON round trip — no explicit `undefined` on an unserved leg', () => {
+    const { recording } = recordRun(breadthConfig(config, buildingId));
+    const roundTripped = JSON.parse(JSON.stringify(recording)) as typeof recording;
+    expect(JSON.stringify(roundTripped.legs)).toBe(JSON.stringify(recording.legs));
+  }, 300_000);
+});
+
 describe('shortCarLabel', () => {
   it('drops the redundant bank prefix and leaves anything else alone', () => {
     expect(shortCarLabel('main-A', 'main')).toBe('A');
