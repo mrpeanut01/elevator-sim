@@ -4601,3 +4601,487 @@ Counted identically on both trees —
 against the 771 leaves **zero** lines on the old side. That is the guard `T9-FINDINGS.md` exists to
 have built, working exactly as designed on a commit that added 370 pins — and it is also the ninth
 instance of the same drift, in the document that reports drift.
+
+---
+
+## D111 — the viewer and the CLI stopped printing a mean the same run says does not exist
+
+**Date:** 2026-07-28 · **Owner:** T32, recording T29 · **Source:** `packages/viz/DECISIONS-T29.md`
+(which may be deleted once this entry lands) · **Corrects nothing above; adds what was missing**
+
+### The defect, and why it was worse than a display bug
+
+`render/canvas.ts`'s `drawHeader` drew `mean wait so far 87.7 s` **on the header line immediately
+below the `SATURATED — AWT suppressed` banner the same function drew.** Not two surfaces
+disagreeing: one `<canvas role="img">`, whose `aria-label` — written by `describeFrame` from the
+same summary — read *"Mean waiting time is suppressed"*. **The sighted reader saw a number the
+non-sighted reader was told did not exist**, and `Export PNG` baked it into a shareable file,
+because the canvas *is* the export source.
+
+It leaked on **both** suppression grounds, not only saturation: Secure Tower seed
+16757712606996968457 showed `TIMED-OUT — 19 undelivered · AWT suppressed` beside
+`mean wait so far 16.6 s`. Reproduced on screen and in the exported PNG before the fix, and shown
+gone after, on both grounds.
+
+### The decision: the gate has one home, and it is in `frame/`, not in `render/`
+
+`saturated || !awtIsValid` was written out **three** times — in `overlayAt`, in `dev/main.ts`'s
+status line, and in `drawHeader`. Two were right. It now lives once, as
+`meansAreSuppressed(recording)` in `frame/overlay.ts`, and all three call it.
+
+`frame/` and not `render/` because *may this run's estimates be shown* is a fact about the
+**recording**, not about drawing, and `frame/` is where the package already keeps pure
+`(recording, …) → fact` producers. Putting it in `render/` would have made the metrics module depend
+on the renderer — the wrong direction; putting it in `contract/types.ts` would have put behaviour in
+a file that is types. The barrel's caller table names all three non-test callers, so this is not
+another export whose only caller is its own test.
+
+**What it is deliberately not sensitive to:** a `timed-out` status, and undelivered passengers.
+Those are the banner's business. A run can end with people still in the system and still have a mean
+the statistics module stands behind — `awtIsValid` is the summary's own verdict and already accounts
+for censoring, on the four grounds `CLAUDE.md` § Statistical discipline lists. Suppressing on
+*status* instead would have replaced a false positive with a false negative and looked just as fixed.
+
+### `mean wait suppressed`, not `mean wait so far —`
+
+The obvious alternative reused the existing placeholder. Rejected: `—` already means *nobody has
+been served yet*, which is a **different fact** and one the reader can act on (wait, or scrub
+forward). Collapsing "no data yet" into "this figure is not admissible" would have been a smaller
+lie in place of a larger one. The string also no longer contains `mean wait so far` **at all** on a
+suppressed run, which is what lets `canvas.test.ts` assert `not.toContain('mean wait so far')`
+rather than something weaker. That assertion was watched failing against the unfixed gate.
+
+### The same defect in `elevator-sim watch`, which no prior report had caught
+
+The brief said the reviewer had confirmed no other render site leaks, and asked for that to be
+**checked rather than trusted**. Checked, and it did not come out clean.
+`packages/cli/src/commands/watch.ts` printed the running mean unconditionally on **both** of its
+render paths — `mean wait so far 41.5 s` in the TTY frame, and a `mean wait` column of figures in
+the piped/too-small fallback — for the whole of a run, with no suppression anywhere on the screen.
+`printRunReport` then said `AWT  SUPPRESSED` about the same run, on the same terminal, seconds
+later. `run` and `compare` were clean: both go through `renderAwt`, which has refused since it was
+written.
+
+The fix is the CLI's own idiom rather than the viewer's: `format.ts` gains `renderRunningMean`,
+returning the module's existing `RenderedMetric` shape, so the refusal reads `SUPPRESSED` — the word
+`renderAwt` already uses — and carries no digits. The reason is printed **in the frame** rather than
+waiting for the report at the end of playback, because a column of `SUPPRESSED` with no reason
+beside it explains nothing.
+
+**Honest limit, stated rather than glossed.** The fallback path was driven end to end (`--plain`).
+The TTY frame path was **not** driven in a real terminal. Both call the same `renderRunningMean`,
+which is unit-tested and mutation-checked three ways, but *"driven on a TTY"* is not claimed.
+
+### The editor's floor lists are ordered by `index`, not by reversing the array
+
+The reported defect: the form listed `G, 2, 3, 4, 5, 6` downward while the preview beside it drew
+`6` at the top — two views of one building, on one screen, reading in opposite directions.
+
+Three orderings were candidates and **only one is right on every shipped building**:
+
+| candidate | verdict |
+|---|---|
+| leave it | the defect |
+| reverse the declaration array | **wrong on `midtown-office.json`**, which declares index `0` before index `-1`. Reversed, its basement draws *above* the lobby in the form and below it in the picture — the same defect on one building instead of five, which is **worse**, because it looks fixed |
+| sort by `index`, descending | correct. `index` is what a building means by *which floor is above which*: `expandFloors` sorts its output by it, `resolveBuilding` re-sorts by it, and `buildLayout` places rows by the height `index` is required to agree with |
+
+`floorsInBuildingOrder` lives in `editor/editorPreview.ts` rather than `dev/editor.ts`, because
+`dev/editor.ts`'s own docstring says everything with a decision in it lives in `editor*.ts` and is
+tested under Node — **and a sort is a decision**. Its test compares the list order against the pixel
+`y` that `buildLayout` assigns each floor, on **every** shipped building, so the list and the picture
+cannot be wrong in the same direction.
+
+### The ⇧/⇩ buttons: a wart made honest, and the scope call handed back
+
+`moveFloor` moves a floor within the **declaration array** and deliberately renumbers neither `index`
+nor `heightM`. Its docstring gives a good reason: the loader fails a building whose two disagree
+(`floor-height-order`), and an editor that silently rewrote either would settle a modelling error by
+fiat. **Which means those two buttons never moved a floor in the building** — they reformat the
+JSON. Under the old array-ordered table that was invisible, because the two orders coincided on four
+of five buildings; under an `index`-ordered table it is visible.
+
+Three options were weighed. **(1) Repurpose them to swap `index`/`heightM`** — rejected, it is
+exactly the fiat the docstring forbids. **(2) Delete them** — that leaves `moveFloor` with no
+non-test caller, which is this repository's signature defect, so the honest version of "delete them"
+is "delete `moveFloor` too", a larger change than the report asked for that also removes a real if
+minor authoring feature. **(3) Keep them and say what they do** — taken. The glyphs are `⇧`/`⇩` and
+the titles read *move floor 30 earlier in the JSON declaration list (does not change its index or
+height)*.
+
+**Handback, recorded rather than resolved:** the floors table and the declaration list are two
+different orders sharing one widget. A later change should either give the declaration its own view,
+or drop `moveFloor` and let `index` be the only control over ordering. That is a scope decision for
+the owner, and it is carried in [`docs/07`](docs/07-handoff.md) § 8 rather than settled here.
+
+### Two deliberate non-changes in the same audit
+
+**Access-zone floor lists** (`zone.floors.join(' ')`) — a single-line text field bound to the
+document's own array, read left-to-right. Not a vertical column, so there is no direction to
+disagree with, and reordering it on display would mean committing a rewritten document the next time
+the field changed. **The access-zone rows themselves** — a list of *credentials* keyed by zone id,
+not by height; a zone's floors are an arbitrary set, so "the zone's lowest floor" is a weak sort key
+that would make rows jump while the reader types into them. The Document (JSON) textarea keeps
+declaration order necessarily: it **is** the file.
+
+### What this cost the UX ledger, and what it did not
+
+`packages/viz/UX.md` § A.3's **Success** and **Saturated** rows each carried a *"must not show"*
+clause about the running mean. **Both clauses were false**, and both now hold; they are re-marked
+with the evidence rather than ticked. The ledger moved from 87 rows to **88** (`ED-01a` is new) and
+79 are ✅. **The four ⚠️ rows are unchanged and still not passing** — `RV-11`, `RV-17`, `RV-21`,
+`KB-14`, built and reachable, neither driven nor tested; the pass drove three buildings at one
+viewport and did not re-exercise them. Stating that is the point: *a count that ticks them is a
+count that lies.*
+
+---
+
+## D112 — `destination-eta` weights `rideTime` at **0.5**, and the decomposition arms are bound to the configuration rather than to the shipped id
+
+**Date:** 2026-07-28 · **Owner:** T32, recording T30 · **Source:**
+`packages/experiments/DECISIONS-T30.md` §§ T30-D1 – T30-D2 (which may be deleted once this entry
+lands) · **Makes stale:** every sentence saying `destination-eta` is bit-identical to `eta`, weights
+`waitTime` only, or that the promotion is blocked
+
+### The defect: the standing requirement's shape, one level up from code into `data/`
+
+`data/dispatcher-profiles.json`'s `destination-eta` authored `dispatch.callType: mobile-credential`
+and a weight vector of `{ waitTime: 1.0 }` — **identical to `eta`'s**. The destination reached
+`estimateCost` and changed no decision. Measured through the full experiment matrix at seed
+20 260 728, the shipped Level-0 destination profile was **bit-identical to `eta` at 8 of 8 cells**:
+a configured, schema-valid, separately-tested, *shipped* behaviour with no effect on any shipped
+path. Invariant 7 makes dispatch strategy **data**; it does not put data outside the standing
+requirement, and this is the first instance of the defect that lives in a `.json` file.
+
+**The blocker its own `$comment` recorded was stale.** It said the promotion was blocked by
+`policies.test.ts`'s `contributionScenarios()` building calls with no `destinationFloorId`. T16
+closed that gap and `policies.test.ts` carries an explicit regression pin for the promotion.
+Verified by measurement rather than by reading: with the weight authored, `policies.test.ts` is green
+on all 31 tests, including *"has no weight that contributes nothing"* and *"lets no profile weight a
+term its own stage settings make inert"*.
+
+### Why 0.5 — two criteria, both stated **before** the sweep that produced the number
+
+**1. A shipped default may not make a published metric significantly worse.** This rules out the top
+of the bracket. Midtown Office interfloor-mix, n = 150, CRN, WT95 against `eta`:
+
+| `rideTime` | WT95 | verdict |
+|---|---|---|
+| 0.3 | `+0.369 [−0.311, +1.049]` | INDISTINGUISHABLE |
+| **0.5** | `+0.374 [−0.303, +1.051]` | INDISTINGUISHABLE |
+| 0.7 | `+0.620 [−0.033, +1.274]` | INDISTINGUISHABLE, marginally |
+| 1.0 | `+1.010 [+0.292, +1.729]` | **WORSE** |
+| 2.0 | `+1.331 [+0.623, +2.039]` | **WORSE** |
+
+**2. A shipped default may not be observationally inert at a shipped operating point** — the whole
+reason the weight exists. This rules out the bottom. On Midtown up-peak at the matrix's own seed and
+budget, replications differing from `eta`: **0 of 81** at 0.3, **5** at 0.5, **6** at 0.7, **16** at
+1.0. At the bracket's floor the shipped profile would still have been the baseline under another
+name at a shipped operating point — the defect being fixed, one notch smaller.
+
+**0.5 is the smallest bracket point that clears both.** What it costs against 0.3 is `+0.113 s` of
+AWT for `−0.224 s` of TTD and `−0.337 s` in the car; against the unpriced profile,
+`+0.295 [+0.154, +0.437] s` of AWT for `−1.217 [−1.531, −0.902] s` of TTD and
+`−1.512 [−1.813, −1.211] s` in the car. § D27's reporting clause requires saying so.
+
+**What is deliberately not claimed.** 1.0 and 2.0 remain **study arms**; the aggressive end of an
+unscalarized trade is the operator's to opt into by deriving an arm (`CLAUDE.md` § Tuning
+discipline). Phase 6a's `−1.562 [−1.916, −1.208] s` headline at `rideTime 1` is untouched.
+`destination-panel` stays at 1.0: Level 1 has already committed the passenger to a named car at the
+landing, so the wait-versus-ride trade it makes is not the trade a Level-0 disclosure profile makes,
+and the two are not required to agree.
+
+### Liveness, counted through the shipped engine rather than argued
+
+Seed 20 260 726, through `runSimulation`, on the profile `data/` carries:
+
+| configuration | building | `rideTime` non-zero | cross-car spread |
+|---|---|---|---|
+| shipped, `mobile-credential` | `midtown-office` | **260 / 260** | **12 / 65 decisions** |
+| shipped, `up-down-buttons` (gate off) | `midtown-office` | 0 / 248 | 0 / 62 decisions |
+| shipped, `mobile-credential` | `secure-tower` | 159 / 159 | 2 / 53 decisions |
+
+Before the change the shipped profile weighted no gated term, so the count was **0 evaluations**.
+The gated-off side is flat, which is `docs/09` § 8 R6-2's proof obligation discharged in the same
+measurement, and the non-zero count with spread is what R6-1's mitigation column asked for and never
+had. Trajectories separate at **7 of 8** matrix cells.
+
+**`garden-down-peak` stays identical, and it is structural rather than under-weighted.** 0 of 51
+replications differ at 0.3, at 1.0 **and** at 2.0. Every down trip ends at the lobby, so the
+destination carries nothing the direction button did not. **Raising the weight fourfold not moving
+it is how a blind operating point is told from a dead seam** — and it is the reason this is recorded
+as an open question rather than as remaining debt. `destination-panel` at `rideTime 1` lands in the
+same identity class there, independently.
+
+### The near miss, which is the most instructive part of this entry
+
+Three studies used the shipped `destination-eta` as their *"call type disclosed, nothing pricing it"*
+control — correct **only while the shipped profile happened to be that configuration**. Each is now
+bound to a derived arm, `destination-eta-unpriced` (`weights.rideTime: 0`, everything else
+inherited), so the measurement is unchanged and only the id moved:
+
+| study | arm | what would have happened otherwise |
+|---|---|---|
+| `destinationDisclosure.ts` | `DISCLOSURE_UNPRICED_ARM` | the Phase 6a decomposition would have been deleted |
+| `accessControl.ts` | `CREDENTIAL_ARM` | **H-ACCESS-2 silently redefined** — below |
+| `mixedUseHighRise.ts` | `DECOMPOSITION_ARM` | the *"call type alone is worth zero"* claim falsified |
+
+`accessControl.ts` is the one worth stating in full, because it is the case where a **pin
+regeneration would have hidden a change of *meaning* rather than a change of value.** H-ACCESS-2 is
+defined as `Δ = TTD(credential + destination priced) − TTD(credential alone)`. With the control bound
+to the shipped id, `Δ` becomes the marginal effect from 0.5 to 1.0 rather than the effect of pricing
+the destination at all. Measured: the published difference-of-differences
+`+0.982 [+0.584, +1.380]` falls to a mean of **+0.208**, interval still excluding zero on the
+positive side — **same sign, same REFUTED verdict, a fifth of the magnitude**, and the only thing
+marking the change would have been a regenerated pin. Bound to the configuration, the six
+access-control pins do not move at all.
+
+**The decomposition was preserved by inverting which arm is derived**: the *unpriced control* is now
+the derived one and the *priced treatment* is the shipped profile, where it used to be the other way
+round. The evidence that `rideTime: 0` ≡ the term being absent is itself a measurement rather than
+an argument about the scoring engine: `destination-eta-unpriced` is in `eta`'s identity class at
+n = 150, **150 of 150** paired differences of exactly zero on all seven identity metrics — which is
+what the shipped profile used to do.
+
+**The rule this generalizes to, and it is new:** *an arm resolved by a shipped profile id is an arm
+that can be redefined by editing `data/`.* A study whose control is a **configuration** should name
+that configuration.
+
+### Blast radius, measured
+
+**Pins: 40 changed, 12 added, 0 removed**, all `destination-eta` rows;
+`published.ts` goes from 771 to **783** entries. **Behaviour: 4 of 60 shipped cells move** (5
+buildings × 12 profiles), all `destination-eta`, and **`garden-apartments` does not move at all**.
+`docs/10`'s M1 and M2 therefore reproduce exactly, and were re-run rather than assumed. At the
+primary point the shipped profile is bit-identical to the derived study arm at its own weight —
+`destination-eta ≡ destination-eta+ride0.5`, 150 of 150 — so it is not merely *somewhere* on the
+published curve, it is exactly the measured point.
+
+**`docs/09` § 8's risk R6-1 — *"a destination profile lands in `data/` and changes nothing"* —
+HAPPENED.** It is recorded there as an instance, not as a risk, together with the reason its
+mitigation could not fire: `searchSpaceLiveness.test.ts` needs only one shipped building to differ,
+and A1's evaluation-count criterion was never wired to a test.
+
+---
+
+## D113 — the energy proxy: § D106 completed, and one sentence in it corrected
+
+**Date:** 2026-07-28 · **Owner:** T32 · **Corrects, without rewriting:** [§ D106](#d106--the-energy-proxy-its-basis-its-one-constant-what-it-omits-and-why-it-is-an-axis-and-never-a-score)
+
+`packages/experiments/DECISIONS-T30.md` § T30-D6 was written against a tree where this file had
+**zero** occurrences of the word "energy", and asked the documentation task to record the proxy from
+scratch. By the time it merged, **§ D106 already existed** and records it. This entry is therefore
+not the record T30-D6 asked for; it is the **delta** between that request and § D106, verified
+against `packages/core/src/metrics/types.ts` line by line rather than against either prose.
+
+### One sentence in § D106 is wrong, and it is the sentence T30 fixed in the code
+
+§ D106 says: *"`workPerServedLegKJ` normalizes by work done."* **It does not.** Work done is what it
+*divides*; what it divides **by** is legs delivered. `EnergyStatistics.workPerServedLegKJ`'s own
+docstring, corrected in the same commit that authored the `rideTime` weight, now reads: it *"divides
+the work by the **legs delivered** rather than leaving it as a fleet total, and it exists because the
+total is trivially gameable in the wrong direction: a configuration that spends less because it
+served fewer people has not saved anything."* The reasoning in § D106 is right and its rendering of
+the ratio is inverted. **Believe the code.**
+
+### Three things § D106 does not state, and the code does
+
+1. **`g = 9.80665`** — `STANDARD_GRAVITY_MPS2`, CODATA / ISO 80000-3's conventional value, named
+   rather than inlined so the arithmetic can be read against the formula. § D106 writes `g` in the
+   formula and never gives it a number.
+2. **The sample is per completed move and is attributed at *arrival*.** `TravelSample.at` is the
+   moment the car **levelled**, not the moment it started, so a move that straddles a window boundary
+   is charged whole to the window it *ended* in — exactly as a leg is assigned whole to the window
+   its arrival falls in. This is the whole reason the proxy is a per-move sample rather than an
+   odometer read at the end: the shipped operating points report a 300 s peak out of a 900 s run, and
+   a cumulative reading would put a whole-run energy figure beside a peak-window AWT in the same
+   Pareto point.
+3. **`measured: false` is the carrier of the `NaN` decision.** § D106 gives the reason; the field
+   that says which case obtained is `EnergyStatistics.measured`.
+
+### Everything else in T30-D6 checks out against the code, and is already in § D106
+
+The basis `|loadKg − 0.5 · ratedLoadKg| · g · distanceM`; the 0.4–0.5 literature range with Barney &
+Al-Sharif on drive sizing and counterbalancing, CIBSE Guide D § 13, and ISO 25745-2's reference cycle
+measured at empty / half / full load *because the mid point is the balance point*; **0.5 because it
+is the symmetric point**, so the number describes travel out of balance rather than one machine's
+counterweight order; **a code constant and not config**, because a per-run ratio would score two arms
+of one comparison on different scales and put a fitted per-installation constant inside a published
+axis; the enumerated omissions — acceleration losses (no shipped spec carries car and counterweight
+masses), drive and gearing efficiency, door motors, standby/idle power, and the non-regenerative
+absolute value that bounds a regenerative drive **from above**; and `NaN` never `0`, because *"the
+cars did not move"* and *"nobody wrote down how far the cars moved"* are different facts and zeroing
+them restores a two-axis front under a three-axis name.
+
+**Energy is an axis, never a score**, and § D106's reason for it survives this correction untouched.
+
+---
+
+## D114 — the ninth dead seam was a whole half of `benchmark/`, and `core`'s dead-code scanner had two holes (**C7 CLOSED**)
+
+**Date:** 2026-07-28 · **Owner:** T32, recording T30 · **Source:**
+`packages/experiments/DECISIONS-T30.md` §§ T30-D3 – T30-D4
+
+### The ninth: five studies, not one
+
+`measureEnergyLiveness` had no non-test caller — two barrels, a string key in `published.ts` and its
+own test — and the repository's own scanner reported `measureEnergyLiveness -> []`. **It was not a
+one-off.** `published.ts` § `STUDY_ENTRY_POINTS` splits `benchmark/` in two: everything mapped to a
+`PublishedStudyId` publishes a confidence interval, and every one of those has a non-test caller
+because `regeneratePins.ts` runs them all — a pin table has to be regenerable from the code that
+produced it. Everything mapped to `'no-intervals'` publishes **counts**, and that half had **no
+driver at all**. All five members were dead by the same measure: `measureAuctionAggregation`,
+`measureDestinationLiveness`, `measureEnergyLiveness`, `measureMultiRoundReachability`,
+`measurePredictorLag`.
+
+**The fix is symmetric rather than special-cased.** `benchmark/livenessSuite.ts` is the categorical
+half's `regeneratePins.ts`: it runs all five, formats their counts, and carries a command shell
+(`node packages/experiments/dist/benchmark/livenessSuite.js [--fast]`). **It asserts nothing** — each
+of the five already has a suite that asserts its own claim at its own budget, and duplicating those
+thresholds would create a second place for them to drift.
+
+**The guard is widened to be derived rather than hard-coded.** `src/index.test.ts` previously listed
+five Phase-7 entry points by hand, so a study added later was invisible to it. It now iterates
+`Object.keys(STUDY_ENTRY_POINTS)` — a categorical whose totality against the `benchmark/` directory
+`published.test.ts` already asserts in **both** directions — and requires each member to have a
+non-test, non-barrel caller, or a use inside its own module beyond its declaration. It deliberately
+does **not** assert barrel re-export: six live study entry points are on no barrel, and
+`measureEnergyLiveness` was on two and dead.
+
+Watched failing twice, by machine: removing `measureEnergyLiveness` from `livenessSuite.ts`
+reproduces the pre-fix state exactly; a synthetic `export async function measureProbeStudy` added to
+`benchmark/` fails `published.test.ts` first (*"benchmark/ exports a study entry point that
+published.ts does not classify"*), and classifying it then fails `index.test.ts` (*"has no caller
+outside its own tests"*) — two stages, neither of them a human reading.
+
+### C7: the guard on the guard, closed
+
+`packages/core/src/dispatch/deadCode.test.ts` is one of the two permanent guards and had two holes
+that `experiments/src/tuning`'s copy had already fixed. `core` may not import from `experiments`, so
+the fixes are **ported inline** rather than shared — two copies of one audit that need not agree is
+a standing hazard the dependency direction imposes.
+
+| hole | how it was made to bite | unfixed audit | fixed audit |
+|---|---|---|---|
+| `EXPORTED` skips `export async function` | an uncalled `export async function probeUncalledAsyncExport` added to `policies/zoning.ts` | **4 passed** — never scanned | **fails**, naming `policies/probeUncalledAsyncExport` |
+| `code()` keeps string literals | both real importers of `createArrivalModel` deleted | **4 passed** — `PredictorError(\`createArrivalModel: …\`)` read as a self-use | **fails**, naming `predictor/createArrivalModel` |
+
+Measured self-use counts under the two implementations: `createArrivalModel` 3 → 1, `PredictorError`
+2 → 1. **Both were live regardless of who imported them** before the fix — the second hole made an
+existing assertion *unfalsifiable*, which is strictly worse than a missing one, because it reads as
+coverage.
+
+**Closing them surfaced no new dead exports.** The allowlist is unchanged in both directions. What
+changed is that three existing assertions became falsifiable, and three assertions were added pinning
+the two fixes against **synthetic** input, because `dispatch/{policies,predictor}` contains no
+`export async function` today and a latent scanner gap is invisible until the first symbol falls into
+it.
+
+**C7 is closed.** It had been carried forward across three passes as *known and not fixed*, which was
+the honest disposition each time; it is now fixed, and the count of dead-seam instances in
+`docs/07` § 3 is the length of that table rather than a number in prose.
+
+---
+
+## D115 — the final truth pass: what the sweep found beyond its brief, and what is left open
+
+**Date:** 2026-07-28 · **Owner:** T32 · **Closes:** the orchestrated delivery's documentation
+
+Three fix tasks landed and deliberately left the prose stale. This entry records the sweep that made
+it true, the drift it found that nobody had listed, and — the part that matters most to whoever
+reads this next — **what is still open.**
+
+### Measured on this tree before anything was written
+
+`npx tsc -b` clean. `npx vitest run --testTimeout=120000` → **172 files / 3 220 tests, 3 211 passed,
+9 skipped**, exit 0, 578 s. That is 3 172 + 19 (§ D111) + 29 (§ D112, § D114), **accounted test by
+test**. The file count is unchanged at 172 — `livenessSuite.ts` is a driver, not a test.
+
+Two figures were re-derived rather than transcribed, because they are outputs of code the fix tasks
+changed:
+
+- **`runMatrix()` re-run in full.** `nearest-car` is still on the Pareto front at **6 of 8** cells,
+  on the same two exceptions, so `docs/10`'s R11 and § D106's argument are intact. **Two rows moved**:
+  `destination-eta` **joins** the front at `midtown-up-peak` and **leaves** it at
+  `midtown-interfloor` and `vertical-city-up-peak`. Those two departures are the interesting ones —
+  it was on those fronts only by being bit-identical to an arm already on them, so it left by
+  *becoming a distinct dispatcher*, not by getting worse.
+- **The 5 × 12 quotability grid re-run** through `elevator-sim run --seed 42 --duration 900`.
+  `docs/10`'s M1 reproduces exactly: 14 of 60 quotable, 40 saturated, 6 censoring failures.
+
+### Drift found beyond what the fix tasks listed
+
+| drift | believed |
+|---|---|
+| **A new identity class nobody had reported** — `destination-eta ≡ capacity-aware` at `garden-residential`, and `garden-down-peak`'s class also contains `destination-panel`. Both fall out of the same `runMatrix()` re-run; neither appears in any prior report | the code |
+| **The Pareto front table in `docs/05`** would have gone stale in exactly the way `published.ts` exists to prevent: front *membership* is derived from the matrix and is pinned by nothing, so the two moved rows would have sat there indefinitely with no test able to see them | the code |
+| **§ D106 already recorded the energy proxy**, so T30-D6's *"`DECISIONS.md` has zero mentions of energy"* was true when written and false when it merged — and § D106 contains the one wording error T30 had just fixed in the code (§ D113) | the code |
+| The UX ledger is **88** rows and **79 ✅**, not 87/78, in `README.md`, `docs/05` and `docs/07` | `packages/viz/UX.md` |
+| `docs/06`'s `activeWhen` worked example said *"`destination-eta` ships the call type and not the weight, so the two profiles together are the worked example of both sides of that gate"* — now false on both halves | the code |
+| `docs/08`'s correction block still read *"`rideTime` is weighted by no profile → `destination-panel` weights it"*; **both** destination profiles weight it | the code |
+| `docs/09` § 8's header asserted **eight** instances and framed R6-1 as a risk; `docs/09` § 0's verified-by-running table and § 7's Wave A rows both asserted the zero weight | the code |
+| `docs/10`'s § 11 remediation list carried six items with no state; two are done, one is done and re-marked, and three are **still open** and now say so | the code |
+| The dead-seam count in `CLAUDE.md`, `docs/05`, `docs/07` and `docs/09` (eight) | `livenessSuite.ts`, which names the ninth |
+| `T9-FINDINGS.md`'s pin count was corrected to 771 by § D110's addendum; it is now **783** (771 + 12 added) | `grep -cE '^\s+"[^"]+": \{ n: '` |
+
+### What remains open, stated in one place
+
+**Nothing here is a defect being hidden; each is a decision or a measurement someone must make.**
+
+1. **Phase 6c — learned control.** Deferred out of Phase 6 with three reasons (§ D28). Needs its own
+   *acceptance question* before it needs an implementation.
+2. **Phase 9 — the experience layer.** `docs/10` is a complete design and **not one line is built**.
+   No status table carries a Phase 9 row, deliberately: a design is not a phase in progress.
+3. **`packages/experiments` has no browser export**, which **blocks** Phase 9's generated editor.
+   The package declares `"."` and `"./package.json"` only, so a deep import of `tuning/space` is
+   refused by the resolver, and the one entry it declares reaches `node:worker_threads` through
+   `runner/parallel.ts`. `docs/10` § 13 q1, a **prerequisite** and not an optimization.
+4. **Four UX rows are ⚠️ unverified** — `RV-11`, `RV-17`, `RV-21`, `KB-14`. Built, reachable, neither
+   driven nor tested. `KB-14` is one of the seven ⛔ non-negotiable keyboard rows.
+5. **`ED-12` / `ED-13` contradict the schema** (**C30**). A zero-car bank is a schema *error*, not a
+   warning; a per-car `servesFloors` does not exist, service zoning is per **bank**. Re-marked
+   rather than ticked; `ED-12` is a `core` schema question.
+6. **`garden-down-peak` is `destination-eta`'s remaining identity class**, and it is *structural* —
+   bit-identical at `rideTime` 0.3, 1.0 **and** 2.0. Whether a destination can carry information at
+   a down-peak whose every trip ends at the lobby is an open question, not debt.
+7. **The `moveFloor` scope call** (§ D111). Give the declaration list its own view, or drop
+   `moveFloor` and let `index` be the only ordering control.
+8. **`C4`, `C5`, `C24`, `C27`, `C32`**, double-deck simulation, `patternSwitching`, the mixed-use
+   study's six-replication margin, and the viewer's `nearest-car` default.
+9. **No test asserts any phase's *status*.** `documentation.test.ts` asserts the four documents
+   **agree**; it would be perfectly happy with four documents that agreed and were all wrong. The
+   only defence is `CLAUDE.md` § Working agreements and a reader who checks. **This is the largest
+   un-mechanised risk in the repository**, and every phase verdict in it rests on that discipline.
+
+### The orchestration artifacts are final, and the mistakes stay in the record
+
+`MULTI_AGENT_PLAN.md`, `AGENT_STATUS.md`, `RISKS.md` and `TEST_MATRIX.md` are marked final and
+retired in place (§ D105), not deleted: `docs/01`, `docs/05`, `docs/08`, `core/src/analytical/`
+and `packages/viz/UX.md` cite them. Five process mistakes are kept in them **because they are the
+most transferable thing the delivery produced**:
+
+1. **The orchestrator weakened an acceptance criterion** by silently dropping a named building from
+   Phase 6's gate — inside a decision whose stated purpose was to *strengthen* it (§ D27 → § D99),
+   which is the only reason it was invisible for a wave. Closed by **measuring** the dropped clause
+   (§ D100), not by arguing it away.
+2. **Worktrees were mis-set-up, so builders linked against stale code.** A symlinked root
+   `node_modules` resolves to its realpath, so `@elevator-sim/*` pointed at the **main checkout's**
+   `dist`. vitest was unaffected; every built-artifact claim was about the wrong tree.
+3. **Two design documents were merged without being linked from `README.md`.** A guard caught it —
+   both times.
+4. **A brief conflated two study arms**, attributing one arm's interval and another's retention and
+   energy figures to a single row. Caught by re-running `runPhase7Acceptance()` rather than by
+   reading the brief.
+5. **A tree was reported clean when a file-sync client had polluted it** with duplicate artifacts.
+
+**Two of the five are the same failure**: a claim accepted because it was *reported* rather than
+*measured*. That is what `docs/07` § 9's *"reviewers must run things, not read them"* is for, and it
+is why every number in this pass names the command that produced it.
+
+### The rule this pass adds to § D110's
+
+§ D110 said a *number* with no non-test re-deriver is the same defect as a *behaviour* with no
+non-test caller. This pass adds the third form: **a study arm resolved by a shipped identifier is an
+arm that can be redefined by editing `data/`** (§ D112). The near miss on H-ACCESS-2 is the proof —
+same sign, same verdict, a fifth of the magnitude, and nothing but a regenerated pin to mark it.
+`published.ts` would have re-derived the number faithfully and been **right about the arithmetic and
+wrong about the question.**

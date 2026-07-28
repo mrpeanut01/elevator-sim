@@ -12,11 +12,29 @@
 >
 > | | Items |
 > |---|---|
-> | ✅ **Closed** | C1, C2, C3, C6, C8, C9, C10, C11, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C25, C26, C28, C29, C31 |
-> | ⬜ **Still open** | **C4** (the sequential stopping rule's budget — needs a decision, not a default) · **C5** (a `'z'` fallback label can still print on a convergence report) · **C7** (two holes in `core`'s dead-code scanner) · **C24** (`fuzz/`'s only non-test caller is a test) · **C27** (Phase 6a/6b/mixed-use studies are off the package barrel) · **C30** (`ED-12`/`ED-13` contradict the schema) · **C32** (the fuzz generator picks call types blind to the profile) |
+> | ✅ **Closed** | C1, C2, C3, C6, C8, C9, C10, C11, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C25, C26, C28, C29, C31, **C7** |
+> | ⬜ **Still open** | **C4** (the sequential stopping rule's budget — needs a decision, not a default) · **C5** (a `'z'` fallback label can still print on a convergence report) · **C24** (`fuzz/`'s only non-test caller is a test) · **C27** (Phase 6a/6b/mixed-use studies are off the package barrel) · **C30** (`ED-12`/`ED-13` contradict the schema) · **C32** (the fuzz generator picks call types blind to the profile) |
 >
-> All seven open items are carried into [`docs/07-handoff.md`](docs/07-handoff.md) § 8, which is the
+> > **✅ C7 CLOSED after this board was retired.** Both holes in `core`'s dead-code scanner are
+> > fixed, both **watched failing** before being closed, and closing them surfaced **no new dead
+> > exports** — the allowlist is unchanged in both directions. What changed is that three existing
+> > assertions became *falsifiable*: the string-literal hole had made *"createArrivalModel must read
+> > live"* unfalsifiable, which reads as coverage and is worse than a missing assertion.
+> > [`DECISIONS.md` § D114](DECISIONS.md). **Six items remain open**, not seven.
+>
+> All open items are carried into [`docs/07-handoff.md`](docs/07-handoff.md) § 8, which is the
 > document a cold reader is pointed at. Nothing here is the only record of an open item.
+>
+> ### The closing wave (T29 / T30 / T31 / T32), after this board was retired
+>
+> Four correctness defects in shipped code and one documentation pass. **No phase status moved.**
+> `destination-eta` shipped a destination that changed no decision — the standing requirement's
+> defect in `data/` rather than in code — and now weights `rideTime` at 0.5
+> ([§ D112](DECISIONS.md)); the viewer *and* `elevator-sim watch` printed a mean the same run said
+> was suppressed ([§ D111](DECISIONS.md)); the `'no-intervals'` half of `benchmark/` had no driver
+> and all five of its studies were dead ([§ D114](DECISIONS.md)); C7 closed. The editor's floor
+> lists now order by `index`, and its ⇧/⇩ buttons are relabelled honestly with the **scope call
+> handed back** (§ D111). Full accounting in [§ D115](DECISIONS.md).
 >
 > ### The four recommendations T23 handed back are all built
 >
@@ -82,7 +100,7 @@ Live state of every task. Updated by the orchestrator as reports come in.
 | C4 | `packages/experiments/src/validation/harness.ts:176` builds `productionStoppingRule` by injecting `estimateMean`, which is now Student-t at every n. Sequentially-stopped experiments may therefore run marginally more replications. T2 argues this is the conservative direction (`stopping.ts`: stopping too early "publishes a number it did not earn") and left it deliberately, since re-wiring it to a crossover estimator in a separate change would create a symbol with no non-test caller. **Needs a decision, not a default.** | T2 | wave 2 |
 | C5 | `packages/experiments/src/reports/compare.ts:607` can still print `'z'` as a fallback family label on a published convergence report, in the branch where `achievedHalfWidth` is already `NaN`. Cosmetic but it is the exact mislabelling finding #14 was about. | T2 | wave 2 |
 | C6 | **One published verdict flips** as a direct result of T2: Phase 5 capacity reassignment, `−0.520 s [−1.029, −0.010]` BETTER at n=60 → `[−1.039, +0.000]` **INDISTINGUISHABLE**. Quoted in four places (`docs/05-roadmap.md:360`, `benchmark/index.ts:497`, `benchmark/capacityReassignment.ts:39` and `:54` — the last is prose and needs rewording, not renumbering). No test asserts the old bound. | T2 | T4 |
-| C7 | **NEW DEFECT — the permanent mechanical guard is partly unearned.** `packages/core/src/dispatch/deadCode.test.ts` has two scanner holes T1 found and fixed in its own copy: (a) the export pattern does not match `export async function`, so those exports were never scanned at all; (b) it strips comments but not string literals, so a symbol that names itself in its own error message counts as self-used and becomes unfalsifiably live. T1 demonstrated (a)+(b) by removing a real importer and watching the unfixed audit stay **green**. The same holes exist in core's copy today. | T1 | new task, wave 2 |
+| C7 | ✅ **CLOSED 2026-07-28.** *(As filed:)* **NEW DEFECT — the permanent mechanical guard is partly unearned.** `packages/core/src/dispatch/deadCode.test.ts` has two scanner holes T1 found and fixed in its own copy: (a) the export pattern does not match `export async function`, so those exports were never scanned at all; (b) it strips comments but not string literals, so a symbol that names itself in its own error message counts as self-used and becomes unfalsifiably live. T1 demonstrated (a)+(b) by removing a real importer and watching the unfixed audit stay **green**. *(Disposition:)* both ported inline — `core` may not import from `experiments` — both watched failing first, **no new dead exports surfaced**, allowlist unchanged in both directions, and three assertions added pinning the fixes against synthetic input because `dispatch/{policies,predictor}` contains no `export async function` today. [`DECISIONS.md` § D114](DECISIONS.md) | T1 → closed by the closing wave | — |
 | C8 | **ENVIRONMENT DEFECT in D4.** `node_modules/@elevator-sim/*` symlinks resolve to `../../packages/*` — the **main checkout's** packages — so a worktree running a *built* artifact links against the main checkout's `dist`, not its own. vitest is unaffected (`resolve.alias` maps to worktree-local source) and `packages/core` is unaffected (no workspace deps), but any worktree-built CLI or `experiments` consumer was stale. T1 hit it and worked around it with worktree-local symlinks. **Consequence: T2's built-CLI evidence was produced against stale `experiments`; the orchestrator re-verified all of it in the main checkout — see below.** | T1 | orchestrator (done) |
 | C9 | `docs/05-roadmap.md` § Phase 7 and `docs/07-handoff.md` still record Phase 7 as NOT ACCEPTED and the CLI as four commands. Both are now false. | T1 | T4 |
 | C12 | **`packages/cli/**` is unassigned and carries 2 moving intervals.** `cli/src/commands/tune.ts:118` holds a **third** copy of the Phase 7 acceptance pair (`[−2.257, −0.319]` → `[−2.277, −0.298]`); `cli/src/cli.test.ts:471-472` and `commands/compare.ts:480-481` carry finding #19's worked example at n=30 (multipliers 1.023317 at 80%, 1.043504 at 95%), whose exact bounds need a CLI re-run. | T6 | orchestrator |
@@ -305,9 +323,13 @@ experiment matrix is the natural place to close it.
 - **`fuzz-1000384`'s verdict.** A fix is in flight in a concurrent task. Every document records it as
   an **open finding** with its seed, its characterisation and its pre-existence proof, and none of
   them declares Phase 8 clean. The orchestrator finalises the verdict at merge.
+  *(Since resolved: **fixed** by § T22-D1, `deadlockIdleBoundS` untouched — see § D115.)*
 - **The 87-row UX ledger's four ⚠️ rows** (`RV-11`, `RV-17`, `RV-21`, `KB-14`) are built and
   reachable, and were neither driven nor tested by the task that inventoried them. They are carried
   through as *unverified*, not as passing.
+  *(Still true at final close. The ledger is now **88** rows; **those same four rows are unchanged
+  and still ⚠️** — the pass that fixed § A.3's two false rows drove three buildings at one viewport
+  and did not re-exercise them.)*
 
 ---
 
@@ -330,4 +352,25 @@ none of these are dispatched yet; they batch into one UI task once it lands.
 **Scope call:** U2–U8 are a coherent body of work, not a punch list — a *product* phase on top of a
 simulator whose engine is now sound. Recorded as **Phase 9** rather than bolted onto Phase 4, whose
 acceptance criteria say nothing about any of it. Phase 4 stays COMPLETE as scoped; this is new scope.
+
+> ### Disposition at final close (2026-07-28)
+>
+> - **U1 — DONE.** Every floor-ordered list in the editor now reads the way the building does,
+>   ordered by **`index`** and **not** by reversing the declaration array: `midtown-office.json`
+>   declares index `0` before index `-1`, so a reversed array would have drawn its basement *above*
+>   the lobby in the form and below it in the picture — the same defect on one building instead of
+>   five, which is worse because it looks fixed. The audit U1 asked for was done: bank service
+>   zoning and the floor-range list moved too; access-zone floor lists and zone rows were examined
+>   and deliberately **left alone**, with reasons. **A second finding fell out of it** — the ⇧/⇩
+>   buttons never moved a floor *in the building*, only in the JSON declaration; they are relabelled
+>   honestly and the scope call is **handed back**. [§ D111](DECISIONS.md).
+> - **U2–U8 — DESIGNED, NOT BUILT.** `docs/10-experience-layer-contract.md` is the contract. **Not
+>   one line of it is implemented**, and no status table carries a Phase 9 row, deliberately. One
+>   prerequisite blocks part of it: `packages/experiments` has **no browser export**, so U6's
+>   generated editor cannot reach `collectSearchSpace()` from a browser at all — `docs/10` § 13 q1.
+> - **U3's hard constraint was violated by the shipped code the whole time.** *"Engagement must not
+>   cost truthfulness: the viewer currently refuses to show a mean on a saturated run"* — it did
+>   not. The canvas header printed one, one line below its own suppression banner, and so did
+>   `elevator-sim watch`. Fixed before Phase 9 rather than as part of it ([§ D111](DECISIONS.md)),
+>   because a gamified surface built on top of that would have inherited it.
 

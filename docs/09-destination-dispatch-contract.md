@@ -44,7 +44,7 @@ Six claims that a Phase 6 plan will otherwise get wrong. Each was checked by run
 | The runner already knows and already discloses the destination | **TRUE.** `sim/simulation.ts:2041-2065` (`#callValue`) puts the head-of-queue passenger's `destinationFloorId` on the `DispatchCall`. Its own docstring says *"This is not destination dispatch: the passenger model, the landing panel and the 'which car do I walk to' constraint are Phase 6"* — which is exactly right |
 | `estimateCost` authorizes the destination | **TRUE.** `model/car/estimateCost.ts:122-132` returns `destinationServiceZone` / `destinationAccessDenied` when the destination is known. Authorization and optimization already happen in one step *when the credential is also present* |
 | `destination-entry` + `deferred` throws at policy construction | **TRUE.** `dispatch/policy.ts:166-171` throws `DispatchError`. `tuning/space/encode.ts` calls the real `createPolicyFor` in `validateValues`, so the sampler rejects the pair rather than handing a search a throw |
-| Some shipped profile is a destination dispatcher | **WAS FALSE WHEN THIS TABLE WAS WRITTEN; NOW PARTLY TRUE, AND THE PART THAT MATTERS IS STILL FALSE.** At the time: all ten shipped profiles authored no `dispatch.callType` and none weighted `rideTime`. Today `data/dispatcher-profiles.json` holds **twelve** profiles, of which **two** — `destination-eta` and `destination-panel` — declare `dispatch.callType: mobile-credential`, and `destination-panel` weights `rideTime: 1`. **`destination-eta` still weights `rideTime` at zero**, and the full experiment matrix measured it **bit-identical to `eta` at all eight cells**: the destination reaches `estimateCost` and changes no decision. So a destination dispatcher does now ship, and one of the two ships a destination it does not use. **In flight:** a builder is authoring the weight that changes this, so neither state is settled |
+| Some shipped profile is a destination dispatcher | **WAS FALSE WHEN THIS TABLE WAS WRITTEN; NOW TRUE.** At the time: all ten shipped profiles authored no `dispatch.callType` and none weighted `rideTime`. Today `data/dispatcher-profiles.json` holds **twelve** profiles, of which **two** — `destination-eta` and `destination-panel` — declare `dispatch.callType: mobile-credential` **and weight `rideTime`**, at 0.5 and 1.0. There was an intermediate state in which the part that mattered was still false: `destination-eta` weighted `rideTime` at **zero**, and the full experiment matrix measured it **bit-identical to `eta` at all eight cells** — a destination that reached `estimateCost` and changed no decision. That is § 8's **R6-1 realised**, and it is closed ([`DECISIONS.md` § D112](../DECISIONS.md)). The profile now separates from `eta` at **seven of eight** cells; the eighth, `garden-down-peak`, is bit-identical at `rideTime` 0.3, 1.0 **and** 2.0 and is therefore a blind operating point rather than an under-weighted term |
 | A passenger boards the car they were assigned | **FALSE, and this is the whole of the model change.** `sim/simulation.ts:1754-1778` (`#boardFrom`) takes whoever is at the head of `Floor.waiting(direction)` that the car *can carry*. There is no per-passenger car assignment anywhere in `core/`. `Passenger` (`model/passenger.ts:134-360`) has `board`/`alight` and no assignment field |
 
 **The consequence is the single most useful decision this document makes: Phase 6 is two things, not
@@ -814,7 +814,8 @@ unit may start as soon as its inputs are locked by this document.
 | Unit | Deliverable | Acceptance criterion | Required liveness evidence (**measured**) | Non-test caller |
 |---|---|---|---|---|
 | **A1** (O-DATA) | Two Level-0 profiles in `data/dispatcher-profiles.json`: `destination-eta` (`destination-entry`, `weights.rideTime`) and `destination-secure` (`mobile-credential`) | Both load through the real `loadConfig`; `policies.test.ts`'s "no profile weights a term its own stage settings make inert" stays green | `rideTime` evaluations **> 0 and non-zero on > 90 % of evaluations** through `runSimulation`, counted via the `createPolicy` instrumentation hook. The roadmap's own baseline is 468/468 non-zero with spread in 57 decisions | `config/loader.ts` ← `cli/src/data.ts` |
-| ↳ **A1 as executed, which differs from A1 as planned** | The two profiles that shipped are `destination-eta` and **`destination-panel`** — there is no `destination-secure` — and **both** declare `mobile-credential`, not `destination-entry`. `destination-panel` weights `rideTime: 1`; **`destination-eta` weights it at zero**, which is why the full experiment matrix found it **bit-identical to `eta` at all eight cells**. The A1 liveness criterion in the row above is therefore **not met by the profile that carries the plan's name**, and nothing failed, because the criterion was never wired to a test. This row is left as planned rather than rewritten, per this document's own rule about checking a disposition against the claim. **In flight:** a builder is authoring the `rideTime` weight that changes it | | | |
+| ↳ **A1 as executed, which differs from A1 as planned** | The two profiles that shipped are `destination-eta` and **`destination-panel`** — there is no `destination-secure` — and **both** declare `mobile-credential`, not `destination-entry`. `destination-panel` weights `rideTime: 1`. `destination-eta` **weighted it at zero for the whole of Phase 6**, which is why the full experiment matrix found it **bit-identical to `eta` at all eight cells**: A1's liveness criterion was not met by the profile carrying the plan's name, and nothing failed, **because the criterion was never wired to a test**. This row is left as planned rather than rewritten, per this document's own rule about checking a disposition against the claim | | | |
+| ↳ **A1's liveness criterion, finally measured (2026-07-28)** | `weights.rideTime: 0.5` is authored ([`DECISIONS.md` § D112](../DECISIONS.md)) and the criterion is now **met and exceeded**: `rideTime` non-zero on **260 / 260** evaluations with cross-car spread in **12 of 65** decisions on `midtown-office`, and 159 / 159 with spread in 2 of 53 on `secure-tower`, counted through `runSimulation` at seed 20 260 726 — against **0 evaluations** before. The gated-off side is flat (0 / 248), which is **R6-2**'s proof obligation discharged in the same measurement. The plan's *"> 90 % of evaluations non-zero"* is cleared at 100 %. `benchmark/destinationLiveness.ts` is the study; `livenessSuite.ts` is its non-test caller | | | |
 | **A2** (O-STUDY) | `experiments/src/benchmark/arms.ts`: new `BenchmarkCase` for Midtown interfloor-mix, with a re-run saturation census | `saturationCensus.test.ts` returns the first-invalid index at the new point for `eta` and for every arm | The census index itself, over 1000 replications. **`arms.ts`'s existing 287/190 may not be reused** | `benchmark/suite.ts` |
 | **A3** (O-SEAM) | Oracle pinned to `up-down-buttons`, with the reasoning in § 1.7 in its docstring | `analytical/validation.test.ts` and `sim/oracle.test.ts` state the pin and fail if a destination profile is passed | A run of the oracle test with a `destination-entry` profile must **fail with a named reason**, not pass | themselves |
 | **A4** (O-STUDY) | `destinationDispatch.ts` Level-0 study: arms A, B, C, E, F at the primary point, n = 150 | Every interval quotable (no saturated cell); `Δ TTD` for C−A excludes zero | The intervals, pinned into `published.ts` `PINNED_ESTIMATES` at full precision | `benchmark/index.ts` + `regeneratePins.ts` + `published.ts` |
@@ -868,10 +869,41 @@ O-SEAM, does B1 through B5 in order.**
 
 ## 8. Risks — how Phase 6 ships a ninth dead seam, and what catches it
 
-`docs/07-handoff.md` § 3 now counts **eight** instances, not five (`CLAUDE.md`'s status line agrees;
-`docs/05-roadmap.md` § Standing requirement says eight and names the seventh and eighth as
-`StageActivity`'s late-arrival counters and `WARNING_CODES.doubleDeckNotSimulated`). Phase 6's four
-most likely ninths:
+> ## ⚠️ **R6-1 HAPPENED. It is no longer a risk; it is an instance.**
+>
+> This table was written to predict the ninth dead seam. Both of its top two candidates came true,
+> and neither was caught by the mitigation named beside it.
+>
+> - **R6-1 — *"a destination profile ships in `data/` and changes nothing"*.** `destination-eta`
+>   shipped `dispatch.callType: mobile-credential` with a weight vector identical to `eta`'s. Its
+>   `activeWhen`-gated term was weighted at zero, so the destination reached `estimateCost` and
+>   changed no decision: **bit-identical to `eta` at 8 of 8 matrix cells**, measured by the full
+>   experiment matrix and by nothing that ran before it. **The mitigation named in the row below did
+>   not fire**, for exactly the reason the row itself gives — `searchSpaceLiveness.test.ts` needs
+>   only *one shipped building to differ*, and A1's evaluation-count criterion "was never wired to a
+>   test" (§ 7, Wave A, as-executed row). Closed by authoring `weights.rideTime: 0.5`
+>   ([`DECISIONS.md` § D112](../DECISIONS.md)).
+> - **The ninth in code was `measureEnergyLiveness`, which is R6-4's shape** — a study module whose
+>   only callers were its own tests — and it was not a one-off: **all five** studies `published.ts`
+>   classifies `'no-intervals'` were dead, because the interval half has `regeneratePins.ts` as its
+>   driver and the categorical half had none. R6-4's mitigation is the **pin table**, and a study
+>   that publishes *counts* has no interval to pin, so the mitigation could not reach it.
+>   [`DECISIONS.md` § D114](../DECISIONS.md).
+>
+> **What the liveness proof looks like now that it exists.** Counted through the shipped engine at
+> seed 20 260 726: `rideTime` non-zero on **260 / 260** evaluations with cross-car spread in **12 of
+> 65** decisions on `midtown-office`, and 159 / 159 with spread in 2 of 53 on `secure-tower` —
+> against **0 evaluations** before, because the shipped profile weighted no gated term. **R6-2's
+> proof obligation is discharged in the same measurement**: the gated-*off* side is flat, 0 / 248
+> evaluations and 0 / 62 decisions under `up-down-buttons`. That is an evaluation count with spread,
+> which is what R6-1's mitigation column asks for and what did not exist until now.
+
+`docs/07-handoff.md` § 3 now counts **nine** instances in code, plus one in `data/` — and the count
+is the length of that table rather than a number in prose. (`CLAUDE.md` § *What this project is*
+agrees; `docs/05-roadmap.md` § Standing requirement names the ninth as the `'no-intervals'` half of
+`benchmark/` and the `data/` one as `destination-eta`.) The four
+candidates as they were predicted, left as written so the prediction can be checked against the
+outcome: 
 
 | # | The shape it would take | What catches it |
 |---|---|---|

@@ -14,7 +14,8 @@ revisited before Phase 0 starts.
 
 **Read this before planning any phase.** The most expensive defect this project has produced is
 not a wrong number. It is a behaviour that is *configurable, unit-tested in isolation, and dead in
-the shipped path* — and it has now happened **eight times**. Four were in Phase 5, all four
+the shipped path* — and it has now happened **nine times in code, plus once in `data/`**. Four were
+in Phase 5, all four
 simultaneously: `prepositionPlan`, `CapacityReassignmentMonitor`, `createAuctionPolicy` and the
 whole arrival-model predictor were built correctly, exported, weighted by a shipped profile, and
 called by nothing outside their own module.
@@ -78,11 +79,41 @@ from three barrels and cross-referenced from a dozen doc comments. Reachability 
    caller, or has been deleted, fails too — otherwise the allowlist becomes the place dead code
    goes to be forgotten, which is this defect one step removed.
 
-**A weaker ninth is recorded rather than hidden.** Phase 8's `fuzz/` module has exactly one non-test
-caller and it is a test: `campaign.ts` is driven by `corpus.test.ts`. The fuzz track flagged this
-itself rather than dressing it up, and it is defensible — a fuzzer's *product* is a test — but it is
-not the answer `tune` gives `tuning/`, and a CLI `fuzz` command would close it cleanly and put the
-deep campaign in a user's hands. Tracked as **C24** in [`AGENT_STATUS.md`](../AGENT_STATUS.md).
+**The ninth was `measureEnergyLiveness`, and it was a class rather than a symbol.**
+`benchmark/published.ts` § `STUDY_ENTRY_POINTS` splits `benchmark/` in two: everything mapped to a
+`PublishedStudyId` publishes a confidence interval, and every one of those has a non-test caller,
+because `regeneratePins.ts` runs them all — a pin table must be regenerable from the code that
+produced it. Everything mapped to `'no-intervals'` publishes *counts*, and that half had **no driver
+at all**, so **all five** of its members were dead by the repository's own measure:
+`measureAuctionAggregation`, `measureDestinationLiveness`, `measureEnergyLiveness`,
+`measureMultiRoundReachability`, `measurePredictorLag`. Two barrels, a string key and its own test is
+what `measureEnergyLiveness` had, and the scanner reported `measureEnergyLiveness -> []`.
+
+The fix is symmetric rather than special-cased: **`benchmark/livenessSuite.ts` is the categorical
+half's `regeneratePins.ts`** (`node packages/experiments/dist/benchmark/livenessSuite.js [--fast]`).
+It asserts nothing — each of the five already has a suite that asserts its own claim at its own
+budget, and duplicating those thresholds would create a second place for them to drift. And
+`experiments/src/index.test.ts`'s guard now iterates `Object.keys(STUDY_ENTRY_POINTS)` — a
+categorical whose totality against the `benchmark/` directory `published.test.ts` already asserts in
+both directions — instead of five hand-written names, so **a sixth categorical study added tomorrow
+fails until it is wired in**. Watched failing on the pre-fix state and on a synthetic new study.
+The block deliberately does *not* require barrel re-export: six live study entry points are on no
+barrel, and `measureEnergyLiveness` was on two and dead.
+
+**And once in `data/`, which is the instance to read if you only read one.** `destination-eta`
+authored `dispatch.callType: mobile-credential` and `weights: { waitTime: 1.0 }` — a weight vector
+identical to `eta`'s. Schema-valid, loaded by the real loader, exercised by its own tests, named
+after the thing it did not do: the destination reached `estimateCost` and changed no decision, and
+the full matrix measured it **bit-identical to `eta` at 8 of 8 cells**. Invariant 7 makes dispatch
+strategy data; it does not put data outside the standing requirement. Closed by authoring
+`weights.rideTime: 0.5` — see § *Phase 6a* and [`DECISIONS.md` § D112](../DECISIONS.md).
+
+**A weaker instance is recorded rather than hidden, and is not counted among the nine.** Phase 8's
+`fuzz/` module has exactly one non-test caller and it is a test: `campaign.ts` is driven by
+`corpus.test.ts`. The fuzz track flagged this itself rather than dressing it up, and it is
+defensible — a fuzzer's *product* is a test — but it is not the answer `tune` gives `tuning/`, and a
+CLI `fuzz` command would close it cleanly and put the deep campaign in a user's hands. Tracked as
+**C24** in [`AGENT_STATUS.md`](../AGENT_STATUS.md), and **still open**.
 
 **What a phase plan must therefore do:** name an owner for every file a new behaviour must be
 *called from*, not merely for the directories it is implemented in. If a phase's work breakdown
@@ -307,12 +338,22 @@ buildings by `packages/viz/src/record/recordRun.test.ts` § *"gives every shaft 
 itself reports, not the position it ended at"*, under `describe.each(BUILDING_IDS)`.
 
 **The UX cycle ran, and its ledger is published rather than summarised.**
-`packages/viz/UX.md` § 7.0 carries **87** scenarios with differentiated states, not a blanket tick:
-78 ✅ (32 wave 1, 34 driven in a browser against the shipped `data/`, 12 asserted by a test whose
-assertion was proved to bite), 2 ✅+⚠️ with one clause each way (`RV-18`, `ED-23`), 4 ⚠️ built and
-unverified (`RV-11`, `RV-17`, `RV-21`, `KB-14`), 2 🔲 re-marked because the row contradicts the
-schema (`ED-12`, `ED-13` — see **C30**), and 1 🔲 not built (`PB-09`). The ids are reproduced in
-[`TEST_MATRIX.md`](../TEST_MATRIX.md) § 3.
+`packages/viz/UX.md` § 7.0 carries **88** scenarios with differentiated states, not a blanket tick:
+**79 ✅** (32 wave 1, 34 driven in a browser against the shipped `data/`, 2 driven *and* asserted,
+11 asserted by a test whose assertion was proved to bite), 2 ✅+⚠️ with one clause each way (`RV-18`,
+`ED-23`), **4 ⚠️ built and unverified** (`RV-11`, `RV-17`, `RV-21`, `KB-14`), 2 🔲 re-marked because
+the row contradicts the schema (`ED-12`, `ED-13` — see **C30**), and 1 🔲 not built (`PB-09`). The
+ids are reproduced in [`TEST_MATRIX.md`](../TEST_MATRIX.md) § 3.
+
+> **The count moved from 87 to 88 because `T29` added a row, and two of the existing rows were
+> found to be *false* rather than merely unverified.** `UX.md` § A.3's **Success** and **Saturated**
+> rows both carried a "must not show" clause about the running mean, and `render/canvas.ts` drew
+> `mean wait so far 87.7 s` one line below the banner saying the mean was suppressed — on the same
+> `<canvas role="img">` whose `aria-label` said it did not exist, and which `Export PNG` bakes into
+> a shareable file. Fixed and re-marked with the evidence, on both suppression grounds
+> ([§ D111](../DECISIONS.md)). **The four ⚠️ rows are unchanged and are still not passing**: built
+> and reachable, neither driven nor tested. `KB-14` is one of the seven ⛔ non-negotiable keyboard
+> rows.
 
 > **Two things this phase found by running the UI rather than reading it**, recorded because the
 > reading pass had already passed: four defects in [`DECISIONS.md` § D69](../DECISIONS.md), and
@@ -689,12 +730,21 @@ variance-derived requirement is 666, the ceiling is 206, so 200 leaves **six rep
 margin** — a tight margin, recorded as such in [`docs/07`](07-handoff.md) § 8); 1 % is a
 **declared-in-advance blind control**, 390/1000 bit-identical.
 
-**The call type alone is worth exactly zero here, and the study separates it out.** The shipped
-`destination-eta` — destination disclosed and authorized, nothing pricing it — is **bit-identical**
-to `eta` on all three up-peak points: 150/150, 238/238 and 200/200 paired differences of exactly
-zero. Every pickup is at `G`, which is in no access zone. The whole of the −2.072 s is the *weight*.
-That is the same decomposition Phase 6a made on Midtown, reproduced on the building the criterion
-names.
+**The call type alone is worth exactly zero here, and the study separates it out.** The
+**`destination-eta-unpriced`** arm — destination disclosed and authorized, nothing pricing it — is
+**bit-identical** to `eta` on all three up-peak points: 150/150, 238/238 and 200/200 paired
+differences of exactly zero. Every pickup is at `G`, which is in no access zone. The whole of the
+−2.072 s is the *weight*. That is the same decomposition Phase 6a made on Midtown, reproduced on the
+building the criterion names.
+
+> **That control used to be the shipped profile, and moving it is the reason the number survived.**
+> Until [§ D112](../DECISIONS.md), `mixedUseHighRise.ts` bound `DECOMPOSITION_ARM` to the shipped
+> `destination-eta` id, which was correct only while the shipped profile *happened* to weight
+> `rideTime` at zero. Now it weights it at 0.5, and the arm is bound to the **configuration**
+> (`destination-eta-unpriced`: `weights.rideTime: 0`, everything else inherited) rather than to the
+> id. The measurement is unchanged and only the name moved. Left pointed at the id, this paragraph's
+> claim — *the call type alone is worth zero* — would have been falsified by a pin regeneration and
+> nothing else.
 
 ### Phase 6a — destination disclosure. **ACCEPTED (2026-07-27); building clause met 2026-07-28.**
 
@@ -721,11 +771,23 @@ with `weights.rideTime: 1` against `eta`, all four figures from the same runs. R
 | AWT | +0.514 [+0.344, +0.684] s | **WORSE** — reported, not hidden |
 | WT95 | +1.010 [+0.292, +1.729] s | **WORSE** — reported, not hidden |
 
-**The effect is the *pricing*, not the call type, and the study separates them.** The shipped
-`destination-eta` — `mobile-credential`, no `rideTime` weight — is **bit-identical to `eta`** here,
-150 of 150 paired differences exactly zero on every metric, because Midtown declares no
-`accessZones` and moving information earlier is worth exactly zero until something reads it. Two
-arms, one variable; the decomposition is a measurement rather than an inference.
+**The effect is the *pricing*, not the call type, and the study separates them.** The
+**`destination-eta-unpriced`** arm — `mobile-credential`, `weights.rideTime: 0`, everything else
+inherited from the shipped profile — is **bit-identical to `eta`** here, 150 of 150 paired
+differences exactly zero on every metric, because Midtown declares no `accessZones` and moving
+information earlier is worth exactly zero until something reads it. Two arms, one variable; the
+decomposition is a measurement rather than an inference.
+
+> **The shipped profile used to *be* that control, and now weights `rideTime` at 0.5.** Until
+> [§ D112](../DECISIONS.md) it authored the call type and no weight, so it was inert — the destination
+> reached `estimateCost` and changed no decision, bit-identical to `eta` at 8 of 8 matrix cells,
+> which is the standing requirement's defect in `data/`. Authoring the weight would have deleted this
+> decomposition had the arm stayed bound to the id; the arm was **inverted** instead — the derived
+> one is now the unpriced control rather than the priced treatment — so the measurement is unchanged
+> and only the name moved. The evidence that `rideTime: 0` ≡ the term absent is itself a
+> measurement: `destination-eta-unpriced` is in `eta`'s identity class at n = 150, 150 of 150 paired
+> differences exactly zero on all seven identity metrics, which is what the shipped profile used to
+> do. **1.0 remains a study arm and this −1.562 s headline is untouched.**
 
 Also settled here, against the doc that predicted otherwise: the deferral the approach is forced to
 surrender is **not a cost at this operating point**. The same `eta` deferring 1.5 s is WORSE on TTD
@@ -783,6 +845,18 @@ is a claim about **authorization** rather than about **optimization**.
 > single-building interval **does** exclude zero on the confirming side and the
 > difference-of-differences **does not**. Across buildings there is no pairing, so the two `Δ` series
 > are combined with a **Welch** two-sample interval rather than a paired-t.
+
+> **The near miss, recorded because it is the most instructive thing in this section.** `Δ` is
+> defined as *TTD(credential + destination priced) − TTD(credential alone)*, and `accessControl.ts`
+> resolved "credential alone" by the **shipped `destination-eta` id** — correct only while that
+> profile happened to weight `rideTime` at zero. When [§ D112](../DECISIONS.md) authored the weight
+> at 0.5, that binding would have silently redefined `Δ` as *the marginal effect of going from 0.5 to
+> 1.0* rather than *the effect of pricing the destination at all*. Measured both ways: the published
+> `+0.982 [+0.584, +1.380]` falls to a mean of **+0.208**, interval still excluding zero on the
+> positive side — **same sign, same REFUTED verdict, a fifth of the magnitude**, and the only thing
+> marking the change would have been a pin regeneration. Bound to the *configuration*
+> (`destination-eta-unpriced`) instead, the six access-control pins do not move at all. **An arm
+> resolved by a shipped id is an arm that can be redefined by editing `data/`.**
 
 The mechanism of the refutation is legible, which is what makes it credible rather than a fluke:
 once the credential is present the access check has **already passed**, so the destination can only
@@ -1130,7 +1204,7 @@ load-bearing is the shape [§ D99](../DECISIONS.md) had to own.
 | Determinism regression, golden runs | ✅ built | `validation/goldenRuns.test.ts`, `validation/golden/manifest.json`, `fuzz/determinism.test.ts` |
 | Scale & performance | ✅ built | `validation/perfScaling.test.ts`, `perfSweep.test.ts` — see § D91 on why the wall-clock gates are opt-in |
 | Adversarial edge cases | ✅ built | `validation/adversarial.test.ts`, `fuzz/faults.test.ts` |
-| Full experiment matrix + Pareto at a real budget | ✅ built | `benchmark/matrix.ts` + `matrix.test.ts` (8 cells × 12 profiles, per-cell derived budgets n = 50…200, front over AWT / energy / WT95), `benchmark/phase7Acceptance.ts` + its test (n = 150, disjoint seeds), `benchmark/matrixCensus.test.ts` (opt-in 200-replication census that re-derives the budgets), `benchmark/energyLiveness.ts` for the axis they need |
+| Full experiment matrix + Pareto at a real budget | ✅ built | `benchmark/matrix.ts` + `matrix.test.ts` (8 cells × 12 profiles, per-cell derived budgets n = 50…200, front over AWT / energy / WT95), `benchmark/phase7Acceptance.ts` + its test (n = 150, disjoint seeds), `benchmark/matrixCensus.test.ts` (opt-in 200-replication census that re-derives the budgets), `benchmark/energyLiveness.ts` for the axis they need — **whose own non-test caller arrived late**: it was the ninth dead seam, and `benchmark/livenessSuite.ts` is the driver that closed it (§ Standing requirement, [`DECISIONS.md` § D114](../DECISIONS.md)) |
 
 ### Campaign statistics, measured on this code
 
@@ -1243,22 +1317,25 @@ non-default `CarConfig.mode`.
 
 ### What the matrix found. The eighth track produced four results, and three of them are about profiles that ship.
 
-Re-measured for this section by running `runMatrix()` on this tree (8 cells, 12 arms, CRN within
-each cell, budgets as derived in `matrix.ts`), not transcribed from the commit that produced it.
+**Re-measured on 2026-07-28 by running `runMatrix()` on this tree** (8 cells, 12 arms, CRN within
+each cell, budgets as derived in `matrix.ts`, `MATRIX_SEED = 20 260 728`) — **after** § D112 authored
+`destination-eta`'s `rideTime` weight, which moves two rows of the table below. Not transcribed from
+the commit that produced it, and not carried over from the version of this section that predated the
+weight.
 
 **1. `nearest-car` is on the Pareto front at six of the eight cells** — and it is there *because it
 is worse at serving people*. Measured front membership, one row per cell:
 
 | cell | n | front |
 |---|---|---|
-| `midtown-up-peak` | 81 | **nearest-car**, energy-aware, capacity-aware |
-| `midtown-down-peak` | 78 | eta, energy-aware, fairness-first, zoned-uppeak, destination-eta |
-| `midtown-interfloor` | 200 | **nearest-car**, eta, energy-aware, destination-eta |
+| `midtown-up-peak` | 81 | **nearest-car**, energy-aware, capacity-aware, `destination-eta` |
+| `midtown-down-peak` | 78 | eta, energy-aware, fairness-first, zoned-uppeak, `destination-eta` |
+| `midtown-interfloor` | 200 | **nearest-car**, eta, energy-aware |
 | `garden-residential` | 65 | collective, **nearest-car**, energy-aware, zoned-uppeak |
-| `garden-down-peak` | 51 | collective, **nearest-car**, eta, energy-aware, fairness-first, capacity-aware, auction, auction-multi-round, zoned-uppeak, destination-eta |
+| `garden-down-peak` | 51 | collective, **nearest-car**, eta, energy-aware, fairness-first, capacity-aware, auction, auction-multi-round, zoned-uppeak, `destination-eta` |
 | `secure-up-peak` | 119 | **nearest-car**, energy-aware |
 | `mixed-use-up-peak` | 50 | energy-aware |
-| `vertical-city-up-peak` | 50 | **nearest-car**, eta, energy-aware, destination-eta |
+| `vertical-city-up-peak` | 50 | **nearest-car**, eta, energy-aware |
 
 `nearest-car` is the arm this document elsewhere calls too weak a baseline to separate anything, and
 it is the viewer's default. It reaches the front by being **best on energy and worst on wait**: a
@@ -1266,15 +1343,32 @@ dispatcher that drives less carries fewer people, and a front is non-domination,
 the whole reason [`docs/10`](10-experience-layer-contract.md) § 5.5 forbids an aggregated "eco"
 score — one would rank the worst dispatcher first. **Energy is an axis, never a score.**
 
-**2. `destination-eta` is bit-identical to `eta` at all eight cells.** It differs in two authored
-fields and weights `rideTime` at zero, so the destination reaches `estimateCost` and changes no
-decision. Phase 6a's accepted result stands — it was measured on *derived* arms that weight
-`rideTime` — but the value is not in the profile that ships. **A builder is authoring the weight
-that changes this, so neither state should be quoted as settled.**
+> **Two rows moved when the weight was authored, and neither `nearest-car` count did.**
+> `destination-eta` **joins** the front at `midtown-up-peak` and **leaves** it at
+> `midtown-interfloor` and `vertical-city-up-peak`; every other cell's membership is unchanged, and
+> `nearest-car` is still on the front at exactly six. The two departures are the interesting ones:
+> at those cells `destination-eta` was on the front only by being bit-identical to an arm already on
+> it, so it left the front by *becoming a distinct dispatcher* rather than by getting worse.
 
-**3. Two more identity classes.** `fairness-first` is bit-identical to `eta` at five cells and
-`auction-multi-round` to `auction` at both Garden cells. Reported rather than filtered: an arm that
-is secretly another arm is a result about that arm.
+**2. `destination-eta` used to be bit-identical to `eta` at all eight cells, and is now identical at
+one.** It authored `dispatch.callType: mobile-credential` and a weight vector identical to `eta`'s,
+so the destination reached `estimateCost` and changed no decision — a shipped, schema-valid,
+separately-tested profile with no effect on any shipped path. Closed by
+[§ D112](../DECISIONS.md): `weights.rideTime: 0.5`, chosen against two criteria stated *before* the
+sweep. **The one cell where it is still identical is `garden-down-peak`, and that is structural, not
+a weight being too small** — measured bit-identical there at `rideTime` 0.3, 1.0 **and** 2.0, because
+every down trip ends at the lobby and the destination carries nothing the direction button did not.
+Raising the weight fourfold not moving it is how a *blind operating point* is told from a *dead
+seam*.
+
+**3. Three more identity classes, two of them unchanged and one new.** `fairness-first` is
+bit-identical to `eta` at five cells (`midtown-up-peak`, `garden-residential`, `garden-down-peak`,
+`secure-up-peak`, `mixed-use-up-peak`) and `auction-multi-round` to `auction` at both Garden cells —
+both unchanged by the weight. **New:** `destination-eta ≡ capacity-aware` at `garden-residential`,
+which no prior report names; and `garden-down-peak`'s class is
+`{eta, fairness-first, destination-eta, destination-panel}`, i.e. the Level-1 panel is in it too.
+Reported rather than filtered: an arm that is secretly another arm is a result about that arm — and
+an arm that stops being one arm and becomes another is not a fix, it is a new fact.
 
 **4. Saturation ceilings are a property of (building, traffic, seed), not of a building.** Midtown
 up-peak's `nearest-car` ceiling is **287** in `arms.ts` at seed 20 260 726 and **174** in `matrix.ts`
@@ -1329,14 +1423,23 @@ at its own seed and operating point. Neither is wrong; inheriting either across 
 | Item | Where it is recorded |
 |---|---|
 | **Phase 6c — learned control** | § Phase 6c above; deferred with reasons, not dropped |
-| **`destination-eta` ships a destination it does not use** — bit-identical to `eta` at all eight matrix cells. **In flight**: a builder is authoring the weight that changes it, so do not quote either state as settled | § *What the matrix found* above |
+| **Phase 9 — the experience layer** | Designed in [`docs/10`](10-experience-layer-contract.md) and **not built**. No phase row exists for it in any status table, deliberately: a design is not a phase in progress |
+| **`packages/experiments` has no browser export**, which blocks `docs/10`'s generated editor | [`docs/10`](10-experience-layer-contract.md) § 13 q1 — a **prerequisite**, not an optimization. The package declares `"."` and `"./package.json"` only, so a deep import of `tuning/space` is refused by the resolver, and the one entry it does declare pulls `node:worker_threads` through `runner/parallel.ts` |
 | **Double-deck simulation and Vertical City** | § Phase 6 above; disclaimed on every run of that building |
 | **Fuzzy traffic-pattern switching** | § Phase 7 above; authored in `data/`, read by nothing |
 | **The Level-1 panel does not clear the Phase 6 gate on `mixed-use-high-rise`** | § *Phase 6 on the building the criterion names* above. A measured result, not a task — but it is what a reader planning 6c needs |
-| Open items C4, C5, C7, C24, C27, C30, C32 | [`AGENT_STATUS.md`](../AGENT_STATUS.md) § Carried forward, and [`docs/07`](07-handoff.md) § 8 |
+| **`garden-down-peak` is `destination-eta`'s remaining identity class** | § *What the matrix found* above. Structural — bit-identical at `rideTime` 0.3, 1.0 and 2.0 — so it is a **blind operating point**, not an under-weighted term. Whether a destination can carry information at a down-peak whose every trip ends at the lobby is an open question, not a defect |
+| **The editor's ⇧/⇩ buttons reorder the JSON declaration and not the building** | `packages/viz/DECISIONS-T29.md` § T29-4, and [§ D111](../DECISIONS.md). Relabelled honestly rather than repurposed; the scope call — give the declaration its own view, or drop `moveFloor` and let `index` be the only ordering control — is **handed back to the owner** |
+| **No test asserts any phase's *status*** | [`docs/07` § 8](07-handoff.md). The guards assert the four documents **agree**, not that they are **true** |
+| Open items C4, C5, C24, C27, C30, C32 | [`AGENT_STATUS.md`](../AGENT_STATUS.md) § Carried forward, and [`docs/07`](07-handoff.md) § 8. **C7 is closed** — see below |
 
 **Closed since this table was last written:** **Phase 8's full experiment matrix and Pareto front at
 a real budget, and with it Phase 7's acceptance interval at 50–200 replications** — both landed in
-`f895a16`, and Phase 8 is accepted ([`DECISIONS.md` § D108](../DECISIONS.md)). Also
+`f895a16`, and Phase 8 is accepted ([`DECISIONS.md` § D108](../DECISIONS.md)). Since then:
+**`destination-eta`'s inert destination** ([§ D112](../DECISIONS.md)); **the ninth dead seam and the
+whole `'no-intervals'` half of `benchmark/`** ([§ D114](../DECISIONS.md)); **C7**, the two holes in
+`core`'s dead-code scanner, both watched failing before being closed and surfacing **no new dead
+exports** ([§ D114](../DECISIONS.md)); and **the viewer and `elevator-sim watch` printing a
+suppressed mean** ([§ D111](../DECISIONS.md)). Also
 `fuzz-1000384` (§ Phase 8, finding 4), C2, C19, C20, C21, C22, C23, C26, C28, C29, C31. Each was
 verified rather than taken on report; see [`docs/07`](07-handoff.md) § 8.

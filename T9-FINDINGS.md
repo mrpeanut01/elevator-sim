@@ -15,6 +15,23 @@
 > > gives 401 and on `docs/drift-sweep` gives 771. **No existing pin moved**: a sorted key-and-value
 > > diff of the 401 old lines against the 771 new ones has **zero** lines only on the old side. The
 > > guard did what this document exists to have built.
+>
+> > > **Superseded once more, and this time pins *did* move — which is the case this guard was
+> > > actually built for.** `destination-eta`'s `weights.rideTime` was authored at 0.5
+> > > ([`DECISIONS.md` § D112](DECISIONS.md)), changing a shipped dispatcher's behaviour: **40 pins
+> > > changed, 12 added, 0 removed, every one of them a `destination-eta` row.** Counted the same
+> > > way on `docs/final-truth`: **783** entries (771 + 12). The guard's value here was not that it
+> > > stopped the change — the change is correct — but that it made the change **enumerable**: the
+> > > set of moved keys *is* the blast radius, and it is confined to the one profile that moved.
+> > >
+> > > **And the near miss that a pin table cannot catch, recorded here because this is the document
+> > > about numbers the code does not produce.** Three studies resolved their control arm by the
+> > > *shipped profile id*. Left that way, `regeneratePins.ts` would have regenerated H-ACCESS-2's
+> > > pins faithfully — and the regenerated number would have answered a **different question**:
+> > > `+0.982 [+0.584, +1.380]` becoming a mean of `+0.208`, same sign, same REFUTED verdict, a
+> > > fifth of the magnitude. A pin holds a number to the code that produces it; it does not hold a
+> > > study to the *question* it was asked. **An arm resolved by a shipped id is an arm that can be
+> > > redefined by editing `data/`.** § D112, § D115.
 
 Branch `fix/unreproducible-benchmarks`, 2026-07-27. Everything below is **measured**, at seed
 `20 260 726`, on the branch's own tree unless a commit is named.

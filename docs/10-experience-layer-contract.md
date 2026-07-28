@@ -297,7 +297,29 @@ Verified against the code and against runs on 2026-07-28, on `design/phase9-expe
 `integration`). Where a repository document disagrees with the code, the code wins and the
 disagreement is stated.
 
-### 2.1 The viewer is honest, with one leak
+### 2.1 The viewer is honest, with one leak — ✅ **CLOSED 2026-07-28, and there were two**
+
+> **This section is left as written, and its finding is fixed.** `M11` was real and is closed
+> ([`DECISIONS.md` § D111](../DECISIONS.md)): the suppression gate now lives once, as
+> `meansAreSuppressed(recording)` in `frame/overlay.ts`, called by `overlayAt`, by `drawHeader` and
+> by `dev/main.ts`'s status line — there were three copies of `saturated || !awtIsValid` and the
+> third was missing. A suppressed run's header now reads `mean wait suppressed`, and deliberately
+> **not** `mean wait so far —`: the em dash already means *nobody has been served yet*, which is a
+> different fact and one the reader can act on.
+>
+> **The leak was not confined to `viz`, which this section could not have known.** `elevator-sim
+> watch` printed the running mean unconditionally on **both** of its render paths — the TTY frame
+> and the piped fallback — for the whole of a run, seconds before `printRunReport` said
+> `AWT  SUPPRESSED` about the same run on the same terminal. `run` and `compare` were clean.
+> Found by checking the claim that no other render site leaks rather than trusting it.
+>
+> **W1 below is therefore already done**, and its acceptance and liveness evidence were produced:
+> the assertion `not.toContain('mean wait so far')` was watched failing against the unfixed gate,
+> and the fix was driven in a browser and in the exported PNG on both suppression grounds.
+> **Honest limit:** the CLI's TTY frame path was not driven in a real terminal — both paths call the
+> same unit-tested `renderRunningMean`, but "driven on a TTY" is not claimed.
+
+
 
 `dev/main.ts`'s DOM status line, `frame/overlay.ts`, `render/overlay.ts` and `render/describeFrame.ts`
 all suppress correctly. **The canvas header does not** (**M11**). `render/canvas.ts` `drawHeader`
@@ -1204,7 +1226,12 @@ Dependencies are hard unless marked. Every unit names its **non-test caller**, b
 `docs/05-roadmap.md`'s standing requirement says the question is not "is it reachable" but "name the
 caller", and a barrel re-export is not one.
 
-### W1 — Close the honesty leak *(no dependencies; blocks everything)*
+### W1 — Close the honesty leak *(no dependencies; blocks everything)* — ✅ **DONE 2026-07-28**
+
+> **Landed ahead of Phase 9, because it is a correctness fix and not a feature**
+> ([`DECISIONS.md` § D111](../DECISIONS.md)). Both acceptance clauses pass, the liveness evidence
+> below was produced, and a **second** leak the unit did not know about was found and fixed in
+> `packages/cli/src/commands/watch.ts` on both of its render paths. W1 no longer blocks anything.
 
 Remove the unconditional running mean from `render/canvas.ts`'s header, or gate it on
 `awtIsValid`; make the canvas agree with `describeFrame`.
@@ -1381,6 +1408,25 @@ configuration.
 | **M18** | Secure Tower, `collective`, seeds 1000–1019, 900 s: of § 5.2's five single-run goals, `deliver-everyone` passes **0/20**, `nobody-abandoned` **20/20**, `answer-the-demand` **0/20**, `long-waits-under` (≤ 10 %) **11/20**, and `everyone-can-get-there` is not evaluable from `RunSummary` at all. Same batch: 4/20 saturated, 6/20 quotable, reproducing M7. R12. |
 | **M19** | `runMatrix()` on this tree: `nearest-car` is on the Pareto front at **6 of 8** cells (all but `midtown-down-peak` and `mixed-use-up-peak`); every cell's front is decided over `['awt','energy','wt95']`. The basis for R11. |
 
+### Re-checked on 2026-07-28, after `destination-eta` gained its `rideTime` weight
+
+`weights.rideTime: 0.5` ([`DECISIONS.md` § D112](../DECISIONS.md)) changes a shipped dispatcher's
+behaviour, so every row above that names `destination-eta` or counts dispatchers was re-run rather
+than assumed. **Rows are marked measured-again, not merely believed.**
+
+| id | state |
+|---|---|
+| **M1** | **Reproduces exactly.** Re-run as 5 × 12 through `elevator-sim run --seed 42 --duration 900`: **14 of 60** quotable, 12 of them Garden Apartments, the other two `mixed-use-high-rise`/`destination-panel` and `secure-tower`/`destination-eta`; **40** saturated, **6** censoring failures. `secure-tower`/`destination-eta` still quotes, at 38.11 s. |
+| **M2** | **Reproduces exactly**, and necessarily: the weight moves **4 of the 60** shipped cells and **`garden-apartments` does not move at all**. Ten of twelve still return AWT 11.32 s; the exceptions are still `zoned-uppeak` (2.50 s) and `predictive-balanced` (11.92 s). The six-profile shared fingerprint, which includes `destination-eta`, is unaffected. |
+| **M11** | ✅ **CLOSED** — see § 2.1 and § 11 W1. The defect was real, and it was in `elevator-sim watch` as well as in the canvas. |
+| **M12** | **Still true as written** — 12 profiles, exactly two declaring `mobile-credential`. What it did *not* say, and what changed, is the weight vector: both of those two now weight `rideTime`. |
+| **M15** | ✅ **CLOSED** — the tab is written to the URL. |
+| **M19** | **Re-measured and unchanged at 6 of 8**, on the same two exceptions. Two cells' *membership* moved — `destination-eta` joins `midtown-up-peak` and leaves `midtown-interfloor` and `vertical-city-up-peak` — and neither move touches `nearest-car`, so **R11's basis is intact**. Per-cell table in [`docs/05`](05-roadmap.md) § *What the matrix found*. |
+
+**Not re-measured, and therefore not re-asserted:** M3–M9, M10, M13, M14, M16, M17, M18. None names
+`destination-eta` or a dispatcher count, and M10's refutation (`packages/experiments` has no browser
+export) was re-read against `packages/experiments/package.json` and still holds.
+
 ---
 
 ## 13. Open questions that must be settled before implementation
@@ -1447,22 +1493,27 @@ configuration.
    | [Experience layer contract](docs/10-experience-layer-contract.md) | Phase 9's contract: the rules that keep a gamified surface honest, basic/advanced modes, rider queues, plain-language metrics, generated dispatcher and rider-model editors, access zoning |
    ```
 
-1. **`packages/viz/src/render/canvas.ts`** — remove or gate the unconditional running mean in
-   `drawHeader` (**M11**, W1). This is a correctness fix, not a Phase 9 feature, and it should not
-   wait for Phase 9.
-2. **`packages/viz/UX.md`** — re-mark nothing yet, but note that § A.3's **Saturated** row is
-   currently contradicted by `render/canvas.ts`; when W1 lands the row becomes true and should gain a
-   `✅ test` mark with the constant-substitution evidence.
-3. **`docs/05-roadmap.md`** — add Phase 9 with the acceptance criteria of § 11, and record that
-   `nearest-car` is the viewer's default despite § 4 of `docs/07-handoff.md` recommending against it
-   as a reference arm.
-4. **`packages/viz/src/dev/main.ts`** — change the viewer's default dispatcher from `nearest-car` to
-   `collective` or `eta`, per `docs/07-handoff.md` § 4. One line, and it removes the worst first
-   impression the product currently makes.
-5. **`packages/viz/src/dev/main.ts`** — write the selected tab into the URL (**M15**), so a scenario
-   deep link can open the editor.
-6. **`.claude/launch.json` or `packages/viz/vite.config.ts`** — reconcile ports 5173 / 5174
-   (**M16**).
+1. ✅ **DONE.** **`packages/viz/src/render/canvas.ts`** — remove or gate the unconditional running
+   mean in `drawHeader` (**M11**, W1). Landed 2026-07-28 as `meansAreSuppressed` in
+   `frame/overlay.ts` with three named non-test callers, **and** the same defect was found and fixed
+   in `packages/cli/src/commands/watch.ts` on both render paths ([§ D111](../DECISIONS.md)).
+2. ✅ **DONE.** **`packages/viz/UX.md`** — § A.3's **Success** and **Saturated** rows are re-marked
+   with the evidence, on both suppression grounds, on screen and in the exported PNG. Both
+   *"must not show"* clauses were **false**, not merely unverified.
+3. ⬜ **STILL OPEN.** **`docs/05-roadmap.md`** — add Phase 9 with the acceptance criteria of § 11.
+   Deliberately **not** done: Phase 9 is designed and not started, and adding a roadmap phase row
+   for unstarted work is how a design starts reading as work in progress. It is recorded instead in
+   `docs/05` § *What remains* and [`docs/07`](07-handoff.md) § 8. The second half of this item —
+   that `nearest-car` is the viewer's default despite `docs/07` § 4 recommending against it as a
+   reference arm — is recorded, and item 4 is the fix.
+4. ⬜ **STILL OPEN.** **`packages/viz/src/dev/main.ts`** — change the viewer's default dispatcher
+   from `nearest-car` to `collective` or `eta`, per `docs/07-handoff.md` § 4. One line, and it
+   removes the worst first impression the product currently makes.
+5. ✅ **DONE.** **`packages/viz/src/dev/main.ts`** — the selected tab is written into the URL
+   (**M15**), and with it the editor and the viewer stopped holding separate opinions about which
+   building is open ([§ D111](../DECISIONS.md)).
+6. ⬜ **STILL OPEN.** **`.claude/launch.json` or `packages/viz/vite.config.ts`** — reconcile ports
+   5173 / 5174 (**M16**).
 7. **`AGENT_STATUS.md`** — U2–U8 are not yet tracked there; only U1 is.
 8. **`data/dispatcher-profiles.json`** — no change requested. Noted for the record: the profile set is
    sparse (`weights.rideTime` is authored by exactly one profile), which is correct and is why § 8.3
@@ -1495,7 +1546,8 @@ Internal sources: [`CLAUDE.md`](../CLAUDE.md) invariants 4–8 and § Statistica
 [`docs/06-parameterization-and-tuning.md`](06-parameterization-and-tuning.md) § The parameter schema;
 [`docs/07-handoff.md`](07-handoff.md) § 4 Resolution limits;
 [`docs/09-destination-dispatch-contract.md`](09-destination-dispatch-contract.md) § 1.3;
-[`packages/viz/UX.md`](../packages/viz/UX.md) § 7.1 and § 7.2 — *in flight: that file is under
-active edit, so its row states are not quoted here as current*;
+[`packages/viz/UX.md`](../packages/viz/UX.md) § 7.1 and § 7.2 — *settled 2026-07-28: the ledger is
+**88** rows, **79 ✅**, with `RV-11`, `RV-17`, `RV-21` and `KB-14` still ⚠️ unverified and `ED-12` /
+`ED-13` re-marked against the schema*;
 [`DECISIONS.md`](../DECISIONS.md) § D15, § D30, § D63, § D64, and **§ D106** (the energy proxy: its
 basis, its constants, its omissions, and why energy is an axis and never a score).

@@ -575,12 +575,21 @@ Everything above is data. Changing any of it requires no rebuild — which is th
 > shipped profile, and 468/468 non-zero under `destination-entry`.
 >
 > **That corroboration is now historical, and the reason is the point of the example.** Phase 6
-> shipped two more profiles — `data/dispatcher-profiles.json` carries **twelve** — and one of them,
-> `destination-panel`, *does* weight `rideTime`. It is allowed to precisely because it also authors
-> `dispatch.callType: mobile-credential`, which satisfies the term's `activeWhen`. The rule the red
-> suite was enforcing has not changed: a profile may weight `rideTime` **iff** its own stage
-> settings make the term live. `destination-eta` ships the call type and *not* the weight, so the
-> two profiles together are the worked example of both sides of that gate.
+> shipped two more profiles — `data/dispatcher-profiles.json` carries **twelve** — and **both** of
+> them, `destination-panel` and `destination-eta`, weight `rideTime` (at 1.0 and **0.5**). They are
+> allowed to precisely because both also author `dispatch.callType: mobile-credential`, which
+> satisfies the term's `activeWhen`. The rule the red suite was enforcing has not changed: a profile
+> may weight `rideTime` **iff** its own stage settings make the term live.
+>
+> > **Corrected 2026-07-28.** This paragraph read *"`destination-eta` ships the call type and not the
+> > weight, so the two profiles together are the worked example of both sides of that gate"*. That
+> > was true when written and is now false: [`DECISIONS.md` § D112](../DECISIONS.md) authored
+> > `weights.rideTime: 0.5`, because a profile that discloses a destination nothing prices is a
+> > shipped behaviour with no effect on any shipped path — measured **bit-identical to `eta` at 8 of
+> > 8 matrix cells**. The *gate* is unchanged; what changed is that no shipped profile now sits on
+> > its permissive side without using it. The other side of the gate — a profile weighting `rideTime`
+> > **without** the call type — is still exercised, by `policies.test.ts` rather than by `data/`,
+> > which is the right place for a configuration that must stay illegal.
 > [Review finding #6](08-review-findings.md); the JSON blocks in this file are now parsed and run
 > through the real `parseDispatcherProfiles` and the same `activeWhen` gate computation by
 > `packages/experiments/src/tuning/space/docExamples.test.ts`, so this example can no longer drift

@@ -24,6 +24,13 @@ partially complete.** Read the two that need care precisely:
   track lands, and no property violation is outstanding*) is met ([§ D108](DECISIONS.md); § D102 is
   the superseded partial verdict, left standing).
 
+**No phase status has moved since `f895a16`.** What has moved is what the phases are *true of*:
+`destination-eta` now weights `rideTime` at **0.5** and is no longer a destination profile that
+changes no decision ([§ D112](DECISIONS.md)); the viewer and `elevator-sim watch` no longer print a
+mean the same run says is suppressed ([§ D111](DECISIONS.md)); the ninth dead seam and the two holes
+in `core`'s dead-code scanner are closed ([§ D114](DECISIONS.md)). None of that changes a phase
+verdict, and none of it was allowed to round one up.
+
 **Energy is an axis, never a score.** The matrix that closed Phase 8 measured `nearest-car` — the
 weakest shipped dispatcher and the viewer's default — **on the Pareto front at six of eight cells**,
 because it is best on energy and worst on wait. A dispatcher that drives less carries fewer people.
@@ -35,11 +42,22 @@ by serving fewer people has not saved anything. See [§ D106](DECISIONS.md).
 in [`docs/05-roadmap.md`](docs/05-roadmap.md), which carries each phase's acceptance verdict and the
 measurements behind it. Read its **Standing requirement — the integration seam has an owner** before
 planning work: a behaviour that is configurable, unit-tested in isolation and never called from a
-shipped path passes every other check this repository runs, and has already shipped **eight** times.
-The instructive one is the sixth: the whole of `tuning/` was reachable from nothing outside its own
-tests, the module said so in its own docstring, and the roadmap asserted the phase green anyway. So
-the rule is not "is it reachable?" but **"name the non-test caller"**. A barrel re-export and a
-`{@link}` tag look exactly like a caller and are not one.
+shipped path passes every other check this repository runs, and has already shipped **nine** times in
+code — plus, once, in `data/`. The instructive one is the sixth: the whole of `tuning/` was reachable
+from nothing outside its own tests, the module said so in its own docstring, and the roadmap asserted
+the phase green anyway. So the rule is not "is it reachable?" but **"name the non-test caller"**. A
+barrel re-export and a `{@link}` tag look exactly like a caller and are not one.
+
+**The ninth, and the one in `data/`, are the two most recent and they are the two worth reading.**
+The ninth is `measureEnergyLiveness` — and it was not a one-off: `published.ts` splits `benchmark/`
+into studies that publish an interval and studies classified `'no-intervals'`, the first half has
+`regeneratePins.ts` as its driver, and the second half had **no driver at all**, so **all five** of
+its members were dead by the same measure. `benchmark/livenessSuite.ts` is now that driver and
+`src/index.test.ts`'s guard iterates the entry-point set **derived from the directory** rather than
+five hand-written names. The one in `data/` is `destination-eta`: two authored fields, a schema-valid
+profile, its own tests, and `weights.rideTime: 0` — so the destination reached `estimateCost` and
+changed no decision, **bit-identical to `eta` at 8 of 8 matrix cells**. Invariant 7 makes strategy
+data; it does not make data exempt. See [§ D112](DECISIONS.md) and [§ D114](DECISIONS.md).
 
 **A stated mechanism goes stale the same way, and the correction is now pinned.** Seven places
 in this repository asserted, as fact, that destination dispatch does better under access control

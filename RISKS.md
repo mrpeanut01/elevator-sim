@@ -29,13 +29,38 @@
 > seam), R5 (statistical nonsense), R7 (an agent reports a green suite that is red) and R10 (scope
 > pressure weakens a criterion) describe how *this kind of work* fails. R10 was realised once, by
 > the orchestrator, inside a decision meant to strengthen a gate — see `DECISIONS.md` § D99.
+>
+> > ## ⚠️ **R1 was realised — twice — after this register closed.** It stays **live**, because it is
+> > a property of the project rather than of the delivery, and because being realised is what a
+> > high-likelihood risk does.
+> >
+> > 1. **The ninth in code was a whole half of a directory, not a symbol.** Every study
+> >    `published.ts` maps to a `PublishedStudyId` had `regeneratePins.ts` as its non-test caller;
+> >    every study it maps to `'no-intervals'` had **none**, so all five were dead.
+> >    `benchmark/livenessSuite.ts` is now that half's driver and the guard derives its entry-point
+> >    set from the directory. [§ D114](DECISIONS.md).
+> > 2. **And once in `data/`, which this register's wording did not anticipate.**
+> >    `destination-eta` shipped `dispatch.callType: mobile-credential` with a weight vector
+> >    identical to `eta`'s — schema-valid, separately tested, and **bit-identical to `eta` at 8 of 8
+> >    matrix cells**. R1's mitigation column says *"every task names the file its behaviour is
+> >    called from"*; a profile in a JSON file has no such file, and that is the gap. Closed by
+> >    authoring `weights.rideTime: 0.5`. [§ D112](DECISIONS.md).
+> >
+> > **The mitigation that would have caught the second, stated for the next register:** a shipped
+> > *configuration* needs the same liveness evidence a shipped *symbol* does — an evaluation count
+> > with cross-car spread through a real run, and a flat gated-off side. `docs/09` § 8 R6-1 named
+> > this exact shape as a risk and its mitigation *"was never wired to a test"*.
+> >
+> > **R7 was also realised, in a smaller form:** a brief conflated two study arms, and a tree was
+> > reported clean when a file-sync client had polluted it. Both were caught by re-running rather
+> > than re-reading. See `MULTI_AGENT_PLAN.md`'s mistakes 4 and 5.
 
 **Status as of 2026-07-28, at close.** Closed: R2–R4, R6, R8, R9, R11–R23. Still live and permanent:
 R1, R5, R7, R10.
 
 | ID | Risk | Likelihood | Impact | Owner | Mitigation | Escalation trigger |
 |---|---|---|---|---|---|---|
-| R1 | **A ninth "configurable, tested in isolation, dead in the shipped path" defect ships.** Eight have already, and a *weaker* ninth is recorded rather than hidden: `fuzz/`'s only non-test caller is a test (**C24**) — defensible, because a fuzzer's product *is* a test, but it is not the answer `tune` gives `tuning/`. | High — it is the project's dominant failure mode | Critical. Invalidates every number the feature is supposed to produce, and passes every check the repo runs | orchestrator | Every task names the file its behaviour is *called from*; T1 extends the mechanical dead-code audit to `experiments/src/tuning/**`; T3 adds a generic search-space liveness sweep so a flat dimension fails a test rather than waiting for a reviewer | Any task reports "wired" without an instrumented run or a trajectory-difference assertion |
+| R1 | **A ninth "configurable, tested in isolation, dead in the shipped path" defect ships.** Eight have already, and a *weaker* ninth is recorded rather than hidden: `fuzz/`'s only non-test caller is a test (**C24**) — defensible, because a fuzzer's product *is* a test, but it is not the answer `tune` gives `tuning/`. **⚠️ REALISED TWICE — see the header. Nine in code, one in `data/`.** | High — it is the project's dominant failure mode | Critical. Invalidates every number the feature is supposed to produce, and passes every check the repo runs | orchestrator | Every task names the file its behaviour is *called from*; T1 extends the mechanical dead-code audit to `experiments/src/tuning/**`; T3 adds a generic search-space liveness sweep so a flat dimension fails a test rather than waiting for a reviewer | Any task reports "wired" without an instrumented run or a trajectory-difference assertion |
 | R2 | **T2's quantile fix silently invalidates published results.** Switching `pairedDifferenceEstimate` from z to t past n=25 widens every interval at the documented 50–200 budget | Certain (it is the point of the fix) | High. Verdicts flip; at least 3 of 148 real comparisons flipped in the review's own sweep | T2 + reviewer | T2 must enumerate every number published in `docs/` and `benchmark/` that its change moves, and hand the list to T4; T4 re-derives rather than copies | A published verdict flips from BETTER to INDISTINGUISHABLE and is not re-derived in docs |
 | R3 | **T3's fixes to inert tunables change simulator behaviour**, invalidating benchmark numbers T4 is documenting | High | Medium. Rework, not wrong results — provided it is caught | T3 + orchestrator | Merge order puts T3 before T2 before T4; T3 reports every shipped-run trajectory change it causes | T3 reports a behaviour change on a shipped profile without a regenerated benchmark number |
 | R4 | **Removing a dead dimension is mistaken for a fix.** Deleting `answer.reopenOnLateArrival` closes the finding without deciding whether late-arrival reopens *should* be modelled | Medium | Medium. Silently narrows the model and is unrecoverable from the register | T3 | Each inert dimension gets an explicit implement-vs-delete-vs-gate decision recorded in `DECISIONS.md`, not a default | T3 deletes a tunable with no recorded rationale |

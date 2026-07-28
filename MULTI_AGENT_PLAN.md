@@ -20,12 +20,14 @@
 > > profiles with per-cell derived budgets, a Pareto front over (AWT, energy, WT95) made possible by
 > > a new energy proxy, and Phase 7's interval at n = 150 on disjoint held-out seeds. **Phase 8 is
 > > accepted** ([`DECISIONS.md` § D108](DECISIONS.md)) and § 7's definition of done is reached. The
-> > suite figure below (3 138) is likewise superseded: **172 files / 3 172 tests**. The rows in
+> > suite figure below (3 138) is likewise superseded: **172 files / 3 220 tests** at true close
+> > (3 172 when this note was first written). The rows in
 > > § 1 and § 4 that still say "not started" are left as the close-of-delivery record, per the
 > > retire-in-place decision (§ D105); read [`docs/07-handoff.md`](docs/07-handoff.md) for current
 > > state.
 >
-> **Three process mistakes this plan made, recorded because they cost real work:**
+> **Five process mistakes this plan made, recorded because they cost real work.** All five are
+> variations on one theme: *a claim accepted because it was reported rather than measured.*
 > 1. **The orchestrator weakened an acceptance criterion.** § D27 raised Phase 6's metric clause and
 >    silently dropped its *building* clause. Caught by a builder (T23-F1), owned in § D99, closed by
 >    measurement in § D100. It happened inside a decision whose stated purpose was to strengthen a
@@ -35,13 +37,34 @@
 >    **main checkout's** `dist`. vitest was unaffected (`resolve.alias` maps to worktree-local
 >    source) but every built-artifact claim was about the wrong tree, and one task's CLI evidence had
 >    to be re-run. Fixed by `.worktree-setup.sh` from wave 2 on. See C8.
-> 3. **A document was merged without being linked**, leaving `README.md`'s table and `docs/09`
->    inconsistent. **A guard caught it** — `validation/documentation.test.ts` now fails on any
->    `docs/*.md` on disk and absent from README's table. See R20.
+> 3. **Two design documents were merged without being linked** from `README.md`'s table, leaving it
+>    inconsistent with `docs/`. **A guard caught it — both times** —
+>    `validation/documentation.test.ts` fails on any `docs/*.md` on disk and absent from that table.
+>    See R20.
+> 4. **A brief conflated two study arms.** The Phase 7 acceptance brief attributed one arm's interval
+>    (`c-deadband-2.582`, −1.105 s) and another arm's retention and energy figures (`c-deadband-2`,
+>    94 %, ~30 %) to a single row. Caught by **re-running `runPhase7Acceptance()`**, not by reading
+>    the brief. § D110.
+> 5. **A tree was reported clean when a file-sync client had polluted it** with duplicate artifacts.
+>    Fixed by `.gitignore`, and worth naming because "the tree is clean" is exactly the kind of claim
+>    that gets taken on report.
 >
 > **Where the live information is now.** [`docs/05-roadmap.md`](docs/05-roadmap.md) for phase
 > verdicts and evidence; [`docs/07-handoff.md`](docs/07-handoff.md) for current state, the permanent
 > guards, and the open debt; [`DECISIONS.md`](DECISIONS.md) for every decision and its rationale.
+>
+> ### ✅ **Final, after the closing wave (T29 / T30 / T31 / T32)**
+>
+> Three fix tasks landed after this board was retired, and a fourth made the prose true. **No phase
+> status moved**; four correctness defects in shipped code closed:
+> `destination-eta`'s inert destination ([§ D112](DECISIONS.md)), the viewer's and
+> `elevator-sim watch`'s suppressed-mean leak ([§ D111](DECISIONS.md)), the ninth dead seam
+> ([§ D114](DECISIONS.md)) and **C7** ([§ D114](DECISIONS.md)).
+> **Suite at true close: 172 files / 3 220 tests (3 211 pass, 9 skip), `tsc -b` clean.**
+> What remains open is enumerated in [§ D115](DECISIONS.md) and
+> [`docs/07-handoff.md`](docs/07-handoff.md) § 8 — Phase 6c, Phase 9, `packages/experiments`' browser
+> export, four ⚠️ UX rows, C4/C5/C24/C27/C30/C32, and the fact that **no test asserts any phase's
+> status.**
 
 Coordination artifact for the orchestrated completion of this project. Authoritative for task
 scope, ownership, dependency order and merge order. Updated as waves land.
@@ -64,7 +87,7 @@ Concretely, four bodies of work remain:
 |---|---|
 | Review register — 21 findings (1 critical, 13 major, 7 minor) | ✅ **all 21 closed** (wave 1) |
 | Phase 7 — Automated tuning | ✅ **ACCEPTED** 2026-07-27 (wave 1); re-confirmed 2026-07-28 |
-| Phase 4 — Visualization | ✅ **COMPLETE** — viewer, editor, live metrics overlay, playback from a stored seed, 87-scenario UX ledger |
+| Phase 4 — Visualization | ✅ **COMPLETE** — viewer, editor, live metrics overlay, playback from a stored seed, 87-scenario UX ledger *(88 after `T29`; see `packages/viz/UX.md` § 7.0)* |
 | Phase 6a / 6b — destination disclosure and dispatch | ✅ **ACCEPTED** against the criterion D27 raised |
 | Phase 6c — learned control | ⬜ **deferred out of the phase** with reasons (D28) — not dropped, and it needs its own acceptance question first |
 | Phase 6 — the criterion measured on the building it names | ✅ **closed by measurement** (D99 → D100): met by the Level-0 arm, **not** met by the Level-1 panel at any measured point |
