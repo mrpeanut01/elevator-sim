@@ -18,7 +18,7 @@ import { recordRun } from '../record/recordRun.js';
 import { buildLayout } from '../render/layout.js';
 import { describePreview } from '../render/preview.js';
 import { addCar, removeFloor, updateFloor } from './editorEdits.js';
-import { previewGeometry } from './editorPreview.js';
+import { floorsInBuildingOrder, previewGeometry } from './editorPreview.js';
 import { validateBuilding } from './editorValidate.js';
 
 let config: LoadedConfig;
@@ -155,5 +155,69 @@ describe('unserved floors — RV-08 in the editor', () => {
   it('is empty again once the floor itself is removed', () => {
     const source = sourceOf('garden-apartments');
     expect(previewGeometry(removeFloor(source, '6')).unservedFloorIds).toEqual([]);
+  }, 120_000);
+});
+
+describe('U1 — the editor\u2019s floor lists run the way the building does', () => {
+  /*
+   * The owner\u2019s report: the form listed `G, 2, 3, 4, 5, 6` top-to-bottom while the preview
+   * beside it drew `6` at the top and the lobby at the bottom. Two views of one building, on one
+   * screen, reading in opposite directions.
+   *
+   * `buildLayout` places a row at `yForHeight(floor.heightM)`, so the *picture* is ordered by
+   * height, ascending upward, no matter what order the floors arrive in. These assertions
+   * compare the list order against that pixel order rather than against a literal, so they
+   * cannot both be wrong in the same direction.
+   */
+  it.each(BUILDING_IDS)('%s: the list order is the picture order, top-first', (buildingId) => {
+    const geometry = previewGeometry(sourceOf(buildingId));
+    const layout = buildLayout({
+      width: 900,
+      height: 640,
+      floors: geometry.floors,
+      shafts: geometry.shafts,
+    });
+    const yById = new Map(layout.rows.map((row) => [row.floorId, row.y]));
+    const listed = floorsInBuildingOrder(geometry.floors.map((floor) => ({
+      id: floor.id,
+      index: floor.index,
+      heightM: floor.heightM,
+      population: floor.population,
+    })));
+    const ys = listed.map((floor) => yById.get(floor.id) ?? Number.NaN);
+    // Pixel y grows downward, so "top-first" is a non-decreasing sequence of y.
+    for (const [at, y] of ys.entries()) {
+      if (at === 0) continue;
+      expect(y, `${listed[at]?.id ?? '?'} must not be drawn above ${listed[at - 1]?.id ?? '?'}`)
+        .toBeGreaterThanOrEqual(ys[at - 1] ?? Number.NaN);
+    }
+    // …and the ground really is last, which is the sentence the owner wrote.
+    expect(listed.at(-1)?.index).toBe(Math.min(...geometry.floors.map((floor) => floor.index)));
+  }, 120_000);
+
+  it('orders by floor index, not by reversing the declaration array', () => {
+    /*
+     * `midtown-office.json` declares index 0 before index -1. Reversing the array would put the
+     * basement above the lobby in the form and below it in the picture \u2014 the same defect on one
+     * building instead of five, which is worse, because it looks fixed.
+     */
+    const source = sourceOf('midtown-office');
+    const declared = source.floors ?? [];
+    const reversed = [...declared].reverse().map((floor) => floor.id);
+    const ordered = floorsInBuildingOrder(declared).map((floor) => floor.id);
+    expect(ordered).not.toEqual(reversed);
+    expect(ordered.at(-1)).toBe(
+      declared.reduce((low, floor) => (floor.index < low.index ? floor : low), declared[0]!).id,
+    );
+    expect(ordered.at(0)).toBe(
+      declared.reduce((high, floor) => (floor.index > high.index ? floor : high), declared[0]!).id,
+    );
+  }, 120_000);
+
+  it('copies rather than reorders the document it was handed', () => {
+    const source = sourceOf('garden-apartments');
+    const before = (source.floors ?? []).map((floor) => floor.id);
+    floorsInBuildingOrder(source.floors ?? []);
+    expect((source.floors ?? []).map((floor) => floor.id)).toEqual(before);
   }, 120_000);
 });

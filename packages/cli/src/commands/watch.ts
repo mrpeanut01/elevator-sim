@@ -21,6 +21,7 @@ import {
   SimulationError,
   type PassengerModel,
   type ResolvedBuilding,
+  type RunSummary,
   type SimulationResult,
 } from '@elevator-sim/core';
 
@@ -42,7 +43,7 @@ import {
 } from '../args.js';
 import { loadData, resolveDataDir } from '../data.js';
 import { EXIT_INTERNAL, UsageError, didYouMean } from '../errors.js';
-import { bar, clock, count, num, secs } from '../format.js';
+import { bar, clock, count, num, renderRunningMean } from '../format.js';
 import { BINARY, printCommandHelp, type CommandHelp } from '../help.js';
 import type { Output } from '../output.js';
 import { planRun, printRunReport, type RunPlan } from './run.js';
@@ -287,7 +288,7 @@ async function play(
       const t = Math.min(endS, ((Date.now() - startedWall) / 1000) * speed);
       queues.advanceTo(t);
       out.raw(CURSOR_HOME);
-      for (const line of renderFrame(out, plan, building, floors, visibleShafts, shafts.length, loads, queues, t, endS, speed, frame.rowsPerFloor, passengerModelOfRun(result))) {
+      for (const line of renderFrame(out, plan, building, floors, visibleShafts, shafts.length, loads, queues, t, endS, speed, frame.rowsPerFloor, passengerModelOfRun(result), result.summary)) {
         out.raw(`${line}${CLEAR_LINE}\n`);
       }
       if (stopped || t >= endS) break;
@@ -356,6 +357,7 @@ function renderFrame(
   speed: number,
   rowsPerFloor: number,
   model: PassengerModel,
+  summary: RunSummary,
 ): readonly string[] {
   const { bold, dim, cyan, green, yellow, red, magenta } = out.palette;
   const lines: string[] = [];
@@ -364,14 +366,27 @@ function renderFrame(
     ` ${bold(building.name)} ${dim('·')} ${cyan(plan.dispatcherId)} ${dim('·')} ${plan.trafficProfileId}` +
       `   ${dim('seed')} ${cyan(plan.seedText)} ${dim(`· ×${num(speed, 0)} speed`)}`,
   );
-  const meanWait = queues.runningMeanWaitS;
+  /*
+   * `T29`/`D1`: the running mean is suppressed on the grounds the summary already decided, and
+   * the reason leads the frame rather than waiting for `printRunReport` at the end of playback.
+   *
+   * This screen used to print `mean wait so far 41.5 s` for the whole of a run that the report
+   * two seconds later called `AWT  SUPPRESSED` — the same defect the web viewer's canvas header
+   * had, on the other surface, found by checking rather than trusting that the viewer was the
+   * only one.
+   */
+  const mean = renderRunningMean(summary, queues.runningMeanWaitS);
   lines.push(
     ` ${bold(clock(t))} ${dim(`/ ${clock(endS)}`)}   ` +
       `${dim('waiting')} ${bold(String(queues.totalWaiting))}   ` +
       `${dim('served')} ${String(queues.served)}   ` +
-      `${dim('mean wait so far')} ${bold(Number.isFinite(meanWait) ? secs(meanWait, 1) : '—')}`,
+      `${dim('mean wait so far')} ${mean.quotable ? bold(mean.text) : red(mean.text)}`,
   );
-  lines.push('');
+  if (!mean.quotable && mean.reason !== undefined) {
+    lines.push(` ${red(`AWT suppressed — ${mean.reason}`)}`);
+  } else {
+    lines.push('');
+  }
 
   const header =
     ` ${padEnd(dim('floor'), FLOOR_LABEL_WIDTH)}` +
@@ -587,6 +602,15 @@ function playPlain(
     `  ${bold(building.name)} ${dim('·')} ${cyan(plan.dispatcherId)} ${dim('·')} seed ${cyan(plan.seedText)}`,
   );
   out.line(dim(`  ${landingLegend(passengerModelOfRun(result))}`));
+  // `T29`/`D1`: said once, above the table, rather than left to `printRunReport` after the last
+  // row — a column of `SUPPRESSED` with no reason beside it explains nothing.
+  if (!result.summary.awtIsValid) {
+    out.line(
+      out.palette.red(
+        `  AWT suppressed — ${result.summary.awtInvalidReason ?? 'this run’s average waiting time is not reportable'}`,
+      ),
+    );
+  }
   out.line();
   const labels = shafts.slice(0, 8);
   out.line(
@@ -606,10 +630,11 @@ function playPlain(
         return padEnd(`${floorIdAt(shaft.track, t)}${arrow}${reading.occupants}`, 9);
       })
       .join('');
-    const meanWait = queues.runningMeanWaitS;
+    // `T29`/`D1`, the second of this command's two render paths.
+    const mean = renderRunningMean(result.summary, queues.runningMeanWaitS, { unit: false });
     out.line(
       `  ${padEnd(clock(t), 8)}${padStart(String(queues.totalWaiting), 8)}${padStart(String(queues.served), 8)}` +
-        `${padStart(Number.isFinite(meanWait) ? num(meanWait, 1) : '—', 11)}   ${cars}`,
+        `${padStart(mean.text, 11)}   ${cars}`,
     );
   }
   queues.advanceTo(endS);

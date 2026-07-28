@@ -13,6 +13,7 @@ import {
   renderAchievedInterval,
   renderAwt,
   renderLongestWait,
+  renderRunningMean,
   renderEstimate,
   renderSaturation,
   renderSignedEstimate,
@@ -176,6 +177,49 @@ describe('renderAwt — the saturated case', () => {
     const rendered = renderAwt(summary({ awtIsValid: true, meanS: Number.NaN }));
     expect(rendered.quotable).toBe(false);
     expect(rendered.text).toBe(ABSENT);
+  });
+});
+
+describe('renderRunningMean — T29/D1, the live figure `watch` used to print unconditionally', () => {
+  /*
+   * `commands/watch.ts` printed `mean wait so far 41.5 s` on both of its render paths for the
+   * whole of a run whose report, seconds later on the same terminal, said `AWT  SUPPRESSED`.
+   * Being a *running* figure rather than the windowed AWT does not rescue it: it is a mean of the
+   * same waits over the same run, and docs/03 forbids a mean for a queue that did not settle.
+   */
+  it('prints the running figure it was handed, not a constant', () => {
+    const at = (value: number, unit = true): string =>
+      renderRunningMean(summary({ awtIsValid: true }), value, { unit }).text;
+    expect(renderRunningMean(summary({ awtIsValid: true }), 41.52).quotable).toBe(true);
+    expect(at(41.52)).toBe('41.5 s');
+    // A second value, because one is a constant with extra steps — this package has shipped a
+    // frame seven of whose eight fields could be literals with the suite still green.
+    expect(at(7.04)).toBe('7.0 s');
+    expect(at(41.52, false)).toBe('41.5');
+    expect(at(7.04, false)).toBe('7.0');
+  });
+
+  it('prints SUPPRESSED with no digits at all when it does not', () => {
+    const rendered = renderRunningMean(
+      summary({ awtIsValid: false, awtInvalidReason: 'the queue diverged over the window' }),
+      41.52,
+    );
+    expect(rendered.quotable).toBe(false);
+    expect(rendered.text).toBe('SUPPRESSED');
+    expect(rendered.text).not.toMatch(/\d/);
+    expect(rendered.reason).toContain('diverged');
+    // …on both call sites, so the tabular fallback cannot keep its own opinion.
+    expect(
+      renderRunningMean(summary({ awtIsValid: false }), 41.52, { unit: false }).text,
+    ).not.toMatch(/\d/);
+  });
+
+  it('still says "nobody yet" rather than "not admissible" on a reportable run', () => {
+    // Two different facts. An em dash means nobody has been served; SUPPRESSED means the figure
+    // exists and may not be quoted. Collapsing them would be a smaller lie in place of a larger.
+    const rendered = renderRunningMean(summary({ awtIsValid: true }), Number.NaN);
+    expect(rendered.text).toBe(ABSENT);
+    expect(rendered.quotable).toBe(false);
   });
 });
 
