@@ -55,6 +55,7 @@ import {
   pct,
   renderAchievedInterval,
   renderAwt,
+  renderLongestWait,
   renderSaturation,
   secs,
 } from '../format.js';
@@ -343,12 +344,21 @@ export function printRunReport(out: Output, plan: RunPlan, result: SimulationRes
       : red('SUPPRESSED'),
     24,
   );
-  field(
-    out,
-    'longest wait',
-    awt.quotable ? secs(summary.waiting.maxS, 1) : red('SUPPRESSED'),
-    24,
-  );
+  // Never suppressed, and read off `serviceLevel` rather than `waiting.maxS`: see
+  // `format.ts` § renderLongestWait. The tail is the evidence a suppressed mean is hiding, and
+  // `waiting.maxS` is blind to a passenger who never boarded at all.
+  const longest = renderLongestWait(summary);
+  if (longest !== undefined) {
+    field(
+      out,
+      'longest wait',
+      longest.quotable ? longest.text : red(bold(longest.text)),
+      24,
+    );
+    if (!longest.quotable && longest.reason !== undefined) {
+      out.line(red(`  ${' '.repeat(24)}${longest.reason}`));
+    }
+  }
   if (summary.waiting.unservedCount > 0) {
     field(
       out,

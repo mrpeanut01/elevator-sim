@@ -251,7 +251,7 @@ describe('every parameter core declares is accounted for', () => {
         expect(SPACE.byId.has(row.id), where).toBe(accepted);
       }
     }
-    // Ten schemas, 98 declared rows including the four `answer.*`/`car.*` that
+    // Ten schemas, 99 declared rows including the four `answer.*`/`car.*` that
     // `CAR_PARAMETERS` re-declares by spreading `LOAD_SENSOR_PARAMETERS`. Pinned so a schema
     // that stops being found — by being renamed, or by moving to a declaration form the scan
     // does not match — fails rather than silently shrinking the space.
@@ -264,7 +264,15 @@ describe('every parameter core declares is accounted for', () => {
     // could tune its own walk distance could tune away its own cost — so it is declared, counted,
     // and correctly absent from the searchable space, which is exactly the discrimination the
     // biconditional above exists to prove.
-    expect(rows).toBe(98);
+    //
+    // **98 → 99 in T21, with the space unmoved at 49**, and that asymmetry is the same
+    // discrimination again. `metrics.maxWaitHorizonS` (`METRICS_PARAMETERS`) is the abandonment
+    // horizon `RunSummary.awtIsValid`'s fourth gate is stated in. It is an *analysis* parameter —
+    // changing it re-reads a stored run rather than re-simulating one — so like every other
+    // `metrics.*` row it is declared and counted here and is correctly not authorable in a
+    // dispatcher profile. A dispatcher that could tune the threshold at which its own long waits
+    // stop being reported would be tuning away its own evidence.
+    expect(rows).toBe(99);
     expect(SPACE.parameters.length).toBe(49);
     // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
     // always said `false` would satisfy the biconditional above only by accident.

@@ -19,6 +19,7 @@
  *    evidence for the choice, and pinning it would turn a measurement into a fixture.
  */
 
+import { DEFAULT_MAX_WAIT_HORIZON_S } from '@elevator-sim/core';
 import { describe, expect, it } from 'vitest';
 
 import type { TrafficArmSpec } from '../runner/types.js';
@@ -68,6 +69,41 @@ describe('Phase 5 — the operating points are the highest at which an interval 
       );
       expect(invalid).toEqual([]);
       expect(result.saturated).toBe(false);
+
+      /*
+       * **The margin under the abandonment horizon, measured rather than assumed.**
+       *
+       * `RunSummary.awtIsValid`'s fourth gate (T21) suppresses a mean whose window contains a wait
+       * past `DEFAULT_MAX_WAIT_HORIZON_S`. `CLAUDE.md`'s standing objection to any suppression rule
+       * is that one which fires everywhere computes nothing, so the gap between the horizon and the
+       * worst wait these operating points actually produce is asserted here, at the budget the
+       * benchmark uses, rather than argued for in a docstring. The assertion above would already
+       * fail if the gate fired; this prints the distance, so a change that halves the margin is
+       * visible before it becomes a failure.
+       */
+      const worst = result.cells.map((cell) => ({
+        arm: cell.dispatcherArmId,
+        longestS: Math.max(
+          ...cell.replications.map((record) => record.summary.serviceLevel.longestWaitS),
+        ),
+      }));
+      const worstOverall = worst.reduce((a, b) => (b.longestS > a.longestS ? b : a));
+      console.log(
+        `  longest single wait at n = ${spec.replications}: ${worstOverall.longestS.toFixed(1)} s ` +
+          `(${worstOverall.arm}), against a ${DEFAULT_MAX_WAIT_HORIZON_S} s abandonment horizon — ` +
+          `${(DEFAULT_MAX_WAIT_HORIZON_S / worstOverall.longestS).toFixed(1)}× of margin`,
+      );
+      for (const cell of result.cells) {
+        for (const record of cell.replications) {
+          expect(record.summary.serviceLevel.verdict, `${spec.label}: ${cell.dispatcherArmId}`).toBe(
+            'served',
+          );
+        }
+      }
+      // Not a tautology of the line above: the horizon must sit clear of this operating point by
+      // a factor, not by a second. Measured: 4.4× here, 6.6× on Garden, 7.4× on Secure Tower,
+      // and 2.6× on Midtown interfloor-mix at n = 1000, which is the tightest of the five.
+      expect(worstOverall.longestS).toBeLessThan(DEFAULT_MAX_WAIT_HORIZON_S / 2);
     }
   }, TIMEOUT_MS);
 
@@ -285,6 +321,23 @@ describe('Phase 6a — the interfloor-mix operating points, censused rather than
     // Phase 5's ceilings are not reused, and this is the assertion that says so: `nearest-car`
     // diverges at 287 on Midtown up-peak and never here, on the same building.
     expect(firstInvalidByArm.get(BASELINE_PROFILE)).toBeUndefined();
+
+    // The margin under the abandonment horizon, on the point with the longest tail of the five
+    // shipped ones, at the largest budget any of them is censused at. See the same block in
+    // `at-budget` above for why this is asserted rather than argued.
+    const worst = result.cells
+      .map((cell) => ({
+        arm: cell.dispatcherArmId,
+        longestS: Math.max(
+          ...cell.replications.map((record) => record.summary.serviceLevel.longestWaitS),
+        ),
+      }))
+      .reduce((a, b) => (b.longestS > a.longestS ? b : a));
+    console.log(
+      `  longest single wait over 1000 replications: ${worst.longestS.toFixed(1)} s (${worst.arm}), ` +
+        `against a ${DEFAULT_MAX_WAIT_HORIZON_S} s abandonment horizon`,
+    );
+    expect(worst.longestS).toBeLessThan(DEFAULT_MAX_WAIT_HORIZON_S / 2);
   }, TIMEOUT_MS);
 
   it('finds the conventional arms invalid from replication zero on Secure Tower interfloor-mix', async () => {

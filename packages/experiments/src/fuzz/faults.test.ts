@@ -147,18 +147,41 @@ describe('the two behavioural properties fail on a real run with a faulty contro
     expect(outcome.violations.some((violation) => violation.property === 'conservation')).toBe(false);
   }, 60_000);
 
+  /**
+   * **This demonstration moved a layer down in T21, and the move is the finding.**
+   *
+   * The fault is unchanged: one floor's calls are refused until well past the end of demand, then
+   * released, so everybody is eventually collected. The run stays uncensored and its queue never
+   * diverges — which used to mean `awtIsValid` stayed `true`, and P6 was the only thing in the
+   * project that noticed the fifteen-minute wait.
+   *
+   * `RunSummary.awtIsValid` now has a fourth gate (`core/src/metrics/summarize.ts` §
+   * `diagnoseServiceLevel`, and `packages/core/DECISIONS-T21.md`), so **the model catches this
+   * fault itself** and P6's escape clause — *"a fifteen-minute wait is legitimate in a run that
+   * says so"* — is satisfied. A version of this test that still demanded a P6 violation would be
+   * demanding that the simulator go back to publishing a mean beside an abandoned passenger.
+   *
+   * So both halves are asserted, on the same faulted run, and the second is what keeps P6
+   * load-bearing rather than merely satisfied:
+   *
+   * 1. with the model's gate **on**, the run refuses to publish and names the passenger, and P6
+   *    is correctly silent;
+   * 2. with the model's gate **off** — `maxWaitHorizonS` past anything the run can reach, which is
+   *    the gate's own off switch — the original condition returns exactly, and `checkStarvation`
+   *    fires on it. `checkStarvation` itself is unchanged, line for line.
+   */
   it('P6 starvation — one landing left unallocated long enough to blow the bound', () => {
-    // One floor's calls are refused until well past the end of demand, then released, so
-    // everybody is eventually collected: the run stays uncensored, `awtIsValid` stays true and
-    // the saturation verdict stays `stable`. That is exactly the condition the property is
-    // about — a run that publishes a mean while somebody waited a quarter of an hour.
-    //
     // The (case, floor) pair is **searched for** in a fixed order rather than pinned to a magic
     // seed, and the search is the interesting half of the demonstration: on a case that is
     // already near capacity, starving a whole landing makes the queue diverge and the simulator
-    // *correctly* flags the run — so the property does not fire, and should not. Only on a case
-    // the fault leaves otherwise healthy is a long wait a defect rather than a disclosure.
-    let fired: Violation[] = [];
+    // *correctly* flags the run on the trend gate — so the property does not fire, and should
+    // not. Only on a case the fault leaves otherwise healthy is a long wait a defect rather than
+    // a disclosure. The search runs with the fourth gate off, so it looks for the same shape of
+    // case it always looked for.
+    const GATE_OFF = { maxWaitHorizonS: Number.MAX_SAFE_INTEGER } as const;
+    let ungated: Violation[] = [];
+    let gated: Violation[] = [];
+    let gatedResult: SimulationResult | undefined;
     let starved = '';
 
     search: for (const seed of STANDARD_CORPUS) {
@@ -166,24 +189,51 @@ describe('the two behavioural properties fail on a real run with a faulty contro
       const releaseAtS = candidate.durationS + PROPERTY_BOUNDS.starvationBoundS + 120;
       const relaxed: FuzzCase = { ...candidate, drainGraceS: releaseAtS + 1200 };
       for (const floor of (candidate.building.floors ?? []).filter((entry) => entry.population > 0)) {
-        const outcome = evaluateCase(relaxed, {
-          config,
-          createPolicy: starvingFloorUntil(floor.id, releaseAtS),
+        const createPolicy = starvingFloorUntil(floor.id, releaseAtS);
+        const simConfig = fuzzSimulationConfigFor(relaxed, { config, createPolicy });
+        const contextFor = (result: SimulationResult): PropertyContext => ({
+          case: relaxed,
+          building: simConfig.building,
+          dispatcherProfile: simConfig.dispatcherProfile,
+          elevatorSpecs: config.elevatorSpecs,
+          result,
+          bounds: PROPERTY_BOUNDS,
         });
-        if (!outcome.violations.some((violation) => violation.property === 'starvation')) continue;
-        fired = [...outcome.violations];
+
+        const off = runSimulation({ ...simConfig, summarize: GATE_OFF });
+        const offViolations = checkAll(contextFor(off));
+        if (!offViolations.some((violation) => violation.property === 'starvation')) continue;
+
+        ungated = offViolations;
+        gatedResult = runSimulation(simConfig);
+        gated = checkAll(contextFor(gatedResult));
         starved = `${candidate.caseId} floor ${floor.id}, released at t=${String(releaseAtS)}`;
         break search;
       }
     }
 
-    show(`P6 starvation (${starved})`, fired);
-    expect(fired.some((violation) => violation.property === 'starvation')).toBe(true);
+    show(`P6 starvation, model gate OFF (${starved})`, ungated);
+    show('P6 starvation, model gate ON', gated);
+
+    // 1. The property fires on the fault, on a real run of the real simulator.
+    expect(ungated.some((violation) => violation.property === 'starvation')).toBe(true);
     // Not merely a restatement of "the run went badly": nobody was lost and nobody was
     // misdelivered, so P1-P4 stay quiet and only the bound fires.
-    expect(fired.some((violation) => violation.property === 'conservation')).toBe(false);
-    expect(fired.some((violation) => violation.property === 'destination')).toBe(false);
-    expect(fired.some((violation) => violation.property === 'capacity')).toBe(false);
-    expect(fired.some((violation) => violation.property === 'monotonic-time')).toBe(false);
+    for (const quiet of ['conservation', 'destination', 'capacity', 'monotonic-time'] as const) {
+      expect(ungated.some((violation) => violation.property === quiet)).toBe(false);
+    }
+
+    // 2. With the gate on, the same run discloses the same passenger and P6 stands down.
+    expect(gatedResult).toBeDefined();
+    const summary = (gatedResult as SimulationResult).summary;
+    console.log(
+      `  model gate ON: verdict=${summary.serviceLevel.verdict}, awtIsValid=${String(summary.awtIsValid)}, ` +
+        `longest ${summary.serviceLevel.longestWaitS.toFixed(1)} s (leg ${String(summary.serviceLevel.longestWaitLegId)})`,
+    );
+    expect(summary.saturation.verdict).toBe('stable');
+    expect(summary.serviceLevel.verdict).toBe('starved');
+    expect(summary.serviceLevel.longestWaitS).toBeGreaterThan(PROPERTY_BOUNDS.starvationBoundS);
+    expect(summary.awtIsValid).toBe(false);
+    expect(gated).toEqual([]);
   }, 120_000);
 });
