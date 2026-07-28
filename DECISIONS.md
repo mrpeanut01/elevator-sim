@@ -80,3 +80,45 @@ package to run tests, so a shared dependency tree is sufficient and avoids five 
 
 **Impact.** Any task that needs to run the *built* CLI (`node packages/cli/dist/index.js`) must run
 `npx tsc -b` in its own worktree first; `dist/` is gitignored so it will not conflict at merge.
+
+---
+
+## D5 — The Phase 4 renderer consumes a *recorded* run, not a live `Simulation`
+
+**Date:** 2026-07-27 · **Owner:** T5 · **Ratified by:** orchestrator
+
+**Context.** Phase 4's renderer must sample `Car.positionAt(t)` at display framerate *between*
+kernel events. That needs a time source. `Simulation.run()` is one synchronous call with no live
+clock to sample, and `CLAUDE.md` invariant 3 forbids adding one to `core/`.
+
+**Alternatives.** (a) Invert control — a tick loop or wall clock driving the simulation.
+(b) Render a finished, serialisable, seed-bearing `VizRecording`. (c) Support both.
+
+**Chosen:** (b). **Why:** (a) puts a clock in `core` and breaks invariant 3. A shipped building
+simulates in milliseconds, so running first and sampling afterwards costs nothing perceptible, and
+it is what makes Phase 4's acceptance criterion — "a stored run replays visually identically" —
+mechanically checkable in Node without a browser.
+
+**Impact.** Wave 2's live metrics overlay reads from the recording's folded step series rather than
+from a running simulation. The building editor is unaffected (it operates on config, not runs).
+Long runs hold all frames in memory; streaming is wave-2 work. Recorded runs are `postMessage`-able,
+so moving simulation off the main thread stays open.
+
+---
+
+## D6 — `npm install` is deferred until wave 1's builders finish
+
+**Date:** 2026-07-27 · **Owner:** orchestrator
+
+**Context.** `packages/viz` declares `vite` as a devDependency and `package-lock.json` is stale, so
+`npm ci` would fail. The obvious fix is to run `npm install` immediately.
+
+**Alternatives.** (a) Run it now. (b) Defer to the end of the wave.
+
+**Chosen:** (b). **Why:** per D4 the root `node_modules` is symlinked into every live worktree.
+Reinstalling while three builders are running their suites against it would mutate their dependency
+tree mid-run and produce failures that look like defects in their work. The tree already contains
+vite 8.1.5 (vitest brings it), so nothing is blocked until the lock is regenerated.
+
+**Impact.** Tracked as C1 in `AGENT_STATUS.md`. Wave 1 does not close until it is done and the
+suite is re-run against the refreshed lock.

@@ -10,7 +10,7 @@ Live state of every task. Updated by the orchestrator as reports come in.
 | T2 | statistics builder | `fix/statistics-integrity` | `.worktrees/T2-statistics` | 🟡 in flight | — | await report + blast-radius list |
 | T3 | inert-tunables builder | `fix/inert-tunables` | `.worktrees/T3-inert-tunables` | 🟡 in flight | — | await report + behaviour-change list |
 | T4 | docs builder | `docs/register-drift` | `.worktrees/T4-docs` | ⬜ held | wave-1 merges | dispatch after T1–T3 merge |
-| T5 | viz foundation builder | `feat/viz-foundation` | `.worktrees/T5-viz` | 🟡 in flight | — | await report + UX inventory |
+| T5 | viz foundation builder | `feat/viz-foundation` | `.worktrees/T5-viz` | ✅ **merged** `a3cb937` | — | independent review in flight |
 
 ## Review / test assignments
 
@@ -20,7 +20,15 @@ Live state of every task. Updated by the orchestrator as reports come in.
 | T2 | required (high risk — changes every published interval) | required | — |
 | T3 | required (high risk — writes `sim/simulation.ts`) | required | — |
 | T4 | orchestrator re-verification | — | — |
-| T5 | pending | pending | — |
+| T5 | 🟡 in flight — adversarial, instructed to run not read | orchestrator (post-merge suite) | pending |
+
+## Carried forward — must be actioned before wave 1 closes
+
+| # | Item | Raised by | Owner |
+|---|---|---|---|
+| C1 | `npm install` to refresh `package-lock.json` for `packages/viz`'s `vite` devDependency. **Deferred deliberately** — the root `node_modules` is symlinked into every live worktree, so reinstalling mid-flight would disrupt running agents. Run once wave 1's builders are all done. `npm ci` would fail until then. | T5 | orchestrator |
+| C2 | `core`'s barrel re-exports `loadConfig`, which imports `node:fs/promises`, so any browser import of `@elevator-sim/core` throws at module evaluation. `config/loader.ts`'s own header documents the opposite intent ("a browser build can import `parseBuilding`/`resolveBuilding` from `./parse.js` … Phase 4's web viewer consuming core"). Needs an fs-free subpath export. Worked around in the dev server only. | T5 | new task, wave 2 |
+| C3 | `patternSwitching` roadmap bullet may need marking not-done — pending T3's decision. | plan | T4 |
 
 ## Baseline
 
