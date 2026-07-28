@@ -36,7 +36,12 @@ import {
   type SimulationResult,
 } from '@elevator-sim/core';
 
-import { resolveCase, type GenerateOptions } from './generate.js';
+import {
+  carriesCallType,
+  legalCallTypesFor,
+  resolveCase,
+  type GenerateOptions,
+} from './generate.js';
 import { checkAll, type PropertyContext } from './properties.js';
 import { PROPERTY_BOUNDS, type FuzzCase, type FuzzOutcome, type PropertyBounds, type Violation } from './types.js';
 
@@ -64,7 +69,7 @@ export function generateOptionsFrom(
 ): GenerateOptions {
   return {
     elevatorSpecs: config.elevatorSpecs,
-    dispatcherProfileIds: config.dispatcherProfiles.profiles.map((profile) => profile.id),
+    dispatcherProfiles: config.dispatcherProfiles.profiles,
     trafficProfileIds: config.trafficProfiles.profiles.map((profile) => profile.id),
     ...(space === undefined ? {} : { space }),
   };
@@ -82,28 +87,60 @@ export function generateOptionsFrom(
  * `dispatch.passengerAssignment: 'panel'` declares
  * `activeWhen: { 'dispatch.callType': ['destination-entry', 'mobile-credential'] }`, and
  * `resolveDispatchConfig` **refuses** the pair `panel` + `up-down-buttons` outright: a panel that
- * cannot ask for a destination is an up/down button (`the root DECISIONS.md` § T16-D1).
- * `generate.ts` picks a call type from the two conventional values without consulting the profile,
- * so overriding it onto Phase 6b's shipped `destination-panel` used to construct a configuration
- * the schema declares inadmissible and every fuzz case naming that profile threw — measured, 1
- * corpus counterexample and the whole trace-invariance suite.
+ * cannot ask for a destination is an up/down button (`the root DECISIONS.md` § T16-D1). A helper
+ * that overrides a conditional dimension and leaves its dependents behind produces a profile
+ * nobody could author, so dropping the dependent is the same rule `activeWhen` states, applied in
+ * the same direction.
  *
- * The fix is here rather than in the generator or in `data/` because this is the function that
- * *moves* the gate: a helper that overrides a conditional dimension and leaves its dependents
- * behind produces a profile nobody could author. Dropping the dependent is the same rule
- * `activeWhen` states, applied in the same direction.
+ * ## What that drop is no longer doing, and why it stays (C32)
  *
- * **Cross-boundary note.** This file is outside T18's ownership (`packages/experiments/src/fuzz/**`).
- * The edit is made rather than handed back for the reason `the root DECISIONS.md` § T16-D10 gives for
- * the same shape: leaving it red blocks integration for concurrent branches over a change that is
- * mechanical and whose alternative — not shipping the profile — is the task. See
- * `the root DECISIONS.md` § T18-D7.
+ * It used to be load-bearing for the **generator**: `generate.ts` picked a call type from two
+ * conventional values without consulting the profile, so a case naming `destination-panel` beside
+ * `up-down-buttons` reached here as a configuration the schema declares inadmissible, and this line
+ * quietly rewrote it into a different dispatcher. Measured over the shipped seeds: **1 of the 64
+ * pinned corpus cases (`fuzz-118`) and 61 of 2 000 deep cases**, plus 61 more deep cases of
+ * `destination-eta` × `up-down-buttons` that were not refused and ran with `weights.rideTime`
+ * inert. The generator now draws the call type from {@link legalCallTypesFor}, so **no generated
+ * case can reach the drop** — {@link assertCarriesCallType}, called below on every case, is what
+ * turns that from a claim into a check.
+ *
+ * The line is kept rather than deleted, for two reasons and neither is caution:
+ *
+ * 1. It has a caller that is not the generator. `validation/adversarial.test.ts` builds the
+ *    **conventional control arm** of a destination-dispatch comparison with exactly
+ *    `withCallType(panel, 'up-down-buttons')`, and asserts the drop by name — deliberately, because
+ *    the control has to be the same profile with the destination taken away.
+ * 2. `withCallType` is on the package barrel as the documented way to move this gate. A public
+ *    helper that produces an inadmissible profile for one of its three legal arguments would be a
+ *    trap, and the fix for that is not to remove the argument from the *generator* only.
+ *
+ * So: the generator no longer relies on it, and this file no longer lets it be relied on silently.
  */
 export function withCallType(profile: DispatcherProfile, callType: CallType): DispatcherProfile {
   const carriesDestination = callType === 'destination-entry' || callType === 'mobile-credential';
   const dispatch = { ...profile.dispatch, callType };
   if (!carriesDestination) delete dispatch.passengerAssignment;
   return { ...profile, dispatch };
+}
+
+/**
+ * The generator's side of the bargain, checked rather than trusted.
+ *
+ * A case whose `(profile, callType)` pair the profile cannot carry is a **generator** defect — the
+ * same class as an unroutable building, and handled the same way: thrown rather than filtered, so
+ * it cannot be mistaken for a simulator finding or absorbed into a rewrite nobody sees. It is not a
+ * `ConfigError`, so `evaluateCase` does not turn it into a skip.
+ *
+ * @throws Error if the pair is one {@link legalCallTypesFor} would not have produced.
+ */
+export function assertCarriesCallType(profile: DispatcherProfile, callType: CallType): void {
+  if (carriesCallType(profile, callType)) return;
+  throw new Error(
+    `fuzz case names dispatcher "${profile.id}" under dispatch.callType "${callType}", which that ` +
+      `profile cannot carry: the pair is either refused by resolveDispatchConfig or leaves a tunable ` +
+      `the profile authored inert. legalCallTypesFor("${profile.id}") = ` +
+      `${legalCallTypesFor(profile).join(', ')}. This is a bug in generate.ts, not a simulator finding.`,
+  );
 }
 
 /**
@@ -120,6 +157,7 @@ export function fuzzSimulationConfigFor(fuzzCase: FuzzCase, options: RunOptions)
   if (base === undefined) {
     throw new Error(`fuzz case "${fuzzCase.caseId}" names unknown dispatcher "${fuzzCase.dispatcherProfileId}"`);
   }
+  assertCarriesCallType(base, fuzzCase.callType);
   return {
     building: resolveCase(fuzzCase, generateOptionsFrom(config)),
     dispatcherProfile: withCallType(base, fuzzCase.callType),
