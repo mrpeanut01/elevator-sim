@@ -1,68 +1,66 @@
 /**
- * Service mode, injected — and an exact statement of how much of it that reaches.
+ * Service mode, in two arms — **what the dispatcher believes** and **what the car is** — and the
+ * measured difference between them.
  *
  * Two of Phase 8's adversarial cases are **"all cars out of service"** and **"mid-run mode
- * changes"**. Neither is reachable from any configuration this repository can author, and the
- * honest thing is to say precisely where the wall is before saying what is done about it.
+ * changes"**. When this module was written neither was reachable from any authorable
+ * configuration, so it did the reachable half through a `Proxy` and named the wall. The wall is
+ * gone: `carConfigSchema.mode` and `BuildingConfig.serviceEvents` both exist, both flow through
+ * `resolveBuilding` → `CarInit.mode` / `Car.setMode`, and the physical half is now an ordinary
+ * building config. The `Proxy` stays anyway, because the *difference between the two arms is a
+ * real property of the simulator* and is worth pinning rather than losing.
  *
- * ## What exists in `core`, and what does not
+ * ## The two arms
  *
- * The *model* is complete. `Car` has a private `#mode`, a `setMode()` that releases the work the
- * new mode cannot do, `CarInit.mode` for the initial value, `SERVICE_MODES` with four values, and
- * `infeasibilityOf()` returns `'serviceMode'` as its **first** check — before service zoning,
- * before access, before capacity. `INELIGIBILITY_REASONS` carries the reason and
- * `dispatch/lifecycle.ts` defaults to it.
+ * | | arm A — {@link seenAsMode} | arm B — an authored `mode` / `serviceEvents` |
+ * |---|---|---|
+ * | what changes | the `mode` on every `CarSnapshot` the group controller is shown | the car's own `#mode` |
+ * | how | `SimulationConfig.createPolicy` | `data`-shaped building config, through `parseBuilding` |
+ * | `infeasibilityOf` answers `'serviceMode'` | yes | yes |
+ * | hall calls **allocated** | none | none |
+ * | committed hall calls released and re-offered | **no** — `Car.setMode` is never called | **yes** |
+ * | car calls from people already aboard | honoured | refused (`registerCarCall` throws) |
+ * | a car may come back | as the dispatcher sees it | physically |
+ * | **passengers still board** | **yes** | **no** |
  *
- * What is missing is every path from a configuration to that field:
+ * ## The last row is the one worth pinning, and it is not a defect
  *
- * | Gap | Where |
- * |---|---|
- * | `carConfigSchema` is a `z.strictObject` with no `mode` key | `core/src/config/schema.ts` |
- * | so `ResolvedCar` carries no mode, and `Simulation` never passes `CarInit.mode` | `core/src/sim/simulation.ts` |
- * | `Simulation` holds `#carsById` **private**, with no accessor | same |
- * | nothing schedules a `setMode` at a simulated time | same |
+ * `sim/simulation.ts` `#loadWhileIdle` opens the doors of a car already standing at a landing
+ * with a queue **without consulting the dispatcher**, deliberately: its docstring explains that
+ * under a lobby parking strategy, making every free car wait for its own allocation "serves one
+ * car at a time while three sit closed a metre away". So in arm A the fleet is *dispatcher-
+ * blinded* — the group allocates nothing, and a car parked where the queue is keeps collecting
+ * people anyway, who then press car calls that move it. In arm B the fleet is *physically
+ * recalled* — `#carCanCarry` checks `acceptsHallCalls` and refuses, so nobody boards at all.
  *
- * The last two are what close the door on the injection seams as well. `SimulationConfig`
- * exposes `createPolicy` and `createPredictor`; neither is handed a `Car`. A policy sees
- * `readonly CarSnapshot[]` — plain data — so the strongest thing an injected policy can do is
- * change **what the dispatcher believes**, and it cannot change what the car *is*.
+ * That makes `legsBoarded === 0` the **wrong** assertion in arm A and the **right** one in arm B,
+ * from the same reason code and the same zero allocation count. `adversarial.test.ts` asserts
+ * both, in one test, on one building at one seed — because the pair is the evidence that neither
+ * number is an accident, and because a future change that made `#loadWhileIdle` consult the
+ * dispatcher would collapse the two arms into one and ought to fail loudly when it does.
  *
- * ## So this module does the reachable half, and labels it
- *
- * {@link seenAsMode} rewrites the `mode` on every snapshot the group controller is shown, from a
- * given simulated time onward. That is a real run: the real eligibility stage runs, reaches
- * `infeasibilityOf`, returns `'serviceMode'`, and the real dispatch loop does whatever it does
- * with a call no car will take. The reason code that the fuzzing task established was
- * unreachable is genuinely reached, through the shipped path, in a shipped run.
- *
- * What it does **not** reproduce, and what `adversarial.test.ts` therefore does not claim:
- *
- * - the car does not release its committed hall calls, because `Car.setMode` is never called.
- *   A car already carrying a call still serves it. Real recall drops that work on the floor;
- * - car calls from passengers already aboard are still honoured — correct for `independent`,
- *   wrong for `out-of-service`;
- * - a car cannot come *back* into service in a way the physical model registers, only in a way
- *   the dispatcher registers.
- *
- * The `core` change that would close the gap is small and is requested rather than made: a
- * `mode` field on `carConfigSchema` threaded to `CarInit.mode` for the initial state, plus either
- * an authored `serviceEvents: [{ atS, carId, mode }]` schedule on the building or a
- * `SimulationConfig.serviceSchedule` hook for the mid-run case. Until then
- * `adversarial.test.ts` carries a skipped, documented test naming exactly that, rather than a
- * green one that pretends.
- *
- * ## Why a `Proxy`
+ * ## Why a `Proxy` (arm A)
  *
  * The same reason `fuzz/faults.ts` and `benchmark/auctionAggregation.ts` give: the shipped
  * policies carry private fields, so every method has to be applied with the real policy as its
  * receiver or the private state is unreachable. Only the methods that are *shown* cars are
  * wrapped; everything else is the real method bound to the real object.
+ *
+ * ## Why arm B still needs instrumentation ({@link watchDispatch})
+ *
+ * Because "the group allocated nothing" is not readable off a `SimulationResult`: the record
+ * carries which car *carried* a leg, not which decisions the controller was asked for or which
+ * cars it refused and why. `createPolicy` is the documented seam for exactly that, and it is the
+ * one `core/src/sim/serviceMode.test.ts` uses for the same measurements. Nothing here reads a
+ * private field and nothing new is exported from `core` for a test to look at.
  */
 
 import {
   createPolicyFor,
   type AuctionPolicyOptions,
   type CarSnapshot,
+  type DispatchContext,
+  type DispatchDecision,
   type DispatchPolicy,
   type DispatcherProfile,
   type ServiceMode,
@@ -125,11 +123,13 @@ export interface ModeInjection {
 }
 
 /**
- * Show the group controller every car in `mode`, from `fromS` onward.
+ * **Arm A.** Show the group controller every car in `mode`, from `fromS` onward.
  *
- * `fromS = 0` is the "all cars out of service for the whole run" case; any positive value is a
- * mid-run change *as the dispatcher sees it*. See the module docstring for exactly what that does
- * and does not reproduce — the distinction is the whole point of this file existing.
+ * `fromS = 0` blinds the dispatcher for the whole run; any positive value is a mid-run change
+ * *as the dispatcher sees it*. The cars themselves are untouched and remain in service, which is
+ * exactly what makes this the control arm rather than a weaker version of arm B: see the module
+ * docstring's table for the row-by-row difference, and `adversarial.test.ts` for the test that
+ * measures it.
  */
 export function seenAsMode(mode: ServiceMode, fromS = 0): ModeInjection {
   const injection: ModeInjection = {
@@ -172,4 +172,104 @@ export function seenAsMode(mode: ServiceMode, fromS = 0): ModeInjection {
     },
   };
   return injection;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Arm B — watching the real controller decide about physically-moded cars
+ * -------------------------------------------------------------------------- */
+
+/** One decision the group controller was asked for, and what it answered. */
+export interface WatchedDecision {
+  readonly at: number;
+  readonly callId: string;
+  /** Empty when the group declined to allocate anybody at this instant. */
+  readonly carIds: readonly string[];
+}
+
+/** A call handed back to the group, identified by carrying its **original** registration time. */
+export interface WatchedReoffer {
+  readonly callId: string;
+  readonly registeredAt: number;
+}
+
+/**
+ * What a run's group controller was asked and what it answered — the only way to see, from
+ * outside, that a fleet stopped being *dispatched to* as opposed to stopped *carrying people*.
+ */
+export interface DispatchWatch {
+  readonly createPolicy: (profile: DispatcherProfile, options: AuctionPolicyOptions) => DispatchPolicy;
+  /** Every decision, allocating or not, in the order the controller was asked. */
+  readonly decisions: WatchedDecision[];
+  /** The subset that named at least one car. Zero of these is "the group stopped dispatching". */
+  readonly allocations: WatchedDecision[];
+  /** Count per `IneligibilityReason`, so `serviceMode` can be shown to have actually been reached. */
+  readonly refusals: Map<string, number>;
+  /**
+   * Registrations whose `registeredAt` is **older** than the newest instant the group has already
+   * been asked about, which cannot be a first registration and is therefore a re-offer.
+   *
+   * `#reofferCall` re-registers a released call with its original `registeredAt` on purpose, so a
+   * starvation term still sees a ninety-second-old call rather than a fresh one — and that is
+   * precisely what makes a re-offer distinguishable from a new press without reading anything
+   * private. Counting registrations per call id would not work: a call id is
+   * `bank#floor:direction` and is registered afresh every time that landing fills again.
+   */
+  readonly reoffers: WatchedReoffer[];
+}
+
+/**
+ * Wrap the shipped policy and record what it is asked and what it answers.
+ *
+ * A `Proxy` for the reason given at the top of this file and in `core`'s `seam.test.ts`: the
+ * shipped policies carry private fields, so a plain object wrapper loses them. Only `register`,
+ * `dispatch` and `reconsider` are overridden; every other member is the real method bound to the
+ * real policy, and none of the three changes a decision.
+ */
+export function watchDispatch(): DispatchWatch {
+  const decisions: WatchedDecision[] = [];
+  const allocations: WatchedDecision[] = [];
+  const refusals = new Map<string, number>();
+  const reoffers: WatchedReoffer[] = [];
+  /** The newest instant the group has been asked about — a proxy for the kernel clock. */
+  let asked = Number.NEGATIVE_INFINITY;
+
+  const record = (at: number, callId: string, decision: DispatchDecision): DispatchDecision => {
+    asked = Math.max(asked, at);
+    for (const verdict of decision.rejected) {
+      const reason = verdict.reason;
+      if (reason !== undefined) refusals.set(reason, (refusals.get(reason) ?? 0) + 1);
+    }
+    const entry: WatchedDecision = { at, callId, carIds: decision.carIds };
+    decisions.push(entry);
+    if (decision.carIds.length > 0) allocations.push(entry);
+    return decision;
+  };
+
+  const createPolicy = (profile: DispatcherProfile, options: AuctionPolicyOptions): DispatchPolicy => {
+    const inner = createPolicyFor(profile, options);
+    const overrides: Partial<DispatchPolicy> = {
+      register(call, at, context?: DispatchContext | undefined) {
+        if (at < asked) reoffers.push({ callId: call.id, registeredAt: at });
+        return inner.register(call, at, context);
+      },
+      dispatch(callId, cars, at, context?: DispatchContext | undefined) {
+        return record(at, callId, inner.dispatch(callId, cars, at, context));
+      },
+      reconsider(callId, cars, at, context?: DispatchContext | undefined) {
+        return record(at, callId, inner.reconsider(callId, cars, at, context));
+      },
+    };
+    return new Proxy(inner, {
+      get(target, property): unknown {
+        const own = (overrides as Record<string | symbol, unknown>)[property];
+        if (own !== undefined) return own;
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === 'function'
+          ? (value as (...args: readonly unknown[]) => unknown).bind(target)
+          : value;
+      },
+    }) as DispatchPolicy;
+  };
+
+  return { createPolicy, decisions, allocations, refusals, reoffers };
 }

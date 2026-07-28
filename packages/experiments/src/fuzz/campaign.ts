@@ -12,7 +12,8 @@
  *
  * - **always-on** — {@link STANDARD_CORPUS}, a pinned list of seeds in {@link STANDARD_SPACE}.
  *   Every topology, both entrance arrangements, access zones with and without a credential at
- *   the landing, both extremes of floor pitch, single-car banks, and the two-floor building.
+ *   the landing, both extremes of floor pitch, single-car banks, the two-floor building, cars
+ *   that start the run out of group control, and mid-run service-mode schedules.
  *   What it does **not** cover is stated on the corpus itself, asserted by `generate.test.ts`,
  *   and repeated in the report.
  * - **deep** — {@link DEEP_SPACE}, opt-in via `ELEVATOR_SIM_FUZZ=deep`, hundreds of cases up to
@@ -139,9 +140,16 @@ export function formatStats(stats: CampaignStats): string {
  *   arrival rates above {@link STANDARD_SPACE.maxArrivalRatePctPop5min} % of population per
  *   5 minutes, and banks of more than {@link STANDARD_SPACE.maxCarsPerBank} cars;
  * - anything about *statistics*: one replication per case, so nothing here says a mean is
- *   right, only that the mechanics under it are sound.
+ *   right, only that the mechanics under it are sound;
+ * - **a bank with no serving car.** Service mode is generated, but never to the point of leaving
+ *   a bank unable to collect its own landings — `generate.ts` § "Service mode is generated"
+ *   gives the reason, and the corner itself is covered deliberately in
+ *   `validation/adversarial.test.ts` and `core/src/sim/serviceMode.test.ts`, where the expected
+ *   `timed-out` status is asserted rather than avoided.
  *
- * See `DECISIONS-T12.md` § "What remains unfuzzed" for the axes neither corpus reaches.
+ * See `DECISIONS.md` § "What remains unfuzzed" for the axes neither corpus reaches, and
+ * `validation/DECISIONS-T20.md` for the two rows of that table which are no longer true —
+ * out-of-service cars and mid-run mode changes are both generated as of this corpus.
  */
 export const STANDARD_CORPUS: readonly number[] = Object.freeze([
   101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119,

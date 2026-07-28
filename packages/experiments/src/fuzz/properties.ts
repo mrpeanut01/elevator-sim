@@ -730,6 +730,15 @@ export function checkMonotonicTime(context: PropertyContext): Violation[] {
  * Passengers the fleet legitimately cannot serve — an access lockout, a floor no bank reaches —
  * are exempt, because a run that cannot collect them is reporting the truth. They are still
  * required to be *named*, which P1 checks.
+ *
+ * **A fleet that never moves at all is the case this check was blind to**, and the blindness is
+ * worth stating because it survived a whole Phase 8 campaign: the idle stretch used to be
+ * measured once for the run, against a `lastActivityAt` that falls back to `record.startedAt`
+ * when nobody ever boards — so every passenger arrived "after" it, every one was skipped as not
+ * yet waiting, and the deadest possible building reported nothing. Service mode made that
+ * configuration authorable and it turned up immediately. The stretch is now measured per
+ * passenger, from whenever their own wait overlaps the fleet's inactivity; see the comment at
+ * the comparison itself.
  */
 export function checkTermination(context: PropertyContext): Violation[] {
   const { building, result, bounds } = context;
@@ -755,9 +764,6 @@ export function checkTermination(context: PropertyContext): Violation[] {
     if (leg.boardedAt !== undefined) lastActivityAt = Math.max(lastActivityAt, leg.boardedAt);
     if (leg.alightedAt !== undefined) lastActivityAt = Math.max(lastActivityAt, leg.alightedAt);
   }
-  const idleSeconds = result.deadlineS - lastActivityAt;
-  if (idleSeconds <= bounds.deadlockIdleBoundS) return violations;
-
   const permitted = permittedGroupsByFloor(building);
   const callCarriesCredential = context.case.callType === 'mobile-credential';
   const credentialByJourney = new Map(
@@ -766,7 +772,27 @@ export function checkTermination(context: PropertyContext): Violation[] {
 
   for (const journey of result.undelivered) {
     const waitingSince = Math.max(journey.arrivedAt, journey.boardedAt ?? Number.NEGATIVE_INFINITY);
-    if (waitingSince > lastActivityAt) continue;
+    /*
+     * The idle stretch **this passenger actually sat through**, rather than the run's longest
+     * one: the fleet has been doing nothing since `lastActivityAt`, and this passenger has been
+     * outstanding since `waitingSince`, so the overlap starts at whichever is later.
+     *
+     * The first draft compared the run-wide `deadlineS - lastActivityAt` against the bound and
+     * then skipped any journey with `waitingSince > lastActivityAt`. That is the same number
+     * whenever the passenger arrived before the stall — and it is blind to the one case it most
+     * needs to catch. When the fleet does **no work at all**, `lastActivityAt` falls back to
+     * `record.startedAt`; every passenger arrives after that, so every one of them is skipped and
+     * a building in which literally nobody ever boarded reports no deadlock. That is not
+     * hypothetical: an authored all-out-of-service fleet
+     * (`validation/adversarial.test.ts`, "boards nobody at all …") produced exactly it, passing
+     * all six properties while delivering none of 365 journeys.
+     *
+     * This form is **strictly stronger**, never weaker: when `waitingSince <= lastActivityAt` the
+     * maximum is `lastActivityAt` and it reduces to the original expression exactly.
+     */
+    const stallBeganAt = Math.max(lastActivityAt, waitingSince);
+    const idleSeconds = result.deadlineS - stallBeganAt;
+    if (idleSeconds <= bounds.deadlockIdleBoundS) continue;
     const servable = isServable(
       building,
       permitted,
@@ -777,7 +803,7 @@ export function checkTermination(context: PropertyContext): Violation[] {
     );
     if (!servable) continue;
     fail(
-      `deadlock: the last passenger boarded or alighted anywhere at t=${lastActivityAt.toFixed(1)}, ${idleSeconds.toFixed(1)} s before this run's hard deadline of t=${String(result.deadlineS)} (it stopped at t=${String(result.endedAt)}, status ${result.status}), while journey "${journey.journeyId}" (${journey.originFloorId} to ${journey.destinationFloorId}, ${journey.reason}) was servable and outstanding since t=${String(waitingSince)}`,
+      `deadlock: the last passenger boarded or alighted anywhere at t=${lastActivityAt.toFixed(1)}, and nothing has happened for the ${idleSeconds.toFixed(1)} s before this run's hard deadline of t=${String(result.deadlineS)} (it stopped at t=${String(result.endedAt)}, status ${result.status}), while journey "${journey.journeyId}" (${journey.originFloorId} to ${journey.destinationFloorId}, ${journey.reason}) was servable and outstanding since t=${String(waitingSince)}`,
       journey.journeyId,
     );
     return violations; // one is enough; they all describe the same stall
