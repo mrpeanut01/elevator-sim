@@ -1,11 +1,28 @@
 # Test matrix
 
-Scenario-level coverage. Component tests alone do not close a row — this project's dominant defect
-class passes every component test it has.
+> ## 🏁 FINAL STATE — 2026-07-28. This document is closed and is no longer updated.
+>
+> **What it was for.** Scenario-level coverage during the orchestrated completion of this project.
+> It exists because component tests alone do not close a row: this project's dominant defect class —
+> *configurable, unit-tested in isolation, dead in the shipped path* — passes every component test
+> it has, eight times over.
+>
+> **Where the live information is now.** [`docs/05-roadmap.md`](docs/05-roadmap.md) carries each
+> phase's acceptance verdict and the measurements behind it;
+> [`docs/07-handoff.md`](docs/07-handoff.md) § 3 lists the permanent guards and why each exists, and
+> § 8 lists the open debt. This file is kept because it records *how* the coverage was assembled and
+> because `packages/viz/UX.md` cites § 3 of it.
+>
+> **Its own carried-forward items, at close:** every row below is ✅ except three, and all three are
+> stated rather than quietly ticked — **C7** (two holes in `core`'s dead-code scanner, still open),
+> the four ⚠️ unverified UX rows, and the full experiment matrix (⬜, the one track between Phase 8
+> and acceptance). The two rows that were ❌ or ⚠️ when this file was last written — `fuzz-1000384`
+> and the unpinned refuted mechanism — are **both closed**, and are marked so below.
 
 Legend: ⬜ not started · 🟡 in progress · ✅ passing · ❌ failing · ⚪ n/a
 
-**Suite as of 2026-07-28: 167 files, 3,100 tests (3,092 passing, 8 skipped), `tsc -b` clean.**
+**Suite at close, measured on `docs/handoff` 2026-07-28: 168 files, 3,138 tests (3,130 passing,
+8 skipped), 460 s, `tsc -b` clean.**
 
 ---
 
@@ -29,7 +46,7 @@ Legend: ⬜ not started · 🟡 in progress · ✅ passing · ❌ failing · ⚪
 | `patternSwitching` | integration | **recorded as deliberately unimplemented** and the roadmap bullet marked not-done (D12) | T3 | ✅ |
 | Doc claims match code | consistency | phase set agrees across `CLAUDE.md`, `README.md`, `docs/07-handoff.md`; docs' JSON examples parse and satisfy their gates; docs/01's module tree matches disk in both directions; docs/03's formulas evaluate against `roundTripTime()` | T4 | ✅ |
 | Published study intervals re-derive | mechanical | every interval-shaped literal in `benchmark/` is either reproduced by a pinned estimate at its own printed precision, or declared unpinned with a count | T9 | ✅ |
-| `core` builds and tests with `viz` absent | build | invariant 6, in its strong form once `viz` exists | T5 | ⚠️ see **C28** — the *import* direction is asserted by `viz/src/boundaries.test.ts`; the *doc-tree* guard in `core` currently reddens if `packages/viz` is deleted |
+| `core` builds and tests with `viz` absent | build | invariant 6, in its strong form once `viz` exists | T5 | ✅ — **C28 closed.** `moduleTree.test.ts` is scoped to installed workspace members; verified by deleting and deregistering `packages/viz` in a scratch copy (`tsc -b` clean, `core` 77 files / 1 832 tests green), with the pre-fix guard reddening on the same copy |
 | Stored run replays visually identically | integration | replay from a stored seed reproduces the same frame sequence, with a per-field negative control | T5 | ✅ |
 | **The first frame places every car where the run says it started** | integration | the raised Phase 4 clause (**C16**), asserted on all five buildings by `describe.each(BUILDING_IDS)` | T8 | ✅ |
 
@@ -47,6 +64,9 @@ Legend: ⬜ not started · 🟡 in progress · ✅ passing · ❌ failing · ⚪
 | `benchmark/published.test.ts` | a published number cannot appear without a study behind it, nor change in silence | ✅ |
 | `viz/src/boundaries.test.ts` | invariant 6, plus the no-DOM rule with positive controls (D66) | ✅ |
 | `core/src/browser.test.ts` + the import-graph guard | no `node:` builtin reachable from the browser barrel (D31–D33) | ✅ |
+| `core/src/sim/moduleTree.test.ts` | `docs/01`'s module tree against disk, both directions, scoped to installed packages | ✅ |
+| `experiments/src/validation/documentation.test.ts` | phase-set agreement across three documents, `docs/07` against itself, README's doc table, the roadmap's entry points, **and the refuted mechanism at all seven sites** | ✅ |
+| `experiments/src/benchmark/saturationCensus.test.ts` | an operating point excluded by its **ceiling** reported as if excluded by its **answer** | ✅ |
 
 ## 3. Phase 4 — UI scenarios
 
@@ -75,23 +95,23 @@ untested**, and that distinction is the point of publishing the ledger instead o
 
 | Track | Proves | Status |
 |---|---|---|
-| Property-based fuzzing | no passenger lost, none delivered to the wrong floor, no car over capacity, no negative waits, no deadlock, bounded starvation | ✅ built — 64-case always-on corpus (0 violations), 2 000-case deep tier (**1 violation, open**) |
+| Property-based fuzzing | no passenger lost, none delivered to the wrong floor, no car over capacity, no negative waits, no deadlock, bounded starvation | ✅ built — 64-case always-on corpus (0 violations), 2 000-case deep tier (**0 violations**; the one it found is fixed) |
 | Analytical cross-validation | closed-form agreement across all five buildings | ✅ `oracle/fiveBuildings.test.ts`, `bankCensus.test.ts`; three banks recorded as unmeasurable with mechanisms rather than reconciled (D39) |
 | Physics verification | S-curve times vs hand calculations; degenerate short hops | ✅ `validation/physics.test.ts` |
 | Statistical self-validation | Phase 3 results re-run as regression | ✅ `crnVarianceReduction`, `nullComparison`, `sequentialStopping`, `operatingPoint` |
 | Determinism regression | golden runs replay byte-identically from stored seeds | ✅ `validation/goldenRuns.test.ts`, `fuzz/determinism.test.ts` |
 | Scale & performance | large buildings, long sweeps, memory profile | ✅ `validation/perfScaling.test.ts` — always-on tier asserts **simulation outputs** (legs, kernel events); wall-clock gates are `ELEVATOR_SIM_DEEP=1` (D91) |
 | Adversarial edge cases | saturation, single car, all calls one floor, access lockout, all cars out of service, mid-run mode changes | ✅ `validation/adversarial.test.ts`, `fuzz/faults.test.ts` |
-| Full experiment matrix | every dispatcher × building × traffic; Pareto front over (AWT, energy, WT95) with explicit INDISTINGUISHABLE verdicts | ⬜ **not started** — carries Phase 7's acceptance interval at 50–200 replications with it |
+| Full experiment matrix | every dispatcher × building × traffic; Pareto front over (AWT, energy, WT95) with explicit INDISTINGUISHABLE verdicts | ⬜ **not started** — carries Phase 7's acceptance interval at 50–200 replications with it. **The one track between Phase 8 and acceptance** |
 
-### Open findings from the campaign
+### Findings from the campaign — all four closed
 
 | # | Finding | Status |
 |---|---|---|
 | 1 | A published mean beside an abandoned passenger — `fuzz-1001074`, max wait 922.7 s with `awtIsValid: true` | ✅ fixed — a fourth `awtIsValid` ground |
 | 2 | An out-of-service car parked at an occupied landing threw out of `run()` and killed the run | ✅ fixed — `#carCanCarry` and `#park` |
 | 3 | P5 termination blind to a fleet that never moves at all — 0 of 365 journeys, zero violations | ✅ fixed by strengthening; the bound was not moved |
-| 4 | **`fuzz-1000384`** — 1 694.3 s of fleet inactivity with a servable journey outstanding | ❌ **OPEN.** Pre-existing at `c072f97`; reduced to 29 passengers; belongs to `sim/`/`dispatch/`. Blocks Phase 8's acceptance |
+| 4 | **`fuzz-1000384`** — 1 694.3 s of fleet inactivity with a servable journey outstanding; 592 identical dispatches to a car that had left group control | ✅ **fixed** — a promise a withdrawn car cannot keep is revoked (§ T22-D1). `deadlockIdleBoundS` untouched at 600 s, `PROPERTY_BOUNDS` unchanged line for line, 60 of 60 shipped cells byte-identical. **R22 discharged** |
 
 ## 5. Phase 6 — destination dispatch
 
@@ -105,4 +125,6 @@ untested**, and that distinction is the point of publishing the ledger instead o
 | Every leg promised, promise kept, promise bites | zero wrong-car boardings on 5 buildings; 70 of 96 legs board a different car than under conventional dispatch | ✅ `sim/destinationDispatch.test.ts` |
 | The panel's cost where it binds | Midtown interfloor-mix 4.5 %, D − C | ✅ TTD `+5.94` WORSE, WT95 `+37.34` WORSE, ride `−1.02` BETTER |
 | `compare` refuses to gate across passenger models | two arms with different models → headline moves to TTD, `core`'s nine-metric list printed | ✅ `cli/src/cli.test.ts` |
-| The refuted mechanism is pinned by a test | no test asserts that the seven mechanism sites stay corrected | ❌ **not built** — see the recommendation in `AGENT_STATUS.md` **C23** |
+| The refuted mechanism is pinned by a test | the seven mechanism sites stay corrected | ✅ **built** — `validation/documentation.test.ts`, three ways: a claim with no refutation within 400 chars fails, a deleted correction fails, and `estimateCost.ts`'s exclusion is asserted in both directions. All three watched failing. **C23 closed** |
+| **The criterion measured on the building it names** | Phase 6's gate on `mixed-use-high-rise`, which § D27 dropped and § D99 owned | ✅ `benchmark/mixedUseHighRise.test.ts` + `saturationCensus.test.ts`, 72 pins. **Met by Level 0** (ΔTTD −21.239 / −2.072 / −2.116, all BETTER); **not met by Level 1** at any measured point |
+| The building's own scenario admits no paired comparison | mixed 40/30/30, every `role:"baseline"` profile 0/30 quotable, unserved **rising** as load falls | ✅ measured, reported as counts and never as an interval |

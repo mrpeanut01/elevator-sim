@@ -9,16 +9,21 @@ Read [`docs/00-project-brief.md`](docs/00-project-brief.md) first, then
 [`docs/01-architecture.md`](docs/01-architecture.md).
 
 **Current status: Phases 0–5 and 7 are landed and accepted, plus a five-command CLI. Phases 6 and 8
-are a foundation only.** That last clause is the only phrase the status guard has, and it covers two
-different situations, so read it precisely:
+are partially complete.** Each of those two is partial for a different reason, so read them
+precisely:
 
 - **Phase 6** — 6a (destination *disclosure*) and 6b (destination *dispatch*) are accepted against a
-  **raised** criterion. 6c (learned control) is deferred out of the phase with reasons, not dropped.
-  Double-deck operation is configured, validated, disclaimed on every run — and not simulated.
-- **Phase 8** — seven tracks landed and found four real defects, three now fixed. The full
-  experiment matrix is not done, and one property violation (`fuzz-1000384`, a P5 deadlock) is
-  **open and blocks the phase's acceptance**. Phase 8's own rule is that a failure blocks release,
-  and it applies to findings the phase itself produced.
+  **raised** criterion, now measured on the building that criterion names ([§ D100](DECISIONS.md)).
+  The gate is **met by the Level-0 arm and not by the Level-1 panel at any measured point** — say
+  both. 6c (learned control) is deferred out of the phase with reasons, not dropped. Double-deck
+  operation is configured, validated, disclaimed on every run — and not simulated.
+- **Phase 8** — **both blocking property violations are closed**, and neither was closed by moving a
+  bound: `fuzz-1001074` by a fourth `awtIsValid` ground, `fuzz-1000384` by revoking a promise a
+  withdrawn car cannot keep. The deep tier is green at 2 000 cases. Seven of eight tracks have
+  landed; the eighth — the full experiment matrix and Pareto front at a real budget, which carries
+  Phase 7's acceptance interval at 50–200 replications — has not, so the phase's criterion (*every
+  track lands, and no property violation is outstanding*) is not yet met
+  ([§ D102](DECISIONS.md)).
 
 [`docs/07-handoff.md`](docs/07-handoff.md) is the resume brief. Work proceeds by the phases
 in [`docs/05-roadmap.md`](docs/05-roadmap.md), which carries each phase's acceptance verdict and the
@@ -30,12 +35,15 @@ tests, the module said so in its own docstring, and the roadmap asserted the pha
 the rule is not "is it reachable?" but **"name the non-test caller"**. A barrel re-export and a
 `{@link}` tag look exactly like a caller and are not one.
 
-**A stated mechanism goes stale the same way, and the correction is not yet pinned.** Seven places
+**A stated mechanism goes stale the same way, and the correction is now pinned.** Seven places
 in this repository asserted, as fact, that destination dispatch does better under access control
 *because* authorization and optimization happen in the same step. Measured at n = 150 per building
 under common random numbers, the difference-of-differences is `+0.982 s [+0.584, +1.380]` — it buys
 *less* where access is controlled, and the saving is entirely in the credential. All seven are
-corrected; **no test asserts they stay corrected.** If you write a sentence about *why* something
+corrected, and `packages/experiments/src/validation/documentation.test.ts` now asserts it three
+ways: the claim may not appear without a refutation within 400 characters of it, the correction may
+not be silently deleted, and `model/car/estimateCost.ts`'s exclusion — its sentence is *descriptive*
+and true — is asserted in **both** directions. If you write a sentence about *why* something
 performs better, either measure it or say it is unmeasured.
 
 **A published number goes stale the same way.** Three figures in this repository did not reproduce

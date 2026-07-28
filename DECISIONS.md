@@ -4042,3 +4042,235 @@ Files this task does not own. Each is now false as written.
    accepted … Phases 6 and 8 are not started"*, which contradicts the repository root `CLAUDE.md`
    and the T18/T20/T21 work already merged onto `integration`. Not this task's to fix, but it is
    wrong in both copies in different ways.
+
+---
+
+Decisions taken while **closing the delivery** — the final documentation task, T25, on
+`docs/handoff`. This block also folds in the rationale for **T24** (`feat/phase-6`, merged as
+`9b66890`), whose builder recorded its decisions in its commit message and whose block was never
+appended here.
+
+`DECISIONS.md` is **append-only**. Nothing above this line is rewritten. Where an earlier entry is
+now false, it is *corrected here and cross-linked* rather than edited in place, so the record of
+what was believed when remains readable.
+
+---
+
+## D100 — D99 is closed **by measurement**, and the verdict has three parts
+
+**Date:** 2026-07-28 · **Owner:** T24 · **Closes:** § D99 (which owns § D98 / T23-F1)
+
+**Context.** § D27 raised Phase 6's metric clause and silently dropped its **building** clause —
+the original criterion read *"…on the Mixed-Use High-Rise"*. § D99 called that a weakening, chose
+remedy (c) *measure it there*, and assigned it to the final task. `benchmark/mixedUseHighRise.ts`
+is that measurement; `benchmark/mixedUseHighRise.test.ts` and `saturationCensus.test.ts` assert it;
+72 new pins in `benchmark/published.ts` hold it, **0 moved and 0 removed**.
+
+**1. The building's own scenario admits no paired comparison — and that is a measurement, not a
+refusal.** Under the mixed 40/30/30 traffic the building's own `$comment` describes, every profile
+in `data/dispatcher-profiles.json` carrying `role: "baseline"` fails outright, n = 30:
+
+| mixed 40/30/30, 1800 s | conventional (all three baselines) | credential-aware |
+|---|---|---|
+| 1.5 %pop/5 min | 0/30 quotable, 39.2 undelivered/run, **24.4 % unserved** | 30/30 quotable, 0 undelivered |
+| 0.75 % | 0/30 quotable, 22.7 undelivered, **31.7 % unserved** | 30/30, 0 undelivered |
+| 0.2 % | 0/30 quotable, 6.4 undelivered, **36.6 % unserved** | 30/30, 0 undelivered |
+
+**The unserved fraction rises as the load falls.** That is the signature of a *structural* refusal
+and not of overload: an access-restricted pickup carries no credential under `up-down-buttons`,
+every car answers `accessDenied`, and lowering the rate removes only the share that *can* be
+served. It is § D60's H-ACCESS-1 mechanism reproduced on a second building. No baseline has a
+quotable mean, so no paired-t interval exists to evaluate the criterion against at that point.
+
+**The candidate reason already on record does not bite, and was checked rather than cited.** § D99
+named T13's finding that this building reports its achieved **interval** `unmeasurable` by design
+(a shuttle holds doors 39.8 s while an office-local car completes a round trip in 31.3 s, so no
+departure-gap threshold is valid). That bears on the *oracle*, which reconstructs departures from
+boarding times. The Phase 6 gate is **TTD**, which is read off passenger records and needs no
+departure bracket — and the study duly produces TTD intervals on this building. The obstacle is
+the access geometry, not the departure bracket.
+
+**2. Incoming-only up-peak is the one comparable regime, and it is not blind.** `G` is the only
+entrance outside both access zones, so it is the only origin at which a conventional baseline can
+be measured here at all. It is also where a destination carries the most information: a passenger
+at `G` may be bound for retail (2–5), an office floor (6–30), the sky lobby (31) or a residence
+(32–60) **via a transfer at 31** — three banks and a two-leg journey behind one up button.
+
+**3. The gate, ΔTTD at up-peak 4 %, n = 200, arm − baseline.** Baselines are read out of `data/`
+by `role: "baseline"` rather than named in code (invariant 7): `nearest-car`, `eta`, `collective`.
+
+| | vs `nearest-car` | vs `eta` | vs `collective` |
+|---|---|---|---|
+| **Level 0** (`destination-eta` + `weights.rideTime: 1`) | **−21.239 [−22.793, −19.685] BETTER** | **−2.072 [−2.868, −1.277] BETTER** | **−2.116 [−2.908, −1.325] BETTER** |
+| Level 1 (`destination-panel`) | −18.633 [−20.702, −16.563] BETTER | +0.534 [−0.855, +1.923] INDIST. | +0.490 [−0.902, +1.882] INDIST. |
+
+The costs, published beside the gate because § D27 says omitting them fails the phase:
+
+| | ΔAWT vs `eta` | ΔWT95 vs `eta` | Δride vs `eta` |
+|---|---|---|---|
+| **Level 0** | **+0.876 [+0.703, +1.050] WORSE** | +0.273 [−0.026, +0.571] INDIST. | −2.452 [−3.068, −1.835] BETTER |
+| Level 1 | **+3.190 [+2.463, +3.916] WORSE** | **+9.083 [+5.683, +12.484] WORSE** | −3.126 [−3.785, −2.466] BETTER |
+
+**Chosen, and recorded plainly rather than as a headline: the criterion is MET by the Level-0 arm
+and NOT met by the Level-1 panel at any measured point.** Level 1's gate interval contains zero
+against `eta` and `collective` at every rate, and at 4 % it is 9.083 s WORSE on WT95 — the § D29
+write-once promise binding under load, the same mechanism `destinationDispatchContrast.ts`
+measures on Midtown at 4.5 %. Level 1 buys in-car time and pays for it at the landing.
+
+**It is not met at 1 % or 2 % either, and the required `n` says why rather than the verdict.** At
+2 % the Level-0 gate against `eta` is `−0.109 [−0.616, +0.399]` INDISTINGUISHABLE, needing
+**n ≈ 5161 against a measured ceiling of 395** — *permanently* unresolvable at that operating
+point, not under-budgeted. **3 % is excluded by its ceiling and not by its answer** (its effect is
+*larger* than 2 %'s); `nearest-car` loses its AWT on replication 22 there, so no budget in the
+project's 50–200 band can be spent at that rate with the naive baseline in the cell. That
+distinction is asserted, because the two are indistinguishable in a results table.
+
+**Budgets derived from this building, never copied.** Ceilings censused at 1000 replications per
+arm: 1 % none, 2 % `nearest-car`@395, 3 % `nearest-car`@22, 4 % `destination-panel`@206. n = 238 at
+2 % is variance-derived from a pilot at a **disjoint** seed; n = 200 at 4 % is **ceiling-bound**
+(the variance-derived requirement is 666, the ceiling is 206, and 200 leaves **six replications of
+margin**); 1 % is a **declared-in-advance blind control**, 390/1000 bit-identical.
+
+**Impact on the acceptance already recorded.** § D99 said the acceptance carried a caveat until the
+building clause was met. It is now met on the arm Phase 6a accepted, so the caveat is discharged
+for 6a and **stands, restated, for 6b**: Phase 6b's shipped panel does not clear the gate on the
+building the criterion names. That is recorded in `docs/05-roadmap.md` § Phase 6 and in
+`docs/07-handoff.md` § 7 as a measured result rather than as a retraction — 6b's own acceptance
+rested on the Midtown/Secure-Tower contrast, which is unchanged and unretracted.
+
+---
+
+## D101 — four earlier records describing *"recall strands promises"* as live are **corrected here, not rewritten**
+
+**Date:** 2026-07-28 · **Owner:** T25 · **Supersedes:** § D77 limitation 2, § *What is still
+unreachable* item 2, § T16-D3's closing line, and § D29 · **Fixed by:** § T22-D1
+
+§ T22-D1 revokes a promise whose car has left group control. The four records below were written
+before it and are **false as written**. Per this file's append-only rule they are corrected here
+and cross-linked from nowhere else; a reader who reaches one of them should read this entry.
+
+| record | what it says | what is true now |
+|---|---|---|
+| § D77 *Known limitations* item 2 | *"Under destination dispatch, recalling a promised car strands its promises… Fixing it means re-promising, which is a change to D29's write-once rule and belongs with Phase 6b."* | **Fixed.** `Simulation.#revokePromisesTo`, called only from `#onServiceChange` and gated on `Car.acceptsHallCalls === false`, voids the promise; the call is re-decided over the whole bank and `#tellThePanel` names the new car |
+| § *What is still unreachable* item 2 | classifies the same thing as *"a modelled behaviour with an honest counter, and a blocked improvement… **HANDBACK**"* | **It was a defect, not a modelled behaviour.** P5 termination reports it as a deadlock — that is how `fuzz-1000384` was found — and it is fixed. The *coverage* half of the same item (`serviceEvents` × destination dispatch untested in `experiments/`) is also now closed, in `validation/adversarial.test.ts`: legsAssigned 367, promisesRevoked 2, control 0, `assigned − revoked === legsCreated` |
+| § T16-D3, closing line | *"Re-assignment is **out of scope and not built**, and no knob for it exists (§ D29)."* | Still true of re-assignment **for optimisation**, and no knob exists. False without that qualification: one non-optimising exception is built |
+| § D29 | write-once, stated without exception | Write-once stands **for a car that is full** — the case D29 argues, where the promise is a real cost because the car empties and comes back. It does **not** stand for a car withdrawn from group control, which does not come back unless a later schedule entry says so |
+
+**Why this refines D29 rather than violating it.** D29's argument is explicitly about a **full**
+car: holding the passenger is the cost of committing at the panel, and re-offering them would be
+the panel changing its mind to get a better answer — which is how a destination arm quietly
+recovers the deferral advantage it is supposed to have surrendered. None of that survives contact
+with a car on `independent`, `fire-recall` or `out-of-service`. The rule is a fact about the
+**car**, not about the score, and no dispatch decision can produce it. The guard on that
+distinction is a control: `sim/serviceMode.test.ts` asserts `promisesRevoked === 0` on a panel run
+of the same building with **no** schedule, in which 18 promises are broken by full cars.
+
+---
+
+## D102 — Phase 8's blocking clause is **discharged**; the phase is **not** recorded accepted, because one track has not landed
+
+**Date:** 2026-07-28 · **Owner:** T25
+
+**Context.** Phase 8's stated acceptance is *"every track lands, **and** no property violation is
+outstanding."* Both of Phase 8's blocking findings are now closed and measured:
+
+- **`fuzz-1001074`** — a published mean beside an abandoned passenger (mean wait 172.1 s, p95
+  686.4 s, **max 922.7 s**, 67.8 % of legs over 60 s, `awtIsValid` **true**) — closed by a **fourth
+  `awtIsValid` ground** (§ T21-D1 – T21-D3).
+- **`fuzz-1000384`** — a P5 deadlock, 592 identical dispatches at 5 s intervals to a car that had
+  left group control — closed by § T22-D1, with `deadlockIdleBoundS` untouched at 600 s and
+  `PROPERTY_BOUNDS` unchanged line for line.
+
+The deep tier is green at 2 000 cases (1 396 887 passengers, 0 violations) and the oracle's deep
+campaign is green at 11 measurable banks × n = 128.
+
+**The eighth track has not landed.** *Full experiment matrix × Pareto front at a real budget* is
+marked ⬜ in the phase's own scope list and in its own track table, and it carries Phase 7's
+acceptance interval at 50–200 replications with it.
+
+**Alternatives.** (a) Record Phase 8 **accepted**, on the ground that the blocking rule — the only
+clause written down before the work started — now passes. (b) Record it **accepted** and footnote
+the missing track. (c) Record it **partial**: blocking clause discharged, seven of eight tracks
+landed, criterion not met.
+
+**Chosen: (c).** `CLAUDE.md` § Working agreements: *"A phase is done when its stated acceptance
+criteria pass, not when the code exists."* The criterion as written has two clauses and one of them
+does not pass. (a) would require reading the tracks clause out of the criterion, which is a
+weakening; the roadmap flagged that clause as newly written down on 2026-07-28 and said at the time
+that it *"does not do any work"*, but that was said while the blocking rule was already withholding
+acceptance. It does work now, and removing a clause the moment it becomes load-bearing is exactly
+the shape § D99 had to own. (b) states two different things in two places, which is review finding
+#18's shape.
+
+**This is a deliberate divergence from the task brief T25 was given,** which said Phase 8 moves to
+accepted. It is recorded here rather than acted on silently. The change that matters is real and is
+stated first in every document: **the blocking violation is closed, and Phase 8's remaining gap is a
+scheduled measurement rather than a defect.**
+
+**Impact.** The four guard-coupled documents record Phase 8 as ⚠️ **partial**, using the new
+vocabulary term (§ D103), with the discharge and the outstanding track both named. `RISKS.md` R22 —
+*an open Phase 8 property violation is closed by weakening the property* — is **discharged**: the
+bound did not move, the case was not filtered out of the corpus, and the property gained no
+exemption.
+
+---
+
+## D103 — the phase-status vocabulary gains `partial`, and the apology paragraphs are deleted
+
+**Date:** 2026-07-28 · **Owner:** T24 (guard) + T25 (migration) · **Closes:** § D96 / T23-R2
+
+`validation/documentation.test.ts`'s `statusFromProse` recognised three prose terms — *landed and
+accepted*, *a foundation only*, *not started*. Neither Phase 6 nor Phase 8 is "a foundation only",
+so all four guard-coupled documents were carrying the guard's phrase **plus a paragraph explaining
+that the phrase was the guard's and not the author's** — in the first line of the resume brief,
+which is the exact position review finding #18 was about.
+
+T24 added `are partially complete` → `'partial'`, unit-tested on **synthetic** sentences
+deliberately, so the term was exercised before any document used it and the two halves could land
+in either order. T25 migrates all four documents in one commit and **deletes the apology
+paragraphs**. `⚠️` in a status table and *"are partially complete"* in prose are now asserted to
+mean the same thing by `the phase-status vocabulary` describe block.
+
+---
+
+## D104 — `docs/01` § *Layout note* said two things that are now false; both are corrected
+
+**Date:** 2026-07-28 · **Owner:** T25 · **Closes:** C28, C29
+
+The note read *"there is deliberately no `viz/editor/`, and this doc must not invent one"* (C29,
+recorded as refuted by disk in § D93) and carried a weakness note for C28. **Both were true when
+written and both are now false**, in the same merge:
+
+- The four editor modules **moved** to `packages/viz/src/editor/` and the `docs/01` tree line landed
+  in the **same commit** (`f3fd3da`), which is what the bidirectional guard requires.
+- `core/src/sim/moduleTree.test.ts` is **scoped to packages present on disk**, with `core`'s presence
+  asserted so the scope cannot degrade into "skip everything". The fix was verified against the
+  strong form of invariant 6: `packages/viz` deleted and deregistered in a scratch copy → `tsc -b`
+  clean and `core` green at 77 files / 1 832 tests, while the **pre-fix** guard reddens on the same
+  copy. C28 was real, and it is fixed.
+
+The note is replaced by a record of what happened, not deleted — the two-directional constraint is
+the reason the layout is what it is, and the next person to move a directory needs it.
+
+---
+
+## D105 — the orchestration artifacts are **retired in place**, not deleted
+
+**Date:** 2026-07-28 · **Owner:** T25
+
+`MULTI_AGENT_PLAN.md`, `AGENT_STATUS.md`, `RISKS.md`, `TEST_MATRIX.md`, `T2-BLAST-RADIUS.md` and
+`T9-FINDINGS.md` were working documents for a delivery that is now finishing.
+
+**Chosen:** each gets a **final-state header** saying what it was for, what its carried-forward
+items resolved to, and that it is no longer updated. None is deleted.
+
+**Why not delete them.** Three reasons, and the third is the load-bearing one. They are cited from
+live source (`core/src/analytical/upPeak.ts`, `core/src/sim/moduleTree.test.ts`,
+`experiments/src/tuning/report/{format,pareto}.ts`, `experiments/src/reports/format.ts`,
+`packages/viz/UX.md`) and from `docs/01`, `docs/05`, `docs/08` and `docs/09`; the open items C4, C5,
+C7, C24, C27, C30 and C32 live in `AGENT_STATUS.md` § Carried forward and have no other home; and
+they are the record of **how the work was done, including the mistakes** — the orchestrator weakened
+a criterion (§ D99), set worktrees up so builders linked against the main checkout's `dist` (C8), and
+merged a document without linking it from `README.md`, which a guard caught (R20). A project whose
+dominant defect class is *"nobody noticed"* does not delete its own account of what it failed to
+notice.

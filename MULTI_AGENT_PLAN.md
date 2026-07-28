@@ -1,9 +1,44 @@
 # Multi-agent execution plan
 
+> ## 🏁 FINAL STATE — the delivery closed 2026-07-28. This document is no longer updated.
+>
+> **What it was for.** The authoritative coordination artifact: task scope, ownership boundaries,
+> dependency order, merge order and the definition of done, across four waves and twenty-five tasks.
+> It is kept because it is the record of *how* the work was done — including the mistakes, which are
+> named below rather than tidied away — and because `packages/viz/UX.md` cites its planning-first
+> rule.
+>
+> **What it achieved against § 1's goal.** All 21 review findings closed. Phases 0–5 and 7 accepted;
+> Phase 4 complete against a **raised** criterion; Phases 6 and 8 partial, each for a stated reason.
+> Suite 2 442 → **3 138** tests, green after every merge, `tsc -b` clean throughout.
+>
+> **§ 7's definition of done is not fully reached, and the gap is one item**, unchanged from what
+> § 1 predicted: Phase 8's full experiment matrix at 50–200 replications, which also discharges
+> Phase 7's acceptance interval. `fuzz-1000384`, the other half of that sentence, **is closed**.
+>
+> **Three process mistakes this plan made, recorded because they cost real work:**
+> 1. **The orchestrator weakened an acceptance criterion.** § D27 raised Phase 6's metric clause and
+>    silently dropped its *building* clause. Caught by a builder (T23-F1), owned in § D99, closed by
+>    measurement in § D100. It happened inside a decision whose stated purpose was to strengthen a
+>    gate, which is the only reason it was invisible for a wave.
+> 2. **Worktrees were mis-set-up, so builders linked against stale code.** Wave 1 symlinked the root
+>    `node_modules`; Node resolves a symlink to its realpath, so `@elevator-sim/*` pointed at the
+>    **main checkout's** `dist`. vitest was unaffected (`resolve.alias` maps to worktree-local
+>    source) but every built-artifact claim was about the wrong tree, and one task's CLI evidence had
+>    to be re-run. Fixed by `.worktree-setup.sh` from wave 2 on. See C8.
+> 3. **A document was merged without being linked**, leaving `README.md`'s table and `docs/09`
+>    inconsistent. **A guard caught it** — `validation/documentation.test.ts` now fails on any
+>    `docs/*.md` on disk and absent from README's table. See R20.
+>
+> **Where the live information is now.** [`docs/05-roadmap.md`](docs/05-roadmap.md) for phase
+> verdicts and evidence; [`docs/07-handoff.md`](docs/07-handoff.md) for current state, the permanent
+> guards, and the open debt; [`DECISIONS.md`](DECISIONS.md) for every decision and its rationale.
+
 Coordination artifact for the orchestrated completion of this project. Authoritative for task
 scope, ownership, dependency order and merge order. Updated as waves land.
 
-**Started:** 2026-07-27 · **Baseline commit:** `6b20687` · **Integration branch:** `integration`
+**Started:** 2026-07-27 · **Closed:** 2026-07-28 · **Baseline commit:** `6b20687` ·
+**Integration branch:** `integration`
 
 ---
 
@@ -23,11 +58,14 @@ Concretely, four bodies of work remain:
 | Phase 4 — Visualization | ✅ **COMPLETE** — viewer, editor, live metrics overlay, playback from a stored seed, 87-scenario UX ledger |
 | Phase 6a / 6b — destination disclosure and dispatch | ✅ **ACCEPTED** against the criterion D27 raised |
 | Phase 6c — learned control | ⬜ **deferred out of the phase** with reasons (D28) — not dropped, and it needs its own acceptance question first |
-| Phase 8 — Testing campaign | ⚠️ seven tracks landed and found four defects, three fixed. **`fuzz-1000384` is open and blocks acceptance**; the full experiment matrix at a real budget is not started |
+| Phase 6 — the criterion measured on the building it names | ✅ **closed by measurement** (D99 → D100): met by the Level-0 arm, **not** met by the Level-1 panel at any measured point |
+| Phase 8 — Testing campaign | ⚠️ seven of eight tracks landed and found four defects, **all four fixed**. `fuzz-1000384` is **closed**; the full experiment matrix at a real budget is not started, so the criterion is not yet met |
 
-**The one thing between here and § 7's definition of done:** close `fuzz-1000384`, then run the full
-experiment matrix at 50–200 replications — which also discharges Phase 7's acceptance interval, a
-measurement the roadmap assigns to Phase 8 and that accepting Phase 7 did not discharge.
+**The one thing between here and § 7's definition of done, at close:** run the full experiment matrix
+at 50–200 replications — which also discharges Phase 7's acceptance interval, a measurement the
+roadmap assigns to Phase 8 and that accepting Phase 7 did not discharge. `fuzz-1000384`, the other
+half of this sentence as originally written, is closed (§ T22-D1) — and closed by fixing the
+simulator, not by moving `deadlockIdleBoundS`, which is what R22 existed to prevent.
 
 ## 2. Architecture snapshot
 

@@ -604,20 +604,101 @@ on AWT does not fail the phase; **omitting it does.**
 > simulator can quantify it". Gating on TTD *and* keeping both losing metrics in public is strictly
 > stronger than the original.
 
-> **⚠️ One clause of the original that the raise did not carry, recorded rather than glossed.** The
-> old criterion named a building: *"on the Mixed-Use High-Rise"*. § D27's replacement does not, and
-> **no Phase 6 result below is measured on `mixed-use-high-rise`.** The operating points chosen are
-> Midtown Office and Secure Tower interfloor-mix, for stated reasons — Secure Tower is the only
-> access-zoned building, and Midtown is the unzoned control the difference-of-differences needs. The
-> reasons are good and the substitution was never argued. Two things follow, and both are honest
-> readings rather than one being the safe one: dropping a *named building* from a criterion is the
-> shape of a weakening, and `mixed-use-high-rise` is also the building whose achieved interval is
-> reported `unmeasurable` by design (a shuttle holds doors 39.8 s while an office-local car
-> completes a round trip in 31.3 s, so no departure-gap threshold is valid there), which is a real
-> obstacle rather than an excuse. **Not resolved here.** Phase 8's full experiment matrix covers
-> every dispatcher × building × traffic and is the natural place to close it.
+> **✅ One clause of the original that the raise did not carry — recorded, then closed by
+> measurement.** The old criterion named a building: *"on the Mixed-Use High-Rise"*. § D27's
+> replacement did not, and for a time **no Phase 6 result was measured on `mixed-use-high-rise`**.
+> The operating points were Midtown Office and Secure Tower interfloor-mix, for good reasons —
+> Secure Tower is the only access-zoned building, Midtown the unzoned control the
+> difference-of-differences needs — and the substitution was never argued. Dropping a *named
+> building* from a criterion is the shape of a weakening;
+> [`DECISIONS.md` § D99](../DECISIONS.md) owned that, chose *measure it there* over *argue the
+> substitution*, and § D100 is the result. **It is measured, and the building clause is back.** See
+> § *Phase 6 on the building the criterion names* below.
 
-### Phase 6a — destination disclosure. **ACCEPTED (2026-07-27).**
+### Phase 6 on the building the criterion names — `mixed-use-high-rise`
+
+Measured by `benchmark/mixedUseHighRise.ts`; asserted by `mixedUseHighRise.test.ts` and
+`saturationCensus.test.ts`; held by 72 pins in `benchmark/published.ts` (**0 moved, 0 removed**).
+The verdict has three parts and all three are load-bearing.
+
+**1. The building's own scenario admits no paired comparison — measured, not asserted.** Under the
+mixed 40/30/30 traffic the building's `$comment` describes, every profile in
+`data/dispatcher-profiles.json` carrying `role: "baseline"` fails outright, n = 30 per cell:
+
+| mixed 40/30/30, 1800 s | conventional (all three baselines) | credential-aware |
+|---|---|---|
+| 1.5 %pop/5 min | 0/30 quotable, 39.2 undelivered/run, **24.4 % unserved** | 30/30 quotable, 0 undelivered |
+| 0.75 % | 0/30 quotable, 22.7 undelivered, **31.7 % unserved** | 30/30, 0 undelivered |
+| 0.2 % | 0/30 quotable, 6.4 undelivered, **36.6 % unserved** | 30/30, 0 undelivered |
+
+**The unserved fraction rises as the load falls**, which is the signature of a *structural* refusal
+and not of overload: an access-restricted pickup carries no credential under `up-down-buttons`,
+every car answers `accessDenied`, and lowering the rate strips out only the share that *can* be
+served. It is § H-ACCESS-1's mechanism reproduced on a second building. No baseline has a quotable
+mean there, so no paired-t interval exists — reported as counts, never as an interval.
+
+**The candidate reason already on record was checked and does not bite.** § D99 flagged that this
+building reports its achieved *interval* `unmeasurable` by design — a shuttle holds doors 39.8 s
+while an office-local car completes a round trip in 31.3 s, so no departure-gap threshold is valid.
+That constrains the **oracle**, which reconstructs departures from boarding times. The Phase 6 gate
+is **TTD**, read off passenger records, needing no departure bracket — and the study does produce
+TTD intervals here. The obstacle is the access geometry, not the bracket.
+
+**2. Incoming-only up-peak is the one comparable regime, and it is not blind.** `G` is the only
+entrance outside both access zones, so it is the only origin at which a conventional baseline can
+be measured on this building at all. It is also where a destination carries the most information: a
+passenger at `G` may be bound for retail (2–5), an office floor (6–30), the sky lobby (31) or a
+residence (32–60) **via a transfer at 31** — three banks and a two-leg journey behind one up button.
+
+**3. The gate, ΔTTD at up-peak 4 %, n = 200, arm − baseline.** Baselines are resolved from `data/`
+by `role: "baseline"` rather than named in code (invariant 7): `nearest-car`, `eta`, `collective`.
+
+| | vs `nearest-car` | vs `eta` | vs `collective` |
+|---|---|---|---|
+| **Level 0** — `destination-eta` + `weights.rideTime: 1` | **−21.239 [−22.793, −19.685] BETTER** | **−2.072 [−2.868, −1.277] BETTER** | **−2.116 [−2.908, −1.325] BETTER** |
+| Level 1 — `destination-panel` | −18.633 [−20.702, −16.563] BETTER | +0.534 [−0.855, +1.923] INDIST. | +0.490 [−0.902, +1.882] INDIST. |
+
+The costs, published beside the gate because § D27 says omitting them fails the phase:
+
+| | ΔAWT vs `eta` | ΔWT95 vs `eta` | Δride vs `eta` |
+|---|---|---|---|
+| **Level 0** | **+0.876 [+0.703, +1.050] WORSE** | +0.273 [−0.026, +0.571] INDIST. | −2.452 [−3.068, −1.835] BETTER |
+| Level 1 | **+3.190 [+2.463, +3.916] WORSE** | **+9.083 [+5.683, +12.484] WORSE** | −3.126 [−3.785, −2.466] BETTER |
+
+**The criterion is MET by the Level-0 arm, and NOT met by the Level-1 panel at any measured
+point.** Both halves are the result; neither is a footnote on the other. Level 1's gate interval
+contains zero against `eta` and `collective` at every rate, and at 4 % it is 9.083 s WORSE on WT95 —
+the § D29 write-once promise binding under load, the same mechanism § Phase 6b measures on Midtown
+at 4.5 %. Level 1 buys in-car time and pays for it at the landing.
+
+**It is not met at 1 % or 2 % either, and the required `n` says why rather than the verdict.** At
+2 % the Level-0 gate against `eta` is `−0.109 [−0.616, +0.399]` INDISTINGUISHABLE, needing
+**n ≈ 5161 against a measured ceiling of 395** — *permanently* unresolvable at that operating point
+in the sense [`docs/07-handoff.md`](07-handoff.md) § 4 means it, not a budget that was too small.
+**3 % is excluded by its ceiling and not by its answer** — its effect is *larger* than 2 %'s, and
+`nearest-car` loses its AWT on replication 22 there, so no budget in the 50–200 band can be spent at
+that rate with the naive baseline in the cell. `saturationCensus.test.ts` asserts that distinction,
+because the two are indistinguishable in a results table.
+
+**Budgets derived from this building, never copied.** Ceilings censused at 1000 replications per
+arm — 1 % none, 2 % `nearest-car`@395, 3 % `nearest-car`@22, 4 % `destination-panel`@206. n = 238 at
+2 % is variance-derived from a pilot at a **disjoint** seed; n = 200 at 4 % is **ceiling-bound** (the
+variance-derived requirement is 666, the ceiling is 206, so 200 leaves **six replications of
+margin** — a tight margin, recorded as such in [`docs/07`](07-handoff.md) § 8); 1 % is a
+**declared-in-advance blind control**, 390/1000 bit-identical.
+
+**The call type alone is worth exactly zero here, and the study separates it out.** The shipped
+`destination-eta` — destination disclosed and authorized, nothing pricing it — is **bit-identical**
+to `eta` on all three up-peak points: 150/150, 238/238 and 200/200 paired differences of exactly
+zero. Every pickup is at `G`, which is in no access zone. The whole of the −2.072 s is the *weight*.
+That is the same decomposition Phase 6a made on Midtown, reproduced on the building the criterion
+names.
+
+### Phase 6a — destination disclosure. **ACCEPTED (2026-07-27); building clause met 2026-07-28.**
+
+**Its arm is the one that clears the gate on `mixed-use-high-rise`** — Level 0 beats all three
+baseline-role profiles on TTD there with intervals excluding zero, and its AWT and WT95 are
+published with verdicts. See § *Phase 6 on the building the criterion names* above.
 
 Measured at Midtown Office interfloor-mix, n = 150 under common random numbers, `destination-eta`
 with `weights.rideTime: 1` against `eta`, all four figures from the same runs. Regenerated by
@@ -715,11 +796,25 @@ corrected as of 2026-07-28. `model/car/estimateCost.ts:123` is **not** on the li
 written: it says only that a destination *lets* a dispatcher authorize and optimize in one step,
 which is a true description of the code. What was refuted is the performance claim built on it.
 
-### Phase 6b — destination dispatch. **ACCEPTED (2026-07-28).**
+### Phase 6b — destination dispatch. **ACCEPTED (2026-07-28), and the acceptance carries a caveat.**
+
+> **What 6b's acceptance rests on, and what it does not.** It rests on the Midtown / Secure Tower
+> contrast below, which is unchanged and unretracted: at the primary operating point every metric is
+> INDISTINGUISHABLE while the arms are demonstrably wired, and where the promise binds the cost is
+> published rather than hidden. It does **not** rest on the building the criterion names: measured
+> there ([§ D100](../DECISIONS.md), and § *Phase 6 on the building the criterion names* above),
+> **the Level-1 panel does not clear the gate at any measured point** — its TTD interval contains
+> zero against `eta` and `collective` at 1 %, 2 % and 4 %, and at 4 % it is `+9.083 [+5.683,
+> +12.484]` s WORSE on WT95. State that plainly beside the ✅ rather than under it. The Level-0 arm
+> is what met the criterion on that building.
 
 Per-passenger assignment is wired through `sim/simulation.ts`; a destination assignment is
 **write-once** and a bumped passenger is counted in `brokenPromises` rather than re-promised
-([§ D29](../DECISIONS.md)). `VIZ_SCHEMA_VERSION` bumped 3 → 4 and the landing panel is **rendered**
+([§ D29](../DECISIONS.md)) — with exactly one exception, added by
+[§ T22-D1](../DECISIONS.md) and recorded in [§ D101](../DECISIONS.md): a promise to a car that
+**leaves group control** is revoked, because that car does not come back and the promise cannot be
+kept. That refines D29 rather than weakening it — D29's argument is about a car that is *full*, and
+a full car empties and returns. `VIZ_SCHEMA_VERSION` bumped 3 → 4 and the landing panel is **rendered**
 — the contract's "either bump and render, or refuse the run outright; do not do neither" was
 answered by rendering.
 
@@ -960,7 +1055,21 @@ crashes.
 > today. `CLAUDE.md` forbids inventing a criterion after the fact as firmly as it forbids weakening
 > one, and the way to honour that when a phase genuinely lacked a written gate is to say so.
 
-**Status: ⚠️ TRACKS LANDED — the phase is NOT accepted, because one property violation is open.**
+**Status: ⚠️ PARTIAL — the blocking clause is DISCHARGED; the phase is not yet accepted, because
+one track has not landed.**
+
+The change that matters is the first one: **no property violation is outstanding.** Both findings
+that blocked this phase are closed, and *neither was closed by moving a bound* —
+`deadlockIdleBoundS` is untouched at 600 s and `PROPERTY_BOUNDS` is unchanged line for line, which
+is what `RISKS.md` R22 existed to prevent. The deep tier is green at 2 000 cases (1 396 887
+passengers, 0 violations) and the oracle's deep campaign is green at 11 measurable banks × n = 128.
+
+What is left is a **scheduled measurement, not a defect**: the eighth track below. The criterion is
+*every track lands, **and** no property violation is outstanding*; the second clause now passes and
+the first does not, so the phase is recorded partial rather than accepted. The reasoning for not
+rounding that up is [`DECISIONS.md` § D102](../DECISIONS.md) — in short, the tracks clause was
+written down late and flagged as such, and deleting a clause at the moment it becomes load-bearing
+is the shape § D99 had to own.
 
 | track | state | evidence |
 |---|---|---|
@@ -982,7 +1091,15 @@ crashes.
 | simulated time | 14.84 h | 1 242.86 h |
 | run outcomes | 55 completed, 9 timed-out | 1 143 completed, 857 timed-out |
 | unroutable / invalid generated | 0 | 0 |
-| **property violations** | **0** | **1 — open, see below** |
+| **property violations** | **0** | **0** — was 1; closed, see finding 4 below |
+
+The deep row's 2 000-case figures are the campaign that *found* `fuzz-1000384`. After the fix the
+whole deep campaign was re-run per case and diffed on `(status, simulatedSeconds, violations)`:
+**8 cases of 2 000 change**, every one of them `destination-panel` with a `serviceEvents` schedule —
+exactly and only the path the fix touches — and the other 1 992 are identical to the microsecond.
+Seven of the eight move in the expected direction; the eighth is reported rather than buried in
+[§ *Blast radius*](../DECISIONS.md), and moves no publishable number, because both states are
+`diverging-queue` with `awtIsValid: false`.
 
 ### What the campaign found. A testing campaign that reports only "all green" has hidden its own value.
 
@@ -1022,8 +1139,8 @@ applied. `deadlockIdleBoundS` is untouched at 600 s; the bound was never the pro
 would have been this track's own failure mode. Blast radius measured at zero new failures
 ([§ D86](../DECISIONS.md)).
 
-**4. A deadlock, `fuzz-1000384`. 🟡 OPEN.** At the 2 000-case overnight budget the deep tier reports
-one failure:
+**4. A deadlock, `fuzz-1000384`. ✅ RESOLVED — by revoking a promise a withdrawn car cannot keep.**
+At the 2 000-case overnight budget the deep tier reported one failure:
 
 ```
 case      fuzz-1000384      simSeed 205687583
@@ -1036,13 +1153,43 @@ status    timed-out, 480 passengers
 ```
 
 **P5 termination, not P6 starvation, and proven pre-existing** — re-run at the branch point
-`c072f97` with every T21 change stashed, it reproduces the identical violation to the same decimal.
-The shrinker reduces it in 33 steps to a 29-passenger case that still deadlocks, on a bank whose
-remaining car is `mode: "independent"`. It belongs to `sim/` and `dispatch/`, not to the metrics
-layer. **A fix is in flight in a concurrent task; this roadmap records the finding, not a verdict on
-the fix.** Until it closes, Phase 8 is not accepted — the phase's own rule is that a Phase 8 failure
-blocks release, and applying that rule to a finding the phase itself produced is the whole point of
-having it.
+`c072f97` with every T21 change stashed, it reproduced the identical violation to the same decimal.
+The shrinker reduced it in 33 steps (139 candidate evaluations, 4.1 s) from a 32-floor sky-lobby
+with 3 banks, 6 cars, 2 access zones and 480 passengers to **4 floors, 2 cars, 29 passengers and no
+access zones**. **The access zones fall away entirely** despite the case's `access-zones` tag, so it
+is not about access zoning; the single-entry service schedule and the two-car bank both survive, and
+`dropCar` can remove neither — which *is* the diagnosis: the defect needs one car withdrawn and
+another available and idle.
+
+**The mechanism, instrumented rather than inferred.** A destination-panel promise bound journey
+`j9` to car `low-1`; at t = 472 a service event moved `low-1` to `independent` and released its hall
+calls; `#reofferCall` re-offered the call, and `#candidateCars` — enforcing § D29's write-once
+promise at the candidate set — handed it **straight back to the car that had just left**.
+`cands=[low-1] -> unassigned, low-1:serviceMode`, repeated every `dispatchRetryS = 5 s`, **592
+identical dispatches** to t = 3427, while `low-4` served every other landing in the building and
+stood idle in between.
+
+**Fixed by [§ T22-D1](../DECISIONS.md): a promise whose car has left group control is revoked, not
+held.** `Simulation.#revokePromisesTo` is called from `#onServiceChange` and nowhere else, gated on
+`Car.acceptsHallCalls === false`. On the shrunk case: `timed-out` / 22 delivered / 7 undelivered →
+**`completed` / 29 delivered / 0 undelivered**, with one revocation. On the parent, still
+`timed-out` — which is the honest answer, since 3.8 %pop/5 min on that building with a car withdrawn
+is past handling capacity, `saturation.verdict` is `diverging-queue` and no mean is published — but
+fleet inactivity before the deadline falls from **1 694.3 s to 5.9 s** and all six properties hold.
+
+**This refines § D29 rather than weakening it,** and the distinction is guarded by a control rather
+than argued: D29's write-once rule is stated about a car that is **full**, whose promise is a real
+cost precisely because the car empties and comes back. A car on `independent`, `fire-recall` or
+`out-of-service` does not come back unless a later schedule entry says so, so the promise is not a
+cost being paid — it is a promise that cannot be kept. `sim/serviceMode.test.ts` asserts
+`promisesRevoked === 0` on a panel run of the same building with **no** schedule, in which 18
+promises are broken by full cars. Recorded in [§ D101](../DECISIONS.md), which also corrects the
+four earlier records that still describe this as live.
+
+**Blast radius: 60 of 60 shipped cells byte-identical** (5 buildings × 12 profiles, full structural
+fingerprint) once the new always-zero `promisesRevoked` field is stripped, and `promisesRevoked` is
+0 in all 60 — necessarily, since no shipped building carries a `serviceEvents` schedule or a
+non-default `CarConfig.mode`.
 
 ### Known coverage gaps, checked rather than inherited
 
@@ -1051,8 +1198,12 @@ having it.
    on a *generator* artefact ([§ D87](../DECISIONS.md)). Covered instead by
    `adversarial.test.ts` and `core/src/sim/serviceMode.test.ts`, where the expected outcome can be
    asserted rather than avoided.
-2. **`serviceEvents` × `passengerAssignment: 'destination'` is untested** — `runCorner` and
-   `fuzzSimulationConfigFor` both drive conventional dispatch. The clearest next step on this axis.
+2. ✅ **CLOSED. `serviceEvents` × `passengerAssignment: 'destination'` was untested** — `runCorner`
+   and `fuzzSimulationConfigFor` both drove conventional dispatch, which is precisely where the
+   deadlock lived. `validation/adversarial.test.ts` now covers it directly: legsAssigned 367,
+   promisesRevoked 2, control 0, and `assigned − revoked === legsCreated`. The fuzz generator
+   already reached it — `destination-panel` is one of the twelve profiles it draws, which is how
+   `fuzz-1000384` was found — but the `validation/` corner was conventional-only.
 3. **A dispatcher or a zone cannot be changed mid-run.** A car's availability can
    (`BuildingConfig.serviceEvents`); the other two have no mechanism.
 4. **Multi-replication statistics over generated buildings.** One replication per case, as
@@ -1087,9 +1238,13 @@ having it.
 
 | Item | Where it is recorded |
 |---|---|
-| **`fuzz-1000384` — an open P5 deadlock violation.** Blocks Phase 8's acceptance | § Phase 8 above; fix in flight in a concurrent task |
-| **Phase 8's full experiment matrix + Pareto front at a real budget**, and with it Phase 7's acceptance interval at 50–200 replications | § Phase 8 above |
+| **Phase 8's full experiment matrix + Pareto front at a real budget**, and with it Phase 7's acceptance interval at 50–200 replications. **This is the only thing between Phase 8 and acceptance** | § Phase 8 above |
 | **Phase 6c — learned control** | § Phase 6c above; deferred with reasons, not dropped |
 | **Double-deck simulation and Vertical City** | § Phase 6 above; disclaimed on every run of that building |
 | **Fuzzy traffic-pattern switching** | § Phase 7 above; authored in `data/`, read by nothing |
-| Open items C2 (partly), C4, C5, C7, C24 – C32 | [`AGENT_STATUS.md`](../AGENT_STATUS.md) § Carried forward |
+| **The Level-1 panel does not clear the Phase 6 gate on `mixed-use-high-rise`** | § *Phase 6 on the building the criterion names* above. A measured result, not a task — but it is what a reader planning 6c needs |
+| Open items C4, C5, C7, C24, C27, C30, C32 | [`AGENT_STATUS.md`](../AGENT_STATUS.md) § Carried forward, and [`docs/07`](07-handoff.md) § 8 |
+
+**Closed since this table was last written:** `fuzz-1000384` (§ Phase 8, finding 4), C2, C19, C20,
+C21, C22, C23, C26, C28, C29, C31. Each was verified rather than taken on report; see
+[`docs/07`](07-handoff.md) § 8.

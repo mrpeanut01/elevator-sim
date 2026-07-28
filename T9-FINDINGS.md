@@ -1,5 +1,13 @@
 # T9 — published benchmark numbers that the code does not produce
 
+> **🏁 Retired 2026-07-28 with the delivery; still authoritative, no longer updated.** A measurement
+> record, and the origin of one of the repository's permanent guards:
+> `benchmark/published.test.ts`, which is now what stands between a published interval and silent
+> drift. `published.ts` carries **401 pinned estimate entries** as of 2026-07-28 (counted here by
+> grep on this tree, not asserted by any test), grown by every study added since this task and with
+> **no existing pin moved** by any of them — most recently the mixed-use study's 72, where
+> `published.ts` was **+100 / −0** and a key-by-key diff confirmed it (§ D100).
+
 Branch `fix/unreproducible-benchmarks`, 2026-07-27. Everything below is **measured**, at seed
 `20 260 726`, on the branch's own tree unless a commit is named.
 
