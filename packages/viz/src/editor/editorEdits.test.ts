@@ -21,7 +21,7 @@ import { join } from 'node:path';
 import { loadConfig, type BuildingConfig, type LoadedConfig } from '@elevator-sim/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { BUILDING_IDS, DATA_DIR } from './fixtures.test-helper.js';
+import { BUILDING_IDS, DATA_DIR } from '../fixtures.test-helper.js';
 import {
   OPERATIONAL_ZONING_NOTE,
   addBank,

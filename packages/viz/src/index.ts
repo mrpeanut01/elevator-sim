@@ -230,9 +230,9 @@ export {
   updateCar,
   updateFloor,
   upsertAccessZone,
-} from './editorEdits.js';
-export { EditorHistory, MIN_HISTORY_DEPTH, type HistoryState } from './editorHistory.js';
-export { previewGeometry, type PreviewGeometry } from './editorPreview.js';
+} from './editor/editorEdits.js';
+export { EditorHistory, MIN_HISTORY_DEPTH, type HistoryState } from './editor/editorHistory.js';
+export { previewGeometry, type PreviewGeometry } from './editor/editorPreview.js';
 export {
   issuesMayBeIncomplete,
   summariseReport,
@@ -241,4 +241,4 @@ export {
   type ValidateOptions,
   type ValidationReport,
   type ValidationStage,
-} from './editorValidate.js';
+} from './editor/editorValidate.js';

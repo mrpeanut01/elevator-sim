@@ -13,7 +13,7 @@
  * zoning is not building geometry at all (see `editorEdits.ts`).
  */
 
-import type { PreviewGeometry } from '../editorPreview.js';
+import type { PreviewGeometry } from '../editor/editorPreview.js';
 import type { Canvas2DLike, Theme } from './canvas.js';
 import { DEFAULT_THEME, fitLabel } from './canvas.js';
 import type { Layout } from './layout.js';

@@ -49,16 +49,16 @@ import {
   updateCar,
   updateFloor,
   upsertAccessZone,
-} from '../editorEdits.js';
-import { EditorHistory } from '../editorHistory.js';
-import { previewGeometry } from '../editorPreview.js';
+} from '../editor/editorEdits.js';
+import { EditorHistory } from '../editor/editorHistory.js';
+import { previewGeometry } from '../editor/editorPreview.js';
 import {
   issuesMayBeIncomplete,
   summariseReport,
   validateBuilding,
   validateBuildingText,
   type ValidationReport,
-} from '../editorValidate.js';
+} from '../editor/editorValidate.js';
 import { buildLayout } from '../render/layout.js';
 import { describePreview, drawPreview } from '../render/preview.js';
 import type { Canvas2DLike } from '../render/canvas.js';

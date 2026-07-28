@@ -940,6 +940,35 @@ export function handlingCapacityOf(
  * its doors 39.8 s shares the floor with an office-local car whose whole round trip is 31.3 s. Two
  * banks with duty cycles that different do not have one achieved interval between them, whatever
  * threshold is chosen, so refusing to report one is the correct answer rather than a limitation.
+ * Vertical City's ground lobby is the same shape and worse: 39.8 s against 30.0 s.
+ *
+ * ## An empty bracket is not the only thing worth naming — a **narrow** one is (C21)
+ *
+ * This section used to stop at the three empty brackets, which reads as though every other bank has
+ * comfortable headroom. It does not. Re-measured across all fourteen shipped banks, band width
+ * `minRoundTrip − maxReopen`, narrowest first:
+ *
+ * | bank | max reopen | min round trip | **band** |
+ * |---|---|---|---|
+ * | **Vertical City · zone-5-local** | 28.80 s | 30.03 s | **1.23 s** |
+ * | Vertical City · zone-1-local / zone-2-local | 26.40 s | 30.03 s | 3.63 s |
+ * | Secure Tower · low | 24.00 s | 30.83 s | 6.83 s |
+ * | … six more, 7.23 s to 34.83 s … | | | |
+ * | Secure Tower · high | 24.00 s | 59.43 s | 35.43 s |
+ *
+ * `zone-5-local`'s band is **1.23 s wide** — 2.95× tighter than the next narrowest and 28.8× below
+ * the widest — and {@link departureGapBracket} still returns a `bracket-midpoint` there with no
+ * warning of any kind, because the bracket is non-empty and that is the only question the function
+ * asks. That bank is 1.23 s of authored timing away from joining the three above, and a reader of
+ * the empty-bracket table alone would not know it. The figure is measured here rather than
+ * transcribed: an earlier statement of it said "5× tighter than the next", which the fourteen-bank
+ * sweep does not reproduce.
+ *
+ * It is **not** turned into a warning threshold. "How narrow is too narrow" is a judgement, the
+ * bracket's whole argument is that any value strictly inside it works, and a constant chosen here
+ * would be exactly the kind of hidden tolerance {@link DEPARTURE_GAP_REOPEN_MARGIN} is written not
+ * to be. It is named so that the next person to change a car's `passengerTransferS` or a zone's
+ * first hop knows which bank goes first.
  */
 export interface DepartureGapBracket {
   /** `openS + max(hall dwell, car dwell, P·tp) + closeS`, seconds. The lower bound. */

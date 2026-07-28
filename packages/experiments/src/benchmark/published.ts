@@ -68,6 +68,7 @@ import { comparePaired, samplesOf } from '../validation/harness.js';
 import type { AccessControlStudy } from './accessControl.js';
 import type { DisclosureStudy } from './destinationDisclosure.js';
 import type { DispatchContrastStudy } from './destinationDispatchContrast.js';
+import type { MixedUseStudy } from './mixedUseHighRise.js';
 import type { CaseResult } from './suite.js';
 import type { PrepositioningStudy } from './prepositioning.js';
 import type { Stage5Study } from './capacityReassignment.js';
@@ -95,6 +96,7 @@ export const PUBLISHED_STUDY_IDS = Object.freeze([
   'destination-disclosure',
   'destination-dispatch',
   'access-control',
+  'mixed-use-high-rise',
 ] as const);
 
 export type PublishedStudyId = (typeof PUBLISHED_STUDY_IDS)[number];
@@ -339,6 +341,29 @@ export function accessControlFigures(
   return figures;
 }
 
+/**
+ * The Mixed-Use High-Rise study's figures, keyed `point/candidate−baseline/metric`.
+ *
+ * Iterates the study's own points, its own baselines — which are read out of `data/` by
+ * {@link baselineProfileIds} — and its own metrics, so a fourth `role: 'baseline'` profile authored
+ * in `data/dispatcher-profiles.json` appears in the key set immediately and the totality check fails
+ * until it has a pin. **§ 1's coverage census contributes nothing**, and that is the point: it is
+ * categorical, it has no standard error, and its assertions are counts in
+ * `mixedUseHighRise.test.ts`.
+ */
+export function mixedUseFigures(study: MixedUseStudy): ReadonlyMap<string, PinnedEstimate> {
+  const figures = new Map<string, PinnedEstimate>();
+  for (const point of study.points) {
+    for (const cell of point.cells) {
+      figures.set(
+        `${point.id}/${cell.armId}−${cell.baselineId}/${cell.metric}`,
+        estimateOf(cell.estimate),
+      );
+    }
+  }
+  return figures;
+}
+
 /** The forecast-causality audit's one interval. */
 export function causalityFigures(
   audit: ForecastCausalityAudit,
@@ -573,6 +598,7 @@ export const STUDY_ENTRY_POINTS: Readonly<Record<string, PublishedStudyId | 'no-
     runNegativeControls: 'destination-disclosure',
     runDestinationDispatchStudy: 'destination-dispatch',
     runAccessControlStudy: 'access-control',
+    runMixedUseHighRiseStudy: 'mixed-use-high-rise',
     // Counts and nothing else: evaluations, non-zero evaluations, cross-car spread and eligibility
     // refusals by reason. No standard error anywhere in it, so there is nothing for a pin to hold —
     // and the assertions it feeds are inequalities against zero, not intervals.
@@ -930,5 +956,79 @@ export const PINNED_ESTIMATES: Readonly<
     "midtown-office/relative": { n: 150, mean: -0.028525773527358408, standardError: 0.003086751585385648, lower: -0.0346252353363334, upper: -0.022426311718383413 },
     "secure-tower/absolute": { n: 150, mean: -0.5801943527532207, standardError: 0.09300206009696317, lower: -0.7639676490570606, upper: -0.39642105644938086 },
     "secure-tower/relative": { n: 150, mean: -0.011047649460555179, standardError: 0.0017581141127432525, lower: -0.014521706115217158, upper: -0.007573592805893199 },
+  }),
+  "mixed-use-high-rise": Object.freeze({
+    "up-peak-1pct/destination-eta+ride1−collective/awtS": { n: 150, mean: 0.5722989475015055, standardError: 0.076666560359278, lower: 0.4208048139434696, upper: 0.7237930810595413 },
+    "up-peak-1pct/destination-eta+ride1−collective/rideMeanS": { n: 150, mean: -0.7060268699225966, standardError: 0.1471633094200422, lower: -0.9968235086089494, upper: -0.41523023123624364 },
+    "up-peak-1pct/destination-eta+ride1−collective/ttdMeanS": { n: 150, mean: -0.1706153819475601, standardError: 0.1702570569008219, lower: -0.50704556997816, upper: 0.16581480608303972 },
+    "up-peak-1pct/destination-eta+ride1−collective/wt95S": { n: 150, mean: 0.08359263041224493, standardError: 0.060343406882192946, lower: -0.03564673677362801, upper: 0.20283199759811787 },
+    "up-peak-1pct/destination-eta+ride1−eta/awtS": { n: 150, mean: 0.5778040112166882, standardError: 0.07568087559712015, lower: 0.4282576037377237, upper: 0.7273504186956528 },
+    "up-peak-1pct/destination-eta+ride1−eta/rideMeanS": { n: 150, mean: -0.6991478023262565, standardError: 0.14726955152535937, lower: -0.9901543768127417, upper: -0.4081412278397714 },
+    "up-peak-1pct/destination-eta+ride1−eta/ttdMeanS": { n: 150, mean: -0.16946724963458842, standardError: 0.16987352046314547, lower: -0.5051395646102157, upper: 0.1662050653410388 },
+    "up-peak-1pct/destination-eta+ride1−eta/wt95S": { n: 150, mean: 0.10139818653428274, standardError: 0.052665926390099115, lower: -0.002670378027761211, upper: 0.2054667510963267 },
+    "up-peak-1pct/destination-eta+ride1−nearest-car/awtS": { n: 150, mean: -1.7574925391552632, standardError: 0.22575178778966273, lower: -2.203581046714527, upper: -1.3114040315959994 },
+    "up-peak-1pct/destination-eta+ride1−nearest-car/rideMeanS": { n: 150, mean: -1.1569413052658746, standardError: 0.18230250051238703, lower: -1.517173448604039, upper: -0.7967091619277102 },
+    "up-peak-1pct/destination-eta+ride1−nearest-car/ttdMeanS": { n: 150, mean: -4.381996639002665, standardError: 0.40074016643782867, lower: -5.173864488713168, upper: -3.5901287892921623 },
+    "up-peak-1pct/destination-eta+ride1−nearest-car/wt95S": { n: 150, mean: -11.266569890655031, standardError: 0.9204326131457056, lower: -13.085356863405828, upper: -9.447782917904235 },
+    "up-peak-1pct/destination-panel−collective/awtS": { n: 150, mean: 0.5837174208128969, standardError: 0.07802284078670993, lower: 0.4295432592576136, upper: 0.7378915823681802 },
+    "up-peak-1pct/destination-panel−collective/rideMeanS": { n: 150, mean: -0.6929238200896324, standardError: 0.16204855253405182, lower: -1.0131338953223754, upper: -0.37271374485688935 },
+    "up-peak-1pct/destination-panel−collective/ttdMeanS": { n: 150, mean: -0.16274549943231922, standardError: 0.20971330898868323, lower: -0.5771417615307591, upper: 0.25165076266612063 },
+    "up-peak-1pct/destination-panel−collective/wt95S": { n: 150, mean: 0.06987814231964465, standardError: 0.0504409494840884, lower: -0.029793838556068042, upper: 0.16955012319535734 },
+    "up-peak-1pct/destination-panel−eta/awtS": { n: 150, mean: 0.5892224845280799, standardError: 0.07717141461080278, lower: 0.43673075231621866, upper: 0.7417142167399411 },
+    "up-peak-1pct/destination-panel−eta/rideMeanS": { n: 150, mean: -0.6860447524932923, standardError: 0.162141322925931, lower: -1.006438143242888, upper: -0.36565136174369667 },
+    "up-peak-1pct/destination-panel−eta/ttdMeanS": { n: 150, mean: -0.16159736711934755, standardError: 0.2095871131465746, lower: -0.5757442645708112, upper: 0.25254953033211613 },
+    "up-peak-1pct/destination-panel−eta/wt95S": { n: 150, mean: 0.08768369844168247, standardError: 0.040987073647911154, lower: 0.006692700798493295, upper: 0.16867469608487165 },
+    "up-peak-1pct/destination-panel−nearest-car/awtS": { n: 150, mean: -1.7460740658438718, standardError: 0.22885456888828717, lower: -2.1982937097415025, upper: -1.2938544219462411 },
+    "up-peak-1pct/destination-panel−nearest-car/rideMeanS": { n: 150, mean: -1.14383825543291, standardError: 0.19450472031906882, lower: -1.5281821459061375, upper: -0.7594943649596826 },
+    "up-peak-1pct/destination-panel−nearest-car/ttdMeanS": { n: 150, mean: -4.374126756487428, standardError: 0.4209550829209927, lower: -5.205939547554549, upper: -3.5423139654203064 },
+    "up-peak-1pct/destination-panel−nearest-car/wt95S": { n: 150, mean: -11.280284378747632, standardError: 0.9241741130073476, lower: -13.106464604529357, upper: -9.454104152965908 },
+    "up-peak-2pct/destination-eta+ride1−collective/awtS": { n: 238, mean: 0.6827179350230642, standardError: 0.059598900112144734, lower: 0.5653066708084972, upper: 0.8001291992376313 },
+    "up-peak-2pct/destination-eta+ride1−collective/rideMeanS": { n: 238, mean: -0.7814334762839042, standardError: 0.2106127711590126, lower: -1.1963456923647842, upper: -0.3665212602030243 },
+    "up-peak-2pct/destination-eta+ride1−collective/ttdMeanS": { n: 238, mean: -0.03960515156886264, standardError: 0.2610232485611048, lower: -0.5538272185077692, upper: 0.47461691537004386 },
+    "up-peak-2pct/destination-eta+ride1−collective/wt95S": { n: 238, mean: 0.004611381474101925, standardError: 0.11563448201830342, lower: -0.22319132453253163, upper: 0.23241408748073547 },
+    "up-peak-2pct/destination-eta+ride1−eta/awtS": { n: 238, mean: 0.6739522314544583, standardError: 0.05994238848540023, lower: 0.5558642868972834, upper: 0.7920401760116331 },
+    "up-peak-2pct/destination-eta+ride1−eta/rideMeanS": { n: 238, mean: -0.771097224042806, standardError: 0.2087262736499293, lower: -1.1822929947352254, upper: -0.35990145335038665 },
+    "up-peak-2pct/destination-eta+ride1−eta/ttdMeanS": { n: 238, mean: -0.10850733230403298, standardError: 0.2577855196306536, lower: -0.6163509955107723, upper: 0.39933633090270637 },
+    "up-peak-2pct/destination-eta+ride1−eta/wt95S": { n: 238, mean: 0.17426403661850884, standardError: 0.05621981365184821, lower: 0.06350965386395543, upper: 0.28501841937306227 },
+    "up-peak-2pct/destination-eta+ride1−nearest-car/awtS": { n: 238, mean: -4.301624403903193, standardError: 0.22609722446577474, lower: -4.747041364786367, upper: -3.8562074430200193 },
+    "up-peak-2pct/destination-eta+ride1−nearest-car/rideMeanS": { n: 238, mean: -3.8587346760381904, standardError: 0.31299144619603203, lower: -4.4753353400953, upper: -3.242134011981081 },
+    "up-peak-2pct/destination-eta+ride1−nearest-car/ttdMeanS": { n: 238, mean: -12.328414985504825, standardError: 0.5815212316420223, lower: -13.474025774399045, upper: -11.182804196610604 },
+    "up-peak-2pct/destination-eta+ride1−nearest-car/wt95S": { n: 238, mean: -23.78912828784516, standardError: 0.9765326425467977, lower: -25.712921040605163, upper: -21.865335535085155 },
+    "up-peak-2pct/destination-panel−collective/awtS": { n: 238, mean: 0.8526899878181485, standardError: 0.09681945191580711, lower: 0.661953342869898, upper: 1.043426632766399 },
+    "up-peak-2pct/destination-panel−collective/rideMeanS": { n: 238, mean: -0.7901635121646926, standardError: 0.20461182020418645, lower: -1.193253710779311, upper: -0.3870733135500742 },
+    "up-peak-2pct/destination-panel−collective/ttdMeanS": { n: 238, mean: 0.04149502732326189, standardError: 0.3026955285944627, lower: -0.5548224318496193, upper: 0.6378124864961432 },
+    "up-peak-2pct/destination-panel−collective/wt95S": { n: 238, mean: 0.22056721499579146, standardError: 0.2911127036670399, lower: -0.35293180096176635, upper: 0.7940662309533493 },
+    "up-peak-2pct/destination-panel−eta/awtS": { n: 238, mean: 0.8439242842495419, standardError: 0.09714673202476015, lower: 0.6525428896285264, upper: 1.0353056788705575 },
+    "up-peak-2pct/destination-panel−eta/rideMeanS": { n: 238, mean: -0.7798272599235941, standardError: 0.20315052441401169, lower: -1.1800386707452666, upper: -0.3796158491019216 },
+    "up-peak-2pct/destination-panel−eta/ttdMeanS": { n: 238, mean: -0.027407153411908435, standardError: 0.2994431356010343, lower: -0.6173173202964676, upper: 0.5625030134726506 },
+    "up-peak-2pct/destination-panel−eta/wt95S": { n: 238, mean: 0.3902198701401983, standardError: 0.27244581548076496, lower: -0.14650492789087977, upper: 0.9269446681712764 },
+    "up-peak-2pct/destination-panel−nearest-car/awtS": { n: 238, mean: -4.1316523511081105, standardError: 0.23930164037009974, lower: -4.603082328366159, upper: -3.660222373850062 },
+    "up-peak-2pct/destination-panel−nearest-car/rideMeanS": { n: 238, mean: -3.8674647119189767, standardError: 0.3119260836100537, lower: -4.481966586101923, upper: -3.2529628377360305 },
+    "up-peak-2pct/destination-panel−nearest-car/ttdMeanS": { n: 238, mean: -12.247314806612701, standardError: 0.620241585547689, lower: -13.469205622392407, upper: -11.025423990832996 },
+    "up-peak-2pct/destination-panel−nearest-car/wt95S": { n: 238, mean: -23.57317245432347, standardError: 1.0333512081754137, lower: -25.608899145608536, upper: -21.537445763038402 },
+    "up-peak-4pct/destination-eta+ride1−collective/awtS": { n: 200, mean: 0.8746942954337072, standardError: 0.08829543539315919, lower: 0.7005795337826055, upper: 1.048809057084809 },
+    "up-peak-4pct/destination-eta+ride1−collective/rideMeanS": { n: 200, mean: -2.4707351572476806, standardError: 0.3110451165101312, lower: -3.0841026103073954, upper: -1.8573677041879657 },
+    "up-peak-4pct/destination-eta+ride1−collective/ttdMeanS": { n: 200, mean: -2.1163583506713275, standardError: 0.40134963479253394, lower: -2.907802389533532, upper: -1.324914311809123 },
+    "up-peak-4pct/destination-eta+ride1−collective/wt95S": { n: 200, mean: 0.25336859159793673, standardError: 0.15168291209489007, lower: -0.04574351955875128, upper: 0.5524807027546248 },
+    "up-peak-4pct/destination-eta+ride1−eta/awtS": { n: 200, mean: 0.8764178109008983, standardError: 0.08797316262305768, lower: 0.7029385571478325, upper: 1.0498970646539643 },
+    "up-peak-4pct/destination-eta+ride1−eta/rideMeanS": { n: 200, mean: -2.451719588792003, standardError: 0.31250415643227464, lower: -3.067964205174513, upper: -1.8354749724094928 },
+    "up-peak-4pct/destination-eta+ride1−eta/ttdMeanS": { n: 200, mean: -2.0722858950293706, standardError: 0.40333920921514566, lower: -2.8676532881945205, upper: -1.2769185018642208 },
+    "up-peak-4pct/destination-eta+ride1−eta/wt95S": { n: 200, mean: 0.2725685915979369, standardError: 0.15143528350529975, lower: -0.02605520674096462, upper: 0.5711923899368384 },
+    "up-peak-4pct/destination-eta+ride1−nearest-car/awtS": { n: 200, mean: -6.619792030614814, standardError: 0.38866040409459174, lower: -7.386213457960691, upper: -5.853370603268937 },
+    "up-peak-4pct/destination-eta+ride1−nearest-car/rideMeanS": { n: 200, mean: -7.371891454287547, standardError: 0.4334778789142667, lower: -8.226690994400922, upper: -6.517091914174172 },
+    "up-peak-4pct/destination-eta+ride1−nearest-car/ttdMeanS": { n: 200, mean: -21.239007590100304, standardError: 0.7880325851976934, lower: -22.792973603564555, upper: -19.685041576636053 },
+    "up-peak-4pct/destination-eta+ride1−nearest-car/wt95S": { n: 200, mean: -30.923566047357046, standardError: 1.8520335598329785, lower: -34.57569574584363, upper: -27.27143634887046 },
+    "up-peak-4pct/destination-panel−collective/awtS": { n: 200, mean: 3.188042070868538, standardError: 0.3686307738050983, lower: 2.4611182040509716, upper: 3.9149659376861043 },
+    "up-peak-4pct/destination-panel−collective/rideMeanS": { n: 200, mean: -3.1446115694017127, standardError: 0.33541525441594466, lower: -3.806035875389115, upper: -2.4831872634143104 },
+    "up-peak-4pct/destination-panel−collective/ttdMeanS": { n: 200, mean: 0.4899579905450675, standardError: 0.7057089150084833, lower: -0.9016693227427439, upper: 1.881585303832879 },
+    "up-peak-4pct/destination-panel−collective/wt95S": { n: 200, mean: 9.064080447740142, standardError: 1.7248459098801037, lower: 5.662759267926132, upper: 12.465401627554153 },
+    "up-peak-4pct/destination-panel−eta/awtS": { n: 200, mean: 3.1897655863357297, standardError: 0.36836829628928636, lower: 2.463359313773188, upper: 3.9161718588982715 },
+    "up-peak-4pct/destination-panel−eta/rideMeanS": { n: 200, mean: -3.125596000946036, standardError: 0.334409634530808, lower: -3.7850372682199134, upper: -2.4661547336721585 },
+    "up-peak-4pct/destination-panel−eta/ttdMeanS": { n: 200, mean: 0.5340304461870233, standardError: 0.7045722067125382, lower: -0.8553553277376937, upper: 1.9234162201117404 },
+    "up-peak-4pct/destination-panel−eta/wt95S": { n: 200, mean: 9.08328044774014, standardError: 1.7243024717812594, lower: 5.683030904241543, upper: 12.483529991238738 },
+    "up-peak-4pct/destination-panel−nearest-car/awtS": { n: 200, mean: -4.306444255179986, standardError: 0.524964242527924, lower: -5.341650928731112, upper: -3.271237581628861 },
+    "up-peak-4pct/destination-panel−nearest-car/rideMeanS": { n: 200, mean: -8.04576786644158, standardError: 0.4694257725578802, lower: -8.971455090677546, upper: -7.120080642205614 },
+    "up-peak-4pct/destination-panel−nearest-car/ttdMeanS": { n: 200, mean: -18.632691248883926, standardError: 1.0494153407776206, lower: -20.70209269776858, upper: -16.56328979999927 },
+    "up-peak-4pct/destination-panel−nearest-car/wt95S": { n: 200, mean: -22.112854191214836, standardError: 2.4547454653589926, lower: -26.953505576101918, upper: -17.272202806327755 },
   }),
 });
