@@ -90,12 +90,19 @@ import { armOf, runBenchmarkCase, type CaseResult } from './suite.js';
  * The matrix's reference arm.
  *
  * `collective` rather than `eta` among the two docs/07 § 4 permits, for a reason that is measured
- * rather than aesthetic: at **every one of the eight cells** `eta` is bit-identical to at least one
- * other shipped profile — to `destination-eta` at all eight and to `fairness-first` at five (see
- * {@link MatrixCellResult.identityClasses}) — and a baseline that is secretly the same run as one
- * of its own arms makes that arm's whole row a row of exact zeros with nothing to say. It would
- * also have hidden the matrix's largest structural finding behind a row of zeros in the baseline
- * column, where nobody reads it. `collective` is in no identity class at any cell.
+ * rather than aesthetic: `eta` is bit-identical to at least one other shipped profile at most cells
+ * — to `fairness-first` at five, and, when this matrix was first run, to `destination-eta` at
+ * **all eight** (see {@link MatrixCellResult.identityClasses}) — and a baseline that is secretly the
+ * same run as one of its own arms makes that arm's whole row a row of exact zeros with nothing to
+ * say. It would also have hidden the matrix's largest structural finding behind a row of zeros in
+ * the baseline column, where nobody reads it. `collective` is in no identity class at any cell.
+ *
+ * That finding is now closed rather than merely reported: `destination-eta` was inert because it
+ * weighted no term that read the destination it disclosed, and `data/dispatcher-profiles.json`
+ * weights `rideTime` at 0.5. It separates from `eta` at seven of the eight cells; the one where it
+ * does not is named, with the measurement that shows the cell blind at every weight up to 2.0, in
+ * `matrix.test.ts`. The choice of baseline is
+ * unaffected — `fairness-first` is still identical to `eta` at five cells — and is left alone.
  */
 export const MATRIX_BASELINE = 'collective';
 

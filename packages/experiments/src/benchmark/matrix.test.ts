@@ -236,31 +236,79 @@ describe('the Pareto front is over three axes and never orders a tie', () => {
  * -------------------------------------------------------------------------- */
 
 describe('bit-identical arms are found and named', () => {
-  it('finds destination-eta bit-identical to eta at every one of the eight cells', async () => {
-    // **The matrix's headline structural finding.** `destination-eta` differs from `eta` in exactly
-    // two authored fields — `dispatch.callType: mobile-credential` and its name — and its weight
-    // vector is `{ waitTime: 1.0 }`, the same as `eta`'s. Its own `$comment` in
-    // `data/dispatcher-profiles.json` records the reason it does not weight `rideTime`: a fixture
-    // gap in `dispatch/policies/policies.test.ts`, not a judgement about the weight. The
-    // consequence, unmeasured until now: the destination is disclosed all the way into
-    // `estimateCost` and changes no decision, so the shipped Level-0 profile is the baseline under
-    // another name at every operating point in this matrix.
-    //
-    // This is not a contradiction of Phase 6a. That phase's accepted result was measured on
-    // *derived* arms at `rideTime` 0.3, 1.0 and 2.0 (`destinationDisclosure.ts`), and it stands.
-    // What the matrix adds is that the value is not in the profile that ships.
+  it('finds destination-eta separated from eta everywhere the destination carries information', async () => {
+    /*
+     * **This assertion used to say the opposite, and the change is the fix rather than a
+     * concession.** It read *"finds `destination-eta` bit-identical to `eta` at every one of the
+     * eight cells"*, and it passed: the shipped Level-0 profile differed from `eta` in two authored
+     * fields, weighted `{ waitTime: 1.0 }` exactly as `eta` does, and therefore disclosed a
+     * destination all the way into `estimateCost` that changed no decision anywhere in this matrix.
+     * A configured, tested, shipped behaviour with no effect on any shipped path — the ninth
+     * instance of docs/05-roadmap.md § *Standing requirement*, one level up from code into data.
+     * The old assertion named its own successor: *"if a rideTime weight was authored into the
+     * shipped profile, that is the fix and this expectation is the thing to update."* T30 authored
+     * it, at 0.5, and this is that update.
+     *
+     * What replaces it is stricter, not looser, because it is asserted in **both** directions.
+     *
+     * - At seven of the eight cells the shipped profile must now separate from `eta`. A weight that
+     *   did nothing would fail here exactly as the old arrangement should have.
+     * - At the one named below it must still be identical, and it is named with the mechanism that
+     *   makes it blind — measured rather than asserted. Listing it by name means a cell that
+     *   *stops* being blind, or a second cell that starts, fails this test too.
+     *
+     * ## Why that one, and why it is not a weight being too small
+     *
+     * **`garden-down-peak` is structurally blind.** Every down trip there ends at the lobby, so the
+     * destination carries nothing the direction button did not — the mechanism
+     * `destinationDisclosure.ts`'s `NEGATIVE_CONTROLS` predicts in advance for the same traffic on
+     * Midtown. Measured at this cell's own seed and budget, `destination-eta` is bit-identical to
+     * `eta` on 0 of 51 replications at `rideTime` 0.3, at 1.0 **and** at 2.0. Raising the weight
+     * fourfold does not move it, which is what tells a blind operating point from a dead seam.
+     * `destination-panel` at 1.0 lands in the same class here, independently.
+     *
+     * **`midtown-up-peak` is on this list's other side, and it is why the shipped weight is 0.5
+     * rather than 0.3.** It differs on 0 of 81 replications at `rideTime` 0.3, 5 at 0.5, 6 at 0.7
+     * and 16 at 1.0 — so at the bracket's floor the shipped profile would still have been the
+     * baseline under another name at a shipped operating point, which is the defect one notch
+     * smaller. 0.5 is the smallest bracket point that separates here, and the reason it is not
+     * higher is the tail: WT95 at the primary operating point is INDISTINGUISHABLE from the
+     * baseline at 0.5 and significantly WORSE at 1.0. The full argument is in
+     * `destinationDisclosure.ts` § *Why the shipped default is 0.5*.
+     */
+    const STILL_IDENTICAL: Readonly<Record<string, string>> = Object.freeze({
+      'garden-down-peak':
+        'every down trip ends at the lobby, so the destination carries nothing the direction ' +
+        'button did not — identical at rideTime 0.3, 1.0 and 2.0 alike',
+    });
+
+    const separated: string[] = [];
+    const identical: string[] = [];
     for (const result of await matrixOf()) {
-      const classes = result.identityClasses.map((members) => new Set(members));
-      const together = classes.some(
-        (members) => members.has('eta') && members.has('destination-eta'),
+      const together = result.identityClasses.some(
+        (members) => members.includes('eta') && members.includes('destination-eta'),
       );
-      expect(
-        together,
-        `${result.cell.id}: destination-eta is no longer bit-identical to eta. If a rideTime weight ` +
-          'was authored into the shipped profile, that is the fix and this expectation is the thing ' +
-          'to update — deliberately, in a diff a human reads.',
-      ).toBe(true);
+      (together ? identical : separated).push(result.cell.id);
     }
+
+    expect(
+      identical.sort(),
+      'a cell where the shipped destination profile is still the baseline under another name, with ' +
+        'no measured mechanism recorded for why. Either the weight stopped biting — the defect T30 ' +
+        'closed, returning — or this cell is genuinely blind and belongs in STILL_IDENTICAL with ' +
+        'the measurement that shows raising the weight does not move it',
+    ).toEqual(Object.keys(STILL_IDENTICAL).sort());
+
+    // The other direction: the exemption list may not outlive its reason, exactly as the two
+    // dead-code allowlists are asserted. A cell that starts separating must leave the list.
+    expect(separated.length, 'the shipped profile separates from eta at no cell at all').toBeGreaterThan(
+      0,
+    );
+    console.log(
+      `destination-eta vs eta: separated at ${separated.length} of ${
+        separated.length + identical.length
+      } cells (${separated.join(', ')}); still identical at ${identical.join(', ') || 'none'}`,
+    );
   });
 
   it('reports every identity class as a class rather than as a set of tiny effects', async () => {

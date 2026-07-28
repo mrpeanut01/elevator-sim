@@ -101,7 +101,12 @@ import {
 } from '../validation/harness.js';
 
 import { MIDTOWN_INTERFLOOR_MIX, SECURE_INTERFLOOR_MIX, destinationCase } from './arms.js';
-import { DISCLOSURE_BASELINE, DISCLOSURE_PROFILE, rideArmId } from './destinationDisclosure.js';
+import {
+  DISCLOSURE_BASELINE,
+  DISCLOSURE_PROFILE,
+  DISCLOSURE_UNPRICED_ARM,
+  rideArmId,
+} from './destinationDisclosure.js';
 import { BENCHMARK_SEED } from './suite.js';
 
 /* -------------------------------------------------------------------------- *
@@ -118,8 +123,31 @@ import { BENCHMARK_SEED } from './suite.js';
  */
 export const BARE_KIOSK_ARM = 'destination-entry-bare';
 
-/** The credential arm (E) and the credential-plus-priced-destination arm (F) of § H-ACCESS-2. */
-export const CREDENTIAL_ARM = DISCLOSURE_PROFILE;
+/**
+ * The credential arm (E) and the credential-plus-priced-destination arm (F) of § H-ACCESS-2.
+ *
+ * **E is `destination-eta-unpriced`, a derived arm, and it must be.** `Δ` is defined above as
+ * *`TTD(credential + destination priced) − TTD(credential alone)`*, so E has to be the credential
+ * with the destination **not** priced — one variable between the two arms and nothing else. It used
+ * to be the shipped `destination-eta` because the shipped profile *was* that configuration: it
+ * authored a `callType` and weighted no term that read the destination, which is exactly the inert
+ * shipped behaviour T30 removed by authoring `weights.rideTime: 0.5`.
+ *
+ * Leaving E pointed at the shipped profile after that change would have silently redefined the
+ * study: `Δ` would have become the *marginal* effect from 0.5 to 1.0 rather than the effect of
+ * pricing the destination at all. Measured, that is exactly what happens: the published
+ * difference-of-differences `+0.982 [+0.584, +1.380]` falls to a mean of `+0.208` with an interval
+ * still excluding zero on the positive side — the same sign, the same REFUTED verdict, and a fifth
+ * of the magnitude, with nothing but a pin regeneration to mark the change of meaning. So E is
+ * bound to the *configuration* rather than to whatever `data/` currently ships, and the pins are
+ * unchanged.
+ *
+ * H-ACCESS-1 gains from the same binding for a second reason: its claim is about the **`callType`**,
+ * and an arm that differed from the conventional baseline in a weight as well as a call type would
+ * confound it. {@link CoverageResult.midtownNullIsIdentical} — the null half, bit-identity where
+ * there are no access zones — is only a null at all for a configuration that prices nothing.
+ */
+export const CREDENTIAL_ARM = DISCLOSURE_UNPRICED_ARM;
 export const CREDENTIAL_PLUS_DESTINATION_ARM = rideArmId(1);
 
 /** Every derived profile this study registers. Config only, never code (invariant 7). */
@@ -131,6 +159,10 @@ export function accessControlProfiles(
     derivedProfile(baseline, BARE_KIOSK_ARM, {
       name: 'Destination entry with no credential',
       dispatch: { callType: 'destination-entry' },
+    }),
+    derivedProfile(destination, CREDENTIAL_ARM, {
+      name: 'Destination disclosure, ride unpriced',
+      weights: { rideTime: 0 },
     }),
     derivedProfile(destination, CREDENTIAL_PLUS_DESTINATION_ARM, {
       name: 'Destination disclosure, rideTime 1',

@@ -465,8 +465,12 @@ export function outOfBalanceWorkJ(reading: TravelReading): number {
  * {@link workKJ} is the axis. {@link distanceM} and {@link starts} are published beside it
  * because they are the two things that can move it, and a single scalar cannot say which: a
  * dispatcher that cut energy by carrying fuller cars and one that cut it by driving less are
- * different findings with the same number. {@link workPerServedLegKJ} normalizes by work done
- * — a configuration that spends less because it served fewer people has not saved anything.
+ * different findings with the same number. {@link workPerServedLegKJ} divides the work by the
+ * **legs delivered** rather than leaving it as a fleet total, and it exists because the total is
+ * trivially gameable in the wrong direction: *a configuration that spends less because it served
+ * fewer people has not saved anything.* A saturating dispatcher whose queues diverge drives less
+ * and therefore scores better on {@link workKJ}, which is exactly the arm a three-axis front must
+ * not reward. The per-leg figure is the one that cannot be improved by refusing work.
  *
  * ## `NaN`, never `0`, when nothing was recorded
  *

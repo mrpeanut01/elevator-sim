@@ -2,17 +2,24 @@
  * **The liveness proof for everything Phase 6a ships, and it is a count rather than a diff.**
  *
  * `docs/09` § 8 R6-1 names this phase's most likely dead seam: *a destination profile lands in
- * `data/` and changes nothing.* The reason a trajectory difference cannot rule it out is measured in
- * `destinationDisclosure.test.ts` — the shipped profile is **bit-identical to `eta` on Midtown
- * Office**, on Garden Apartments and at both up-peak points, and that is correct rather than broken.
- * So the evidence here is the one the contract asks for: how often each gated behaviour actually
- * evaluated, how often it produced a non-zero value, and how often it produced a **different** value
- * for different candidate cars inside one decision.
+ * `data/` and changes nothing.* **It happened**, and it took T30 and a full experiment matrix to
+ * see it: the shipped profile weighted no gated term, and was bit-identical to `eta` at 8 of 8
+ * matrix cells.
+ *
+ * A trajectory difference is still the wrong evidence, and the reason is measured rather than
+ * argued. Even with the weight authored, the shipped profile is bit-identical to `eta` on Garden
+ * Apartments down-peak at **every** weight up to 2.0 — every down trip ends at the lobby, so the
+ * destination carries nothing the direction button did not. An operating point that is blind and a
+ * seam that is dead produce the same diff. So the evidence here is the one the contract asks for:
+ * how often each gated behaviour actually evaluated, how often it produced a non-zero value, and how
+ * often it produced a **different** value for different candidate cars inside one decision.
  *
  * Measured through `runSimulation` at the study's own operating points, seed 20260726:
  *
  * | configuration | `rideTime` non-zero | cross-car spread | eligibility |
  * |---|---|---|---|
+ * | **shipped `destination-eta`** (`rideTime 0.5`), `mobile-credential`, Midtown | **260 / 260** | **12 / 65 decisions** | — |
+ * | the shipped profile at `up-down-buttons`, Midtown | **0 / 248** | **0 / 62 decisions** | — |
  * | `destination-eta` + `rideTime 1`, `mobile-credential`, Midtown | **248 / 248** | **12 / 62 decisions** | — |
  * | the same weights at `up-down-buttons`, Midtown | **0 / 248** | **0 / 62 decisions** | — |
  * | shipped `destination-eta`, `mobile-credential`, Secure Tower | — | — | **0** refusals, **0** decisions wholly refused |
@@ -20,6 +27,14 @@
  *
  * Both gates are flat on their off side and live on their on side, which is the proof obligation
  * docs/09 § 8 R6-2 puts on the author rather than the reviewer.
+ *
+ * **The first two rows are new, and their absence is how the inert profile shipped.** Until T30 the
+ * shipped `destination-eta` weighted no gated term at all, so the `rideTime` rows here measured
+ * only `liveness-priced` — the same profile with the weight *forced to 1 by this file*. Those
+ * counts proved the **term** live and said nothing about the **profile**, and the matrix later
+ * measured what the profile did: bit-identical to `eta` at 8 of 8 cells. `data/` now ships 0.5 and
+ * the shipped configuration is counted at its own weight, on its own building, against its own
+ * gated-off control.
  *
  * ## Why 12 of 62 is the right number to look at, and why it is not small
  *
@@ -32,14 +47,21 @@
  * demanded spread in *every* decision would be demanding that the term price something it has said
  * it does not.
  *
- * ## The shipped profile's liveness is categorical, not a spread, and forcing one shape would lie
+ * ## The shipped profile now has liveness of **both** shapes, and they are still different shapes
  *
- * `destination-eta` weights no gated term. What its `callType` moves is the **eligibility filter**:
- * the credential reaches `estimateCost`, and cars stop refusing the call. The live direction is
- * therefore *fewer* refusals — and the refusals it removes are bank-wide, every car saying no to the
- * same call, which is why removing them turns 307 unassignable decisions per run into none and an
- * unservable building into a served one. That is H-ACCESS-1 one level down, in the filter that
- * causes it.
+ * On Midtown Office, `destination-eta`'s `callType` moves nothing in the eligibility filter — the
+ * building declares no `accessZones` — so what makes it live there is the **pricing**: 260 of 260
+ * evaluations non-zero, with cross-car spread in 12 of 65 decisions.
+ *
+ * On Secure Tower what its `callType` moves is the **eligibility filter**: the credential reaches
+ * `estimateCost`, and cars stop refusing the call. The live direction is therefore *fewer* refusals
+ * — and the refusals it removes are bank-wide, every car saying no to the same call, which is why
+ * removing them turns 307 unassignable decisions per run into none and an unservable building into
+ * a served one. That is H-ACCESS-1 one level down, in the filter that causes it.
+ *
+ * Forcing one shape onto both would still lie. A count of refusals says nothing about an argmin and
+ * a cross-car spread says nothing about a call nobody can serve; the profile earns its name on two
+ * buildings for two different reasons, and both are counted.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -110,9 +132,48 @@ describe('Phase 6a liveness — counted through the shipped engine', () => {
     expect(off.ridePricing.decisionsWithSpread).toBe(0);
   }, TIMEOUT_MS);
 
+  it('prices the ride on the SHIPPED profile, at the weight data/ actually carries', async () => {
+    /*
+     * **The assertion whose absence let the inert profile ship.** Everything above measures
+     * `liveness-priced` — `destination-eta` with `rideTime` forced to 1 — which is a study arm. The
+     * shipped file weighted `rideTime` at nothing at all, so the counts that proved the *term* live
+     * proved nothing about the *profile*, and the matrix later found it bit-identical to `eta` at 8
+     * of 8 cells. `data/dispatcher-profiles.json` now ships 0.3, and this is that configuration
+     * counted through the shipped engine on the primary building, at its own weight.
+     *
+     * Same three questions as the study arm, and the third is still the load-bearing one: a term
+     * returning the same number for every candidate is a constant added to every cost, and a
+     * constant cannot move an argmin.
+     */
+    const row = at(await liveness(), 'destination-eta', 'midtown-office');
+    expect(row.callType).toBe('mobile-credential');
+    expect(row.weightsRideTime).toBe(0.5);
+
+    expect(row.ridePricing.evaluations).toBeGreaterThan(0);
+    expect(row.ridePricing.nonZero / row.ridePricing.evaluations).toBeGreaterThan(0.9);
+    expect(row.ridePricing.decisionsWithSpread).toBeGreaterThan(0);
+    console.log(
+      `SHIPPED destination-eta on midtown-office: rideTime ${row.ridePricing.nonZero}/` +
+        `${row.ridePricing.evaluations} non-zero, cross-car spread in ` +
+        `${row.ridePricing.decisionsWithSpread}/${row.ridePricing.decisions} decisions ` +
+        `over ${row.totalDecisions} dispatch decisions`,
+    );
+  }, TIMEOUT_MS);
+
+  it('leaves the shipped profile’s own gate flat on its off side', async () => {
+    // docs/09 § 8 R6-2: the off side is the author's proof obligation, and it has to be the off side
+    // of *this* configuration rather than of a neighbouring one.
+    const off = at(await liveness(), 'liveness-shipped-conventional');
+    expect(off.callType).toBe('up-down-buttons');
+    expect(off.weightsRideTime).toBe(0.5);
+    expect(off.ridePricing.evaluations).toBeGreaterThan(0);
+    expect(off.ridePricing.nonZero).toBe(0);
+    expect(off.ridePricing.decisionsWithSpread).toBe(0);
+  }, TIMEOUT_MS);
+
   it('shows the shipped profile removing every access refusal on the zoned building', async () => {
     const rows = await liveness();
-    const credentialled = at(rows, 'destination-eta');
+    const credentialled = at(rows, 'destination-eta', 'secure-tower');
     const conventional = at(rows, 'liveness-conventional');
 
     expect(credentialled.callType).toBe('mobile-credential');
