@@ -18,11 +18,11 @@ Concretely, four bodies of work remain:
 
 | Body | State |
 |---|---|
-| Review register — 21 findings (1 critical, 13 major, 7 minor) | open |
-| Phase 7 — Automated tuning | built, **NOT accepted** (no non-test caller) |
-| Phase 4 — Visualization | not started |
-| Phase 6 — Destination dispatch & learned control | not started |
-| Phase 8 — Testing campaign | not started |
+| Review register — 21 findings (1 critical, 13 major, 7 minor) | ✅ **all 21 closed** (wave 1) |
+| Phase 7 — Automated tuning | ✅ **ACCEPTED** 2026-07-27 (wave 1) |
+| Phase 4 — Visualization | 🟡 foundation landed; editor + metrics overlay in flight (T11) |
+| Phase 8 — Testing campaign | 🟡 fuzzing (T12) and oracle (T13) in flight |
+| Phase 6 — Destination dispatch & learned control | ⬜ contract in flight (T14), implementation wave 3 |
 
 ## 2. Architecture snapshot
 
@@ -34,13 +34,15 @@ packages/core          model, physics, dispatch, sim kernel, metrics, analytical
   src/sim/seam.test.ts         ← behavioural liveness guard (permanent, may not be deleted)
   src/dispatch/deadCode.test.ts← mechanical dead-export audit (permanent, may not be deleted)
 packages/experiments   replication runner, CRN, statistics, benchmark, tuning (Phase 7)
-packages/cli           list | run | compare | watch
-packages/viz           ← Phase 4, does not exist yet
+packages/cli           list | run | compare | tune | watch
+packages/viz           Phase 4 — contract, frame producer, replay harness, Canvas renderer
 ```
 
 `core` must never depend on `experiments`, `cli` or `viz` (invariant 6). `vitest.config.ts`
-aliases cross-package specifiers to package *source*, so a worktree needs only a `node_modules`
-symlink at its root to run the suite.
+aliases cross-package specifiers to package *source*, so **vitest** works in a worktree with a
+plain `node_modules` symlink — but a **built** artifact does not: node resolves the symlink to its
+realpath and `@elevator-sim/*` then points at the main checkout. Use `.worktree-setup.sh`, which
+builds a real `node_modules` whose workspace entries point into the worktree.
 
 ## 3. Standing rules this plan is built around
 
@@ -63,7 +65,7 @@ Taken from [`docs/05-roadmap.md` § Standing requirement](docs/05-roadmap.md) an
 
 ## 4. Task tree
 
-### Wave 1 — Correctness foundation (in flight)
+### Wave 1 — Correctness foundation (CLOSED 2026-07-27)
 
 Everything downstream reports numbers. The register must be worked *before* any tuning campaign
 or Phase 8 measurement, or the campaign spends its budget on inert dimensions and publishes
@@ -108,22 +110,15 @@ full by a picture with a 77-metre error.
 Fans out against T14's locked contract. Scope, parallelisation and ownership come from T14's work
 breakdown, not from this table.
 
-### Wave 3 — Phase 6 (planned)
-
-| ID | Task | Depends on |
-|---|---|---|
-| T10 | `DestinationDispatcher` — passenger-model change, contract task first | Wave 1 |
-| T11 | Access-control integration on `secure-tower` | T10 |
-| T12 | `LearnedDispatcher` | T10 |
-| T13 | Double-deck runtime (or explicit deferral, per T3's decision) | T3 |
-
 ### Wave 4 — Phase 8 campaign + acceptance (planned)
+
+Task ids continue from T15; the wave-2 ids T10–T14 are taken.
 
 | ID | Task |
 |---|---|
-| T14 | Determinism regression, scale & performance, adversarial edge cases |
-| T15 | Full experiment matrix + Pareto front, at a real replication budget |
-| T16 | Phase 7 acceptance number at 50–200 replications (roadmap explicitly assigns this to Phase 8) |
+| T15 | Determinism regression, scale & performance, adversarial edge cases |
+| T16 | Full experiment matrix + Pareto front, at a real replication budget |
+| T17 | Phase 7's acceptance number at 50–200 replications — the roadmap explicitly assigns this to Phase 8, and accepting the phase did not discharge it |
 
 ## 5. Ownership map — wave 1
 
