@@ -43,6 +43,14 @@ Live state of every task. Updated by the orchestrator as reports come in.
 Any task reporting fewer than 2,442 passing tests without naming the assertions it deliberately
 changed has regressed the suite.
 
+## Integration verification — run by the orchestrator, not taken on report
+
+| After merging | `tsc -b` | Full suite | Expected | Verdict |
+|---|---|---|---|---|
+| baseline | clean | 115 files / 2442 tests | — | ✅ |
+| T5 `a3cb937` | clean | 124 files / **2531** tests | 2442 + 89 | ✅ matches |
+| T2 `0342982` | clean | 124 files / **2543** tests | 2531 + 12 | ✅ matches |
+
 ## Log
 
 - **2026-07-27** — Repo surveyed. Build clean. Coordination artifacts created. Wave 1 defined:
