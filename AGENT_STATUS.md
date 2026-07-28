@@ -308,3 +308,14 @@ experiment matrix is the natural place to close it.
 - **The 87-row UX ledger's four ⚠️ rows** (`RV-11`, `RV-17`, `RV-21`, `KB-14`) are built and
   reachable, and were neither driven nor tested by the task that inventoried them. They are carried
   through as *unverified*, not as passing.
+
+---
+
+# UI feedback from the user — 2026-07-28, triage in progress
+
+Collected while T26 (experiment matrix) is in flight. T26 owns `packages/**` and `data/**`, so
+none of these are dispatched yet; they batch into one UI task once it lands.
+
+| # | Item | Class | Notes |
+|---|---|---|---|
+| U1 | **Building editor: invert the floor list so Ground is at the bottom**, matching the preview. | broken — internal inconsistency | Confirmed by screenshot: the editor lists `G, 2, 3, 4, 5, 6` top-to-bottom (ascending downward) while the preview draws `6` at top and `Lobby` at bottom (ascending upward). Two representations of the same building reading in opposite directions on one screen. Check the same inversion in every other floor-ordered list in the editor (bank `servesFloors`, zone floor lists, sky-lobby flags) rather than fixing only the one reported — a half-inverted editor is worse than a consistently wrong one. `UX.md` rows `ED-*` may need re-marking. |
