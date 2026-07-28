@@ -50,7 +50,9 @@ rather than new capability:
 
 **What did *not* move, and should not be read as having moved:** every phase verdict, every published
 interval outside the `destination-eta` rows, the four ⚠️ UX rows, and `C24`, `C27`, `C30`, `C32`,
-`C4`, `C5`. The pin table moved **40 rows changed, 12 added, 0 removed, all `destination-eta`**.
+`C5`. (`C4` has since closed — [§ D116](../DECISIONS.md) — and closing it moved no number either:
+nothing outside a test ever injected a stopping rule, so the budget it asked about had no subject.)
+The pin table moved **40 rows changed, 12 added, 0 removed, all `destination-eta`**.
 
 > **Read [`08-review-findings.md`](08-review-findings.md) before planning.** A whole-system
 > review on 2026-07-26 produced **21 findings — 1 critical, 13 major, 7 minor**, none of which
@@ -686,7 +688,7 @@ after the weight landed rather than carried over.
 | Mixed-use achieved **interval** | Reports `unmeasurable` by design: a shuttle holds doors 39.8 s while an office-local car completes a round trip in 31.3 s, so **no** departure-gap threshold is valid there. Constrains the oracle; **does not** constrain a TTD comparison, which § D100 checked rather than assumed |
 | Double-deck operation | Configured and validated on `vertical-city`, **not simulated**; disclaimed on every run of that building, and the disclaimer reaches `RunRecord` and the CLI report |
 | Fuzzy pattern switching | `patternSwitching` is authored in `data/` and schema-validated, and no runtime code reads it. Deferred scope, not a defect to fix in passing — see `DECISIONS.md` § D12 |
-| `C4` — the sequential stopping rule's budget | `productionStoppingRule` injects `estimateMean`, now Student-t at every `n`, so sequentially-stopped experiments may run marginally more replications. Deliberate and conservative; **needs a decision, not a default** |
+| **`runner/` is now audited** *(`C4` closed, [§ D116](../DECISIONS.md))* | The sequential stopping rule turned out not to be one thing. The **port is exempt**: a rule stops *cells*, so a paired comparison's two arms would stop at different `n` and the shorter arm's own realized variance would decide how many pairs survive — so a fixed budget is right for a stronger reason than the studies give, and the rule is admissible only for single-cell precision-targeted estimation, of which none ships. `fixedBudgetStoppingRule` is **dead** and claimed in its docstring to be the shipped default; `runner.acceptableRange` is **inert**, and its report-side twin `targetHalfWidth` has no shipped caller either, so `ConvergenceStatus` is `'not-assessed'` everywhere and CONVERGED / HIT CAP / IN PROGRESS have never been printed. **86 runner exports, 7 uncalled** — all seven now allowlisted with reasons in the new `runner/deadCode.test.ts`, the **third** dead-code guard, asserted in both directions and watched failing three ways. One of the four assertions **pins the exemption itself**: a study that injects a stopping rule turns it red. The scanner is one copy (`auditModules` in `tuning/callers.test-helper.ts`), not a third. What no guard here catches is the other half — `runner.acceptableRange` is *read*, in a branch nothing takes, so it has callers and is invisible to all three |
 | `C5` — a `'z'` label can still print | `reports/compare.ts:607` can print `'z'` as a fallback family label on a convergence report, in the branch where `achievedHalfWidth` is already `NaN`. Cosmetic, and it is the exact mislabelling finding #14 was about |
 | `C27` — Phase 6a/6b studies are off the package barrel | Reachable at their module paths with `regeneratePins.ts` as the non-test caller, but not on `benchmark/index.ts` or `src/index.ts`. Name list in § D62; both files must change in one commit. `runMixedUseHighRiseStudy` is in the same position |
 | `C32` — the fuzz generator picks call types blind to the profile | `fuzz/generate.ts` can name a call type the profile cannot carry a destination for; `run.ts` works around it in `withCallType`. A real corpus extension |
@@ -703,8 +705,8 @@ and CLI printing a suppressed mean** ([§ D111](../DECISIONS.md)).
 **Still open, in one place, because a reader planning work needs the list and not the prose:**
 Phase 6c · Phase 9 · `packages/experiments`' browser export · the four ⚠️ UX rows · `ED-12`/`ED-13`
 (**C30**) · `garden-down-peak`'s identity class · the `moveFloor` scope call · double-deck ·
-`patternSwitching` · **C4** · **C5** · **C24** · **C27** · **C32** · the mixed-use study's
-six-replication margin · and **no test asserts any phase's status**.
+`patternSwitching` · **C5** · **C24** · **C27** · **C32** · the mixed-use study's six-replication
+margin · and **no test asserts any phase's status**.
 
 ### Two figures corrected here, because the handed-back versions did not reproduce
 

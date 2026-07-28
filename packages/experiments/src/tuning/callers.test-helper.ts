@@ -23,7 +23,7 @@
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { basename, join, relative } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** The monorepo's `packages/` directory. */
@@ -209,4 +209,91 @@ export function nonTestImportersOf(
         !isTest(path) && !isBarrel(path) && !exclude(path) && scope.bindings(path).has(name),
     )
     .map((path) => relative(PACKAGES_DIR, path));
+}
+
+/* -------------------------------------------------------------------------- *
+ * The module audit
+ * -------------------------------------------------------------------------- */
+
+/**
+ * One exported declaration, at the start of a line.
+ *
+ * `core`'s copy of this pattern has no `async` alternative, because nothing in
+ * `dispatch/{policies,predictor}` is asynchronous. Several of the symbols the suites below exist to
+ * protect are — `randomSearch`, `successiveHalving`, `sepCmaEs` and `runHoldoutRound` are all
+ * `export async function` — so the pattern is **widened** here. A scanner that silently skips the
+ * symbols it was written for is the same class of defect as the one it audits.
+ */
+const EXPORTED =
+  /^export\s+(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:const|let|var|function|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/;
+
+/** One export, keyed `module/symbol` so two modules may export the same name. */
+export interface AuditedSymbol {
+  readonly key: string;
+  readonly name: string;
+  /** Relative to `packages/`, so a failure message names the file. */
+  readonly file: string;
+}
+
+export interface ModuleAudit {
+  readonly symbols: readonly AuditedSymbol[];
+  readonly uncalled: readonly AuditedSymbol[];
+}
+
+/**
+ * Every export of each module, and which of them nothing calls.
+ *
+ * **One copy, deliberately.** `tuning/deadCode.test.ts` and `runner/deadCode.test.ts` ask the same
+ * question of different directories, and § D114 records what two copies of one audit cost: `core`'s
+ * had two scanner holes this one had already fixed, and the dependency direction forbids sharing
+ * with it. Nothing forbids sharing *here*, so the mechanism lives in one place and the suites carry
+ * only their own allowlists and claims.
+ *
+ * A symbol is **live** when it is used inside its own file (two occurrences of the name in
+ * comment- and string-stripped source: the export and a use), when a sibling in the same module
+ * imports it, or when anything outside the module does. A barrel re-export is not a caller, and
+ * neither is a `*.test.ts` or a `*.test-helper.ts`.
+ *
+ * **The self-use rule has a known blind spot, and it is not a bug to be fixed here.** A dead symbol
+ * calling a sibling in the same file makes that sibling read as self-used — so liveness can be two
+ * hops long and die at the second. Both instances found so far are in `runner/`
+ * (`halfWidthStoppingRule → productionStoppingRule`, `verifyCrnAlignment → assertCrnAligned`) and
+ * both are stated in that suite's allowlist rather than papered over. Widening the rule to a
+ * reachability analysis would re-introduce exactly what `PUBLIC_API_ONLY` exists to prevent:
+ * *reachable* was true of all nine dead behaviours. See DECISIONS.md § D116.
+ *
+ * @param modules paths relative to `packages/`, e.g. `experiments/src/runner`. Not recursive:
+ *   each names one directory, so a submodule is audited by naming it.
+ */
+export function auditModules(modules: readonly string[], scope: Corpus = corpus()): ModuleAudit {
+  const all = scope.files;
+  const symbols: AuditedSymbol[] = [];
+
+  for (const moduleRelative of modules) {
+    const moduleDir = join(PACKAGES_DIR, moduleRelative);
+    const short = basename(moduleRelative);
+    for (const path of all) {
+      if (dirname(path) !== moduleDir || isTest(path) || isBarrel(path)) continue;
+      const seen = new Set<string>();
+      for (const line of scope.text(path).split('\n')) {
+        const name = EXPORTED.exec(line)?.[1];
+        if (name === undefined || seen.has(name)) continue;
+        seen.add(name);
+        symbols.push({ key: `${short}/${name}`, name, file: relative(PACKAGES_DIR, path) });
+      }
+    }
+  }
+
+  const uncalled = symbols.filter((symbol) => {
+    const own = join(PACKAGES_DIR, symbol.file);
+    const selfUses = (code(scope.text(own)).match(new RegExp(`\\b${symbol.name}\\b`, 'g')) ?? [])
+      .length;
+    if (selfUses > 1) return false;
+    return !all.some((path) => {
+      if (path === own || isTest(path) || isBarrel(path)) return false;
+      return scope.bindings(path).has(symbol.name);
+    });
+  });
+
+  return { symbols, uncalled };
 }

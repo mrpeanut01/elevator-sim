@@ -264,7 +264,7 @@ export const RUNNER_PARAMETERS: readonly RunnerParameterSpec[] = Object.freeze([
     default: RUNNER_DEFAULTS.acceptableRange,
     unit: 's',
     description:
-      'Target confidence-interval half-width in the stopping metric’s own units. Seconds when the metric is a duration.',
+      'Target confidence-interval half-width in the stopping metric’s own units. Seconds when the metric is a duration. INERT unless a stopping rule is injected: it is reported in every StoppingSummary but read for a decision only inside decide()’s rule branch, and no shipped study injects a rule. Not expressible as activeWhen — a rule is an injected function, not a parameter with an id to condition on. DECISIONS.md § D116.',
   },
   {
     id: 'runner.stoppingMetric',

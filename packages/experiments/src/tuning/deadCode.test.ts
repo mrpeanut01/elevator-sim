@@ -39,11 +39,9 @@
  * forgotten, which is the failure one step removed from the one this file exists to catch.
  */
 
-import { basename, dirname, join, relative } from 'node:path';
-
 import { describe, expect, it } from 'vitest';
 
-import { PACKAGES_DIR, code, corpus, isBarrel, isTest } from './callers.test-helper.js';
+import { auditModules } from './callers.test-helper.js';
 
 /** The three modules Phase 7 landed. docs/05-roadmap.md § Phase 7 names exactly these. */
 const AUDITED_MODULES = [
@@ -148,76 +146,11 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
 });
 
 /* -------------------------------------------------------------------------- *
- * Scanning
- * -------------------------------------------------------------------------- */
-
-/**
- * One exported declaration, at the start of a line.
- *
- * `core`'s copy of this pattern has no `async` alternative, because nothing in
- * `dispatch/{policies,predictor}` is asynchronous. Three of the five entry points this file exists
- * to protect are — `randomSearch`, `successiveHalving`, `sepCmaEs` and `runHoldoutRound` are all
- * `export async function` — so the pattern is **widened** here rather than copied. It is worth
- * saying out loud: a scanner that silently skips the symbols the file was written for is the same
- * class of defect as the one it audits, and the first assertion below names those symbols
- * explicitly so that this cannot regress quietly.
- */
-const EXPORTED =
-  /^export\s+(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:const|let|var|function|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/;
-
-interface Symbol_ {
-  readonly key: string;
-  readonly name: string;
-  readonly file: string;
-}
-
-interface Audit {
-  readonly symbols: readonly Symbol_[];
-  readonly uncalled: readonly Symbol_[];
-}
-
-function audit(): Audit {
-  const scope = corpus();
-  const all = scope.files;
-
-  const symbols: Symbol_[] = [];
-  for (const [moduleRelative, moduleDir] of AUDITED_MODULES.map(
-    (m) => [m, join(PACKAGES_DIR, m)] as const,
-  )) {
-    const short = basename(moduleRelative);
-    for (const path of all) {
-      if (dirname(path) !== moduleDir || isTest(path) || isBarrel(path)) continue;
-      const seen = new Set<string>();
-      for (const line of scope.text(path).split('\n')) {
-        const name = EXPORTED.exec(line)?.[1];
-        if (name === undefined || seen.has(name)) continue;
-        seen.add(name);
-        symbols.push({ key: `${short}/${name}`, name, file: relative(PACKAGES_DIR, path) });
-      }
-    }
-  }
-
-  const uncalled = symbols.filter((symbol) => {
-    const own = join(PACKAGES_DIR, symbol.file);
-    // Used inside its own file? Two occurrences in comment-stripped source: the export and a use.
-    const selfUses = (code(scope.text(own)).match(new RegExp(`\\b${symbol.name}\\b`, 'g')) ?? [])
-      .length;
-    if (selfUses > 1) return false;
-    return !all.some((path) => {
-      if (path === own || isTest(path) || isBarrel(path)) return false;
-      return scope.bindings(path).has(symbol.name);
-    });
-  });
-
-  return { symbols, uncalled };
-}
-
-/* -------------------------------------------------------------------------- *
  * The assertions
  * -------------------------------------------------------------------------- */
 
 describe('every export of tuning/{search,space,report} has a caller or a stated reason', () => {
-  const { symbols, uncalled } = audit();
+  const { symbols, uncalled } = auditModules(AUDITED_MODULES);
 
   it('scans all three modules and finds the exports it is supposed to be auditing', () => {
     // A scanner that silently matched nothing would pass every assertion below. These are the

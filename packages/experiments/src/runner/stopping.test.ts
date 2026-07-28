@@ -86,11 +86,12 @@ describe('fixedBudgetStoppingRule', () => {
 });
 
 /**
- * **The shipped rule, and the one assertion that says which estimator it is.**
+ * **The composed rule, and the one assertion that says which estimator it is.**
  *
- * `validation/harness.ts`'s `productionStoppingRule` is the only stopping rule anything outside a
- * test injects, and what it injects is `reports/statistics`'s `estimateMean` — Student-t at
- * `n - 1`, at every `n`. docs/03-traffic-and-statistics.md § Part 3 writes the rule with a
+ * `validation/harness.ts`'s `productionStoppingRule` is the repository's only composed stopping
+ * rule. **Nothing outside a test injects it, or any rule** — every shipped study fixes its budget,
+ * deliberately (DECISIONS.md § D116). What it injects is `reports/statistics`'s `estimateMean` —
+ * Student-t at `n - 1`, at every `n`. docs/03-traffic-and-statistics.md § Part 3 writes the rule with a
  * `t` (n ≤ 25) / `z` (n > 25) crossover instead; the quantile chooser that implemented that had no
  * non-test caller once review finding #14 took it off the published path, and is deleted rather
  * than kept exported behind a caller list nothing satisfies (DECISIONS.md § D7).
@@ -101,7 +102,7 @@ describe('fixedBudgetStoppingRule', () => {
  * precision the page then declines to call converged, in the direction {@link HalfWidthEstimate}'s
  * docstring names: "one that stops too early publishes a number it did not earn".
  */
-describe('productionStoppingRule — the estimator the shipped loop control uses', () => {
+describe('productionStoppingRule — the estimator loop control would use if injected', () => {
   it('measures the same half-width the published interval will print, on both sides of n = 25', () => {
     for (const n of [10, 25, 26, 200]) {
       const samples = Array.from({ length: n }, (_, index) => index * 1.3);

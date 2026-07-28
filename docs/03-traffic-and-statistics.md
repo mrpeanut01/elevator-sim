@@ -178,6 +178,18 @@ rule is not consulted below it, so the policy floor dominates and a default swee
 50–200 replications whatever the rule computes. **State the target precision, then let the
 rule pick `n`** — do not quote a flat run count.
 
+> **Which of the two this repository actually does, measured 2026-07-28.** It states the target and
+> derives `n` — but **offline, not sequentially.** `benchmark/matrix.ts`'s `budgetFor` inverts
+> `n ≥ (z · sd / h)²` at `h = 1 s` against a 200-replication census and clamps to [50, 200], and
+> that is where the matrix's per-cell budgets come from. **No shipped study injects a stopping
+> rule**, and the omission is deliberate rather than pending: a rule stops *cells*
+> (`replicationRunner.ts`'s `CellState`), so the two arms of a paired comparison would stop at
+> different `n` and the shorter arm — chosen by its own realized variance — would decide how many
+> pairs survive. That is selection on the outcome variable. The rule remains correct for
+> **single-cell** precision-targeted estimation, of which this repository ships none; the port is
+> exempted on that ground in [`DECISIONS.md` § D116](../DECISIONS.md). Read the instruction above as
+> *state the target* — not as a claim that anything here stops sequentially.
+
 ### AWT is lognormal, but approximate it as normal
 
 Average waiting time can never be ≤ 0 and has a long right tail, making it lognormal.
