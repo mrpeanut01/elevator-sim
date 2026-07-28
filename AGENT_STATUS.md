@@ -1,6 +1,15 @@
 # Agent status board
 
-> ## 🏁 FINAL STATE — the delivery closed 2026-07-28. This board is no longer updated.
+> ## ↩️ REOPENED 2026-07-28 for **wave 5**. The live board is [§ Wave 5](#wave-5--live) at the foot
+> of this file; everything between here and it is the **unaltered** waves 1–4 record.
+>
+> Wave 5 works the six still-open C-items below plus the three non-`C` items in
+> [§ D115](DECISIONS.md) § *What remains open*. Its board is [`WAVE5_PLAN.md`](WAVE5_PLAN.md).
+> **This board is reopened because a live delivery needs a live status board** —
+> [`MULTI_AGENT_PLAN.md`](MULTI_AGENT_PLAN.md), [`RISKS.md`](RISKS.md) and
+> [`TEST_MATRIX.md`](TEST_MATRIX.md) stay retired in place per [§ D105](DECISIONS.md).
+
+> ## 🏁 FINAL STATE of waves 1–4 — that delivery closed 2026-07-28. This section is no longer updated.
 >
 > **What it was for.** The live state of every task across four waves — branch, worktree, status,
 > blockers, review verdict — plus the **carried-forward register (C1 – C32)**, which is the part
@@ -373,4 +382,52 @@ acceptance criteria say nothing about any of it. Phase 4 stays COMPLETE as scope
 >   not. The canvas header printed one, one line below its own suppression banner, and so did
 >   `elevator-sim watch`. Fixed before Phase 9 rather than as part of it ([§ D111](DECISIONS.md)),
 >   because a gamified surface built on top of that would have inherited it.
+
+---
+
+# Wave 5 — live
+
+Opened **2026-07-28** from `918897d` on `integration`. Plan and ownership map:
+[`WAVE5_PLAN.md`](WAVE5_PLAN.md). Scope: the six open C-items and the three non-`C` items in
+[§ D115](DECISIONS.md) § *What remains open*. **No phase verdict is in scope.**
+
+**Baseline, measured before the wave opened rather than taken from the handoff:** `npx tsc -b`
+clean; `npx vitest run --testTimeout=120000` → **172 files / 3 220 tests, 3 211 passed, 9 skipped**,
+exit 0, 540 s. Reproduces `docs/07` § 1 exactly.
+
+| Task | Item | Branch | Worktree | Status | Last update | Blockers | Next action |
+|---|---|---|---|---|---|---|---|
+| **T33** | `C5` — the `'z'` family label | `fix/c5-z-label` | `.worktrees/T33` | 🟡 in flight | 2026-07-28 | — | build → review → merge 1st |
+| **T34** | `C24` + `C27` — CLI `fuzz`, both barrels | `feat/fuzz-cli-and-barrels` | `.worktrees/T34` | 🟡 in flight | 2026-07-28 | — | build → review → merge 5th |
+| **T35** | `experiments` browser export | `feat/experiments-browser-export` | `.worktrees/T35` | 🟡 in flight | 2026-07-28 | — | build → review → merge 4th |
+| **T36** | `C32` — profile-aware fuzz call types | `fix/c32-fuzz-call-types` | `.worktrees/T36` | 🟡 in flight | 2026-07-28 | — | build → review → merge 3rd |
+| **T37** | `C4` — stopping-rule budget **decision** | `fix/c4-stopping-budget` | `.worktrees/T37` | 🟡 in flight | 2026-07-28 | — | build → review → merge 2nd |
+| **T38** | `C30` — `ED-12`/`ED-13` schema question | `fix/c30-editor-schema` | `.worktrees/T38` | 🟡 in flight | 2026-07-28 | — | build → review → merge 6th |
+| **T39** | The four ⚠️ UX rows, **driven** | `feat/ux-verify-rows` | `.worktrees/T39` | 🟡 in flight | 2026-07-28 | — | build → review → merge 7th |
+| **T40** | A guard binding phase status to evidence | `test/phase-status-assertions` | `.worktrees/T40` | 🟡 in flight | 2026-07-28 | — | build → review → merge last |
+
+### Carried-forward register — wave 5 disposition
+
+| Item | Owner | State |
+|---|---|---|
+| **C4** — the sequential stopping rule's budget | T37 | 🟡 in flight — deliverable is a **decision**, and "change nothing, here is what it costs" is an acceptable one |
+| **C5** — a `'z'` fallback label can print | T33 | 🟡 in flight |
+| **C24** — `fuzz/`'s only non-test caller is a test | T34 | 🟡 in flight — closed by a CLI `fuzz` command giving `campaign.ts` a **named** non-test caller |
+| **C27** — Phase 6a/6b/mixed-use studies off the barrels | T34 | 🟡 in flight — note this buys public API surface, **not** liveness; `index.test.ts` deliberately does not treat a barrel as a caller |
+| **C30** — `ED-12`/`ED-13` contradict the schema | T38 → T39 | 🟡 in flight — verdict from T38, ledger rows applied by the orchestrator after T39 merges |
+| **C32** — fuzz generator picks call types blind | T36 | 🟡 in flight — **watch the seed→case mapping**; two named regressions ride on it |
+
+### The three non-`C` items
+
+| Item | Owner | State |
+|---|---|---|
+| `packages/experiments` has no browser export — **blocks** `docs/10` W4 | T35 | 🟡 in flight — a prerequisite, not an optimization |
+| Four ⚠️ UX rows — `RV-11`, `RV-17`, `RV-21`, `KB-14` | T39 | 🟡 in flight — an honest ⚠️ is an acceptable outcome; a ticked row that was argued rather than exercised is not |
+| **No test asserts any phase's status** — § D115 calls this the largest un-mechanised risk | T40 | 🟡 in flight |
+
+### Explicitly **not** in wave 5
+
+Phase 6c · Phase 9 · double-deck simulation · `patternSwitching` · `garden-down-peak`'s identity
+class · the `moveFloor` scope call. Each is deferred by a recorded argument, not by neglect, and
+wave 5 does not quietly reopen any of them. See [`WAVE5_PLAN.md`](WAVE5_PLAN.md) § 1.
 

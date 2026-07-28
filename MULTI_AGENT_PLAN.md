@@ -1,6 +1,19 @@
 # Multi-agent execution plan
 
-> ## 🏁 FINAL STATE — the delivery closed 2026-07-28. This document is no longer updated.
+> ## ↩️ THE DELIVERY REOPENED 2026-07-28 after `918897d`, as **wave 5**.
+>
+> **This document is still not updated** — it remains the closed record of waves 1–4, retired in
+> place per [§ D105](DECISIONS.md), and everything below the next heading is as it was at close.
+> Wave 5 has its own board: **[`WAVE5_PLAN.md`](WAVE5_PLAN.md)**.
+>
+> Wave 5 works the open-debt register in [§ D115](DECISIONS.md) § *What remains open* —
+> `C4`, `C5`, `C24`, `C27`, `C30`, `C32`, the `packages/experiments` browser export, the four ⚠️ UX
+> rows, and the one § D115 names as **the largest un-mechanised risk in the repository**: *no test
+> asserts any phase's status*. It moves **no phase verdict**, and it does not reopen Phase 6c,
+> Phase 9, double-deck, `patternSwitching`, `garden-down-peak`'s identity class or the `moveFloor`
+> scope call — each of which is deferred by a recorded argument rather than by neglect.
+
+> ## 🏁 FINAL STATE of waves 1–4 — that delivery closed 2026-07-28. This section is no longer updated.
 >
 > **What it was for.** The authoritative coordination artifact: task scope, ownership boundaries,
 > dependency order, merge order and the definition of done, across four waves and twenty-five tasks.

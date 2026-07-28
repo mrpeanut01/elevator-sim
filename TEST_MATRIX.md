@@ -1,6 +1,18 @@
 # Test matrix
 
-> ## 🏁 FINAL STATE — 2026-07-28. This document is closed and is no longer updated.
+> ## ↩️ The delivery reopened 2026-07-28 as **wave 5**, and this matrix stays retired in place.
+>
+> Two of the three items it left carried forward are wave-5 scope and are being worked now: the
+> **four ⚠️ unverified UX rows** (T39, driven against a dev server serving its own worktree) and
+> **C7**, which closed after this file was written. The third — the full experiment matrix — landed
+> in `f895a16`.
+>
+> Wave 5's coverage is tracked in [`WAVE5_PLAN.md`](WAVE5_PLAN.md) § 5 and
+> [`AGENT_STATUS.md`](AGENT_STATUS.md) § Wave 5. Its standing rule is this file's own: **a component
+> test does not close a row**, because this project's dominant defect class passes every component
+> test it has.
+
+> ## 🏁 FINAL STATE of waves 1–4 — 2026-07-28. This section is closed and is no longer updated.
 >
 > **What it was for.** Scenario-level coverage during the orchestrated completion of this project.
 > It exists because component tests alone do not close a row: this project's dominant defect class —

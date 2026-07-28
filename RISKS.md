@@ -1,6 +1,17 @@
 # Risk register
 
-> ## 🏁 FINAL STATE — the delivery closed 2026-07-28. This document is no longer updated.
+> ## ↩️ The delivery reopened 2026-07-28 as **wave 5**, and this register stays retired in place.
+>
+> Wave 5's own risks are in [`WAVE5_PLAN.md`](WAVE5_PLAN.md) § 7 — four of them concrete and
+> task-specific (a shifted fuzz seed→case mapping silently re-pointing two named regressions; a
+> tautological phase-status guard; a schema relaxed so a UX row can be ticked; a UX row argued rather
+> than exercised), plus the register-shrinks-to-look-finished risk that § 5 answers by requiring the
+> debt table to be rewritten to what is *actually* left.
+>
+> **R1, R5, R7 and R10 below are live and permanent** — they are properties of the project, not of
+> the closed delivery — and they still apply to wave 5.
+
+> ## 🏁 FINAL STATE of waves 1–4 — that delivery closed 2026-07-28. This section is no longer updated.
 >
 > **What it was for.** Naming, in advance, the ways this delivery could produce confident nonsense
 > or quiet damage, with a mitigation and an escalation trigger for each — so that a risk becoming
