@@ -93,6 +93,7 @@ export const ARM_PROFILES: readonly string[] = Object.freeze([
   'auction',
   'auction-multi-round',
   'zoned-uppeak',
+  'destination-eta',
 ]);
 
 /* -------------------------------------------------------------------------- *
@@ -151,7 +152,7 @@ export interface BenchmarkCase {
 }
 
 /** Midtown Office under the closed form's own conditions: everything in through the main entrance. */
-const MIDTOWN_UP_PEAK_1PCT: TrafficArmSpec = Object.freeze({
+export const MIDTOWN_UP_PEAK_1PCT: TrafficArmSpec = Object.freeze({
   id: 'up-peak-1pct',
   durationS: 900,
   demand: Object.freeze({
@@ -163,7 +164,7 @@ const MIDTOWN_UP_PEAK_1PCT: TrafficArmSpec = Object.freeze({
 });
 
 /** Garden Apartments over a full hour, reported over the whole run. See the module doc. */
-const GARDEN_RESIDENTIAL_2PCT: TrafficArmSpec = Object.freeze({
+export const GARDEN_RESIDENTIAL_2PCT: TrafficArmSpec = Object.freeze({
   id: 'residential-2pct-fullrun',
   durationS: 3600,
   reportWindow: 'full-run',
@@ -171,7 +172,7 @@ const GARDEN_RESIDENTIAL_2PCT: TrafficArmSpec = Object.freeze({
 });
 
 /** Secure Tower up-peak. No `entranceWeights`: this building has one entrance. */
-const SECURE_UP_PEAK_2PCT: TrafficArmSpec = Object.freeze({
+export const SECURE_UP_PEAK_2PCT: TrafficArmSpec = Object.freeze({
   id: 'up-peak-2pct',
   durationS: 900,
   demand: Object.freeze({
@@ -228,6 +229,120 @@ export function benchmarkCase(id: string): BenchmarkCase {
   if (found === undefined) {
     throw new Error(
       `No benchmark case "${id}". Known: ${BENCHMARK_CASES.map((entry) => entry.id).join(', ')}.`,
+    );
+  }
+  return found;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Phase 6a — the destination-disclosure operating points
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Why Phase 6a needs its own operating points, and why they are not in {@link BENCHMARK_CASES}.**
+ *
+ * The three cases above are up-peak or sparse-residential, and all three are close to **blind** to
+ * destination information. That is not a guess: it is measured, and it is the single most
+ * consequential fact about this phase's design.
+ *
+ * | shipped operating point | what a destination arm does there |
+ * |---|---|
+ * | Garden Apartments, residential 2 % | **nothing.** One bank, two cars, six floors — an argmin over two candidates almost never flips on a ride-time tiebreak |
+ * | Midtown Office, down-peak | **nothing.** Every down trip ends at the lobby, so the destination carries no information the direction button did not already carry |
+ * | Midtown Office, up-peak 1 % | almost nothing, and what it does is dominated by the lobby plateau |
+ * | Secure Tower, up-peak 2 % | almost nothing: three identical cars per bank serving one unrestricted lobby have nothing for a destination to differentiate |
+ * | **Midtown Office, interfloor-mix** | the effect, at full size |
+ *
+ * A phase that measured destination dispatch at the shipped up-peak points would report *no effect*
+ * and would be **wrong about why** — it would read as the ninth instance of the standing
+ * requirement's dead seam when it is the information genuinely being absent. So the negative
+ * controls are predicted in advance and measured as counts
+ * (`destinationDisclosure.ts` `negativeControls`), and the treatment is measured here.
+ *
+ * These are **not** added to {@link BENCHMARK_CASES} for two reasons, both load-bearing:
+ *
+ * 1. `BENCHMARK_CASES` is *Phase 5's* gate — "the three cases the acceptance criterion is argued
+ *    on". Adding a fourth silently changes what that criterion was argued on.
+ * 2. Its baseline is `nearest-car`, and Phase 6a's reference arm is `eta`
+ *    (docs/09 § 2.3: `nearest-car` is the only profile that saturates anywhere and it caps the
+ *    budget). On {@link SECURE_INTERFLOOR_MIX} **both** conventional profiles are unquotable on
+ *    every replication — measured below — so a Phase 5-shaped table there would have no cells at
+ *    all rather than the categorical result that is the actual finding.
+ *
+ * `saturationCensus.test.ts` censuses these two points exactly as it censuses the three above.
+ */
+
+/**
+ * Midtown Office, mixed directional traffic over half an hour, reported over the whole run.
+ *
+ * 40/30/30 incoming/outgoing/interfloor at 1.5 % of population per 5 minutes. Interfloor traffic is
+ * what makes a destination informative: an up call from floor 9 may be going to 10 or to 20, and
+ * only under a destination call type does the dispatcher know which.
+ *
+ * Full-run rather than peak-5min for the same reason Garden is: this is a *pattern* rather than a
+ * peak, and a 300 s window of it is a sample of the pattern rather than the thing itself.
+ */
+export const MIDTOWN_INTERFLOOR_MIX: TrafficArmSpec = Object.freeze({
+  id: 'interfloor-mix',
+  durationS: 1800,
+  reportWindow: 'full-run',
+  demand: Object.freeze({
+    directionalSplit: Object.freeze({ incoming: 0.4, outgoing: 0.3, interfloor: 0.3 }),
+    entranceWeights: Object.freeze({ G: 1, P1: 0 }),
+    arrivalRatePctPop5min: 1.5,
+    peakWindowS: 300,
+  }),
+});
+
+/** The same pattern on Secure Tower. No `entranceWeights`: this building has one entrance. */
+export const SECURE_INTERFLOOR_MIX: TrafficArmSpec = Object.freeze({
+  id: 'interfloor-mix',
+  durationS: 1800,
+  reportWindow: 'full-run',
+  demand: Object.freeze({
+    directionalSplit: Object.freeze({ incoming: 0.4, outgoing: 0.3, interfloor: 0.3 }),
+    arrivalRatePctPop5min: 1.5,
+    peakWindowS: 300,
+  }),
+});
+
+/**
+ * Phase 6a's two operating points, censused by `saturationCensus.test.ts`.
+ *
+ * **OQ-5 is settled here and the answer is that `arms.ts`'s existing ceilings do not transfer.**
+ * `nearest-car` first loses its AWT at replication 287 on Midtown up-peak and 190 on Secure Tower
+ * up-peak; neither number applies to either row below, and the census re-measures rather than
+ * reusing them.
+ */
+export const DESTINATION_CASES: readonly BenchmarkCase[] = Object.freeze([
+  Object.freeze({
+    id: 'midtown-interfloor-mix',
+    label: 'Midtown Office, interfloor-mix 1.5 %, full run',
+    building: 'midtown-office',
+    traffic: MIDTOWN_INTERFLOOR_MIX,
+    replications: 150,
+    admissibleReplications: undefined,
+    rationale:
+      'The primary point, chosen because it is the only shipped-building configuration where destination information exists to be used: 40/30/30 directional traffic means an up call does not determine its own destination. 1.5 % of population per 5 minutes over 1800 s is measured clean — over 1000 replications at seed 20260726 no arm loses its AWT, not even nearest-car, so unlike every Phase 5 case there is no saturation ceiling and n is a choice rather than a limit. n = 150 is re-derived from the measured sd of the paired difference at this point (2.83 s on TTD at rideTime 1.0), which puts the 95 % half-width at 0.45 s against a 1.65 s effect.',
+  }),
+  Object.freeze({
+    id: 'secure-interfloor-mix',
+    label: 'Secure Tower, interfloor-mix 1.5 %, full run',
+    building: 'secure-tower',
+    traffic: SECURE_INTERFLOOR_MIX,
+    replications: 150,
+    admissibleReplications: 0,
+    rationale:
+      'The access-control half. The same pattern on the building with five access zones, and the point of it is that the CONVENTIONAL arms cannot serve it: measured over 300 replications at seed 20260726, eta loses its AWT on 259 and nearest-car on 263, both from replication index 0, with 34 % of journeys unserved. The failure is structural rather than load-driven — an access-restricted pickup carries no credential under up-down-buttons, so every car returns accessDenied and the call is permanently unassignable — so lowering the rate does not rescue it. admissibleReplications is 0 for exactly that reason: there is no budget at which a conventional arm has a quotable AWT here, which is why H-ACCESS-1 is reported as counts and not as an interval. The credential-aware arms complete 300 of 300 with 0 unserved.',
+  }),
+]);
+
+/** The destination case of this id. @throws Error when there is none. */
+export function destinationCase(id: string): BenchmarkCase {
+  const found = DESTINATION_CASES.find((entry) => entry.id === id);
+  if (found === undefined) {
+    throw new Error(
+      `No destination case "${id}". Known: ${DESTINATION_CASES.map((entry) => entry.id).join(', ')}.`,
     );
   }
   return found;

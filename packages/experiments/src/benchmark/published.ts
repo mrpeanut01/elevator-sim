@@ -65,6 +65,8 @@ import type { MeanEstimate } from '../reports/types.js';
 import type { ReplicationMetric } from '../runner/metrics.js';
 import { comparePaired, samplesOf } from '../validation/harness.js';
 
+import type { AccessControlStudy } from './accessControl.js';
+import type { DisclosureStudy } from './destinationDisclosure.js';
 import type { CaseResult } from './suite.js';
 import type { PrepositioningStudy } from './prepositioning.js';
 import type { Stage5Study } from './capacityReassignment.js';
@@ -89,6 +91,8 @@ export const PUBLISHED_STUDY_IDS = Object.freeze([
   'prepositioning',
   'capacity-reassignment',
   'forecast-causality',
+  'destination-disclosure',
+  'access-control',
 ] as const);
 
 export type PublishedStudyId = (typeof PUBLISHED_STUDY_IDS)[number];
@@ -270,6 +274,48 @@ export function capacityFigures(study: Stage5Study): ReadonlyMap<string, PinnedE
       figures.set(`${row.arrivalRatePctPop5min}/${metric}`, estimateOf(estimate));
     }
   }
+  return figures;
+}
+
+/**
+ * The Phase 6a disclosure study's figures, keyed `arm/metric` and `control/<id>/metric`.
+ *
+ * Iterates the study's own arms and its own metrics, so an arm added to `RIDE_TIME_WEIGHTS` appears
+ * in the key set immediately and the totality check fails until it has a pin. The negative controls
+ * are pinned too: their verdict is *part of the result* — the claim is that the same two profiles
+ * that separate at the primary point do **not** separate at the shipped up-peak points — and an
+ * unpinned control could drift to a difference without anything failing.
+ */
+export function disclosureFigures(study: DisclosureStudy): ReadonlyMap<string, PinnedEstimate> {
+  const figures = new Map<string, PinnedEstimate>();
+  for (const arm of study.arms) {
+    for (const cell of arm.cells) {
+      figures.set(`${arm.armId}/${cell.metric}`, estimateOf(cell.estimate));
+    }
+  }
+  for (const control of study.negativeControls) {
+    figures.set(`control/${control.id}/${control.ttd.metric}`, estimateOf(control.ttd.estimate));
+  }
+  return figures;
+}
+
+/**
+ * The access-control study's figures: two within-building deltas and the difference-of-differences.
+ *
+ * H-ACCESS-1 contributes **nothing** here and that is the point — it is categorical, it has no
+ * standard error, and there is nothing for a pin to hold. Its assertions are counts, in
+ * `accessControl.test.ts`.
+ */
+export function accessControlFigures(
+  study: AccessControlStudy,
+): ReadonlyMap<string, PinnedEstimate> {
+  const figures = new Map<string, PinnedEstimate>();
+  for (const delta of [study.optimization.secure, study.optimization.midtown]) {
+    figures.set(`${delta.building}/absolute`, estimateOf(delta.absolute.estimate));
+    figures.set(`${delta.building}/relative`, estimateOf(delta.relative));
+  }
+  figures.set('difference-of-differences/absolute', estimateOf(study.optimization.absolute));
+  figures.set('difference-of-differences/relative', estimateOf(study.optimization.relative));
   return figures;
 }
 
@@ -503,6 +549,13 @@ export const STUDY_ENTRY_POINTS: Readonly<Record<string, PublishedStudyId | 'no-
     measurePredictorLag: 'no-intervals',
     measureAuctionAggregation: 'no-intervals',
     measureMultiRoundReachability: 'no-intervals',
+    runDestinationDisclosureStudy: 'destination-disclosure',
+    runNegativeControls: 'destination-disclosure',
+    runAccessControlStudy: 'access-control',
+    // Counts and nothing else: evaluations, non-zero evaluations, cross-car spread and eligibility
+    // refusals by reason. No standard error anywhere in it, so there is nothing for a pin to hold —
+    // and the assertions it feeds are inequalities against zero, not intervals.
+    measureDestinationLiveness: 'no-intervals',
   });
 
 /* -------------------------------------------------------------------------- *
@@ -533,6 +586,10 @@ export const PINNED_ESTIMATES: Readonly<
     "garden-residential/collective/pctOverLongWait": { n: 500, mean: -0.3800200933573363, standardError: 0.09945119433554514, lower: -0.575414777837209, upper: -0.1846254088774636 },
     "garden-residential/collective/ttdMeanS": { n: 500, mean: -3.680868462083656, standardError: 0.2187148183926376, lower: -4.110583894024203, upper: -3.251153030143109 },
     "garden-residential/collective/wt95S": { n: 500, mean: -3.84425954987177, standardError: 0.36006176277132784, lower: -4.55168347775943, upper: -3.1368356219841096 },
+    "garden-residential/destination-eta/awtS": { n: 500, mean: -1.2781683656593825, standardError: 0.10755681902029572, lower: -1.4894884091896998, upper: -1.0668483221290652 },
+    "garden-residential/destination-eta/pctOverLongWait": { n: 500, mean: -0.43764204457684847, standardError: 0.11226717559957262, lower: -0.6582166641205034, upper: -0.2170674250331936 },
+    "garden-residential/destination-eta/ttdMeanS": { n: 500, mean: -1.8582425474835709, standardError: 0.13854583002490287, lower: -2.1304476117322806, upper: -1.5860374832348614 },
+    "garden-residential/destination-eta/wt95S": { n: 500, mean: -4.228562437470144, standardError: 0.3661935135175747, lower: -4.948033596267166, upper: -3.5090912786731216 },
     "garden-residential/energy-aware/awtS": { n: 500, mean: -1.2705623141208482, standardError: 0.10906519229330046, lower: -1.4848459029532182, upper: -1.0562787252884782 },
     "garden-residential/energy-aware/pctOverLongWait": { n: 500, mean: -0.43764204457684847, standardError: 0.11226717559957262, lower: -0.6582166641205034, upper: -0.2170674250331936 },
     "garden-residential/energy-aware/ttdMeanS": { n: 500, mean: -1.5138326203400023, standardError: 0.13590677032504084, lower: -1.7808526464318217, upper: -1.246812594248183 },
@@ -577,6 +634,10 @@ export const PINNED_ESTIMATES: Readonly<
     "midtown-up-peak/collective/pctOverLongWait": { n: 250, mean: -7.3548065155836895, standardError: 0.6564266605502094, lower: -8.647663024439378, upper: -6.061950006728002 },
     "midtown-up-peak/collective/ttdMeanS": { n: 250, mean: -10.356236682593348, standardError: 0.7097713429914008, lower: -11.75415751020953, upper: -8.958315854977165 },
     "midtown-up-peak/collective/wt95S": { n: 250, mean: -23.370313169992823, standardError: 1.4241136950429996, lower: -26.175157596091566, upper: -20.56546874389408 },
+    "midtown-up-peak/destination-eta/awtS": { n: 250, mean: -6.8066848556977035, standardError: 0.45215957034252524, lower: -7.697229799543736, upper: -5.916139911851671 },
+    "midtown-up-peak/destination-eta/pctOverLongWait": { n: 250, mean: -7.3548065155836895, standardError: 0.6564266605502094, lower: -8.647663024439378, upper: -6.061950006728002 },
+    "midtown-up-peak/destination-eta/ttdMeanS": { n: 250, mean: -10.312463457348638, standardError: 0.7062606596732539, lower: -11.70346986473912, upper: -8.921457049958157 },
+    "midtown-up-peak/destination-eta/wt95S": { n: 250, mean: -23.411667367886075, standardError: 1.4220624137272133, lower: -26.212471719807475, upper: -20.610863015964675 },
     "midtown-up-peak/energy-aware/awtS": { n: 250, mean: -6.757922236779572, standardError: 0.4526435569786732, lower: -7.649420410148943, upper: -5.8664240634102 },
     "midtown-up-peak/energy-aware/pctOverLongWait": { n: 250, mean: -7.3548065155836895, standardError: 0.6564266605502094, lower: -8.647663024439378, upper: -6.061950006728002 },
     "midtown-up-peak/energy-aware/ttdMeanS": { n: 250, mean: -9.493603110542796, standardError: 0.715811342253399, lower: -10.903419939386005, upper: -8.083786281699588 },
@@ -621,6 +682,10 @@ export const PINNED_ESTIMATES: Readonly<
     "secure-up-peak/collective/pctOverLongWait": { n: 150, mean: -4.429925122305146, standardError: 0.5119325885714427, lower: -5.441510663410848, upper: -3.4183395811994446 },
     "secure-up-peak/collective/ttdMeanS": { n: 150, mean: -7.18550512270792, standardError: 0.5406776492236365, lower: -8.253891282455832, upper: -6.117118962960009 },
     "secure-up-peak/collective/wt95S": { n: 150, mean: -19.52395099275389, standardError: 1.4781496981897648, lower: -22.444794274974143, upper: -16.603107710533635 },
+    "secure-up-peak/destination-eta/awtS": { n: 150, mean: -5.756382817981705, standardError: 0.3930865298508329, lower: -6.53312698093906, upper: -4.97963865502435 },
+    "secure-up-peak/destination-eta/pctOverLongWait": { n: 150, mean: -4.429925122305146, standardError: 0.5119325885714427, lower: -5.441510663410848, upper: -3.4183395811994446 },
+    "secure-up-peak/destination-eta/ttdMeanS": { n: 150, mean: -7.194652724499509, standardError: 0.5416545415210114, lower: -8.264969236300216, upper: -6.124336212698802 },
+    "secure-up-peak/destination-eta/wt95S": { n: 150, mean: -19.5228660151815, standardError: 1.4782454713303441, lower: -22.443898546389605, upper: -16.601833483973394 },
     "secure-up-peak/energy-aware/awtS": { n: 150, mean: -5.715237539321243, standardError: 0.39827114486426696, lower: -6.502226569866389, upper: -4.928248508776097 },
     "secure-up-peak/energy-aware/pctOverLongWait": { n: 150, mean: -4.429925122305146, standardError: 0.5119325885714427, lower: -5.441510663410848, upper: -3.4183395811994446 },
     "secure-up-peak/energy-aware/ttdMeanS": { n: 150, mean: -6.577641981676558, standardError: 0.5532762960452231, lower: -7.6709232335649755, upper: -5.48436072978814 },
@@ -784,5 +849,39 @@ export const PINNED_ESTIMATES: Readonly<
   }),
   "forecast-causality": Object.freeze({
     "partialCorrelationWithFutureGivenPast": { n: 100, mean: -0.01394223164765208, standardError: 0.008955159208326503, lower: -0.03171121035296866, upper: 0.0038267470576644966 },
+  }),
+  "destination-disclosure": Object.freeze({
+    "control/garden-residential/ttdMeanS": { n: 30, mean: -0.010298960627877088, standardError: 0.01029896062787709, lower: -0.03136270018716893, upper: 0.010764778931414755 },
+    "control/midtown-down-peak/ttdMeanS": { n: 30, mean: -0.483662150116074, standardError: 0.2880161280401028, lower: -1.0727212725959798, upper: 0.10539697236383178 },
+    "control/midtown-up-peak/ttdMeanS": { n: 30, mean: 0.5271509995413051, standardError: 0.393391296022742, lower: -0.27742454004140715, upper: 1.3317265391240172 },
+    "control/secure-up-peak/ttdMeanS": { n: 30, mean: -0.49274695393197304, standardError: 0.3533894917560226, lower: -1.2155096176896003, upper: 0.23001570982565428 },
+    "destination-eta+ride0.3/awtS": { n: 150, mean: 0.1822679630099019, standardError: 0.06799631009138127, lower: 0.04790635823509304, upper: 0.31662956778471074 },
+    "destination-eta+ride0.3/rideMeanS": { n: 150, mean: -1.1754399784738851, standardError: 0.1393919143098174, lower: -1.4508802380134047, upper: -0.8999997189343656 },
+    "destination-eta+ride0.3/ttdMeanS": { n: 150, mean: -0.9931720154639856, standardError: 0.14677659835799667, lower: -1.2832045079957783, upper: -0.7031395229321928 },
+    "destination-eta+ride0.3/wt95S": { n: 150, mean: 0.3687378780586761, standardError: 0.34416825773756227, lower: -0.3113431345730715, upper: 1.0488188906904237 },
+    "destination-eta+ride1/awtS": { n: 150, mean: 0.5139006721684526, standardError: 0.08610589568971445, lower: 0.3437542876088473, upper: 0.6840470567280579 },
+    "destination-eta+ride1/rideMeanS": { n: 150, mean: -2.0758113863664462, standardError: 0.1670641262132753, lower: -2.4059323012830056, upper: -1.7456904714498866 },
+    "destination-eta+ride1/ttdMeanS": { n: 150, mean: -1.561910714197996, standardError: 0.17918132736647488, lower: -1.9159753782699884, upper: -1.2078460501260035 },
+    "destination-eta+ride1/wt95S": { n: 150, mean: 1.0104890557365185, standardError: 0.363758237132459, lower: 0.29169798566979566, upper: 1.7292801258032413 },
+    "destination-eta+ride2/awtS": { n: 150, mean: 0.7477528863606464, standardError: 0.09502799144738838, lower: 0.5599763230112726, upper: 0.9355294497100202 },
+    "destination-eta+ride2/rideMeanS": { n: 150, mean: -2.547262434421546, standardError: 0.17210130209890642, lower: -2.887336875266451, upper: -2.207187993576641 },
+    "destination-eta+ride2/ttdMeanS": { n: 150, mean: -1.7995095480609007, standardError: 0.18423648039954615, lower: -2.1635632611414772, upper: -1.4354558349803241 },
+    "destination-eta+ride2/wt95S": { n: 150, mean: 1.3305439852735406, standardError: 0.35831151577429454, lower: 0.6225157083857518, upper: 2.0385722621613294 },
+    "destination-eta/awtS": { n: 150, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "destination-eta/rideMeanS": { n: 150, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "destination-eta/ttdMeanS": { n: 150, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "destination-eta/wt95S": { n: 150, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "eta-deferred/awtS": { n: 150, mean: 1.0807425352842992, standardError: 0.06497113291441807, lower: 0.9523587204760142, upper: 1.2091263500925842 },
+    "eta-deferred/rideMeanS": { n: 150, mean: 0.04178984576931768, standardError: 0.12958213651800538, lower: -0.21426616358337866, upper: 0.297845855122014 },
+    "eta-deferred/ttdMeanS": { n: 150, mean: 1.122532381053615, standardError: 0.13886394151119685, lower: 0.848135402721631, upper: 1.396929359385599 },
+    "eta-deferred/wt95S": { n: 150, mean: 1.8949586449919775, standardError: 0.22848055472523252, lower: 1.4434780580091853, upper: 2.34643923197477 },
+  }),
+  "access-control": Object.freeze({
+    "difference-of-differences/absolute": { n: 150, mean: 0.9817163614447753, standardError: 0.20187949687645595, lower: 0.5838889567775986, upper: 1.379543766111952 },
+    "difference-of-differences/relative": { n: 150, mean: 0.017478124066803227, standardError: 0.0035523232655978545, lower: 0.010479881172083476, upper: 0.02447636696152298 },
+    "midtown-office/absolute": { n: 150, mean: -1.561910714197996, standardError: 0.17918132736647488, lower: -1.9159753782699884, upper: -1.2078460501260035 },
+    "midtown-office/relative": { n: 150, mean: -0.028525773527358408, standardError: 0.003086751585385648, lower: -0.0346252353363334, upper: -0.022426311718383413 },
+    "secure-tower/absolute": { n: 150, mean: -0.5801943527532207, standardError: 0.09300206009696317, lower: -0.7639676490570606, upper: -0.39642105644938086 },
+    "secure-tower/relative": { n: 150, mean: -0.011047649460555179, standardError: 0.0017581141127432525, lower: -0.014521706115217158, upper: -0.007573592805893199 },
   }),
 });
