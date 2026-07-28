@@ -84,17 +84,17 @@ live counters.
 | RV-08 | alternate | Access-restricted floors (`secure-tower`) | Restricted landings marked; a call no car may serve is shown as unassignable, not as a long wait | ✅ test (both halves) · ✅ run (the second half, `T29`) — a floor no shaft serves gets `⊘`, exercised on a constructed recording because **no shipped building has an unserved floor**, so the `⊘` path does not arise in `data/`. The *unanswered call* half no longer depends on the reader finding it: until `T29` its only surface anywhere was the caption drawn for a landing picked out of the landing `<select>`, which is `wide-only` and therefore absent below 1280 px. It is now a `✗` on the landing itself and a count in the canvas banner, and a sentence in the text alternative — driven on Secure Tower seed `16757712606996968457` (*12 landings unanswered*) and Vertical City seed `42` (*22 landings unanswered*). `✗` and `⊘` are deliberately different glyphs in different gutters: one is geometry, the other is an outcome |
 | RV-09 | alternate | 60+ floor building (`vertical-city`) | Floor labels thin out rather than overlap; every floor still has a row | ✅ run — measured on `vertical-city`: labels thin by stride, reference floors (entrance, every sky lobby, both ends) are never thinned, and a label wider than the gutter is clipped with an ellipsis rather than drawn off the canvas |
 | RV-10 | edge | Single-car bank | Layout does not collapse; the one shaft is centred | ✅ w1 (`layout.test.ts`) |
-| RV-11 | edge | Zero-population building / no demand generated | "No passengers were generated" empty state, not an empty chart | ⚠️ unverified — the status line says *no passengers were generated in this window — nothing to watch* when `generated === 0`, in `dev/main.ts`. No shipped building produces that, and `dev/main.ts` has no test |
+| RV-11 | edge | Zero-population building / no demand generated | "No passengers were generated" empty state, not an empty chart | ✅ run (`T39`) — no shipped building produces it, so one was **built in the editor**: Garden Apartments with all six floor populations set to 0, then **Run this building** (`ED-04`). The status line reads *0 generated, 0 delivered · no passengers were generated in this window — nothing to watch · AWT suppressed — No passenger was served within the reporting window…*; the canvas draws the building with `AWT suppressed` in the banner and `mean wait suppressed` where the running mean goes; the metrics panel reads `rolling mean wait SUPPRESSED` with the reason. A designed state, not a blank canvas and not a crash. **Not on the canvas:** the *no passengers were generated* sentence itself is only in the status line — the picture, the exported PNG and `describeFrame`'s text alternative say `0 generated` and leave the reader to draw the conclusion |
 | RV-12 | edge | Run with zero-length window (`startedAt == endedAt`) | Progress is 0, scrub disabled, no division by zero | ✅ w1 (`Playback.progress`) |
 | RV-13 | edge | A car never leaves its home floor | Drawn parked at its start height, not omitted | ✅ w1 (`recordRun.test.ts` start-position guard + `frameAt.test.ts`, over **every** shipped building) |
 | RV-14 | edge | Load factor above 1 (overload alarm at 1.1) | Rendered in the overload colour and labelled; the bar does not silently clip at 1 | ✅ test — four load bands with the fill rule (0.8) and the alarm (1.1) at **different** thresholds; the panel's track is scaled to `max(1.1, heaviest car)` so an overloaded car draws past the full mark. No shipped run in the sessions driven reached 1.1, so the `!` glyph was not seen on screen |
 | RV-15 | failure | Conservation audit fails (`SimulationError`) | Full-width error with the message and the seed; **no partial building drawn** | ✅ w1 (status line) |
 | RV-16 | failure | Drain deadline fires with passengers in the system | Reported as `timed-out` with the undelivered count; not shown as a completed run | ✅ w1 (status line leads with the status and the undelivered count; the canvas banner is still w2) |
-| RV-17 | failure | `data/` fetch fails (404 / offline) | "Could not load data" with the failing path and a Retry control | ⚠️ unverified — the message and a **Retry** button are built (`dev/main.ts`'s `load()`), and the fetch failing was confirmed by stopping the dev server; but the app cannot be *loaded* from a stopped dev server, so the handler itself was not driven |
-| RV-18 | failure | Malformed building JSON (`ConfigError`) | Every issue listed with its file and JSON path — `ConfigError` reports all of them at once, so the UI must not show only the first | ✅ run in the **editor** (`ED-20`: six located problems at once). In the **viewer** the same `ConfigError.message` is shown verbatim in a `pre-wrap` region, so every issue survives — that half is ⚠️ unverified, for `RV-17`'s reason |
+| RV-17 | failure | `data/` fetch fails (404 / offline) | "Could not load data" with the failing path and a Retry control | ✅ run (`T39`) — **and it was false when driven.** The earlier note argued the handler was unreachable because the app cannot load from a stopped server; that is true of a stopped server and irrelevant to a *fetch* failure. Method: `data/elevator-specs.json` was moved aside **while the dev server ran**, and the page reloaded. The message named no path — Vite answers `Accept: */*` (which `fetch` sends) with `index.html` and a **200**, so the only branch that named the path, `!response.ok`, is the branch a missing file does not take; the reader got `could not load data/: Unexpected token '<', "<!doctype "… is not valid JSON`. A network failure named no path either. `dev/data.ts` now names the path in all three modes and says what HTML-for-JSON means here. Re-driven: *could not load data/: /elevator-specs.json did not parse as JSON: … (the server answered 200 text/html, which is what this dev server sends when the file is missing from data/)*, focus on the `role="alert"` region, **Retry** beside it. Second defect fixed in passing: the five transport controls were left **enabled** in this state, wired to listeners `boot` had never attached |
+| RV-18 | failure | Malformed building JSON (`ConfigError`) | Every issue listed with its file and JSON path — `ConfigError` reports all of them at once, so the UI must not show only the first | ✅ run in the **editor** (`ED-20`: six located problems at once) · ✅ run in the **viewer** (`T39`) — driven by the method `RV-17`'s note said was impossible: five schema violations were written into `data/buildings/garden-apartments.json` while the dev server ran. The `role="alert"` region rendered `Invalid config in garden-apartments.json: 5 problems` and then **all five**, each with its JSON path (`id`, `type`, `floors[1].index`, `floors[2].heightM`, `banks[0].cars[0].ratedLoadLb`), verbatim and `pre-wrap`. Restoring the file and pressing **Retry** brought the viewer into service — `RV-21` again, from a `ConfigError` rather than a 404 |
 | RV-19 | failure | Browser has no 2D canvas context | Explains the situation in text; does not throw into the console | ✅ w1 |
 | RV-20 | recovery | After RV-15/RV-16/RV-18, change one input and re-run | Error clears; previous inputs are preserved, not reset | ✅ run — a bad seed raised the error and moved focus to it; fixing the seed and re-running cleared it with dispatcher and duration untouched |
-| RV-21 | recovery | After RV-17, press Retry | Refetches without a page reload | ⚠️ unverified — built alongside `RV-17` and unverifiable for the same reason |
+| RV-21 | recovery | After RV-17, press Retry | Refetches without a page reload | ✅ run (`T39`) · ✅ test — **this row was false, and it is the reason the pass was worth making.** Driven by restoring `data/elevator-specs.json` and pressing **Retry**: the fetch succeeded — three 200s in the resource timings — and the page then died. `unhandledrejection: ReferenceError: Cannot access 'started' before initialization at start (dev/main.ts:124)`. The failure path did `if (!(await load())) return;` *above* the `let started = false` that `start()` closes over, so a first load that failed left that binding in its temporal dead zone for the life of the page; the retry ran inside a floating `async` IIFE with no `catch`, so the page cleared its own error message and stopped for ever at `loading data…`, empty. The sequence now lives in `dev/bootstrap.ts`, where its state cannot depend on the statement order of the caller and a throw from `start` **rejects** instead of vanishing; `bootstrap.test.ts` drives fail → Retry → succeed. Re-driven end to end: Retry refetched and the viewer came into service without a reload — building list populated, seed `1089729876208202577`, *6 generated, 6 delivered · AWT 19.4 s* |
 
 ### A.3 States
 
@@ -171,12 +171,16 @@ The transport over a recording: play, pause, scrub, speed, step, and replay-from
 
 ### B.3 States
 
-| State | Must show | Must not show |
-|---|---|---|
-| **Empty** (no recording) | Transport disabled and visibly so | Enabled controls that do nothing |
-| **Loading** (simulating or fetching) | Progress or at least an indeterminate state with a label | A dead transport with no explanation |
-| **Playing / paused / ended** | Which of the three it is, the clock, the elapsed fraction | "Playing" while the playhead is pinned at the end |
-| **Error** | What failed and which recording | A stale playhead moving over a recording that failed to load |
+The `Empty` row's "must not show" clause was **false whenever `data/` failed to load**, and its
+"must show" clause was **false for a run the editor handed over after a failed run** — both found
+by `T39` while driving `RV-17` and `RV-11`, and both re-marked here rather than quietly fixed.
+
+| State | Must show | Must not show | Established |
+|---|---|---|---|
+| **Empty** (no recording) | Transport disabled and visibly so | Enabled controls that do nothing | ✅ run (`T39`) — **both clauses were false and now hold.** The disable/enable pair lived in `boot`, which a failed load never reaches, so `RV-17`'s error state showed five live-looking controls whose listeners had never been attached; and it was triggered by a click on **Run**, which `ED-04`'s *"Run this building"* does not perform, so after a failed run the editor could put a run on screen that could not be paused, stepped, scrubbed or exported. The transport now follows the recording, from `adopt` and from `runOnce`'s failure path. Driven: disabled before the fetch, disabled after a failed run, enabled by an editor hand-over |
+| **Loading** (simulating or fetching) | Progress or at least an indeterminate state with a label | A dead transport with no explanation | ✅ run (`T39`) — `loading data…` in the status line throughout the fetch and again on each Retry |
+| **Playing / paused / ended** | Which of the three it is, the clock, the elapsed fraction | "Playing" while the playhead is pinned at the end | — not exercised by `T39` |
+| **Error** | What failed and which recording | A stale playhead moving over a recording that failed to load | partly — `T39` drove only the *failed load* case (`RV-17`, `RV-18`), where the canvas stays blank at its `No run yet.` label because no recording was ever adopted. The case the clause is really about — an error arriving while a recording is on screen — was not exercised |
 
 ---
 
@@ -260,7 +264,7 @@ Applies to every surface. Non-negotiable rows are marked ⛔.
 | KB-11 | ⛔ After an error, focus moves to the error message so a screen reader announces it | ✅ run — a `role="alert"` region with `tabindex="-1"` on both surfaces; after a bad seed `document.activeElement.id` was `error`, and after an invalid JSON paste it was `editor-error` |
 | KB-12 | Modal dialogs (discard, overwrite) trap focus and restore it on close | ✅ run — a native `<dialog>.showModal()`, so the trap and the restore are the platform's. The promise behind it settles on **any** of close / cancel / either button, because `close` was observed not to fire for a synthetic submit and a dialog that never resolves hangs the flow silently |
 | KB-13 | ⛔ Canvas is not a focus trap; it exposes a text alternative summarising the current frame | ✅ run · ✅ test — `describeFrame` writes the canvas's `aria-label` and a polite live region: building, seed, clock, run status, suppression, waiting and boarded counts, **the landings whose calls no car answers** (`T29`), and per car the floor, direction, **door phase in words** and **OVERLOADED/full in words**. The editor's preview canvas has its own (`describePreview`). `T29` found the rule bites in a direction nobody had checked: the alternative was *more* honest than the picture, saying the mean was suppressed while the header printed one, so `KB-13` is now also the reason the two are asserted to agree |
-| KB-14 | ⛔ `prefers-reduced-motion` respected: playback still works, but nothing animates that is not the simulation itself | ⚠️ unverified — a `@media (prefers-reduced-motion: reduce)` block disables every transition and animation, and a run does **not** autoplay under it (the reader gets the first frame and a Play button). The media query was not emulated in the browser session |
+| KB-14 | ⛔ `prefers-reduced-motion` respected: playback still works, but nothing animates that is not the simulation itself | ✅ run (`T39`) · ✅ test — the browser tooling here cannot emulate the media query, so it was driven the only honest way left: `window.matchMedia` — the one thing the app reads — was replaced before pressing **Run**, and the A/B run both ways. Under `reduce`: **Play**, clock frozen at `0:00 / 15:00`, scrub at 0, unchanged across three seconds of forced frames; pressing **Play** then advanced it to `6:49`, so the transport is untouched. Without the stub, the same click autoplayed — **Pause**, clock at `0:19` and moving. The decision moved out of `main.ts` into `dev/motion.ts` so it can be asserted without an operating system that has the preference switched on; `motion.test.ts` pins the query string, both autoplay verdicts, and — for the second clause — that `index.html`'s guard block still selects `*` and carries `!important` on both properties. Also measured in the live page: **zero** `transition`/`animation` declarations exist in the stylesheet at all, so the block is a guard against future motion rather than a fix for present motion |
 | KB-15 | Colour is never the only signal — **direction** carries a ▲/▼ glyph | ✅ w1 |
 | KB-15a | …and so does **door state**, which today is a fill-width gap only | ✅ run · ✅ test — four distinct glyphs (`▮` `◂▸` `▯` `▸◂`) drawn beside the car wherever the floor pitch leaves room, and the phase in words in the text alternative at every pitch. `opening` and `closing` are the pair a width-only signal cannot tell apart, and they draw differently at the same fraction |
 | KB-15b | …and so does **overload**, which today is `theme.carHeavy` and nothing else — and fires at load factor 0.8, not at the 1.1 alarm | ✅ test — the 80 % fill rule and the 1.1 alarm are now different thresholds with different colours, and the alarm carries a `!` glyph beside the car **at every floor pitch** and a `!` in the load panel. Not seen on screen: no run driven in the session reached 1.1 |
@@ -299,21 +303,21 @@ criterion means.
    truth for "may I show this mean" is exactly the failure this project is built to avoid.
 5. **The seed is visible and copyable on every surface that shows a run.**
 
-### 7.0 Ledger — where the 88 rows stand after wave 2 and `T29`
+### 7.0 Ledger — where the 88 rows stand after wave 2, `T29` and `T39`
 
 | State | Rows | Ids |
 |---|---|---|
 | ✅ **wave 1** | 32 | `RV-01 04 05 10 12 13 15 16 19` · `PB-01 02 03 04 05 06 10 11 12 13 14` · `ED-11` · `KB-02 03 04 05 08 09 10 15` · `RS-01 06 07` |
-| ✅ **run** — driven in a browser against the shipped `data/` | 34 | `RV-02 03 06 07 09 20` · `PB-07 08 15 16 17 18` · `ED-01 02 04 05 06 10 18 19 20 21 22` · `KB-01 06 07 11 12 13 15a` · `RS-02 03 05 08` |
-| ✅ **run** + ✅ **test** — driven *and* asserted, both clauses | 2 | `RV-08` · `ED-01a` (added by `T29`) |
+| ✅ **run** — driven in a browser against the shipped `data/` | 37 | `RV-02 03 06 07 09 11 17 18 20` · `PB-07 08 15 16 17 18` · `ED-01 02 04 05 06 10 18 19 20 21 22` · `KB-01 06 07 11 12 13 15a` · `RS-02 03 05 08` |
+| ✅ **run** + ✅ **test** — driven *and* asserted, both clauses | 4 | `RV-08` · `RV-21` · `ED-01a` (added by `T29`) · `KB-14` |
 | ✅ **test** — asserted, and the assertion proved to bite | 11 | `RV-14` · `ED-03 07 08 09 14 15 16 17` · `KB-15b` · `RS-04` |
-| ✅ + ⚠️ — one clause each way | 2 | `RV-18` (editor half run, viewer half unverified) · `ED-23` (in-app half run, `beforeunload` unverified) |
-| ⚠️ **unverified** — built, reachable, neither driven nor tested | 4 | `RV-11` `RV-17` `RV-21` `KB-14` |
+| ✅ + ⚠️ — one clause each way | 1 | `ED-23` (in-app half run, `beforeunload` unverified) |
+| ⚠️ **unverified** — built, reachable, neither driven nor tested | 0 | — |
 | 🔲 **re-marked** — the row contradicts the schema; stated rather than papered over | 2 | `ED-12` `ED-13` |
 | 🔲 **not built** | 1 | `PB-09` (window selection then loop) |
 
-The seven ⛔ non-negotiable keyboard rows — `KB-01 02 08 10 11 13 14 15` — are all ✅ except
-`KB-14`, which is built and unverified.
+The seven ⛔ non-negotiable keyboard rows — `KB-01 02 08 10 11 13 14 15` — are now **all ✅**;
+`KB-14` was the last, and `T39` drove it.
 
 #### 7.0.1 What `T29` changed, and what it deliberately did not
 
@@ -331,9 +335,35 @@ nothing else changed bucket.
 | `ED-T1`, `ED-01a` | Every floor-ordered list in the editor reads the way the building does — `U1` |
 
 **Not claimed.** `T29` drove Secure Tower, Vertical City and Garden Apartments in a browser at
-one viewport. It did not re-exercise `RV-11`, `RV-17`, `RV-21` or `KB-14`, which stay ⚠️; it did
-not touch Basic/Advanced modes, which are not built; and the `⊘` unserved-floor path still has no
-shipped building that produces it.
+one viewport. It did not re-exercise `RV-11`, `RV-17`, `RV-21` or `KB-14` — `T39` did, below; it
+did not touch Basic/Advanced modes, which are not built; and the `⊘` unserved-floor path still
+has no shipped building that produces it.
+
+#### 7.0.2 What `T39` changed — the last four ⚠️ rows, and what driving them found
+
+`T39` closed the four rows that had been *built and never exercised*. Two of them were not merely
+unverified; they were **false**, and both had been false since wave 2 shipped. The count stays at
+88: no row was added or removed.
+
+| Row | Change |
+|---|---|
+| `RV-21` | **False.** Retry refetched and then killed the page on a temporal-dead-zone `ReferenceError`, silently, inside a floating promise. Sequence extracted to `dev/bootstrap.ts` with `bootstrap.test.ts`; a throw from `start` can no longer vanish. ⚠️ → ✅ run + ✅ test |
+| `RV-17` | **False in its second clause.** The message named the failing path only on the `!response.ok` branch, which is the branch a file missing from `data/` does *not* take on this dev server. `dev/data.ts` now names it in every failure mode. ⚠️ → ✅ run |
+| `KB-14` | Held. Driven both ways by substituting `window.matchMedia`, and moved to `dev/motion.ts` so the verdict is assertable without the operating-system setting. ⚠️ → ✅ run + ✅ test |
+| `RV-11` | Held. No shipped building produces it, so the state was built in the editor and run through `ED-04`. ⚠️ → ✅ run |
+| `RV-18` | The viewer half was ⚠️ "for `RV-17`'s reason", and that reason was wrong for it too. Driven: five schema problems, all five shown at once. ✅ + ⚠️ → ✅ run |
+| § B.3 empty state | Two wiring defects found while driving the above and fixed: the transport was left **enabled** during a failed load, and left **disabled** for a run handed over by the editor after a failed run — `ED-04`'s door, which is how `RV-11` is reached |
+
+**Not claimed.** `T39` drove one viewport (1280 × 720) and did not re-audit the rows `T29` had
+already established beyond the `D111` spot-check below. The `⊘` unserved-floor path still has no
+shipped building that produces it, and `ED-23`'s `beforeunload` half is still unverified.
+
+**`D111` spot-check.** Re-confirmed on **both** suppression grounds, on the canvas *and* in the
+bitmap `Export PNG` writes (`canvas.toDataURL`, inspected by rendering it back into the page):
+Vertical City at 26:34 with 1868 legs boarded, saturated, drew `SATURATED — AWT suppressed` and
+`mean wait suppressed` with no figure anywhere; the zero-population run drew `AWT suppressed` and
+`mean wait suppressed` on the empty-window ground. The metrics panel read `SUPPRESSED` with the
+reason in both. No regression.
 
 ### 7.2 Not frozen: the field set of `VizRecording`
 
