@@ -42,6 +42,7 @@ export {
   formatPath,
   issuesFromZodError,
   parseLoadDivisor,
+  serviceEventSchema,
   trafficProfileSchema,
   trafficProfilesSchema,
 } from './schema.js';
@@ -142,6 +143,8 @@ export type {
   ResolvedBank,
   ResolvedBuilding,
   ResolvedCar,
+  ResolvedServiceEvent,
+  ServiceEventConfig,
   TrafficProfile,
   TrafficProfiles,
   TypicalMax,

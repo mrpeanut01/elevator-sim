@@ -157,9 +157,13 @@ export const CAR_DEFAULTS = Object.freeze({
  * anything about elevators. `car.*` ids resolve against a car in a building config,
  * `answer.*` against a dispatcher profile's answer stage.
  *
- * Rated speed, acceleration, jerk and the door timings are **not** here: they are already
- * declared by `config/schema.ts` and `DOOR_PARAMETERS` respectively, and a second
- * declaration would be a second source of truth.
+ * Rated speed, acceleration, jerk, the door timings and the car's **service mode** are not
+ * here: they are already declared by `config/schema.ts` and `DOOR_PARAMETERS` respectively, and
+ * a second declaration would be a second source of truth. `car.mode` is the newest of them and
+ * the rule bites the same way — it is a `carConfigSchema` field with a `z.enum(SERVICE_MODES)`,
+ * exactly as `doorType` is, so its schema (CLAUDE.md invariant 8) is declared there. It would
+ * also be the wrong dimension for a dispatcher search to hold: a tuner that took its own fleet
+ * out of service to improve an objective would be tuning the ruler.
  */
 export const CAR_PARAMETERS: readonly CarParameterSpec[] = [
   ...LOAD_SENSOR_PARAMETERS,

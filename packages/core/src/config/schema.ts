@@ -24,6 +24,7 @@ import {
   DWELL_POLICIES,
   PARKING_STRATEGIES,
   REASSIGNMENT_POLICIES,
+  SERVICE_MODES,
   type AccessZone,
   type BankConfig,
   type BuildingConfig,
@@ -36,6 +37,7 @@ import {
   type ElevatorSpecs,
   type FloorConfig,
   type FloorRange,
+  type ServiceEventConfig,
   type TrafficProfile,
   type TrafficProfiles,
 } from './types.js';
@@ -69,6 +71,8 @@ export const ISSUE_CODES = {
   invalidConvention: 'invalid-convention',
   /** The building type has no row in `timing.passengerTransferS` and no car stated one. */
   missingPassengerTransfer: 'missing-passenger-transfer',
+  /** A `serviceEvents` entry names a car this building does not have, or names one ambiguously. */
+  unknownServiceEventCar: 'unknown-service-event-car',
 } as const;
 
 /** Stable codes for non-fatal diagnostics. */
@@ -638,6 +642,12 @@ export const carConfigSchema = z.strictObject({
   $comment: comment,
   id: identifier,
   spec: identifier,
+  // Operational state, not hardware. Declared as a tunable in `CAR_PARAMETERS`
+  // (`model/car/car.ts`) with type, values and default, per CLAUDE.md invariant 8; it is not
+  // in the *dispatcher's* search space because no dispatcher profile has a section that can
+  // hold a `car.*` id, which is the same mechanical rule that excludes `car.passengerTransferS`
+  // (see `experiments/src/tuning/space/collect.ts`).
+  mode: z.enum(SERVICE_MODES).optional(),
   ratedSpeedMps: positive.optional(),
   ratedLoadLb: positive.optional(),
   doorType: z.enum(DOOR_TYPES).optional(),
@@ -670,6 +680,21 @@ export const bankConfigSchema = z.strictObject({
   cars: z.array(carConfigSchema).min(1, 'a bank must have at least one car'),
 });
 
+/**
+ * One scheduled service-mode change. See {@link ServiceEventConfig}.
+ *
+ * `atS` is non-negative, and `z.number()` already refuses `Infinity` and `NaN` — a schedule entry
+ * that can never fire is a silently-inert event, which is worse than a rejected one. Which car it
+ * names is checked in `resolveBuilding`, where the banks are in view.
+ */
+export const serviceEventSchema = z.strictObject({
+  $comment: comment,
+  atS: nonNegative,
+  carId: identifier,
+  bankId: identifier.optional(),
+  mode: z.enum(SERVICE_MODES),
+});
+
 export const accessZoneSchema = z.strictObject({
   $comment: comment,
   id: identifier,
@@ -689,6 +714,7 @@ export const buildingConfigSchema = z
     totalPopulation: nonNegative.optional(),
     banks: z.array(bankConfigSchema).min(1, 'a building must have at least one bank'),
     accessZones: z.array(accessZoneSchema).optional(),
+    serviceEvents: z.array(serviceEventSchema).optional(),
     notes: z.array(z.string().min(1)).optional(),
   })
   .superRefine((building, ctx) => {
@@ -745,4 +771,5 @@ type _FloorRangeConforms = Conforms<FloorRange, z.infer<typeof floorRangeSchema>
 type _CarConfigConforms = Conforms<CarConfig, z.infer<typeof carConfigSchema>>;
 type _BankConfigConforms = Conforms<BankConfig, z.infer<typeof bankConfigSchema>>;
 type _AccessZoneConforms = Conforms<AccessZone, z.infer<typeof accessZoneSchema>>;
+type _ServiceEventConforms = Conforms<ServiceEventConfig, z.infer<typeof serviceEventSchema>>;
 type _BuildingConfigConforms = Conforms<BuildingConfig, z.infer<typeof buildingConfigSchema>>;

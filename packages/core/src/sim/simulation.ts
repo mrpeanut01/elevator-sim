@@ -161,6 +161,7 @@ import {
   carDoorEvent,
   dispatchTickEvent,
   queueSampleEvent,
+  serviceChangeEvent,
   transferArrivalEvent,
 } from './events.js';
 import {
@@ -584,6 +585,11 @@ export class Simulation {
           shaft: shaftForBank(resolved, context.bankId),
           homeFloorId: homeFloorIdFor(resolved, requireBank(resolved, context.bankId)),
           clock: kernel,
+          // Service mode at t=0, straight off the resolved car. Without this line
+          // `carConfigSchema.mode` would validate, round-trip and reach no car — the
+          // "configured, validated, dead in the shipped path" shape docs/05 § *Standing
+          // requirement* names. The non-test caller of `CarInit.mode` is right here.
+          mode: spec.mode,
           ...(answer === undefined ? {} : { answer }),
           ...(loadSensorSpec === undefined ? {} : { loadSensorSpec }),
           ...(passengerTransferS === undefined ? {} : { passengerTransferS }),
@@ -591,6 +597,24 @@ export class Simulation {
       },
     });
     for (const car of this.#building.cars) this.#carsById.set(car.id, car);
+
+    /*
+     * A service schedule that was authored and not resolved, said out loud.
+     *
+     * `ResolvedBuilding.serviceEvents` is optional because a `ResolvedBuilding` can be assembled
+     * by hand — fixtures, the fuzz generator, `experiments/validation/syntheticBuilding.ts` — and
+     * making it required would break every one of those at compile time in packages this change
+     * does not own. The cost of that choice is exactly one silent failure mode: a hand-built
+     * resolved building whose `config` declares a schedule the resolver never located. So it is
+     * not silent. A **disclaimer**, not an advisory, and for the reason `#disclaimers` gives: the
+     * model is not the configuration, and nothing about the resulting numbers would say so.
+     */
+    const authoredEvents = resolved.config.serviceEvents ?? [];
+    if (authoredEvents.length > 0 && (resolved.serviceEvents ?? []).length === 0) {
+      this.#disclaimers.push(
+        `building "${resolved.id}" authors ${authoredEvents.length} serviceEvents entr${authoredEvents.length === 1 ? 'y' : 'ies'} and the ResolvedBuilding carries none, so no car changes service mode in this run. A ResolvedBuilding assembled by hand must resolve its own schedule; resolveBuilding() does it.`,
+      );
+    }
 
     /* ---- one group controller per bank (docs/01-architecture.md) ---- */
     // Which policy is **data**: `auction.aggregation` names a factory in
@@ -857,6 +881,7 @@ export class Simulation {
 
     this.#scheduleTrace();
     this.#scheduleQueueSamples();
+    this.#scheduleServiceEvents();
 
     let endReason: RunEndReason = 'drained';
     try {
@@ -927,6 +952,95 @@ export class Simulation {
         }),
       );
     }
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Service mode
+   * ---------------------------------------------------------------- */
+
+  /**
+   * Put the building's authored service schedule on the queue.
+   *
+   * **In array order, and not sorted.** The kernel's total order is `(time, sequence)` and the
+   * sequence is the order things were scheduled in, so two entries with the same `atS` fire in
+   * the order they were authored (CLAUDE.md invariant 4). Sorting here would be a second
+   * ordering authority saying the same thing, and two authorities is how one of them drifts.
+   *
+   * Entries past the drain deadline are refused rather than queued, for the same reason
+   * {@link #scheduleTick} refuses one: an event on the queue keeps the run alive to its time, so
+   * a recall authored at 10 000 s on a 1800 s trace would extend a run by more than two hours to
+   * do nothing. Refused **loudly** — a schedule entry that never fires is a configuration that
+   * did not happen, which is exactly what `warnings` is for.
+   */
+  #scheduleServiceEvents(): void {
+    const events = this.#resolved.serviceEvents ?? [];
+    for (const [index, event] of events.entries()) {
+      if (event.atS > this.#deadlineS) {
+        this.#deadlineTruncations += 1;
+        this.#warnings.push(
+          `serviceEvents[${index}] would set car "${event.bankId}-${event.carId}" to "${event.mode}" at ${event.atS} s, which is past this run's drain deadline of ${this.#deadlineS} s (demand horizon ${this.#trace.durationS} s + sim.drainGraceS ${this.#options.drainGraceS} s). It was not scheduled and the car's mode is unchanged by it.`,
+        );
+        continue;
+      }
+      this.#kernel.schedule(
+        event.atS,
+        serviceChangeEvent({ index }, (payload, context) => {
+          this.#onServiceChange(payload.index, context.time);
+        }),
+      );
+    }
+  }
+
+  /**
+   * A car changes service mode, and the group takes back whatever the new mode cannot do.
+   *
+   * {@link Car.setMode} is the authority on *what* is released — a car leaving `in-service` drops
+   * its hall calls, one leaving `independent` as well drops its car calls — and this method is
+   * the authority on *what happens to them*. Both halves are needed and only the first existed:
+   * a released hall call that nothing hands back to the group is a landing pinned to a car that
+   * will never come, which under `reassignmentPolicy: 'never'` (every shipped profile) is
+   * permanent.
+   *
+   * So each released call goes through {@link #reofferCall} — the same path a car that filled up
+   * and left people behind uses, and the same path capacity-driven bypass uses. It completes the
+   * lifecycle and re-registers the call with its **original** `registeredAt`, so a starvation
+   * term still sees an old call rather than a fresh one.
+   *
+   * A car coming *back* needs no special handling and gets none: the bank is re-dispatched here,
+   * and a call that no car could take was left `retry`-able rather than structurally unservable
+   * (`serviceMode` is deliberately absent from `STRUCTURAL_INELIGIBILITY`), so the pending
+   * dispatch tick finds the returning car too. `#stepCar` inside `#dispatchBank` then gives it
+   * its first instruction.
+   *
+   * **What this does not model**, stated because the books still balance either way: a car put
+   * into `fire-recall` or `out-of-service` with passengers aboard keeps them aboard. `setMode`
+   * clears its car calls, so it has no reason to move and they end the run as
+   * `undelivered: 'riding'` — named, counted, never lost. A real Phase I recall discharges at the
+   * recall level; modelling that is a behaviour, not a config field, and is out of scope here.
+   */
+  #onServiceChange(index: number, at: SimTime): void {
+    const event = this.#resolved.serviceEvents?.[index];
+    /* c8 ignore next 5 -- the index came from the same array a moment ago. */
+    if (event === undefined) {
+      throw new SimulationError(
+        `Service event ${index} is not in the schedule of building "${this.#resolved.id}".`,
+      );
+    }
+    const car = this.#carsById.get(`${event.bankId}-${event.carId}`);
+    /* c8 ignore next 5 -- resolveBuilding located this car against the same banks. */
+    if (car === undefined) {
+      throw new SimulationError(
+        `Service event ${index} names car "${event.carId}" in bank "${event.bankId}", which this run did not build.`,
+      );
+    }
+
+    for (const call of car.setMode(event.mode)) {
+      const active = this.#activeCalls.get(call.id);
+      if (active === undefined) continue;
+      this.#noteRefusal(active, car.id, 'serviceMode');
+      this.#reofferCall(car, active, at);
+    }
+    this.#dispatchBank(car.bankId, at);
   }
 
   /* ---------------------------------------------------------------- *
@@ -1369,9 +1483,14 @@ export class Simulation {
   /**
    * Put a still-occupied landing back out to the group, unallocated.
    *
-   * Two situations reach here, and they are the same situation: a car was sent for a landing
-   * and the landing is still occupied afterwards. Either the car filled up and left people
-   * behind, or it arrived already bypassing on load and could not open for them at all.
+   * Three situations reach here, and the first two are the same situation: a car was sent for a
+   * landing and the landing is still occupied afterwards. Either the car filled up and left
+   * people behind, or it arrived already bypassing on load and could not open for them at all.
+   *
+   * The third is a **service-mode change** ({@link #onServiceChange}): a car recalled, taken out
+   * of service or put on independent operation drops its hall calls, and the landings behind them
+   * are still occupied. It is the same problem — work committed to a car that will not do it —
+   * and it takes the same remedy, which is why it is this method and not a fourth one.
    *
    * **Why the lifecycle is completed and re-registered rather than merely edited.** The
    * policy's lifecycle is the authority on who holds a call, and the only ways out of it are
@@ -1487,6 +1606,12 @@ export class Simulation {
    * Safe against spinning, for a structural reason: "nothing committed" means an *empty* car
    * (a passenger aboard is a committed stop), so the load cell always has room and the queue
    * always shrinks. A stop that could board nobody is never begun.
+   *
+   * **Not a way around service mode**, though it is a way around a dispatch decision.
+   * {@link #waitingFor} counts through {@link #carCanCarry}, which refuses a car that may not take
+   * a landing queue, so a recalled or out-of-service car standing at a full landing counts zero
+   * and opens nothing. Without that the group would stop allocating and the doors would keep
+   * opening anyway — and `Car.registerCarCall` would throw the moment somebody stepped in.
    */
   #loadWhileIdle(car: Car, at: SimTime): boolean {
     const floor = this.#building.requireFloor(car.floorId);
@@ -2168,6 +2293,13 @@ export class Simulation {
    */
   #park(car: Car, at: SimTime): void {
     if (at > this.#trace.durationS) return;
+    // Parking is stage 7, and stage 7 is the *group controller* placing its fleet. A car the
+    // group may not allocate to is not the group's to place: a recalled or out-of-service car
+    // driving itself to a lobby because a parking strategy said so is the controller operating
+    // hardware that has been taken away from it. Inert on every shipped run — every car of every
+    // building in `data/buildings` is `in-service` throughout — so no parking-strategy
+    // measurement in `seam.test.ts` or `searchSpaceLiveness.test.ts` moves.
+    if (!car.acceptsHallCalls) return;
     const policy = this.#policies.get(car.bankId);
     const bank = this.#building.bankById(car.bankId);
     /* c8 ignore next -- every car's bank has a policy. */
@@ -2474,8 +2606,34 @@ export class Simulation {
     );
   }
 
+  /**
+   * Service **mode**, service zoning and access zoning, all three checked, none merged.
+   *
+   * The mode clause is the one that is not obvious, and it is load-bearing rather than tidy.
+   * Every landing boarding in this module goes through {@link #boardFrom}, and `Car.board`
+   * registers the passenger's destination as a car call — which `Car.registerCarCall` **refuses**
+   * for a mode that does not honour car calls, by throwing a `ModelError` that `run()` propagates
+   * unchanged. So without this clause, the first out-of-service car standing at an occupied
+   * landing crashes the run.
+   *
+   * It was unreachable until `CarConfig.mode` and `BuildingConfig.serviceEvents` made a
+   * not-in-service car authorable: the only previous way to produce one was to proxy the
+   * *dispatcher's view* of the cars (`experiments/validation/serviceMode.ts`), which leaves the
+   * physical car in service, so `#loadWhileIdle` went on boarding from it quite legally. That is
+   * why the adversarial campaign correctly asserts allocations rather than boardings — its cars
+   * really were in service — and why this clause changes nothing about that run, or about any
+   * run of any shipped building, all of whose cars are `in-service` for their whole duration.
+   *
+   * `acceptsHallCalls` and not `acceptsCarCalls` is deliberate: this predicate answers *"may this
+   * car take somebody who is standing at a landing"*, and the answer for `independent` is no. An
+   * attendant-operated car honours the buttons pressed inside it — which is what
+   * `acceptsCarCalls` is for, and which `Car` still allows — but it is not under group control
+   * and does not collect a landing queue. {@link #park} is gated on the same predicate for the
+   * same reason.
+   */
   #carCanCarry(car: Car, passenger: Passenger): boolean {
     return (
+      car.acceptsHallCalls &&
       car.shaft.floorsById.has(passenger.destinationFloorId) &&
       isAccessPermitted(car.shaft, passenger.credentialGroup, passenger.destinationFloorId)
     );
