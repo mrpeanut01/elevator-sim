@@ -28,7 +28,6 @@ import { doorOpenFractionAt, positionAt, type SimTime } from '@elevator-sim/core
 
 import { lastAtOrBefore, stepValueAt } from '../contract/series.js';
 import {
-  VIZ_SCHEMA_VERSION,
   type DoorPhase,
   type Frame,
   type FrameCar,
@@ -47,7 +46,7 @@ import {
  */
 export function frameAt(recording: VizRecording, simTimeS: SimTime): Frame {
   const t = clamp(simTimeS, recording.startedAt, recording.endedAt);
-  const served = stepValueAt(recording.progress.served, t);
+  const boardedLegs = stepValueAt(recording.progress.boardedLegs, t);
   return {
     schemaVersion: recording.schemaVersion,
     runId: recording.runId,
@@ -55,14 +54,9 @@ export function frameAt(recording: VizRecording, simTimeS: SimTime): Frame {
     cars: recording.shafts.map((shaft) => frameCar(shaft, t)),
     landings: frameLandings(recording, t),
     totalWaiting: stepValueAt(recording.progress.waiting, t),
-    served,
-    runningMeanWaitS: served === 0 ? undefined : stepValueAt(recording.progress.meanWaitS, t),
+    boardedLegs,
+    runningMeanWaitS: boardedLegs === 0 ? undefined : stepValueAt(recording.progress.meanWaitS, t),
   };
-}
-
-/** Assert-free schema check, for a recording that arrived from disk or over a wire. */
-export function isSupportedRecording(recording: VizRecording): boolean {
-  return recording.schemaVersion === VIZ_SCHEMA_VERSION;
 }
 
 function frameCar(shaft: VizShaft, t: SimTime): FrameCar {
@@ -97,9 +91,18 @@ function frameLandings(recording: VizRecording, t: SimTime): readonly FrameLandi
 }
 
 /* -------------------------------------------------------------------------- *
- * The samplers. Exported: wave 2 draws trails and shaft occupancy strips from
- * the same functions the frame is built with, and two implementations of "where
- * was the car" would eventually disagree.
+ * The samplers.
+ *
+ * Their caller is {@link frameCar}, directly above, and — stated plainly because the barrel's
+ * table has a row for it — they have **no caller outside this package**. They are separate
+ * functions rather than inline expressions so that a test can ask "where was the car at t?"
+ * without going through a whole frame, which is what makes the wiring assertions in
+ * `frameAt.test.ts` possible: those compare `frame.cars[i].heightM` against `carHeightAt(shaft,
+ * t)` and would be vacuous if the two could not be evaluated separately.
+ *
+ * That test exists because seven of `frameCar`'s eight fields could be replaced by constants
+ * without the package's 89-test suite noticing. Testing a sampler is not testing that the frame
+ * calls it.
  * -------------------------------------------------------------------------- */
 
 /** The move in effect at `t`: the last one *commanded* at or before it. */

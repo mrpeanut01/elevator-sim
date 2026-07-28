@@ -32,6 +32,7 @@
 import {
   Simulation,
   type Car,
+  type CarMotion,
   type Direction,
   type PassengerRecord,
   type ResolvedBuilding,
@@ -61,6 +62,22 @@ export interface RecordedRun {
 }
 
 /**
+ * Where a car stood before the run, captured before the run.
+ *
+ * The whole point of this type is the word *before*. `Car.floorId` and `Car.heightM` are live
+ * fields: after `Simulation.run()` returns they describe where the car **ended**, and a
+ * recording that read them then told the frame producer to park every car at its final position
+ * for every instant up to its first commanded move — 77 m out on Midtown Office, whose cars
+ * start in the basement, and invisible on Garden Apartments, whose cars start where they end.
+ * The recording was still deterministic and still replayed identically; it was simply a picture
+ * of a different building. See `recordRun.test.ts` § the start-position guard.
+ */
+interface CarStart {
+  readonly floorId: string;
+  readonly heightM: number;
+}
+
+/**
  * Simulate `config` and describe the result for a screen.
  *
  * Throws whatever `Simulation.run()` throws — a `SimulationError` for a run whose conservation
@@ -70,12 +87,15 @@ export interface RecordedRun {
 export function recordRun(config: SimulationConfig): RecordedRun {
   const simulation = new Simulation(config);
   const tracks = new Map<string, CarTrack>();
+  const starts = new Map<string, CarStart>();
   for (const car of simulation.building.cars) {
     tracks.set(car.id, instrumentCar(car));
+    // Before `run()`, not after. `car.floorId`/`car.heightM` are live. See {@link CarStart}.
+    starts.set(car.id, { floorId: car.floorId, heightM: car.heightM });
   }
   const result = simulation.run();
   return {
-    recording: describeRun(config.building, simulation.building.cars, tracks, result),
+    recording: describeRun(config.building, simulation.building.cars, tracks, starts, result),
     result,
   };
 }
@@ -88,6 +108,7 @@ function describeRun(
   building: ResolvedBuilding,
   cars: readonly Car[],
   tracks: ReadonlyMap<string, CarTrack>,
+  starts: ReadonlyMap<string, CarStart>,
   result: SimulationResult,
 ): VizRecording {
   const specs = resolveSpecs(building);
@@ -97,17 +118,23 @@ function describeRun(
     const track = tracks.get(car.id);
     const load = loads.get(car.id);
     const spec = specs.get(car.id);
+    const start = requireStart(starts, car);
+    const motions = track?.motions ?? [];
+    const doorMarks = track?.doorMarks ?? [];
+    assertStartAgreesWithFirstMove(car.id, start, motions);
+    assertNonDecreasing(car.id, 'motions', motions, (motion) => motion.commandedAt);
+    assertNonDecreasing(car.id, 'doorMarks', doorMarks, (mark) => mark.at);
     return {
       carId: car.id,
       bankId: car.bankId,
       label: shortCarLabel(car.id, car.bankId),
-      startFloorId: car.floorId,
-      startHeightM: car.heightM,
+      startFloorId: start.floorId,
+      startHeightM: start.heightM,
       servedFloorIds: car.shaft.floors.map((floor) => floor.id),
       capacityPersons: spec?.capacityPersons ?? 0,
       doorConfig: car.doorConfig,
-      motions: track?.motions ?? [],
-      doorMarks: track?.doorMarks ?? [],
+      motions,
+      doorMarks,
       occupants: load?.occupants ?? constantSeries(0),
       loadFactor: load?.loadFactor ?? constantSeries(0),
     };
@@ -133,6 +160,71 @@ function describeRun(
     summary: describeSummary(result),
     warnings: result.warnings,
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * Record-time validation
+ *
+ * The rule these keep is the one `StepSeriesBuilder.push` already keeps for the numeric series:
+ * a recording is checked where it is *built*, not where it is read. `frameAt.motionAt` and
+ * `series.lastAtOrBefore` binary-search `motions` and `doorMarks`, and a binary search over an
+ * unsorted array does not fail — it returns a wrong answer, silently, at some instants and not
+ * others. That is the worst failure mode this package can have, because the picture stays
+ * deterministic and therefore still "replays identically".
+ * -------------------------------------------------------------------------- */
+
+function requireStart(starts: ReadonlyMap<string, CarStart>, car: Car): CarStart {
+  const start = starts.get(car.id);
+  if (start === undefined) {
+    throw new Error(
+      `recordRun: no start position was captured for car "${car.id}". Every car must be ` +
+        'measured before Simulation.run(), because Car.floorId and Car.heightM are live fields.',
+    );
+  }
+  return start;
+}
+
+/**
+ * The start must be where the kernel says the car was when it first moved.
+ *
+ * Cheap, exact, and it needs no second source of truth: `CarMotion.fromHeightM` is the car's
+ * height at the instant `departFor` was called, and nothing moves a car except `departFor`.
+ */
+function assertStartAgreesWithFirstMove(
+  carId: string,
+  start: CarStart,
+  motions: readonly CarMotion[],
+): void {
+  const first = motions[0];
+  if (first === undefined) return;
+  if (start.heightM !== first.fromHeightM || start.floorId !== first.fromFloorId) {
+    throw new Error(
+      `recordRun: car "${carId}" is recorded as starting at ${String(start.heightM)} m ` +
+        `(floor ${start.floorId}), but its first move departs ${String(first.fromHeightM)} m ` +
+        `(floor ${first.fromFloorId}). A start read after the run describes where the car ` +
+        'ended, and every frame before the first move would draw it there.',
+    );
+  }
+}
+
+function assertNonDecreasing<T>(
+  carId: string,
+  what: string,
+  entries: readonly T[],
+  timeOf: (entry: T) => SimTime,
+): void {
+  for (let i = 1; i < entries.length; i += 1) {
+    const previous = entries[i - 1];
+    const current = entries[i];
+    if (previous === undefined || current === undefined) continue;
+    if (timeOf(current) < timeOf(previous)) {
+      throw new Error(
+        `recordRun: car "${carId}" has ${what}[${String(i)}] at ${String(timeOf(current))} after ` +
+          `${what}[${String(i - 1)}] at ${String(timeOf(previous))}. The frame producer binary-` +
+          'searches these, so an out-of-order entry returns a wrong position rather than failing.',
+      );
+    }
+  }
 }
 
 function describeFloor(floor: ResolvedBuilding['floors'][number]): VizFloor {
@@ -261,11 +353,11 @@ function foldPassengers(passengers: readonly PassengerRecord[]): FoldedPassenger
   const counts = new Map<string, number>();
 
   const waiting = new StepSeriesBuilder(0);
-  const served = new StepSeriesBuilder(0);
+  const boardedLegs = new StepSeriesBuilder(0);
   const meanWait = new StepSeriesBuilder(0);
 
   let totalWaiting = 0;
-  let servedCount = 0;
+  let boardedCount = 0;
   let waitSum = 0;
 
   for (const event of events) {
@@ -282,12 +374,12 @@ function foldPassengers(passengers: readonly PassengerRecord[]): FoldedPassenger
 
     totalWaiting += event.delta;
     if (event.delta === -1) {
-      servedCount += 1;
+      boardedCount += 1;
       waitSum += event.waitS;
     }
     waiting.push(event.at, totalWaiting);
-    served.push(event.at, servedCount);
-    meanWait.push(event.at, servedCount === 0 ? 0 : waitSum / servedCount);
+    boardedLegs.push(event.at, boardedCount);
+    meanWait.push(event.at, boardedCount === 0 ? 0 : waitSum / boardedCount);
   }
 
   const landings: VizLanding[] = [];
@@ -307,6 +399,10 @@ function foldPassengers(passengers: readonly PassengerRecord[]): FoldedPassenger
 
   return {
     landings,
-    progress: { waiting: waiting.build(), served: served.build(), meanWaitS: meanWait.build() },
+    progress: {
+      waiting: waiting.build(),
+      boardedLegs: boardedLegs.build(),
+      meanWaitS: meanWait.build(),
+    },
   };
 }

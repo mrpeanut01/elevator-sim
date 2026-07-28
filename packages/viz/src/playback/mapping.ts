@@ -47,11 +47,6 @@ export function simTimeAt(anchor: PlaybackAnchor, displayMs: number): SimTime {
   return anchor.atSimTimeS + ((displayMs - anchor.atDisplayMs) / 1000) * anchor.speed;
 }
 
-/** Display time at which the playhead reaches `simTimeS`, unclamped. Inverse of {@link simTimeAt}. */
-export function displayMsAt(anchor: PlaybackAnchor, simTimeS: SimTime): number {
-  return anchor.atDisplayMs + ((simTimeS - anchor.atSimTimeS) / anchor.speed) * 1000;
-}
-
 /** Pin the two clocks together again at `(displayMs, simTimeS)`, keeping `speed`. */
 export function reanchor(
   anchor: PlaybackAnchor,

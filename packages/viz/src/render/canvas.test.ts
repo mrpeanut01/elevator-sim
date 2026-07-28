@@ -118,7 +118,7 @@ const RECORDING: VizRecording = {
   landings: [],
   progress: {
     waiting: constantSeries(0),
-    served: constantSeries(0),
+    boardedLegs: constantSeries(0),
     meanWaitS: constantSeries(0),
   },
   summary: {
@@ -170,7 +170,7 @@ function frame(overrides: Partial<Frame> = {}): Frame {
       { floorId: '3', waitingUp: 0, waitingDown: 0 },
     ],
     totalWaiting: 5,
-    served: 12,
+    boardedLegs: 12,
     runningMeanWaitS: 18.25,
     ...overrides,
   };
@@ -237,7 +237,7 @@ describe('drawScene', () => {
   });
 
   it('shows the running mean as an em dash before anybody has been served', () => {
-    const ctx = draw(frame({ served: 0, runningMeanWaitS: undefined }));
+    const ctx = draw(frame({ boardedLegs: 0, runningMeanWaitS: undefined }));
     expect(ctx.transcript).toContain('mean wait so far —');
   });
 

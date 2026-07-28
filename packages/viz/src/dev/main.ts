@@ -113,6 +113,22 @@ async function main(): Promise<void> {
       elevatorSpecs: resources.elevatorSpecs,
       seed,
       durationS: 900,
+      /**
+       * `report`, not the kernel's default `throw`.
+       *
+       * At the shipped traffic rates, Mixed-Use High-Rise, Secure Tower and Vertical City
+       * routinely end a 900 s run with people still in the system, and `Simulation` treats that
+       * as a failed run — correctly, because a mean over a system that never cleared is the
+       * confident nonsense this project exists to avoid. But under `throw` there is no recording
+       * at all, so pressing **Run** on three of the five shipped buildings produced an error
+       * message and an empty canvas rather than the playback UX.md RV-01 promises.
+       *
+       * `report` gives the viewer the recording it has to be able to draw, and the run's
+       * `timed-out` status and undelivered count are shown in the status line rather than
+       * swallowed — UX.md RV-16. Nothing about the statistics moves: `awtIsValid` still comes
+       * from the summary and still suppresses the mean.
+       */
+      onTimeout: 'report',
     };
 
     ui.status.textContent = 'simulating…';
@@ -251,13 +267,21 @@ async function main(): Promise<void> {
 function statusLine(recording: VizRecording): string {
   const { summary } = recording;
   const suppressed = summary.saturated || !summary.awtIsValid;
-  return [
+  const parts = [
     `${recording.buildingName} · ${recording.dispatcherProfileId} · seed ${recording.seed}`,
-    `${String(summary.generated)} generated, ${String(summary.delivered)} delivered`,
+  ];
+  // A run that did not deliver everybody is never presented as a completed one (UX.md RV-16).
+  // It leads the line, because it is the fact that decides how much of the rest means anything.
+  if (recording.status !== 'completed') {
+    parts.push(`${recording.status.toUpperCase()} — ${String(summary.undelivered)} undelivered`);
+  }
+  parts.push(`${String(summary.generated)} generated, ${String(summary.delivered)} delivered`);
+  parts.push(
     suppressed
       ? `AWT suppressed${summary.awtInvalidReason === undefined ? '' : ` — ${summary.awtInvalidReason}`}`
       : `AWT ${summary.meanWaitS.toFixed(1)} s · WT95 ${summary.wait95S.toFixed(1)} s`,
-  ].join('   ·   ');
+  );
+  return parts.join('   ·   ');
 }
 
 /**

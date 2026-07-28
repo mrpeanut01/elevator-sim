@@ -12,7 +12,7 @@
  * simulator's determinism, or whether a recording is *complete* enough to be replayed without
  * the objects that produced it.
  *
- * ## The negative control
+ * ## The negative control, and why asserting on the whole sequence was not enough
  *
  * A replay test that cannot fail proves nothing. Phase 3's control increments the stored seed
  * by one and requires the run *not* to reproduce; this does the same and requires the **frame
@@ -21,6 +21,17 @@
  * recordings cannot differ merely by their identity. CLAUDE.md invariant 5 says every persisted
  * record carries its seed; this is what checks that the seed is load-bearing rather than
  * decorative all the way through to the picture.
+ *
+ * That was originally asserted as `serializeFrames(b) !== serializeFrames(a)` — inequality of
+ * the *whole* serialised sequence — and a reviewer showed what that buys: with all seven car
+ * fields of `frameCar` replaced by constants, the control still passed, because the landing
+ * counts alone differed and one differing field satisfies inequality of the whole. A viewer
+ * that drew no car motion at all passed the negative control of Phase 4's acceptance test.
+ *
+ * So the control is now **per field**. Each of the seven car fields is digested across the whole
+ * sequence separately, and each digest must differ between the two seeds. Crippling any single
+ * field pins its digest and fails that field's assertion by name, which is also what makes the
+ * failure legible: the message says which part of the picture stopped depending on the run.
  *
  * ## Why frames and not pixels
  *
@@ -37,13 +48,28 @@ import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { DATA_DIR, FIXTURE_SEED, fixtureConfig } from '../fixtures.test-helper.js';
-import type { VizRecording } from '../contract/types.js';
+import { VIZ_SCHEMA_VERSION, type Frame, type FrameCar, type VizRecording } from '../contract/types.js';
 import { frameSequence, serializeFrames } from '../frame/sequence.js';
-import { isSupportedRecording } from '../frame/frameAt.js';
 import { recordRun } from '../record/recordRun.js';
 
 /** 30 Hz at ×10 over a 600 s run: about 1800 frames, which is a real replay, not a spot check. */
 const PLAYBACK = { fps: 30, speed: 10 } as const;
+
+/** Every field of {@link FrameCar} that a run can change. Identity fields cannot and are not here. */
+const CAR_FIELDS = [
+  'heightM',
+  'floorId',
+  'direction',
+  'doorFraction',
+  'doorPhase',
+  'occupants',
+  'loadFactor',
+] as const satisfies readonly (keyof FrameCar)[];
+
+/** One field of one car, across a whole sequence. Differs between seeds iff that field is live. */
+function carFieldDigest(frames: readonly Frame[], field: (typeof CAR_FIELDS)[number]): string {
+  return frames.map((frame) => frame.cars.map((car) => String(car[field])).join(',')).join('|');
+}
 
 let scratch: string | undefined;
 
@@ -55,7 +81,7 @@ describe('Phase 4 acceptance — a stored run replays visually identically', () 
   it('round-trips through JSON on disk and re-simulates from the stored seed alone', async () => {
     /* Record. */
     const original = recordRun(fixtureConfig(await loadConfig(DATA_DIR))).recording;
-    expect(isSupportedRecording(original)).toBe(true);
+    expect(original.schemaVersion).toBe(VIZ_SCHEMA_VERSION);
     expect(original.seed).toBe(FIXTURE_SEED.toString());
 
     /* Persist. Nothing from the producing side survives except this file. */
@@ -99,14 +125,38 @@ describe('Phase 4 acceptance — a stored run replays visually identically', () 
     expect(b.runId).toBe(a.runId);
     expect(b.buildingId).toBe(a.buildingId);
     expect(b.dispatcherProfileId).toBe(a.dispatcherProfileId);
-    expect(b.endedAt).not.toBe(Number.NaN);
+    expect(b.endedAt).not.toBeNaN();
+    expect(a.endedAt).not.toBeNaN();
     expect(b.seed).not.toBe(a.seed);
 
-    const framesA = serializeFrames(frameSequence(a, PLAYBACK));
-    const framesB = serializeFrames(frameSequence(b, PLAYBACK));
-    console.log(
-      `[phase 4] negative control, seed ${a.seed} → ${b.seed}: identical=${String(framesA === framesB)}`,
+    const sequenceA = frameSequence(a, PLAYBACK);
+    const sequenceB = frameSequence(b, PLAYBACK);
+    const framesA = serializeFrames(sequenceA);
+    const framesB = serializeFrames(sequenceB);
+
+    /* Field by field, because inequality of the whole is satisfied by any one differing field —
+       and it was: with all seven car fields pinned to constants, this test still passed on the
+       landing counts alone. Each entry below is a separate, separately-named claim that this
+       part of the picture depends on the run. */
+    const pinned = CAR_FIELDS.filter(
+      (field) => carFieldDigest(sequenceA, field) === carFieldDigest(sequenceB, field),
     );
+    console.log(
+      `[phase 4] negative control, seed ${a.seed} → ${b.seed}: identical=${String(framesA === framesB)}, ` +
+        `car fields pinned across seeds=${pinned.length === 0 ? 'none' : pinned.join(',')}`,
+    );
+    expect(pinned).toEqual([]);
+
+    /* The counters too, for the same reason. */
+    const counter = (frames: readonly typeof sequenceA[number][], read: (f: Frame) => unknown): string =>
+      frames.map((frame) => String(read(frame))).join(',');
+    expect(counter(sequenceB, (f) => f.totalWaiting)).not.toBe(
+      counter(sequenceA, (f) => f.totalWaiting),
+    );
+    expect(counter(sequenceB, (f) => f.boardedLegs)).not.toBe(
+      counter(sequenceA, (f) => f.boardedLegs),
+    );
+
     expect(framesB).not.toBe(framesA);
   }, 600_000);
 

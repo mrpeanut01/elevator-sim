@@ -12,7 +12,6 @@
 import { fileURLToPath } from 'node:url';
 
 import {
-  loadConfig,
   resolveDoorConfig,
   type DispatcherProfile,
   type DoorConfig,
@@ -38,17 +37,61 @@ export const FIXTURE_DOOR_CONFIG: DoorConfig = resolveDoorConfig({
 /** The repository's `data/` directory. */
 export const DATA_DIR = fileURLToPath(new URL('../../../data', import.meta.url));
 
-export const loadResources = (): Promise<LoadedConfig> => loadConfig(DATA_DIR);
-
 /**
  * The smallest shipped building, so a suite that runs several replications stays quick.
  *
  * Garden Apartments: a handful of floors and two cars, which is enough to exercise every part
  * of the contract (two shafts, both directions of landing call, doors, occupancy) without
  * paying for a tower.
+ *
+ * **It is not enough on its own, and the reason is recorded here so nobody re-pins to it.** Its
+ * two cars start where they end, so the recorder's start-position defect — cars described at
+ * their *final* floor and height, and therefore drawn there until their first commanded move —
+ * was invisible on this building and on no other. Breadth-first suites iterate
+ * {@link BUILDING_IDS}; this constant is only for the assertions that genuinely need one run.
  */
 export const FIXTURE_BUILDING_ID = 'garden-apartments';
 export const FIXTURE_DISPATCHER_ID = 'eta';
+
+/**
+ * Every building the project ships, in load order — the same list `core`'s `sim/seam.test.ts`
+ * iterates, kept here rather than imported because a test helper is not part of `core`'s
+ * published surface.
+ *
+ * Pinned rather than derived so that adding a building to `data/buildings/` is a **deliberate**
+ * act with a visible diff. `recordRun.test.ts`'s *the fixture list covers every building the
+ * project ships* compares this list with {@link shippedBuildingIds} and fails when they
+ * disagree, so a new building cannot arrive without the breadth suites covering it.
+ */
+export const BUILDING_IDS = [
+  'garden-apartments',
+  'midtown-office',
+  'mixed-use-high-rise',
+  'secure-tower',
+  'vertical-city',
+] as const;
+
+/**
+ * The ids `loadConfig` actually found, sorted — for the guard that keeps {@link BUILDING_IDS}
+ * honest.
+ */
+export function shippedBuildingIds(config: LoadedConfig): readonly string[] {
+  return [...config.buildingsById.keys()].sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * A duration short enough to run five buildings in one suite, long enough that cars leave their
+ * start floors, doors cycle and landings queue. Breadth beats length here: the defect this
+ * parameterisation exists to catch shows up in the first frame.
+ *
+ * It cannot go much below this. The CIBSE rise-and-fall template holds its peak for 300 s and
+ * `riseAndFallTemplate` refuses a run shorter than its own hold rather than silently clipping
+ * the peak; and the shorter the window, the more of each tall building's peak is still queued
+ * when it closes. 900 s is what `src/dev/main.ts` runs, so the suites measure the recording the
+ * viewer actually produces. Three of the five buildings still end that window with people in
+ * the system — see {@link FixtureOptions.onTimeout} for why that is reported rather than fatal.
+ */
+export const BREADTH_DURATION_S = 900;
 
 /** A short horizon. Long enough that cars move and queues form; short enough to run in a test. */
 export const FIXTURE_DURATION_S = 600;
@@ -61,6 +104,19 @@ export interface FixtureOptions {
   readonly buildingId?: string;
   readonly dispatcherId?: string;
   readonly durationS?: number;
+  /**
+   * `'throw'` (the kernel's default) or `'report'`.
+   *
+   * The breadth suites pass `'report'`, and the reason is worth stating rather than leaving as a
+   * flag. At the shipped traffic profiles' own rates, Mixed-Use High-Rise, Secure Tower and
+   * Vertical City routinely end a 900 s run with people still in the system, and `Simulation`
+   * treats that as a *failed run* — correctly, because a mean over a system that never cleared
+   * is exactly the confident nonsense this project exists to avoid. But a **picture** of such a
+   * run is still meaningful and still has to be right: it is the `timed-out` state UX.md RV-16
+   * describes. `'report'` is how a viewer gets the recording it must be able to draw; nothing
+   * about the statistics changes, and `VizSummary.awtIsValid` still carries the suppression.
+   */
+  readonly onTimeout?: 'throw' | 'report';
 }
 
 export function requireBuilding(config: LoadedConfig, id: string): ResolvedBuilding {
@@ -86,13 +142,30 @@ export function requireDispatcher(config: LoadedConfig, id: string): DispatcherP
  * else moved — which is what the replay negative control depends on.
  */
 export function fixtureConfig(config: LoadedConfig, options: FixtureOptions = {}): SimulationConfig {
+  const building = requireBuilding(config, options.buildingId ?? FIXTURE_BUILDING_ID);
+  const profile = requireDispatcher(config, options.dispatcherId ?? FIXTURE_DISPATCHER_ID);
   return {
-    building: requireBuilding(config, options.buildingId ?? FIXTURE_BUILDING_ID),
-    dispatcherProfile: requireDispatcher(config, options.dispatcherId ?? FIXTURE_DISPATCHER_ID),
+    building,
+    dispatcherProfile: profile,
     trafficProfiles: config.trafficProfiles,
     elevatorSpecs: config.elevatorSpecs,
     seed: options.seed ?? FIXTURE_SEED,
     durationS: options.durationS ?? FIXTURE_DURATION_S,
+    onTimeout: options.onTimeout ?? 'throw',
     runId: 'viz-fixture',
   };
+}
+
+/** Every shipped building, recorded over {@link BREADTH_DURATION_S}. See {@link FixtureOptions.onTimeout}. */
+export function breadthConfig(
+  config: LoadedConfig,
+  buildingId: string,
+  options: FixtureOptions = {},
+): SimulationConfig {
+  return fixtureConfig(config, {
+    ...options,
+    buildingId,
+    durationS: options.durationS ?? BREADTH_DURATION_S,
+    onTimeout: options.onTimeout ?? 'report',
+  });
 }

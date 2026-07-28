@@ -43,10 +43,31 @@ describe('frameTimes', () => {
     expect(slow.length).toBeCloseTo(fast.length * 2, -1);
   });
 
-  it('honours maxFrames rather than exhausting memory on a long run', () => {
-    const times = frameTimes(recording, { fps: 240, speed: 0.5, maxFrames: 50 });
+  it('refuses to exceed maxFrames rather than truncating the replay in silence', () => {
+    // The old behaviour clipped: the head of the run plus one final instant, with no signal.
+    // A comparison over that sequence cannot see a divergence in the span it skipped, so a
+    // truncated replay could report "identical" about a run it never sampled.
+    expect(() => frameTimes(recording, { fps: 240, speed: 0.5, maxFrames: 50 })).toThrow(RangeError);
+    expect(() => frameTimes(recording, { fps: 240, speed: 0.5, maxFrames: 50 })).toThrow(
+      /truncate: true/,
+    );
+  });
+
+  it('truncates only when the caller asks for it, and then bounds memory as promised', () => {
+    const times = frameTimes(recording, { fps: 240, speed: 0.5, maxFrames: 50, truncate: true });
     expect(times).toHaveLength(50);
     expect(times[times.length - 1]).toBe(recording.endedAt);
+    // And what makes the old behaviour dangerous, stated as a fact: the sampled head covers a
+    // small fraction of the run, so the gap before the final instant is most of it.
+    const penultimate = times[times.length - 2];
+    if (penultimate === undefined) throw new Error('expected at least two frames');
+    expect(recording.endedAt - penultimate).toBeGreaterThan((recording.endedAt - recording.startedAt) / 2);
+  });
+
+  it('does not throw when the grid fits under the ceiling', () => {
+    const times = frameTimes(recording, { fps: 30, speed: 10 });
+    expect(times.length).toBeLessThan(20_000);
+    expect(times.length).toBeGreaterThan(1000);
   });
 
   it('rejects nonsense parameters instead of producing an empty picture', () => {

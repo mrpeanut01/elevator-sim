@@ -13,7 +13,25 @@
  * rather than by two calculations agreeing.
  */
 
-import type { VizFloor, VizShaft } from '../contract/types.js';
+import type { VizFloor } from '../contract/types.js';
+
+/**
+ * The part of a shaft that geometry needs: an identity and the floors it serves.
+ *
+ * Narrower than {@link VizShaft} on purpose. A layout has nothing to say about motions, door
+ * marks, occupancy or capacity, and taking the whole `VizShaft` meant that laying a building out
+ * required a *finished run* — which is precisely what UX.md's ED-01/ED-02 (change a floor
+ * height, add a car, see the picture update, no run needed) cannot have. `VizShaft` satisfies
+ * this structurally, so every existing caller is unchanged and the editor's preview becomes
+ * expressible without widening anything later.
+ */
+export interface ShaftGeometry {
+  readonly carId: string;
+  readonly bankId: string;
+  readonly label: string;
+  /** Floor ids this shaft physically serves — service zoning, not access and not operational. */
+  readonly servedFloorIds: readonly string[];
+}
 
 export interface Rect {
   readonly x: number;
@@ -60,7 +78,7 @@ export interface LayoutOptions {
   readonly width: number;
   readonly height: number;
   readonly floors: readonly VizFloor[];
-  readonly shafts: readonly VizShaft[];
+  readonly shafts: readonly ShaftGeometry[];
   /** Room for floor ids and heights. */
   readonly gutterLeftPx?: number;
   /** Room for the waiting-passenger counts. */

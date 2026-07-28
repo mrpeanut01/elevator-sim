@@ -17,7 +17,7 @@ import { FIXTURE_DOOR_CONFIG } from '../fixtures.test-helper.js';
 import { constantSeries } from '../contract/series.js';
 import { VIZ_SCHEMA_VERSION, type VizRecording } from '../contract/types.js';
 import { ManualClock } from './clock.js';
-import { MAX_SPEED, MIN_SPEED, displayMsAt, reanchor, simTimeAt } from './mapping.js';
+import { MAX_SPEED, MIN_SPEED, reanchor, simTimeAt } from './mapping.js';
 import { Playback } from './playback.js';
 
 const RECORDING: VizRecording = {
@@ -53,7 +53,7 @@ const RECORDING: VizRecording = {
   landings: [],
   progress: {
     waiting: constantSeries(0),
-    served: constantSeries(0),
+    boardedLegs: constantSeries(0),
     meanWaitS: constantSeries(0),
   },
   summary: {
@@ -76,11 +76,6 @@ describe('the display-to-simulated mapping', () => {
     expect(simTimeAt(anchor, 1000)).toBe(50);
     expect(simTimeAt(anchor, 2000)).toBe(60);
     expect(simTimeAt(anchor, 500)).toBe(45);
-  });
-
-  it('inverts exactly', () => {
-    expect(displayMsAt(anchor, 60)).toBe(2000);
-    expect(simTimeAt(anchor, displayMsAt(anchor, 73.5))).toBeCloseTo(73.5, 9);
   });
 
   it('is frame-rate independent: elapsed display time alone decides the playhead', () => {
