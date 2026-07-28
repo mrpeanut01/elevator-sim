@@ -19,15 +19,15 @@
  * | load | `fairness-first` − `eta`, AWT | WT95 | WT99 | % > 60 s | quotable? |
  * |---|---|---|---|---|---|
  * | 1 % | −0.01 [−0.05, +0.02] | −0.05 [−0.13, +0.02] | −0.03 [−0.09, +0.03] | 0.00, 250/250 identical | yes — nothing significant |
- * | 2 % | **−0.23 [−0.41, −0.05]** | **−1.58 [−2.48, −0.68]** | **−1.94 [−2.87, −1.02]** | **−0.49 [−0.76, −0.21]** | **yes — everything significant** |
+ * | 2 % | **−0.26 [−0.45, −0.08]** | **−1.65 [−2.55, −0.76]** | **−2.05 [−2.98, −1.11]** | **−0.54 [−0.82, −0.27]** | **yes — everything significant** |
  * | 3 % | — | — | — | — | **no**: `eta` saturates 2 replications in 250 |
  *
  * **The term does exactly what a fairness term is supposed to do, and the shape of the effect is the
- * evidence.** At 2 % the mean moves **1.16 %**, WT95 **3.83 %** and WT99 **4.24 %** — the tail moves
+ * evidence.** At 2 % the mean moves **1.30 %**, WT95 **4.02 %** and WT99 **4.46 %** — the tail moves
  * more than three times harder than the mean, and further out is harder still. A gate that reported
  * AWT alone would have called that
- * row a rounding error; it is a 1.6 s improvement in the wait a passenger actually complains about,
- * and it cuts the fraction waiting over a minute from 1.30 % to 0.81 %.
+ * row a rounding error; it is a 1.7 s improvement in the wait a passenger actually complains about,
+ * and it cuts the fraction waiting over a minute from 1.30 % to 0.75 %.
  *
  * ## And the window in which it can be said is one load step wide
  *
@@ -37,21 +37,24 @@
  * | load | `nearest-car` | `eta` | `fairness-first` | `capacity-aware` | `zoned-uppeak` |
  * |---|---|---|---|---|---|
  * | 1 % | 2 | 0 | 0 | 0 | 0 |
- * | 2 % | 29 | 0 | 0 | 0 | 0 |
- * | 2.25 % | 45 | 1 | 1 | 1 | 1 |
+ * | 2 % | 29 | 0 | 0 | 0 | 1 |
+ * | 2.25 % | 45 | 1 | 1 | 1 | 3 |
  * | 2.5 % | 52 | 3 | 2 | 1 | 2 |
- * | 2.75 % | 64 | 0 | 1 | 0 | 0 |
- * | 3 % | 108 | 2 | 0 | 0 | 2 |
+ * | 2.75 % | 64 | 0 | 1 | 0 | 2 |
+ * | 3 % | 108 | 2 | 0 | 0 | 5 |
  *
- * (saturated replications.) **There is no load above 2 % at which every arm is simultaneously
- * quotable.** The system passes from *the tail terms are inert* straight into *some arm's queues
- * diverge*, with a single load step of overlap. So the 2 % row is not one point among many that could
- * have been chosen — it is the only one there is, and the effect it shows is the largest this
- * apparatus can legitimately report for a tail term.
+ * (saturated replications.) **There is no load in this sweep at which every arm is simultaneously
+ * quotable** — not even 2 %, where `zoned-uppeak` loses one replication in 250. The system passes
+ * from *the tail terms are inert* straight into *some arm's queues diverge*, and the widest window
+ * any pair shares is one load step. So the 2 % row is not one point among many that could have been
+ * chosen — it is the only load at which `eta`, `fairness-first` and `capacity-aware` are quotable
+ * together, and the effect it shows is the largest this apparatus can legitimately report for a tail
+ * term. (`zoned-uppeak` is run and censused here but no interval is quoted for it at any load, so
+ * its column bounds the *claim*, not the table.)
  *
  * `capacity-aware` falls in the gap. It is **INDISTINGUISHABLE** from `eta` at 2 % on every metric
- * (AWT `−0.16 [−0.44, +0.12]`, needing n ≈ 790; WT95 `−0.86 [−1.85, +0.14]`), and at 2.75 % — where it is quotable and
- * `fairness-first` is not — it is `−0.72 [−1.27, −0.17]` on AWT and `−2.29 [−4.10, −0.49]` on WT95,
+ * (AWT `−0.19 [−0.48, +0.10]`, needing n ≈ 556; WT95 `−0.92 [−1.91, +0.07]`), and at 2.75 % — where it is quotable and
+ * `fairness-first` is not — it is `−0.82 [−1.37, −0.26]` on AWT and `−2.64 [−4.44, −0.85]` on WT95,
  * both significant. Its `loadFactor` and `crowding` weights need cars near their bypass threshold to
  * have anything to price. That is a statement about when the term is *relevant*, and the honest
  * summary is: **indistinguishable from `eta` at every load where all arms are quotable together.**
@@ -74,6 +77,29 @@
  *
  * The right conclusion is about the criterion, not about the dispatchers: a Phase 6 criterion should
  * name `eta` as the thing to beat, because `eta` is quotable everywhere the terms actually work.
+ *
+ * ## Provenance — every figure above was regenerated on 2026-07-27, and why it had to be
+ *
+ * The numbers this header carried until then were measured at `a1ec6ad`, the commit that first
+ * landed this module, and **were never regenerated after `c237d95` wired stage 5 and stage 7 into
+ * `sim/simulation.ts`**. Both arms of the interesting comparison declare
+ * `reassignmentPolicy: until-commitment`; `eta` does not, and takes the `never` default. So the
+ * wiring moved the *treatment* and left the *reference* exactly where it was, and every published
+ * difference here shifted while `eta`'s own mean stayed bit-identical to the digit.
+ *
+ * Measured rather than argued, at seed 20 260 726, n = 250, two-entrance 2 %: `eta` produced
+ * **0 replications of 250** with a `capacityMigrations > 0`, and 0 of 250 whose AWT changed across
+ * the wiring commit. `fairness-first` produced 14 with a migration, and the **10** whose AWT moved
+ * are a subset of exactly those 14. `capacity-aware`: 8 with a migration, 5 moved, same containment.
+ * `zoned-uppeak` migrated nothing and moved on **all 250** — that one is stage 7, the `zone-center`
+ * parking the same commit wired, and it is why only its column of the census above changed.
+ *
+ * **The studies are deterministic from their seeds and this was never a reproducibility failure.**
+ * Re-running `runTailStudy()` in one tree gives bit-identical estimates every time; the two trees
+ * disagreed because the engine between them differs, which is what CLAUDE.md invariants 2 and 4
+ * promise and not a violation of them. The defect was that nothing in the suite re-derived a
+ * published interval, so a docstring could go stale for two commits without a single test noticing.
+ * `published.ts` is the guard that closes it, and this header is now pinned by it.
  */
 
 import type { ReplicationMetric } from '../runner/metrics.js';
@@ -124,6 +150,18 @@ export const TAIL_METRICS: readonly ReplicationMetric[] = Object.freeze([
 
 /** Loads the study sweeps, as a percentage of population per 5 minutes. */
 export const TAIL_LOADS: readonly number[] = Object.freeze([1, 2, 3]);
+
+/**
+ * The finer sweep this module's header publishes a saturation census over, and quotes `capacity-aware`
+ * from at 2.75 %.
+ *
+ * Declared rather than left in the prose, because a figure published from a sweep that no exported
+ * constant names is a figure nothing can re-derive — which is exactly how the 2.75 % row and the
+ * census column went stale across `c237d95` without a test noticing. `tailStudy.test.ts` runs the
+ * study over *these* loads, so the header's finer rows are covered by the same pins as its coarse
+ * ones.
+ */
+export const TAIL_CENSUS_LOADS: readonly number[] = Object.freeze([1, 2, 2.25, 2.5, 2.75, 3]);
 
 /**
  * Midtown Office up-peak with **both** entrances filling, at the building's own default weights.

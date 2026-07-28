@@ -22,14 +22,28 @@ import { describe, expect, it } from 'vitest';
 
 import { loadResources, withProfiles } from '../validation/harness.js';
 
-import { TAIL_REFERENCE, formatTailStudy, runTailStudy, type TailStudy } from './tailStudy.js';
+import {
+  TAIL_CENSUS_LOADS,
+  TAIL_REFERENCE,
+  formatTailStudy,
+  runTailStudy,
+  type TailStudy,
+} from './tailStudy.js';
+import { checkPinned, describeMismatches, tailFigures } from './published.js';
 
 const TIMEOUT_MS = 900_000;
 
 let cached: TailStudy | undefined;
 
 async function study(): Promise<TailStudy> {
-  cached ??= await runTailStudy({ resources: withProfiles(await loadResources(), []) });
+  // `TAIL_CENSUS_LOADS` rather than the default `TAIL_LOADS`, because this module's header
+  // publishes a saturation census and a `capacity-aware` interval at 2.75 % — loads the default
+  // sweep does not visit. A figure quoted from a sweep no suite runs is a figure nothing can
+  // re-derive, which is exactly how that row went stale across c237d95.
+  cached ??= await runTailStudy({
+    loads: TAIL_CENSUS_LOADS,
+    resources: withProfiles(await loadResources(), []),
+  });
   return cached;
 }
 
@@ -132,5 +146,47 @@ describe('Phase 5 — where the tail terms earn their weights, and why it is not
         `${Math.ceil(((1.96 * Math.sqrt(cell.comparison.varianceOfDifference)) / Math.abs(cell.comparison.estimate.mean)) ** 2)}, ` +
         'and at every higher load some arm has no quotable AWT.',
     );
+  }, TIMEOUT_MS);
+});
+
+
+/**
+ * The saturation census this module's header prints, asserted rather than described.
+ *
+ * Integers, so no interval covers them — and the `zoned-uppeak` column is the half of the header
+ * that `c237d95` moved *without* moving a single published interval, because stage-7 parking
+ * changed which replications diverge and not what any quoted comparison estimated. Pinned here so
+ * the guard's coverage of this file is the whole table and not only its interval rows.
+ */
+const PUBLISHED_CENSUS: Readonly<Record<string, Readonly<Record<string, number>>>> = Object.freeze({
+  '1': { 'nearest-car': 2, eta: 0, 'fairness-first': 0, 'capacity-aware': 0, 'zoned-uppeak': 0 },
+  '2': { 'nearest-car': 29, eta: 0, 'fairness-first': 0, 'capacity-aware': 0, 'zoned-uppeak': 1 },
+  '2.25': { 'nearest-car': 45, eta: 1, 'fairness-first': 1, 'capacity-aware': 1, 'zoned-uppeak': 3 },
+  '2.5': { 'nearest-car': 52, eta: 3, 'fairness-first': 2, 'capacity-aware': 1, 'zoned-uppeak': 2 },
+  '2.75': { 'nearest-car': 64, eta: 0, 'fairness-first': 1, 'capacity-aware': 0, 'zoned-uppeak': 2 },
+  '3': { 'nearest-car': 108, eta: 2, 'fairness-first': 0, 'capacity-aware': 0, 'zoned-uppeak': 5 },
+});
+
+/* -------------------------------------------------------------------------- *
+ * Layer A of the publication guard — see published.ts
+ * -------------------------------------------------------------------------- */
+
+describe('the figures this study publishes still come out of it', () => {
+  it('reproduces every pinned estimate, at full precision', async () => {
+    // Free: the study above is already run and cached, so this is arithmetic on a result the suite
+    // has paid for. What it catches is the defect nothing else in this repository can — a docstring
+    // whose numbers the code stopped producing two commits ago.
+    const mismatches = checkPinned('tail', tailFigures(await study()));
+    expect(describeMismatches('tail', mismatches), describeMismatches('tail', mismatches)).toBe(
+      '',
+    );
+  }, TIMEOUT_MS);
+
+  it('reproduces the saturation census the header prints', async () => {
+    const measuredStudy = await study();
+    const measured = Object.fromEntries(
+      measuredStudy.rows.map((row) => [String(row.loadPctPop5min), row.saturatedByArm]),
+    );
+    expect(measured).toEqual(PUBLISHED_CENSUS);
   }, TIMEOUT_MS);
 });

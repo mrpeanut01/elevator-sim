@@ -68,6 +68,7 @@ import { comparePaired, loadResources, samplesOf, withProfiles } from '../valida
 import { ARM_PROFILES, BASELINE_PROFILE, BENCHMARK_CASES } from './arms.js';
 import { criterionOutcomes, formatBenchmark } from './report.js';
 import { armOf, runBenchmark, type CaseResult } from './suite.js';
+import { benchmarkFigures, checkPinned, describeMismatches } from './published.js';
 
 const TIMEOUT_MS = 900_000;
 
@@ -298,5 +299,22 @@ describe('Phase 5 criterion — each dispatcher against nearest-car', () => {
     // `ARM_PROFILES` would silently escape the gate.
     const shipped = [...(await loadResources()).dispatcherProfilesById.keys()].sort();
     expect([BASELINE_PROFILE, ...ARM_PROFILES].sort()).toEqual(shipped);
+  }, TIMEOUT_MS);
+});
+
+
+/* -------------------------------------------------------------------------- *
+ * Layer A of the publication guard — see published.ts
+ * -------------------------------------------------------------------------- */
+
+describe('the figures this study publishes still come out of it', () => {
+  it('reproduces every pinned estimate, at full precision', async () => {
+    // Free: the study above is already run and cached, so this is arithmetic on a result the suite
+    // has paid for. What it catches is the defect nothing else in this repository can — a docstring
+    // whose numbers the code stopped producing two commits ago.
+    const mismatches = checkPinned('benchmark', benchmarkFigures(await benchmark()));
+    expect(describeMismatches('benchmark', mismatches), describeMismatches('benchmark', mismatches)).toBe(
+      '',
+    );
   }, TIMEOUT_MS);
 });
