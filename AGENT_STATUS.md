@@ -70,6 +70,11 @@ changed has regressed the suite.
 | T3 `9fb32e8` | clean | 128 files / **2590** tests | 2578 + 12 | ✅ matches |
 | T6 `ff2c1bf` | clean | 128 files / **2592** tests | 2590 + 2 | ✅ matches |
 | T8 `1dbfa43` | clean | 128 files / **2610** tests | 2592 + 18 | ✅ matches |
+| T9 `0e509ef` | clean | 129 files / **2623** tests | 2610 + 13 | ✅ matches |
+
+**Eight merges, eight predicted counts, eight matches.** The suite has grown 2442 → 2623 with no
+regression at any step. A count that did not match its prediction would be the cheapest possible
+signal that a test was silently dropped; none has.
 
 **All five wave-1 builders merged.** Worktrees for T1, T2, T3 and T5 removed and their branches
 deleted after merge + green suite, per the plan's worktree policy. `.worktrees/T6-blast-radius`
