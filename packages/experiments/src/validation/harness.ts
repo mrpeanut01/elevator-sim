@@ -173,8 +173,14 @@ export function gardenAt(arrivalRatePctPop5min: number): TrafficArmSpec {
  * -------------------------------------------------------------------------- */
 
 /**
- * **The production stopping rule**, and the one place the shipped loop control's estimator is
- * chosen.
+ * **The stopping rule the gate injects** — and the only composed rule in the repository.
+ *
+ * It is called "production" for the estimator it chooses, not for a caller it has: **no shipped
+ * study injects a stopping rule at all.** Every one fixes its budget, and for a reason stronger
+ * than convenience — a rule stops *cells*, so the two arms of a paired comparison would stop at
+ * different `n` and the shorter arm's own variance would decide how many pairs survive. See
+ * DECISIONS.md § D125, which grants the port an exemption on exactly that ground. What follows
+ * describes what this rule computes if injected, which is what `sequentialStopping.test.ts` does.
  *
  * `estimateMean` — Student-t at `n - 1`, at every `n` — so the rule's half-width is the *same
  * number* the report will print for that cell. That is the point of injecting it here rather than

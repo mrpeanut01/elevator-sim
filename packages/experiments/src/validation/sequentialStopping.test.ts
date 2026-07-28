@@ -17,7 +17,7 @@
  * The runner is already built so that this cannot bite: `RUNNER_DEFAULTS.minReplications` is 50 and
  * the rule is not consulted below it, so the *policy* floor dominates and a default sweep spends
  * 50–200 replications whatever the rule thinks. The number worth writing down is the target that
- * makes the two agree — measured below, ±0.5 s (≈ 3 % of AWT) needs ~140 replications, squarely
+ * makes the two agree — measured below, ±0.5 s (≈ 3 % of AWT) needs ~143 replications, squarely
  * inside the doc's band. A configuration whose AWT interval should genuinely be ±2 s wide does not
  * need 50 runs, and one tuned to 1 % differences needs far more than 200.
  *
@@ -35,7 +35,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { estimateMean } from '../reports/statistics.js';
+import { estimateMean, normalQuantile } from '../reports/statistics.js';
 import { halfWidthStoppingRule } from '../runner/stopping.js';
 import {
   GATE_BUILDING,
@@ -49,6 +49,45 @@ import {
   withProfiles,
 } from './harness.js';
 import type { ReplicationMetric } from '../runner/metrics.js';
+
+/** The doc's worked confidence level, and the one the budget projection below runs at. */
+const CONFIDENCE = 0.9;
+
+/** `z[0.95]` — used *only* to seed the scan below, never as the answer. */
+const Z = normalQuantile(1 - (1 - CONFIDENCE) / 2);
+
+/**
+ * `t[n-1]` at {@link CONFIDENCE}, read back out of the shipped `estimateMean` rather than tabulated.
+ *
+ * Reading it back is what keeps this projection honest: the rule this suite reports on is injected
+ * with `estimateMean`, so the quantile the projection uses is by construction the quantile the
+ * runner will actually apply. A local table could drift from it, which is precisely how C19
+ * happened.
+ */
+function tQuantileAt(n: number): number {
+  const estimate = estimateMean(
+    Array.from({ length: n }, (_, index) => index),
+    { confidence: CONFIDENCE },
+  );
+  return estimate.halfWidth / estimate.standardError;
+}
+
+/**
+ * Smallest `n` whose half-width reaches `target` at standard deviation `s`.
+ *
+ * The same shape as `runner/stoppingBudget.test.ts`'s helper, and a scan for the same reason: the
+ * fixed-point recurrence `n = ceil((q(n) s / target)^2)` **oscillates between 221 and 222** on the
+ * ±0.4 s rung and returns whichever iterate it ran out on. The half-width is monotone decreasing in
+ * `n`, so a scan has no such failure mode. `Z` seeds it because the normal-theory answer is a lower
+ * bound on the t answer, which makes the scan short rather than making it correct.
+ */
+function budgetFor(s: number, target: number, quantileAt: (n: number) => number): number {
+  const normalTheory = Math.max(2, Math.ceil(((Z * s) / target) ** 2));
+  for (let n = Math.max(2, normalTheory - 4); n <= 5_000_000; n += 1) {
+    if ((quantileAt(n) * s) / Math.sqrt(n) <= target) return n;
+  }
+  throw new Error(`no budget found for s = ${s}, target = ${target}`);
+}
 
 interface StopOutcome {
   readonly metric: ReplicationMetric;
@@ -156,21 +195,35 @@ describe('sequential stopping against a real configuration', () => {
       resources,
     });
     const samples = samplesOf(reference, 'eta', 'awtS');
-    const estimate = estimateMean([...samples], { confidence: 0.9 });
+    const estimate = estimateMean([...samples], { confidence: CONFIDENCE });
     console.log(
       `[stopping] reference sample: n = ${estimate.n}, mean ${estimate.mean.toFixed(4)} s, s = ${estimate.stdDev.toFixed(4)} s, 90 % half-width ${estimate.halfWidth.toFixed(4)} s`,
     );
-    const z90 = 1.6448536269514722;
+    /* Student-t at n - 1, because that is what the simulator uses at every n on both the published
+       and the stopping path (DECISIONS.md § D7, § D14). This projection used to hard-code the
+       deleted normal quantile, so it printed and asserted the very row C19 corrected in the docs —
+       the repository derived one answer and published another. The budgets below are therefore
+       1–2 replications wider at most rungs than the z row they replace, always in the conservative
+       direction, since `t[n-1] > z` at every finite n.
+
+       These rungs are projected from *this run's own* s, printed above, not from the s = 3.60 s
+       reference docs/07 § 4 and docs/03 fix their table at. The two agree rung for rung where the
+       two standard deviations agree — at exactly s = 3.60 s this same scan returns the published
+       11 / 37 / 57 / 143 / 222 / 563 — and a rung may sit one replication off when they do not.
+       `runner/stoppingBudget.test.ts` is what pins the published table itself. */
     for (const target of [2, 1, 0.8, 0.5, 0.4, 0.25]) {
-      const needed = Math.ceil((z90 * estimate.stdDev / target) ** 2);
+      const needed = budgetFor(estimate.stdDev, target, tQuantileAt);
       console.log(
         `[stopping] ±${target} s (${((target / estimate.mean) * 100).toFixed(1)} % of AWT) at 90 % needs n ≈ ${needed}`,
       );
     }
     /* The claim: the doc's 50–200 budget corresponds to a ±0.5 s target on this configuration,
-       not to its own ±2 s worked example. */
-    const at050 = Math.ceil((z90 * estimate.stdDev / 0.5) ** 2);
-    const at200 = Math.ceil((z90 * estimate.stdDev / 2) ** 2);
+       not to its own ±2 s worked example. Both assertions were checked against the t budgets before
+       the quantile changed, and neither moved: at s ≈ 3.60 s the ±0.5 s budget is 143 and the ±2 s
+       budget is 11, against 141 and 9 at z. The conclusion survives the correction rather than
+       being fitted to it. */
+    const at050 = budgetFor(estimate.stdDev, 0.5, tQuantileAt);
+    const at200 = budgetFor(estimate.stdDev, 2, tQuantileAt);
     expect(at050).toBeGreaterThanOrEqual(50);
     expect(at050).toBeLessThanOrEqual(200);
     expect(at200).toBeLessThan(50);

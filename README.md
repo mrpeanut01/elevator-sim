@@ -56,7 +56,7 @@ Machine-readable configuration lives in [`data/`](data/).
 
 **Phases 0–5, 7 and 8 are landed and accepted. Phase 6 is partially complete** — see the table for
 what that means. Four packages (`core`, `experiments`, `viz`, `cli`), a six-command CLI,
-**178 test files, 3,349 tests** (3,340 passing, 9 skipped), `tsc -b` clean.
+**179 test files, 3,353 tests** (3,344 passing, 9 skipped), `tsc -b` clean.
 
 | Phase | Status |
 |---|---|
@@ -81,7 +81,7 @@ npm run sim -- compare --building midtown-office --a eta --b nearest-car --reps 
 npm run sim -- tune --building garden-apartments --params idle.repositionThresholdS --seed 42
 npm run sim -- fuzz --cases 8                  # or: --tier deep --cases 2000, the overnight pass
 npm run sim -- watch --building garden-apartments --dispatcher nearest-car --speed 10
-npm test        # 178 files, 3,349 tests — the benchmarks execute real replications, so this is minutes, not seconds
+npm test        # 179 files, 3,353 tests — the benchmarks execute real replications, so this is minutes, not seconds
 ```
 
 `compare` prints a paired-t interval on the difference and refuses to rank two arms whose interval
@@ -94,9 +94,11 @@ mean the run's own summary suppresses; `watch` printed one on both of its render
 **What is not done is in the brief, not in this table.** Phase 6c (learned control) is deferred with
 reasons; Phase 9 (the experience layer) is designed in
 [`docs/10`](docs/10-experience-layer-contract.md) and **not built**; double-deck operation is
-configured, disclaimed and not simulated. Nothing in this repository asserts a phase's *status* —
-the guards assert that this table, `CLAUDE.md` and [`docs/07`](docs/07-handoff.md) agree, not that
-they are true. See [`docs/07` § 8](docs/07-handoff.md).
+configured, disclaimed and not simulated. A phase's *status* is now bound to **evidence that
+exists** — `validation/phaseStatus.test.ts` parses every status and citation out of the roadmap and
+fails if an accepted phase names a test, study or pin group that does not — but **not to evidence
+that supports it**: a phase could still cite a real suite that does not assert its criterion, and the
+guard cannot tell a raised criterion from a weakened one. See [`docs/07` § 8](docs/07-handoff.md).
 
 The browser viewer and building editor live in `packages/viz` and are dev-served with Vite;
 `packages/core` exposes a `./browser` subpath so nothing pulls `node:fs` into a bundle.

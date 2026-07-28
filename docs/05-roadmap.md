@@ -108,6 +108,33 @@ the full matrix measured it **bit-identical to `eta` at 8 of 8 cells**. Invarian
 strategy data; it does not put data outside the standing requirement. Closed by authoring
 `weights.rideTime: 0.5` — see § *Phase 6a* and [`DECISIONS.md` § D112](../DECISIONS.md).
 
+**A tenth candidate was assessed and is *not* a tenth instance — the sequential stopping rule.**
+Nothing outside a test injects one; every shipped study fixes its budget. Assessed rather than
+assumed ([`DECISIONS.md` § D125](../DECISIONS.md)), it resolved into three different things, which
+is the transferable part: **the port is exempt** on a *statistical* ground, not a "nobody needed it
+yet" one — a rule stops **cells**, so the two arms of a paired comparison would stop at different
+`n` and the shorter arm's own realized variance would decide how many pairs survive, which is
+selection on the outcome variable. A fixed budget is not a stopgap there; it is required.
+`fixedBudgetStoppingRule` beside it **is** dead, and its docstring asserted the shipped role it does
+not have — counted as a false claim rather than as a tenth seam, because it is a no-op whose absence
+changes nothing, and the judgement is recorded so a later reader can disagree with it. And
+`runner.acceptableRange` is an **inert tunable** of § D112's shape.
+
+Two lessons for the guards themselves. **Liveness can be two hops long and die at the second:**
+`halfWidthStoppingRule` scans green because `validation/harness.ts` imports it, and `harness.ts` is
+genuinely live — but what it builds is `productionStoppingRule`, whose every importer is a test.
+`verifyCrnAlignment` is the second instance, live only because the uncalled `assertCrnAligned` calls
+it in the same file. *Name the non-test caller* means name one that is **itself** called. The scanner
+is deliberately **not** widened into a reachability analysis to catch this — *reachable* was true of
+all nine — so the first case is pinned as an assertion instead.
+
+And **`runner/` was audited by neither guard** — `core`'s cannot see `packages/experiments`, and
+`tuning/deadCode.test.ts`'s `AUDITED_MODULES` is the three Phase 7 modules. **A third guard now
+exists**: `packages/experiments/src/runner/deadCode.test.ts`, 86 exports scanned, 7 allowlisted with
+reasons, asserted in both directions, watched failing three ways. The scanner is **one copy** —
+extracted to `tuning/callers.test-helper.ts` as `auditModules`, because § D114 records what two
+copies of one audit cost and only the package dependency direction ever forced that.
+
 **A weaker instance is recorded rather than hidden, and is not counted among the nine.** Phase 8's
 `fuzz/` module has exactly one non-test caller and it is a test: `campaign.ts` is driven by
 `corpus.test.ts`. The fuzz track flagged this itself rather than dressing it up, and it is
@@ -280,8 +307,13 @@ both of which had biased results *optimistically* — the direction
 The part that makes results trustworthy. **Do not skip or defer this.**
 
 - Replication runner, parallel across cores, each replication internally deterministic
-- Sequential stopping rule: t-distribution for n ≤ 25, normal for n > 25, stop when
-  half-width < acceptable range
+- Sequential stopping rule: **Student-t at every `n`**, stop when half-width < acceptable range.
+  (This line used to carry the `t` (n ≤ 25) / `z` (n > 25) crossover; that quantile chooser was
+  deleted — [`DECISIONS.md` § D14](../DECISIONS.md), and § Sequential stopping rule in
+  [`docs/03`](03-traffic-and-statistics.md).) **The port ships; no shipped study injects a rule** —
+  every one fixes its budget, because a rule stops *cells* and a paired comparison's two arms would
+  stop at different `n`. Exempted with that reason recorded in
+  [`DECISIONS.md` § D125](../DECISIONS.md); none of the four acceptance criteria below depends on it
 - Common random numbers: same passenger traces fed to every alternative under comparison
 - Paired-t confidence intervals on differences
 - Saturation detection (positive trend in queue length) → flag and suppress AWT CI
@@ -1478,7 +1510,7 @@ at its own seed and operating point. Neither is wrong; inheriting either across 
 | **`garden-down-peak` is `destination-eta`'s remaining identity class** | § *What the matrix found* above. Structural — bit-identical at `rideTime` 0.3, 1.0 and 2.0 — so it is a **blind operating point**, not an under-weighted term. Whether a destination can carry information at a down-peak whose every trip ends at the lobby is an open question, not a defect |
 | **The editor's ⇧/⇩ buttons reorder the JSON declaration and not the building** | `packages/viz/DECISIONS-T29.md` § T29-4, and [§ D111](../DECISIONS.md). Relabelled honestly rather than repurposed; the scope call — give the declaration its own view, or drop `moveFloor` and let `index` be the only ordering control — is **handed back to the owner** |
 | **No test asserts any phase's *status*** | [`docs/07` § 8](07-handoff.md). The guards assert the four documents **agree**, not that they are **true** |
-| Open items C4, C5, C24, C27, C30, C32 | **All six closed by wave 5** ([§ D116](../DECISIONS.md)–[§ D122](../DECISIONS.md)); **C33** and **C34** opened in their place, and five smaller findings besides. Current list: [`docs/07`](07-handoff.md) § 8 § *Still open, in one place*. **C7 is closed** — see below |
+| Open items C4, C5, C24, C27, C30, C32 | **All six closed** ([§ D116](../DECISIONS.md)–[§ D122](../DECISIONS.md), plus [§ D125](../DECISIONS.md)); **C33** and **C34** opened in their place, and five smaller findings besides. `C4` took **two** decisions — § D119 on the budget, § D125 on the port's disposition — and § D125 also added the **third dead-code guard**, over `runner/`, which neither `core`'s scanner nor `tuning/`'s could reach. Current list: [`docs/07`](07-handoff.md) § 8 § *Still open, in one place*. **C7 is closed** — see below |
 
 **Closed since this table was last written:** **Phase 8's full experiment matrix and Pareto front at
 a real budget, and with it Phase 7's acceptance interval at 50–200 replications** — both landed in

@@ -3,10 +3,12 @@
 > ## ↩️ THE DELIVERY REOPENED 2026-07-28 after `918897d`, as **wave 5** — and wave 5 has now CLOSED.
 >
 > **Wave 5's outcome:** all eight lanes merged, **no phase verdict moved**, and the suite went
-> 172 files / 3 220 tests → **178 files / 3 349 tests (3 340 pass, 9 skip)**, `tsc -b` clean, 567 s
-> measured serially on an idle machine. Nine register items closed and **seven opened**. Board:
-> [`WAVE5_PLAN.md`](WAVE5_PLAN.md) · decisions: [§ D116](DECISIONS.md)–[§ D124](DECISIONS.md) ·
-> current debt: [`docs/07-handoff.md`](docs/07-handoff.md) § 8.
+> 172 files / 3 220 tests → **178 files / 3 349 tests (3 340 pass, 9 skip)**, `tsc -b` clean, 567 s,
+> measured serially on an idle machine — and **179 / 3 353** once a concurrent session's independent
+> `C4` work was merged in afterwards ([§ D125](DECISIONS.md)). Nine register items closed and
+> **seven opened**. Board: [`WAVE5_PLAN.md`](WAVE5_PLAN.md) · decisions:
+> [§ D116](DECISIONS.md)–[§ D125](DECISIONS.md) · current debt:
+> [`docs/07-handoff.md`](docs/07-handoff.md) § 8.
 >
 > The list below is the state **at wave 5's opening** and is left as written.
 >

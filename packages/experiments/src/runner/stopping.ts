@@ -138,8 +138,13 @@ export function halfWidthStoppingRule(
 /**
  * A fixed budget: never stop early.
  *
- * The rule the runner uses when none is injected, named so a report can say which rule produced a
- * replication count rather than leaving "no rule" implicit.
+ * **The runner does not call this.** It is the named counterpart of the runner's own `undefined`
+ * branch, not that branch's implementation: `replicationRunner.ts`'s `decide()` handles
+ * `rule === undefined` inline and sets `reason: 'fixed-budget'` itself. This symbol exists so a
+ * caller that wants the shipped default *as a value* — a test asserting the branch, a study
+ * selecting a rule from a table — can name it rather than pass `undefined`. Its docstring used to
+ * claim the runner used it, which was the shape of defect this repository names most often: a
+ * symbol asserting a shipped role it does not have. See DECISIONS.md § D125.
  */
 export const fixedBudgetStoppingRule: StoppingRule = ({ samples }) => ({
   stop: false,

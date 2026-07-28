@@ -4,7 +4,8 @@
 >
 > **Measured serially on an idle machine after the eighth merge** — the only condition under which
 > the number means anything: `npx tsc -b` clean, **178 files / 3 349 tests, 3 340 passed, 9 skipped**,
-> exit 0, 567 s. Baseline was 172 / 3 220. The **+129 tests and +6 files are accounted for lane by
+> exit 0, 567 s. Baseline was 172 / 3 220. *(A concurrent session's work was merged after this wave
+> closed, taking the tree to **179 / 3 353** — [§ D125](DECISIONS.md).)* The **+129 tests and +6 files are accounted for lane by
 > lane** in [`docs/07-handoff.md`](docs/07-handoff.md) § 1.
 >
 > **Nine items closed, seven opened.** § 5 made *"the debt table rewritten to what is actually left,

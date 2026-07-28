@@ -5583,3 +5583,239 @@ modules rather than one, and § D123's roadmap carrying no status at all for two
 **Five of eight lanes found the register understated what was wrong.** That is not an argument
 against keeping a register; it is an argument for the standing rule that produced every one of these
 findings — **determine whether this is true, do not make it true**, and *reviewers run things*.
+
+---
+
+## D125 preface — two decisions closed `C4`, and they were reached independently
+
+**This entry was written as `D116` by a concurrent session working from `918897d`, in parallel with
+and unaware of wave 5.** It is renumbered to `D125` and kept **whole**, because it is not a duplicate
+of [§ D119](#) — the two answer different halves of `C4` and neither subsumes the other:
+
+| | question | answer |
+|---|---|---|
+| **§ D119** (T37, wave 5) | *What does Student-t at every `n` cost the budget, and is it worth it?* | Keep it. +0.59 % at the shipped policy, **+0** on the configuration `docs/07` § 4 describes; below the replication floor a normal quantile gives up **12–20 points of coverage** to save 3–8 replications |
+| **§ D125** (below) | *What is the disposition of the port itself, which has no non-test caller?* | An exemption for the port, one genuinely dead symbol beside it, and an inert tunable behind it |
+
+**§ D119 explicitly left § D125's question open** — *"the stopping rule has no non-test caller at
+all, which is § 3's standing requirement and needs its own decision rather than a deletion."* § D125
+is that decision. The two agree on every fact they share, and were **measured independently from the
+same tree**: both establish that every shipped study fixes its budget, that `stoppingRule` is
+injected only from `validation/`, and therefore that **no published interval in this repository was
+produced by a sequentially-stopped run**.
+
+**§ D125 carries a finding § D119 did not have, and it is the more important of the two.** A stopping
+rule stops **cells**, not experiments, so under an injected rule the two arms of a paired comparison
+stop at **different `n`**; `compare.ts` pairs on the common prefix, so the shorter arm silently
+decides how many pairs survive, and which arm is shorter is decided by its own realized variance.
+**That is selection on the outcome variable.** The rule is therefore not merely unwired in the
+comparison studies — it is **inadmissible** in them, which is a stronger statement than § D119's
+budget argument and is the reason a `compare --precision` flag must *not* be built.
+
+> **Recorded because it is the transferable part:** two independent lanes given the same open item
+> produced complementary, non-overlapping findings, and the one that went looking for the *seam*
+> rather than the *number* found the statistical error. `C4`'s row said *"needs a decision, not a
+> default"* and it needed two.
+
+## D125 — the sequential stopping rule: an **exemption for the port**, a dead symbol beside it, and an inert tunable behind it (**C4 CLOSED**)
+
+**Date:** 2026-07-28 · **Owner:** T37, closing `C4` · **Asks:** docs/05-roadmap.md § *Standing
+requirement — the integration seam has an owner*
+
+### The question
+
+`runner/stopping.ts` and the `StoppingRule` port are reachable only from tests and from
+`validation/harness.ts`, which only tests call. Outside `runner/`, the field `stoppingRule` appears
+three times: `validation/harness.ts:206` declares it on `GateRunInput`, `:234` forwards it, and
+`validation/sequentialStopping.test.ts:80` injects it. Every shipped study fixes its budget instead
+— `cli/commands/compare.ts:249`, `tuning/search/objective.ts:148`, `tuning/report/holdoutRound.ts:200`
+all set `minReplications === maxReplications`, and `objective.ts:129` says so in its own docstring.
+`benchmark/` never mentions the field, so **no published interval in this repository was produced by
+a sequentially-stopped run.** Three dispositions were on the table: (a) a real seam awaiting a named
+caller, (b) a public-API-only exemption, (c) the tenth dead seam.
+
+**The answer is not one of the three. It is (b) for the port, (c) for one symbol beside it, and a
+fourth thing — an inert tunable — behind both.** Taking the module as a unit is what would have
+produced a wrong answer, in either direction.
+
+### Measured first
+
+The scanner already in the repository (`tuning/deadCode.test.ts` § `audit`, whose corpus walker is
+module-generic) was pointed at `experiments/src/runner` as a probe. **86 exports scanned, 7
+uncalled:** `crn/replicationSeeds`, `crn/assertCrnAligned`, `experiment/parseExperimentSpec`,
+`replicationRunner/runReplication`, `replicationRunner/fingerprintExperiment`,
+`stopping/fixedBudgetStoppingRule`, `types/RUNNER_PARAMETERS`. The probe was removed; the numbers are
+what the disposition below is argued from, and the guard that would make them permanent is named at
+the end as **not done**.
+
+`halfWidthStoppingRule` does **not** appear in that list, and the reason is the interesting part:
+`validation/harness.ts` imports it, and `harness.ts` is a live non-test module — the whole of
+`benchmark/` imports it, driven by `regeneratePins.ts` and `livenessSuite.ts`. So a one-hop scanner
+reports it green. But what `harness.ts` builds with it is `productionStoppingRule`, whose own
+importers are `validation/index.ts` (a barrel), `runner/stopping.test.ts` and
+`validation/sequentialStopping.test.ts` — **all tests.** The liveness is two hops long and dies at
+the second. This is § D114's C7 one layer out: the mechanical guard is not wrong, it is answering a
+shorter question than the roadmap's rule asks. *Name the non-test caller* means name one that is
+itself called.
+
+### (b) — the port, `halfWidthStoppingRule`, and `productionStoppingRule` are exempt
+
+**Alternatives.** (a) Name a future caller — a `compare --precision <s>` flag — and wire it.
+(b) Record an exemption in the manner of `tuning/deadCode.test.ts` § `PUBLIC_API_ONLY`. (c) Call it
+the tenth seam and delete or wire it.
+
+**Chosen: (b).** **Why:** (a) is wrong on the statistics, and that is the finding this decision
+exists to write down. A stopping rule stops **cells**, not experiments: `CellState` in
+`replicationRunner.ts:219` carries its own `done` and `reason`, and `decide()` is called per cell. A
+cell is one (building, dispatcher, traffic). So under an injected rule the two arms of a comparison
+stop at **different `n`** — and every publishable comparison this repository produces is paired
+under common random numbers, where the arms must be differenced pairwise. `compare.ts:784` already
+pairs on the common prefix, so the shorter arm silently decides how many pairs survive, and *which*
+arm is shorter is decided by its own realized variance. **That is selection on the outcome
+variable** — the identical error `CandidateReportOptions.maxInvalidFraction`'s default of 0 exists
+to refuse. A sequential rule is therefore not merely unwired in the comparison studies; it is
+**inadmissible** in them, and `objective.ts:129`'s fixed budget is right for a reason stronger than
+the one it gives.
+
+What the rule *is* admissible for is single-cell precision-targeted estimation — one configuration,
+"state the target, let the rule pick `n`". **This repository ships no such study.** That is exactly
+`PUBLIC_API_ONLY`'s criterion, "library surface for a study that does not exist in this repository",
+and the exemption is granted on it. The record must carry both halves, because they point opposite
+ways: one says *nobody has needed it yet*, the other says *the studies that exist must not use it*.
+
+**This is not the roadmap's "reachable, therefore fine".** The port has a live consumer in shipped
+code — `runPlan`/`decide` read `options?.stoppingRule` and branch on it, and the `undefined` branch
+is the shipped behaviour of every run the project has ever published. What has no caller is the
+**injection**, and the reason is recorded above rather than assumed.
+
+### (c) — `fixedBudgetStoppingRule` is dead, and its docstring claimed the opposite
+
+Its docstring read *"The rule the runner uses when none is injected, named so a report can say which
+rule produced a replication count rather than leaving 'no rule' implicit."* **The runner never calls
+it.** `decide()` handles `rule === undefined` inline and sets `reason = 'fixed-budget'` itself
+(`replicationRunner.ts:262`, `:280`, `:420`). Its only importers are the barrel and two tests.
+
+**It is not counted as the tenth seam, and the judgement is stated so a later reader can disagree
+with it rather than guess.** The nine were behaviours that should have been changing results and
+were not. This is a **no-op** whose deadness costs nothing behaviourally — `stop: false, n` is what
+the inline branch already does. What it cost was **truth**: a symbol asserting a shipped role it
+does not have is how `tuning/`'s docstring described its own deadness for a whole phase. The tally
+stays at nine in code plus one in `data/`; the docstring is corrected rather than the symbol
+deleted, because deleting the named counterpart of an exempt port would leave the port's
+`undefined` branch anonymous again.
+
+Three further sentences asserted shipped use and are corrected in the same pass:
+`harness.ts:176` ("the one place the shipped loop control's estimator is chosen"),
+`stopping.test.ts:91` ("the only stopping rule anything outside a test injects" — nothing outside a
+test injects one), and that suite's `describe` title ("the estimator the shipped loop control
+uses"). Each is true of a repository where some study stops sequentially. None is true of this one.
+
+### The thing behind both: `runner.acceptableRange` is an inert tunable
+
+`runner.acceptableRange` is declared in `RUNNER_PARAMETERS` with a type, a range, a unit and a
+default (invariant 8), validated by `experiment.ts:465`, and reported in **every** `StoppingSummary`
+(`replicationRunner.ts:463`). It is read for a **decision** in exactly one place: inside the
+`rule !== undefined` branch of `decide()`. **Set it to any value in any shipped run and no number
+moves.** That is the shape of § D112's `destination-eta` — a schema-valid, authored, tested
+parameter that changes no decision — relocated from `data/` into `runner/`.
+
+Its report-side twin is in the same state and further along. `CandidateReportOptions.targetHalfWidth`
+has **no** shipped caller: `phase7Acceptance.ts:167` does not pass it to `runHoldoutRound`, and the
+CLI never builds a `ConvergenceReport` at all — `compare.ts` goes straight to `estimateMean` and
+`pairedDifferenceEstimate`. So `ConvergenceReport.status` is `'not-assessed'` on every shipped path,
+**three of the four `ConvergenceStatus` values and three of `formatConvergence`'s four branches are
+unreachable outside tests**, and the CONVERGED / HIT CAP / IN PROGRESS strings have never been
+printed by this software.
+
+**Not remedied by a fake `activeWhen`, and the reason is worth recording.** Invariant 8's mechanism
+for a conditional parameter maps a **parameter id** to the values that make another live
+(`RunnerParameterSpec.activeWhen`, used correctly by `runner.workers` on `runner.parallelMode`). A
+stopping rule is an **injected function**, not a serializable parameter, so there is no id to
+condition on. Inventing one to satisfy the schema would make the declaration agree with itself and
+still lie. The description is corrected to say the parameter is inert unless a rule is injected;
+the latent harm — a generic optimizer burning budget on a flat dimension, findings #9/#10/#12/#13/#21
+exactly — is **unrealized**, because `RUNNER_PARAMETERS` is itself one of the seven uncalled exports
+and nothing searches it.
+
+### What does not move
+
+**Phase 3 stays green, and not by charity.** Its four acceptance criteria are exact-zero paired
+differences, nominal-rate coverage over 40 seed pairs, an excluding interval for a crippled variant,
+and replay from seed. **None mentions the stopping rule** — it is a deliverable-list item, not a
+criterion, and CLAUDE.md § Working agreements is explicit that a phase is done when its stated
+criteria pass. No published number is affected, because no published number was ever produced by a
+sequentially-stopped run. That is the same fact that makes `C4` — *"sequentially-stopped experiments
+may run marginally more replications"* — **moot as filed**: there are none. `C4` is closed by
+answering a different question than it asked, and the substitution is stated rather than quiet.
+
+### Documentation corrected in this pass
+
+- **docs/05-roadmap.md § Phase 3** still listed the deliverable as *"t-distribution for n ≤ 25,
+  normal for n > 25"* — the crossover § D14 deleted and docs/03 § Sequential stopping rule already
+  corrected. A stale line in the deliverable list of the phase whose gate suite pins the opposite.
+- **docs/03 § Sequential stopping rule** instructs *"State the target precision, then let the rule
+  pick `n` — do not quote a flat run count."* **No shipped path does this.** The repository's actual
+  answer is `benchmark/matrix.ts:budgetFor`, which solves the same `n ≥ (z·sd/h)²` **offline**
+  against a 200-replication census and clamps it to [50, 200]. That is a legitimate answer and a
+  different one, and the doc now says which of the two the code does.
+
+### The guard — **built**, and it deviates from the remedy this section first named
+
+The exemption above began life recorded in this document and nowhere else, which is the weaker form
+this repository has been burned by: an allowlist is what keeps a claim from becoming an assumption.
+`packages/experiments/src/runner/deadCode.test.ts` is now that allowlist — the **third** instance of
+the audit, after `core/src/dispatch` and `tuning/`.
+
+**Deviation, stated rather than quiet.** This section first named the remedy as *"add
+`experiments/src/runner` to `tuning/deadCode.test.ts` § `AUDITED_MODULES`"*. That was the wrong
+shape. `tuning/deadCode.test.ts` opens *"The dead-code audit for `tuning/`"*, and a file auditing
+`runner/` under that name is a symbol asserting a role it does not have — the defect this very
+decision corrected four instances of, committed in the act of guarding against it. So `runner/` gets
+its own suite. **The scanner is not copied**: `audit()` moved out of `tuning/deadCode.test.ts` into
+`callers.test-helper.ts` as `auditModules(modules)`, and both suites now call it, because § D114
+records precisely what two copies of one audit cost — `core`'s had two holes `tuning/`'s had already
+fixed, and only the package dependency direction forced that duplication. Nothing forces it here.
+`tuning/`'s four assertions pass unchanged across the extraction.
+
+**The seven, each with the reason that makes it correct rather than a defect** — and two of them
+sharpened what was written above. `runner/runReplication` is the **second** symbol whose docstring
+named a role this repository fills another way: it offers itself for "replaying one stored record",
+and `validation/storedRunReplay.test.ts` — the suite that satisfies Phase 3's fourth acceptance
+criterion, i.e. the exact stated use case — composes `replicationSeed`, `simulationConfigFor` and
+`runSimulation` itself, because it replays from a stored run and has no live `ExperimentPlan` to
+pass. And `runner/assertCrnAligned` turned out to be the throwing form of a check **every** caller
+wants un-thrown: three Phase 3 gate suites call the reporting `verifyCrnAlignment`, and
+`cli/commands/compare.ts` computes the same comparison inline as `crnStatus` so it can print
+`MISMATCH — n of m pairs share a trace digest` rather than throw halfway through a report. That is a
+clean exemption and it incidentally names a small duplication — `crnStatus` reimplements rather than
+calls — **observed and not fixed**, because changing it moves CLI output.
+
+**A second two-hop instance, found by building the guard.** `verifyCrnAlignment` scans live only
+because `assertCrnAligned` calls it in the same file, and `assertCrnAligned` has no caller at all —
+the same shape as `halfWidthStoppingRule → productionStoppingRule` above. Both are stated in the new
+suite's header and allowlist. **The scanner is deliberately not widened** into a reachability
+analysis to catch them: *reachable* was true of all nine dead behaviours, so that would re-introduce
+exactly what `PUBLIC_API_ONLY` exists to prevent. Instead the first is **pinned as an assertion** —
+a fourth `it` requires `productionStoppingRule` to have no non-test importer, so a study that ever
+injects a stopping rule turns this suite red and forces the cells-stop-independently argument to be
+re-made rather than silently outgrown.
+
+**Watched failing three times, by machine**, since a guard that has not been seen red is a guard
+nobody has tested:
+
+| mutation | assertion that caught it |
+|---|---|
+| `export function probeUncalledRunnerExport` added to `runner/metrics.ts` | *no export that is dead* — names `runner/probeUncalledRunnerExport (experiments/src/runner/metrics.ts)` |
+| `benchmark/verdict.ts` imports `productionStoppingRule` | *pins the exemption* — fails with the § D116 argument quoted in the message |
+| `runner/planExperiment` parked in `PUBLIC_API_ONLY` | *keeps the allowlist honest* — `runner/planExperiment — now has a caller` |
+
+**What it still will not catch**, unchanged and worth restating: a parameter that is declared and
+reported while deciding nothing. `runner.acceptableRange` is invisible to every scanner in this
+repository, because it has callers — it is *read*, in a branch nothing takes. That class is caught
+by `core/src/sim/searchSpaceLiveness.test.ts` for dispatcher dimensions (§ D7) and by nothing at all
+for runner ones.
+
+**Impact.** `C4` closed. **`runner/` is now audited** — 86 exports, 7 allowlisted with reasons,
+asserted in both directions, watched failing three ways. One scanner, three suites. Four false
+docstrings and two documentation claims corrected. No phase status, no acceptance verdict and no
+published number moves.

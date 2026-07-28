@@ -50,7 +50,9 @@ rather than new capability:
 
 **What did *not* move, and should not be read as having moved:** every phase verdict, every published
 interval outside the `destination-eta` rows, the four ⚠️ UX rows, and `C24`, `C27`, `C30`, `C32`,
-`C4`, `C5`. The pin table moved **40 rows changed, 12 added, 0 removed, all `destination-eta`**.
+`C5`. (`C4` has since closed — [§ D119](../DECISIONS.md) and [§ D125](../DECISIONS.md) — and closing it moved no number either:
+nothing outside a test ever injected a stopping rule, so the budget it asked about had no subject.)
+The pin table moved **40 rows changed, 12 added, 0 removed, all `destination-eta`**.
 
 ### What wave 5 moved — the open-debt register, and still no phase verdict
 
@@ -115,24 +117,27 @@ npm run sim -- compare --building midtown-office --a eta --b nearest-car --reps 
 npm run sim -- tune --building garden-apartments --params idle.repositionThresholdS --seed 42
 npm run sim -- fuzz --cases 8                  # or: --tier deep --cases 2000, the overnight pass
 npm run sim -- watch --building garden-apartments --dispatcher eta --speed 10
-npm test          # full suite: 178 files, 3,349 tests (3,340 pass, 9 skip)
+npm test          # full suite: 179 files, 3,353 tests (3,344 pass, 9 skip)
 ```
 
 Measured on this tree after wave 5's eighth merge, 2026-07-28: `npx tsc -b` clean,
-`npx vitest run --testTimeout=120000` → **178 files / 3 349 tests, 3 340 passed, 9 skipped**,
-exit 0, 567 s. The benchmarks execute real replications, which is where the runtime goes.
+`npx vitest run --testTimeout=120000` → **179 files / 3 353 tests, 3 344 passed, 9 skipped**,
+exit 0, 466 s. The benchmarks execute real replications, which is where the runtime goes.
 
 > **Wave 5's +129 is accounted for, test by test**, as § D115's +48 was: `reports` +4 (§ D117);
 > `cli/commands/fuzz.test.ts` +16 and `index.test.ts` +1 (§ D118); `browser.test.ts` +22 (§ D121);
 > `fuzz/generate.test.ts` +10 (§ D122); `runner/stoppingBudget.test.ts` +6 (§ D119);
 > `config/parse.test.ts` +6 (§ D116); `viz` `bootstrap.test.ts` + `motion.test.ts` +9 (§ D120);
 > `validation/phaseStatus.test.ts` +55 (§ D123). **3 220 → 3 349**, and **172 → 178 files** for the
-> six new files in that list. The skip count is unchanged at 9.
+> six new files in that list. A concurrent session then added **+4 tests and the seventh new file**,
+> `runner/deadCode.test.ts` ([§ D125](../DECISIONS.md)) — **3 349 → 3 353, 178 → 179**. The skip
+> count is unchanged at 9 throughout.
 
 **Do not treat the wall-clock as a fixture.** The commit that landed the eighth track (`f895a16`)
 measured the suite going from 435 s to **519 s** on its machine; a re-run of the same tree took
-**793 s**; the 3 220-test tree took **578 s**; this 3 349-test tree took **567 s** — *fewer* seconds
-for *more* tests, which is the point. All four are true and none is a property of the code. If you
+**793 s**; the 3 220-test tree took **578 s**; the 3 349-test tree took **567 s**; this 3 353-test
+tree took **466 s** — *fewer* seconds for *more* tests, twice over, which is the point. All five are
+true and none is a property of the code. If you
 need a runtime regression signal, measure it twice on an idle machine — this is the same class of
 mistake as inheriting a saturation ceiling across studies (§ 4).
 
@@ -740,7 +745,7 @@ after the weight landed rather than carried over.
 | Mixed-use achieved **interval** | Reports `unmeasurable` by design: a shuttle holds doors 39.8 s while an office-local car completes a round trip in 31.3 s, so **no** departure-gap threshold is valid there. Constrains the oracle; **does not** constrain a TTD comparison, which § D100 checked rather than assumed |
 | Double-deck operation | Configured and validated on `vertical-city`, **not simulated**; disclaimed on every run of that building, and the disclaimer reaches `RunRecord` and the CLI report |
 | Fuzzy pattern switching | `patternSwitching` is authored in `data/` and schema-validated, and no runtime code reads it. Deferred scope, not a defect to fix in passing — see `DECISIONS.md` § D12 |
-| `C4` — the sequential stopping rule's budget | `productionStoppingRule` injects `estimateMean`, now Student-t at every `n`, so sequentially-stopped experiments may run marginally more replications. Deliberate and conservative; **needs a decision, not a default** |
+| **`runner/` is now audited** *(`C4` closed, [§ D119](../DECISIONS.md) and [§ D125](../DECISIONS.md))* | The sequential stopping rule turned out not to be one thing. The **port is exempt**: a rule stops *cells*, so a paired comparison's two arms would stop at different `n` and the shorter arm's own realized variance would decide how many pairs survive — so a fixed budget is right for a stronger reason than the studies give, and the rule is admissible only for single-cell precision-targeted estimation, of which none ships. `fixedBudgetStoppingRule` is **dead** and claimed in its docstring to be the shipped default; `runner.acceptableRange` is **inert**, and its report-side twin `targetHalfWidth` has no shipped caller either, so `ConvergenceStatus` is `'not-assessed'` everywhere and CONVERGED / HIT CAP / IN PROGRESS have never been printed. **86 runner exports, 7 uncalled** — all seven now allowlisted with reasons in the new `runner/deadCode.test.ts`, the **third** dead-code guard, asserted in both directions and watched failing three ways. One of the four assertions **pins the exemption itself**: a study that injects a stopping rule turns it red. The scanner is one copy (`auditModules` in `tuning/callers.test-helper.ts`), not a third. What no guard here catches is the other half — `runner.acceptableRange` is *read*, in a branch nothing takes, so it has callers and is invisible to all three |
 | `C5` — a `'z'` label can still print | `reports/compare.ts:607` can print `'z'` as a fallback family label on a convergence report, in the branch where `achievedHalfWidth` is already `NaN`. Cosmetic, and it is the exact mislabelling finding #14 was about |
 | `C27` — Phase 6a/6b studies are off the package barrel | Reachable at their module paths with `regeneratePins.ts` as the non-test caller, but not on `benchmark/index.ts` or `src/index.ts`. Name list in § D62; both files must change in one commit. `runMixedUseHighRiseStudy` is in the same position |
 | `C32` — the fuzz generator picks call types blind to the profile | `fuzz/generate.ts` can name a call type the profile cannot carry a destination for; `run.ts` works around it in `withCallType`. A real corpus extension |
@@ -760,16 +765,13 @@ and CLI printing a suppressed mean** ([§ D111](../DECISIONS.md)).
 **narrowed rather than closed**. [§ D116](../DECISIONS.md)–[§ D124](../DECISIONS.md).
 
 **Still open, in one place, because a reader planning work needs the list and not the prose:**
-
 *Deferred by a recorded argument, not by neglect* — Phase 6c · Phase 9 · double-deck simulation ·
 `patternSwitching` · `garden-down-peak`'s identity class · the `moveFloor` scope call.
 
 *Live debt* — **C33** (the `'z'` shape at `statistics.ts:332`, and `ConvergenceReport.method` being
 non-optional) · **C34** (the browser barrel has no non-test caller) · W4's TypeScript-condition gap ·
-`deepCampaignRequested`, `withCallType` and the stopping rule, each with a test as its only caller ·
-`destination-entry` unreached by both fuzz corpora · `sequentialStopping.test.ts:163`'s hard-coded
-`z90` · `StoppingVerdict.distribution`'s stale docstring · `estimateMean`'s zero-variance
-`halfWidth = 0` · the mixed-use study's six-replication margin · `stats/` consolidation ·
+`deepCampaignRequested` and `withCallType`, each with a test as its only caller ·
+`destination-entry` unreached by both fuzz corpora · `estimateMean`'s zero-variance `halfWidth = 0` · the mixed-use study's six-replication margin · `stats/` consolidation ·
 `runDestinationDispatchStudy` off both barrels.
 
 *And the one that no longer has a name of its own, because it is now everyone's:* a phase's status is
@@ -777,10 +779,17 @@ bound to evidence that **exists**, not to evidence that **supports** it. The gua
 raised criterion from a weakened one, and it never questions a `partial` or `deferred` phase. **That
 is the largest remaining un-mechanised risk**, and it is smaller than it was, not gone.
 
+> **A concurrent session closed three of those in parallel** — `sequentialStopping.test.ts:163`'s
+> hard-coded `z90` (it now reads `t[n−1]` back out of the shipped `estimateMean`, so the projection
+> cannot drift from the rule it reports on — which is how **C19** happened), `StoppingVerdict`'s
+> stale docstring, and the stopping rule's missing non-test caller, which is now a **recorded
+> exemption** rather than an open question ([§ D125](../DECISIONS.md)).
+>
 > **Wave 5 closed nine items and opened seven.** That is the register working. `WAVE5_PLAN.md` § 5
 > made *"the debt table rewritten to what is actually left, including anything this wave opened"* a
 > condition of done, precisely because a register that only ever shrinks is not being read honestly —
 > and because five of the seven were found only by fixing something adjacent to them.
+
 
 ### Two figures corrected here, because the handed-back versions did not reproduce
 
