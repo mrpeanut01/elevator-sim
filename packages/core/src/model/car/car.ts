@@ -545,8 +545,13 @@ export class Car implements CarLike {
    * `estimateCost.ts` docstring.
    *
    * @throws ModelError if no move is in progress or `at` precedes the arrival time.
+   *
+   * @returns what the move cost, for the energy proxy — see {@link CarTravel}. Returning it is
+   *   what makes the travel record possible at all: `#motion` is cleared here, so a caller that
+   *   wanted the displacement afterwards would have to reconstruct it from floor heights, and a
+   *   cumulative odometer read at the end of the run cannot be windowed.
    */
-  completeArrival(at: SimTime = this.now()): void {
+  completeArrival(at: SimTime = this.now()): CarTravel {
     const motion = this.#motion;
     if (motion === undefined) {
       throw new ModelError(`Car "${this.id}" is not moving and has no arrival to complete.`);
@@ -568,6 +573,13 @@ export class Car implements CarLike {
     this.#floor = target;
     this.#motion = undefined;
     this.#settleDirection();
+
+    return Object.freeze({
+      distanceM: motion.profile.distanceM,
+      direction: motion.direction,
+      loadKg: this.loadSensor.massKg,
+      ratedLoadKg: this.loadSensor.ratedLoadKg,
+    });
   }
 
   /* ---------------------------------------------------------------- *
@@ -1473,4 +1485,29 @@ export interface CarRecord {
   readonly distanceTravelledM: number;
   readonly departures: number;
   readonly stopsServed: number;
+}
+
+/**
+ * One completed move, as {@link Car.completeArrival} reports it.
+ *
+ * The raw input to the energy proxy, and deliberately **raw**: no work, no joules, no
+ * counterweight. `metrics/types.ts` owns `COUNTERWEIGHT_BALANCE_RATIO` and `outOfBalanceWorkJ`,
+ * and `metrics` already imports `model` — the reverse import would be a cycle, and more to the
+ * point a car is a mechanism rather than a meter. It reports what it did; the recorder prices it.
+ *
+ * Structurally identical to `metrics/types.ts`'s `TravelReading`, which is why the recorder takes
+ * one without a cast, in the same way `Passenger` satisfies `RecordablePassenger`.
+ */
+export interface CarTravel {
+  /** Metres travelled, always positive. */
+  readonly distanceM: number;
+  readonly direction: Direction;
+  /**
+   * Passenger mass aboard for the whole move, kg.
+   *
+   * Exact rather than averaged: a stop is the only thing that changes a car's load, and a car
+   * that is moving is not stopped, so the load was constant across the move by construction.
+   */
+  readonly loadKg: number;
+  readonly ratedLoadKg: number;
 }

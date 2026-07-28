@@ -87,7 +87,7 @@ export const DISPATCH_DEFAULTS = Object.freeze({
    *
    * Default `none` so that declaring destination *dispatch* cannot move a destination
    * *disclosure* run by one bit — the two are different passenger models and nine of the
-   * nineteen replication metrics stop being comparable across them.
+   * twenty-three replication metrics stop being comparable across them.
    */
   passengerAssignment: 'none',
   /** No batching. Every press is scored on its own. */

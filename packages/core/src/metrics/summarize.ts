@@ -80,6 +80,7 @@ import {
   type CarTimings,
   type DepartureGapBasis,
   type DurationStatistics,
+  type EnergyStatistics,
   type HandlingCapacity,
   type IntervalStatistics,
   type JourneyRecord,
@@ -98,6 +99,7 @@ import {
   type SaturationThresholds,
   type ServiceLevelDiagnosis,
   type ServiceLevelVerdict,
+  type TravelSample,
   type WaitStatistics,
 } from './types.js';
 
@@ -695,6 +697,69 @@ export function diagnoseServiceLevel(
     overHorizonCount,
     arrivalCount: legs.length,
     censoredAtS,
+  });
+}
+
+/* -------------------------------------------------------------------------- *
+ * Energy
+ * -------------------------------------------------------------------------- */
+
+/**
+ * What the fleet spent moving, over the window.
+ *
+ * **Window membership is by arrival time and is half-open**, `[startS, endS)`, exactly as a leg's
+ * is — a {@link TravelSample} is stamped with the instant the car levelled. A move is charged
+ * whole to the window it finished in rather than split across a boundary, for the same reason a
+ * leg is: a fractional charge would need the motion profile, the record does not carry it, and a
+ * proportional split by time would be wrong anyway because an S-curve does not spend its metres
+ * uniformly.
+ *
+ * **`undefined` samples are not zero samples.** A record with no `travelSamples` reports
+ * `measured: false` and `NaN` throughout, so a downstream Pareto front suppresses the axis rather
+ * than making every arm tie on it. An empty array is treated the same way and for the same
+ * reason: the recorder omits the field rather than writing `[]`, so an empty array can only have
+ * come from a caller constructing a record by hand.
+ *
+ * @param servedLegCount legs that alighted in the window, for {@link EnergyStatistics.workPerServedLegKJ}.
+ */
+export function energyStatistics(
+  samples: readonly TravelSample[] | undefined,
+  options: { readonly window: ReportWindow; readonly servedLegCount: number },
+): EnergyStatistics {
+  const window = assertWindow(options.window);
+  if (samples === undefined || samples.length === 0) {
+    return Object.freeze({
+      measured: false,
+      workKJ: Number.NaN,
+      distanceM: Number.NaN,
+      starts: Number.NaN,
+      workPerServedLegKJ: Number.NaN,
+      movingCarCount: Number.NaN,
+    });
+  }
+
+  let workJ = 0;
+  let distanceM = 0;
+  let starts = 0;
+  const cars = new Set<string>();
+  for (const sample of samples) {
+    if (!windowContains(window, sample.at)) continue;
+    workJ += sample.workJ;
+    distanceM += sample.distanceM;
+    starts += 1;
+    cars.add(sample.carId);
+  }
+
+  const workKJ = workJ / 1000;
+  return Object.freeze({
+    measured: true,
+    workKJ,
+    distanceM,
+    starts,
+    // NaN rather than Infinity when nothing was served: "the fleet drove and delivered nobody"
+    // has no per-passenger cost, and Infinity would sort as the worst finite value in a front.
+    workPerServedLegKJ: options.servedLegCount > 0 ? workKJ / options.servedLegCount : Number.NaN,
+    movingCarCount: cars.size,
   });
 }
 
@@ -1533,6 +1598,11 @@ export function summarizeRun(record: RunRecord, options: SummarizeOptions = {}):
       : { designLoadFactor: options.designLoadFactor }),
   });
 
+  const energy = energyStatistics(record.travelSamples, {
+    window,
+    servedLegCount: legsInWindow.filter((leg) => leg.alightedAt !== undefined).length,
+  });
+
   const handlingCapacity = handlingCapacityOf(record.passengers, window, record.population);
 
   // The record's own timings are the honest source; options override them so a stored run can
@@ -1624,6 +1694,7 @@ export function summarizeRun(record: RunRecord, options: SummarizeOptions = {}):
     rideTime,
     timeToDestination,
     loadFactor,
+    energy,
     handlingCapacity,
     achievedInterval,
     saturation,

@@ -331,7 +331,7 @@ export async function runCompare(
   out.line(dim(`  every mean carries its ${num(confidence * 100, 0)} % interval; there is no bare mean here`));
 
   /*
-   * The two arms do not have the same passenger model, and nine of the nineteen recorded
+   * The two arms do not have the same passenger model, and nine of the twenty-three recorded
    * metrics stop measuring the same thing when they do not.
    *
    * Measured, not theorised: this command used to print `VERDICT: INDISTINGUISHABLE on AWT` for

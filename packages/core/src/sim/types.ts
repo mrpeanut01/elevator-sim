@@ -651,7 +651,7 @@ export interface SimulationResult {
    * Which passenger model this run used, and which recorded metrics that makes uncomparable.
    *
    * Empty list under every conventional and disclosure-only run. See `metrics/comparability.ts`
-   * for why nine of the nineteen change construct, and DECISIONS.md § D27 for the gate that
+   * for why nine of the twenty-three change construct, and DECISIONS.md § D27 for the gate that
    * follows from it: TTD with an interval excluding zero, **and** AWT and WT95 reported with
    * explicit verdicts rather than omitted.
    */

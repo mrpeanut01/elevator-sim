@@ -51,6 +51,9 @@ import {
   type PassengerRecord,
   type QueueSample,
   type ReportWindow,
+  type TravelReading,
+  type TravelSample,
+  outOfBalanceWorkJ,
   type RunRecord,
 } from './types.js';
 
@@ -206,6 +209,7 @@ export class MetricsRecorder {
   readonly #legs = new Map<string, LegState>();
   readonly #loadSamples: LoadSample[] = [];
   readonly #queueSamples: QueueSample[] = [];
+  readonly #travelSamples: TravelSample[] = [];
 
   #lastEventAt: SimTime;
   #boardedCount = 0;
@@ -517,6 +521,68 @@ export class MetricsRecorder {
   }
 
   /**
+   * Record one completed car move — the energy proxy's raw input.
+   *
+   * Called on every arrival, from the same handler that calls `Car.completeArrival`, whose
+   * return value satisfies {@link TravelReading} structurally. **This is the whole of the
+   * integration seam on the recorder's side**, and it is one call: a travel statistic that
+   * existed here and was never called from `sim/simulation.ts` would be the ninth instance of
+   * the defect docs/05-roadmap.md § *Standing requirement* enumerates.
+   *
+   * The joules are computed here rather than in the car, because
+   * {@link COUNTERWEIGHT_BALANCE_RATIO} is a measurement convention and a car is a mechanism.
+   * A zero-distance move is refused: the simulator never commands one (`departFor` throws when
+   * the target is the current floor), so one arriving here is a bug worth failing on rather
+   * than a free sample that dilutes the mean.
+   */
+  sampleTravel(at: SimTime, carId: string, reading: TravelReading): void {
+    this.#assertOpen('sampleTravel');
+    if (!Number.isFinite(at)) {
+      throw new MetricsError(`Travel sample needs a finite time; received ${at}.`);
+    }
+    if (!Number.isFinite(reading.distanceM) || reading.distanceM <= 0) {
+      throw new MetricsError(
+        `Travel sample for car "${carId}" needs a positive distance; received ${reading.distanceM}. A car does not depart for the floor it is standing on, so a zero-distance move is a bug rather than a datum.`,
+      );
+    }
+    if (!Number.isFinite(reading.ratedLoadKg) || reading.ratedLoadKg <= 0) {
+      throw new MetricsError(
+        `Travel sample for car "${carId}" needs a positive ratedLoadKg; received ${reading.ratedLoadKg}. The counterweight has nothing to balance against without one, so the work would be the car's whole load rather than its out-of-balance load.`,
+      );
+    }
+    if (!Number.isFinite(reading.loadKg) || reading.loadKg < 0) {
+      throw new MetricsError(
+        `Travel sample for car "${carId}" needs a non-negative loadKg; received ${reading.loadKg}.`,
+      );
+    }
+    this.#travelSamples.push(
+      Object.freeze({
+        at,
+        carId,
+        distanceM: reading.distanceM,
+        direction: reading.direction,
+        loadKg: reading.loadKg,
+        ratedLoadKg: reading.ratedLoadKg,
+        workJ: outOfBalanceWorkJ(reading),
+      }),
+    );
+    // **Deliberately does not `#observe(at)`, unlike every other recording method here.**
+    //
+    // `#lastEventAt` is not bookkeeping: `Simulation` computes the run horizon as
+    // `max(recorder.lastEventAt, demandEndedAt)`, so anything that advances it lengthens the
+    // full-run window, which changes `windowSeconds`, the handling-capacity denominator and the
+    // saturation fit for every run in the project. An instrument that changes the thing it is
+    // measuring is a broken instrument, and adding the energy axis must not move a single
+    // published figure — `benchmark/published.test.ts` is what would find out, and this is why it
+    // does not have to.
+    //
+    // Nothing is lost. A car arrival is always followed, within the same stop, by the door
+    // opening and the alighting that `recordAlighting` *does* observe, so the last travel sample
+    // of a run never sits past the last passenger event; `energyLiveness.test.ts` asserts that
+    // directly by counting samples outside the emitted record's own `[startedAt, endedAt)`.
+  }
+
+  /**
    * Sample the building-wide number of passengers waiting at landings.
    *
    * The direct input to saturation detection. Sampling on a regular grid is fine and is what
@@ -605,6 +671,12 @@ export class MetricsRecorder {
       passengers: Object.freeze(this.passengerRecords()),
       loadSamples: Object.freeze([...this.#loadSamples]),
       queueSamples: Object.freeze([...this.#queueSamples]),
+      // Omitted rather than empty when nothing moved, so a record from a harness that does not
+      // sample travel is byte-identical to one written before the field existed — and so
+      // `summarizeRun` can tell "the cars did not move" from "nobody wrote it down".
+      ...(this.#travelSamples.length === 0
+        ? {}
+        : { travelSamples: Object.freeze([...this.#travelSamples]) }),
       ...(this.#metadata === undefined ? {} : { metadata: Object.freeze({ ...this.#metadata }) }),
     });
   }

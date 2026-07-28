@@ -1,18 +1,18 @@
 /**
  * The comparability declaration, checked in both directions against the shape it describes.
  *
- * `metrics/comparability.ts` claims that nine of the nineteen scalars a replication reports stop
- * measuring the same thing under destination dispatch, and that the other ten do not. A list like
+ * `metrics/comparability.ts` claims that nine of the twenty-three scalars a replication reports stop
+ * measuring the same thing under destination dispatch, and that the other fourteen do not. A list like
  * that is exactly the kind of claim this repository has watched go stale — three published figures
  * did not reproduce from the code that was supposed to produce them, and nothing noticed, because
  * nothing re-derived them. So both halves are executed here:
  *
  * - **every listed metric names a statistic that exists**, resolved by walking its declared dotted
  *   path into a real `RunSummary` produced by a real run;
- * - **the two lists partition the nineteen**, disjointly and exhaustively, so a twentieth metric
- *   cannot appear and be neither listed nor excluded.
+ * - **the two lists partition the twenty-three**, disjointly and exhaustively, so a twenty-fourth
+ *   metric cannot appear and be neither listed nor excluded.
  *
- * The nineteen are named here rather than imported, because `REPLICATION_METRICS` lives in
+ * The twenty-three are named here rather than imported, because `REPLICATION_METRICS` lives in
  * `packages/experiments` and `core` may not depend on it — a test that reached across would invert
  * the package graph to check a property of `core`. The duplication is the price of the direction of
  * the dependency, and it is guarded: `experiments`' own suite asserts its list, and any divergence
@@ -37,7 +37,7 @@ import {
 } from './comparability.js';
 
 /**
- * The nineteen scalars `experiments/src/runner/metrics.ts` projects from a summary.
+ * The twenty-three scalars `experiments/src/runner/metrics.ts` projects from a summary.
  *
  * Written out so the partition below is a claim about a fixed set rather than about whatever the
  * two lists happen to contain.
@@ -62,6 +62,10 @@ const REPLICATION_METRICS = [
   'maxQueueLength',
   'queueSlopePersonsPerMinute',
   'unservedFraction',
+  'energyKJ',
+  'carDistanceM',
+  'carStarts',
+  'energyPerServedLegKJ',
 ] as const;
 
 let summary: RunSummary;
@@ -110,7 +114,7 @@ describe('the nine metrics destination dispatch makes uncomparable', () => {
     }
   });
 
-  it('partitions the nineteen replication metrics, disjointly and exhaustively', () => {
+  it('partitions the twenty-three replication metrics, disjointly and exhaustively', () => {
     const sensitive = new Set(MODEL_SENSITIVE_METRIC_IDS);
     const comparable = new Set(COMPARABLE_METRIC_IDS);
     const overlap = [...sensitive].filter((id) => comparable.has(id));
@@ -139,7 +143,7 @@ describe('the passenger model a stage produces', () => {
       expect(passengerModelOf({ callType, passengerAssignment: 'none' })).toBe('conventional');
     }
     // Destination *disclosure* is not a passenger-model change and must not be reported as one:
-    // Phase 6a's intervals are quotable on all nineteen metrics precisely because of this row.
+    // Phase 6a's intervals are quotable on all twenty-three metrics precisely because of this row.
     expect(
       passengerModelOf({ callType: 'mobile-credential', passengerAssignment: 'panel' }),
     ).toBe('destination-dispatch');
@@ -151,7 +155,7 @@ describe('the passenger model a stage produces', () => {
       MODEL_SENSITIVE_METRIC_IDS,
     );
     // The other half a caller actually filters on: under the conventional model every one of the
-    // nineteen is comparable, and under destination dispatch exactly the ten survive.
+    // twenty-three is comparable, and under destination dispatch exactly the fourteen survive.
     expect([...comparabilityOf('conventional').comparableMetrics].sort()).toEqual(
       [...REPLICATION_METRICS].sort(),
     );

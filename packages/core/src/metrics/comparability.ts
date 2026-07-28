@@ -13,7 +13,7 @@
  * **different quantity**: the number still has a definition and still computes, but the wait it
  * measures now contains the walk to a named car and excludes the option of boarding whichever car
  * arrives first, so a Level-0-versus-Level-1 difference on it is not interpretable as an
- * improvement. Nine of the nineteen replication metrics are like that
+ * improvement. Nine of the twenty-three replication metrics are like that
  * (docs/09-destination-dispatch-contract.md § 1.6). Ten are not, and `ttdMeanS` — the same
  * `journeyStartedAt → alightedAt` under both models, with the walk honestly inside it — is the
  * one the phase is gated on (DECISIONS.md § D27).
@@ -31,7 +31,7 @@
  * ## The list is asserted in both directions
  *
  * `comparability.test.ts` checks that every id here names a statistic `summarizeRun` actually
- * produces, and that the ten it does **not** name are exactly the rest. An entry for a metric
+ * produces, and that the fourteen it does **not** name are exactly the rest. An entry for a metric
  * that no longer exists, or a metric that quietly appears and is neither listed nor excluded, is
  * a red test — which is the difference between this and a list that goes stale the way three
  * published figures in this repository did.
@@ -131,11 +131,11 @@ export const MODEL_SENSITIVE_METRICS: readonly ModelSensitiveMetric[] = Object.f
 ]);
 
 /**
- * **The ten that survive**, declared beside the nine rather than left as "everything else".
+ * **The fourteen that survive**, declared beside the nine rather than left as "everything else".
  *
  * Carried explicitly so the partition is checkable: `comparability.test.ts` asserts the two lists
- * are disjoint and that together they are exactly the nineteen scalars a replication reports.
- * Without this half, a twentieth metric could appear and be neither listed nor excluded — which
+ * are disjoint and that together they are exactly the twenty-three scalars a replication reports.
+ * Without this half, a twenty-fourth metric could appear and be neither listed nor excluded — which
  * is the shape of every stale claim this repository has had to correct.
  *
  * `personsPer5Min` and `pctPopulationPer5Min` are comparable **as values between two simulated
@@ -153,6 +153,16 @@ export const COMPARABLE_METRIC_IDS: readonly string[] = Object.freeze([
   'fractionAtDesignLoad',
   'queueSlopePersonsPerMinute',
   'unservedFraction',
+  // The four energy metrics measure **where the cars went**, which is the same physical quantity
+  // whichever way a passenger was told which car to walk to. Nothing about a landing panel
+  // changes what a metre of travel under a given load costs, so unlike the nine above there is no
+  // construct shift to declare — and the energy axis is therefore quotable across a Level-0 /
+  // Level-1 comparison when AWT is not. That asymmetry is a result, not an oversight: it is what
+  // makes a three-axis Pareto front comparable across the models the wait axis cannot span.
+  'energyKJ',
+  'carDistanceM',
+  'carStarts',
+  'energyPerServedLegKJ',
 ]);
 
 /** The nine ids alone, for a consumer that only needs to filter. */
@@ -164,7 +174,7 @@ export const MODEL_SENSITIVE_METRIC_IDS: readonly string[] = Object.freeze(
  * What a caller pairing two runs needs to know, computed once and carried on the result.
  *
  * `notComparableMetrics` is empty under the conventional model — including under destination
- * *disclosure*, where all nineteen metrics stay comparable and Phase 6a's intervals are quotable
+ * *disclosure*, where all twenty-three metrics stay comparable and Phase 6a's intervals are quotable
  * on every one of them.
  */
 export interface RunComparability {
@@ -176,8 +186,9 @@ export interface RunComparability {
    *
    * Carried beside the exclusion rather than left to be derived, because a caller filtering by
    * subtraction has to know the full metric list to subtract from — which is the thing
-   * `packages/experiments` owns and `core` cannot see. All nineteen under the conventional model;
-   * the ten of § 1.6 under destination dispatch, with `ttdMeanS` first among them.
+   * `packages/experiments` owns and `core` cannot see. All twenty-three under the conventional
+   * model; the fourteen of § 1.6 plus the energy axis under destination dispatch, with `ttdMeanS`
+   * first among them.
    */
   readonly comparableMetrics: readonly string[];
 }

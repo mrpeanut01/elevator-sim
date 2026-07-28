@@ -52,6 +52,7 @@ export type {
 } from './comparability.js';
 
 export {
+  COUNTERWEIGHT_BALANCE_RATIO,
   DEPARTURE_GAP_BASES,
   METRICS_SCHEMA_VERSION,
   MetricsError,
@@ -63,7 +64,9 @@ export {
   SERVICE_LEVEL_VERDICTS,
   legSecondsOf,
   rideSecondsOf,
+  outOfBalanceWorkJ,
   runSeed,
+  STANDARD_GRAVITY_MPS2,
   waitSecondsOf,
   windowContains,
   windowContainsArrival,
@@ -75,6 +78,7 @@ export type {
   CarTimings,
   DepartureGapBasis,
   DurationStatistics,
+  EnergyStatistics,
   HandlingCapacity,
   Histogram,
   HistogramBin,
@@ -98,6 +102,8 @@ export type {
   SaturationThresholds,
   SaturationVerdict,
   ServiceLevelDiagnosis,
+  TravelReading,
+  TravelSample,
   ServiceLevelVerdict,
   WaitStatistics,
 } from './types.js';
@@ -155,6 +161,7 @@ export {
   departureGapBracket,
   detectSaturation,
   diagnoseServiceLevel,
+  energyStatistics,
   fullRunWindow,
   handlingCapacityOf,
   legDurations,

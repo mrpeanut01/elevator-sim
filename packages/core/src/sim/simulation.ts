@@ -81,7 +81,7 @@
  * `'none'` is the default and every branch above reduces to the code that was there before it
  * existed, byte for byte: 0 of 55 shipped (building, profile) cells at seed 20260726 move.
  *
- * Nine of the nineteen recorded metrics stop being comparable across the two models
+ * Nine of the twenty-three recorded metrics stop being comparable across the two models
  * (`metrics/comparability.ts`); the run says so in `result.comparability` and in a disclaimer.
  *
  * ## How nobody gets lost
@@ -2339,7 +2339,14 @@ export class Simulation {
         const arriving = this.#carsById.get(payload.carId);
         /* c8 ignore next -- arrivals are only scheduled for cars in this building. */
         if (arriving === undefined) return;
-        arriving.completeArrival(context.time);
+        // **The energy axis's integration seam.** This is the only place in the shipped path
+        // where a completed move is observable — `completeArrival` clears `#motion` — and it is
+        // therefore the only place a per-move travel sample can be taken. Every car move goes
+        // through `#depart`, including stage 7's repositioning, which is the whole point: an
+        // energy proxy reconstructed from passenger records would be blind to the empty-car
+        // driving that pre-positioning does. `benchmark/energyLiveness.test.ts` counts the
+        // samples against the fleet's own odometers rather than trusting this comment.
+        this.#recorder.sampleTravel(context.time, arriving.id, arriving.completeArrival(context.time));
         this.#stepCar(arriving, context.time);
       }),
     );
