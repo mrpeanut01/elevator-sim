@@ -469,8 +469,10 @@ describe('elevator-sim compare', () => {
    * Review finding #19. `--confidence` moves every bound the command prints and was missing from
    * the `reproduce:` line, so running the printed string could contradict the verdict printed
    * directly above it: at `--confidence 0.8` the measured case printed "AWT −0.22 s [−0.41, −0.04]
-   * BETTER" and its own reproduce line re-ran at the 0.95 default as "[−0.50, +0.05]
-   * INDISTINGUISHABLE".
+   * BETTER" and its own reproduce line re-ran at the 0.95 default as "[−0.51, +0.07]
+   * INDISTINGUISHABLE". Both bounds re-measured on this tree; the 0.95 pair was [−0.50, +0.05]
+   * before the published interval became Student-t at every `n` (review finding #14), a 4.35 %
+   * multiplier at n = 30.
    *
    * `--serial` is appended to the re-run rather than being expected in the printed line: it picks
    * an executor and cannot move a number, which is exactly the criterion for what belongs on a

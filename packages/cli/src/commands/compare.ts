@@ -478,9 +478,16 @@ export async function runCompare(
      overridden. `--confidence` used to be omitted (review finding #19), so re-running the line
      labelled `reproduce:` reproduced the run but not the verdict printed above it: at
      --confidence 0.8 the printed AWT row read "−0.22 s [−0.41, −0.04] BETTER" and the printed
-     command re-ran it at 0.95 as "[−0.50, +0.05] INDISTINGUISHABLE". A reproduce line that
+     command re-ran it at 0.95 as "[−0.51, +0.07] INDISTINGUISHABLE". A reproduce line that
      reproduces a different answer is worse than no reproduce line. Matches `run`, which builds
-     its own line from every number-moving flag. */
+     its own line from every number-moving flag.
+
+     Both bounds are re-measured on this tree, not carried forward: the 0.95 pair moved from
+     [−0.50, +0.05] when `estimateMean` stopped switching to the normal quantile above n = 25
+     (review finding #14). At n = 30 the multiplier is 1.043504 at 95 % and 1.023317 at 80 %, which
+     is why the 0.8 row is unchanged at two decimals and the 0.95 row is not. Command:
+       compare --building midtown-office --a eta --b capacity-aware --reps 30 --seed 20260726
+               --rate 1 --duration 900 [--confidence 0.8] */
   out.line(
     `  ${dim('reproduce:')} ${cyan(
       [

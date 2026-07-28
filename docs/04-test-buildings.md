@@ -17,9 +17,25 @@ Machine-readable configs in [`data/buildings/`](../data/buildings/).
 
 Six floors, two hydraulic cars, no zoning. Deliberately boring on paper — and it is the
 building where **parking policy dominates**. Traffic is sparse enough that a car's idle
-position matters more than any assignment cleverness. Also the building where faster
-elevators demonstrably do *not* help, because travel distances are too short for the car
-to ever reach rated speed. Good sanity check against over-optimism.
+position matters more than any assignment cleverness.
+
+> **It is NOT the speed negative control, and this section said it was.** The retracted claim was
+> that faster elevators "demonstrably do not help" here "because travel distances are too short for
+> the car to ever reach rated speed". Both halves are measurably false. Run through the repo's own
+> `buildProfile`, a 3.0 m one-floor hop at `v = 0.63`, `a = 0.6`, `j = 0.8` comes back
+> `kind = speedLimited` — the car *does* reach rated speed — and raising rated speed from 0.63 to
+> 1.00 m/s cuts that hop from **6.562 s to 5.417 s** (−17.5 %) and the 15 m full-rise run from
+> **25.610 s to 17.417 s** (−32.0 %). A test written to the old claim would pin a bug, which
+> `data/buildings/garden-apartments.json`'s own `notes[1]` already warned about while this document
+> did not. The governing quantity is floor pitch against `v²/a`, the distance needed to reach rated
+> speed: Garden's 0.63 m/s hydraulic needs 0.66 m against a 3.0 m pitch and spends most of a hop at
+> rated speed. [Review finding #3](08-review-findings.md).
+>
+> **The genuine negative control is Midtown Office.** `buildProfile(3.8, {v: 2.5, a: 1.0, j: 1.4})`
+> is `accelerationLimited`, and raising `v` to 4.0 leaves the hop at **4.678 s, unchanged**: a
+> 2.5 m/s car needs 6.25 m to reach rated speed against a 3.8 m pitch, so it never gets there. This
+> is the direction [`CLAUDE.md`](../CLAUDE.md) § modelling rules warns about — *short hops never
+> reach rated speed* — and it is a property of a fast car in a tight building, not of a slow one.
 
 **Watch for:** whether the dispatcher wastes energy repositioning during dead hours.
 
@@ -64,6 +80,19 @@ floors simultaneously, so the dispatcher must pair calls that are one floor apar
 **Watch for:** this is the most likely candidate to be deferred past v1. The double-deck
 model is a substantial addition and the other four buildings cover most of the algorithmic
 ground.
+
+> **Double-deck operation is configured, validated, and NOT simulated — and every run now says so.**
+> `data/buildings/vertical-city.json` declares eight shuttles with `doubleDeck: true`,
+> `deckSeparationM: 4.5`, `ratedLoadLbPerDeck: 2000` and four `servesFloorPairs`. `loadConfig`
+> resolves all of it and builds a full `Bank.deckByFloorId` index; `Car` has no deck concept, so the
+> runtime runs each shuttle as a single-deck car and makes up to eight separate stops where the
+> declared hardware makes four paired ones. **Every shuttle-bank round-trip time, interval and
+> handling-capacity figure this simulator reports for Vertical City is therefore for hardware nobody
+> configured.** The config layer used to validate the pairing carefully enough to look wired and then
+> go silent, and silence reads as "modelled". It now raises `double-deck-not-simulated` naming the
+> building and the bank, `Simulation` raises the same statement into `result.warnings`, and
+> `RunRecord` carries it so a stored run keeps the disclaimer. Implementing decks is Phase 6.
+> [Review finding #11](08-review-findings.md); [`DECISIONS.md` § D11, § D22, § D23](../DECISIONS.md).
 
 ---
 

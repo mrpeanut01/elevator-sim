@@ -206,7 +206,12 @@ attributable to the policy rather than to the world.
 
 ## Module layout
 
-As built through Phase 3. `viz/` is Phase 4 and **is not on disk yet**.
+**As built through Phase 7, plus Phase 4's foundation.** This tree is normative, not historical: the
+roadmap's Standing Requirement demands that a phase plan *"name an owner for every file a new
+behaviour must be called from"*, and it cannot be used that way if it is stale. It was scoped "as
+built through Phase 3" for two phases too long, omitting every directory Phases 5 and 7 added
+([review finding #15](08-review-findings.md)); `packages/core/src/sim/moduleTree.test.ts` now fails
+if a source directory exists that this block does not list, or vice versa.
 
 ```
 packages/
@@ -214,8 +219,14 @@ packages/
 │   ├── kernel/            — discrete-event queue, clock, deterministic tie-breaking
 │   ├── random/            — RNG and the per-source StreamSet
 │   ├── physics/           — S-curve motion profiles (motion/), door state machine (doors/)
-│   ├── model/             — Car (car/), Bank, Building, Floor, Passenger
-│   ├── dispatch/          — DispatchPolicy, scoring engine, cost term library (terms/)
+│   │   ├── motion/        — jerk-limited S-curve profiles, travel time
+│   │   └── doors/         — door state machine, reopen causes, dwell
+│   ├── model/             — Bank, Building, Floor, Passenger
+│   │   └── car/           — Car, its shaft, the load sensor, estimateCost
+│   ├── dispatch/          — DispatchPolicy, scoring engine, parameter schemas
+│   │   ├── terms/         — the cost term library
+│   │   ├── policies/      — Phase 5: zoning, pre-positioning, capacity reassignment, auction
+│   │   └── predictor/     — Phase 5: the per-floor per-bucket arrival model
 │   ├── traffic/           — passenger generation, demand profiles, routing
 │   ├── analytical/        — closed-form Barney/CIBSE RTT, the correctness oracle
 │   ├── config/            — data/*.json loading, schema, floorRange expansion
@@ -225,9 +236,22 @@ packages/
 │   ├── runner/            — parallel replication execution, CRN, sequential stopping
 │   ├── reports/           — persistence, replay, re-analysis, and the interval arithmetic
 │   ├── oracle/            — closed-form against measured round trip, reconciled term by term
+│   ├── benchmark/         — Phase 5: the written report and the studies behind it
+│   ├── tuning/            — Phase 7: automated search over the parameter space
+│   │   ├── space/         — the self-describing search space, sampling, encoding
+│   │   ├── search/        — random search, successive halving, sep-CMA-ES, the objective
+│   │   └── report/        — Pareto fronts, the held-out validation round
 │   └── validation/        — the Phase 3 acceptance gate
-├── viz/                   — web visualization, consumes core            (Phase 4, not yet present)
+├── viz/                   — web visualization, consumes core          (Phase 4 foundation only)
+│   ├── contract/          — the recording schema and its folded series
+│   ├── record/            — instrumenting a run into a VizRecording
+│   ├── frame/             — the deterministic frame producer
+│   ├── playback/          — the playback clock and its mapping
+│   ├── render/            — layout and the minimal Canvas renderer
+│   ├── replay/            — the replay harness and its per-field negative control
+│   └── dev/               — the Vite dev entry point (dev-only)
 └── cli/                   — headless batch entry point
+    └── commands/          — list, run, compare, tune, watch
 ```
 
 > **Layout note — `experiments/stats/` does not exist.** This doc previously placed the

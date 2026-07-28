@@ -795,3 +795,73 @@ transfer-driven dwell from every stop in the run, not just from reopens, so the 
 produced measured something else. And "no measured AWT cost" is not "no effect" — the hold moves
 **41 of the 50** passenger-record trajectories at seed 20260726, on every building but
 `garden-apartments`, which is exactly why the default stays `false`.
+
+---
+
+## D26 — Phase 7 is accepted; Phase 4 is recorded as a foundation; four doc claims become tests
+
+**Date:** 2026-07-27 · **Owner:** T4 · **Corrects the impact line of D22**
+
+**Context.** Ten of the review register's twenty-one findings were documentation drift, and the
+register itself did not say which findings survived the wave. Two phase verdicts were also stale in
+opposite directions: Phase 7 was recorded NOT ACCEPTED after T1 closed all three of its stated
+blockers, and Phase 4 carried no status line at all while `packages/viz` existed on disk.
+
+### Phase 7 — ACCEPTED
+
+**Alternatives.** (a) Accept. (b) Withhold acceptance because the fuzzy pattern-detector scope
+bullet is unbuilt. (c) Accept and quietly drop the bullet.
+
+**Chosen:** (a), with the bullet marked **⬜ NOT DONE** in the roadmap. **Why:** the phase's stated
+acceptance criteria are two — a tuned vector beating `predictive-balanced` on held-out seeds with a
+paired-t interval excluding zero, and candidates below the half-width reported as indistinguishable
+rather than ranked — and both are met, at `−1.288 s [−2.277, −0.298]` on the holdout set and through
+`pareto.ts`'s dominance rule. The three "to accept this phase" requirements this document set are
+each met by code, not by wording: `tuning/index.ts`, the package re-export, `tuneCommand` as the
+**named non-test caller**, and `tuning/deadCode.test.ts`. The known-answer test was passed blind —
+`tune` returned **2.582 s** against the shipped 8 s, seed sets `DISJOINT`, holdout `GENERALIZES`.
+(b) would be inventing a criterion after the fact, which `CLAUDE.md` § Working agreements forbids as
+firmly as it forbids weakening one; (c) would hide undelivered scope inside a green tick, which is
+the register's own finding #5.
+
+### Phase 4 — FOUNDATION LANDED, NOT COMPLETE
+
+**Alternatives.** (a) Mark it complete: both acceptance clauses pass. (b) Record it as a foundation
+with the unbuilt bullets named. (c) Leave it with no status.
+
+**Chosen:** (b). **Why:** (a) is available on the acceptance criteria alone and is wrong — two of
+the four scope bullets, the building editor and the live metrics overlay, are not built, and a phase
+is done when its scope is delivered and its criteria pass, not when the criteria pass. (c) is the
+state that let the register go a whole wave without anyone noticing `viz/` had appeared. The
+criterion itself is **raised**, per C16: *"and the first frame places every car where the run says
+it started"*, because the original was satisfied in full by a recorder wrong on 4 of 5 buildings — a
+wrong picture replays as faithfully as a right one.
+
+### Four documentation claims become tests
+
+**Alternatives.** (a) Fix the ten drift findings and move on. (b) Fix them and guard the ones with a
+cheap mechanical form.
+
+**Chosen:** (b). Built, each watched failing against the drift it targets and then restored:
+
+| guard | asserts |
+|---|---|
+| `experiments/src/validation/documentation.test.ts` | the phase set agrees across `CLAUDE.md`, `README.md` and `docs/07`; `docs/07`'s opening sentence does not contradict its own table; every `docs/*.md` appears in README's documentation **table**; every study entry point the roadmap names is exported by `@elevator-sim/experiments` |
+| `experiments/src/tuning/space/docExamples.test.ts` | every fenced `json` block in `docs/06` is classified — profile, parameter declarations, or declared-other with a reason — profiles load through `parseDispatcherProfiles` and weight no gated-off term, and every declared id and gate key is in `collectSearchSpace().ids` |
+| `core/src/sim/moduleTree.test.ts` | `docs/01`'s module tree and the directories under `packages/*/src` are the same set, **in both directions** |
+| `core/src/analytical/docFormula.test.ts` | the formulas in `docs/03` Part 2 are parsed, evaluated, and compared against `roundTripTime()` on Secure Tower's high bank, where `tx = 14.025 s` |
+
+Findings **#3** and **#20** are closed without a guard, stated rather than glossed: #3's prescribed
+per-building `buildProfile(...).kind` assertion and #20's `contiguousZones` band-count assertion are
+not built, so both documents can drift again.
+
+**Impact.** No simulated number moves. The suite grows by four files and thirteen tests.
+
+### Correction to D22
+
+D22 records the merged-state fingerprint as *"Ten cells move — `vertical-city` × all ten profiles —
+in the `record` field"*. On the merged `integration` tree the figure reported is **30 of 50 cells,
+`record` field only**, the movement coming from `RunRecord.warnings` on every building that raises
+one rather than on `vertical-city` alone. **NOT RE-MEASURED by T4** — closing it would need a
+fingerprint of the pre-merge tree, which this worktree does not have built. Recorded with its
+provenance rather than transcribed as a measurement. No simulated number moves either way.

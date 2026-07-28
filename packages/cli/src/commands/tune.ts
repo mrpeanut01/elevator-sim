@@ -115,7 +115,7 @@ const STRUCTURAL_RESOLUTION_S = 1.9;
 
 /**
  * The largest effect this project has ever measured by tuning: `predictive-balanced`'s
- * `idle.repositionThresholdS` 8 s → 2 s on Garden Apartments, −1.288 s [−2.257, −0.319] on the
+ * `idle.repositionThresholdS` 8 s → 2 s on Garden Apartments, −1.288 s [−2.277, −0.298] on the
  * holdout seed set at n = 60 (docs/05-roadmap.md § Phase 7).
  *
  * It is the honest ceiling on "could this budget resolve *anything*". A run whose half-width
