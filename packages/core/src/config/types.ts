@@ -260,6 +260,38 @@ export type CommitmentPoint = (typeof COMMITMENT_POINTS)[number];
 export const CALL_TYPES = ['up-down-buttons', 'destination-entry', 'mobile-credential'] as const;
 export type CallType = (typeof CALL_TYPES)[number];
 
+/** Whether a destination call type also names the car (`CALL_TYPES` decides what is *known*). */
+export const DESTINATION_CALL_TYPES: readonly CallType[] = Object.freeze([
+  'destination-entry',
+  'mobile-credential',
+]);
+
+/** Whether the destination call type is one that carries the destination at call time. */
+export function isDestinationCallType(callType: CallType): boolean {
+  return DESTINATION_CALL_TYPES.includes(callType);
+}
+
+/**
+ * **The Level-0 / Level-1 switch** — whether the landing panel names a car for each passenger.
+ *
+ * `callType` decides what the *dispatcher* knows; this decides what the *passenger* is told,
+ * and they are genuinely different systems (docs/09-destination-dispatch-contract.md § 1.1):
+ *
+ * | Value | The landing | The passenger |
+ * |---|---|---|
+ * | `none` | one up/down button per direction | boards any car that opens and can carry them |
+ * | `panel` | one request per origin-destination pair | boards **only** the car the panel named |
+ *
+ * `none` is the default and reproduces the conventional passenger model bit for bit, so a
+ * profile that merely discloses the destination (`callType: destination-entry`, the Phase 6a
+ * arm) is untouched by this parameter existing. Turning it on is the passenger-model change,
+ * which is why it is a declared categorical the search space can see rather than an implicit
+ * consequence of `callType` — a run of the two is not comparable on nine of the nineteen
+ * replication metrics, and a switch nobody declared could not be told from a dispatcher gain.
+ */
+export const PASSENGER_ASSIGNMENT_MODES = ['none', 'panel'] as const;
+export type PassengerAssignmentMode = (typeof PASSENGER_ASSIGNMENT_MODES)[number];
+
 export const DWELL_POLICIES = ['fixed', 'adaptive'] as const;
 export type DwellPolicy = (typeof DWELL_POLICIES)[number];
 
@@ -292,6 +324,12 @@ export type Aggregation = (typeof AGGREGATIONS)[number];
 export interface DispatchStageConfig extends Commented {
   /** Determines whether the destination is known at call time. */
   readonly callType?: CallType | undefined;
+  /**
+   * Whether the landing panel names a car for each passenger (destination *dispatch*), or the
+   * landing keeps its up/down button (destination *disclosure*). Only meaningful under a
+   * destination `callType`. See {@link PASSENGER_ASSIGNMENT_MODES}.
+   */
+  readonly passengerAssignment?: PassengerAssignmentMode | undefined;
   /** Group near-simultaneous calls at one floor before scoring, seconds. */
   readonly batchWindowS?: number | undefined;
   readonly assignmentTiming?: AssignmentTiming | undefined;

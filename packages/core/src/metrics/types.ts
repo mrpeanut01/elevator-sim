@@ -45,6 +45,8 @@
 import type { SimTime } from '../kernel/types.js';
 import type { CredentialGroup, Direction } from '../model/types.js';
 
+import type { PassengerModel } from './comparability.js';
+
 /* -------------------------------------------------------------------------- *
  * Errors and versioning
  * -------------------------------------------------------------------------- */
@@ -243,6 +245,18 @@ export interface PassengerRecord {
   readonly carId?: string | undefined;
   /** The bank that served this leg, when known. */
   readonly bankId?: string | undefined;
+
+  /**
+   * The car the landing panel named, under destination *dispatch* only.
+   *
+   * Absent under every conventional and disclosure-only run, so a schema-version-1 record is
+   * byte-identical to one written before this field existed. Where it is present,
+   * `assignedCarId === carId` for every leg that boarded — a wrong-car boarding is a
+   * conservation failure, not a statistic, and `Simulation` asserts it rather than reporting it.
+   */
+  readonly assignedCarId?: string | undefined;
+  /** When the panel named a car. Between {@link arrivedAt} and {@link boardedAt}, always. */
+  readonly assignedAt?: SimTime | undefined;
 }
 
 /** Seconds spent waiting at the landing on this leg, or `undefined` if never served. */
@@ -472,6 +486,16 @@ export interface CarTimings {
  */
 export interface RunRecord {
   readonly schemaVersion: number;
+  /**
+   * Which passenger model produced this run — see `metrics/comparability.ts`.
+   *
+   * Absent means `conventional`, which is every run this project produced before destination
+   * dispatch existed and every run that only *discloses* the destination. Present and equal to
+   * `destination-dispatch` means the landing panel named a car per passenger, and nine of the
+   * scalars derived from this record may not be paired against a record that does not say so.
+   * Recorded rather than derived, because a stored record outlives the profile that made it.
+   */
+  readonly passengerModel?: PassengerModel | undefined;
   /** Identity of this replication, unique within an experiment. */
   readonly runId: string;
   /** The `StreamSet` master seed, as a decimal string. Invariant 5. */

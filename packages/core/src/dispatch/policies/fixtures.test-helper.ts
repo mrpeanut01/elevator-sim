@@ -116,10 +116,20 @@ export function snapshotAt(id: string, floorId: string, at = 0): CarSnapshot {
  * Calls
  * -------------------------------------------------------------------------- */
 
+/**
+ * A landing call, optionally carrying the destination a destination-entry panel would know.
+ *
+ * `destinationFloorId` is opt-in and absent by default, so every existing caller is unchanged and
+ * a fixture that wants to exercise `rideTime` — the one term in the library whose `activeWhen`
+ * asks for a destination — can say so in one argument rather than by spreading fields onto the
+ * returned value. `costRequestFor` drops it again under `up-down-buttons`, so supplying it does
+ * not smuggle information into a conventional scenario.
+ */
 export function call(
   floorId: string,
   direction: Direction = 'up',
   registeredAt = 0,
+  destinationFloorId?: string | undefined,
 ): DispatchCall {
   return {
     id: hallCallId(floorId, direction),
@@ -127,6 +137,7 @@ export function call(
     floorIndex: Number(floorId),
     direction,
     registeredAt,
+    ...(destinationFloorId === undefined ? {} : { destinationFloorId }),
   };
 }
 

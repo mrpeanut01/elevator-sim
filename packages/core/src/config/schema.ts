@@ -15,6 +15,7 @@ import { z } from 'zod';
 import {
   AGGREGATIONS,
   ASSIGNMENT_MODES,
+  PASSENGER_ASSIGNMENT_MODES,
   ASSIGNMENT_TIMINGS,
   BUILDING_TYPES,
   CALL_TYPES,
@@ -451,6 +452,7 @@ export const costTermSchema = z.strictObject({
 const dispatchStageSchema = z.strictObject({
   $comment: comment,
   callType: z.enum(CALL_TYPES).optional(),
+  passengerAssignment: z.enum(PASSENGER_ASSIGNMENT_MODES).optional(),
   batchWindowS: nonNegative.optional(),
   assignmentTiming: z.enum(ASSIGNMENT_TIMINGS).optional(),
   deferWindowS: nonNegative.optional(),

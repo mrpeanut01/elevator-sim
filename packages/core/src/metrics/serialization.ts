@@ -21,6 +21,8 @@ import { z } from 'zod';
 
 import { DIRECTIONS } from '../model/types.js';
 
+import { PASSENGER_MODELS } from './comparability.js';
+
 import {
   METRICS_SCHEMA_VERSION,
   MetricsError,
@@ -67,6 +69,11 @@ export const passengerRecordSchema = z.strictObject({
   alightedAt: simTime.optional(),
   carId: z.string().min(1).optional(),
   bankId: z.string().min(1).optional(),
+  // Destination dispatch only, and optional in both directions: a record written before the
+  // landing panel existed parses unchanged, and a record written by a panel run round-trips the
+  // promise it made. `passengerModel` on the run record says which of the two a reader is holding.
+  assignedCarId: z.string().min(1).optional(),
+  assignedAt: simTime.optional(),
 });
 
 export const loadSampleSchema = z.strictObject({
@@ -114,6 +121,7 @@ export const runRecordSchema = z.strictObject({
   population: z.number().min(0).optional(),
   carIds: z.array(identifier).optional(),
   carTimings: carTimingsSchema.optional(),
+  passengerModel: z.enum(PASSENGER_MODELS).optional(),
   startedAt: simTime,
   endedAt: simTime,
   reportWindow: reportWindowSchema.optional(),
