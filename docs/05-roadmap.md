@@ -14,7 +14,7 @@ revisited before Phase 0 starts.
 
 **Read this before planning any phase.** The most expensive defect this project has produced is
 not a wrong number. It is a behaviour that is *configurable, unit-tested in isolation, and dead in
-the shipped path* — and it has now happened **five times**. Four were in Phase 5, all four
+the shipped path* — and it has now happened **eight times**. Four were in Phase 5, all four
 simultaneously: `prepositionPlan`, `CapacityReassignmentMonitor`, `createAuctionPolicy` and the
 whole arrival-model predictor were built correctly, exported, weighted by a shipped profile, and
 called by nothing outside their own module.
@@ -28,6 +28,18 @@ the caller has to be something that actually performs the measurement. `report/h
 that caller: it is the only code in the repository that runs the held-out seed set, which a search
 structurally cannot do (every round a search runs shares one experiment seed, so the seeds it
 optimizes against are the only seeds it has ever seen).
+
+**The sixth was the whole of `tuning/` one level up, and it was asserted closed by this document.**
+[Review finding #1](08-review-findings.md) found that `report/holdoutRound.ts` had only moved the
+seam up one level: there was no `tuning/index.ts`, `packages/experiments/src/index.ts` exported
+nothing from `tuning/`, and every importer of `randomSearch`, `successiveHalving`, `sepCmaEs`,
+`runnerObjective` and `runHoldoutRound` was a `*.test.ts` in the same directory. This section
+nonetheless read *"green. The machinery is complete and wired"*. All three are now closed — see
+§ Phase 7 — and the **seventh and eighth** were found in the same wave and are recorded in
+[`DECISIONS.md` § D23](../DECISIONS.md): `StageActivity`'s late-arrival counters lived on the
+`Simulation` instance that `runSimulation()` discards, and `WARNING_CODES.doubleDeckNotSimulated`
+was raised and asserted in both directions with no shipped path branching on the code. Both now name
+a non-test caller (`printRunReport` and `planRun`, in `packages/cli/src/commands/run.ts`).
 
 **The cause was structural, not careless.** Phase 5 partitioned work by module directory and
 `sim/simulation.ts` — the file every one of those modules has to be called *from* — appeared in no
@@ -251,8 +263,40 @@ in [Traffic & Statistics](03-traffic-and-statistics.md). Two are flagged inline 
 - Building editor: floors, banks, cars, zones
 - Live metrics overlay; run playback from a stored seed
 
-**Acceptance:** a stored run replays visually identically. Rendering is fully decoupled —
-`core` builds and tests with `viz` absent.
+**Acceptance:** a stored run replays visually identically, **and the first frame places every car
+where the run says it started.** Rendering is fully decoupled — `core` builds and tests with `viz`
+absent.
+
+> **The second clause was added after the first was satisfied by a wrong picture.** The Phase 4
+> recorder placed every car at its *final* position until its first move — wrong on 4 of the 5
+> shipped buildings — and that recording replayed identically on every seed, because a wrong picture
+> replays as faithfully as a right one. A replay-identity criterion cannot see a systematic error
+> that is present in both replays. Raising the criterion is the response
+> [`CLAUDE.md`](../CLAUDE.md) § Working agreements requires; weakening it was never available.
+> Raised by T8, recorded as **C16** in `AGENT_STATUS.md`. *(The count is reported, not
+> re-measurable: `AGENT_STATUS.md`'s own C16 line says "3 of 4" where the closing report says 4 of 5,
+> and the defective recorder no longer exists to re-run. The clause holds either way, and it is now
+> asserted on **all five** buildings by `describe.each(BUILDING_IDS)`.)*
+
+**Status: FOUNDATION LANDED — the phase is NOT complete.** `packages/viz` is on disk with a
+rendering contract (`contract/`, `VIZ_SCHEMA_VERSION = 2`), a deterministic frame producer
+(`frame/`), a replay harness with a per-field negative control (`replay/`), a playback clock
+(`playback/`), a minimal Canvas renderer (`render/`), and an **85-scenario UX inventory**
+(`packages/viz/UX.md`, ids `RV-…` / `PB-…` / `ED-…` / `KB-…`). Of the four scope bullets above:
+
+| bullet | state |
+|---|---|
+| Web viewer consuming `core` with no reverse dependency | ✅ built — `packages/viz/src/boundaries.test.ts` asserts the direction |
+| Renderer samples `Car.positionAt(t)` between kernel events | ✅ built — `frame/frameAt.ts`, driven by `playback/clock.ts` |
+| Building editor: floors, banks, cars, zones | ⬜ **not built** — inventoried as UX.md § 4 (Surface C) only |
+| Live metrics overlay; run playback from a stored seed | ⚠️ **half** — playback from a stored seed is built and has a negative control; the metrics overlay is not built |
+
+The first acceptance clause is exercised by `packages/viz/src/replay/replay.test.ts` (round trip
+from the stored seed, a seed-altered negative control, and a coarse-sample-rate control); the second
+by `packages/viz/src/record/recordRun.test.ts` § *"gives every shaft the start the run itself
+reports, not the position it ended at"*. The phase is **not** marked complete because two of its
+four scope bullets are unbuilt; wave 2 fans out against the contract this foundation froze
+([`DECISIONS.md` § D5, § D15](../DECISIONS.md)).
 
 ---
 
@@ -292,14 +336,43 @@ on Garden Apartments, where parking policy dominates.
 
 **Status: green. Both criteria are MET as the roadmap words them — but the second is met by
 `zone-center`, not by the learned arrival model this phase's own scope bullet names.** The gate lives
-in
-`packages/experiments/src/benchmark/`, whose `index.ts` is the written report; every number below is
-regenerated by `formatBenchmark(await runBenchmark())`.
+in `packages/experiments/src/benchmark/`, whose `index.ts` is the written report.
+
+> **Which entry point regenerates which number.** This section previously said *"every number below
+> is regenerated by `formatBenchmark(await runBenchmark())`"*. That is false and was
+> [review finding #17](08-review-findings.md): `runBenchmark` is a loop over `BENCHMARK_CASES`
+> calling `runBenchmarkCase`, and `formatBenchmark` is `results.map(formatCase)` plus
+> `formatCriterionVerdict`. It calls none of the studies below. The actual mapping:
+>
+> | numbers | entry point |
+> |---|---|
+> | the § 1 comparison tables and the first criterion's verdict | `formatBenchmark(await runBenchmark())` |
+> | the pre-positioning table (`zone-center`, `lobby`, `predicted-demand`) | `runPrepositioningStudy()` |
+> | the tail terms and the saturation census | `runTailStudy()` |
+> | the capacity-reassignment sweep | `runCapacityReassignmentStudy()` |
+> | the predictor-lag study | `measurePredictorLag()` |
+> | the forecast-causality audit | `auditForecastCausalityInRun()` |
+> | the auction-aggregation reachability table | `measureAuctionAggregation()` |
+> | the deadband and rate sweeps below | **no entry point ships** — driven through `runBenchmarkCase` by hand, so they are recorded rather than reproducible in one call |
+>
+> `packages/experiments/src/benchmark/published.test.ts` now partitions every interval-shaped
+> literal in `benchmark/` into *reproduced by a pinned estimate at its own printed precision* or
+> *declared unpinned with a count*, asserting the two multisets are equal in both directions — so a
+> number cannot appear without a study behind it, and a study's number cannot change in silence.
 
 | criterion | verdict |
 |---|---|
 | each dispatcher beats `nearest-car` with a paired-t interval excluding zero on at least one building | **MET** — 9 of 9 arms. One arm is also WORSE somewhere and is named below |
-| pre-positioning shows measurable AWT improvement on Garden Apartments | **MET as written** — `zone-center` vs `stay` is **−4.88 s [−5.27, −4.49]** (−29.7 %) at n = 500 under CRN. **The *predictive* strategy does NOT clear it at the settings the library ships:** `predicted-demand` vs `stay` is **−0.006 s [−0.031, +0.019]**, a measured near-zero rather than an unresolved one. It reaches −0.98 s [−1.28, −0.68] only after `idle.repositionThresholdS` is retuned from 8 s to 3 s, and the profile is left as authored |
+| pre-positioning shows measurable AWT improvement on Garden Apartments | **MET as written** — `zone-center` vs `stay` is **−4.88 s [−5.27, −4.49]** (−29.7 %) at n = 500 under CRN. **The *predictive* strategy does NOT clear it at the settings the library ships:** `predicted-demand` vs `stay` is **−0.006 s [−0.021, +0.010]**, a measured near-zero rather than an unresolved one. It reaches −0.98 s [−1.28, −0.68] only after `idle.repositionThresholdS` is retuned from 8 s to 3 s, and the profile is left as authored |
+
+> **The `predicted-demand` row was wrong here, and the way it was wrong is worth keeping.**
+> It read `−0.006 [−0.031, +0.019]` — the correct bound for the **n = 300** deadband
+> sweep, pasted into a row whose own prose says n = 500. At n = 500 the same comparison is
+> `−0.006 [−0.021, +0.010]` (mean −0.005801020408, SE 0.007965417897), a half-width 1.6× narrower.
+> The *mean* matched, every other row in the same study reproduced to the digit, and no test read
+> either bound — which is exactly why it survived. [Review finding #4](08-review-findings.md); root
+> cause and the n = 500 re-measurement are T9's, and `benchmark/published.test.ts` now fails if the
+> n = 300 literal reappears in an n = 500 position.
 
 The second criterion previously read *NOT MET — 500 of 500 paired differences precisely `0`*, and
 that zero was never statistical. Four Phase 5 behaviours were built correctly and connected to
@@ -356,10 +429,13 @@ Seven measurements the headline hides, all of them results rather than opinions:
   per cell: crossings per run climb 0.00 → 0.55 → 2.77 → 6.07 → 19.27 → 40.98 across 1/2/3/4/8/16 %
   and `capacityHeld` shows the monitor examining 5 to 34 calls per run — so the sweep runs — while
   **migrations stay at exactly 0.00 per run through 4 %**, the last quotable load. The first migration
-  appears at 8 %, where 56 of 60 replications have a diverging queue and no mean may be quoted. The
-  −0.520 s [−1.029, −0.010] that switching the policy is worth at 3 % is *reassignment as a whole*,
-  and it decomposes to `split-demand` widening an already-assigned landing 0.367 times per run and a
-  car-to-car swap 0.017 times per run — none of it the capacity trigger. `core/src/sim/seam.test.ts`
+  appears at 8 %, where 56 of 60 replications have a diverging queue and no mean may be quoted.
+  **Switching the policy at 3 % is not a resolved effect at this budget:** the paired difference is
+  −0.520 s [−1.039, +0.000] at n = 60, which **contains zero — INDISTINGUISHABLE**. The point
+  estimate is *reassignment as a whole*, and it decomposes to `split-demand` widening an
+  already-assigned landing 0.367 times per run and a car-to-car swap 0.017 times per run — none of
+  it the capacity trigger. The sign is stable and the magnitude is plausible; what n = 60 does not
+  buy is the right to call it a win. `core/src/sim/seam.test.ts`
   asserts `capacityMigrations > 0` at the traffic profile's default demand and is right to as a wiring
   guard, but at that point AWT is 788 s and 60 of 60 replications diverge; it is proof of connection,
   not evidence the mechanism pays.
@@ -370,15 +446,31 @@ Seven measurements the headline hides, all of them results rather than opinions:
   *run loop* hands the model — over 100 real replications of Midtown Office under mixed traffic:
   **0 of 34 422** forecast queries ran backwards, `corr(forecast, preceding 300 s)` is 0.614 against
   `corr(forecast, following 300 s)` 0.324, and the partial correlation with the future **given every
-  arrival the run had already produced** is **−0.0139 [−0.0315, +0.0036]** — zero, over replications
+  arrival the run had already produced** is **−0.0139 [−0.0317, +0.0038]** — zero, over replications
   rather than over queries. A forecast that leaked the trace would keep predictive power there.
 - **`nearest-car` is too weak a baseline to separate anything.** Unchanged: it loses by 27–30 % on
   the up-peak buildings and is the only profile that saturates inside the measured budget, capping
   Midtown Office at **n = 287**. `zoned-uppeak` is now the only other arm that ever loses its AWT in
   1 000 replications, at index 683 on Secure Tower — above the 150 that case is measured at. The
   tail terms only earn their weights one load step *above* where the baseline stops being quotable:
-  at 2 % with two entrances contending, `fairness-first` − `eta` is **−0.23 s AWT [−0.41, −0.05]**,
-  **−1.58 s WT95** and **−1.94 s WT99**.
+  at 2 % with two entrances contending, `fairness-first` − `eta` is **−0.26 s AWT [−0.45, −0.08]**,
+  **−1.65 s WT95** and **−2.05 s WT99**.
+
+  > **These three figures were stale, and the reason is this section's own defect resurfacing a
+  > phase later.** They read `−0.23 [−0.41, −0.05]` / `−1.58` / `−1.94` until 2026-07-27. T9
+  > extracted the commit that introduced `tailStudy.ts` (`a1ec6ad`), built it, and re-ran the study:
+  > **the old tree reproduces the published text character-for-character**, and the current tree does
+  > not. The figures were measured *before* `c237d95` wired stage 5 (capacity reassignment) and
+  > stage 7 (pre-positioning) into `sim/simulation.ts`, and were never regenerated afterwards. The
+  > mechanism is clean at replication resolution: `eta` declares no `reassignmentPolicy`, so the
+  > wiring moved the treatment arms and left the reference untouched — `eta`'s mean is bit-identical
+  > at every load, `fairness-first` changed on 10 of 250 replications and `capacity-aware` on 5, and
+  > in both arms *changed ⊂ migrated*. `zoned-uppeak` moved on all 250 through a different mechanism
+  > (stage 7 `zone-center` parking, wired by the same commit), which is why only its column of the
+  > saturation census moved. **No verdict flips anywhere.** So the four dead seams this section
+  > reports fixing had a second cost nobody billed: every number measured while they were dead became
+  > wrong the moment they were wired, and nothing in the suite re-derived a published interval, so no
+  > test could notice. That is the argument for `published.test.ts` above.
 
 Two things the wiring also made authorable as **data** rather than as an options object:
 
@@ -478,7 +570,18 @@ Search the parameter space instead of hand-guessing weights. Full design in
 - Random search baseline, Bayesian optimization, CMA-ES; OCBA for final selection
 - Held-out traffic seeds for validation
 - Pareto front reporting over (AWT, energy, WT95)
-- Fuzzy traffic-pattern detector with hysteresis, driving per-pattern weight sets
+- ⬜ **NOT DONE — Fuzzy traffic-pattern detector with hysteresis, driving per-pattern weight sets.**
+  This bullet was listed as delivered and no detector exists.
+  `data/dispatcher-profiles.json` authors a complete `patternSwitching` block — `type: "fuzzy"`,
+  four inputs, five patterns, `hysteresisS: 120`, a `weightSetsByPattern` map — which is
+  schema-validated, typed on the public `core` barrel, and cross-checked for dangling profile names,
+  and **nothing reads it**. A user editing `weightSetsByPattern` sees a clean `loadConfig` and zero
+  behavioural change: the defect one level up from code, into data.
+  [Review finding #5](08-review-findings.md), confirmed by measurement and recorded as deliberately
+  unimplemented scope in [`DECISIONS.md` § D12](../DECISIONS.md). It is deferred rather than dropped
+  because it is a genuinely new *behaviour* — a controller that switches the whole weight vector
+  mid-run — with its own acceptance question and its own risk to CRN, since two arms that switch at
+  different times see different weight vectors at the same instant.
 
 **Acceptance:** a tuned weight vector beats the hand-authored `predictive-balanced`
 profile on **held-out seeds** with a paired-t interval excluding zero. Candidates whose
@@ -505,52 +608,56 @@ indistinguishable rather than ranked.
 > See [Traffic & Statistics](03-traffic-and-statistics.md) § *Measured: flat plateaus, not
 > noise*.
 
-**Status: NOT ACCEPTED — the phase is blocked by the sixth instance of this document's own standing
-requirement.** The machinery is built and correct; it is reachable from nothing. This section
-previously read *"green. The machinery is complete and wired"*, and that verdict was wrong: it was
-reached by verifying the seam *inside* `tuning/report` and never checking the seam at the package
-boundary.
+**Status: ACCEPTED (2026-07-27), against the criteria as written and after the three blockers
+below were closed.** This section has now carried three different verdicts, and the sequence is the
+point: it read *"green. The machinery is complete and wired"* when nothing outside a test could
+reach the module; that was corrected to **NOT ACCEPTED** by
+[review finding #1](08-review-findings.md); the blockers were then closed by real work rather than
+by rewording, and the verdict is accepted on the evidence below. **Both scope bullets that were
+never built are marked not-done above rather than swept into this verdict.**
 
-**What is actually true.** There is no `packages/experiments/src/tuning/index.ts`;
-`packages/experiments/src/index.ts` exports nothing from `tuning/`; and every importer of
-`randomSearch`, `successiveHalving`, `sepCmaEs`, `runnerObjective` and `runHoldoutRound` is either a
-`*.test.ts` in the same directory or a barrel re-export — and this document is explicit that
-**a barrel re-export is not a caller**. The CLI exposes `list|run|compare|watch` and no tuning
-command. Nothing a user or an experiment can invoke reaches any of it.
+**What was wrong, recorded so the shape stays visible.** There was no
+`packages/experiments/src/tuning/index.ts`; `packages/experiments/src/index.ts` exported nothing
+from `tuning/`; every importer of `randomSearch`, `successiveHalving`, `sepCmaEs`, `runnerObjective`
+and `runHoldoutRound` was either a `*.test.ts` in the same directory or a barrel re-export — and this
+document is explicit that **a barrel re-export is not a caller**. The CLI exposed
+`list|run|compare|watch` and no tuning command.
 
-**The module said so itself.** `tuning/search/index.ts` § 6 is titled *"OPEN — nothing here is
-reachable from the package's public surface"* and calls it "a gate blocker, recorded here rather
+**The module said so itself.** `tuning/search/index.ts` § 6 was titled *"OPEN — nothing here is
+reachable from the package's public surface"* and called it "a gate blocker, recorded here rather
 than left to be rediscovered." That was honest and correct; the phase was accepted anyway, over the
 module's own written objection. That is the failure worth learning from — the fifth instance was
 caught by a verifier, and the sixth was *reported by the code itself* and then overridden at the
-acceptance step.
+acceptance step. `dispatch/deadCode.test.ts` could not have caught it either: it sets
+`AUDITED_MODULES = ['core/src/dispatch/policies', 'core/src/dispatch/predictor']`, is a
+`packages/core` test, and cannot see `packages/experiments` at all.
 
-**Why the existing guards did not catch it.** `dispatch/deadCode.test.ts` sets
-`AUDITED_MODULES = ['core/src/dispatch/policies', 'core/src/dispatch/predictor']`. It is a
-`packages/core` test and cannot see `packages/experiments` at all, so the mechanical audit was
-structurally incapable of covering `tuning/` no matter what it contained.
+**The three requirements this section set, each checked rather than asserted:**
 
-**To accept this phase**, three things, none of which is a rewrite:
+| requirement | evidence |
+|---|---|
+| 1. A `tuning/index.ts` barrel and a re-export from `packages/experiments/src/index.ts`, resolving the `Candidate` name collision between `tuning/space` (a parameter assignment) and `tuning/search` (a configuration under evaluation) | ✅ `packages/experiments/src/tuning/index.ts` exists; `packages/experiments/src/index.ts` re-exports from it, names listed explicitly rather than by `export *`; the collision is resolved in `tuning/index.ts` with the space keeping the bare name |
+| 2. A **real caller** — the natural one is a CLI `tune` command | ✅ **named non-test caller: `tuneCommand` in `packages/cli/src/commands/tune.ts`**, which imports and calls `runnerObjective`, `successiveHalving`, `sepCmaEs`, `randomSearch` and `runHoldoutRound` directly, and is registered as `['tune', …]` in `packages/cli/src/index.ts`. `elevator-sim --help` lists **five** commands: `list run compare tune watch` |
+| 3. An experiments-side dead-code audit with `AUDITED_MODULES` extended to `experiments/src/tuning/{search,space,report}` | ✅ `packages/experiments/src/tuning/deadCode.test.ts`, with exactly those three modules |
 
-1. A `tuning/index.ts` barrel and a re-export from `packages/experiments/src/index.ts`, resolving
-   the `Candidate` name collision between `tuning/space` (a parameter assignment) and
-   `tuning/search` (a configuration under evaluation) that `search/index.ts` § 6 documents as the
-   concrete blocker.
-2. A **real caller** — the natural one is a CLI `tune` command, which also gives the phase a
-   user-visible surface and is how the acceptance number gets produced at a real budget.
-3. An experiments-side dead-code audit mirroring `deadCode.test.ts`, with `AUDITED_MODULES`
-   extended to `experiments/src/tuning/{search,space,report}`, so a seventh instance fails a test
-   rather than waiting for a reviewer.
+**And the phase was made to answer its own known-answer test.** `docs/07-handoff.md` § 5 left
+`data/dispatcher-profiles.json`'s `idle.repositionThresholdS` at the shipped **8 s** on purpose,
+against Phase 5's independently measured interior optimum of **2 s**, so that an optimizer that
+rediscovers it blind has validated itself. Run end to end against the real `data/` directory by the
+orchestrator: `tune` searching that dimension from the shipped 8 s returned **2.582 s**, with the
+tuning and holdout seed sets printed `DISJOINT` (trace seed 9876618837807159332 against holdout
+11367898276632666949) and a holdout verdict of `GENERALIZES` at `--validate-reps 150`. That is the
+phase's product — a search, an optimizer-found value, and a held-out check — produced by a command a
+user can type.
 
-What *is* done and verified, and does not need redoing: the search space, the three searches,
-successive halving, plateau detection, the Pareto reporting and the held-out validation round are
-built, individually tested, and `runHoldoutRound()` is exercised end to end against the real `data/`
-directory by `report/holdoutRound.test.ts`. The acceptance measurement below was produced by that
-path and stands.
+What *is* done and verified: the search space, the three searches, successive halving, plateau
+detection, the Pareto reporting and the held-out validation round are built, individually tested, and
+`runHoldoutRound()` is exercised end to end against the real `data/` directory by
+`report/holdoutRound.test.ts`. The acceptance measurement below was produced by that path and stands.
 
 | criterion | verdict |
 |---|---|
-| a tuned weight vector beats hand-authored `predictive-balanced` on **held-out** seeds with a paired-t interval excluding zero | **MET as a measurement, NOT as a gate** — at n = 60 on Garden Apartments, `idle.repositionThresholdS` 8 s → 2 s gives **−1.288 s [−2.257, −0.319]** on the holdout seed set, which excludes zero. On the *tuning* seed set the same arm gives **−0.916 [−2.135, +0.303]**, which does not |
+| a tuned weight vector beats hand-authored `predictive-balanced` on **held-out** seeds with a paired-t interval excluding zero | **MET as a measurement, NOT as a gate** — at n = 60 on Garden Apartments, `idle.repositionThresholdS` 8 s → 2 s gives **−1.288 s [−2.277, −0.298]** on the holdout seed set, which excludes zero. On the *tuning* seed set the same arm gives **−0.916 [−2.161, +0.328]**, which does not |
 | candidates below the interval half-width are reported as indistinguishable rather than ranked | **MET** — `pareto.ts` places an arm on the front only where another is significantly better on ≥1 objective and significantly worse on none; ties are reported as `indeterminate`, never ordered |
 
 **Why the interval is measured but not asserted.** The sign is stable and the effect is real, but
@@ -562,6 +669,15 @@ that the seed sets are disjoint, that every arm ran the same seeds within a set,
 parameter demonstrably reaches the dispatcher (`verdict !== 'IDENTICAL'`), and that the page renders
 both fronts — and leaves the number to a run with a real budget. **Producing that number at 50–200
 replications is Phase 8's job**, not a weakening of this criterion.
+
+> **The argument for not gating on it got stronger, not weaker, when the interval was corrected.**
+> Both bounds above moved outward on 2026-07-27, when `estimateMean` stopped switching from
+> Student-t to the normal quantile above n = 25 ([review finding #14](08-review-findings.md);
+> [`DECISIONS.md` § D14](../DECISIONS.md)). The mean did not move; only the half-width did, by
+> 2.09 % at n = 60. The holdout interval still excludes zero — `−0.319` → `−0.298` — but its margin
+> falls from 33 % of the half-width to **30 %**. A gate asserting significance here would have been
+> a coin flip before the correction and is a slightly worse one after it. Full precision:
+> `mean = −1.2878228134149254`, `SE = 0.494478730556314`, `t(59)` half-width 0.9894497.
 
 Three results worth carrying forward:
 

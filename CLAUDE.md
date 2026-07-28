@@ -8,15 +8,23 @@ An elevator traffic simulator for designing and benchmarking smart dispatch algo
 Read [`docs/00-project-brief.md`](docs/00-project-brief.md) first, then
 [`docs/01-architecture.md`](docs/01-architecture.md).
 
-**Current status: Phases 0–3, 5 and 7 landed and green, plus a CLI.** Phases 4, 6 and 8 are not
-started; [`docs/07-handoff.md`](docs/07-handoff.md) is the resume brief. Work proceeds by the phases
+**Current status: Phases 0–3, 5 and 7 are landed and accepted, plus a five-command CLI. Phase 4 is a
+foundation only. Phases 6 and 8 are not started.**
+[`docs/07-handoff.md`](docs/07-handoff.md) is the resume brief. Work proceeds by the phases
 in [`docs/05-roadmap.md`](docs/05-roadmap.md), which carries each phase's acceptance verdict and the
 measurements behind it. Read its **Standing requirement — the integration seam has an owner** before
 planning work: a behaviour that is configurable, unit-tested in isolation and never called from a
-shipped path passes every other check this repository runs, and has already shipped **five** times.
-The fifth was `tuning/report`, whose every caller was one of its own tests — so the rule is not
-"is it reachable?" but **"name the non-test caller"**. A barrel re-export and a `{@link}` tag look
-exactly like a caller and are not one.
+shipped path passes every other check this repository runs, and has already shipped **eight** times.
+The instructive one is the sixth: the whole of `tuning/` was reachable from nothing outside its own
+tests, the module said so in its own docstring, and the roadmap asserted the phase green anyway. So
+the rule is not "is it reachable?" but **"name the non-test caller"**. A barrel re-export and a
+`{@link}` tag look exactly like a caller and are not one.
+
+**A published number goes stale the same way.** Three figures in this repository did not reproduce
+from the code that was supposed to produce them — one measured before a seam was wired and never
+regenerated, two hand-transcribed through a double rounding — and no test noticed, because nothing
+in the suite re-derived a published interval. If you publish a number, pin it to the run that
+produced it.
 
 ## Non-negotiable invariants
 

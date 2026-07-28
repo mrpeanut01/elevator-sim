@@ -42,28 +42,43 @@ a test oracle.** If the simulator's numbers diverge wildly from the closed form 
 up-peak, there is a bug. It is the best free validation available.
 
 ```
-RTT = 2·H·tv + (S+1)·ts + 2·P·tp        round trip time
+RTT = 2·(H·tv + tx) + (S+1)·ts + 2·P·tp  round trip time
 S   = N·(1 − ((N−1)/N)^P)                expected stops among N floors
+H   = N − Σ_{i=1..N−1} (i/N)^P           expected highest reversal floor
 INT = RTT / L                            interval, L = cars in group
 HC5 = 300·P·L / RTT = 300·P / INT        persons handled per 5 minutes, whole group
 %POP = HC5 / population × 100            handling capacity as % of population
 ```
+
+**The `tx` term is not optional, and this block omitted it.** `roundTripTime()`
+computes `2·(H·tv + tx)` and `deriveUpPeakTerms` derives `tx` from real floor heights for *every*
+zoned bank — Secure Tower's high bank runs ~60 m of express, worth ~14 s each way and about **20 %
+of its round trip**. Hand-checking a zoned bank against the expression this document published
+therefore disagreed with the code by tens of seconds of RTT. `tx` is zero only for a bank whose
+served zone starts at the terminal, which is the unzoned case the textbook form assumes.
+
+The `H` line was missing too, while `highestReversalFloor`'s docstring asserted *"that is the
+expression stated in `docs/03-traffic-and-statistics.md` Part 2"* — of a formula this document did
+not contain. Both are [review finding #16](08-review-findings.md), and both are now checked rather
+than trusted: `packages/core/src/analytical/docFormula.test.ts` parses this fenced block and
+evaluates it against `roundTripTime()` on a bank with a non-zero `expressJumpS`.
+
+| Term | Meaning |
+|---|---|
+| `H` | Highest reversal floor — `N − Σ_{i=1..N−1} (i/N)^P`, exact for uniform destinations |
+| `N` | Number of floors served above the lobby |
+| `tv` | Single-floor transit time at rated speed |
+| `tx` | **Express-jump time** — the one-way run from the terminal to the bottom of the served zone. Zero for an unzoned bank, ~14 s for Secure Tower's high bank |
+| `ts` | Time lost per stop (doors, start delay, leveling) |
+| `tp` | Passenger transfer time |
+| `P` | Passengers per trip — **use 80% of rated capacity** |
+| `L` | Number of cars in the group |
 
 `HC5` is the **group** figure: `L` cars each complete `300/RTT` round trips in the window
 and carry `P` people on each. Dropping `L` gives the per-car figure, which is what `%POP`
 must not be measured with — on Midtown Office that reads 1.50% of population per 5 minutes
 against the 11–15% office target above, instead of the correct 6.01%. CIBSE Guide D and
 Barney both write it as `UPPHC = 300·P / INT`.
-
-| Term | Meaning |
-|---|---|
-| `H` | Highest reversal floor |
-| `N` | Number of floors served above the lobby |
-| `tv` | Single-floor transit time at rated speed |
-| `ts` | Time lost per stop (doors, start delay, leveling) |
-| `tp` | Passenger transfer time |
-| `P` | Passengers per trip — **use 80% of rated capacity** |
-| `L` | Number of cars in the group |
 
 ## Part 3: Statistical methodology
 
@@ -176,16 +191,43 @@ and a **confidence level** (e.g. 90%), then run until satisfied:
 
 ```
 after each replication n:
-    halfWidth = t[n-1, conf] * (s / sqrt(n))     # n <= 25, t-distribution
-    halfWidth = z[conf]      * (s / sqrt(n))     # n >  25, normal approximation
+    halfWidth = t[n-1, conf] * (s / sqrt(n))     # every n — no crossover
     if halfWidth < acceptableRange: stop and report mean
 ```
 
-z-values by confidence level:
+**This simulator uses Student-t at every `n`, in the stopping rule as well as in the published
+interval.** The textbook `t` (n ≤ 25) / `z` (n > 25) crossover, which this section previously wrote
+as the rule, describes the literature and **not** this repository. It was removed on 2026-07-27:
+
+- `estimateMean` — and therefore `pairedDifferenceEstimate`, and therefore every interval this
+  project prints — was switching to the normal quantile above n = 25 while the CLI labelled the
+  result "the paired-t interval". At n = 26 that is `z = 1.9600` where `t(25) = 2.0595`: the
+  half-width is 4.83 % too small and a nominal 95 % interval has **93.88 %** actual coverage. Three
+  of 148 real paired comparisons in a sweep at n = 26 flipped from EXCLUDES-ZERO to contains-zero.
+  [Review finding #14](08-review-findings.md).
+- The crossover survived in one function, `halfWidthQuantile`, whose docstring named two callers it
+  did not have. Nothing injected it; `validation/harness.ts` had already been building the
+  production stopping rule out of `estimateMean`. The symbol is **deleted**, and the stopping rule is
+  t-always by decision rather than by accident. The alternative — injecting a crossover estimator so
+  the loop control ran a narrower quantile than the report — would let a cell stop while its own
+  convergence report said IN PROGRESS: two numbers for the same quantity, which is finding #14's
+  failure mode one layer down. [`DECISIONS.md` § D14](../DECISIONS.md).
+
+**No replication count changed** as a result, in the suite or anywhere else. The t quantile is
+strictly wider than z, so the effect on the loop control is to stop *later*, which is the
+conservative direction: a rule that stops too early publishes a number it did not earn.
+
+Quantiles by confidence level. `z` is the `n → ∞` limit and is quoted for reference only — nothing in
+this repository uses it to build a published interval:
 
 | Confidence | 70% | 80% | 90% | 95% | 99% |
 |---|---|---|---|---|---|
-| z | 1.04 | 1.28 | 1.65 | 1.96 | 2.58 |
+| z (limit) | 1.04 | 1.28 | 1.65 | 1.96 | 2.58 |
+
+| n | 26 | 30 | 50 | 100 | 200 | 500 |
+|---|---|---|---|---|---|---|
+| t(n−1, .975) | 2.0595 | 2.0452 | 2.0096 | 1.9842 | 1.9720 | 1.9647 |
+| half-width vs z | +5.08 % | +4.35 % | +2.53 % | +1.24 % | +0.61 % | +0.24 % |
 
 ### Saturation detection
 

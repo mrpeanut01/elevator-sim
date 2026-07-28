@@ -42,15 +42,18 @@ This project exists to make those comparisons rigorous.
 | [Elevator Reference](docs/02-elevator-reference.md) | Elevator classes, speeds, capacities, door and motion timings |
 | [Traffic & Statistics](docs/03-traffic-and-statistics.md) | Demand profiles, RTT math, replication methodology, CRN, stopping rules |
 | [Test Buildings](docs/04-test-buildings.md) | Five reference buildings from low-rise to supertall |
-| [Roadmap](docs/05-roadmap.md) | Phased development plan |
+| [Roadmap](docs/05-roadmap.md) | Phased development plan, with each phase's acceptance verdict and the measurements behind it |
 | [Parameterization & Tuning](docs/06-parameterization-and-tuning.md) | How to tweak every model without recoding, and how to search for an optimum |
+| [Handoff](docs/07-handoff.md) | Current state, measured facts that bound what you may claim, known-answer tests, open debt |
+| [Review findings](docs/08-review-findings.md) | The whole-system review register, with each finding's disposition |
 
 Machine-readable configuration lives in [`data/`](data/).
 
 ## Status
 
-**Phases 0–3 and 5 are landed and green; Phase 7 is built but not yet accepted.** Three packages
-(`core`, `experiments`, `cli`), 115 test files, 2,442 passing tests, `tsc -b` clean.
+**Phases 0–3, 5 and 7 are landed and accepted. Phase 4 is a foundation only. Phases 6 and 8 are not
+started.** Four packages (`core`, `experiments`, `viz`, `cli`), 129 test files, 2,627 passing tests,
+`tsc -b` clean.
 
 | Phase | Status |
 |---|---|
@@ -59,9 +62,9 @@ Machine-readable configuration lives in [`data/`](data/).
 | 2 — Traffic & dispatch | ✅ Poisson batch arrivals, weighted-cost engine, RTT oracle |
 | 3 — Experiment infra | ✅ Replication runner, CRN, sequential stopping, paired-t |
 | 5 — Smart dispatch | ✅ Twelve cost terms, auction, predictor, benchmark suite |
-| CLI | ✅ `list`, `run`, `compare`, `watch` |
-| 7 — Automated tuning | ⚠️ Built and tested, **not accepted** — no non-test caller reaches it |
-| 4 — Visualization | ⬜ Not started |
+| 7 — Automated tuning | ✅ Search space, three searches, held-out validation, `elevator-sim tune` |
+| CLI | ✅ `list`, `run`, `compare`, `tune`, `watch` |
+| 4 — Visualization | ⚠️ Foundation only — rendering contract, frame producer, replay harness, Canvas renderer, 85-scenario UX inventory. Building editor and live metrics overlay unbuilt |
 | 6 — Destination dispatch & learned control | ⬜ Not started |
 | 8 — Testing campaign | ⬜ Not started |
 
@@ -71,8 +74,13 @@ Try it:
 npm install && npm run build
 npm run sim -- list
 npm run sim -- run --building garden-apartments --dispatcher eta --seed 42
+npm run sim -- compare --building midtown-office --a eta --b nearest-car --reps 100
+npm run sim -- tune --building garden-apartments --params idle.repositionThresholdS --seed 42
 npm run sim -- watch --building garden-apartments --dispatcher nearest-car --speed 10
 ```
+
+`compare` prints a paired-t interval on the difference and refuses to rank two arms whose interval
+contains zero — that is the point of the project, not a nicety.
 
 See the [Roadmap](docs/05-roadmap.md) for per-phase acceptance verdicts and the measurements behind
 them, and the [Handoff brief](docs/07-handoff.md) for current state and open debt.
