@@ -30,6 +30,7 @@ import {
   type Stage5Study,
 } from './capacityReassignment.js';
 import { loadResources } from '../validation/harness.js';
+import { capacityFigures, checkPinned, describeMismatches } from './published.js';
 
 const TIMEOUT_MS = 900_000;
 
@@ -146,5 +147,26 @@ describe('Phase 5 scope — capacity-driven reassignment on the load edge', () =
           `differences exactly zero, load-crossing migrations ${row.treatment.migrationsPerRun.toFixed(2)}/run.`,
       );
     }
+  }, TIMEOUT_MS);
+});
+
+
+/* -------------------------------------------------------------------------- *
+ * Layer A of the publication guard — see published.ts
+ * -------------------------------------------------------------------------- */
+
+describe('the figures this study publishes still come out of it', () => {
+  it('reproduces every pinned estimate, at full precision', async () => {
+    // Its own run, at the study's shipped default budget rather than this suite's cheaper 40:
+    // the intervals `capacityReassignment.ts` and `index.ts` § 2 publish — including the verdict
+    // flip T2 § 3 records — are n = 60 numbers, and a pin checked at another `n` is review finding
+    // #4 committed a second time.
+    const mismatches = checkPinned(
+      'capacity-reassignment',
+      capacityFigures(await runCapacityReassignmentStudy({})),
+    );
+    expect(describeMismatches('capacity-reassignment', mismatches), describeMismatches('capacity-reassignment', mismatches)).toBe(
+      '',
+    );
   }, TIMEOUT_MS);
 });

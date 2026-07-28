@@ -25,6 +25,8 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { causalityFigures, checkPinned, describeMismatches } from './published.js';
+
 import {
   AFTER_FLOOR,
   BEFORE_FLOOR,
@@ -170,6 +172,25 @@ describe('Phase 5 — the wired predictor is fed the past and only the past', ()
         `corr(forecast, future) ${result.correlationWithFuture.toFixed(4)}, ` +
         `partial(future | past) ${result.partialCorrelationWithFutureGivenPast.toFixed(4)} ` +
         `± ${result.partialHalfWidth.toFixed(4)} over ${result.partialSamples} samples.`,
+    );
+  }, 900_000);
+});
+
+
+/* -------------------------------------------------------------------------- *
+ * Layer A of the publication guard — see published.ts
+ * -------------------------------------------------------------------------- */
+
+describe('the figures this study publishes still come out of it', () => {
+  it('reproduces every pinned estimate, at full precision', async () => {
+    // At n = 100, which is what `index.ts` § 6 and this file's own header quote, not the n = 12 the
+    // suite above runs for speed. The published half-width is an n = 100 half-width.
+    const mismatches = checkPinned(
+      'forecast-causality',
+      causalityFigures(await auditForecastCausalityInRun({ replications: 100 })),
+    );
+    expect(describeMismatches('forecast-causality', mismatches), describeMismatches('forecast-causality', mismatches)).toBe(
+      '',
     );
   }, 900_000);
 });

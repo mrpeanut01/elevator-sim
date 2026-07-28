@@ -23,7 +23,7 @@
  * | criterion | verdict |
  * |---|---|
  * | *each dispatcher beats `nearest-car` with a paired-t interval excluding zero on at least one building* | **MET — 9 of 9 arms.** One of them, `zoned-uppeak`, is also WORSE than the baseline on a whole building, and it is named rather than averaged away |
- * | *pre-positioning shows measurable AWT improvement on Garden Apartments* | **MET as written, by `zone-center`: −4.88 s [−5.27, −4.49]** (−29.7 %) at n = 500 under CRN. **NOT MET by the *predictive* strategy at the settings the library ships:** `predicted-demand` reads **−0.006 s [−0.031, +0.019]**, a measured near-zero rather than an unresolved one. Retuning one field, `idle.repositionThresholdS`, from 8 s to 3 s takes it to −0.98 s [−1.28, −0.68] — reported as a retune, and the profile is left alone |
+ * | *pre-positioning shows measurable AWT improvement on Garden Apartments* | **MET as written, by `zone-center`: −4.88 s [−5.27, −4.49]** (−29.7 %) at n = 500 under CRN. **NOT MET by the *predictive* strategy at the settings the library ships:** `predicted-demand` reads **−0.006 s [−0.021, +0.010]**, a measured near-zero rather than an unresolved one. Retuning one field, `idle.repositionThresholdS`, from 8 s to 3 s takes it to −0.98 s [−1.28, −0.68] — reported as a retune, and the profile is left alone |
  *
  * **Phase 5 is green on both criteria as the roadmap words them**, and the second one is green on a
  * reading the roadmap's own scope bullet does not support — see the split immediately below, which is
@@ -43,7 +43,7 @@
  * | reading of the criterion | verdict |
  * |---|---|
  * | *idle repositioning* — stage 7, any strategy | **MET.** `zone-center` is `−4.88 [−5.27, −4.49]`, −29.7 %, and `lobby` is `+1.98 [+1.75, +2.20]` the other way. Parking policy dominates this building, exactly as the clause says |
- * | ***predictive* pre-positioning** — the learned arrival model of the phase's own bullet, at the settings the library ships | **NOT MET, and not for want of resolution.** `predicted-demand` vs `stay` on `predictive-balanced` as authored is **−0.006 s [−0.031, +0.019]** at n = 500, and the whole predictor apparatus — the same profile run with and without a forecast — is **−0.007 s [−0.032, +0.018]**, 296 of 300 replications bit-identical |
+ * | ***predictive* pre-positioning** — the learned arrival model of the phase's own bullet, at the settings the library ships | **NOT MET, and not for want of resolution.** `predicted-demand` vs `stay` on `predictive-balanced` as authored is **−0.006 s [−0.021, +0.010]** at n = 500 (review finding #4: this cell used to read `[−0.031, +0.019]`, which is the **n = 300** deadband-sweep bound of § 4 quoted in an n = 500 sentence — same mean to three places, a half-width 59 % too wide), and the whole predictor apparatus — the same profile run with and without a forecast — is **−0.007 s [−0.032, +0.018]**, 296 of 300 replications bit-identical |
  *
  * The second row is a **result, not a null result for want of power.** Garden's half-width here is
  * 0.02 s against a 0.3 s detectable-effect target, so the interval says the true effect is between
@@ -239,7 +239,7 @@
  * | strategy vs `stay` | AWT, 95 % paired-t | WT95 | % > 60 s | TTD | verdict on AWT |
  * |---|---|---|---|---|---|
  * | `zone-center` | **−4.88 [−5.27, −4.49]**, −29.7 % | −6.02 [−6.61, −5.43] | +0.02 [−0.04, +0.07] | −4.44 [−4.89, −3.99] | **BETTER** |
- * | `predicted-demand`, deadband 8 s as authored | `−0.006 [−0.031, +0.019]`, 497/500 differences exactly 0 | `0.00 [0.00, 0.00]` — **IDENTICAL**, 500/500 | `0.00 [0.00, 0.00]` — IDENTICAL | −0.01 [−0.02, +0.01] | **INDISTINGUISHABLE** |
+ * | `predicted-demand`, deadband 8 s as authored | `−0.006 [−0.021, +0.010]`, 497/500 differences exactly 0 | `0.00 [0.00, 0.00]` — **IDENTICAL**, 500/500 | `0.00 [0.00, 0.00]` — IDENTICAL | −0.01 [−0.02, +0.01] | **INDISTINGUISHABLE** |
  * | `predicted-demand`, deadband 3 s (**a retune**) | **−0.98 [−1.28, −0.68]**, −5.9 % | **−1.03 [−1.45, −0.62]** | +0.03 [−0.03, +0.09] | **−0.60 [−0.94, −0.26]** | **BETTER** |
  * | `lobby` | **+1.98 [+1.75, +2.20]**, +12.0 % | **+1.61 [+1.30, +1.93]** | +0.01 [−0.01, +0.04] | **+1.85 [+1.58, +2.11]** | **WORSE** |
  *
@@ -340,7 +340,7 @@
  * | load | `fairness-first` − `eta`: AWT | WT95 | WT99 | % > 60 s | quotable? |
  * |---|---|---|---|---|---|
  * | 1 % | −0.01 [−0.05, +0.02] | −0.05 [−0.13, +0.02] | −0.03 [−0.09, +0.03] | 0.00 exactly | yes; nothing significant |
- * | 2 % | **−0.26 [−0.45, −0.08]** | **−1.66 [−2.55, −0.76]** | **−2.05 [−2.98, −1.11]** | **−0.54 [−0.82, −0.27]** | **yes; all significant** |
+ * | 2 % | **−0.26 [−0.45, −0.08]** | **−1.65 [−2.55, −0.76]** | **−2.05 [−2.98, −1.11]** | **−0.54 [−0.82, −0.27]** | **yes; all significant** |
  * | 3 % | −1.10 [−1.58, −0.62] | −7.79 [−10.01, −5.57] | −9.65 [−12.17, −7.13] | −1.71 [−2.29, −1.14] | no: `eta` itself saturates |
  *
  * **The 2 % row is the phase's one clean demonstration that a tail term does what tail terms are for.**
@@ -460,9 +460,16 @@
  *
  * | case | AWT | WT95 | TTD |
  * |---|---|---|---|
- * | Midtown Office | **+1.43 [+1.11, +1.76]** | **+1.48 [+1.11, +1.85]** | **−2.59 [−3.06, −2.12]** |
+ * | Midtown Office | **+1.43 [+1.11, +1.76]** | **+1.48 [+1.10, +1.85]** | **−2.59 [−3.06, −2.12]** |
  * | Garden Apartments | +0.01 [−0.01, +0.02] | +0.02 [−0.02, +0.07] | −0.01 [−0.02, +0.01] |
- * | Secure Tower | **+0.42 [+0.27, +0.57]** | **+0.40 [+0.16, +0.64]** | **−0.81 [−1.08, −0.53]** |
+ * | Secure Tower | **+0.42 [+0.26, +0.57]** | **+0.40 [+0.16, +0.64]** | **−0.81 [−1.08, −0.53]** |
+ *
+ * Two lower bounds in that table read `+1.11` and `+0.27` until 2026-07-27. Both were **double
+ * roundings** — `1.104865` and `0.264903` taken to three places and then to two — and both are
+ * wrong under either quantile, so the T2 t/z switch could not have surfaced them. Of the 18 bounds
+ * in this table they are the only two where rounding twice differs from rounding once, which is
+ * how the cause was identified rather than guessed. `published.ts` now re-derives every one of
+ * them from the estimate.
  *
  * **The architecture answer, in the terms docs/01 asked it in.** Decentralizing the argmin buys
  * nothing: moving the computation into the cars changes who computes it, not what it computes, and the

@@ -39,6 +39,7 @@ import {
   type PrepositioningStudy,
 } from './prepositioning.js';
 import { armOf } from './suite.js';
+import { checkPinned, describeMismatches, prepositioningFigures } from './published.js';
 
 const TIMEOUT_MS = 900_000;
 
@@ -173,6 +174,23 @@ describe('Phase 5 criterion — pre-positioning on Garden Apartments', () => {
         `[${awt.estimate.lower.toFixed(3)}, ${awt.estimate.upper.toFixed(3)}] ` +
         `(${(awt.relativeEffect * 100).toFixed(1)} %) at n = ${awt.comparison.n}. ` +
         'Parking policy dominates here — and the up-peak instinct to park at the lobby is the wrong way round on a residential building.',
+    );
+  }, TIMEOUT_MS);
+});
+
+
+/* -------------------------------------------------------------------------- *
+ * Layer A of the publication guard — see published.ts
+ * -------------------------------------------------------------------------- */
+
+describe('the figures this study publishes still come out of it', () => {
+  it('reproduces every pinned estimate, at full precision', async () => {
+    // Free: the study above is already run and cached, so this is arithmetic on a result the suite
+    // has paid for. What it catches is the defect nothing else in this repository can — a docstring
+    // whose numbers the code stopped producing two commits ago.
+    const mismatches = checkPinned('prepositioning', prepositioningFigures(await study()));
+    expect(describeMismatches('prepositioning', mismatches), describeMismatches('prepositioning', mismatches)).toBe(
+      '',
     );
   }, TIMEOUT_MS);
 });
