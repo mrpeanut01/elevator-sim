@@ -467,10 +467,15 @@ export interface CarSnapshot {
  * cannot express:
  *
  * - `credentialGroup` and `destinationFloorId` are unknown at call time with conventional
- *   buttons and known under destination entry. That asymmetry is the mechanism behind the
- *   result this project wants to reproduce: destination dispatch does better under access
- *   control precisely because it learns both before boarding and can authorize and optimize
- *   in the same step.
+ *   buttons and known under destination entry, so a credential-aware profile can authorize and
+ *   optimize in one step where a conventional one cannot authorize at all.
+ *   **Measured, the performance claim built on that asymmetry is refuted** (DECISIONS.md § D30,
+ *   § D60). The credential is what makes an access-controlled building servable at all —
+ *   conventional dispatch cannot serve `secure-tower`'s interfloor traffic under any budget — and
+ *   once the credential is present, moving the *destination* earlier buys **less** there than on
+ *   an unzoned building, because the access check has already passed and three identical cars per
+ *   bank leave less for a destination to differentiate. The asymmetry is real; "better under
+ *   access control because of it" was not measured when it was written and is now measured false.
  * - `boardingPassengers` / `boardingMassKg` let a dispatcher that has counted the hall queue
  *   say so, instead of the car assuming `assumedBoardingPassengers`.
  */

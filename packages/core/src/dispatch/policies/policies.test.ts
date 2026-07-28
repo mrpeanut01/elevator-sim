@@ -216,16 +216,35 @@ interface ContributionScenario {
  *
  * | Scenario | Feeds |
  * |---|---|
- * | `idle` | `waitTime`, `distanceTravelled`, `stopCount`, `zoneAffinity`, `predictedDemand` |
- * | `loaded` | `detourPenalty`, `existingCallDelay`, `loadFactor`, `crowding`, `starvation` |
- * | `descending` | `directionReversal` — an idle car has no direction to reverse |
+ * | `idle` | `waitTime`, `distanceTravelled`, `stopCount`, `zoneAffinity`, `predictedDemand`, **`rideTime`** |
+ * | `loaded` | `detourPenalty`, `existingCallDelay`, `loadFactor`, `crowding`, `starvation`, `rideTime` |
+ * | `descending` | `directionReversal` — an idle car has no direction to reverse — and `rideTime` |
+ *
+ * ## Every call carries a destination, and it has to (finding C26)
+ *
+ * `rideTime` is the one term in the library with an `activeWhen`, and what it asks for is a call
+ * that knows where the passenger is going. These three calls used to carry no `destinationFloorId`,
+ * so `costRequestFor` forwarded none and `rideTime` returned 0 for every car in every scenario **by
+ * construction** — which meant the "has no weight that contributes nothing" assertion below would
+ * fail any profile that legitimately weighted it, and the failure would read as a defect in the
+ * profile rather than as a gap in this fixture.
+ *
+ * That it was a fixture gap was provable from this very file: the next test but one takes
+ * `contributionScenarios()[1]`, spreads a destination onto its call, and measures `rideTime` at 0
+ * under `up-down-buttons` and above 0 under `destination-entry`. The apparatus existed; the
+ * contribution scenarios simply never had a destination on them, because until Phase 6 no shipped
+ * profile weighted the one term that needs one.
+ *
+ * The destinations are chosen **above the call floor and different per scenario**, so `rideTime`
+ * has a real journey to price and two scenarios cannot mask each other by pricing the same one.
+ * They change nothing for the other eleven terms, which never read the field.
  */
 function contributionScenarios(): readonly ContributionScenario[] {
   const idle: ContributionScenario = {
     name: 'idle',
     cars: [snapshotAt('A', '0'), snapshotAt('B', '6'), snapshotAt('C', '12'), snapshotAt('D', '18')],
     at: 0,
-    call: call('9', 'up'),
+    call: call('9', 'up', 0, '17'),
     waitingPassengers: 6,
   };
 
@@ -260,7 +279,7 @@ function contributionScenarios(): readonly ContributionScenario[] {
     name: 'loaded',
     cars: loadedBank.map((car) => car.snapshot(90)),
     at: 90,
-    call: call('9', 'up'),
+    call: call('9', 'up', 0, '19'),
     waitingPassengers: 40,
   };
 
@@ -276,7 +295,7 @@ function contributionScenarios(): readonly ContributionScenario[] {
     name: 'descending',
     cars: descendingBank.map((car) => car.snapshot(4)),
     at: 4,
-    call: call('9', 'up'),
+    call: call('9', 'up', 0, '20'),
     waitingPassengers: 8,
   };
 
@@ -408,6 +427,68 @@ describe('every profile in data/dispatcher-profiles.json', () => {
     // map sends raw 0 to 0, so no published number moved) and the *general* rule is asserted
     // mechanically below, off each term's own `activeWhen`.
     expect(inertByProfile).toEqual({});
+  });
+
+  it('lets a profile weighting rideTime under a destination call type pass the contribution check', () => {
+    /*
+     * **The regression pin for finding C26.** The assertion above scores every shipped profile over
+     * `contributionScenarios()`, and those scenarios used to carry no destination — so `rideTime`
+     * returned 0 for every car in every one of them *by construction*, and the natural Phase 6
+     * profile (`{ waitTime: 1, rideTime: 1 }` under a destination call type) could not be shipped:
+     * it failed with `{ 'destination-eta': ['rideTime'] }`, and the failure looked like a defect in
+     * the profile rather than a gap in the fixture.
+     *
+     * This is that promotion, exercised. It is deliberately run against a profile built here rather
+     * than one taken from `data/`, because whether the shipped file *carries* the weight is a
+     * separate decision with its own pins to regenerate — this test's job is to prove the blocker
+     * is gone, so that the decision can be taken on its merits.
+     */
+    const candidate: DispatcherProfile = {
+      id: 'destination-eta+ride',
+      name: 'Destination ETA with ride time',
+      weights: { waitTime: 1, rideTime: 1 },
+      dispatch: { callType: 'mobile-credential' },
+    };
+    expect(unsatisfiedGatesOf(candidate)).toEqual([]);
+
+    const policy = createDispatchPolicy(candidate);
+    const priced = new Set<string>();
+    for (const scenario of contributionScenarios()) {
+      const context = groupContext(scenario.cars, scenario.at, {
+        waitingPassengers: scenario.waitingPassengers,
+        predictor: DEMAND_FORECAST,
+      });
+      for (const score of policy.score(scenario.call, scenario.cars, scenario.at, context)) {
+        for (const term of score.terms) {
+          if (term.contribution > 0) priced.add(term.termId);
+        }
+      }
+    }
+    expect(
+      [...priced].sort(),
+      'rideTime is still zero on every car in every contribution scenario, so the fixture is ' +
+        'still destination-blind and the promotion is still blocked',
+    ).toEqual(['rideTime', 'waitTime']);
+
+    // And the other direction, so the fixture cannot be said to be smuggling a destination into a
+    // conventional scenario: the same scenarios under `up-down-buttons` price `rideTime` at zero,
+    // because `costRequestFor` drops the field the call carries.
+    const conventional = createDispatchPolicy({
+      ...candidate,
+      id: 'conventional+ride',
+      dispatch: { callType: 'up-down-buttons' },
+    });
+    for (const scenario of contributionScenarios()) {
+      const context = groupContext(scenario.cars, scenario.at, {
+        waitingPassengers: scenario.waitingPassengers,
+        predictor: DEMAND_FORECAST,
+      });
+      for (const score of conventional.score(scenario.call, scenario.cars, scenario.at, context)) {
+        for (const term of score.terms) {
+          if (term.termId === 'rideTime') expect(term.contribution).toBe(0);
+        }
+      }
+    }
   });
 
   it('lets no profile weight a term its own stage settings make inert', () => {

@@ -119,9 +119,16 @@ export function acceptsCarCalls(mode: ServiceMode): boolean {
  *
  * Note what is deliberately *absent*: the destination, and the caller's credential. With
  * up/down buttons the system does not learn either until the passenger is already in the
- * car. That asymmetry is the mechanism behind the result this project wants to reproduce —
- * destination dispatch does better under access control precisely because it learns the
- * destination at call time and can authorize and optimize in the same step.
+ * car — which is why an access-restricted pickup floor is infeasible for a whole bank under
+ * conventional dispatch, and why a credential-aware profile can serve it.
+ *
+ * **Measured, the performance claim built on that asymmetry is refuted** (DECISIONS.md § D30,
+ * § D60). The credential is what makes an access-controlled building servable at all —
+ * conventional dispatch cannot serve `secure-tower`'s interfloor traffic under any budget — and
+ * once the credential is present, moving the *destination* earlier buys **less** there than on
+ * an unzoned building, because the access check has already passed and three identical cars per
+ * bank leave less for a destination to differentiate. The asymmetry is real; "better under
+ * access control because of it" was not measured when it was written and is now measured false.
  */
 export interface HallCall {
   /**

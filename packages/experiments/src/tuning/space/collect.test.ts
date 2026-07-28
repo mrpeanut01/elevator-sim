@@ -251,12 +251,21 @@ describe('every parameter core declares is accounted for', () => {
         expect(SPACE.byId.has(row.id), where).toBe(accepted);
       }
     }
-    // Ten schemas, 96 declared rows including the four `answer.*`/`car.*` that
+    // Ten schemas, 98 declared rows including the four `answer.*`/`car.*` that
     // `CAR_PARAMETERS` re-declares by spreading `LOAD_SENSOR_PARAMETERS`. Pinned so a schema
     // that stops being found — by being renamed, or by moving to a declaration form the scan
     // does not match — fails rather than silently shrinking the space.
-    expect(rows).toBe(96);
-    expect(SPACE.parameters.length).toBe(48);
+    //
+    // **96 → 98 and 48 → 49 in Phase 6b**, and the asymmetry is the point rather than an
+    // oversight. Two rows landed: `dispatch.passengerAssignment` (the Level-0/Level-1 switch,
+    // `DISPATCH_PARAMETERS`) and `sim.assignedWalkS` (the walk from a destination panel to the car
+    // it named, `SIM_PARAMETERS`). Only the first is a *dispatcher* dimension. The walk is a
+    // property of the lobby and is deliberately not authorable in a profile — a dispatcher that
+    // could tune its own walk distance could tune away its own cost — so it is declared, counted,
+    // and correctly absent from the searchable space, which is exactly the discrimination the
+    // biconditional above exists to prove.
+    expect(rows).toBe(98);
+    expect(SPACE.parameters.length).toBe(49);
     // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
     // always said `false` would satisfy the biconditional above only by accident.
     expect(authorable).toBeGreaterThan(0);

@@ -39,6 +39,7 @@
  */
 
 import type { SimTime } from '../kernel/types.js';
+import type { PassengerModel } from './comparability.js';
 import type { CredentialGroup, Direction } from '../model/types.js';
 
 import {
@@ -90,6 +91,12 @@ export interface BoardingDetails {
   readonly bankId?: string | undefined;
 }
 
+/** Which car a destination-dispatch landing panel named, and which bank it belongs to. */
+export interface AssignmentDetails {
+  readonly carId: string;
+  readonly bankId?: string | undefined;
+}
+
 export interface MetricsRecorderOptions {
   /**
    * The seed that produced this run (CLAUDE.md invariant 5).
@@ -128,6 +135,15 @@ export interface MetricsRecorderOptions {
    * constant and says so — see `IntervalStatistics.departureGapBasis`.
    */
   readonly carTimings?: CarTimings | undefined;
+  /**
+   * Which passenger model produced this run — see `metrics/comparability.ts`.
+   *
+   * Omitted for `conventional`, so a record written by a conventional run is byte-identical to
+   * one written before the field existed and every stored schema-version-1 record still parses.
+   * Present only when the landing panel named cars, which is exactly when nine of the recorded
+   * metrics stop being comparable with a record that does not carry it.
+   */
+  readonly passengerModel?: PassengerModel | undefined;
   /** Simulated time the run starts. Defaults to `0`. */
   readonly startedAt?: SimTime | undefined;
   /** The window this run intends to be reported over, when the demand template names one. */
@@ -158,6 +174,8 @@ interface LegState {
     alightedAt: SimTime | undefined;
     carId: string | undefined;
     bankId: string | undefined;
+    assignedCarId: string | undefined;
+    assignedAt: SimTime | undefined;
   };
 }
 
@@ -180,6 +198,7 @@ export class MetricsRecorder {
   readonly #population: number | undefined;
   readonly #carIds: readonly string[] | undefined;
   readonly #carTimings: CarTimings | undefined;
+  readonly #passengerModel: PassengerModel | undefined;
   readonly #startedAt: SimTime;
   readonly #reportWindow: ReportWindow | undefined;
   readonly #metadata: Readonly<Record<string, string | number | boolean>> | undefined;
@@ -190,6 +209,7 @@ export class MetricsRecorder {
 
   #lastEventAt: SimTime;
   #boardedCount = 0;
+  #assignedCount = 0;
   #alightedCount = 0;
   #finishedAt: SimTime | undefined;
 
@@ -208,6 +228,7 @@ export class MetricsRecorder {
     this.#carIds = options.carIds === undefined ? undefined : Object.freeze([...options.carIds]);
     this.#carTimings =
       options.carTimings === undefined ? undefined : Object.freeze({ ...options.carTimings });
+    this.#passengerModel = options.passengerModel;
     this.#startedAt = options.startedAt ?? 0;
     if (!Number.isFinite(this.#startedAt)) {
       throw new MetricsError(`Run start time must be finite; received ${this.#startedAt}.`);
@@ -234,6 +255,11 @@ export class MetricsRecorder {
   /** Legs that have boarded. */
   get boardedCount(): number {
     return this.#boardedCount;
+  }
+
+  /** Legs a landing panel named a car for. `0` under every conventional run. */
+  get assignedCount(): number {
+    return this.#assignedCount;
   }
 
   /** Legs that have completed. */
@@ -302,9 +328,54 @@ export class MetricsRecorder {
         alightedAt: undefined,
         carId: undefined,
         bankId: undefined,
+        assignedCarId: undefined,
+        assignedAt: undefined,
       },
     });
     this.#observe(passenger.arrivedAt);
+  }
+
+  /**
+   * Record the car a destination-dispatch landing panel named for a waiting leg.
+   *
+   * Beside `recordArrival` / `recordBoarding` / `recordAlighting` and called from the same one
+   * place `#admit`'s decision to assign is taken, so no leg can be promised a car without the
+   * promise reaching the metrics layer — which is what makes `legsAssigned` a check on the seam
+   * rather than a restatement of it.
+   *
+   * **Write-once**, mirroring `Passenger.assign` (DECISIONS.md § D29). A second call is a panel
+   * changing its mind, which this model does not have.
+   *
+   * @throws MetricsError if the leg never arrived, has already been assigned, has already
+   *   boarded, or is assigned before it arrived.
+   */
+  recordAssignment(
+    passenger: RecordablePassenger | string,
+    at: SimTime,
+    details: AssignmentDetails,
+  ): void {
+    this.#assertOpen('recordAssignment');
+    const id = typeof passenger === 'string' ? passenger : passenger.id;
+    const leg = this.#require(id, 'be assigned a car');
+    if (leg.record.assignedCarId !== undefined) {
+      throw new MetricsError(
+        `Leg "${id}" was assigned to car "${leg.record.assignedCarId}" at t=${String(leg.record.assignedAt)} and cannot be assigned to "${details.carId}" at t=${at}. A destination assignment is write-once.`,
+      );
+    }
+    if (leg.record.boardedAt !== undefined) {
+      throw new MetricsError(
+        `Leg "${id}" boarded at t=${leg.record.boardedAt} and cannot be assigned a car at t=${at}.`,
+      );
+    }
+    if (!Number.isFinite(at) || at < leg.record.arrivedAt) {
+      throw new MetricsError(
+        `Leg "${id}" cannot be assigned at t=${at}: it arrived at t=${leg.record.arrivedAt}.`,
+      );
+    }
+    leg.record.assignedCarId = details.carId;
+    leg.record.assignedAt = at;
+    this.#assignedCount += 1;
+    this.#observe(at);
   }
 
   /**
@@ -481,6 +552,7 @@ export class MetricsRecorder {
       ...(this.#population === undefined ? {} : { population: this.#population }),
       ...(this.#carIds === undefined ? {} : { carIds: this.#carIds }),
       ...(this.#carTimings === undefined ? {} : { carTimings: this.#carTimings }),
+      ...(this.#passengerModel === undefined ? {} : { passengerModel: this.#passengerModel }),
       startedAt: this.#startedAt,
       endedAt,
       ...(this.#reportWindow === undefined
@@ -539,6 +611,11 @@ function freezeLeg(leg: LegState): PassengerRecord {
     ...(source.alightedAt === undefined ? {} : { alightedAt: source.alightedAt }),
     ...(source.carId === undefined ? {} : { carId: source.carId }),
     ...(source.bankId === undefined ? {} : { bankId: source.bankId }),
+    // Omitted, not `undefined`, so a conventional run's record is byte-identical to one written
+    // before destination dispatch existed — which is what keeps every stored Phase 5 and Phase 6a
+    // record parseable and every published digest of one unchanged.
+    ...(source.assignedCarId === undefined ? {} : { assignedCarId: source.assignedCarId }),
+    ...(source.assignedAt === undefined ? {} : { assignedAt: source.assignedAt }),
   });
 }
 

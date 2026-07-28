@@ -46,6 +46,7 @@ import type { AuctionPolicyOptions } from '../dispatch/policies/types.js';
 import type { ArrivalModel } from '../dispatch/predictor/types.js';
 import type { DispatchPolicy } from '../dispatch/types.js';
 import type { SimTime } from '../kernel/types.js';
+import type { RunComparability } from '../metrics/comparability.js';
 import type { SummarizeOptions, WindowSelection } from '../metrics/summarize.js';
 import type { ReportWindow, RunRecord, RunSummary } from '../metrics/types.js';
 import type {
@@ -126,6 +127,22 @@ export const SIM_DEFAULTS = Object.freeze({
    * whose doors keep cycling advances the clock just as well as a moving one.
    */
   drainGraceS: 3600,
+  /**
+   * Seconds a passenger spends walking from a destination-entry panel to the car it named.
+   *
+   * **Zero by default, and that is the whole reason it is a knob rather than a constant.** The
+   * walk is real — a lobby panel is not next to the car it picks — but a non-zero default would
+   * move every destination-dispatch number by an undeclared amount and make the passenger-model
+   * change indistinguishable from the walk. A study sets it explicitly and reports the
+   * sensitivity.
+   *
+   * Charged **between `arrivedAt` and `boardedAt`**, never by moving `arrivedAt` later:
+   * `PassengerRecord.arrivedAt` is the window-membership key, dispatcher-independent by
+   * contract, and moving it would change which passengers fall in the report window per arm —
+   * at which point a paired-t is being taken over differently-populated windows and is not a
+   * paired-t. Inert under every conventional run, where nobody is assigned a car at all.
+   */
+  assignedWalkS: 0,
   /** Evenly spaced building-wide queue samples over the demand horizon. Feeds saturation detection. */
   queueSampleCount: 120,
   /**
@@ -200,6 +217,17 @@ export const SIM_PARAMETERS: readonly SimParameterSpec[] = Object.freeze([
     unit: 's',
     description:
       'Hard timeout: simulated seconds past the end of demand in which the system may finish delivering. Exceeding it is reported as a failed run, never trimmed away.',
+  },
+  {
+    id: 'sim.assignedWalkS',
+    type: 'continuous',
+    range: [0, 30],
+    scale: 'linear',
+    default: SIM_DEFAULTS.assignedWalkS,
+    unit: 's',
+    description:
+      'Walk from a destination-entry panel to the car it named, under dispatch.passengerAssignment "panel". Counted inside waiting time and inside time to destination, never by moving the arrival instant. Deliberately a property of the lobby and NOT authorable in a dispatcher profile: a dispatcher that could tune its own walk distance could tune away its own cost, and the Pareto front would be a lie.',
+    activeWhen: { 'dispatch.passengerAssignment': ['panel'] },
   },
   {
     id: 'sim.queueSampleCount',
@@ -342,6 +370,8 @@ export interface SimulationConfig {
 
   /* ---- the runner's own tunables; see SIM_PARAMETERS ---- */
   readonly transferWalkS?: number | undefined;
+  /** Walk from a destination-entry panel to the named car. See `SIM_DEFAULTS.assignedWalkS`. */
+  readonly assignedWalkS?: number | undefined;
   readonly dispatchRetryS?: number | undefined;
   readonly drainGraceS?: number | undefined;
   readonly queueSampleCount?: number | undefined;
@@ -418,6 +448,43 @@ export interface ConservationAudit {
   readonly legsAlighted: number;
   /** Sky-lobby transfers performed. */
   readonly transfers: number;
+
+  /* ---- destination dispatch; all three are 0 under the conventional passenger model ---- */
+
+  /**
+   * Legs a landing panel named a car for.
+   *
+   * Equal to {@link legsCreated} on any `completed` destination-dispatch run: a run that
+   * delivered everybody assigned everybody. It can fall short on a `timed-out` run, where a leg
+   * whose call no car could ever take is still standing at the landing unpromised — which is a
+   * *diagnosis*, and one the undelivered list already names, rather than a book that does not
+   * balance.
+   */
+  readonly legsAssigned: number;
+  /**
+   * Boardings onto a car other than the one the panel named. **Always 0, or the run threw.**
+   *
+   * Not a statistic: this is the whole of the passenger-model change stated as a number, and the
+   * defect it catches — a destination profile that ships, is configured, is weighted, and boards
+   * people exactly as the conventional model did — is the one the contract names as the most
+   * likely way this phase produces a dead seam.
+   */
+  readonly wrongCarBoardings: number;
+  /**
+   * **Broken promises**: occasions on which a car left behind somebody it had been promised to.
+   *
+   * An **event count, not a headcount**: one passenger bumped from three successive trips of the
+   * car they were promised counts three times, because three times is what it cost them.
+   *
+   * A *result*, not a failure (DECISIONS.md § D29). Those passengers keep their assignment and
+   * wait for the car they were told about; the alternative — re-offering them to the group — is
+   * the panel silently changing its mind, which would let this arm recover the deferral advantage
+   * it is supposed to have surrendered and flatter the very thing being measured. A non-zero
+   * count is the price of committing at call time, which is what this simulator exists to
+   * quantify.
+   */
+  readonly brokenPromises: number;
+
   /** `generated === delivered + undelivered && legsCreated === legsRecorded`. */
   readonly balanced: boolean;
 }
@@ -560,4 +627,13 @@ export interface SimulationResult {
    * is about, one level down: reachable in principle, unreachable from the shipped entry point.
    */
   readonly stageActivity: StageActivity;
+  /**
+   * Which passenger model this run used, and which recorded metrics that makes uncomparable.
+   *
+   * Empty list under every conventional and disclosure-only run. See `metrics/comparability.ts`
+   * for why nine of the nineteen change construct, and DECISIONS.md § D27 for the gate that
+   * follows from it: TTD with an interval excluding zero, **and** AWT and WT95 reported with
+   * explicit verdicts rather than omitted.
+   */
+  readonly comparability: RunComparability;
 }

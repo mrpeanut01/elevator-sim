@@ -36,6 +36,22 @@
  */
 
 export {
+  COMPARABLE_METRIC_IDS,
+  MODEL_SENSITIVE_METRICS,
+  MODEL_SENSITIVE_METRIC_IDS,
+  PASSENGER_MODELS,
+  comparabilityDisclaimer,
+  comparabilityOf,
+  passengerModelOf,
+} from './comparability.js';
+
+export type {
+  ModelSensitiveMetric,
+  PassengerModel,
+  RunComparability,
+} from './comparability.js';
+
+export {
   DEPARTURE_GAP_BASES,
   METRICS_SCHEMA_VERSION,
   MetricsError,
@@ -109,6 +125,7 @@ export type {
 export { MetricsRecorder } from './recorder.js';
 
 export type {
+  AssignmentDetails,
   BoardingDetails,
   MetricsRecorderOptions,
   RecordablePassenger,

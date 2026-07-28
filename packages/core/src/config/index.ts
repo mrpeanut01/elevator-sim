@@ -82,10 +82,13 @@ export {
   BUILDING_TYPES,
   CALL_TYPES,
   COMMITMENT_POINTS,
+  DESTINATION_CALL_TYPES,
   DOOR_TYPES,
   DWELL_POLICIES,
   PARKING_STRATEGIES,
+  PASSENGER_ASSIGNMENT_MODES,
   REASSIGNMENT_POLICIES,
+  isDestinationCallType,
 } from './types.js';
 
 export type {
@@ -100,6 +103,7 @@ export type {
   BuildingConfig,
   BuildingType,
   CallType,
+  PassengerAssignmentMode,
   CapacityEntry,
   CarConfig,
   CodeMinimumSpeed,

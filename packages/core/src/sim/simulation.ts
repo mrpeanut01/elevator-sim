@@ -28,7 +28,10 @@
  * 2. **Each batch is one kernel event.** Its passengers appear at the landing together, one
  *    button press between them.
  * 3. **Registration lights buttons and opens calls**, one per `(bank, floor, direction)` — see
- *    "Why calls are per bank" below — and runs the seven-stage lifecycle for that bank.
+ *    "Why calls are per bank" below — and runs the seven-stage lifecycle for that bank. Under
+ *    `dispatch.passengerAssignment: 'panel'` the allocation unit gains a fourth component, the
+ *    **destination**: the landing has no direction button, so two people going to two different
+ *    floors are two requests. See "Destination dispatch" below.
  * 4. **Cars execute their own commitments.** A car that is idle either stops where it stands,
  *    departs for the next stop on its projected route, or parks. Travel is the jerk-limited
  *    S-curve; the stop is the real door machine; boarding is bounded by the load cell.
@@ -51,13 +54,41 @@
  * is lit while anyone waits, and each bank that can carry *somebody* in that queue gets its own
  * `DispatchCall` with its own lifecycle.
  *
+ * ## Destination dispatch — the passenger model, not a cost term
+ *
+ * `dispatch.callType` decides what the *dispatcher* knows; `dispatch.passengerAssignment` decides
+ * what the *passenger is told*, and only the second changes what a passenger is. Under `'panel'`:
+ *
+ * - the allocation unit is `(bank, floor, direction, destination)` rather than the button, so the
+ *   call count rises with the number of distinct destinations at a landing (measured: 25 → 70 on
+ *   Midtown at the interfloor-mix operating point);
+ * - `#applyDecision` **tells the panel** — every unpromised passenger of that request is assigned
+ *   the car the group just chose, write-once, and the promise reaches the recorder in the same
+ *   statement pair;
+ * - `#boardFrom` refuses anyone whose promise names another car, or whose walk
+ *   (`sim.assignedWalkS`) is not finished;
+ * - a car that fills up leaves promised passengers behind rather than handing them on. Their
+ *   promise **stands** (DECISIONS.md § D29) and `#candidateCars` gives the call straight back to
+ *   the same car. `ConservationAudit.brokenPromises` counts how often that happens, and it is a
+ *   *result* — the price of committing at the panel — not a failure;
+ * - the panel performs the access check, so an authorized request is not refused a second time by
+ *   `estimateCost` for want of a credential (§ D30).
+ *
+ * `'none'` is the default and every branch above reduces to the code that was there before it
+ * existed, byte for byte: 0 of 55 shipped (building, profile) cells at seed 20260726 move.
+ *
+ * Nine of the nineteen recorded metrics stop being comparable across the two models
+ * (`metrics/comparability.ts`); the run says so in `result.comparability` and in a disclaimer.
+ *
  * ## How nobody gets lost
  *
  * Four mechanisms, in increasing order of how much they are relied on:
  *
  * - **Boarding is a `takeWaiting` with a serve predicate.** A passenger only ever leaves the
  *   landing queue by entering a car whose shaft reaches their destination and whose access
- *   zoning admits their credential. There is no other path out of the queue.
+ *   zoning admits their credential — and, under a panel, which is the car they were promised.
+ *   There is no other path out of the queue, and `ConservationAudit.wrongCarBoardings` is the
+ *   assertion that says so rather than the assumption.
  * - **A hall call is extinguished only when the landing has no eligible passenger left.** A car
  *   that fills up releases the call instead of completing it, and the group re-allocates it —
  *   which is the overflow case, and the reason a full car cannot delete a queue.
@@ -91,6 +122,12 @@ import {
   type GroupObservationContext,
 } from '../dispatch/index.js';
 import { SimKernel, type SimTime } from '../kernel/index.js';
+import {
+  comparabilityDisclaimer,
+  comparabilityOf,
+  passengerModelOf,
+  type PassengerModel,
+} from '../metrics/comparability.js';
 import { MetricsRecorder } from '../metrics/recorder.js';
 import { PEAK_WINDOW_S, departureGapBracket, summarizeRun } from '../metrics/summarize.js';
 import { MetricsError } from '../metrics/types.js';
@@ -154,6 +191,16 @@ interface ActiveCall {
   readonly bankId: string;
   readonly floorId: string;
   readonly direction: Direction;
+  /**
+   * The destination this call is *for*, under destination dispatch; `undefined` otherwise.
+   *
+   * This is what makes the allocation unit an **origin-destination pair** rather than a button.
+   * Two people at one landing bound for two different floors are two requests here, where a
+   * conventional landing has one up button between them, and it is the whole mechanism by which
+   * a destination dispatcher can send them to different cars. `#eligibleWaiting` filters the
+   * landing queue on it, so a call never counts — or is completed by — somebody going elsewhere.
+   */
+  readonly destinationFloorId?: string | undefined;
   /**
    * Frozen. `registeredAt` is the first press and is never refreshed; the credential is
    * whoever is at the head of the queue, and is refreshed when the call is re-offered.
@@ -248,6 +295,7 @@ interface WaitingTally {
 /** Options with every default applied. */
 interface ResolvedOptions {
   readonly transferWalkS: number;
+  readonly assignedWalkS: number;
   readonly dispatchRetryS: number;
   readonly drainGraceS: number;
   readonly queueSampleCount: number;
@@ -266,9 +314,27 @@ interface ResolvedOptions {
  */
 const MAX_DISPATCH_PASSES = 6;
 
-/** Identity of a `(bank, floor, direction)` allocation unit. */
-function callIdOf(bankId: string, floorId: string, direction: Direction): string {
-  return `${bankId}#${floorId}:${direction}`;
+/**
+ * Identity of an allocation unit.
+ *
+ * `(bank, floor, direction)` conventionally — the button, one live call per landing per way.
+ * `(bank, floor, direction, destination)` under destination dispatch — the request, one live
+ * call per origin-destination pair. The direction stays in the key even though the destination
+ * implies it: it keeps every id parseable by the same reader, and it keeps two calls that a
+ * hand-written fixture might give the same destination on different floors distinct.
+ *
+ * Matches `dispatch/lifecycle.ts`'s `batchKeyOf` in *what it keys on* and deliberately not in
+ * format: this is the runner's per-bank id, that is the policy's per-batch key, and a bank has
+ * to appear here and must not appear there.
+ */
+function callIdOf(
+  bankId: string,
+  floorId: string,
+  direction: Direction,
+  destinationFloorId?: string | undefined,
+): string {
+  const base = `${bankId}#${floorId}:${direction}`;
+  return destinationFloorId === undefined ? base : `${base}→${destinationFloorId}`;
 }
 
 /**
@@ -341,6 +407,20 @@ export class Simulation {
   readonly #recorder: MetricsRecorder;
   readonly #factory: PassengerFactory;
   readonly #profileId: string;
+  /**
+   * **The Level-0 / Level-1 switch, resolved once.**
+   *
+   * `true` only under `dispatch.passengerAssignment: 'panel'`. Read all over the run loop, and
+   * read from the *policy's resolved config* rather than from the authored profile, so a default
+   * and an authored value cannot disagree. Every bank of a run shares one profile, so one boolean
+   * is the whole of it.
+   *
+   * Where it is `false` — which is every run this project produced before this phase, and every
+   * destination *disclosure* run — each branch below reduces to exactly the code that was there,
+   * which is what makes `passengerAssignment` provably flat outside its own gate.
+   */
+  readonly #panelAssigns: boolean;
+  readonly #passengerModel: PassengerModel;
   readonly #runId: string;
   readonly #reportWindow: ReportWindow;
   readonly #summarizeOptions: SimulationConfig['summarize'];
@@ -390,6 +470,12 @@ export class Simulation {
   readonly #disclaimers: string[] = [];
   readonly #warnings: string[] = [];
   #transfers = 0;
+  /** Legs a landing panel named a car for. See {@link ConservationAudit.legsAssigned}. */
+  #legsAssigned = 0;
+  /** Boardings onto a car other than the promised one. Asserted `0`; see `#reconcile`. */
+  #wrongCarBoardings = 0;
+  /** Passengers a full car left behind after promising them a place. D29's *result*. */
+  #brokenPromises = 0;
   #capacityCrossings = 0;
   #capacityMigrations = 0;
   #capacityHeld = 0;
@@ -519,6 +605,30 @@ export class Simulation {
     }
     this.#buildPredictors(config, profile);
 
+    /* ---- which passenger model this run is ---- */
+    // Off the *resolved* stage of a policy this run actually built, not off the authored profile:
+    // `createPolicyFor` is what applies the defaults and what refuses `panel` under a call type
+    // that cannot ask for a destination, so a run whose policy would throw never gets here to
+    // claim a model it is not running. `config.createPolicy` is the instrumentation hook and may
+    // hand back a policy built from different options — reading it here is what keeps the model
+    // stamped on the record equal to the model the cars actually ran.
+    const [firstPolicy] = [...this.#policies.values()];
+    const stage = firstPolicy?.config.dispatch;
+    this.#passengerModel =
+      stage === undefined ? 'conventional' : passengerModelOf(stage);
+    this.#panelAssigns = this.#passengerModel === 'destination-dispatch';
+
+    /*
+     * The comparability disclaimer, raised at construction beside the double-deck one.
+     *
+     * A *disclaimer*, not an advisory, and ordered with them for the reason `#disclaimers`
+     * gives: an advisory qualifies a result, a disclaimer says the model is not the
+     * configuration a reader will assume. "AWT" on a panel run is a different quantity from
+     * "AWT" on a conventional one, and nothing about the number says so.
+     */
+    const disclaimer = comparabilityDisclaimer(this.#passengerModel);
+    if (disclaimer !== undefined) this.#disclaimers.push(disclaimer);
+
     this.#factory = new PassengerFactory({
       streams: this.#streams,
       massConfig: config.trafficProfiles.passengerMass,
@@ -565,6 +675,9 @@ export class Simulation {
 
     this.#recorder = new MetricsRecorder({
       seed: this.#streams,
+      ...(this.#passengerModel === 'conventional'
+        ? {}
+        : { passengerModel: this.#passengerModel }),
       runId: this.#runId,
       buildingId: resolved.id,
       dispatcherProfileId: profile.id,
@@ -927,38 +1040,51 @@ export class Simulation {
 
       const carried = new Set<string>();
       for (const bank of this.#building.banksServing(floor.id)) {
-        let count = 0;
-        let massKg = 0;
-        for (const passenger of waiting) {
-          if (!this.#bankCanCarry(bank, passenger)) continue;
-          carried.add(passenger.id);
-          count += 1;
-          massKg += passenger.massKg;
-        }
-        if (count === 0) continue;
+        for (const destinationFloorId of this.#requestKeys(waiting)) {
+          let count = 0;
+          let massKg = 0;
+          for (const passenger of waiting) {
+            if (
+              destinationFloorId !== undefined &&
+              passenger.destinationFloorId !== destinationFloorId
+            ) {
+              continue;
+            }
+            if (!this.#bankMayServe(bank, passenger)) continue;
+            carried.add(passenger.id);
+            count += 1;
+            massKg += passenger.massKg;
+          }
+          if (count === 0) continue;
 
-        const id = callIdOf(bank.id, floor.id, direction);
-        let active = this.#activeCalls.get(id);
-        if (active === undefined) {
-          active = {
-            id,
-            bankId: bank.id,
-            floorId: floor.id,
-            direction,
-            call: this.#callValue(id, floor, direction, at, bank),
-            carIds: Object.freeze([]),
-          };
-          this.#activeCalls.set(id, active);
+          const id = callIdOf(bank.id, floor.id, direction, destinationFloorId);
+          let active = this.#activeCalls.get(id);
+          if (active === undefined) {
+            active = {
+              id,
+              bankId: bank.id,
+              floorId: floor.id,
+              direction,
+              ...(destinationFloorId === undefined ? {} : { destinationFloorId }),
+              call: this.#callValue(id, floor, direction, at, bank, destinationFloorId),
+              carIds: Object.freeze([]),
+            };
+            this.#activeCalls.set(id, active);
+          }
+          this.#policy(bank.id).register(active.call, at, {
+            waitingPassengers: count,
+            waitingMassKg: massKg,
+          });
+          touched.add(bank.id);
         }
-        this.#policy(bank.id).register(active.call, at, {
-          waitingPassengers: count,
-          waitingMassKg: massKg,
-        });
-        touched.add(bank.id);
       }
 
       for (const passenger of waiting) {
         if (carried.has(passenger.id)) continue;
+        // A passenger already promised a car is served by that car's bank and by no other, so
+        // they are legitimately absent from every *other* bank's tally. Their own bank counted
+        // them, which is what this check is for.
+        if (passenger.isAssigned) continue;
         throw new SimulationError(
           `Passenger "${passenger.id}" waits at floor "${floor.id}" for "${passenger.destinationFloorId}", which no bank serving that floor can reach for credential "${String(passenger.credentialGroup)}". The trace planned a route no bank can fly; nobody could ever collect them.`,
         );
@@ -966,6 +1092,31 @@ export class Simulation {
     }
 
     return touched;
+  }
+
+  /**
+   * The distinct requests standing in one landing queue — the identities calls are opened for.
+   *
+   * `[undefined]` conventionally: the queue is one button, and the single call it opens serves
+   * whoever is in it. Under a panel it is the **distinct destinations**, in queue order, so two
+   * people at one landing bound for two different floors produce two requests where a direction
+   * button produces one. That is the mechanical heart of the change, and its first-order cost:
+   * the per-instant dispatch work rises with the number of distinct destinations at the landing
+   * rather than with the number of directions.
+   *
+   * Queue order and not a sort, so the order calls are opened in is arrival order — the same
+   * FIFO the rest of this module is deterministic by.
+   */
+  #requestKeys(waiting: readonly Passenger[]): readonly (string | undefined)[] {
+    if (!this.#panelAssigns) return [undefined];
+    const keys: string[] = [];
+    const seen = new Set<string>();
+    for (const passenger of waiting) {
+      if (seen.has(passenger.destinationFloorId)) continue;
+      seen.add(passenger.destinationFloorId);
+      keys.push(passenger.destinationFloorId);
+    }
+    return keys;
   }
 
   /* ---------------------------------------------------------------- *
@@ -1023,11 +1174,14 @@ export class Simulation {
           group ??= this.#groupContext(bank.id, snapshots, at);
           const decision = policy.dispatch(
             lifecycle.callId,
-            snapshots,
+            // Restricted to the promised car when this call's remaining passengers already have
+            // one. See `#candidateCars`: this is where D29's write-once promise is enforced, and
+            // it is here rather than in `#reofferCall` because three paths reach a re-offer.
+            this.#candidateCars(active, snapshots),
             at,
             withLandingCounts(group, waiting.count, waiting.massKg),
           );
-          if (this.#applyDecision(active, decision)) snapshots = undefined;
+          if (this.#applyDecision(active, decision, at)) snapshots = undefined;
           if (decision.outcome === 'deferred') {
             if (decision.dueAt !== undefined) this.#scheduleTick(bankId, decision.dueAt);
           } else if (decision.carIds.length === 0) {
@@ -1059,7 +1213,11 @@ export class Simulation {
    *
    * @returns `true` if any car's commitments actually changed.
    */
-  #applyDecision(active: ActiveCall, decision: Pick<DispatchDecision, 'carIds'>): boolean {
+  #applyDecision(
+    active: ActiveCall,
+    decision: Pick<DispatchDecision, 'carIds'>,
+    at: SimTime,
+  ): boolean {
     const next = decision.carIds;
     let changed = false;
     for (const carId of active.carIds) {
@@ -1073,7 +1231,49 @@ export class Simulation {
       changed = true;
     }
     active.carIds = next;
+    // **The landing panel answers**, at the instant the group decides and not one event later.
+    // Unconditional on `changed`, because a decision that names the car it already named is still
+    // the answer somebody who arrived since is waiting for.
+    if (next.length > 0) this.#tellThePanel(active, next, at);
     return changed;
+  }
+
+  /**
+   * Tell everyone still standing at this request which car to walk to.
+   *
+   * Called from {@link #applyDecision} — the one place a call moves onto a car — so a passenger
+   * cannot be promised a car the group did not choose, and cannot reach a queue anyone serves
+   * without the promise also reaching the metrics layer. That is the same argument `#admit`'s
+   * docstring makes for `recordArrival`, and it is what makes `legsAssigned` a check rather than
+   * a tautology.
+   *
+   * **Only the unpromised are told anything.** `Passenger.assign` is write-once and throws on a
+   * second call; skipping the already-promised is not a way around that throw but the statement
+   * of the rule — a decision that moves a call to another car (stage 5's capacity migration, or a
+   * re-offer) does not move the people who were already told where to stand.
+   *
+   * Under `split-demand` a request may be given several cars, and the queue is dealt across them
+   * in arrival order. Under `single-car` — every shipped profile — that is `carIds[0]` for
+   * everybody, evaluated identically.
+   */
+  #tellThePanel(active: ActiveCall, carIds: readonly string[], at: SimTime): void {
+    if (!this.#panelAssigns) return;
+    const floor = this.#building.requireFloor(active.floorId);
+    const bank = this.#building.bankById(active.bankId);
+    /* c8 ignore next -- every active call belongs to a bank of this building. */
+    if (bank === undefined) return;
+    let index = 0;
+    for (const passenger of this.#waitingForCall(floor, active)) {
+      if (passenger.isAssigned) continue;
+      if (!this.#bankCanCarry(bank, passenger)) continue;
+      const carId = carIds[index % carIds.length];
+      /* c8 ignore next -- `carIds` is non-empty at the one call site. */
+      if (carId === undefined) continue;
+      index += 1;
+      passenger.assign(carId, at);
+      this.#recorder.recordAssignment(passenger, at, { carId, bankId: bank.id });
+      this.#legsAssigned += 1;
+    }
   }
 
   /** Whether every car refused this call for a reason that cannot change with time. */
@@ -1211,6 +1411,16 @@ export class Simulation {
       this.#syncButton(active.floorId, active.direction);
       return;
     }
+    // **A broken promise, counted** (DECISIONS.md § D29). Everybody still standing here whom
+    // *this* car had been promised to is somebody a full car left behind. Their `assignedCarId`
+    // stands — `#candidateCars` will hand this call straight back to the same car, and they wait
+    // for it — so the count is the price of committing at the panel rather than a fault.
+    if (this.#panelAssigns) {
+      const floor = this.#building.requireFloor(active.floorId);
+      for (const passenger of this.#waitingForCall(floor, active)) {
+        if (passenger.assignedCarId === car.id) this.#brokenPromises += 1;
+      }
+    }
     // The person who pressed the button has gone up in the car; the credential on the re-offer
     // is whoever is now at the head of what is left.
     active.call = this.#callValue(
@@ -1219,6 +1429,7 @@ export class Simulation {
       active.direction,
       active.call.registeredAt,
       bank,
+      active.destinationFloorId,
     );
     policy.register(active.call, active.call.registeredAt, {
       waitingPassengers: waiting.count,
@@ -1279,7 +1490,10 @@ export class Simulation {
    */
   #loadWhileIdle(car: Car, at: SimTime): boolean {
     const floor = this.#building.requireFloor(car.floorId);
-    if (this.#waitingFor(car, floor, 'up') === 0 && this.#waitingFor(car, floor, 'down') === 0) {
+    if (
+      this.#waitingFor(car, floor, 'up', at) === 0 &&
+      this.#waitingFor(car, floor, 'down', at) === 0
+    ) {
       return false;
     }
     return this.#beginStop(car, [], [], at) === 'stopped';
@@ -1438,7 +1652,7 @@ export class Simulation {
     let boarding = 0;
     let projectedMassKg = car.loadSensor.massKg - alightingMassKg;
     for (const direction of directions) {
-      const projected = this.#projectedBoarding(car, floor, direction, projectedMassKg);
+      const projected = this.#projectedBoarding(car, floor, direction, projectedMassKg, at);
       boarding += projected.count;
       projectedMassKg = projected.massKg;
     }
@@ -1504,8 +1718,8 @@ export class Simulation {
     } else if (chosen.size === 0) {
       // Idle, doors open. Take the fuller queue; ties go up, so the choice is total and does
       // not depend on the order two queues happened to be built in.
-      const up = this.#waitingFor(car, floor, 'up');
-      const down = this.#waitingFor(car, floor, 'down');
+      const up = this.#waitingFor(car, floor, 'up', at);
+      const down = this.#waitingFor(car, floor, 'down', at);
       if (up > 0 || down > 0) chosen.add(up >= down ? 'up' : 'down');
     }
 
@@ -1522,11 +1736,17 @@ export class Simulation {
     return target.index > car.floorIndex ? 'up' : 'down';
   }
 
-  /** How many at this landing, going this way, this car could actually carry. */
-  #waitingFor(car: Car, floor: Floor, direction: Direction): number {
+  /**
+   * How many at this landing, going this way, this car could actually carry **now**.
+   *
+   * Under a panel that means the people it was promised to and whose walk is done, which is what
+   * keeps an idle car from opening its doors for a queue it may not touch — a stop that boards
+   * nobody, cycles the doors and leaves the landing exactly as it found it.
+   */
+  #waitingFor(car: Car, floor: Floor, direction: Direction, at: SimTime): number {
     let count = 0;
     for (const passenger of floor.waiting(direction)) {
-      if (this.#carCanCarry(car, passenger)) count += 1;
+      if (this.#carCanCarry(car, passenger) && this.#promiseAllows(car, passenger, at)) count += 1;
     }
     return count;
   }
@@ -1701,7 +1921,7 @@ export class Simulation {
       // `queueLength` before the projection: the latter copies the queue, this runs at the close
       // of every stop, and the overwhelming majority of stops leave an empty landing behind them.
       if (floor.queueLength(direction) === 0) continue;
-      const projected = this.#projectedBoarding(car, floor, direction, massKg);
+      const projected = this.#projectedBoarding(car, floor, direction, massKg, at);
       boarding += projected.count;
       massKg = projected.massKg;
     }
@@ -1766,15 +1986,48 @@ export class Simulation {
         // serve predicate `Floor.takeWaiting` exists for: on a floor served by two banks, "who
         // is waiting here" and "who can this car take" are different sets.
         (candidate) =>
-          this.#carCanCarry(car, candidate) && massKg + candidate.massKg < overloadKg,
+          this.#carCanCarry(car, candidate) &&
+          this.#promiseAllows(car, candidate, at) &&
+          massKg + candidate.massKg < overloadKg,
       );
       if (passenger === undefined) break;
 
       car.board(passenger, at);
+      // Counted, not assumed. `#promiseAllows` is the only path into this loop and it refuses
+      // the wrong car, so this can only be non-zero if a *second* path into a car appears — which
+      // is exactly the defect the phase is most likely to ship, and `#reconcile` fails the run on
+      // it rather than reporting a plausible statistic.
+      if (passenger.assignedCarId !== undefined && passenger.assignedCarId !== car.id) {
+        this.#wrongCarBoardings += 1;
+      }
       this.#recorder.recordBoarding(passenger, at, { carId: car.id, bankId: car.bankId });
       boarded += 1;
     }
     return boarded;
+  }
+
+  /**
+   * Whether a promised passenger may get into *this* car, at *this* instant.
+   *
+   * Two clauses, and both are the passenger model rather than a policy:
+   *
+   * 1. **The car is the one the panel named.** Somebody the panel has not answered yet may not
+   *    board at all: they are still standing at the kiosk. In practice the panel answers in the
+   *    same instant they arrive — `#openCalls` runs a dispatch pass — so the window is empty
+   *    unless no car was eligible, which is a landing nobody could serve either way.
+   * 2. **The walk is done.** `sim.assignedWalkS` after the panel spoke, charged **between
+   *    `arrivedAt` and `boardedAt`** and never by moving `arrivedAt`, which is the window
+   *    membership key every paired-t in this project depends on. At the default of 0 the clause
+   *    is `at >= assignedAt`, which the kernel guarantees.
+   *
+   * Trivially `true` under every conventional run, where nobody is assigned anything.
+   */
+  #promiseAllows(car: Car, passenger: Passenger, at: SimTime): boolean {
+    if (!this.#panelAssigns) return true;
+    const assignedCarId = passenger.assignedCarId;
+    if (assignedCarId !== car.id) return false;
+    const assignedAt = passenger.assignedAt ?? 0;
+    return at >= assignedAt + this.#options.assignedWalkS;
   }
 
   /**
@@ -1798,6 +2051,7 @@ export class Simulation {
     floor: Floor,
     direction: Direction,
     fromMassKg: number,
+    at: SimTime,
   ): { count: number; massKg: number } {
     const designLoadKg = car.loadSensor.designLoadKg;
     const overloadKg = car.loadSensor.ratedLoadKg * car.loadSensor.overloadThreshold;
@@ -1806,6 +2060,7 @@ export class Simulation {
     for (const passenger of floor.waiting(direction)) {
       if (massKg >= designLoadKg) break;
       if (!this.#carCanCarry(car, passenger)) continue;
+      if (!this.#promiseAllows(car, passenger, at)) continue;
       if (massKg + passenger.massKg >= overloadKg) continue;
       massKg += passenger.massKg;
       count += 1;
@@ -1839,9 +2094,7 @@ export class Simulation {
     // this car can have emptied a queue another bank still has a car driving towards, and
     // leaving that call lit sends it on a trip to collect nobody.
     for (const other of this.#building.banksServing(car.floorId)) {
-      for (const direction of DIRECTIONS) {
-        const active = this.#activeCalls.get(callIdOf(other.id, car.floorId, direction));
-        if (active === undefined) continue;
+      for (const active of this.#callsAt(other.id, car.floorId)) {
         if (this.#eligibleWaiting(other, active).count === 0) {
           this.#completeCall(active, at);
           // The car that was driving there has just been freed; its group may have somewhere
@@ -2017,9 +2270,17 @@ export class Simulation {
    * the policy is *allowed* to use it is `dispatch.callType`'s decision, not the runner's:
    * `costRequestFor` forwards it only under `mobile-credential` and drops it under
    * `up-down-buttons`, so a conventional run cannot accidentally benefit from information the
-   * passenger never gave it. Supplying it here is what lets a credential-aware profile
-   * demonstrate the result docs/01-architecture.md is after — that access control is cheaper
-   * when authorization and optimization happen in the same step.
+   * passenger never gave it. Supplying it here is what lets a credential-aware profile serve an
+   * access-controlled building at all — which conventional dispatch measurably cannot, at any
+   * budget, because a landing call carries no credential and every car answers `accessDenied`.
+   *
+   * **That is a claim about authorization, and it is the only one the measurements support.** This
+   * docstring used to say the credential makes access control *cheaper* because authorization and
+   * optimization happen in the same step; measured at n = 150 per building under CRN, the
+   * destination's contribution to optimization is **smaller** on the access-controlled building
+   * than on the unzoned one, so the difference-of-differences refutes the mechanism rather than
+   * confirming it (DECISIONS.md § D30, § D60). The saving is real and it is entirely in the
+   * credential.
    *
    * The **destination is on the call for exactly the same reason**, and gated the same way. The
    * runner knows where the head of the queue is going — it generated them — and
@@ -2044,10 +2305,17 @@ export class Simulation {
     direction: Direction,
     registeredAt: SimTime,
     bank: Bank<Car>,
+    forDestinationFloorId?: string | undefined,
   ): DispatchCall & HallCall {
     let credentialGroup: string | undefined;
     let destinationFloorId: string | undefined;
     for (const passenger of floor.waiting(direction)) {
+      if (
+        forDestinationFloorId !== undefined &&
+        passenger.destinationFloorId !== forDestinationFloorId
+      ) {
+        continue;
+      }
       if (!this.#bankCanCarry(bank, passenger)) continue;
       credentialGroup = passenger.credentialGroup;
       destinationFloorId = passenger.destinationFloorId;
@@ -2061,6 +2329,22 @@ export class Simulation {
       registeredAt,
       ...(credentialGroup === undefined ? {} : { credentialGroup }),
       ...(destinationFloorId === undefined ? {} : { destinationFloorId }),
+      // The panel authorized this request (DECISIONS.md § D30), and says so.
+      //
+      // `#bankCanCarry` — the predicate every passenger above has just passed — *is* the access
+      // check, run against the building's own zoning with the passenger's real credential. So by
+      // the time a call value exists under a panel, authorization has already happened at the
+      // kiosk, and forwarding that verdict is what stops `estimateCost` asking a second time
+      // whether an **unbadged** passenger may reach a zoned floor. Unasked, that question made a
+      // bare `destination-entry` arm unable to serve `secure-tower` at all — worse than
+      // conventional, not better (51.7 % unserved against 33.5 %).
+      //
+      // There is deliberately **no rejection branch** here. A passenger the panel would refuse
+      // cannot reach this code: `#openCalls` throws for anybody no bank serving the floor can
+      // carry, and the trace's route planner never generates one. Building a "rejected at the
+      // panel" accounting path that nothing in this simulator can reach would be a ninth dead
+      // seam, which is the defect this phase is most at risk of shipping.
+      ...(this.#panelAssigns ? { panelAuthorized: true } : {}),
     });
   }
 
@@ -2154,9 +2438,32 @@ export class Simulation {
     for (const migration of result.migrated) {
       const active = this.#activeCalls.get(migration.callId);
       if (active === undefined) continue;
-      this.#applyDecision(active, { carIds: migration.toCarIds });
+      this.#applyDecision(active, { carIds: migration.toCarIds }, at);
     }
     return true;
+  }
+
+  /**
+   * Whether this bank still has any business with this passenger.
+   *
+   * `#bankCanCarry` asks whether the fabric and the credential allow it. This adds the one thing
+   * a promise changes: **once the panel has named a car, the request belongs to that car's
+   * bank**, and every other bank's call for it is finished.
+   *
+   * Without this clause a landing served by two banks livelocks under a panel, and the shape is
+   * worth naming because it is not obvious. Bank 1 opens the request, wins it, and promises
+   * car X. Bank 2 opened the same request and still counts the passenger as waiting, so it sends
+   * one of its own cars — which arrives, may not board anybody (the boarding predicate is per
+   * car and refuses it), surrenders the call as "nobody would move", and is sent straight back.
+   * Secure Tower's screened lobby, both of Mixed-Use High-Rise's shared floors and all eight of
+   * Vertical City's are multi-bank, so this is a shipped configuration and not a hypothetical.
+   */
+  #bankMayServe(bank: Bank<Car>, passenger: Passenger): boolean {
+    if (!this.#bankCanCarry(bank, passenger)) return false;
+    if (!this.#panelAssigns) return true;
+    const assignedCarId = passenger.assignedCarId;
+    if (assignedCarId === undefined) return true;
+    return this.#carsById.get(assignedCarId)?.bankId === bank.id;
   }
 
   /** Service zoning and access zoning, both checked, neither merged into the other. */
@@ -2174,16 +2481,100 @@ export class Simulation {
     );
   }
 
+  /**
+   * Who this call is still for: the landing queue, filtered to the bank and — under a panel — to
+   * the call's own destination.
+   *
+   * The destination filter is what stops one OD request being completed by a car that emptied a
+   * *different* OD request at the same landing, and what stops its waiting count including people
+   * it was never opened for. Conventionally `destinationFloorId` is `undefined` and the filter is
+   * not applied at all, so this is byte-for-byte the query it has always been.
+   */
   #eligibleWaiting(bank: Bank<Car>, active: ActiveCall): WaitingTally {
     const floor = this.#building.requireFloor(active.floorId);
     let count = 0;
     let massKg = 0;
-    for (const passenger of floor.waiting(active.direction)) {
-      if (!this.#bankCanCarry(bank, passenger)) continue;
+    for (const passenger of this.#waitingForCall(floor, active)) {
+      if (!this.#bankMayServe(bank, passenger)) continue;
       count += 1;
       massKg += passenger.massKg;
     }
     return { count, massKg };
+  }
+
+  /** The landing queue this call was opened over, before any bank or car predicate. */
+  #waitingForCall(floor: Floor, active: ActiveCall): readonly Passenger[] {
+    const waiting = floor.waiting(active.direction);
+    const destinationFloorId = active.destinationFloorId;
+    if (destinationFloorId === undefined) return waiting;
+    return waiting.filter((passenger) => passenger.destinationFloorId === destinationFloorId);
+  }
+
+  /**
+   * The cars this call may still be given to — **the write-once promise, enforced**.
+   *
+   * DECISIONS.md § D29 says a bumped passenger keeps their assignment and waits for the car they
+   * were told about. `#reofferCall` puts a still-occupied landing back out to the group, and
+   * three separate paths reach it; patching one of them would leave the other two re-offering a
+   * promised passenger to whichever car happens to score best, which is the panel silently
+   * changing its mind. So the override is applied where *every* re-offer is eventually decided —
+   * the candidate set stage 4 is allowed to choose from — rather than at any one call site.
+   *
+   * The effect is that a decision for a call whose remaining passengers are already promised can
+   * only ever return the promised car. If that car is full, no car is eligible, the call is
+   * retried on the ordinary timer, and the passengers wait. That waiting *is* destination
+   * dispatch's cost, and `ConservationAudit.brokenPromises` counts how often it is paid.
+   *
+   * Returns the full snapshot list conventionally, and whenever nobody at the landing has been
+   * promised anything yet — which is every call at the moment it opens.
+   */
+  #candidateCars(
+    active: ActiveCall,
+    snapshots: readonly CarSnapshot[],
+  ): readonly CarSnapshot[] {
+    if (!this.#panelAssigns) return snapshots;
+    const floor = this.#building.requireFloor(active.floorId);
+    const promised = new Set<string>();
+    for (const passenger of this.#waitingForCall(floor, active)) {
+      const carId = passenger.assignedCarId;
+      if (carId !== undefined) promised.add(carId);
+    }
+    if (promised.size === 0) return snapshots;
+    const restricted = snapshots.filter((snapshot) => promised.has(snapshot.carId));
+    /* c8 ignore next 4 -- `#bankMayServe` drops a passenger promised outside this bank from the
+       call's own waiting set, so a call that reaches a decision at all has every promise inside
+       the bank being decided. The fallback is a guard against that invariant, not a path: an
+       empty candidate list would report the call unservable rather than pending. */
+    return restricted.length === 0 ? snapshots : restricted;
+  }
+
+  /**
+   * Every live call one bank has at one floor.
+   *
+   * Two direct lookups conventionally, because the identity is `(bank, floor, direction)` and
+   * there are exactly two directions — the same two the caller used to write out. Under a panel
+   * the identity carries a destination and the set is not enumerable in advance, so it is found
+   * by scan. **The conventional path is kept as a lookup rather than folded into the scan** so
+   * that turning the panel on is the only thing that changes the cost of a stop, and every
+   * conventional run's event count is unchanged.
+   *
+   * Live calls are extinguished the moment their landing empties, so the scanned set is the
+   * occupied landings of one bank, not the building's floor count.
+   */
+  #callsAt(bankId: string, floorId: string): readonly ActiveCall[] {
+    if (!this.#panelAssigns) {
+      const found: ActiveCall[] = [];
+      for (const direction of DIRECTIONS) {
+        const active = this.#activeCalls.get(callIdOf(bankId, floorId, direction));
+        if (active !== undefined) found.push(active);
+      }
+      return found;
+    }
+    const found: ActiveCall[] = [];
+    for (const active of this.#activeCalls.values()) {
+      if (active.bankId === bankId && active.floorId === floorId) found.push(active);
+    }
+    return found;
   }
 
   /** The landing light goes out when the landing is empty, and not before. */
@@ -2265,6 +2656,7 @@ export class Simulation {
       events: this.#kernel.processedCount(),
       warnings,
       stageActivity: this.stageActivity,
+      comparability: comparabilityOf(this.#passengerModel),
     });
 
     // Reported **before** the audit, and unconditionally — not under `onTimeout`. That option
@@ -2471,6 +2863,53 @@ export class Simulation {
       );
     }
 
+    /*
+     * **Claim 4: nobody got into a car they were not sent to.**
+     *
+     * The whole of the passenger-model change, stated as a number that must be zero. The defect
+     * it catches is the one this phase is most likely to ship: a destination profile that loads,
+     * validates, weights `rideTime`, opens one call per origin-destination pair — and then boards
+     * people exactly as the conventional model did, because the boarding predicate was never
+     * wired. Every aggregate statistic would look plausible; a *count* of wrong-car boardings
+     * cannot.
+     *
+     * Asserted rather than reported, because unlike `brokenPromises` there is no reading of it
+     * that is a result.
+     */
+    if (this.#wrongCarBoardings > 0) {
+      problems.push(
+        `${this.#wrongCarBoardings} of ${this.#recorder.boardedCount} boardings put a passenger into a car other than the one the landing panel named. Under dispatch.passengerAssignment "panel" the promise is the passenger model; a boarding that ignores it is measuring conventional dispatch under a destination profile's name`,
+      );
+    }
+    /*
+     * **Claim 5: under a panel, a run that delivered everybody promised everybody.**
+     *
+     * Conditioned on the run having completed, and that is not a softening. A `timed-out` run can
+     * legitimately end with somebody unassigned — a landing every car refused structurally is
+     * never given a car to be promised — and that passenger is already named in `undelivered`
+     * with the reason. Requiring the equality unconditionally would replace a precise diagnosis
+     * with a conservation failure that says less.
+     */
+    /*
+     * **Claim 6: every promise the runner made reached the record.**
+     *
+     * The `legsCreated === legsRecorded` argument, applied to the new state. The runner's counter
+     * and the recorder's are incremented in the same statement pair and could still drift if a
+     * second assignment path appeared, and a promise the record does not carry is invisible to
+     * every downstream check of it — including the wrong-car check a reader would run over a
+     * stored record rather than over this run.
+     */
+    if (this.#legsAssigned !== this.#recorder.assignedCount) {
+      problems.push(
+        `${this.#legsAssigned} landing-panel assignments were made but ${this.#recorder.assignedCount} reached the recorder; a promise the record does not carry cannot be audited from the record`,
+      );
+    }
+    if (this.#panelAssigns && undelivered.length === 0 && this.#legsAssigned !== legsCreated) {
+      problems.push(
+        `${legsCreated} legs were created and every journey was delivered, but only ${this.#legsAssigned} were ever assigned a car by the landing panel; ${legsCreated - this.#legsAssigned} boarded without being promised anything`,
+      );
+    }
+
     const audit: ConservationAudit = Object.freeze({
       generated,
       delivered,
@@ -2480,9 +2919,13 @@ export class Simulation {
       legsBoarded: this.#recorder.boardedCount,
       legsAlighted: this.#recorder.alightedCount,
       transfers: this.#transfers,
+      legsAssigned: this.#legsAssigned,
+      wrongCarBoardings: this.#wrongCarBoardings,
+      brokenPromises: this.#brokenPromises,
       balanced:
         problems.length === 0 &&
         legsCreated === legsRecorded &&
+        this.#wrongCarBoardings === 0 &&
         delivered + undelivered.length === generated,
     });
 
@@ -2523,6 +2966,10 @@ function resolveOptions(config: SimulationConfig): ResolvedOptions {
     transferWalkS: nonNegative(
       config.transferWalkS ?? SIM_DEFAULTS.transferWalkS,
       'transferWalkS',
+    ),
+    assignedWalkS: nonNegative(
+      config.assignedWalkS ?? SIM_DEFAULTS.assignedWalkS,
+      'assignedWalkS',
     ),
     dispatchRetryS: positive(config.dispatchRetryS ?? SIM_DEFAULTS.dispatchRetryS, 'dispatchRetryS'),
     drainGraceS: nonNegative(config.drainGraceS ?? SIM_DEFAULTS.drainGraceS, 'drainGraceS'),
