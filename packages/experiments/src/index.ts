@@ -351,6 +351,17 @@ export type {
  * reasoning as the `canonicalJson` omission above: a name whose wrong resolution
  * is not a compile error does not go on the surface. It stays reachable at
  * `benchmark/auctionAggregation.js`.
+ *
+ * **Phase 6a's disclosure studies and Phase 6b's raised criterion are here too**,
+ * as of C27: `DECISIONS.md` § D62's name list verbatim plus
+ * `runMixedUseHighRiseStudy`. What that closes is a *surface* gap — the studies
+ * were reachable only at their module paths — and it closes nothing about
+ * liveness. Their non-test caller is `benchmark/regeneratePins.ts` and always
+ * was; `index.test.ts` § study entry points asks that question of a domain
+ * derived from the directory, and deliberately does not ask whether a name is on
+ * a barrel, because `measureEnergyLiveness` was on two barrels and was dead.
+ * `runDestinationDispatchStudy` is still on no barrel and is still live, which is
+ * the same point from the other side.
  * -------------------------------------------------------------------------- */
 
 export {
@@ -450,6 +461,46 @@ export {
   twoEntranceUpPeak,
   verdictCounts,
   withoutReassignment,
+  // Phase 6a's disclosure studies and Phase 6b's raised criterion — `DECISIONS.md` § D62's name
+  // list verbatim, plus `runMixedUseHighRiseStudy`, added here and to `benchmark/index.ts` in one
+  // commit because `index.test.ts` requires this barrel to carry every runtime value that one
+  // exports. C27. It buys **public API surface** and nothing else: their non-test caller is
+  // `regeneratePins.ts`, and `index.test.ts` § study entry points asks that question separately
+  // and deliberately does not ask this one.
+  DEFERRED_ARM,
+  DESTINATION_CASES,
+  DISCLOSURE_BASELINE,
+  DISCLOSURE_METRICS,
+  DISCLOSURE_METRIC_LABELS,
+  DISCLOSURE_PROFILE,
+  GARDEN_RESIDENTIAL_2PCT,
+  MIDTOWN_DOWN_PEAK_1PCT,
+  MIDTOWN_INTERFLOOR_MIX,
+  MIDTOWN_UP_PEAK_1PCT,
+  NEGATIVE_CONTROLS,
+  RIDE_TIME_WEIGHTS,
+  SECURE_INTERFLOOR_MIX,
+  SECURE_UP_PEAK_2PCT,
+  destinationCase,
+  disclosureArm,
+  disclosureCase,
+  disclosureProfiles,
+  formatDisclosureStudy,
+  replicationsForHalfWidth,
+  rideArmId,
+  runDestinationDisclosureStudy,
+  runNegativeControls,
+  BARE_KIOSK_ARM,
+  CREDENTIAL_ARM,
+  CREDENTIAL_PLUS_DESTINATION_ARM,
+  accessControlProfiles,
+  differenceOfDifferences,
+  formatAccessControlStudy,
+  runAccessControlStudy,
+  formatDestinationLiveness,
+  livenessCases,
+  measureDestinationLiveness,
+  runMixedUseHighRiseStudy,
 } from './benchmark/index.js';
 
 export type {

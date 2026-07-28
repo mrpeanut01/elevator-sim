@@ -55,7 +55,7 @@ Machine-readable configuration lives in [`data/`](data/).
 ## Status
 
 **Phases 0–5, 7 and 8 are landed and accepted. Phase 6 is partially complete** — see the table for
-what that means. Four packages (`core`, `experiments`, `viz`, `cli`), a five-command CLI,
+what that means. Four packages (`core`, `experiments`, `viz`, `cli`), a six-command CLI,
 **172 test files, 3,220 tests** (3,211 passing, 9 skipped), `tsc -b` clean.
 
 | Phase | Status |
@@ -67,11 +67,11 @@ what that means. Four packages (`core`, `experiments`, `viz`, `cli`), a five-com
 | 4 — Visualization | ✅ Viewer, building editor, live metrics overlay, playback from a stored seed, 88-scenario UX ledger |
 | 5 — Smart dispatch | ✅ Twelve cost terms, auction, predictor, benchmark suite |
 | 7 — Automated tuning | ✅ Search space, three searches, held-out validation, `elevator-sim tune` |
-| CLI | ✅ `list`, `run`, `compare`, `tune`, `watch` |
+| CLI | ✅ `list`, `run`, `compare`, `tune`, `fuzz`, `watch` |
 | 6 — Destination dispatch & learned control | ⚠️ 6a (disclosure) and 6b (dispatch) accepted against a **raised** criterion, now measured on the Mixed-Use High-Rise the criterion names: **met by the Level-0 arm, not met by the Level-1 panel at any measured point**. 6c (learned control) deferred out of the phase with reasons; double-deck still not simulated |
 | 8 — Testing campaign | ✅ All eight tracks landed — fuzzing, oracle across all five buildings, physics, statistics, determinism, scale, adversarial, and the full experiment matrix (8 cells × 12 profiles, Pareto front over AWT / energy / WT95) — and found four real defects, **all four now fixed**; the deep tier is green at 2 000 cases and **no property violation is outstanding**, so both halves of the criterion are met |
 
-Try it — five commands, all against the real `data/` directory:
+Try it — six commands, all against the real `data/` directory:
 
 ```bash
 npm install && npm run build
@@ -79,6 +79,7 @@ npm run sim -- list
 npm run sim -- run --building garden-apartments --dispatcher eta --seed 42
 npm run sim -- compare --building midtown-office --a eta --b nearest-car --reps 100
 npm run sim -- tune --building garden-apartments --params idle.repositionThresholdS --seed 42
+npm run sim -- fuzz --cases 8                  # or: --tier deep --cases 2000, the overnight pass
 npm run sim -- watch --building garden-apartments --dispatcher nearest-car --speed 10
 npm test        # 172 files, 3,220 tests — the benchmarks execute real replications, so this is minutes, not seconds
 ```

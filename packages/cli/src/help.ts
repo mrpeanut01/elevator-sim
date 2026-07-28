@@ -99,6 +99,7 @@ export function printRootHelp(out: Output, commands: readonly CommandHelp[]): vo
   out.line(
     `  ${dim('$')} ${BINARY} tune --building garden-apartments --params idle.repositionThresholdS --seed 42`,
   );
+  out.line(`  ${dim('$')} ${BINARY} fuzz --cases 8`);
   out.line(`  ${dim('$')} ${BINARY} watch --building garden-apartments --dispatcher eta --speed 10`);
   out.line();
   out.line(
