@@ -143,6 +143,20 @@ Scaffolding and the pieces everything else depends on.
 Two `StreamSet`s constructed from the same seed produce identical draws; consuming from
 one stream does not perturb any other.
 
+**Status: green.** The gate is `packages/core/src/kernel/kernel.test.ts` § *"processes a scripted
+event sequence identically across 100 runs"* and § *"replays identically from `reset()` on a single
+kernel, 100 times"*, plus `packages/core/src/kernel/eventQueue.test.ts` for the `(time, sequence)`
+tie-break (invariant 4); `packages/core/src/random/streams.test.ts` §§ *reproducibility* and *stream
+independence* for the second clause (invariant 2); and `packages/core/src/config/loader.test.ts`
+with `packages/core/src/config/expandFloors.test.ts` for the config bullet.
+
+<!-- This **Status:** line was written on 2026-07-28 so that the phase's verdict is stated in the
+     document that carries its criterion, and so that it names the suites that answer it. The
+     verdict itself is unchanged and was not decided here: CLAUDE.md's status line, README.md
+     § Status and docs/07-handoff.md § 1 have all carried ✅ for this phase, and
+     validation/documentation.test.ts already asserts those three agree. What is new is that the
+     roadmap says it, with evidence — parsed by validation/phaseStatus.test.ts. -->
+
 ---
 
 ## Phase 1 — Physics and model
@@ -160,6 +174,19 @@ The car as an entity: motion, doors, load.
 **Acceptance:** a car traversing 10 floors matches a hand-calculated S-curve travel time
 within 1%. A short one-floor hop demonstrably never reaches rated speed. `estimateCost()`
 called 10,000 times leaves simulation state bit-identical.
+
+**Status: green.** The gate is `packages/core/src/physics/motion/sCurve.test.ts`, clause by clause:
+§ *"roadmap acceptance: 10 floors of Midtown Office within 1% of hand calculation"* for the first,
+and § *"a one-floor hop in a 2.5 m/s car peaks well below rated speed"* with § *"rated speed is
+reached only once the trip exceeds the threshold distance"* for the second. The purity clause
+(invariant 1) is `packages/core/src/model/car/estimateCost.test.ts` § *"leaves the car bit-identical
+after 10,000 calls with the doors open and people aboard"* and its mid-flight sibling. The
+remaining scope bullets are covered by `packages/core/src/physics/doors/doorMachine.test.ts`,
+`packages/core/src/model/car/loadSensor.test.ts` and `packages/core/src/model/car/car.test.ts`.
+
+<!-- Written on 2026-07-28 for the reason given under Phase 0: the verdict is the one the other
+     three documents already carry, and what is new is that the roadmap states it and names the
+     suites. No verdict was changed. -->
 
 ---
 
