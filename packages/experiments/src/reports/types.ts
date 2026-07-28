@@ -175,6 +175,7 @@ export interface StoredSummarizeOptions {
   readonly saturation?: Partial<SaturationThresholds> | undefined;
   readonly queueSampleCount?: number | undefined;
   readonly maxUnservedFraction?: number | undefined;
+  readonly maxWaitHorizonS?: number | undefined;
   readonly terminalFloorIds?: readonly string[] | undefined;
   readonly departureGapS?: number | undefined;
 }

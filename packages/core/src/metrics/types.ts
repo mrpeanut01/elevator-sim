@@ -783,6 +783,92 @@ export interface SaturationDiagnosis {
 }
 
 /* -------------------------------------------------------------------------- *
+ * Service level — the tail the trend test cannot see
+ * -------------------------------------------------------------------------- */
+
+/**
+ * What {@link ServiceLevelDiagnosis} concluded about the longest wait in the window.
+ *
+ * A **second, independent** verdict, deliberately not a fourth {@link SaturationVerdict}. See
+ * the {@link ServiceLevelDiagnosis} docstring for why the two are separate claims: `saturation`
+ * is a statement about the queue's *derivative* and this is a statement about how long one
+ * passenger actually stood there. Collapsing them would make `saturation.verdict === 'stable'`
+ * stop meaning "the trend test said stable", which is what every consumer reads it as.
+ */
+export const SERVICE_LEVEL_VERDICTS = [
+  /** No arrival in the window waited past the horizon. */
+  'served',
+  /** At least one did. The mean is not quotable on its own; see {@link RunSummary.awtIsValid}. */
+  'starved',
+  /** The window contained no arrivals, so there is no longest wait. */
+  'no-arrivals',
+] as const;
+
+export type ServiceLevelVerdict = (typeof SERVICE_LEVEL_VERDICTS)[number];
+
+/**
+ * How long one passenger waited, and whether that alone makes the mean unquotable.
+ *
+ * ## The hole this closes
+ *
+ * {@link RunSummary.awtIsValid} had two substantive gates and they are both proxies for one
+ * question — *did the backlog clear?* — detected in two specific shapes:
+ *
+ * - the **trend** gate ({@link SaturationDiagnosis}) catches a queue that never clears and is
+ *   still growing at the horizon;
+ * - the **censoring** gate (`DEFAULT_MAX_UNSERVED_FRACTION`) catches a queue that has not cleared
+ *   *by* the horizon, because the people still in it are unserved legs.
+ *
+ * Neither catches the third shape: **a queue that grew enormously and then drained before the
+ * horizon.** Such a run reports `completed`, nought unserved, nought censored, and a fitted trend
+ * diluted by its own hump — and it publishes a mean beside a passenger who stood at a landing for
+ * a quarter of an hour. That is the *"statistics improve as the bug gets worse"* failure
+ * `CLAUDE.md` § Statistical discipline is written against, and it was reached by a real
+ * counterexample rather than imagined: `packages/core/DECISIONS-T21.md` records it, with figures.
+ *
+ * ## Why the wait and not the queue
+ *
+ * The obvious alternative is to threshold the queue *level* — "twenty people waiting is too many".
+ * It cannot be made scale-free. Little's Law is `L = λW`, so a queue length only means something
+ * once you know the arrival rate: forty people waiting is a normal morning in a 4 000-person tower
+ * and a catastrophe in an eleven-floor building with one car. The **wait** is already normalised by
+ * the arrival rate, which is exactly why it is the observable this gate is stated in.
+ *
+ * ## Censoring runs in the safe direction
+ *
+ * A leg that never boarded has no waiting time, but it does have a waiting time *so far*:
+ * `censoredAtS - arrivedAt`, a **lower bound** on what it would have been. So an unserved leg
+ * counts here at its lower bound, and {@link longestWaitIsCensored} says when the reported figure
+ * is one. Excluding them would put the gate's blind spot precisely where the service is worst.
+ */
+export interface ServiceLevelDiagnosis {
+  readonly verdict: ServiceLevelVerdict;
+  /** `true` only for {@link ServiceLevelVerdict} `starved`. */
+  readonly starved: boolean;
+  /** The horizon applied, seconds. See `DEFAULT_MAX_WAIT_HORIZON_S`. */
+  readonly horizonS: number;
+  /**
+   * The longest wait any arrival in the window is known to have had, seconds.
+   *
+   * `NaN` when the window held no arrivals. For a leg that never boarded this is
+   * `censoredAtS - arrivedAt`, a lower bound — see {@link longestWaitIsCensored}.
+   */
+  readonly longestWaitS: number;
+  /** Whether {@link longestWaitS} belongs to a leg that never boarded, and is therefore a floor. */
+  readonly longestWaitIsCensored: boolean;
+  /** The leg that waited longest, so the figure can be traced back to a passenger. */
+  readonly longestWaitLegId?: string | undefined;
+  readonly longestWaitOriginFloorId?: string | undefined;
+  readonly longestWaitDestinationFloorId?: string | undefined;
+  /** Arrivals in the window whose wait is known to exceed {@link horizonS}. */
+  readonly overHorizonCount: number;
+  /** Arrivals in the window, served or not — the denominator of {@link overHorizonCount}. */
+  readonly arrivalCount: number;
+  /** The time an unserved leg's wait was censored at. `RunRecord.endedAt`. */
+  readonly censoredAtS: SimTime;
+}
+
+/* -------------------------------------------------------------------------- *
  * Summary statistics
  * -------------------------------------------------------------------------- */
 
@@ -1091,11 +1177,19 @@ export interface RunSummary {
   /** **INT**, achieved: the spacing of car departures from the terminal. */
   readonly achievedInterval: IntervalStatistics;
   readonly saturation: SaturationDiagnosis;
+  /**
+   * How long the worst-served passenger in the window waited.
+   *
+   * A **separate** diagnosis from {@link saturation}, because "the queue is not diverging" and
+   * "nobody was abandoned" are two claims and a run can satisfy the first while failing the
+   * second. See {@link ServiceLevelDiagnosis}.
+   */
+  readonly serviceLevel: ServiceLevelDiagnosis;
 
   /**
    * Whether {@link waiting}'s mean may carry a confidence interval.
    *
-   * `false` on any of three independent grounds:
+   * `false` on any of four independent grounds:
    *
    * 1. **Saturation** — the queue diverged over the window. docs/03-traffic-and-statistics.md:
    *    "If a configuration saturates, flag it and suppress the AWT interval. Do not report a
@@ -1107,6 +1201,13 @@ export interface RunSummary {
    *    the simulation knows why a landing emptied), but nothing can make the mean of the
    *    fastest sixth of a cohort trustworthy.
    * 3. **Emptiness** — nobody was served at all, so there is no mean.
+   * 4. **Starvation** — somebody waited past `DEFAULT_MAX_WAIT_HORIZON_S`. Gates 1 and 2 are
+   *    both proxies for "the backlog did not clear" and neither sees a backlog that *did*
+   *    clear, just late enough to leave a passenger on a landing for a quarter of an hour. See
+   *    {@link ServiceLevelDiagnosis}, which carries the evidence.
+   *
+   * The four are evaluated in that order, so a run that trips more than one reports the most
+   * fundamental reason rather than the last one checked.
    *
    * Phase 3 reads this and suppresses the interval.
    */

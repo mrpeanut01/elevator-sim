@@ -32,6 +32,13 @@
  * {@link DEFAULT_MAX_UNSERVED_FRACTION}, because a run can be badly censored without the
  * fitted trend firing at all.
  *
+ * Both of those are proxies for one question — *did the backlog clear?* — and neither sees the
+ * third shape it comes in: a queue that grew enormously and then drained **before** the horizon.
+ * Such a run reports `completed`, nought unserved, and a trend diluted by its own hump, and it
+ * publishes a mean beside a passenger who waited a quarter of an hour. {@link diagnoseServiceLevel}
+ * is the gate for that, and {@link RunSummary.serviceLevel} carries its evidence; see
+ * `packages/core/DECISIONS-T21.md` for the counterexample that found it.
+ *
  * ## Both halves of the Phase 2 oracle live here
  *
  * {@link handlingCapacityOf} is the achieved counterpart of the closed form's `HC5` and
@@ -89,6 +96,8 @@ import {
   type RunSummary,
   type SaturationDiagnosis,
   type SaturationThresholds,
+  type ServiceLevelDiagnosis,
+  type ServiceLevelVerdict,
   type WaitStatistics,
 } from './types.js';
 
@@ -151,6 +160,45 @@ export const DEFAULT_LOAD_FACTOR_EDGES: readonly number[] = Object.freeze(
  * essentially none.
  */
 export const DEFAULT_MAX_UNSERVED_FRACTION = 0.05;
+
+/**
+ * Seconds a passenger may be known to have waited before the window's AWT stops being quotable.
+ *
+ * **900 s — fifteen minutes.** Not a service-quality target and not tuned to make anything pass:
+ * it is the point past which a wait stops being a bad wait and becomes evidence that the
+ * passenger was *forgotten*, and it is chosen the same way `DEFAULT_MAX_UNSERVED_FRACTION` is —
+ * from the distance to the regime the project actually publishes in.
+ *
+ * - docs/03-traffic-and-statistics.md treats anything past **60 s** as a bad wait, and
+ *   {@link DEFAULT_LONG_WAIT_THRESHOLD_S} is the metric built on that.
+ * - The shipped operating points run at **10–30 s AWT**. A quarter of an hour is between one and
+ *   two orders of magnitude out.
+ * - **Measured**, over the shipped operating points at every shipped dispatcher profile, at the
+ *   budgets the benchmark actually uses — `benchmark/saturationCensus.test.ts` re-measures all of
+ *   these and asserts the margin, so none of them can go stale:
+ *
+ *   | operating point | n | longest single wait | margin |
+ *   |---|---|---|---|
+ *   | Midtown Office, up-peak 1 % | 250 | 203.7 s (`destination-panel`) | 4.4× |
+ *   | Garden Apartments, residential 2 %, full run | 500 | 136.6 s (`destination-panel`) | 6.6× |
+ *   | Secure Tower, up-peak 2 % | 150 | 121.2 s (`nearest-car`) | 7.4× |
+ *   | Midtown Office, interfloor-mix 1.5 %, full run | 1000 | **344.8 s** (`nearest-car`) | **2.6×** |
+ *
+ *   Every replication of every one of those cells comes back `served`. The cells that *do* produce
+ *   longer waits — Secure Tower interfloor-mix under the conventional arms — are already unquotable
+ *   on gates 1 and 2 from replication index 0, and are published as counts rather than as an
+ *   interval (`benchmark/arms.ts`, `admissibleReplications: 0`). So this horizon sits clear above
+ *   everything the project publishes and below everything it already refuses to.
+ *
+ * **It is deliberately the same number as `fuzz/types.ts`'s `PROPERTY_BOUNDS.starvationBoundS`,
+ * and deliberately not imported from it.** The project should state one abandonment horizon, and
+ * it belongs in the model rather than in a test bound — which is the handback `DECISIONS-T20.md`
+ * § D83 made. The fuzz property keeps its own copy on purpose: it scans the *whole record*
+ * including legs outside the report window, it re-derives servability from the building, and a
+ * constant shared between a check and the thing it checks makes the check vacuous. See
+ * `packages/core/DECISIONS-T21.md` § T21-D3 for what P6 still catches that this does not.
+ */
+export const DEFAULT_MAX_WAIT_HORIZON_S = 900;
 
 /* -------------------------------------------------------------------------- *
  * Journeys
@@ -557,6 +605,96 @@ export function detectSaturation(
     meanQueueLength: trend.meanY,
     maxQueueLength: Math.max(...inWindow.map((sample) => sample.waiting)),
     thresholds,
+  });
+}
+
+/* -------------------------------------------------------------------------- *
+ * Service level — the tail the trend test cannot see
+ * -------------------------------------------------------------------------- */
+
+export interface ServiceLevelOptions {
+  /**
+   * The time an unserved leg's wait is censored at — `RunRecord.endedAt`.
+   *
+   * The **run's** end, not the window's. A leg that arrived inside a peak-5-minute window and was
+   * still on the landing when the run finished waited at least until the run finished, and
+   * clipping that to the window edge would understate it by however long the run continued.
+   */
+  readonly censoredAtS: SimTime;
+  /** Seconds past which a wait makes the mean unquotable. Default {@link DEFAULT_MAX_WAIT_HORIZON_S}. */
+  readonly horizonS?: number | undefined;
+}
+
+/**
+ * The longest wait in a cohort, and whether it is past the horizon. Pure.
+ *
+ * Takes legs **already selected to the window** — the same contract as {@link summarizeWaiting},
+ * so the two describe the same cohort by construction rather than by two selections that could
+ * drift apart.
+ *
+ * Three deliberate choices, each of which a simpler version got wrong:
+ *
+ * - **An unserved leg counts, at its lower bound.** Its wait is unknown but is at least
+ *   `censoredAtS - arrivedAt`, and dropping it would blind the gate exactly where service is
+ *   worst — the same censoring argument `DEFAULT_MAX_UNSERVED_FRACTION` is built on, applied to
+ *   the tail instead of the mean.
+ * - **The comparison is strict.** A wait of exactly the horizon is not past it, matching
+ *   {@link DurationStatistics} conventions and `pctOverLongWait`.
+ * - **Ties go to the first leg in record order**, so the named passenger is deterministic and
+ *   does not depend on `Array.prototype.sort` stability or on `Map` iteration.
+ *
+ * @throws MetricsError if the horizon is not a finite, non-negative number of seconds.
+ */
+export function diagnoseServiceLevel(
+  legs: readonly PassengerRecord[],
+  options: ServiceLevelOptions,
+): ServiceLevelDiagnosis {
+  const horizonS = options.horizonS ?? DEFAULT_MAX_WAIT_HORIZON_S;
+  if (!Number.isFinite(horizonS) || horizonS < 0) {
+    throw new MetricsError(
+      `Maximum-wait horizon must be a finite, non-negative number of seconds; received ${horizonS}.`,
+    );
+  }
+  const censoredAtS = options.censoredAtS;
+
+  let longestWaitS = Number.NaN;
+  let longest: PassengerRecord | undefined;
+  let longestIsCensored = false;
+  let overHorizonCount = 0;
+
+  for (const leg of legs) {
+    const censored = leg.boardedAt === undefined;
+    // A leg that arrived after the censoring instant (a record whose horizon precedes its last
+    // arrival) would otherwise contribute a negative wait and drag the maximum down; clamp at 0
+    // rather than let a malformed record understate the tail.
+    const waitS = Math.max(0, (leg.boardedAt ?? censoredAtS) - leg.arrivedAt);
+    if (waitS > horizonS) overHorizonCount += 1;
+    if (longest === undefined || waitS > longestWaitS) {
+      longestWaitS = waitS;
+      longest = leg;
+      longestIsCensored = censored;
+    }
+  }
+
+  const verdict: ServiceLevelVerdict =
+    longest === undefined ? 'no-arrivals' : overHorizonCount > 0 ? 'starved' : 'served';
+
+  return Object.freeze({
+    verdict,
+    starved: verdict === 'starved',
+    horizonS,
+    longestWaitS,
+    longestWaitIsCensored: longestIsCensored,
+    ...(longest === undefined
+      ? {}
+      : {
+          longestWaitLegId: longest.passengerId,
+          longestWaitOriginFloorId: longest.originFloorId,
+          longestWaitDestinationFloorId: longest.destinationFloorId,
+        }),
+    overHorizonCount,
+    arrivalCount: legs.length,
+    censoredAtS,
   });
 }
 
@@ -1288,6 +1426,11 @@ export interface SummarizeOptions {
    * Default {@link DEFAULT_MAX_UNSERVED_FRACTION}.
    */
   readonly maxUnservedFraction?: number | undefined;
+  /**
+   * Seconds a passenger may be known to have waited before the AWT is marked invalid.
+   * Default {@link DEFAULT_MAX_WAIT_HORIZON_S}.
+   */
+  readonly maxWaitHorizonS?: number | undefined;
   /** Terminal floor(s) for the achieved interval. See {@link IntervalOptions}. */
   readonly terminalFloorIds?: readonly string[] | undefined;
   /**
@@ -1413,6 +1556,11 @@ export function summarizeRun(record: RunRecord, options: SummarizeOptions = {}):
   const unservedFraction =
     waiting.arrivalCount === 0 ? 0 : waiting.unservedCount / waiting.arrivalCount;
 
+  const serviceLevel = diagnoseServiceLevel(legsInWindow, {
+    censoredAtS: record.endedAt,
+    ...(options.maxWaitHorizonS === undefined ? {} : { horizonS: options.maxWaitHorizonS }),
+  });
+
   const awtInvalidReason = saturation.saturated
     ? `Queue length rose by ${saturation.projectedGrowthPersons.toFixed(1)} persons (${saturation.slopePersonsPerMinute.toFixed(2)}/min, ${saturation.growthToNoiseRatio.toFixed(1)}x the queue's own scatter) over the ${windowDurationS(window).toFixed(0)} s reporting window, against thresholds ${saturation.thresholds.minProjectedGrowthPersons} persons and ${saturation.thresholds.minSlopePersonsPerMinute}/min; the system is saturated, AWT is not approximately normal and its confidence interval must be suppressed.`
     : waiting.count === 0
@@ -1423,7 +1571,14 @@ export function summarizeRun(record: RunRecord, options: SummarizeOptions = {}):
         // survivors, and does so without the queue trend necessarily firing at all.
         unservedFraction > maxUnservedFraction
         ? `${waiting.unservedCount} of ${waiting.arrivalCount} arrivals in the reporting window (${(unservedFraction * 100).toFixed(1)}%) were never served, above the ${(maxUnservedFraction * 100).toFixed(1)}% censoring limit. AWT is the mean over the legs that boarded, which are systematically the passengers who waited least, so the reported mean is biased low by an unknown amount and its confidence interval must be suppressed.`
-        : undefined;
+          : // The tail is checked independently of both. The trend gate sees a queue that is
+            // still growing at the horizon and the censoring gate sees one that has not cleared
+            // by it; neither sees a queue that grew enormously and then drained just in time,
+            // which reports `completed`, nought unserved, a diluted trend — and a mean beside a
+            // passenger who stood on a landing for a quarter of an hour.
+            serviceLevel.starved
+            ? `Leg "${String(serviceLevel.longestWaitLegId)}" (${String(serviceLevel.longestWaitOriginFloorId)} to ${String(serviceLevel.longestWaitDestinationFloorId)}) waited ${serviceLevel.longestWaitS.toFixed(1)} s${serviceLevel.longestWaitIsCensored ? ' and had still not boarded when the run ended, so that is a lower bound' : ''}, past the ${serviceLevel.horizonS.toFixed(0)} s abandonment horizon; ${serviceLevel.overHorizonCount} of ${serviceLevel.arrivalCount} arrivals in the reporting window are past it. The queue did not diverge and the window is not censored, so neither of those gates fires — but a mean of ${waiting.meanS.toFixed(1)} s reported beside a wait of ${serviceLevel.longestWaitS.toFixed(1)} s describes a system nobody experienced, and its confidence interval must be suppressed.`
+            : undefined;
 
   return Object.freeze({
     runId: record.runId,
@@ -1443,6 +1598,7 @@ export function summarizeRun(record: RunRecord, options: SummarizeOptions = {}):
     handlingCapacity,
     achievedInterval,
     saturation,
+    serviceLevel,
     awtIsValid: awtInvalidReason === undefined,
     ...(awtInvalidReason === undefined ? {} : { awtInvalidReason }),
   });
@@ -1557,6 +1713,16 @@ export const METRICS_PARAMETERS: readonly MetricsParameterSpec[] = [
     default: DEFAULT_MAX_UNSERVED_FRACTION,
     description:
       'Fraction of a window’s arrivals that may go unserved before its AWT is marked invalid. AWT averages the legs that boarded, so unserved legs are censored observations and censored in the direction that flatters the result.',
+  },
+  {
+    id: 'metrics.maxWaitHorizonS',
+    type: 'continuous',
+    range: [60, 3600],
+    scale: 'linear',
+    default: DEFAULT_MAX_WAIT_HORIZON_S,
+    unit: 's',
+    description:
+      'Seconds a passenger may be known to have waited before the window’s AWT is marked invalid. Independent of the queue-trend and censoring gates, both of which are proxies for “the backlog did not clear” and neither of which sees a backlog that cleared just late enough to leave somebody on a landing for a quarter of an hour. The range runs from the long-wait quality threshold at the bottom to an hour at the top; the default sits a factor of 2.6 above the longest wait any shipped operating point produces (344.8 s, Midtown Office interfloor-mix under nearest-car, over 1000 replications).',
   },
   {
     id: 'metrics.departureGapS',

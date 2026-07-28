@@ -16,9 +16,32 @@
  * Failures are shrunk before they are printed, and every one carries the seed that produced its
  * unshrunk parent plus the whole reduced config — a deep finding has to survive the walk from
  * the machine that found it to the person who fixes it.
+ *
+ * ## Status, measured (T21)
+ *
+ * | budget | result |
+ * |---|---|
+ * | `ELEVATOR_SIM_FUZZ=deep` (250 cases, the tier's own default) | **green**, 0 failures |
+ * | `ELEVATOR_SIM_FUZZ_CASES=2000` (the overnight pass) | **1 failure — `fuzz-1000384`, and it is not a T21 finding** |
+ *
+ * **OPEN FINDING at the 2 000-case budget — `fuzz-1000384`, simSeed 205687583. P5 termination,
+ * not P6 starvation.** A sky-lobby case with access zones, an initial service mode *and* a mid-run
+ * service schedule times out with the group having done no passenger work for 1 694 s before its
+ * deadline while journey `j35` (G to 4) was servable and outstanding since t = 152.9. The shrinker
+ * reduces it in 33 steps to a 29-passenger case that still deadlocks, on a bank whose remaining car
+ * is `mode: "independent"`.
+ *
+ * **Proven pre-existing and separate.** Reproduced with
+ * `caseFromSeed(1000384, generateOptionsFrom(config, DEEP_SPACE))` on `c072f97` — the branch point,
+ * with every T21 change stashed — producing the identical violation to the same decimal. It is
+ * mechanically untouchable by T21 in any case: `checkTermination` reads `result.status`,
+ * `deadlineS`, the boarding and alighting timestamps and the servability of an undelivered journey,
+ * and consults neither `awtIsValid` nor `serviceLevel`. It is a **dispatch or service-mode
+ * liveness defect**, in the same family as `DECISIONS-T20.md` § D79's finding, and it belongs to
+ * whoever owns `sim/` and `dispatch/` rather than to the metrics layer. **HANDBACK.**
  */
 
-import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
+import { loadConfig, runSimulation, type LoadedConfig } from '@elevator-sim/core';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -30,7 +53,10 @@ import {
   formatStats,
   runCampaign,
 } from './campaign.js';
+import { caseFromSeed } from './generate.js';
+import { evaluateCase, fuzzSimulationConfigFor, generateOptionsFrom } from './run.js';
 import { formatOutcome } from './shrink.js';
+import { PROPERTY_BOUNDS } from './types.js';
 
 const DATA_DIR = fileURLToPath(new URL('../../../../data', import.meta.url));
 
@@ -70,64 +96,104 @@ describe.skipIf(!deepCampaignRequested())('the deep campaign', () => {
 });
 
 /* -------------------------------------------------------------------------- *
- * An open counterexample, named rather than filtered out
+ * The counterexample that closed the fourth `awtIsValid` gate
  * -------------------------------------------------------------------------- */
 
 /**
- * **OPEN FINDING — the deep campaign is red on this, deliberately.**
- *
- * Widening the generator to emit service modes turned up one counterexample in 2 000 deep cases,
- * and it is **not** a service-mode bug. Reproduce the parent with
+ * **CLOSED (T21).** Widening the generator to emit service modes turned up one counterexample in
+ * 2 000 deep cases, and it was **not** a service-mode bug. Reproduce the parent with
  * `caseFromSeed(1001074, generateOptionsFrom(config, DEEP_SPACE))`:
  *
  * ```
  * case      fuzz-1001074      simSeed 2110294577
  * topology  single-bank       tags: basement, mixed-use, initial-service-mode
- * dispatch  auction-multi-round / mobile-credential
+ * dispatch  destination-eta / mobile-credential
  * demand    6.1 %pop/5min over 1433 s, drain 1800 s
  * service   initial: main/main-2 = independent      schedule: none
- * status    completed, 177 passengers
- * violations
+ * status    completed, 177 passengers, 1616.0 simulated s, full-run window
+ * as found
  *   [starvation] leg "p106" (13 to G) waited 922.7 s, past the 900 s bound,
  *                in a run reporting saturation verdict "stable" with a valid AWT
  *   [starvation] leg "p107" (13 to G) waited 922.7 s, …
  * ```
  *
  * The service mode is only how the campaign *reached* it. `main-2` is `independent`, so the
- * fourteen-floor building is served by one car for hall calls — and **the shrinker removed the
+ * fifteen-floor building is served by one car for hall calls — and **the shrinker removed the
  * mode**, reducing in five steps to an eleven-floor, genuinely single-car building with the whole
- * fleet in service, which reproduces both violations exactly. Nothing about the counterexample
- * requires `CarConfig.mode` to exist; the old corpus simply never drew a building of that shape
- * at that rate.
+ * fleet in service, which reproduces the run summary to the last digit.
  *
- * ## What actually disagrees
+ * ## What disagreed, and how it was settled
  *
- * Two definitions, both defensible, and the run satisfies one:
+ * `summarize.ts` called the run `stable` and was right by its own definition: the queue rose to 41
+ * and drained to 0, so it did not *diverge*. `checkStarvation` called it starvation and was also
+ * right: the run published an AWT of 172.1 s while two people waited 15.4 minutes. "The queue is
+ * not diverging" and "nobody was abandoned" were being treated as one claim and are two.
  *
- * - `metrics/summarize.ts` calls the run **`stable`**, and by its own definition it is right: the
- *   verdict is a regression on queue length over the report window, and this queue does not
- *   *diverge* — it spikes under a transient overload the single car cannot absorb, and then
- *   clears. The run `completed`; nobody is undelivered.
- * - `properties.ts` `checkStarvation` calls it **starvation**, and by `CLAUDE.md`'s discipline it
- *   is also right: the run publishes an AWT while two people waited 15.4 minutes, which is the
- *   "statistics improve as the bug gets worse" failure the whole track exists to catch.
+ * The resolution is in `core`, not here. `RunSummary.awtIsValid` gained a **fourth** gate — see
+ * `metrics/summarize.ts` § `diagnoseServiceLevel` and `packages/core/DECISIONS-T21.md` — because
+ * the trend gate and the censoring gate are both proxies for "did the backlog clear?" and neither
+ * sees a backlog that cleared *late*. The run now reports `awtIsValid: false` with the passenger
+ * named, and P6's existing escape clause (*"a fifteen-minute wait is legitimate in a run that says
+ * so"*) is satisfied for the right reason.
  *
- * So "the queue is not diverging" and "nobody was abandoned" are being treated as one claim and
- * are two. The resolution belongs in `core/src/metrics/summarize.ts` — a run that produced a
- * quarter-hour wait should say so in its own verdict, whether or not its queue diverges — and
- * that file is **not owned by this package**. **HANDBACK.**
- *
- * `PROPERTY_BOUNDS.starvationBoundS` is deliberately **not** moved. 900 s is two orders of
- * magnitude past the 10–30 s AWT the shipped buildings run at; raising it to make this case pass
- * is exactly the move this track exists to prevent, and the generator is not narrowed to avoid
- * the case either.
+ * **Nothing in this package moved.** `PROPERTY_BOUNDS.starvationBoundS` is still 900 s,
+ * `checkStarvation` is unchanged line for line, and the generator was not narrowed. The property
+ * still has teeth that the core gate does not: it scans the **whole record** rather than the
+ * report window, so a passenger starved outside a `peak-5min` window is invisible to
+ * `serviceLevel` and visible here; and it re-derives servability from the building, so it can tell
+ * an abandoned passenger from one the fleet could never legally carry.
  */
 describe('deep campaign counterexample fuzz-1001074 (starvation vs. a "stable" verdict)', () => {
-  it.skip('a run that starves a passenger for 922.7 s should not report a quotable AWT — needs a resolution in core/src/metrics/summarize.ts', () => {
-    /* Intentionally empty. The reproduction is the seed in the docstring above, and the assertion
-       that would go here is one this package cannot make true: either `summarize.ts` widens what
-       it is willing to call unquotable, or the project accepts that a transient single-car
-       overload is a legitimate `stable` run with a legitimate 15-minute wait — and if it is the
-       second, that decision belongs beside `SaturationThresholds`, not in a fuzz bound. */
-  });
+  let localConfig: LoadedConfig;
+
+  beforeAll(async () => {
+    localConfig = await loadConfig(DATA_DIR);
+  }, 60_000);
+
+  it('reproduces, and no longer publishes a quotable AWT beside a 922.7 s wait', () => {
+    const options = generateOptionsFrom(localConfig, DEEP_SPACE);
+    const fuzzCase = caseFromSeed(1_001_074, options);
+    const result = runSimulation(fuzzSimulationConfigFor(fuzzCase, { config: localConfig }));
+    const summary = result.summary;
+
+    // The run is unchanged: same status, same cohort, same numbers. Only the verdict on whether
+    // they may be quoted has moved, which is what makes this a reporting fix and not a
+    // behavioural one.
+    expect(result.status).toBe('completed');
+    expect(result.undelivered).toHaveLength(0);
+    expect(summary.window.id).toBe('full-run');
+    expect(summary.waiting.arrivalCount).toBe(177);
+    expect(summary.waiting.unservedCount).toBe(0);
+    expect(summary.waiting.meanS).toBeCloseTo(172.067, 2);
+    expect(summary.waiting.maxS).toBeCloseTo(922.65, 2);
+
+    // The queue genuinely did not diverge, and the fit still says so. The fix does not pretend
+    // otherwise — that was the whole disagreement.
+    expect(summary.saturation.verdict).toBe('stable');
+    expect(summary.saturation.saturated).toBe(false);
+
+    // What changed.
+    expect(summary.serviceLevel.verdict).toBe('starved');
+    expect(summary.serviceLevel.longestWaitS).toBeCloseTo(922.65, 2);
+    expect(summary.serviceLevel.longestWaitIsCensored).toBe(false);
+    expect(summary.awtIsValid).toBe(false);
+    expect(summary.awtInvalidReason).toMatch(/abandonment horizon/);
+
+    // And therefore P6 passes, without P6 having been touched.
+    const violations = evaluateCase(fuzzCase, { config: localConfig }).violations;
+    expect(violations).toEqual([]);
+  }, 120_000);
+
+  it('still fails P6 if the gate is turned off, so the case is a live regression rather than a fixture', () => {
+    const options = generateOptionsFrom(localConfig, DEEP_SPACE);
+    const fuzzCase = caseFromSeed(1_001_074, options);
+    const config = fuzzSimulationConfigFor(fuzzCase, { config: localConfig });
+    // A horizon past the run's own length is the gate's own off switch, and it restores the
+    // original defect exactly: `stable`, a valid AWT, and a 922.7 s wait.
+    const result = runSimulation({ ...config, summarize: { maxWaitHorizonS: 100_000 } });
+    expect(result.summary.awtIsValid).toBe(true);
+    expect(result.summary.saturation.verdict).toBe('stable');
+    expect(result.summary.serviceLevel.verdict).toBe('served');
+    expect(result.summary.waiting.maxS).toBeGreaterThan(PROPERTY_BOUNDS.starvationBoundS);
+  }, 120_000);
 });

@@ -149,6 +149,17 @@ produce and neither would ever fire.
 
 ## D83 — **FINDING, HANDBACK.** The deep campaign is red on `fuzz-1001074`, and it is not a service-mode bug
 
+> **RESOLVED in T21 — this section is kept as the record of the finding, not as an open item.**
+> The handback was accepted. `RunSummary.awtIsValid` gained a **fourth** ground —
+> `core/src/metrics/summarize.ts` § `diagnoseServiceLevel`, evidence in
+> `packages/core/DECISIONS-T21.md` — because the trend gate and the censoring gate are both proxies
+> for *"did the backlog clear?"* and neither sees a backlog that cleared *late*. The deep tier is
+> green: 0 failures in 250 and in 2 000 cases. Nothing in this package moved:
+> `PROPERTY_BOUNDS.starvationBoundS` is still 900 s, `checkStarvation` is unchanged line for line,
+> and the generator was not narrowed. The skipped placeholder in `fuzz/deep.test.ts` is now two
+> passing regression tests.
+
+
 One counterexample in 2 000 deep cases. P6 starvation:
 
 ```
