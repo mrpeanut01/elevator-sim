@@ -1,5 +1,5 @@
 /**
- * The six things that can happen in a run, as kernel events.
+ * The seven things that can happen in a run, as kernel events.
  *
  * The whole simulation is these and nothing else. There is no tick, no polling loop and no
  * "advance by dt": the clock jumps from one of these to the next, which is what makes a
@@ -14,6 +14,7 @@
  * | `sim.carArrived` | a car is levelled | completes the move and asks the car what to do next |
  * | `sim.carDoor` | the door's next automatic transition is due | runs the door forward; transfers passengers when it reaches open |
  * | `sim.queueSample` | a sample point on the demand horizon | records the building-wide queue length |
+ * | `sim.serviceChange` | a `serviceEvents` entry's time comes | changes a car's service mode and re-offers whatever it had to drop |
  *
  * ## Why the payloads are ids and not objects
  *
@@ -46,6 +47,7 @@ export const SIM_EVENT_TYPES = Object.freeze({
   carArrived: 'sim.carArrived',
   carDoor: 'sim.carDoor',
   queueSample: 'sim.queueSample',
+  serviceChange: 'sim.serviceChange',
 } as const);
 
 export type SimEventType = (typeof SIM_EVENT_TYPES)[keyof typeof SIM_EVENT_TYPES];
@@ -97,6 +99,18 @@ export interface CarEventPayload {
 /** A point on the queue-sampling grid. */
 export interface QueueSamplePayload {
   /** 0-based position on the grid, for tracing. */
+  readonly index: number;
+}
+
+/**
+ * One entry of the building's `serviceEvents` schedule coming due.
+ *
+ * Indexed into `ResolvedBuilding.serviceEvents` for the reason the batch payload gives: the
+ * handler must read the schedule the run is actually driving, and an index cannot be a stale
+ * copy of an entry from a different building.
+ */
+export interface ServiceChangePayload {
+  /** Index into `ResolvedBuilding.serviceEvents`. */
   readonly index: number;
 }
 
@@ -156,4 +170,18 @@ export function queueSampleEvent(
   handler: EventHandler<QueueSamplePayload>,
 ): SimEvent<QueueSamplePayload> {
   return createEvent(SIM_EVENT_TYPES.queueSample, payload, handler);
+}
+
+/**
+ * A car changing service mode at a scheduled simulated time.
+ *
+ * The event that makes `Car.setMode` reachable from a configuration. Scheduled from
+ * `ResolvedBuilding.serviceEvents` at `run()`, alongside the trace and the queue-sample grid, so
+ * the time it fires at is the kernel's and never a wall clock (CLAUDE.md invariant 3).
+ */
+export function serviceChangeEvent(
+  payload: ServiceChangePayload,
+  handler: EventHandler<ServiceChangePayload>,
+): SimEvent<ServiceChangePayload> {
+  return createEvent(SIM_EVENT_TYPES.serviceChange, payload, handler);
 }

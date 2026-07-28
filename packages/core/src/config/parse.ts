@@ -44,6 +44,7 @@ import type {
   ResolvedBank,
   ResolvedBuilding,
   ResolvedCar,
+  ResolvedServiceEvent,
   TrafficProfiles,
 } from './types.js';
 
@@ -471,6 +472,57 @@ export function resolveBuilding(
     });
   });
 
+  /*
+   * The service schedule, with every car located.
+   *
+   * Resolved here rather than at run time for the reason every other cross-reference in this
+   * function is: an event naming a car that does not exist must be a located `ConfigError`, not
+   * an event the runner silently skips. A skipped service event produces a run that completes,
+   * balances its books, and did not do the thing its configuration says it did — which is the
+   * "configured, validated, dead" shape this repository has shipped repeatedly.
+   *
+   * Authored order is preserved. The kernel's total order is `(time, sequence)` and the runner
+   * schedules these in array order, so two events at the same `atS` fire in the order they were
+   * written (CLAUDE.md invariant 4). Sorting here would be a second ordering authority.
+   */
+  const serviceEvents: ResolvedServiceEvent[] = [];
+  (building.serviceEvents ?? []).forEach((event, eventIndex) => {
+    const path = `serviceEvents[${eventIndex}]`;
+    const holders = building.banks.filter(
+      (bank) =>
+        (event.bankId === undefined || bank.id === event.bankId) &&
+        bank.cars.some((car) => car.id === event.carId),
+    );
+    const [holder] = holders;
+    if (holder === undefined) {
+      const known = building.banks.flatMap((bank) =>
+        bank.cars.map((car) => `${bank.id}/${car.id}`),
+      );
+      addIssue(
+        `${path}.carId`,
+        event.bankId === undefined
+          ? `service event at ${event.atS} s names car "${event.carId}", which no bank of this building declares. Known cars (bank/car): ${formatKnown(known)}.`
+          : `service event at ${event.atS} s names car "${event.carId}" in bank "${event.bankId}", which that bank does not declare${building.banks.some((bank) => bank.id === event.bankId) ? '' : ' (and no bank has that id)'}. Known cars (bank/car): ${formatKnown(known)}.`,
+        ISSUE_CODES.unknownServiceEventCar,
+      );
+      return;
+    }
+    if (holders.length > 1) {
+      addIssue(
+        `${path}.carId`,
+        `service event at ${event.atS} s names car "${event.carId}", which exists in ${holders.length} banks (${holders.map((bank) => bank.id).join(', ')}). Car ids are unique per bank, not per building — add "bankId" to say which one.`,
+        ISSUE_CODES.unknownServiceEventCar,
+      );
+      return;
+    }
+    serviceEvents.push({
+      atS: event.atS,
+      bankId: holder.id,
+      carId: event.carId,
+      mode: event.mode,
+    });
+  });
+
   (building.accessZones ?? []).forEach((zone, zoneIndex) => {
     zone.floors.forEach((floorId, floorIndex) => {
       if (floorsById.has(floorId) || floors.length === 0) return;
@@ -503,6 +555,7 @@ export function resolveBuilding(
     transferFloors,
     banks,
     accessZones: building.accessZones ?? [],
+    serviceEvents,
     totalPopulation,
     warnings,
   };

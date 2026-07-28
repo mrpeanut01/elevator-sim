@@ -36,6 +36,33 @@ export interface TypicalMax {
 // ---------------------------------------------------------------------------
 
 /**
+ * The operating mode of a car. Car-owned state, per docs/01-architecture.md: degraded modes
+ * are natural as a per-car state machine and miserable as central flags.
+ *
+ * - `in-service` — normal automatic operation; answers hall calls and car calls.
+ * - `independent` — attendant/independent service. Removed from group control: it answers
+ *   car calls pressed inside the car only, and the dispatcher must not allocate hall calls
+ *   to it.
+ * - `fire-recall` — Phase I emergency recall. The car returns to its designated level and
+ *   parks with doors open; it provides no passenger service. (Phase II firefighter
+ *   operation is a distinct mode and is out of scope for Phase 1 — it would be a new member
+ *   of this union, not a reinterpretation of this one.)
+ * - `out-of-service` — parked, maintenance, or failed. Provides nothing.
+ *
+ * **Declared here rather than in `model/types.ts`**, which is where it used to live and which
+ * still re-exports it, because it is now an *authored* vocabulary: `CarConfig.mode` and
+ * `ServiceEventConfig.mode` both hold one, so `config/schema.ts` needs the values at run time to
+ * build its `z.enum`. Every other closed set that appears in `data/` is declared here for the
+ * same reason — `DOOR_TYPES`, `CALL_TYPES`, `PARKING_STRATEGIES`, `AGGREGATIONS` — and every
+ * runtime module reads them from here rather than the other way round. Moving it keeps `config/`
+ * a closed module graph, which `config/parse.test.ts` pins.
+ */
+export const SERVICE_MODES = ['in-service', 'independent', 'fire-recall', 'out-of-service'] as const;
+
+/** The operating mode of a car. See {@link SERVICE_MODES}. */
+export type ServiceMode = (typeof SERVICE_MODES)[number];
+
+/**
  * Door types are a closed set because this module resolves a car's `doorType` against
  * `elevator-specs.json → doors`. Adding a type means adding its timings to that file and
  * its name here.
@@ -567,6 +594,19 @@ export interface CarConfig extends Commented {
   readonly id: string;
   /** Elevator class id in `data/elevator-specs.json`. */
   readonly spec: string;
+  /**
+   * Service mode the car starts the run in. Defaults to `in-service`.
+   *
+   * The one field here that is not hardware: it is *operational state*, and it is authorable
+   * because the alternative is that a whole class of scenario cannot be expressed at all. A
+   * building with a car under maintenance, a bank in fire recall, an attendant-operated car —
+   * all of them are `mode`, and without it `INELIGIBILITY_REASONS.serviceMode` is unreachable
+   * from `data/` and "all cars out of service" is not an authorable configuration.
+   *
+   * Anything other than `in-service` makes the car ineligible for hall calls for the whole run
+   * unless a {@link ServiceEventConfig} puts it back. See {@link BuildingConfig.serviceEvents}.
+   */
+  readonly mode?: ServiceMode | undefined;
   /** Top speed, m/s. Defaults to the class typical. */
   readonly ratedSpeedMps?: number | undefined;
   /** Rated load. Imperial: unit is in the name. Defaults to the class low end. */
@@ -640,6 +680,34 @@ export interface AccessZone extends Commented {
   readonly credentialGroups: readonly string[];
 }
 
+/**
+ * One scheduled service-mode change, at a simulated time.
+ *
+ * **Data, not a hook** (CLAUDE.md invariant 7, and DECISIONS-T19). A schedule authored here is
+ * part of the building, so it travels with `buildingId` through the persisted run envelope and a
+ * stored run replays it exactly; a `SimulationConfig` callback would be a function, would not
+ * serialize, and would be silently absent from every replay — which is Phase 4's acceptance
+ * criterion failing quietly rather than loudly.
+ *
+ * `atS` is **simulated** seconds from the start of the run, from the kernel and never a wall
+ * clock (invariant 3). Two events at the same `atS` fire in authored order, because the queue's
+ * total order is `(time, sequence)` and the sequence follows the order the runner scheduled them
+ * in, which is the order they appear in the array (invariant 4).
+ */
+export interface ServiceEventConfig extends Commented {
+  /** Simulated seconds from the start of the run. */
+  readonly atS: number;
+  /** The car's id within its bank. */
+  readonly carId: string;
+  /**
+   * Which bank the car is in. Required only when the same car id appears in more than one
+   * bank; omitted, the id must be unique across the building.
+   */
+  readonly bankId?: string | undefined;
+  /** The mode to switch to. Switching to the mode the car is already in is a no-op. */
+  readonly mode: ServiceMode;
+}
+
 /** One file in `data/buildings/`. Floors come from `floors`, `floorRanges`, or both. */
 export interface BuildingConfig extends Commented {
   readonly id: string;
@@ -653,6 +721,14 @@ export interface BuildingConfig extends Commented {
   readonly totalPopulation?: number | undefined;
   readonly banks: readonly BankConfig[];
   readonly accessZones?: readonly AccessZone[] | undefined;
+  /**
+   * Mid-run service-mode changes, in authored order. Absent means "nothing changes".
+   *
+   * A car's *initial* mode is `CarConfig.mode`; this is the schedule that moves it afterwards —
+   * a recall at 600 s, a return to service at 900 s. See {@link ServiceEventConfig} for why this
+   * is authored data rather than an injection seam.
+   */
+  readonly serviceEvents?: readonly ServiceEventConfig[] | undefined;
   readonly notes?: readonly string[] | undefined;
 }
 
@@ -668,6 +744,14 @@ export interface ResolvedCar {
   readonly id: string;
   /** The elevator class this car was resolved against. */
   readonly spec: string;
+  /**
+   * Service mode at t=0. `in-service` unless the car config said otherwise.
+   *
+   * Always present, unlike {@link passengerTransferS}: there is a safe default here and it is
+   * the same one `Car` applies, so a resolved car can state it rather than leaving every
+   * consumer to re-derive it.
+   */
+  readonly mode: ServiceMode;
   readonly ratedSpeedMps: number;
   /** m/s^2. */
   readonly acceleration: number;
@@ -715,6 +799,21 @@ export interface ResolvedCar {
   readonly designCapacityPersonsPerDeck?: number | undefined;
 }
 
+/**
+ * A {@link ServiceEventConfig} with its car located: `bankId` is no longer optional, and the
+ * pair `(bankId, carId)` names exactly one car of this building.
+ *
+ * Resolved at config time and not at run time, so an event naming a car that does not exist is a
+ * `ConfigError` with a path — the same treatment a bank serving an undeclared floor gets — rather
+ * than a silently-skipped event that makes a run quietly not test what it says it tests.
+ */
+export interface ResolvedServiceEvent {
+  readonly atS: number;
+  readonly bankId: string;
+  readonly carId: string;
+  readonly mode: ServiceMode;
+}
+
 /** A bank with its cars resolved. */
 export interface ResolvedBank {
   readonly id: string;
@@ -744,6 +843,16 @@ export interface ResolvedBuilding {
   readonly transferFloors: readonly FloorConfig[];
   readonly banks: readonly ResolvedBank[];
   readonly accessZones: readonly AccessZone[];
+  /**
+   * The building's service-mode schedule, every car located, in authored order.
+   *
+   * **Optional, and its absence is not the same as an empty schedule.** A `ResolvedBuilding`
+   * assembled by hand rather than by {@link resolveBuilding} — fixtures, the fuzz generator,
+   * `experiments/validation/syntheticBuilding.ts` — will not have it, and a run given one whose
+   * `config.serviceEvents` is non-empty while this is absent says so in `result.warnings` rather
+   * than dropping the schedule quietly. See `sim/simulation.ts`.
+   */
+  readonly serviceEvents?: readonly ResolvedServiceEvent[] | undefined;
   /** Sum of expanded floor populations. Authoritative over the declared value. */
   readonly totalPopulation: number;
   /** Non-fatal diagnostics raised while resolving this building. */

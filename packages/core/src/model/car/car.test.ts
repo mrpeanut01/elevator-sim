@@ -1169,7 +1169,17 @@ describe('CAR_PARAMETERS', () => {
   it('does not redeclare a tunable that already has a home in config or the door schema', () => {
     const ids = new Set(CAR_PARAMETERS.map((parameter) => parameter.id));
 
-    for (const id of ['car.ratedSpeedMps', 'car.acceleration', 'car.jerk', 'car.doorOpenS']) {
+    // `car.mode` and `car.doorType` are the two categoricals the rule covers, and they are here
+    // because the rule is easiest to break with a categorical: neither has a `range`, so a row
+    // for one would have slipped past the "fully specified" check above as well.
+    for (const id of [
+      'car.ratedSpeedMps',
+      'car.acceleration',
+      'car.jerk',
+      'car.doorOpenS',
+      'car.doorType',
+      'car.mode',
+    ]) {
       expect(ids.has(id)).toBe(false);
     }
   });

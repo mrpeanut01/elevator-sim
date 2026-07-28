@@ -16,10 +16,12 @@
  *   agree on direction — but only `index` is defined for a building with skipped numbers
  *   (no floor 13) or basements.
  *
- * This module imports nothing but kernel *types*, so it is free of any runtime dependency
- * and safe to import from anywhere in `core/`.
+ * This module imports nothing but kernel *types* and `config/types.ts` — which is itself a
+ * declaration-only module with no imports at all — so it is free of any runtime dependency and
+ * safe to import from anywhere in `core/`.
  */
 
+import type { ServiceMode } from '../config/types.js';
 import type { SimTime } from '../kernel/index.js';
 
 /* -------------------------------------------------------------------------- *
@@ -68,22 +70,17 @@ export type CredentialGroup = string;
  * -------------------------------------------------------------------------- */
 
 /**
- * The operating mode of a car. Car-owned state, per docs/01-architecture.md: degraded modes
- * are natural as a per-car state machine and miserable as central flags.
+ * The operating mode of a car, re-exported from its declaration in `config/types.ts`.
  *
- * - `in-service` — normal automatic operation; answers hall calls and car calls.
- * - `independent` — attendant/independent service. Removed from group control: it answers
- *   car calls pressed inside the car only, and the dispatcher must not allocate hall calls
- *   to it.
- * - `fire-recall` — Phase I emergency recall. The car returns to its designated level and
- *   parks with doors open; it provides no passenger service. (Phase II firefighter
- *   operation is a distinct mode and is out of scope for Phase 1 — it would be a new member
- *   of this union, not a reinterpretation of this one.)
- * - `out-of-service` — parked, maintenance, or failed. Provides nothing.
+ * It moved there when `CarConfig.mode` and `BuildingConfig.serviceEvents` made it an authored
+ * value: `config/schema.ts` needs the four names at run time to build its `z.enum`, and every
+ * closed set that appears in `data/` is declared in `config/types.ts` so that `config/` depends
+ * on nothing outside itself. Re-exported here because this is the vocabulary module the rest of
+ * the simulation argues in, and because `acceptsHallCalls` and `acceptsCarCalls` — the two
+ * predicates that give the modes their meaning — are still this module's.
  */
-export const SERVICE_MODES = ['in-service', 'independent', 'fire-recall', 'out-of-service'] as const;
-
-export type ServiceMode = (typeof SERVICE_MODES)[number];
+export { SERVICE_MODES } from '../config/types.js';
+export type { ServiceMode } from '../config/types.js';
 
 /**
  * Whether a car in this mode may be allocated hall calls.

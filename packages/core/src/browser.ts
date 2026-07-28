@@ -176,6 +176,7 @@ export {
   personsAtRatedLoad,
   resolveBuilding,
   resolveCar,
+  serviceEventSchema,
   trafficProfileSchema,
   trafficProfilesSchema,
 } from './config/index.js';
@@ -234,6 +235,8 @@ export type {
   ResolvedBank,
   ResolvedBuilding,
   ResolvedCar,
+  ResolvedServiceEvent,
+  ServiceEventConfig,
   TrafficProfile,
   TrafficProfiles,
   TypicalMax,
@@ -970,6 +973,7 @@ export {
   dispatchTickEvent,
   queueSampleEvent,
   runSimulation,
+  serviceChangeEvent,
   transferArrivalEvent,
 } from './sim/index.js';
 
@@ -979,6 +983,7 @@ export type {
   ConservationAudit,
   DispatchTickPayload,
   QueueSamplePayload,
+  ServiceChangePayload,
   SimEventType,
   SimParameterSpec,
   SimParameterType,
