@@ -347,7 +347,16 @@ describe('elevator-sim run', () => {
 });
 
 describe('elevator-sim compare', () => {
-  it('reports INDISTINGUISHABLE when a dispatcher is compared with itself', async () => {
+  /**
+   * CHANGED 2026-07-27 (review finding #8). This test used to assert `INDISTINGUISHABLE` for a
+   * dispatcher compared with itself, and in doing so pinned the defect: every paired difference in
+   * that run is *exactly* zero, so the honest answer is IDENTICAL and the advice attached to
+   * INDISTINGUISHABLE — raise --reps — is unsatisfiable at any replication count.
+   *
+   * The claim the old assertion was reaching for, that the command refuses to rank two arms it
+   * cannot separate, is kept and strengthened below.
+   */
+  it('names a self-comparison IDENTICAL, not a resolution problem', async () => {
     const { code, text } = await cli([
       'compare',
       '--building',
@@ -366,9 +375,45 @@ describe('elevator-sim compare', () => {
       ...SHORT,
     ]);
     expect(code).toBe(0);
-    expect(text).toContain('INDISTINGUISHABLE');
+    expect(text).toContain('IDENTICAL');
+    expect(text).toContain('VERDICT: IDENTICAL on AWT');
+    expect(text).toContain('4 of 4 paired differences are exactly zero');
+    /* The refusal to rank, which is what the previous assertion was really about. */
     expect(text).not.toContain('is BETTER than');
     expect(text).not.toContain('is WORSE than');
+    /* And the advice that no replication count can satisfy, gone. */
+    expect(text).not.toContain('Raise --reps');
+    expect(text).not.toContain("below this experiment's resolution");
+    expect(text).not.toContain('INDISTINGUISHABLE');
+  });
+
+  it('points a bit-identical comparison of two different profiles at the wiring-bug rule', async () => {
+    // Finding #8's real case: `eta` and `fairness-first` are distinct shipped profiles that agree
+    // on every dispatch decision here, so the paired differences are all exactly zero. The
+    // roadmap's rule is that this is a wiring bug until proven otherwise, and the CLI must say so
+    // rather than suggest more replications.
+    const { code, text } = await cli([
+      'compare',
+      '--building',
+      'garden-apartments',
+      '--a',
+      'eta',
+      '--b',
+      'fairness-first',
+      '--reps',
+      '4',
+      '--seed',
+      '20260726',
+      '--window',
+      'full-run',
+      '--serial',
+      ...SHORT,
+    ]);
+    expect(code).toBe(0);
+    expect(text).toContain('VERDICT: IDENTICAL on AWT');
+    expect(text).toContain('bit-identical result is a wiring bug until proven otherwise');
+    expect(text).not.toContain('Raise --reps');
+    expect(text).not.toContain("below this experiment's resolution");
   });
 
   it('verifies common random numbers rather than assuming them', async () => {
@@ -419,6 +464,69 @@ describe('elevator-sim compare', () => {
     expect(armLine).toBeDefined();
     expect(armLine).toMatch(/\[.*\]/);
   });
+
+  /**
+   * Review finding #19. `--confidence` moves every bound the command prints and was missing from
+   * the `reproduce:` line, so running the printed string could contradict the verdict printed
+   * directly above it: at `--confidence 0.8` the measured case printed "AWT −0.22 s [−0.41, −0.04]
+   * BETTER" and its own reproduce line re-ran at the 0.95 default as "[−0.50, +0.05]
+   * INDISTINGUISHABLE".
+   *
+   * `--serial` is appended to the re-run rather than being expected in the printed line: it picks
+   * an executor and cannot move a number, which is exactly the criterion for what belongs on a
+   * reproduce line and what does not.
+   */
+  it('prints a reproduce line that reproduces the verdict printed above it', async () => {
+    const argv = [
+      'compare',
+      '--building',
+      'midtown-office',
+      '--a',
+      'eta',
+      '--b',
+      'capacity-aware',
+      '--reps',
+      '30',
+      '--seed',
+      '20260726',
+      '--rate',
+      '1',
+      '--duration',
+      '900',
+      '--confidence',
+      '0.8',
+      '--serial',
+    ];
+    const first = await cli(argv);
+    expect(first.code).toBe(0);
+
+    const line = first.text.split('\n').find((candidate) => candidate.includes('reproduce:'));
+    expect(line).toBeDefined();
+    const printed = (line as string).slice((line as string).indexOf('reproduce:') + 10).trim();
+    expect(printed.startsWith('elevator-sim compare')).toBe(true);
+    expect(printed).toContain('--confidence 0.8');
+
+    /* Re-run the printed string verbatim, as a user would. */
+    const second = await cli([...printed.split(/\s+/).slice(1), '--serial']);
+    expect(second.code).toBe(0);
+
+    const awtRows = (text: string): readonly string[] =>
+      text.split('\n').filter((row) => row.trim().startsWith('AWT'));
+    const verdictLines = (text: string): readonly string[] =>
+      text.split('\n').filter((row) => row.includes('VERDICT:'));
+
+    expect(awtRows(second.text)).toEqual(awtRows(first.text));
+    expect(verdictLines(second.text)).toEqual(verdictLines(first.text));
+    expect(verdictLines(first.text).join('\n')).toContain('is BETTER than');
+
+    /* And the reason the flag has to be on the line: dropping it changes the answer. */
+    const withoutConfidence = printed
+      .split(/\s+/)
+      .slice(1)
+      .filter((token, index, tokens) => token !== '--confidence' && tokens[index - 1] !== '--confidence');
+    const third = await cli([...withoutConfidence, '--serial']);
+    expect(verdictLines(third.text)).not.toEqual(verdictLines(first.text));
+  }, 120_000);
 
   it('warns when the replication budget is below the documented range', async () => {
     const { text } = await cli([

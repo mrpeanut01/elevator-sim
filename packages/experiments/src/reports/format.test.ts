@@ -22,6 +22,7 @@ import {
   formatNumber,
   formatSigned,
 } from './format.js';
+import { pairedDifferenceEstimate } from './statistics.js';
 import type { ComparisonReport } from './types.js';
 
 const SEEDS = [1, 2, 3, 4, 5, 6];
@@ -97,6 +98,32 @@ describe('every mean is printed with its interval', () => {
     expect(formatMeanEstimate({ ...estimateStub, halfWidth: Number.NaN }, 2, 's')).toMatch(
       /no interval \(n=1\)/,
     );
+  });
+
+  it('names the family t(n−1) past n = 25, where it used to print "normal"', () => {
+    // Review finding #14's second half: this line printed `normal` for an estimate that the page
+    // header called a paired-t interval. Both are now true at once, and the printed family lets a
+    // reader re-derive the printed half-width — t(25, .975) = 2.0595386.
+    const estimate = pairedDifferenceEstimate(
+      Array.from({ length: 26 }, (_, index) => index),
+      Array.from({ length: 26 }, () => 0),
+      { confidence: 0.95 },
+    );
+    const text = formatMeanEstimate(estimate, 3, 's');
+    expect(text).toContain('n=26');
+    expect(text).toContain('t(25)');
+    expect(text).not.toContain('normal');
+  });
+
+  it('spells a normal-approximation estimate "normal(z)", so it cannot pass for a t interval', () => {
+    // The arm is unreachable from this package's estimators now. It is kept explicit rather than
+    // deleted so that a future or hand-built z estimate announces itself in the printed page.
+    const text = formatMeanEstimate(
+      { ...estimateStub, n: 30, stdDev: 1, standardError: 0.2, halfWidth: 0.39, lower: 4.61, upper: 5.39, method: 'z' as const, degreesOfFreedom: Number.NaN },
+      2,
+      's',
+    );
+    expect(text).toContain('normal(z)');
   });
 });
 

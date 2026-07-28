@@ -107,6 +107,18 @@ export function formatSigned(value: number, precision: number): string {
  * The half-width is printed as well as the bounds, because it is the quantity the sequential
  * stopping rule and the noise floor are both stated in, and `n` and the quantile family are printed
  * so a reader can re-derive the interval by hand — which someone eventually will.
+ *
+ * ## The family label is load-bearing
+ *
+ * Every interval this module receives from `estimateMean`/`pairedDifferenceEstimate` is Student-t
+ * at `n − 1`, so the label reads `t(df)` at every `n` and a reader who multiplies `t(df)` by
+ * `halfWidth/quantile` gets the printed bounds back. It did not always: review finding #14 found
+ * this function printing `normal` for an interval that the page header two sections down called a
+ * paired-t interval, because the estimator silently switched families above n=25.
+ *
+ * The `'z'` arm below is therefore no longer reachable from any estimator in this package, and is
+ * kept — spelled `normal(z)`, never bare — precisely so that a hand-built or future
+ * normal-approximation estimate announces itself instead of hiding behind a `t`-shaped label.
  */
 export function formatMeanEstimate(
   estimate: MeanEstimate,
@@ -121,7 +133,7 @@ export function formatMeanEstimate(
   const level = `${(estimate.confidence * 100).toFixed(0)}%`;
   const bounds = `[${formatNumber(estimate.lower, precision)}, ${formatNumber(estimate.upper, precision)}]`;
   const family =
-    estimate.method === 't' ? `t(${formatNumber(estimate.degreesOfFreedom, 0)})` : 'normal';
+    estimate.method === 't' ? `t(${formatNumber(estimate.degreesOfFreedom, 0)})` : 'normal(z)';
   return [
     mean,
     `${level} CI ${bounds}`,
@@ -331,7 +343,7 @@ export function formatComparisonReport(report: ComparisonReport): string {
     [
       report.title,
       wrap(
-        `${(report.confidence * 100).toFixed(0)}% confidence. Comparisons are paired-t intervals on per-replication differences over shared seeds (common random numbers); a candidate is ranked only where the interval excludes zero.`,
+        `${(report.confidence * 100).toFixed(0)}% confidence. Comparisons are paired-t intervals on per-replication differences over shared seeds (common random numbers) — Student-t at n−1, at every n, matching the family each interval prints; a candidate is ranked only where the interval excludes zero.`,
         '',
       ),
     ].join('\n'),

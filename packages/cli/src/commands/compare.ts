@@ -12,9 +12,28 @@
  *   variance is the whole reason the comparison is affordable;
  * - an interval containing zero is **INDISTINGUISHABLE**, printed as that word, with no ranking
  *   and no point estimate offered as a consolation prize;
+ * - a run in which **every** paired difference is exactly zero is **IDENTICAL**, which is a
+ *   different finding and not a stronger INDISTINGUISHABLE — see below;
  * - a saturated arm has its waiting statistics **suppressed** rather than averaged.
  *
  * Nothing here prints a mean without its interval.
+ *
+ * ## Why IDENTICAL is a fourth word rather than a shade of the third
+ *
+ * INDISTINGUISHABLE means "there is an effect here that this budget cannot resolve", and the
+ * honest advice attached to it is to raise `--reps`. That advice is *wrong* — unsatisfiable, in
+ * fact — when the two arms produced bit-identical runs: dispatch is an `argmin` over a handful of
+ * cars and the simulator is deterministic, so a change too small to flip a single decision produces
+ * n-out-of-n exactly-zero paired differences at every replication count. No `--reps` resolves a
+ * difference that is not there.
+ *
+ * The repository already made this distinction and this command did not use it: `experiments`'
+ * `benchmark/verdict.ts` returns `IDENTICAL` for exactly this case and says why collapsing the two
+ * "would let an inert cost term be written up as 'a promising direction that needs more
+ * replications', which is the specific mistake this project exists not to make". Review finding #8
+ * measured the gap outside the self-comparison sanity check too: at the project's own operating
+ * point `eta` and `fairness-first` — two distinct shipped profiles — produce 30/30 exactly-zero
+ * paired AWT differences, and the CLI reported that as a resolution problem.
  */
 
 import type { ReplicationMetric } from '@elevator-sim/experiments';
@@ -146,15 +165,18 @@ export const COMPARE_HELP: CommandHelp = {
     'Both arms are driven by byte-identical passenger traces at every replication index, so the ' +
       'difference between them is the dispatcher and nothing else. That is worth 5–20× in ' +
       'required replications, and it is what makes a 100-replication answer trustworthy.',
-    'The verdict is a paired-t confidence interval on A − B. If it contains zero the answer is ' +
-      'INDISTINGUISHABLE and the two are not ranked — overlapping or straddling intervals do not ' +
-      'become a winner by being looked at harder.',
+    'The verdict is a paired-t confidence interval on A − B — Student-t at n−1, at every n. If it ' +
+      'contains zero the answer is INDISTINGUISHABLE and the two are not ranked — overlapping or ' +
+      'straddling intervals do not become a winner by being looked at harder.',
+    'If every paired difference is exactly zero the answer is IDENTICAL instead: the two arms ' +
+      'produced bit-identical runs, which is no effect rather than a small one, and no --reps ' +
+      'resolves it.',
   ],
   flags: COMPARE_FLAGS,
   examples: [
     `${BINARY} compare --building garden-apartments --a eta --b nearest-car --reps 100 --window full-run`,
     `${BINARY} compare --building midtown-office --a predictive-balanced --b eta --reps 200 --rate 8`,
-    `${BINARY} compare --building garden-apartments --a eta --b eta --reps 20 --window full-run   # must be INDISTINGUISHABLE`,
+    `${BINARY} compare --building garden-apartments --a eta --b eta --reps 20 --window full-run   # must be IDENTICAL`,
   ],
 };
 
@@ -321,6 +343,7 @@ export async function runCompare(
 
   heading(out, `Paired difference  (A − B, ${num(confidence * 100, 0)} % confidence)`);
   let headline: Verdict | undefined;
+  let headlineDifference: PairedDifference | undefined;
 
   // A difference of means is only as trustworthy as the means. If either arm's cohort was
   // censored — saturated, or a window nobody was served in — then every per-metric difference
@@ -350,17 +373,23 @@ export async function runCompare(
       continue;
     }
     const verdict = verdictOf(difference, entry.direction);
-    if (entry.metric === 'awtS') headline = verdict;
-    const text = renderSignedEstimate(difference.mean, difference.lower, difference.upper, {
+    if (entry.metric === 'awtS') {
+      headline = verdict;
+      headlineDifference = difference;
+    }
+    const { estimate } = difference;
+    const text = renderSignedEstimate(estimate.mean, estimate.lower, estimate.upper, {
       digits: entry.digits,
       unit: entry.unit,
     });
     const tag =
-      verdict === 'INDISTINGUISHABLE'
-        ? yellow(verdict)
-        : verdict === 'BETTER'
-          ? green(verdict)
-          : red(verdict);
+      verdict === 'IDENTICAL'
+        ? cyan(verdict)
+        : verdict === 'INDISTINGUISHABLE'
+          ? yellow(verdict)
+          : verdict === 'BETTER'
+            ? green(verdict)
+            : red(verdict);
     out.line(`  ${padColumn(entry.label, labelWidth)}  ${padColumn(text, 34)}  ${tag}`);
   }
 
@@ -390,6 +419,27 @@ export async function runCompare(
     }
   } else if (headline === undefined) {
     out.line(yellow(bold('  VERDICT: NONE — AWT could not be estimated on both arms.')));
+  } else if (headline === 'IDENTICAL') {
+    const pairs = headlineDifference?.differences.length ?? reps;
+    out.line(cyan(bold(`  VERDICT: IDENTICAL on AWT — ${count(pairs)} of ${count(pairs)} paired differences are exactly zero.`)));
+    out.line(
+      wrap(
+        `${aId} and ${bId} produced bit-identical runs at every replication, so this is no effect at all rather than an effect too small to see. ` +
+          'No replication count changes it, and there is nothing here to widen or narrow.',
+        Math.min(out.columns - 4, 92),
+        '  ',
+      ),
+    );
+    out.line();
+    out.line(
+      wrap(
+        aId === bId
+          ? `Comparing ${aId} with itself is the documented sanity check, and this is the result it is supposed to produce: the apparatus adds no difference of its own.`
+          : `docs/05-roadmap.md: a bit-identical result is a wiring bug until proven otherwise. Two profiles that differ on paper and not in a single dispatch decision usually mean the difference between them is inert — check that the cost terms ${aId} and ${bId} disagree on are read by the shipped path before reading this as "the two are equally good".`,
+        Math.min(out.columns - 4, 92),
+        '  ',
+      ),
+    );
   } else if (headline === 'INDISTINGUISHABLE') {
     out.line(yellow(bold(`  VERDICT: INDISTINGUISHABLE on AWT at n = ${count(reps)}.`)));
     out.line(
@@ -424,6 +474,13 @@ export async function runCompare(
     );
   }
   out.line();
+  /* Every flag that can move a number, unconditionally where it has a default that can be
+     overridden. `--confidence` used to be omitted (review finding #19), so re-running the line
+     labelled `reproduce:` reproduced the run but not the verdict printed above it: at
+     --confidence 0.8 the printed AWT row read "−0.22 s [−0.41, −0.04] BETTER" and the printed
+     command re-ran it at 0.95 as "[−0.50, +0.05] INDISTINGUISHABLE". A reproduce line that
+     reproduces a different answer is worse than no reproduce line. Matches `run`, which builds
+     its own line from every number-moving flag. */
   out.line(
     `  ${dim('reproduce:')} ${cyan(
       [
@@ -433,6 +490,7 @@ export async function runCompare(
         `--b ${bId}`,
         `--reps ${reps}`,
         `--seed ${seed}`,
+        `--confidence ${confidence}`,
         ...(window === undefined ? [] : [`--window ${window}`]),
         ...(durationS === undefined ? [] : [`--duration ${durationS}`]),
         ...(rate === undefined ? [] : [`--rate ${rate}`]),
@@ -448,14 +506,41 @@ export async function runCompare(
  * Statistics
  * -------------------------------------------------------------------------- */
 
-export type Verdict = 'BETTER' | 'WORSE' | 'INDISTINGUISHABLE';
+export type Verdict = 'BETTER' | 'WORSE' | 'INDISTINGUISHABLE' | 'IDENTICAL';
+
+/**
+ * A paired difference and the evidence behind it: the interval, and the raw per-replication
+ * differences the interval was computed from.
+ *
+ * The differences are carried rather than recomputed because {@link identical} is keyed on them
+ * being **exactly** zero. There is no tolerance here on purpose: "within 1e-9 of each other" is a
+ * claim about resolution, which is what INDISTINGUISHABLE already says. IDENTICAL is a claim about
+ * the two runs having been the same run, and only `d === 0` supports it.
+ */
+export interface PairedDifference {
+  readonly estimate: MeanEstimate;
+  /** `A − B`, one per replication, in replication index order. */
+  readonly differences: readonly number[];
+  /** How many of {@link differences} are exactly `0`. */
+  readonly exactZeroCount: number;
+  /** `n > 0` and every paired difference is exactly `0`. */
+  readonly identical: boolean;
+}
 
 /**
  * The verdict, and the only place a difference is allowed to become a word.
  *
  * `direction` is `-1` when lower is better, so a negative difference on AWT is A winning.
+ *
+ * IDENTICAL is tested first and does not consult the interval at all. An all-zero difference series
+ * has a zero-width interval at `[0, 0]`, which `intervalContainsZero` reports as true, so the
+ * ordering is what keeps the two apart — and the interval is the wrong instrument for the question
+ * anyway. Mirrors `experiments`' `benchmark/verdict.ts` `classify`, which reaches the same
+ * conclusion from `exactZeroCount === n` before it reaches for `intervalExcludesZero`.
  */
-export function verdictOf(estimate: MeanEstimate, direction: -1 | 1): Verdict {
+export function verdictOf(difference: PairedDifference, direction: -1 | 1): Verdict {
+  if (difference.identical) return 'IDENTICAL';
+  const { estimate } = difference;
   if (!Number.isFinite(estimate.lower) || !Number.isFinite(estimate.upper)) {
     return 'INDISTINGUISHABLE';
   }
@@ -552,13 +637,23 @@ function pairedEstimate(
   b: CellResult,
   metric: ReplicationMetric,
   confidence: number,
-): MeanEstimate | undefined {
+): PairedDifference | undefined {
   const left = finiteSamples(a, metric);
   const right = finiteSamples(b, metric);
   if (left === undefined || right === undefined) return undefined;
   const n = Math.min(left.length, right.length);
   if (n < 2) return undefined;
-  return pairedDifferenceEstimate(left.slice(0, n), right.slice(0, n), { confidence });
+  const candidate = left.slice(0, n);
+  const baseline = right.slice(0, n);
+  const differences = candidate.map((value, index) => value - (baseline[index] as number));
+  let exactZeroCount = 0;
+  for (const value of differences) if (value === 0) exactZeroCount += 1;
+  return {
+    estimate: pairedDifferenceEstimate(candidate, baseline, { confidence }),
+    differences,
+    exactZeroCount,
+    identical: exactZeroCount === n,
+  };
 }
 
 /** Whether the two arms really did see identical passenger populations, index by index. */
