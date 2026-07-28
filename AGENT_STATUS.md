@@ -10,14 +10,15 @@ Live state of every task. Updated by the orchestrator as reports come in.
 | T2 | statistics builder | `fix/statistics-integrity` | `.worktrees/T2-statistics` | ✅ **merged** `0342982` | — | independent review in flight |
 | T3 | inert-tunables builder | `fix/inert-tunables` | `.worktrees/T3-inert-tunables` | 🟡 in flight | — | await report + behaviour-change list |
 | T4 | docs builder | `docs/register-drift` | `.worktrees/T4-docs` | ⬜ held | wave-1 merges | dispatch after T1–T3 merge |
+| T6 | blast-radius + statistics follow-ups | `fix/blast-radius` | `.worktrees/T6-blast-radius` | 🟡 in flight | — | **blocks T4** |
 | T5 | viz foundation builder | `feat/viz-foundation` | `.worktrees/T5-viz` | ✅ **merged** `a3cb937` | — | independent review in flight |
 
 ## Review / test assignments
 
 | Task | Reviewer | Tester | Gate verdict |
 |---|---|---|---|
-| T1 | pending | pending | — |
-| T2 | 🟡 in flight — adversarial, blast-radius list is a primary target | orchestrator (post-merge suite) | pending |
+| T1 | pending | orchestrator verified `tune` end to end + known-answer test | ✅ passed |
+| T2 | ✅ done — **ACCEPT WITH FOLLOW-UPS** | orchestrator re-verified in main checkout | ✅ passed, 6 follow-ups → T6 |
 | T3 | required (high risk — writes `sim/simulation.ts`) | required | — |
 | T4 | orchestrator re-verification | — | — |
 | T5 | 🟡 in flight — adversarial, instructed to run not read | orchestrator (post-merge suite) | pending |
