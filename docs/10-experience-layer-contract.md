@@ -1,0 +1,1243 @@
+# The experience layer — Phase 9 contract
+
+**Status: design, not implementation.** Nothing here is built. This document decides what Phase 9
+is, what it may not do, and what evidence each unit of work must produce before it is called done.
+It is the contract the implementation waves are written against, in the same sense that
+[`docs/09-destination-dispatch-contract.md`](09-destination-dispatch-contract.md) was the contract
+for Phase 6.
+
+It answers seven requests from the project's owner, tracked as **U2–U8**: basic/advanced modes,
+gamification, visible rider queues, human-readable metrics, a dispatcher builder, definable rider
+models, and access zoning. Each is a good request. Two of them, taken literally, would destroy the
+only property that makes this simulator worth looking at, and § 1 is about which two and what to do
+instead.
+
+Every factual claim about the current code in this document was checked against the code and, where
+a number appears, against a run. Measurements carry their configuration. The measurement log is
+§ 12; the body cites it as **M1**–**M16**.
+
+---
+
+## 0. The one-paragraph summary
+
+Phase 9 is not a skin. The measurement that should govern its scope is **M1**: at the viewer's own
+defaults — seed 42, 900 s, each building's shipped traffic profile at `typical` demand — only **14
+of 60** building × dispatcher combinations produce a quotable mean waiting time, and **12 of those
+14 are Garden Apartments**, a building on which **10 of the 12 shipped dispatchers produce the
+identical AWT to three decimal places** and six of them produce a **byte-identical recording**
+(**M2**). So the current viewer's honest state space is: one building where nothing you change makes
+any difference, and four buildings where the headline number is legitimately refused. A gamified
+layer laid on top of that without changing it would have nothing true to say. **Phase 9's first job
+is not presentation. It is to give the viewer a set of configurations in which a non-expert's
+choices visibly and legitimately matter** — which means shipping scenarios at demand levels below
+the saturation ceiling, and it means the demand level becomes a first-class control (U7) before the
+gamification (U3) has anything to score.
+
+---
+
+## 1. The rules that keep a gamified surface honest
+
+This project's stated failure mode is reporting confident nonsense. The shipped viewer already
+refuses to draw a mean waiting time on a run whose queues diverged, and prints the reason instead;
+that refusal is the discipline reaching the screen, and it is the thing most at risk here.
+
+The distinction that matters is **not** technical-versus-plain. `WT95 = 62 s` and *"1 in 20 riders
+waited more than a minute"* are the same fact, and the second is not less true than the first — the
+risk-communication literature says it is in fact better understood (§ 3.4). The distinction is
+**observation versus estimate**, and the codebase has already drawn it: `frame/overlay.ts` splits
+`OverlayMetrics` into observations (`waitingNow`, `longestCurrentWaitS`, `boardedInWindow`) that are
+never suppressed, and estimates (`rollingMeanWaitS`, per-bank `meanWaitS`) that are suppressed with
+the reason. `DECISIONS.md` § D64 records that decision and its reasoning. Phase 9 inherits it whole.
+
+### R1 — Only observations may be scored.
+
+A score may be computed from facts about the run that happened: how many people were delivered, how
+long the longest wait was, how many people were still standing at the end, how many riders waited
+over a minute, how much of the demand was answered. It may **not** be computed from any quantity the
+summary marks as an estimate, and it may not be computed from `summary.meanWaitS`,
+`summary.wait95S`, or `summary.meanTimeToDestinationS` unless `summary.awtIsValid` is `true`.
+
+The reason this is not merely defensive: on the shipped configurations, an observation-based score
+is *available* on all 60 cells and an estimate-based one is available on 14 (**M1**). The honest
+rule is also the only one that ships.
+
+### R2 — A score is a property of a run, never of a dispatcher.
+
+The viewer runs one replication. One replication cannot support the sentence "dispatcher A is better
+than dispatcher B" — CLAUDE.md requires a paired-t interval excluding zero over 50–200 replications
+under common random numbers, and `docs/07-handoff.md` § 4 measures the smallest detectable effect at
+**0.20 s between near-neighbour weight vectors and 1.9 s between structurally different
+dispatchers**, both at n = 100.
+
+This is not a theoretical caution. **M7**: Secure Tower under `collective`, 20 consecutive seeds,
+900 s — **6 of 20 replications** return a quotable AWT and **4 of 20** are diagnosed saturated. The
+same configuration. A badge reading *"no saturation — well played"* on one run of that
+configuration is a 70/30 coin flip presented as a skill outcome. **M8** is the same defect from the
+other side: on Midtown Office at seed 42, every arm saturates at 4 %/5 min, `eta` and
+`predictive-balanced` are quotable at 5 %, and everything saturates again at 6 %. Quotability is
+**not monotone in demand at a single seed**.
+
+So: a single-run surface may say *"in this run, X happened."* It may not say *"this dispatcher is
+better."* If the product wants to say the second thing — and § 5 argues it should — it must run a
+replication batch, and § 11.W3 costs that out (**M6**: 2–196 ms per replication; a 50-replication
+batch is 0.1 s on Garden Apartments and 9.8 s on Vertical City).
+
+### R3 — Suppression replaces the number, it never hides it.
+
+When a statistic is suppressed, the surface shows the *reason*, in the reader's register. It never
+shows a blank, a dash, a zero, or a substituted number. Basic mode may shorten the reason; it may
+not remove it. The full reason must remain reachable from the same place in one interaction.
+
+The current reason strings are usable as-is for an expert and unusable for a novice. This is real
+text the viewer prints today:
+
+> Queue length rose by 148.1 persons (29.61/min, 19.9x the queue's own scatter) over the 300 s
+> reporting window, against thresholds 8 persons and 0.5/min; the system is saturated, AWT is not
+> approximately normal and its confidence interval must be suppressed.
+
+The Basic-mode form of that, which is the same fact:
+
+> **The queues never stopped growing.** By the end of the busy period, 148 more people were waiting
+> than at the start — the building could not keep up. There is no meaningful "average wait" for a
+> building in that state, so we are not showing one.
+
+Both must be present; which one leads is what Basic/Advanced switches (§ 4).
+
+### R4 — A suppressed run is not a lost run. It is a **result**, and it is the best fail state available.
+
+Saturation is a far better losing condition than an arbitrary score threshold, because it is a real
+property of the building rather than a number someone chose. A queue that diverges is legible on
+screen (**M5**: the deepest single landing queue reaches **175 people** on Midtown Office at 900 s
+and **379** on Vertical City at 1800 s), it is diagnosable, and it is fixable by exactly the levers
+the product is trying to teach — more cars, faster cars, zoning, a better dispatcher, less demand.
+
+Therefore Phase 9's fail states are, in order of preference:
+
+1. **Overwhelmed** — `summary.saturated`. The queues diverged.
+2. **Abandoned** — `serviceLevel.verdict === 'starved'`; somebody waited past the 900 s horizon.
+3. **Stranded** — `status === 'timed-out'` with `undelivered > 0`. People never got where they were
+   going.
+4. **Locked out** — an access-controlled call no car could legally answer (§ 10).
+
+None of these is invented. All four are already computed by `core`. Three of the four are already in
+`VizSummary`; the second is not, and § 11.W2 adds it with its renderer.
+
+### R5 — No score is displayed on a run whose statistics are suppressed *unless every component of
+that score is an observation*.
+
+The concrete rule for an implementer: a scoring function takes `VizSummary` plus the observation
+fields, and its type must make the estimate fields unreachable. Not a lint, not a convention — the
+score's input type does not carry `meanWaitS`. This is the same instrument `overlayAt` already uses,
+one level up.
+
+### R6 — A "win" that turned out to rest on an invalid measurement is retracted in place, and says so.
+
+If a player achieves a goal, and the run that achieved it is then found to be suppressed — because
+suppression is decided from the whole run and a goal may be evaluated mid-playback — the achievement
+is withdrawn with the reason attached, in the same component, without a page transition. The
+withdrawal text names what happened: *"This run's queues never stopped growing, so the average wait
+this goal was measured against is not a real number. The goal is not met."*
+
+The mechanism that makes this cheap: goals are evaluated from the finished recording, not
+incrementally during playback. `recordRun` returns a complete recording before the first frame is
+drawn; there is no live simulation to be surprised by. A goal evaluated at frame time from
+`overlayAt` is a *preview*, and must be labelled provisional until the playhead reaches `endedAt`.
+
+### R7 — The seed stays visible and copyable in every mode, including Basic.
+
+`UX.md` § 7.1 rule 5 and CLAUDE.md invariant 5. A game whose runs cannot be reproduced is not a
+demonstration of a simulator. Basic mode may render it as *"run #1454934106898…"* with a copy
+control rather than as a labelled seed field, but it may not drop it.
+
+### R8 — Basic mode may hide complexity. It may never hide a failure.
+
+Enumerated in § 4. The short form: saturation, undelivered passengers, invalid statistics,
+locked-out calls, and the seed are visible in every mode. Everything else is negotiable.
+
+### R9 — One source of truth for "may I show this".
+
+`awtIsValid` is copied from the summary and never recomputed (`UX.md` § 7.1 rule 4). Phase 9 adds
+scoring and a second surface; both read the same flag from the same place. A scoring module that
+re-derives saturation from queue samples is a defect, not an optimization.
+
+### R10 — Do not translate a confidence interval into a probability word.
+
+The IPCC's calibrated-language framework is the largest natural experiment in doing this, and the
+finding is that lay readers **misinterpret calibrated likelihood terms regressively** — pulling
+"very likely" down and "unlikely" up toward 50 % — with the misreading correlated to the reader's
+prior beliefs ([Cambridge](https://www.cambridge.org/core/books/critical-assessment-of-the-intergovernmental-panel-on-climate-change/uncertainty/3B238E862AB873D1D746F8A594DC6DFD),
+[Springer](https://link.springer.com/article/10.1007/s10584-020-02746-x)). So Phase 9 does **not**
+render `[+0.58, +1.38] s` as *"probably a bit better"*. Where an interval must be communicated to a
+non-expert, it is communicated as a **frequency over runs** — *"we ran it 50 times; the new setting
+was faster in a way we can actually measure"* / *"the difference was smaller than the noise, so we
+can't tell them apart"* — which is the natural-frequency framing § 3.4 cites, applied to the
+quantity this project actually has.
+
+---
+
+## 2. What is true of the shipped product today
+
+Verified against the code and against runs on 2026-07-28, on `design/phase9-experience` (based on
+`integration`). Where a repository document disagrees with the code, the code wins and the
+disagreement is stated.
+
+### 2.1 The viewer is honest, with one leak
+
+`dev/main.ts`'s DOM status line, `frame/overlay.ts`, `render/overlay.ts` and `render/describeFrame.ts`
+all suppress correctly. **The canvas header does not** (**M11**). `render/canvas.ts` `drawHeader`
+draws
+
+```
+waiting 193   boarded 83 legs   mean wait so far 87.7 s
+```
+
+unconditionally from `frame.runningMeanWaitS`, on the same header line as the banner it draws
+immediately above it:
+
+```
+SATURATED — AWT suppressed
+```
+
+Seen on screen at Midtown Office, seed 42, t = 8:36, and worse at Secure Tower seed
+16757712606996968457 where the header reads *"mean wait so far 1.8 s"* beside a banner saying
+*10.7 % of arrivals were never served*. `describeFrame` — the text alternative the screen-reader
+user gets — says *"Mean waiting time is suppressed"* and never states a mean. **The sighted reader
+sees a number the non-sighted reader is told does not exist.**
+
+`UX.md` § A.3 row **Saturated** already says the state must not show *"A mean waiting time"*. The
+row is correct and the canvas contradicts it. This is a Phase 9 blocker, not a Phase 9 feature:
+every rule in § 1 is undermined by one unlabelled mean in the largest type on the screen.
+§ 11.W1 fixes it.
+
+### 2.2 The default configuration is the worst one available
+
+The viewer opens on Garden Apartments with `nearest-car`. Both defaults are poor:
+
+- `docs/07-handoff.md` § 4 says in its own words that **`nearest-car` is a poor reference arm** —
+  *"the **only** profile that saturates"* at the benchmark operating points — and recommends
+  `collective` or `eta`. It is the viewer's default dispatcher.
+- Garden Apartments generates **16 passengers in 900 s**. **M2**: ten of the twelve shipped
+  dispatchers return AWT 11.319 s / WT95 24.548 s / TTD 39.302 s — identical to three decimals — and
+  six of them (`eta`, `fairness-first`, `capacity-aware`, `auction`, `auction-multi-round`,
+  `destination-eta`) produce a **byte-identical** recording. The two that differ are `zoned-uppeak`
+  (2.500 s) and `predictive-balanced` (11.919 s).
+
+So the newcomer's first act — change the dispatcher and press Run — produces, six times out of
+twelve, *literally the same picture*. This is not a rendering problem and it is not a bug: it is the
+flat-plateau phenomenon `docs/07-handoff.md` § 4 documents ("weight perturbations below the
+decision-flip threshold produce bit-identical runs"), reached by having too little traffic for any
+decision to matter. It is nonetheless the single largest obstacle to U3, and no amount of
+gamification fixes it. **A scenario library at usable demand levels does.**
+
+### 2.3 The recording already carries everything a rider queue needs
+
+`VizRecording` is at `VIZ_SCHEMA_VERSION` **4**. `legs` landed at v3 with `overlayAt` and
+`landingAssignmentsAt` as its consumers; `passengerModel`, `VizLeg.destinationFloorId` and
+`VizLeg.assignedCarId` landed at v4. `VizLeg` today carries: `passengerId`, `originFloorId`,
+`destinationFloorId`, `direction`, `arrivedAt`, `boardedAt?`, `carId?`, `bankId?`, `assignedCarId?`.
+
+**A per-floor queue of individual riders is derivable from that with no contract change at all.**
+Every waiting rider at time `t` is a leg with `arrivedAt <= t` and `boardedAt` absent or `> t` —
+which is `isWaitingAt`, already written. The individual's wait age is `t - arrivedAt`, their
+destination is `destinationFloorId`, and under a panel the car they were promised is
+`assignedCarId`. § 6 designs U4 on that basis. This contradicts the framing in the request, which
+anticipated a contract widening; the widening U4 needs is zero fields.
+
+### 2.4 The recording's byte budget is not where it was assumed to be
+
+**M3**, measured by serialising each section:
+
+| run | total | `legs` | `shafts` | `landings` | `progress` | legs |
+|---|---|---|---|---|---|---|
+| Midtown Office, `nearest-car`, 900 s | 1 782 kB | **81 kB (5 %)** | 1 655 kB (93 %) | 11 kB | 33 kB | 459 |
+| Vertical City, `nearest-car`, 1800 s | 7 971 kB | **608 kB (8 %)** | 7 107 kB (89 %) | 56 kB | 178 kB | **3 222** |
+| Secure Tower, `destination-panel`, 900 s | 1 156 kB | 57 kB (5 %) | 1 059 kB (92 %) | 8 kB | 24 kB | 290 |
+
+The recording is dominated by `shafts` — the per-move `CarMotion` objects, 89–93 % of every byte.
+Legs are 5–8 %. **Adding a field to `VizLeg` costs about 5 % of 5 %.** The cost argument against
+widening `VizLeg` is therefore weak; the *consumer* argument (a field with no renderer is this
+repository's signature defect) is the only one that should decide it, and this document keeps it.
+
+Two corrections to figures circulating in planning material: Vertical City at 1800 s holds **3 222**
+legs under `nearest-car` / seed 42 / `onTimeout: 'report'`, not 3 346; and the growth figure is not
+"~150 kB per 1 000 legs" for the *recording* — it is **176–197 kB per 1 000 legs for the `legs`
+array** across the three runs above, and **2.5–4.0 MB per 1 000 legs for the recording as a whole**,
+because the whole is mostly motion and motion does not scale with passengers.
+
+### 2.5 Reading the queue is free
+
+**M4**: `landingAssignmentsAt` costs **0.02 ms/frame** on Midtown Office and **0.07 ms/frame** on
+Vertical City with 3 222 legs, against a 16.7 ms 60 Hz budget. A per-rider queue renderer built on a
+sibling selector will be in the same class. Frame budget is not a constraint on U4.
+
+### 2.6 The parameter surface is real, complete, and already generic
+
+**M9**, by running `discoverParameterSchemas()` and `collectSearchSpace()`:
+
+- Discovery finds **10 schemas** exporting **99 declared parameter rows**:
+  `ANALYTICAL_PARAMETERS` (3), `CAR_PARAMETERS` (6), `DISPATCH_PARAMETERS` (32),
+  `DOOR_PARAMETERS` (10), `LOAD_SENSOR_PARAMETERS` (4), `METRICS_PARAMETERS` (12),
+  `POLICY_PARAMETERS` (3), `PREDICTOR_PARAMETERS` (6), `SIM_PARAMETERS` (6),
+  `TRAFFIC_PARAMETERS` (17).
+- `collectSearchSpace()` narrows those to **49 dimensions** a dispatcher profile can actually hold —
+  by *trying*, through `parseDispatcherProfiles`. By section:
+  `weights` 12, `dispatch` 11, `answer` 9, `idle` 9, `auction` 3, `eligibility` 2, `normalization` 2,
+  `constraints` 1. By type: continuous 32, categorical 9, boolean 4, integer 4. **13** carry an
+  `activeWhen` gate, and the space comes back in a stable topological gate order.
+- Every row carries `id`, `type`, `range`/`values`, `scale`, `default`, `unit?`, `description` and
+  `activeWhen?`. Descriptions run **54 to 1 167 characters** and are written for a reader, not for a
+  parser. `answer.reopenOnLateArrival`'s is 1 138 characters of why.
+
+**M10**: the same discovery run against the **browser** barrel (`core/src/browser.ts`) returns the
+identical 10 schemas and 99 rows. `parseDispatcherProfiles`, `buildingConfigSchema`, `parseBuilding`,
+`resolveBuilding`, `parseTrafficProfiles` and `COST_TERMS` are all browser-barrel exports, and
+`browser.test.ts` asserts the two barrels differ by exactly `loadConfig`. **A generated editor can
+run entirely client-side against `@elevator-sim/core/browser`.**
+
+This settles U6's architectural question: a generic editor should be **generated** from the schema,
+not hand-written. § 8.
+
+### 2.7 The traffic surface is self-describing too — and that is the answer to U7
+
+`TRAFFIC_PARAMETERS` has 17 rows in the same shape, with `activeWhen` gates on the template geometry
+and one `perMemberOf: 'building.entranceFloors'` row. It is excluded from `collectSearchSpace()` for
+one mechanical reason only — **no dispatcher profile has a section that can hold it** — not for want
+of a schema. So U6 and U7 are the same generator pointed at two schemas. § 9.
+
+### 2.8 Access zoning exists in the editor, and says almost nothing
+
+The editor keeps the three kinds of zoning genuinely separate, which is the hard part and is already
+done: **Banks, cars and service zoning** / **Access zoning — credentials** / **Operational zoning**,
+the last being a paragraph explaining that operational zoning is a dispatcher profile setting and is
+not edited there. `editorEdits.ts` routes them through separate functions and
+`editorEdits.test.ts` asserts an access edit changes `accessZones` and nothing else.
+
+What is there, driven on Secure Tower: each zone is **two free-text fields** — floors as
+`"2 3 4 5 6 7 8"` and credential groups as `"tenant-alpha-staff tenant-alpha-visitor facilities
+security"`. There is no floor picker, no credential vocabulary, no view of which credential reaches
+which floor, and — the important omission — **no connection to the dispatcher**.
+
+**M12**: of the 12 shipped dispatcher profiles, exactly **two** (`destination-eta`,
+`destination-panel`) declare a credential-carrying `dispatch.callType`. The other ten run at the
+`up-down-buttons` default, under which an access-restricted pickup carries no credential, every car
+returns `accessDenied`, and the call is **permanently unassignable**. Measured consequence, already
+published: on Secure Tower, conventional dispatch leaves **33.5 %** unserved with **0 of 30**
+replications quotable, and a destination-entry kiosk *without* the credential is **worse**, at
+**51.7 %** (`docs/05-roadmap.md`, `DECISIONS.md` § D30 area, and `dispatch/types.ts`).
+
+So today a user can author an access zone in the editor and run it against ten of twelve dispatchers
+that structurally cannot serve it, and nothing on either screen says so. § 10.
+
+### 2.9 What the viewer cannot say, because the recording does not carry it
+
+`VizSummary` carries nine fields: `saturated`, `awtIsValid`, `awtInvalidReason`, `meanWaitS`,
+`wait95S`, `meanTimeToDestinationS`, `generated`, `delivered`, `undelivered`.
+
+`RunSummary` carries, and `VizSummary` does not: `window` / `windowSeconds` (**so the viewer never
+says which window its numbers cover, which `UX.md` RV-T4 requires**), `waiting.pctOverLongWait` and
+`longWaitThresholdS`, `handlingCapacity` (HC5, %POP), `achievedInterval` (INT and its CoV),
+`loadFactor`, `rideTime`, `serviceLevel` (the longest wait and whether it is censored), and
+`counts`. § 7 lists which of these U5 needs and § 11.W2 adds them with their renderers.
+
+**There is no energy metric anywhere** (**M13**). `REPLICATION_METRICS` has 19 entries and none of
+them is energy; nothing in `core` or `experiments` computes joules or kWh.
+`idle.repositionEnergyWeight` is an exchange rate against *seconds of empty travel*, not against
+energy. CLAUDE.md's tuning discipline says to report the Pareto front over **(AWT, energy, WT95)**;
+the energy axis does not exist. Phase 9 must not imply it does — no "energy" gauge, no
+"eco" score, no green leaf. § 7.3.
+
+### 2.10 Two small things found while driving the UI
+
+- **M15**: the Run-viewer / Building-editor tab selection is not written to the URL. Every other
+  control is. A scenario deep link that should open the editor cannot.
+- **M16**: `.claude/launch.json` declares port **5173**; `packages/viz/vite.config.ts` declares
+  **5174**. Neither is wrong on its own; together the preview tooling points at a port the server
+  does not use.
+
+Both are requests, not this document's to fix (§ 14).
+
+---
+
+## 3. Research — what is known, and what this document is proposing
+
+Cited sources are at § 15. This section separates **found** from **proposed**; the proposals are
+mine and are marked.
+
+### 3.1 Overcrowding is a proven fail state, and it is the same one this simulator has
+
+**Found.** Mini Metro's primary losing condition is a station that stays overcrowded too long; the
+whole network then shuts down. Commentary from transport planners treats this as the game's central
+design insight — it makes an abstract systems failure legible as a visible pile-up at one place, and
+it is the failure the player caused ([Human Transit](https://humantransit.org/2014/03/the-lessons-of-mini-metro.html),
+[Transportist](https://transportist.org/2014/11/05/mini-metro-review/)). The same commentary notes
+the honest caveat: real passengers would divert to another mode rather than accumulate without
+bound.
+
+**Found, and it is a warning.** Mini Metro's minimalism makes the overcrowding indicator itself hard
+to read on a busy screen — players report losing to a station they never saw fill
+([Steam](https://steamcommunity.com/app/287980/discussions/0/35221031840044247)). Legibility of the
+fail state is a separate problem from the fail state being good.
+
+**Proposed.** This project's saturation diagnosis is exactly Mini Metro's overcrowding condition,
+except that it is a fitted trend test on real queue samples rather than a timer, and it comes with a
+sentence explaining itself. Adopt it as the fail state (R4). Take the warning seriously: the
+diverging queue must be *visually* unmistakable well before the run ends, which is what U4 buys
+(§ 6) — and it must not be conveyed by colour alone, per `UX.md` KB-15.
+
+### 3.2 The elevator-sim genre has already learned the hard lesson
+
+**Found.** SimTower was built around an elevator simulation and its endgame was elevator management;
+players and retrospectives converge on the same complaint, that elevator micromanagement became
+unwieldy at scale. Project Highrise deliberately went the other way and made elevators abstract,
+becoming a building-management game rather than an elevator game
+([Steam, Project Highrise discussions](https://steamcommunity.com/app/423580/discussions/0/358417461606712182/?ctp=2)).
+
+**Proposed.** This project cannot take Project Highrise's exit: the elevators *are* the subject. The
+scaling problem is therefore real and must be solved by *aggregation*, not by removal — which is why
+§ 6 specifies a queue renderer that degrades from individual rider glyphs to a bar with a count, and
+why § 8 specifies a dispatcher editor that opens on the three or four dimensions that matter rather
+than on all 49.
+
+### 3.3 Progressive disclosure, not a forked product
+
+**Found.** Progressive disclosure is a 1995 Nielsen pattern with four decades of evidence: novices
+learn faster and make fewer errors, experts pay one interaction
+([NN/g](https://www.nngroup.com/articles/progressive-disclosure/),
+[UX Tigers](https://www.uxtigers.com/post/progressive-disclosure)). It improves learnability,
+efficiency and error rate. The canonical shape is the phone camera: shutter/zoom/flash on open, a
+Pro mode holding ISO and RAW.
+
+**Proposed.** Basic and Advanced are **one product with one state**, not two apps. Every Advanced
+control has a Basic default that is *set*, not absent — switching modes never changes what the
+simulator does, only what is shown. This is testable, and § 11 makes it an acceptance criterion:
+**for every scenario, the recording produced in Basic mode is byte-identical to the recording
+produced in Advanced mode.** If a mode switch can change a run, it is not progressive disclosure.
+
+### 3.4 Natural frequencies, not probabilities — and no probability words
+
+**Found.** Representing statistical information as natural frequencies rather than probabilities
+measurably improves comprehension for lay readers and clinicians alike, and the advantage is largest
+for rare events — "5 out of 1 000" beats "0.005"
+([Frontiers](https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2015.01473/full),
+[NCBI](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4604268/)). Icon arrays implement the same
+framing visually and are associated with more accurate risk estimation and reduced denominator
+neglect ([arXiv](https://arxiv.org/pdf/2207.09608)).
+
+**Found, and it is the constraint on U5.** The IPCC's calibrated-language framework is the largest
+deployed attempt to translate uncertainty into words, and the measured outcome is that the public
+misinterprets the terms *regressively*, with the error correlated to the reader's prior beliefs
+([Springer](https://link.springer.com/article/10.1007/s10584-020-02746-x)). Translation into
+likelihood adjectives is not a safe operation.
+
+**Proposed.** U5's translations are **natural-frequency restatements of percentiles and counts**,
+never adjectival restatements of intervals. `WT95 = 62 s` becomes *"1 in 20 riders waited more than
+62 seconds"* — same fact, better format. `Δ = [+0.58, +1.38] s` becomes *"faster, by between half a
+second and one and a half seconds"* — the interval, stated, with no adjective — or, where the
+audience is the Basic-mode player, *"the difference was too small to measure at this many runs"*
+when it contains zero. § 7 gives the table.
+
+### 3.5 Teaching a system by making its ratios visible
+
+**Found.** Factorio is widely credited with teaching production ratios without a tutorial, by making
+the bottleneck physically visible: the belt backs up in front of the slow machine and empties after
+it, so the player reads the constraint off the screen rather than off a number.
+
+**Proposed.** The elevator equivalent is already computed and already suppressed correctly:
+**offered demand versus handling capacity**. `HandlingCapacity` carries `offeredPer5Min` and
+`personsPer5Min` in the same unit. A single paired bar — *"people arriving: 62 per 5 min / people
+carried: 41 per 5 min"* — is the Factorio belt, it is two observations rather than any estimate, and
+it explains saturation before the queue diverges. It is not in `VizSummary` today; § 11.W2 adds it.
+This is the highest-value single addition in the whole of Phase 9.
+
+---
+
+## 4. U2 — Basic and Advanced modes
+
+### Recommendation
+
+**Basic is the default. Advanced is one control away and is remembered.** The reason is not that
+novices matter more; it is that `UX.md`'s Newcomer role has a stated failure cost (*"concludes the
+tool does not work"*) and the Analyst's does not depend on which mode opens. An expert pays one
+click, which the progressive-disclosure literature (§ 3.3) says is the correct price.
+
+**An advanced user must not be worse off**, so Advanced is a strict superset. Every control and
+every figure that exists today is present in Advanced, in the same place, with the same wording.
+Phase 9 adds; it does not relocate.
+
+### What Basic hides
+
+| Hidden in Basic | Where it goes |
+|---|---|
+| The raw `awtInvalidReason` string | Behind "why?" on the plain-language form (R3) |
+| The per-bank mean-wait breakdown | Advanced |
+| The load-factor panel's numeric column (bars stay) | Advanced |
+| The window bounds label (`window 216–516 s`) | Replaced by *"the busiest 5 minutes"*; exact bounds in Advanced |
+| The dispatcher profile *id* | Replaced by its display name; id shown on hover and in provenance |
+| `Verify replay`, `Save recording`, `Export PNG`, bank filter, landing selector, frame-step buttons | Advanced |
+| The 49-dimension dispatcher editor | Basic shows the curated subset (§ 8.3) |
+| Every metric in § 7's "technical only" column | Advanced |
+
+### What Basic may never hide — the non-negotiable list
+
+1. **Saturation.** Present as a persistent banner in the reader's register, never a toast.
+2. **Undelivered passengers.** The count, and that they never arrived.
+3. **That a statistic is suppressed, and why.** Shortened, never removed (R3).
+4. **Locked-out calls** — a call no car may legally answer (§ 10).
+5. **The seed**, copyable (R7).
+6. **The passenger model**, when it is `destination-dispatch`, because it changes what a landing
+   queue *is* — `describeFrame` already says so and Basic mode is exactly the audience that needs
+   telling.
+7. **Warnings** from the run, including `double-deck-not-simulated`.
+
+### The mode-parity acceptance criterion
+
+For every shipped scenario, run in Basic and in Advanced, `JSON.stringify(recording)` must be
+identical. A mode that changes a run is not a view. This is a cheap test and it is the one that
+stops Basic mode from quietly lowering the demand to make the picture nicer.
+
+---
+
+## 5. U3 — Gamification
+
+### 5.1 What the simulator already provides, and what it does not
+
+It provides genuinely good raw material: rush hours with a rise-and-fall shape, saturation with a
+diagnosis, access lockouts with measured consequences, cars taken out of service mid-run
+(`serviceEvents`), a 100-floor building, and dispatchers that really do trade waiting against stop
+count and empty travel.
+
+It does **not** provide, and Phase 9 must not pretend it does: an energy axis (§ 2.9), a
+per-dispatcher verdict from one run (R2), or — at shipped demand — a set of configurations where a
+non-expert's choices change the outcome (§ 2.2, **M1**, **M2**).
+
+### 5.2 The shape: scenarios, not a campaign score
+
+**A scenario is a named, seeded, fully-specified configuration plus a goal set plus a replication
+budget.** It is data — a JSON file, validated by a schema, in the same spirit as invariant 7. It
+carries:
+
+```
+id, name, brief (2–3 sentences of plain language)
+building        — a building id or an inline BuildingConfig
+traffic         — a TRAFFIC_PARAMETERS patch (§ 9)
+dispatcher      — a starting profile, and which dimensions the player may move
+seeds           — the tuning seed set, explicitly
+holdoutSeeds    — a disjoint set, explicitly (CLAUDE.md § Tuning discipline)
+replications    — how many runs a goal is judged over
+goals           — a list of checkable goal objects
+```
+
+Goals are **checkable predicates over quantities that survive suppression**, and each declares
+whether it is judged on one run or on a batch:
+
+| Goal kind | Judged on | Checkable from |
+|---|---|---|
+| `deliver-everyone` | one run | `summary.undelivered === 0` |
+| `no-divergence` | **batch** | fraction of replications with `saturated === false` |
+| `nobody-abandoned` | one run | `serviceLevel.verdict !== 'starved'` |
+| `answer-the-demand` | one run | `handlingCapacity.personsPer5Min >= offeredPer5Min` |
+| `long-waits-under` | one run | `waiting.pctOverLongWait <= x` — an observation, a count over served legs, and it carries its own censoring caveat which must be shown |
+| `everyone-can-get-there` | one run | zero locked-out calls (§ 10) |
+| `beat-the-baseline` | **batch**, paired-t | interval on the difference excludes zero |
+
+`no-divergence` and `beat-the-baseline` are batch goals **because R2 says so**, and **M7** is the
+evidence: a single-run saturation verdict on Secure Tower flips 6/20. Stating a batch goal as
+*"stays under control in at least 45 of 50 runs"* is both honest and better game design — it is a
+frequency, which § 3.4 says lay readers read well.
+
+### 5.3 Fail states
+
+Per R4: **Overwhelmed**, **Abandoned**, **Stranded**, **Locked out**. Each has a plain-language
+sentence, a one-line diagnosis naming the floor or the credential involved, and a **suggested
+lever** drawn from the scenario's own editable dimensions. The lever is a hint, never an automatic
+fix, and never phrased as "the right answer" — there is a Pareto front here, not an optimum.
+
+### 5.4 Progression
+
+Progression is by **mechanism introduced**, not by score threshold. Proposed ordering, each stage
+adding exactly one concept and each stage using a shipped building:
+
+1. **One shaft, low demand.** Garden Apartments. Teaches: a call, a car, a wait. Winnable trivially.
+2. **The morning rush.** Midtown Office at a demand level *below* its ceiling. Teaches: rise-and-fall,
+   the offered-vs-carried bar (§ 3.5). First encounter with a number that moves when you change
+   something.
+3. **Overwhelmed.** The same building at shipped demand. **Unwinnable as configured**, and it says
+   so: this is the scenario that teaches saturation and teaches that the tool refuses to average a
+   diverging queue. Its goal is *diagnose it*, not *beat it*.
+4. **Two banks.** Mixed-Use High-Rise. Teaches service zoning and transfers, and that a journey can
+   have two waits.
+5. **Credentials.** Secure Tower. Teaches access zoning — and teaches it by *failing first* under a
+   conventional dispatcher, which is a measured fact (§ 2.8) and the most instructive lesson in the
+   whole set.
+6. **The tall one.** Vertical City. Teaches that geometry beats dispatch at scale.
+7. **Tune it.** The dispatcher editor (§ 8) with a batch goal and a holdout set — the first scenario
+   where the player is asked to prove an improvement rather than observe one.
+
+Stage 3 is the load-bearing one. **A game that cannot be lost teaches nothing, and this simulator's
+losing condition is real.**
+
+### 5.5 What must never be built
+
+- A score displayed on a suppressed run (R1, R5).
+- A leaderboard ranking dispatchers from single runs (R2).
+- A grade letter derived from AWT.
+- An "efficiency" or "energy" score (§ 2.9 — the quantity does not exist).
+- A difficulty setting that changes anything other than declared `TRAFFIC_PARAMETERS` and building
+  fabric. Difficulty is demand and geometry; it is never a fudge factor on a metric.
+
+---
+
+## 6. U4 — Visible rider queues per floor
+
+### 6.1 The contract change is zero fields
+
+§ 2.3. Every waiting rider at instant `t` is already in `recording.legs`. The addition is a **pure
+selector beside `overlayAt` and `landingAssignmentsAt`**, in `frame/overlay.ts`:
+
+```
+queueAt(recording, t): readonly FloorQueue[]
+```
+
+where a `FloorQueue` is `{ floorId, riders: readonly QueuedRider[], total, oldestWaitS }` and a
+`QueuedRider` is `{ passengerId, waitedS, direction, destinationFloorId, promisedCarId? }`, ordered
+by `(arrivedAt, passengerId)` — the order `legs` is already sorted in, so the queue renders
+first-come-first-served left to right, which is itself information.
+
+Purity, ordering and the right-continuity convention are inherited from `isWaitingAt`, which already
+exists and which `overlay.test.ts` already cross-checks against `Frame.totalWaiting` on every shipped
+building. The new selector must satisfy `sum(queue.total) === frame.totalWaiting` on every shipped
+building at every sampled instant, by the same test.
+
+### 6.2 The renderer, and how it degrades
+
+**M5**: the deepest single landing call reaches **175 waiting** on Midtown Office (900 s, seed 42,
+`nearest-car`) and **379** on Vertical City (1800 s). One glyph per rider is not a design at those
+depths, and Vertical City has 100 floors sharing the canvas height. So:
+
+| Riders at a landing | Drawn as |
+|---|---|
+| 1–12 | Individual glyphs, oldest first, each glyph's fill carrying its wait age band |
+| 13–40 | Glyphs to the row width, then `+N` |
+| > 40, or floor pitch below the glyph height | A **bar** proportional to `log(1 + n)` with the count, plus the oldest wait |
+
+Wait age is banded — under 30 s, 30–60 s, over 60 s, over the horizon — and every band carries a
+**shape** as well as a colour, because `UX.md` KB-15 forbids colour as the only signal. The three
+existing thresholds are not invented: 60 s is `metrics.longWaitThresholdS`, and the horizon is
+`DEFAULT_MAX_WAIT_HORIZON_S`.
+
+Under `destination-dispatch` the queue at a floor is **not one queue**. `landingAssignmentsAt`
+already groups by `(origin, destination, promised car)`, and measured on Midtown Office there are
+132 promise groups behind 28 direction landings. The renderer must therefore group the glyphs by
+promised car and label the group, or it will draw a Level-1 building as a Level-0 one — the exact
+defect version 4 exists to prevent. `describeFrame` already says the sentence; the picture must
+match it.
+
+### 6.3 The screen-reader form lands with it
+
+`describeFrame` gains, per floor with anybody on it, one clause: *"Floor 7: 6 people waiting, the
+longest for 41 seconds."* Not per rider — `KB-13` asks for a description, not a manifest. This is
+not optional; it is how the individual-glyph information reaches a reader who cannot see it.
+
+### 6.4 Non-test caller
+
+`packages/viz/src/render/canvas.ts` (the shipped scene draw) and
+`packages/viz/src/render/describeFrame.ts`. Named, and both in the same change as the selector.
+
+---
+
+## 7. U5 — Human-understandable metrics
+
+### 7.1 The translation table
+
+Every row is the **same fact** in both columns. Where a plain form would mislead, the row says so and
+keeps the technical form only.
+
+| Technical | Plain-language form | Notes |
+|---|---|---|
+| `AWT = 24.5 s` | "Riders waited **25 seconds on average**" | Only when `awtIsValid`. Otherwise R3's reason. |
+| `WT95 = 62 s` | "**1 in 20 riders** waited more than a minute" | Natural frequency (§ 3.4). `95` → `1 in 20` is exact. |
+| `WT99` | "**1 in 100 riders** waited more than …" | |
+| `maxWaitS` | "The **unluckiest rider** waited …" | Must carry `longestWaitIsCensored`: if that rider never boarded, the figure is a **floor**, and the plain form becomes "…waited at least …". |
+| `TTD = 96 s` | "**Door to door**, a typical trip took a minute and a half" | Journey-level, spanning transfers. On a sky-lobby building this is the number that matters and AWT is not. |
+| `% > 60 s = 8 %` | "**8 in 100** riders waited more than a minute" | Carries the censoring caveat: the denominator is *served* legs, and the unserved are exactly the ones that would have counted. Show `unservedCount` beside it, always. |
+| `INT = 30 s, CoV 0.4` | "A lift left the lobby **every 30 seconds**" + "…but unevenly — they arrived in clumps" | CoV → "bunching", with a two-state plain reading only. Do not put a number on the adjective. |
+| `HC5 = 41 persons/5 min` vs `offered = 62` | "The lifts carried **41 people every 5 minutes**. **62 arrived.**" | § 3.5. Two observations. This is the headline Basic-mode metric. |
+| `%POP = 12.4 %` | "**12 % of the building** moved every 5 minutes" | Requires a population; absent when the record has none. |
+| `meanLoadFactor 0.62` | "Cars ran about **6 in 10 full**" | Note the 0.8 design rule: "full" in this product means 80 %, not 100 %. Say so once. |
+| `saturated` | "**The queues never stopped growing.**" | R3. |
+| `undelivered = 20` | "**20 people never got where they were going** before the clock ran out." | |
+| `awtIsValid = false`, censoring ground | "Too many people were still waiting when time ran out — the average would only count the lucky ones." | This is the *exact* meaning of the technical reason. |
+
+### 7.2 What must not be translated
+
+- **Confidence intervals into adjectives.** R10, § 3.4. An interval is either shown as an interval or
+  as a frequency over runs.
+- **`queueSlopePersonsPerMinute`.** "The queue grew by 29.6 people a minute" is fine as a
+  *diagnosis line* and misleading as a *metric*, because it is a fitted slope over a window and the
+  fit is what the saturation test is; quoting it standalone invites treating it as a target.
+- **`intervalCoV` as a number.** See table.
+- **Anything derived from `meanWaitS` when it is suppressed**, including "improvement over baseline".
+
+### 7.3 Energy
+
+Do not ship an energy metric, an energy score, or energy iconography. § 2.9: it does not exist. If
+the owner wants the wait-versus-energy tradeoff surfaced — and it is a genuinely interesting one —
+the honest proxy that *does* exist is **empty-car travel**, derivable from `shafts[].motions` and
+`occupants`, and it must be labelled as what it is: *"metres travelled with nobody aboard"*. That is
+a new metric with a real definition and it is out of Phase 9's scope; § 13 records it as an open
+question.
+
+### 7.4 Every figure carries its window
+
+`UX.md` RV-T4 requires it and `VizSummary` cannot satisfy it (§ 2.9). Adding `window` and
+`windowSeconds` to `VizSummary` is a prerequisite for every row above, because *"riders waited 25
+seconds on average"* is false without *"during the busiest 5 minutes"*.
+
+---
+
+## 8. U6 — Building dispatcher models in the UI
+
+### 8.1 The architecture is a fit, and it is verified rather than assumed
+
+Invariant 7 makes a dispatcher **data**; invariant 8 makes every tunable **self-describing**;
+`collectSearchSpace()` returns 49 fully-specified dimensions in gate order with descriptions written
+for humans (**M9**); and the whole surface is reachable from the browser barrel (**M10**). A
+hand-written editor for 49 knobs would be wrong on the day the 50th is declared — which is the
+argument `collect.ts` already makes about hand-listed search spaces, applied to a form.
+
+**Decision: the dispatcher editor is generated from the schema.** One control renderer per
+`type` — continuous (slider + number, honouring `scale: 'log'`), integer (stepper), categorical
+(select over `values`), boolean (checkbox) — plus one rule that reads `activeWhen` through the
+existing `isActive` and disables-with-reason rather than hiding. Four renderers, no elevator
+knowledge, and a new parameter appears in the UI with no UI change. `description` is the help text;
+`unit` is the suffix; `default` is the reset.
+
+**A generated form is the only form that can be proved complete**, and the completeness test is
+mechanical: every id in `collectSearchSpace().ids` must be reachable in the editor. That test is the
+U6 analogue of `parameters.test.ts`'s "nothing hidden".
+
+### 8.2 The guard rails a UI must respect
+
+1. **`parseDispatcherProfiles` is the validator.** Not a re-implementation, not a subset. The editor
+   authors a `DispatcherProfile` object and runs it through `parseDispatcherProfiles` before enabling
+   Run — the same instrument `isProfileAuthorable` uses, and the same one `loadConfig` uses. The
+   editor adds no schema, exactly as the building editor adds none.
+2. **A profile may not weight a term its own settings make inert.** `policies.test.ts` enforces this
+   two ways and the UI can only enforce one of them cheaply:
+   - **Declarative** — a term's own `activeWhen` unsatisfied by the profile's settings. This is
+     `unsatisfiedGatesOf`, it is pure schema, and the editor must enforce it live: weighting
+     `rideTime` while `dispatch.callType` is `up-down-buttons` is refused at the control, with the
+     reason, and the fix offered (*"a ride-time weight needs the destination to be known when the
+     call is made"*).
+   - **Empirical** — a weighted term that contributes zero across the scoring scenarios. This
+     **cannot** be decided from the schema; `policies.test.ts` decides it by scoring. The editor must
+     therefore **not claim** a profile is sound, only that it is *authorable and has no dead gate*.
+     A profile the user wants to add to `data/` goes through the real test.
+3. **Do not offer knobs that are not tunables.** `carMode`, service zoning and access zoning are
+   deliberately excluded from `DISPATCH_PARAMETERS` (`dispatch/parameters.ts` says why): they are
+   state and building fabric. The generated editor gets them for free by construction — it only
+   renders what the schema declares — and that is a reason to generate rather than hand-write.
+
+### 8.3 Basic mode's curated subset
+
+49 sliders is an expert tool. Basic mode opens on a **preset gallery** — the 12 shipped profiles,
+each with a plain-language description of what it is trying to do and what it gives up — plus **three
+dimensions** the player may move:
+
+- `weights.waitTime` versus `weights.stopCount` versus `weights.distanceTravelled`, presented as one
+  three-way balance rather than three sliders. This is the tradeoff the product is trying to teach
+  and it is the one the shipped profiles actually differ on (`energy-aware` is
+  `0.6 / 0.3 / 0.1`).
+- `idle.parkingStrategy`, because `dispatch/parameters.ts` states that on sparse-traffic buildings
+  this stage dominates everything else, and it is a categorical with four legible values.
+- `dispatch.reassignmentPolicy`, described in the schema as *"one of the highest-leverage knobs
+  available"*.
+
+"Show all 49" is one control away.
+
+### 8.4 The noise floor is a UI element, not a footnote
+
+**This is the most important thing in § 8.** `docs/07-handoff.md` § 4: near-neighbour weight vectors
+are resolvable to **0.20 s at n = 100**; structurally different dispatchers to **1.9 s**. Below
+that, an observed difference is noise. And weight perturbations below the decision-flip threshold
+(δ ≤ 0.03) produce **bit-identical runs** — exactly zero gradient over finite regions.
+
+A UI that shows a player moving a slider and a number changing from 24.5 s to 24.2 s has told them a
+lie by juxtaposition. So:
+
+- Single-run comparisons in the dispatcher editor are shown as **"this run"** figures, never as a
+  delta against the previous run.
+- Any delta requires a **batch** (§ 11.W3) and is shown with its interval; when the interval contains
+  zero the UI says *"too small to measure at N runs"* and offers to raise N, quoting the budget table
+  from `docs/07-handoff.md` § 4 (±0.5 s needs n = 143; ±0.25 s needs n = 563).
+- A **bit-identical** result is reported as such — *"nothing changed: this weight did not flip a
+  single decision"* — because `docs/07-handoff.md` says a bit-identical result is a wiring bug until
+  proven otherwise, and because it is a genuinely interesting thing to have discovered.
+
+### 8.5 Exposing `tune`
+
+The optimizer is shipped, has a non-test caller (`packages/cli/src/commands/tune.ts`), and
+rediscovered a known-good value blind. Exposing it in the UI is high value and structurally awkward:
+`collectSearchSpace` and the search algorithms are node-free, but they are only reachable through
+`@elevator-sim/experiments`'s single `.` export, whose barrel pulls the runner and therefore
+`node:worker_threads`. **A browser cannot import the tuner today.**
+
+Two options, and the choice is § 13's first open question:
+
+- **(a)** `packages/experiments` grows a `./browser` export condition covering `tuning/space` and
+  `tuning/search`, guarded by a graph-walk test in the manner of `core/src/browser.test.ts`. Clean,
+  and it makes the search space itself importable, which the generated editor also wants.
+- **(b)** The UI shells out to the CLI. Not available in a browser at all, so this means the desktop
+  story only.
+
+Recommendation: **(a)**, scoped to `tuning/space` first (which the editor needs regardless) and
+`tuning/search` only if a UI-driven search is actually wanted. Either way `tune`'s **method** is not
+re-implemented: held-out seeds, CRN within a round, and no ranking inside the noise floor come from
+`runHoldoutRound`, not from new UI code.
+
+---
+
+## 9. U7 — Rider models, definable, assignable, with multipliers
+
+### 9.1 What exists
+
+`data/traffic-profiles.json` holds four **profiles** (`office-prestige`, `office-standard`,
+`residential`, `hotel`), each with a rate range (`min`/`typical`/`max` as % of population per 5 min),
+a target interval and wait, a **batch size distribution** (geometric, mean 1.4–2.0), and a
+directional split. It also holds two **demand templates** (CIBSE rise-and-fall, ISO constant) and one
+**passenger mass distribution** (normal, μ 75 kg, σ 15 kg, min 20 kg). A building assigns a profile
+per building and per floor.
+
+`TRAFFIC_PARAMETERS` declares 17 tunables over that, self-describing in the same shape as the
+dispatch schema, with `activeWhen` gates on template geometry and one `perMemberOf` row (§ 2.7).
+
+### 9.2 Decision: a rider model is a `TRAFFIC_PARAMETERS` patch, and the editor is the same generator
+
+U7 needs no new concept. A **rider model** is a named, validated patch over `TRAFFIC_PARAMETERS`,
+stored as data, assignable to a scenario. The editor is § 8.1's generated form pointed at
+`TRAFFIC_PARAMETERS` instead of `collectSearchSpace()` — same four control renderers, same
+`activeWhen` rule, same `description` as help text. **This is the single strongest argument for
+generating the form rather than writing it: U6 and U7 collapse into one unit of work.**
+
+The three model rules bind and are already honoured by `core`, so the editor's job is to make them
+**visible** rather than to enforce them:
+
+- **Batches, not individuals.** The batch-size distribution is in the profile and is not a
+  `TRAFFIC_PARAMETERS` row; the editor must show it as a stated property of the chosen profile
+  (*"people arrive in groups averaging 1.4"*) and must offer `traffic.batchSharesDestination`, whose
+  own description says it *"materially reduces stop count"*.
+- **Mass is a distribution.** Shown as μ/σ, read-only in Phase 9, and labelled as what it is for:
+  *"the load sensor has to have something to measure"*.
+- **80 %, not 100 %.** Wherever the UI says a car is "full", it means the design load factor. Said
+  once, prominently, in the metrics glossary.
+
+### 9.3 The multiplier the owner asked for does not exist, and should
+
+**This is a real gap.** `traffic.arrivalRatePctPop5min` is an **absolute override** — its own
+description says an unset value is *"the only honest default: 12 is an office number and would run a
+residential building at 2.4× its demand."* There is **no** row that multiplies a profile's own rate.
+So "1.5× the normal morning rush" is not currently expressible; "8 %/5 min regardless of building
+type" is.
+
+Two ways forward:
+
+- **(a) A new declared tunable** `traffic.arrivalRateMultiplier`, `continuous`, range `[0, 4]`,
+  default `1`, `activeWhen: { 'traffic.arrivalRatePctPop5min': <unset> }` — except `activeWhen`'s
+  declared forms are a value list and a numeric range, and "is unset" is neither. The gate would have
+  to be expressed some other way, or the two would have to be mutually exclusive by resolver rule
+  with a stated precedence. This is a `core` change, in `TRAFFIC_PARAMETERS` and the resolver, with
+  a round-trip test per `parameters.test.ts`'s standard.
+- **(b) The scenario layer resolves the multiplier** into an absolute rate at authoring time, storing
+  both the multiplier and the resolved value, and `core` is untouched.
+
+Recommendation: **(b) for Phase 9, (a) as a follow-on**. Reason: (a) is a `core` schema change whose
+`activeWhen` semantics need a new condition form, and `dispatch/parameters.ts` is explicit that a
+declared knob nothing reads is worse than no knob. (b) is honest — it stores what was actually run —
+and it keeps the invariant-8 surface exactly as complete as it is now. The scenario file records
+`{ profileRateTypical: 12, multiplier: 1.5, arrivalRatePctPop5min: 18 }` so the provenance of the
+number is on the record.
+
+**Occupancy multipliers are a different thing and live elsewhere.** Floor `population` is building
+fabric, in `data/buildings/*.json`, and `resolveBuilding` takes the sum of floors as authoritative.
+An "occupancy ×1.5" control is a **building** edit, not a traffic edit, and must be presented as
+such — collapsing the two would be the traffic-versus-fabric version of collapsing the three zonings.
+
+### 9.4 Designing the saturated case in from the start
+
+The owner's stated purpose for multipliers is worst-case scenarios, and worst cases saturate. Per
+**M1**, saturation is already the *common* case, so this is not a corner to handle later.
+
+Concretely, a rider-model editor must:
+
+- Show, before the run, an estimate of whether the configuration can be served — the **offered vs.
+  handling capacity** comparison of § 3.5, which for a proposed configuration can be computed
+  *analytically* from `core/src/analytical` (the Barney/CIBSE round-trip-time calculation) without
+  simulating anything. This is the "unbuildable configuration" warning `UX.md`'s Designer role asks
+  for, and the machinery exists.
+- Report a saturated run as an **outcome with a diagnosis**, not as an error.
+- Never offer a "compare" affordance across two configurations one of which is suppressed.
+- Refuse to display a mean, per R1 — and note that the *observations* remain fully available, which
+  is what lets a worst-case scenario still be interesting: 379 people at one landing is a spectacular
+  and completely honest thing to show.
+
+### 9.5 Scenario success criteria are checkable
+
+Yes — that is what § 5.2's goal table is for. Every goal kind reduces to a predicate over
+`RunSummary` fields or over a batch of them. Two properties the implementation must have:
+
+1. **A goal that references a suppressed quantity is a scenario-authoring error, caught by the
+   scenario schema at load**, not at judging time. `long-waits-under` is allowed (it is a count over
+   served legs, with a stated caveat); a hypothetical `awt-under` is **rejected by the schema**
+   because it can be unjudgeable.
+2. **Batch goals declare their replication count and their seeds**, and the tuning and holdout sets
+   must be disjoint — the same rule `runHoldoutRound` enforces by refusing rather than warning.
+
+---
+
+## 10. U8 — Access zoning (credentials)
+
+### 10.1 Keep the three zonings distinct — and make the distinction *earned* rather than asserted
+
+The editor already separates them structurally (§ 2.8) and explains the difference in prose. Prose
+is the weakest form of this. Phase 9's job is to make the distinction visible in the **picture**,
+where it cannot be skimmed past:
+
+A **credential lens** on the building preview: pick a credential group and the preview draws three
+states per floor —
+
+- **reachable** — some shaft serves it *and* this credential opens it;
+- **not served** — no shaft physically reaches it (service zoning);
+- **not permitted** — a shaft reaches it, this credential does not open it (access zoning).
+
+Three states, three glyphs, three legend rows, one sentence each. Anyone who uses the lens once has
+learned the distinction, because the two failure states look different and are labelled with
+different causes. Operational zoning is absent from the lens **by construction** and the lens says
+so: it is not a property of the building.
+
+### 10.2 The editor's actual gaps
+
+| Gap | Fix |
+|---|---|
+| Floors are a free-text id list | A floor multi-select over the building's own floors, with the range syntax `expandFloors` already understands. `ED-14` already validates unknown floors; the control should make it unreachable. |
+| Credential groups are free text | An autocomplete over groups already used in this building, with free entry retained. No fixed vocabulary — `core` has none and inventing one would be a second source of truth. |
+| No view of coverage | The credential lens (§ 10.1), plus a matrix view (floors × credential groups) for the Analyst. |
+| No warning when a floor is in no zone | Today's semantics: a floor in no access zone is unrestricted. Correct, and worth stating on screen — Secure Tower's own notes say only the lobby is unrestricted, and that is the design. |
+| **No connection to the dispatcher** | § 10.3. This is the important one. |
+
+### 10.3 The dispatcher compatibility warning — the highest-value item in U8
+
+**M12** and the published measurements: a building with access zones, run under a dispatcher whose
+`dispatch.callType` is `up-down-buttons`, has calls that **no car may legally answer**, and ten of
+the twelve shipped dispatchers are in that state. The consequence is not "worse", it is
+**structural**: `docs/01-architecture.md` records **0 of 30** replications quotable and **33.5 %**
+unserved for conventional dispatch on Secure Tower's interfloor traffic; a destination-entry kiosk
+*without* the credential is worse at **51.7 %**.
+
+So the viewer and the editor both gain a check, computed from data both already hold:
+
+> **This building has access-controlled floors. `nearest-car` does not read credentials, so calls
+> from those floors cannot be answered by any car — 33 % of riders will not be served. Two shipped
+> dispatchers do read credentials: `destination-eta` and `destination-panel`.**
+
+Stated **before** the run, not diagnosed after it, and it is a warning rather than a block —
+because running it and watching it fail is the single best lesson in the scenario set (§ 5.4
+stage 5). This is not a new concept; `ConfigWarning` already exists, the editor already lists
+warnings separately from errors, and Run stays enabled for a warning (`ED-15`).
+
+### 10.4 Locked-out calls, on screen
+
+A call no car may legally answer is currently indistinguishable from a long wait. `RV-08` covers the
+*service*-zoning case (`⊘` on a floor no shaft serves) and notes that **no shipped building has an
+unserved floor**, so the path does not arise in `data/`. The *access* case does arise, on Secure
+Tower, and has no marker.
+
+To draw it, the recording must be able to distinguish "nobody came" from "nobody may come". Today it
+cannot: `VizLeg` carries no `credentialGroup` (it is on `PassengerRecord` and deliberately not
+copied). **This is the one genuine contract widening U8 needs**, and it lands with its renderer per
+§ 2.4's rule:
+
+- `VizLeg.credentialGroup?: CredentialGroup` — `VIZ_SCHEMA_VERSION` → 5.
+- Consumers in the same change: the queue renderer's locked-out marker (§ 6), `describeFrame`'s
+  clause, and the credential lens's "this rider cannot reach their destination" line.
+- Cost: `credentialGroup` is a short string on a fraction of legs; against § 2.4's budget (legs are
+  5–8 % of the recording) it is negligible.
+
+Whether a *stronger* signal is needed — an explicit "this call was refused on access grounds" event
+rather than an inference from credential plus zone — is § 13's open question 4.
+
+---
+
+## 11. Work breakdown
+
+Dependencies are hard unless marked. Every unit names its **non-test caller**, because
+`docs/05-roadmap.md`'s standing requirement says the question is not "is it reachable" but "name the
+caller", and a barrel re-export is not one.
+
+### W1 — Close the honesty leak *(no dependencies; blocks everything)*
+
+Remove the unconditional running mean from `render/canvas.ts`'s header, or gate it on
+`awtIsValid`; make the canvas agree with `describeFrame`.
+
+- **Acceptance:** on every shipped building whose run is suppressed, the rendered header contains no
+  mean; `describeFrame` and the canvas make the same claims about the same run.
+- **Liveness evidence:** a test that replaces the header's mean with a constant and goes red;
+  a driven browser session on Midtown Office seed 42 showing the header without a mean.
+- **Non-test caller:** `render/canvas.ts` `drawScene`, already shipped.
+- **Note:** `UX.md` § A.3's **Saturated** row is already correct and the code is wrong. No
+  criterion is weakened.
+
+### W2 — Widen `VizSummary` to what U5 and U3 need *(depends on W1 for the honesty rule)*
+
+Add to `VizSummary`, each with a renderer in the same change: `window`, `windowSeconds`,
+`pctOverLongWait` + `longWaitThresholdS` + `unservedCount`, `handlingCapacity`
+(`personsPer5Min`, `offeredPer5Min`, `pctPopulationPer5Min?`), `achievedInterval`
+(`meanS`, `coefficientOfVariation`), `serviceLevel` (`verdict`, `longestWaitS`,
+`longestWaitIsCensored`, `overHorizonCount`). `VIZ_SCHEMA_VERSION` → 5 together with W7's
+`VizLeg.credentialGroup` if the two land in one wave; otherwise two bumps.
+
+- **Acceptance:** every added field is drawn somewhere in the shipped viewer; the offered-vs-carried
+  bar (§ 3.5) is on screen in Basic mode; every displayed figure names its window.
+- **Liveness evidence:** per field, replace it with a constant and watch a test go red — the standard
+  `UX.md` sets for a `✅ test` mark.
+- **Non-test caller:** `render/overlay.ts` and `render/canvas.ts`.
+- **Risk:** this is the unit most likely to acquire a field with no consumer. The rule is one field,
+  one renderer, same commit.
+
+### W3 — The replication batch runner in the viewer *(depends on W2)*
+
+A worker that runs N replications of a configuration and returns a paired summary, so R2's batch
+goals and § 8.4's honest deltas are possible.
+
+- **Feasibility, measured (M6):** 2 ms/rep (Garden Apartments), 24 ms (Secure Tower), 60 ms
+  (Midtown), 196 ms (Vertical City) at 900 s. 50 replications: 0.1 s to 9.8 s. 200: 0.4 s to 39 s.
+  A worker plus a progress indicator covers it; the main thread must not block (`UX.md` § A.3
+  **Simulating**).
+- **Acceptance:** a batch of 50 on Midtown Office returns a paired-t interval on a difference; an
+  interval containing zero is reported as unresolved and the two arms are **not ordered**; the seeds
+  used are recorded and reproducible.
+- **Liveness evidence:** a comparison whose true difference is zero (a profile against itself)
+  reports "not resolved" rather than a winner.
+- **Non-test caller:** the scenario judge (W5) and the dispatcher editor's compare control (W6).
+- **Open:** whether the batch reuses `packages/experiments`'s CRN manager (§ 13 q1) or duplicates a
+  minimal seed-pairing rule. Duplicating is a second source of truth about pairing and should be
+  avoided.
+
+### W4 — The generated parameter form *(depends on nothing; parallel to W1–W3)*
+
+Four control renderers keyed on `type`, one `activeWhen` rule, `description` as help, `unit` as
+suffix, `default` as reset. Pointed at `collectSearchSpace()` for U6 and at `TRAFFIC_PARAMETERS` for
+U7.
+
+- **Acceptance:** every id in `collectSearchSpace().ids` (49 today) is reachable in the editor, and
+  the test that asserts it derives the list from the function rather than from a fixture; every
+  authored profile round-trips through `parseDispatcherProfiles`; a weight on a term whose
+  `activeWhen` is unsatisfied is refused **at the control**, with the reason.
+- **Liveness evidence:** add a fictional schema row via the injectable `source` and watch the control
+  appear with no UI change.
+- **Non-test caller:** the dispatcher editor tab and the rider-model editor tab.
+- **Blocked by:** § 13 q1 — whether `@elevator-sim/experiments` gains a browser-safe export, or the
+  viewer runs its own discovery over the `core/browser` namespace. **M10** says the second works
+  today with no package change; the first is better long-term.
+
+### W5 — Scenarios as data, and the judge *(depends on W2, W3)*
+
+The scenario schema, a shipped scenario library covering § 5.4's seven stages, and a judge that
+evaluates goals from finished recordings and batches.
+
+- **Acceptance:** every shipped scenario loads, validates, runs, and reaches its stated goal state
+  from the shipped `data/` — including stage 3, which must reach **Overwhelmed**; a goal referencing
+  a suppressible quantity is rejected by the schema at load; tuning and holdout seed sets are
+  asserted disjoint.
+- **Liveness evidence:** each scenario's declared outcome is asserted against an actual run, not
+  against a fixture. A scenario whose demand is changed must change its verdict.
+- **Non-test caller:** the Basic-mode scenario picker.
+- **Note:** stage 2 requires finding a demand level at which Midtown Office is quotable across arms.
+  **M8** shows this is not a matter of picking a number off a sweep at one seed — quotability is
+  non-monotone in demand at a single seed — so the level must be chosen the way
+  `saturationCensus.test.ts` chooses one: **the highest load at which every arm, including the
+  baseline, still returns a valid AWT**, measured over a batch.
+
+### W6 — Basic / Advanced *(depends on W2, W4, W5)*
+
+One state, two views, § 4's hide/never-hide lists.
+
+- **Acceptance:** the mode-parity test — for every shipped scenario, the recording produced in Basic
+  is byte-identical to Advanced; every item on § 4's never-hide list is asserted present in Basic on
+  a run that exhibits it.
+- **Liveness evidence:** the parity test fails if any control's Basic default differs from its
+  Advanced value.
+- **Non-test caller:** the app shell.
+
+### W7 — Rider queues and the credential lens *(depends on W1; W7b depends on W2)*
+
+- **W7a — `queueAt` + renderer + `describeFrame` clause.** No contract change (§ 6.1).
+- **W7b — `VizLeg.credentialGroup`, the locked-out marker, and the credential lens** (§ 10).
+- **Acceptance (a):** `sum(queueAt(r,t).total) === frameAt(r,t).totalWaiting` on every shipped
+  building at every sampled instant; the renderer degrades correctly at 175 and 379 waiting (**M5**);
+  under `destination-dispatch` the glyphs are grouped by promised car.
+- **Acceptance (b):** on Secure Tower under `nearest-car`, a locked-out call is drawn as locked out
+  and not as a long wait; the same run under `destination-eta` shows none.
+- **Liveness evidence:** remove the field and the marker's test goes red; a driven browser session
+  on Secure Tower showing both states.
+- **Non-test caller:** `render/canvas.ts`, `render/describeFrame.ts`, `render/preview.ts`.
+
+### W8 — Access-zoning editor and the dispatcher compatibility warning *(depends on W7b)*
+
+Floor multi-select, credential autocomplete, coverage matrix, and § 10.3's pre-run warning in both
+the editor and the viewer.
+
+- **Acceptance:** opening Secure Tower with `nearest-car` selected produces the warning naming the
+  two credential-aware profiles, before Run; opening it with `destination-eta` produces none;
+  authoring an access zone on a building and switching to a conventional dispatcher raises it live.
+- **Liveness evidence:** the warning's test asserts the *count* of credential-aware shipped profiles
+  is derived from `data/dispatcher-profiles.json` rather than hard-coded, so adding a third profile
+  changes the message.
+- **Non-test caller:** `dev/editor.ts` and `dev/main.ts`.
+
+### Dependency graph
+
+```
+W1 ──┬── W2 ──┬── W3 ──┬── W5 ──┬── W6
+     │        │        │        │
+     │        ├────────┴────────┘
+     │        │
+     └── W7a  └── W7b ── W8
+              
+W4 (independent, gated on open question q1) ──── W5, W6
+```
+
+---
+
+## 12. Measurement log
+
+All measured on `design/phase9-experience` on 2026-07-28, Node 26, against the repository's own
+`data/`. Scripts were scratch; every result is reproducible from the stated configuration.
+
+| id | Measurement |
+|---|---|
+| **M1** | 5 buildings × 12 dispatchers, seed 42, `durationS: 900`, `onTimeout: 'report'`, shipped traffic profile at default demand level: **14 of 60** cells report `awtIsValid === true`. 12 of those 14 are Garden Apartments; the other two are `mixed-use-high-rise`/`destination-panel` and `secure-tower`/`destination-eta`. **40** of the 60 are diagnosed `saturated`; **6** more fail on censoring; 14 are quotable. |
+| **M2** | Garden Apartments, same settings: 10 of 12 dispatchers give AWT 11.319 s / WT95 24.548 s / TTD 39.302 s. SHA-256 over `{shafts, landings, legs}` gives **7 distinct recordings**; one fingerprint is shared by `eta`, `fairness-first`, `capacity-aware`, `auction`, `auction-multi-round`, `destination-eta`. The exceptions are `zoned-uppeak` (AWT 2.500 s) and `predictive-balanced` (11.919 s). |
+| **M3** | Recording section sizes by `JSON.stringify().length` — see § 2.4 table. `shafts` is 89–93 % of every recording; `legs` is 5–8 %. Vertical City at 1800 s: **3 222 legs**, 7 971 kB total. |
+| **M4** | `landingAssignmentsAt` at mid-run, 60 calls: 1 ms on Midtown Office (0.02 ms/call), 4 ms on Vertical City with 3 222 legs (0.07 ms/call). 60 Hz budget is 16.7 ms. |
+| **M5** | Sampling every 15 s: deepest single landing call **175** (Midtown Office, 900 s), **379** (Vertical City, 1800 s), **5** (Secure Tower under `destination-panel`, where a call is one OD pair). Most simultaneous call rows: 10 / 44 / 29. |
+| **M6** | `Simulation.run()` without recording, 20 replications, seeds 1000–1019, 900 s, `collective`: Garden Apartments 2 ms/rep, Secure Tower 24 ms/rep, Midtown Office 60 ms/rep, Vertical City 196 ms/rep. |
+| **M7** | Same batch: Garden Apartments 19/20 quotable, 0/20 saturated. Midtown Office **0/20** quotable, 20/20 saturated. Secure Tower **6/20** quotable, 4/20 saturated. Vertical City 0/20 quotable, 19/20 saturated. |
+| **M8** | Midtown Office, seed 42, `demand: { arrivalRatePctPop5min: r }`: quotable at r = 1, 2, 3 for all four arms tested; **all four saturate at r = 4**; at r = 5 `eta` (77.2 s) and `predictive-balanced` (62.6 s) are quotable and the others are not; all saturate at r = 6 and above. Quotability is not monotone in demand at one seed. |
+| **M9** | `discoverParameterSchemas()` → 10 schemas, **99 declared rows**, of which **95 distinct ids** (four are legitimately re-declared by two schemas each: `answer.bypassLoadThreshold`, `answer.overloadThreshold`, `car.designLoadFactor`, `car.nominalPassengerMassKg`). `collectSearchSpace()` → **49** dimensions, 13 gated; sections `weights` 12, `dispatch` 11, `answer` 9, `idle` 9, `auction` 3, `eligibility` 2, `normalization` 2, `constraints` 1; types continuous 32, categorical 9, boolean 4, integer 4. The **46** distinct ids excluded are all of `car.*`, `traffic.*`, `metrics.*`, `analytical.*` and `sim.*` — excluded mechanically, because no dispatcher profile has a section that can hold them, not by name. |
+| **M10** | `discoverParameterSchemas(browserBarrel)` returns the identical 10 schemas and 99 rows. Discovery works client-side with no package change. |
+| **M11** | `render/canvas.ts:210–217` draws `mean wait so far` from `frame.runningMeanWaitS` with no `awtIsValid` guard, on the same header as the `SATURATED — AWT suppressed` banner drawn at lines 230–235. Observed on screen at Midtown Office seed 42 (87.7 s beside the banner) and Secure Tower seed 16757712606996968457 (1.8 s beside *10.7 % never served*). `describeFrame.ts:67–71` states the suppression and never prints a mean. |
+| **M12** | `data/dispatcher-profiles.json` holds 12 profiles. Exactly two — `destination-eta`, `destination-panel` — declare `dispatch.callType: mobile-credential`. The other ten run at the `up-down-buttons` default. |
+| **M13** | No energy metric exists. `REPLICATION_METRICS` has 19 entries, none energy; no occurrence of `energyJ`, `kWh` or `energyKwh` anywhere in `core` or `experiments` source. |
+| **M14** | `VizSummary` carries 9 fields; `RunSummary` carries `window`, `windowSeconds`, `counts`, `waiting.*` (including `pctOverLongWait`), `rideTime`, `loadFactor`, `handlingCapacity`, `achievedInterval`, `saturation`, `serviceLevel` — none of the last seven reaches the viewer. |
+| **M15** | The Run-viewer / Building-editor tab selection is not written to the URL; every other control is. Verified by clicking the tab and re-reading `location.href`. |
+| **M16** | `.claude/launch.json` declares port 5173; `packages/viz/vite.config.ts` declares 5174 with `strictPort: false`. |
+
+---
+
+## 13. Open questions that must be settled before implementation
+
+1. **Does `@elevator-sim/experiments` gain a browser-safe export?** W4 needs the search space and
+   W3 wants the CRN manager, and today the package's only export pulls `node:worker_threads` through
+   the runner. **M10** shows the viewer can do its own discovery over `core/browser` with no package
+   change, so W4 is not blocked — but two discoveries is two sources of truth about what the search
+   space is. *Settled by:* a decision from the owner of `packages/experiments`, plus a graph-walk
+   test in the manner of `core/src/browser.test.ts` if the answer is yes.
+
+2. **What demand level makes Midtown Office a teachable scenario?** **M8** shows a single-seed sweep
+   cannot answer this. *Settled by:* running `saturationCensus.test.ts`'s own rule — the highest load
+   at which every arm including the baseline returns a valid AWT — over a batch on each candidate
+   building, and recording the answer in the scenario file.
+
+3. **Is a scenario's goal judged on the report window or the whole run?** Every figure in
+   `RunSummary` is windowed (peak 5 minutes by default), but "20 people never arrived" is a whole-run
+   fact. A scenario that mixes them without saying which is which will produce goals that look
+   contradictory. *Settled by:* fixing the convention in the scenario schema — each goal declares its
+   scope — and asserting it.
+
+4. **Does a locked-out call need an explicit event, or is credential-plus-zone enough?** § 10.4
+   infers it. An inference in the viewer is a second source of truth about a question `core` answers
+   (`estimateCost` returns `accessDenied` / `destinationAccessDenied`), and CLAUDE.md has a rule about
+   that. *Settled by:* checking whether the refusal reason survives into `RunRecord` today; if it does
+   not, deciding whether `core` should carry it, which is a `core` change and not this document's.
+
+5. **How many replications does a Basic-mode player wait for?** W3 measures 0.1–9.8 s for 50. The
+   budget table says ±0.5 s needs n = 143 and ±0.25 s needs n = 563 — on Vertical City that is 28 s
+   and 110 s. *Settled by:* choosing a default per scenario, sized to the building, and stating the
+   resolution the chosen budget buys on screen (which is what `tune` already does).
+
+6. **Is `traffic.arrivalRateMultiplier` worth a `core` schema change?** § 9.3 recommends resolving it
+   at the scenario layer for Phase 9. *Settled by:* whether `activeWhen` can express "the absolute
+   override is unset" without a new condition form. If it cannot, (b) stands.
+
+7. **What is the plain-language name for a "leg"?** `boardedLegs` counts leg boardings and a
+   sky-lobby journey boards twice — this was already a wave-1 defect (`served` → `boardedLegs`).
+   Basic mode must not reintroduce it by calling legs "people". *Settled by:* a decision on the word,
+   applied consistently, with `describeFrame`'s existing wording as the reference.
+
+8. **Should the four `⚠️ unverified` rows in `UX.md` be settled before or during Phase 9?**
+   `RV-11`, `RV-17`, `RV-21`, `KB-14`. `KB-14` (`prefers-reduced-motion`) matters most here, because
+   an animated queue is exactly what that media query is about. *Settled by:* emulating the query in a
+   driven session, which costs minutes.
+
+---
+
+## 14. Requests for files this document does not own
+
+0. **`README.md` § Documentation — required, and this branch is red without it.**
+   `packages/experiments/src/validation/documentation.test.ts` § *"lists every docs/\*.md on disk"*
+   walks `docs/` and requires every file to be linked from README's table. Adding this document
+   fails it; reproduced on this branch, `1 failed | 10 passed`. `README.md` is not this task's file,
+   so the row is requested rather than written:
+
+   ```
+   | [Experience layer contract](docs/10-experience-layer-contract.md) | Phase 9's contract: the rules that keep a gamified surface honest, basic/advanced modes, rider queues, plain-language metrics, generated dispatcher and rider-model editors, access zoning |
+   ```
+
+1. **`packages/viz/src/render/canvas.ts`** — remove or gate the unconditional running mean in
+   `drawHeader` (**M11**, W1). This is a correctness fix, not a Phase 9 feature, and it should not
+   wait for Phase 9.
+2. **`packages/viz/UX.md`** — re-mark nothing yet, but note that § A.3's **Saturated** row is
+   currently contradicted by `render/canvas.ts`; when W1 lands the row becomes true and should gain a
+   `✅ test` mark with the constant-substitution evidence.
+3. **`docs/05-roadmap.md`** — add Phase 9 with the acceptance criteria of § 11, and record that
+   `nearest-car` is the viewer's default despite § 4 of `docs/07-handoff.md` recommending against it
+   as a reference arm.
+4. **`packages/viz/src/dev/main.ts`** — change the viewer's default dispatcher from `nearest-car` to
+   `collective` or `eta`, per `docs/07-handoff.md` § 4. One line, and it removes the worst first
+   impression the product currently makes.
+5. **`packages/viz/src/dev/main.ts`** — write the selected tab into the URL (**M15**), so a scenario
+   deep link can open the editor.
+6. **`.claude/launch.json` or `packages/viz/vite.config.ts`** — reconcile ports 5173 / 5174
+   (**M16**).
+7. **`AGENT_STATUS.md`** — U2–U8 are not yet tracked there; only U1 is.
+8. **`data/dispatcher-profiles.json`** — no change requested. Noted for the record: the profile set is
+   sparse (`weights.rideTime` is authored by exactly one profile), which is correct and is why § 8.3
+   opens on presets rather than on sliders.
+
+---
+
+## 15. Sources
+
+Prior art and research consulted for § 3. Findings from these are marked **found** in the text;
+everything else is this document's proposal.
+
+- Nielsen Norman Group, *Progressive Disclosure* — https://www.nngroup.com/articles/progressive-disclosure/
+- UX Tigers, *Progressive Disclosure: From Training Wheels to Week-Long AI Agents* — https://www.uxtigers.com/post/progressive-disclosure
+- Human Transit, *overcrowding and underfunding: the lessons of "Mini Metro"* — https://humantransit.org/2014/03/the-lessons-of-mini-metro.html
+- Transportist (David Levinson), *Mini Metro Review* — https://transportist.org/2014/11/05/mini-metro-review/
+- Steam, *Mini Metro* — lost to a station without an overcrowding indicator — https://steamcommunity.com/app/287980/discussions/0/35221031840044247
+- Steam, *Project Highrise* — elevator management discussion — https://steamcommunity.com/app/423580/discussions/0/358417461606712182/?ctp=2
+- Frontiers in Psychology, *Natural frequencies improve Bayesian reasoning in simple and complex inference tasks* — https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2015.01473/full
+- NCBI PMC4604268, same study — https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4604268/
+- arXiv 2207.09608, *A Cross-Language Study of How People Verbalize Probabilities in Icon Array Visualizations* — https://arxiv.org/pdf/2207.09608
+- Climatic Change (Springer), *Confident, likely, or both? The implementation of the uncertainty language framework in IPCC special reports* — https://link.springer.com/article/10.1007/s10584-020-02746-x
+- Cambridge, *A Critical Assessment of the IPCC* ch. 17, *Uncertainty* — https://www.cambridge.org/core/books/critical-assessment-of-the-intergovernmental-panel-on-climate-change/uncertainty/3B238E862AB873D1D746F8A594DC6DFD
+
+Internal sources: [`CLAUDE.md`](../CLAUDE.md) invariants 4–8 and § Statistical discipline;
+[`docs/03-traffic-and-statistics.md`](03-traffic-and-statistics.md) § Saturation detection;
+[`docs/05-roadmap.md`](05-roadmap.md) § Standing requirement and § Phase 6;
+[`docs/06-parameterization-and-tuning.md`](06-parameterization-and-tuning.md) § The parameter schema;
+[`docs/07-handoff.md`](07-handoff.md) § 4 Resolution limits;
+[`docs/09-destination-dispatch-contract.md`](09-destination-dispatch-contract.md) § 1.3;
+[`packages/viz/UX.md`](../packages/viz/UX.md) § 7.1 and § 7.2;
+[`DECISIONS.md`](../DECISIONS.md) § D15, § D30, § D63, § D64.
