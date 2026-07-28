@@ -5,13 +5,17 @@
  * Argument parsing, config loading and run/sweep invocation live here. Wall-clock time and
  * process I/O are allowed in this package; they are not allowed in `@elevator-sim/core`.
  *
- * Four commands, and one rule that runs through all of them: **every command that simulates
+ * Six commands, and one rule that runs through all of them: **every command that simulates
  * prints the seed it used**. CLAUDE.md invariant 5 says every persisted run record carries its
  * seed so that any run replays exactly; a CLI that produced an interesting number you could not
- * reproduce would honour the letter of that and none of its point.
+ * reproduce would honour the letter of that and none of its point. `fuzz` is the one whose seeds
+ * *are* its subject: a case is a pure function of one generator seed, and every counterexample it
+ * prints carries the seed that reproduces it.
  *
  * Exit codes: `0` success, `1` the user asked for something impossible, `2` the simulator itself
- * failed. Nothing here depends on a third-party package — argument parsing is hand-rolled and
+ * failed — which is what a `fuzz` property violation is, so that command exits `2` on a finding
+ * rather than reporting one in a body of text somebody has to read. Nothing here depends on a
+ * third-party package — argument parsing is hand-rolled and
  * colour is raw ANSI — so the install is trivial and the surface is auditable.
  *
  * Two things about the plumbing, both because this is a discovery tool people pipe:
@@ -27,8 +31,10 @@ import { pathToFileURL } from 'node:url';
 import { ConfigError, TrafficError } from '@elevator-sim/core';
 
 import { compareCommand, COMPARE_HELP } from './commands/compare.js';
+import { fuzzCommand, FUZZ_HELP } from './commands/fuzz.js';
 import { listCommand, LIST_HELP } from './commands/list.js';
 import { runCommand, RUN_HELP } from './commands/run.js';
+import { tuneCommand, TUNE_HELP } from './commands/tune.js';
 import { watchCommand, WATCH_HELP } from './commands/watch.js';
 import { EXIT_INTERNAL, EXIT_USAGE, UsageError, didYouMean } from './errors.js';
 import { BINARY, printCommandHelp, printRootHelp, type CommandHelp } from './help.js';
@@ -51,6 +57,30 @@ export { listCommand, LIST_FLAGS, printList, summariseWeights } from './commands
 export { runCommand, RUN_FLAGS, planRun, printRunReport, type RunPlan } from './commands/run.js';
 export { compareCommand, COMPARE_FLAGS, runCompare, verdictOf, type Verdict } from './commands/compare.js';
 export { watchCommand, WATCH_FLAGS, layoutFor, rowFor } from './commands/watch.js';
+export {
+  tuneCommand,
+  TUNE_FLAGS,
+  finalistsOf,
+  headlineOf,
+  ladderFrom,
+  narrowedSpace,
+  replicationsToResolveEffect,
+  resolutionAt,
+  runTune,
+} from './commands/tune.js';
+export {
+  fuzzCommand,
+  FUZZ_FLAGS,
+  FUZZ_TIERS,
+  chunkSize,
+  mergeStats,
+  reportCampaign,
+  runFuzz,
+  seedsFor,
+  spaceOf,
+  violationsByProperty,
+  type FuzzTier,
+} from './commands/fuzz.js';
 
 const VERSION = '0.0.0';
 
@@ -61,10 +91,19 @@ const COMMANDS: ReadonlyMap<string, { readonly help: CommandHelp; readonly run: 
     ['list', { help: LIST_HELP, run: listCommand }],
     ['run', { help: RUN_HELP, run: runCommand }],
     ['compare', { help: COMPARE_HELP, run: compareCommand }],
+    ['tune', { help: TUNE_HELP, run: tuneCommand }],
+    ['fuzz', { help: FUZZ_HELP, run: fuzzCommand }],
     ['watch', { help: WATCH_HELP, run: watchCommand }],
   ]);
 
-const HELP_ORDER: readonly CommandHelp[] = [LIST_HELP, RUN_HELP, COMPARE_HELP, WATCH_HELP];
+const HELP_ORDER: readonly CommandHelp[] = [
+  LIST_HELP,
+  RUN_HELP,
+  COMPARE_HELP,
+  TUNE_HELP,
+  FUZZ_HELP,
+  WATCH_HELP,
+];
 
 /**
  * Run the CLI.

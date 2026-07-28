@@ -18,16 +18,31 @@
  *
  * ## What a zone is for
  *
- * Two consumers, both already declared and both previously inert for want of a partition:
+ * Two consumers, both declared long before they were wired, and **both live now**:
  *
  * - **`RepositionContext.zoneFloorIds`**, so `parkingStrategy: zone-center` sends each car to the
  *   middle of *its own* band. Without a partition every car in the bank computes the same shaft
- *   median and the strategy parks the whole group on one floor, which is worse than not parking.
- *   That is not hypothetical: `Simulation.#park` supplies no partition today, and on
- *   `midtown-office` it moves all four cars to floor `10`. Which is why no shipped profile declares
- *   `zone-center` yet — see `prepositioning.ts` § *`Simulation.#park` still does not call this*.
+ *   median and the strategy parks the whole group on one floor, which is worse than not parking —
+ *   measured on `midtown-office`, all four cars to floor `10`. `Simulation.#park` now calls
+ *   `resolvePrepositionContext`, which defaults `zones` to `zoneAssignment(cars)`, so the partition
+ *   is supplied on every reposition decision. See `prepositioning.ts` § *`Simulation.#park` calls
+ *   this, and the two strategies it feeds are live*.
  * - **the `zoneAffinity` cost term**, which prices a car's deviation from its band. That term
  *   lives in `terms/` and reads the zone from its context; this file is where the zone comes from.
+ *
+ * **A shipped profile declares `zone-center`.** `data/dispatcher-profiles.json`'s `zoned-uppeak`
+ * carries `idle.parkingStrategy: "zone-center"`, and it is the only one that does. Measured on
+ * `midtown-office`, seed 20 260 726, 1800 s, base `eta` at `idle.repositionThresholdS: 2`:
+ * `zone-center` versus `stay` produces different car trajectories. On Garden Apartments at n = 500
+ * under CRN it is the best pre-positioning result the project has — `−4.88 s [−5.27, −4.49]`,
+ * −29.7 % AWT, better than the *predictive* strategy this phase's own scope bullet named.
+ *
+ * **The three paragraphs above used to say the opposite, in the present tense** — no partition, no
+ * shipped profile, and a cross-reference to a `prepositioning.ts` heading that had already been
+ * renamed when that file was corrected and this one was not. A reader following the standing
+ * dead-code audit would have concluded `zone-center` was an unwired strategy and either re-plumbed
+ * a live seam or discounted every `zone-center` result as coming from a dead path. Recorded as
+ * review finding #20 in `docs/08-review-findings.md`.
  *
  * ## Why bands by car id, and not by proximity
  *

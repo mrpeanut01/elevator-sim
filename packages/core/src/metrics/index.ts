@@ -36,6 +36,23 @@
  */
 
 export {
+  COMPARABLE_METRIC_IDS,
+  MODEL_SENSITIVE_METRICS,
+  MODEL_SENSITIVE_METRIC_IDS,
+  PASSENGER_MODELS,
+  comparabilityDisclaimer,
+  comparabilityOf,
+  passengerModelOf,
+} from './comparability.js';
+
+export type {
+  ModelSensitiveMetric,
+  PassengerModel,
+  RunComparability,
+} from './comparability.js';
+
+export {
+  COUNTERWEIGHT_BALANCE_RATIO,
   DEPARTURE_GAP_BASES,
   METRICS_SCHEMA_VERSION,
   MetricsError,
@@ -44,9 +61,12 @@ export {
   QUEUE_SERIES_SOURCES,
   SATURATION_DEFAULTS,
   SATURATION_VERDICTS,
+  SERVICE_LEVEL_VERDICTS,
   legSecondsOf,
   rideSecondsOf,
+  outOfBalanceWorkJ,
   runSeed,
+  STANDARD_GRAVITY_MPS2,
   waitSecondsOf,
   windowContains,
   windowContainsArrival,
@@ -58,6 +78,7 @@ export type {
   CarTimings,
   DepartureGapBasis,
   DurationStatistics,
+  EnergyStatistics,
   HandlingCapacity,
   Histogram,
   HistogramBin,
@@ -80,6 +101,10 @@ export type {
   SaturationDiagnosis,
   SaturationThresholds,
   SaturationVerdict,
+  ServiceLevelDiagnosis,
+  TravelReading,
+  TravelSample,
+  ServiceLevelVerdict,
   WaitStatistics,
 } from './types.js';
 
@@ -109,6 +134,7 @@ export type {
 export { MetricsRecorder } from './recorder.js';
 
 export type {
+  AssignmentDetails,
   BoardingDetails,
   MetricsRecorderOptions,
   RecordablePassenger,
@@ -123,6 +149,7 @@ export {
   DEFAULT_LOAD_FACTOR_EDGES,
   DEFAULT_LONG_WAIT_THRESHOLD_S,
   DEFAULT_MAX_UNSERVED_FRACTION,
+  DEFAULT_MAX_WAIT_HORIZON_S,
   DEFAULT_QUEUE_SAMPLE_COUNT,
   DEFAULT_WAIT_HISTOGRAM_BIN_S,
   HANDLING_CAPACITY_WINDOW_S,
@@ -133,6 +160,8 @@ export {
   buildJourneys,
   departureGapBracket,
   detectSaturation,
+  diagnoseServiceLevel,
+  energyStatistics,
   fullRunWindow,
   handlingCapacityOf,
   legDurations,
@@ -155,6 +184,7 @@ export type {
   PeakWindowOptions,
   QueueSeriesOptions,
   SaturationOptions,
+  ServiceLevelOptions,
   SummarizeOptions,
   WaitOptions,
   WindowSelection,

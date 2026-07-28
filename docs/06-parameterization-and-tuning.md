@@ -115,14 +115,64 @@ The stop decision and what happens at the floor.
 | Parameter | Values | Notes |
 |---|---|---|
 | `bypassLoadThreshold` | 0.0–1.0, default 0.8 | Car stops taking new hall calls |
-| `overloadThreshold` | default 1.1 | Doors held, car will not start |
+| `overloadThreshold` | **`[designLoadFactor, 1.5]`**, default 1.1 | Doors held, car will not start |
 | `allowBypassIfSoleEligibleCar` | bool | Starvation guard — prevents a floor never being served |
 | `dwellPolicy` | `fixed` \| `adaptive` | |
 | `dwellAdaptationGain` | float | Extends dwell with hall queue length |
-| `reopenOnLateArrival` | bool | Models the door-hold button and photo-eye |
+| `reopenOnLateArrival` | bool, **default `false`** | The late-arrival courtesy hold. Ships off — see below |
 | `maxReopensPerStop` | 0–20 | Reopens honoured at one stop before the doors close regardless; the anti-hold-forever rule |
 | `maxDwellS` | seconds | Ceiling on adaptive dwell |
 | `maxTransferSeconds` | seconds | Ceiling on the transfer-driven part of a stop |
+
+> **`overloadThreshold`'s range starts at the design load factor, and it used to start at 1.0.**
+> Over `[1, 1.5]` the dimension is a **flat plateau**: boarding stops at `designLoadFactor × rated`
+> (0.8 — [`CLAUDE.md`](../CLAUDE.md) § modelling rules), so a threshold at or above 1.0 can only
+> reject a candidate heavier than `0.2 × rated`, which is 146 kg on the lightest shipped car against
+> a N(75, 15) passenger mass distribution — at least 4.7σ. Measured: 1.0 vs 1.5 is bit-identical on
+> all five shipped buildings. The interlock is **one-sided rather than dead** — it starts biting as
+> the threshold approaches the boarding cap from *below*, because the last boarder is the one that
+> carries the load across — so the range floor moved instead of the knob being gated or deleted.
+> The default is unchanged at EN 81's 110 %, so no shipped run moves; only the interval a search may
+> explore does. [Review finding #21](08-review-findings.md);
+> [`DECISIONS.md` § D10](../DECISIONS.md).
+
+> **`reopenOnLateArrival` now ships `false`, and the price on it is a measurement rather than a
+> number taken from a diverging queue.** The behaviour did not exist when this table was first
+> written: the only non-test caller of `Car.requestReopen` hardcoded `'obstruction'` and the knob
+> gates only `cause === 'lateArrival'`, so it was a schema-validated, optimizer-searchable boolean
+> that could not move any run ([review findings #12 and #13](08-review-findings.md)). It is now
+> implemented — when the doors start closing on a landing that still holds a passenger this car could
+> carry, and the car is below its design load, the run requests a `lateArrival` reopen, with no
+> random draw, because that is a deterministic consequence of the trace and a probability here would
+> spend a stream on something the passenger population already decides (invariant 2).
+>
+> It ships **off**. Two figures for its cost were published and **both were unquotable for the same
+> reason**: "~30 % AWT on `secure-tower`" and a reviewer's correction to "+59.1 %" are each a
+> single-replication point estimate of a mean on a configuration that **saturates** — at seed
+> 20260726 `secure-tower` reports `saturation: { saturated: true, verdict: 'diverging-queue' }` under
+> the shipped profiles — and [`CLAUDE.md`](../CLAUDE.md) § Statistical discipline forbids reporting a
+> mean for a system whose queues grow without bound. Re-measured under this project's own rules —
+> 50 replications per cell, paired arms on common random numbers (seeds 20260726–20260775), a
+> paired-t 95 % interval, and AWT suppressed wherever either arm saturates:
+>
+> | 5 buildings × 10 profiles | quotable | significantly worse | significantly better | no significant difference |
+> |---|---|---|---|---|
+> | | 34 of 50 | **0** | 2 | 32 |
+>
+> *(That grid is **as measured**: ten profiles shipped at the time. Twelve ship now —
+> `destination-eta` and `destination-panel` were added in Phase 6 — so the study covers 50 of
+> today's 60 cells. The two significant results are unaffected; nothing here has been re-run at
+> 5 × 12, and this table is not a current census.)*
+>
+> Both significant cells are *improvements*: `secure-tower|auction-multi-round` −13.2 % (−7.66 s,
+> CI [−12.72, −2.60]) and `vertical-city|predictive-balanced` −14.4 % (−6.80 s, CI [−11.36, −2.23]).
+> The remaining 16 cells saturate in nearly every replication — `midtown-office` on all ten profiles,
+> and most of `mixed-use-high-rise` and `vertical-city` — and are suppressed rather than quoted.
+> **There is no measured AWT cost.** The default is nonetheless `false`, because "no measured cost"
+> is not "no effect": the hold moves **41 of the 50** passenger-record trajectories at seed 20260726,
+> on every building but `garden-apartments`, and turning it on would revalue the runs Phase 5's
+> verdicts were measured against. Switching it on is a deliberate re-measurement, not a default.
+> [`DECISIONS.md` § D9, § D25](../DECISIONS.md).
 
 ### Stage 7: Idle repositioning
 
@@ -250,12 +300,22 @@ parameters must be self-describing. Every tunable declares its type and range:
   "activeWhen": { "dispatch.reassignmentPolicy": ["until-commitment", "continuous"] }
 },
 {
-  "id": "dispatch.parkingStrategy",
+  "id": "idle.parkingStrategy",
   "type": "categorical",
   "values": ["stay", "lobby", "zone-center", "predicted-demand"],
   "default": "stay"
 }
 ```
+
+> **That last `id` read `dispatch.parkingStrategy` until 2026-07-27, and no profile can hold it.**
+> `dispatchStageSchema` is a `z.strictObject` with no `parkingStrategy` key, so
+> `parseDispatcherProfiles` rejects a profile carrying it and the dimension is unsearchable — while
+> the real knob, `idle.parkingStrategy`, never gets sampled. It is the exact contract the next
+> section states, violated by the example that introduces it, and `parkingStrategy` is placed
+> correctly under stage 7 / `idle` in this document's own Stage 7 table.
+> [Review finding #7](08-review-findings.md); the ids that appear in this file's fenced blocks are
+> now asserted against `collectSearchSpace().ids` by
+> `packages/experiments/src/tuning/space/docExamples.test.ts`.
 
 Supported types: `continuous`, `integer`, `categorical`, `boolean`.
 `activeWhen` expresses conditional parameters, so the optimizer does not waste evaluations
@@ -429,6 +489,24 @@ new traffic. This risk is rarely mentioned in the elevator literature and is ent
 than collapsing to a single number. Reducing energy generally costs waiting time; that
 tradeoff is a decision for the building operator, not a constant to bake in.
 
+> **The energy axis is now measurable, and that changes what this guardrail costs to honour.** Until
+> `f895a16`, `RunSummary` recorded no energy, no metres travelled and no stop count, so every front
+> this project produced silently degenerated to two axes with the third reported `inactive` — the
+> guardrail above was correct advice that could not be followed. `RunSummary.energy` now carries an
+> out-of-balance mechanical-work proxy over the reporting window, `runner/metrics.ts` projects
+> `energyKJ`, `carDistanceM`, `carStarts` and `energyPerServedLegKJ`, and both `matrix.ts` and
+> `phase7Acceptance.ts` decide their fronts over all three axes. Basis, constants and enumerated
+> omissions: [`docs/02` § Energy and the counterweight](02-elevator-reference.md) and
+> [`DECISIONS.md` § D106](../DECISIONS.md).
+>
+> **The tradeoff it exposes is real and it is expensive.** Phase 7's acceptance arms buy 1.09 s of
+> AWT on Garden Apartments for **+30.3 %** energy (2 s deadband) and 1.11 s for **+27.7 %**
+> (2.582 s), measured at n = 150 on held-out seeds. Report both. And note the direction the axis
+> cuts: measured across the whole matrix, **`nearest-car` — the weakest shipped dispatcher — is on
+> the front at six of eight cells**, because it is best on energy and worst on wait. That is why
+> energy is an **axis and never a score**: any aggregate that folds it into one number ranks the
+> worst dispatcher first.
+
 **Report the noise floor.** If two candidates differ by less than the confidence-interval
 half-width, they are **indistinguishable**. Say so. Do not rank them.
 
@@ -446,7 +524,6 @@ evaluate the assembled controller end-to-end on a full day.
   "engine": "weighted-cost",
   "weights": {
     "waitTime": 1.0,
-    "rideTime": 0.3,
     "detourPenalty": 0.4,
     "existingCallDelay": 0.5,
     "directionReversal": 0.8,
@@ -484,6 +561,39 @@ evaluate the assembled controller end-to-end on a full day.
 ```
 
 Everything above is data. Changing any of it requires no rebuild — which is the whole point.
+
+> **This example carried `"rideTime": 0.3` until 2026-07-27, and pasting it into
+> `data/dispatcher-profiles.json` — which the sentence above invites — turned the suite red.**
+> The profile authors no `dispatch.callType`, so it sits at the `up-down-buttons` default, where
+> `rideTimeTerm.activeWhen` declares the term **inert**; `policies.test.ts` § *"lets no profile
+> weight a term its own stage settings make inert"* builds exactly that profile as a fixture and
+> asserts `unsatisfiedGatesOf(offender) === ['rideTime']`. The shipped `predictive-balanced` dropped
+> the weight in Phase 5 and records why in its own `$comment` — *"a weight that is decoration in
+> every shipped configuration"* — and this worked example was never updated, so the one config the
+> tuning doc presented as canonical was the one the repository forbids. Independently corroborated
+> at the time: across all 5 buildings × 10 profiles, `rideTime` got **0 evaluations** under every
+> shipped profile, and 468/468 non-zero under `destination-entry`.
+>
+> **That corroboration is now historical, and the reason is the point of the example.** Phase 6
+> shipped two more profiles — `data/dispatcher-profiles.json` carries **twelve** — and **both** of
+> them, `destination-panel` and `destination-eta`, weight `rideTime` (at 1.0 and **0.5**). They are
+> allowed to precisely because both also author `dispatch.callType: mobile-credential`, which
+> satisfies the term's `activeWhen`. The rule the red suite was enforcing has not changed: a profile
+> may weight `rideTime` **iff** its own stage settings make the term live.
+>
+> > **Corrected 2026-07-28.** This paragraph read *"`destination-eta` ships the call type and not the
+> > weight, so the two profiles together are the worked example of both sides of that gate"*. That
+> > was true when written and is now false: [`DECISIONS.md` § D112](../DECISIONS.md) authored
+> > `weights.rideTime: 0.5`, because a profile that discloses a destination nothing prices is a
+> > shipped behaviour with no effect on any shipped path — measured **bit-identical to `eta` at 8 of
+> > 8 matrix cells**. The *gate* is unchanged; what changed is that no shipped profile now sits on
+> > its permissive side without using it. The other side of the gate — a profile weighting `rideTime`
+> > **without** the call type — is still exercised, by `policies.test.ts` rather than by `data/`,
+> > which is the right place for a configuration that must stay illegal.
+> [Review finding #6](08-review-findings.md); the JSON blocks in this file are now parsed and run
+> through the real `parseDispatcherProfiles` and the same `activeWhen` gate computation by
+> `packages/experiments/src/tuning/space/docExamples.test.ts`, so this example can no longer drift
+> from what the loader and the policy gate accept.
 
 > **`idle.repositionThresholdS: 8` in this example is not a recommendation, and it is deliberately
 > left where it is.** Phase 5 measured it as the binding constraint on predictive pre-positioning:

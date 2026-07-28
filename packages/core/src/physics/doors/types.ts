@@ -311,6 +311,26 @@ export interface DoorMachineState {
   readonly stopStartedAt: SimTime | undefined;
   /** Why the car stopped. Accumulates as more reasons are declared during the stop. */
   readonly reason: DoorStopReason;
+  /**
+   * What sizes the dwell of the **current open period**, as opposed to the whole stop.
+   *
+   * Equal to {@link reason} for every stop that is never reopened with a revised reason, which
+   * is why the two were one field for as long as no caller revised one. They have to be
+   * separate because {@link reason} is cumulative and `mergeStopReasons` takes the **larger**
+   * transfer — correct for a stop that is still growing, and wrong for a door that has already
+   * served the cohort and is reversing for one late passenger. Sizing that reopen off `reason`
+   * re-grants the whole-cohort transfer (up to {@link DoorConfig.maxTransferSeconds}) once per
+   * honoured reopen, which is a delay the arriving passenger cannot account for.
+   *
+   * So: an `open` command **widens** this (a stop that grows needs at least the dwell it
+   * already had), and a `reopen` carrying a revised reason **replaces** it (a new open period
+   * with its own cohort). A `reopen` with no revised reason leaves it at {@link reason}, which
+   * is what keeps the photo-eye path — a safety reopen nobody sizes — exactly as it was.
+   *
+   * {@link reason} stays cumulative regardless, so `totalS - nominalStopSeconds(config, reason)`
+   * still measures the whole stop's reopen overhead against everything the stop answered.
+   */
+  readonly dwellReason: DoorStopReason;
   /** Dwell granted for the current open period, seconds. Meaningful when `state` is `open`. */
   readonly grantedDwellS: number;
   /** Reopens honoured so far this stop; compared against `maxReopensPerStop`. */
@@ -372,7 +392,20 @@ export interface DoorEvent {
 export type DoorCommand =
   /** The car has stopped here; open up. Repeats merge the reason into the current stop. */
   | { readonly kind: 'open'; readonly reason: DoorStopReason }
-  /** Photo-eye or late passenger. Optionally revises the stop reason at the same time. */
+  /**
+   * Photo-eye or late passenger.
+   *
+   * The optional `reason` **revises** rather than widens: it states what *this open period*
+   * has to cover, and becomes {@link DoorMachineState.dwellReason} outright. Supply it
+   * whenever the reopen is for a known, smaller cohort than the stop already served — a
+   * courtesy hold for one approaching passenger is the case it exists for. Omit it for a
+   * safety reopen, where nobody knows who is in the doorway and the stop's own reason is the
+   * only honest estimate; the dwell is then sized off {@link DoorMachineState.reason} exactly
+   * as it always was.
+   *
+   * It is merged into {@link DoorMachineState.reason} either way, so attribution still sees
+   * everything the stop answered.
+   */
   | {
       readonly kind: 'reopen';
       readonly cause: DoorReopenCause;
@@ -442,8 +475,49 @@ export const DOOR_DEFAULTS = Object.freeze({
   dwellPolicy: 'fixed',
   dwellAdaptationGain: 0.4,
   maxDwellS: 20,
-  /** The courtesy hold is standard behaviour; a profile switches it off to measure the cost. */
-  reopenOnLateArrival: true,
+  /**
+   * **Off by default, and the default changed when the behaviour landed.**
+   *
+   * It read `true` — *"the courtesy hold is standard behaviour; a profile switches it off to
+   * measure the cost"* — for as long as the run loop emitted no `lateArrival` reopen at all, so
+   * the default described a behaviour that did not exist and no configuration could switch off.
+   * `Simulation.#reopenForLateArrival` now emits one, which makes the knob live and this default
+   * load-bearing for the first time.
+   *
+   * ## Why it stays off, and what the cost actually is
+   *
+   * This docstring used to say enabling it *"shifts AWT by up to 30 % on `secure-tower`"*. A
+   * later review corrected the maximum to +59.1 %. **Both were unquotable**, for the same
+   * unnoticed reason: they are single-replication point estimates of a mean waiting time on a
+   * configuration that saturates — `secure-tower` reports
+   * `saturation: { saturated: true, verdict: 'diverging-queue' }` at that seed under the shipped
+   * profiles — and CLAUDE.md § Statistical discipline says in so many words that a system whose
+   * queues grow without bound has no mean to report, and that no comparison may be declared
+   * without a paired-t interval that excludes zero.
+   *
+   * Re-measured under those rules — paired arms on common random numbers, **50 replications**
+   * per cell, a paired-t 95 % interval, AWT suppressed wherever either arm's queue diverges —
+   * across the five shipped buildings x ten shipped profiles:
+   *
+   * - **34 of the 50 cells have a quotable interval. Not one of them is significantly worse.**
+   * - Two are significantly *better*: `secure-tower|auction-multi-round` at −13.2 % (−7.66 s,
+   *   95 % CI [−12.72, −2.60]) and `vertical-city|predictive-balanced` at −14.4 % (−6.80 s,
+   *   95 % CI [−11.36, −2.23]).
+   * - The other 32 show no significant difference. The remaining 16 cells saturate in almost
+   *   every replication and are suppressed rather than quoted.
+   *
+   * So the honest statement is that there is **no measured AWT cost**, which is not the same as
+   * "it is free": it is a real modelling change and it moves **41 of the 50** passenger-record
+   * trajectories at seed 20260726, on every building whose landings ever hold somebody the car
+   * could take (all but `garden-apartments`).
+   *
+   * It is `false` because *that* is what a default has to protect. Phase 5's verdicts were
+   * measured with the hold off, and revaluing 41 of 50 trajectories underneath them would leave
+   * those verdicts comparing runs taken under different physical models — whether or not the
+   * headline mean moves. Turning it on is a deliberate re-measurement, not a side effect of
+   * implementing it.
+   */
+  reopenOnLateArrival: false,
   maxReopensPerStop: 5,
   /** 20 persons (design load of the largest reference car) x 2.0 s, the slowest reference tp. */
   maxTransferSeconds: 40,
@@ -549,7 +623,7 @@ export const DOOR_PARAMETERS: readonly DoorParameterSpec[] = [
     type: 'boolean',
     default: DOOR_DEFAULTS.reopenOnLateArrival,
     description:
-      'Honour the door-hold button and the courtesy hold for an approaching passenger. Photo-eye obstruction reopens regardless: it is a safety function.',
+      'Honour the door-hold button and the courtesy hold for an approaching passenger: when the doors start closing on a landing that still holds somebody this car could carry, reverse them and board. Photo-eye obstruction reopens regardless — it is a safety function. Off by default because every number this project has published was measured without it, and enabling it moves 41 of the 50 shipped building x profile trajectories — a deliberate re-measurement, not a free improvement. It has no measured AWT cost: over 50 paired replications on common random numbers, none of the 34 cells with a quotable interval is significantly worse, two are significantly better (secure-tower|auction-multi-round -13.2%, CI [-12.72, -2.60]s; vertical-city|predictive-balanced -14.4%, CI [-11.36, -2.23]s) and the rest show no significant difference; the other 16 cells saturate and their means are suppressed. This row previously advertised "up to 30% of AWT on secure-tower", which was a single-replication point estimate taken from a diverging queue. What the hold buys back is a whole extra round trip for the passenger who would have been left behind.',
   },
   {
     id: 'answer.maxReopensPerStop',

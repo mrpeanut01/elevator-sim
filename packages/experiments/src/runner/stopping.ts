@@ -17,6 +17,37 @@
  * into "run more replications", and it is inseparable from the batching, the minimum replication
  * count and the reproducibility argument that live next door.
  *
+ * **The shipped rule does not use the doc's crossover.** `validation/harness.ts`'s
+ * `productionStoppingRule` injects `reports/statistics`'s `estimateMean`, which is Student-t at
+ * `n - 1` at every `n`, so the half-width this rule compares against `acceptableRange` is the same
+ * number the report will print. A `z` above n = 25 is 2–5 % narrower and would stop *earlier* than
+ * the published interval justifies — the direction the last paragraph of {@link HalfWidthEstimate}
+ * warns about. § Part 3's four-line rule therefore needs correcting to `t[n-1]` at every `n`; the
+ * quantile chooser that implemented it is deleted (DECISIONS.md § D7). What survives here is the
+ * *port*: this module still adapts any estimator, and `fixtures.test-helper.ts`'s `docHalfWidth`
+ * double deliberately uses the doc's crossover family to prove that.
+ *
+ * **What that costs, measured.** `t[n-1] > z` at every `n`, so the shipped rule can only ever run
+ * *more* replications than a normal-approximation one — open item `C4` asked how many more, and
+ * `stoppingBudget.test.ts` is the answer. At the policy that ships (floor 50, checked every 8,
+ * capped at 200) the arithmetic bounds the inflation at **3.9 %** and the realized cost on
+ * `midtown-office`/`eta`/up-peak across six target precisions was **zero replications** — the
+ * 50-replication floor and the 8-replication chunk quantize the whole of it away. With the floor
+ * lowered to 2 it was **+7 replications in 393 (+1.8 %)**.
+ *
+ * What those replications buy is not marginal. `t[1]/z = 3.84`, and below the floor a `z` rule
+ * stopped on intervals that contained the long-run mean **56 %** of the time against a nominal 90 %,
+ * where the shipped rule managed 76 % — it saved 3.1 replications a cell and gave up 20 points of
+ * coverage. Both families under-cover, because a sequentially-stopped interval always does; the gap
+ * between them is the point. Do not trade it away for replications. See `stoppingBudget.test.ts`
+ * and DECISIONS.md's `C4` entry.
+ *
+ * One thing that measurement rules out: the overhead is **not** bounded by one `checkEvery` chunk,
+ * so do not write a bound of that shape. A sample half-width is not monotone in `n`, so a cell where
+ * `z` stopped and `t` did not can run far past the crossing before the next one — **+187** at the
+ * widest cell of C4's seven-configuration sweep (`secure-tower`/`destination-eta`, floor lowered to
+ * 2). The 3.9 % is a bound on the *budget*, not on any one cell.
+ *
  * So this module owns the comparison and injects the arithmetic. {@link halfWidthStoppingRule}
  * adapts any half-width estimator into a {@link StoppingRule}:
  *
@@ -50,7 +81,11 @@ export interface HalfWidthEstimate {
   readonly n?: number | undefined;
   readonly mean?: number | undefined;
   readonly stdDev?: number | undefined;
-  /** `'t'` for `n ≤ 25`, `'z'` beyond it, or whatever the estimator calls it. */
+  /**
+   * Whatever the estimator calls its quantile family. `'t'` from the shipped estimator, at every
+   * `n`; the `docHalfWidth` double says `'z'` past 25, which is how the runner's tests prove this
+   * field is recorded verbatim rather than re-derived.
+   */
   readonly distribution?: string | undefined;
 }
 
@@ -103,8 +138,13 @@ export function halfWidthStoppingRule(
 /**
  * A fixed budget: never stop early.
  *
- * The rule the runner uses when none is injected, named so a report can say which rule produced a
- * replication count rather than leaving "no rule" implicit.
+ * **The runner does not call this.** It is the named counterpart of the runner's own `undefined`
+ * branch, not that branch's implementation: `replicationRunner.ts`'s `decide()` handles
+ * `rule === undefined` inline and sets `reason: 'fixed-budget'` itself. This symbol exists so a
+ * caller that wants the shipped default *as a value* — a test asserting the branch, a study
+ * selecting a rule from a table — can name it rather than pass `undefined`. Its docstring used to
+ * claim the runner used it, which was the shape of defect this repository names most often: a
+ * symbol asserting a shipped role it does not have. See DECISIONS.md § D125.
  */
 export const fixedBudgetStoppingRule: StoppingRule = ({ samples }) => ({
   stop: false,

@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    // The only package that renders. `DOM` is here and nowhere else: `core` must keep building
+    // with an `ES2022`-only lib so it cannot acquire a browser dependency by accident, and the
+    // reverse direction — a browser type leaking into `core` — is what invariant 6 forbids.
+    //
+    // `node` is here for the tests and for `src/dev/`'s data loading, both of which run under
+    // Node. Nothing in `src/contract`, `src/frame`, `src/playback` or `src/render` imports a
+    // `node:` module or touches `document`; that is asserted mechanically in
+    // `src/boundaries.test.ts`.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../core" }]
+}

@@ -80,6 +80,7 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { DispatcherProfile, LoadedConfig, ResolvedBuilding } from '../config/types.js';
+import { assertOracleProfile } from './oraclePin.test-helper.js';
 import { loadConfig } from '../config/loader.js';
 import type { PassengerRecord, ReportWindow } from '../metrics/types.js';
 import { achievedIntervalOf } from '../metrics/summarize.js';
@@ -235,7 +236,11 @@ function replication(caseSpec: Case, seed: number, pctPopulation5Min: number, bu
   const profile = profileOf('collective');
   return new Simulation({
     building: building ?? buildingOf(caseSpec.buildingId),
-    dispatcherProfile: { ...profile, idle: { ...profile.idle, parkingStrategy: 'lobby' } },
+    // Pinned to conventional up/down buttons. See `assertOracleProfile`.
+    dispatcherProfile: assertOracleProfile({
+      ...profile,
+      idle: { ...profile.idle, parkingStrategy: 'lobby' },
+    }),
     trafficProfiles: config.trafficProfiles,
     elevatorSpecs: config.elevatorSpecs,
     seed,

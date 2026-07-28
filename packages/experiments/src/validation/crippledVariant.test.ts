@@ -231,5 +231,38 @@ describe('Phase 3 resolution limit — the smallest degradation detectable at n 
     expect(bottom.detected).toBeLessThan(top.detected);
     /* Every effect on this ladder is small; none of them may be mistaken for the 12 % cripple. */
     expect(Math.abs(mean(top.effects)) / baseMean).toBeLessThan(0.1);
+
+    /* ---------------------------------------------------------------------- *
+     * Phase 8 regression pin — the resolution limit itself, not just the shape of the curve.
+     *
+     * `docs/07-handoff.md` § 4 publishes **0.20 s (1.3 % of AWT) at 80 % power** as the smallest
+     * near-neighbour effect this project can detect at n = 100, and every claim of an
+     * improvement in the repository is checked against it. Until now the curve that produces
+     * that number was printed here and asserted only as "the bottom rung is weaker than the top
+     * one" — a curve could have shifted by a factor of three and still passed, and the figure
+     * every later phase quotes would have been wrong with nothing failing.
+     *
+     * The rung the figure comes from is `+0.4`: measured effect 0.2002 s, 1.27 % of a 15.72 s
+     * base AWT, detected on 8 of 10 disjoint seed sets. Pinned at zero marginal runtime.
+     * -------------------------------------------------------------------- */
+    const resolutionRung = rows.get(0.4);
+    if (resolutionRung === undefined) throw new Error('the 0.4 rung is the published one');
+    const resolutionEffect = mean(resolutionRung.effects);
+    /* The effect size, which is what the doc quotes in seconds and in percent. */
+    expect(resolutionEffect).toBeGreaterThan(0.17);
+    expect(resolutionEffect).toBeLessThan(0.23);
+    expect(resolutionEffect / baseMean).toBeGreaterThan(0.010);
+    expect(resolutionEffect / baseMean).toBeLessThan(0.016);
+    /* And the power at it: "80 %" on ten seed sets is 8/10, and the claim is that this rung is
+       the knee — the rung below is under-powered and the rung above is at ceiling. A limit that
+       drifted downward would make every published improvement look more detectable than it is,
+       which is the optimistic direction CLAUDE.md § Statistical discipline singles out. */
+    expect(resolutionRung.detected).toBeGreaterThanOrEqual(7);
+    expect(resolutionRung.detected).toBeLessThanOrEqual(9);
+    expect(bottom.detected).toBeLessThan(resolutionRung.detected);
+    expect(rows.get(0.5)?.detected).toBe(seeds.length);
+    /* The base AWT the percentage is taken against, so a shift in the operating point cannot
+       silently re-scale the limit while leaving the seconds figure intact. */
+    expect(baseMean).toBeCloseTo(15.72, 0);
   }, 1_800_000);
 });

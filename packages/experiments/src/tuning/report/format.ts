@@ -23,6 +23,10 @@
  *     AWT (mean wait) difference +0.021 s · 95% CI [−0.104, +0.146] · noise floor ±0.125 s …
  * ```
  *
+ * The illustration above is a 12-replication page, so its intervals are `t(11)` and are unchanged
+ * by the 2026-07 switch of published intervals to Student-t at every `n` (review finding #14):
+ * `n <= 25` was always `t`. Re-measured, not assumed — T2-BLAST-RADIUS.md § 4c.
+ *
  * ## What this formatter refuses to print
  *
  * - **A bare mean.** Every value goes through `reports/format.ts`'s {@link formatMeanEstimate},

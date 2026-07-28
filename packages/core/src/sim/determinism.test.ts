@@ -56,6 +56,11 @@ function run(
  * -------------------------------------------------------------------------- */
 
 describe('the same seed and config replay exactly', () => {
+  // Twenty full replications of a 21-floor building, in one test: roughly 3 s of arithmetic on a
+  // quiet machine and comfortably past vitest's 5 s default whenever the runner is saturated,
+  // which it is — this file runs alongside 116 others. An explicit budget rather than the default
+  // so a red here means *nondeterminism*, which is what the test is for, and never "the laptop was
+  // busy". Nothing about the assertion is relaxed.
   it('is bit-identical across twenty runs of Midtown Office', () => {
     const expected = fingerprint(runSimulation(run('midtown-office', 'collective', 20260726)));
     for (let replication = 0; replication < 19; replication += 1) {
@@ -63,7 +68,7 @@ describe('the same seed and config replay exactly', () => {
         expected,
       );
     }
-  });
+  }, 60_000);
 
   it('is bit-identical on a multi-bank building with sky-lobby transfers', () => {
     const profile = config.dispatcherProfilesById.get('eta');

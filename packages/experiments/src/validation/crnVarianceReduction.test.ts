@@ -179,11 +179,15 @@ describe('Phase 3 criterion 3 — common random numbers reduce the variance of t
 
     const base = samplesOf(result, 'base', 'awtS');
     const reductions = new Map<string, number>();
+    const correlations = new Map<string, number>();
+    const factors = new Map<string, number>();
     for (const armId of ['near', 'mid', 'far']) {
       const comparison = comparePaired('awtS', samplesOf(result, armId, 'awtS'), base);
       const implied = comparison.varianceCandidate + comparison.varianceBaseline;
       const reduction = 1 - comparison.varianceOfDifference / implied;
       reductions.set(armId, reduction);
+      correlations.set(armId, comparison.correlation);
+      factors.set(armId, implied / comparison.varianceOfDifference);
       console.log(
         `[criterion 3] ${armId.padEnd(5)} rho ${comparison.correlation.toFixed(4)}, Var(A-B) ${comparison.varianceOfDifference.toFixed(4)} s² against ${implied.toFixed(4)} s² independent → ${(reduction * 100).toFixed(2)} % reduction, ${(implied / comparison.varianceOfDifference).toFixed(1)}× fewer replications`,
       );
@@ -199,5 +203,73 @@ describe('Phase 3 criterion 3 — common random numbers reduce the variance of t
     /* And in the near-neighbour regime — the one Phase 7's optimizer works in — the doc's claim
        holds with room to spare. */
     expect(near).toBeGreaterThan(0.94);
+
+    /* ---------------------------------------------------------------------- *
+     * Phase 8 regression pin — the published magnitudes, not just their shape.
+     *
+     * `docs/07-handoff.md` § 4 "CRN is regime-dependent" publishes this exact table, and until
+     * now it was **printed here and asserted nowhere**: the checks above are ordering and a
+     * single 0.94 floor, so a change moving rho from 0.608 to 0.31 would have passed while the
+     * published table rotted. That is the failure `CLAUDE.md` § "A published number goes stale
+     * the same way" describes and the one that left the Phase 5 tail study stale for three
+     * phases. Pinning costs nothing: the run has already happened.
+     *
+     * | comparison | rho | reduction | factor |
+     * |---|---|---|---|
+     * | `eta` vs `eta` + 0.1·distance | 0.997 | 99.69 % | 324× |
+     * | `eta` vs `eta` + 0.8·distance | 0.903 | 89.77 % |  9.8× |
+     * | `eta` vs `nearest-car`        | 0.608 | 43.75 % |  1.8× |
+     *
+     * The bands are ±0.005 on a correlation and ±1 point on a reduction — tight enough that a
+     * real change in the simulator or the runner fails here, wide enough to survive the
+     * last-bit differences an unrelated refactor of the arithmetic could introduce. They are not
+     * the place to absorb a regression: a shift past them is a finding.
+     * -------------------------------------------------------------------- */
+    expect(correlations.get('near') ?? 0).toBeCloseTo(0.997, 2);
+    expect(correlations.get('mid') ?? 0).toBeCloseTo(0.903, 2);
+    expect(correlations.get('far') ?? 0).toBeCloseTo(0.608, 2);
+    expect(near).toBeCloseTo(0.9969, 2);
+    expect(mid).toBeCloseTo(0.8977, 2);
+    expect(far).toBeCloseTo(0.4375, 2);
+    /* The replication factor is what the budget is actually planned from, and it is the most
+       sensitive of the three: 324× is 1/(1 − 0.9969), so a reduction wrong in the third decimal
+       moves it by tens. Banded proportionally rather than absolutely for that reason. */
+    expect(factors.get('near') ?? 0).toBeGreaterThan(200);
+    expect(factors.get('near') ?? 0).toBeLessThan(500);
+    expect(factors.get('mid') ?? 0).toBeCloseTo(9.8, 0);
+    expect(factors.get('far') ?? 0).toBeCloseTo(1.8, 1);
+
+    /* ---------------------------------------------------------------------- *
+     * And the **structural** resolution limit, which is derived from this same `far` arm and is
+     * published in `docs/07-handoff.md` § 4 as **1.9 s (12 % of AWT) at 80 % power, n = 100** —
+     * "~10× coarser" than the near-neighbour limit `crippledVariant.test.ts` pins.
+     *
+     *   MDE = (z_0.975 + z_0.80) · sd_D / sqrt(n)
+     *       = 2.802 · sqrt(Var(A−B)) / 10
+     *
+     * It was published and nothing re-derived it. It is the number that decides whether a Phase 5
+     * or Phase 6 dispatcher comparison is allowed to be called a result at all, so it is the one
+     * whose silent drift would do the most damage.
+     * -------------------------------------------------------------------- */
+    const structural = comparePaired('awtS', samplesOf(result, 'far', 'awtS'), base);
+    const POWER_FACTOR = 1.959963984540054 + 0.8416212335729143; // z(0.975) + z(0.80)
+    const structuralMde =
+      (POWER_FACTOR * Math.sqrt(structural.varianceOfDifference)) / Math.sqrt(GATE_REPLICATIONS);
+    const nearNeighbourMde =
+      (POWER_FACTOR *
+        Math.sqrt(comparePaired('awtS', samplesOf(result, 'near', 'awtS'), base).varianceOfDifference)) /
+      Math.sqrt(GATE_REPLICATIONS);
+    console.log(
+      `[criterion 3] smallest detectable effect at n = ${GATE_REPLICATIONS}, 80 % power: ` +
+        `structural ${structuralMde.toFixed(4)} s, near-neighbour ${nearNeighbourMde.toFixed(4)} s ` +
+        `(${(structuralMde / nearNeighbourMde).toFixed(1)}× coarser)`,
+    );
+    expect(structuralMde).toBeGreaterThan(1.6);
+    expect(structuralMde).toBeLessThan(2.2);
+    /* "~10× coarser" is the doc's phrasing for the two regimes; measured on this ladder the ratio
+       is far larger still, because `near` is a 0.1 weight perturbation rather than the 0.4 the
+       published 0.20 s figure comes from. Asserted as a floor, so the qualitative claim holds
+       without pinning a ratio the doc does not state. */
+    expect(structuralMde / nearNeighbourMde).toBeGreaterThan(10);
   }, 1_800_000);
 });

@@ -144,6 +144,79 @@ export function renderAwt(summary: RunSummary): RenderedMetric {
   return { text: secs(summary.waiting.meanS, 2), quotable: true };
 }
 
+/**
+ * The **running** mean wait, live during `watch`, or an explicit refusal — `T29`/`D1`.
+ *
+ * Found while checking whether the web viewer's header was the only place a suppressed mean
+ * leaked. It was not: `commands/watch.ts` printed `mean wait so far 41.5 s` on both of its render
+ * paths, on every run, with no suppression anywhere in the frame — and then `printRunReport` said
+ * `AWT  SUPPRESSED` a moment later, about the same run, on the same terminal.
+ *
+ * Being a *running* figure rather than the windowed AWT does not rescue it. `renderAwt` above
+ * refuses because docs/03 forbids a mean for a system whose queues grow without bound; the
+ * running mean is a mean of the same waits over the same run. It carries no digits when the
+ * summary refuses, and the refusal reads `SUPPRESSED` because that is the word the rest of this
+ * module already uses for it.
+ *
+ * `unit: false` for the tabular fallback, whose column header already says `mean wait`.
+ */
+export function renderRunningMean(
+  summary: RunSummary,
+  meanWaitS: number,
+  options: { readonly unit?: boolean } = {},
+): RenderedMetric {
+  if (!summary.awtIsValid) {
+    return {
+      text: 'SUPPRESSED',
+      quotable: false,
+      reason: summary.awtInvalidReason ?? 'this run’s average waiting time is not reportable',
+    };
+  }
+  if (!Number.isFinite(meanWaitS)) return { text: ABSENT, quotable: false };
+  return {
+    text: options.unit === false ? num(meanWaitS, 1) : secs(meanWaitS, 1),
+    quotable: true,
+  };
+}
+
+/**
+ * The longest wait in the window — **always shown, never suppressed.**
+ *
+ * The mean is an estimate and the suppression rules are about estimates; the longest wait is an
+ * *observation*, and it is the observation that a suppressed AWT is usually hiding. Printing
+ * `SUPPRESSED` here — which this report used to do, off `waiting.maxS` — removed the evidence at
+ * exactly the moment it mattered, and did so twice over: `waiting.maxS` is computed over the legs
+ * that **boarded**, so on a run whose worst passenger never boarded at all it reported the longest
+ * wait among the people who were eventually collected. `RunSummary.serviceLevel` counts the
+ * unserved at their lower bound, and this says so when it is one.
+ *
+ * `undefined` when the window held no arrivals, so there is no wait to report.
+ */
+export function renderLongestWait(summary: RunSummary): RenderedMetric | undefined {
+  const level = summary.serviceLevel;
+  switch (level.verdict) {
+    case 'no-arrivals':
+      return undefined;
+    case 'served':
+    case 'starved': {
+      const who =
+        level.longestWaitLegId === undefined
+          ? ''
+          : ` (leg ${level.longestWaitLegId}, ${String(level.longestWaitOriginFloorId)} to ${String(level.longestWaitDestinationFloorId)})`;
+      const bound = level.longestWaitIsCensored ? 'at least ' : '';
+      const text = `${bound}${secs(level.longestWaitS, 1)}${who}`;
+      if (level.verdict === 'served') return { text, quotable: true };
+      return {
+        text,
+        quotable: false,
+        reason:
+          `past the ${num(level.horizonS, 0)} s abandonment horizon, and so are ` +
+          `${count(level.overHorizonCount)} of ${count(level.arrivalCount)} arrivals in the window.`,
+      };
+    }
+  }
+}
+
 /** A one-line saturation verdict, or `undefined` when the queue did not diverge. */
 export function renderSaturation(summary: RunSummary): string | undefined {
   const saturation = summary.saturation;

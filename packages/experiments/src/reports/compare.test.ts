@@ -19,9 +19,15 @@ import {
   buildComparisonReport,
   compareCandidates,
   comparisonReportFromRunSet,
+  publishedIntervalFamily,
 } from './compare.js';
 import { load, observation, observations, storedRun } from './fixtures.test-helper.js';
-import { ReportsError, type CandidateReport, type MetricComparison } from './types.js';
+import {
+  ReportsError,
+  type CandidateReport,
+  type MeanEstimate,
+  type MetricComparison,
+} from './types.js';
 
 const metric = (report: CandidateReport, metricId: string) => {
   const found = report.metrics.find((entry) => entry.metricId === metricId);
@@ -186,14 +192,131 @@ describe('convergence is reported as what it is', () => {
     expect(report.convergence.status).not.toBe('converged');
   });
 
-  it('records which quantile family the half-width came from', () => {
+  it('records which quantile family the half-width came from — t, at every n', () => {
+    // CHANGED 2026-07-27 (review finding #14). This assertion previously required
+    // `large.convergence.method` to be `'z'` at n = 30, and in doing so pinned the defect: the
+    // convergence report's `method` is copied off the *published* metric estimate, and a
+    // published interval is Student-t at n − 1 at every n (docs/03 § Part 4). The `n > 25` normal
+    // approximation belonged to the sequential stopping rule (docs/03 § Part 3); as of 2026-07-27
+    // it is implemented nowhere at all — see `statistics.test.ts` § "there is exactly one interval
+    // quantile in this module" and DECISIONS.md § D7.
+    //
+    // The old assertion could only pass while a nominal 95 % interval covered 93.9 %, so it was
+    // not a weaker statement of the same claim — it was the bug, written down.
     const small = buildCandidateReport('a', observations([1, 2, 3]));
     const large = buildCandidateReport(
       'b',
       observations(Array.from({ length: 30 }, (_, index) => 5 + index * 0.01)),
     );
     expect(small.convergence.method).toBe('t');
-    expect(large.convergence.method).toBe('z');
+    expect(large.convergence.method).toBe('t');
+    /* And it is the estimate's own family, not a re-derivation: df travels with it. */
+    expect(large.metrics.find((metric) => metric.metricId === 'awt')?.estimate?.degreesOfFreedom)
+      .toBe(29);
+  });
+
+  it('says t rather than z when there is no estimate to read a family off', () => {
+    // Review follow-up to finding #14, one layer down. When the headline metric is suppressed
+    // there is no `MeanEstimate`, so `method` comes from a fallback — and that fallback used to be
+    // an n-dependent quantile chooser that returned `'z'` past n = 25. `formatConvergence` never
+    // prints `method`, so the wrong family was invisible on the page and fully present in any
+    // serialized `ConvergenceReport`, which is exactly the mislabelling finding #14 was about.
+    //
+    // 30 saturated replications: past the old crossover, and with nothing to estimate from.
+    const saturated = observations(
+      Array.from({ length: 30 }, (_, index) => 300 + index),
+      { saturated: true, awtIsValid: false },
+    );
+    const report = buildCandidateReport('overloaded', saturated, { targetHalfWidth: 1 });
+    expect(report.convergence.achievedHalfWidth).toBeNaN();
+    expect(report.convergence.method).toBe('t');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The family label (open item C5)
+ * -------------------------------------------------------------------------- */
+
+describe('a convergence report cannot label its half-width with a family it did not come from', () => {
+  /*
+   * C5 in docs/07-handoff.md § 8 says `compare.ts` "can print `'z'` as a fallback family label
+   * ... in the branch where `achievedHalfWidth` is already `NaN`". Measured against the code as
+   * it stands, that is **stale**: the n-dependent quantile chooser it refers to was deleted in
+   * `89bbf37`, the fallback literal has read `'t'` since, and the suite above pins it.
+   *
+   * What was *not* pinned is that it stays that way. The label was read as
+   * `estimate?.method ?? 't'`, whose static type is `IntervalMethod` — the two-member union — so
+   * nothing but the fallback's own literal stopped a `'z'` reaching a serialized
+   * `ConvergenceReport`, and `formatConvergence` never prints the field, so no rendered page
+   * would have shown it. The tests below pin the label at both ends: the compiler now requires
+   * the published family at the construction site, and the value that feeds it is checked rather
+   * than copied.
+   */
+  const estimateStub: MeanEstimate = Object.freeze({
+    n: 30,
+    mean: 5,
+    stdDev: 1,
+    standardError: 0.2,
+    confidence: 0.95,
+    method: 't',
+    degreesOfFreedom: 29,
+    halfWidth: 0.409,
+    lower: 4.591,
+    upper: 5.409,
+    min: 4,
+    max: 6,
+  });
+
+  it('reads the family off the estimate when there is one', () => {
+    expect(publishedIntervalFamily(estimateStub)).toBe('t');
+  });
+
+  it('states the published family when there is no estimate to read one off', () => {
+    // The suppressed-metric branch: `achievedHalfWidth` is `NaN` and there is no `MeanEstimate`.
+    expect(publishedIntervalFamily(undefined)).toBe('t');
+  });
+
+  it('refuses a normal-approximation estimate instead of copying its label onto a report', () => {
+    // `IntervalMethod` keeps `'z'` for stored pre-2026-07 run sets and for `formatMeanEstimate`'s
+    // `normal(z)` arm (types.ts § IntervalMethod), so the union can express this even though no
+    // estimator in this package produces it. A convergence report that met one would be
+    // describing an interval no estimator here can re-derive, so it refuses loudly rather than
+    // publishing either family.
+    const normal: MeanEstimate = { ...estimateStub, method: 'z', degreesOfFreedom: Number.NaN };
+    expect(() => publishedIntervalFamily(normal)).toThrow(ReportsError);
+    expect(() => publishedIntervalFamily(normal)).toThrow(/z/);
+  });
+
+  it('says t on every shape of report the public API can build', () => {
+    // The reachability argument, executed rather than asserted: `convergenceOf` is the only
+    // construction site of a `ConvergenceReport` in the repository, and every estimate it can see
+    // comes from `estimateMean`, which is Student-t at every n. These are the branches that reach
+    // it — no estimate at all, a suppressed one, one below the old n = 25 crossover, one above it,
+    // and a convergence metric id that matches nothing.
+    const shaped: readonly CandidateReport[] = [
+      buildCandidateReport('empty', []),
+      buildCandidateReport('single', observations([4.2])),
+      buildCandidateReport('small', observations([1, 2, 3])),
+      buildCandidateReport(
+        'large',
+        observations(Array.from({ length: 30 }, (_, index) => 5 + index * 0.01)),
+      ),
+      buildCandidateReport(
+        'saturated',
+        observations(Array.from({ length: 30 }, (_, index) => 300 + index), {
+          saturated: true,
+          awtIsValid: false,
+        }),
+        { targetHalfWidth: 1 },
+      ),
+      buildCandidateReport('unknown-metric', observations([4.1, 5.0, 5.6]), {
+        convergenceMetricId: 'no-such-metric',
+        targetHalfWidth: 1,
+      }),
+    ];
+    for (const report of shaped) {
+      expect(report.convergence.method).toBe('t');
+    }
   });
 });
 

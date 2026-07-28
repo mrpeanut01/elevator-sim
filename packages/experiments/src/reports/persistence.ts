@@ -778,6 +778,7 @@ function parseSummarizeOptions(value: unknown, path: Path): StoredSummarizeOptio
     'saturation',
     'queueSampleCount',
     'maxUnservedFraction',
+    'maxWaitHorizonS',
     'terminalFloorIds',
     'departureGapS',
   ]);
@@ -847,6 +848,7 @@ function parseSummarizeOptions(value: unknown, path: Path): StoredSummarizeOptio
       'maxUnservedFraction',
       readOptional(object, 'maxUnservedFraction', path, expectNumber),
     ),
+    ...spread('maxWaitHorizonS', readOptional(object, 'maxWaitHorizonS', path, expectNumber)),
     ...spread(
       'terminalFloorIds',
       readOptional(object, 'terminalFloorIds', path, expectStringArray),

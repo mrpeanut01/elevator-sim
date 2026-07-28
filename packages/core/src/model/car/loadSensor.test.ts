@@ -407,4 +407,53 @@ describe('LOAD_SENSOR_PARAMETERS', () => {
       REFERENCE_SPECS.loadSensor.overloadAlarmThreshold,
     );
   });
+
+  it('gives the overload threshold a range that can actually be crossed', () => {
+    // The shape of finding #21, as an assertion on the schema rather than on a run.
+    //
+    // Boarding stops at the design load (`Simulation.#boardFrom`, CLAUDE.md § modelling rules:
+    // cars fill to 80 % of rated, not 100 %), so the overload predicate can only reject a
+    // candidate heavier than `(overloadThreshold - designLoadFactor) x rated`. Declared over
+    // [1, 1.5] — as it was — that is at least `0.2 x rated`: 146 kg on the lightest shipped car
+    // against a N(75, 15) mass distribution, i.e. 4.7 sigma, i.e. never. The whole declared
+    // range was one bit-identical run on all five shipped buildings, and Phase 7 would have
+    // spent 50-200 replications an evaluation resolving it.
+    //
+    // A range whose floor sits above the boarding cap is a dimension with no reachable effect,
+    // whatever its default is. `sim/searchSpaceLiveness.test.ts` asserts the behavioural half.
+    const overload = LOAD_SENSOR_PARAMETERS.find(
+      (parameter) => parameter.id === 'answer.overloadThreshold',
+    );
+    const [min] = overload?.range ?? [Number.POSITIVE_INFINITY, 0];
+    expect(
+      min,
+      'answer.overloadThreshold cannot bind above the design load factor, because boarding ' +
+        'already stops there. A range starting above it is a flat search dimension',
+    ).toBeLessThanOrEqual(LOAD_SENSOR_DEFAULTS.designLoadFactor);
+    // The default stays EN 81's 110 %: widening the searchable interval must not move any
+    // shipped run, and the physical device really does trip above rated load.
+    expect(overload?.default).toBe(LOAD_SENSOR_DEFAULTS.overloadThreshold);
+    expect(LOAD_SENSOR_DEFAULTS.overloadThreshold).toBeGreaterThan(1);
+  });
+
+  it('rejects a candidate that would cross a threshold set at the design load', () => {
+    // The mechanism the range change exposes, at the level of the sensor: with the interlock at
+    // the boarding cap, the last boarder — the one the cap deliberately lets cross by a person —
+    // is the one the predicate stops. That is the whole of the dimension's one-sided effect.
+    const strict = resolveLoadSensor(CAR, SPEC_THRESHOLDS, {
+      bypassLoadThreshold: 0.8,
+      overloadThreshold: LOAD_SENSOR_DEFAULTS.designLoadFactor,
+    });
+    expect(strict.overloadThreshold).toBe(LOAD_SENSOR_DEFAULTS.designLoadFactor);
+    const permissive = resolveLoadSensor(CAR, SPEC_THRESHOLDS, {
+      bypassLoadThreshold: 0.8,
+      overloadThreshold: 1.5,
+    });
+    // Same car, same boarding cap: the strict interlock bites below the cap, the permissive one
+    // a long way above it, and only the first is reachable while boarding stops at the cap.
+    const sensor = new LoadSensor(strict);
+    const ratedKg = sensor.ratedLoadKg;
+    expect(strict.overloadThreshold * ratedKg).toBeLessThanOrEqual(sensor.designLoadKg);
+    expect(permissive.overloadThreshold * ratedKg).toBeGreaterThan(sensor.designLoadKg);
+  });
 });

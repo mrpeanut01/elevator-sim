@@ -1,0 +1,236 @@
+{
+  "$comment": "Golden runs for the Phase 8 determinism regression. READ validation/golden.ts BEFORE EDITING. This file contains NO simulator output — no AWT, no fingerprint, no passenger count — only the inputs a run is driven from and the NAMES of the keys the persisted envelope carries. That is deliberate: a golden artefact that has to be regenerated whenever elevator behaviour legitimately changes stops being read, and an unread golden is how a real regression ships. Nothing here moves when a dispatcher, a cost term, a weight vector or the physics changes. The only edit this file should ever need is an added or removed key name in an envelopeKeys list, which is a change to the persistence contract and is exactly the change a human should have to look at. If a proposed diff to this file is anything else, it is a bug in the change, not in the manifest.",
+  "version": 1,
+  "reportsSchemaVersion": 1,
+  "metricsSchemaVersion": 1,
+  "runs": [
+    {
+      "id": "garden-eta-baseline",
+      "covers": "The cheap two-car hydraulic case, with no sim overrides at all: the minimal envelope, so a new replay knob that is recorded unconditionally shows up here first.",
+      "buildingId": "garden-apartments",
+      "dispatcherProfileId": "eta",
+      "seed": "20260728000001",
+      "demandTemplate": "rise-and-fall",
+      "durationS": 1800,
+      "demand": {
+        "arrivalRatePctPop5min": 12,
+        "peakWindowS": 300
+      },
+      "usesElevatorSpecs": true,
+      "tier": "always-on",
+      "envelopeKeys": [
+        "buildingId",
+        "demand.arrivalRatePctPop5min",
+        "demand.peakWindowS",
+        "demandTemplate",
+        "dispatcherProfileId",
+        "durationS",
+        "runId",
+        "seed",
+        "sim.onTimeout",
+        "summarize.terminalFloorIds",
+        "summarize.window.endS",
+        "summarize.window.id",
+        "summarize.window.startS",
+        "trafficProfileId",
+        "usesElevatorSpecs"
+      ]
+    },
+    {
+      "id": "midtown-uppeak-collective",
+      "covers": "The primary validation building under pure up-peak, with an explicit directional split and two weighted entrances — the demand fields a lighter golden never records. Its seed is above 2^53 on purpose: the decimal-string path is the one a real sweep writes, and Number() would lose it silently.",
+      "buildingId": "midtown-office",
+      "dispatcherProfileId": "collective",
+      "seed": "18446744073709551557",
+      "demandTemplate": "rise-and-fall",
+      "durationS": 1800,
+      "demand": {
+        "arrivalRatePctPop5min": 3,
+        "peakWindowS": 300,
+        "directionalSplit": {
+          "incoming": 1,
+          "outgoing": 0,
+          "interfloor": 0
+        },
+        "entranceWeights": {
+          "G": 0.8,
+          "P1": 0.2
+        }
+      },
+      "usesElevatorSpecs": true,
+      "tier": "always-on",
+      "envelopeKeys": [
+        "buildingId",
+        "demand.arrivalRatePctPop5min",
+        "demand.directionalSplit.incoming",
+        "demand.directionalSplit.interfloor",
+        "demand.directionalSplit.outgoing",
+        "demand.entranceWeights",
+        "demand.peakWindowS",
+        "demandTemplate",
+        "dispatcherProfileId",
+        "durationS",
+        "runId",
+        "seed",
+        "sim.onTimeout",
+        "summarize.terminalFloorIds",
+        "summarize.window.endS",
+        "summarize.window.id",
+        "summarize.window.startS",
+        "trafficProfileId",
+        "usesElevatorSpecs"
+      ]
+    },
+    {
+      "id": "secure-tower-obstructed-doors",
+      "covers": "Access zoning plus a door-obstruction probability, so the run draws from the doors stream as well as the arrivals streams, and four sim knobs are recorded. Its status is timed-out rather than completed, because access-locked-out passengers legitimately keep a run alive to its drain deadline — a stored run that timed out is a real measurement and must replay like any other (reports/replay.ts honours the stored onTimeout for this reason).",
+      "buildingId": "secure-tower",
+      "dispatcherProfileId": "eta",
+      "seed": "7",
+      "demandTemplate": "rise-and-fall",
+      "durationS": 1500,
+      "demand": {
+        "arrivalRatePctPop5min": 3,
+        "peakWindowS": 300
+      },
+      "sim": {
+        "doorObstructionProbability": 0.15,
+        "dispatchRetryS": 3,
+        "drainGraceS": 900,
+        "queueSampleCount": 24,
+        "onTimeout": "report"
+      },
+      "usesElevatorSpecs": true,
+      "tier": "always-on",
+      "envelopeKeys": [
+        "buildingId",
+        "demand.arrivalRatePctPop5min",
+        "demand.peakWindowS",
+        "demandTemplate",
+        "dispatcherProfileId",
+        "durationS",
+        "runId",
+        "seed",
+        "sim.dispatchRetryS",
+        "sim.doorObstructionProbability",
+        "sim.drainGraceS",
+        "sim.onTimeout",
+        "sim.queueSampleCount",
+        "summarize.terminalFloorIds",
+        "summarize.window.endS",
+        "summarize.window.id",
+        "summarize.window.startS",
+        "trafficProfileId",
+        "usesElevatorSpecs"
+      ]
+    },
+    {
+      "id": "midtown-congested-retry",
+      "covers": "A deliberately congested run, and the only golden that reaches the dispatch-retry timer: simulation.ts does not re-offer a call every car refused for a structural reason, so sim.dispatchRetryS is inert everywhere except where a car declines for a soft reason. This run SATURATES, on purpose — a saturated run is a perfectly good determinism fixture and a very bad statistic, and nothing in this suite reads its AWT (CLAUDE.md: flag it, suppress the interval).",
+      "buildingId": "midtown-office",
+      "dispatcherProfileId": "collective",
+      "seed": "6180339887",
+      "demandTemplate": "rise-and-fall",
+      "durationS": 1800,
+      "demand": {
+        "arrivalRatePctPop5min": 6,
+        "peakWindowS": 300
+      },
+      "sim": {
+        "dispatchRetryS": 3,
+        "drainGraceS": 600,
+        "onTimeout": "report"
+      },
+      "usesElevatorSpecs": true,
+      "tier": "always-on",
+      "envelopeKeys": [
+        "buildingId",
+        "demand.arrivalRatePctPop5min",
+        "demand.peakWindowS",
+        "demandTemplate",
+        "dispatcherProfileId",
+        "durationS",
+        "runId",
+        "seed",
+        "sim.dispatchRetryS",
+        "sim.drainGraceS",
+        "sim.onTimeout",
+        "summarize.terminalFloorIds",
+        "summarize.window.endS",
+        "summarize.window.id",
+        "summarize.window.startS",
+        "trafficProfileId",
+        "usesElevatorSpecs"
+      ]
+    },
+    {
+      "id": "mixed-use-transfers",
+      "covers": "Multi-bank with sky-lobby transfers, so transferWalkS and maxEvents are recorded and a journey has more than one leg. Deep tier: it is the slowest of the five and its coverage of the envelope overlaps the always-on set except for those two keys.",
+      "buildingId": "mixed-use-high-rise",
+      "dispatcherProfileId": "eta",
+      "seed": "4295032833",
+      "demandTemplate": "rise-and-fall",
+      "durationS": 1800,
+      "demand": {
+        "arrivalRatePctPop5min": 2,
+        "peakWindowS": 300
+      },
+      "sim": {
+        "transferWalkS": 22,
+        "maxEvents": 4000000,
+        "onTimeout": "report"
+      },
+      "usesElevatorSpecs": true,
+      "tier": "deep",
+      "envelopeKeys": [
+        "buildingId",
+        "demand.arrivalRatePctPop5min",
+        "demand.peakWindowS",
+        "demandTemplate",
+        "dispatcherProfileId",
+        "durationS",
+        "runId",
+        "seed",
+        "sim.maxEvents",
+        "sim.onTimeout",
+        "sim.transferWalkS",
+        "summarize.terminalFloorIds",
+        "summarize.window.endS",
+        "summarize.window.id",
+        "summarize.window.startS",
+        "trafficProfileId",
+        "usesElevatorSpecs"
+      ]
+    },
+    {
+      "id": "vertical-city-constant-iso",
+      "covers": "The other demand template, the largest building, and the only golden whose window is the constant-ISO measurement slice rather than a rise-and-fall peak. Deep tier on runtime alone.",
+      "buildingId": "vertical-city",
+      "dispatcherProfileId": "collective",
+      "seed": "99991",
+      "demandTemplate": "constant-iso",
+      "durationS": 2400,
+      "demand": {
+        "arrivalRatePctPop5min": 2
+      },
+      "usesElevatorSpecs": true,
+      "tier": "deep",
+      "envelopeKeys": [
+        "buildingId",
+        "demand.arrivalRatePctPop5min",
+        "demandTemplate",
+        "dispatcherProfileId",
+        "durationS",
+        "runId",
+        "seed",
+        "sim.onTimeout",
+        "summarize.terminalFloorIds",
+        "summarize.window.endS",
+        "summarize.window.id",
+        "summarize.window.startS",
+        "trafficProfileId",
+        "usesElevatorSpecs"
+      ]
+    }
+  ]
+}

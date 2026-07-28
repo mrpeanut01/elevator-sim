@@ -45,6 +45,8 @@
 import type { SimTime } from '../kernel/types.js';
 import type { CredentialGroup, Direction } from '../model/types.js';
 
+import type { PassengerModel } from './comparability.js';
+
 /* -------------------------------------------------------------------------- *
  * Errors and versioning
  * -------------------------------------------------------------------------- */
@@ -243,6 +245,18 @@ export interface PassengerRecord {
   readonly carId?: string | undefined;
   /** The bank that served this leg, when known. */
   readonly bankId?: string | undefined;
+
+  /**
+   * The car the landing panel named, under destination *dispatch* only.
+   *
+   * Absent under every conventional and disclosure-only run, so a schema-version-1 record is
+   * byte-identical to one written before this field existed. Where it is present,
+   * `assignedCarId === carId` for every leg that boarded — a wrong-car boarding is a
+   * conservation failure, not a statistic, and `Simulation` asserts it rather than reporting it.
+   */
+  readonly assignedCarId?: string | undefined;
+  /** When the panel named a car. Between {@link arrivedAt} and {@link boardedAt}, always. */
+  readonly assignedAt?: SimTime | undefined;
 }
 
 /** Seconds spent waiting at the landing on this leg, or `undefined` if never served. */
@@ -340,6 +354,145 @@ export interface LoadReading {
   readonly loadFactor: number;
   readonly occupants: number;
   readonly massKg: number;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Travel and energy
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Standard gravity, m/s². The only physical constant the energy proxy needs.
+ *
+ * CODATA / ISO 80000-3's conventional value. Named rather than inlined so the arithmetic below
+ * can be read against the formula it implements.
+ */
+export const STANDARD_GRAVITY_MPS2 = 9.80665;
+
+/**
+ * **The counterweight balance ratio: the fraction of rated load the counterweight carries on
+ * top of the car's own mass.**
+ *
+ * 0.5 — the near-universal traction-lift convention. The counterweight is sized at
+ * `car mass + 0.4…0.5 × rated load`, so the drive sees zero static out-of-balance at half load
+ * and its worst case (full car up, empty car down) is symmetric. Sources: Barney & Al-Sharif,
+ * *Elevator Traffic Handbook* § on drive sizing and counterbalancing; CIBSE Guide D § 13 on
+ * lift power and energy; ISO 25745-2, whose reference-cycle energy measurement is taken at
+ * empty, half and full load precisely because the mid point is the balance point. See
+ * docs/02-elevator-reference.md.
+ *
+ * **Why 0.5 and not 0.45.** The range in the literature is 0.4–0.5 and real installations vary.
+ * 0.5 is chosen because it is the value at which the proxy is *symmetric* — an empty car and a
+ * full car of the same travel cost the same — which makes the number a statement about how far
+ * cars drove out of balance rather than about a particular machine's counterweight order. A
+ * proxy whose value depended on an unmeasured per-installation choice would put a fitted
+ * constant inside a published axis.
+ *
+ * Not a tunable (CLAUDE.md invariant 7 governs *dispatch strategy*, which is data; this is
+ * reference data about the machine) and deliberately not configurable: a per-run counterweight
+ * ratio would let two arms of one comparison be scored on different scales.
+ */
+export const COUNTERWEIGHT_BALANCE_RATIO = 0.5;
+
+/**
+ * One completed car move, as the energy proxy reads it.
+ *
+ * Recorded **per move**, not per run, for one reason that decides the whole design: every other
+ * statistic in a {@link RunSummary} is computed over a reporting window, and the shipped
+ * operating points report a 300 s peak out of a 900 s run. A cumulative odometer read at the
+ * end would put a whole-run energy figure beside a peak-window AWT in the same Pareto point,
+ * and the two would not be describing the same 300 seconds. A per-move sample windows exactly
+ * as a {@link LoadSample} does.
+ *
+ * **Attributed at arrival**, i.e. `at` is the moment the car levelled, not the moment it
+ * started. The move is charged to the window it *ended* in. Stated rather than left implicit:
+ * a move that straddles the window boundary is charged whole to one side, exactly as a leg is
+ * assigned whole to the window its arrival falls in.
+ */
+export interface TravelSample {
+  readonly at: SimTime;
+  readonly carId: string;
+  /** Metres travelled on this move. Always positive; {@link direction} carries the sign. */
+  readonly distanceM: number;
+  readonly direction: Direction;
+  /** Passenger mass aboard for the move, kg. Load only changes at a stop, so this is exact. */
+  readonly loadKg: number;
+  /** The car's rated load, kg. The counterweight's reference. */
+  readonly ratedLoadKg: number;
+  /**
+   * **The energy proxy for this move, in joules of out-of-balance mechanical work.**
+   *
+   * `|loadKg − COUNTERWEIGHT_BALANCE_RATIO · ratedLoadKg| · g · distanceM`.
+   *
+   * The absolute value is the **non-regenerative** convention: a drive without regeneration
+   * dissipates the overhauling direction in a brake resistor rather than returning it, so both
+   * directions cost. ISO 25745-2 measures a non-regenerative unit exactly this way, and it is
+   * the conservative choice — a regenerative drive's figure is bounded above by this one.
+   *
+   * **What it deliberately omits, so nobody reads it as kWh:** acceleration losses (which need
+   * the car and counterweight masses, which no shipped spec carries), drive and gearing
+   * efficiency, door-motor energy, and standby/idle power — ISO 25745-2's other half, which on
+   * a lightly-used lift dominates the running term and is a property of the *machine*, not of
+   * the dispatcher. This is a proxy for *the work the dispatch decisions caused*, and that is
+   * the quantity a Pareto front over dispatchers is asking about. {@link EnergyStatistics}
+   * reports the stops and the metres beside it so a reader can see which one moved.
+   */
+  readonly workJ: number;
+}
+
+/** The four numbers a {@link TravelSample} needs from a car after a move. */
+export interface TravelReading {
+  readonly distanceM: number;
+  readonly direction: Direction;
+  readonly loadKg: number;
+  readonly ratedLoadKg: number;
+}
+
+/** `|load − ratio·rated| · g · distance`, in joules. Pure and total. See {@link TravelSample.workJ}. */
+export function outOfBalanceWorkJ(reading: TravelReading): number {
+  const netKg = Math.abs(reading.loadKg - COUNTERWEIGHT_BALANCE_RATIO * reading.ratedLoadKg);
+  return netKg * STANDARD_GRAVITY_MPS2 * Math.abs(reading.distanceM);
+}
+
+/**
+ * What the fleet spent moving, over the reporting window.
+ *
+ * The third Pareto axis (docs/06 § Guardrails, CLAUDE.md § Tuning discipline: *"Report the
+ * Pareto front over (AWT, energy, WT95)"*). Before this existed the axis was a declared seam
+ * with nothing filling it, and the front silently degenerated to two objectives.
+ *
+ * ## Three numbers, not one
+ *
+ * {@link workKJ} is the axis. {@link distanceM} and {@link starts} are published beside it
+ * because they are the two things that can move it, and a single scalar cannot say which: a
+ * dispatcher that cut energy by carrying fuller cars and one that cut it by driving less are
+ * different findings with the same number. {@link workPerServedLegKJ} divides the work by the
+ * **legs delivered** rather than leaving it as a fleet total, and it exists because the total is
+ * trivially gameable in the wrong direction: *a configuration that spends less because it served
+ * fewer people has not saved anything.* A saturating dispatcher whose queues diverge drives less
+ * and therefore scores better on {@link workKJ}, which is exactly the arm a three-axis front must
+ * not reward. The per-leg figure is the one that cannot be improved by refusing work.
+ *
+ * ## `NaN`, never `0`, when nothing was recorded
+ *
+ * A record written before travel sampling existed, or by a harness that does not sample, has
+ * no travel samples — and "the cars did not move" and "nobody wrote down how far the cars
+ * moved" are different facts. {@link measured} says which. Zeroing them would make every arm
+ * tie on energy and quietly restore a two-axis front under a three-axis name, which is exactly
+ * what `pareto.ts` refused to do when the proxy was absent.
+ */
+export interface EnergyStatistics {
+  /** Whether the run recorded any travel at all. `false` ⇒ every figure below is `NaN`. */
+  readonly measured: boolean;
+  /** Out-of-balance mechanical work over the window, kilojoules. The Pareto energy axis. */
+  readonly workKJ: number;
+  /** Metres the fleet travelled in the window, summed over cars. */
+  readonly distanceM: number;
+  /** Moves commanded in the window. Each is one motor start. */
+  readonly starts: number;
+  /** {@link workKJ} per leg that alighted in the window. `NaN` when none did. */
+  readonly workPerServedLegKJ: number;
+  /** Cars that moved at least once in the window. */
+  readonly movingCarCount: number;
 }
 
 /**
@@ -472,6 +625,16 @@ export interface CarTimings {
  */
 export interface RunRecord {
   readonly schemaVersion: number;
+  /**
+   * Which passenger model produced this run — see `metrics/comparability.ts`.
+   *
+   * Absent means `conventional`, which is every run this project produced before destination
+   * dispatch existed and every run that only *discloses* the destination. Present and equal to
+   * `destination-dispatch` means the landing panel named a car per passenger, and nine of the
+   * scalars derived from this record may not be paired against a record that does not say so.
+   * Recorded rather than derived, because a stored record outlives the profile that made it.
+   */
+  readonly passengerModel?: PassengerModel | undefined;
   /** Identity of this replication, unique within an experiment. */
   readonly runId: string;
   /** The `StreamSet` master seed, as a decimal string. Invariant 5. */
@@ -499,6 +662,29 @@ export interface RunRecord {
   readonly reportWindow?: ReportWindow | undefined;
 
   /**
+   * Non-fatal diagnostics the run raised, disclaimers first. Absent when there were none.
+   *
+   * **This is what makes a disclaimer travel with the data it disclaims.** Some of these do not
+   * qualify a number, they say the number describes *different hardware or a different
+   * building* — Vertical City's eight double-deck shuttles run as single-deck cars, so every
+   * round-trip time, interval and handling capacity stored here is for a machine nobody
+   * configured. A run whose record does not carry that is a record that reads as modelled, and
+   * `serializeRunRecord` is `JSON.stringify(record)`: without this field the statement reached
+   * `SimulationResult.warnings` in memory and the console, and nothing that outlived the
+   * process.
+   *
+   * Optional, so every record written before the field existed still parses — and so a run with
+   * nothing to say adds no key. Ordered rather than sorted on read: the producer puts
+   * disclaimers ahead of advisories, because a consumer that truncates (the CLI does) must
+   * truncate the advisories.
+   *
+   * It is **not** a substitute for {@link seed} (invariant 5) and does not participate in
+   * replay: a replayed run re-derives its own warnings from the same configuration, so a
+   * fingerprint over the record covers this field exactly as it covers every other one.
+   */
+  readonly warnings?: readonly string[] | undefined;
+
+  /**
    * Every car in service during the run, whether or not it ever carried anybody.
    *
    * The fleet roster, not a derived list. `LoadFactorStatistics` needs it because an idle car
@@ -523,6 +709,19 @@ export interface RunRecord {
   readonly passengers: readonly PassengerRecord[];
   readonly loadSamples: readonly LoadSample[];
   readonly queueSamples: readonly QueueSample[];
+  /**
+   * One entry per completed car move — the raw input to {@link EnergyStatistics}.
+   *
+   * Optional, so every record written before the energy axis existed still parses and every
+   * stored Phase 5 / 6 record replays unchanged. Absent means *not measured*, and
+   * `summarizeRun` reports `energy.measured: false` with `NaN` figures rather than zeros; see
+   * {@link EnergyStatistics}.
+   *
+   * Recorded rather than reconstructed. Passenger records say where *passengers* went; they
+   * cannot say where the *cars* went, and the difference is precisely the deadheading that
+   * stage 7's repositioning spends energy on — the one stage an energy axis exists to price.
+   */
+  readonly travelSamples?: readonly TravelSample[] | undefined;
   /** Free-form provenance: weight vector id, sweep coordinates, anything Phase 3 wants back. */
   readonly metadata?: Readonly<Record<string, string | number | boolean>> | undefined;
 }
@@ -733,6 +932,92 @@ export interface SaturationDiagnosis {
   readonly maxQueueLength: number;
   /** The thresholds actually applied, so a stored verdict can be re-derived. */
   readonly thresholds: SaturationThresholds;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Service level — the tail the trend test cannot see
+ * -------------------------------------------------------------------------- */
+
+/**
+ * What {@link ServiceLevelDiagnosis} concluded about the longest wait in the window.
+ *
+ * A **second, independent** verdict, deliberately not a fourth {@link SaturationVerdict}. See
+ * the {@link ServiceLevelDiagnosis} docstring for why the two are separate claims: `saturation`
+ * is a statement about the queue's *derivative* and this is a statement about how long one
+ * passenger actually stood there. Collapsing them would make `saturation.verdict === 'stable'`
+ * stop meaning "the trend test said stable", which is what every consumer reads it as.
+ */
+export const SERVICE_LEVEL_VERDICTS = [
+  /** No arrival in the window waited past the horizon. */
+  'served',
+  /** At least one did. The mean is not quotable on its own; see {@link RunSummary.awtIsValid}. */
+  'starved',
+  /** The window contained no arrivals, so there is no longest wait. */
+  'no-arrivals',
+] as const;
+
+export type ServiceLevelVerdict = (typeof SERVICE_LEVEL_VERDICTS)[number];
+
+/**
+ * How long one passenger waited, and whether that alone makes the mean unquotable.
+ *
+ * ## The hole this closes
+ *
+ * {@link RunSummary.awtIsValid} had two substantive gates and they are both proxies for one
+ * question — *did the backlog clear?* — detected in two specific shapes:
+ *
+ * - the **trend** gate ({@link SaturationDiagnosis}) catches a queue that never clears and is
+ *   still growing at the horizon;
+ * - the **censoring** gate (`DEFAULT_MAX_UNSERVED_FRACTION`) catches a queue that has not cleared
+ *   *by* the horizon, because the people still in it are unserved legs.
+ *
+ * Neither catches the third shape: **a queue that grew enormously and then drained before the
+ * horizon.** Such a run reports `completed`, nought unserved, nought censored, and a fitted trend
+ * diluted by its own hump — and it publishes a mean beside a passenger who stood at a landing for
+ * a quarter of an hour. That is the *"statistics improve as the bug gets worse"* failure
+ * `CLAUDE.md` § Statistical discipline is written against, and it was reached by a real
+ * counterexample rather than imagined: `the root DECISIONS.md` records it, with figures.
+ *
+ * ## Why the wait and not the queue
+ *
+ * The obvious alternative is to threshold the queue *level* — "twenty people waiting is too many".
+ * It cannot be made scale-free. Little's Law is `L = λW`, so a queue length only means something
+ * once you know the arrival rate: forty people waiting is a normal morning in a 4 000-person tower
+ * and a catastrophe in an eleven-floor building with one car. The **wait** is already normalised by
+ * the arrival rate, which is exactly why it is the observable this gate is stated in.
+ *
+ * ## Censoring runs in the safe direction
+ *
+ * A leg that never boarded has no waiting time, but it does have a waiting time *so far*:
+ * `censoredAtS - arrivedAt`, a **lower bound** on what it would have been. So an unserved leg
+ * counts here at its lower bound, and {@link longestWaitIsCensored} says when the reported figure
+ * is one. Excluding them would put the gate's blind spot precisely where the service is worst.
+ */
+export interface ServiceLevelDiagnosis {
+  readonly verdict: ServiceLevelVerdict;
+  /** `true` only for {@link ServiceLevelVerdict} `starved`. */
+  readonly starved: boolean;
+  /** The horizon applied, seconds. See `DEFAULT_MAX_WAIT_HORIZON_S`. */
+  readonly horizonS: number;
+  /**
+   * The longest wait any arrival in the window is known to have had, seconds.
+   *
+   * `NaN` when the window held no arrivals. For a leg that never boarded this is
+   * `censoredAtS - arrivedAt`, a lower bound — see {@link longestWaitIsCensored}.
+   */
+  readonly longestWaitS: number;
+  /** Whether {@link longestWaitS} belongs to a leg that never boarded, and is therefore a floor. */
+  readonly longestWaitIsCensored: boolean;
+  /** The leg that waited longest, so the figure can be traced back to a passenger. */
+  readonly longestWaitLegId?: string | undefined;
+  readonly longestWaitOriginFloorId?: string | undefined;
+  readonly longestWaitDestinationFloorId?: string | undefined;
+  /** Arrivals in the window whose wait is known to exceed {@link horizonS}. */
+  readonly overHorizonCount: number;
+  /** Arrivals in the window, served or not — the denominator of {@link overHorizonCount}. */
+  readonly arrivalCount: number;
+  /** The time an unserved leg's wait was censored at. `RunRecord.endedAt`. */
+  readonly censoredAtS: SimTime;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -1040,15 +1325,25 @@ export interface RunSummary {
   /** **TTD**, per journey, spanning every leg and every transfer. */
   readonly timeToDestination: DurationStatistics;
   readonly loadFactor: LoadFactorStatistics;
+  /** What the fleet spent moving over the window — the Pareto front's third axis. */
+  readonly energy: EnergyStatistics;
   readonly handlingCapacity: HandlingCapacity;
   /** **INT**, achieved: the spacing of car departures from the terminal. */
   readonly achievedInterval: IntervalStatistics;
   readonly saturation: SaturationDiagnosis;
+  /**
+   * How long the worst-served passenger in the window waited.
+   *
+   * A **separate** diagnosis from {@link saturation}, because "the queue is not diverging" and
+   * "nobody was abandoned" are two claims and a run can satisfy the first while failing the
+   * second. See {@link ServiceLevelDiagnosis}.
+   */
+  readonly serviceLevel: ServiceLevelDiagnosis;
 
   /**
    * Whether {@link waiting}'s mean may carry a confidence interval.
    *
-   * `false` on any of three independent grounds:
+   * `false` on any of four independent grounds:
    *
    * 1. **Saturation** — the queue diverged over the window. docs/03-traffic-and-statistics.md:
    *    "If a configuration saturates, flag it and suppress the AWT interval. Do not report a
@@ -1060,6 +1355,13 @@ export interface RunSummary {
    *    the simulation knows why a landing emptied), but nothing can make the mean of the
    *    fastest sixth of a cohort trustworthy.
    * 3. **Emptiness** — nobody was served at all, so there is no mean.
+   * 4. **Starvation** — somebody waited past `DEFAULT_MAX_WAIT_HORIZON_S`. Gates 1 and 2 are
+   *    both proxies for "the backlog did not clear" and neither sees a backlog that *did*
+   *    clear, just late enough to leave a passenger on a landing for a quarter of an hour. See
+   *    {@link ServiceLevelDiagnosis}, which carries the evidence.
+   *
+   * The four are evaluated in that order, so a run that trips more than one reports the most
+   * fundamental reason rather than the last one checked.
    *
    * Phase 3 reads this and suppresses the interval.
    */

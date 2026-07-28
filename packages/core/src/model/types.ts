@@ -16,10 +16,12 @@
  *   agree on direction — but only `index` is defined for a building with skipped numbers
  *   (no floor 13) or basements.
  *
- * This module imports nothing but kernel *types*, so it is free of any runtime dependency
- * and safe to import from anywhere in `core/`.
+ * This module imports nothing but kernel *types* and `config/types.ts` — which is itself a
+ * declaration-only module with no imports at all — so it is free of any runtime dependency and
+ * safe to import from anywhere in `core/`.
  */
 
+import type { ServiceMode } from '../config/types.js';
 import type { SimTime } from '../kernel/index.js';
 
 /* -------------------------------------------------------------------------- *
@@ -68,22 +70,17 @@ export type CredentialGroup = string;
  * -------------------------------------------------------------------------- */
 
 /**
- * The operating mode of a car. Car-owned state, per docs/01-architecture.md: degraded modes
- * are natural as a per-car state machine and miserable as central flags.
+ * The operating mode of a car, re-exported from its declaration in `config/types.ts`.
  *
- * - `in-service` — normal automatic operation; answers hall calls and car calls.
- * - `independent` — attendant/independent service. Removed from group control: it answers
- *   car calls pressed inside the car only, and the dispatcher must not allocate hall calls
- *   to it.
- * - `fire-recall` — Phase I emergency recall. The car returns to its designated level and
- *   parks with doors open; it provides no passenger service. (Phase II firefighter
- *   operation is a distinct mode and is out of scope for Phase 1 — it would be a new member
- *   of this union, not a reinterpretation of this one.)
- * - `out-of-service` — parked, maintenance, or failed. Provides nothing.
+ * It moved there when `CarConfig.mode` and `BuildingConfig.serviceEvents` made it an authored
+ * value: `config/schema.ts` needs the four names at run time to build its `z.enum`, and every
+ * closed set that appears in `data/` is declared in `config/types.ts` so that `config/` depends
+ * on nothing outside itself. Re-exported here because this is the vocabulary module the rest of
+ * the simulation argues in, and because `acceptsHallCalls` and `acceptsCarCalls` — the two
+ * predicates that give the modes their meaning — are still this module's.
  */
-export const SERVICE_MODES = ['in-service', 'independent', 'fire-recall', 'out-of-service'] as const;
-
-export type ServiceMode = (typeof SERVICE_MODES)[number];
+export { SERVICE_MODES } from '../config/types.js';
+export type { ServiceMode } from '../config/types.js';
 
 /**
  * Whether a car in this mode may be allocated hall calls.
@@ -119,9 +116,16 @@ export function acceptsCarCalls(mode: ServiceMode): boolean {
  *
  * Note what is deliberately *absent*: the destination, and the caller's credential. With
  * up/down buttons the system does not learn either until the passenger is already in the
- * car. That asymmetry is the mechanism behind the result this project wants to reproduce —
- * destination dispatch does better under access control precisely because it learns the
- * destination at call time and can authorize and optimize in the same step.
+ * car — which is why an access-restricted pickup floor is infeasible for a whole bank under
+ * conventional dispatch, and why a credential-aware profile can serve it.
+ *
+ * **Measured, the performance claim built on that asymmetry is refuted** (DECISIONS.md § D30,
+ * § D60). The credential is what makes an access-controlled building servable at all —
+ * conventional dispatch cannot serve `secure-tower`'s interfloor traffic under any budget — and
+ * once the credential is present, moving the *destination* earlier buys **less** there than on
+ * an unzoned building, because the access check has already passed and three identical cars per
+ * bank leave less for a destination to differentiate. The asymmetry is real; "better under
+ * access control because of it" was not measured when it was written and is now measured false.
  */
 export interface HallCall {
   /**

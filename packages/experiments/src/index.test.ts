@@ -15,10 +15,21 @@ import { describe, expect, it } from 'vitest';
 
 import * as barrel from './index.js';
 import * as benchmarkModule from './benchmark/index.js';
+import * as fuzzModule from './fuzz/index.js';
 import * as oracleModule from './oracle/index.js';
 import * as reportsModule from './reports/index.js';
 import * as runnerModule from './runner/index.js';
 import * as statsModule from './reports/statistics.js';
+import * as tuningModule from './tuning/index.js';
+import { STUDY_ENTRY_POINTS } from './benchmark/published.js';
+import {
+  PACKAGES_DIR,
+  code,
+  corpus,
+  isTest,
+  nonTestImportersOf,
+  type Corpus,
+} from './tuning/callers.test-helper.js';
 
 const submodules = {
   stats: statsModule,
@@ -26,6 +37,8 @@ const submodules = {
   reports: reportsModule,
   oracle: oracleModule,
   benchmark: benchmarkModule,
+  tuning: tuningModule,
+  fuzz: fuzzModule,
 } satisfies Record<string, Record<string, unknown>>;
 
 /**
@@ -99,9 +112,12 @@ describe('Phase 3 is usable through the barrel alone', () => {
     const estimate = barrel.pairedDifferenceEstimate(candidate, baseline, { confidence: 0.95 });
     expect(estimate.n).toBe(10);
     expect(estimate.mean).toBeCloseTo(2, 9);
-    /* n = 10 is at or below `T_DISTRIBUTION_MAX_N`, so the t family is the one the doc prescribes. */
-    expect(barrel.T_DISTRIBUTION_MAX_N).toBe(25);
+    /* Student-t at n − 1, at every n: docs/03 § Part 4, and the only family the barrel exposes. */
     expect(estimate.method).toBe('t');
+    expect(estimate.degreesOfFreedom).toBe(9);
+    /* The n-dependent crossover to a normal quantile is gone from the surface, not merely unused. */
+    expect('halfWidthQuantile' in barrel).toBe(false);
+    expect('T_DISTRIBUTION_MAX_N' in barrel).toBe(false);
     expect(barrel.intervalContainsZero(estimate)).toBe(false);
 
     /* And the same series against itself is the null: an interval of exactly [0, 0]. */
@@ -196,5 +212,283 @@ describe('Phase 5 verdict vocabulary is usable through the barrel alone', () => 
     expect(barrel.ARM_PROFILES).not.toContain(barrel.BASELINE_PROFILE);
     expect(barrel.ARM_PROFILES.length).toBeGreaterThan(0);
     expect(barrel.BENCHMARK_CASES.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Phase 7's contribution to the surface is a **module that had no caller at all**, which is a
+ * different failure from the one every other block here guards against.
+ *
+ * docs/08-review-findings.md § 1: `tuning/` shipped complete, correct, unit-tested and reachable
+ * from nothing — no `tuning/index.ts`, no re-export from this barrel, no CLI command, and every
+ * importer of `randomSearch`, `successiveHalving`, `sepCmaEs`, `runnerObjective` and
+ * `runHoldoutRound` a `*.test.ts` beside it. The roadmap's own rule is not *"is it reachable?"* but
+ * **"name the non-test caller"**, so both halves are asserted below, separately, because the first
+ * one passing is exactly what made the sixth instance invisible.
+ */
+describe('Phase 7 is reachable from the barrel and called from outside its own tests', () => {
+  /**
+   * The five entry points docs/08-review-findings.md § 1 names by hand.
+   *
+   * A **fixed historical set**, and deliberately so: it pins one named finding, and `tuning/`'s own
+   * exports are audited exhaustively — derived from the directory — by `tuning/deadCode.test.ts`.
+   * What a hand-written list *cannot* do is notice a study that did not exist when it was written,
+   * and this one did not: `measureEnergyLiveness` shipped with no caller and was invisible here for
+   * a whole phase. That gap is closed by the derived block below, not by adding names to this one.
+   */
+  const ENTRY_POINTS = [
+    'randomSearch',
+    'successiveHalving',
+    'sepCmaEs',
+    'runnerObjective',
+    'runHoldoutRound',
+  ] as const;
+
+  const scope = corpus();
+
+  it.each(ENTRY_POINTS)('re-exports %s from the package root', (name) => {
+    const value = (barrel as Record<string, unknown>)[name];
+    expect(value, `${name} is not on @elevator-sim/experiments`).toBeTypeOf('function');
+    expect(value).toBe((tuningModule as Record<string, unknown>)[name]);
+  });
+
+  it.each(ENTRY_POINTS)('has at least one non-test, non-barrel importer of %s', (name) => {
+    const callers = nonTestImportersOf(scope, name);
+    expect(
+      callers,
+      `${name} has no non-test caller. A barrel re-export is reachability, not use, and a {@link} ` +
+        'tag is neither — that combination is precisely the state Phase 7 shipped in ' +
+        '(docs/08-review-findings.md § 1). Something outside a *.test.ts must import it',
+    ).not.toEqual([]);
+  });
+
+  it('counts the CLI tune command as the caller, and the barrels as not', () => {
+    /* Named rather than merely counted: "some file imports it" is satisfiable by a second barrel,
+       and the point of the rule is that a specific, shipped, user-reachable path uses it. */
+    for (const name of ENTRY_POINTS) {
+      expect(nonTestImportersOf(scope, name)).toContain('cli/src/commands/tune.ts');
+    }
+    /* And the inverse, so the scanner cannot be passing for the wrong reason: the barrels do bind
+       these names, and must not be what makes the assertion above pass. */
+    expect(nonTestImportersOf(scope, 'randomSearch')).not.toContain('experiments/src/index.ts');
+    expect(nonTestImportersOf(scope, 'randomSearch')).not.toContain(
+      'experiments/src/tuning/index.ts',
+    );
+  });
+
+  it('drives the search space through the barrel alone, with no elevator-specific knowledge', () => {
+    /* CLAUDE.md invariant 8, as a usable surface rather than as a declaration: a generic optimizer
+       reads the schema, draws a point from a named stream, and writes it back as a real profile —
+       and nothing in this test names a floor, a car or a call. */
+    const space = barrel.searchSpace();
+    expect(space.ids.length).toBeGreaterThan(0);
+    expect(space.parameters.every((parameter) => parameter.id.includes('.'))).toBe(true);
+
+    const rng = barrel.policyNoiseStream(20_260_727);
+    const candidate = barrel.sampleCandidate(space, rng);
+    expect(candidate.size).toBeGreaterThan(0);
+
+    /* Exactly in both directions, which is what makes a search's winner a configuration a run can
+       be reproduced from rather than a vector nobody can author. */
+    const profile = barrel.candidateProfile(space, candidate, { id: 'barrel-probe' });
+    expect(profile.id).toBe('barrel-probe');
+    const roundTripped = barrel.candidateFromProfile(space, profile);
+    for (const [id, value] of candidate) expect(roundTripped.get(id)).toEqual(value);
+  });
+
+  it('keeps the two Candidates apart: the space keeps the name, the search is renamed', () => {
+    /* A type-level assertion, so it is `tsc` that enforces it and this test that records why.
+       `tuning/space`'s Candidate is a parameter assignment; `tuning/search`'s is a configuration
+       under evaluation, and its generic is routinely the first. Both are on the surface, under
+       names that cannot be confused. */
+    const point: barrel.Candidate = new Map([['weights.waitTime', 1]]);
+    const underEvaluation: barrel.SearchCandidate<barrel.Candidate> = {
+      id: 'c-1',
+      value: point,
+      origin: 'test',
+    };
+    expect(underEvaluation.value.get('weights.waitTime')).toBe(1);
+  });
+
+  it('exposes the held-out guard as a refusal, not as a warning', () => {
+    /* CLAUDE.md § Tuning discipline. An overlapping holdout set is not a weaker guard against
+       overfitting, it is *no* guard, so the barrel's own function throws rather than annotating —
+       and it is reachable from the package root, which is what this block is about. */
+    const observation = (seed: string): barrel.TuningObservation => ({
+      runId: `run-${seed}`,
+      seed,
+      windowSeconds: 3600,
+      arrivals: 40,
+      served: 40,
+      unserved: 0,
+      awtS: 16,
+      wt95S: 30,
+      pctOverLongWait: 0,
+      ttdS: 60,
+      achievedIntervalS: 40,
+      personsPer5Min: 12,
+      saturated: false,
+      awtIsValid: true,
+    });
+    const evaluation = (
+      tuningSeeds: readonly string[],
+      holdoutSeeds: readonly string[],
+    ): barrel.CandidateEvaluation => ({
+      candidateId: 'c-1',
+      tuning: { seedSetId: 'tune', role: 'tuning', observations: tuningSeeds.map(observation) },
+      holdout: { seedSetId: 'hold', role: 'holdout', observations: holdoutSeeds.map(observation) },
+    });
+
+    expect(() => barrel.assertDisjointSeedSets([evaluation(['1', '2'], ['3', '4'])])).not.toThrow();
+    /* One shared seed is enough: the search optimized against that traffic. */
+    expect(() => barrel.assertDisjointSeedSets([evaluation(['1', '2'], ['2', '4'])])).toThrow(
+      barrel.TuningReportError,
+    );
+  });
+});
+
+/**
+ * **The same rule as the block above, over a domain nobody maintains by hand.**
+ *
+ * The Phase 7 block asserts five names. It cannot assert a sixth, because the sixth did not exist
+ * when it was written — and a sixth is exactly what shipped. `measureEnergyLiveness` lives in
+ * `benchmark/energyLiveness.ts`, a module whose own docstring is about not shipping a dead seam,
+ * and its only importers were two barrels, a string key in `published.ts` and its own test. By this
+ * repository's own scanner: `measureEnergyLiveness -> []`. Nothing failed, because nothing looked.
+ *
+ * So the domain here is **derived**: `STUDY_ENTRY_POINTS`, whose keys `published.test.ts` already
+ * asserts — in both directions — are exactly the `export (async )?function (run|measure|audit)Xxx`
+ * declarations `benchmark/` contains. That is `sim/seam.test.ts`'s convention: iterate a
+ * categorical's own domain rather than a copy of it, so a member added tomorrow is in scope today.
+ * Add a study to `benchmark/` and it must be classified in `published.ts`; classify it and this
+ * block demands a caller for it.
+ *
+ * ## What counts as a caller here
+ *
+ * The definition the two permanent dead-code audits use, and for the same reasons: a real
+ * `import`/`export … from` binding in a file that is neither a test nor a barrel, **or** a use
+ * inside the entry point's own module beyond its declaration. The second is not a loophole — it is
+ * how `runNegativeControls` (called by `runDestinationDisclosureStudy`) and `runMatrixCell` (called
+ * by `runMatrix`) are legitimately live, and it is measured on comment-**and**-string-stripped
+ * source so a `{@link}` tag or a symbol named in its own error message cannot supply it.
+ *
+ * The interval-publishing half of `benchmark/` has always satisfied this: `regeneratePins.ts` runs
+ * every one of them. The categorical half had no such driver, which is the *class* the ninth
+ * instance belonged to rather than a one-off. `livenessSuite.ts` is that driver.
+ */
+describe('every study entry point benchmark/ declares is called from outside its own tests', () => {
+  const scope = corpus();
+
+  /** The domain, derived. Sorted so a failure reads in a stable order. */
+  const ENTRY_POINTS = Object.keys(STUDY_ENTRY_POINTS).sort();
+
+  /** The module that declares `name`, from comment-stripped source so a code fence cannot claim it. */
+  function definingFile(candidates: Corpus, name: string): string | undefined {
+    const declared = new RegExp(String.raw`export\s+(?:async\s+)?function\s+${name}\b`);
+    return candidates.files.find((path) => !isTest(path) && declared.test(code(candidates.text(path))));
+  }
+
+  /** Non-test, non-barrel importers, plus the entry point's own module when it uses it itself. */
+  function callSitesOf(name: string): readonly string[] {
+    const sites = [...nonTestImportersOf(scope, name)];
+    const own = definingFile(scope, name);
+    if (own !== undefined) {
+      const uses = (code(scope.text(own)).match(new RegExp(`\\b${name}\\b`, 'g')) ?? []).length;
+      if (uses > 1) sites.push(`${own.slice(PACKAGES_DIR.length)} (used in its own module)`);
+    }
+    return sites;
+  }
+
+  it('takes its domain from the classification published.ts derives from the directory', () => {
+    /* Non-vacuous, and non-vacuous about the right thing: an empty or tiny domain would make every
+       assertion below pass by not looking, which is the failure this block exists to end. */
+    expect(ENTRY_POINTS.length).toBeGreaterThan(15);
+    /* The ninth instance, and the driver that answers it. If either name ever disappears from the
+       classification, this block has stopped covering the case it was written for. */
+    expect(ENTRY_POINTS).toContain('measureEnergyLiveness');
+    expect(ENTRY_POINTS).toContain('runLivenessSuite');
+    /* And the five categorical studies are all in scope, not just the interval-publishing ones —
+       the half that had no driver at all. */
+    for (const name of [
+      'measureAuctionAggregation',
+      'measureDestinationLiveness',
+      'measureMultiRoundReachability',
+      'measurePredictorLag',
+    ]) {
+      expect(ENTRY_POINTS).toContain(name);
+    }
+  });
+
+  /*
+   * There is deliberately **no** "…is re-exported from the package root" assertion here, and the
+   * omission is the block's whole thesis rather than an oversight. The Phase 7 block above asserts
+   * re-export because docs/08-review-findings.md § 1 named that as one of two separate properties;
+   * repeating it over this domain would assert *reachability*, which is the exact property all nine
+   * dead behaviours already had.
+   *
+   * **This used to say "six study entry points are not on the barrel at all", and C27 moved five of
+   * them onto it. The thesis did not move with them.** `runNegativeControls`,
+   * `runAccessControlStudy`, `runDestinationDisclosureStudy`, `runMixedUseHighRiseStudy` and
+   * `measureDestinationLiveness` are now on both barrels, `runDestinationDispatchStudy` is on
+   * neither, and **all six were live before the change and are live after it** — because what makes
+   * them live is `regeneratePins.ts`, which did not move either. `measureEnergyLiveness` was on
+   * **two** barrels and was dead. The barrel says nothing either way in either direction, which is
+   * exactly why this block asks only the question that does; the assertion below pins that the two
+   * questions really do come apart on today's tree.
+   */
+  it('shows the two questions coming apart, in both directions, on today’s tree', () => {
+    /* On no barrel and live. If this name ever lands on a barrel, replace it with another that is
+       not — do not delete the assertion, because it is what stops the block quietly becoming a
+       reachability check when the last off-barrel entry point disappears. */
+    expect('runDestinationDispatchStudy' in barrel).toBe(false);
+    expect(callSitesOf('runDestinationDispatchStudy')).not.toEqual([]);
+
+    /* On the barrel and live — but not *because* it is on the barrel: the barrels are excluded
+       from the caller set by construction, so its call sites are the same ones it had before C27
+       put it on the package surface. */
+    expect('runDestinationDisclosureStudy' in barrel).toBe(true);
+    expect(nonTestImportersOf(scope, 'runDestinationDisclosureStudy')).not.toContain(
+      'experiments/src/index.ts',
+    );
+    expect(nonTestImportersOf(scope, 'runDestinationDisclosureStudy')).not.toContain(
+      'experiments/src/benchmark/index.ts',
+    );
+    expect(callSitesOf('runDestinationDisclosureStudy')).toContain(
+      'experiments/src/benchmark/regeneratePins.ts',
+    );
+  });
+
+  it.each(ENTRY_POINTS)('has at least one non-test, non-barrel caller of %s', (name) => {
+    expect(
+      callSitesOf(name),
+      `${name} has no caller outside its own tests. A barrel re-export is reachability, not use; a ` +
+        '{@link} tag is neither; and a string key in published.ts is a classification rather than a ' +
+        'call. That combination is the exact state measureEnergyLiveness shipped in — the ninth ' +
+        'instance of docs/05-roadmap.md § Standing requirement. Wire it into a driver ' +
+        '(regeneratePins.ts for an interval study, livenessSuite.ts for a categorical one), give it ' +
+        'a CLI command, or delete it',
+    ).not.toEqual([]);
+  });
+
+  it('names livenessSuite.ts as the caller of the five that publish no interval', () => {
+    /* Named rather than merely counted, for the reason the Phase 7 block gives: "some file imports
+       it" is satisfiable by a second barrel. These five are the ones that had nothing. */
+    for (const name of [
+      'measureAuctionAggregation',
+      'measureDestinationLiveness',
+      'measureEnergyLiveness',
+      'measureMultiRoundReachability',
+      'measurePredictorLag',
+    ]) {
+      expect(callSitesOf(name), name).toContain('experiments/src/benchmark/livenessSuite.ts');
+    }
+    /* And the inverse, so this cannot pass for the wrong reason: the barrels do bind these names,
+       and must not be what makes the assertion above pass. */
+    expect(nonTestImportersOf(scope, 'measureEnergyLiveness')).not.toContain(
+      'experiments/src/benchmark/index.ts',
+    );
+    expect(nonTestImportersOf(scope, 'measureEnergyLiveness')).not.toContain(
+      'experiments/src/index.ts',
+    );
   });
 });

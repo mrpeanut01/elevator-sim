@@ -1,4 +1,4 @@
-import type { IntervalStatistics, RunSummary } from '@elevator-sim/core';
+import type { IntervalStatistics, RunSummary, ServiceLevelDiagnosis } from '@elevator-sim/core';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -12,6 +12,8 @@ import {
   pct,
   renderAchievedInterval,
   renderAwt,
+  renderLongestWait,
+  renderRunningMean,
   renderEstimate,
   renderSaturation,
   renderSignedEstimate,
@@ -53,6 +55,7 @@ function summary(partial: {
   readonly awtInvalidReason?: string;
   readonly meanS?: number;
   readonly saturated?: boolean;
+  readonly serviceLevel?: Partial<ServiceLevelDiagnosis>;
 }): RunSummary {
   return {
     awtIsValid: partial.awtIsValid,
@@ -64,6 +67,20 @@ function summary(partial: {
       sampleCount: 120,
       rSquared: 0.914,
       maxQueueLength: 87,
+    },
+    serviceLevel: {
+      verdict: 'served',
+      starved: false,
+      horizonS: 900,
+      longestWaitS: 41.2,
+      longestWaitIsCensored: false,
+      longestWaitLegId: 'p7',
+      longestWaitOriginFloorId: 'G',
+      longestWaitDestinationFloorId: '12',
+      overHorizonCount: 0,
+      arrivalCount: 220,
+      censoredAtS: 1800,
+      ...partial.serviceLevel,
     },
   } as unknown as RunSummary;
 }
@@ -160,6 +177,112 @@ describe('renderAwt — the saturated case', () => {
     const rendered = renderAwt(summary({ awtIsValid: true, meanS: Number.NaN }));
     expect(rendered.quotable).toBe(false);
     expect(rendered.text).toBe(ABSENT);
+  });
+});
+
+describe('renderRunningMean — T29/D1, the live figure `watch` used to print unconditionally', () => {
+  /*
+   * `commands/watch.ts` printed `mean wait so far 41.5 s` on both of its render paths for the
+   * whole of a run whose report, seconds later on the same terminal, said `AWT  SUPPRESSED`.
+   * Being a *running* figure rather than the windowed AWT does not rescue it: it is a mean of the
+   * same waits over the same run, and docs/03 forbids a mean for a queue that did not settle.
+   */
+  it('prints the running figure it was handed, not a constant', () => {
+    const at = (value: number, unit = true): string =>
+      renderRunningMean(summary({ awtIsValid: true }), value, { unit }).text;
+    expect(renderRunningMean(summary({ awtIsValid: true }), 41.52).quotable).toBe(true);
+    expect(at(41.52)).toBe('41.5 s');
+    // A second value, because one is a constant with extra steps — this package has shipped a
+    // frame seven of whose eight fields could be literals with the suite still green.
+    expect(at(7.04)).toBe('7.0 s');
+    expect(at(41.52, false)).toBe('41.5');
+    expect(at(7.04, false)).toBe('7.0');
+  });
+
+  it('prints SUPPRESSED with no digits at all when it does not', () => {
+    const rendered = renderRunningMean(
+      summary({ awtIsValid: false, awtInvalidReason: 'the queue diverged over the window' }),
+      41.52,
+    );
+    expect(rendered.quotable).toBe(false);
+    expect(rendered.text).toBe('SUPPRESSED');
+    expect(rendered.text).not.toMatch(/\d/);
+    expect(rendered.reason).toContain('diverged');
+    // …on both call sites, so the tabular fallback cannot keep its own opinion.
+    expect(
+      renderRunningMean(summary({ awtIsValid: false }), 41.52, { unit: false }).text,
+    ).not.toMatch(/\d/);
+  });
+
+  it('still says "nobody yet" rather than "not admissible" on a reportable run', () => {
+    // Two different facts. An em dash means nobody has been served; SUPPRESSED means the figure
+    // exists and may not be quoted. Collapsing them would be a smaller lie in place of a larger.
+    const rendered = renderRunningMean(summary({ awtIsValid: true }), Number.NaN);
+    expect(rendered.text).toBe(ABSENT);
+    expect(rendered.quotable).toBe(false);
+  });
+});
+
+describe('renderLongestWait — an observation, never suppressed', () => {
+  it('reports the longest wait and names the passenger on a healthy run', () => {
+    const rendered = renderLongestWait(summary({ awtIsValid: true, meanS: 12 }));
+    expect(rendered?.quotable).toBe(true);
+    expect(rendered?.text).toBe('41.2 s (leg p7, G to 12)');
+  });
+
+  /**
+   * The regression this renderer exists for. The report used to print the word SUPPRESSED here,
+   * off `waiting.maxS`, which removed the evidence at exactly the moment it mattered: on a run
+   * suppressed *because* somebody waited a quarter of an hour, the longest wait is the finding.
+   */
+  it('still prints the digits when the mean is suppressed, because the tail is the evidence', () => {
+    const rendered = renderLongestWait(
+      summary({
+        awtIsValid: false,
+        awtInvalidReason: 'past the abandonment horizon',
+        meanS: 172.1,
+        serviceLevel: {
+          verdict: 'starved',
+          starved: true,
+          longestWaitS: 922.7,
+          longestWaitLegId: 'p106',
+          longestWaitOriginFloorId: '13',
+          longestWaitDestinationFloorId: 'G',
+          overHorizonCount: 2,
+          arrivalCount: 177,
+        },
+      }),
+    );
+    expect(rendered?.quotable).toBe(false);
+    expect(rendered?.text).toBe('922.7 s (leg p106, 13 to G)');
+    expect(rendered?.reason).toContain('900 s abandonment horizon');
+    expect(rendered?.reason).toContain('2 of 177 arrivals in the window.');
+  });
+
+  it('says so when the figure is a lower bound because the passenger never boarded', () => {
+    const rendered = renderLongestWait(
+      summary({
+        awtIsValid: false,
+        serviceLevel: {
+          verdict: 'starved',
+          starved: true,
+          longestWaitS: 1350,
+          longestWaitIsCensored: true,
+          overHorizonCount: 1,
+        },
+      }),
+    );
+    expect(rendered?.text).toBe('at least 1350.0 s (leg p7, G to 12)');
+  });
+
+  it('is silent when the window held no arrivals, rather than printing a zero', () => {
+    const rendered = renderLongestWait(
+      summary({
+        awtIsValid: true,
+        serviceLevel: { verdict: 'no-arrivals', longestWaitS: Number.NaN, arrivalCount: 0 },
+      }),
+    );
+    expect(rendered).toBeUndefined();
   });
 });
 
