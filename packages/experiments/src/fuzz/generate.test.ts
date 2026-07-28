@@ -15,13 +15,27 @@
  * claims are asserted here against exactly the pinned seeds.
  */
 
-import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
+import {
+  CALL_TYPES,
+  loadConfig,
+  type CallType,
+  type DispatcherProfile,
+  type LoadedConfig,
+} from '@elevator-sim/core';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { STANDARD_CORPUS } from './campaign.js';
-import { caseFromSeed, minDurationFor, resolveCase, STANDARD_SPACE } from './generate.js';
-import { generateOptionsFrom } from './run.js';
+import { DEEP_SPACE, STANDARD_CORPUS, deepSeeds } from './campaign.js';
+import {
+  GENERATED_CALL_TYPES,
+  carriesCallType,
+  caseFromSeed,
+  legalCallTypesFor,
+  minDurationFor,
+  resolveCase,
+  STANDARD_SPACE,
+} from './generate.js';
+import { assertCarriesCallType, generateOptionsFrom, withCallType } from './run.js';
 import { FUZZ_TOPOLOGIES, type FuzzCase } from './types.js';
 
 const DATA_DIR = fileURLToPath(new URL('../../../../data', import.meta.url));
@@ -165,6 +179,186 @@ describe('what the pinned corpus covers', () => {
       // always-on corpus is entirely rise-and-fall. Stated, not assumed.
       expect(entry.demandTemplate).toBe('rise-and-fall');
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The call type is drawn against the profile, not beside it (finding C32)
+ * -------------------------------------------------------------------------- */
+
+/** A minimal profile, so the rule is exercised past whatever `data/` happens to ship today. */
+function probe(over: Partial<DispatcherProfile>): DispatcherProfile {
+  return { id: 'probe', name: 'Probe', weights: { waitTime: 1 }, ...over };
+}
+
+describe('legalCallTypesFor — the rule, taken from the schema rather than a list', () => {
+  it('refuses the pair the real resolver refuses, on both of its grounds', () => {
+    // A panel that cannot ask for a destination is an up/down button (§ T16-D1) …
+    const panel = probe({ dispatch: { passengerAssignment: 'panel' } });
+    expect(carriesCallType(panel, 'up-down-buttons')).toBe(false);
+    expect(carriesCallType(panel, 'destination-entry')).toBe(true);
+    expect(carriesCallType(panel, 'mobile-credential')).toBe(true);
+
+    // … and a destination dispatcher must name the car at the landing, so it cannot defer.
+    const deferred = probe({ dispatch: { assignmentTiming: 'deferred', deferWindowS: 1.5 } });
+    expect(carriesCallType(deferred, 'destination-entry')).toBe(false);
+    expect(carriesCallType(deferred, 'up-down-buttons')).toBe(true);
+    expect(carriesCallType(deferred, 'mobile-credential')).toBe(true);
+  });
+
+  it('refuses a call type that would leave a weight the profile authored inert', () => {
+    // Nothing throws for this pair — it runs, and `rideTime` returns 0 for every candidate car, so
+    // the case measures `eta` under a destination profile's name. That is the half of C32 no
+    // exception was ever going to catch.
+    const destination = probe({ weights: { waitTime: 0.5, rideTime: 0.5 } });
+    expect(carriesCallType(destination, 'up-down-buttons')).toBe(false);
+    expect(carriesCallType(destination, 'destination-entry')).toBe(true);
+    expect(carriesCallType(destination, 'mobile-credential')).toBe(true);
+  });
+
+  it('does not constrain a gated tunable the profile left at its declared default', () => {
+    // The default comparison is what makes the rule safe to apply to the whole schema: a weight of
+    // zero on the gated term is not a request, so nothing is being switched off.
+    expect(carriesCallType(probe({ weights: { waitTime: 1, rideTime: 0 } }), 'up-down-buttons')).toBe(
+      true,
+    );
+    expect(
+      carriesCallType(probe({ dispatch: { passengerAssignment: 'none' } }), 'up-down-buttons'),
+    ).toBe(true);
+  });
+
+  it('leaves an ungated profile every rung of the ladder, and draws only the two the corpus explores', () => {
+    const plain = probe({});
+    for (const callType of CALL_TYPES) expect(carriesCallType(plain, callType)).toBe(true);
+    expect(legalCallTypesFor(plain)).toEqual([...GENERATED_CALL_TYPES]);
+  });
+
+  it('throws on a pair the generator could not have produced, rather than rewriting it', () => {
+    // The seam `run.ts` puts between the generator and the simulator. A pair that gets here is a
+    // generator bug and is thrown loudly, on the same rule as an unroutable building: a case the
+    // campaign quietly rewrote would report on a configuration nobody asked for.
+    const panel = probe({ dispatch: { passengerAssignment: 'panel' } });
+    expect(() => {
+      assertCarriesCallType(panel, 'up-down-buttons');
+    }).toThrow(/cannot carry/);
+    expect(() => {
+      assertCarriesCallType(panel, 'mobile-credential');
+    }).not.toThrow();
+  });
+
+  it('reports the shipped table, so a `data/` edit that changes it fails here', () => {
+    /*
+     * The measured state of `data/dispatcher-profiles.json` at the time C32 was closed. Pinned
+     * rather than derived a second time: the point of the table is that it is a property of the
+     * *data*, so a thirteenth profile — or a `dispatch.callType` added to an existing one — should
+     * make this row move and say so.
+     */
+    const table = new Map<string, readonly CallType[]>(
+      config.dispatcherProfiles.profiles.map((profile) => [
+        profile.id,
+        CALL_TYPES.filter((callType) => carriesCallType(profile, callType)),
+      ]),
+    );
+
+    // Every profile can be run under the credentialed call type; that is what makes the
+    // access-zone arm of the draw total.
+    for (const [id, legal] of table) {
+      expect(legal, `"${id}" cannot carry mobile-credential`).toContain('mobile-credential');
+    }
+
+    // The three constrained profiles, and the reason each is constrained.
+    expect(table.get('destination-panel')).toEqual(['destination-entry', 'mobile-credential']);
+    expect(table.get('destination-eta')).toEqual(['destination-entry', 'mobile-credential']);
+    expect(table.get('predictive-balanced')).toEqual(['up-down-buttons', 'mobile-credential']);
+
+    const unconstrained = [...table.entries()].filter(
+      ([, legal]) => legal.length === CALL_TYPES.length,
+    );
+    expect(unconstrained).toHaveLength(config.dispatcherProfiles.profiles.length - 3);
+  });
+});
+
+describe('what the generator draws (C32)', () => {
+  /** The pinned corpus and a deep pass: 2 064 cases, generated only — no simulation. */
+  const everyCase = (): FuzzCase[] => [
+    ...corpus,
+    ...deepSeeds(2000).map((seed) => caseFromSeed(seed, generateOptionsFrom(config, DEEP_SPACE))),
+  ];
+
+  it('never names a call type its profile cannot carry, over every pinned and 2 000 deep cases', () => {
+    const profiles = new Map(config.dispatcherProfiles.profiles.map((p) => [p.id, p]));
+    let checked = 0;
+    for (const entry of everyCase()) {
+      const profile = profiles.get(entry.dispatcherProfileId);
+      expect(profile, `${entry.caseId} names an unknown dispatcher`).toBeDefined();
+      if (profile === undefined) continue;
+      expect(
+        carriesCallType(profile, entry.callType),
+        `${entry.caseId}: ${entry.dispatcherProfileId} cannot carry "${entry.callType}"`,
+      ).toBe(true);
+      // The seam `run.ts` puts on the same claim, exercised on the same cases.
+      expect(() => {
+        assertCarriesCallType(profile, entry.callType);
+      }).not.toThrow();
+      checked += 1;
+    }
+    // The count, so a corpus that silently emptied could not pass this vacuously. Derived from the
+    // pinned list rather than written out: `campaign.ts` says why a number in prose goes stale.
+    expect(checked).toBe(corpus.length + 2000);
+  }, 120_000);
+
+  it('leaves `withCallType` nothing to rewrite: no generated case reaches the drop', () => {
+    /*
+     * Before the fix this was false 1 time in the pinned corpus (`fuzz-118`) and 61 times in 2 000
+     * deep cases, every one of them `destination-panel` × `up-down-buttons` — a case that named
+     * Phase 6b's shipped destination dispatcher and then ran a conventional one, because the
+     * override dropped `passengerAssignment` to make the profile admissible.
+     *
+     * `withCallType` still drops it, and still must: `validation/adversarial.test.ts` builds the
+     * conventional control arm of a destination comparison with exactly that call. What is asserted
+     * here is that the *generator* no longer needs it to.
+     */
+    const profiles = new Map(config.dispatcherProfiles.profiles.map((p) => [p.id, p]));
+    for (const entry of everyCase()) {
+      const profile = profiles.get(entry.dispatcherProfileId);
+      if (profile === undefined) continue;
+      const applied = withCallType(profile, entry.callType);
+      expect(
+        applied.dispatch?.passengerAssignment,
+        `${entry.caseId}: withCallType had to drop passengerAssignment`,
+      ).toBe(profile.dispatch?.passengerAssignment);
+    }
+  }, 120_000);
+
+  it('names the rung it does not explore, rather than merely not reaching it', () => {
+    // `destination-entry` is legal for eleven of the twelve shipped profiles and is generated by
+    // neither corpus. Stated on `GENERATED_CALL_TYPES` with the reason, asserted here, so the gap
+    // cannot close or widen without this line moving.
+    expect(GENERATED_CALL_TYPES).not.toContain('destination-entry');
+    expect(GENERATED_CALL_TYPES).toEqual(['up-down-buttons', 'mobile-credential']);
+    for (const entry of everyCase()) expect(entry.callType).not.toBe('destination-entry');
+  }, 120_000);
+
+  it('pins what closing C32 moved in the always-on corpus: one case, and nothing else', () => {
+    /*
+     * `fuzz-118` is the whole blast radius of the fix on the pinned corpus. It drew
+     * `destination-panel` beside an access-restricted building and a lockout, which under the old
+     * generator meant `up-down-buttons` — inadmissible, rewritten at run time into a dispatcher
+     * nobody configured. It is now a credentialed run of the profile it names, and therefore no
+     * longer a lockout.
+     *
+     * Everything else about the case — the building, the seed, the horizon, the demand — is
+     * byte-identical across the change, because the call type is drawn from the same position in
+     * the same stream and `pick` consumes one draw whatever the length of the list.
+     */
+    const moved = corpus.find((entry) => entry.fuzzSeed === '118');
+    expect(moved?.dispatcherProfileId).toBe('destination-panel');
+    expect(moved?.callType).toBe('mobile-credential');
+    expect(moved?.tags).not.toContain('access-lockout');
+    expect(moved?.tags).toContain('access-zones');
+
+    // The lockout axis is still covered, one case narrower: 5 of 64, down from 6.
+    expect(corpus.filter((entry) => entry.tags.includes('access-lockout'))).toHaveLength(5);
   });
 });
 

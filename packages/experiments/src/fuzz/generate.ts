@@ -41,6 +41,33 @@
  * deliberately, with the expected `timed-out` status asserted, in
  * `validation/adversarial.test.ts` and `core/src/sim/serviceMode.test.ts`.
  *
+ * ## The call type is drawn against the profile, not beside it
+ *
+ * A `(building, dispatcher profile, call type)` triple used to be three independent draws, and the
+ * third is not independent of the second: `dispatch.passengerAssignment: 'panel'` declares
+ * `activeWhen: { 'dispatch.callType': [...DESTINATION_CALL_TYPES] }` and `resolveDispatchConfig`
+ * **refuses** the pair outright, while `weights.rideTime` carries the same gate from the term's own
+ * definition and goes silently to zero under it. So the generator drew pairs the engine cannot run
+ * (`destination-panel` × `up-down-buttons`, which `run.ts` `withCallType` rewrote at run time) and
+ * pairs it runs with the profile's whole point switched off (`destination-eta` × `up-down-buttons`,
+ * whose `weights.rideTime: 0.5` is inert). Measured before the fix: **1 of the 64 pinned cases and
+ * 122 of 2 000 deep cases**, 61 of each kind.
+ *
+ * {@link legalCallTypesFor} closes it, and it is derived rather than listed: for each candidate the
+ * profile is resolved through the **real** `resolveDispatchConfig` (which is what refuses the hard
+ * pairs), and then every row of `DISPATCH_PARAMETERS` the profile moves off its declared default is
+ * required to be *live* by its own `activeWhen`. No profile id and no term id appears here
+ * (CLAUDE.md invariant 7) — a thirteenth profile, or a second gated term, is covered on the day it
+ * lands in `data/`.
+ *
+ * What that does **not** do is widen the axis. {@link GENERATED_CALL_TYPES} is the two rungs of the
+ * information ladder the campaign explores, and `destination-entry` — the middle rung, legal for
+ * eleven of the twelve shipped profiles — is still unreached by both corpora. Widening it is a
+ * coverage decision with a different blast radius (it moves roughly half of every corpus, and under
+ * access zoning it is a *third* case rather than a second, being a call that carries a destination
+ * but no credential), and it belongs to its own task rather than to this one. `generate.test.ts` asserts
+ * both halves: that every generated pair is legal, and that the unexplored rung is named.
+ *
  * ## Connectivity is a construction guarantee, not a filter
  *
  * `RoutePlanner.requireRoute` throws when no chain of banks connects two floors, which is
@@ -52,18 +79,32 @@
  */
 
 import {
+  CALL_TYPES,
+  DISPATCH_PARAMETERS,
+  DispatchError,
+  dispatchParameterValue,
   parseBuilding,
   resolveBuilding,
+  resolveDispatchConfig,
   type BuildingConfig,
   type CallType,
   type DemandTemplateId,
+  type DispatcherProfile,
   type ElevatorSpecs,
   type Rng,
   type ResolvedBuilding,
+  type ResolvedDispatchConfig,
   type ServiceEventConfig,
   type ServiceMode,
   StreamSet,
 } from '@elevator-sim/core';
+
+// One rule for every `activeWhen` in every schema, and this is the package's only copy of it —
+// `core` implements it beside `DISPATCH_PARAMETERS` but does not put it on the barrel, so
+// `tuning/space/types.ts` restates it once and says so in its own docstring. Imported rather than
+// restated a second time: a generator that evaluated gates by a rule of its own would be deciding
+// what "live" means for a schema it does not own.
+import { activeWhenSatisfied } from '../tuning/space/types.js';
 
 import type { FuzzCase, FuzzTopology } from './types.js';
 
@@ -154,11 +195,121 @@ export const DEEP_SPACE: FuzzSpace = Object.freeze({
 /** Everything the generator needs from the loaded reference data. Ids are data, never literals. */
 export interface GenerateOptions {
   readonly elevatorSpecs: ElevatorSpecs;
-  /** Shipped dispatcher profile ids. Which dispatcher runs is a choice, not a branch. */
-  readonly dispatcherProfileIds: readonly string[];
+  /**
+   * The shipped dispatcher profiles, whole. Which dispatcher runs is a choice, not a branch.
+   *
+   * The profiles rather than their ids, because the call type a case may name is a function of the
+   * profile it names it beside — see {@link legalCallTypesFor}. An id cannot answer that question,
+   * and a lookup table keyed by id inside the generator would be the branch invariant 7 forbids.
+   */
+  readonly dispatcherProfiles: readonly DispatcherProfile[];
   /** Shipped traffic profile ids. */
   readonly trafficProfileIds: readonly string[];
   readonly space?: FuzzSpace | undefined;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Which call types a profile can carry
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The call types the campaign draws from, and the one it does not.
+ *
+ * The two ends of the `dispatch.callType` ladder: a landing button that knows neither destination
+ * nor credential, and a phone that knows both. They are the two that matter to the rest of this
+ * file, because the access-zone axis turns on whether the call carries a **credential** — a
+ * restricted landing is servable under one and a lockout under the other.
+ *
+ * `destination-entry` — the middle rung, which knows the destination and not the credential — is
+ * deliberately **not** here, and that is a coverage gap this file states rather than hides. See the
+ * module docstring; `generate.test.ts` asserts the gap is named and not merely absent.
+ */
+export const GENERATED_CALL_TYPES: readonly CallType[] = Object.freeze(
+  CALL_TYPES.filter((callType) => callType !== 'destination-entry'),
+);
+
+/**
+ * The call type an access-restricted landing needs before its passengers can be carried at all.
+ *
+ * A literal because it is a property of what the *call type* knows rather than a tunable: `docs/06`
+ * § Stage 1 — *"mobile-credential knows both"* — and `core` publishes no predicate for the
+ * credential half (`isDestinationCallType` covers only the destination half). Named here so the two
+ * places the generator depends on it read as one fact.
+ */
+const CREDENTIALED_CALL_TYPE: CallType = 'mobile-credential';
+
+const DISPATCH_PARAMETER_BY_ID = new Map(
+  DISPATCH_PARAMETERS.map((parameter) => [parameter.id, parameter]),
+);
+
+/**
+ * Whether this profile can be run under this call type without either being refused or gutted.
+ *
+ * Two grounds, and the second is the one that has no exception to throw:
+ *
+ * 1. **`resolveDispatchConfig` refuses the pair.** `dispatch.passengerAssignment: 'panel'` under a
+ *    call type that carries no destination is *"a panel that cannot ask for a destination"*
+ *    (`DECISIONS.md` § T16-D1), and `dispatch.assignmentTiming: 'deferred'` under
+ *    `destination-entry` is refused for the mirror reason. Both throw `DispatchError`, so the real
+ *    resolver is asked rather than its rules restated.
+ * 2. **A tunable the profile moved off its default is inert.** Every row of `DISPATCH_PARAMETERS`
+ *    that declares an `activeWhen` must be live under the candidate call type. That is what catches
+ *    `destination-eta` × `up-down-buttons`: nothing refuses it, it runs, and `weights.rideTime: 0.5`
+ *    — the entire difference between that profile and `eta` ([§ D112](DECISIONS.md)) — returns 0 for
+ *    every car. A case that names a destination profile and measures a conventional one is worse
+ *    than a case that crashes, because it reports.
+ *
+ * The default comparison is what makes the second ground safe to apply to the *whole* schema: a
+ * parameter still sitting at its declared default is one the profile is not asking for, and a gate
+ * closed over it costs nothing. Only what the profile actually authored has to be live.
+ */
+export function carriesCallType(profile: DispatcherProfile, callType: CallType): boolean {
+  const candidate: DispatcherProfile = { ...profile, dispatch: { ...profile.dispatch, callType } };
+
+  let resolved: ResolvedDispatchConfig;
+  try {
+    resolved = resolveDispatchConfig(candidate);
+  } catch (error) {
+    if (error instanceof DispatchError) return false;
+    throw error;
+  }
+
+  // A parameter the resolved config does not carry reads as its declared default, which is exactly
+  // what the engine will use — the same rule `policies.test.ts` § `settingAt` states: a gate is
+  // judged against what the run will do, not against what the file happens to spell out.
+  const read = (id: string): number | string | boolean | undefined =>
+    dispatchParameterValue(resolved, id) ?? DISPATCH_PARAMETER_BY_ID.get(id)?.default;
+
+  for (const parameter of DISPATCH_PARAMETERS) {
+    const conditions = parameter.activeWhen;
+    if (conditions === undefined) continue;
+    if (read(parameter.id) === parameter.default) continue;
+    for (const [gate, condition] of Object.entries(conditions)) {
+      if (condition === undefined) continue;
+      if (!activeWhenSatisfied(condition, read(gate))) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Every call type in {@link GENERATED_CALL_TYPES} this profile can carry, in ladder order.
+ *
+ * @throws Error if a shipped profile can carry none of them. That is a `data/` change this
+ *   generator cannot express, not a case to skip: a profile the campaign silently stopped
+ *   generating would narrow the corpus without failing anything, which is the exact shape of defect
+ *   `generate.test.ts`'s coverage assertions exist to catch.
+ */
+export function legalCallTypesFor(profile: DispatcherProfile): readonly CallType[] {
+  const legal = GENERATED_CALL_TYPES.filter((callType) => carriesCallType(profile, callType));
+  if (legal.length === 0) {
+    throw new Error(
+      `dispatcher profile "${profile.id}" can carry none of the call types the fuzz generator draws ` +
+        `(${GENERATED_CALL_TYPES.join(', ')}), so no case can name it. Widen GENERATED_CALL_TYPES or ` +
+        `fix the profile; do not skip it silently.`,
+    );
+  }
+  return legal;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -575,7 +726,8 @@ export function caseFromSeed(fuzzSeed: number | bigint, options: GenerateOptions
   }
 
   /* ---- run configuration ------------------------------------------------- */
-  const dispatcherProfileId = pick(runRng, options.dispatcherProfileIds);
+  const dispatcherProfile = pick(runRng, options.dispatcherProfiles);
+  const dispatcherProfileId = dispatcherProfile.id;
   // `constant-iso` needs a 20-minute horizon before it has a measurement window at all, so it
   // is reachable only in a space whose runs are long enough — the always-on corpus is entirely
   // `rise-and-fall`, and the deep campaign draws both. Stated on the corpus, not capped here.
@@ -585,17 +737,32 @@ export function caseFromSeed(fuzzSeed: number | bigint, options: GenerateOptions
       (id) => space.maxDurationS >= minDurationFor(id),
     ),
   );
+  // The call types this profile can actually be run under — never all of them, and never a fixed
+  // list. See `legalCallTypesFor`.
+  const callTypes = legalCallTypesFor(dispatcherProfile);
+  const credentialed = callTypes.find((id) => id === CREDENTIALED_CALL_TYPE);
+  const uncredentialed = callTypes.find((id) => id !== CREDENTIALED_CALL_TYPE);
+
   // With restricted floors in play a bare up/down button carries no credential, so a call from
   // a restricted landing is unassignable and those passengers are locked out for the whole run.
   // That is a real operating condition and it is generated on purpose in a minority of cases —
   // tagged, so the starvation property can tell "abandoned" from "not authorized to travel".
-  const lockout = accessZones.length > 0 && runRng.nextFloat() < 0.25;
-  const callType: CallType =
-    accessZones.length === 0
-      ? pick(runRng, ['up-down-buttons', 'mobile-credential'] as const)
-      : lockout
-        ? 'up-down-buttons'
-        : 'mobile-credential';
+  //
+  // The draw is made whenever there are access zones and is *then* resolved against what the
+  // profile can carry, rather than the two being folded into one condition: the `fuzz.run` stream
+  // must advance identically whatever the profile is, or making the generator profile-aware would
+  // move every scalar drawn after it — the horizon, the arrival rate, the service schedule that is
+  // a function of the horizon — in every case, for a reason that has nothing to do with them.
+  const lockoutDrawn = accessZones.length > 0 && runRng.nextFloat() < 0.25;
+  const underAccessZones = (lockoutDrawn ? uncredentialed : credentialed) ?? credentialed ?? uncredentialed;
+  /* c8 ignore next 4 -- `legalCallTypesFor` throws on an empty set, so one of the two is present. */
+  if (underAccessZones === undefined) {
+    throw new Error(`no legal call type for dispatcher profile "${dispatcherProfileId}"`);
+  }
+  const callType: CallType = accessZones.length === 0 ? pick(runRng, callTypes) : underAccessZones;
+  // The tag is read off the chosen call type rather than off the draw, so it says what is true of
+  // the case: restricted landings are locked out exactly when the call carries no credential.
+  const lockout = accessZones.length > 0 && callType !== CREDENTIALED_CALL_TYPE;
 
   // Drawn here rather than inline in the returned object literal, in exactly the order they were
   // drawn before this axis existed — `arrivalRatePctPop5min`, then `durationS`, then
