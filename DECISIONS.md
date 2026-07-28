@@ -973,8 +973,6 @@ same species of defect as a published number nothing re-derives.
 
 ---
 
-## D31 — `core` splits into a browser barrel and a Node entry, routed by an export condition
-
 Decision record for `fix/core-browser-entry`. Fixes wave-1 finding **C2**.
 
 ## The defect
@@ -999,7 +997,7 @@ THROW packages/core/dist/index.js
       (imported by …/packages/core/dist/config/loader.js)
 ```
 
-## Decision 1 — restructure, not a subpath beside the default barrel
+## D31 — `core` restructures into a browser barrel and a Node entry, routed by an export condition
 
 The brief offered two shapes: add an `@elevator-sim/core/config` subpath beside the existing
 default barrel, or move `loadConfig` off the default barrel. **Neither in its pure form was
@@ -1054,7 +1052,7 @@ side of a split. The *safe* barrel is where every ordinary export goes, and it i
 guard walks. Before, the polarity was reversed: the safe path was the opt-in one and nobody
 opted in.
 
-## Decision 2 — the guard walks the graph, and its complement is asserted
+## D32 — the browser guard walks the import graph, and its complement is asserted
 
 `src/browser.test.ts` does a breadth-first walk of the real static import graph from
 `src/browser.ts`, resolving `./x.js → x.ts` the way `tsc` emits, and asserts:
@@ -1083,7 +1081,7 @@ bare `from`, because `config/resolveCar.ts` builds the message ``cannot read a �
 
 The guard was watched failing three ways before being trusted — see the delivery report.
 
-## Decision 3 — where the guard lives
+## D33 — the browser guard lives in `core`, not in `viz`
 
 In `core`, not in `viz/src/boundaries.test.ts`. Invariant 6 runs one way: `core` must build
 and test with `viz` absent, so a `core` invariant cannot be enforced from `viz`.
