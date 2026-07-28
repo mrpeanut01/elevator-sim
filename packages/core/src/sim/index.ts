@@ -46,7 +46,7 @@
 
 export { Simulation, runSimulation } from './simulation.js';
 
-export type { StageActivity } from './simulation.js';
+export type { StageActivity } from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * Events

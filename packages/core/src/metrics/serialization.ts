@@ -117,6 +117,7 @@ export const runRecordSchema = z.strictObject({
   startedAt: simTime,
   endedAt: simTime,
   reportWindow: reportWindowSchema.optional(),
+  warnings: z.array(z.string().min(1)).optional(),
   passengers: z.array(passengerRecordSchema),
   loadSamples: z.array(loadSampleSchema),
   queueSamples: z.array(queueSampleSchema),

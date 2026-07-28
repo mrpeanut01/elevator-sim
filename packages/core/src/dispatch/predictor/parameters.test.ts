@@ -365,16 +365,38 @@ describe('PREDICTOR_PARAMETERS', () => {
       createArrivalModel({ floorIds: tower }).expectedDemandByFloor(0, horizonS).get('5') ?? 0;
     expect(raw(3600) / raw(30)).toBeCloseTo(120, 6);
 
-    // The other direction: below the gate's bound a bucket-of-day recurs inside the run, the
+    // The other direction: at a short enough cycle a bucket-of-day recurs inside the run, the
     // window folds, and the shape moves with the horizon. So the dimension is conditional rather
-    // than dead, which is what the gate declares.
+    // than dead.
     const folded = HORIZONS.map((horizonS) => shape(horizonS, 600));
     expect(new Set(folded.map((values) => values.join(','))).size).toBeGreaterThan(1);
 
-    // And the gate is declared, so a generic optimizer skips the plateau without reading any of
-    // the above. `sim/searchSpaceLiveness.test.ts` asserts the behavioural half through a run.
+    /*
+     * **And the row carries no `activeWhen`, which this test used to pin to `{ max: 1800 }`.**
+     *
+     * That bound was unsound in the direction the module docstring calls the worse of the two:
+     * measured through real runs at seed 20260726, the horizon still produces 2 distinct
+     * passenger-record trajectories on `secure-tower` at a cycle of **3600** — outside the gate,
+     * where a generic optimizer had been told not to look. The condition is relational (a
+     * bucket-of-day has to recur inside the window, roughly `horizon >= cycle`) and `activeWhen`
+     * compares against constants, so no bound is correct for more than the single cycle it is
+     * fitted to.
+     *
+     * Ungated, therefore, and the inertness at the shipped cycle is carried where it can be
+     * falsified: `sim/searchSpaceLiveness.test.ts` holds it in `DECLARED_INERT`, whose entries
+     * must execute the condition under which the dimension IS live. The same file now also
+     * asserts that every surviving gate's gated-**off** region is flat, so this class of wrong
+     * bound is a red test rather than a comment.
+     */
     const horizon = predictorParameter('idle.predictorHorizonS');
-    expect(horizon?.activeWhen).toStrictEqual({ 'idle.predictorCycleS': { max: 1800 } });
+    expect(horizon?.activeWhen).toBeUndefined();
+
+    // The folding happens above 1800 too, which is the measurement that removed the bound.
+    const above = HORIZONS.map((horizonS) => shape(horizonS, 3600));
+    expect(
+      new Set(above.map((values) => values.join(','))).size,
+      'the forecast no longer folds at a 3600 s cycle, so the bound that was removed would have been sound after all',
+    ).toBeGreaterThan(1);
   });
 });
 

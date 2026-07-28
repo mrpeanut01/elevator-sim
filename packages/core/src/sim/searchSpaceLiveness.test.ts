@@ -34,11 +34,17 @@
  * fails too. Without both halves the allowlist is where dead configuration goes to be forgotten,
  * which is the failure mode one step removed from the one this file exists to catch.
  *
- * The four `activeWhen`-gated dimensions are not in the allowlist and must not be: a gate is the
+ * The `activeWhen`-gated dimensions are not in the allowlist and must not be: a gate is the
  * *declared* form of "inert here", it is machine-readable to a generic optimizer without reading
- * this file, and the sweep satisfies it and then requires liveness inside it. `idle.predictorHorizonS`
- * is the worked example — flat over its whole declared range at the default `predictorCycleS`,
- * live once the cycle is short enough for a bucket-of-day to recur, and now gated on exactly that.
+ * this file, and the sweep satisfies it and then requires liveness inside it.
+ *
+ * **And, since a gate is a claim, it is checked in both directions too.** The sweep used to
+ * satisfy a gate, confirm the dimension live inside it, and never probe outside — so a gate whose
+ * condition was simply *wrong* passed silently, and a gate was the one unfalsifiable escape hatch
+ * in a file built to have none. `idle.predictorHorizonS` is the worked example and it is a worked
+ * example of the failure, not of the mechanism: gated on `predictorCycleS <= 1800`, it was still
+ * live at cycle 3600 on `secure-tower`, which is a live dimension declared dead. It is ungated and
+ * allowlisted now, and every remaining gate has to assert that its gated-**off** region is flat.
  *
  * ## Why the dimension list is derived and not written down
  *
@@ -350,7 +356,15 @@ interface Sweep {
   readonly inadmissible: boolean;
 }
 
-/** Two profiles differing in exactly one dimension, run until they diverge. */
+/**
+ * Two profiles differing in exactly one dimension, run until they diverge.
+ *
+ * `satisfyOwnGates` is on for every liveness question and **off** for the one question that is
+ * about the gate itself: the gated-off probe writes a violating gate value into `harness.base`
+ * and must not have it written straight back. Without the switch that probe silently measures
+ * the region *inside* the gate and reports every gate in the schema as unsound, which is what it
+ * did the first time it was run.
+ */
 function sweepDimension(
   harness: Harness,
   spec: DispatchParameterSpec,
@@ -358,6 +372,7 @@ function sweepDimension(
   overrides: RunOverrides = {},
   buildingIds: readonly string[] = PROBE_BUILDINGS,
   building?: ResolvedBuilding,
+  satisfyOwnGates = true,
 ): Sweep {
   let admissible = false;
   for (let choice = 0; choice < 3; choice += 1) {
@@ -372,8 +387,10 @@ function sweepDimension(
       try {
         left = structuredClone(harness.base);
         right = structuredClone(harness.base);
-        satisfyGates(spec, byId, choice, left);
-        satisfyGates(spec, byId, choice, right);
+        if (satisfyOwnGates) {
+          satisfyGates(spec, byId, choice, left);
+          satisfyGates(spec, byId, choice, right);
+        }
         writeInto(left, spec.id, low);
         writeInto(right, spec.id, high);
         materialise(left);
@@ -481,7 +498,62 @@ const DECLARED_INERT: Readonly<Record<string, InertReason>> = Object.freeze({
       'the guard needs exactly one eligible car rejected solely on load; every shipped building has a fleet large enough that another car is always eligible',
     liveOnOneCarBank: true,
   },
+
+  /*
+   * The worked example this file's header used to give for a *gate*, moved to where the claim
+   * has to be proven. It carried `activeWhen: { 'idle.predictorCycleS': { max: 1800 } }`, and
+   * that bound was measurably wrong in the direction that costs the most: at cycle 3600 —
+   * outside the gate — sweeping the horizon over {30, 120, 300, 900, 3600} still produces 2
+   * distinct trajectories on `secure-tower`. The gate hid a live region, which is exactly what
+   * `activeWhen` is supposed to prevent.
+   *
+   * The real condition is relational (a bucket-of-day has to recur inside the window, roughly
+   * `horizon >= cycle`) and `activeWhen` is a comparison against constants, so no bound is
+   * sound. Ungated and allowlisted instead — the entry below then has to *execute* the
+   * condition, which the gate never did.
+   */
+  'idle.predictorHorizonS': {
+    reason:
+      'the forecast integrates to exactly rate x horizon while no bucket-of-day recurs inside a replication, and all three consumers reduce it to a scale-invariant statistic, so the whole declared range is one run at the shipped predictorCycleS of 86400',
+    liveUnder: { idle: { predictorCycleS: 1800 } },
+  },
 });
+
+/* -------------------------------------------------------------------------- *
+ * The other half of the same obligation: a gate must not hide a live region
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Values of a gate that **violate** one condition, most contrasting first.
+ *
+ * The mirror of {@link gateValues}. For a list-form condition, any admitted value of the gate
+ * that is not in the list; for a range, the parts of the gate's own range outside `[min, max]`.
+ */
+function gateViolatingValues(
+  gate: DispatchParameterSpec,
+  condition: ActiveWhenCondition,
+): readonly Value[] {
+  if (!isActiveWhenRange(condition)) {
+    const excluded = new Set<string>(condition);
+    if (gate.type === 'boolean') {
+      return [true, false].filter((value) => !excluded.has(String(value)));
+    }
+    return (gate.values ?? []).filter((value) => !excluded.has(value));
+  }
+  const [low, high] = gate.range ?? [0, 1];
+  const out: number[] = [];
+  // Just outside each end, and the far endpoint, so a condition with one open side still
+  // produces a probe. `round` keeps an integer dimension integral.
+  if (condition.max !== undefined && condition.max < high) {
+    const justOver = Math.min(high, condition.max * (gate.scale === 'log' ? 2 : 1) + 1);
+    out.push(round(gate, justOver), round(gate, high));
+  }
+  if (condition.min !== undefined && condition.min > low) {
+    const justUnder = Math.max(low, condition.min / (gate.scale === 'log' ? 2 : 1) - 1);
+    out.push(round(gate, justUnder), round(gate, low));
+  }
+  return [...new Set(out)];
+}
 
 /* -------------------------------------------------------------------------- *
  * The assertions
@@ -585,10 +657,13 @@ describe('every searchable dimension can change a run, or declares why it cannot
     // Each of these was flat over its whole declared range on every shipped building, and each
     // is closed by a *different* remedy — a gate, a behaviour, a range — so a single generic
     // assertion above would not say which one regressed. The evidence string is the measurement.
+    // `idle.predictorHorizonS` is deliberately not in this list any more. Its remedy moved from
+    // a gate to a `DECLARED_INERT` entry — see that entry — and the obligation that keeps it
+    // honest is the "proves every declared-inert dimension live" test below, which runs the
+    // same sweep under the condition the entry names. Asserting it live here as well would
+    // assert it live at the *shipped* cycle, where it provably is not.
     const { harness, byId } = await harnessFor();
     for (const id of [
-      // #9/#10: gated on idle.predictorCycleS, and live once the gate is satisfied.
-      'idle.predictorHorizonS',
       // #12/#13: Simulation.#reopenForLateArrival is the non-test caller it did not have.
       'answer.reopenOnLateArrival',
       // #21: the declared range now reaches the design load factor, where the interlock binds.
@@ -599,6 +674,84 @@ describe('every searchable dimension can change a run, or declares why it cannot
       const verdict = sweepDimension(harness, spec, byId);
       expect(verdict.live, `${id} went flat again`).toBe(true);
     }
+  }, 600_000);
+
+  it('finds no activeWhen gate that hides a live region', async () => {
+    /*
+     * **The half of the contract `activeWhen` never had to keep.**
+     *
+     * A `DECLARED_INERT` entry is a claim with a proof obligation: it names the condition under
+     * which the dimension is live and the test executes it. An `activeWhen`-gated region carried
+     * no obligation at all — the sweep satisfied the gate, found the dimension live inside it,
+     * and never looked outside. So a gate was the one unfalsifiable escape hatch in a file whose
+     * entire purpose is to have none, and "it is fine, it is just conditional" is precisely what
+     * the five shipped instances of this defect looked like.
+     *
+     * `idle.predictorHorizonS` is why this exists rather than why it is a good idea. It shipped
+     * gated on `{ 'idle.predictorCycleS': { max: 1800 } }`, and at cycle 3600 — gated **off** —
+     * the horizon still moved `secure-tower`. That is a live dimension a generic optimizer was
+     * told to skip, which `dispatch/predictor/parameters.ts` calls the worse of the two errors
+     * in its own words. Nothing in this file could have said so.
+     *
+     * The assertion is the contrapositive of the gate's meaning: outside its condition, the
+     * dimension must be **flat**. A gate that fails this is not documentation, it is a claim
+     * that is false, and the remedy is to fix the bound or to drop the gate and allowlist the
+     * dimension — which is what that row did.
+     */
+    const { harness, dimensions, byId } = await harnessFor();
+    const unsound: string[] = [];
+    let gatesChecked = 0;
+
+    for (const spec of dimensions) {
+      for (const [gateId, condition] of Object.entries(spec.activeWhen ?? {})) {
+        if (condition === undefined) continue;
+        const gate = byId.get(gateId);
+        if (gate === undefined) continue;
+        const violating = gateViolatingValues(gate, condition);
+        if (violating.length === 0) continue; // the gate admits the gate's whole range
+        gatesChecked += 1;
+
+        for (const value of violating) {
+          const off = structuredClone(harness.base) as Authored;
+          // The gate's *own* gates still have to be satisfied, or the probe measures a
+          // combination the policy layer refuses rather than the region under test.
+          satisfyGates(gate, byId, 0, off);
+          writeInto(off, gateId, value);
+          let outside: Sweep;
+          try {
+            outside = sweepDimension(
+              { ...harness, base: off },
+              spec,
+              byId,
+              {},
+              PROBE_BUILDINGS,
+              undefined,
+              false,
+            );
+          } catch {
+            continue; // the configuration is inadmissible; not evidence either way
+          }
+          if (outside.live) {
+            unsound.push(
+              `${spec.id} is gated on ${gateId} ${JSON.stringify(condition)}, and at ` +
+                `${gateId}=${String(value)} — outside that gate — it still moves a run ` +
+                `(${outside.evidence ?? ''})`,
+            );
+          }
+        }
+      }
+    }
+
+    // Non-vacuity: a scanner that matched no gate would pass this silently, which is the same
+    // defect one level up.
+    expect(gatesChecked, 'no activeWhen gate was checked at all').toBeGreaterThan(0);
+    expect(
+      unsound,
+      'these gates tell a generic optimizer to skip a region in which the dimension is ' +
+        'demonstrably live. A gate is a machine-readable claim, not a comment: either tighten ' +
+        'the condition until it is true, or remove the gate and carry the dimension in ' +
+        'DECLARED_INERT, whose entries have to prove when they ARE live',
+    ).toEqual([]);
   }, 600_000);
 
   it('proves every declared-inert dimension live under the condition its entry names', async () => {

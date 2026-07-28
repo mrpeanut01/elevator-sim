@@ -934,6 +934,101 @@ describe('open while the door is already closing', () => {
     expect(typesOf(step.events)).not.toContain('door.openDeclined');
   });
 
+  it('sizes a revised reopen to its own cohort, not to the cohort the stop already served', () => {
+    /*
+     * **The assertion whose absence made the courtesy hold's published cost an artefact.**
+     *
+     * `applyReopen` used to size every honoured reopen off `door.reason`, which
+     * `mergeStopReasons` keeps at the **larger** transfer of everything the stop has answered.
+     * So a door reversing for one late passenger was re-granted the whole cohort's transfer —
+     * `(alighting + boardingAtOpen) * tp`, bounded only by `maxTransferSeconds` — once per
+     * honoured reopen, up to `maxReopensPerStop` times. Nobody boarded against that dwell and
+     * nobody could: the cohort had already transferred.
+     *
+     * The bound is the whole point. A hold for `k` passengers may cost at most what a hall-call
+     * stop for `k` passengers costs, and nothing about the stop it interrupts may enter into it.
+     */
+    const tp = 1.2;
+    const cohort = (people: number): DoorStopReason => ({
+      carCall: true,
+      hallCall: true,
+      hallQueueLength: people,
+      transferSeconds: people * tp,
+    });
+
+    // Cohorts big enough that the transfer, not the base hall dwell, sets the stop's dwell —
+    // otherwise the two are equal and the test cannot tell a fix from the defect.
+    for (const served of [6, 12, 20]) {
+      for (const late of [1, 2, 3]) {
+        // A stop that transferred `served` people, now closing.
+        let door = applyDoorCommand(createDoorState(0), { kind: 'open', reason: cohort(served) }, 0, COURTESY).state;
+        door = advanceDoor(door, COURTESY.openS, COURTESY).state;
+        expect(door.state).toBe('open');
+        expect(door.grantedDwellS).toBeCloseTo(served * tp, PRECISION);
+        expect(served * tp).toBeGreaterThan(COURTESY.dwellHallCallS);
+        door = advanceDoor(door, COURTESY.openS + door.grantedDwellS + 0.5, COURTESY).state;
+        expect(door.state).toBe('closing');
+
+        const at = COURTESY.openS + served * tp + 0.5;
+        const held = applyDoorCommand(
+          door,
+          {
+            kind: 'reopen',
+            cause: 'lateArrival',
+            reason: { carCall: false, hallCall: true, hallQueueLength: late, transferSeconds: late * tp },
+          },
+          at,
+          COURTESY,
+        ).state;
+        // Out to fully open again, which is where the reversed period's dwell is granted.
+        const reopened = advanceDoor(held, at + COURTESY.openS, COURTESY).state;
+        expect(reopened.state).toBe('open');
+
+        // The bound: what a hall-call stop for exactly these `late` passengers would get.
+        const bound = dwellSecondsFor(COURTESY, {
+          carCall: false,
+          hallCall: true,
+          hallQueueLength: late,
+          transferSeconds: late * tp,
+        });
+        expect(
+          reopened.grantedDwellS,
+          `a hold for ${late} passenger(s) was granted ${reopened.grantedDwellS}s after a stop ` +
+            `that transferred ${served}; the bound for ${late} passenger(s) is ${bound}s`,
+        ).toBeCloseTo(bound, PRECISION);
+        // And, stated the other way, it never scales with the cohort it interrupted.
+        expect(reopened.grantedDwellS).toBeLessThan(served * tp + 1e-9);
+
+        // Attribution is untouched: the *stop* still knows everything it answered, so
+        // `totalS - nominalStopSeconds` stays the overhead it claims to be.
+        expect(reopened.reason.transferSeconds).toBeCloseTo(served * tp, PRECISION);
+        expect(reopened.reason.carCall).toBe(true);
+      }
+    }
+  });
+
+  it('leaves a reopen with no revised reason sized off the stop, which is the photo-eye', () => {
+    // The safety path must not change. Nobody knows who is standing in a doorway, so the stop's
+    // own reason is the only honest estimate and an obstruction reopen still gets it.
+    const tp = 1.2;
+    const reason: DoorStopReason = {
+      carCall: true,
+      hallCall: true,
+      hallQueueLength: 12,
+      transferSeconds: 12 * tp,
+    };
+    let door = applyDoorCommand(createDoorState(0), { kind: 'open', reason }, 0, COURTESY).state;
+    door = advanceDoor(door, COURTESY.openS, COURTESY).state;
+    door = advanceDoor(door, COURTESY.openS + door.grantedDwellS + 0.5, COURTESY).state;
+    expect(door.state).toBe('closing');
+
+    const at = COURTESY.openS + 12 * tp + 0.5;
+    const bounced = applyDoorCommand(door, { kind: 'reopen', cause: 'obstruction' }, at, COURTESY).state;
+    const reopened = advanceDoor(bounced, at + COURTESY.openS, COURTESY).state;
+    expect(reopened.grantedDwellS).toBeCloseTo(12 * tp, PRECISION);
+    expect(reopened.dwellReason).toEqual(reopened.reason);
+  });
+
   it('serves the late hall call if the caller follows the decline with a reopen', () => {
     // The documented remedy: `reopen` reverses the door, spends a slot of the bounded reopen
     // budget and earns a real dwell for the widened reason — unlike `open`, which cannot.

@@ -366,6 +366,7 @@ export function createDoorState(at: SimTime = 0): DoorMachineState {
     openFractionAtSince: 0,
     stopStartedAt: undefined,
     reason: NO_REASON,
+    dwellReason: NO_REASON,
     grantedDwellS: 0,
     reopenCount: 0,
     accounting: ZERO_ACCOUNTING,
@@ -530,7 +531,10 @@ function fireAutomatic(
   switch (door.state) {
     case 'opening': {
       const accounting = settleCurrentPhase(door, at);
-      const grantedDwellS = dwellSecondsFor(config, door.reason);
+      // `dwellReason`, not `reason`: this fires for the initial open *and* for the reopen that
+      // reverses a closing door, and a reopen may have revised what the coming open period has
+      // to cover. The two are the same value unless somebody revised one.
+      const grantedDwellS = dwellSecondsFor(config, door.dwellReason);
       return {
         state: Object.freeze({
           ...door,
@@ -661,6 +665,7 @@ function applyOpen(
         openFractionAtSince: 0,
         stopStartedAt: at,
         reason: merged,
+        dwellReason: merged,
         grantedDwellS: 0,
         reopenCount: 0,
         accounting: ZERO_ACCOUNTING,
@@ -670,12 +675,16 @@ function applyOpen(
   }
 
   const merged = mergeStopReasons(door.reason, reason);
+  // An `open` **widens**: a stop that has grown needs at least the dwell it already had, so the
+  // current open period's basis merges rather than being replaced. That is the difference from
+  // `reopen`, which starts a new open period and may state a smaller cohort for it.
+  const dwellReason = mergeStopReasons(door.dwellReason, reason);
 
   if (door.state === 'opening') {
     // Record the widened reason; it will set the dwell when the door reaches fully open, so
     // the stop really does honour it. No reversal — that is what `reopen` is for.
     return Object.freeze({
-      state: Object.freeze({ ...door, reason: merged }),
+      state: Object.freeze({ ...door, reason: merged, dwellReason }),
       events: NO_EVENTS,
     });
   }
@@ -705,15 +714,15 @@ function applyOpen(
   // Already dwelling. Recompute against the widened reason, but keep the deadline anchored
   // to when the door opened (`since`), so merging reasons can extend the dwell only up to
   // the dwell ceiling and never indefinitely.
-  const grantedDwellS = dwellSecondsFor(config, merged);
+  const grantedDwellS = dwellSecondsFor(config, dwellReason);
   if (grantedDwellS <= door.grantedDwellS) {
     return Object.freeze({
-      state: Object.freeze({ ...door, reason: merged }),
+      state: Object.freeze({ ...door, reason: merged, dwellReason }),
       events: NO_EVENTS,
     });
   }
   return Object.freeze({
-    state: Object.freeze({ ...door, reason: merged, grantedDwellS }),
+    state: Object.freeze({ ...door, reason: merged, dwellReason, grantedDwellS }),
     events: Object.freeze([
       event('door.dwellExtended', at, 'open', 'open', 1, { dwellS: grantedDwellS }),
     ]),
@@ -761,13 +770,19 @@ function applyReopen(
   // Honoured, so — and only so — the revised reason counts. A refused request must not be
   // able to lengthen the stop it was refused for.
   const merged = reason === undefined ? door.reason : mergeStopReasons(door.reason, reason);
+  // While the door is still opening or dwelling, the declared cohort has **not** transferred
+  // yet, so a revised reason can only widen — the same rule `open` follows. Narrowing here
+  // would let a caller cut short a dwell the stop was granted and never served, which is
+  // exactly the case `DoorTimeAccounting` forbids: `totalS - nominalStopSeconds(reason)` would
+  // go negative on a stop nobody forced closed.
+  const widened = mergeStopReasons(door.dwellReason, reason ?? NO_REASON);
 
   if (door.state === 'opening') {
     // Already opening: there is nothing to reverse and no time is lost, so this costs no slot
     // of the reopen budget and produces no transition. It still had to pass the rules above,
     // which is the difference between "free" and "invisible".
     return Object.freeze({
-      state: Object.freeze({ ...door, reason: merged }),
+      state: Object.freeze({ ...door, reason: merged, dwellReason: widened }),
       events: NO_EVENTS,
     });
   }
@@ -775,13 +790,14 @@ function applyReopen(
   if (door.state === 'open') {
     // Dwelling: the photo-eye or the hold button restarts the dwell timer from now.
     const accounting = countedReopen(settleCurrentPhase(door, at), cause);
-    const grantedDwellS = dwellSecondsFor(config, merged);
+    const grantedDwellS = dwellSecondsFor(config, widened);
     return Object.freeze({
       state: Object.freeze({
         ...door,
         since: at,
         openFractionAtSince: 1,
         reason: merged,
+        dwellReason: widened,
         grantedDwellS,
         reopenCount: door.reopenCount + 1,
         accounting,
@@ -792,10 +808,25 @@ function applyReopen(
     });
   }
 
-  // Closing: reverse from wherever the door had got to. The partial close is still real
-  // time and stays in `closingS`; it is additionally recorded in `abortedClosingS` so the
-  // metrics layer can separate the close that worked from the ones that did not.
+  /*
+   * Closing: reverse from wherever the door had got to. The partial close is still real
+   * time and stays in `closingS`; it is additionally recorded in `abortedClosingS` so the
+   * metrics layer can separate the close that worked from the ones that did not.
+   *
+   * **And this is the one state in which a revised reason may narrow the dwell.** A door only
+   * reaches `closing` on its own by serving its granted dwell in full, so the cohort declared
+   * at open has transferred and a reversal is for whoever turned up afterwards — which is the
+   * whole premise of the courtesy hold, and the only state `Simulation.#reopenForLateArrival`
+   * requests one from. Sizing it off `merged` instead re-grants that discharged cohort's
+   * transfer, bounded only by `maxTransferSeconds`, once per honoured reopen; measured across
+   * the shipped buildings that was most of the apparent cost of `answer.reopenOnLateArrival`.
+   *
+   * A `close` command can also reach `closing` early, and there the dwell was *not* served in
+   * full — which is the documented exception on {@link DoorTimeAccounting}: a forced close is
+   * already the one thing that may put a stop under its nominal duration.
+   */
   const openFraction = doorOpenFractionAt(door, at, config);
+  const dwellReason = reason === undefined ? door.reason : mergeStopReasons(NO_REASON, reason);
   const accounting = countedReopen(settleCurrentPhase(door, at, true), cause);
   return Object.freeze({
     state: Object.freeze({
@@ -804,6 +835,7 @@ function applyReopen(
       since: at,
       openFractionAtSince: openFraction,
       reason: merged,
+      dwellReason,
       reopenCount: door.reopenCount + 1,
       accounting,
     }),

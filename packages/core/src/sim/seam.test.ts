@@ -51,6 +51,9 @@ import type {
 import { createArrivalModel } from '../dispatch/predictor/arrivalModel.js';
 import type { ArrivalModel } from '../dispatch/predictor/types.js';
 import type { Direction } from '../model/types.js';
+import { LOAD_SENSOR_DEFAULTS } from '../model/car/loadSensor.js';
+import { dwellSecondsFor } from '../physics/doors/doorMachine.js';
+import { DOOR_DEFAULTS } from '../physics/doors/types.js';
 
 import { BUILDING_IDS, load } from './fixtures.test-helper.js';
 import { Simulation, runSimulation } from './simulation.js';
@@ -317,16 +320,132 @@ describe('answer.reopenOnLateArrival reaches a run, in both of its positions', (
     expect(trajectory(honoured.result)).not.toBe(trajectory(declined.result));
   }, 120_000);
 
-  it('is off by default, so no published number was revalued by implementing it', async () => {
-    // The default is `false` deliberately (`DOOR_DEFAULTS.reopenOnLateArrival`): turning the hold
-    // on moves 41 of the 50 shipped building x profile trajectories. A profile that authors
-    // nothing must therefore run exactly as it did before the behaviour existed.
+  it('is off by default, exercised through default resolution on a building that asks', async () => {
+    /*
+     * This used to call `simulate(false, 'garden-apartments')` — setting the flag *explicitly*,
+     * so it never touched the default at all — on the one shipped building whose landings always
+     * empty, where `lateArrivalHoldsRequested` is 0 and `granted === 0` holds whatever the door
+     * does. Both halves were vacuous, and together they asserted nothing.
+     *
+     * What it has to test: a profile that **authors nothing** resolves to a declined hold, on a
+     * building that actually asks for one. `midtown-office` requests holds; the profile goes in
+     * with no `answer.reopenOnLateArrival` key at all, so `resolveDoorConfig` falls all the way
+     * through to `DOOR_DEFAULTS`.
+     */
     const cfg = await load();
-    const base = cfg.dispatcherProfilesById.get('eta') as DispatcherProfile;
+    const base = cfg.dispatcherProfilesById.get('predictive-balanced') as DispatcherProfile;
     expect(base.answer?.reopenOnLateArrival).toBeUndefined();
-    const { simulation } = await simulate(false, 'garden-apartments');
-    expect(simulation.stageActivity.lateArrivalHoldsGranted).toBe(0);
+    expect(DOOR_DEFAULTS.reopenOnLateArrival).toBe(false);
+
+    const answer = { ...base.answer };
+    delete (answer as Record<string, unknown>)['reopenOnLateArrival'];
+    const simulation = new Simulation({
+      building: cfg.buildingsById.get('midtown-office') as ResolvedBuilding,
+      dispatcherProfile: { ...base, id: 'hold-unauthored', answer },
+      trafficProfiles: cfg.trafficProfiles,
+      elevatorSpecs: cfg.elevatorSpecs,
+      seed: SEED,
+      onTimeout: 'report',
+    });
+    const result = simulation.run();
+    const activity = simulation.stageActivity;
+
+    // The building really does ask, so the two assertions below are about the *default*.
+    expect(
+      activity.lateArrivalHoldsRequested,
+      'midtown-office stopped producing late arrivals; this test is vacuous again',
+    ).toBeGreaterThan(0);
+    expect(activity.lateArrivalHoldsGranted).toBe(0);
+    expect(activity.lateArrivalHoldsRefused).toBe(activity.lateArrivalHoldsRequested);
+
+    // And bit-identical to the same profile with the flag written out as `false`, which is what
+    // "the default preserves the published operating point" means.
+    const explicit = await simulate(false);
+    expect(trajectory(result)).toBe(trajectory(explicit.result));
   }, 120_000);
+
+  it('grants no hold that boards nobody, and sizes each one to its own cohort', async () => {
+    /*
+     * **The two assertions whose absence let the courtesy hold ship with a fictional price.**
+     *
+     * 1. *A granted hold buys boarding.* `#reopenForLateArrival` used to test
+     *    `massKg >= designLoadKg` plus the serve predicate, while `#boardFrom` also requires
+     *    `massKg + candidate.massKg < overloadKg`. The two disagree the moment
+     *    `answer.overloadThreshold` comes down towards the design load factor — the floor its
+     *    declared range now reaches — and the disagreement is a door that reverses, spends the
+     *    time, and boards nobody. Both now ask `#projectedBoarding`, which is defined against
+     *    `#boardFrom` clause for clause, so the two cannot drift apart again silently.
+     *
+     * 2. *The dwell is the hold's, not the stop's.* `applyReopen` re-granted
+     *    `dwellSecondsFor(config, door.reason)` — the transfer of the cohort that had **already**
+     *    got off and on, capped only at `maxTransferSeconds` — once per honoured reopen.
+     *
+     * The bound is per-hold and not a run total, because a run total cannot see it: the hold
+     * dwell is `max(base hall dwell, cohort x tp)`, the base term dominates on these buildings,
+     * and summing hides one 40 s re-grant among two hundred 5 s holds. Measured with the defect
+     * in place, `lateArrivalHoldMaxDwellS` reaches **40.0 s on vertical-city — exactly
+     * `maxTransferSeconds`** — against a largest hold cohort of 17, and every building below
+     * fails this assertion. With the dwell sized to the hold, each comes in at exactly
+     * `dwellSecondsFor` of its own largest cohort.
+     */
+    const cfg = await load();
+    const base = cfg.dispatcherProfilesById.get('predictive-balanced') as DispatcherProfile;
+
+    for (const buildingId of ['secure-tower', 'mixed-use-high-rise']) {
+      for (const overloadThreshold of [1.1, LOAD_SENSOR_DEFAULTS.designLoadFactor]) {
+        const simulation = new Simulation({
+          building: cfg.buildingsById.get(buildingId) as ResolvedBuilding,
+          dispatcherProfile: {
+            ...base,
+            id: `hold-bound-${String(overloadThreshold)}`,
+            answer: { ...base.answer, reopenOnLateArrival: true, overloadThreshold },
+          },
+          trafficProfiles: cfg.trafficProfiles,
+          elevatorSpecs: cfg.elevatorSpecs,
+          seed: SEED,
+          onTimeout: 'report',
+        });
+        simulation.run();
+        const a = simulation.stageActivity;
+        const where = `on ${buildingId} at overloadThreshold ${overloadThreshold}`;
+
+        expect(a.lateArrivalHoldsGranted, `no hold was granted ${where}`).toBeGreaterThan(0);
+
+        // (1) The intersection of the room check and the boarding predicate.
+        expect(
+          a.lateArrivalHoldsBoarded,
+          `${a.lateArrivalHoldsGranted} holds reversed a door and boarded nobody ${where} — ` +
+            'the room check and #boardFrom disagree again',
+        ).toBeGreaterThan(0);
+
+        // (2) The dwell bound, rebuilt from the fleet's own resolved door configs: what a
+        // hall-call open period for the largest cohort any single hold was sized for costs.
+        // Nothing about the stops the holds interrupted may enter into it.
+        let bound = 0;
+        for (const car of simulation.building.cars) {
+          bound = Math.max(
+            bound,
+            dwellSecondsFor(car.doorConfig, {
+              carCall: false,
+              hallCall: true,
+              hallQueueLength: a.lateArrivalHoldMaxCohort,
+              transferSeconds: a.lateArrivalHoldMaxCohort * car.passengerTransferS,
+            }),
+          );
+        }
+        expect(
+          a.lateArrivalHoldMaxDwellS,
+          `one hold was granted ${a.lateArrivalHoldMaxDwellS.toFixed(2)}s ${where}, and the ` +
+            `largest cohort any hold was sized for is ${a.lateArrivalHoldMaxCohort} ` +
+            `passengers, worth ${bound.toFixed(2)}s. A reopen is being re-granted the transfer ` +
+            'of the cohort that had already transferred',
+        ).toBeLessThanOrEqual(bound + 1e-9);
+
+        // Non-vacuity: a run in which no hold was sized for anybody could not fail the above.
+        expect(a.lateArrivalHoldMaxCohort, `no hold was sized for anybody ${where}`).toBeGreaterThan(0);
+      }
+    }
+  }, 240_000);
 });
 
 /* -------------------------------------------------------------------------- *

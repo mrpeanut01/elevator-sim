@@ -128,7 +128,7 @@ export const PREDICTOR_DEFAULTS = Object.freeze({
  * dispatch schema through the real profile parser and back out of the real resolver, so the claim
  * is asserted rather than written down.
  *
- * ## Five of the six rows carry no `activeWhen`, and that is the honest answer rather than an
+ * ## None of the six rows carries an `activeWhen`, and that is the honest answer rather than an
  * omission
  *
  * This paragraph used to claim four of the six were gated on
@@ -145,6 +145,12 @@ export const PREDICTOR_DEFAULTS = Object.freeze({
  * already had twice. So the condition is stated here and those rows stay ungated: an optimizer
  * that over-searches a dimension wastes budget, one that skips a live dimension reports a winner
  * that is only optimal at whatever the default happened to be.
+ *
+ * **That last sentence is why the sixth row lost its gate too**, and it is worth stating as a
+ * rule rather than as an anecdote: `activeWhen` may only carry a condition it can express
+ * *exactly*. An approximate gate is not a conservative simplification — it is the "skips a live
+ * dimension" error with a machine-readable face on it, and it is the harder of the two to find,
+ * because the region it hides is precisely the region nothing ever probes.
  *
  * ## The sixth row — and the claim above used to be **false** for it
  *
@@ -168,16 +174,39 @@ export const PREDICTOR_DEFAULTS = Object.freeze({
  * cancels out of all three.
  *
  * So the horizon is live exactly when the cycle is short enough that a bucket-of-day comes round
- * inside one replication, and the row is gated on that: `{ 'idle.predictorCycleS': { max: 1800 } }`.
- * Measured at seed 20260726 over horizons {30, 120, 300, 900, 3600}, garden-apartments produces 1
- * distinct trajectory at cycle 86 400 and 2 at cycle 1 800; at cycle 600 with a 120 s bucket it
- * produces 4. 1 800 s is the bound because it is the replication length this project reports
- * against — the condition is really *"the cycle is shorter than the run"*, and `activeWhen` cannot
- * name the run length, so it names the cycle at the run length instead. `idle.predictorCycleS`'s
- * own description already states the same fact from the other side.
+ * inside one replication.
  *
- * The gate is deliberately **not** an excuse: it does not say the horizon is meaningless, it says
- * a search that leaves the cycle at a day must not spend budget on the horizon.
+ * ## And it was gated on an approximation of that, which was unsound
+ *
+ * This row shipped with `activeWhen: { 'idle.predictorCycleS': { max: 1800 } }` and a measurement
+ * that does not reproduce. Re-measured at seed 20260726 over horizons {30, 120, 300, 900, 3600},
+ * against `predictive-balanced` on the shipped buildings:
+ *
+ * ```
+ *                       cycle 86 400   3 600   1 800    900    600
+ * garden-apartments                1       1       1      1      1
+ * secure-tower                     1       2       4      3      2
+ * midtown-office                   1       1       1      1      1
+ * ```
+ *
+ * Two things are wrong with the old note. It named **garden-apartments** as producing 2 distinct
+ * trajectories at cycle 1 800; garden-apartments produces **1** at every cycle tried. The
+ * building on which this dimension is live is **secure-tower**. And, the reason the gate had to
+ * go: at cycle 3 600 — *outside* the gate, where a generic optimizer was told not to look — the
+ * horizon still produces 2 distinct trajectories. The gate skipped a live dimension, which the
+ * paragraph above calls the worse of the two errors in so many words.
+ *
+ * 1 800 s was neither necessary nor sufficient. The true condition is **relational** — roughly
+ * `horizon >= cycle`, a bucket-of-day recurring inside the window — and it is not a comparison
+ * against a constant at all, so no `activeWhen` bound is correct for more than the one cycle it
+ * was fitted to (the shipped 86 400, where the row is inert).
+ *
+ * So the row is **ungated**, exactly like the other five, and for the same reason: the condition
+ * is stated here because it cannot be stated there. Being ungated is not a claim that the
+ * dimension is live at the shipped defaults — it is not — and that claim is not left to prose
+ * either: `sim/searchSpaceLiveness.test.ts` carries it in `DECLARED_INERT`, whose entries must
+ * **prove** the condition under which the dimension is live by executing it. That is a stronger
+ * obligation than a gate, which carried none at all.
  */
 export const PREDICTOR_PARAMETERS: readonly DispatchParameterSpec[] = Object.freeze([
   {
@@ -188,8 +217,7 @@ export const PREDICTOR_PARAMETERS: readonly DispatchParameterSpec[] = Object.fre
     default: PREDICTOR_DEFAULTS.predictorHorizonS,
     unit: 's',
     description:
-      'How far ahead the demand forecast looks, seconds. The forecast is an expected arrival count over this window, so the horizon sets what "likely to appear soon" means: short enough that the estimate is about the demand a repositioning car can still get in front of, long enough that a car has time to travel there. Log scale because the interesting range spans two orders of magnitude. Gated on the cycle, and that gate is the whole point: while no bucket-of-day recurs inside a replication every bucket in the window shrinks to the same landing-level rate, the forecast integrates to exactly rate x horizon, and all three consumers (two demand-weighted means and an argmax) are invariant under a uniform scaling of it — so the whole declared range is one bit-identical run. Below a cycle of 1800 s the window folds and the shape of the forecast, not just its scale, moves with the horizon.',
-    activeWhen: { 'idle.predictorCycleS': { max: 1800 } },
+      'How far ahead the demand forecast looks, seconds. The forecast is an expected arrival count over this window, so the horizon sets what "likely to appear soon" means: short enough that the estimate is about the demand a repositioning car can still get in front of, long enough that a car has time to travel there. Log scale because the interesting range spans two orders of magnitude. Live exactly when a bucket-of-day recurs inside the window — roughly when the horizon reaches the cycle. While it does not, every bucket in the window shrinks to the same landing-level rate, the forecast integrates to exactly rate x horizon, and all three consumers (two demand-weighted means and an argmax) are invariant under a uniform scaling of it, so the whole declared range is one bit-identical run. That condition is relational and cannot be written as an activeWhen bound on the cycle alone: measured at seed 20260726 the horizon moves secure-tower at cycle 1800 (4 trajectories) AND at cycle 3600 (2), so a gate at max 1800 skipped a live region. Inert at the shipped cycle of 86400 and searchable below it; searching it against a fixed cycle is searching a real dimension.',
   },
   {
     id: 'idle.predictorLearningRate',

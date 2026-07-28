@@ -20,6 +20,7 @@
 import {
   SimulationError,
   Simulation,
+  WARNING_CODES,
   type LoadedConfig,
   type SimulationConfig,
   type SimulationResult,
@@ -200,7 +201,23 @@ export interface RunPlan {
   readonly trafficProfileName: string;
   readonly seedText: string;
   readonly commandLine: string;
+  /**
+   * Load-time disclaimers about this building, carried from the config layer.
+   *
+   * **This is the non-test reader `WARNING_CODES.doubleDeckNotSimulated` did not have.**
+   * `resolveBuilding` raised it, `config/doubleDeck.test.ts` asserted it in both directions, and
+   * no shipped path read the code — the CLI printed the `Simulation`-side statement and never
+   * looked at `ResolvedBuilding.warnings` at all. A code nothing branches on is a string with a
+   * test, which is the shape of defect the standing requirement in `docs/05-roadmap.md` names.
+   *
+   * Selected **by code**, so the choice of what counts as a load-time disclaimer is a machine-
+   * readable decision rather than a substring match on prose.
+   */
+  readonly configDisclaimers: readonly string[];
 }
+
+/** Config-warning codes the CLI repeats before a run, because they qualify its numbers. */
+const DISCLAIMER_CODES: readonly string[] = [WARNING_CODES.doubleDeckNotSimulated];
 
 export function planRun(config: LoadedConfig, parsed: ParsedArgs): RunPlan {
   const buildingId = requiredStringFlag(parsed, 'building');
@@ -257,6 +274,9 @@ export function planRun(config: LoadedConfig, parsed: ParsedArgs): RunPlan {
     trafficProfileName: traffic.name,
     seedText: String(seed),
     commandLine: parts.join(' '),
+    configDisclaimers: base.warnings
+      .filter((warning) => DISCLAIMER_CODES.includes(warning.code))
+      .map((warning) => warning.message),
   };
 }
 
@@ -411,13 +431,62 @@ export function printRunReport(out: Output, plan: RunPlan, result: SimulationRes
     24,
   );
 
+  /*
+   * The courtesy hold, whenever the run asked for one at all.
+   *
+   * **This is the non-test caller `StageActivity.lateArrivalHolds*` did not have.** The counters
+   * exist to separate "the profile declined every hold" from "nothing ever requests one", and
+   * that distinction is worth nothing to a reader who cannot see it: `runSimulation` returns a
+   * `SimulationResult`, the counters were only on the `Simulation` instance, and every non-test
+   * caller in this repository goes through the function. Printing `requested` next to `granted`
+   * is the whole point — a granted count alone cannot tell a switched-off knob from a
+   * disconnected one, which is exactly the state this knob spent its life in.
+   *
+   * Shown only when a hold was requested, so a building whose landings always empty (Garden
+   * Apartments) does not carry a row of zeroes.
+   */
+  const holds = result.stageActivity;
+  if (holds.lateArrivalHoldsRequested > 0) {
+    heading(out, 'Door holds');
+    field(
+      out,
+      'late arrivals',
+      `${count(holds.lateArrivalHoldsRequested)} requested · ${count(holds.lateArrivalHoldsGranted)} granted · ${count(holds.lateArrivalHoldsRefused)} refused`,
+      24,
+    );
+    if (holds.lateArrivalHoldsGranted > 0) {
+      field(
+        out,
+        'bought',
+        `${count(holds.lateArrivalHoldsBoarded)} boarded for ${holds.lateArrivalHoldDwellS.toFixed(1)} s of held dwell`,
+        24,
+      );
+    }
+  }
+
+  /*
+   * Two lists, deliberately, and neither is truncated away.
+   *
+   * `result.warnings` arrives disclaimers-first because `Simulation` orders it that way rather
+   * than by accident of construction order — the double-deck line used to survive this cut only
+   * because it happened to be warning #1 on the one building that raises it. The cut is 12
+   * rather than 6 as well, so a run that raises several stuck-call advisories does not push a
+   * disclaimer off the screen even if the ordering were ever to change again.
+   */
+  if (plan.configDisclaimers.length > 0) {
+    heading(out, 'Configuration');
+    for (const disclaimer of plan.configDisclaimers) {
+      out.line(yellow(`  • ${disclaimer}`));
+    }
+  }
+
   if (result.warnings.length > 0) {
     heading(out, 'Warnings');
-    for (const warning of result.warnings.slice(0, 6)) {
+    for (const warning of result.warnings.slice(0, 12)) {
       out.line(yellow(`  • ${warning}`));
     }
-    if (result.warnings.length > 6) {
-      out.line(dim(`  … and ${count(result.warnings.length - 6)} more`));
+    if (result.warnings.length > 12) {
+      out.line(dim(`  … and ${count(result.warnings.length - 12)} more`));
     }
   }
 

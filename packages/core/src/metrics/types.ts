@@ -499,6 +499,29 @@ export interface RunRecord {
   readonly reportWindow?: ReportWindow | undefined;
 
   /**
+   * Non-fatal diagnostics the run raised, disclaimers first. Absent when there were none.
+   *
+   * **This is what makes a disclaimer travel with the data it disclaims.** Some of these do not
+   * qualify a number, they say the number describes *different hardware or a different
+   * building* — Vertical City's eight double-deck shuttles run as single-deck cars, so every
+   * round-trip time, interval and handling capacity stored here is for a machine nobody
+   * configured. A run whose record does not carry that is a record that reads as modelled, and
+   * `serializeRunRecord` is `JSON.stringify(record)`: without this field the statement reached
+   * `SimulationResult.warnings` in memory and the console, and nothing that outlived the
+   * process.
+   *
+   * Optional, so every record written before the field existed still parses — and so a run with
+   * nothing to say adds no key. Ordered rather than sorted on read: the producer puts
+   * disclaimers ahead of advisories, because a consumer that truncates (the CLI does) must
+   * truncate the advisories.
+   *
+   * It is **not** a substitute for {@link seed} (invariant 5) and does not participate in
+   * replay: a replayed run re-derives its own warnings from the same configuration, so a
+   * fingerprint over the record covers this field exactly as it covers every other one.
+   */
+  readonly warnings?: readonly string[] | undefined;
+
+  /**
    * Every car in service during the run, whether or not it ever carried anybody.
    *
    * The fleet roster, not a derived list. `LoadFactorStatistics` needs it because an idle car

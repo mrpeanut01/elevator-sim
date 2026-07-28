@@ -440,6 +440,83 @@ export const SIMULATION_STATUSES = ['completed', 'timed-out', 'aborted'] as cons
 
 export type SimulationStatus = (typeof SIMULATION_STATUSES)[number];
 
+/** What stage 5's load-driven trigger and the predictor actually did, for a caller that asks. */
+export interface StageActivity {
+  /** Arrivals fed to the arrival models, summed over banks. Zero means no predictor was built. */
+  readonly predictorObservations: number;
+  /** Cars observed crossing their own hall-call bypass threshold, summed over banks. */
+  readonly capacityCrossings: number;
+  /** Calls stage 5 moved off a car that had just filled up. */
+  readonly capacityMigrations: number;
+  /** Calls it looked at and left where they were, with a gate that kept them. */
+  readonly capacityHeld: number;
+  /**
+   * Courtesy holds the run *asked for*: the doors started closing on a landing that still held
+   * a passenger this car could carry, and there was room for them.
+   *
+   * Counted separately from the two below for the same reason `capacityCrossings` is counted
+   * separately from `capacityMigrations`. A granted count of zero means both "the profile
+   * declined every hold" and "nothing ever calls `requestReopen('lateArrival')`" — which is the
+   * state `answer.reopenOnLateArrival` was in for its whole life — and only a request count
+   * separates them.
+   */
+  readonly lateArrivalHoldsRequested: number;
+  /** Courtesy holds the door machine honoured, reversing a closing door. */
+  readonly lateArrivalHoldsGranted: number;
+  /**
+   * Courtesy holds refused: `answer.reopenOnLateArrival` is off, or the stop's reopen budget
+   * (`answer.maxReopensPerStop`) is spent. The first is `DOOR_REOPEN_REFUSALS.policyDisabled`,
+   * which was an unreachable verdict until the request site existed.
+   */
+  readonly lateArrivalHoldsRefused: number;
+  /**
+   * Passengers the *requested* holds were sized for, summed — the numbers the revised
+   * `DoorStopReason.transferSeconds` was computed from.
+   *
+   * Paired with {@link lateArrivalHoldsBoarded}, this is what makes the dwell falsifiable: the
+   * door grants `boarders x tp` for a hold, so the two counts must agree over a run in which
+   * every request was granted. They did not have to before, because the door re-granted the
+   * whole stop's transfer whatever this number was, and nothing compared them.
+   */
+  readonly lateArrivalHoldsProjected: number;
+  /**
+   * Passengers who actually boarded on the replayed boarding half of a granted hold, summed.
+   *
+   * Zero while holds are being granted is the "delay with no boarding to pay for it" case:
+   * a door reversed, time was spent, and nobody got in.
+   */
+  readonly lateArrivalHoldsBoarded: number;
+  /**
+   * Dwell seconds the door granted to the open periods courtesy holds produced, summed.
+   *
+   * Read off `DoorMachineState.grantedDwellS` when the reversed door reaches fully open, so it
+   * is what the machine actually granted rather than what this class thinks it asked for. That
+   * is what makes it a check on the door instead of a restatement of the request: bound it by
+   * the hold's *own* cohort — `granted x baseHallDwell + projected x tp` — and a reopen that
+   * re-grants the whole stop's transfer fails, which is the defect this counter exists for.
+   *
+   * An obstruction reopen landing inside a held-open period is also counted here, since it
+   * extends the same open period. At the shipped `sim.doorObstructionProbability` of 0 no such
+   * draw is ever taken.
+   */
+  readonly lateArrivalHoldDwellS: number;
+  /**
+   * The largest dwell any single granted hold was given, and the largest cohort any single hold
+   * was sized for.
+   *
+   * The pair the bound is actually checkable on. Run totals are too blunt: a hold's dwell is
+   * `max(base hall dwell, cohort x tp)`, the base term dominates on the shipped buildings, and
+   * summing hides one 40 s re-grant among two hundred 5 s holds. These two are extrema, so a
+   * **single** hold given the interrupted stop's transfer instead of its own pushes
+   * `lateArrivalHoldMaxDwellS` above what `lateArrivalHoldMaxCohort` can justify — and the check
+   * rebuilds that bound from the fleet's own resolved door configs rather than from anything
+   * recorded here. Measured with the defect in place it reached exactly `maxTransferSeconds`.
+   */
+  readonly lateArrivalHoldMaxDwellS: number;
+  /** See {@link lateArrivalHoldMaxDwellS}. Passengers, not seconds. */
+  readonly lateArrivalHoldMaxCohort: number;
+}
+
 /**
  * One replication, complete.
  *
@@ -473,4 +550,14 @@ export interface SimulationResult {
   readonly events: number;
   /** Non-fatal diagnostics from the trace generator, plus any the run itself raised. */
   readonly warnings: readonly string[];
+  /**
+   * What the stages that are easy to wire up and leave unreachable actually did.
+   *
+   * On the *result*, not only on the `Simulation` instance, because `runSimulation()` returns
+   * the result and discards the instance — so every one of these counters was invisible to the
+   * function the CLI, `packages/experiments` and every doc example call. A diagnostic only its
+   * own tests can read is the shape of defect the standing requirement in `docs/05-roadmap.md`
+   * is about, one level down: reachable in principle, unreachable from the shipped entry point.
+   */
+  readonly stageActivity: StageActivity;
 }
