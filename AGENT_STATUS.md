@@ -12,7 +12,7 @@ Live state of every task. Updated by the orchestrator as reports come in.
 | T4 | docs builder | `docs/register-drift` | `.worktrees/T4-docs` | ⬜ held | wave-1 merges | dispatch after T1–T3 merge |
 | T6 | blast-radius + statistics follow-ups | `fix/blast-radius` | `.worktrees/T6-blast-radius` | ✅ **merged** `ff2c1bf` | — | **T4 unblocked on numbers** |
 | T7 | courtesy-hold + gate remediation | `fix/courtesy-hold` | `.worktrees/T7-courtesy-hold` | 🟡 in flight | — | **blocks T4** (3 doc figures) |
-| T8 | viz frame defects (from T5 review REJECT) | `fix/viz-frame-defects` | `.worktrees/T8-viz-fix` | 🟡 in flight | — | await report |
+| T8 | viz frame defects (from T5 review REJECT) | `fix/viz-frame-defects` | *(removed)* | ✅ **merged**; 8/8 mutants killed | — | done |
 | T9 | unreproducible benchmark numbers (C13, C14) + a drift guard | `fix/unreproducible-benchmarks` | `.worktrees/T9-benchmarks` | 🟡 in flight | — | await root cause |
 | T5 | viz foundation builder | `feat/viz-foundation` | `.worktrees/T5-viz` | ✅ **merged** `a3cb937` | — | independent review in flight |
 
@@ -41,6 +41,8 @@ Live state of every task. Updated by the orchestrator as reports come in.
 | C12 | **`packages/cli/**` is unassigned and carries 2 moving intervals.** `cli/src/commands/tune.ts:118` holds a **third** copy of the Phase 7 acceptance pair (`[−2.257, −0.319]` → `[−2.277, −0.298]`); `cli/src/cli.test.ts:471-472` and `commands/compare.ts:480-481` carry finding #19's worked example at n=30 (multipliers 1.023317 at 80%, 1.043504 at 95%), whose exact bounds need a CLI re-run. | T6 | orchestrator |
 | C13 | **Two published bounds in `benchmark/index.ts` never reproduced, pre-dating this wave** — `:463` WT95 reads `[+1.11, +1.85]` but measures `[+1.10, +1.85]`; `:465` AWT reads `[+0.27, +0.57]` but measures `[+0.26, +0.57]`. Neither flips a verdict. T6 deliberately did **not** fix them, so that correcting a pre-existing error would not make a blast-radius diff unauditable. Correct judgement; still needs doing. | T6 | new task |
 | C14 | **`docs/05-roadmap.md:380` and `benchmark/tailStudy.ts:21,22,53,54` do not reproduce from `runTailStudy()` at all** — e.g. `−0.23 [−0.41, −0.05]` published vs `−0.26 [−0.44, −0.08]` measured. **Not attributable to T2**; this is a separate pre-existing defect of the same class as register finding #4. | T6 | new task |
+| C16 | **RAISE the Phase 4 acceptance criterion.** "A stored run replays identically" was satisfied in full by a recorder wrong on 3 of 4 buildings — a wrong picture replays as faithfully as a right one. Add a second clause: *and the first frame places every car where the run says it started.* `CLAUDE.md`: raise a criterion, never lower it. | T8 | T4 |
+| C17 | `RunRecord` still has **no** `warnings` field — confirmed by grep of `packages/core/src/metrics/types.ts`. T8's report incidentally claimed otherwise; it meant `SimulationResult.warnings`. The question (does the double-deck disclaimer travel with a stored run?) remains **open with T7**, not settled. | orchestrator | T7 |
 | C15 | `docs/03-traffic-and-statistics.md` § Part 3 still states the t/z crossover as this simulator's rule. After D14 it must read `t[n−1]` at every n, or say plainly that it describes the literature and not this simulator. | T6 | T4 |
 | C3 | **CONFIRMED by T3 (D12): `patternSwitching` is NOT implemented.** `docs/05-roadmap.md:481` lists "Fuzzy traffic-pattern detector with hysteresis, driving per-pattern weight sets" as a delivered Phase 7 bullet and **must be marked not-done**. T3 does not own `docs/`. | T3 | T4 |
 | C10 | `docs/06-parameterization-and-tuning.md` now states a stale range for `answer.overloadThreshold` — narrowed from `[1, 1.5]` to `[designLoadFactor, 1.5]` by T3 (D10). | T3 | T4 |
@@ -66,6 +68,7 @@ changed has regressed the suite.
 | T1 `2f835d0` | clean | 126 files / **2578** tests | 2543 + 35 | ✅ matches |
 | T3 `9fb32e8` | clean | 128 files / **2590** tests | 2578 + 12 | ✅ matches |
 | T6 `ff2c1bf` | clean | 128 files / **2592** tests | 2590 + 2 | ✅ matches |
+| T8 `1dbfa43` | clean | 128 files / **2610** tests | 2592 + 18 | ✅ matches |
 
 **All five wave-1 builders merged.** Worktrees for T1, T2, T3 and T5 removed and their branches
 deleted after merge + green suite, per the plan's worktree policy. `.worktrees/T6-blast-radius`
