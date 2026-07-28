@@ -56,7 +56,7 @@ Machine-readable configuration lives in [`data/`](data/).
 
 **Phases 0–5, 7 and 8 are landed and accepted. Phase 6 is partially complete** — see the table for
 what that means. Four packages (`core`, `experiments`, `viz`, `cli`), a six-command CLI,
-**172 test files, 3,220 tests** (3,211 passing, 9 skipped), `tsc -b` clean.
+**178 test files, 3,349 tests** (3,340 passing, 9 skipped), `tsc -b` clean.
 
 | Phase | Status |
 |---|---|
@@ -81,7 +81,7 @@ npm run sim -- compare --building midtown-office --a eta --b nearest-car --reps 
 npm run sim -- tune --building garden-apartments --params idle.repositionThresholdS --seed 42
 npm run sim -- fuzz --cases 8                  # or: --tier deep --cases 2000, the overnight pass
 npm run sim -- watch --building garden-apartments --dispatcher nearest-car --speed 10
-npm test        # 172 files, 3,220 tests — the benchmarks execute real replications, so this is minutes, not seconds
+npm test        # 178 files, 3,349 tests — the benchmarks execute real replications, so this is minutes, not seconds
 ```
 
 `compare` prints a paired-t interval on the difference and refuses to rank two arms whose interval

@@ -4,14 +4,13 @@
     {
       "name": "viz",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--workspace", "@elevator-sim/viz"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--workspace",
+        "@elevator-sim/viz"
+      ],
       "port": 5173
-    },
-    {
-      "name": "viz-T39",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["vite", "--port", "5174", ".worktrees/T39/packages/viz"],
-      "port": 5174
     }
   ]
 }

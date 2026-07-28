@@ -5428,3 +5428,158 @@ removes the prerequisite; it does not do W4.
 **And the barrel has no non-test caller**, and cannot have one until W4 exists. That is this
 repository's signature defect shape and it is stated in the file rather than dressed up;
 `browser.test.ts` is its mechanical owner meanwhile. **Tracked as C34.**
+
+---
+
+## D122 — the fuzz generator draws the call type **against** the profile (**C32 CLOSED**)
+
+**Date:** 2026-07-28 · **Owner:** T36 (wave 5) · **Closes:** C32
+
+**Decision.** `legalCallTypesFor` **derives** the legal `(profile, callType)` set rather than
+listing it, and `generate.ts` draws from it. `withCallType`'s rewrite is **kept and checked**, not
+deleted.
+
+**C32 was one item and is two defects.** `(building, profile, callType)` was three independent
+draws, and the third is not independent of the second:
+
+| pair | what actually happened | standard 64 | deep 2 000 |
+|---|---|---|---|
+| `destination-panel` × `up-down-buttons` | `resolveDispatchConfig` **refuses** it, so `withCallType` deleted `passengerAssignment` and the case ran **a different dispatcher** under the profile's name | 1 | **61** |
+| `destination-eta` × `up-down-buttons` | nothing refuses it, but `weights.rideTime: 0.5` is **inert** without a destination, so the case measured plain `eta` under a destination profile's name | 0 | **61** |
+| **total running something other than what they said** | | 1 of 64 (1.6 %) | **122 of 2 000 (6.1 %)** |
+
+The second is the more interesting one, and no refusal would ever have caught it: it is § D112's
+lesson — *an arm resolved by a shipped identifier is an arm that can be redefined by editing
+`data/`* — arriving in the fuzz corpus. A third illegal shipped pair,
+`predictive-balanced` × `destination-entry`, was never generated at all, because `destination-entry`
+is not drawn.
+
+**Method.** Resolve the candidate through the **real** `resolveDispatchConfig` (catching the hard
+refusals), then require every `DISPATCH_PARAMETERS` row the profile moved off its declared default
+to be live by its own `activeWhen` (catching the inert-weight case). **No profile id and no term id
+appear anywhere** — invariant 7 — so a thirteenth profile or a second gated term is covered the day
+it lands in `data/`. `activeWhenSatisfied` is imported from `tuning/space/types.ts` rather than
+restated a third time.
+
+**The blast radius was measured, not argued.** Full case-by-case JSON diff over 64 + 2 000:
+**exactly the 123 illegal-or-inert cases change**, all to `mobile-credential`, and **nothing else in
+any case moves** — building, `simSeed`, horizon, arrival rate, door-obstruction probability, demand
+template and service schedule byte-identical, because the draw sits in the same position and `pick`
+consumes one PCG draw whatever the list length.
+
+**The seed-vs-case pinning answer.** Both regressions are pinned to a **seed**
+(`caseFromSeed(1_001_074, …)`) with case-identifying assertions. The mapping did not move for
+either, **and not by luck**: no case whose call type was already `mobile-credential` changed at all,
+and both are `mobile-credential` cases. Verified by diff **and** by running them. Post-rebase
+regeneration differs in **0 of 2 064** cases, so § D116's `empty-bank` change moves nothing here —
+`generateCars` always emits at least one car, so the generator cannot trip it.
+
+**Deep tier on the rebased tree: 2 000 cases, 0 failures, 1 396 887 passengers, 1 251 simulated
+hours, no property violation.** That was wave 5's blocking condition.
+
+**`withCallType` kept deliberately.** The drop is now unreachable from the generator, and
+`assertCarriesCallType` runs on every case and throws if it ever is not. It is not deleted because
+`validation/adversarial.test.ts` uses it to build the conventional control arm of a destination
+comparison — **which makes its only caller outside the generator a test**, C24's exact shape. That
+is recorded in `docs/07` § 3 rather than glossed.
+
+**`destination-entry` remains unreached by both corpora**, legal for 11 of 12 profiles. Now
+**stated on `GENERATED_CALL_TYPES` and asserted** rather than silently absent. Widening it moves
+about half of every corpus and makes the access-zone arm a three-way case — a call carrying a
+destination but no credential — so it is its own task.
+
+---
+
+## D123 — a phase's status is bound to evidence that **exists** (§ D115's largest risk, **narrowed**)
+
+**Date:** 2026-07-28 · **Owner:** T40 (wave 5) · **Narrows:** § D115 item 9
+
+**Decision.** Add `validation/phaseStatus.test.ts`, the complement to `documentation.test.ts`: that
+guard asserts the four documents **agree**, and would pass on four documents that agreed and were
+all wrong. This one asserts each phase's stated status **names evidence that resolves**.
+
+**Derived, never listed.** The phase set, every status and every citation are parsed out of
+`docs/05-roadmap.md` — the same discipline `index.test.ts` adopted after a hand-written list of five
+entry points made a sixth invisible (§ D114). `NOT ACCEPTED` is matched **before** `ACCEPTED`, which
+is the most dangerous possible misparse. Phase 6 is `partial` **by derivation** from its sub-phases
+rather than by assertion. Evidence resolves in three classes — file paths against disk, study
+functions against declarations in `packages/*/src`, pin groups against `PINNED_ESTIMATES` — and an
+accepted phase must put a real test beside its **verdict**, not only beside its criterion. Phase 8's
+criterion must state **both** halves, and its campaign table must read zero property violations in
+**every** column.
+
+**Ten manufactured failures watched, against the real documents.** Two are worth recording. Marking
+6c `ACCEPTED` fires a check the lane added **after watching an upgraded 6c pass by inheriting 6a's
+citations** — the tautological-guard trap, caught inside its own lane. And renaming every
+`## Phase` heading to `## Stage` produced **11 failures rather than a silent pass**, the test count
+falling 55 → 23 as the `it.each` domains emptied and the non-vacuity bounds catching exactly that.
+
+**It found a gap nobody had listed: the roadmap stated no status at all for Phases 0 and 1.**
+`CLAUDE.md`, `README.md` § Status and `docs/07` § 1 all carry ✅ for both, and
+`documentation.test.ts` already asserts those three agree — the roadmap simply never said so, and
+**nothing could see it because no guard read the roadmap for status.** Added as form, with every
+cited suite verified to exist and assert its clause. No verdict was altered anywhere. The
+alternatives were both worse: tolerate `unstated` (a hand-written exception for exactly two phases —
+the tautological shape again), or ship the guard red.
+
+**The ceiling, stated in the test's own docstring and not rounded up.** It proves that every phase
+marked accepted names concrete evidence and that every artefact it names exists. It does **not**
+prove that any measurement is correct; that a cited suite asserts the criterion it is cited *for*
+(citations are checked for existence, not relevance); that the criterion is the *right* criterion —
+nothing mechanical distinguishes § D27's raise from a weakening; or that a `partial`/`deferred`
+phase is not secretly finished, the asymmetry being deliberate because **over-claiming is the
+failure this repository has shipped**. The remaining defence is `CLAUDE.md` § Working agreements and
+a reader who checks. So `docs/07` § 8's line is **narrowed, not deleted**.
+
+---
+
+## D124 — wave 5 closed, and the register is longer in places
+
+**Date:** 2026-07-28 · **Owner:** orchestrator · **Closes:** the wave-5 delivery
+
+**Measured on this tree after the eighth merge**, serially and on an otherwise idle machine:
+`npx tsc -b` clean; `npx vitest run --testTimeout=120000` → **178 files / 3 349 tests, 3 340 passed,
+9 skipped**, exit 0, 567 s. **+129 tests and +6 files, accounted for lane by lane** in `docs/07`
+§ 1. The skip count is unchanged at 9.
+
+**Nine items in, nine closed, seven opened.** Closed: `C4`, `C5`, `C24`, `C27`, `C30`, `C32`, the
+four ⚠️ UX rows, `packages/experiments`' browser export (the *prerequisite*), and — narrowed rather
+than closed — *no test asserts any phase's status*. Opened: `C33`, `C34`, W4's TypeScript-condition
+gap, `deepCampaignRequested`, `withCallType`, `destination-entry`'s unreached corpus rung, and three
+findings from the `C4` measurement. **No phase verdict moved, and none was in scope.**
+
+**Five of the seven new items were found only by fixing something adjacent to them**, which is the
+argument for `WAVE5_PLAN.md` § 5 making *"the debt table rewritten to what is actually left,
+including anything this wave opened"* a condition of done. A register that only ever shrinks is not
+being read honestly.
+
+### Three findings about the *process*, recorded because they cost real work
+
+1. **Parallelise the work; serialise the measurement.** Eight lanes were run concurrently on a
+   **10-core** machine, each spawning a full vitest worker pool: load average reached **198 with 31
+   vitest processes**, roughly 20× oversubscription. Two lanes stalled without reporting and four
+   committed nothing for tens of minutes. The orchestrator's own full-suite run was killed rather
+   than trusted, and the wave's only authoritative suite figure is the serial one above. **The
+   error was not the concurrency but the verification scope**: eight agents each running a
+   package-wide suite bought no signal the orchestrator was not going to re-derive anyway.
+2. **An unscoped `pkill` is a cross-lane fault.** One lane ran `pkill -f vitest/dist/workers/forks`
+   against its own run and killed other lanes' workers. A builder then saw a `1 error` in a package
+   it had never touched and **correctly refused to say whether it was pre-existing**. It was not —
+   the serial run is green. *The right answer to an unexplained red is to say you cannot explain it,
+   not to explain it away*, and that lane got it right.
+3. **Two lanes reported "the run is still executing" instead of a result**, and had to be resumed.
+   A brief that demands a full-package suite from every lane manufactures exactly this. Ask each
+   lane for its own scope and re-derive the whole at integration.
+
+### The one thing wave 5 confirms about the project's dominant defect class
+
+Three of this wave's eight lanes found that **the item as written was not the defect**. `C5`'s
+stated defect was already gone and the unheld convention was the real one (§ D117). `C30`'s question
+was answerable only because `resolveBuilding` had been silently disagreeing with the schema, which
+no row mentioned (§ D116). `C32` was two defects, and the second — an *inert weight*, not an illegal
+combination — no refusal would ever have caught (§ D122). Add § D121's reachability list being three
+modules rather than one, and § D123's roadmap carrying no status at all for two phases.
+
+**Five of eight lanes found the register understated what was wrong.** That is not an argument
+against keeping a register; it is an argument for the standing rule that produced every one of these
+findings — **determine whether this is true, do not make it true**, and *reviewers run things*.

@@ -1,5 +1,34 @@
 # Wave 5 — closing the open-debt register
 
+> ## 🏁 CLOSED 2026-07-28. All eight lanes merged; **no phase verdict moved.**
+>
+> **Measured serially on an idle machine after the eighth merge** — the only condition under which
+> the number means anything: `npx tsc -b` clean, **178 files / 3 349 tests, 3 340 passed, 9 skipped**,
+> exit 0, 567 s. Baseline was 172 / 3 220. The **+129 tests and +6 files are accounted for lane by
+> lane** in [`docs/07-handoff.md`](docs/07-handoff.md) § 1.
+>
+> **Nine items closed, seven opened.** § 5 made *"the debt table rewritten to what is actually left,
+> including anything this wave opened"* a condition of done, and it was the right condition: five of
+> the seven new items were found only by fixing something adjacent to them.
+>
+> **Five of the eight lanes found that the item as written was not the defect** — `C5`'s stated
+> defect was already gone, `C30`'s question was answerable only because a second gate had been
+> disagreeing in silence, `C32` was two defects with the second invisible to any refusal, the `node:`
+> reachability list was three modules rather than one, and the roadmap carried no status at all for
+> two phases. Decisions: [§ D116](DECISIONS.md)–[§ D124](DECISIONS.md).
+>
+> **§ 7's risks, scored.** All four task-specific risks were real and all four were caught by the
+> mitigation named against them — T36 proved the seed→case mapping unmoved by diff *and* by running
+> both regressions; T40's guard fired on a 6c upgraded by inheriting a sibling's citations, which is
+> the tautological shape, caught inside its own lane; T38 re-marked the row rather than relaxing the
+> schema; T39 recorded what it could not exercise instead of ticking it. **The risk this board did
+> not name is the one that cost the most:** eight lanes each running a package-wide suite on a
+> 10-core machine, load 198, two lanes stalled and one stray `pkill` crossing lanes. See
+> [§ D124](DECISIONS.md).
+>
+> The plan below is as written at the opening and is left unaltered.
+
+
 Coordination artifact for the delivery **reopened 2026-07-28** after `918897d`. Authoritative for
 wave-5 task scope, ownership, merge order and the definition of done.
 

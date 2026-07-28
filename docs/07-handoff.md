@@ -52,6 +52,26 @@ rather than new capability:
 interval outside the `destination-eta` rows, the four ⚠️ UX rows, and `C24`, `C27`, `C30`, `C32`,
 `C4`, `C5`. The pin table moved **40 rows changed, 12 added, 0 removed, all `destination-eta`**.
 
+### What wave 5 moved — the open-debt register, and still no phase verdict
+
+Wave 5 (2026-07-28, board at [`WAVE5_PLAN.md`](../WAVE5_PLAN.md)) worked the nine items § D115 left
+open. **No phase status changed, and none was ever in scope.** Eight lanes landed:
+
+| | |
+|---|---|
+| **`C30` — a carless bank is an error at *both* gates** | The schema did **not** move; `ED-12`'s row was the thing that was wrong. `resolveBuilding` was **raised** to agree with `bankConfigSchema`, which it had been silently contradicting, and `ISSUE_CODES.emptyBank` — declared in the vocabulary and emitted by **nothing anywhere in the repository** — now fires. Measured: a carless bank publishes `awtIsValid: true` on **ten of twelve seeds**. [§ D116](../DECISIONS.md) |
+| **`C5` — the row was stale; the *unheld convention* was the defect** | `'z'` could not print and had not been able to since `89bbf37`. What was open is that nothing held the correct literal there. Closed at the type. **Opens `C33`** — the same shape survives two files away. [§ D117](../DECISIONS.md) |
+| **`C24` + `C27` — `elevator-sim fuzz`, and the D62 names on both barrels** | `campaign.ts` has a named non-test caller, verified with the repository's own scanner. The barrel work buys public API surface and **not** liveness, and says so. [§ D118](../DECISIONS.md) |
+| **`C4` — Student-t stays, and now the cost is measured** | +0.59 % at the shipped policy, **+0** on the configuration § 4's table describes. Below the replication floor a normal quantile saves 3–8 replications and gives up **12–20 points of coverage**. [§ D119](../DECISIONS.md) |
+| **The four ⚠️ UX rows — driven, and two were *false*** | `RV-21`'s **Retry was permanently dead after any failed load**, silently. The ⚠️ bucket is now empty and all seven ⛔ keyboard rows are green. [§ D120](../DECISIONS.md) |
+| **`packages/experiments` has a browser export** | The `node:` reachability list is **three** modules, not the one on record. `W4` is **partly** unblocked, not fully — TypeScript does not apply the `browser` condition. [§ D121](../DECISIONS.md) |
+| **`C32` — the fuzz generator draws the call type *against* the profile** | Two defects, not one: **122 of 2 000 deep cases (6.1 %)** were running something other than what they said. Deep tier green at 2 000 with 0 property violations. [§ D122](../DECISIONS.md) |
+| **A phase's status is now bound to evidence** | § D115's *largest un-mechanised risk*, narrowed rather than closed — it binds status to evidence that **exists**, not evidence that **supports**. It found the roadmap stated **no status at all** for Phases 0 and 1. [§ D123](../DECISIONS.md) |
+
+**Wave 5 opened items as well as closing them**, which is why § 8's table is longer in places rather
+than shorter: `C33`, `C34`, and four smaller findings named in § 8. A register that only ever shrinks
+is not being read honestly.
+
 > **Read [`08-review-findings.md`](08-review-findings.md) before planning.** A whole-system
 > review on 2026-07-26 produced **21 findings — 1 critical, 13 major, 7 minor**, none of which
 > the test suite could catch at the time. All 21 are now closed: 19 fixed, and 2 (#5's fuzzy pattern
@@ -95,23 +115,35 @@ npm run sim -- compare --building midtown-office --a eta --b nearest-car --reps 
 npm run sim -- tune --building garden-apartments --params idle.repositionThresholdS --seed 42
 npm run sim -- fuzz --cases 8                  # or: --tier deep --cases 2000, the overnight pass
 npm run sim -- watch --building garden-apartments --dispatcher eta --speed 10
-npm test          # full suite: 172 files, 3,220 tests (3,211 pass, 9 skip)
+npm test          # full suite: 178 files, 3,349 tests (3,340 pass, 9 skip)
 ```
 
-Measured on this tree on 2026-07-28: `npx tsc -b` clean, `npx vitest run --testTimeout=120000`
-→ **172 files / 3 220 tests, 3 211 passed, 9 skipped**, exit 0. The benchmarks execute real
-replications, which is where the runtime goes.
+Measured on this tree after wave 5's eighth merge, 2026-07-28: `npx tsc -b` clean,
+`npx vitest run --testTimeout=120000` → **178 files / 3 349 tests, 3 340 passed, 9 skipped**,
+exit 0, 567 s. The benchmarks execute real replications, which is where the runtime goes.
 
-> **The +48 since the drift sweep is accounted for, test by test:** +19 from the viewer/CLI
-> suppression work ([§ D111](../DECISIONS.md)) and +29 from the engine-honesty work
-> ([§ D112](../DECISIONS.md), [§ D114](../DECISIONS.md)). 3 172 → 3 220. The file count is unchanged
-> at 172 — `benchmark/livenessSuite.ts` is a driver, not a test.
+> **Wave 5's +129 is accounted for, test by test**, as § D115's +48 was: `reports` +4 (§ D117);
+> `cli/commands/fuzz.test.ts` +16 and `index.test.ts` +1 (§ D118); `browser.test.ts` +22 (§ D121);
+> `fuzz/generate.test.ts` +10 (§ D122); `runner/stoppingBudget.test.ts` +6 (§ D119);
+> `config/parse.test.ts` +6 (§ D116); `viz` `bootstrap.test.ts` + `motion.test.ts` +9 (§ D120);
+> `validation/phaseStatus.test.ts` +55 (§ D123). **3 220 → 3 349**, and **172 → 178 files** for the
+> six new files in that list. The skip count is unchanged at 9.
 
 **Do not treat the wall-clock as a fixture.** The commit that landed the eighth track (`f895a16`)
 measured the suite going from 435 s to **519 s** on its machine; a re-run of the same tree took
-**793 s**; this tree at 3 220 tests took **578 s**. All three are true and none is a property of the
-code. If you need a runtime regression signal, measure it twice on an idle machine — this is the
-same class of mistake as inheriting a saturation ceiling across studies (§ 4).
+**793 s**; the 3 220-test tree took **578 s**; this 3 349-test tree took **567 s** — *fewer* seconds
+for *more* tests, which is the point. All four are true and none is a property of the code. If you
+need a runtime regression signal, measure it twice on an idle machine — this is the same class of
+mistake as inheriting a saturation ceiling across studies (§ 4).
+
+> **Wave 5 demonstrated the failure mode this warning is about, at scale.** Eight lanes were run
+> concurrently on a **10-core** machine, each spawning a full vitest worker pool: load average
+> reached **198 with 31 vitest processes**, roughly 20× oversubscription. Two lanes stalled without
+> reporting, four committed nothing for tens of minutes, and one lane's stray unscoped
+> `pkill -f vitest/dist/workers/forks` killed *other* lanes' workers — after which a builder saw a
+> `1 error` in a package it had never touched and, correctly, **refused to say whether it was
+> pre-existing**. It was not: the serial run above is green. **Parallelise the work, serialise the
+> measurement.** A suite result taken under that load is not evidence.
 
 Two opt-in tiers exist and are **not** part of that run: `ELEVATOR_SIM_FUZZ=deep` runs the
 2 000-case fuzz campaign, and `ELEVATOR_SIM_DEEP=1` enables the oracle's deep campaign (11
@@ -160,8 +192,24 @@ check the repo runs. The count is the length of this table, not a number carried
 | **9** | **The whole `'no-intervals'` half of `benchmark/`** — `measureAuctionAggregation`, `measureDestinationLiveness`, `measureEnergyLiveness`, `measureMultiRoundReachability`, `measurePredictorLag` | The interval half has `regeneratePins.ts` as its driver; the categorical half had **none**, so all five were dead. `measureEnergyLiveness` had two barrels, a string key in `published.ts` and its own test, and the repository's own scanner printed `measureEnergyLiveness -> []`. Closed by `benchmark/livenessSuite.ts`, and `index.test.ts`'s guard now iterates the entry-point set **derived from the directory** rather than five hand-written names ([§ D114](../DECISIONS.md)) |
 | **10, in `data/`** | **`destination-eta`** | `dispatch.callType: mobile-credential` and a weight vector identical to `eta`'s. Schema-valid, loaded by the real loader, tested, named after the thing it did not do: **bit-identical to `eta` at 8 of 8 matrix cells**. Invariant 7 makes dispatch strategy *data*; it does not put data outside this requirement. Closed by authoring `weights.rideTime: 0.5` ([§ D112](../DECISIONS.md)) |
 
-**A weaker instance is recorded and not counted:** `fuzz/`'s only non-test caller is a test
-(`campaign.ts` ← `corpus.test.ts`). Defensible, still open, tracked as **C24**.
+**The weaker instance that was recorded here is CLOSED**: `fuzz/`'s only non-test caller used to be
+a test (`campaign.ts` ← `corpus.test.ts`), tracked as **C24**. `cli/src/commands/fuzz.ts` is now the
+named non-test caller of `runCampaign`, `formatStats`, `STANDARD_CORPUS`, `deepSeeds` and
+`deepCampaignSize` — **verified with the repository's own scanner rather than asserted**
+([§ D118](../DECISIONS.md)).
+
+**Three weaker instances are open in its place, and are recorded rather than dressed up** — which is
+the same treatment C24 got, and the reason it eventually closed:
+
+| | |
+|---|---|
+| `deepCampaignRequested` | Scans to `[]`. Its only importer is `fuzz/deep.test.ts` — **C24's exact shape, in the file that closed C24.** Defensible (it gates a vitest tier) and still the weaker answer |
+| `withCallType` | Its only caller outside `fuzz/generate.ts` is `validation/adversarial.test.ts`, which uses it to build the conventional control arm of a destination comparison. Kept deliberately, and now **checked rather than relied on**: `assertCarriesCallType` runs on every case ([§ D122](../DECISIONS.md)) |
+| `experiments/src/browser.ts` | Has **no** non-test caller and cannot have one until `docs/10`'s W4 exists. Stated in the file rather than dressed up; `browser.test.ts` is its mechanical owner meanwhile. Tracked as **C34** ([§ D121](../DECISIONS.md)) |
+
+The stopping rule is a fourth: nothing outside `validation/` ever injects one, so
+`productionStoppingRule` has no non-test caller at all. Deleting a documented port with a Phase 3
+gate suite behind it needs its own recorded decision, so it is named here and not acted on.
 
 Add three more of the same shape that were **not** dead code but stale *numbers*: a published
 interval measured before a seam was wired and never regenerated, and two intervals hand-transcribed
@@ -556,9 +604,10 @@ the same building with **no** schedule, in which 18 promises are broken by full 
 - ✅ **Live metrics overlay** — it suppresses *estimates* and keeps *observations*, and copies
   `awtIsValid` from the summary rather than recomputing it (§ D64)
 - ✅ A rendering contract (`VIZ_SCHEMA_VERSION = 4`), a Canvas renderer, and an **88-scenario UX
-  ledger** at `packages/viz/UX.md` § 7.0 with per-scenario ids and differentiated states — **79 ✅**,
-  2 half, **4 built-but-unverified** (`RV-11 17 21`, `KB-14`), 2 re-marked against the schema
-  (`ED-12 13`), 1 not built (`PB-09`)
+  ledger** at `packages/viz/UX.md` § 7.0 with per-scenario ids and differentiated states — **86 ✅**
+  (32 wave 1, 37 driven, 4 driven *and* asserted, 13 asserted by a test proved to bite), 1 half
+  (`ED-23`), **0 unverified**, 1 not built (`PB-09`). Wave 5 drove the last four ⚠️ rows and settled
+  `ED-12`/`ED-13` against the schema ([§ D120](../DECISIONS.md), [§ D116](../DECISIONS.md))
 
 > **Two of those rows were *false*, not merely unverified, and were found by driving the app.**
 > `UX.md` § A.3's **Success** and **Saturated** rows each carried a "must not show" clause about the
@@ -672,15 +721,19 @@ after the weight landed rather than carried over.
 |---|---|
 | **Phase 6c — learned control** | Deferred out of Phase 6 with reasons (§ D28). Needs its own acceptance question before it needs an implementation |
 | **Phase 9 — the experience layer: designed, not built** | [`docs/10`](10-experience-layer-contract.md) is a complete design — novice/expert modes, a schema-generated dispatcher and traffic editor, access-zone credentials, and the rules that keep a gamified surface honest — and **not one line of it is implemented**. No status table carries a Phase 9 row, deliberately: a design is not a phase in progress. Its § 13 lists the questions that must be settled before implementation starts |
-| **`packages/experiments` has no browser export** — this **blocks** `docs/10`'s generated editor | The package declares exactly `"."` and `"./package.json"` with no browser condition, so a deep import of `tuning/space` is refused by the resolver; the one entry it does declare reaches `node:worker_threads` through `runner/parallel.ts`. `docs/10` § 13 q1 was originally marked *optional* on the strength of a measurement (M10) that was **refuted**; it is now a **prerequisite**. `W4 cannot start against collectSearchSpace() until this is answered` — and answering it is a decision for the owner of `packages/experiments`, plus a graph-walk test in the manner of `core/src/browser.test.ts` |
+| **`packages/experiments`' browser export — the prerequisite is CLOSED, `W4` is only *partly* unblocked** | A browser barrel, an export condition and a both-directions graph-walk guard landed ([§ D121](../DECISIONS.md)); `collectSearchSpace()` is importable, callable and provably `node:`-free, and M10 is confirmed corrected and pinned at 49 ids under both conditions. **The `node:` reachability list turned out to be three modules, not the one this row used to name** — `runner/parallel.ts`, `reports/persistence.ts`, and `validation/harness.ts` via `benchmark/verdict.ts`. **Still open:** TypeScript does not apply the `browser` export condition, so a browser-only file importing `@elevator-sim/experiments` typechecks against the **Node** types; the mitigation is the explicit `./browser` subpath and **nothing mechanically forces a `viz` file to pick it**. In `core` that gap was one function; here it is hundreds of names. The rest of `W4` — four control renderers, the `activeWhen` rule at the control, the fictional-schema liveness evidence — is unwritten |
 | **`garden-down-peak` is `destination-eta`'s remaining identity class** | Measured bit-identical to `eta` there at `rideTime` **0.3, 1.0 and 2.0** — so it is a **blind operating point**, not an under-weighted term: every down trip ends at the lobby and the destination carries nothing the direction button did not. `destination-panel` lands in the same class there independently. Whether *any* destination weight can carry information at such a point is an open question rather than a defect, and raising the weight fourfold not moving it is the evidence that separates the two |
 | **The editor's ⇧/⇩ buttons never moved a floor in the building** | `moveFloor` moves a floor within the **declaration array** and deliberately renumbers neither `index` nor `heightM`, for a good reason its own docstring gives: the loader fails a building whose two disagree (`floor-height-order`), and an editor that silently rewrote either would settle a modelling error by fiat. So the buttons reformat the JSON. Under the old array-ordered table that was invisible; under the `index`-ordered table it is visible, and they are **relabelled honestly** rather than repurposed or deleted — deleting them would leave `moveFloor` with no non-test caller, which is this repository's signature defect. **The scope call is handed back**: give the declaration list its own view, or drop `moveFloor` and let `index` be the only ordering control. `packages/viz/DECISIONS-T29.md` § T29-4, [§ D111](../DECISIONS.md) |
 | **The Level-1 panel does not clear the Phase 6 gate on `mixed-use-high-rise`** | INDISTINGUISHABLE against `eta` and `collective` at every measured rate, and WT95 `+9.083` WORSE at 4 %. A measured result rather than a task, but it is what anyone planning further destination work needs. § 7 |
-| **Four UX rows are ⚠️ unverified, not passing** *(confirmed against `packages/viz/UX.md` § 7.0 on 2026-07-28, after its edits landed: the ledger is 88 rows, and these four are unchanged)* | `RV-11` (zero-population empty state), `RV-17` (`data/` fetch failure), `RV-21` (Retry after RV-17), `KB-14` (`prefers-reduced-motion`). All four are built and reachable; none was driven or tested. `RV-17`/`RV-21` are structurally awkward — the app cannot be *loaded* from a stopped dev server — and `KB-14`'s media query was not emulated. `KB-14` is one of the seven ⛔ non-negotiable keyboard rows. The pass that fixed the § A.3 rows drove Secure Tower, Vertical City and Garden Apartments at **one viewport** and did **not** re-exercise these four |
-| **`ED-12` / `ED-13` contradict the schema** | `ED-12` ("a zero-car bank is a warning") against `bankConfigSchema`'s *a bank must have at least one car*, so a zero-car bank is a schema **error** and cannot be a warning without the editor overriding the loader, which `ED-T8` forbids. `ED-13` describes a per-car `servesFloors` the schema does not have — service zoning is declared per **bank**. Both re-marked rather than ticked. `ED-12` is a `core` schema question (**C30**) |
+| **The four ⚠️ UX rows are CLOSED, and two of them were *false*** | Driven, not read ([§ D120](../DECISIONS.md)). `RV-21`: `main()` ran its data load **above** the `let started = false` that `start()` closes over, so any failed first load left that binding in its temporal dead zone for the life of the page — Retry then threw inside a floating `async` IIFE with no `catch`, the page cleared its own error message and sat at `loading data…` for ever, empty, with nothing in the console. **Retry was permanently dead after any failed load.** `RV-17`: Vite answers `Accept: */*` with `index.html` and a **200**, so `!response.ok` — the only branch that named the missing path — is exactly the branch a missing `data/` file does not take. A fifth row (§ B.3) was false on **both** clauses. The ⚠️ bucket is **0** and all seven ⛔ keyboard rows are green. **Two limitations are recorded in the rows rather than absorbed:** `KB-14`'s CSS clause is unexercised under a real OS preference (the media query cannot be emulated by the available tooling, so it was driven by replacing `window.matchMedia`), and `RV-11`'s *no passengers were generated* sentence exists only in the status line — the canvas, the exported PNG and `describeFrame` leave the reader to infer it |
+| **`ED-12` / `ED-13` — CLOSED, and the schema did not move (`C30`)** | [§ D116](../DECISIONS.md). `ED-12`'s row was the thing that was wrong: a carless bank is an **error**, and relaxing `bankConfigSchema` so the ledger could show a green row would have been the weaken-a-criterion-to-pass failure `CLAUDE.md` forbids. What changed is that `resolveBuilding` — the editor's whole definition of legality under `ED-T8` — was **raised** to agree with the schema it had been silently contradicting, emitting an `empty-bank` code the vocabulary declared and **nothing anywhere in the repository had ever produced**. It matters because the run does not simply have no service there: on a seven-floor tower whose top floor was served only by a carless bank, **ten of twelve seeds published `awtIsValid: true`**, two with passengers never served at all, under the 5 % censoring limit. `ED-13`'s scenario was unrepresentable by design — a per-car `servesFloors` does not exist, because service zoning is a property of the shaft group |
 | **The mixed-use study's replication margin is tight** | n = 200 at up-peak 4 % is **ceiling-bound**, not variance-derived: the requirement for the hardest pair is 666, the measured ceiling is 206, and 200 leaves **six replications of margin**. A change that costs the arms six replications of headroom invalidates the point rather than widening it. The pair needing 666 is reported unresolved rather than quoted |
-| **`C24` — `fuzz/`'s only non-test caller is a test** | Verified: every importer of `campaign.js` outside `fuzz/index.ts` is a `*.test.ts`. Defensible — a fuzzer's product *is* a test — and it is **recorded rather than dressed up**, which is the point. It is still a weaker answer to § 3's standing requirement than `tune` gives `tuning/`. A CLI `fuzz` command closes it cleanly and puts the deep campaign in a user's hands |
-| **No test asserts any phase's *status*** | The guards assert that the four documents **agree** with each other, not that they are **true**. `documentation.test.ts` would be perfectly happy with four documents that agreed and were all wrong. The only defence against that is the discipline in `CLAUDE.md` § Working agreements — *a phase is done when its stated acceptance criteria pass* — and a reader who checks. This is the largest un-mechanised risk in the repository and it is stated here rather than left implicit |
+| **`C24` — CLOSED by a named non-test caller** | `cli/src/commands/fuzz.ts`, verified with the repository's own scanner ([§ D118](../DECISIONS.md)). Three weaker instances stand in its place and are listed in § 3 — `deepCampaignRequested`, `withCallType`, and `experiments/src/browser.ts` (**C34**) — plus the stopping rule, which has no non-test caller at all |
+| **A phase's status is now bound to *evidence that exists* — and still not to evidence that *supports* it** | § D115 called this the largest un-mechanised risk in the repository. It is **narrowed, not closed** ([§ D123](../DECISIONS.md)). `validation/phaseStatus.test.ts` parses the phase set, every status and every cited artefact out of `docs/05-roadmap.md` — never a hand-written list — and fails if an accepted phase cites a test, directory, study function or pin group that does not exist, if a discipline table carries an undischarged row, if Phase 8's campaign table reports a violation, or if its own parse degrades to asserting nothing. Ten manufactured failures were watched. **What it provably does not catch:** that any measurement is *correct*; that a cited suite actually asserts the criterion it is cited for (citations are checked for existence, not relevance); that the criterion is the right criterion — nothing mechanical distinguishes a raised criterion from a weakened one; and it is **asymmetric by design**, never questioning a `partial` or `deferred` phase, because over-claiming is the failure this repository has shipped. The remaining defence is `CLAUDE.md` § Working agreements and a reader who checks |
+| **`C33` — the `'z'`-label shape survives two files from where it was fixed** | Opened by [§ D117](../DECISIONS.md) rather than folded into C5's closure. `reports/statistics.ts:332` stamps `method: 't' as IntervalMethod` on an interval whose `halfWidth`, `lower` and `upper` are all `NaN` — an assertion that **widens a correct literal to the union for no reason**, and the one remaining place in `reports/` where the family loses its narrow type. Separately, `ConvergenceReport.method` is non-optional in `types.ts`, so a suppressed metric still *names* a family for an interval that does not exist. *"C5 is closed"* and *"the same defect exists two files away"* must not be the same sentence — this repository has twice been burned by a fix that made its own report true and left a sibling copy wrong |
+| **`C34` — the new browser barrel has no non-test caller** | And cannot have one until `docs/10`'s W4 exists. Stated in the file rather than dressed up, with `browser.test.ts` as its mechanical owner meanwhile ([§ D121](../DECISIONS.md)). This is the repository's signature defect shape, entered knowingly and with its owner named |
+| **`destination-entry` is unreached by both fuzz corpora** | Legal for 11 of 12 profiles and drawn by neither the 64-case nor the 2 000-case corpus. Now **stated on `GENERATED_CALL_TYPES` and asserted**, rather than silently absent ([§ D122](../DECISIONS.md)). Widening it is its own task: it moves about half of every corpus and makes the access-zone arm a three-way case — a call carrying a destination but no credential |
+| **Three findings from the `C4` measurement, recorded rather than fixed in passing** | `validation/sequentialStopping.test.ts:163` still projects the budget with a **hard-coded `z90`** and prints the row **C19** corrected in both doc copies — so the repository derives one answer and publishes another, and C19 fixed the docs and missed the code. `runner/types.ts`'s `StoppingVerdict.distribution` still documents the `'t'` ≤ 25 / `'z'` past it family § D14 deleted. And `estimateMean` returns `halfWidth = 0` on a zero-variance sample, which is finite and below any target, so the rule stops immediately — `stopping.ts`'s docstring implies such a sample yields a non-finite half-width. Only reachable below the 50-replication floor ([§ D119](../DECISIONS.md)) |
 | `stats/` consolidation | Statistics live in `reports/statistics.ts` and `runner/stopping.ts`; `docs/01` layout records this as outstanding |
 | Profiles bit-identical to one another | `eta ≡ fairness-first` survives on both up-peak buildings and is *correct* there (`starvation` is zero for every candidate when no car holds a committed hall call). It still means "9 of 9 beat baseline" counts fewer distinct dispatchers than it sounds. **Re-measured through `runMatrix()` on 2026-07-28**, after the `destination-eta` weight: `eta ≡ fairness-first` at **five** cells, `auction ≡ auction-multi-round` at both Garden cells, `destination-eta ≡ eta` at **`garden-down-peak` only** (where the class also contains `destination-panel`), and a class no earlier report names — **`destination-eta ≡ capacity-aware` at `garden-residential`**. This is why the matrix baselines on `collective`, which is in no identity class at any cell — a baseline that is secretly one of its own arms makes that arm's whole row a row of exact zeros |
 | `prepositionPlan` | Zero callers — superseded by `resolvePrepositionContext`. **Classified**, not deleted: one of the 14 entries in `dispatch/deadCode.test.ts`'s `PUBLIC_API_ONLY`, asserted in both directions |
@@ -701,11 +754,33 @@ after the weight landed rather than carried over.
 ([§ D112](../DECISIONS.md)), **the ninth dead seam** ([§ D114](../DECISIONS.md)), and **the viewer
 and CLI printing a suppressed mean** ([§ D111](../DECISIONS.md)).
 
+**Closed by wave 5**, each verified rather than taken on report: **C4** · **C5** · **C24** ·
+**C27** · **C30** · **C32** · the four ⚠️ UX rows · `packages/experiments`' browser export
+(the *prerequisite*; W4 itself is only partly unblocked) · and *no test asserts any phase's status*,
+**narrowed rather than closed**. [§ D116](../DECISIONS.md)–[§ D124](../DECISIONS.md).
+
 **Still open, in one place, because a reader planning work needs the list and not the prose:**
-Phase 6c · Phase 9 · `packages/experiments`' browser export · the four ⚠️ UX rows · `ED-12`/`ED-13`
-(**C30**) · `garden-down-peak`'s identity class · the `moveFloor` scope call · double-deck ·
-`patternSwitching` · **C4** · **C5** · **C24** · **C27** · **C32** · the mixed-use study's
-six-replication margin · and **no test asserts any phase's status**.
+
+*Deferred by a recorded argument, not by neglect* — Phase 6c · Phase 9 · double-deck simulation ·
+`patternSwitching` · `garden-down-peak`'s identity class · the `moveFloor` scope call.
+
+*Live debt* — **C33** (the `'z'` shape at `statistics.ts:332`, and `ConvergenceReport.method` being
+non-optional) · **C34** (the browser barrel has no non-test caller) · W4's TypeScript-condition gap ·
+`deepCampaignRequested`, `withCallType` and the stopping rule, each with a test as its only caller ·
+`destination-entry` unreached by both fuzz corpora · `sequentialStopping.test.ts:163`'s hard-coded
+`z90` · `StoppingVerdict.distribution`'s stale docstring · `estimateMean`'s zero-variance
+`halfWidth = 0` · the mixed-use study's six-replication margin · `stats/` consolidation ·
+`runDestinationDispatchStudy` off both barrels.
+
+*And the one that no longer has a name of its own, because it is now everyone's:* a phase's status is
+bound to evidence that **exists**, not to evidence that **supports** it. The guard cannot tell a
+raised criterion from a weakened one, and it never questions a `partial` or `deferred` phase. **That
+is the largest remaining un-mechanised risk**, and it is smaller than it was, not gone.
+
+> **Wave 5 closed nine items and opened seven.** That is the register working. `WAVE5_PLAN.md` § 5
+> made *"the debt table rewritten to what is actually left, including anything this wave opened"* a
+> condition of done, precisely because a register that only ever shrinks is not being read honestly —
+> and because five of the seven were found only by fixing something adjacent to them.
 
 ### Two figures corrected here, because the handed-back versions did not reproduce
 

@@ -113,7 +113,11 @@ strategy data; it does not put data outside the standing requirement. Closed by 
 `corpus.test.ts`. The fuzz track flagged this itself rather than dressing it up, and it is
 defensible — a fuzzer's *product* is a test — but it is not the answer `tune` gives `tuning/`, and a
 CLI `fuzz` command would close it cleanly and put the deep campaign in a user's hands. Tracked as
-**C24** in [`AGENT_STATUS.md`](../AGENT_STATUS.md), and **still open**.
+**C24** in [`AGENT_STATUS.md`](../AGENT_STATUS.md), and **CLOSED by wave 5**: `elevator-sim fuzz`
+gives `campaign.ts` a named non-test caller, verified with the repository's own scanner
+([§ D118](../DECISIONS.md)). Three weaker instances of the same shape stand in its place and are
+listed in [`docs/07`](07-handoff.md) § 3 — including one, `deepCampaignRequested`, *in the very file
+that closed C24*.
 
 **What a phase plan must therefore do:** name an owner for every file a new behaviour must be
 *called from*, not merely for the directories it is implemented in. If a phase's work breakdown
@@ -366,11 +370,10 @@ itself reports, not the position it ended at"*, under `describe.each(BUILDING_ID
 
 **The UX cycle ran, and its ledger is published rather than summarised.**
 `packages/viz/UX.md` § 7.0 carries **88** scenarios with differentiated states, not a blanket tick:
-**79 ✅** (32 wave 1, 34 driven in a browser against the shipped `data/`, 2 driven *and* asserted,
-11 asserted by a test whose assertion was proved to bite), 2 ✅+⚠️ with one clause each way (`RV-18`,
-`ED-23`), **4 ⚠️ built and unverified** (`RV-11`, `RV-17`, `RV-21`, `KB-14`), 2 🔲 re-marked because
-the row contradicts the schema (`ED-12`, `ED-13` — see **C30**), and 1 🔲 not built (`PB-09`). The
-ids are reproduced in [`TEST_MATRIX.md`](../TEST_MATRIX.md) § 3.
+**86 ✅** (32 wave 1, 37 driven in a browser against the shipped `data/`, 4 driven *and* asserted,
+13 asserted by a test whose assertion was proved to bite), 1 ✅+⚠️ with one clause each way
+(`ED-23`), **0 ⚠️ unverified**, 0 🔲 re-marked, and 1 🔲 not built (`PB-09`). The ids are reproduced
+in [`TEST_MATRIX.md`](../TEST_MATRIX.md) § 3.
 
 > **The count moved from 87 to 88 because `T29` added a row, and two of the existing rows were
 > found to be *false* rather than merely unverified.** `UX.md` § A.3's **Success** and **Saturated**
@@ -378,9 +381,21 @@ ids are reproduced in [`TEST_MATRIX.md`](../TEST_MATRIX.md) § 3.
 > `mean wait so far 87.7 s` one line below the banner saying the mean was suppressed — on the same
 > `<canvas role="img">` whose `aria-label` said it did not exist, and which `Export PNG` bakes into
 > a shareable file. Fixed and re-marked with the evidence, on both suppression grounds
-> ([§ D111](../DECISIONS.md)). **The four ⚠️ rows are unchanged and are still not passing**: built
-> and reachable, neither driven nor tested. `KB-14` is one of the seven ⛔ non-negotiable keyboard
-> rows.
+> ([§ D111](../DECISIONS.md)).
+>
+> **Wave 5 drove the last four ⚠️ rows, and two of *those* were false as well**
+> ([§ D120](../DECISIONS.md)). `RV-21`'s **Retry was permanently dead after any failed load** — a
+> temporal-dead-zone `ReferenceError` thrown inside a floating `async` IIFE with no `catch`, so the
+> page cleared its own error message and sat at `loading data…` for ever with nothing in the
+> console. `RV-17` named no path, because Vite answers `Accept: */*` with `index.html` and a **200**
+> and `!response.ok` is exactly the branch a missing file does not take. A fifth row (§ B.3) was
+> false on both clauses. All seven ⛔ non-negotiable keyboard rows, `KB-14` included, are now ✅ —
+> and `KB-14`'s row records what could *not* be exercised: the CSS clause under a real OS
+> preference, the media query being un-emulable by the available tooling.
+>
+> **That is three consecutive passes in which driving the app found a shipped defect that reading it
+> had missed** — and § D111's own pass had driven three buildings at one viewport without
+> re-exercising these four.
 
 > **Two things this phase found by running the UI rather than reading it**, recorded because the
 > reading pass had already passed: four defects in [`DECISIONS.md` § D69](../DECISIONS.md), and
@@ -784,10 +799,13 @@ with `weights.rideTime: 1` against `eta`, all four figures from the same runs. R
 `benchmark/destinationDisclosure.js`; pinned by `benchmark/published.ts` and asserted by
 `benchmark/destinationDisclosure.test.ts`.
 
-> **Reproduction caveat, stated rather than glossed.** Phase 6a's and 6b's study entry points are
-> **not** on `benchmark/index.ts` or on the `@elevator-sim/experiments` barrel, because
-> `index.test.ts` requires the two to move together and the barrel was another task's file
-> ([§ D62](../DECISIONS.md)). Their non-test caller is `benchmark/regeneratePins.ts`, exactly as
+> **Reproduction caveat — the barrel half is now CLOSED (C27), and it buys less than it looks.**
+> Phase 6a's and 6b's study entry points were **not** on `benchmark/index.ts` or on the
+> `@elevator-sim/experiments` barrel, because `index.test.ts` requires the two to move together and
+> the barrel was another task's file ([§ D62](../DECISIONS.md)). Wave 5 put all 34 names plus
+> `runMixedUseHighRiseStudy` on both in one commit ([§ D118](../DECISIONS.md)) — **but a barrel
+> re-export is *reachability*, not liveness**, which is the exact property all ten dead behaviours
+> already had, and `measureEnergyLiveness` was on two barrels and was dead. Their non-test caller is `benchmark/regeneratePins.ts`, exactly as
 > `runTailStudy`'s is, and they are reachable at their module paths. Putting them on the package
 > surface is tracked as **C27**; the name list is in § D62.
 
@@ -1423,10 +1441,12 @@ at its own seed and operating point. Neither is wrong; inheriting either across 
 5. **Persistence and replay round-trips on generated buildings.** `reports/replay.test.ts` and
    `validation/storedRunReplay.test.ts` own that for shipped buildings; a fuzz case is evaluated in
    memory.
-6. **`fuzz/`'s only non-test caller is a test.** `campaign.ts` is driven by `corpus.test.ts`. A
-   fuzzer's product *is* a test, so this is defensible, but it is a weaker answer to the standing
-   requirement than `tune` gives `tuning/`. A CLI `fuzz` command would close it cleanly. Tracked as
-   **C24**.
+6. **`fuzz/`'s only non-test caller was a test — CLOSED.** `campaign.ts` was driven by
+   `corpus.test.ts`; it is now driven by `cli/src/commands/fuzz.ts`, and the deep campaign is in a
+   user's hands rather than behind an environment variable set before a test run. Tracked as
+   **C24**, closed by [§ D118](../DECISIONS.md). The command deliberately **cannot** set
+   `PROPERTY_BOUNDS` and offers no fault-injection flag: `fuzz-1001074`'s lesson is that the cheap
+   fix for a red property is to move a bound.
 
 ---
 
@@ -1458,7 +1478,7 @@ at its own seed and operating point. Neither is wrong; inheriting either across 
 | **`garden-down-peak` is `destination-eta`'s remaining identity class** | § *What the matrix found* above. Structural — bit-identical at `rideTime` 0.3, 1.0 and 2.0 — so it is a **blind operating point**, not an under-weighted term. Whether a destination can carry information at a down-peak whose every trip ends at the lobby is an open question, not a defect |
 | **The editor's ⇧/⇩ buttons reorder the JSON declaration and not the building** | `packages/viz/DECISIONS-T29.md` § T29-4, and [§ D111](../DECISIONS.md). Relabelled honestly rather than repurposed; the scope call — give the declaration its own view, or drop `moveFloor` and let `index` be the only ordering control — is **handed back to the owner** |
 | **No test asserts any phase's *status*** | [`docs/07` § 8](07-handoff.md). The guards assert the four documents **agree**, not that they are **true** |
-| Open items C4, C5, C24, C27, C30, C32 | [`AGENT_STATUS.md`](../AGENT_STATUS.md) § Carried forward, and [`docs/07`](07-handoff.md) § 8. **C7 is closed** — see below |
+| Open items C4, C5, C24, C27, C30, C32 | **All six closed by wave 5** ([§ D116](../DECISIONS.md)–[§ D122](../DECISIONS.md)); **C33** and **C34** opened in their place, and five smaller findings besides. Current list: [`docs/07`](07-handoff.md) § 8 § *Still open, in one place*. **C7 is closed** — see below |
 
 **Closed since this table was last written:** **Phase 8's full experiment matrix and Pareto front at
 a real budget, and with it Phase 7's acceptance interval at 50–200 replications** — both landed in

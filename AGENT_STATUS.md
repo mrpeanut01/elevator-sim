@@ -1,11 +1,15 @@
 # Agent status board
 
-> ## ↩️ REOPENED 2026-07-28 for **wave 5**. The live board is [§ Wave 5](#wave-5--live) at the foot
-> of this file; everything between here and it is the **unaltered** waves 1–4 record.
+> ## ↩️ REOPENED 2026-07-28 for **wave 5**, which has now **CLOSED**. The board is
+> [§ Wave 5](#wave-5--live) at the foot of this file; everything between here and it is the
+> **unaltered** waves 1–4 record.
 >
-> Wave 5 works the six still-open C-items below plus the three non-`C` items in
+> **All six C-items listed as still open below are CLOSED** — `C4`, `C5`, `C24`, `C27`, `C30`,
+> `C32` ([§ D116](DECISIONS.md)–[§ D122](DECISIONS.md)). **`C33` and `C34` are open in their place.**
+>
+> Wave 5 worked the six still-open C-items below plus the three non-`C` items in
 > [§ D115](DECISIONS.md) § *What remains open*. Its board is [`WAVE5_PLAN.md`](WAVE5_PLAN.md).
-> **This board is reopened because a live delivery needs a live status board** —
+> **This board was reopened because a live delivery needs a live status board** —
 > [`MULTI_AGENT_PLAN.md`](MULTI_AGENT_PLAN.md), [`RISKS.md`](RISKS.md) and
 > [`TEST_MATRIX.md`](TEST_MATRIX.md) stay retired in place per [§ D105](DECISIONS.md).
 
@@ -397,33 +401,33 @@ exit 0, 540 s. Reproduces `docs/07` § 1 exactly.
 
 | Task | Item | Branch | Worktree | Status | Last update | Blockers | Next action |
 |---|---|---|---|---|---|---|---|
-| **T33** | `C5` — the `'z'` family label | `fix/c5-z-label` | `.worktrees/T33` | 🟡 in flight | 2026-07-28 | — | build → review → merge 1st |
-| **T34** | `C24` + `C27` — CLI `fuzz`, both barrels | `feat/fuzz-cli-and-barrels` | `.worktrees/T34` | 🟡 in flight | 2026-07-28 | — | build → review → merge 5th |
-| **T35** | `experiments` browser export | `feat/experiments-browser-export` | `.worktrees/T35` | 🟡 in flight | 2026-07-28 | — | build → review → merge 4th |
-| **T36** | `C32` — profile-aware fuzz call types | `fix/c32-fuzz-call-types` | `.worktrees/T36` | 🟡 in flight | 2026-07-28 | — | build → review → merge 3rd |
-| **T37** | `C4` — stopping-rule budget **decision** | `fix/c4-stopping-budget` | `.worktrees/T37` | 🟡 in flight | 2026-07-28 | — | build → review → merge 2nd |
-| **T38** | `C30` — `ED-12`/`ED-13` schema question | `fix/c30-editor-schema` | `.worktrees/T38` | 🟡 in flight | 2026-07-28 | — | build → review → merge 6th |
-| **T39** | The four ⚠️ UX rows, **driven** | `feat/ux-verify-rows` | `.worktrees/T39` | 🟡 in flight | 2026-07-28 | — | build → review → merge 7th |
-| **T40** | A guard binding phase status to evidence | `test/phase-status-assertions` | `.worktrees/T40` | 🟡 in flight | 2026-07-28 | — | build → review → merge last |
+| **T33** | `C5` — the `'z'` family label | `fix/c5-z-label` | *removed* | ✅ merged `ef8274d` | 2026-07-28 | — | done — **the item was stale; the unheld convention was the defect**. Opened `C33` |
+| **T34** | `C24` + `C27` — CLI `fuzz`, both barrels | `feat/fuzz-cli-and-barrels` | *removed* | ✅ merged `e7532a5` | 2026-07-28 | — | done — non-test caller **verified with the repo's own scanner** |
+| **T35** | `experiments` browser export | `feat/experiments-browser-export` | *removed* | ✅ merged `6240250` | 2026-07-28 | — | done — reachability list was **three** modules, not one. W4 **partly** unblocked. Opened `C34` |
+| **T36** | `C32` — profile-aware fuzz call types | `fix/c32-fuzz-call-types` | *removed* | ✅ merged `c8d95d3` | 2026-07-28 | — | done — **two** defects, 122 of 2 000 deep cases affected. Deep tier green at 2 000, 0 violations |
+| **T37** | `C4` — stopping-rule budget **decision** | `fix/c4-stopping-budget` | *removed* | ✅ merged `4467b87` | 2026-07-28 | — | done — **change nothing**, with the benefit measured, not asserted |
+| **T38** | `C30` — `ED-12`/`ED-13` schema question | `fix/c30-editor-schema` | *removed* | ✅ merged `eb0e825` | 2026-07-28 | — | done — schema **held**; `resolveBuilding` raised to agree with it |
+| **T39** | The four ⚠️ UX rows, **driven** | `feat/ux-verify-rows` | *removed* | ✅ merged `913b766` | 2026-07-28 | — | done — **two rows were false**; Retry was permanently dead after any failed load |
+| **T40** | A guard binding phase status to evidence | `test/phase-status-assertions` | *removed* | ✅ merged `0a69872` | 2026-07-28 | — | done — ten manufactured failures watched. Found the roadmap stated **no status at all** for Phases 0 and 1 |
 
 ### Carried-forward register — wave 5 disposition
 
 | Item | Owner | State |
 |---|---|---|
-| **C4** — the sequential stopping rule's budget | T37 | 🟡 in flight — deliverable is a **decision**, and "change nothing, here is what it costs" is an acceptable one |
-| **C5** — a `'z'` fallback label can print | T33 | 🟡 in flight |
-| **C24** — `fuzz/`'s only non-test caller is a test | T34 | 🟡 in flight — closed by a CLI `fuzz` command giving `campaign.ts` a **named** non-test caller |
-| **C27** — Phase 6a/6b/mixed-use studies off the barrels | T34 | 🟡 in flight — note this buys public API surface, **not** liveness; `index.test.ts` deliberately does not treat a barrel as a caller |
-| **C30** — `ED-12`/`ED-13` contradict the schema | T38 → T39 | 🟡 in flight — verdict from T38, ledger rows applied by the orchestrator after T39 merges |
-| **C32** — fuzz generator picks call types blind | T36 | 🟡 in flight — **watch the seed→case mapping**; two named regressions ride on it |
+| **C4** — the sequential stopping rule's budget | T37 | ✅ **CLOSED** — decision is *change nothing*, and the **benefit** was measured, not asserted: below the replication floor a normal quantile gives up **12–20 points of coverage** to save 3–8 replications ([§ D119](DECISIONS.md)) |
+| **C5** — a `'z'` fallback label can print | T33 | ✅ **CLOSED — and the row was stale.** `'z'` could not print and had not been able to since `89bbf37`; the *unheld convention* was the real defect. Opens **C33** ([§ D117](DECISIONS.md)) |
+| **C24** — `fuzz/`'s only non-test caller is a test | T34 | ✅ **CLOSED** — `cli/src/commands/fuzz.ts`, verified with the repository's own scanner. Three weaker instances stand in its place, one of them *in the file that closed it* ([§ D118](DECISIONS.md)) |
+| **C27** — Phase 6a/6b/mixed-use studies off the barrels | T34 | ✅ **CLOSED** — 34 names + `runMixedUseHighRiseStudy` on both barrels in one commit. It buys public API surface and **not** liveness, and the entry says so ([§ D118](DECISIONS.md)) |
+| **C30** — `ED-12`/`ED-13` contradict the schema | T38 → T39 | ✅ **CLOSED — the schema held.** `ED-12`'s row was wrong; `resolveBuilding` was **raised** to agree with the schema it had been silently contradicting, emitting an `empty-bank` code nothing had ever produced ([§ D116](DECISIONS.md)) |
+| **C32** — fuzz generator picks call types blind | T36 | ✅ **CLOSED** — two defects, not one; **122 of 2 000 deep cases (6.1 %)** ran something other than what they said. Seed→case mapping proved unmoved by diff **and** by running both regressions ([§ D122](DECISIONS.md)) |
 
 ### The three non-`C` items
 
 | Item | Owner | State |
 |---|---|---|
-| `packages/experiments` has no browser export — **blocks** `docs/10` W4 | T35 | 🟡 in flight — a prerequisite, not an optimization |
-| Four ⚠️ UX rows — `RV-11`, `RV-17`, `RV-21`, `KB-14` | T39 | 🟡 in flight — an honest ⚠️ is an acceptable outcome; a ticked row that was argued rather than exercised is not |
-| **No test asserts any phase's status** — § D115 calls this the largest un-mechanised risk | T40 | 🟡 in flight |
+| `packages/experiments` has no browser export — **blocks** `docs/10` W4 | T35 | ✅ **prerequisite CLOSED, W4 only *partly* unblocked.** The `node:` reachability list was **three** modules, not one; TypeScript does not apply the `browser` condition. Opens **C34** ([§ D121](DECISIONS.md)) |
+| Four ⚠️ UX rows — `RV-11`, `RV-17`, `RV-21`, `KB-14` | T39 | ✅ **CLOSED by exercise, and two were *false*.** `RV-21`'s Retry was permanently dead after any failed load. `KB-14`'s row records what could **not** be exercised ([§ D120](DECISIONS.md)) |
+| **No test asserts any phase's status** — § D115 calls this the largest un-mechanised risk | T40 | ⚠️ **NARROWED, not closed.** Status is now bound to evidence that **exists**, not evidence that **supports** it; the guard cannot tell a raised criterion from a weakened one and never questions a `partial` phase ([§ D123](DECISIONS.md)) |
 
 ### Explicitly **not** in wave 5
 
@@ -431,3 +435,19 @@ Phase 6c · Phase 9 · double-deck simulation · `patternSwitching` · `garden-d
 class · the `moveFloor` scope call. Each is deferred by a recorded argument, not by neglect, and
 wave 5 does not quietly reopen any of them. See [`WAVE5_PLAN.md`](WAVE5_PLAN.md) § 1.
 
+
+### Wave 5 closed — 2026-07-28
+
+All eight lanes merged, **no phase verdict moved**. Suite 172 files / 3 220 tests →
+**178 files / 3 349 tests (3 340 pass, 9 skip)**, `tsc -b` clean, 567 s measured **serially on an
+idle machine** — the only condition under which that number means anything.
+
+**Nine items closed, seven opened.** New: **C33** (the `'z'` shape two files from where it was
+fixed) · **C34** (the browser barrel has no non-test caller) · W4's TypeScript-condition gap ·
+`deepCampaignRequested` · `withCallType` · `destination-entry` unreached by both fuzz corpora ·
+three findings from the `C4` measurement. Current list: [`docs/07`](docs/07-handoff.md) § 8.
+
+**Five of the eight lanes found the register understated what was wrong** — the item as written was
+not the defect. That is the argument for *determine whether this is true, do not make it true*, and
+it is written up in [§ D124](DECISIONS.md) along with three process findings, including the one this
+wave paid for: **parallelise the work, serialise the measurement.**
