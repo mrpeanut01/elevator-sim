@@ -6,7 +6,7 @@ Live state of every task. Updated by the orchestrator as reports come in.
 
 | Task | Agent | Branch | Worktree | Status | Blockers | Next action |
 |---|---|---|---|---|---|---|
-| T1 | tuning-seam builder | `feat/tuning-seam` | `.worktrees/T1-tuning-seam` | 🟡 in flight | — | await report |
+| T1 | tuning-seam builder | `feat/tuning-seam` | `.worktrees/T1-tuning-seam` | ✅ **merged** `2f835d0` | — | review pending |
 | T2 | statistics builder | `fix/statistics-integrity` | `.worktrees/T2-statistics` | ✅ **merged** `0342982` | — | independent review in flight |
 | T3 | inert-tunables builder | `fix/inert-tunables` | `.worktrees/T3-inert-tunables` | 🟡 in flight | — | await report + behaviour-change list |
 | T4 | docs builder | `docs/register-drift` | `.worktrees/T4-docs` | ⬜ held | wave-1 merges | dispatch after T1–T3 merge |
@@ -31,6 +31,9 @@ Live state of every task. Updated by the orchestrator as reports come in.
 | C4 | `packages/experiments/src/validation/harness.ts:176` builds `productionStoppingRule` by injecting `estimateMean`, which is now Student-t at every n. Sequentially-stopped experiments may therefore run marginally more replications. T2 argues this is the conservative direction (`stopping.ts`: stopping too early "publishes a number it did not earn") and left it deliberately, since re-wiring it to a crossover estimator in a separate change would create a symbol with no non-test caller. **Needs a decision, not a default.** | T2 | wave 2 |
 | C5 | `packages/experiments/src/reports/compare.ts:607` can still print `'z'` as a fallback family label on a published convergence report, in the branch where `achievedHalfWidth` is already `NaN`. Cosmetic but it is the exact mislabelling finding #14 was about. | T2 | wave 2 |
 | C6 | **One published verdict flips** as a direct result of T2: Phase 5 capacity reassignment, `−0.520 s [−1.029, −0.010]` BETTER at n=60 → `[−1.039, +0.000]` **INDISTINGUISHABLE**. Quoted in four places (`docs/05-roadmap.md:360`, `benchmark/index.ts:497`, `benchmark/capacityReassignment.ts:39` and `:54` — the last is prose and needs rewording, not renumbering). No test asserts the old bound. | T2 | T4 |
+| C7 | **NEW DEFECT — the permanent mechanical guard is partly unearned.** `packages/core/src/dispatch/deadCode.test.ts` has two scanner holes T1 found and fixed in its own copy: (a) the export pattern does not match `export async function`, so those exports were never scanned at all; (b) it strips comments but not string literals, so a symbol that names itself in its own error message counts as self-used and becomes unfalsifiably live. T1 demonstrated (a)+(b) by removing a real importer and watching the unfixed audit stay **green**. The same holes exist in core's copy today. | T1 | new task, wave 2 |
+| C8 | **ENVIRONMENT DEFECT in D4.** `node_modules/@elevator-sim/*` symlinks resolve to `../../packages/*` — the **main checkout's** packages — so a worktree running a *built* artifact links against the main checkout's `dist`, not its own. vitest is unaffected (`resolve.alias` maps to worktree-local source) and `packages/core` is unaffected (no workspace deps), but any worktree-built CLI or `experiments` consumer was stale. T1 hit it and worked around it with worktree-local symlinks. **Consequence: T2's built-CLI evidence was produced against stale `experiments`; the orchestrator re-verified all of it in the main checkout — see below.** | T1 | orchestrator (done) |
+| C9 | `docs/05-roadmap.md` § Phase 7 and `docs/07-handoff.md` still record Phase 7 as NOT ACCEPTED and the CLI as four commands. Both are now false. | T1 | T4 |
 | C3 | `patternSwitching` roadmap bullet may need marking not-done — pending T3's decision. | plan | T4 |
 
 ## Baseline
@@ -50,6 +53,28 @@ changed has regressed the suite.
 | baseline | clean | 115 files / 2442 tests | — | ✅ |
 | T5 `a3cb937` | clean | 124 files / **2531** tests | 2442 + 89 | ✅ matches |
 | T2 `0342982` | clean | 124 files / **2543** tests | 2531 + 12 | ✅ matches |
+| T1 `2f835d0` | clean | pending | 2543 + 41 | 🟡 |
+
+### Orchestrator re-verification of T2, run in the main checkout (C8 remediation)
+
+Because T2's built-CLI evidence came from a worktree with stale package resolution, every
+CLI-level claim was re-run here, where resolution is correct:
+
+| Claim | Result |
+|---|---|
+| `compare --a eta --b eta` reports IDENTICAL | ✅ verified — 20 of 20 exactly zero, and **0** occurrences of "Raise --reps" / "below this experiment's resolution" |
+| published interval is Student-t at every n | ✅ verified — n=25/26/30/100/500 all `method=t`, recovered quantiles 2.063899 / 2.059539 / 2.045230 / 1.984217 / 1.964729, converging to z from above |
+| stopping-rule crossover unchanged | ✅ verified — `halfWidthQuantile(25)` = t 2.063899, `(26)` = z 1.959964 |
+| `reproduce:` line reproduces the verdict (#19) | ✅ verified — both runs give `−0.22 s [−0.41, −0.04] BETTER` and the line now carries `--confidence 0.8` |
+
+### Orchestrator verification of T1, run in the main checkout
+
+| Claim | Result |
+|---|---|
+| `elevator-sim tune` runs against real `data/` | ✅ verified end to end |
+| help lists five commands | ✅ verified — `list run compare tune watch` |
+| tuning and holdout seed sets are disjoint | ✅ verified — printed `DISJOINT`, trace seed 9876618837807159332 vs holdout 11367898276632666949 |
+| **known-answer test: an optimizer rediscovers the deadband blind** | ✅ **verified** — searching from the shipped `idle.repositionThresholdS: 8`, random search returned **2.582 s** against Phase 5's independently measured interior optimum of 2 s. `docs/07-handoff.md` § 5 left the wrong value shipped precisely so this could be tested |
 
 ## Log
 
