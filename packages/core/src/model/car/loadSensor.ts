@@ -437,6 +437,25 @@ export class LoadSensor {
  * `answer.allowBypassIfSoleEligibleCar` is deliberately **absent**: it is a starvation guard
  * that depends on how many *other* cars could serve the floor, which no car can know. It is
  * declared by the dispatcher, which owns it.
+ *
+ * ## `answer.overloadThreshold`'s range starts at the design load factor, not at rated load
+ *
+ * It used to be declared over `[1, 1.5]`, and over that whole interval it is a **flat plateau**:
+ * boarding stops at the design load (`car.designLoadFactor` x rated, universally 0.8 — CLAUDE.md
+ * § modelling rules), so a threshold at or above 1.0 can only reject a candidate heavier than
+ * `0.2 x rated`. That is 146 kg on the lightest shipped car against a N(75, 15) passenger mass
+ * distribution — at least 4.7 sigma — so `Car.isOverloaded`, `doorsHeldByOverload` and the
+ * overload-alarm path were dead in every run this project can produce, while an optimizer spent
+ * 50–200 replications an evaluation resolving the dimension. Measured: 1.0 vs 1.5 is
+ * bit-identical on all five shipped buildings.
+ *
+ * The interlock is not dead, it is **one-sided**: it starts biting as the threshold approaches
+ * the boarding cap from above, because the last boarder is what carries the load across. So the
+ * floor of the declared range is {@link LOAD_SENSOR_DEFAULTS.designLoadFactor} — the first value
+ * at which the predicate can reject anybody — rather than rated load, and the invariant that
+ * keeps it honest is asserted in `loadSensor.test.ts`: **the range must start at or below the
+ * design load factor, or the dimension has no reachable effect.** The default is unchanged at
+ * EN 81's 110 %, so no shipped run moves; only the interval a search may explore does.
  */
 export const LOAD_SENSOR_PARAMETERS: readonly CarParameterSpec[] = [
   {
@@ -451,11 +470,11 @@ export const LOAD_SENSOR_PARAMETERS: readonly CarParameterSpec[] = [
   {
     id: 'answer.overloadThreshold',
     type: 'continuous',
-    range: [1, 1.5],
+    range: [LOAD_SENSOR_DEFAULTS.designLoadFactor, 1.5],
     scale: 'linear',
     default: LOAD_SENSOR_DEFAULTS.overloadThreshold,
     description:
-      'Load fraction at which the overload alarm sounds: the doors are held open and the car will not start. Must not be below bypassLoadThreshold.',
+      'Load fraction at which the overload alarm sounds: the doors are held open and the car will not start. Must not be below bypassLoadThreshold. The range starts at the design load factor rather than at rated load because boarding already stops at the design load: above it the predicate can only reject a candidate heavier than (overloadThreshold - designLoadFactor) x rated, which at 1.0 and above is 0.2 x rated — at least 4.7 sigma of the passenger mass distribution, i.e. never. Measured bit-identical from 1.0 to 1.5 on all five shipped buildings, and live from 0.81 down. EN 81 sets the real device at 110%, which is the default; the lower end of the range is the conservative interlock that trips as the last boarder crosses the cap.',
   },
   {
     id: 'car.designLoadFactor',

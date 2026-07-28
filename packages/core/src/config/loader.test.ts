@@ -316,16 +316,23 @@ describe('loadConfig against the real data/ directory', () => {
     }
   });
 
-  it('reports exactly the two known advisories on the shipped data', () => {
+  it('reports exactly the three known advisories on the shipped data', () => {
     expect(config.warnings.map((warning) => warning.code)).toEqual([
       // patternSwitching selects an "energy-saver" profile that has not been authored.
       WARNING_CODES.unknownWeightSetProfile,
       // Midtown's bank spans 76.9 m; geared traction is reference-rated to 76 m.
       WARNING_CODES.riseExceedsClass,
+      // Vertical City's shuttle bank declares eight double-deck cars that the runtime runs as
+      // single-deck cars. The config layer used to validate the deck pairing carefully enough
+      // to look wired and then say nothing at all, so the only signal that the shuttles were
+      // not being modelled was silence.
+      WARNING_CODES.doubleDeckNotSimulated,
     ]);
     expect(config.warnings[0]?.message).toContain('energy-saver');
     expect(config.warnings[1]?.message).toContain('76.9');
     expect(config.warnings[1]?.file).toContain('midtown-office.json');
+    expect(config.warnings[2]?.message).toContain('double-deck operation is not simulated');
+    expect(config.warnings[2]?.file).toContain('vertical-city.json');
   });
 
   it('is deterministic: two loads produce identical results', async () => {

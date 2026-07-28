@@ -86,6 +86,17 @@ const sideCar: ResolvedCar = resolveCar(
 const CENTER: DoorConfig = resolveDoorConfig(centerCar);
 const SIDE: DoorConfig = resolveDoorConfig(sideCar);
 
+/**
+ * A centre-opening car whose profile **opted into** the courtesy hold.
+ *
+ * `DOOR_DEFAULTS.reopenOnLateArrival` is `false`: the hold is a modelling change that revalues
+ * every published number, so a profile turns it on deliberately (see that constant). Every
+ * assertion about what a *granted* late-arrival reopen does therefore has to run against a
+ * config that granted it; running them against {@link CENTER} would be asserting the refusal
+ * path while reading as the honour path.
+ */
+const COURTESY: DoorConfig = resolveDoorConfig(centerCar, { reopenOnLateArrival: true });
+
 const CAR_CALL: DoorStopReason = { carCall: true, hallCall: false };
 const HALL_CALL: DoorStopReason = { carCall: false, hallCall: true };
 const BOTH_CALLS: DoorStopReason = { carCall: true, hallCall: true };
@@ -732,7 +743,7 @@ describe('reopen during closing', () => {
   });
 
   it('distinguishes a late arrival from an obstruction', () => {
-    const { state, events } = drive(CENTER, [openAt(0, HALL_CALL), lateArrivalAt(7.8)]);
+    const { state, events } = drive(COURTESY, [openAt(0, HALL_CALL), lateArrivalAt(7.8)]);
     const reopen = events.find((entry) => entry.type === 'door.reopenStarted');
     expect(reopen?.cause).toBe('lateArrival');
     expect(state.accounting.lateArrivals).toBe(1);
@@ -927,25 +938,25 @@ describe('open while the door is already closing', () => {
     // The documented remedy: `reopen` reverses the door, spends a slot of the bounded reopen
     // budget and earns a real dwell for the widened reason — unlike `open`, which cannot.
     const declined = applyDoorCommand(
-      carCallStop(CENTER),
+      carCallStop(COURTESY),
       { kind: 'open', reason: LATE_HALL_CALL },
       5.5,
-      CENTER,
+      COURTESY,
     );
     const reopened = applyDoorCommand(
       declined.state,
       { kind: 'reopen', cause: 'lateArrival', reason: LATE_HALL_CALL },
       5.5,
-      CENTER,
+      COURTESY,
     );
     expect(reopened.state.state).toBe('opening');
     expect(reopened.state.reason.hallCall).toBe(true);
 
-    const final = advanceDoor(reopened.state, 100, CENTER).state;
+    const final = advanceDoor(reopened.state, 100, COURTESY).state;
     expect(final.accounting.reopens).toBe(1);
     expect(final.accounting.lateArrivals).toBe(1);
     // A real hall-call dwell was granted, so the stop is longer than a clean one, not shorter.
-    expect(final.accounting.totalS).toBeGreaterThan(nominalStopSeconds(CENTER, final.reason));
+    expect(final.accounting.totalS).toBeGreaterThan(nominalStopSeconds(COURTESY, final.reason));
   });
 
   it('never ends a stop below its own nominal duration, over randomized command streams', () => {
@@ -1441,7 +1452,8 @@ describe('door tunables declare their schema', () => {
       dwellPolicy: 'adaptive',
       dwellAdaptationGain: 0.9,
       maxDwellS: 17,
-      reopenOnLateArrival: false,
+      // Opposite of the default, which is now `false` — see DOOR_DEFAULTS.reopenOnLateArrival.
+      reopenOnLateArrival: true,
       maxReopensPerStop: 2,
       maxTransferSeconds: 25,
     } satisfies DoorAnswerSource;
