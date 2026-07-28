@@ -53,7 +53,27 @@ export function sourceFiles(root: string): readonly string[] {
 export const isTest = (path: string): boolean =>
   path.endsWith('.test.ts') || path.endsWith('.test-helper.ts');
 
-export const isBarrel = (path: string): boolean => basename(path) === 'index.ts';
+/**
+ * A file whose job is to re-export, and which therefore proves *reachability* rather than *use*.
+ *
+ * `index.ts` anywhere, **plus any package's `src/browser.ts`** — a barrel by role and not by name.
+ * `core/src/browser.ts` (DECISIONS.md § D31) and `experiments/src/browser.ts` (see that file's own
+ * docstring) are their packages' environment-free entry points. Neither is called `index.ts`, and
+ * both re-export a large public surface.
+ *
+ * This is not a hypothetical. When `core` landed its split, its own copy of this predicate did not
+ * recognise `browser.ts`, the 950-line barrel counted as a real consumer of everything it
+ * re-exported, and all fourteen `PUBLIC_API_ONLY` entries reported *"now has a caller"* — the audit
+ * that exists to stop dead code reading as live had been made to read everything as live
+ * (DECISIONS.md § D33 § *One thing the split nearly broke, silently*). `experiments/src/browser.ts`
+ * re-exports six of `tuning/deadCode.test.ts`'s allowlisted `space/*` entries and would have done
+ * exactly the same thing here.
+ *
+ * Matching on the path suffix rather than on the two names means a third package's browser barrel
+ * is covered on the day it lands, rather than on the day someone notices.
+ */
+export const isBarrel = (path: string): boolean =>
+  basename(path) === 'index.ts' || path.replace(/\\/g, '/').endsWith('/src/browser.ts');
 
 /** Named bindings a file imports, or re-exports from elsewhere. Never a bare textual match. */
 export function boundNames(source: string): ReadonlySet<string> {
