@@ -571,12 +571,66 @@ function candidateMetric(
   });
 }
 
+/**
+ * The one quantile family a report built here can carry — as a value, so the compiler holds it.
+ *
+ * `statistics.ts` narrows `publishedIntervalQuantile`'s return type to `'t'`: every published
+ * interval in this package is Student-t at `n − 1`, at every `n` (DECISIONS.md § D14, review
+ * finding #14). This constant is that guarantee restated where a report is *assembled* rather than
+ * where an interval is computed, because the two are different places to get it wrong.
+ */
+const PUBLISHED_INTERVAL_FAMILY = 't' as const;
+
+/**
+ * A {@link ConvergenceReport} whose family label is pinned to {@link PUBLISHED_INTERVAL_FAMILY}.
+ *
+ * `ConvergenceReport.method` is typed `IntervalMethod`, the two-member union, because a *stored*
+ * run set predating 2026-07 carries `'z'` and must still parse. That width is right for the stored
+ * shape and wrong for a freshly assembled one: it let the family label be assigned from an
+ * expression of union type, so nothing but a literal in the right place kept `'z'` off a report
+ * whose every interval was `t`. Narrowing the construction site — the only one in the repository —
+ * makes that assignment a compile error rather than a convention.
+ */
+type PublishedConvergenceReport = ConvergenceReport & {
+  readonly method: typeof PUBLISHED_INTERVAL_FAMILY;
+};
+
+/**
+ * The family label a convergence report may carry for `estimate`, or a refusal.
+ *
+ * Three cases, and the third is the one worth stating:
+ *
+ * - An estimate in the published family: its own label, copied.
+ * - **No estimate at all** — the headline metric was suppressed, so `achievedHalfWidth` is `NaN`.
+ *   There is no interval to read a family off, and `ConvergenceReport.method` is not optional, so
+ *   the report names the family it would have used. This is the branch open item C5 was about: it
+ *   used to call an n-dependent quantile chooser that returned `'z'` past n = 25, so a suppressed
+ *   metric could stamp `'z'` on a report whose every printed interval was `t`.
+ * - An estimate from **outside** the published family: refused. Copying `'z'` here would be
+ *   truthful about that estimate and untruthful about this package, which has no estimator that
+ *   produces one; the estimate came from somewhere else, and a reader cannot re-derive the
+ *   half-width from a family the code cannot compute. `formatConvergence` never prints `method`,
+ *   so a wrong value is invisible on the page and fully present in a serialized report — which is
+ *   precisely why this refuses rather than degrading quietly.
+ */
+export function publishedIntervalFamily(
+  estimate: MeanEstimate | undefined,
+): typeof PUBLISHED_INTERVAL_FAMILY {
+  if (estimate === undefined) return PUBLISHED_INTERVAL_FAMILY;
+  if (estimate.method !== PUBLISHED_INTERVAL_FAMILY) {
+    throw new ReportsError(
+      `a convergence report cannot label its half-width "${estimate.method}": every interval this package publishes is Student-t at n − 1, at every n (statistics.ts § "One quantile", DECISIONS.md § D14), so a "${estimate.method}" estimate did not come from an estimator here and the report will not put a family on it.`,
+    );
+  }
+  return estimate.method;
+}
+
 function convergenceOf(
   metrics: readonly MetricEstimate[],
   replications: number,
   confidence: number,
   options: CandidateReportOptions,
-): ConvergenceReport {
+): PublishedConvergenceReport {
   const metricId = options.convergenceMetricId ?? HEADLINE_METRIC_ID;
   const estimate = metrics.find((metric) => metric.metricId === metricId)?.estimate;
   const achievedHalfWidth = estimate?.halfWidth ?? Number.NaN;
@@ -601,16 +655,14 @@ function convergenceOf(
     confidence,
     /*
      * `'t'`, always — including when `achievedHalfWidth` is `NaN` because the headline metric was
-     * suppressed and there is no estimate to read a family off.
+     * suppressed and there is no estimate to read a family off. {@link publishedIntervalFamily}
+     * has the three cases and why the third refuses; {@link PublishedConvergenceReport} is what
+     * makes `'z'` unwritable here, rather than this line being careful.
      *
-     * `formatConvergence` never prints this field, so a wrong value here is invisible on the page
-     * and fully present in a serialized `ConvergenceReport` — which is exactly the mislabelling
-     * review finding #14 was about, one layer down. It used to fall back to a quantile chooser
-     * that returned `'z'` past n = 25, so a suppressed metric could stamp `'z'` on a report whose
-     * every printed interval was `t`. There is now one family: `estimateMean` is Student-t at
-     * every `n`, and so is the stopping rule `validation/harness.ts` injects.
+     * It used to read `estimate?.method ?? 't'` — an expression of union type assigned to a field
+     * of union type. The literal was right and nothing checked it. Open item C5.
      */
-    method: estimate?.method ?? ('t' as const),
+    method: publishedIntervalFamily(estimate),
   });
 }
 
