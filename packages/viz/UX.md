@@ -76,12 +76,12 @@ live counters.
 |---|---|---|---|---|
 | RV-01 | happy | Pick building + dispatcher, press Run | Simulation completes, playback starts, cars move | ✅ w1 — **for every shipped building**. Until wave 1's remediation this was true of two of the five: under the kernel's default `onTimeout: 'throw'` the three tall buildings end a 900 s run undelivered and produced no recording at all. `src/dev/main.ts` now runs with `onTimeout: 'report'` |
 | RV-02 | happy | Change dispatcher, press Run again | New run replaces the old; previous run's seed preserved so the two are comparable | ✅ run — the seed is written back into the field before each run, so pressing Run after changing the dispatcher compares like with like |
-| RV-03 | happy | Deep link with all parameters in the URL | Loads and runs without further input | ✅ run — `?building=…&dispatcher=…&seed=…&duration=…&speed=…`, and every control writes back to the URL |
+| RV-03 | happy | Deep link with all parameters in the URL | Loads and runs without further input | ✅ run — `?building=…&dispatcher=…&seed=…&duration=…&speed=…&tab=…`, and every control writes back to the URL. **`tab` is `T29`'s addition and it closes a real hole**: `syncUrl` wrote five keys and not the surface, so `selectTab` never recorded where the reader was, a deep link always opened on the viewer, and a reload from the editor came back to the viewer. Worse, the editor kept its **own** building selector: `?building=secure-tower` plus **Building editor** opened *Garden Apartments*, because the editor took `resources.entries[0]` and nothing told it otherwise. Driven both ways — `?building=secure-tower&tab=editor` reloads into the editor on Secure Tower, and choosing Vertical City in the editor moves the viewer's selector and the URL with it |
 | RV-04 | alternate | Blank seed | A seed is drawn, **shown**, and the field is populated so the run is reproducible | ✅ w1 |
 | RV-05 | alternate | Explicit seed reused | Byte-identical picture to the earlier run with that seed | ✅ w1 (proved in `replay.test.ts`) |
 | RV-06 | alternate | Building with multiple banks | Banks are visually grouped and labelled; a bank filter is offered | ✅ run — bank id above each column (only when there is more than one), clipped to the column width; filter disabled on a single-bank building |
 | RV-07 | alternate | Building with sky lobbies (`mixed-use-high-rise`) | Transfer floors marked; a transferring passenger is not double-counted in the waiting total | ✅ run (the `⇄` badge) · ✅ test (the count) — a leg is counted as waiting only between its own arrival and its own boarding, so a two-leg journey is never waiting twice at one instant; `frame/overlay.test.ts` cross-checks `waitingNow` against `Frame.totalWaiting` on every shipped building. **Journey-level identity is not asserted**, because `VizLeg` deliberately omits `journeyId` |
-| RV-08 | alternate | Access-restricted floors (`secure-tower`) | Restricted landings marked; a call no car may serve is shown as unassignable, not as a long wait | ✅ test — a floor no shaft serves gets `⊘`; a waiting leg the run never answered reads *unassigned — no car answered this call in this run*. Exercised on a constructed recording: **no shipped building has an unserved floor**, so the `⊘` path does not arise in `data/` |
+| RV-08 | alternate | Access-restricted floors (`secure-tower`) | Restricted landings marked; a call no car may serve is shown as unassignable, not as a long wait | ✅ test (both halves) · ✅ run (the second half, `T29`) — a floor no shaft serves gets `⊘`, exercised on a constructed recording because **no shipped building has an unserved floor**, so the `⊘` path does not arise in `data/`. The *unanswered call* half no longer depends on the reader finding it: until `T29` its only surface anywhere was the caption drawn for a landing picked out of the landing `<select>`, which is `wide-only` and therefore absent below 1280 px. It is now a `✗` on the landing itself and a count in the canvas banner, and a sentence in the text alternative — driven on Secure Tower seed `16757712606996968457` (*12 landings unanswered*) and Vertical City seed `42` (*22 landings unanswered*). `✗` and `⊘` are deliberately different glyphs in different gutters: one is geometry, the other is an outcome |
 | RV-09 | alternate | 60+ floor building (`vertical-city`) | Floor labels thin out rather than overlap; every floor still has a row | ✅ run — measured on `vertical-city`: labels thin by stride, reference floors (entrance, every sky lobby, both ends) are never thinned, and a label wider than the gutter is clipped with an ellipsis rather than drawn off the canvas |
 | RV-10 | edge | Single-car bank | Layout does not collapse; the one shaft is centred | ✅ w1 (`layout.test.ts`) |
 | RV-11 | edge | Zero-population building / no demand generated | "No passengers were generated" empty state, not an empty chart | ⚠️ unverified — the status line says *no passengers were generated in this window — nothing to watch* when `generated === 0`, in `dev/main.ts`. No shipped building produces that, and `dev/main.ts` has no test |
@@ -98,14 +98,35 @@ live counters.
 
 ### A.3 States
 
-| State | Must show | Must not show |
-|---|---|---|
-| **Empty** (nothing selected) | What this view is for; the controls that need choosing; a "run a sample" affordance for the Newcomer | An empty canvas with no explanation |
-| **Loading data** | That `data/` is being fetched | A spinner with no label |
-| **Simulating** | That a run is in progress and that it takes ~a second; the parameters being run | A frozen UI with no feedback — the simulation is synchronous and *will* block the main thread until wave 2 moves it to a worker |
-| **Success** | Building, dispatcher, traffic, seed, clock, speed, counters, per-car status, legend | An AWT when `awtIsValid` is false |
-| **Error** | What failed, the seed, and what to change | A partially drawn building |
-| **Saturated** | Persistent banner, undelivered count, suppression reason | A mean waiting time |
+Two of the "must not show" clauses below were **false in the shipped viewer until `T29`**, and they
+are re-marked in the manner `D18` established — stating the contradiction rather than quietly
+fixing the row. `drawHeader` drew `mean wait so far 87.7 s` on the header line *immediately below*
+the `SATURATED — AWT suppressed` banner the same function drew, and it did so on both suppression
+grounds: Secure Tower at seed `16757712606996968457` showed `TIMED-OUT — 19 undelivered · AWT
+suppressed` beside `mean wait so far 16.6 s`.
+
+Not two surfaces disagreeing — **one**. The `<canvas role="img">` that painted the number carries
+an `aria-label` written by `describeFrame` from the same summary, reading *"Mean waiting time is
+suppressed…"*. The sighted reader saw a figure the non-sighted reader was told did not exist, and
+**Export PNG** baked it into a shareable file, because the canvas is the export source.
+
+The `Established` column is filled in only where `T29` actually drove the row. `—` means *this
+task did not exercise it*, not *it does not work*.
+
+| State | Must show | Must not show | Established |
+|---|---|---|---|
+| **Empty** (nothing selected) | What this view is for; the controls that need choosing; a "run a sample" affordance for the Newcomer | An empty canvas with no explanation | — not exercised by `T29` |
+| **Loading data** | That `data/` is being fetched | A spinner with no label | — not exercised by `T29` |
+| **Simulating** | That a run is in progress and that it takes ~a second; the parameters being run | A frozen UI with no feedback — the simulation is synchronous and *will* block the main thread until wave 2 moves it to a worker | — not exercised by `T29` |
+| **Success** | Building, dispatcher, traffic, seed, clock, speed, counters, per-car status, legend | An AWT when `awtIsValid` is false | ✅ run · ✅ test — **was false, now holds.** Driven on Secure Tower seed `16757712606996968457` (`awtIsValid` false, **not** saturated): the header reads `mean wait suppressed` and no figure appears, on screen, in the `aria-label` and in the exported PNG. `canvas.test.ts` *"prints no mean on the other suppression ground either"*. The **must show** half is unchanged and not re-exercised here |
+| **Error** | What failed, the seed, and what to change | A partially drawn building | — not exercised by `T29` |
+| **Saturated** | Persistent banner, undelivered count, suppression reason | A mean waiting time | ✅ run · ✅ test — **was false, now holds.** Driven on Vertical City seed `42` (`summary.saturated` true): banner `SATURATED — AWT suppressed`, header `mean wait suppressed`, the `41.5 s` gone from screen and from `canvas.toDataURL`. `canvas.test.ts` *"says so, loudly, when the run saturated — and prints no mean beside the banner"*, whose `not.toContain('mean wait so far')` was watched failing against the unfixed gate. The **must show** half was already true and is unchanged |
+
+The gate itself now has one home — `meansAreSuppressed(recording)` in `frame/overlay.ts`, read by
+`overlayAt`, by `drawHeader` and by `dev/main.ts`'s status line. There were three copies of
+`saturated || !awtIsValid` and one of them was missing; § 7.1 rule 4 says why that is not a
+tidiness argument. An em dash still means *nobody has been served yet* and is never used for a
+suppressed run, because those are different facts and only one of them is the reader's to act on.
 
 ---
 
@@ -168,7 +189,7 @@ Edits `data/buildings/*.json` against the **existing** schema, which already val
 
 | Id | Task | Success condition |
 |---|---|---|
-| ED-T1 | Add, remove and reorder floors | Heights and indices stay consistent; the shaft picture updates live |
+| ED-T1 | Add, remove and reorder floors | Heights and indices stay consistent; the shaft picture updates live; **the list reads the way the building does** — highest floor at the top, ground at the bottom, the same direction the preview beside it draws (`U1`) |
 | ED-T2 | Use a floor **range** for a tall building | Ranges expand exactly as `expandFloors` does; the editor shows the expansion |
 | ED-T3 | Add a bank and cars, choosing an elevator class | The class comes from `data/elevator-specs.json`; capacity and timings are shown, not typed |
 | ED-T4 | Define **service** zoning (which floors a shaft physically serves) | A shaft serving a subset is drawn over that subset only |
@@ -183,6 +204,7 @@ Edits `data/buildings/*.json` against the **existing** schema, which already val
 | Id | Class | Scenario | Expected | Wave |
 |---|---|---|---|---|
 | ED-01 | happy | Load a shipped building, change a floor height, see the picture update | Live preview; no run needed | ✅ run — floor 4 of Garden Apartments moved 9 m → 11.5 m and the preview redrew with no run |
+| ED-01a | happy | Read the floor list and the preview together | They run in the same direction | ✅ run · ✅ test (`U1`, added by `T29`) — **this row exists because they did not.** The form listed `G, 2, 3, 4, 5, 6` downward while the preview drew `6` at the top: two views of one building, on one screen, reading opposite ways. Every floor-ordered list in the editor now goes through `floorsInBuildingOrder` — the floors table, each bank's *service* zoning checklist (`.checklist label` is `display:flex`, so it is a vertical list of floors) and the floor-range list. Ordered by `index` rather than by reversing the declaration array, because `midtown-office.json` declares index `0` before index `-1` and a reversed array would draw its basement above the lobby in the form and below it in the picture. Driven on Secure Tower (`30 … G`) and Vertical City (`77 … G`, ranges 6 → 1); `editorPreview.test.ts` compares the list order against the pixel `y` `buildLayout` gives each floor, on **every** shipped building, so the two cannot be wrong in the same direction |
 | ED-02 | happy | Add a car to an existing bank | Appears as a new shaft immediately | ✅ run · ✅ test — **Add car** produced car B and a second shaft in the preview |
 | ED-03 | happy | Change a car's elevator class | Speed/capacity/door timings update from the spec | ✅ test — the class `<select>` is filled from `elevator-specs.json` and each car shows its class envelope; changing the class **clears the per-car overrides that belonged to the old one**, so a 0.63 m/s hydraulic override cannot survive onto a gearless car |
 | ED-04 | happy | Save and run | Viewer opens on the edited building | ✅ run — floor 6's population 24 → 200, **Run this building**, and the viewer ran the edited building (12 passengers generated against 7 before) |
@@ -237,7 +259,7 @@ Applies to every surface. Non-negotiable rows are marked ⛔.
 | KB-10 | ⛔ Focus is not stolen by the animation loop — the scrub position updates only while it is unfocused | ✅ w1 |
 | KB-11 | ⛔ After an error, focus moves to the error message so a screen reader announces it | ✅ run — a `role="alert"` region with `tabindex="-1"` on both surfaces; after a bad seed `document.activeElement.id` was `error`, and after an invalid JSON paste it was `editor-error` |
 | KB-12 | Modal dialogs (discard, overwrite) trap focus and restore it on close | ✅ run — a native `<dialog>.showModal()`, so the trap and the restore are the platform's. The promise behind it settles on **any** of close / cancel / either button, because `close` was observed not to fire for a synthetic submit and a dialog that never resolves hangs the flow silently |
-| KB-13 | ⛔ Canvas is not a focus trap; it exposes a text alternative summarising the current frame | ✅ run · ✅ test — `describeFrame` writes the canvas's `aria-label` and a polite live region: building, seed, clock, run status, suppression, waiting and boarded counts, and per car the floor, direction, **door phase in words** and **OVERLOADED/full in words**. The editor's preview canvas has its own (`describePreview`) |
+| KB-13 | ⛔ Canvas is not a focus trap; it exposes a text alternative summarising the current frame | ✅ run · ✅ test — `describeFrame` writes the canvas's `aria-label` and a polite live region: building, seed, clock, run status, suppression, waiting and boarded counts, **the landings whose calls no car answers** (`T29`), and per car the floor, direction, **door phase in words** and **OVERLOADED/full in words**. The editor's preview canvas has its own (`describePreview`). `T29` found the rule bites in a direction nobody had checked: the alternative was *more* honest than the picture, saying the mean was suppressed while the header printed one, so `KB-13` is now also the reason the two are asserted to agree |
 | KB-14 | ⛔ `prefers-reduced-motion` respected: playback still works, but nothing animates that is not the simulation itself | ⚠️ unverified — a `@media (prefers-reduced-motion: reduce)` block disables every transition and animation, and a run does **not** autoplay under it (the reader gets the first frame and a Play button). The media query was not emulated in the browser session |
 | KB-15 | Colour is never the only signal — **direction** carries a ▲/▼ glyph | ✅ w1 |
 | KB-15a | …and so does **door state**, which today is a fill-width gap only | ✅ run · ✅ test — four distinct glyphs (`▮` `◂▸` `▯` `▸◂`) drawn beside the car wherever the floor pitch leaves room, and the phase in words in the text alternative at every pitch. `opening` and `closing` are the pair a width-only signal cannot tell apart, and they draw differently at the same fraction |
@@ -256,7 +278,7 @@ Applies to every surface. Non-negotiable rows are marked ⛔.
 | RS-05 | More shafts than fit | Horizontal scroll **or** a bank filter — never silently truncated | ✅ run — `vertical-city` at 1280 px drew *showing 30 of 35 shafts — widen the window*, and the bank filter narrows to a bank. The metrics panel's two lists obey the same rule, and a list with no room at all collapses to one line naming what it holds rather than to "showing 0 of N" |
 | RS-06 | Window resize during playback | Relayout without pausing or jumping the playhead | ✅ w1 (layout is rebuilt per frame) |
 | RS-07 | `devicePixelRatio` 2 or 3 | Crisp lines and text, not a scaled bitmap | ✅ w1 |
-| RS-08 | Print / screenshot | The current frame is exportable as PNG with its seed and clock burned in | ✅ run — **Export PNG** produced `mixed-use-high-rise-42-5s.png` from `canvas.toDataURL`; the seed and the clock are in the header the canvas already draws, and in the filename |
+| RS-08 | Print / screenshot | The current frame is exportable as PNG with its seed and clock burned in | ✅ run — **Export PNG** produced `mixed-use-high-rise-42-5s.png` from `canvas.toDataURL`; the seed and the clock are in the header the canvas already draws, and in the filename. Re-driven in `T29`, because "the header the canvas already draws" is exactly why `D1` mattered: the export is the canvas, so a leaked mean left the artifact rather than the screen. The exported bitmap was decoded back into the page and read on both suppression grounds — `mean wait so far 41.5 s` before, `mean wait suppressed` after |
 
 ---
 
@@ -277,13 +299,14 @@ criterion means.
    truth for "may I show this mean" is exactly the failure this project is built to avoid.
 5. **The seed is visible and copyable on every surface that shows a run.**
 
-### 7.0 Ledger — where the 87 rows stand after wave 2
+### 7.0 Ledger — where the 88 rows stand after wave 2 and `T29`
 
 | State | Rows | Ids |
 |---|---|---|
 | ✅ **wave 1** | 32 | `RV-01 04 05 10 12 13 15 16 19` · `PB-01 02 03 04 05 06 10 11 12 13 14` · `ED-11` · `KB-02 03 04 05 08 09 10 15` · `RS-01 06 07` |
 | ✅ **run** — driven in a browser against the shipped `data/` | 34 | `RV-02 03 06 07 09 20` · `PB-07 08 15 16 17 18` · `ED-01 02 04 05 06 10 18 19 20 21 22` · `KB-01 06 07 11 12 13 15a` · `RS-02 03 05 08` |
-| ✅ **test** — asserted, and the assertion proved to bite | 12 | `RV-08 14` · `ED-03 07 08 09 14 15 16 17` · `KB-15b` · `RS-04` |
+| ✅ **run** + ✅ **test** — driven *and* asserted, both clauses | 2 | `RV-08` · `ED-01a` (added by `T29`) |
+| ✅ **test** — asserted, and the assertion proved to bite | 11 | `RV-14` · `ED-03 07 08 09 14 15 16 17` · `KB-15b` · `RS-04` |
 | ✅ + ⚠️ — one clause each way | 2 | `RV-18` (editor half run, viewer half unverified) · `ED-23` (in-app half run, `beforeunload` unverified) |
 | ⚠️ **unverified** — built, reachable, neither driven nor tested | 4 | `RV-11` `RV-17` `RV-21` `KB-14` |
 | 🔲 **re-marked** — the row contradicts the schema; stated rather than papered over | 2 | `ED-12` `ED-13` |
@@ -291,6 +314,26 @@ criterion means.
 
 The seven ⛔ non-negotiable keyboard rows — `KB-01 02 08 10 11 13 14 15` — are all ✅ except
 `KB-14`, which is built and unverified.
+
+#### 7.0.1 What `T29` changed, and what it deliberately did not
+
+`T29` fixed correctness defects in the shipped viewer. It touched six rows and added one, and the
+count moved from 87 to 88 because `ED-01a` is new. `RV-08` moved from **test** to **run + test**;
+nothing else changed bucket.
+
+| Row | Change |
+|---|---|
+| § A.3 **Saturated**, § A.3 **Success** | Both "must not show" clauses were **false** and now hold — `D1`. Marked with the evidence, on both suppression grounds, on screen and in the exported PNG |
+| `RV-03` | `tab` joins the five URL keys; the editor and the viewer stopped holding separate opinions about which building is open — `D11` |
+| `RV-08` | The unanswered-call marker gained a surface that does not depend on the landing `<select>` — `D10` |
+| `RS-08` | Re-driven, because the export **is** the canvas and that is what made `D1` more than a display bug |
+| `KB-13` | The text alternative gained the unanswered landings, and became the thing the picture is asserted to agree with |
+| `ED-T1`, `ED-01a` | Every floor-ordered list in the editor reads the way the building does — `U1` |
+
+**Not claimed.** `T29` drove Secure Tower, Vertical City and Garden Apartments in a browser at
+one viewport. It did not re-exercise `RV-11`, `RV-17`, `RV-21` or `KB-14`, which stay ⚠️; it did
+not touch Basic/Advanced modes, which are not built; and the `⊘` unserved-floor path still has no
+shipped building that produces it.
 
 ### 7.2 Not frozen: the field set of `VizRecording`
 

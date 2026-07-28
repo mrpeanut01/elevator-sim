@@ -104,6 +104,26 @@ function isWaitingAt(leg: VizLeg, t: SimTime): boolean {
   return leg.boardedAt === undefined || leg.boardedAt > t;
 }
 
+/**
+ * May this run's *estimates* be shown at all? — `UX.md` § 7.1 rule 4, and `D1`.
+ *
+ * The two grounds the summary already decided on, read straight off it and never recomputed.
+ * It lives here, with the metrics, rather than in a renderer, because the question is a fact
+ * about the recording and every surface must get the same answer to it. There are three surfaces
+ * and there were three copies of the expression: `overlayAt` below, `dev/main.ts`'s status line,
+ * and — the one that got it wrong — `render/canvas.ts`'s header, which drew
+ * `mean wait so far 87.7 s` on the line under the `SATURATED — AWT suppressed` banner it drew
+ * itself. Three copies of a rule is three chances to keep two of them.
+ *
+ * Note what it is deliberately **not** sensitive to: a `timed-out` status, or undelivered
+ * passengers. Those are `RV-16`'s banner, and a run can end with people still in the system and
+ * still have a mean the statistics module stands behind. `awtIsValid` is the summary's own
+ * verdict and it already accounts for censoring — four grounds' worth, per `CLAUDE.md`.
+ */
+export function meansAreSuppressed(recording: VizRecording): boolean {
+  return recording.summary.saturated || !recording.summary.awtIsValid;
+}
+
 export function overlayAt(
   recording: VizRecording,
   simTimeS: SimTime,
@@ -113,7 +133,7 @@ export function overlayAt(
   const windowS = options.windowS ?? DEFAULT_WINDOW_S;
   const windowStartS = Math.max(recording.startedAt, t - windowS);
 
-  const suppressed = recording.summary.saturated || !recording.summary.awtIsValid;
+  const suppressed = meansAreSuppressed(recording);
   const suppressionReason = suppressed
     ? (recording.summary.awtInvalidReason ??
       'the run saturated: the queues did not reach a steady state, so a mean wait describes nothing.')

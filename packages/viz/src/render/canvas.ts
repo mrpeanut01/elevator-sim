@@ -24,6 +24,7 @@
  */
 
 import type { LandingAssignment, OverlayMetrics } from '../frame/overlay.js';
+import { meansAreSuppressed } from '../frame/overlay.js';
 import type { DoorPhase, Frame, VizRecording } from '../contract/types.js';
 import type { Layout } from './layout.js';
 import { LOAD_ALARM, drawOverlay, loadColour } from './overlay.js';
@@ -122,6 +123,22 @@ export interface SceneInput {
    * statement about the geometry rather than about how long somebody has been waiting.
    */
   readonly unservedFloorIds?: readonly string[] | undefined;
+  /**
+   * Floors with somebody standing at a call **no car answers in this run** — `D10`, `RV-08`.
+   *
+   * Distinct from {@link SceneInput.unservedFloorIds}, which is geometry: a floor no shaft
+   * reaches. This is an *outcome* — a call the run left unanswered — and until now its only
+   * surface anywhere in the viewer was the caption `drawSelection` draws for a landing the reader
+   * had picked out of the landing `<select>`. That selector is `wide-only` (dropped below 1280 px)
+   * and the Phase 9 design sends it to Advanced mode, while the same design lists a locked-out
+   * call among the facts Basic mode may never hide. A fact with one optional surface is a fact
+   * that is usually not shown, so it is drawn on the landing itself and named in the banner.
+   *
+   * Derived by the caller from `landingAssignmentsAt`, for the reason `SceneInput.overlay` is:
+   * `drawScene` stays a pure function of its inputs, and the renderer never reaches for a
+   * recording-wide scan of its own.
+   */
+  readonly unansweredCallFloorIds?: readonly string[] | undefined;
 }
 
 /**
@@ -207,11 +224,11 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
 
   ctx.textAlign = 'right';
   ctx.fillStyle = theme.text;
-  const mean = frame.runningMeanWaitS;
   ctx.fillText(
-    `waiting ${String(frame.totalWaiting)}   boarded ${String(frame.boardedLegs)} legs   mean wait so far ${
-      mean === undefined ? '—' : `${mean.toFixed(1)} s`
-    }`,
+    `waiting ${String(frame.totalWaiting)}   boarded ${String(frame.boardedLegs)} legs   ${meanClause(
+      recording,
+      frame,
+    )}`,
     layout.width - 12,
     30,
   );
@@ -229,10 +246,53 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   }
   if (recording.summary.saturated) banner.push('SATURATED — AWT suppressed');
   else if (!recording.summary.awtIsValid) banner.push('AWT suppressed');
+  // `D10` — a call no car answered is never left to the landing selector alone. See
+  // {@link SceneInput.unansweredCallFloorIds}.
+  const unanswered = input.unansweredCallFloorIds ?? [];
+  if (unanswered.length > 0) {
+    banner.push(
+      `${String(unanswered.length)} landing${unanswered.length === 1 ? '' : 's'} unanswered — ${
+        unanswered.length === 1 ? 'no car answers' : 'no car answers those calls'
+      } in this run`,
+    );
+  }
   if (banner.length > 0) {
     ctx.fillStyle = theme.warning;
     ctx.fillText(banner.join('   ·   '), layout.width - 12, 10);
   }
+}
+
+/**
+ * The header's third field: the live running mean, or the fact that it is suppressed.
+ *
+ * ## Why a suppressed run gets no number here, and why that is not a display preference
+ *
+ * The header used to draw `mean wait so far 87.7 s` unconditionally, on the line immediately
+ * below the `SATURATED — AWT suppressed` banner *the same function draws*. Worse than two
+ * surfaces disagreeing: it is **one** `<canvas role="img">`, whose `aria-label` — written by
+ * `describeFrame` from the same summary — reads *"Mean waiting time is suppressed… Rolling mean
+ * wait over the last 300 seconds is not reported."* The sighted reader saw a number the
+ * non-sighted reader was told did not exist, and **Export PNG** baked it into a shareable file,
+ * because the canvas is the export source.
+ *
+ * It leaked on **both** grounds, not only saturation: Secure Tower at seed
+ * `16757712606996968457` reports `TIMED-OUT — 20 undelivered · AWT suppressed` beside
+ * `mean wait so far 21.0 s`.
+ *
+ * `Frame.runningMeanWaitS` being a *running* figure rather than the reported AWT does not rescue
+ * it. `UX.md` § A.3 forbids **a mean waiting time** on a saturated run and **an AWT when
+ * `awtIsValid` is false** on a successful one, and the running mean is a mean waiting time over a
+ * run whose queues the statistics module refused to stand behind. `frame/overlay.ts` already
+ * suppresses the rolling window mean and the per-bank means on exactly these grounds; this is the
+ * one place that did not.
+ *
+ * The word rather than an em dash, because `—` already means *nobody has been served yet* — a
+ * different fact, and one the reader can act on.
+ */
+function meanClause(recording: VizRecording, frame: Frame): string {
+  if (meansAreSuppressed(recording)) return 'mean wait suppressed';
+  const mean = frame.runningMeanWaitS;
+  return `mean wait so far ${mean === undefined ? '—' : `${mean.toFixed(1)} s`}`;
 }
 
 function drawFloors(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
@@ -474,9 +534,19 @@ export function landingOptionLabel(assignment: LandingAssignment): string {
   return `${head} → ${assignment.answeredByCarId}`;
 }
 
+/**
+ * The glyph for a landing whose call no car answers — `D10`.
+ *
+ * `✗` and not `⊘`: `⊘` already means *this floor is served by no shaft* on the label gutter, and
+ * the two are different claims — one about the building's geometry, one about what the dispatcher
+ * did with a call it could legally have taken. Colour is not the only signal either way.
+ */
+const UNANSWERED_GLYPH = '✗';
+
 function drawLandings(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   const { frame, layout } = input;
   const rowById = new Map(layout.rows.map((row) => [row.floorId, row]));
+  const unanswered = new Set(input.unansweredCallFloorIds ?? []);
   const x = layout.plot.x + layout.plot.width + 10;
   ctx.font = FONT;
   ctx.textAlign = 'left';
@@ -498,7 +568,13 @@ function drawLandings(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void 
     }
     if (landing.waitingDown > 0) {
       ctx.fillStyle = theme.waitingDown;
-      ctx.fillText(`▼${String(landing.waitingDown)}`, cursor, row.y);
+      const text = `▼${String(landing.waitingDown)}`;
+      ctx.fillText(text, cursor, row.y);
+      cursor += 8 * (text.length + 1);
+    }
+    if (unanswered.has(landing.floorId)) {
+      ctx.fillStyle = theme.warning;
+      ctx.fillText(UNANSWERED_GLYPH, cursor, row.y);
     }
   }
 }

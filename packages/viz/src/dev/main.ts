@@ -25,7 +25,12 @@ import { SimulationError, type BuildingConfig, type SimulationConfig } from '@el
 
 import type { VizRecording } from '../contract/types.js';
 import { frameSequence, serializeFrames } from '../frame/sequence.js';
-import { landingAssignmentsAt, overlayAt, type LandingAssignment } from '../frame/overlay.js';
+import {
+  landingAssignmentsAt,
+  meansAreSuppressed,
+  overlayAt,
+  type LandingAssignment,
+} from '../frame/overlay.js';
 import { recordRun } from '../record/recordRun.js';
 import { readRecordingDocument, verifyReplay } from '../record/document.js';
 import { Playback } from '../playback/playback.js';
@@ -220,6 +225,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
   if (params.get('seed') !== null) ui.seed.value = params.get('seed') ?? '';
   if (params.get('duration') !== null) ui.duration.value = params.get('duration') ?? '900';
   if (params.get('speed') !== null) applyParam(ui.speed, params.get('speed'));
+  /**
+   * Which surface is on screen — `D11`, and the sixth key in the URL.
+   *
+   * `syncUrl` wrote five keys and not this one, so `selectTab` never recorded where the reader
+   * was: a deep link could name a building and a seed and still always open on the viewer, and a
+   * reload from the editor came back to the viewer. Held here rather than read back off
+   * `aria-selected`, so there is one answer to "which tab" rather than a DOM attribute and a URL
+   * that can drift.
+   */
+  let currentTab: 'viewer' | 'editor' = params.get('tab') === 'editor' ? 'editor' : 'viewer';
 
   function syncUrl(): void {
     const next = new URLSearchParams({
@@ -228,6 +243,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       seed: ui.seed.value,
       duration: ui.duration.value,
       speed: ui.speed.value,
+      tab: currentTab,
     });
     window.history.replaceState(null, '', `?${next.toString()}`);
   }
@@ -655,13 +671,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   function selectTab(which: 'viewer' | 'editor'): void {
     const viewer = which === 'viewer';
+    currentTab = which;
     ui.tabViewer.setAttribute('aria-selected', String(viewer));
     ui.tabEditor.setAttribute('aria-selected', String(!viewer));
     ui.tabViewer.tabIndex = viewer ? 0 : -1;
     ui.tabEditor.tabIndex = viewer ? -1 : 0;
     ui.panelViewer.hidden = !viewer;
     ui.panelEditor.hidden = viewer;
-    if (!viewer) editor.refresh();
+    if (!viewer) {
+      // `D11`: one building across both panes. Declines to act on an unsaved edit — see
+      // `EditorHandle.showBuilding`.
+      editor.showBuilding(ui.building.value);
+      editor.refresh();
+    }
+    syncUrl();
   }
 
   ui.tabViewer.addEventListener('click', () => {
@@ -688,6 +711,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   const editor = mountEditor({
     resources,
+    // `D11`: the editor opens on the building the URL and the viewer already name, not on
+    // whatever `data/` happens to list first.
+    initialBuildingId: ui.building.value,
+    onOpen: (buildingId) => {
+      applyParam(ui.building, buildingId);
+      // A shipped building was chosen, so the ad-hoc document the editor may have handed over
+      // earlier is no longer what Run means.
+      adhocBuilding = undefined;
+      syncUrl();
+    },
     onRun: (building) => {
       adhocBuilding = building;
       selectTab('viewer');
@@ -744,6 +777,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       }),
   });
 
+  // `D11`: `?tab=editor` survives a reload, and opens on the building the URL names. After the
+  // mount, because `selectTab('editor')` hands the building over to the editor.
+  if (currentTab === 'editor') selectTab('editor');
+
   // ED-23: warned before navigation, and only when there is something to lose.
   window.addEventListener('beforeunload', (event) => {
     if (!editor.isDirty()) return;
@@ -799,24 +836,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
         shafts,
         overlayWidthPx: wantsOverlay ? OVERLAY_WIDTH_PX : 0,
       });
-      const metrics = overlayAt(recording, frame.simTimeS);
-      drawScene(surface, {
-        recording,
-        frame,
-        layout,
-        overlay: wantsOverlay ? metrics : undefined,
-        selection,
-        unservedFloorIds: unservedFloors(recording),
-      });
-
-      // KB-13: the canvas is not a hole in the page. Updated at most twice a second, because a
-      // live region that changes 60 times a second is unusable rather than accessible.
-      const description = describeFrame({ recording, frame, metrics });
-      if (description !== lastDescription) {
-        lastDescription = description;
-        ui.canvas.setAttribute('aria-label', description);
-      }
-
+      // The assignments are refreshed *before* the draw, not after it, because `D10` makes them
+      // an input to the picture rather than only to the landing `<select>`. Drawing first left
+      // the first frame after a run marked from the assignment list of `startedAt`.
       if (frame.simTimeS - landingRefreshAt > 1 || frame.simTimeS < landingRefreshAt) {
         landingRefreshAt = frame.simTimeS;
         // Only while the reader is not holding the control open, for KB-10's reason.
@@ -830,6 +852,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
           selection =
             fresh === undefined ? { floorId: selection.floorId, waiting: 0 } : selectionOf(fresh);
         }
+      }
+
+      const metrics = overlayAt(recording, frame.simTimeS);
+      const unanswered = unansweredCallFloors(recording, assignments);
+      drawScene(surface, {
+        recording,
+        frame,
+        layout,
+        overlay: wantsOverlay ? metrics : undefined,
+        selection,
+        unservedFloorIds: unservedFloors(recording),
+        unansweredCallFloorIds: unanswered,
+      });
+
+      // KB-13: the canvas is not a hole in the page. Updated at most twice a second, because a
+      // live region that changes 60 times a second is unusable rather than accessible.
+      const description = describeFrame({
+        recording,
+        frame,
+        metrics,
+        unansweredCallFloorIds: unanswered,
+      });
+      if (description !== lastDescription) {
+        lastDescription = description;
+        ui.canvas.setAttribute('aria-label', description);
       }
 
       // KB-10: the scrub position is written only while the reader is not holding it.
@@ -868,6 +915,33 @@ function boot(ui: Elements, resources: BrowserResources): void {
   enable();
 }
 
+/**
+ * Floors standing a call that no car answers in this run — `D10`.
+ *
+ * `landingAssignmentsAt` only returns calls with somebody waiting at the instant asked for, and
+ * `answeredByCarId` is taken off the record rather than guessed, so this is *"nobody ever comes"*
+ * and not *"nobody has come yet"*. `promisedCarId` excludes the destination-dispatch case where a
+ * panel has already named a car: a promised passenger still standing at the horizon is not an
+ * unanswered call, which is the distinction `frame/overlay.ts` § version 4 exists to preserve.
+ *
+ * Ordered by the building's own floor order, not by id. Sorting the ids as strings read
+ * `11, 12, 16, 20, 24, 25, 26, 3, 4, 6, 8, 9` in the spoken description — every digit correct and
+ * the sentence useless.
+ */
+function unansweredCallFloors(
+  recording: VizRecording,
+  assignments: readonly LandingAssignment[],
+): readonly string[] {
+  const ids = new Set<string>();
+  for (const assignment of assignments) {
+    if (assignment.waiting === 0) continue;
+    if (assignment.promisedCarId !== undefined) continue;
+    if (assignment.answeredByCarId !== undefined) continue;
+    ids.add(assignment.floorId);
+  }
+  return recording.floors.map((floor) => floor.id).filter((id) => ids.has(id));
+}
+
 /** Floor ids no shaft in this recording serves — `RV-08`'s unassignable landings. */
 function unservedFloors(recording: VizRecording): readonly string[] {
   const served = new Set(recording.shafts.flatMap((shaft) => shaft.servedFloorIds));
@@ -881,7 +955,8 @@ function applyParam(select: HTMLSelectElement, value: string | null): void {
 
 function statusLine(recording: VizRecording): string {
   const { summary } = recording;
-  const suppressed = summary.saturated || !summary.awtIsValid;
+  // One gate, three surfaces — the status line, the canvas header and the metrics panel.
+  const suppressed = meansAreSuppressed(recording);
   const parts = [
     `${recording.buildingName} · ${recording.dispatcherProfileId} · seed ${recording.seed}`,
   ];

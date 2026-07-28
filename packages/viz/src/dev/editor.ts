@@ -51,7 +51,7 @@ import {
   upsertAccessZone,
 } from '../editor/editorEdits.js';
 import { EditorHistory } from '../editor/editorHistory.js';
-import { previewGeometry } from '../editor/editorPreview.js';
+import { floorsInBuildingOrder, previewGeometry } from '../editor/editorPreview.js';
 import {
   issuesMayBeIncomplete,
   summariseReport,
@@ -71,12 +71,41 @@ export interface EditorHandle {
   refresh(): void;
   /** `ED-23` — is there an unsaved edit? */
   isDirty(): boolean;
+  /**
+   * Open the shipped building with this id, if it is safe to — `D11`.
+   *
+   * The two panes used to hold independent opinions about which building was on screen:
+   * `?building=secure-tower` loaded Secure Tower in the viewer and **Garden Apartments** in the
+   * editor, because the editor opened `resources.entries[0]` and nothing ever told it otherwise.
+   *
+   * Silently does nothing in three cases, and each is deliberate: the editor already holds that
+   * building; there is an unsaved edit (following a tab switch is not worth discarding work, and
+   * a modal on every tab switch is worse than the mismatch); or no shipped entry has that id,
+   * which is the case for a blank or imported document. `ED-23`'s guarantee is unchanged.
+   */
+  showBuilding(buildingId: string): void;
+  /** Id of the document currently open, shipped or not — the other half of `D11`. */
+  currentBuildingId(): string;
 }
 
 export interface EditorOptions {
   readonly resources: BrowserResources;
   /** `ED-04`/`ED-T8` — one control from a valid edit to a run in the viewer. */
   readonly onRun: (building: BuildingConfig) => void;
+  /**
+   * Which shipped building to open with — `D11`. Falls back to the first entry when absent or
+   * unknown, which is what the editor did unconditionally before.
+   */
+  readonly initialBuildingId?: string | undefined;
+  /**
+   * A shipped building was opened here. `D11`'s other direction: the viewer's own selector
+   * follows, so the URL and both panes name one building.
+   *
+   * Not fired for **Start from blank** or **Import**: neither produces a document the viewer's
+   * `<select>` can hold, and setting it to a stale id would be the mismatch again with the
+   * arrow reversed.
+   */
+  readonly onOpen?: ((buildingId: string) => void) | undefined;
   /**
    * Ask the user to confirm something. Resolves `true` to proceed.
    *
@@ -144,10 +173,23 @@ export function mountEditor(options: EditorOptions): EditorHandle {
     openSelect.append(new Option(`${entry.config.name} (${entry.file})`, entry.file));
   }
 
-  const first = resources.entries[0];
+  // `D11`: the viewer's chosen building wins over "whatever is first in `data/`".
+  const first =
+    resources.entries.find((entry) => entry.config.id === options.initialBuildingId) ??
+    resources.entries[0];
   const history = new EditorHistory(
     first === undefined ? blankBuilding(resources.elevatorSpecs, resources.trafficProfiles) : structuredClone(first.config),
   );
+  /**
+   * The `data/` file the open document came from, or `undefined` for a blank or imported one.
+   *
+   * Tracked rather than derived, because `openSelect`'s option values are **file names** and the
+   * cancel path used to put `history.current.id` back into it — an id is not a file name, so
+   * declining "discard and open" left the control showing the first option while the editor held
+   * a different building. One of the two ways the panes could disagree; `D11` is the other.
+   */
+  let openFile: string | undefined = first?.file;
+  if (openFile !== undefined) openSelect.value = openFile;
   let report: ValidationReport = validate(history.current);
   /** Text the reader typed that does not parse. Kept so `ED-18` does not lose their work. */
   let pendingJson: string | undefined;
@@ -194,7 +236,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
       floorsBody.append(row);
       return;
     }
-    for (const floor of floors) {
+    for (const floor of floorsInBuildingOrder(floors)) {
       const row = document.createElement('tr');
       row.append(
         cellWithText(floor.id),
@@ -219,9 +261,28 @@ export function mountEditor(options: EditorOptions): EditorHandle {
         ),
       );
       const actions = document.createElement('td');
+      /*
+       * `moveFloor` moves a floor within the **declaration list** and deliberately renumbers
+       * neither `index` nor `heightM` — its own docstring says why, and the reason is good: the
+       * loader fails a building whose two disagree (`floor-height-order`), and an editor that
+       * silently rewrote either would settle a modelling error by fiat.
+       *
+       * Which means these two buttons never moved a floor *in the building*, only in the JSON.
+       * With the table now in building order (`U1`) their effect shows in the Document textarea
+       * rather than in the row above, so the titles say so instead of saying "up the list", which
+       * under the old array-ordered table read as though it moved the floor.
+       */
       actions.append(
-        button('↑', () => commit(moveFloor(building, floor.id, -1)), `move floor ${floor.id} up the list`),
-        button('↓', () => commit(moveFloor(building, floor.id, 1)), `move floor ${floor.id} down the list`),
+        button(
+          '⇧',
+          () => commit(moveFloor(building, floor.id, -1)),
+          `move floor ${floor.id} earlier in the JSON declaration list (does not change its index or height)`,
+        ),
+        button(
+          '⇩',
+          () => commit(moveFloor(building, floor.id, 1)),
+          `move floor ${floor.id} later in the JSON declaration list (does not change its index or height)`,
+        ),
         button('✕', () => commit(removeFloor(building, floor.id)), `remove floor ${floor.id}`),
       );
       row.append(actions);
@@ -232,7 +293,11 @@ export function mountEditor(options: EditorOptions): EditorHandle {
   function renderRanges(building: BuildingConfig): void {
     rangesNode.replaceChildren();
     const ranges = building.floorRanges ?? [];
-    for (const [index, range] of ranges.entries()) {
+    // `U1`: a range is a block of floors, so the list of them runs the way the building does —
+    // the highest block first. The number in `range N` and the `✕` both stay bound to the
+    // document position, because that is what removing one addresses.
+    const ordered = [...ranges.entries()].sort(([, a], [, b]) => b.fromIndex - a.fromIndex);
+    for (const [index, range] of ordered) {
       const line = document.createElement('div');
       line.className = 'dim';
       line.append(
@@ -298,7 +363,11 @@ export function mountEditor(options: EditorOptions): EditorHandle {
       const zoning = document.createElement('div');
       zoning.className = 'checklist';
       const served = new Set(bank.servesFloors);
-      for (const floorId of floorIds) {
+      // `U1`: `.checklist label` is `display: flex`, so this is a *vertical* list of floors and
+      // reads top-to-bottom like the table above it and the preview beside it. `floorIds` arrives
+      // ascending (`expandFloors` sorts by index), so it is reversed for display only — the
+      // committed `servesFloors` below stays in the building's ascending order.
+      for (const floorId of [...floorIds].reverse()) {
         const box2 = document.createElement('input');
         box2.type = 'checkbox';
         box2.checked = served.has(floorId);
@@ -481,7 +550,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
         'Discard and open',
       );
       if (!proceed) {
-        openSelect.value = history.current.id;
+        openSelect.value = openFile ?? '';
         return;
       }
     }
@@ -492,6 +561,23 @@ export function mountEditor(options: EditorOptions): EditorHandle {
     }
     clearError();
     history.reset(structuredClone(entry.config));
+    openFile = entry.file;
+    pendingJson = undefined;
+    report = validate(history.current);
+    render();
+    options.onOpen?.(entry.config.id);
+  }
+
+  /** `D11` — see {@link EditorHandle.showBuilding} for the three cases this declines. */
+  function showBuilding(buildingId: string): void {
+    if (history.current.id === buildingId) return;
+    if (history.state.isDirty) return;
+    const entry = resources.entries.find((candidate) => candidate.config.id === buildingId);
+    if (entry === undefined) return;
+    clearError();
+    history.reset(structuredClone(entry.config));
+    openFile = entry.file;
+    openSelect.value = entry.file;
     pendingJson = undefined;
     report = validate(history.current);
     render();
@@ -512,6 +598,9 @@ export function mountEditor(options: EditorOptions): EditorHandle {
       }
       clearError();
       history.reset(blankBuilding(resources.elevatorSpecs, resources.trafficProfiles));
+      // The open document no longer came from `data/`, and the control must not claim it did.
+      openFile = undefined;
+      openSelect.value = '';
       pendingJson = undefined;
       report = validate(history.current);
       render();
@@ -576,6 +665,8 @@ export function mountEditor(options: EditorOptions): EditorHandle {
 
       clearError();
       history.reset(imported.building);
+      openFile = undefined;
+      openSelect.value = '';
       pendingJson = undefined;
       report = imported;
       render();
@@ -721,6 +812,8 @@ export function mountEditor(options: EditorOptions): EditorHandle {
   return {
     refresh: renderPreview,
     isDirty: () => history.state.isDirty,
+    showBuilding,
+    currentBuildingId: () => history.current.id,
   };
 }
 

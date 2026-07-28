@@ -118,6 +118,34 @@ describe('the description carries the two facts a picture must not hide', () => 
   }, 300_000);
 });
 
+describe('D10 — a call no car answers is said in words, not only drawn', () => {
+  /*
+   * The sighted half of this signal is `canvas.ts`'s `✗` on the landing and the count in the
+   * banner. `KB-13` is the rule that the non-sighted reader is told the same thing, and it bites
+   * hardest here: before `D10` the only surface for "no car answered this call in this run"
+   * anywhere in the viewer was the caption drawn for a landing picked out of a `<select>` that is
+   * dropped below 1280 px of viewport.
+   *
+   * Driven off a real run rather than a literal, so the sentence is asserted against a recording
+   * the rest of this file also uses.
+   */
+  it('names the landings it was handed, and says nothing when there are none', () => {
+    const { recording } = recordRun(breadthConfig(config, 'garden-apartments'));
+    const frame = frameAt(recording, recording.endedAt / 2);
+
+    const quiet = describeFrame({ recording, frame });
+    expect(quiet).not.toContain('no car');
+
+    const one = describeFrame({ recording, frame, unansweredCallFloorIds: ['4'] });
+    expect(one).toContain('1 landing with a call no car answers in this run: 4.');
+
+    // The count and the ids are both read, so neither can be a constant.
+    const two = describeFrame({ recording, frame, unansweredCallFloorIds: ['2', '5'] });
+    expect(two).toContain('2 landings with a call no car answers in this run: 2, 5.');
+    expect(two).not.toContain('1 landing with');
+  }, 300_000);
+});
+
 describe('the description says which passenger model produced the run — version 4', () => {
   it('names destination dispatch, and only on a run that used it', () => {
     /*
