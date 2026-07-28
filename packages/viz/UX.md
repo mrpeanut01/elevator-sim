@@ -57,7 +57,7 @@ live counters.
 
 | Id | Class | Scenario | Expected | Wave |
 |---|---|---|---|---|
-| RV-01 | happy | Pick building + dispatcher, press Run | Simulation completes, playback starts, cars move | ✅ w1 |
+| RV-01 | happy | Pick building + dispatcher, press Run | Simulation completes, playback starts, cars move | ✅ w1 — **for every shipped building**. Until wave 1's remediation this was true of two of the five: under the kernel's default `onTimeout: 'throw'` the three tall buildings end a 900 s run undelivered and produced no recording at all. `src/dev/main.ts` now runs with `onTimeout: 'report'` |
 | RV-02 | happy | Change dispatcher, press Run again | New run replaces the old; previous run's seed preserved so the two are comparable | 🔲 w2 |
 | RV-03 | happy | Deep link with all parameters in the URL | Loads and runs without further input | 🔲 w2 |
 | RV-04 | alternate | Blank seed | A seed is drawn, **shown**, and the field is populated so the run is reproducible | ✅ w1 |
@@ -69,10 +69,10 @@ live counters.
 | RV-10 | edge | Single-car bank | Layout does not collapse; the one shaft is centred | ✅ w1 (`layout.test.ts`) |
 | RV-11 | edge | Zero-population building / no demand generated | "No passengers were generated" empty state, not an empty chart | 🔲 w2 |
 | RV-12 | edge | Run with zero-length window (`startedAt == endedAt`) | Progress is 0, scrub disabled, no division by zero | ✅ w1 (`Playback.progress`) |
-| RV-13 | edge | A car never leaves its home floor | Drawn parked at its start height, not omitted | ✅ w1 |
+| RV-13 | edge | A car never leaves its home floor | Drawn parked at its start height, not omitted | ✅ w1 (`recordRun.test.ts` start-position guard + `frameAt.test.ts`, over **every** shipped building) |
 | RV-14 | edge | Load factor above 1 (overload alarm at 1.1) | Rendered in the overload colour and labelled; the bar does not silently clip at 1 | 🔲 w2 |
 | RV-15 | failure | Conservation audit fails (`SimulationError`) | Full-width error with the message and the seed; **no partial building drawn** | ✅ w1 (status line) |
-| RV-16 | failure | Drain deadline fires with passengers in the system | Reported as `timed-out` with the undelivered count; not shown as a completed run | 🔲 w2 |
+| RV-16 | failure | Drain deadline fires with passengers in the system | Reported as `timed-out` with the undelivered count; not shown as a completed run | ✅ w1 (status line leads with the status and the undelivered count; the canvas banner is still w2) |
 | RV-17 | failure | `data/` fetch fails (404 / offline) | "Could not load data" with the failing path and a Retry control | ✅ w1 (message only; no Retry) |
 | RV-18 | failure | Malformed building JSON (`ConfigError`) | Every issue listed with its file and JSON path — `ConfigError` reports all of them at once, so the UI must not show only the first | 🔲 w2 |
 | RV-19 | failure | Browser has no 2D canvas context | Explains the situation in text; does not throw into the console | ✅ w1 |
@@ -118,15 +118,15 @@ The transport over a recording: play, pause, scrub, speed, step, and replay-from
 | PB-04 | happy | Scrub backwards | Frames are correct for the earlier instant — the frame producer is pure, so no state has to be rewound | ✅ w1 |
 | PB-05 | happy | Replay from a pasted seed | Identical picture | ✅ w1 |
 | PB-06 | alternate | Loop enabled | Restarts at `startedAt` with no accumulated drift | ✅ w1 |
-| PB-07 | alternate | Load a recording from a file rather than re-simulating | Same picture; schema version checked first | 🔲 w2 (`isSupportedRecording` exists) |
+| PB-07 | alternate | Load a recording from a file rather than re-simulating | Same picture; schema version checked first | 🔲 w2 — the check goes **with** the load path; `isSupportedRecording` was deleted rather than shipped guarding nothing (see `src/index.ts`) |
 | PB-08 | alternate | Step one frame while paused | Advances exactly one display frame | 🔲 w2 |
 | PB-09 | alternate | Window selection then loop | Only the selected span repeats | 🔲 w2 |
 | PB-10 | edge | Seek before `startedAt` / after `endedAt` | Clamps; never extrapolates | ✅ w1 |
 | PB-11 | edge | Speed set to the extremes | ×0.05 and ×1000 accepted; outside that range refused with a message | ✅ w1 |
 | PB-12 | edge | Tab hidden, then restored (rAF stops firing) | The playhead reflects **elapsed display time**, so it resumes at the right instant rather than replaying the gap | ✅ w1 (anchored mapping) |
 | PB-13 | edge | High-refresh (144 Hz) vs 60 Hz display | Same simulated instants reached at the same wall-clock time; frame rate does not change the run | ✅ w1 (`mapping.test` frame-rate independence) |
-| PB-14 | edge | Very long run (drain tail of an hour) | Scrub resolution stays usable; frame budget is bounded | ✅ w1 (`maxFrames`) |
-| PB-15 | failure | Recording schema version newer than the viewer | "This recording was made by a newer viewer" — not a crash and not a wrong picture | 🔲 w2 |
+| PB-14 | edge | Very long run (drain tail of an hour) | Scrub resolution stays usable; frame budget is bounded, and a run over the ceiling is **refused, not clipped** | ✅ w1 (`frameTimes` throws; `truncate: true` is the explicit opt-in) |
+| PB-15 | failure | Recording schema version newer than the viewer | "This recording was made by a newer viewer" — not a crash and not a wrong picture | 🔲 w2. `VIZ_SCHEMA_VERSION` is stamped on every recording and is at **2**; nothing reads it yet, and nothing in wave 1 could |
 | PB-16 | failure | Seed does not reproduce the stored recording | Explicit mismatch report naming both fingerprints; **must not silently show the new run** | 🔲 w2 |
 | PB-17 | failure | Corrupt recording file (truncated JSON) | Parse error with the byte offset; the previous run stays on screen | 🔲 w2 |
 | PB-18 | recovery | After PB-15/16/17 | Load a different recording without a page reload | 🔲 w2 |
@@ -222,7 +222,9 @@ Applies to every surface. Non-negotiable rows are marked ⛔.
 | KB-12 | Modal dialogs (discard, overwrite) trap focus and restore it on close | 🔲 w2 |
 | KB-13 | ⛔ Canvas is not a focus trap; it exposes a text alternative summarising the current frame | 🔲 w2 |
 | KB-14 | ⛔ `prefers-reduced-motion` respected: playback still works, but nothing animates that is not the simulation itself | 🔲 w2 |
-| KB-15 | Colour is never the only signal — door state, direction and overload each carry a glyph as well as a colour | ✅ w1 (bracket/arrow glyphs) |
+| KB-15 | Colour is never the only signal — **direction** carries a ▲/▼ glyph | ✅ w1 |
+| KB-15a | …and so does **door state**, which today is a fill-width gap only | 🔲 w2 |
+| KB-15b | …and so does **overload**, which today is `theme.carHeavy` and nothing else — and fires at load factor 0.8, not at the 1.1 alarm | 🔲 w2 (with RV-14) |
 
 ---
 
@@ -241,7 +243,9 @@ Applies to every surface. Non-negotiable rows are marked ⛔.
 
 ---
 
-## 7. What wave 2 must not change
+## 7. What wave 2 must not change — and what it is expected to change
+
+### 7.1 Frozen: the four structural decisions
 
 These are contract decisions, not preferences. Changing one changes what the acceptance
 criterion means.
@@ -255,3 +259,37 @@ criterion means.
 4. **`awtIsValid` is copied from the summary, never recomputed in the viewer.** Two sources of
    truth for "may I show this mean" is exactly the failure this project is built to avoid.
 5. **The seed is visible and copyable on every surface that shows a run.**
+
+### 7.2 Not frozen: the field set of `VizRecording`
+
+The list above froze four *structural* decisions. It was read — reasonably — as freezing the
+recording's **shape** too, and that reading is wrong and was worth correcting before wave 2
+started, because under it several of this document's own rows are unreachable and a necessary
+change would have looked like a violation:
+
+- The fold discards `PassengerRecord.carId` and `bankId`, so **RV-T3** ("hovering a landing
+  highlights the assigned car; the assignment shown matches the record") cannot be built from a
+  recording at all.
+- The roadmap's **live metrics overlay** can show exactly three cumulative counters from
+  `VizProgress`. Anything windowed — a rolling AWT, a per-bank breakdown, the peak-5-minute
+  figure the statistics actually report — needs per-leg data the fold drops.
+
+So: **the field set of `VizRecording` is expected to grow, and growing it is a deliberate
+`VIZ_SCHEMA_VERSION` bump, not a violation of § 7.1.** What is frozen is the direction of
+dependency, the purity of `frameAt`, the single home of the wall clock, and the provenance of
+`awtIsValid` — none of which a new field touches.
+
+Two consequences already applied in wave 1's remediation:
+
+- `VIZ_SCHEMA_VERSION` is **2**. `VizProgress.served` / `Frame.served` became `boardedLegs`,
+  because the counter counts leg boardings and the header drew them as people.
+- `buildLayout` takes `readonly ShaftGeometry[]` — carId, bankId, label, servedFloorIds — rather
+  than `readonly VizShaft[]`. `VizShaft` satisfies it structurally, so no caller changed, and
+  **ED-01/ED-02**'s run-less editor preview is now expressible: laying a building out no longer
+  requires motions, door marks, occupancy series and a capacity, i.e. no longer requires a
+  finished run.
+
+What was deliberately **not** done: adding the per-leg array that RV-T3 and a windowed overlay
+need. Nothing in wave 1 would read it, and a field with no reader is the defect this repository
+has shipped five times, not a head start. Wave 2 adds it together with its first consumer, and
+bumps the version to 3. The full reasoning is in `packages/viz/DECISIONS-T8.md`.

@@ -59,8 +59,21 @@ import type {
  * A recording is serialisable on purpose — the replay harness round-trips one through JSON
  * before sampling it, so a field that cannot survive `JSON.parse(JSON.stringify(x))` is a test
  * failure rather than a surprise in wave 2.
+ *
+ * ## Version history
+ *
+ * | Version | Change |
+ * |---|---|
+ * | 1 | Wave 1's first shape. |
+ * | 2 | `VizProgress.served` / `Frame.served` renamed {@link VizProgress.boardedLegs}, because the counter counts **leg boardings** and the header called them people. See `packages/viz/DECISIONS-T8.md`. |
+ *
+ * Nothing in wave 1 *reads* this number: the schema guard that used to exist checked a value
+ * that could only ever match, because the only producer of a recording in the shipped path is
+ * `recordRun` in the same build. It was deleted rather than kept as decoration. The version is
+ * carried because it is what a wave-2 file-load path will check, and bumping it is how a
+ * deliberate contract change is recorded — see `UX.md` § 7.
  */
-export const VIZ_SCHEMA_VERSION = 1;
+export const VIZ_SCHEMA_VERSION = 2;
 
 /* -------------------------------------------------------------------------- *
  * Geometry
@@ -160,10 +173,17 @@ export interface VizLanding {
  * the summary. The two answer different questions and quoting one as the other is exactly the
  * confident nonsense this project is built to avoid, so the field is named for what it is and
  * `Frame.runningMeanWaitS` is `undefined` — not zero — until somebody has actually boarded.
+ *
+ * {@link boardedLegs} is named for the same reason and was called `served` until a reviewer
+ * pointed out that the header drew it as a count of people. It is not. A sky-lobby journey
+ * boards twice, and `foldPassengers` counts a boarding — so on Mixed-Use High-Rise the old
+ * label overstated the population served by exactly the transfer rate. Both counters here are
+ * now in the same unit (legs), which is also what {@link waiting} has always been.
  */
 export interface VizProgress {
   readonly waiting: StepSeries;
-  readonly served: StepSeries;
+  /** Cumulative **leg** boardings. A journey that transfers contributes one per leg. */
+  readonly boardedLegs: StepSeries;
   readonly meanWaitS: StepSeries;
 }
 
@@ -271,8 +291,10 @@ export interface Frame {
   readonly simTimeS: SimTime;
   readonly cars: readonly FrameCar[];
   readonly landings: readonly FrameLanding[];
+  /** Legs standing at a landing right now. */
   readonly totalWaiting: number;
-  readonly served: number;
-  /** Running mean wait over everybody served so far. `undefined` before the first boarding. */
+  /** Cumulative leg boardings. **Legs, not people** — see {@link VizProgress.boardedLegs}. */
+  readonly boardedLegs: number;
+  /** Running mean wait over every leg boarded so far. `undefined` before the first boarding. */
   readonly runningMeanWaitS: number | undefined;
 }

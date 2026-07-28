@@ -18,6 +18,17 @@
  *
  * The last frame is pinned to `endedAt` whether or not the grid lands on it, so a comparison
  * always includes the end of the run.
+ *
+ * ## The frame ceiling is not silent
+ *
+ * `maxFrames` bounds memory. It used to bound it by **clipping**: the grid stopped after
+ * `maxFrames - 1` points and then jumped straight to `endedAt`, so a caller asking for a long
+ * run at a slow speed silently got the head of the replay plus one final instant — and a
+ * comparison over that sequence would miss any divergence in the tail it never sampled. A
+ * replay harness whose sample set quietly stops covering the run is the one thing this file
+ * exists to prevent, so exceeding the ceiling now **throws**, and a caller that genuinely wants
+ * the head of a long run says so with `truncate: true`. UX.md's rule for this class of thing is
+ * RS-05's: never silently truncated.
  */
 
 import type { SimTime } from '@elevator-sim/core';
@@ -36,6 +47,14 @@ export interface SequenceOptions {
   readonly endAtS?: SimTime;
   /** Hard ceiling on frames produced, so a long run cannot exhaust memory. Default 20000. */
   readonly maxFrames?: number;
+  /**
+   * Opt in to clipping at {@link maxFrames} instead of throwing.
+   *
+   * A truncated sequence covers the head of the run plus its final instant and **nothing in
+   * between**, so it is not evidence about the tail. Only a caller that has decided it does not
+   * need the tail should set this.
+   */
+  readonly truncate?: boolean;
 }
 
 /**
@@ -58,8 +77,20 @@ export function frameTimes(recording: VizRecording, options: SequenceOptions = {
   const end = options.endAtS ?? recording.endedAt;
   if (end < start) throw new RangeError(`endAtS (${end}) precedes startAtS (${start}).`);
 
+  if (!Number.isFinite(maxFrames) || maxFrames < 1) {
+    throw new RangeError(`maxFrames must be at least 1; got ${maxFrames}.`);
+  }
+
   const stepS = speed / fps;
-  const count = Math.min(maxFrames - 1, Math.max(0, Math.ceil((end - start) / stepS)));
+  const wanted = Math.max(0, Math.ceil((end - start) / stepS)) + 1;
+  if (wanted > maxFrames && options.truncate !== true) {
+    throw new RangeError(
+      `A playback of ${end - start} s at ${speed}x and ${fps} fps needs ${wanted} frames, over ` +
+        `the ${maxFrames}-frame ceiling. Raise maxFrames, lower fps or raise speed — or pass ` +
+        'truncate: true to accept the head of the run plus its final instant and no tail.',
+    );
+  }
+  const count = Math.min(maxFrames - 1, wanted - 1);
   const times: SimTime[] = [];
   for (let k = 0; k < count; k += 1) times.push(start + k * stepS);
   times.push(end);

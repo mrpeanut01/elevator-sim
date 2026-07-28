@@ -11,7 +11,7 @@
     // `node` is here for the tests and for `src/dev/`'s data loading, both of which run under
     // Node. Nothing in `src/contract`, `src/frame`, `src/playback` or `src/render` imports a
     // `node:` module or touches `document`; that is asserted mechanically in
-    // `src/purity.test.ts`.
+    // `src/boundaries.test.ts`.
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },

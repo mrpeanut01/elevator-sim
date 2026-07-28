@@ -5,7 +5,7 @@
  * renderer — a renderer has nothing else to animate against — so the rule this package keeps
  * instead is narrower and mechanically checkable: **wall-clock time enters through
  * {@link DisplayClock} and nowhere else**, and every module that produces a picture takes the
- * time as an argument. `src/purity.test.ts` greps for the alternatives.
+ * time as an argument. `src/boundaries.test.ts` greps for the alternatives.
  *
  * The payoff is that a test drives playback frame by frame with a {@link ManualClock}: no
  * timers, no `await sleep`, no flake, and the frame sequence a test sees is the frame sequence

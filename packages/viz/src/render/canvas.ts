@@ -129,7 +129,7 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   ctx.fillStyle = theme.text;
   const mean = frame.runningMeanWaitS;
   ctx.fillText(
-    `waiting ${String(frame.totalWaiting)}   served ${String(frame.served)}   mean wait so far ${
+    `waiting ${String(frame.totalWaiting)}   boarded ${String(frame.boardedLegs)} legs   mean wait so far ${
       mean === undefined ? '—' : `${mean.toFixed(1)} s`
     }`,
     layout.width - 12,
