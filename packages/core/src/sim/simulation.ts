@@ -131,6 +131,7 @@ import {
   SimulationError,
   type ConservationAudit,
   type SimulationConfig,
+  type StageActivity,
   type SimulationResult,
   type SimulationStatus,
   type UndeliveredJourney,
@@ -319,36 +320,6 @@ class BankDemandForecast implements DemandForecastSource {
   }
 }
 
-/** What stage 5's load-driven trigger and the predictor actually did, for a caller that asks. */
-export interface StageActivity {
-  /** Arrivals fed to the arrival models, summed over banks. Zero means no predictor was built. */
-  readonly predictorObservations: number;
-  /** Cars observed crossing their own hall-call bypass threshold, summed over banks. */
-  readonly capacityCrossings: number;
-  /** Calls stage 5 moved off a car that had just filled up. */
-  readonly capacityMigrations: number;
-  /** Calls it looked at and left where they were, with a gate that kept them. */
-  readonly capacityHeld: number;
-  /**
-   * Courtesy holds the run *asked for*: the doors started closing on a landing that still held
-   * a passenger this car could carry, and there was room for them.
-   *
-   * Counted separately from the two below for the same reason `capacityCrossings` is counted
-   * separately from `capacityMigrations`. A granted count of zero means both "the profile
-   * declined every hold" and "nothing ever calls `requestReopen('lateArrival')`" — which is the
-   * state `answer.reopenOnLateArrival` was in for its whole life — and only a request count
-   * separates them.
-   */
-  readonly lateArrivalHoldsRequested: number;
-  /** Courtesy holds the door machine honoured, reversing a closing door. */
-  readonly lateArrivalHoldsGranted: number;
-  /**
-   * Courtesy holds refused: `answer.reopenOnLateArrival` is off, or the stop's reopen budget
-   * (`answer.maxReopensPerStop`) is spent. The first is `DOOR_REOPEN_REFUSALS.policyDisabled`,
-   * which was an unreachable verdict until the request site existed.
-   */
-  readonly lateArrivalHoldsRefused: number;
-}
 
 /* -------------------------------------------------------------------------- *
  * The simulation
@@ -404,6 +375,19 @@ export class Simulation {
   /** Call id to car id to how often that car declined it at stage 6. Survives a re-offer. */
   readonly #refusals = new Map<string, Map<string, RefusalTally>>();
 
+  /**
+   * Statements that a number this run reports describes something other than what was asked
+   * for, kept apart from the advisories and reported **first**.
+   *
+   * The distinction is not presentational. An advisory qualifies a result ("this call bounced a
+   * lot", "the run outlasted its drain tail"); a disclaimer says the *model* is not the
+   * configuration — Vertical City's double-deck shuttles run as single-deck cars, a car with no
+   * resolved `passengerTransferS` runs at the office value whatever building it is in. Every
+   * consumer that truncates has to truncate the advisories, and the CLI's cut used to survive
+   * only because the double-deck line happened to be warning #1 on the one building that raises
+   * it. Ordering it deliberately is one line and removes the coincidence.
+   */
+  readonly #disclaimers: string[] = [];
   readonly #warnings: string[] = [];
   #transfers = 0;
   #capacityCrossings = 0;
@@ -412,6 +396,11 @@ export class Simulation {
   #lateArrivalHoldsRequested = 0;
   #lateArrivalHoldsGranted = 0;
   #lateArrivalHoldsRefused = 0;
+  #lateArrivalHoldsProjected = 0;
+  #lateArrivalHoldsBoarded = 0;
+  #lateArrivalHoldDwellS = 0;
+  #lateArrivalHoldMaxDwellS = 0;
+  #lateArrivalHoldMaxCohort = 0;
   /** How often the drain deadline refused to schedule something. `> 0` means it really bit. */
   #deadlineTruncations = 0;
   #ran = false;
@@ -467,7 +456,7 @@ export class Simulation {
           config.elevatorSpecs === undefined
             ? 'no elevatorSpecs were supplied to this run'
             : `elevator-specs.json → timing.passengerTransferS has no entry for building type "${resolved.type}"`;
-        this.#warnings.push(
+        this.#disclaimers.push(
           `passenger transfer time is undetermined for building "${resolved.id}": ${why}, and car(s) ${unstated.join(', ')} declare none, so they run at the ${CAR_DEFAULTS.passengerTransferS} s default — the office value. Supply elevatorSpecs, or declare passengerTransferS on the car.`,
         );
       }
@@ -494,7 +483,7 @@ export class Simulation {
         (total, bank) => total + bank.cars.filter((car) => car.doubleDeck === true).length,
         0,
       );
-      this.#warnings.push(
+      this.#disclaimers.push(
         `building "${resolved.id}" declares ${cars} double-deck car(s) in bank(s) ${doubleDeckBanks.map((bank) => `"${bank.id}"`).join(', ')}, and double-deck operation is not simulated: each runs as a single-deck car of the same whole-car capacity, so it makes up to twice the stops the declared hardware would. Every round-trip time, interval and handling-capacity number this run reports for those banks describes single-deck hardware. Double-deck dispatch is Phase 6.`,
       );
     }
@@ -708,6 +697,11 @@ export class Simulation {
       lateArrivalHoldsRequested: this.#lateArrivalHoldsRequested,
       lateArrivalHoldsGranted: this.#lateArrivalHoldsGranted,
       lateArrivalHoldsRefused: this.#lateArrivalHoldsRefused,
+      lateArrivalHoldsProjected: this.#lateArrivalHoldsProjected,
+      lateArrivalHoldsBoarded: this.#lateArrivalHoldsBoarded,
+      lateArrivalHoldDwellS: this.#lateArrivalHoldDwellS,
+      lateArrivalHoldMaxDwellS: this.#lateArrivalHoldMaxDwellS,
+      lateArrivalHoldMaxCohort: this.#lateArrivalHoldMaxCohort,
     });
   }
 
@@ -1610,6 +1604,9 @@ export class Simulation {
   #transferAtStop(car: Car, at: SimTime): void {
     const stop = this.#stops.get(car.id);
     if (stop === undefined || stop.transferred) return;
+    // `alighted` is latched and only a granted reopen clears `transferred`, so this is exactly
+    // "the boarding half is replaying because a courtesy hold reversed the door".
+    const onReopen = stop.alighted;
     stop.transferred = true;
 
     const floor = this.#building.requireFloor(car.floorId);
@@ -1623,8 +1620,19 @@ export class Simulation {
       }
     }
 
+    let boarded = 0;
     for (const direction of stop.directions) {
-      this.#boardFrom(car, floor, direction, at);
+      boarded += this.#boardFrom(car, floor, direction, at);
+    }
+    if (onReopen) {
+      this.#lateArrivalHoldsBoarded += boarded;
+      // The door is fully open here — this handler runs on `door.opened` — so `grantedDwellS` is
+      // the dwell this reversed open period was actually given. Read, never recomputed.
+      this.#lateArrivalHoldDwellS += car.door.grantedDwellS;
+      this.#lateArrivalHoldMaxDwellS = Math.max(
+        this.#lateArrivalHoldMaxDwellS,
+        car.door.grantedDwellS,
+      );
     }
 
     // The load cell directly, not a whole `CarSnapshot`: this fires on every stop and the
@@ -1652,6 +1660,26 @@ export class Simulation {
    * room check below — which is also why no reopen is granted to a full car, since holding the
    * door for somebody who cannot get in is a delay with no boarding to pay for it.
    *
+   * ## The room check *is* the boarding predicate, computed by the same function
+   *
+   * That last sentence was a claim, not a mechanism, and the two disagreed. This asked
+   * `massKg >= designLoadKg` plus {@link #carCanCarry}; {@link #boardFrom} admits on
+   * `massKg + candidate.massKg < overloadKg` as well. At `answer.overloadThreshold` down at the
+   * design load factor — the floor of the declared range — the hold was granted, the door
+   * reversed, and the boarding loop then took nobody: exactly the delay-with-no-boarding this
+   * docstring says is excluded. So the question is asked of {@link #projectedBoarding}, which is
+   * the projection {@link #boardFrom} is defined against, and a hold is requested only when it
+   * answers with at least one passenger.
+   *
+   * ## The dwell is sized to the reopen's cohort, not the stop's
+   *
+   * The count is then handed to the door as a **revised** {@link DoorStopReason}. Without one,
+   * `applyReopen` re-grants `dwellSecondsFor(config, door.reason)` — the original stop's
+   * whole-cohort transfer, `(alighting + boardingAtOpen) * tp` up to `maxTransferSeconds` — for
+   * however many passengers the hold is actually for, once per honoured reopen. That is not a
+   * small overstatement: it made the courtesy hold cost up to 59 % of AWT on `secure-tower`,
+   * a figure that was published as the price of the knob and was an artefact of this line.
+   *
    * No random draw is involved and none should be: unlike the photo-eye, this is a *deterministic
    * consequence of the trace*, and adding a probability here would spend a stream on something
    * the passenger population already decides (CLAUDE.md invariant 2).
@@ -1667,23 +1695,28 @@ export class Simulation {
     if (car.loadSensor.massKg >= car.loadSensor.designLoadKg) return;
 
     const floor = this.#building.requireFloor(car.floorId);
-    let waiting = false;
+    let boarding = 0;
+    let massKg = car.loadSensor.massKg;
     for (const direction of stop.directions) {
-      // `queueLength` before `waiting`: the latter copies the queue, this runs at the close of
-      // every stop, and the overwhelming majority of stops leave an empty landing behind them.
+      // `queueLength` before the projection: the latter copies the queue, this runs at the close
+      // of every stop, and the overwhelming majority of stops leave an empty landing behind them.
       if (floor.queueLength(direction) === 0) continue;
-      for (const passenger of floor.waiting(direction)) {
-        if (this.#carCanCarry(car, passenger)) {
-          waiting = true;
-          break;
-        }
-      }
-      if (waiting) break;
+      const projected = this.#projectedBoarding(car, floor, direction, massKg);
+      boarding += projected.count;
+      massKg = projected.massKg;
     }
-    if (!waiting) return;
+    if (boarding === 0) return;
 
     this.#lateArrivalHoldsRequested += 1;
-    const step = car.requestReopen('lateArrival', at);
+    const step = car.requestReopen('lateArrival', at, {
+      // A landing period, for the people the boarding loop is about to take and nobody else.
+      // Not `carCall`: nobody alights on a reopen — `stop.alighted` is latched, so the alighting
+      // half of the transfer does not replay and must not be paid for a second time either.
+      carCall: false,
+      hallCall: true,
+      hallQueueLength: boarding,
+      transferSeconds: boarding * car.passengerTransferS,
+    });
     // Refused — the profile declined the courtesy hold, or the stop's reopen budget is spent.
     // The door carries on closing and the passenger waits for the next car, which is the
     // behaviour `reopenOnLateArrival: false` buys and the reason it is a knob at all.
@@ -1692,6 +1725,11 @@ export class Simulation {
       return;
     }
     this.#lateArrivalHoldsGranted += 1;
+    // Counted on the grant, not the request: a refused hold's projection sized no dwell and
+    // boards nobody, so including it would make `projected` and `boarded` incomparable — and
+    // they are compared, which is the assertion this whole path was missing.
+    this.#lateArrivalHoldsProjected += boarding;
+    this.#lateArrivalHoldMaxCohort = Math.max(this.#lateArrivalHoldMaxCohort, boarding);
     // Granted, so the boarding half of the transfer replays when the door reaches open again.
     stop.transferred = false;
   }
@@ -1708,10 +1746,15 @@ export class Simulation {
    * Tying "room for one more" to exactly the predicate stage 6 uses is what keeps the two from
    * disagreeing. A separate head-count cap would let a car answer a call and then board nobody,
    * and the call would bounce between "assigned" and "surrendered" forever.
+   *
+   * @returns how many boarded, which is what {@link #transferAtStop} attributes to a courtesy
+   *   hold when the boarding half is replaying. {@link #projectedBoarding} is this loop's
+   *   projection and must stay clause-for-clause identical to it.
    */
-  #boardFrom(car: Car, floor: Floor, direction: Direction, at: SimTime): void {
+  #boardFrom(car: Car, floor: Floor, direction: Direction, at: SimTime): number {
     const designLoadKg = car.loadSensor.designLoadKg;
     const overloadKg = car.loadSensor.ratedLoadKg * car.loadSensor.overloadThreshold;
+    let boarded = 0;
 
     for (;;) {
       if (car.loadSensor.massKg >= designLoadKg) break;
@@ -1729,7 +1772,9 @@ export class Simulation {
 
       car.board(passenger, at);
       this.#recorder.recordBoarding(passenger, at, { carId: car.id, bankId: car.bankId });
+      boarded += 1;
     }
+    return boarded;
   }
 
   /**
@@ -1738,6 +1783,15 @@ export class Simulation {
    *
    * Threaded rather than recomputed per direction, so a stop that loads two queues does not
    * price both of them against an empty car and grant twice the dwell it needs.
+   *
+   * **Every clause of {@link #boardFrom}'s predicate, in the same order.** It used to omit the
+   * overload interlock — `massKg + candidate.massKg < overloadKg` — which is inert only while
+   * `answer.overloadThreshold` stays well above `car.designLoadFactor`. That was true of the
+   * shipped default (1.1 against 0.8: a candidate would have to weigh more than 0.3 x rated) and
+   * stopped being guaranteed the moment the declared range's floor moved down to the design load
+   * factor. A projection that over-counts grants a dwell for passengers the boarding loop then
+   * refuses, and — since {@link #reopenForLateArrival} asks this same question — reverses a door
+   * for a passenger who cannot get in.
    */
   #projectedBoarding(
     car: Car,
@@ -1746,11 +1800,13 @@ export class Simulation {
     fromMassKg: number,
   ): { count: number; massKg: number } {
     const designLoadKg = car.loadSensor.designLoadKg;
+    const overloadKg = car.loadSensor.ratedLoadKg * car.loadSensor.overloadThreshold;
     let massKg = fromMassKg;
     let count = 0;
     for (const passenger of floor.waiting(direction)) {
       if (massKg >= designLoadKg) break;
       if (!this.#carCanCarry(car, passenger)) continue;
+      if (massKg + passenger.massKg >= overloadKg) continue;
       massKg += passenger.massKg;
       count += 1;
     }
@@ -2154,9 +2210,9 @@ export class Simulation {
     if (this.#options.queueSampleCount > 0) {
       this.#recorder.sampleQueue(endedAt, this.#waitingCount());
     }
-    const record: RunRecord = this.#recorder.finish(endedAt);
+    const bareRecord: RunRecord = this.#recorder.finish(endedAt);
 
-    const summary: RunSummary = summarizeRun(record, {
+    const summary: RunSummary = summarizeRun(bareRecord, {
       ...(this.#summarizeOptions ?? {}),
       ...(this.#windowSelection === undefined ? {} : { window: this.#windowSelection }),
       terminalFloorIds:
@@ -2164,7 +2220,22 @@ export class Simulation {
         (this.#entranceFloorIds.length > 0 ? this.#entranceFloorIds : undefined),
     });
 
-    const { audit, undelivered, problems } = this.#reconcile(record);
+    const { audit, undelivered, problems } = this.#reconcile(bareRecord);
+
+    /*
+     * Warnings are final only here — `#diagnoseStuckCalls` and `#reconcile` both raise them —
+     * so the record is completed after the audit rather than by the recorder. The recorder has
+     * no view of them and should not grow one: it records what the run *did*, and these are
+     * what the run has to *say* about the configuration it did it under.
+     *
+     * Disclaimers first, then advisories; see `#disclaimers`. The key is omitted entirely when
+     * there is nothing to say, so a quiet run's record is byte-identical to one written before
+     * this field existed. Everything a summary or the audit reads was computed above from the
+     * same data, so attaching this cannot change either.
+     */
+    const warnings = Object.freeze([...this.#disclaimers, ...this.#warnings]);
+    const record: RunRecord =
+      warnings.length === 0 ? bareRecord : Object.freeze({ ...bareRecord, warnings });
     // Three outcomes, not two. A run that hit the event valve is not a saturated building and
     // must not be filed as one: `timed-out` is a statement about the *configuration* — demand
     // the group could not clear inside the drain tail — while `aborted` is a statement about
@@ -2192,7 +2263,8 @@ export class Simulation {
       endedAt,
       deadlineS: this.#deadlineS,
       events: this.#kernel.processedCount(),
-      warnings: Object.freeze([...this.#warnings]),
+      warnings,
+      stageActivity: this.stageActivity,
     });
 
     // Reported **before** the audit, and unconditionally — not under `onTimeout`. That option

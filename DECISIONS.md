@@ -344,3 +344,284 @@ The liveness sweep this task adds is ~40 s of CPU and contributes to the content
 was reduced first — three probe values per numeric dimension rather than four, one run memo for
 the whole file, `vertical-city` out of the probe set (it saturates, and every live dimension
 resolves without it), and a `queueLength` guard before the queue copy in `#reopenForLateArrival`.
+
+---
+
+## D14 — A reopen **revises** the dwell; it does not re-grant the stop's (T7, review finding: courtesy hold)
+
+**Date:** 2026-07-27 · **Owner:** T7
+
+**Context.** `Simulation.#reopenForLateArrival` called `car.requestReopen('lateArrival', at)` with no
+revised `DoorStopReason`, so `applyReopen` sized the reversed open period off `door.reason` — the
+cumulative stop reason, which `mergeStopReasons` holds at the **larger** transfer of everything the
+stop has answered. A door reversing for one late passenger was therefore re-granted the whole
+cohort's transfer, `(alighting + boardingAtOpen) × tp` bounded only by `maxTransferSeconds`, once
+per honoured reopen and up to `maxReopensPerStop` times. `Car.requestReopen(cause, at, reason?)`
+had accepted a revised reason since it was written; nothing passed one.
+
+Measured with the defect in place, the largest dwell granted to any single hold reaches **40.0 s on
+`vertical-city` — exactly `maxTransferSeconds`** — against a largest hold cohort of 17 passengers,
+worth 29.75 s. On `secure-tower` it reaches 14.4 s against a largest cohort of 7, worth 8.4 s.
+
+**Alternatives.** (a) Pass a revised reason and let `mergeStopReasons` combine it. (b) Give the
+machine a separate basis for the current open period. (c) Leave it and document the overstatement.
+
+**Chosen:** (b). **Why:** (a) does not work — the merge takes the **maximum** transfer, which is
+correct for an `open` that widens a growing stop and is exactly what has to be avoided here, so a
+smaller revision has no effect at all. (c) is not available: the number is not a rounding, it is a
+dwell nobody boards against, and Phase 7 would optimise the knob against it.
+
+`DoorMachineState` gains `dwellReason`, the basis for the **current open period**, alongside the
+cumulative `reason`. An `open` widens it (`mergeStopReasons`), and a `reopen` carrying a revised
+reason **replaces** it. A reopen with no revised reason leaves it at `reason`, so the photo-eye —
+a safety reopen nobody can size, because nobody knows who is in the doorway — is bit-identical to
+before.
+
+**One restriction, found by an existing test rather than by inspection.** Narrowing is allowed
+**only from the `closing` state**. A door reaches `closing` on its own by serving its granted dwell
+in full, so the declared cohort really has transferred; while `opening` or `open` it has not, and
+narrowing there lets a caller cut short a dwell the stop was granted and never served — which made
+`totalS - nominalStopSeconds(config, reason)` go negative and turned
+`doorMachine.test.ts`'s randomized "never ends a stop below its own nominal duration" red. That is
+also the only state `#reopenForLateArrival` requests a hold from, so the sim behaviour is
+unaffected by the restriction. A forced `close` can also reach `closing` early; that case is
+already the documented exception on `DoorTimeAccounting`.
+
+**The test whose absence allowed this.** Two, at the two levels. `doorMachine.test.ts` asserts
+per-hold that a revised reopen is granted exactly `dwellSecondsFor` of *its own* cohort across
+`served ∈ {6, 12, 20}` × `late ∈ {1, 2, 3}`, and that an unrevised reopen still gets the stop's.
+`sim/seam.test.ts` asserts the same bound through real runs, rebuilt from the fleet's own resolved
+door configs. Both were confirmed to **fail** with the fix reverted before being accepted.
+
+---
+
+## D15 — The room check for a courtesy hold *is* the boarding predicate, computed by one function
+
+**Date:** 2026-07-27 · **Owner:** T7
+
+**Context.** `#reopenForLateArrival` tested `massKg >= designLoadKg` plus `#carCanCarry`;
+`#boardFrom` admits on `massKg + candidate.massKg < overloadKg` as well. The two agree only while
+`answer.overloadThreshold` sits well above `car.designLoadFactor`, which D10 stopped guaranteeing
+when it moved the declared range's floor down to the design load factor. At the floor, the hold was
+granted, the door reversed, and the boarding loop took nobody — precisely the *"delay with no
+boarding to pay for it"* the docstring claims is excluded.
+
+**Alternatives.** (a) Copy the missing clause into the room check. (b) Ask `#projectedBoarding`,
+and fix `#projectedBoarding` to be clause-for-clause identical to `#boardFrom`.
+
+**Chosen:** (b). **Why:** (a) is a third copy of a predicate that already had two, and the defect
+is that they drifted. `#projectedBoarding` was *also* missing the overload clause — it is the
+projection `#beginStop` sizes the initial dwell from, so the same drift was mis-sizing ordinary
+stops in exactly the configurations D10 opened up. One function now answers "who boards", and both
+the dwell and the hold decision are derived from it. A hold is requested only when it answers with
+at least one passenger, which makes "a hold buys boarding" true by construction rather than by
+claim.
+
+**Impact.** No shipped run moves: at the default `overloadThreshold` of 1.1 against a design load
+factor of 0.8, the missing clause could only reject a candidate heavier than `0.3 × rated` — at
+least 4.7σ on N(75, 15) for the lightest shipped car, which is D10's own arithmetic.
+
+---
+
+## D16 — `idle.predictorHorizonS` is **ungated and allowlisted**, and every gate now has a proof obligation
+
+**Date:** 2026-07-27 · **Owner:** T7 · **Supersedes the remedy chosen in D8**
+
+**Context.** D8 gated the row on `{ 'idle.predictorCycleS': { max: 1800 } }`. Re-measured at seed
+20260726 over horizons {30, 120, 300, 900, 3600} against `predictive-balanced`, counting distinct
+passenger-record trajectories:
+
+```
+                  cycle 86 400   3 600   1 800    900    600
+garden-apartments            1       1       1      1      1
+secure-tower                 1       2       4      3      2
+midtown-office               1       1       1      1      1
+```
+
+Two of D8's statements are wrong. It named **garden-apartments** as producing 2 distinct
+trajectories at cycle 1 800; garden-apartments produces **1** at every cycle tried, and the building
+on which this dimension is live is **secure-tower**. And, decisively, at cycle 3 600 — *outside* the
+gate, where a generic optimizer was told not to look — the horizon still produces 2 distinct
+trajectories. The gate skipped a live dimension, which `PREDICTOR_PARAMETERS`' own docstring calls
+the worse of the two errors: *"one that skips a live dimension reports a winner that is only
+optimal at whatever the default happened to be."* 1 800 s was neither necessary nor sufficient; it
+was correct only for the shipped `cycle: 86 400`, where the row is inert.
+
+**Alternatives.** (a) Keep a gate and make the bound sound. (b) Remove the gate, state the
+condition in the row's `description`, and declare the dimension inert-at-shipped-defaults through
+`DECLARED_INERT`.
+
+**Chosen:** (b). **Why:** (a) is not available. The true condition is **relational** — a
+bucket-of-day has to recur inside the window, roughly `horizon >= cycle` — and `activeWhen` compares
+a parameter against constants, so no bound is correct for more than the single cycle it is fitted
+to. Fitting one anyway is how the unsound gate got there. The other five predictor rows already
+state their condition in prose for the same reason (theirs is a disjunction `activeWhen` cannot
+express), so this is the file's existing answer rather than a new one.
+
+`DECLARED_INERT` is a **stronger** claim than a gate, not a weaker one: an entry names the condition
+under which the dimension *is* live and the test executes it, so the entry fails if the condition
+stops producing a difference and fails if the dimension becomes live under the plain sweep. The
+gate carried no obligation at all.
+
+**And that is the structural half.** `activeWhen`-gated regions were the one unfalsifiable escape
+hatch in a file built to eliminate exactly that: the sweep satisfied a gate, confirmed the
+dimension live inside it, and never probed outside. So a gate whose condition was simply *wrong*
+passed silently — which is what happened here for a whole wave. `searchSpaceLiveness.test.ts` now
+asserts the contrapositive for **every** `activeWhen`-gated dimension: outside the gate's
+condition, the dimension must be **flat**. Confirmed to fail, naming the dimension and the region
+(`idle.predictorCycleS=3601 … it still moves a run (30 vs 3600 on secure-tower)`), by restoring the
+shipped gate before being accepted.
+
+The first version of that probe reported **all 13** gated dimensions as unsound, because
+`sweepDimension` re-satisfies the spec's own gates and wrote the violating value straight back. The
+sweep now takes a `satisfyOwnGates` switch, and the non-vacuity assertion (`gatesChecked > 0`) is
+there because a probe that silently matches nothing is the same defect one level up.
+
+**Impact.** No shipped run moves. A search that leaves the cycle at a day now skips the horizon
+because this repository's own test says it is inert there, rather than because a bound nobody
+checked said so — and a search at any *other* cycle is no longer told to skip a live dimension.
+
+---
+
+## D17 — `RunRecord` carries its run's warnings, and disclaimers are ordered ahead of advisories
+
+**Date:** 2026-07-27 · **Owner:** T7 · **Corrects a claim in D11**
+
+**Context.** D11 states that the double-deck disclaimer is raised into `result.warnings` *"where a
+stored record and every report can see it"*. A stored record could not: `RunRecord` had no
+`warnings` field and `serializeRunRecord` is `JSON.stringify(record)`, so the statement reached
+`SimulationResult.warnings` in memory and the CLI's printout and nothing that outlived the process.
+The CLI's printout truncated at 6 and survived only because the disclaimer happened to be warning
+#1 on the one building that raises it.
+
+**Alternatives.** (a) Correct D11's claim. (b) Add `warnings` to `RunRecord`.
+
+**Chosen:** (b), because D11's *intent* is right and only its mechanism was missing. Optional, so a
+run with nothing to say adds no key and its record is byte-identical to one written before the
+field existed; `runRecordSchema` accepts it, so the round trip and `parseRunRecord`'s refusal to
+load a seedless record (invariant 5) are untouched.
+
+Attached by `Simulation.#finish` **after** the conservation audit rather than by `RunRecorder`,
+because `#diagnoseStuckCalls` and `#reconcile` both raise warnings and the list is not final until
+they have run. The recorder records what the run *did*; these are what the run has to *say* about
+the configuration it did it under, and it should not grow a view of them.
+
+Ordering is now deliberate: `Simulation` keeps a separate `#disclaimers` list — statements that a
+number describes *different hardware or a different building* (double-deck cars run single-deck, a
+car with no resolved `passengerTransferS` runs at the office value) — and emits it ahead of the
+advisories. The CLI's truncation is also raised from 6 to 12. Either alone would have done; both
+cost one line each and remove the coincidence.
+
+**Impact on the fingerprint comparison.** Ten cells move — `vertical-city` × all ten profiles — in
+the `record` field, which previously moved in `warnings` only. That is the intended effect and the
+only cell movement in this task's whole change set.
+
+---
+
+## D18 — The late-arrival counters are surfaced on `SimulationResult`, and the double-deck warning code gets a reader
+
+**Date:** 2026-07-27 · **Owner:** T7
+
+**Context.** Two new instances of the standing requirement's own pattern.
+`StageActivity.lateArrivalHoldsRequested/Granted/Refused` were on the `Simulation` instance only —
+not on `SimulationResult`, not on `RunRecord` — and `runSimulation()` returns the result and
+discards the instance, so no non-test caller could read them; only `seam.test.ts` did. And
+`WARNING_CODES.doubleDeckNotSimulated` was raised by `resolveBuilding` and asserted in both
+directions by `config/doubleDeck.test.ts`, while no shipped path branched on the code: the CLI
+printed the `Simulation`-side string and never looked at `ResolvedBuilding.warnings`.
+
+**Alternatives, for each.** (a) Delete. (b) Give it a non-test caller.
+
+**Chosen:** (b) for both, because both are genuinely valuable and neither is speculative.
+
+The counters exist to separate *"the profile declined every hold"* from *"nothing ever calls
+`requestReopen('lateArrival')`"* — the state the knob spent its entire life in — and that
+distinction is worth nothing to a reader who cannot reach it. `StageActivity` moves to
+`sim/types.ts` next to `SimulationResult`, is carried on the result, and
+`packages/cli/src/commands/run.ts` prints `requested · granted · refused` whenever a hold was asked
+for. **Named non-test caller: `printRunReport` in `packages/cli/src/commands/run.ts`.** On
+`vertical-city` at the shipped defaults it prints `169 requested · 0 granted · 169 refused`, which
+is the distinction, visible.
+
+Three counters are added for the same reason the first three exist — `lateArrivalHoldsProjected`,
+`lateArrivalHoldsBoarded`, `lateArrivalHoldDwellS`, plus the two extrema
+`lateArrivalHoldMaxDwellS` / `lateArrivalHoldMaxCohort` that D14's bound is checkable on. Run
+totals were tried first and are too blunt: a hold's dwell is `max(base hall dwell, cohort × tp)`,
+the base term dominates on the shipped buildings, and summing hides one 40 s re-grant among two
+hundred 5 s holds.
+
+For the warning code, `RunPlan` gains `configDisclaimers`, selected from
+`ResolvedBuilding.warnings` **by code** rather than by matching on prose, and printed under
+`Configuration`. **Named non-test caller: `planRun` in `packages/cli/src/commands/run.ts`.**
+
+---
+
+## D19 — D13's justification does not reproduce; the timeouts stay, the reason is corrected
+
+**Date:** 2026-07-27 · **Owner:** T7 · **Corrects a claim in D13**
+
+**Context.** D13 states that, measured on pristine `integration`, `sim/determinism.test.ts` *"is
+bit-identical across twenty runs of Midtown Office"* **already fails** the full suite at vitest's
+5 s default. It does not. The whole-system review ran the pristine baseline at the default timeout
+and got **126/126 files, 2578/2578 tests, zero failures**, with the two named tests at 2316 ms and
+1965 ms. Re-timed here, they are **2640 ms** and **2253 ms** — roughly half the default budget.
+
+**Chosen:** keep the explicit 60 s timeouts, and delete the justification. **Why:** a timeout
+relaxes no assertion — twenty replications and five seeds are still the sample sizes those two
+properties are asserted at — so the timeouts are harmless and give headroom on a contended runner.
+But "it already fails" was the stated reason, and a decision log that keeps a reason which does not
+reproduce is worse than one that says "headroom on a shared runner", which is what this is.
+
+---
+
+## D20 — The courtesy hold's published cost was never quotable, for a reason neither D9 nor the review caught
+
+**Date:** 2026-07-27 · **Owner:** T7 · **Corrects D9, `DOOR_DEFAULTS` and `DOOR_PARAMETERS`**
+
+**Context.** D9 records that enabling `answer.reopenOnLateArrival` *"shifts AWT by up to 30 % on
+`secure-tower`"*; the same figure is in `DOOR_DEFAULTS.reopenOnLateArrival`'s docstring and in
+`DOOR_PARAMETERS`' `answer.reopenOnLateArrival` description. The whole-system review corrected the
+maximum to **+59.1 %** (reproduced here exactly, on `secure-tower|auction-multi-round` at seed
+20260726) and inferred from a `maxTransferSeconds: 0` run that the hold might be a net *benefit*.
+
+Both are built on the same unnoticed floor. Every one of those figures is a percentage change in
+the mean waiting time of a configuration that **saturates**: at seed 20260726 `secure-tower` reports
+`saturation: { saturated: true, verdict: 'diverging-queue' }` under the shipped profiles. CLAUDE.md
+§ Statistical discipline: *"If a configuration saturates, flag it and suppress the AWT interval. Do
+not report a mean for a system whose queues grow without bound."* They are also single-replication
+point estimates with no confidence interval, against a rule that says no comparison may be declared
+without a paired-t interval that excludes zero.
+
+The review's inference has a second problem of its own: `maxTransferSeconds: 0` removes the
+transfer-driven dwell from **every stop in the run**, not just from reopens, so the sign flip it
+produced is not a measurement of this defect.
+
+**Chosen:** re-measure under the project's own rules — paired arms on common random numbers, 50
+replications, a paired-t 95 % interval, and AWT suppressed wherever either arm saturates — and
+replace the figure in all three shipped locations with what that produces. Where a cell has no
+quotable mean, the effect is reported as what it demonstrably is: the knob still moves the run, and
+the trajectory count says so.
+
+**Impact.** No shipped run moves; the default is still `false`. What changes is that the price on
+the knob is now a measurement rather than a number taken from a diverging queue.
+
+**The re-measurement.** 50 replications per cell, paired arms on common random numbers (seeds
+20260726–20260775), paired-t 95 % interval, AWT suppressed wherever either arm reports
+`saturation.saturated`:
+
+| | quotable cells | significantly worse | significantly better | no significant difference |
+|---|---|---|---|---|
+| 5 buildings × 10 profiles | 34 of 50 | **0** | 2 | 32 |
+
+The two significant cells are both *improvements*: `secure-tower|auction-multi-round` −13.2 %
+(−7.66 s, CI [−12.72, −2.60]) and `vertical-city|predictive-balanced` −14.4 % (−6.80 s,
+CI [−11.36, −2.23]). The remaining 16 cells saturate in nearly every replication — `midtown-office`
+on all ten profiles, and most of `mixed-use-high-rise` and `vertical-city` — and are suppressed
+rather than quoted.
+
+Note what this does **not** say. The review's inference that the hold *"may be a net benefit"*
+lands on the right side, but not by the route it took: `maxTransferSeconds: 0` strips the
+transfer-driven dwell from every stop in the run, not just from reopens, so the sign flip it
+produced measured something else. And "no measured AWT cost" is not "no effect" — the hold moves
+**41 of the 50** passenger-record trajectories at seed 20260726, on every building but
+`garden-apartments`, which is exactly why the default stays `false`.
