@@ -418,15 +418,13 @@ documenting a crossover nothing implements is the same defect in a smaller packa
 
 ---
 
-## D15 — The Phase 4 recording contract is restated, not upheld (T8)
-
 Staged here rather than in the repository's `DECISIONS.md` because another builder is appending
 to that file in the same wave. **The orchestrator should fold these entries in and delete this
 file.** Nothing outside `packages/viz/` was touched.
 
 ---
 
-## D-T8-1 — The recording schema is not frozen; § 7 said more than it meant
+## D15 — The Phase 4 recording schema is not frozen; UX.md § 7 said more than it meant
 
 **Decision.** `UX.md` § 7 is restated. The four structural decisions it lists stay frozen. The
 **field set of `VizRecording` is explicitly not frozen**, and growing it is a deliberate
