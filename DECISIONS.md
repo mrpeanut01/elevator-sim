@@ -80,3 +80,228 @@ package to run tests, so a shared dependency tree is sufficient and avoids five 
 
 **Impact.** Any task that needs to run the *built* CLI (`node packages/cli/dist/index.js`) must run
 `npx tsc -b` in its own worktree first; `dist/` is gitignored so it will not conflict at merge.
+
+---
+
+## D5 — The search-space liveness sweep is a permanent guard in `core`, derived rather than listed
+
+**Date:** 2026-07-27 · **Owner:** T3 (`fix/inert-tunables`)
+
+**Context.** Findings #9, #10, #12, #13 and #21 are the same defect five times: a knob that is
+schema-validated, profile-authorable, optimizer-searchable, unit-tested — and unable to move any
+decision in any shipped run. Every one of them names the same missing test.
+
+**Alternatives.** (a) Fix the five knobs and move on. (b) Add a per-knob liveness assertion to
+`sim/seam.test.ts` for each. (c) Build one exhaustive sweep over every dimension the search space
+carries, iterated from the schema rather than from a list.
+
+**Chosen:** (c), as `packages/core/src/sim/searchSpaceLiveness.test.ts`, with (b) added for the
+one finding whose remedy is a new behaviour. **Why:** (a) and (b) both leave the *49th* dimension
+uncovered, which is the same defect in miniature — the roadmap's Standing Requirement is explicit
+that a hand-written list passes every check anyone runs right up to the moment it goes stale. The
+sweep discovers the space the way `collectSearchSpace()` does (every `*_PARAMETERS` export off
+the barrel, narrowed by trying to author each id through the real `parseDispatcherProfiles`), so
+a new dimension is covered with no edit. It asserts on **passenger-record trajectories**, not
+summary metrics, for the reason `seam.test.ts` states: a mean is exactly the statistic that hides
+a structural difference.
+
+It is written in `core` rather than beside `collectSearchSpace()` in `experiments` because `core`
+may not depend on `experiments`; a test that reached across would invert the package graph to
+check a property of `core`.
+
+**Impact.** 48 dimensions: 44 live, 4 declared inert with a machine-readable reason and an
+executed proof that each is live under the condition its reason names. The allowlist is asserted
+in both directions, like `dispatch/deadCode.test.ts`'s, so it cannot become the place dead
+configuration goes to be forgotten. Verified failing: reverting any of the three fixes below
+turns it red and names the dimension.
+
+---
+
+## D6 — `idle.predictorHorizonS` is **gated**, not implemented differently (findings #9, #10)
+
+**Date:** 2026-07-27 · **Owner:** T3
+
+**Context.** The forecast integrates to exactly `rate x horizon` while no bucket-of-day recurs
+inside a replication, and all three consumers reduce it to a scale-invariant statistic (two
+demand-weighted means and an argmax). At the shipped `predictorCycleS: 86400` the whole declared
+`[30, 3600]` log range — a factor of 120 — is one bit-identical run.
+
+**Alternatives.** (a) Make the consumers scale-sensitive. (b) Narrow the range. (c) Gate it.
+(d) Remove it.
+
+**Chosen:** (c) — `activeWhen: { 'idle.predictorCycleS': { max: 1800 } }`. **Why:** (a) would be
+inventing a behaviour to justify a knob; the three consumers are scale-invariant because that is
+what they should be. (b) has no non-flat sub-range to narrow to — the plateau is the whole range,
+and what changes it is a *different* parameter. (d) hides a dimension that is genuinely live
+below the bound (measured: 1 distinct trajectory at cycle 86 400, 2 at 1 800, 4 at cycle 600 with
+a 120 s bucket). A gate is the machine-readable form of "inert here", which is exactly what
+CLAUDE.md invariant 8 asks for, and 1 800 s is the replication length this project reports
+against — the real condition is "the cycle is shorter than the run", and `activeWhen` cannot name
+the run length.
+
+`PREDICTOR_PARAMETERS`' module docstring positively asserted that all six rows are live whenever
+`parkingStrategy: predicted-demand` **or** `weights.predictedDemand > 0` — both true of the
+shipped `predictive-balanced`, and the claim was false for this row. Corrected, with the
+mechanism and the measurement.
+
+**Impact.** No shipped run moves. A search that leaves the cycle at a day now skips the horizon.
+
+---
+
+## D7 — The late-arrival courtesy hold is **implemented**, and ships **off by default** (findings #12, #13)
+
+**Date:** 2026-07-27 · **Owner:** T3
+
+**Context.** The only non-test caller of `Car.requestReopen` hardcoded `'obstruction'`, and
+`answer.reopenOnLateArrival` gates only `cause === 'lateArrival'`. So the knob could not move any
+run, `DoorAccounting.lateArrivals` was structurally 0 on every run this project can produce, and
+`DOOR_REOPEN_REFUSALS.policyDisabled` was an unreachable verdict.
+
+**Alternatives.** (a) Implement the behaviour with the declared default (`true`). (b) Implement
+it and ship it off. (c) Gate it. (d) Remove the knob, the cause and the counter.
+
+**Chosen:** (b). **Why:** (c) has nothing honest to gate on — there is no parameter whose value
+decides whether passengers arrive late; "nobody implemented it" is not an `activeWhen`. (d) would
+break `packages/experiments/src/tuning/space/collect.test.ts`, which is not this task's to edit,
+and would delete a real modelling capability rather than connect it. (a) is what the declared
+default asked for and is **not acceptable as a side effect**: measured across the five shipped
+buildings x ten shipped profiles at seed 20260726, turning the hold on moves **41 of the 50**
+passenger-record trajectories and shifts AWT by up to 30 % on `secure-tower` — and it broke nine
+tests in `packages/experiments`, including Phase 5's own acceptance criteria, by revaluing the
+runs those verdicts were measured on. Turning it on is a deliberate re-measurement, not a
+by-product of wiring it.
+
+So the behaviour exists, the request site runs on every stop, and `DOOR_DEFAULTS.reopenOnLateArrival`
+is now `false`. Verified: all 50 shipped building x profile cells are **bit-identical** to the
+pre-change tree on the full run fingerprint (record, summary, conservation, warnings).
+
+The behaviour: when the doors start closing on a landing that still holds a passenger this car
+could carry, and the car is below its design load, the run requests a `lateArrival` reopen. No
+random draw — unlike the photo-eye this is a deterministic consequence of the trace, and a
+probability here would spend a stream on something the passenger population already decides
+(invariant 2). `#transferAtStop` now replays only its **boarding** half on a granted reopen; a
+separate `alighted` flag stops the alighting cohort being alighted twice.
+
+**Second-order.** `analytical/types.ts`'s `no-door-interference` assumption claimed the simulator
+models "photo-eye obstruction and late-arrival reopens", so the RTT reconciliation was charging a
+divergence source that did not exist. Corrected to state that **both are off at the shipped
+defaults** and contribute exactly zero divergence to every number this project publishes. It stays
+in `CLOSED_FORM_COMPARISON_RULE.oneSidedUnderIds`, which remains correct: a reopen can only ever
+push the simulator above the closed form, and zero is one-sided too.
+
+---
+
+## D8 — `answer.overloadThreshold`'s declared range is **narrowed down to the design load factor** (finding #21)
+
+**Date:** 2026-07-27 · **Owner:** T3
+
+**Context.** Declared over `[1, 1.5]`, and flat over all of it: boarding stops at
+`car.designLoadFactor x rated` (0.8 — CLAUDE.md § modelling rules), so a threshold at or above
+1.0 can only reject a candidate heavier than `0.2 x rated`. That is 146 kg on the lightest
+shipped car against N(75, 15), at least 4.7 sigma. `Car.isOverloaded`, `doorsHeldByOverload` and
+the overload-alarm path were dead in every shipped run.
+
+**Alternatives.** (a) Let cars board past the design load so the interlock can trip. (b) Gate it.
+(c) Move the range floor to the design load factor. (d) Remove it.
+
+**Chosen:** (c) — `range: [LOAD_SENSOR_DEFAULTS.designLoadFactor, 1.5]`, which is what finding
+#21's own "missing test" prescribes. **Why:** (a) violates the modelling rule that makes every
+result honest. (b) has no in-space gate: the condition is a comparison against
+`car.designLoadFactor`, which is not profile-authorable and therefore not a dimension, and the
+search space requires every gate to be one of its own. (d) would break `collect.test.ts` in a
+package this task does not own, and would delete a knob the engine really does read.
+
+The interlock is **one-sided**, not dead: it starts biting as the threshold approaches the
+boarding cap from above, because the last boarder is the one that carries the load across.
+`loadSensor.test.ts` now asserts the invariant that keeps this honest — *the range must start at
+or below the design load factor, or the dimension has no reachable effect.*
+
+**Impact.** The default is unchanged at EN 81's 110 %, so no shipped run moves; only the interval
+a search may explore does. An optimizer may now drive the interlock down to the boarding cap,
+which is a real and modelled configuration (a conservative overload device), not a plateau.
+
+---
+
+## D9 — Double-deck operation is **disclaimed on every run**, not implemented (finding #11)
+
+**Date:** 2026-07-27 · **Owner:** T3
+
+**Context.** `doubleDeck`, `deckSeparationM`, `ratedLoadLbPerDeck`, `servesFloorPairs` and the
+whole `Bank` deck index are parsed, cross-validated with two dedicated warning codes, resolved
+onto `ResolvedCar` and unit-tested, with zero runtime consumers.
+`data/buildings/vertical-city.json` declares eight such shuttles and `loadConfig` said nothing at
+all, so every RTT, interval and handling-capacity number reported for that bank is for hardware
+nobody configured.
+
+**Alternatives.** (a) Implement double-deck dispatch. (b) Emit a warning naming the building and
+carry it into every run. (c) Delete the config surface.
+
+**Chosen:** (b), which is option (b) of the finding. **Why:** (a) is Phase 6 by the handoff's own
+scoping (`docs/07-handoff.md:217`) and is a dispatch problem, not a config one. (c) would throw
+away a validated surface Phase 6 needs and would make `vertical-city` unauthorable. The defect
+was never that decks are unimplemented — it is that the config layer validated the pairing
+carefully enough to *look* wired and then went silent, and silence reads as "modelled".
+
+So `loadConfig` raises `double-deck-not-simulated` naming the building and the bank, and the
+`Simulation` raises the same statement into `result.warnings`, where a stored record and every
+report can see it. `config/doubleDeck.test.ts` walks `data/buildings/` and asserts it in both
+directions, so the day a `Car` learns about decks the disclaimer has to be revisited rather than
+quietly outliving its truth.
+
+**Impact.** Vertical City's config now carries a third advisory and every run of every
+double-deck building carries one warning. No simulated number moves.
+
+---
+
+## D10 — `patternSwitching` is recorded as **deliberately unimplemented**, and the roadmap bullet is not done (finding #5)
+
+**Date:** 2026-07-27 · **Owner:** T3
+
+**Context.** `data/dispatcher-profiles.json:163-178` authors a complete fuzzy pattern-detector
+block — four inputs, five patterns, `hysteresisS: 120`, a `weightSetsByPattern` map. It is
+schema-validated, typed on the public core barrel, and cross-checked for dangling profile names.
+Nothing reads it. `docs/05-roadmap.md:481` nonetheless lists "Fuzzy traffic-pattern detector with
+hysteresis, driving per-pattern weight sets" as a delivered Phase 7 bullet.
+
+**Alternatives.** (a) Implement the detector. (b) Record it as unimplemented scope and have the
+roadmap bullet marked not-done. (c) Delete the config block.
+
+**Chosen:** (b). **Why:** a fuzzy detector with hysteresis driving per-pattern weight sets is a
+genuinely new *behaviour* — a controller that switches the dispatcher's whole weight vector
+mid-run — with its own acceptance question (does switching beat the best single vector, at a
+paired-t interval that excludes zero?) and its own risk to CRN, because two arms that switch at
+different times see different weight vectors at the same instant. It is a phase of work, not a
+finding fix, and doing it inside a defect-clearing wave is how a behaviour ships configured,
+tested in isolation and unmeasured. (c) throws away authored intent that is otherwise correct.
+
+**Impact.** **The roadmap bullet at `docs/05-roadmap.md:481` must be marked not-done** — this
+task does not own `docs/`, so it is reported to the orchestrator instead. `config/parse.ts`'s
+comment, which still described `patternSwitching` as "a Phase 7 controller", now states plainly
+that the controller does not exist and that the validation must not be read as evidence that it
+drives anything.
+
+---
+
+## D11 — Two wall-clock-bound `sim/` tests get an explicit timeout, and no assertion is relaxed
+
+**Date:** 2026-07-27 · **Owner:** T3
+
+**Context.** `sim/determinism.test.ts` "is bit-identical across twenty runs of Midtown Office" and
+`sim/conservation.test.ts` "holds on vertical-city across 5 seeds" are ~3 s and ~4 s of pure
+arithmetic against vitest's **5 s default**, on a runner with 117 files in flight. Measured on the
+pristine `integration` tree, before any of this task's changes, the first of the two **already
+fails** the full suite on this machine.
+
+**Alternatives.** (a) Leave them. (b) Shrink the tests (fewer replications, fewer seeds).
+(c) Give each an explicit timeout.
+
+**Chosen:** (c), 60 s each. **Why:** (a) leaves a suite that is red for a reason unrelated to any
+assertion in it, which trains readers to ignore red. (b) is the one option that *would* weaken an
+acceptance criterion — twenty replications and five seeds are the sample sizes those two
+properties are asserted at. A timeout is the runner's budget, not the property: with it, red means
+nondeterminism or a lost passenger, which is what both tests exist to detect.
+
+The liveness sweep this task adds is ~40 s of CPU and contributes to the contention, so the cost
+was reduced first — three probe values per numeric dimension rather than four, one run memo for
+the whole file, `vertical-city` out of the probe set (it saturates, and every live dimension
+resolves without it), and a `queueLength` guard before the queue copy in `#reopenForLateArrival`.

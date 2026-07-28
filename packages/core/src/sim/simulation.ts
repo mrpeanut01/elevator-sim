@@ -220,8 +220,22 @@ interface StopInProgress {
   readonly served: readonly ActiveCall[];
   /** Landing queues this car will load from, up before down. See `#boardingDirections`. */
   readonly directions: readonly Direction[];
-  /** Set once the doors reach fully open and people have actually moved. */
+  /**
+   * Set once the doors reach fully open and people have actually moved.
+   *
+   * Cleared again by a granted **late-arrival reopen**, which is what lets the courtesy hold
+   * board the passenger it was granted for — see `#reopenForLateArrival`.
+   */
   transferred: boolean;
+  /**
+   * Set once the alighting cohort has left, and **never cleared**.
+   *
+   * Separate from {@link transferred} because a reopen replays the boarding half of the transfer
+   * and must not replay the alighting half: `stop.alighting` is the list computed when the stop
+   * began, and calling `Car.alight` twice for the same passenger is a conservation defect rather
+   * than a second alighting.
+   */
+  alighted: boolean;
 }
 
 /** How many are waiting for a call, and what they weigh. */
@@ -315,6 +329,25 @@ export interface StageActivity {
   readonly capacityMigrations: number;
   /** Calls it looked at and left where they were, with a gate that kept them. */
   readonly capacityHeld: number;
+  /**
+   * Courtesy holds the run *asked for*: the doors started closing on a landing that still held
+   * a passenger this car could carry, and there was room for them.
+   *
+   * Counted separately from the two below for the same reason `capacityCrossings` is counted
+   * separately from `capacityMigrations`. A granted count of zero means both "the profile
+   * declined every hold" and "nothing ever calls `requestReopen('lateArrival')`" — which is the
+   * state `answer.reopenOnLateArrival` was in for its whole life — and only a request count
+   * separates them.
+   */
+  readonly lateArrivalHoldsRequested: number;
+  /** Courtesy holds the door machine honoured, reversing a closing door. */
+  readonly lateArrivalHoldsGranted: number;
+  /**
+   * Courtesy holds refused: `answer.reopenOnLateArrival` is off, or the stop's reopen budget
+   * (`answer.maxReopensPerStop`) is spent. The first is `DOOR_REOPEN_REFUSALS.policyDisabled`,
+   * which was an unreachable verdict until the request site existed.
+   */
+  readonly lateArrivalHoldsRefused: number;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -376,6 +409,9 @@ export class Simulation {
   #capacityCrossings = 0;
   #capacityMigrations = 0;
   #capacityHeld = 0;
+  #lateArrivalHoldsRequested = 0;
+  #lateArrivalHoldsGranted = 0;
+  #lateArrivalHoldsRefused = 0;
   /** How often the drain deadline refused to schedule something. `> 0` means it really bit. */
   #deadlineTruncations = 0;
   #ran = false;
@@ -435,6 +471,32 @@ export class Simulation {
           `passenger transfer time is undetermined for building "${resolved.id}": ${why}, and car(s) ${unstated.join(', ')} declare none, so they run at the ${CAR_DEFAULTS.passengerTransferS} s default — the office value. Supply elevatorSpecs, or declare passengerTransferS on the car.`,
         );
       }
+    }
+
+    /*
+     * Double-deck hardware the runtime does not model, said out loud on every run.
+     *
+     * `loadConfig` raises the same thing as a `double-deck-not-simulated` config warning, but a
+     * config warning is read once by whoever loaded the directory and is not attached to
+     * anything a run produces. `result.warnings` is, and it is what `serializeRunRecord`'s
+     * caller and every report have in front of them — so a stored round-trip time for Vertical
+     * City's eight declared shuttles carries the reason it is a round-trip time for different
+     * hardware, rather than being indistinguishable from a modelled one.
+     *
+     * Detected from the resolved building rather than copied out of `ResolvedBuilding.warnings`,
+     * so a building assembled by hand instead of by the loader is covered too.
+     */
+    const doubleDeckBanks = resolved.banks.filter((bank) =>
+      bank.cars.some((car) => car.doubleDeck === true),
+    );
+    if (doubleDeckBanks.length > 0) {
+      const cars = doubleDeckBanks.reduce(
+        (total, bank) => total + bank.cars.filter((car) => car.doubleDeck === true).length,
+        0,
+      );
+      this.#warnings.push(
+        `building "${resolved.id}" declares ${cars} double-deck car(s) in bank(s) ${doubleDeckBanks.map((bank) => `"${bank.id}"`).join(', ')}, and double-deck operation is not simulated: each runs as a single-deck car of the same whole-car capacity, so it makes up to twice the stops the declared hardware would. Every round-trip time, interval and handling-capacity number this run reports for those banks describes single-deck hardware. Double-deck dispatch is Phase 6.`,
+      );
     }
 
     this.#building = createBuilding<Car>(resolved, {
@@ -643,6 +705,9 @@ export class Simulation {
       capacityCrossings: this.#capacityCrossings,
       capacityMigrations: this.#capacityMigrations,
       capacityHeld: this.#capacityHeld,
+      lateArrivalHoldsRequested: this.#lateArrivalHoldsRequested,
+      lateArrivalHoldsGranted: this.#lateArrivalHoldsGranted,
+      lateArrivalHoldsRefused: this.#lateArrivalHoldsRefused,
     });
   }
 
@@ -1396,7 +1461,13 @@ export class Simulation {
       hallQueueLength: boarding,
       transferSeconds: (alighting.length + boarding) * car.passengerTransferS,
     });
-    this.#stops.set(car.id, { alighting, served, directions, transferred: false });
+    this.#stops.set(car.id, {
+      alighting,
+      served,
+      directions,
+      transferred: false,
+      alighted: false,
+    });
     this.#scheduleDoor(car);
     return 'stopped';
   }
@@ -1516,6 +1587,12 @@ export class Simulation {
       car.requestReopen('obstruction', at);
     }
 
+    // The courtesy hold. Checked after the photo-eye and only while the door is still closing,
+    // so an obstruction that has already reversed the door does not also spend a reopen here.
+    if (closeStarted && car.doorState === 'closing') {
+      this.#reopenForLateArrival(car, at);
+    }
+
     if (car.doorState === 'closed') {
       this.#finishStop(car, at);
       this.#stepCar(car, at);
@@ -1524,7 +1601,12 @@ export class Simulation {
     this.#scheduleDoor(car);
   }
 
-  /** Everybody moves at the instant the doors are fully open: out first, then in. */
+  /**
+   * Everybody moves at the instant the doors are fully open: out first, then in.
+   *
+   * Runs a second time after a granted late-arrival reopen, and the alighting half is guarded by
+   * its own flag so only the boarding half replays — see {@link StopInProgress.alighted}.
+   */
   #transferAtStop(car: Car, at: SimTime): void {
     const stop = this.#stops.get(car.id);
     if (stop === undefined || stop.transferred) return;
@@ -1532,10 +1614,13 @@ export class Simulation {
 
     const floor = this.#building.requireFloor(car.floorId);
 
-    for (const passenger of stop.alighting) {
-      car.alight(passenger, at);
-      this.#recorder.recordAlighting(passenger, at);
-      if (!passenger.isFinalLeg) this.#scheduleTransfer(passenger, at);
+    if (!stop.alighted) {
+      stop.alighted = true;
+      for (const passenger of stop.alighting) {
+        car.alight(passenger, at);
+        this.#recorder.recordAlighting(passenger, at);
+        if (!passenger.isFinalLeg) this.#scheduleTransfer(passenger, at);
+      }
     }
 
     for (const direction of stop.directions) {
@@ -1545,6 +1630,70 @@ export class Simulation {
     // The load cell directly, not a whole `CarSnapshot`: this fires on every stop and the
     // reading is the only field the recorder wants.
     this.#recorder.sampleLoad(at, car.id, car.loadSensor.snapshot());
+  }
+
+  /**
+   * The courtesy hold: somebody reached the landing while the door was closing.
+   *
+   * **This is the non-test caller `answer.reopenOnLateArrival` did not have.** The knob is
+   * schema-validated, profile-authorable and one of the search space's dimensions, and the only
+   * thing `Car.requestReopen` was ever called with in a run was `'obstruction'` — so the gate at
+   * `doorMachine.refusalFor` (`cause === 'lateArrival' && !config.reopenOnLateArrival`) was
+   * unreachable, `DoorAccounting.lateArrivals` was structurally 0 on every run this project can
+   * produce, and `DOOR_REOPEN_REFUSALS.policyDisabled` was a verdict nothing could return. That
+   * is the *configured, unit-tested, dead in the shipped path* defect, one level up into data.
+   *
+   * ## Why "somebody eligible is still waiting" is exactly "somebody arrived late"
+   *
+   * {@link #boardFrom} drains a landing queue of every passenger this car can carry, in arrival
+   * order, and stops only when the load cell crosses the **design** load. So at the instant the
+   * door starts closing, an eligible passenger still on the landing means one of two things: the
+   * car filled up, or they were not there when the doors were open. The first is excluded by the
+   * room check below — which is also why no reopen is granted to a full car, since holding the
+   * door for somebody who cannot get in is a delay with no boarding to pay for it.
+   *
+   * No random draw is involved and none should be: unlike the photo-eye, this is a *deterministic
+   * consequence of the trace*, and adding a probability here would spend a stream on something
+   * the passenger population already decides (CLAUDE.md invariant 2).
+   *
+   * The reopen is bounded by `answer.maxReopensPerStop` in the door machine, so a landing that
+   * keeps producing arrivals cannot hold a car indefinitely; the door refuses and closes anyway.
+   */
+  #reopenForLateArrival(car: Car, at: SimTime): void {
+    const stop = this.#stops.get(car.id);
+    // Only after the transfer really happened. A door closing on a stop that never opened on
+    // anybody has no "late" to be late for.
+    if (stop === undefined || !stop.transferred) return;
+    if (car.loadSensor.massKg >= car.loadSensor.designLoadKg) return;
+
+    const floor = this.#building.requireFloor(car.floorId);
+    let waiting = false;
+    for (const direction of stop.directions) {
+      // `queueLength` before `waiting`: the latter copies the queue, this runs at the close of
+      // every stop, and the overwhelming majority of stops leave an empty landing behind them.
+      if (floor.queueLength(direction) === 0) continue;
+      for (const passenger of floor.waiting(direction)) {
+        if (this.#carCanCarry(car, passenger)) {
+          waiting = true;
+          break;
+        }
+      }
+      if (waiting) break;
+    }
+    if (!waiting) return;
+
+    this.#lateArrivalHoldsRequested += 1;
+    const step = car.requestReopen('lateArrival', at);
+    // Refused — the profile declined the courtesy hold, or the stop's reopen budget is spent.
+    // The door carries on closing and the passenger waits for the next car, which is the
+    // behaviour `reopenOnLateArrival: false` buys and the reason it is a knob at all.
+    if (step.refusal !== undefined) {
+      this.#lateArrivalHoldsRefused += 1;
+      return;
+    }
+    this.#lateArrivalHoldsGranted += 1;
+    // Granted, so the boarding half of the transfer replays when the door reaches open again.
+    stop.transferred = false;
   }
 
   /**

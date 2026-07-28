@@ -128,22 +128,56 @@ export const PREDICTOR_DEFAULTS = Object.freeze({
  * dispatch schema through the real profile parser and back out of the real resolver, so the claim
  * is asserted rather than written down.
  *
- * ## No row carries an `activeWhen`, and that is the honest answer rather than an omission
+ * ## Five of the six rows carry no `activeWhen`, and that is the honest answer rather than an
+ * omission
  *
  * This paragraph used to claim four of the six were gated on
- * `{ 'idle.parkingStrategy': ['predicted-demand'] }`. None of them is, and none should be. A
- * forecast informs **two independent mechanisms** — where an idle car parks (stage 7) and the
- * `predictedDemand` cost term (stage 3) — so every one of these six is live when *either* the
- * parking strategy is `predicted-demand` *or* `weights.predictedDemand` is above zero.
+ * `{ 'idle.parkingStrategy': ['predicted-demand'] }`. None of them is, and none of *those five*
+ * should be. A forecast informs **two independent mechanisms** — where an idle car parks
+ * (stage 7) and the `predictedDemand` cost term (stage 3) — so each of them is live when *either*
+ * the parking strategy is `predicted-demand` *or* `weights.predictedDemand` is above zero.
  *
  * That is a **disjunction**, and `DispatchParameterSpec.activeWhen` is a conjunction of
  * conditions: every entry must hold. There is no form that expresses "either of these". Gating on
  * the parking strategy alone would be worse than not gating, because it would tell an optimizer to
  * stop tuning the forecast for a profile that scores on `predictedDemand` and parks with `stay` —
  * a live dimension declared dead, which is the failure this schema's `description` fields have
- * already had twice. So the condition is stated here and the rows stay ungated: an optimizer that
- * over-searches a dimension wastes budget, one that skips a live dimension reports a winner that
- * is only optimal at whatever the default happened to be.
+ * already had twice. So the condition is stated here and those rows stay ungated: an optimizer
+ * that over-searches a dimension wastes budget, one that skips a live dimension reports a winner
+ * that is only optimal at whatever the default happened to be.
+ *
+ * ## The sixth row — and the claim above used to be **false** for it
+ *
+ * This paragraph asserted, in the present tense, that *"every one of these six is live"* whenever
+ * either of those two conditions holds. Both hold for the shipped `predictive-balanced` profile,
+ * which authors `idle.parkingStrategy: predicted-demand`, `weights.predictedDemand: 0.4` **and**
+ * `idle.predictorHorizonS: 300` — and sweeping `idle.predictorHorizonS` across the whole declared
+ * `[30, 3600]` log range, a factor of 120, produced exactly **one** passenger-record trajectory on
+ * every shipped building. The claim was wrong, and it was wrong in the direction that costs the
+ * most: an optimizer told a flat plateau is live spends 50–200 replications an evaluation on it
+ * and then reports whichever value the draw held as part of a tuned winner.
+ *
+ * The mechanism. `forecast()` integrates `estimatedRate(floor, direction, bucket, fromT)` over
+ * `[fromT, fromT + horizon]`. At a `predictorCycleS` longer than the whole span the model is
+ * observed and queried over — which the 86 400 s default is for every replication this project
+ * runs — no bucket-of-day recurs, `completedOccurrences` is 0 for every bucket in the window, and
+ * `estimatedRate` shrinks every one of them to the same landing-level rate. The integral is then
+ * exactly `rate x horizon` for every (floor, direction), and all three consumers of the forecast
+ * reduce it to a **scale-invariant** statistic: `expectedResponseSeconds` and `demandMisalignmentM`
+ * are demand-weighted means, and stage 7's `parkingCandidates` is an argmax. A uniform multiplier
+ * cancels out of all three.
+ *
+ * So the horizon is live exactly when the cycle is short enough that a bucket-of-day comes round
+ * inside one replication, and the row is gated on that: `{ 'idle.predictorCycleS': { max: 1800 } }`.
+ * Measured at seed 20260726 over horizons {30, 120, 300, 900, 3600}, garden-apartments produces 1
+ * distinct trajectory at cycle 86 400 and 2 at cycle 1 800; at cycle 600 with a 120 s bucket it
+ * produces 4. 1 800 s is the bound because it is the replication length this project reports
+ * against — the condition is really *"the cycle is shorter than the run"*, and `activeWhen` cannot
+ * name the run length, so it names the cycle at the run length instead. `idle.predictorCycleS`'s
+ * own description already states the same fact from the other side.
+ *
+ * The gate is deliberately **not** an excuse: it does not say the horizon is meaningless, it says
+ * a search that leaves the cycle at a day must not spend budget on the horizon.
  */
 export const PREDICTOR_PARAMETERS: readonly DispatchParameterSpec[] = Object.freeze([
   {
@@ -154,7 +188,8 @@ export const PREDICTOR_PARAMETERS: readonly DispatchParameterSpec[] = Object.fre
     default: PREDICTOR_DEFAULTS.predictorHorizonS,
     unit: 's',
     description:
-      'How far ahead the demand forecast looks, seconds. The forecast is an expected arrival count over this window, so the horizon sets what "likely to appear soon" means: short enough that the estimate is about the demand a repositioning car can still get in front of, long enough that a car has time to travel there. Log scale because the interesting range spans two orders of magnitude.',
+      'How far ahead the demand forecast looks, seconds. The forecast is an expected arrival count over this window, so the horizon sets what "likely to appear soon" means: short enough that the estimate is about the demand a repositioning car can still get in front of, long enough that a car has time to travel there. Log scale because the interesting range spans two orders of magnitude. Gated on the cycle, and that gate is the whole point: while no bucket-of-day recurs inside a replication every bucket in the window shrinks to the same landing-level rate, the forecast integrates to exactly rate x horizon, and all three consumers (two demand-weighted means and an argmax) are invariant under a uniform scaling of it — so the whole declared range is one bit-identical run. Below a cycle of 1800 s the window folds and the shape of the forecast, not just its scale, moves with the horizon.',
+    activeWhen: { 'idle.predictorCycleS': { max: 1800 } },
   },
   {
     id: 'idle.predictorLearningRate',

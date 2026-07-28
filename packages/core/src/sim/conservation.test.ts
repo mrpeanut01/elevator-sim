@@ -122,6 +122,10 @@ function assertConserved(result: SimulationResult): void {
 
 describe('generated === delivered + explicitly undelivered', () => {
   for (const buildingId of BUILDING_IDS) {
+    // An explicit budget rather than vitest's 5 s default: `vertical-city` is 3 400 journeys a
+    // replication and five of them is ~4 s on a quiet machine, which is inside the default only
+    // until the runner is busy — and it always is, with 116 other files in flight. A conservation
+    // failure must mean passengers went missing, never that the laptop was loaded.
     it(`holds on ${buildingId} across ${SEEDS.length} seeds`, () => {
       for (const seed of SEEDS) {
         const result = runSimulation(request(buildingId, 'eta', seed));
@@ -129,7 +133,7 @@ describe('generated === delivered + explicitly undelivered', () => {
         expect(result.conservation.generated).toBeGreaterThan(0);
         assertConserved(result);
       }
-    });
+    }, 60_000);
   }
 
   it('holds on every shipped dispatcher, on a building with two banks', () => {

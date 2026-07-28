@@ -393,6 +393,29 @@ export function resolveBuilding(
         WARNING_CODES.unusedFloorPairs,
       );
     }
+    /*
+     * The honest half of the double-deck surface: the parser validates the pairing carefully
+     * enough to look wired, and the runtime ignores it entirely.
+     *
+     * Everything above cross-checks decks — the pairing, the separation, the per-deck load and
+     * the per-deck person count — and `resolveCar` puts `capacityPersonsPerDeck` on the resolved
+     * car while `Bank` builds a whole `deckByFloorId` index. Nothing in `sim/`, `model/car/` or
+     * `dispatch/` reads any of it: `Car` has no deck concept, so this bank runs as a bank of
+     * single-deck cars of the same whole-car capacity and makes up to twice the stops the
+     * declared hardware would. Without this warning the only signal was silence, and silence
+     * reads as "modelled".
+     *
+     * One warning per bank rather than per car, and it names the bank because a mixed building
+     * can have one double-deck bank and three conventional ones — only the numbers from this
+     * one are affected.
+     */
+    if (doubleDeckCars.length > 0) {
+      addWarning(
+        `${at}.cars`,
+        `bank "${bank.id}" of building "${building.id}" declares ${doubleDeckCars.length} double-deck car${doubleDeckCars.length === 1 ? '' : 's'}, and double-deck operation is not simulated: each runs as a single-deck car of the same whole-car capacity, so it makes up to twice the stops the declared hardware would and every round-trip time, interval and handling-capacity figure reported for this bank describes different hardware. Double-deck dispatch is Phase 6.`,
+        WARNING_CODES.doubleDeckNotSimulated,
+      );
+    }
 
     // One check per distinct deck separation, not per car, so a bank of eight identical
     // shuttles reports one problem rather than eight.
@@ -489,8 +512,21 @@ export function resolveBuilding(
  * Check references that only make sense across files: for now, the per-pattern weight
  * sets, which name dispatcher profiles.
  *
- * Non-fatal by design — `patternSwitching` describes a Phase 7 controller and may name
- * profiles that have not been authored yet.
+ * Non-fatal by design — `patternSwitching` describes a controller that **does not exist**, and
+ * may name profiles that have not been authored yet.
+ *
+ * That sentence used to read *"a Phase 7 controller"*, which was true while Phase 7 was ahead of
+ * this file and stopped being true when Phase 7 landed without it. There is no fuzzy pattern
+ * detector anywhere in the repository: `data/dispatcher-profiles.json` authors a complete
+ * `patternSwitching` block — four inputs, five patterns, `hysteresisS`, and a
+ * `weightSetsByPattern` map — `dispatcherProfilesSchema` validates it, the core barrel types it,
+ * this function cross-checks its profile names, and **nothing reads it**. Editing
+ * `weightSetsByPattern` produces a clean `loadConfig` and zero behavioural change, which is the
+ * *configured, validated, dead in the shipped path* defect one level up from code into data.
+ *
+ * It is left unimplemented deliberately rather than by oversight (see `DECISIONS.md`), so this
+ * comment says so out loud: a reader who finds the block validated here must not read the
+ * validation as evidence that it drives anything.
  */
 export function crossCheckDispatcherProfiles(
   dispatchers: DispatcherProfiles,

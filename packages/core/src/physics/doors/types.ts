@@ -442,8 +442,25 @@ export const DOOR_DEFAULTS = Object.freeze({
   dwellPolicy: 'fixed',
   dwellAdaptationGain: 0.4,
   maxDwellS: 20,
-  /** The courtesy hold is standard behaviour; a profile switches it off to measure the cost. */
-  reopenOnLateArrival: true,
+  /**
+   * **Off by default, and the default changed when the behaviour landed.**
+   *
+   * It read `true` — *"the courtesy hold is standard behaviour; a profile switches it off to
+   * measure the cost"* — for as long as the run loop emitted no `lateArrival` reopen at all, so
+   * the default described a behaviour that did not exist and no configuration could switch off.
+   * `Simulation.#reopenForLateArrival` now emits one, which makes the knob live and this default
+   * load-bearing for the first time.
+   *
+   * It is `false` because turning the hold on is a **modelling change that revalues every number
+   * this project has published**: measured across the five shipped buildings x ten shipped
+   * profiles at seed 20260726, enabling it moves 41 of the 50 passenger-record trajectories and
+   * shifts AWT by up to 30 % on `secure-tower`. A default that silently did that would leave
+   * Phase 5's verdicts comparing runs against numbers taken under a different physical model.
+   * Turning it on is a deliberate re-measurement, not a side effect of implementing it — so the
+   * default preserves the published operating point and the knob carries the cost, which is what
+   * a tunable is for.
+   */
+  reopenOnLateArrival: false,
   maxReopensPerStop: 5,
   /** 20 persons (design load of the largest reference car) x 2.0 s, the slowest reference tp. */
   maxTransferSeconds: 40,
@@ -549,7 +566,7 @@ export const DOOR_PARAMETERS: readonly DoorParameterSpec[] = [
     type: 'boolean',
     default: DOOR_DEFAULTS.reopenOnLateArrival,
     description:
-      'Honour the door-hold button and the courtesy hold for an approaching passenger. Photo-eye obstruction reopens regardless: it is a safety function.',
+      'Honour the door-hold button and the courtesy hold for an approaching passenger: when the doors start closing on a landing that still holds somebody this car could carry, reverse them and board. Photo-eye obstruction reopens regardless — it is a safety function. Off by default, because every number this project has published was measured without it; enabling it moves 41 of 50 shipped building x profile trajectories and up to 30 % of AWT on secure-tower, so it is a deliberate re-measurement rather than a free improvement. The cost it buys back is a whole extra round trip for the passenger left behind.',
   },
   {
     id: 'answer.maxReopensPerStop',

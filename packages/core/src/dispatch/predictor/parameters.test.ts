@@ -318,6 +318,64 @@ describe('PREDICTOR_PARAMETERS', () => {
     expect(description).not.toMatch(/cancels out/);
     expect(description).toMatch(/NOT inert/);
   });
+
+  it('idle.predictorHorizonS is a pure scalar on the forecast at the default cycle, and says so', () => {
+    // Finding #9/#10, measured at the level the *consumers* read rather than at the level the
+    // existing rows above read.
+    //
+    // `expectedDemandByFloor(t, H)` scales linearly with H, so reading a raw cell — which is what
+    // `predictorCycleS` and `predictorPriorRatePerS` are measured by, two tests up — reports the
+    // horizon as the most live row of the six. It is the least. All three consumers of the
+    // forecast reduce it to a **scale-invariant** statistic: `expectedResponseSeconds` and
+    // `demandMisalignmentM` are demand-weighted means and `parkingCandidates` is an argmax. So
+    // the statistic to assert on is the *normalised shape*, and at the default cycle that shape
+    // is identical for every horizon in the whole declared [30, 3600] range — a factor of 120.
+    const tower: readonly string[] = Array.from({ length: 20 }, (_, index) => String(index + 1));
+    const shape = (horizonS: number, cycleS: number): readonly number[] => {
+      const predictor = createArrivalModel({ floorIds: tower, idle: { predictorCycleS: cycleS } });
+      for (let at = 0; at < 1800; at += 7) {
+        predictor.observe(at % 2 === 0 ? '5' : '2', at % 3 === 0 ? 'down' : 'up', at);
+      }
+      const forecast = predictor.expectedDemandByFloor(1800, horizonS);
+      const values = tower.map((floorId) => forecast.get(floorId) ?? 0);
+      const total = values.reduce((sum, value) => sum + value, 0);
+      return values.map((value) => value / total);
+    };
+
+    const HORIZONS = [30, 120, 300, 900, 3600] as const;
+    const atDefault = HORIZONS.map((horizonS) =>
+      shape(horizonS, PREDICTOR_DEFAULTS.predictorCycleS),
+    );
+    for (const [index, normalised] of atDefault.entries()) {
+      // Identical to 12 decimal places, per floor. The residual is float rounding in the 15th
+      // significant figure of a division by a sum of 120x-larger terms — not an effect: a
+      // difference an argmax could act on would be in the first two figures, and a demand
+      // weighting that moved by 1e-15 moves no decision.
+      const reference = atDefault[0] as readonly number[];
+      for (const [floor, value] of normalised.entries()) {
+        expect(
+          value,
+          `horizon ${String(HORIZONS[index])} at the default cycle, floor index ${String(floor)}`,
+        ).toBeCloseTo(reference[floor] as number, 12);
+      }
+    }
+    // The raw magnitudes do move, which is exactly why reading them would have reported the row
+    // as the liveliest of the six.
+    const raw = (horizonS: number): number =>
+      createArrivalModel({ floorIds: tower }).expectedDemandByFloor(0, horizonS).get('5') ?? 0;
+    expect(raw(3600) / raw(30)).toBeCloseTo(120, 6);
+
+    // The other direction: below the gate's bound a bucket-of-day recurs inside the run, the
+    // window folds, and the shape moves with the horizon. So the dimension is conditional rather
+    // than dead, which is what the gate declares.
+    const folded = HORIZONS.map((horizonS) => shape(horizonS, 600));
+    expect(new Set(folded.map((values) => values.join(','))).size).toBeGreaterThan(1);
+
+    // And the gate is declared, so a generic optimizer skips the plateau without reading any of
+    // the above. `sim/searchSpaceLiveness.test.ts` asserts the behavioural half through a run.
+    const horizon = predictorParameter('idle.predictorHorizonS');
+    expect(horizon?.activeWhen).toStrictEqual({ 'idle.predictorCycleS': { max: 1800 } });
+  });
 });
 
 describe('PREDICTOR_DEFAULTS', () => {

@@ -83,6 +83,20 @@ export const WARNING_CODES = {
   unusedFloorPairs: 'unused-floor-pairs',
   deckLoadMismatch: 'deck-load-mismatch',
   deckPersonsOutsideClassRange: 'deck-persons-outside-class-range',
+  /**
+   * The building declares double-deck cars and the runtime does not simulate them.
+   *
+   * Not a defect in the config — it is a fact about the simulator, raised where the reader can
+   * act on it. `doubleDeck`, `deckSeparationM`, `ratedLoadLbPerDeck`, `servesFloorPairs` and the
+   * whole `Bank` deck index are parsed, cross-validated by the two warnings above, resolved onto
+   * `ResolvedCar` and unit-tested — and no code in `sim/`, `model/car/` or `dispatch/` reads any
+   * of them. So a shuttle declared as a double-deck car runs as a single-deck car of the same
+   * whole-car capacity, making up to twice the stops the declared hardware would, and every
+   * round-trip time, interval and handling-capacity figure reported for that bank is for
+   * hardware nobody configured. Double-deck *dispatch* is Phase 6 (docs/07-handoff.md); saying
+   * so out loud is not.
+   */
+  doubleDeckNotSimulated: 'double-deck-not-simulated',
 } as const;
 
 /** Render a zod path as `banks[0].cars[1].spec`. */

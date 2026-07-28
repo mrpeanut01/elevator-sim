@@ -596,7 +596,7 @@ export const CLOSED_FORM_ASSUMPTIONS: readonly ClosedFormAssumption[] = [
     id: 'no-door-interference',
     assumption: 'Doors open and close once per stop, uninterrupted.',
     divergence:
-      'The simulator models photo-eye obstruction and late-arrival reopens, each of which adds a partial door cycle. Small per event, but it only ever adds time.',
+      'The simulator models two reopen causes, and BOTH ARE OFF AT THE SHIPPED DEFAULTS, so this assumption contributes exactly zero divergence to every number this project currently publishes. Photo-eye obstruction is drawn from the runner stream at sim.doorObstructionProbability, which defaults to 0; the late-arrival courtesy hold is emitted when a landing still holds a passenger the car could carry as the doors start closing, and is refused unless a profile authors answer.reopenOnLateArrival: true, which defaults to false. Enable either and each honoured reopen adds a partial door cycle — small per event, and it only ever adds time. This text previously claimed both were modelled unconditionally, while no code path in the repository emitted a late-arrival reopen at all, so the reconciliation was charging a divergence source that did not exist.',
     bias: 'under',
   },
   {

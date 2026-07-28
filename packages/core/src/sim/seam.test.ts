@@ -263,6 +263,73 @@ describe('capacity-driven reassignment fires on the load edge', () => {
 });
 
 /* -------------------------------------------------------------------------- *
+ * Stage 6 — the courtesy hold reaches the door, and the profile decides it
+ * -------------------------------------------------------------------------- */
+
+describe('answer.reopenOnLateArrival reaches a run, in both of its positions', () => {
+  async function simulate(reopenOnLateArrival: boolean, buildingId = 'midtown-office') {
+    const cfg = await load();
+    const base = cfg.dispatcherProfilesById.get('predictive-balanced') as DispatcherProfile;
+    const simulation = new Simulation({
+      building: cfg.buildingsById.get(buildingId) as ResolvedBuilding,
+      dispatcherProfile: {
+        ...base,
+        id: `hold-${String(reopenOnLateArrival)}`,
+        answer: { ...base.answer, reopenOnLateArrival },
+      },
+      trafficProfiles: cfg.trafficProfiles,
+      elevatorSpecs: cfg.elevatorSpecs,
+      seed: SEED,
+      onTimeout: 'report',
+    });
+    return { simulation, result: simulation.run() };
+  }
+
+  it('asks for the hold whatever the profile says, and honours it only when the profile does', async () => {
+    // Three counts, and the first is the one that distinguishes "off" from "never wired" — the
+    // same distinction `capacityCrossings` makes for stage 5, and for the same reason. The only
+    // non-test caller of `Car.requestReopen` used to hardcode `'obstruction'`, so the
+    // `lateArrival` branch of `doorMachine.refusalFor` was unreachable, `DoorAccounting.lateArrivals`
+    // was structurally 0 on every run this project can produce, and
+    // `DOOR_REOPEN_REFUSALS.policyDisabled` was a verdict nothing could return. A granted count
+    // of zero could not tell any of that from a profile that simply declined every hold.
+    const declined = (await simulate(false)).simulation.stageActivity;
+    expect(
+      declined.lateArrivalHoldsRequested,
+      'no courtesy hold was ever asked for — the request site is gone',
+    ).toBeGreaterThan(0);
+    expect(declined.lateArrivalHoldsGranted).toBe(0);
+    expect(
+      declined.lateArrivalHoldsRefused,
+      'DOOR_REOPEN_REFUSALS.policyDisabled is unreachable again',
+    ).toBe(declined.lateArrivalHoldsRequested);
+
+    const honoured = (await simulate(true)).simulation.stageActivity;
+    expect(honoured.lateArrivalHoldsGranted).toBeGreaterThan(0);
+  }, 120_000);
+
+  it('produces a different set of journeys when it is honoured', async () => {
+    // The behavioural half. A bit-identical pair here would mean the door reversed and nobody
+    // boarded, which is a reopen that costs time and buys nothing — the shape the obstruction
+    // path had before `#transferAtStop` learned to replay its boarding half.
+    const declined = await simulate(false);
+    const honoured = await simulate(true);
+    expect(trajectory(honoured.result)).not.toBe(trajectory(declined.result));
+  }, 120_000);
+
+  it('is off by default, so no published number was revalued by implementing it', async () => {
+    // The default is `false` deliberately (`DOOR_DEFAULTS.reopenOnLateArrival`): turning the hold
+    // on moves 41 of the 50 shipped building x profile trajectories. A profile that authors
+    // nothing must therefore run exactly as it did before the behaviour existed.
+    const cfg = await load();
+    const base = cfg.dispatcherProfilesById.get('eta') as DispatcherProfile;
+    expect(base.answer?.reopenOnLateArrival).toBeUndefined();
+    const { simulation } = await simulate(false, 'garden-apartments');
+    expect(simulation.stageActivity.lateArrivalHoldsGranted).toBe(0);
+  }, 120_000);
+});
+
+/* -------------------------------------------------------------------------- *
  * Stage 3 — no weighted cost term may be inert through the shipped engine
  * -------------------------------------------------------------------------- */
 
