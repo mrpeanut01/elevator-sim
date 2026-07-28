@@ -155,13 +155,129 @@ function boundNames(source: string): ReadonlySet<string> {
   return names;
 }
 
-/** Source with block and line comments removed, so a `{@link}` cannot read as a use. */
+/**
+ * Source with comments **and string literals** removed, so that neither a `{@link}` tag nor an
+ * error message can read as a use.
+ *
+ * This file used to strip comments only, and that was a hole wide enough to drive the whole audit
+ * through. `predictor/arrivalModel.ts` throws
+ *
+ * ```ts
+ * throw new PredictorError(`createArrivalModel: horizonSeconds must be positive; …`);
+ * ```
+ *
+ * — its own name, inside a template literal, in its own file. Under a comment-only strip those are
+ * two further occurrences of `createArrivalModel`, so `selfUses > 1` and the symbol reads as
+ * **self-used**: live no matter who imports it, and *unfalsifiably* live. Measured before the fix:
+ * deleting both real importers (`sim/simulation.ts` and `experiments/src/benchmark/predictorLag.ts`)
+ * left this suite fully green — including the assertion below that names `createArrivalModel` as a
+ * symbol that must read live. A guard that cannot fail is not a guard, and naming your function in
+ * its own error message is good practice this file must not punish by silently exempting it.
+ *
+ * Template **interpolations are kept**, because `${runRound(…)}` is code. Everything between the
+ * quotes is not. Ported from `experiments/src/tuning/callers.test-helper.ts`, which fixed both
+ * holes first; `core` may not import from `experiments`, so the scanner is duplicated rather than
+ * shared.
+ */
 function code(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+  let out = '';
+  let index = 0;
+
+  /** From an opening quote to its match, contributing nothing. */
+  const quoted = (start: number): number => {
+    const quote = source[start];
+    let position = start + 1;
+    while (position < source.length) {
+      const char = source[position];
+      if (char === '\\') {
+        position += 2;
+        continue;
+      }
+      if (char === quote || char === '\n') return position + 1;
+      position += 1;
+    }
+    return position;
+  };
+
+  /** From the opening backtick to the matching one, keeping only `${…}` bodies. */
+  const template = (start: number): number => {
+    let position = start + 1;
+    while (position < source.length) {
+      const char = source[position];
+      if (char === '\\') {
+        position += 2;
+        continue;
+      }
+      if (char === '`') return position + 1;
+      if (char === '$' && source[position + 1] === '{') {
+        let depth = 1;
+        let cursor = position + 2;
+        const from = cursor;
+        while (cursor < source.length && depth > 0) {
+          const inner = source[cursor];
+          if (inner === '{') depth += 1;
+          else if (inner === '}') depth -= 1;
+          else if (inner === '`') {
+            cursor = template(cursor) - 1;
+          } else if (inner === "'" || inner === '"') {
+            cursor = quoted(cursor) - 1;
+          }
+          cursor += 1;
+        }
+        out += ` ${source.slice(from, Math.max(from, cursor - 1))} `;
+        position = cursor;
+        continue;
+      }
+      position += 1;
+    }
+    return position;
+  };
+
+  while (index < source.length) {
+    const char = source[index];
+    const next = source[index + 1];
+    if (char === '/' && next === '/') {
+      while (index < source.length && source[index] !== '\n') index += 1;
+      continue;
+    }
+    if (char === '/' && next === '*') {
+      index += 2;
+      while (index < source.length && !(source[index] === '*' && source[index + 1] === '/')) {
+        index += 1;
+      }
+      index += 2;
+      continue;
+    }
+    if (char === "'" || char === '"') {
+      index = quoted(index);
+      out += ' ';
+      continue;
+    }
+    if (char === '`') {
+      index = template(index);
+      continue;
+    }
+    out += char;
+    index += 1;
+  }
+  return out;
 }
 
+/**
+ * One exported declaration, at the start of a line.
+ *
+ * The `async` alternative is **not** decoration. Without it, `export async function foo` matches
+ * nothing at all, so every asynchronous export of an audited module is silently *never scanned* —
+ * it can neither be reported dead nor appear in the allowlist, and the audit passes by not looking.
+ * Nothing in `dispatch/{policies,predictor}` is asynchronous today, which is exactly why the hole
+ * survived: it is latent, and the first `export async function` added to either module would have
+ * entered the codebase unaudited. `experiments/src/tuning/deadCode.test.ts` widened its copy when
+ * three of the five symbols it exists to protect turned out to be `async`; this is the same
+ * widening, applied before rather than after. The pattern is asserted against a synthetic
+ * declaration below, so the alternative cannot be dropped again without a test failing.
+ */
 const EXPORTED =
-  /^export\s+(?:declare\s+)?(?:abstract\s+)?(?:const|let|var|function|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/;
+  /^export\s+(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:const|let|var|function|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/;
 
 interface Symbol_ {
   readonly key: string;
@@ -259,5 +375,75 @@ describe('every export of dispatch/policies and dispatch/predictor has a caller 
     expect(uncalled.map((symbol) => symbol.key)).not.toContain('policies/repositionContextFor');
     expect(uncalled.map((symbol) => symbol.key)).not.toContain('predictor/createArrivalModel');
     expect(uncalled.map((symbol) => symbol.key)).not.toContain('policies/CapacityReassignmentMonitor');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The scanner's own two holes, closed and pinned
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The audit above is only as good as the two functions below it, and both were wrong.**
+ *
+ * Each hole was demonstrated before it was closed, by making the audit *fail to fail*:
+ *
+ * | hole | demonstration | unfixed | fixed |
+ * |---|---|---|---|
+ * | `EXPORTED` did not match `export async function` | an uncalled `export async function` added to `policies/zoning.ts` | **green** — never scanned at all | red, naming it |
+ * | `code()` stripped comments but not string literals | both real importers of `createArrivalModel` deleted (`sim/simulation.ts`, `experiments/src/benchmark/predictorLag.ts`) | **green** — `PredictorError(\`createArrivalModel: …\`)` in its own file read as a self-use | red, naming it |
+ *
+ * The second is the worse of the two: it made *"`createArrivalModel` must read live"* — the
+ * assertion three lines above — **unfalsifiable**. Any symbol that names itself in its own error
+ * message was permanently live regardless of who called it, which is a guard that cannot fail.
+ *
+ * So the two are pinned here directly, against synthetic input rather than against whatever the
+ * audited modules happen to contain today. `dispatch/{policies,predictor}` has no `export async
+ * function` at all, which is exactly how that hole survived: a latent scanner gap is invisible
+ * until the first symbol falls into it, and by then it has entered the codebase unaudited.
+ */
+describe('the scanner cannot silently stop looking', () => {
+  it('matches an async exported function — the declaration form it used to skip entirely', () => {
+    expect(EXPORTED.exec('export async function runThing(): Promise<void> {')?.[1]).toBe('runThing');
+    // …and still every form it already matched, so widening the alternative broke nothing.
+    for (const [line, name] of [
+      ['export function plain(): void {', 'plain'],
+      ['export const VALUE = 1;', 'VALUE'],
+      ['export class Thing {', 'Thing'],
+      ['export abstract class Base {', 'Base'],
+      ['export interface Shape {', 'Shape'],
+      ['export type Alias = number;', 'Alias'],
+      ['export enum Kind {', 'Kind'],
+      ['export declare const AMBIENT: number;', 'AMBIENT'],
+    ] as const) {
+      expect(EXPORTED.exec(line)?.[1], line).toBe(name);
+    }
+    // A re-export is not a declaration, and must not be scanned as one.
+    expect(EXPORTED.exec("export { thing } from './thing.js';")).toBeNull();
+  });
+
+  it('removes string literals, so a symbol that names itself is not thereby self-used', () => {
+    // The exact shape that made the audit unfalsifiable: the name appears twice, and the second
+    // occurrence is inside the error message the function throws.
+    const source = [
+      'function helper(): void {',
+      '  throw new Error(`helper: not implemented`);',
+      '}',
+    ].join('\n');
+    expect((code(source).match(/\bhelper\b/g) ?? []).length).toBe(1);
+
+    // Single and double quotes too, and a `{@link}` in a comment, which was the only case the old
+    // implementation handled.
+    expect((code("const a = 'helper';\n/** {@link helper} */\nconst b = \"helper\";").match(/\bhelper\b/g) ?? []).length).toBe(0);
+
+    // …but a template **interpolation** is code and must survive, or the fix would create the
+    // opposite defect: a real call written `${helper()}` reading as dead.
+    expect((code('const x = `${helper()}`;').match(/\bhelper\b/g) ?? []).length).toBe(1);
+  });
+
+  it('still finds a real use, so the strip is not simply deleting the file', () => {
+    // Both directions. A scanner that returned the empty string would pass every assertion above.
+    const stripped = code(readFileSync(join(PACKAGES_DIR, 'core/src/dispatch/policies/registry.ts'), 'utf8'));
+    expect(stripped.length).toBeGreaterThan(200);
+    expect(stripped).toContain('createPolicyFor');
   });
 });

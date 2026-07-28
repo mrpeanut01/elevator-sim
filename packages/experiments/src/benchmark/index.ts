@@ -835,3 +835,11 @@ export type {
   DecisionOutcome,
   DecisionState,
 } from './auctionAggregation.js';
+
+/* -------------------------------------------------------------------------- *
+ * The driver for the studies that publish counts rather than intervals
+ * -------------------------------------------------------------------------- */
+
+export { formatLivenessSuite, runLivenessSuite } from './livenessSuite.js';
+
+export type { LivenessSuiteOptions, LivenessSuiteResult } from './livenessSuite.js';

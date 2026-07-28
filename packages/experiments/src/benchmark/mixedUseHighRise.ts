@@ -131,9 +131,11 @@
  * the sense `docs/07-handoff.md` § 4 means it, not a budget that was too small.
  *
  * **The call type on its own is worth exactly zero here, and the study separates it out.** The
- * shipped `destination-eta` — destination disclosed and authorized, nothing pricing it — is
+ * `destination-eta-unpriced` arm — destination disclosed and authorized, nothing pricing it — is
  * **bit-identical** to `eta` on all three up-peak points, 150/150, 238/238 and 200/200 paired
- * differences of exactly zero. Every pickup is at `G`, which is in no access zone, so moving
+ * differences of exactly zero. That arm was the shipped profile until T30 authored a `rideTime`
+ * weight onto it; the configuration is unchanged and only its id moved, for the reason
+ * {@link DECOMPOSITION_ARM} gives. Every pickup is at `G`, which is in no access zone, so moving
  * information earlier is worth nothing until something reads it. The whole of the −2.072 s is the
  * *weight*, and that is a decomposition rather than an inference — the same one Phase 6a made on
  * Midtown, reproduced on the building the criterion names.
@@ -169,7 +171,12 @@ import {
 } from '../validation/harness.js';
 
 import { DESTINATION_DISPATCH_PROFILE } from './arms.js';
-import { DISCLOSURE_BASELINE, DISCLOSURE_PROFILE, rideArmId } from './destinationDisclosure.js';
+import {
+  DISCLOSURE_BASELINE,
+  DISCLOSURE_PROFILE,
+  DISCLOSURE_UNPRICED_ARM,
+  rideArmId,
+} from './destinationDisclosure.js';
 import { BENCHMARK_SEED } from './suite.js';
 import { compareCell, type CellComparison } from './verdict.js';
 
@@ -190,13 +197,20 @@ export const LEVEL_1_ARM = DESTINATION_DISPATCH_PROFILE;
 export const MIXED_USE_CANDIDATES: readonly string[] = Object.freeze([LEVEL_0_ARM, LEVEL_1_ARM]);
 
 /**
- * The shipped destination profile with no `rideTime` weight — the **decomposition** arm.
+ * The destination call type with no `rideTime` weight — the **decomposition** arm.
  *
  * Not a candidate. It is in the experiment so that "the call type alone" and "the weight" can be
  * told apart by measurement rather than by argument, exactly as `destinationDisclosure.ts` does on
  * Midtown. Its result is a bit-identity count, not an interval.
+ *
+ * **Derived, not shipped, since T30.** It used to be `DISCLOSURE_PROFILE` itself, because the
+ * shipped `destination-eta` authored a `callType` and weighted nothing that read the destination —
+ * which is precisely why T30 authored `weights.rideTime: 0.5` on it. Binding this arm to the
+ * shipped id would have turned the decomposition into a comparison between two *priced*
+ * configurations and quietly falsified the sentence it exists to support. It is bound to the
+ * configuration instead, and the identity counts are unchanged.
  */
-export const DECOMPOSITION_ARM = DISCLOSURE_PROFILE;
+export const DECOMPOSITION_ARM = DISCLOSURE_UNPRICED_ARM;
 
 /**
  * **The naive baselines, read out of `data/` rather than listed here.**
@@ -254,6 +268,10 @@ export const MIXED_USE_GATE: ReplicationMetric = 'ttdMeanS';
 /** Every derived profile this study registers. Config only, never code (invariant 7). */
 export function mixedUseProfiles(destination: DispatcherProfile): readonly DispatcherProfile[] {
   return Object.freeze([
+    derivedProfile(destination, DECOMPOSITION_ARM, {
+      name: 'Destination disclosure, ride unpriced',
+      weights: { rideTime: 0 },
+    }),
     derivedProfile(destination, LEVEL_0_ARM, {
       name: 'Destination disclosure, rideTime 1',
       weights: { rideTime: 1 },

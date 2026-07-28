@@ -291,6 +291,23 @@ export function livenessCases(
   });
 
   /*
+   * The **shipped** profile's own off side, at the shipped weight rather than at the study's 1.0.
+   *
+   * `liveness-priced` and `liveness-priced-conventional` price the ride at 1.0, which is a study
+   * arm; `data/dispatcher-profiles.json` ships 0.3. Those are different configurations, and a
+   * liveness proof for the second that quotes counts from the first is the same substitution the
+   * standing requirement is about — the shipped thing proved live by measuring a nearby thing. So
+   * the shipped profile is counted on the primary building at its own weight, with its own gated-off
+   * control, and the assertions below name it explicitly.
+   */
+  const shippedConventional: DispatcherProfile = Object.freeze({
+    ...destination,
+    id: 'liveness-shipped-conventional',
+    name: 'The shipped destination profile at its own weight, conventional call type',
+    dispatch: Object.freeze({ ...destination.dispatch, callType: 'up-down-buttons' as const }),
+  });
+
+  /*
    * The panel gate's **off side**: the shipped Level-1 profile with `passengerAssignment`
    * removed and nothing else touched. That is arm C to the shipped profile's arm D — same
    * weights, same call type, same credential — so the counts below isolate the passenger model
@@ -317,6 +334,16 @@ export function livenessCases(
       label: 'the same profile at up-down-buttons — the gate’s off side',
       building: 'secure-tower',
       profile: conventional,
+    }),
+    Object.freeze({
+      label: 'shipped destination-eta at the primary point — the profile data/ actually carries',
+      building: 'midtown-office',
+      profile: destination,
+    }),
+    Object.freeze({
+      label: 'the shipped profile at up-down-buttons — its own gate’s off side',
+      building: 'midtown-office',
+      profile: shippedConventional,
     }),
     Object.freeze({
       label: 'destination-eta + rideTime 1 at the primary point',

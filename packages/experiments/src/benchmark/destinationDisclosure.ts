@@ -34,11 +34,49 @@
  *
  * | `rideTime` | TTD | AWT | WT95 | in-car time |
  * |---|---|---|---|---|
- * | **none** (the shipped profile) | `+0.000 [+0.000, +0.000]` **IDENTICAL** | `+0.000 [+0.000, +0.000]` **IDENTICAL** | `+0.000 [+0.000, +0.000]` **IDENTICAL** | `+0.000 [+0.000, +0.000]` **IDENTICAL** |
+ * | **none** (`destination-eta-unpriced`) | `+0.000 [+0.000, +0.000]` **IDENTICAL** | `+0.000 [+0.000, +0.000]` **IDENTICAL** | `+0.000 [+0.000, +0.000]` **IDENTICAL** | `+0.000 [+0.000, +0.000]` **IDENTICAL** |
  * | 0.3 | `−0.993 [−1.283, −0.703]` **BETTER** | `+0.182 [+0.048, +0.317]` WORSE | `+0.369 [−0.311, +1.049]` INDIST. | `−1.175 [−1.451, −0.900]` BETTER |
+ * | **0.5 — the shipped profile** | `−1.217 [−1.531, −0.902]` **BETTER** | `+0.295 [+0.154, +0.437]` WORSE | `+0.374 [−0.303, +1.051]` INDIST. | `−1.512 [−1.813, −1.211]` BETTER |
+ * | 0.7 | `−1.433 [−1.787, −1.079]` **BETTER** | `+0.392 [+0.239, +0.546]` WORSE | `+0.620 [−0.033, +1.274]` INDIST. | `−1.825 [−2.158, −1.493]` BETTER |
  * | **1.0** | **`−1.562 [−1.916, −1.208]` BETTER** | **`+0.514 [+0.344, +0.684]` WORSE** | **`+1.010 [+0.292, +1.729]` WORSE** | `−2.076 [−2.406, −1.746]` BETTER |
  * | 2.0 | `−1.800 [−2.164, −1.435]` **BETTER** | `+0.748 [+0.560, +0.936]` WORSE | `+1.331 [+0.623, +2.039]` WORSE | `−2.547 [−2.887, −2.207]` BETTER |
  * | *`eta` deferring 1.5 s* | `+1.123 [+0.848, +1.397]` WORSE | `+1.081 [+0.952, +1.209]` WORSE | `+1.895 [+1.443, +2.346]` WORSE | `+0.042 [−0.214, +0.298]` INDIST. |
+ *
+ * ## Why the shipped default is 0.5 — neither the headline 1.0 nor the bracket's own floor
+ *
+ * A shipped default is not a study arm. The bracket is monotone in **both** directions over its
+ * whole width, so there is no interior optimum to discover: choosing a default is choosing a point
+ * on a trade, and it has to be chosen against criteria stated before the numbers. Two were, and
+ * they cut from opposite ends.
+ *
+ * **A default may not make a published metric significantly worse.** That is the tail, and it rules
+ * out the top of the bracket. WT95 is `+0.369 [−0.311, +1.049]` at 0.3 and `+0.374 [−0.303,
+ * +1.051]` at 0.5 — intervals containing zero — `+0.620 [−0.033, +1.274]` at 0.7, which only just
+ * does, and `+1.010 [+0.292, +1.729]` at 1.0 and `+1.331 [+0.623, +2.039]` at 2.0, which do not.
+ * WT95 is the metric this project's service-level machinery gates on, and a default that measurably
+ * lengthens the tail is a trade an operator should opt into rather than inherit. AWT is WORSE at
+ * every point — the honest cost of the mechanism, and D27 exists to make it public — but at 0.5 it
+ * is `+0.295 [+0.154, +0.437]`, against the `+1.081 [+0.952, +1.209]` the deferral a destination
+ * dispatcher may not use costs.
+ *
+ * **A default may not be observationally inert at a shipped operating point.** That is the whole
+ * reason this weight exists, and it rules out the bottom. Counted at the matrix's own seed and
+ * budget on Midtown up-peak, the shipped profile is bit-identical to `eta` on **0 of 81**
+ * replications at 0.3, and differs on **5** at 0.5, **6** at 0.7 and **16** at 1.0. A default that
+ * changes nothing at a shipped operating point is the defect being fixed, one notch smaller.
+ *
+ * 0.5 is the smallest bracket point that clears both, and what it costs against 0.3 is `+0.113 s`
+ * of AWT for `−0.224 s` of TTD and `−0.337 s` in the car.
+ *
+ * **One cell stays identical at every weight, and that one is structural.** On Garden Apartments
+ * down-peak the shipped profile is bit-identical to `eta` on 0 of 51 replications at 0.3, at 1.0
+ * *and* at 2.0. Every down trip there ends at the lobby, so the destination carries nothing the
+ * direction button did not — the same mechanism {@link NEGATIVE_CONTROLS} predicts in advance for
+ * `midtown-down-peak`. That is an operating point being blind, not a weight being small, and the
+ * way to tell is that raising the weight fourfold does not move it.
+ *
+ * CLAUDE.md § Tuning discipline says not to scalarize early; 1.0 and 2.0 remain arms here and the
+ * operator reaches them by deriving one, which is what {@link disclosureProfiles} is for.
  *
  * Four things the table says that a headline cannot.
  *
@@ -48,11 +86,14 @@
  * is spent on. Had the TTD gain exceeded the ride gain, the number would be coming from somewhere
  * the mechanism does not predict.
  *
- * **The call type alone is worth exactly zero here, and the study separates it out.** The shipped
- * profile — the destination disclosed and authorized, nothing pricing it — is bit-identical to `eta`
- * on this building, 150 of 150 paired differences of precisely `0` on every metric. Midtown Office
- * declares no `accessZones`, so moving information earlier is worth nothing until something reads
- * it. The whole −1.562 s is the *weight*, and that is a decomposition rather than an inference.
+ * **The call type alone is worth exactly zero here, and the study separates it out.** The
+ * `destination-eta-unpriced` arm — the destination disclosed and authorized, nothing pricing it —
+ * is bit-identical to `eta` on this building, 150 of 150 paired differences of precisely `0` on
+ * every metric. Midtown Office declares no `accessZones`, so moving information earlier is worth
+ * nothing until something reads it. The whole −1.562 s is the *weight*, and that is a decomposition
+ * rather than an inference. That row was the shipped profile until T30 authored the weight, which
+ * is precisely why the row had to be kept: a configuration nobody ships is still the only thing
+ * that can attribute the effect.
  *
  * **The trade is monotone and is not scalarized away.** TTD improves and AWT degrades over the whole
  * bracket. 1.0 is an operating point on a curve, not a discovered optimum, and the curve is reported
@@ -131,13 +172,42 @@ export const DISCLOSURE_BASELINE = 'eta';
 export const DISCLOSURE_PROFILE = 'destination-eta';
 
 /**
+ * The shipped profile with its `rideTime` weight taken back off, and nothing else touched.
+ *
+ * **This arm is the decomposition, and it used to be the shipped profile itself.** Until T30 the
+ * shipped `destination-eta` weighted nothing that read the destination, so *it* was the "call type
+ * alone" row — and the matrix then measured what that was worth: bit-identical to `eta` at 8 of 8
+ * cells, a shipped profile named for a mechanism that changed no decision. Authoring the weight
+ * fixed that and would have deleted the decomposition with it, because the row that separates the
+ * call type from the pricing has to be a configuration with the call type and no pricing.
+ *
+ * So it is derived instead of shipped. Same `callType`, same `waitTime`, `rideTime` at exactly 0 —
+ * which the scoring engine treats identically to an absent weight, and the proof of that is this
+ * arm landing in `eta`'s identity class with 150 of 150 paired differences of exactly zero, which is
+ * what the shipped profile used to do. Nothing about Phase 6a's accepted result changes: the same
+ * two rows, under two ids.
+ */
+export const DISCLOSURE_UNPRICED_ARM = 'destination-eta-unpriced';
+
+/**
+ * The `weights.rideTime` `data/dispatcher-profiles.json` ships `destination-eta` at.
+ *
+ * Held here so the study can assert the file against it rather than discovering it, and so a change
+ * to the shipped default is a change somebody makes on purpose in two places rather than a silent
+ * drift in one. {@link RIDE_TIME_WEIGHTS} brackets it and includes it, so the shipped arm and the
+ * derived arm at the same weight must land in one identity class — which is the liveness statement
+ * for the shipped profile: it *is* a measured point on the published curve, not a nearby one.
+ */
+export const SHIPPED_RIDE_TIME_WEIGHT = 0.5;
+
+/**
  * The `weights.rideTime` values the study brackets the shipped profile with.
  *
  * Three points rather than one, because a single weight cannot distinguish "moving the information
  * earlier helps" from "this particular weight helps". The trade is monotone in both directions here
  * and reporting it is the honest form of an unscalarized result.
  */
-export const RIDE_TIME_WEIGHTS: readonly number[] = Object.freeze([0.3, 1, 2]);
+export const RIDE_TIME_WEIGHTS: readonly number[] = Object.freeze([0.3, 0.5, 0.7, 1, 2]);
 
 /** Arm id for the disclosure arm at one `rideTime` weight. */
 export function rideArmId(weight: number): string {
@@ -154,19 +224,29 @@ export const DEFERRED_ARM = 'eta-deferred';
  * the shape `loadConfig` produces, and the simulator cannot tell one from a profile authored in
  * `data/dispatcher-profiles.json`. Nothing here branches on a profile id.
  *
- * **Why the `rideTime` arms are derived rather than shipped.** The shipped `destination-eta` authors
- * `dispatch.callType` and does *not* weight `rideTime`, and that is a blocked promotion rather than
- * a design choice — `core/src/dispatch/policies/policies.test.ts`'s `contributionScenarios()` build
- * their call from a fixture that carries no `destinationFloorId`, so the one gated term in the
- * library cannot contribute in the only fixture that guards *"no weight that contributes nothing"*.
- * A shipped profile weighting it turns that suite red for a fixture gap. See
- * `the root DECISIONS.md` § T15-2 for the one-line fix and the promotion it unblocks.
+ * **Which end of the bracket is derived, and which ships.** The shipped `destination-eta` now
+ * authors `dispatch.callType` **and** `weights.rideTime: 0.3`, so the arm this study used to derive
+ * at 0.3 is the shipped profile, and the arm it used to take from `data/` — the call type with
+ * nothing pricing it — is the one derived here as {@link DISCLOSURE_UNPRICED_ARM}. That inversion
+ * is the whole of T30's change to this study: the same five configurations are measured, and the
+ * only difference is which of them `data/` carries.
+ *
+ * It happened because the previous arrangement made the shipped profile inert. The promotion had
+ * been recorded as *blocked* — `core/src/dispatch/policies/policies.test.ts`'s
+ * `contributionScenarios()` built their call from a fixture carrying no `destinationFloorId`, so
+ * the one gated term in the library could not contribute in the only fixture guarding *"no weight
+ * that contributes nothing"* — and T16 closed that gap without the profile following. The matrix
+ * then measured the consequence: `destination-eta` bit-identical to `eta` at 8 of 8 cells.
  */
 export function disclosureProfiles(
   baseline: DispatcherProfile,
   destination: DispatcherProfile,
 ): readonly DispatcherProfile[] {
   return Object.freeze([
+    derivedProfile(destination, DISCLOSURE_UNPRICED_ARM, {
+      name: 'Destination disclosure, ride unpriced',
+      weights: { rideTime: 0 },
+    }),
     ...RIDE_TIME_WEIGHTS.map((weight) =>
       derivedProfile(destination, rideArmId(weight), {
         name: `Destination disclosure, rideTime ${weight}`,
@@ -405,7 +485,9 @@ const IDENTITY_METRICS: readonly ReplicationMetric[] = Object.freeze([
 
 const ROLES: Readonly<Record<string, string>> = Object.freeze({
   [DISCLOSURE_PROFILE]:
-    'the shipped profile: the destination is disclosed and authorized, and nothing prices it',
+    `the shipped profile: the destination is disclosed, authorized and priced at ${SHIPPED_RIDE_TIME_WEIGHT}`,
+  [DISCLOSURE_UNPRICED_ARM]:
+    'the decomposition: the same call type with nothing pricing the destination at all',
   [DEFERRED_ARM]:
     'the constraint a destination dispatcher must accept — deferred assignment, which it may not use',
 });
@@ -470,6 +552,7 @@ export async function runDestinationDisclosureStudy(
 
   const armIds = [
     DISCLOSURE_PROFILE,
+    DISCLOSURE_UNPRICED_ARM,
     ...RIDE_TIME_WEIGHTS.map((weight) => rideArmId(weight)),
     DEFERRED_ARM,
   ];
