@@ -11,6 +11,7 @@ Live state of every task. Updated by the orchestrator as reports come in.
 | T3 | inert-tunables builder | `fix/inert-tunables` | `.worktrees/T3-inert-tunables` | ✅ **merged** `9fb32e8` | — | independent review in flight |
 | T4 | docs builder | `docs/register-drift` | `.worktrees/T4-docs` | ⬜ held | wave-1 merges | dispatch after T1–T3 merge |
 | T6 | blast-radius + statistics follow-ups | `fix/blast-radius` | `.worktrees/T6-blast-radius` | 🟡 in flight | — | **blocks T4** |
+| T7 | courtesy-hold + gate remediation | `fix/courtesy-hold` | `.worktrees/T7-courtesy-hold` | 🟡 in flight | — | **blocks T4** (3 doc figures) |
 | T5 | viz foundation builder | `feat/viz-foundation` | `.worktrees/T5-viz` | ✅ **merged** `a3cb937` | — | independent review in flight |
 
 ## Review / test assignments
@@ -19,7 +20,7 @@ Live state of every task. Updated by the orchestrator as reports come in.
 |---|---|---|---|
 | T1 | pending | orchestrator verified `tune` end to end + known-answer test | ✅ passed |
 | T2 | ✅ done — **ACCEPT WITH FOLLOW-UPS** | orchestrator re-verified in main checkout | ✅ passed, 6 follow-ups → T6 |
-| T3 | 🟡 in flight — adversarial; the 10-of-50-warnings-only claim is load-bearing | orchestrator (post-merge suite) | pending |
+| T3 | ✅ done — **ACCEPT WITH FOLLOW-UPS** | orchestrator (post-merge suite) | ✅ passed; 8 follow-ups → T7 |
 | T4 | orchestrator re-verification | — | — |
 | T5 | 🟡 in flight — adversarial, instructed to run not read | orchestrator (post-merge suite) | pending |
 
