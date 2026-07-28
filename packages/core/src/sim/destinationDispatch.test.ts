@@ -268,6 +268,48 @@ describe('the landing panel names a car and boarding honours it', () => {
     other.board(11);
     expect(() => other.assign('car-A', 12)).toThrow(/boarded at/);
   });
+
+  it('allows a second promise only after the first is released, and never after boarding', () => {
+    /* `releasePromise` is the single exception to write-once, and it is the model half of the
+       Phase 8 P5 fix: a promise whose car has left group control cannot be kept, so it is voided
+       rather than held (`DECISIONS-T22.md` § T22-D1). The guard that keeps it from becoming a
+       general `reassign()` lives at the one call site — `Simulation.#revokePromisesTo`, gated on
+       `Car.acceptsHallCalls` — and is asserted in `sim/serviceMode.test.ts`; what is asserted here
+       is that the model itself still refuses everything else. */
+    const make = (id: string): Passenger =>
+      new Passenger({
+        id,
+        journeyId: `j-${id}`,
+        originFloorId: 'G',
+        originFloorIndex: 0,
+        destinationFloorId: '10',
+        destinationFloorIndex: 10,
+        massKg: 75,
+        arrivedAt: 10,
+      });
+
+    const passenger = make('p3');
+    passenger.assign('car-A', 12);
+    expect(passenger.releasePromise(14)).toBe('car-A');
+    expect(passenger.isAssigned).toBe(false);
+    expect(passenger.assignedCarId).toBeUndefined();
+    expect(passenger.assignedAt).toBeUndefined();
+
+    // And only then does a second promise stand.
+    passenger.assign('car-B', 15);
+    expect(passenger.assignedCarId).toBe('car-B');
+    expect(() => passenger.assign('car-C', 16)).toThrow(/write-once/);
+
+    // Releasing nothing is a no-op, so a sweep over a landing needs no pre-filter.
+    expect(make('p4').releasePromise(14)).toBeUndefined();
+
+    // A promise discharged by boarding is not a promise that can be voided: doing so would make
+    // `assignedCarId !== carId` read as a wrong-car boarding, which is asserted to be zero.
+    const boarded = make('p5');
+    boarded.assign('car-A', 12);
+    boarded.board(13);
+    expect(() => boarded.releasePromise(14)).toThrow(/boarded at/);
+  });
 });
 
 /* -------------------------------------------------------------------------- *

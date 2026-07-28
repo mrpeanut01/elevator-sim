@@ -452,10 +452,12 @@ export interface ConservationAudit {
   /* ---- destination dispatch; all three are 0 under the conventional passenger model ---- */
 
   /**
-   * Legs a landing panel named a car for.
+   * Promises a landing panel made.
    *
-   * Equal to {@link legsCreated} on any `completed` destination-dispatch run: a run that
-   * delivered everybody assigned everybody. It can fall short on a `timed-out` run, where a leg
+   * An **event count**, not a leg count, because {@link promisesRevoked} makes a second promise on
+   * the same leg possible. `legsAssigned - promisesRevoked` is the number in force at the end, and
+   * *that* equals {@link legsCreated} on any `completed` destination-dispatch run: a run that
+   * delivered everybody promised everybody. It can fall short on a `timed-out` run, where a leg
    * whose call no car could ever take is still standing at the landing unpromised — which is a
    * *diagnosis*, and one the undelivered list already names, rather than a book that does not
    * balance.
@@ -484,6 +486,24 @@ export interface ConservationAudit {
    * quantify.
    */
   readonly brokenPromises: number;
+  /**
+   * **Promises revoked**: occasions on which the group took a promise back because the car it
+   * named had left group control.
+   *
+   * The narrow exception to {@link brokenPromises}' argument, and the two are counted separately
+   * so they can never be read as one number. A *full* car will empty and come back, so waiting for
+   * it is the cost of committing at the panel and D29 keeps the passenger on it. A car put on
+   * `independent`, `fire-recall` or `out-of-service` will not come back unless a later schedule
+   * entry says so; holding a passenger to it strands them for the rest of the run while the rest
+   * of the bank stands idle, which the Phase 8 P5 property reports as a deadlock — measured, and
+   * `fuzz-1000384` is the counterexample.
+   *
+   * `0` on every conventional run, and `0` on every run with no mid-run service change in it,
+   * which is every shipped building. A non-zero count is only ever produced by
+   * `BuildingConfig.serviceEvents` or a `CarConfig.mode` that a schedule later changes. See
+   * `packages/core/DECISIONS-T22.md` § T22-D1.
+   */
+  readonly promisesRevoked: number;
 
   /** `generated === delivered + undelivered && legsCreated === legsRecorded`. */
   readonly balanced: boolean;

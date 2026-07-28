@@ -210,6 +210,7 @@ export class MetricsRecorder {
   #lastEventAt: SimTime;
   #boardedCount = 0;
   #assignedCount = 0;
+  #releasedCount = 0;
   #alightedCount = 0;
   #finishedAt: SimTime | undefined;
 
@@ -257,9 +258,21 @@ export class MetricsRecorder {
     return this.#boardedCount;
   }
 
-  /** Legs a landing panel named a car for. `0` under every conventional run. */
+  /**
+   * Promises a landing panel made. `0` under every conventional run.
+   *
+   * An **event count**, not a leg count: a leg whose promise was voided by
+   * {@link releaseAssignment} and then re-made counts twice. `assignedCount - releasedCount` is
+   * the number of legs holding a promise now, which is the quantity
+   * `Simulation.#reconcile` compares with `legsCreated`.
+   */
   get assignedCount(): number {
     return this.#assignedCount;
+  }
+
+  /** Promises voided because the car they named left group control. See {@link releaseAssignment}. */
+  get releasedCount(): number {
+    return this.#releasedCount;
   }
 
   /** Legs that have completed. */
@@ -344,7 +357,8 @@ export class MetricsRecorder {
    * rather than a restatement of it.
    *
    * **Write-once**, mirroring `Passenger.assign` (DECISIONS.md § D29). A second call is a panel
-   * changing its mind, which this model does not have.
+   * changing its mind, which this model does not have — with the one exception
+   * {@link releaseAssignment} states, which must be called first.
    *
    * @throws MetricsError if the leg never arrived, has already been assigned, has already
    *   boarded, or is assigned before it arrived.
@@ -375,6 +389,36 @@ export class MetricsRecorder {
     leg.record.assignedCarId = details.carId;
     leg.record.assignedAt = at;
     this.#assignedCount += 1;
+    this.#observe(at);
+  }
+
+  /**
+   * Void a leg's promise, because the car it named has left group control.
+   *
+   * The recorder's half of `Passenger.releasePromise`, and it exists for the same reason
+   * `recordAssignment` does: the record must carry what the model holds, or a promise cannot be
+   * audited from a stored record. `assignedCarId` is cleared rather than overwritten in place so
+   * that the record never claims a promise that is not in force — a reader reconstructing "who was
+   * promised what at t" from a record whose field was quietly re-pointed would see a passenger
+   * promised to a car that had been out of service for twenty minutes.
+   *
+   * A no-op on a leg with no promise, so a sweep over a landing does not need to pre-filter.
+   *
+   * @throws MetricsError if the leg never arrived or has already boarded.
+   */
+  releaseAssignment(passenger: RecordablePassenger | string, at: SimTime): void {
+    this.#assertOpen('releaseAssignment');
+    const id = typeof passenger === 'string' ? passenger : passenger.id;
+    const leg = this.#require(id, 'have its assignment released');
+    if (leg.record.boardedAt !== undefined) {
+      throw new MetricsError(
+        `Leg "${id}" boarded at t=${leg.record.boardedAt} and its assignment cannot be released at t=${at}.`,
+      );
+    }
+    if (leg.record.assignedCarId === undefined) return;
+    leg.record.assignedCarId = undefined;
+    leg.record.assignedAt = undefined;
+    this.#releasedCount += 1;
     this.#observe(at);
   }
 

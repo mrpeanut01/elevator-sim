@@ -127,15 +127,17 @@ export interface NextLegInit {
 /**
  * One leg of one passenger's journey.
  *
- * Mutable in exactly three places — {@link Passenger.assign}, {@link Passenger.board},
- * {@link Passenger.alight} and nothing else — and every mutation is written once and never
- * revised. Everything else is `readonly`, so a passenger handed to a cost function cannot be
- * edited by it.
+ * Mutable in exactly four places — {@link Passenger.assign}, {@link Passenger.releasePromise},
+ * {@link Passenger.board}, {@link Passenger.alight} and nothing else. The two timestamps are
+ * written once and never revised. Everything else is `readonly`, so a passenger handed to a cost
+ * function cannot be edited by it.
  *
- * The assignment is the newest of the three and the only one that is not a timestamp alone: it
+ * The assignment is the newest of the four and the only one that is not a timestamp alone: it
  * is the car a destination-dispatch landing panel named, and it is write-once for a reason a
  * decision record states rather than a convention (DECISIONS.md § D29). See
- * {@link Passenger.assign}.
+ * {@link Passenger.assign}. The single exception is {@link Passenger.releasePromise}, which voids
+ * a promise whose car has left group control — a promise the named car cannot keep at all, which
+ * is not the case D29 is about. See `packages/core/DECISIONS-T22.md` § T22-D1.
  */
 export class Passenger {
   /** Identity of this leg. Unique within a run. */
@@ -288,6 +290,11 @@ export class Passenger {
    * a full car leaves behind is a *result* (`ConservationAudit.brokenPromises`), not a failure,
    * and it is measured rather than engineered away.
    *
+   * **Write-once, not write-never.** {@link releasePromise} voids a promise whose car has left
+   * group control, after which this may be called again. That is a different case from a full
+   * car and is argued at {@link releasePromise}; a second `assign` without a release in between
+   * is still the bug this throw is for.
+   *
    * Refused after boarding for the same reason `board` refuses a second call: an assignment
    * made to somebody already in a car is not an assignment, it is a bookkeeping error that
    * would make `assignedCarId !== carId` look like a wrong-car boarding.
@@ -313,6 +320,46 @@ export class Passenger {
     }
     this.#assignedCarId = carId;
     this.#assignedAt = at;
+  }
+
+  /**
+   * Void the promise, because the car it names has **left group control**.
+   *
+   * The one exception to {@link assign}'s write-once rule, and it is narrower than it looks.
+   * D29 is an argument about a car that is *full*: the promise stands because the car will empty
+   * and come back, so waiting for it is a real cost of committing at the panel and re-offering the
+   * passenger would be the panel changing its mind to get a better answer. None of that applies to
+   * a car that has gone to `independent`, `fire-recall` or `out-of-service`. It will never accept
+   * a hall call again unless a later schedule entry puts it back, so the promise is not a cost
+   * being paid — it is a promise that cannot be kept, and holding a passenger to it strands them
+   * for the rest of the run while other cars in the same bank stand idle.
+   *
+   * That is not hypothetical: it is the Phase 8 P5 counterexample `fuzz-1000384`, and it was
+   * recorded as a known limitation by T19 (`DECISIONS.md` § D77, limitation 2) before a fuzz
+   * campaign turned it into a blocking finding. `packages/core/DECISIONS-T22.md` § T22-D1 carries
+   * the argument and the measurement.
+   *
+   * The deferral advantage D29 protects is untouched, because this is not a re-optimization: the
+   * only condition under which the runner calls this is `Car.acceptsHallCalls === false` for the
+   * named car, which no scoring decision can produce. Every revocation is counted in
+   * `ConservationAudit.promisesRevoked`, so an arm that somehow started revoking for another
+   * reason would say so in its own books.
+   *
+   * @returns the car id that was released, or `undefined` if nothing was promised.
+   * @throws ModelError if the passenger has already boarded — a promise discharged by boarding is
+   *   not a promise that can be voided, and voiding it would make `assignedCarId !== carId` look
+   *   like a wrong-car boarding.
+   */
+  releasePromise(at: SimTime): string | undefined {
+    if (this.#boardedAt !== undefined) {
+      throw new ModelError(
+        `Passenger "${this.id}" boarded at t=${this.#boardedAt} and its promise cannot be released at t=${at}.`,
+      );
+    }
+    const carId = this.#assignedCarId;
+    this.#assignedCarId = undefined;
+    this.#assignedAt = undefined;
+    return carId;
   }
 
   /** Record boarding. Write-once: a second call is a bug, not an update. */

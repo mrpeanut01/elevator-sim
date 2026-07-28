@@ -483,3 +483,142 @@ describe('a scheduled service change is replayable', () => {
     expect(fingerprint(withSchedule)).not.toBe(fingerprint(without));
   }, 120_000);
 });
+
+/* -------------------------------------------------------------------------- *
+ * 4. Under a landing panel — the P5 deadlock, and the promise that caused it
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The Phase 8 P5 counterexample, at the smallest configuration that produces it.**
+ *
+ * Everything above drives `collective`, which is conventional dispatch: nobody is promised
+ * anything, so withdrawing a car is finished the moment `#reofferCall` hands its calls back. That
+ * left the interaction of `serviceEvents` with `dispatch.passengerAssignment: 'panel'` untested —
+ * `validation/DECISIONS-T20.md` names it as the clearest next step on this axis — and the fuzz
+ * campaign found what was in the gap.
+ *
+ * `fuzz-1000384`, shrunk to a single bank of two cars: at t = 460 a passenger bound for the top
+ * floor is promised the fast car; at t = 472 the schedule puts that car on `independent`. Its hall
+ * calls are released and re-offered exactly as § 2 above asserts — and then `#candidateCars`
+ * restricts the re-offered call to the promised car, because D29's promise is write-once and is
+ * enforced at the candidate set (`DECISIONS.md` § T16-D3). So the only candidate is a car that
+ * refuses `serviceMode`, the call is retried every `dispatchRetryS`, and it is refused again every
+ * five seconds until the drain deadline — 1 694 s of it in the original case — while the other car
+ * of the same bank serves every *other* landing and stands idle in between.
+ *
+ * The fix is `#revokePromisesTo`: a promise whose car has left group control is voided, because
+ * D29's argument is about a car that is **full** and will come back. See
+ * `packages/core/DECISIONS-T22.md` § T22-D1.
+ *
+ * The fixture below is the walk-up with the same shape: one bank, two cars, and a recall timed so
+ * that somebody is holding a promise to the recalled car when it fires.
+ */
+describe('a promise to a car that leaves group control is revoked, not held for the whole run', () => {
+  const RECALL_AT = 200;
+
+  /**
+   * The walk-up under the shipped destination-panel profile, at **half** the demand `run` uses.
+   *
+   * 30 %pop/5 min is past what one hydraulic car at 0.63 m/s can clear, so with A withdrawn from
+   * t = 200 onwards the run legitimately ends `timed-out` with people still queued — honest
+   * saturation, and the wrong backdrop for a *liveness* assertion, because "somebody is still
+   * waiting" would then be true whether the defect were fixed or not. At 15 %pop/5 min the
+   * remaining car keeps up, so "everybody was delivered" is a claim the recall can break and does
+   * break without `#revokePromisesTo`. Measured, this fixture, seed 20260728, 78 legs either way:
+   *
+   * | | status | undelivered | promises made | revoked |
+   * |---|---|---|---|---|
+   * | with `#revokePromisesTo` | `completed` | 0 | 79 | 1 |
+   * | without it | `timed-out` | **25** | 54 | — |
+   *
+   * The 24 legs that are never even *promised* are the tell: once the call is pinned to a car
+   * that refuses `serviceMode`, it is never assigned again, so `#tellThePanel` never runs for
+   * anybody who joins that landing afterwards either.
+   */
+  function runPanel(
+    config: LoadedConfig,
+    building: ResolvedBuilding,
+    extra: Partial<SimulationConfig> = {},
+  ): SimulationResult {
+    return run(config, building, {
+      dispatcherProfile: config.dispatcherProfilesById.get('destination-panel') as never,
+      demand: { arrivalRatePctPop5min: 15 },
+      ...extra,
+    });
+  }
+
+  it('re-promises the stranded passengers to another car, and the run stops deadlocking', async () => {
+    const config = await load();
+    const seen = watch();
+    const result = runPanel(
+      config,
+      resolve(config, { serviceEvents: [{ atS: RECALL_AT, carId: 'A', mode: 'independent' }] }),
+      { createPolicy: seen.createPolicy },
+    );
+
+    /* The promise really was taken back, and only at the recall. `promisesRevoked` is `0` on every
+       run without a mid-run service change in it, which is what the control below asserts, so a
+       non-zero count here is this mechanism and nothing else. */
+    expect(result.conservation.promisesRevoked).toBeGreaterThan(0);
+
+    /* And every revoked promise was re-made: `legsAssigned` counts promise *events*, so
+       `assigned - revoked` is the number in force, and on a run that delivered everybody that is
+       exactly one per leg. This is the audit's own invariant, restated here because it is the
+       thing that would break if a revocation ever left somebody unpromised. */
+    expect(result.conservation.legsAssigned - result.conservation.promisesRevoked).toBe(
+      result.conservation.legsCreated,
+    );
+    expect(result.conservation.wrongCarBoardings).toBe(0);
+    expect(result.conservation.balanced).toBe(true);
+
+    /* **The liveness claim, in the terms P5 states it in.** Nobody is left standing, and the
+       fleet is not idle with work outstanding: every leg boarded, and the last of them boarded
+       after the recall rather than the whole landing being frozen at it. */
+    expect(result.undelivered).toHaveLength(0);
+    expect(result.status).toBe('completed');
+    const boardedAfter = result.record.passengers.filter(
+      (leg) => leg.boardedAt !== undefined && leg.boardedAt > RECALL_AT,
+    );
+    expect(boardedAfter.length).toBeGreaterThan(0);
+
+    /* The withdrawn car is never allocated again, so the re-promise went to the other car rather
+       than back to the one that caused the problem. */
+    for (const allocation of seen.allocations.filter((a) => a.at >= RECALL_AT)) {
+      expect(allocation.carIds).not.toContain('main-A');
+    }
+
+    // eslint-disable-next-line no-console
+    console.log(
+      `[T22] panel + recall at ${String(RECALL_AT)}s: promises made=${String(result.conservation.legsAssigned)}, ` +
+        `revoked=${String(result.conservation.promisesRevoked)}, broken=${String(result.conservation.brokenPromises)}, ` +
+        `legs=${String(result.conservation.legsCreated)}, boarded after the recall=${String(boardedAfter.length)}, ` +
+        `undelivered=${String(result.undelivered.length)}, status=${result.status}`,
+    );
+  }, 120_000);
+
+  it('revokes nothing at all without a service change, so the write-once promise still binds', async () => {
+    /* The control, and the guard on D29: `#revokePromisesTo` is reachable only from
+       `#onServiceChange`, so a panel run of the same building with no schedule must revoke
+       nothing — however many promises a full car breaks. If this ever goes non-zero, the panel has
+       started changing its mind for some other reason, which is the deferral advantage D29 exists
+       to stop this arm recovering. */
+    const config = await load();
+    const result = runPanel(config, resolve(config));
+    expect(result.conservation.legsAssigned).toBeGreaterThan(0);
+    expect(result.conservation.promisesRevoked).toBe(0);
+    expect(result.conservation.brokenPromises).toBeGreaterThan(0);
+    expect(result.conservation.wrongCarBoardings).toBe(0);
+    expect(result.conservation.balanced).toBe(true);
+  }, 120_000);
+
+  it('leaves the conventional model untouched: no promise exists, so none can be revoked', async () => {
+    const config = await load();
+    const result = run(
+      config,
+      resolve(config, { serviceEvents: [{ atS: RECALL_AT, carId: 'A', mode: 'independent' }] }),
+    );
+    expect(result.conservation.legsAssigned).toBe(0);
+    expect(result.conservation.promisesRevoked).toBe(0);
+    expect(result.conservation.balanced).toBe(true);
+  }, 120_000);
+});
