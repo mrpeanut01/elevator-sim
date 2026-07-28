@@ -5,7 +5,7 @@
  * Argument parsing, config loading and run/sweep invocation live here. Wall-clock time and
  * process I/O are allowed in this package; they are not allowed in `@elevator-sim/core`.
  *
- * Four commands, and one rule that runs through all of them: **every command that simulates
+ * Five commands, and one rule that runs through all of them: **every command that simulates
  * prints the seed it used**. CLAUDE.md invariant 5 says every persisted run record carries its
  * seed so that any run replays exactly; a CLI that produced an interesting number you could not
  * reproduce would honour the letter of that and none of its point.
@@ -29,6 +29,7 @@ import { ConfigError, TrafficError } from '@elevator-sim/core';
 import { compareCommand, COMPARE_HELP } from './commands/compare.js';
 import { listCommand, LIST_HELP } from './commands/list.js';
 import { runCommand, RUN_HELP } from './commands/run.js';
+import { tuneCommand, TUNE_HELP } from './commands/tune.js';
 import { watchCommand, WATCH_HELP } from './commands/watch.js';
 import { EXIT_INTERNAL, EXIT_USAGE, UsageError, didYouMean } from './errors.js';
 import { BINARY, printCommandHelp, printRootHelp, type CommandHelp } from './help.js';
@@ -51,6 +52,17 @@ export { listCommand, LIST_FLAGS, printList, summariseWeights } from './commands
 export { runCommand, RUN_FLAGS, planRun, printRunReport, type RunPlan } from './commands/run.js';
 export { compareCommand, COMPARE_FLAGS, runCompare, verdictOf, type Verdict } from './commands/compare.js';
 export { watchCommand, WATCH_FLAGS, layoutFor, rowFor } from './commands/watch.js';
+export {
+  tuneCommand,
+  TUNE_FLAGS,
+  finalistsOf,
+  headlineOf,
+  ladderFrom,
+  narrowedSpace,
+  replicationsToResolveEffect,
+  resolutionAt,
+  runTune,
+} from './commands/tune.js';
 
 const VERSION = '0.0.0';
 
@@ -61,10 +73,17 @@ const COMMANDS: ReadonlyMap<string, { readonly help: CommandHelp; readonly run: 
     ['list', { help: LIST_HELP, run: listCommand }],
     ['run', { help: RUN_HELP, run: runCommand }],
     ['compare', { help: COMPARE_HELP, run: compareCommand }],
+    ['tune', { help: TUNE_HELP, run: tuneCommand }],
     ['watch', { help: WATCH_HELP, run: watchCommand }],
   ]);
 
-const HELP_ORDER: readonly CommandHelp[] = [LIST_HELP, RUN_HELP, COMPARE_HELP, WATCH_HELP];
+const HELP_ORDER: readonly CommandHelp[] = [
+  LIST_HELP,
+  RUN_HELP,
+  COMPARE_HELP,
+  TUNE_HELP,
+  WATCH_HELP,
+];
 
 /**
  * Run the CLI.
