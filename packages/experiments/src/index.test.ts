@@ -424,12 +424,39 @@ describe('every study entry point benchmark/ declares is called from outside its
    * omission is the block's whole thesis rather than an oversight. The Phase 7 block above asserts
    * re-export because docs/08-review-findings.md § 1 named that as one of two separate properties;
    * repeating it over this domain would assert *reachability*, which is the exact property all nine
-   * dead behaviours already had. Six study entry points are not on the barrel at all
-   * (`runNegativeControls`, `runAccessControlStudy`, `runDestinationDisclosureStudy`,
-   * `runDestinationDispatchStudy`, `runMixedUseHighRiseStudy`, `measureDestinationLiveness`) and
-   * every one of them is live; `measureEnergyLiveness` was on **two** barrels and was dead. The
-   * barrel says nothing either way, so this block asks only the question that does.
+   * dead behaviours already had.
+   *
+   * **This used to say "six study entry points are not on the barrel at all", and C27 moved five of
+   * them onto it. The thesis did not move with them.** `runNegativeControls`,
+   * `runAccessControlStudy`, `runDestinationDisclosureStudy`, `runMixedUseHighRiseStudy` and
+   * `measureDestinationLiveness` are now on both barrels, `runDestinationDispatchStudy` is on
+   * neither, and **all six were live before the change and are live after it** — because what makes
+   * them live is `regeneratePins.ts`, which did not move either. `measureEnergyLiveness` was on
+   * **two** barrels and was dead. The barrel says nothing either way in either direction, which is
+   * exactly why this block asks only the question that does; the assertion below pins that the two
+   * questions really do come apart on today's tree.
    */
+  it('shows the two questions coming apart, in both directions, on today’s tree', () => {
+    /* On no barrel and live. If this name ever lands on a barrel, replace it with another that is
+       not — do not delete the assertion, because it is what stops the block quietly becoming a
+       reachability check when the last off-barrel entry point disappears. */
+    expect('runDestinationDispatchStudy' in barrel).toBe(false);
+    expect(callSitesOf('runDestinationDispatchStudy')).not.toEqual([]);
+
+    /* On the barrel and live — but not *because* it is on the barrel: the barrels are excluded
+       from the caller set by construction, so its call sites are the same ones it had before C27
+       put it on the package surface. */
+    expect('runDestinationDisclosureStudy' in barrel).toBe(true);
+    expect(nonTestImportersOf(scope, 'runDestinationDisclosureStudy')).not.toContain(
+      'experiments/src/index.ts',
+    );
+    expect(nonTestImportersOf(scope, 'runDestinationDisclosureStudy')).not.toContain(
+      'experiments/src/benchmark/index.ts',
+    );
+    expect(callSitesOf('runDestinationDisclosureStudy')).toContain(
+      'experiments/src/benchmark/regeneratePins.ts',
+    );
+  });
 
   it.each(ENTRY_POINTS)('has at least one non-test, non-barrel caller of %s', (name) => {
     expect(

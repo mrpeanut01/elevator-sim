@@ -18,14 +18,27 @@
  *
  * ## Phase 6a lives in this directory too, and is reported in its own modules
  *
- * Everything below this line is **Phase 5**. `destinationDisclosure.ts`, `accessControl.ts` and
- * `destinationLiveness.ts` are Phase 6a — destination *disclosure* — and
+ * Most of what is below this line is **Phase 5**. `destinationDisclosure.ts`, `accessControl.ts`
+ * and `destinationLiveness.ts` are Phase 6a — destination *disclosure* — `mixedUseHighRise.ts` is
+ * Phase 6b's raised criterion measured on the building that criterion names, and
  * `destinationDispatchContrast.ts` is Phase 6b's C→D contrast, the landing panel measured against
- * the same profile without it. **None of the five is re-exported below**, deliberately and by the
- * precedent Phase 6a set: this barrel is Phase 5's published surface, their entry points are
- * registered in `published.ts`'s `STUDY_ENTRY_POINTS` — which is what forces each to declare
- * whether it publishes an interval — and their non-test caller is `regeneratePins.ts`. Each carries
- * its own
+ * the same profile without it.
+ *
+ * **Four of the five are now re-exported below** — the name list is `DECISIONS.md` § D62's,
+ * verbatim, plus `runMixedUseHighRiseStudy`, and it closed **C27**. `destinationDispatchContrast.ts`
+ * is deliberately not among them: D62 does not list it and this task did not invent a list.
+ *
+ * **Read what that re-export buys, because it is narrower than it looks.** It puts these studies on
+ * the *public API surface* of `@elevator-sim/experiments`, so a consumer outside this package can
+ * reproduce Phase 6a and 6b without importing a module path. It says **nothing whatever** about
+ * liveness: a barrel re-export is reachability, and reachability is the exact property all ten of
+ * this repository's dead behaviours already had. `measureEnergyLiveness` was on **two** barrels and
+ * was dead. Their non-test caller was, is, and remains `regeneratePins.ts` (with
+ * `livenessSuite.ts` for the categorical half) — that is what `src/index.test.ts` § study entry
+ * points asserts, and it deliberately does not assert barrel re-export.
+ *
+ * Their entry points are registered in `published.ts`'s `STUDY_ENTRY_POINTS`, which is what forces
+ * each to declare whether it publishes an interval. Each carries its own
  * written report in its own docstring, for the reason this one exists: a result that is not written
  * down next to the code that produces it goes stale without anything failing. Their operating points
  * are `arms.ts`'s `DESTINATION_CASES` rather than {@link BENCHMARK_CASES}, deliberately, and the
@@ -629,8 +642,15 @@ export {
   BASELINE_PROFILE,
   BENCHMARK_CASES,
   BENCHMARK_METRICS,
+  DESTINATION_CASES,
+  GARDEN_RESIDENTIAL_2PCT,
   METRIC_LABELS,
+  MIDTOWN_INTERFLOOR_MIX,
+  MIDTOWN_UP_PEAK_1PCT,
+  SECURE_INTERFLOOR_MIX,
+  SECURE_UP_PEAK_2PCT,
   benchmarkCase,
+  destinationCase,
 } from './arms.js';
 
 export type { BenchmarkCase } from './arms.js';
@@ -843,3 +863,52 @@ export type {
 export { formatLivenessSuite, runLivenessSuite } from './livenessSuite.js';
 
 export type { LivenessSuiteOptions, LivenessSuiteResult } from './livenessSuite.js';
+
+/* -------------------------------------------------------------------------- *
+ * Phase 6a — destination *disclosure*, and Phase 6b's raised criterion
+ *
+ * The list is `DECISIONS.md` § D62's, verbatim, plus `runMixedUseHighRiseStudy`
+ * from C27. Runtime values only: D62 named no types, and widening a barrel is a
+ * deliberate act rather than a sweep. `src/index.ts` carries exactly the same
+ * additions **in the same commit**, because `src/index.test.ts` requires the
+ * package barrel to re-export every runtime value from this one.
+ *
+ * Reachability, not liveness. See the note at the top of this file.
+ * -------------------------------------------------------------------------- */
+
+export {
+  DEFERRED_ARM,
+  DISCLOSURE_BASELINE,
+  DISCLOSURE_METRICS,
+  DISCLOSURE_METRIC_LABELS,
+  DISCLOSURE_PROFILE,
+  MIDTOWN_DOWN_PEAK_1PCT,
+  NEGATIVE_CONTROLS,
+  RIDE_TIME_WEIGHTS,
+  disclosureArm,
+  disclosureCase,
+  disclosureProfiles,
+  formatDisclosureStudy,
+  replicationsForHalfWidth,
+  rideArmId,
+  runDestinationDisclosureStudy,
+  runNegativeControls,
+} from './destinationDisclosure.js';
+
+export {
+  BARE_KIOSK_ARM,
+  CREDENTIAL_ARM,
+  CREDENTIAL_PLUS_DESTINATION_ARM,
+  accessControlProfiles,
+  differenceOfDifferences,
+  formatAccessControlStudy,
+  runAccessControlStudy,
+} from './accessControl.js';
+
+export {
+  formatDestinationLiveness,
+  livenessCases,
+  measureDestinationLiveness,
+} from './destinationLiveness.js';
+
+export { runMixedUseHighRiseStudy } from './mixedUseHighRise.js';

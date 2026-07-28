@@ -74,7 +74,7 @@ interval outside the `destination-eta` rows, the four ⚠️ UX rows, and `C24`,
 | 4 — Visualization | ✅ Viewer, building editor, live metrics overlay, playback from a stored seed; 88-scenario UX ledger |
 | 5 — Smart dispatch | ✅ Twelve cost terms, auction, predictor, benchmark suite |
 | 7 — Automated tuning | ✅ **ACCEPTED** — search space, three searches, held-out validation, and a CLI `tune` that calls them |
-| CLI | ✅ `list`, `run`, `compare`, `tune`, `watch` |
+| CLI | ✅ `list`, `run`, `compare`, `tune`, `fuzz`, `watch` |
 | **6 — Destination dispatch & learned control** | ⚠️ 6a and 6b accepted against the raised criterion, measured on the building it names: **met by Level 0, not met by the Level-1 panel**; **6c deferred out of the phase**; double-deck still not simulated |
 | **8 — Testing campaign** | ✅ Blocking clause **discharged** — 0 outstanding property violations, deep tier green at 2 000 cases — and all eight tracks landed, the last being the full experiment matrix (8 cells × 12 profiles, Pareto over AWT / energy / WT95) with Phase 7's acceptance interval at n = 150 |
 
@@ -93,6 +93,7 @@ npm run sim -- list
 npm run sim -- run --building garden-apartments --dispatcher eta --seed 42
 npm run sim -- compare --building midtown-office --a eta --b nearest-car --reps 100
 npm run sim -- tune --building garden-apartments --params idle.repositionThresholdS --seed 42
+npm run sim -- fuzz --cases 8                  # or: --tier deep --cases 2000, the overnight pass
 npm run sim -- watch --building garden-apartments --dispatcher eta --speed 10
 npm test          # full suite: 172 files, 3,220 tests (3,211 pass, 9 skip)
 ```

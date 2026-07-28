@@ -62,7 +62,7 @@ describe('elevator-sim --help and exit codes', () => {
   it('prints the command list and exits 0', async () => {
     const { code, text } = await cli(['--help']);
     expect(code).toBe(0);
-    for (const command of ['list', 'run', 'compare', 'watch']) {
+    for (const command of ['list', 'run', 'compare', 'tune', 'fuzz', 'watch']) {
       expect(text).toContain(command);
     }
     expect(text).toContain('prints the seed it used');
