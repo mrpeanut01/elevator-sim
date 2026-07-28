@@ -165,3 +165,13 @@ third, mechanical confirmation of the same fact.
 | — | Phase 8: property-based fuzzing (the highest-value track), analytical cross-validation across all five buildings | wave 2 |
 | — | Phase 6: destination dispatch, access control, learned control — contract task first | wave 3 |
 | — | `main` is deliberately **not** updated. Per `MULTI_AGENT_PLAN.md` § 8, `integration` accumulates until the system reaches its definition of done. | orchestrator |
+
+## Doc corrections queued from wave 2 (for the closing documentation pass)
+
+| # | Correction | Found by |
+|---|---|---|
+| C19 | **`docs/07-handoff.md` § 4's replication-budget table is the deleted normal quantile's answer.** 5 of its 6 rows reproduce at `z`; at `t[n−1]` the budgets are **11 / 37 / 57 / 143 / 222 / 563** against the published 9 / 36 / 55 / 141 / 220 / 563. It understates the budget at every rung — the optimistic direction. Conclusions unchanged. Direct consequence of D14; missed by T2/T6's blast radius because that scan covered *published intervals*, not the *planning* table. | T13 |
+| C20 | `packages/core/src/analytical/upPeak.ts` — `deriveUpPeakTerms`' docstring cites "102.8 % … instead of 26.3 %", which reproduces **only at `tp = 1.2 s`**, a value no car of that bank declares. At the declared 1.75 s it is 82.5 % / 21.2 %. Stale pre-fix figures in a `core` docstring. | T13 |
+| C21 | `packages/core/src/metrics/summarize.ts` — the `DepartureGapBracket` docstring names three empty brackets but omits that `vertical-city/zone-5-local`'s band is **1.23 s**, 5× tighter than the next and 29× below the widest. | T13 |
+| C22 | Apply T10's 9-line request in `packages/viz/src/**`: switch browser-reachable, non-test files from `@elevator-sim/core` to `@elevator-sim/core/browser`. Nothing is broken without it — the export condition resolves correctly — but TypeScript's `NodeNext` resolution does not apply the `browser` condition, so a viz file still *sees* `loadConfig` in its types and calling it would typecheck and fail at runtime. Blocked until T11 merges. | T10 |
+| C23 | Phase 6's four assertions of the access-control mechanism as fact — three docs plus `packages/core/src/dispatch/lifecycle.ts:100-104` — pending T15's confirmatory study. | T14 |
