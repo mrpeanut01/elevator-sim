@@ -7,6 +7,14 @@
 > grep on this tree, not asserted by any test), grown by every study added since this task and with
 > **no existing pin moved** by any of them — most recently the mixed-use study's 72, where
 > `published.ts` was **+100 / −0** and a key-by-key diff confirmed it (§ D100).
+>
+> > **Superseded on the same day, in the direction the paragraph above predicts.** `f895a16` added
+> > the full experiment matrix, Phase 7's acceptance study and the energy axis: **401 → 771** pinned
+> > entries. Counted the same way, by grep, on both trees:
+> > `grep -cE '^\s+"[^"]+": \{ n: ' packages/experiments/src/benchmark/published.ts` at `f895a16^`
+> > gives 401 and on `docs/drift-sweep` gives 771. **No existing pin moved**: a sorted key-and-value
+> > diff of the 401 old lines against the 771 new ones has **zero** lines only on the old side. The
+> > guard did what this document exists to have built.
 
 Branch `fix/unreproducible-benchmarks`, 2026-07-27. Everything below is **measured**, at seed
 `20 260 726`, on the branch's own tree unless a commit is named.

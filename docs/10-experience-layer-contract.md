@@ -14,7 +14,25 @@ instead.
 
 Every factual claim about the current code in this document was checked against the code and, where
 a number appears, against a run. Measurements carry their configuration. The measurement log is
-§ 12; the body cites it as **M1**–**M16**.
+§ 12; the body cites it as **M1**–**M19**.
+
+> ## Reviewed 2026-07-28 — **accepted with changes**, and the changes are folded in here
+>
+> An independent re-derivation reproduced **13 of the 16 original measurements exactly**. Three
+> classes of error were found and every correction below is marked in place rather than silently
+> applied, because a design document that quietly changes its own findings is the drift this
+> repository exists to guard against.
+>
+> | class | what was wrong | where |
+> |---|---|---|
+> | **The energy sections were inverted** | This document was authored against a tree with no energy metric and merged after `f895a16` landed one. § 2.9, § 5.1, § 5.5, § 7.3, **M13** and W2's field list all asserted the axis does not exist | § 2.9, § 5.1, § 5.5, § 7.3, § 11.W2, **M13** |
+> | **M10 is refuted** | Schema *discovery* does not run client-side "with no package change" — the functions live in `packages/experiments`, which has no browser export and whose only entry reaches `node:worker_threads`. § 8.5 already said so, so the document contradicted itself | § 2.6, § 11.W4, § 13 q1, **M10** |
+> | **Six smaller errors, each verified** | R5's two clauses were mutually exclusive; `meanLoadFactor`'s row mixed two denominators; `intervalCoV`'s row committed the error R10 bans; § 10.4 was refuted by a shipped renderer; **M2**'s TTD clause matched 9 of 12, not 10; R10 cited the wrong source and the wrong remedy | R5, R10, § 7.1, § 7.2, § 10.4, **M2** |
+>
+> **The energy correction did not weaken a rule.** The prohibition on an energy *score* survives with
+> a stronger reason and is now **R11**. Two rules the review found missing were added: **R12**
+> (one-run goals need measured across-seed variance) and **R13** (minimum-n disclosure). Four
+> measurements were added: **M17**, **M18**, **M19**, and M2's re-derivation.
 
 ---
 
@@ -125,10 +143,19 @@ None of these is invented. All four are already computed by `core`. Three of the
 ### R5 — No score is displayed on a run whose statistics are suppressed *unless every component of
 that score is an observation*.
 
-The concrete rule for an implementer: a scoring function takes `VizSummary` plus the observation
-fields, and its type must make the estimate fields unreachable. Not a lint, not a convention — the
-score's input type does not carry `meanWaitS`. This is the same instrument `overlayAt` already uses,
-one level up.
+The concrete rule for an implementer: a scoring function's input type must make the *estimate* fields
+unreachable. Not a lint, not a convention — the score's input type does not carry `meanWaitS`. This
+is the same instrument `overlayAt` already uses, one level up.
+
+> **Corrected.** This rule originally read *"a scoring function takes `VizSummary` plus the
+> observation fields, and its type must make the estimate fields unreachable"* — and those two
+> clauses are mutually exclusive, because **`VizSummary` carries `meanWaitS`**
+> (`packages/viz/src/contract/types.ts`, nine fields: `saturated`, `awtIsValid`, `awtInvalidReason`,
+> **`meanWaitS`**, `wait95S`, `meanTimeToDestinationS`, `generated`, `delivered`, `undelivered`).
+> A function that takes `VizSummary` can reach `meanWaitS` by construction. The rule as intended:
+> the scorer takes a **narrowed** type — `Pick<VizSummary, 'saturated' | 'awtIsValid' | 'generated'
+> | 'delivered' | 'undelivered'>` plus whatever observations W2 adds — and the narrowing is what
+> carries the guarantee. `VizSummary` itself is not that type and must not be passed whole.
 
 ### R6 — A "win" that turned out to rest on an invalid measurement is retracted in place, and says so.
 
@@ -165,13 +192,102 @@ re-derives saturation from queue samples is a defect, not an optimization.
 The IPCC's calibrated-language framework is the largest natural experiment in doing this, and the
 finding is that lay readers **misinterpret calibrated likelihood terms regressively** — pulling
 "very likely" down and "unlikely" up toward 50 % — with the misreading correlated to the reader's
-prior beliefs ([Cambridge](https://www.cambridge.org/core/books/critical-assessment-of-the-intergovernmental-panel-on-climate-change/uncertainty/3B238E862AB873D1D746F8A594DC6DFD),
-[Springer](https://link.springer.com/article/10.1007/s10584-020-02746-x)). So Phase 9 does **not**
-render `[+0.58, +1.38] s` as *"probably a bit better"*. Where an interval must be communicated to a
-non-expert, it is communicated as a **frequency over runs** — *"we ran it 50 times; the new setting
-was faster in a way we can actually measure"* / *"the difference was smaller than the noise, so we
-can't tell them apart"* — which is the natural-frequency framing § 3.4 cites, applied to the
-quantity this project actually has.
+prior beliefs. So Phase 9 does **not** render `[+0.58, +1.38] s` as *"probably a bit better"*. Where
+an interval must be communicated to a non-expert, it is communicated as a **frequency over runs** —
+*"we ran it 50 times; the new setting was faster in a way we can actually measure"* / *"the
+difference was smaller than the noise, so we can't tell them apart"* — which is the natural-frequency
+framing § 3.4 cites, applied to the quantity this project actually has.
+
+> **Two corrections to the citation, both of which strengthen the rule.**
+>
+> **The regressive-misreading finding is Budescu et al.** — the multi-country experimental work on
+> how readers interpret the IPCC's likelihood terms (Budescu, Broomell & Por, *Psychological
+> Science* 2009; Budescu, Por, Broomell & Smithson, *Nature Climate Change* 2014). The two links this
+> rule originally carried are not that work; they are a chapter on IPCC uncertainty treatment and a
+> later *Climatic Change* paper. Cite the source that contains the finding.
+>
+> **The remedy the IPCC adopted was dual presentation, not abolition.** AR5 did not stop using
+> likelihood words; it began printing the **numerical range beside the word** — *"likely (66–100 %)"*
+> — because Budescu's experiments found the misreading is substantially reduced when the number
+> accompanies the term, and is *not* reduced by the term alone however carefully defined. That is a
+> stronger result for this document than "do not translate": it says a word without a number is the
+> failure mode, and a word **with** a number is a documented remedy.
+>
+> So R10's operative form is: **never a word alone.** Either the interval, or a frequency over runs,
+> or — if a word is used at all — the word *and* the number in the same phrase, in that order of
+> preference. Phase 9's default remains the interval or the frequency, because those need no word.
+>
+> *Provenance: this correction comes from the design review, and unlike every other figure in this
+> document it was **not** re-derived by running anything — the two papers were not fetched. It is
+> recorded as a citation correction to be checked against the sources, not as a measurement.*
+
+### R11 — Energy is an axis, never a score.
+
+The energy proxy exists (§ 2.9). It may be displayed beside AWT and WT95 and never aggregated into a
+grade, and `workPerServedLegKJ` goes beside the raw figure. Measured: `nearest-car` is on the Pareto
+front at **six of eight** matrix cells *because it is worse at serving people*, so any eco score
+ranks the worst dispatcher first. § 7.3 gives the five-clause form.
+
+### R12 — A goal judged on one run must have its across-seed variance measured and published, or it is a batch goal.
+
+R2 already says a *score* is a property of a run and never of a dispatcher. This is the same argument
+applied to **goals**, and it bites harder, because a goal that always passes or always fails is not
+merely noisy — it teaches nothing while looking like an achievement.
+
+**Measured on the design's own stage-5 building.** Secure Tower, `collective`, seeds 1000–1019,
+`durationS: 900`, `onTimeout: 'report'`, evaluating § 5.2's five single-run goals:
+
+| goal | passes | information |
+|---|---|---|
+| `deliver-everyone` (`counts.unserved === 0`) | **0 / 20** | none — it is a constant |
+| `nobody-abandoned` (`serviceLevel.verdict !== 'starved'`) | **20 / 20** | none — it is a constant |
+| `answer-the-demand` (`personsPer5Min >= offeredPer5Min`) | **0 / 20** | none — it is a constant |
+| `long-waits-under` (`pctOverLongWait <= 10`) | **11 / 20** | a coin flip, and the rate is a free parameter of the threshold |
+| `everyone-can-get-there` (zero locked-out calls) | **not evaluable** | see below |
+
+Three of the five carry **zero information** on this building at this operating point: the player's
+choices cannot move them and the outcome is decided by the configuration. The fourth is a coin flip
+whose pass rate is set entirely by the threshold the scenario author picks — which makes the
+threshold, not the player, the thing being tested. For reference, the same batch gives 4/20
+`saturated` and 6/20 quotable, reproducing **M7**.
+
+The fifth is a **second finding**: `everyone-can-get-there` is listed in § 5.2 as checkable from
+"zero locked-out calls (§ 10)", and § 10.4 says the recording **cannot distinguish a locked-out call
+from an unanswered one today**. The goal table and § 10.4 contradict each other; § 10.4 is the one
+that matches the code.
+
+**The rule.** Before a goal ships as single-run, run it over at least 20 seeds on its own scenario
+and publish the pass rate in the scenario file beside the goal. A pass rate of 0 or 1 makes it a
+statement about the configuration — state it in the brief instead. Anything in between makes it a
+batch goal, judged over the scenario's declared `replications` with the fraction reported, which
+§ 5.2 already does for `no-divergence` and `beat-the-baseline` and which § 3.4 says lay readers read
+well.
+
+### R13 — No estimate is displayed without the count it was computed from, and a frequency restatement is forbidden when the denominator is smaller than the frequency it names.
+
+Two clauses, one measurement.
+
+**Measured**: Garden Apartments, `collective`, `durationS: 900`, default peak-5-minute window. At
+seed 42 the run's AWT is `11.319 s` with `awtIsValid: true` — computed over **five** legs
+(`counts.arrivals` in the window = 5). At seed 4 it is `10.262 s` over **one**. At seed 1, eleven.
+Every one of these is a legitimately quotable mean by this project's own rule; none of them is a
+mean anybody should read without knowing the `n`.
+
+**Clause one.** Every displayed estimate carries its count, in the same visual unit — not in a
+tooltip, not in an expandable. `n = 5` is not a caveat on `11.3 s`; it is part of what `11.3 s`
+means.
+
+**Clause two is the sharp one.** § 7.1's flagship translation renders `WT95` as *"**1 in 20 riders**
+waited more than 62 seconds"*. Applied to that Garden run, it would say *"1 in 20 riders…"* about a
+sample of **five**. There is no twentieth rider. The sentence invents a denominator — in the section
+whose whole justification is the natural-frequency literature, which is about making denominators
+*visible*.
+
+So: a natural-frequency restatement (`1 in 20`, `8 in 100`, `5 in 1 000`) may be printed **only when
+the actual count is at least as large as the denominator it names**. Below that, print the
+percentile or the percentage with its `n` and no frequency form. The same applies to `% > 60 s` →
+*"8 in 100"* and to `WT99` → *"1 in 100"*, which needs a hundred legs to be a sentence rather than a
+rounding artefact.
 
 ---
 
@@ -288,11 +404,31 @@ sibling selector will be in the same class. Frame budget is not a constraint on 
   `activeWhen?`. Descriptions run **54 to 1 167 characters** and are written for a reader, not for a
   parser. `answer.reopenOnLateArrival`'s is 1 138 characters of why.
 
-**M10**: the same discovery run against the **browser** barrel (`core/src/browser.ts`) returns the
-identical 10 schemas and 99 rows. `parseDispatcherProfiles`, `buildingConfigSchema`, `parseBuilding`,
-`resolveBuilding`, `parseTrafficProfiles` and `COST_TERMS` are all browser-barrel exports, and
-`browser.test.ts` asserts the two barrels differ by exactly `loadConfig`. **A generated editor can
-run entirely client-side against `@elevator-sim/core/browser`.**
+**M10, corrected**: the same discovery run against the **browser** barrel (`core/src/browser.ts`)
+returns the identical 10 schemas and 99 rows. `parseDispatcherProfiles`, `buildingConfigSchema`,
+`parseBuilding`, `resolveBuilding`, `parseTrafficProfiles` and `COST_TERMS` are all browser-barrel
+exports, and `browser.test.ts` asserts the two barrels differ by exactly `loadConfig`. **The schema
+*data* a generated editor needs is complete in `core/browser`, and discovery run against either
+barrel gives identical results.** That is what M10 establishes and it is true.
+
+**What M10 does *not* establish, and what this section originally claimed:** that discovery *runs*
+client-side with no package change. It does not.
+
+- `discoverParameterSchemas` and `collectSearchSpace` are declared in
+  `packages/experiments/src/tuning/space/collect.ts` — in `experiments`, not in `core`.
+- `packages/experiments/package.json` declares exactly two export paths, `"."` and
+  `"./package.json"`. **There is no browser condition and no subpath**, so a deep import of
+  `tuning/space` is refused by the resolver, not merely discouraged.
+- The one entry that does exist pulls `node:worker_threads` transitively:
+  `index.ts` → `runner/index.ts` → `runner/parallel.ts`, which imports `Worker` at module top level.
+  The barrel's own docstring says so.
+
+**This document already said this correctly**, in § 8.5: *"A browser cannot import the tuner
+today."* The two statements cannot both stand. § 8.5 is the one that matches the code, so § 13's
+**open question 1 is a prerequisite, not an optimization** — a browser-side generated editor needs
+either a `./browser` export condition on `packages/experiments` or its own re-implementation of
+discovery over the `core/browser` namespace, and the second is a second source of truth about what
+the search space is.
 
 This settles U6's architectural question: a generic editor should be **generated** from the schema,
 not hand-written. § 8.
@@ -339,12 +475,29 @@ says which window its numbers cover, which `UX.md` RV-T4 requires**), `waiting.p
 `loadFactor`, `rideTime`, `serviceLevel` (the longest wait and whether it is censored), and
 `counts`. § 7 lists which of these U5 needs and § 11.W2 adds them with their renderers.
 
-**There is no energy metric anywhere** (**M13**). `REPLICATION_METRICS` has 19 entries and none of
-them is energy; nothing in `core` or `experiments` computes joules or kWh.
-`idle.repositionEnergyWeight` is an exchange rate against *seconds of empty travel*, not against
-energy. CLAUDE.md's tuning discipline says to report the Pareto front over **(AWT, energy, WT95)**;
-the energy axis does not exist. Phase 9 must not imply it does — no "energy" gauge, no
-"eco" score, no green leaf. § 7.3.
+**There *is* an energy metric, and the conclusion this section drew from its absence survives with a
+better reason** (**M13, corrected**). This document was written against a tree in which
+`REPLICATION_METRICS` had 19 entries and none was energy. `f895a16` landed the third Pareto axis
+before this design merged, and the sentence went stale between authoring and merge.
+
+Measured on this tree: `REPLICATION_METRICS` has **23** entries, of which four are energy —
+`energyKJ`, `carDistanceM`, `carStarts`, `energyPerServedLegKJ`. `RunSummary.energy`
+(`EnergyStatistics`) carries `workKJ`, `distanceM`, `starts`, `workPerServedLegKJ`, `movingCarCount`
+and a `measured` flag. The proxy is out-of-balance mechanical work,
+`|load − 0.5·rated| · g · distance` summed per move; its basis, its constants and what it
+**deliberately omits** (acceleration losses, drive efficiency, door motors, standby power) are in
+[`docs/02` § Energy and the counterweight](02-elevator-reference.md) and
+[`DECISIONS.md` § D106](../DECISIONS.md). `idle.repositionEnergyWeight` is still an exchange rate
+against *seconds of empty travel* and is still not this.
+
+**So Phase 9 may show energy — and still may not score it.** The prohibition below is unchanged and
+its justification is now a measurement rather than an absence: across the full experiment matrix,
+**`nearest-car` is on the Pareto front at six of eight cells**, because it is best on energy and
+worst on wait. `nearest-car` is the viewer's default and the arm `docs/07` § 4 calls a poor
+reference. **A standalone eco score ranks the worst dispatcher first.** The replacement rule —
+*energy is an axis, never a score* — is § 7.3.
+
+`VizSummary` does not carry any of it today; § 11.W2 is where it would land if Phase 9 wants it.
 
 ### 2.10 Two small things found while driving the UI
 
@@ -425,9 +578,17 @@ neglect ([arXiv](https://arxiv.org/pdf/2207.09608)).
 
 **Found, and it is the constraint on U5.** The IPCC's calibrated-language framework is the largest
 deployed attempt to translate uncertainty into words, and the measured outcome is that the public
-misinterprets the terms *regressively*, with the error correlated to the reader's prior beliefs
-([Springer](https://link.springer.com/article/10.1007/s10584-020-02746-x)). Translation into
-likelihood adjectives is not a safe operation.
+misinterprets the terms *regressively* — pulling "very likely" down and "unlikely" up toward 50 % —
+with the error correlated to the reader's prior beliefs. **The finding is Budescu et al.** (Budescu,
+Broomell & Por, *Psychological Science* 2009; Budescu, Por, Broomell & Smithson, *Nature Climate
+Change* 2014), not the two IPCC-commentary sources this paragraph originally cited.
+
+**And the remedy the IPCC adopted in AR5 was *dual presentation*, not abolition** — the numerical
+range printed beside the word, *"likely (66–100 %)"* — because the same experiments found the
+misreading is reduced when the number accompanies the term and is not reduced by a carefully defined
+term alone. So the constraint is sharper than "do not translate": a likelihood **word without a
+number** is the documented failure mode. U5's default is still the interval or a frequency over
+runs, because neither needs a word at all. R10.
 
 **Proposed.** U5's translations are **natural-frequency restatements of percentiles and counts**,
 never adjectival restatements of intervals. `WT95 = 62 s` becomes *"1 in 20 riders waited more than
@@ -506,9 +667,14 @@ diagnosis, access lockouts with measured consequences, cars taken out of service
 (`serviceEvents`), a 100-floor building, and dispatchers that really do trade waiting against stop
 count and empty travel.
 
-It does **not** provide, and Phase 9 must not pretend it does: an energy axis (§ 2.9), a
-per-dispatcher verdict from one run (R2), or — at shipped demand — a set of configurations where a
-non-expert's choices change the outcome (§ 2.2, **M1**, **M2**).
+It also provides an **energy axis**, which this section originally said it did not (§ 2.9,
+corrected): `RunSummary.energy` and four `REPLICATION_METRICS` entries. It is raw material for a
+*display*, not for a *score* — see § 7.3 and R11.
+
+It does **not** provide, and Phase 9 must not pretend it does: a per-dispatcher verdict from one run
+(R2), a single-run goal whose across-seed variance has been measured (R12), or — at shipped
+demand — a set of configurations where a non-expert's choices change the outcome (§ 2.2, **M1**,
+**M2**).
 
 ### 5.2 The shape: scenarios, not a campaign score
 
@@ -544,6 +710,21 @@ whether it is judged on one run or on a batch:
 evidence: a single-run saturation verdict on Secure Tower flips 6/20. Stating a batch goal as
 *"stays under control in at least 45 of 50 runs"* is both honest and better game design — it is a
 frequency, which § 3.4 says lay readers read well.
+
+> **The five single-run rows above do not survive R12 as written.** Measured on Secure Tower —
+> this progression's own stage 5 — `collective`, seeds 1000–1019, 900 s (**M18**):
+> `deliver-everyone` **0/20**, `nobody-abandoned` **20/20**, `answer-the-demand` **0/20**. Three
+> constants: the player cannot move them, so they are facts about the configuration, not goals.
+> `long-waits-under` is **11/20** at a ≤ 10 % threshold, i.e. a coin flip whose rate is set by the
+> author's choice of threshold rather than by play. Each of these needs its across-seed pass rate
+> measured on its own scenario and published in the scenario file, and anything strictly between 0
+> and 1 becomes a batch goal.
+>
+> **`everyone-can-get-there` cannot be checked at all today**, and the table above and § 10.4
+> contradict each other about it. This row says it is checkable from "zero locked-out calls
+> (§ 10)"; § 10.4 says the recording carries no `credentialGroup` on a `VizLeg` and so cannot
+> distinguish *"nobody came"* from *"nobody may come"*. § 10.4 matches the code. The goal is
+> **blocked on W7**, not available now.
 
 ### 5.3 Fail states
 
@@ -581,7 +762,13 @@ losing condition is real.**
 - A score displayed on a suppressed run (R1, R5).
 - A leaderboard ranking dispatchers from single runs (R2).
 - A grade letter derived from AWT.
-- An "efficiency" or "energy" score (§ 2.9 — the quantity does not exist).
+- **An "efficiency" or "energy" score.** The quantity now exists (§ 2.9), and the prohibition is
+  *stronger* for that, not weaker: measured across the full experiment matrix, `nearest-car` — the
+  viewer's default and the weakest shipped dispatcher — is **on the Pareto front at six of eight
+  cells**, because it is best on energy and worst on wait. An eco score ranks it first. Energy is an
+  axis, never a score (R11, § 7.3).
+- **A single-run goal whose across-seed variance has not been measured** (R12).
+- **An estimate displayed without the count it was computed from** (R13).
 - A difficulty setting that changes anything other than declared `TRAFFIC_PARAMETERS` and building
   fabric. Difficulty is demand and geometry; it is never a fudge factor on a metric.
 
@@ -660,10 +847,10 @@ keeps the technical form only.
 | `maxWaitS` | "The **unluckiest rider** waited …" | Must carry `longestWaitIsCensored`: if that rider never boarded, the figure is a **floor**, and the plain form becomes "…waited at least …". |
 | `TTD = 96 s` | "**Door to door**, a typical trip took a minute and a half" | Journey-level, spanning transfers. On a sky-lobby building this is the number that matters and AWT is not. |
 | `% > 60 s = 8 %` | "**8 in 100** riders waited more than a minute" | Carries the censoring caveat: the denominator is *served* legs, and the unserved are exactly the ones that would have counted. Show `unservedCount` beside it, always. |
-| `INT = 30 s, CoV 0.4` | "A lift left the lobby **every 30 seconds**" + "…but unevenly — they arrived in clumps" | CoV → "bunching", with a two-state plain reading only. Do not put a number on the adjective. |
+| `INT = 30 s, CoV 0.4` | "A lift left the lobby **every 30 seconds**" | **INT only.** `intervalCoV` gets **no plain-language form** — see the note below the table. |
 | `HC5 = 41 persons/5 min` vs `offered = 62` | "The lifts carried **41 people every 5 minutes**. **62 arrived.**" | § 3.5. Two observations. This is the headline Basic-mode metric. |
 | `%POP = 12.4 %` | "**12 % of the building** moved every 5 minutes" | Requires a population; absent when the record has none. |
-| `meanLoadFactor 0.62` | "Cars ran about **6 in 10 full**" | Note the 0.8 design rule: "full" in this product means 80 %, not 100 %. Say so once. |
+| `meanLoadFactor 0.62` | "Cars ran at about **62 % of rated capacity** — and the design target is 80 %, so they were roughly **three-quarters as full as a well-loaded car**" | **The arithmetic in the old row was wrong.** It read *"about 6 in 10 full"* while also saying "full" means 80 % of rated — but `meanLoadFactor` is a fraction of **rated**, so 0.62 of rated is 0.62/0.8 = **0.775** of the design load, i.e. 7.75 in ten "full", not 6 in 10. Either state the fraction of rated in percent, or divide by the design factor before saying "full" — never mix the two denominators in one sentence. |
 | `saturated` | "**The queues never stopped growing.**" | R3. |
 | `undelivered = 20` | "**20 people never got where they were going** before the clock ran out." | |
 | `awtIsValid = false`, censoring ground | "Too many people were still waiting when time ran out — the average would only count the lucky ones." | This is the *exact* meaning of the technical reason. |
@@ -675,17 +862,52 @@ keeps the technical form only.
 - **`queueSlopePersonsPerMinute`.** "The queue grew by 29.6 people a minute" is fine as a
   *diagnosis line* and misleading as a *metric*, because it is a fitted slope over a window and the
   fit is what the saturation test is; quoting it standalone invites treating it as a target.
-- **`intervalCoV` as a number.** See table.
+- **`intervalCoV`, in any form.** The original rule here was *"CoV → 'bunching', with a two-state
+  plain reading only"* — and that is **the error R10 itself bans**, one type down. R10 forbids
+  mapping an interval onto a likelihood adjective; mapping a dispersion statistic onto *"they
+  arrived in clumps"* versus *"evenly"* is the same operation on a different statistic, and it needs
+  a threshold the document never states. Is 0.4 clumpy? 0.25? Nothing in `core` answers that, so
+  neither may the UI. **Show `intervalCoV` as a number with its definition, or not at all.** If a
+  two-state reading is genuinely wanted, it needs a threshold measured against something — the
+  distribution of `intervalCoV` across a batch on the same building would do — and published as a
+  measurement, not chosen to read well.
 - **Anything derived from `meanWaitS` when it is suppressed**, including "improvement over baseline".
 
-### 7.3 Energy
+### 7.3 Energy — an axis, never a score
 
-Do not ship an energy metric, an energy score, or energy iconography. § 2.9: it does not exist. If
-the owner wants the wait-versus-energy tradeoff surfaced — and it is a genuinely interesting one —
-the honest proxy that *does* exist is **empty-car travel**, derivable from `shafts[].motions` and
-`occupants`, and it must be labelled as what it is: *"metres travelled with nobody aboard"*. That is
-a new metric with a real definition and it is out of Phase 9's scope; § 13 records it as an open
-question.
+**This section said "do not ship an energy metric — it does not exist". It does exist** (§ 2.9,
+corrected), and the rule that replaces the old one is narrower and better founded.
+
+**The replacement rule.** Energy may be *displayed*. It may never be *scored*.
+
+1. It is shown **only beside** AWT and WT95, as one axis of a Pareto front — never on its own, never
+   as a gauge with a good end and a bad end.
+2. It is **never aggregated** into a grade, a letter, a star rating, an "efficiency" number or a
+   green leaf. No single number combines it with wait.
+3. `workPerServedLegKJ` is shown **beside** the raw figure, always. *A configuration that spends
+   less by serving fewer people has not saved anything*, and the raw figure alone cannot tell those
+   apart. Show `distanceM` and `starts` too where there is room — they are the two things that can
+   move it.
+4. Where two arms are non-dominated they are **reported and not ordered**. Which trade an operator
+   wants is the operator's call (CLAUDE.md § Tuning discipline).
+5. It carries the same window every other figure carries (§ 7.4), and it is `NaN`-not-zero when the
+   run recorded no travel — `measured: false` means *nobody wrote it down*, which is not *the cars
+   did not move*.
+
+**Why the prohibition on a score survived the metric arriving.** Measured across the full experiment
+matrix, `nearest-car` is on the Pareto front at **six of eight cells** — and it is there because it
+is **worse at serving people**: best on energy, worst on wait. `nearest-car` is the viewer's default
+and the arm the handoff brief calls a poor reference. A standalone eco score would put it at the top
+of the table. That is not a presentation bug that careful labelling fixes; it is what happens when a
+non-domination relation is flattened into a rank.
+
+**Units, stated on screen.** The figure is kilojoules of *out-of-balance mechanical work*, not kWh.
+It omits acceleration losses, drive and gearing efficiency, door motors and standby power. Label it
+*"drive work (proxy)"* or similar, never *"energy used"*, and link the definition
+([`docs/02` § Energy and the counterweight](02-elevator-reference.md)).
+
+**Empty-car travel** — the proxy this section originally proposed as a substitute — is now
+redundant: `carDistanceM` and the load-aware work term together say more, and `starts` says the rest.
 
 ### 7.4 Every figure carries its window
 
@@ -946,10 +1168,19 @@ warnings separately from errors, and Run stays enabled for a warning (`ED-15`).
 
 ### 10.4 Locked-out calls, on screen
 
-A call no car may legally answer is currently indistinguishable from a long wait. `RV-08` covers the
-*service*-zoning case (`⊘` on a floor no shaft serves) and notes that **no shipped building has an
-unserved floor**, so the path does not arise in `data/`. The *access* case does arise, on Secure
-Tower, and has no marker.
+A call no car may legally answer is currently **indistinguishable from a call no car happened to
+take** — which is a narrower and more accurate statement than this section originally made.
+
+> **Corrected.** The original read *"indistinguishable from a long wait"*, and that is refuted by a
+> shipped renderer: `packages/viz/src/render/canvas.ts:451` already draws
+> *"… · unassigned — no car answered this call in this run"* on a landing whose call was never
+> answered, and `:258` draws `⊘` on a floor no shaft serves. So an unanswerable call is **not**
+> presented as an ordinary long wait today; what the viewer cannot say is **why** it went
+> unanswered. That is the gap, and it is the one worth closing.
+
+`RV-08` covers the *service*-zoning case and notes that **no shipped building has an unserved
+floor**, so the `⊘` path does not arise in `data/`. The *access* case does arise, on Secure Tower,
+and falls into the generic "unassigned" text with no credential explanation.
 
 To draw it, the recording must be able to distinguish "nobody came" from "nobody may come". Today it
 cannot: `VizLeg` carries no `credentialGroup` (it is on `PassengerRecord` and deliberately not
@@ -989,11 +1220,18 @@ Remove the unconditional running mean from `render/canvas.ts`'s header, or gate 
 ### W2 — Widen `VizSummary` to what U5 and U3 need *(depends on W1 for the honesty rule)*
 
 Add to `VizSummary`, each with a renderer in the same change: `window`, `windowSeconds`,
-`pctOverLongWait` + `longWaitThresholdS` + `unservedCount`, `handlingCapacity`
+`pctOverLongWait` + `longWaitThresholdS` + `unservedCount`, **the count each estimate was computed
+from** (R13 — an estimate without its `n` may not be drawn), `handlingCapacity`
 (`personsPer5Min`, `offeredPer5Min`, `pctPopulationPer5Min?`), `achievedInterval`
 (`meanS`, `coefficientOfVariation`), `serviceLevel` (`verdict`, `longestWaitS`,
-`longestWaitIsCensored`, `overHorizonCount`). `VIZ_SCHEMA_VERSION` → 5 together with W7's
-`VizLeg.credentialGroup` if the two land in one wave; otherwise two bumps.
+`longestWaitIsCensored`, `overHorizonCount`), and — **added by the § 2.9 correction** — `energy`
+(`measured`, `workKJ`, `workPerServedLegKJ`, `distanceM`, `starts`), which the original field list
+omitted because it was written when the metric did not exist. `VIZ_SCHEMA_VERSION` → 5 together with
+W7's `VizLeg.credentialGroup` if the two land in one wave; otherwise two bumps.
+
+Energy lands under R11: `workKJ` is drawn only beside AWT and WT95, `workPerServedLegKJ` is drawn
+beside `workKJ`, and no renderer combines them into one number. `measured: false` renders as *"not
+recorded"*, never as zero.
 
 - **Acceptance:** every added field is drawn somewhere in the shipped viewer; the offered-vs-carried
   bar (§ 3.5) is on screen in Basic mode; every displayed figure names its window.
@@ -1035,9 +1273,14 @@ U7.
 - **Liveness evidence:** add a fictional schema row via the injectable `source` and watch the control
   appear with no UI change.
 - **Non-test caller:** the dispatcher editor tab and the rider-model editor tab.
-- **Blocked by:** § 13 q1 — whether `@elevator-sim/experiments` gains a browser-safe export, or the
-  viewer runs its own discovery over the `core/browser` namespace. **M10** says the second works
-  today with no package change; the first is better long-term.
+- **Blocked by:** § 13 q1, **as a prerequisite rather than a preference.** `collectSearchSpace()` and
+  `discoverParameterSchemas()` are declared in `packages/experiments`, whose `package.json` exposes
+  one export path with no browser condition, and whose barrel reaches `node:worker_threads`. A deep
+  import is refused by the resolver. So W4 cannot start against `collectSearchSpace()` until either
+  (a) `packages/experiments` gains a browser-safe export, or (b) the viewer re-implements discovery
+  over the `core/browser` namespace — which **M10, corrected** shows would give identical results,
+  and which is a second source of truth about what the search space is. The `TRAFFIC_PARAMETERS`
+  half of W4 is unblocked either way, because that schema is on the `core/browser` barrel.
 
 ### W5 — Scenarios as data, and the judge *(depends on W2, W3)*
 
@@ -1110,13 +1353,16 @@ W4 (independent, gated on open question q1) ──── W5, W6
 
 ## 12. Measurement log
 
-All measured on `design/phase9-experience` on 2026-07-28, Node 26, against the repository's own
-`data/`. Scripts were scratch; every result is reproducible from the stated configuration.
+**M1**–**M16** were measured on `design/phase9-experience` on 2026-07-28, Node 26, against the
+repository's own `data/`. **M17**–**M19**, and the re-derivations marked *corrected* / *refuted*,
+were measured on `docs/drift-sweep` on 2026-07-28 — the same day, but **after `f895a16`**, which is
+why the energy rows move. Scripts were scratch; every result is reproducible from the stated
+configuration.
 
 | id | Measurement |
 |---|---|
 | **M1** | 5 buildings × 12 dispatchers, seed 42, `durationS: 900`, `onTimeout: 'report'`, shipped traffic profile at default demand level: **14 of 60** cells report `awtIsValid === true`. 12 of those 14 are Garden Apartments; the other two are `mixed-use-high-rise`/`destination-panel` and `secure-tower`/`destination-eta`. **40** of the 60 are diagnosed `saturated`; **6** more fail on censoring; 14 are quotable. |
-| **M2** | Garden Apartments, same settings: 10 of 12 dispatchers give AWT 11.319 s / WT95 24.548 s / TTD 39.302 s. SHA-256 over `{shafts, landings, legs}` gives **7 distinct recordings**; one fingerprint is shared by `eta`, `fairness-first`, `capacity-aware`, `auction`, `auction-multi-round`, `destination-eta`. The exceptions are `zoned-uppeak` (AWT 2.500 s) and `predictive-balanced` (11.919 s). |
+| **M2, corrected** | Garden Apartments, same settings: **10 of 12** dispatchers give AWT 11.319 s and WT95 24.548 s, but only **9 of 12** also give TTD 39.302 s — `energy-aware` returns **39.592 s**, matching on wait and differing on journey time. Re-measured on this tree; the original row over-counted the TTD clause by one. SHA-256 over `{shafts, landings, legs}` gives **7 distinct recordings**; one fingerprint is shared by `eta`, `fairness-first`, `capacity-aware`, `auction`, `auction-multi-round`, `destination-eta`. The exceptions are `zoned-uppeak` (AWT 2.500 s) and `predictive-balanced` (11.919 s). |
 | **M3** | Recording section sizes by `JSON.stringify().length` — see § 2.4 table. `shafts` is 89–93 % of every recording; `legs` is 5–8 %. Vertical City at 1800 s: **3 222 legs**, 7 971 kB total. |
 | **M4** | `landingAssignmentsAt` at mid-run, 60 calls: 1 ms on Midtown Office (0.02 ms/call), 4 ms on Vertical City with 3 222 legs (0.07 ms/call). 60 Hz budget is 16.7 ms. |
 | **M5** | Sampling every 15 s: deepest single landing call **175** (Midtown Office, 900 s), **379** (Vertical City, 1800 s), **5** (Secure Tower under `destination-panel`, where a call is one OD pair). Most simultaneous call rows: 10 / 44 / 29. |
@@ -1124,24 +1370,32 @@ All measured on `design/phase9-experience` on 2026-07-28, Node 26, against the r
 | **M7** | Same batch: Garden Apartments 19/20 quotable, 0/20 saturated. Midtown Office **0/20** quotable, 20/20 saturated. Secure Tower **6/20** quotable, 4/20 saturated. Vertical City 0/20 quotable, 19/20 saturated. |
 | **M8** | Midtown Office, seed 42, `demand: { arrivalRatePctPop5min: r }`: quotable at r = 1, 2, 3 for all four arms tested; **all four saturate at r = 4**; at r = 5 `eta` (77.2 s) and `predictive-balanced` (62.6 s) are quotable and the others are not; all saturate at r = 6 and above. Quotability is not monotone in demand at one seed. |
 | **M9** | `discoverParameterSchemas()` → 10 schemas, **99 declared rows**, of which **95 distinct ids** (four are legitimately re-declared by two schemas each: `answer.bypassLoadThreshold`, `answer.overloadThreshold`, `car.designLoadFactor`, `car.nominalPassengerMassKg`). `collectSearchSpace()` → **49** dimensions, 13 gated; sections `weights` 12, `dispatch` 11, `answer` 9, `idle` 9, `auction` 3, `eligibility` 2, `normalization` 2, `constraints` 1; types continuous 32, categorical 9, boolean 4, integer 4. The **46** distinct ids excluded are all of `car.*`, `traffic.*`, `metrics.*`, `analytical.*` and `sim.*` — excluded mechanically, because no dispatcher profile has a section that can hold them, not by name. |
-| **M10** | `discoverParameterSchemas(browserBarrel)` returns the identical 10 schemas and 99 rows. Discovery works client-side with no package change. |
+| **M10, corrected** | `discoverParameterSchemas(browserBarrel)` returns the identical 10 schemas and 99 rows — the schema **data** in `core/browser` is complete and discovery against either barrel agrees. **The second sentence was wrong.** Discovery does *not* run client-side with no package change: `discoverParameterSchemas` and `collectSearchSpace` are declared in `packages/experiments/src/tuning/space/collect.ts`; `packages/experiments/package.json` declares only `"."` and `"./package.json"`, so a deep import is refused by the resolver; and the one entry it does declare reaches `node:worker_threads` through `runner/parallel.ts`. § 8.5 already said *"a browser cannot import the tuner today"* — that is the statement that matches the code. § 13 q1 is therefore a **prerequisite** for W4, not an optimization. |
 | **M11** | `render/canvas.ts:210–217` draws `mean wait so far` from `frame.runningMeanWaitS` with no `awtIsValid` guard, on the same header as the `SATURATED — AWT suppressed` banner drawn at lines 230–235. Observed on screen at Midtown Office seed 42 (87.7 s beside the banner) and Secure Tower seed 16757712606996968457 (1.8 s beside *10.7 % never served*). `describeFrame.ts:67–71` states the suppression and never prints a mean. |
 | **M12** | `data/dispatcher-profiles.json` holds 12 profiles. Exactly two — `destination-eta`, `destination-panel` — declare `dispatch.callType: mobile-credential`. The other ten run at the `up-down-buttons` default. |
-| **M13** | No energy metric exists. `REPLICATION_METRICS` has 19 entries, none energy; no occurrence of `energyJ`, `kWh` or `energyKwh` anywhere in `core` or `experiments` source. |
+| **M13, refuted** | An energy metric exists. `REPLICATION_METRICS` has **23** entries, four of them energy — `energyKJ`, `carDistanceM`, `carStarts`, `energyPerServedLegKJ` — and `RunSummary.energy` (`EnergyStatistics`) carries `workKJ`, `distanceM`, `starts`, `workPerServedLegKJ`, `movingCarCount`, `measured`. The original row was true of the tree this design was authored against and false by the time it merged: `f895a16` landed the axis in between. It is a *proxy* for out-of-balance mechanical work in kJ and is **not** kWh — no `kWh` or `energyKwh` symbol exists, and that part of the row stands. § 2.9, § 7.3, [`DECISIONS.md` § D106](../DECISIONS.md). |
 | **M14** | `VizSummary` carries 9 fields; `RunSummary` carries `window`, `windowSeconds`, `counts`, `waiting.*` (including `pctOverLongWait`), `rideTime`, `loadFactor`, `handlingCapacity`, `achievedInterval`, `saturation`, `serviceLevel` — none of the last seven reaches the viewer. |
 | **M15** | The Run-viewer / Building-editor tab selection is not written to the URL; every other control is. Verified by clicking the tab and re-reading `location.href`. |
 | **M16** | `.claude/launch.json` declares port 5173; `packages/viz/vite.config.ts` declares 5174 with `strictPort: false`. |
+| **M17** | Garden Apartments, `collective`, 900 s, default peak-5min window: the quotable AWT is computed over **5** legs at seed 42 (11.319 s), **1** at seed 4 (10.262 s), **11** at seed 1 (21.463 s), **4** at seed 2, **10** at seed 3 — all with `awtIsValid: true`. R13's minimum-n rule. |
+| **M18** | Secure Tower, `collective`, seeds 1000–1019, 900 s: of § 5.2's five single-run goals, `deliver-everyone` passes **0/20**, `nobody-abandoned` **20/20**, `answer-the-demand` **0/20**, `long-waits-under` (≤ 10 %) **11/20**, and `everyone-can-get-there` is not evaluable from `RunSummary` at all. Same batch: 4/20 saturated, 6/20 quotable, reproducing M7. R12. |
+| **M19** | `runMatrix()` on this tree: `nearest-car` is on the Pareto front at **6 of 8** cells (all but `midtown-down-peak` and `mixed-use-up-peak`); every cell's front is decided over `['awt','energy','wt95']`. The basis for R11. |
 
 ---
 
 ## 13. Open questions that must be settled before implementation
 
-1. **Does `@elevator-sim/experiments` gain a browser-safe export?** W4 needs the search space and
-   W3 wants the CRN manager, and today the package's only export pulls `node:worker_threads` through
-   the runner. **M10** shows the viewer can do its own discovery over `core/browser` with no package
-   change, so W4 is not blocked — but two discoveries is two sources of truth about what the search
-   space is. *Settled by:* a decision from the owner of `packages/experiments`, plus a graph-walk
-   test in the manner of `core/src/browser.test.ts` if the answer is yes.
+1. **Does `@elevator-sim/experiments` gain a browser-safe export? — PREREQUISITE, not optional.**
+   W4 needs the search space and W3 wants the CRN manager, and today the package declares exactly
+   two export paths (`"."`, `"./package.json"`) with no browser condition, so a deep import of
+   `tuning/space` is **refused by the resolver**, and the one entry that exists pulls
+   `node:worker_threads` through `runner/parallel.ts`. This question was originally marked optional
+   on the strength of **M10**'s second sentence, which is refuted: M10 establishes that the schema
+   *data* in `core/browser` is complete and that discovery gives identical results against either
+   barrel, not that discovery *runs* client-side unchanged. § 8.5 stated the true position all
+   along. **W4 cannot start against `collectSearchSpace()` until this is answered.**
+   *Settled by:* a decision from the owner of `packages/experiments`, plus a graph-walk test in the
+   manner of `core/src/browser.test.ts` if the answer is yes.
 
 2. **What demand level makes Midtown Office a teachable scenario?** **M8** shows a single-seed sweep
    cannot answer this. *Settled by:* running `saturationCensus.test.ts`'s own rule — the highest load
@@ -1230,8 +1484,10 @@ everything else is this document's proposal.
 - Frontiers in Psychology, *Natural frequencies improve Bayesian reasoning in simple and complex inference tasks* — https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2015.01473/full
 - NCBI PMC4604268, same study — https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4604268/
 - arXiv 2207.09608, *A Cross-Language Study of How People Verbalize Probabilities in Icon Array Visualizations* — https://arxiv.org/pdf/2207.09608
-- Climatic Change (Springer), *Confident, likely, or both? The implementation of the uncertainty language framework in IPCC special reports* — https://link.springer.com/article/10.1007/s10584-020-02746-x
-- Cambridge, *A Critical Assessment of the IPCC* ch. 17, *Uncertainty* — https://www.cambridge.org/core/books/critical-assessment-of-the-intergovernmental-panel-on-climate-change/uncertainty/3B238E862AB873D1D746F8A594DC6DFD
+- **Budescu, Broomell & Por, *Improving Communication of Uncertainty in the Reports of the IPCC*, Psychological Science 20(3), 2009** — the regressive-misreading finding itself, and the source R10 rests on
+- **Budescu, Por, Broomell & Smithson, *The interpretation of IPCC probabilistic statements around the world*, Nature Climate Change 4, 2014** — the multi-country replication, and the evidence for **dual presentation** (word *plus* numerical range) as the remedy AR5 adopted
+- Climatic Change (Springer), *Confident, likely, or both? The implementation of the uncertainty language framework in IPCC special reports* — https://link.springer.com/article/10.1007/s10584-020-02746-x — *commentary on the framework's implementation; cited for context, not for the misreading finding*
+- Cambridge, *A Critical Assessment of the IPCC* ch. 17, *Uncertainty* — https://www.cambridge.org/core/books/critical-assessment-of-the-intergovernmental-panel-on-climate-change/uncertainty/3B238E862AB873D1D746F8A594DC6DFD — *same: context, not the finding*
 
 Internal sources: [`CLAUDE.md`](../CLAUDE.md) invariants 4–8 and § Statistical discipline;
 [`docs/03-traffic-and-statistics.md`](03-traffic-and-statistics.md) § Saturation detection;
@@ -1239,5 +1495,7 @@ Internal sources: [`CLAUDE.md`](../CLAUDE.md) invariants 4–8 and § Statistica
 [`docs/06-parameterization-and-tuning.md`](06-parameterization-and-tuning.md) § The parameter schema;
 [`docs/07-handoff.md`](07-handoff.md) § 4 Resolution limits;
 [`docs/09-destination-dispatch-contract.md`](09-destination-dispatch-contract.md) § 1.3;
-[`packages/viz/UX.md`](../packages/viz/UX.md) § 7.1 and § 7.2;
-[`DECISIONS.md`](../DECISIONS.md) § D15, § D30, § D63, § D64.
+[`packages/viz/UX.md`](../packages/viz/UX.md) § 7.1 and § 7.2 — *in flight: that file is under
+active edit, so its row states are not quoted here as current*;
+[`DECISIONS.md`](../DECISIONS.md) § D15, § D30, § D63, § D64, and **§ D106** (the energy proxy: its
+basis, its constants, its omissions, and why energy is an axis and never a score).

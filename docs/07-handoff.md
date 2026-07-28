@@ -1,7 +1,7 @@
-# Handoff — resuming at Phase 8's last track and Phase 6c
+# Handoff — resuming at Phase 6c and Phase 9
 
-**Phases 0–5 and 7 are landed and accepted. Phases 6 and 8 are partially complete.** The two are
-partial for different reasons and a cold reader needs both:
+**Phases 0–5, 7 and 8 are landed and accepted. Phase 6 is partially complete.** A cold reader needs
+the shape of both:
 
 - **Phase 6** — 6a (destination *disclosure*) and 6b (destination *dispatch*) are accepted against
   the criterion [`DECISIONS.md` § D27](../DECISIONS.md) **raised**, and that criterion has now been
@@ -11,11 +11,12 @@ partial for different reasons and a cold reader needs both:
   operation is configured, validated and disclaimed on every run of `vertical-city`, and still not
   simulated.
 - **Phase 8** — **both blocking property violations are closed**, and neither was closed by moving a
-  bound. Seven of eight tracks have landed. The eighth — the full experiment matrix and Pareto front
-  at a real budget, which carries Phase 7's acceptance interval at 50–200 replications — has not, so
-  the phase's criterion (*every track lands, **and** no property violation is outstanding*) is not
-  yet met. The reasoning for recording that as partial rather than rounding it up to accepted is
-  [§ D102](../DECISIONS.md).
+  bound. The eighth track — the full experiment matrix and Pareto front at a real budget, which
+  carries Phase 7's acceptance interval at 50–200 replications — **landed in `f895a16`**, so both
+  halves of the criterion (*every track lands, **and** no property violation is outstanding*) now
+  pass and the phase is accepted ([§ D108](../DECISIONS.md)). § D102 recorded the *partial* verdict
+  that this supersedes; it is left standing as the record of why the phase was not rounded up
+  before the measurement existed.
 
 > **This opening sentence has been wrong twice, in the same place, about the same phase.** It once
 > read "Phases 0–5 … are complete; Phases 6, 4 and 8 remain" — asserting Phase 4 both complete and
@@ -55,13 +56,14 @@ two handed to this task that did not reproduce.
 | 7 — Automated tuning | ✅ **ACCEPTED** — search space, three searches, held-out validation, and a CLI `tune` that calls them |
 | CLI | ✅ `list`, `run`, `compare`, `tune`, `watch` |
 | **6 — Destination dispatch & learned control** | ⚠️ 6a and 6b accepted against the raised criterion, measured on the building it names: **met by Level 0, not met by the Level-1 panel**; **6c deferred out of the phase**; double-deck still not simulated |
-| **8 — Testing campaign** | ⚠️ Blocking clause **discharged** — 0 outstanding property violations, deep tier green at 2 000 cases. Seven of eight tracks landed; the full experiment matrix is not done, so the criterion is not yet met |
+| **8 — Testing campaign** | ✅ Blocking clause **discharged** — 0 outstanding property violations, deep tier green at 2 000 cases — and all eight tracks landed, the last being the full experiment matrix (8 cells × 12 profiles, Pareto over AWT / energy / WT95) with Phase 7's acceptance interval at n = 150 |
 
 Phase 7's one undelivered scope bullet — the fuzzy traffic-pattern detector — is marked not-done in
 [the roadmap](05-roadmap.md) rather than folded into the ✅. `data/dispatcher-profiles.json` ships a
 schema-validated `patternSwitching` block that no runtime code reads; editing it changes nothing.
-The same treatment is applied to Phase 6c and to Phase 8's eighth track: both are marked not-done in
-the roadmap with their reasons, rather than swept into a neighbouring tick.
+The same treatment is applied to Phase 6c: it is marked not-done in the roadmap with its reasons,
+rather than swept into a neighbouring tick. Phase 8's eighth track was carried the same way until it
+landed; it is now ✅ with the study that discharges it named.
 
 ### Running it
 
@@ -72,12 +74,18 @@ npm run sim -- run --building garden-apartments --dispatcher eta --seed 42
 npm run sim -- compare --building midtown-office --a eta --b nearest-car --reps 100
 npm run sim -- tune --building garden-apartments --params idle.repositionThresholdS --seed 42
 npm run sim -- watch --building garden-apartments --dispatcher eta --speed 10
-npm test          # full suite: 168 files, 3,138 tests (3,130 pass, 8 skip), ~460 s
+npm test          # full suite: 172 files, 3,172 tests (3,163 pass, 9 skip)
 ```
 
 Measured on this tree on 2026-07-28: `npx tsc -b` clean, `npx vitest run --testTimeout=60000`
-→ **168 files / 3 138 tests**, 460 s. The benchmarks execute real replications, which is where the
-runtime goes.
+→ **172 files / 3 172 tests, 3 163 passed, 9 skipped**, exit 0. The benchmarks execute real
+replications, which is where the runtime goes.
+
+**Do not treat the wall-clock as a fixture.** The commit that landed the eighth track (`f895a16`)
+measured the suite going from 435 s to **519 s** on its machine; a re-run of the same tree here,
+with other work competing for cores, took **793 s**. Both are true and neither is a property of the
+code. If you need a runtime regression signal, measure it twice on an idle machine — this is the
+same class of mistake as inheriting a saturation ceiling across studies (§ 4).
 
 Two opt-in tiers exist and are **not** part of that run: `ELEVATOR_SIM_FUZZ=deep` runs the
 2 000-case fuzz campaign, and `ELEVATOR_SIM_DEEP=1` enables the oracle's deep campaign (11
@@ -242,6 +250,25 @@ It is the **only** profile that saturates, which caps the replication budget at 
 Midtown and makes ~0.8 s a permanent resolution floor there. Prefer `collective` or `eta`. On
 `mixed-use-high-rise` up-peak it is the binding ceiling at 2 % (395) and 3 % (22).
 
+### A saturation ceiling belongs to a **(building, traffic, seed)**, not to a building
+
+**This is the single most reusable-looking number in the project and it is not reusable.** The same
+arm, the same building and the same traffic pattern give different ceilings at different seeds:
+
+| study | cell | arm | ceiling |
+|---|---|---|---|
+| `benchmark/arms.ts` (seed 20 260 726) | Midtown up-peak, 1 % pop/5 min, 900 s, peak-5min | `nearest-car` | **287** |
+| `benchmark/matrix.ts` (its own seed and operating point) | Midtown up-peak | `nearest-car` | **174** |
+
+Neither figure is wrong. Reusing one across studies is, and **this repository has made that mistake
+twice and corrected it twice** — which is why `matrix.ts` establishes every cell's ceiling from its
+own 200-replication census rather than inheriting one, and why its docstring says so in the same
+sentence that gives both numbers. A ceiling read out of a neighbouring module is an unmeasured
+assumption wearing a measured number's clothes.
+
+The same caution applies to the n=287 in the section above, to the 395 and 22 on
+`mixed-use-high-rise`, and to every ceiling in `arms.ts`: each is that study's seed's answer.
+
 ### CRN pairing quality is per-building
 
 Garden Apartments ρ=0.90; Midtown ρ=0.62. Not a constant.
@@ -326,7 +353,7 @@ collapses its round trip onto the textbook figure at −0.4 %.
 
 ### Determinism
 
-Same seed under CRN gives **bit-identical** paired differences — exactly zero on all 19
+Same seed under CRN gives **bit-identical** paired differences — exactly zero on all 23
 metrics, not "an interval containing zero". Across 40 disjoint seed pairs, 38/40 intervals
 contained zero (5.0% rejection against nominal 5%).
 
@@ -507,7 +534,7 @@ UX.md § 7 overstated. **C2 is closed** — `core` now routes a browser barrel a
 an export condition (§ D31), the dev shims are gone, and the import graph is guarded in both
 directions (§ D32, § D33).
 
-### Phase 8 — Testing campaign (blocking clause discharged; one track outstanding)
+### Phase 8 — Testing campaign (ACCEPTED — blocking clause discharged, all eight tracks landed)
 
 | Track | State | Where |
 |---|---|---|
@@ -518,7 +545,7 @@ directions (§ D32, § D33).
 | Determinism regression | ✅ | `validation/goldenRuns.test.ts`, `fuzz/determinism.test.ts` |
 | Scale & performance | ✅ | `validation/perfScaling.test.ts`, `perfSweep.test.ts` (wall-clock gates are opt-in — § D91) |
 | Adversarial edge cases | ✅ | `validation/adversarial.test.ts`, `fuzz/faults.test.ts` |
-| Full experiment matrix + Pareto at a real budget | ⬜ **not done** | — and with it Phase 7's acceptance interval at 50–200 replications, which § Phase 7 of the roadmap assigns here |
+| Full experiment matrix + Pareto at a real budget | ✅ | `benchmark/matrix.ts` + `matrix.test.ts` — 8 cells × 12 profiles, per-cell derived budgets n = 50…200, front over (AWT, energy, WT95); `benchmark/phase7Acceptance.ts` carries Phase 7's acceptance interval at n = 150; `benchmark/matrixCensus.test.ts` is the opt-in 200-replication census that re-derives the budgets |
 
 **Deep tiers, measured:** the fuzz campaign is green at 2 000 cases — 1 396 887 passengers,
 1 242.86 simulated hours, 1 143 completed / 857 timed-out, 0 unroutable, **0 property violations**;
@@ -560,8 +587,17 @@ fixed, and not one of them by moving a bound:**
 
 Treat any Phase 8 failure as **blocking**. A simulator producing confident numbers from broken
 mechanics is worse than one that crashes. That rule is why finding 4 withheld the phase's acceptance
-rather than being footnoted — and it is why the phase is *still* not marked accepted, for a
-different reason: the eighth track has not landed. See [§ D102](../DECISIONS.md).
+rather than being footnoted, and why the phase stayed unaccepted afterwards for a *second* reason —
+the eighth track had not landed ([§ D102](../DECISIONS.md)). It landed in `f895a16`, both clauses
+now pass, and the phase is accepted ([§ D108](../DECISIONS.md)).
+
+**The eighth track produced four findings of its own**, three of them about profiles that ship:
+`nearest-car` is on the Pareto front at **six of eight cells** because it is best on energy and
+worst on wait; `destination-eta` is **bit-identical to `eta` at all eight cells** (in flight — a
+builder is authoring the weight that changes it, so do not quote either state as settled);
+`fairness-first` is identical to `eta` at five cells and `auction-multi-round` to `auction` at both
+Garden cells; and a saturation ceiling is a property of (building, traffic, seed), not of a
+building — see § 4. `docs/05` § *What the matrix found* carries the per-cell table.
 
 ---
 
@@ -569,17 +605,17 @@ different reason: the eighth track has not landed. See [§ D102](../DECISIONS.md
 
 | Item | Notes |
 |---|---|
-| **Phase 8's full experiment matrix** | Every dispatcher × building × traffic with a Pareto front over (AWT, energy, WT95), and **Phase 7's acceptance interval re-measured at 50–200 replications**. The roadmap assigns the latter here explicitly; accepting Phase 7 did not discharge it. **This is the only thing between Phase 8 and acceptance** |
+| **`destination-eta` ships a destination it does not use** | Bit-identical to `eta` at all eight matrix cells: it weights `rideTime` at zero, so the destination reaches `estimateCost` and changes no decision. Phase 6a's accepted result stands — it was measured on *derived* arms that weight `rideTime`. **In flight**: a builder is authoring the weight that changes this, so neither state is settled |
 | **Phase 6c — learned control** | Deferred out of Phase 6 with reasons (§ D28). Needs its own acceptance question before it needs an implementation |
 | **The Level-1 panel does not clear the Phase 6 gate on `mixed-use-high-rise`** | INDISTINGUISHABLE against `eta` and `collective` at every measured rate, and WT95 `+9.083` WORSE at 4 %. A measured result rather than a task, but it is what anyone planning further destination work needs. § 7 |
-| **Four UX rows are ⚠️ unverified, not passing** | `RV-11` (zero-population empty state), `RV-17` (`data/` fetch failure), `RV-21` (Retry after RV-17), `KB-14` (`prefers-reduced-motion`). All four are built and reachable; none was driven or tested. `RV-17`/`RV-21` are structurally awkward — the app cannot be *loaded* from a stopped dev server — and `KB-14`'s media query was not emulated. `KB-14` is one of the seven ⛔ non-negotiable keyboard rows |
+| **Four UX rows are ⚠️ unverified, not passing** *(state as of close; `packages/viz/UX.md` is under active edit by another task at the time of writing, so check it rather than this row)* | `RV-11` (zero-population empty state), `RV-17` (`data/` fetch failure), `RV-21` (Retry after RV-17), `KB-14` (`prefers-reduced-motion`). All four are built and reachable; none was driven or tested. `RV-17`/`RV-21` are structurally awkward — the app cannot be *loaded* from a stopped dev server — and `KB-14`'s media query was not emulated. `KB-14` is one of the seven ⛔ non-negotiable keyboard rows |
 | **`ED-12` / `ED-13` contradict the schema** | `ED-12` ("a zero-car bank is a warning") against `bankConfigSchema`'s *a bank must have at least one car*, so a zero-car bank is a schema **error** and cannot be a warning without the editor overriding the loader, which `ED-T8` forbids. `ED-13` describes a per-car `servesFloors` the schema does not have — service zoning is declared per **bank**. Both re-marked rather than ticked. `ED-12` is a `core` schema question (**C30**) |
 | **`C7` — two holes in `core`'s dead-code scanner, still open** | Verified by reading the file on 2026-07-28: `EXPORTED` does not match `export async function`, and `code()` strips comments but not string literals. Demonstrated to stay green with a real importer removed. The `experiments/src/tuning` copy widened its pattern and says so; `core`'s did not. § 3 |
 | **The mixed-use study's replication margin is tight** | n = 200 at up-peak 4 % is **ceiling-bound**, not variance-derived: the requirement for the hardest pair is 666, the measured ceiling is 206, and 200 leaves **six replications of margin**. A change that costs the arms six replications of headroom invalidates the point rather than widening it. The pair needing 666 is reported unresolved rather than quoted |
 | **`C24` — `fuzz/`'s only non-test caller is a test** | Verified: every importer of `campaign.js` outside `fuzz/index.ts` is a `*.test.ts`. Defensible — a fuzzer's product *is* a test — and it is **recorded rather than dressed up**, which is the point. It is still a weaker answer to § 3's standing requirement than `tune` gives `tuning/`. A CLI `fuzz` command closes it cleanly and puts the deep campaign in a user's hands |
 | **No test asserts any phase's *status*** | The guards assert that the four documents **agree** with each other, not that they are **true**. `documentation.test.ts` would be perfectly happy with four documents that agreed and were all wrong. The only defence against that is the discipline in `CLAUDE.md` § Working agreements — *a phase is done when its stated acceptance criteria pass* — and a reader who checks. This is the largest un-mechanised risk in the repository and it is stated here rather than left implicit |
 | `stats/` consolidation | Statistics live in `reports/statistics.ts` and `runner/stopping.ts`; `docs/01` layout records this as outstanding |
-| Profiles bit-identical to `eta` | `eta ≡ fairness-first` survives on both up-peak buildings and is *correct* there (`starvation` is zero for every candidate when no car holds a committed hall call). It still means "9 of 9 beat baseline" counts fewer distinct dispatchers than it sounds |
+| Profiles bit-identical to `eta` | `eta ≡ fairness-first` survives on both up-peak buildings and is *correct* there (`starvation` is zero for every candidate when no car holds a committed hall call). It still means "9 of 9 beat baseline" counts fewer distinct dispatchers than it sounds. **The full matrix widened this**: `eta ≡ destination-eta` at **all eight** cells, `eta ≡ fairness-first` at **five**, and `auction ≡ auction-multi-round` at both Garden cells. This is why the matrix baselines on `collective`, which is in no identity class at any cell — a baseline that is secretly one of its own arms makes that arm's whole row a row of exact zeros |
 | `prepositionPlan` | Zero callers — superseded by `resolvePrepositionContext`. **Classified**, not deleted: one of the 14 entries in `dispatch/deadCode.test.ts`'s `PUBLIC_API_ONLY`, asserted in both directions |
 | Mixed-use achieved **interval** | Reports `unmeasurable` by design: a shuttle holds doors 39.8 s while an office-local car completes a round trip in 31.3 s, so **no** departure-gap threshold is valid there. Constrains the oracle; **does not** constrain a TTD comparison, which § D100 checked rather than assumed |
 | Double-deck operation | Configured and validated on `vertical-city`, **not simulated**; disclaimed on every run of that building, and the disclaimer reaches `RunRecord` and the CLI report |

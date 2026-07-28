@@ -494,6 +494,10 @@ replayed exactly and results re-analyzed without re-simulating.
 | Car load factor distribution | Validates the capacity model |
 | Achieved handling capacity | Comparison against the analytical baseline |
 | Saturation flag | Suppresses invalid statistics |
+| **Energy proxy** — out-of-balance work over the window, plus metres travelled and motor starts | The third Pareto axis. Landed in `f895a16`; before it, every front this project produced silently degenerated to two axes with the third reported `inactive`. Report `workPerServedLegKJ` beside it — a configuration that spends less by serving fewer people has not saved anything. Definition and omissions: [`docs/02` § Energy and the counterweight](02-elevator-reference.md) |
+
+`REPLICATION_METRICS` is the machine-readable form of this table and is **23** entries wide; the
+seven rows above name the ones a report should lead with.
 
 Percentile confidence intervals require substantially more replications than mean CIs.
 If WT95 is a headline metric, factor that into the stopping rule.

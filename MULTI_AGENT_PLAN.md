@@ -16,6 +16,15 @@
 > § 1 predicted: Phase 8's full experiment matrix at 50–200 replications, which also discharges
 > Phase 7's acceptance interval. `fuzz-1000384`, the other half of that sentence, **is closed**.
 >
+> > **✅ CLOSED AFTER THIS BOARD WAS RETIRED.** The matrix landed in `f895a16` — 8 cells × 12
+> > profiles with per-cell derived budgets, a Pareto front over (AWT, energy, WT95) made possible by
+> > a new energy proxy, and Phase 7's interval at n = 150 on disjoint held-out seeds. **Phase 8 is
+> > accepted** ([`DECISIONS.md` § D108](DECISIONS.md)) and § 7's definition of done is reached. The
+> > suite figure below (3 138) is likewise superseded: **172 files / 3 172 tests**. The rows in
+> > § 1 and § 4 that still say "not started" are left as the close-of-delivery record, per the
+> > retire-in-place decision (§ D105); read [`docs/07-handoff.md`](docs/07-handoff.md) for current
+> > state.
+>
 > **Three process mistakes this plan made, recorded because they cost real work:**
 > 1. **The orchestrator weakened an acceptance criterion.** § D27 raised Phase 6's metric clause and
 >    silently dropped its *building* clause. Caught by a builder (T23-F1), owned in § D99, closed by
@@ -59,7 +68,7 @@ Concretely, four bodies of work remain:
 | Phase 6a / 6b — destination disclosure and dispatch | ✅ **ACCEPTED** against the criterion D27 raised |
 | Phase 6c — learned control | ⬜ **deferred out of the phase** with reasons (D28) — not dropped, and it needs its own acceptance question first |
 | Phase 6 — the criterion measured on the building it names | ✅ **closed by measurement** (D99 → D100): met by the Level-0 arm, **not** met by the Level-1 panel at any measured point |
-| Phase 8 — Testing campaign | ⚠️ seven of eight tracks landed and found four defects, **all four fixed**. `fuzz-1000384` is **closed**; the full experiment matrix at a real budget is not started, so the criterion is not yet met |
+| Phase 8 — Testing campaign | ⚠️ *at close:* seven of eight tracks landed and found four defects, **all four fixed**. `fuzz-1000384` is **closed**; the full experiment matrix at a real budget is not started, so the criterion is not yet met. **Superseded — the matrix landed in `f895a16` and Phase 8 is accepted (§ D108)** |
 
 **The one thing between here and § 7's definition of done, at close:** run the full experiment matrix
 at 50–200 replications — which also discharges Phase 7's acceptance interval, a measurement the
@@ -170,7 +179,7 @@ breakdown, not from this table.
 | T21 | The fourth `awtIsValid` ground | ✅ no pinned estimate moved; uncovered `fuzz-1000384` while verifying |
 | T22 | `fuzz-1000384` — the open P5 deadlock | 🟡 in flight |
 | **T23** | **Closing documentation pass** — phase statuses with evidence, the refuted hypothesis, the measured corrections | ✅ this pass |
-| — | Full experiment matrix + Pareto front at a real replication budget, carrying Phase 7's acceptance number at 50–200 replications | ⬜ **not started** — the last piece of Phase 8 |
+| — | Full experiment matrix + Pareto front at a real replication budget, carrying Phase 7's acceptance number at 50–200 replications | ⬜ **not started** at close — **landed afterwards in `f895a16`**; Phase 8 accepted (§ D108) |
 
 ## 5. Ownership map — wave 1
 

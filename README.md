@@ -54,10 +54,9 @@ Machine-readable configuration lives in [`data/`](data/).
 
 ## Status
 
-**Phases 0–5 and 7 are landed and accepted. Phases 6 and 8 are partially complete** — see the table
-for what that means for each; the two are partial for different reasons. Four packages (`core`,
-`experiments`, `viz`, `cli`), a five-command CLI, **168 test files, 3,138 tests** (3,130 passing,
-8 skipped), `tsc -b` clean.
+**Phases 0–5, 7 and 8 are landed and accepted. Phase 6 is partially complete** — see the table for
+what that means. Four packages (`core`, `experiments`, `viz`, `cli`), a five-command CLI,
+**172 test files, 3,172 tests** (3,163 passing, 9 skipped), `tsc -b` clean.
 
 | Phase | Status |
 |---|---|
@@ -70,7 +69,7 @@ for what that means for each; the two are partial for different reasons. Four pa
 | 7 — Automated tuning | ✅ Search space, three searches, held-out validation, `elevator-sim tune` |
 | CLI | ✅ `list`, `run`, `compare`, `tune`, `watch` |
 | 6 — Destination dispatch & learned control | ⚠️ 6a (disclosure) and 6b (dispatch) accepted against a **raised** criterion, now measured on the Mixed-Use High-Rise the criterion names: **met by the Level-0 arm, not met by the Level-1 panel at any measured point**. 6c (learned control) deferred out of the phase with reasons; double-deck still not simulated |
-| 8 — Testing campaign | ⚠️ Seven of eight tracks landed — fuzzing, oracle across all five buildings, physics, statistics, determinism, scale, adversarial — and found four real defects, **all four now fixed**; the deep tier is green at 2 000 cases. The eighth track, the full experiment matrix and Pareto front at a real budget, is not done, so the criterion (*every track lands, and no property violation is outstanding*) is not yet met |
+| 8 — Testing campaign | ✅ All eight tracks landed — fuzzing, oracle across all five buildings, physics, statistics, determinism, scale, adversarial, and the full experiment matrix (8 cells × 12 profiles, Pareto front over AWT / energy / WT95) — and found four real defects, **all four now fixed**; the deep tier is green at 2 000 cases and **no property violation is outstanding**, so both halves of the criterion are met |
 
 Try it — five commands, all against the real `data/` directory:
 
@@ -81,7 +80,7 @@ npm run sim -- run --building garden-apartments --dispatcher eta --seed 42
 npm run sim -- compare --building midtown-office --a eta --b nearest-car --reps 100
 npm run sim -- tune --building garden-apartments --params idle.repositionThresholdS --seed 42
 npm run sim -- watch --building garden-apartments --dispatcher nearest-car --speed 10
-npm test        # 168 files, 3,138 tests, ~460 s — the benchmarks execute real replications
+npm test        # 172 files, 3,172 tests — the benchmarks execute real replications, so this is minutes, not seconds
 ```
 
 `compare` prints a paired-t interval on the difference and refuses to rank two arms whose interval

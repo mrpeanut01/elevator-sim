@@ -463,6 +463,14 @@ still excludes zero, with the upper bound moving from `−0.319` to `−0.298`. 
 roadmap's own reason for not gating on it ("a coin flip dressed as an acceptance criterion") is now
 better supported.
 
+> **Since retirement: the *verdict* has moved, and this record's reasoning is why.** The criterion is
+> now **MET as a gate, at n = 150** on disjoint held-out seeds — `c-deadband-2` at
+> **−1.088 s [−1.680, −0.495]** and the optimizer-found `c-deadband-2.582` at
+> **−1.105 s [−1.674, −0.536]**, both GENERALIZES ([`DECISIONS.md` § D108](DECISIONS.md)). The n = 60
+> figures above are unchanged and are the record of what the number was before the budget existed.
+> The refusal to gate at n = 60 was correct and is what caused the measurement to be produced at a
+> real budget rather than the gate being lowered to the budget.
+
 **A separate defect at `docs/05-roadmap.md:302`, not caused by T2.** The `[−0.031, +0.019]` quoted
 there — and at `benchmark/index.ts:26` and `:46`, and at `docs/07-handoff.md:203` — is the **n = 300
 deadband-sweep** interval, while the surrounding prose attributes it to **n = 500**. At n = 500 the
