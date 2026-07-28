@@ -5085,3 +5085,346 @@ arm that can be redefined by editing `data/`** (§ D112). The near miss on H-ACC
 same sign, same verdict, a fifth of the magnitude, and nothing but a regenerated pin to mark it.
 `published.ts` would have re-derived the number faithfully and been **right about the arithmetic and
 wrong about the question.**
+
+---
+
+## D116 — a bank with no cars is an error, at **both** gates (**C30 CLOSED**)
+
+**Date:** 2026-07-28 · **Owner:** T38 (wave 5) · **Closes:** C30; re-marks `ED-12` and `ED-13`
+
+**Decision.** `bankConfigSchema` keeps *a bank must have at least one car*, and `resolveBuilding` is
+**raised to agree with it**: a carless bank is now `ISSUE_CODES.emptyBank` at `banks[i].cars`.
+`UX.md`'s `ED-12` — "warning, not an error; the run will simply have no service there" — is the
+thing that was wrong, and its row is rewritten. `ED-13`'s scenario is restated, because a per-car
+`servesFloors` does not exist.
+
+**Context.** Both rows were re-marked rather than ticked because they contradicted the schema, and
+`ED-12` was handed to `core` as **C30**. § D67 and `ED-T8` forbid the editor from rendering a second
+opinion about legality, so *"make it a warning in the editor only"* was never available. The answer
+had to be a modelling decision about `core`.
+
+**Alternatives.** (a) Relax `cars` to `.min(0)` so the ledger row could be ticked. (b) Keep the
+error and re-mark the row. (c) Keep the error, re-mark the row, **and** close the gap that made the
+question live — `resolveBuilding` accepted what the schema rejected. **Chosen: (c).**
+
+**Reasons.** A bank is a group of cars; with none, `servesFloors` is a service claim with no shaft
+behind it, and the schema already refuses every other declaration that names nothing
+(`servesFloors >= 2`, `banks >= 1`, an access zone's floors and credential groups >= 1). `core`
+already held the opposite verdict elsewhere — `deriveUpPeakTerms` throws `AnalyticalError(emptyGroup)`
+and `interval()` requires a positive `L` — so (a) would have put the loader and **the project's
+stated correctness oracle** in contradiction about one building.
+
+And the run does not "simply have no service there". Measured on a seven-floor residential tower
+whose top floor was served only by a carless bank, `nearest-car`, `rise-and-fall`, seeds 1–12:
+**ten of twelve seeds published `awtIsValid: true`** — a mean over the passengers the *other* bank
+served — two of them with passengers in the reporting window never served at all, at **1.5 % and
+4.3 %**, under the 5 % censoring limit. At 28.6 % the censoring ground does fire, which is exactly
+the point: **`awtIsValid`'s grounds are thresholds, a backstop and not a gate**, so whether the
+misreport is caught depends on how much you strand. This is the same lesson as `fuzz-1001074`
+(§ D114's neighbourhood) arriving by a different route.
+
+The "legitimate intermediate editing state" argument is about a **document**, not a building, and
+the editor already answers it the way it answers zero floors or a duplicate id: issues listed, Run
+disabled (`ED-07`, `ED-T7`, `ED-20`). A warning in this vocabulary means *suspicious but the run is
+still interpretable*; a carless bank is not interpretable — the run is a different building from the
+one configured. Option (a) would also have been the **weaken-a-criterion-to-pass** failure this
+repository has recorded making once by accident (§ D27 → § D99).
+
+**Impact.** No shipped building changes; all five still load with their two pre-existing warnings
+(`rise-exceeds-class`, `double-deck-not-simulated`) and no new ones. The editor's user-visible
+behaviour is unchanged — a zero-car bank was already rejected at the schema stage. What changes is
+the **other** callers of `resolveBuilding`: the editor's own definition of valid, the fixtures and
+the fuzzers now get a located `empty-bank` instead of a building that resolves clean and strands
+people, and `fuzz/shrink.ts` no longer needs its hand-written `cars.length === 0` guard to be the
+only thing that knows.
+
+**`empty-bank` was declared in `ISSUE_CODES` and emitted by nothing anywhere in the repository.** A
+diagnostic the vocabulary promised and never produced. Read strictly against § 3's table that is a
+new instance of the same defect class — not dead *code* but a **dead diagnostic**, and invisible to
+both dead-export scanners because the constant was genuinely imported and genuinely used as a value.
+It is recorded here rather than added to the table's count, because the table counts behaviours.
+
+Service state stays a separate concept: a bank whose only car is `mode: "out-of-service"` is still
+legal, and a test pins it so the rule cannot be read as *"delete the cars instead"*.
+
+**`ED-13`.** Unrepresentable by design; no code change. `carConfigSchema` has no `servesFloors`
+because service zoning is a property of the shaft group — a car serving a different floor set *is* a
+different bank (`CLAUDE.md` § the three kinds of zoning). The editor's capability is **misdescribed,
+not missing**: `setBankServedFloors` and the per-bank checklist edit `banks[].servesFloors` only.
+The real check is already asserted — `servesFloors: ['G','2','ghost']` gives `unknown-floor` naming
+`ghost`. The nearest survivor of the original scenario is double-deck's `floor-pair`, and no editor
+control authors `servesFloorPairs`, so it reaches the editor only by import.
+
+---
+
+## D117 — C5 was closed by § D14 and its row was never retired; the convention is now a type (**C5 CLOSED**)
+
+**Date:** 2026-07-28 · **Owner:** T33 (wave 5) · **Closes:** C5 · **Opens:** C33
+
+**Decision.** Record that **C5 as written was stale**, and close the weakness that was genuinely
+open underneath it. `convergenceOf` now returns `PublishedConvergenceReport`
+(`ConvergenceReport & { readonly method: 't' }`), and the family label comes from
+`publishedIntervalFamily()`, which **refuses** a non-`'t'` estimate rather than copying its label.
+
+**Context.** The row said `reports/compare.ts:607` *can print `'z'` as a fallback family label*. It
+cannot, and had not been able to since `89bbf37` — which § D14's own Impact section records in as
+many words. Reachability was **checked, not assumed**: `convergenceOf` is the only construction site
+of a `ConvergenceReport` in the repository; every estimate it can see comes from `estimateMean`,
+whose `n < 2` branch hard-codes `'t'` and whose `n >= 2` branch reads from
+`publishedIntervalQuantile`, whose return type is narrowed to `'t'`; and the fallback literal was
+already `'t'`.
+
+**What was genuinely open.** Nothing held it there. The label read
+`estimate?.method ?? ('t' as const)` — an expression of type `IntervalMethod` assigned to a field of
+type `IntervalMethod` — **in a field `formatConvergence` never prints**. The literal was right and
+no check said it had to be, so a regression would have been invisible on the page and fully present
+in a serialized report. That is review finding #14's shape one layer down.
+
+**Alternatives.** (a) Close the row as already-fixed and delete it. (b) Narrow `IntervalMethod`
+itself. (c) Narrow the **assembly site** and add an executable refusal. **Chosen: (c).** (a) leaves
+the convention unheld — and an unheld convention is what the row was really about, even though its
+stated defect was gone. (b) is wrong: a stored pre-2026-07 run set carries `'z'` and must still
+parse, and `formatMeanEstimate` keeps its `normal(z)` arm; that width is right for the **stored**
+shape and wrong for a freshly assembled one.
+
+**Impact.** Reports suite 155 → 159; both new branches watched failing first, at the type level and
+at runtime. One behavioural change: a `MeanEstimate` carrying `'z'` reaching `convergenceOf` now
+throws `ReportsError` instead of being copied. No shipped path can deliver one — reports are built
+from observations, never from stored estimates — so the refusal is an assertion, not a feature, and
+its caller is real.
+
+**This closure deliberately opens `C33` rather than absorbing it.** Two things remain, and both are
+the same shape one file away:
+
+1. **`reports/statistics.ts:332`** — `method: 't' as IntervalMethod` in the `n < 2` branch, where
+   `halfWidth`, `lower` and `upper` are all `NaN`: a family label stamped on an interval that does
+   not exist, with an assertion that **widens a correct literal to the union for no reason**. It is
+   the one remaining place in `reports/` where the family loses its narrow type.
+2. **`ConvergenceReport.method` is required and non-optional** in `types.ts`, so a suppressed metric
+   still *names* a family for an interval that does not exist — it just can no longer name the wrong
+   one.
+
+*"C5 is closed"* and *"the same defect exists two files away"* must not be the same sentence. This
+repository has twice been burned by a fix that made its own report true and left a sibling copy
+wrong — both times in a dead-code scanner (§ D114), and both times found by porting the fix rather
+than by a test.
+
+---
+
+## D118 — `elevator-sim fuzz`, and what a barrel does not buy (**C24 and C27 CLOSED**)
+
+**Date:** 2026-07-28 · **Owner:** T34 (wave 5) · **Closes:** C24, C27
+
+**Decision.** Ship an `elevator-sim fuzz` command whose non-test caller status is **verified with
+the repository's own scanner**, and put § D62's 34 names plus `runMixedUseHighRiseStudy` on
+`benchmark/index.ts` and the package barrel in one commit.
+
+**C24.** `cli/src/commands/fuzz.ts` is the importer of `runCampaign`, `formatStats`,
+`STANDARD_CORPUS`, `deepSeeds` and `deepCampaignSize` — checked through
+`tuning/callers.test-helper.ts`, not asserted. The deep campaign is now in a user's hands rather
+than reachable only by setting an environment variable before a test run.
+
+Three design calls are the substance, and each is a refusal:
+
+- **`PROPERTY_BOUNDS` is printed and not settable from the CLI.** `fuzz-1001074`'s lesson is that
+  the cheap fix for a red property is to move a bound, so the command does not offer one.
+- **No fault-injection flag.** A `--break-dispatch` would put a way to *manufacture* findings beside
+  the thing that reports them. The red branch is instead driven in the test from a **real** faulted
+  run through the same function `runFuzz` calls.
+- **The tier is a flag, not an environment variable.** `ELEVATOR_SIM_FUZZ` is not consulted, so a
+  stray env var cannot turn a CLI test into a 250-case deep run.
+
+**C27, and what it does not buy.** All 34 names are present and identically bound on both surfaces,
+so a consumer outside the package can reproduce Phase 6a/6b without a module path. **It says nothing
+about liveness.** A barrel re-export is *reachability* — the exact property all ten dead behaviours
+already had, and `measureEnergyLiveness` was on **two** barrels and was dead. Their non-test caller
+was and remains `regeneratePins.ts`. `index.test.ts` keeps its refusal to treat a barrel as a
+caller; its now-stale comment is corrected, and a new assertion pins that the two questions **come
+apart in both directions today** — `runDestinationDispatchStudy` is on no barrel and live,
+`runDestinationDisclosureStudy` is on both and live for a reason that is not the barrel.
+
+**Impact.** Sixth CLI command; `README.md`, `docs/07` § Running it and `CLAUDE.md`'s status line
+updated from five to six. Two items are **left open rather than swept in**: `deepCampaignRequested`
+still scans to `[]` — its only importer is `fuzz/deep.test.ts`, which is C24's own shape in the file
+this task just fixed — and `runDestinationDispatchStudy` remains off both barrels because § D62 does
+not list it and the task did not invent a list.
+
+---
+
+## D119 — the sequential stopping rule keeps Student-t, and the cost is now measured (**C4 CLOSED**)
+
+**Date:** 2026-07-28 · **Owner:** T37 (wave 5) · **Closes:** C4
+
+**Decision.** Keep `productionStoppingRule` exactly as it is — `halfWidthStoppingRule(estimateMean)`,
+Student-t at `n − 1` at every `n`. **No production behaviour changes.** `stopping.ts` gains a
+measured-cost paragraph and `stoppingBudget.test.ts` pins it.
+
+**Context.** § D14 deleted `halfWidthQuantile` and left the loop control stopping on the same
+half-width the report prints. Since `t[n−1] > z` at every finite `n`, a sequentially-stopped
+experiment can only run *more* replications. C4 recorded this as deliberate and conservative but
+**unquantified**, and explicitly as needing a decision rather than a default.
+
+**What makes this a decision rather than an assertion: the benefit was measured too.**
+
+Overhead, 7 configurations across all five shipped buildings × 9 target precisions, seed
+20 260 726, 90 %:
+
+| policy | t | z | overhead | cells where t≠z | worst cell |
+|---|---|---|---|---|---|
+| **shipped** (min 50, every 8, max 200) | 6 786 | 6 746 | **+40 (+0.59 %)** | 5 / 63 | +8 |
+| min 50, every 1 | 12 621 | 12 517 | +104 (+0.83 %) | 35 / 63 | +17 |
+| free (min 2, every 1) | 11 838 | 11 243 | +595 (+5.29 %) | 61 / 63 | **+187** |
+
+Coverage, 30 000 replications in 500 disjoint blocks (binomial se ±1.3 pp), against a nominal 90 %:
+
+| regime | t | z | z saves | z gives up |
+|---|---|---|---|---|
+| below the floor, n\* ≈ 10 | 78.0 % | **61.8 %** | 3.3 reps | **16.2 pp** |
+| below the floor, n\* ≈ 50 | 82.8 % | 71.2 % | 8.5 reps | 11.6 pp |
+| **shipped policy**, n\* ≈ 60–150 | 84.7–88.0 % | 84.0–88.0 % | 1.2–1.8 reps | **0.0–0.7 pp** |
+
+Both families under-cover, because a sequentially-stopped interval always does. **The gap is the
+point.**
+
+**Reasons.** The cost is essentially zero where the runner operates — the 50-replication floor and
+8-replication chunk quantize it away, giving **+0** on the very configuration `docs/07` § 4's table
+describes. Reverting to `z` would save 1.2–1.8 replications a cell for at most 0.7 pp, and below the
+floor would give up 12–20 points of coverage; on `secure-tower`/`destination-eta` a `z` rule stopped
+at **n = 2** where `t` needed 27–189. **The floor is a default, not a guarantee** —
+`RUNNER_DEFAULTS.minReplications` is overridable and `validation/sequentialStopping.test.ts` already
+overrides it to 2, so the quantile is the only thing protecting that path. And reverting would
+reintroduce § D14's defect: `ConvergenceReport.status` decides `converged` from the *published*
+half-width, so a rule stopping on a narrower one lets a cell stop while its own report says
+`IN PROGRESS`.
+
+**Method note.** The replay was validated against the real runner with each family injected —
+**42/42 exact matches** on `stopping.replicationsRun`. Replication *i*'s seed is
+`f(experimentSeed, i)` alone, so a stopping rule cannot change which numbers arrive, only how many
+are read.
+
+**Impact.** No published interval moves, **by construction**: every shipped study uses a fixed
+budget, and `stoppingRule` is injected only from `validation/`. `docs/07` § 4's table re-derives
+exactly at `t` (11 / 37 / 57 / 143 / 222 / 563) and is now pinned in **both** families so neither
+can drift silently. One correction to § C19's account: its superseded row
+`9 / 36 / 55 / 141 / 220 / 563` is not the pure `z` answer — `z` gives **562** at the last rung.
+C19 already says *five of those six rows* reproduce at `z`, so its account was right; the test
+asserts it in exactly that form so it cannot be reworded into something the arithmetic does not
+support.
+
+**Three things this opened, recorded rather than fixed in passing:**
+`validation/sequentialStopping.test.ts:163` still projects the budget with a **hard-coded `z90`** and
+prints the row C19 corrected — so the repository derives one answer and publishes another;
+`runner/types.ts`'s `StoppingVerdict.distribution` still documents the `'t'` ≤ 25 / `'z'` past it
+family § D14 deleted; and **the stopping rule has no non-test caller at all**, which is § 3's
+standing requirement and needs its own decision rather than a deletion.
+
+---
+
+## D120 — the four UX rows, driven: two were false (**the ⚠️ bucket is empty**)
+
+**Date:** 2026-07-28 · **Owner:** T39 (wave 5) · **Closes:** `RV-11`, `RV-17`, `RV-21`, `KB-14`
+
+**Decision.** Close all four by **exercise**, fix what driving them found, and record precisely what
+could not be exercised rather than ticking it.
+
+**`RV-21` was false, and the defect was severe.** `main()` ran `if (!(await load())) return;`
+**above** the `let started = false` that `start()` closes over, so a first load that failed left that
+binding in its temporal dead zone for the life of the page. Retry then threw
+`ReferenceError: Cannot access 'started' before initialization` inside a floating `async` IIFE with
+no `catch` — so the page **cleared its own error message** and sat at `loading data…` for ever, with
+an empty building list, nothing on screen and nothing in the console. **Retry was permanently dead
+after any failed load.** Fixed by `dev/bootstrap.ts`, where the state is declared before anything
+can reach it and a throw from `start` **rejects** rather than vanishing.
+
+**`RV-17`'s second clause was false for an instructive reason.** Vite answers `Accept: */*` — what
+`fetch` sends — with `index.html` and a **200**, so `!response.ok`, the only branch that named the
+missing path, is exactly the branch a missing `data/` file does not take. The reader got
+`Unexpected token '<'`. The message now names the path and says what a 200 `text/html` means here.
+
+**§ B.3's empty state was false on both clauses.** The disable/enable pair lived in `boot`, which a
+failed load never reaches, so the error state showed five live-looking controls whose listeners had
+never been attached; and enabling was triggered by a click on **Run**, which the editor's hand-over
+does not perform, so a run started from the editor could be **playing and un-pausable,
+un-steppable, un-scrubbable and un-exportable**.
+
+**`KB-14` holds, and its method is stated rather than glossed** — it is one of the seven ⛔
+non-negotiable keyboard rows. `prefers-reduced-motion` **cannot** be emulated by the tooling
+available here, so it was driven by replacing `window.matchMedia` — the only thing the app reads —
+and run both ways, with frames **forced** via screenshots rather than trusting a throttled rAF loop.
+What could not be exercised is recorded in the row: the CSS clause under a real OS preference. So is
+the measurement that the stylesheet carries **zero** `transition`/`animation` declarations today, so
+the guard block protects against *future* motion rather than fixing present motion.
+
+**`RV-11` holds** — a designed empty state, not a blank canvas and not a crash. Its one weakness is
+recorded rather than gold-plated: the *no passengers were generated* sentence exists only in the
+status line, so the canvas, the exported PNG and `describeFrame`'s text alternative leave the reader
+to infer it from `0 generated`.
+
+**§ D111 spot-check clean**, on both suppression grounds, on the canvas **and** in the actual bytes
+`Export PNG` writes, with a healthy run as the negative control.
+
+**Impact.** Ledger 88 rows; the ⚠️ bucket goes 4 → **0**; all seven ⛔ non-negotiable keyboard rows
+are green. Nine tests added, and both new files were **mutation-checked** — inverting `shouldAutoplay`
+and deleting the `options.start(value)` call produced six failures across exactly those two files.
+
+**The transferable finding.** Three of the four rows were *built and reachable*, which is the exact
+property § 3 warns is not evidence. Two of them were **false**. This is the second pass in a row
+(§ D111 was the first) where driving the app found a shipped defect that reading it had missed —
+and § D111's own pass had driven three buildings at one viewport and not re-exercised these four.
+
+---
+
+## D121 — a browser entry point for `packages/experiments`, and the guard that keeps it honest
+
+**Date:** 2026-07-28 · **Owner:** T35 (wave 5) · **Closes:** `docs/10` § 13 q1's **prerequisite**
+
+**Decision.** Add a browser barrel, an export condition and a graph-walk guard, porting `core`'s
+mechanism (§ D31–§ D33) rather than inventing one — **with the opposite polarity**, deliberately.
+
+**The reachability list is three, not one.** Measured breadth-first over the real import graph from
+`src/index.ts`:
+
+| module | builtins | reached via |
+|---|---|---|
+| `runner/parallel.ts` | `node:os`, `node:worker_threads` | `index.ts → runner/index.ts` |
+| `reports/persistence.ts` | `node:fs/promises`, `node:path` | `index.ts → reports/index.ts` |
+| `validation/harness.ts` | `node:url` | `index.ts → benchmark/index.ts → benchmark/verdict.ts` |
+
+`docs/07` § 8 named one; `index.ts`'s own docstring described two. Two further builtin-importing
+modules are not reachable from the entry at all.
+
+**Polarity.** In `core` the browser barrel *is* the package. Here the package's centre of gravity is
+Node-bound **by purpose**, so the barrel is additive and narrow, and its contents are justified per
+block rather than being whatever happened to be free of `node:`. `oracle/` and `fuzz/` are measured
+environment-free today and are still **left off**: a name on this barrel constrains its modules
+forever, and nothing asks for them.
+
+**The most valuable line in the change is the `isBarrel` fix.** `experiments/src/browser.ts`
+re-exports six of `tuning/deadCode.test.ts`'s allowlisted `space/*` entries, so an unfixed predicate
+would have counted the barrel as a real consumer and reported all six as *"now has a caller"* — **the
+audit that exists to stop dead code reading as live, made to read everything as live.** That is not
+hypothetical: it is exactly what `core`'s split did (§ D33). Matching on the path suffix rather than
+on two file names means a third package's browser barrel is covered the day it lands rather than the
+day someone notices. **This is the third time the guard-on-the-guard has paid in this repository.**
+
+**Five manufactured failures watched**, and the one that matters most is the silent mode: a resolver
+degraded to resolve nothing left the *"no `node:` import"* assertion **passing vacuously** while
+seven other assertions fired. A guard that cannot fail vacuously is the property § D114 had to add
+by hand.
+
+**M10 confirmed corrected and pinned** — 49 parameter ids under both the browser and the default
+condition, with a non-tautology check first.
+
+**W4 is only PARTLY unblocked, and this entry does not round that up.** `collectSearchSpace()` and
+`discoverParameterSchemas()` are importable, callable and provably `node:`-free; W3's CRN half is
+answered too, since the seed-pairing rule is now importable rather than duplicable. **Still open:**
+TypeScript does not apply the `browser` export condition, so a browser-only file importing
+`@elevator-sim/experiments` typechecks against the **Node** types. The mitigation is the explicit
+`./browser` subpath, and **nothing mechanically forces a `viz` file to pick it**. In `core` that gap
+was one function; here it is hundreds of names. The rest of W4 — four control renderers, the
+`activeWhen` rule at the control, the fictional-schema liveness evidence — is unwritten. This
+removes the prerequisite; it does not do W4.
+
+**And the barrel has no non-test caller**, and cannot have one until W4 exists. That is this
+repository's signature defect shape and it is stated in the file rather than dressed up;
+`browser.test.ts` is its mechanical owner meanwhile. **Tracked as C34.**
