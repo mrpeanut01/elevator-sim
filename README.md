@@ -20,7 +20,8 @@ This project exists to make those comparisons rigorous.
 - **Configurable buildings** — arbitrary floors, multiple banks, service zones, access-control zones
 - **Realistic physics** — S-curve motion profiles with acceleration and jerk limits, door timing, load weighing
 - **Realistic traffic** — office / residential / hotel / mixed-use arrival profiles with peak templates
-- **Pluggable dispatchers** — nearest-car, ETA, zoned, destination-dispatch, auction-based, learned
+- **Pluggable dispatchers** — nearest-car, ETA, zoned, auction-based and destination-dispatch, all
+  as weight vectors in `data/`, not classes. A *learned* dispatcher is deferred scope, not shipped
 - **Statistically valid results** — multi-replication runs, common random numbers, sequential confidence-interval stopping
 
 ## Target smart behaviors
@@ -52,9 +53,9 @@ Machine-readable configuration lives in [`data/`](data/).
 
 ## Status
 
-**Phases 0–3, 5 and 7 are landed and accepted. Phase 4 is a foundation only. Phases 6 and 8 are not
-started.** Four packages (`core`, `experiments`, `viz`, `cli`), 129 test files, 2,627 passing tests,
-`tsc -b` clean.
+**Phases 0–5 and 7 are landed and accepted. Phases 6 and 8 are a foundation only** — see the table
+for what that means for each. Four packages (`core`, `experiments`, `viz`, `cli`), a five-command
+CLI, **167 test files, 3,100 tests** (3,092 passing, 8 skipped), `tsc -b` clean.
 
 | Phase | Status |
 |---|---|
@@ -62,14 +63,14 @@ started.** Four packages (`core`, `experiments`, `viz`, `cli`), 129 test files, 
 | 1 — Physics & model | ✅ S-curve motion, doors, load sensor, pure `estimateCost()` |
 | 2 — Traffic & dispatch | ✅ Poisson batch arrivals, weighted-cost engine, RTT oracle |
 | 3 — Experiment infra | ✅ Replication runner, CRN, sequential stopping, paired-t |
+| 4 — Visualization | ✅ Viewer, building editor, live metrics overlay, playback from a stored seed, 87-scenario UX ledger |
 | 5 — Smart dispatch | ✅ Twelve cost terms, auction, predictor, benchmark suite |
 | 7 — Automated tuning | ✅ Search space, three searches, held-out validation, `elevator-sim tune` |
 | CLI | ✅ `list`, `run`, `compare`, `tune`, `watch` |
-| 4 — Visualization | ⚠️ Foundation only — rendering contract, frame producer, replay harness, Canvas renderer, 85-scenario UX inventory. Building editor and live metrics overlay unbuilt |
-| 6 — Destination dispatch & learned control | ⬜ Not started |
-| 8 — Testing campaign | ⬜ Not started |
+| 6 — Destination dispatch & learned control | ⚠️ 6a (disclosure) and 6b (dispatch) accepted against a **raised** criterion; 6c (learned control) deferred out of the phase with reasons; double-deck still not simulated |
+| 8 — Testing campaign | ⚠️ Seven tracks landed — fuzzing, oracle across all five buildings, physics, determinism, scale, adversarial — and found four real defects. The full experiment matrix is not done, and one property violation is open, which blocks acceptance |
 
-Try it:
+Try it — five commands, all against the real `data/` directory:
 
 ```bash
 npm install && npm run build
@@ -78,10 +79,16 @@ npm run sim -- run --building garden-apartments --dispatcher eta --seed 42
 npm run sim -- compare --building midtown-office --a eta --b nearest-car --reps 100
 npm run sim -- tune --building garden-apartments --params idle.repositionThresholdS --seed 42
 npm run sim -- watch --building garden-apartments --dispatcher nearest-car --speed 10
+npm test        # 167 files, 3,100 tests, ~345 s — the benchmarks execute real replications
 ```
 
 `compare` prints a paired-t interval on the difference and refuses to rank two arms whose interval
-contains zero — that is the point of the project, not a nicety.
+contains zero — that is the point of the project, not a nicety. It also **refuses to gate on AWT
+across two passenger models**, moving its headline verdict to TTD and naming `core`'s own list of
+the nine metrics that stop being comparable.
+
+The browser viewer and building editor live in `packages/viz` and are dev-served with Vite;
+`packages/core` exposes a `./browser` subpath so nothing pulls `node:fs` into a bundle.
 
 See the [Roadmap](docs/05-roadmap.md) for per-phase acceptance verdicts and the measurements behind
 them, and the [Handoff brief](docs/07-handoff.md) for current state and open debt.

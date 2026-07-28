@@ -3,6 +3,21 @@
 **Status: design only. No implementation code was written for this document.**
 **Owner: T14 (architect). Date: 2026-07-27.**
 
+> **Read this first (added 2026-07-28). Phase 6a and 6b have shipped, and parts of this contract are
+> now refuted by measurement rather than merely superseded.** The document is kept in the present
+> tense of the day it was written, so a prediction can be checked against what happened instead of
+> being quietly replaced. Where a section was refuted, the correction is inline and marked ⚠️.
+>
+> | Prediction | Outcome |
+> |---|---|
+> | § 3.1 — a Level-1 run renders an **empty landing series** | ⚠️ **REFUTED.** The real defect was a *collapse*: 28 landings drawn against 92 landing calls and 132 promise groups, and a caption saying "unassigned" about promised passengers. The instruction it justified was right, and was followed |
+> | § 4.3 / § 8 — H-ACCESS-2, the *optimization* half of the access-control hypothesis | ⚠️ **REFUTED, as the pilot predicted.** `Δ_secure − Δ_midtown = +0.982 s [+0.584, +1.380]` at n = 150 per building. The saving is in the credential, and that is H-ACCESS-1, which is **CONFIRMED categorically** |
+> | § 8 — "the most likely way Phase 6 publishes a wrong conclusion is a single-building H-ACCESS-2" | ✅ **Correct, and the trap was avoided by design.** The study asserts the trap explicitly: Secure Tower alone *does* exclude zero on the confirming side |
+> | § 2.2 / § 4 — the operating points, arms and the n = 150 budget | ✅ Held. `sd(ΔTTD)` for the C→D contrast measured 0.908 s at the primary point, inside the contract's stated headroom by 3.7× |
+> | "Level 1 is trajectory-identical to Level 0 at the primary point" | ⚠️ **A single-seed reading.** 27 of 150 replications are bit-identical; 123 are not. The effect is near zero *and* the arms are demonstrably wired — the two readings that together rule out a dead seam |
+>
+> Live results and verdicts are in [`05-roadmap.md` § Phase 6](05-roadmap.md).
+
 This document exists because [`RISKS.md` R9](../RISKS.md) says the passenger model changes
 fundamentally and [`docs/05-roadmap.md` § Standing requirement](05-roadmap.md) says Phase 5 shipped
 four dead seams simultaneously *because work was partitioned by module directory before the
@@ -415,6 +430,31 @@ order it binds:
   Level-1 run with an empty landing series — which is a silent wrong picture, exactly the class of
   defect `docs/07-handoff.md` § 7 records for the first-frame car positions.** So: either bump and
   render, or make `recordRun` refuse a Level-1 run outright. **Do not do neither.**
+
+> ### ⚠️ Correction — the prediction above is REFUTED by measurement; the instruction it justified
+> ### was right anyway (C31)
+>
+> **The predicted failure was an *empty* landing series. The real one was a *collapse*.** Phase 6b
+> kept `PassengerRecord.direction` populated under a panel, so `foldPassengers` draws exactly the
+> same landings a conventional recording does — 28 on Midtown Office under either model. Nothing is
+> empty. What a version-3 recording actually did was **collapse 92 landing calls and 132 promise
+> groups into 28 direction buckets, carrying no field from which the promise could be recovered**,
+> and then say something false on screen: `describeSelection` printed *"unassigned — no car answered
+> this call in this run"* about passengers the panel had already promised a car to. A wrong picture
+> that is *populated* is harder to notice than an empty one, which makes this the more dangerous
+> half of the prediction, not the milder one.
+>
+> The same reasoning applied one level out to the CLI: `watch` on a Level-1 configuration renders a
+> **populated** landing column (measured — `▲71` and `▲8` against a header count of 79), so the
+> flag that `watch` would show an empty series is likewise **not reproducible**, and for the same
+> reason.
+>
+> **The instruction — bump and render, or refuse; do not do neither — was correct and was followed.**
+> `VIZ_SCHEMA_VERSION` is **4**, `VizRecording` carries the per-leg promise, and the panel is
+> rendered: a landing under a panel partitions into promise groups exhaustively
+> (`frame/overlay.test.ts`, 5 buildings × 11 instants), the shaft highlight follows the *promise*
+> rather than the outcome, and a promised passenger nobody served reads as **promised**, not as
+> unassignable. See [`DECISIONS.md` § T18-D1](../DECISIONS.md).
 
 ### 3.2 Tunables — data, not code (invariant 7), each declaring its schema (invariant 8)
 
@@ -851,7 +891,7 @@ the roadmap says any such phase **should** make.
 | **The walk time is made profile-authorable** | A dispatcher tunes away its own cost; the Pareto front is a lie | `sim.assignedWalkS` in `SIM_PARAMETERS`, not in `DISPATCH_PARAMETERS`; `searchSpaceLiveness.test.ts` already asserts `sim.doorObstructionProbability` stays *out* of the dispatcher space by the authorability rule, and the same assertion covers this |
 | **The oracle is "fixed" to agree with a destination dispatcher** | The project's only external correctness anchor is destroyed, and it looks like an improvement | A3 pins the oracle to `up-down-buttons` and fails loudly on a destination profile |
 | **`#reofferCall` re-offers a promised passenger to the group** | Level 1 quietly recovers the deferral advantage it is supposed to have surrendered; the whole "cannot defer" measurement becomes meaningless | OQ-1 must be settled before B2 starts; the chosen semantics is asserted by a test that counts panel re-assignments |
-| **The viz renders a Level-1 run with an empty landing series** | A silently wrong picture — the exact shape of the first-frame car-position defect that Phase 4's replay-identity criterion could not see | B8 forces the choice: render it or refuse it. Not neither |
+| **The viz renders a Level-1 run with an empty landing series** ⚠️ *the risk was real; the shape was wrong — see § 3.1* | A silently wrong picture — the exact shape of the first-frame car-position defect that Phase 4's replay-identity criterion could not see | B8 forces the choice: render it or refuse it. Not neither. **Discharged by rendering**: `VIZ_SCHEMA_VERSION` 4 carries the per-leg promise and the panel is drawn |
 | **A learned policy draws from a trace stream** | CRN destroyed across every arm in the phase; power drops ~10×; nothing fails | B5's stream-neutrality assertion, applied to the whole run |
 | **H-ACCESS-2 is measured on one building** | Secure Tower alone shows −0.455 ± 0.328 s, excludes zero, and reads as confirmation — while the difference-of-differences against Midtown reads as refutation. **This is the most likely way Phase 6 publishes a wrong conclusion**, because the wrong answer is the comfortable one | H-ACCESS-2 is specified as a difference-of-differences in both absolute and baseline-relative form (§ 4.3), and the pilot's refuting sign is stated in the study module's own docstring as the prior |
 | **An arm that times out is given an interval** | A "win" is quoted against a baseline that did not run. Secure Tower arm A times out 10/10 at the primary point | C2a is categorical with no interval; `arms.ts`'s all-arms-valid rule keeps A and B out of Secure Tower's interval table |

@@ -184,3 +184,80 @@ third, mechanical confirmation of the same fact.
 | C31 | **`docs/09` § 3.1's "empty landing series" prediction is REFUTED by measurement.** Phase 6b kept `PassengerRecord.direction` populated, so a Level-1 recording draws the same landings as a conventional one. The real defect was a *collapse* — 28 landings drawn against 92 landing calls and 132 promise groups on Midtown — producing a falsehood on screen: "unassigned — no car answered this call" about passengers the panel had promised a car. Fixed by rendering; the contract's prediction should be corrected. | T18 |
 | C32 | `packages/experiments/src/fuzz/run.ts` was edited by T18 outside its ownership (`withCallType` now drops `passengerAssignment` when the call type cannot carry a destination). Without it every fuzz case naming the shipped profile at `up-down-buttons` threw. **`fuzz/generate.ts` still picks call types blind to the profile** — a real corpus extension for the fuzz owner. | T18 |
 | C30 | `UX.md` `ED-12` ("a zero-car bank is a warning") contradicts `bankConfigSchema`'s *a bank must have at least one car*, and `ED-13` describes a per-car `servesFloors` the schema does not have. Both re-marked rather than ticked; `ED-12` is a `core` schema question. | T11 |
+
+---
+
+# WAVE 4 — the closing documentation pass (T23), 2026-07-28
+
+Branch `docs/final-status`. Baseline verified **before** any edit, in this worktree: `npx tsc -b`
+clean, `npx vitest run --testTimeout=60000` → **167 files / 3,100 tests (3,092 passed, 8 skipped)**,
+343 s. Delta after the pass: **zero** — this task changed no `packages/**` or `data/**` file.
+
+## Disposition of C19 – C32
+
+Each verified in this worktree rather than taken on report. "Verified fixed" means the fix was found
+in the code or the doc; "closed here" means this pass made the change.
+
+| # | Disposition |
+|---|---|
+| C19 | ✅ **CLOSED HERE.** The replication-budget table was the deleted normal quantile's answer. Re-derived from `studentTQuantile` at 90 % two-sided against `s = 3.60 s`: **11 / 37 / 57 / 143 / 222 / 563** against the published 9 / 36 / 55 / 141 / 220 / 563. Five of the six published rows reproduce exactly at `z`; the sixth (563) is already the `t` answer, `z` gives 562. `t` is strictly wider, so the old table **understated the budget at every rung**. Corrected in **both** copies — `docs/07` § 4 and `docs/03` § *Measured: the replication budget…*, which carried the same six numbers. No conclusion changes |
+| C20 | ❌ **STILL OPEN — verified present.** `packages/core/src/analytical/upPeak.ts:253-254` still reads *"102.8 % of population per five minutes instead of 26.3 %"*. `packages/core/**` is not this task's. Recorded in `docs/07` § 8 with the correct figures (82.5 % / 21.2 % at the declared `tp = 1.75 s`) marked as transcribed, not re-measured here |
+| C21 | ❌ **STILL OPEN — verified present.** `packages/core/src/metrics/summarize.ts`'s `DepartureGapBracket` docstring names three empty brackets and does not mention `vertical-city/zone-5-local`'s **1.23 s** band. Recorded in `docs/07` § 8 |
+| C22 | ✅ closed by T11/T10 (16 files migrated, guarded with a positive control) |
+| C23 | ✅ **CLOSED.** Four `core` sites **verified corrected** by reading them, not assumed: `dispatch/lifecycle.ts:133`, `model/types.ts:122`, `model/car/types.ts:470`, `sim/simulation.ts:2410`. The three documents are corrected here: `docs/01-architecture.md` § Zoning, `docs/05-roadmap.md` § Phase 6, `docs/07-handoff.md` § 7. `model/car/estimateCost.ts:123` left as written — it is descriptive and correct. **The recommendation to pin it is below and is NOT built** |
+| C24 | ⬜ open — `fuzz/`'s only non-test caller is a test. Carried into `docs/07` § 8 |
+| C25 | ✅ closed by T19/T20 — `CarConfig.mode` and `BuildingConfig.serviceEvents` made the corner authorable; 9 of the 64 pinned fuzz cases start a car out of group control and 11 carry a mid-run schedule |
+| C26 | ✅ closed by T16-D8; the skipped regression test is un-skipped |
+| C27 | ⬜ open — Phase 6a/6b study entry points are off `benchmark/index.ts` and the package barrel. **The roadmap was written to name their module paths rather than a barrel export**, so it does not repeat finding #17's shape. Carried into `docs/07` § 8 |
+| C28 | ⬜ open, and **reported precisely rather than edited** — `core/src/sim/moduleTree.test.ts` is a `packages/core` file another builder owns this round. Full statement in `docs/01-architecture.md` § *Layout note* and `docs/07` § 8 |
+| C29 | ⚠️ **REFUTED as written, and doing what it asked would have gone red.** It asks for `viz/editor/` in `docs/01`'s module tree. **There is no such directory**: the editor's four modules are flat files at `packages/viz/src/` (§ D65), and `moduleTree.test.ts` compares the doc against disk **in both directions** — the line would have become a phantom and reddened the **core** suite. Recorded in `docs/01` as outstanding, with the note that the file move and the doc line must land in one commit. The other two clauses are done: `docs/05` § Phase 4's table and verdict are rewritten, and `TEST_MATRIX.md` § 3 now carries the 87 UX ids |
+| C30 | ⬜ open — `ED-12` is a `core` schema question. Carried into `docs/07` § 8 and marked in `TEST_MATRIX.md` § 3 |
+| C31 | ✅ **CLOSED HERE.** `docs/09` § 3.1's *empty landing series* prediction is corrected inline and marked ⚠️ REFUTED, with the real defect stated: a **collapse** — 28 landings drawn against 92 landing calls and 132 promise groups on Midtown, producing "unassigned — no car answered this call" about passengers the panel had promised a car. The § 8 risk row is annotated and marked discharged. A summary table of every refuted contract prediction is added at the head of `docs/09` |
+| C32 | ⬜ open — `fuzz/generate.ts` still picks call types blind to the profile. Carried into `docs/07` § 8 |
+
+## Also closed by this pass
+
+| Item | What was done |
+|---|---|
+| C9 | Phase 7 was already recorded ACCEPTED and the CLI as five commands; **re-confirmed by check** and the confirmation recorded in `docs/05` § Phase 7 |
+| C10, C11, C15 | Verified already corrected in `docs/06` (`[designLoadFactor, 1.5]`, `reopenOnLateArrival` default `false`) and `docs/03` § Sequential stopping rule (Student-t at every `n`). No edit needed |
+| C16 | The raised Phase 4 criterion is carried into the rewritten Phase 4 verdict, which now records the phase **COMPLETE** with the evidence for each clause |
+| The fourth `awtIsValid` gate | `docs/03` § *Saturation detection* rewritten: it described the trend test as *the* suppression mechanism and there are **four** grounds. The `fuzz-1001074` reproduction, the Little's-Law consistency check, and the 900 s horizon's measured margins are recorded |
+| Phase 8 | Added to `docs/05-roadmap.md`, which had **no Phase 8 section at all** — the phase existed only in `docs/07` § 7 |
+| Phase 6 | Restructured into 6a / 6b / 6c across `docs/05` and `docs/07`, with D27's raised criterion stated as it now stands and the results against it |
+
+## Recommendations handed back — code changes this task could not make
+
+| # | Change | Why it matters |
+|---|---|---|
+| **T23-R1** | **Pin the seven refuted-mechanism sites.** Add to `packages/experiments/src/validation/documentation.test.ts`: for each of `docs/01-architecture.md`, `docs/05-roadmap.md`, `docs/07-handoff.md`, `core/src/dispatch/lifecycle.ts`, `core/src/model/types.ts`, `core/src/model/car/types.ts`, `core/src/sim/simulation.ts`, assert the file does **not** contain a sentence matching `/better under access control/i` unless the same file also contains `refuted` within 400 characters. Watch it fail by re-inserting the old sentence in one file. **Explicitly exclude** `core/src/model/car/estimateCost.ts`, whose "authorize and optimize in one step" is descriptive and true | § D60 records that nothing went red while all seven were wrong, which is the same defect class as a published number nothing re-derives. The corrections are prose, and prose is the only artefact in this repository nothing executes |
+| **T23-R2** | **Give the phase-status guard a fourth vocabulary term.** `documentation.test.ts`'s `statusFromProse` recognises *landed and accepted* / *a foundation only* / *not started*. Neither Phase 6 nor Phase 8 is "a foundation only", and all three documents now carry a paragraph explaining that the phrase is the guard's, not the author's. Add e.g. `are partially complete` mapping to `'partial'` and migrate the three documents in one commit | The guard currently forces a false-sounding phrase into the first line of the resume brief, which is the exact position review finding #18 was about |
+| **T23-R3** | **Scope `moduleTree.test.ts` to packages that exist** (C28), so deleting `packages/viz` does not redden `core` | Invariant 6's strong form is "core builds and tests with `viz` absent". A reviewer checking it hits a documentation coupling and reasonably reads it as a violation |
+| **T23-R4** | **Correct the two `core` docstrings** C20 and C21 | Stale figures in a docstring are the defect class `CLAUDE.md` § *A published number goes stale the same way* names |
+| **T23-R5** | **Move the four `editor*.ts` files into `packages/viz/src/editor/` and add the line to `docs/01`, in one commit** (C29) | Two-directional guard: neither half is valid alone |
+
+## Found by this pass
+
+**T23-F1 — Phase 6's criterion named a building, the raise dropped it, and nothing was measured
+there.** The original gate read *"a learned dispatcher beats the naive baselines on AWT and WT95
+**on the Mixed-Use High-Rise**"*. § D27 raised the metric clause and did not carry the building
+clause, and **no Phase 6a or 6b result is measured on `mixed-use-high-rise`** — the operating points
+are Midtown Office and Secure Tower interfloor-mix. The reasons for those two are good (Secure Tower
+is the only access-zoned building; Midtown is the unzoned control the difference-of-differences
+needs) and the substitution was never argued in writing. Dropping a named building from a criterion
+is the shape of a weakening, which `CLAUDE.md` forbids, and `mixed-use-high-rise` is separately the
+building whose achieved interval is `unmeasurable` by design — a real obstacle, not an excuse.
+**Not resolved by this pass**; recorded in `docs/05` § Phase 6 and `docs/07` § 8, and Phase 8's full
+experiment matrix is the natural place to close it.
+
+## What this pass could not verify, and says so rather than asserting
+
+- **C20's replacement figures (82.5 % / 21.2 %) and C21's 1.23 s band** are transcribed from Phase
+  8's oracle track. This pass verified that the stale text is still present; it did not re-derive the
+  replacements.
+- **`fuzz-1000384`'s verdict.** A fix is in flight in a concurrent task. Every document records it as
+  an **open finding** with its seed, its characterisation and its pre-existence proof, and none of
+  them declares Phase 8 clean. The orchestrator finalises the verdict at merge.
+- **The 87-row UX ledger's four ⚠️ rows** (`RV-11`, `RV-17`, `RV-21`, `KB-14`) are built and
+  reachable, and were neither driven nor tested by the task that inventoried them. They are carried
+  through as *unverified*, not as passing.

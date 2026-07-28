@@ -7,6 +7,12 @@ Companion to `T2-BLAST-RADIUS.md` § 4e, which flagged items 1 and 2 and deliber
 alone. This file closes them, names the cause of each, and records a **fourth** and **fifth**
 instance found by the guard built for the first three.
 
+> **Still authoritative as of 2026-07-28.** Every figure below stands, and the guard this task built
+> — `benchmark/published.test.ts` — has since been the mechanical proof of a second claim it was not
+> designed for: T21's fourth `awtIsValid` ground moved **no pinned estimate**, because
+> `aggregateMetric` reads `record.metrics[metric]` and never consults that flag. Twelve new pins
+> were added by Phase 6a/6b and none of the existing ones moved, verified key by key.
+
 ---
 
 ## 0. Headline

@@ -8,8 +8,18 @@ An elevator traffic simulator for designing and benchmarking smart dispatch algo
 Read [`docs/00-project-brief.md`](docs/00-project-brief.md) first, then
 [`docs/01-architecture.md`](docs/01-architecture.md).
 
-**Current status: Phases 0–3, 5 and 7 are landed and accepted, plus a five-command CLI. Phase 4 is a
-foundation only. Phases 6 and 8 are not started.**
+**Current status: Phases 0–5 and 7 are landed and accepted, plus a five-command CLI. Phases 6 and 8
+are a foundation only.** That last clause is the only phrase the status guard has, and it covers two
+different situations, so read it precisely:
+
+- **Phase 6** — 6a (destination *disclosure*) and 6b (destination *dispatch*) are accepted against a
+  **raised** criterion. 6c (learned control) is deferred out of the phase with reasons, not dropped.
+  Double-deck operation is configured, validated, disclaimed on every run — and not simulated.
+- **Phase 8** — seven tracks landed and found four real defects, three now fixed. The full
+  experiment matrix is not done, and one property violation (`fuzz-1000384`, a P5 deadlock) is
+  **open and blocks the phase's acceptance**. Phase 8's own rule is that a failure blocks release,
+  and it applies to findings the phase itself produced.
+
 [`docs/07-handoff.md`](docs/07-handoff.md) is the resume brief. Work proceeds by the phases
 in [`docs/05-roadmap.md`](docs/05-roadmap.md), which carries each phase's acceptance verdict and the
 measurements behind it. Read its **Standing requirement — the integration seam has an owner** before
@@ -19,6 +29,14 @@ The instructive one is the sixth: the whole of `tuning/` was reachable from noth
 tests, the module said so in its own docstring, and the roadmap asserted the phase green anyway. So
 the rule is not "is it reachable?" but **"name the non-test caller"**. A barrel re-export and a
 `{@link}` tag look exactly like a caller and are not one.
+
+**A stated mechanism goes stale the same way, and the correction is not yet pinned.** Seven places
+in this repository asserted, as fact, that destination dispatch does better under access control
+*because* authorization and optimization happen in the same step. Measured at n = 150 per building
+under common random numbers, the difference-of-differences is `+0.982 s [+0.584, +1.380]` — it buys
+*less* where access is controlled, and the saving is entirely in the credential. All seven are
+corrected; **no test asserts they stay corrected.** If you write a sentence about *why* something
+performs better, either measure it or say it is unmeasured.
 
 **A published number goes stale the same way.** Three figures in this repository did not reproduce
 from the code that was supposed to produce them — one measured before a seam was wired and never
@@ -66,7 +84,12 @@ average waiting time*, because the real difference is smaller than the noise.
 - Always feed **the same passenger traces** to every alternative under comparison (common
   random numbers). It is worth 5–20× in required run count.
 - If a configuration saturates, **flag it and suppress the AWT interval**. Do not report a
-  mean for a system whose queues grow without bound.
+  mean for a system whose queues grow without bound. **Saturation is one of four grounds**, not the
+  whole rule: `awtIsValid` also fails on an empty window, on censoring above the unserved limit, and
+  — since Phase 8 found a run publishing a mean beside a **922.7 s** wait — on a leg past the 900 s
+  abandonment horizon. The trend test sees a queue still growing at the horizon and the censoring
+  test sees one that has not cleared by it; **neither sees a queue that grew enormously and drained
+  just in time.** See [`docs/03` § Saturation detection](docs/03-traffic-and-statistics.md).
 
 Full detail in [`docs/03-traffic-and-statistics.md`](docs/03-traffic-and-statistics.md).
 
