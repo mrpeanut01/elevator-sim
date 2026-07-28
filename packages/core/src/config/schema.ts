@@ -67,6 +67,15 @@ export const ISSUE_CODES = {
   unknownDoorType: 'unknown-door-type',
   unknownTrafficProfile: 'unknown-traffic-profile',
   unknownCostTerm: 'unknown-cost-term',
+  /**
+   * A bank declares no cars.
+   *
+   * Raised by `resolveBuilding`. A building read from a file never reaches it, because
+   * {@link bankConfigSchema} refuses `cars: []` one stage earlier — but `resolveBuilding` is a
+   * public entry point that the editor, the fixtures and the fuzzers hand hand-built objects to,
+   * and it accepted what the schema rejects. Both gates now give the same verdict, which is also
+   * `deriveUpPeakTerms`' (`emptyGroup`): a group of zero cars has no interval.
+   */
   emptyBank: 'empty-bank',
   invalidConvention: 'invalid-convention',
   /** The building type has no row in `timing.passengerTransferS` and no car stated one. */

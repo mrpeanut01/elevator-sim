@@ -467,3 +467,164 @@ describe('resolveBuilding resolves passengerTransferS onto every ResolvedCar', (
     expect(Object.hasOwn(car, 'passengerTransferS')).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 5. A bank with no cars — C30 (the schema question behind UX.md's ED-12)
+// ---------------------------------------------------------------------------
+
+/**
+ * **A zero-car bank is an error, and it is an error at both gates.**
+ *
+ * `UX.md`'s `ED-12` wanted it to be a *warning* ("the run will simply have no service there").
+ * It does not simply have no service there. Measured on a seven-floor residential tower whose
+ * top floor was served only by a carless bank (`nearest-car`, `rise-and-fall`, seeds 1–12), ten
+ * of twelve seeds came back `awtIsValid: true` and published a mean over the passengers the
+ * *other* bank served; in two of those ten the reporting window itself held passengers who were
+ * never served at all, at 1.5 % and 4.3 % — under the 5 % censoring limit. The censoring and
+ * abandonment grounds are thresholds, so they are a backstop and not a gate, and
+ * `resolveBuilding` raised neither issue nor warning: `bankConfigSchema.cars.min(1)` was the
+ * only thing standing between that building and a run.
+ *
+ * So the schema is unchanged, and the second gate is raised to agree with it. The floor for
+ * "this bank has no service right now" is already in the model and is not an empty array: a car
+ * carries `mode`, and `serviceEvents` can take it out of service at a time — the last test here
+ * pins that, so the rule cannot be read as "delete the cars instead".
+ */
+describe('a bank with no cars is refused by both gates — C30', () => {
+  let specs: ElevatorSpecs;
+
+  beforeAll(async () => {
+    specs = parseElevatorSpecs(JSON.parse(await readFile(SPECS_FILE, 'utf8')), SPECS_FILE);
+  });
+
+  const FLOORS = [
+    { id: 'G', index: 0, heightM: 0 },
+    { id: '2', index: 2, heightM: 5 },
+    { id: '3', index: 3, heightM: 10 },
+  ] as const;
+
+  /** The same tower, with `cars` emptied on its only bank. */
+  function carlessTower(): Record<string, unknown> {
+    const tower = towerWith([...FLOORS]) as {
+      banks: { id: string; servesFloors: string[]; cars: unknown[] }[];
+    };
+    return {
+      ...(tower as unknown as Record<string, unknown>),
+      banks: tower.banks.map((bank) => ({ ...bank, cars: [] })),
+    };
+  }
+
+  it('parseBuilding refuses it, locating the empty array', () => {
+    let error: ConfigError | undefined;
+    try {
+      parseBuilding(carlessTower(), 'tower.json');
+    } catch (thrown) {
+      if (!(thrown instanceof ConfigError)) throw thrown;
+      error = thrown;
+    }
+
+    expect(error).toBeInstanceOf(ConfigError);
+    expect(error?.issues).toHaveLength(1);
+    expect(error?.issues[0]?.path).toBe('banks[0].cars');
+    expect(error?.issues[0]?.code).toBe(ISSUE_CODES.schema);
+    expect(error?.issues[0]?.message).toBe('a bank must have at least one car');
+  });
+
+  it('resolveBuilding refuses it too, by its own code — it used to accept it', () => {
+    // The hole this closes. `resolveBuilding` is a public entry point: the editor validates
+    // through it (D67 makes "resolveBuilding accepted it" the whole definition of a valid
+    // document), and the fixtures and fuzzers hand it objects the schema never saw. It returned
+    // this building with a zero-car bank, no issue and no warning.
+    let error: ConfigError | undefined;
+    try {
+      resolveBuilding(carlessTower() as never, specs, { file: 'tower.json' });
+    } catch (thrown) {
+      if (!(thrown instanceof ConfigError)) throw thrown;
+      error = thrown;
+    }
+
+    expect(error).toBeInstanceOf(ConfigError);
+    expect(error?.issues.map((issue) => issue.code)).toEqual([ISSUE_CODES.emptyBank]);
+    expect(error?.issues[0]?.path).toBe('banks[0].cars');
+    expect(error?.issues[0]?.file).toBe('tower.json');
+    // Names the bank, the number of floors it claims, and the two ways to say it differently.
+    expect(error?.issues[0]?.message).toContain('bank "main" declares no cars');
+    expect(error?.issues[0]?.message).toContain('3 floors');
+    expect(error?.issues[0]?.message).toContain('out-of-service');
+  });
+
+  it('reports one issue per carless bank, not just the first', () => {
+    const tower = towerWith([...FLOORS]) as {
+      banks: { id: string; servesFloors: string[]; cars: unknown[] }[];
+    };
+    const twoBanks = {
+      ...(tower as unknown as Record<string, unknown>),
+      banks: [
+        { ...tower.banks[0], id: 'low', cars: [] },
+        { ...tower.banks[0], id: 'high', cars: [] },
+      ],
+    };
+
+    let error: ConfigError | undefined;
+    try {
+      resolveBuilding(twoBanks as never, specs, { file: 'tower.json' });
+    } catch (thrown) {
+      if (!(thrown instanceof ConfigError)) throw thrown;
+      error = thrown;
+    }
+
+    expect(error?.issues.map((issue) => issue.path)).toEqual(['banks[0].cars', 'banks[1].cars']);
+  });
+
+  it('the other direction: a bank with one car parses, resolves, and warns about nothing', () => {
+    const building = parseBuilding(towerWith([...FLOORS]), 'tower.json');
+    const resolved = resolveBuilding(building, specs, { file: 'tower.json' });
+
+    expect(resolved.banks).toHaveLength(1);
+    expect(resolved.banks[0]?.cars.map((car) => car.id)).toEqual(['A']);
+    expect(resolved.warnings.map((warning) => warning.code)).toEqual([]);
+  });
+
+  it('the other direction, on the shipped data: all five still load, every bank with cars', async () => {
+    const ids = [
+      'garden-apartments',
+      'midtown-office',
+      'mixed-use-high-rise',
+      'secure-tower',
+      'vertical-city',
+    ];
+    for (const id of ids) {
+      const file = join(REPO_ROOT, 'data', 'buildings', `${id}.json`);
+      const resolved = resolveBuilding(
+        parseBuilding(JSON.parse(await readFile(file, 'utf8')), file),
+        specs,
+        { file },
+      );
+      expect(resolved.banks.length, id).toBeGreaterThan(0);
+      for (const bank of resolved.banks) {
+        expect(bank.cars.length, `${id}/${bank.id}`).toBeGreaterThan(0);
+      }
+    }
+  }, 30_000);
+
+  it('a bank whose only car is out of service is still legal — that is how you say it', () => {
+    // The check is about the *declaration*, not about whether anything is running. Service state
+    // is `mode` (and `serviceEvents`), and it stays a run-time fact with its own vocabulary —
+    // collapsing it into "delete the car" would lose the bank, its shafts and its zoning.
+    const tower = towerWith([...FLOORS]) as {
+      banks: { id: string; servesFloors: string[]; cars: Record<string, unknown>[] }[];
+    };
+    const parked = {
+      ...(tower as unknown as Record<string, unknown>),
+      banks: tower.banks.map((bank) => ({
+        ...bank,
+        cars: bank.cars.map((car) => ({ ...car, mode: 'out-of-service' })),
+      })),
+    };
+
+    const resolved = resolveBuilding(parseBuilding(parked, 'tower.json'), specs, {
+      file: 'tower.json',
+    });
+    expect(resolved.banks[0]?.cars.map((car) => car.mode)).toEqual(['out-of-service']);
+  });
+});

@@ -239,6 +239,34 @@ export function resolveBuilding(
   building.banks.forEach((bank, bankIndex) => {
     const at = `banks[${bankIndex}]`;
 
+    /*
+     * A bank is a group of cars. With none, `servesFloors` is a service claim with no shaft
+     * behind it — and nothing downstream said so. `Bank.fromConfig` builds it, `carCount` is 0,
+     * the dispatcher finds no eligible car, and the run *completes and reports*. `awtIsValid`
+     * does not save it: its censoring and abandonment grounds are thresholds, so a carless bank
+     * that strands less than the 5 % censoring limit publishes a mean over the passengers some
+     * *other* bank happened to serve. Measured on a seven-floor residential tower whose top
+     * floor was served only by a carless bank, ten of twelve seeds came back `awtIsValid: true`,
+     * two of them with passengers in the reporting window who were never served at all.
+     *
+     * `bankConfigSchema` already refuses `cars: []`, so a building read from a file never
+     * reaches here empty. This is for the other callers: `resolveBuilding` is a public entry
+     * point the editor, the fixtures and the fuzzers hand hand-built objects to (and § D67 makes
+     * "`resolveBuilding` accepted it" the editor's whole definition of valid), and it was the one
+     * gate that accepted what the schema rejects. `deriveUpPeakTerms` has always thrown
+     * `emptyGroup` for exactly this bank; this is the same verdict, two stages earlier.
+     *
+     * Authored `bank.cars` rather than the resolved list, so a bank whose cars all fail to
+     * resolve reports those failures and not this one on top of them.
+     */
+    if (bank.cars.length === 0) {
+      addIssue(
+        `${at}.cars`,
+        `bank "${bank.id}" declares no cars, so nothing serves the ${bank.servesFloors.length} floors it lists. A bank is a group of cars: with none, the run strands every passenger whose only bank this is and still reports a mean over the rest, and the closed form has no interval for a group of zero. To stop service without deleting the bank, set its cars' "mode" to "out-of-service" or schedule a serviceEvent; to remove the service, remove the bank.`,
+        ISSUE_CODES.emptyBank,
+      );
+    }
+
     const servedFloors: FloorConfig[] = [];
     const seenServed = new Set<string>();
     bank.servesFloors.forEach((floorId, floorIndex) => {
