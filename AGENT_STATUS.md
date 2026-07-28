@@ -57,6 +57,16 @@ changed has regressed the suite.
 | T5 `a3cb937` | clean | 124 files / **2531** tests | 2442 + 89 | ✅ matches |
 | T2 `0342982` | clean | 124 files / **2543** tests | 2531 + 12 | ✅ matches |
 | T1 `2f835d0` | clean | 126 files / **2578** tests | 2543 + 35 | ✅ matches |
+| T3 `9fb32e8` | clean | 128 files / **2590** tests | 2578 + 12 | ✅ matches |
+
+**All five wave-1 builders merged.** Worktrees for T1, T2, T3 and T5 removed and their branches
+deleted after merge + green suite, per the plan's worktree policy. `.worktrees/T6-blast-radius`
+remains (in flight).
+
+Note for future waves: `.gitignore`'s `node_modules/` pattern does not match a *symlink* named
+`node_modules`, so a worktree set up per D4 always reports one untracked entry. That is the
+orchestrator's own artifact, not the builder's work — check `git log <merged>..<branch>` is empty
+before concluding a worktree is dirty.
 
 ### Orchestrator re-verification of T2, run in the main checkout (C8 remediation)
 
