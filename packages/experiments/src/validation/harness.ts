@@ -172,7 +172,23 @@ export function gardenAt(arrivalRatePctPop5min: number): TrafficArmSpec {
  * Running
  * -------------------------------------------------------------------------- */
 
-/** The production stopping rule: the doc's half-width arithmetic, from `reports/statistics`. */
+/**
+ * **The production stopping rule**, and the one place the shipped loop control's estimator is
+ * chosen.
+ *
+ * `estimateMean` — Student-t at `n - 1`, at every `n` — so the rule's half-width is the *same
+ * number* the report will print for that cell. That is the point of injecting it here rather than
+ * a cheaper quantile: `acceptableRange` is a half-width target and `ConvergenceReport.status`
+ * decides `converged` from the published half-width, so a loop that stopped on a narrower estimate
+ * would stop at a precision the page then declines to call converged.
+ *
+ * docs/03-traffic-and-statistics.md § Part 3 writes the stopping rule with a `t` (n ≤ 25) / `z`
+ * (n > 25) crossover, and **this rule does not implement it.** The crossover would stop *earlier*
+ * — `stopping.ts` is explicit that "one that stops too early publishes a number it did not earn" —
+ * and after review finding #14 removed it from the published path it had no non-test caller left
+ * anywhere. It is deleted rather than kept exported behind a false caller list; § Part 3 of that
+ * doc needs correcting to `t[n-1]` at every `n`. See DECISIONS.md § D7.
+ */
 export const productionStoppingRule: StoppingRule = halfWidthStoppingRule((samples, { confidence }) =>
   estimateMean(samples, { confidence }),
 );

@@ -19,6 +19,10 @@
  *                       rank order is reported
  * ```
  *
+ * The illustration above is a 12-replication page, so its intervals are `t(11)` and are unchanged
+ * by the 2026-07 switch of published intervals to Student-t at every `n` (review finding #14):
+ * `n <= 25` was always `t`. Re-measured, not assumed — T2-BLAST-RADIUS.md § 4c.
+ *
  * ## What the formatter refuses to print
  *
  * - **A bare mean.** {@link formatMeanEstimate} always prints the interval, the half-width, the

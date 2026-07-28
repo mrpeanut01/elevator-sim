@@ -10,45 +10,49 @@
  * defensible printed page without a second module in the loop. Keeping it unexported means the
  * two can be reconciled later without a breaking API change, and cannot collide in the meantime.
  *
- * ## Two rules, two functions — do not conflate them
+ * ## One quantile, and why there is no longer a second one
  *
- * docs/03-traffic-and-statistics.md states an `n`-dependent quantile switch in exactly one place,
- * and it is **not** the one that publishes intervals. Read both:
+ * docs/03-traffic-and-statistics.md states the interval arithmetic in two places, and until
+ * 2026-07 this module implemented both:
  *
- * - **§ Part 3, "Sequential stopping rule"** (doc lines ~177-182) is a *loop-control* rule. It asks
- *   "is the precision I have yet good enough to stop?" and answers it with
- *
- *   ```
- *   halfWidth = t[n-1, conf] * (s / sqrt(n))     # n <= 25, t-distribution
- *   halfWidth = z[conf]      * (s / sqrt(n))     # n >  25, normal approximation
- *   ```
- *
- *   That crossover lives in {@link halfWidthQuantile} and nowhere else. It is cheap and it is
- *   allowed to be approximate, because being 5% optimistic about when to stop costs replications,
- *   not correctness.
- *
- * - **§ Part 4, "Use a paired-t interval"** (doc lines ~349-357) is the *published* interval, and
- *   it states one formula with no `n` in the choice of family:
+ * - **§ Part 4, "Use a paired-t interval"** (doc lines ~349-357) is the *published* interval. It
+ *   states one formula with no `n` in the choice of family:
  *
  *   ```
  *   D̄ ± t[n-1, conf] * (s_D / sqrt(n))
  *   ```
  *
  *   That is {@link publishedIntervalQuantile}, and it is the only quantile {@link estimateMean}
- *   and {@link pairedDifferenceEstimate} are allowed to reach.
+ *   and {@link pairedDifferenceEstimate} reach.
  *
- * Until 2026-07 the second called the first. Review finding #14 measured the consequence: at n=26
+ * - **§ Part 3, "Sequential stopping rule"** (doc lines ~177-182) is *loop control*. The doc writes
+ *   it with a crossover — `t[n-1, conf]` at `n <= 25`, `z[conf]` above — on the argument that a
+ *   stopping decision may be approximate because being 5% optimistic about when to stop costs
+ *   replications rather than validity.
+ *
+ * **That argument does not survive the two rules sharing a target.** The runner's
+ * `acceptableRange` is a half-width target, and the report's `ConvergenceReport` decides
+ * `converged` from the *published* half-width. Give the loop control a narrower quantile than the
+ * page and the two disagree about the same cell: the runner stops, and the page prints a
+ * half-width above the target it stopped at. So this module no longer ships a second quantile.
+ * `validation/harness.ts`'s `productionStoppingRule` injects {@link estimateMean} itself, the loop
+ * stops exactly when the published interval meets its target, and the crossover — which had **no
+ * non-test caller** after review finding #14 was fixed — is deleted rather than left exported
+ * with a caller list nothing satisfies (docs/05-roadmap.md § *Standing requirement*, and
+ * DECISIONS.md § D7). docs/03 § Part 3's four-line rule is therefore **not** implemented as
+ * written and needs correcting to `t[n-1]` at every `n`; that doc is not this module's to edit.
+ *
+ * Review finding #14 measured what the crossover cost when it *was* on the published path: at n=26
  * the published half-width used z=1.95996 where the doc prescribes t(25)=2.06390, so it was 4.83%
  * too narrow and a nominal 95% interval had **93.876%** actual coverage — a 6.12% false-positive
  * rate against a declared 5%. At the project's documented 50-200 replication budget that applied to
  * *every* comparison the repository published, under a CLI line reading "the paired-t interval".
  * Three of 148 real paired comparisons in the review's sweep flipped verdict.
  *
- * The separation here is structural rather than advisory: the two quantiles are two functions with
- * different names, different return types (the published one is narrowed to `'t'` and cannot say
- * `'z'`), a different visibility and different tests, and `estimateMean` names the published one
- * directly. Re-introducing the bug means editing a call site that says
- * `publishedIntervalQuantile` and typing something else.
+ * The guarantee is now structural rather than advisory: there is exactly one quantile function,
+ * its return type is narrowed to `'t'` and cannot say `'z'`, and no exported symbol in this
+ * package will choose a normal quantile by `n`. Re-introducing the bug means writing a new
+ * function to do it.
  *
  * § "AWT is lognormal, but approximate it as normal" is the licence for using a normal-theory
  * interval on a quantity that cannot be negative: Peters & Abbi tested Cox's lognormal interval
@@ -74,18 +78,6 @@ import { ReportsError, type IntervalMethod, type MeanEstimate } from './types.js
 /* -------------------------------------------------------------------------- *
  * Constants
  * -------------------------------------------------------------------------- */
-
-/**
- * Replication count at or below which **the sequential stopping rule** uses the t-distribution.
- *
- * docs/03-traffic-and-statistics.md § Part 3, "Sequential stopping rule". Above it that rule uses
- * the normal approximation, which is what the doc's z table is for.
- *
- * This constant has no bearing on a *published* interval. {@link estimateMean} and
- * {@link pairedDifferenceEstimate} use Student-t at `n - 1` at every `n`, per § Part 4. See the
- * module docstring; conflating the two was review finding #14.
- */
-export const T_DISTRIBUTION_MAX_N = 25;
 
 /**
  * Default two-sided confidence level.
@@ -133,6 +125,25 @@ export function sampleStdDevOf(values: readonly number[], mean = meanOf(values))
  * Acklam's rational approximation with one Halley refinement against `erfc`; absolute error below
  * 1e-15 across the range this module uses. Reproduces the doc's z table exactly at the printed
  * precision: 1.04, 1.28, 1.65, 1.96, 2.58 for 70/80/90/95/99% two-sided.
+ *
+ * **This function has no production caller, and that is a claim rather than an oversight**
+ * (docs/05-roadmap.md § *Standing requirement*). Deleting `halfWidthQuantile` — see the module
+ * docstring and DECISIONS.md § D7 — removed the last one, because no interval this package
+ * publishes or stops on is a normal-theory interval any more. It is kept for two reasons, both
+ * checkable:
+ *
+ * 1. It is the **reference the t quantile is validated against.** `studentTQuantile(p, 1e6)` must
+ *    converge on it, and `estimateMean`'s interval must stay strictly wider than it past n = 25 —
+ *    the two assertions in `statistics.test.ts` that would catch a t implementation drifting onto
+ *    the wrong family. A hard-coded table cannot do that at arbitrary confidence.
+ * 2. It **pins the one `z` this repository still uses.** `benchmark/verdict.ts` states its
+ *    replication-planning arithmetic `n >= (z · s_D / |d|)²` in `z` deliberately (a planning figure
+ *    in the hundreds, where t and z agree to under a percent, and where using t would need the
+ *    answer to know its own degrees of freedom) and hard-codes `Z_95 = 1.959963984540054`.
+ *    `statistics.test.ts` asserts `normalQuantile(0.975)` against that same literal, so the two
+ *    cannot drift apart silently.
+ *
+ * If either reason lapses, delete this rather than widening the justification.
  */
 export function normalQuantile(p: number): number {
   if (!(p > 0 && p < 1)) {
@@ -217,36 +228,12 @@ export function studentTCdf(t: number, df: number): number {
 }
 
 /**
- * **The sequential stopping rule's quantile.** Not the published interval's — see
- * {@link publishedIntervalQuantile}, and the module docstring's "Two rules, two functions".
- *
- * The `n <= 25` t / `n > 25` z split is docs/03-traffic-and-statistics.md § Part 3's, verbatim, and
- * is deliberately left intact: it governs *when a run loop stops*, where a slightly optimistic
- * half-width costs replications rather than validity. Feeding it to a reported confidence interval
- * is what made a nominal 95% interval cover 93.876% (review finding #14), and no caller in this
- * module does that any more.
- *
- * Callers: the runner's injected {@link HalfWidthEstimator}, and the convergence report's fallback
- * label for a stopping-rule half-width that no estimate accompanied.
- */
-export function halfWidthQuantile(
-  n: number,
-  confidence: number,
-): { readonly quantile: number; readonly method: IntervalMethod } {
-  assertConfidence(confidence);
-  const p = 1 - (1 - confidence) / 2;
-  if (n <= T_DISTRIBUTION_MAX_N) {
-    return { quantile: studentTQuantile(p, n - 1), method: 't' };
-  }
-  return { quantile: normalQuantile(p), method: 'z' };
-}
-
-/**
- * **The published interval's quantile:** Student-t at `n - 1` degrees of freedom, at every `n`.
+ * **The only interval quantile this package has:** Student-t at `n - 1` degrees of freedom, at
+ * every `n`.
  *
  * Module-private on purpose. It is not part of the package's surface — `estimateMean` is — and the
  * package barrel is owned elsewhere; keeping it internal also means there is exactly one caller and
- * therefore exactly one place a published interval's family is decided.
+ * therefore exactly one place an interval's family is decided.
  *
  * docs/03-traffic-and-statistics.md § Part 4, "Use a paired-t interval", states one formula and
  * puts no `n` in the choice of family:
@@ -290,9 +277,12 @@ export interface EstimateOptions {
  * Mean, spread and confidence interval over one value per replication.
  *
  * The interval is **Student-t at `n - 1`, at every `n`** ({@link publishedIntervalQuantile}), so
- * `method` is always `'t'` and `degreesOfFreedom` is always `n - 1` on a returned interval. If you
- * are looking for the `n > 25` normal approximation, it is {@link halfWidthQuantile} and it belongs
- * to the sequential stopping rule.
+ * `method` is always `'t'` and `degreesOfFreedom` is always `n - 1` on a returned interval. There
+ * is no `n > 25` normal approximation anywhere in this package any more, on the published path or
+ * on the stopping rule's — see the module docstring's "One quantile".
+ *
+ * This is also the estimator `validation/harness.ts` injects into `halfWidthStoppingRule`, so a
+ * sequentially-stopped experiment stops exactly when the interval it will print meets its target.
  *
  * @throws ReportsError on an empty sample, or on any non-finite value. A `NaN` that reaches a
  *   mean produces a `NaN` interval, which prints as an interval and is not one; the caller's job
@@ -349,8 +339,8 @@ export function estimateMean(
     });
   }
 
-  /* Student-t at n - 1, at every n. NOT `halfWidthQuantile` — that is the stopping rule's, and
-     borrowing it here is review finding #14. See the module docstring. */
+  /* Student-t at n - 1, at every n — the one quantile this module has. Choosing a normal
+     quantile by `n` here is review finding #14. See the module docstring. */
   const { quantile, method } = publishedIntervalQuantile(n, confidence);
   const halfWidth = quantile * standardError;
   return Object.freeze({

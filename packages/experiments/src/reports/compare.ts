@@ -39,12 +39,7 @@
  * every estimate either way.
  */
 
-import {
-  estimateMean,
-  halfWidthQuantile,
-  pairedDifferenceEstimate,
-  DEFAULT_CONFIDENCE,
-} from './statistics.js';
+import { estimateMean, pairedDifferenceEstimate, DEFAULT_CONFIDENCE } from './statistics.js';
 import {
   ReportsError,
   intervalContainsZero,
@@ -604,7 +599,18 @@ function convergenceOf(
     ...(target === undefined ? {} : { targetHalfWidth: target }),
     achievedHalfWidth,
     confidence,
-    method: estimate?.method ?? halfWidthQuantile(Math.max(replications, 2), confidence).method,
+    /*
+     * `'t'`, always — including when `achievedHalfWidth` is `NaN` because the headline metric was
+     * suppressed and there is no estimate to read a family off.
+     *
+     * `formatConvergence` never prints this field, so a wrong value here is invisible on the page
+     * and fully present in a serialized `ConvergenceReport` — which is exactly the mislabelling
+     * review finding #14 was about, one layer down. It used to fall back to a quantile chooser
+     * that returned `'z'` past n = 25, so a suppressed metric could stamp `'z'` on a report whose
+     * every printed interval was `t`. There is now one family: `estimateMean` is Student-t at
+     * every `n`, and so is the stopping rule `validation/harness.ts` injects.
+     */
+    method: estimate?.method ?? ('t' as const),
   });
 }
 

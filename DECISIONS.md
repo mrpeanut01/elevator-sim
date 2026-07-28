@@ -122,3 +122,74 @@ vite 8.1.5 (vitest brings it), so nothing is blocked until the lock is regenerat
 
 **Impact.** Tracked as C1 in `AGENT_STATUS.md`. Wave 1 does not close until it is done and the
 suite is re-run against the refreshed lock.
+
+---
+
+## D7 — The sequential stopping rule uses the published estimator; `halfWidthQuantile` is deleted
+
+**Date:** 2026-07-27 · **Owner:** T6
+
+**Context.** Review finding #14 moved published intervals to Student-t at `n − 1` at every `n`.
+That took `reports/statistics.ts`'s `halfWidthQuantile` — the `t` (n ≤ 25) / `z` (n > 25) crossover
+that [`docs/03-traffic-and-statistics.md`](docs/03-traffic-and-statistics.md) § Part 3 states as the
+*sequential stopping rule's* rule — off the published path. Afterwards it had **no non-test
+production caller**: `validation/harness.ts:176` builds `productionStoppingRule` by injecting
+`estimateMean` (t-always), and the only other reference was a fallback label at
+`reports/compare.ts:607` for a family `formatConvergence` never prints. Its own docstring claimed
+"Callers: the runner's injected `HalfWidthEstimator`, and the convergence report's fallback label";
+nothing injected it. That is the shape [`docs/05-roadmap.md`](docs/05-roadmap.md)'s **Standing
+requirement — the integration seam has an owner** exists to catch, arriving for the seventh time and
+created by a fix.
+
+**Alternatives.** (a) Inject a crossover estimator built on `halfWidthQuantile` into
+`productionStoppingRule`, so § Part 3's rule is implemented in the loop control where it belongs
+while published intervals stay t-always. (b) Delete `halfWidthQuantile` and stop claiming the
+crossover is implemented, which makes § Part 3 wrong as written. (c) Leave it exported and unused.
+
+**Chosen:** (b). **Why:**
+
+1. **The two rules share a target, so they cannot use different quantiles.** `acceptableRange` is a
+   half-width target, and `ConvergenceReport.status` decides `converged` from the *published*
+   half-width. Under (a) the runner stops on a half-width 2–5 % narrower than the one the page
+   prints, so a cell can stop while its own report says `IN PROGRESS`. Two numbers for the same
+   quantity on the same cell is the mislabelling class of finding #14, one layer down.
+2. **(a) stops earlier, which is the unsafe direction.** `runner/stopping.ts` states it: "an
+   experiment that runs too long wastes CPU, and one that stops too early publishes a number it did
+   not earn." (b) is the conservative option *and* the smaller diff; it was chosen for the first
+   reason, and the second is noted so it cannot be mistaken for the motive.
+3. **§ Part 3's own justification does not survive.** The doc allows the stopping rule to be
+   approximate because "being 5 % optimistic about when to stop costs replications, not
+   correctness". That holds only while the stopping half-width is never published. It is published:
+   the runner records it on `StoppingVerdict` and a cell's replication count is explained from it.
+4. **(c) is the defect itself.** A symbol may have no caller only with a recorded reason
+   (`tuning/deadCode.test.ts` § `PUBLIC_API_ONLY`); "the doc mentions a crossover" is not one.
+
+`T_DISTRIBUTION_MAX_N` goes with it: after (b) it had no code use, and an exported constant
+documenting a crossover nothing implements is the same defect in a smaller package.
+
+**Impact.**
+
+- Deleted: `halfWidthQuantile`, `T_DISTRIBUTION_MAX_N` (from `reports/statistics.ts` and the
+  `packages/experiments` barrel). Nothing outside `packages/experiments` referenced either.
+- `reports/compare.ts:607` now defaults `ConvergenceReport.method` to `'t'`, so a suppressed
+  headline metric past n = 25 can no longer stamp `'z'` on a serialized report.
+- `runner/stopping.test.ts` gains a `productionStoppingRule` block asserting that the loop control's
+  half-width equals the published one at n = 10, 25, 26 and 200, and that it is strictly wider than
+  the doc's crossover past 25. That block, not a docstring, is now what owns the decision.
+- `runner/fixtures.test-helper.ts`'s `docHalfWidth` double keeps the crossover **on purpose** — an
+  estimator whose family differs from the shipped one is what proves `halfWidthStoppingRule` records
+  the estimate verbatim instead of re-deriving it. Its docstring now says so.
+- **Hand-back to the orchestrator:** `docs/03-traffic-and-statistics.md` § Part 3's four-line rule
+  still reads `t[n-1]` for `n ≤ 25` and `z[conf]` above. It must become `t[n-1]` at every `n`, or
+  state that the crossover is a description of the literature and not of this simulator. `docs/` is
+  not T6's to edit.
+- **`normalQuantile` is left exported with no production caller, and that is now a stated claim.**
+  Deleting `halfWidthQuantile` removed its last one. It is kept because it is the reference
+  `studentTQuantile` is validated against (`studentTQuantile(p, 1e6)` must converge on it, and the
+  published interval must stay strictly wider than it past n = 25) and because
+  `statistics.test.ts` pins it against the `Z_95 = 1.959963984540054` literal
+  `benchmark/verdict.ts` hard-codes for replication planning — the one `z` left in the repository.
+  Both reasons are in its docstring, with an instruction to delete rather than widen them.
+- No replication count in the suite changed: `productionStoppingRule` already injected
+  `estimateMean` before this change. This decision removes a dead alternative, it does not alter
+  behaviour.

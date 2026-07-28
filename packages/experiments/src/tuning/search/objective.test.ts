@@ -259,7 +259,7 @@ describe('the seam, through the real runner and the real data directory', () => 
    *
    * docs/06 leaves `predictive-balanced`'s `idle.repositionThresholdS: 8` as shipped, on purpose,
    * so that Phase 7 has ground truth: Phase 5's sweep on Garden Apartments at n = 300 found an
-   * **interior optimum at 2 s** worth −1.110 s [−1.548, −0.671] against `stay`, with the curve
+   * **interior optimum at 2 s** worth −1.110 s [−1.550, −0.670] against `stay`, with the curve
    * turning back up below it as repositioning churn sets in.
    *
    * Nothing here is told about elevators, deadbands or the number 2. A one-dimensional box, a
@@ -299,9 +299,9 @@ describe('the seam, through the real runner and the real data directory', () => 
     expect(identical.length).toBeGreaterThanOrEqual(8);
     for (const evaluation of identical) expect(at(evaluation)).toBeGreaterThan(3.5);
 
-    // And it is **not** declared a win. Measured: −0.598 s [−1.991, +0.795] at n = 30 — the
+    // And it is **not** declared a win. Measured: −0.598 s [−2.051, +0.856] at n = 30 — the
     // interval contains zero, so this budget locates the region and cannot resolve the effect.
-    // Phase 5 needed n = 300 for [−1.548, −0.671]. The search reports the difference; classifying
+    // Phase 5 needed n = 300 for [−1.550, −0.670]. The search reports the difference; classifying
     // it is `benchmark/verdict.ts`'s job and it would say INDISTINGUISHABLE here.
     const paired = pairedDifferenceEstimate(result.best.samples, incumbent?.samples ?? [], {
       confidence: 0.95,

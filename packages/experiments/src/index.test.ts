@@ -102,9 +102,12 @@ describe('Phase 3 is usable through the barrel alone', () => {
     const estimate = barrel.pairedDifferenceEstimate(candidate, baseline, { confidence: 0.95 });
     expect(estimate.n).toBe(10);
     expect(estimate.mean).toBeCloseTo(2, 9);
-    /* n = 10 is at or below `T_DISTRIBUTION_MAX_N`, so the t family is the one the doc prescribes. */
-    expect(barrel.T_DISTRIBUTION_MAX_N).toBe(25);
+    /* Student-t at n − 1, at every n: docs/03 § Part 4, and the only family the barrel exposes. */
     expect(estimate.method).toBe('t');
+    expect(estimate.degreesOfFreedom).toBe(9);
+    /* The n-dependent crossover to a normal quantile is gone from the surface, not merely unused. */
+    expect('halfWidthQuantile' in barrel).toBe(false);
+    expect('T_DISTRIBUTION_MAX_N' in barrel).toBe(false);
     expect(barrel.intervalContainsZero(estimate)).toBe(false);
 
     /* And the same series against itself is the null: an interval of exactly [0, 0]. */

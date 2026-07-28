@@ -49,9 +49,9 @@
  *
  * `predictive-balanced` — ten weighted terms, deferred assignment, split demand, adaptive dwell,
  * reassignment on deceleration — beats the baseline and **loses to `eta`** on AWT everywhere:
- * `+3.00 s [+2.60, +3.41]` on Midtown, `+1.76 s [+1.55, +1.98]` on Secure Tower, `+1.05 s
+ * `+3.00 s [+2.59, +3.41]` on Midtown, `+1.76 s [+1.54, +1.98]` on Secure Tower, `+1.05 s
  * [+0.94, +1.17]` on Garden. It buys that with TTD, where it is better than `eta` on Midtown
- * (`-1.14 s [-1.79, -0.49]` paired). That is a real Pareto trade and docs/06 § *Do not scalarize too
+ * (`-1.14 s [-1.80, -0.48]` paired). That is a real Pareto trade and docs/06 § *Do not scalarize too
  * early* predicted it exactly: more terms is not more performance on the metric you happen to be
  * reading.
  *
