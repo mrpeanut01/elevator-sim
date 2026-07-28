@@ -32,6 +32,7 @@ import {
   type QueueSample,
   type ReportWindow,
   type RunRecord,
+  type TravelSample,
 } from './types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -102,6 +103,27 @@ export const carTimingsSchema = z.strictObject({
   levelingSettleS: z.number().min(0).optional(),
 });
 
+/**
+ * One completed car move, with its energy proxy.
+ *
+ * `workJ` is stored rather than recomputed on read, for the reason every other derived-but-stored
+ * field in this package is *not*: it is not derived from the rest of the record by this build's
+ * arithmetic alone, it is derived by whichever build wrote it. `COUNTERWEIGHT_BALANCE_RATIO` is a
+ * measurement convention; recomputing on read would silently restate an old dataset's energy under
+ * a new convention and make two runs of the same building incomparable across a version boundary.
+ * The four inputs travel with it, so a reader that disagrees with the convention can redo the sum
+ * and see that it did.
+ */
+export const travelSampleSchema = z.strictObject({
+  at: simTime,
+  carId: identifier,
+  distanceM: z.number().gt(0),
+  direction: z.enum(DIRECTIONS),
+  loadKg: z.number().min(0),
+  ratedLoadKg: z.number().gt(0),
+  workJ: z.number().min(0),
+});
+
 export const queueSampleSchema = z.strictObject({
   at: simTime,
   waiting: z.number().min(0),
@@ -129,6 +151,10 @@ export const runRecordSchema = z.strictObject({
   passengers: z.array(passengerRecordSchema),
   loadSamples: z.array(loadSampleSchema),
   queueSamples: z.array(queueSampleSchema),
+  // Optional in both directions: a record written before the energy axis existed parses
+  // unchanged, and a record written by a run that sampled travel round-trips it. Absence means
+  // *not measured*, which `summarizeRun` reports rather than zeroing.
+  travelSamples: z.array(travelSampleSchema).optional(),
   metadata: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
 });
 
@@ -211,4 +237,5 @@ type _PassengerRecordConforms = Conforms<PassengerRecord, z.infer<typeof passeng
 type _LoadSampleConforms = Conforms<LoadSample, z.infer<typeof loadSampleSchema>>;
 type _CarTimingsConforms = Conforms<CarTimings, z.infer<typeof carTimingsSchema>>;
 type _QueueSampleConforms = Conforms<QueueSample, z.infer<typeof queueSampleSchema>>;
+type _TravelSampleConforms = Conforms<TravelSample, z.infer<typeof travelSampleSchema>>;
 type _RunRecordConforms = Conforms<RunRecord, z.infer<typeof runRecordSchema>>;

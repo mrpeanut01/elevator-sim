@@ -89,20 +89,27 @@ export const WT95_OBJECTIVE_ID = 'wt95';
 /**
  * The three axes docs/06 § Guardrails names, as data.
  *
- * ## The energy axis is a seam, and it is currently open
+ * ## The energy axis is a seam, and it is now filled
  *
  * `awt` and `wt95` project fields Phase 3 already records. `energy` projects
- * {@link TuningObservation.energyProxy}, which **nothing in the simulator currently fills**: `core`'s
- * `RunSummary` has no energy, no metres travelled and no stop count, and `runner/metrics.ts`
- * projects nineteen scalars, none of them an energy proxy. docs/06 § Term library names
- * `distanceTravelled` as the energy proxy, but that term lives inside the dispatch *cost function*,
- * scoring a hypothetical assignment; it is not an outcome the run records.
+ * {@link TuningObservation.energyProxy}, and until Phase 8's experiment matrix landed **nothing in
+ * the simulator filled it**: `core`'s `RunSummary` carried no energy, no metres travelled and no
+ * stop count, and `runner/metrics.ts` projected nineteen scalars, none of them an energy proxy.
+ * The consequence was visible rather than papered over — with no proxy supplied the energy
+ * objective was **suppressed** on every candidate, `UNQUOTABLE` in every comparison, and the front
+ * degenerated to two axes with a report-level note saying so.
  *
- * The consequence is deliberate and visible rather than papered over: with no proxy supplied the
- * energy objective is **suppressed** on every candidate, `UNQUOTABLE` in every comparison, and the
- * front degenerates to two axes with a report-level note saying so. It is not defaulted to zero
+ * `core` now records a per-move travel sample and `RunSummary.energy` summarizes it over the
+ * reporting window, so `runner/metrics.ts` projects `energyKJ` and a caller has something honest to
+ * pass. **The suppression path is not dead and must not be deleted**: a stored record written
+ * before the travel record existed carries no `travelSamples`, `summarizeRun` reports
+ * `energy.measured: false` with `NaN` rather than `0`, and this table then suppresses the axis
+ * exactly as it did before. `pareto.test.ts` exercises that path directly, which is why its
+ * fixtures still supply no proxy.
+ *
+ * What has **not** changed is the refusal to default: the proxy is still not zeroed when absent
  * (which would make every candidate tie on energy and silently restore the two-axis front without
- * saying it did) and it is not reconstructed from passenger records (which describe where
+ * saying it did) and still not reconstructed from passenger records (which describe where
  * passengers went, not where the cars went — missing exactly the deadheading that stage 7 spends
  * energy on).
  *
@@ -132,7 +139,7 @@ export const TUNING_OBJECTIVES: readonly ObjectiveSpec[] = Object.freeze([
     invalidatedBySaturation: false,
     valueOf: (observation: TuningObservation) => observation.energyProxy ?? Number.NaN,
     description:
-      'Energy consumed over the window, or a proxy for it. Not currently measured by the simulator — see the objective table docstring.',
+      'Energy consumed over the window, or a proxy for it. Supplied by the caller: `core` records out-of-balance mechanical work per car move and `runner/metrics.ts` projects it as `energyKJ`. Absent on a record written before that existed, and then suppressed rather than defaulted — see the objective table docstring.',
   }),
   Object.freeze({
     id: WT95_OBJECTIVE_ID,
@@ -320,7 +327,8 @@ export interface CompareObjectiveOptions {
  *
  * A restatement of `benchmark/verdict.ts`'s `classify`, generalized over
  * {@link MetricDirection}. `classify` takes a `PairedComparison`, which is keyed by a
- * `ReplicationMetric`; the energy proxy is not one (see {@link TUNING_OBJECTIVES}), so a
+ * `ReplicationMetric`; the energy proxy is supplied through {@link TuningObservation.energyProxy}
+ * rather than named as one here (see {@link TUNING_OBJECTIVES}), so a
  * `PairedComparison` cannot be constructed for it without stamping a false metric name onto the
  * result. `classify` also hard-codes "negative is better", which is true of every metric Phase 5
  * compares and is not a property this module may assume.

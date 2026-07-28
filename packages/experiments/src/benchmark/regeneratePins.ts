@@ -21,7 +21,9 @@ import { runAccessControlStudy } from './accessControl.js';
 import { runCapacityReassignmentStudy } from './capacityReassignment.js';
 import { runDestinationDisclosureStudy } from './destinationDisclosure.js';
 import { runDestinationDispatchStudy } from './destinationDispatchContrast.js';
+import { runMatrix } from './matrix.js';
 import { runMixedUseHighRiseStudy } from './mixedUseHighRise.js';
+import { runPhase7Acceptance } from './phase7Acceptance.js';
 import { auditForecastCausalityInRun } from './predictorLag.js';
 import { runPrepositioningStudy } from './prepositioning.js';
 import { TAIL_CENSUS_LOADS, runTailStudy } from './tailStudy.js';
@@ -35,7 +37,9 @@ import {
   capacityFigures,
   causalityFigures,
   disclosureFigures,
+  matrixFigures,
   mixedUseFigures,
+  phase7Figures,
   prepositioningFigures,
   tailFigures,
   type PinnedEstimate,
@@ -57,6 +61,8 @@ export async function measureAllPublishedFigures(): Promise<
     'destination-dispatch': dispatchContrastFigures(await runDestinationDispatchStudy({})),
     'access-control': accessControlFigures(await runAccessControlStudy({})),
     'mixed-use-high-rise': mixedUseFigures(await runMixedUseHighRiseStudy({ resources })),
+    matrix: matrixFigures(await runMatrix({ resources })),
+    'phase7-acceptance': phase7Figures(await runPhase7Acceptance({})),
   };
 }
 

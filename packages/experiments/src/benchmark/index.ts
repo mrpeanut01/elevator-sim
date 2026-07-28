@@ -660,6 +660,71 @@ export {
 export type { ArmResult, BenchmarkRunOptions, CaseResult } from './suite.js';
 
 /* -------------------------------------------------------------------------- *
+ * Phase 8's experiment matrix, and Phase 7's acceptance interval at a real budget
+ * -------------------------------------------------------------------------- */
+
+export {
+  EXCLUDED_CELLS,
+  MATRIX_ARM_PROFILES,
+  MATRIX_BASELINE,
+  MATRIX_CELLS,
+  MATRIX_METRICS,
+  MATRIX_SEED,
+  MAX_REPLICATIONS,
+  MIN_REPLICATIONS,
+  NEAR_NEIGHBOUR_CORRELATION,
+  TARGET_HALF_WIDTH_S,
+  budgetFor,
+  cellResult,
+  matrixCell,
+  runMatrix,
+  runMatrixCell,
+} from './matrix.js';
+
+export type {
+  BudgetBasis,
+  ExcludedCell,
+  FrontExclusion,
+  MatrixCell,
+  MatrixCellResult,
+  NearNeighbourPair,
+} from './matrix.js';
+
+export {
+  PHASE7_CASE_ID,
+  PHASE7_DEADBANDS_S,
+  PHASE7_HOLDOUT_SEED,
+  PHASE7_REFERENCE_PROFILE,
+  PHASE7_REPLICATIONS,
+  PHASE7_TUNING_SEED,
+  atDeadband,
+  deadbandArmId,
+  runPhase7Acceptance,
+} from './phase7Acceptance.js';
+
+export type {
+  Phase7AcceptanceOptions,
+  Phase7AcceptanceStudy,
+  Phase7Interval,
+} from './phase7Acceptance.js';
+
+export {
+  LIVENESS_REPLICATIONS,
+  LIVENESS_SEED,
+  LIVENESS_STRATEGIES,
+  LIVENESS_PROFILE,
+  atStrategy,
+  measureEnergyLiveness,
+  strategyArmId,
+} from './energyLiveness.js';
+
+export type {
+  EnergyArmMeasurement,
+  EnergyLivenessOptions,
+  EnergyLivenessStudy,
+} from './energyLiveness.js';
+
+/* -------------------------------------------------------------------------- *
  * Reporting
  * -------------------------------------------------------------------------- */
 

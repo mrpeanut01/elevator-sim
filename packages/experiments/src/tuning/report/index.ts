@@ -50,15 +50,25 @@
  * path against the real `data/` directory, so the acceptance artefact this phase is judged on is
  * produced by a code path rather than described by one.
  *
- * ## One open seam, stated rather than papered over
+ * ## The seam that was open, and the part of it that stays
  *
- * **The energy axis is not measured anywhere in the simulator.** `core`'s `RunSummary` carries no
- * energy, no metres travelled and no stop count, and `runner/metrics.ts` projects nineteen scalars,
- * none of them an energy proxy; docs/06's `distanceTravelled` is a *cost-function term*, scoring a
- * hypothetical assignment, not an outcome of a finished run. So {@link TuningObservation} carries an
- * optional `energyProxy`, and with nothing supplying it the energy objective is **suppressed** on
- * every candidate with that reason printed on the page. It is not defaulted to zero (which would
- * make every candidate tie and silently restore a two-axis front) and it is not reconstructed from
+ * **The energy axis had nothing filling it for most of this project's life.** `core`'s `RunSummary`
+ * carried no energy, no metres travelled and no stop count, and `runner/metrics.ts` projected
+ * nineteen scalars, none of them an energy proxy; docs/06's `distanceTravelled` is a *cost-function
+ * term*, scoring a hypothetical assignment, not an outcome of a finished run. So
+ * {@link TuningObservation} carries an optional `energyProxy`, and with nothing supplying it the
+ * energy objective was **suppressed** on every candidate with that reason printed on the page.
+ *
+ * Phase 8's experiment matrix closed it. `core` records one travel sample per completed car move,
+ * `RunSummary.energy` summarizes them over the reporting window, `runner/metrics.ts` projects
+ * `energyKJ`, and `benchmark/matrix.ts` and `benchmark/phase7Acceptance.ts` are the two non-test
+ * callers that pass it in. Both of this module's fronts are now decided over all three axes.
+ *
+ * **The suppression path stays, and must not be deleted as dead.** A stored record written before
+ * the travel record existed carries no samples, `summarizeRun` reports `energy.measured: false`
+ * with `NaN` rather than `0`, and the axis is suppressed exactly as it was — which is what keeps
+ * every Phase 5 and Phase 6 record readable. It is still not defaulted to zero (which would make
+ * every candidate tie and silently restore a two-axis front) and still not reconstructed from
  * passenger records (which describe where passengers went, not where the cars went — missing exactly
  * the deadheading stage 7 spends energy on).
  */

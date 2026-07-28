@@ -313,7 +313,7 @@ export function isDestinationCallType(callType: CallType): boolean {
  * profile that merely discloses the destination (`callType: destination-entry`, the Phase 6a
  * arm) is untouched by this parameter existing. Turning it on is the passenger-model change,
  * which is why it is a declared categorical the search space can see rather than an implicit
- * consequence of `callType` — a run of the two is not comparable on nine of the nineteen
+ * consequence of `callType` — a run of the two is not comparable on nine of the twenty-three
  * replication metrics, and a switch nobody declared could not be told from a dispatcher gain.
  */
 export const PASSENGER_ASSIGNMENT_MODES = ['none', 'panel'] as const;

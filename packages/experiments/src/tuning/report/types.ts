@@ -97,17 +97,21 @@ export const SEED_SET_ROLES: readonly SeedSetRole[] = Object.freeze(['tuning', '
  *
  * ## Why `energyProxy` is a separate, optional field
  *
- * Because **nothing in the simulator measures it yet.** `core`'s `RunSummary` carries waiting, ride,
- * TTD, load factor, handling capacity, interval and saturation — and no energy, no metres travelled
- * and no stop count; `REPLICATION_METRICS` in `runner/metrics.ts` projects nineteen scalars and
- * none of them is an energy proxy either. docs/06 § Term library names `distanceTravelled` as *the*
- * energy proxy and `stopCount` as its companion, but both live inside the **dispatch cost
- * function**, where they score a hypothetical assignment; neither is recorded as an outcome of a
+ * Because for most of this project's life **nothing in the simulator measured it.** `core`'s
+ * `RunSummary` carried waiting, ride, TTD, load factor, handling capacity, interval and saturation
+ * — and no energy, no metres travelled and no stop count; `REPLICATION_METRICS` projected nineteen
+ * scalars and none of them was an energy proxy. docs/06 § Term library names `distanceTravelled` as
+ * *the* energy proxy and `stopCount` as its companion, but both live inside the **dispatch cost
+ * function**, where they score a hypothetical assignment; neither was recorded as an outcome of a
  * finished run.
  *
- * So this field is the seam, and it is deliberately shaped as a seam rather than as a guess:
+ * `core` now records one {@link RunRecord.travelSamples} entry per completed car move and
+ * `RunSummary.energy` summarizes them over the reporting window, so `runner/metrics.ts` projects
+ * `energyKJ` and a caller has something to supply. **The field stays optional**, because the shape
+ * of the seam is what makes an unmeasured axis reportable as unmeasured rather than as zero:
  *
- * - **Absent** means *not measured*. The energy objective is then **suppressed**, with that reason
+ * - **Absent** means *not measured* — a stored record written before the travel record existed, or
+ *   a harness that does not sample. The energy objective is then **suppressed**, with that reason
  *   printed. It is not defaulted to zero, and it is not reconstructed from passenger records —
  *   boarding and alighting floors describe where passengers went, not where the cars went, and the
  *   difference is exactly the deadheading that idle repositioning spends energy on. A reconstructed
@@ -115,8 +119,8 @@ export const SEED_SET_ROLES: readonly SeedSetRole[] = Object.freeze(['tuning', '
  * - **Present** means a caller measured it and is responsible for saying how. The report quotes it
  *   in whatever unit the {@link ObjectiveSpec} declares.
  *
- * When `core` grows a real per-run travel or energy statistic this field becomes a projection of it
- * like every other, and no signature here changes.
+ * That the transition cost no signature change here is the evidence the seam was shaped correctly:
+ * `benchmark/matrix.ts` and `benchmark/phase7Acceptance.ts` fill it with one lambda each.
  */
 export interface TuningObservation extends ReplicationObservation {
   /**

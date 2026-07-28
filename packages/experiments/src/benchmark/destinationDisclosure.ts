@@ -10,7 +10,7 @@
  *
  * - **Level 0 — disclosure.** `dispatch.callType` moves the destination into the `CostRequest` at
  *   call time. The landing is still one up/down button and any car that opens still takes whoever
- *   fits, so **both arms are strictly comparable on all nineteen recorded metrics**. This module.
+ *   fits, so **both arms are strictly comparable on all twenty-three recorded metrics**. This module.
  * - **Level 1 — dispatch.** The passenger is told which car to walk to and must board it. Phase 6b.
  *
  * This module is the Level-0 measurement, and it needs no `core` change: the seam was already wired

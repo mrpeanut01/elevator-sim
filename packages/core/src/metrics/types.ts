@@ -356,6 +356,141 @@ export interface LoadReading {
   readonly massKg: number;
 }
 
+/* -------------------------------------------------------------------------- *
+ * Travel and energy
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Standard gravity, m/s². The only physical constant the energy proxy needs.
+ *
+ * CODATA / ISO 80000-3's conventional value. Named rather than inlined so the arithmetic below
+ * can be read against the formula it implements.
+ */
+export const STANDARD_GRAVITY_MPS2 = 9.80665;
+
+/**
+ * **The counterweight balance ratio: the fraction of rated load the counterweight carries on
+ * top of the car's own mass.**
+ *
+ * 0.5 — the near-universal traction-lift convention. The counterweight is sized at
+ * `car mass + 0.4…0.5 × rated load`, so the drive sees zero static out-of-balance at half load
+ * and its worst case (full car up, empty car down) is symmetric. Sources: Barney & Al-Sharif,
+ * *Elevator Traffic Handbook* § on drive sizing and counterbalancing; CIBSE Guide D § 13 on
+ * lift power and energy; ISO 25745-2, whose reference-cycle energy measurement is taken at
+ * empty, half and full load precisely because the mid point is the balance point. See
+ * docs/02-elevator-reference.md.
+ *
+ * **Why 0.5 and not 0.45.** The range in the literature is 0.4–0.5 and real installations vary.
+ * 0.5 is chosen because it is the value at which the proxy is *symmetric* — an empty car and a
+ * full car of the same travel cost the same — which makes the number a statement about how far
+ * cars drove out of balance rather than about a particular machine's counterweight order. A
+ * proxy whose value depended on an unmeasured per-installation choice would put a fitted
+ * constant inside a published axis.
+ *
+ * Not a tunable (CLAUDE.md invariant 7 governs *dispatch strategy*, which is data; this is
+ * reference data about the machine) and deliberately not configurable: a per-run counterweight
+ * ratio would let two arms of one comparison be scored on different scales.
+ */
+export const COUNTERWEIGHT_BALANCE_RATIO = 0.5;
+
+/**
+ * One completed car move, as the energy proxy reads it.
+ *
+ * Recorded **per move**, not per run, for one reason that decides the whole design: every other
+ * statistic in a {@link RunSummary} is computed over a reporting window, and the shipped
+ * operating points report a 300 s peak out of a 900 s run. A cumulative odometer read at the
+ * end would put a whole-run energy figure beside a peak-window AWT in the same Pareto point,
+ * and the two would not be describing the same 300 seconds. A per-move sample windows exactly
+ * as a {@link LoadSample} does.
+ *
+ * **Attributed at arrival**, i.e. `at` is the moment the car levelled, not the moment it
+ * started. The move is charged to the window it *ended* in. Stated rather than left implicit:
+ * a move that straddles the window boundary is charged whole to one side, exactly as a leg is
+ * assigned whole to the window its arrival falls in.
+ */
+export interface TravelSample {
+  readonly at: SimTime;
+  readonly carId: string;
+  /** Metres travelled on this move. Always positive; {@link direction} carries the sign. */
+  readonly distanceM: number;
+  readonly direction: Direction;
+  /** Passenger mass aboard for the move, kg. Load only changes at a stop, so this is exact. */
+  readonly loadKg: number;
+  /** The car's rated load, kg. The counterweight's reference. */
+  readonly ratedLoadKg: number;
+  /**
+   * **The energy proxy for this move, in joules of out-of-balance mechanical work.**
+   *
+   * `|loadKg − COUNTERWEIGHT_BALANCE_RATIO · ratedLoadKg| · g · distanceM`.
+   *
+   * The absolute value is the **non-regenerative** convention: a drive without regeneration
+   * dissipates the overhauling direction in a brake resistor rather than returning it, so both
+   * directions cost. ISO 25745-2 measures a non-regenerative unit exactly this way, and it is
+   * the conservative choice — a regenerative drive's figure is bounded above by this one.
+   *
+   * **What it deliberately omits, so nobody reads it as kWh:** acceleration losses (which need
+   * the car and counterweight masses, which no shipped spec carries), drive and gearing
+   * efficiency, door-motor energy, and standby/idle power — ISO 25745-2's other half, which on
+   * a lightly-used lift dominates the running term and is a property of the *machine*, not of
+   * the dispatcher. This is a proxy for *the work the dispatch decisions caused*, and that is
+   * the quantity a Pareto front over dispatchers is asking about. {@link EnergyStatistics}
+   * reports the stops and the metres beside it so a reader can see which one moved.
+   */
+  readonly workJ: number;
+}
+
+/** The four numbers a {@link TravelSample} needs from a car after a move. */
+export interface TravelReading {
+  readonly distanceM: number;
+  readonly direction: Direction;
+  readonly loadKg: number;
+  readonly ratedLoadKg: number;
+}
+
+/** `|load − ratio·rated| · g · distance`, in joules. Pure and total. See {@link TravelSample.workJ}. */
+export function outOfBalanceWorkJ(reading: TravelReading): number {
+  const netKg = Math.abs(reading.loadKg - COUNTERWEIGHT_BALANCE_RATIO * reading.ratedLoadKg);
+  return netKg * STANDARD_GRAVITY_MPS2 * Math.abs(reading.distanceM);
+}
+
+/**
+ * What the fleet spent moving, over the reporting window.
+ *
+ * The third Pareto axis (docs/06 § Guardrails, CLAUDE.md § Tuning discipline: *"Report the
+ * Pareto front over (AWT, energy, WT95)"*). Before this existed the axis was a declared seam
+ * with nothing filling it, and the front silently degenerated to two objectives.
+ *
+ * ## Three numbers, not one
+ *
+ * {@link workKJ} is the axis. {@link distanceM} and {@link starts} are published beside it
+ * because they are the two things that can move it, and a single scalar cannot say which: a
+ * dispatcher that cut energy by carrying fuller cars and one that cut it by driving less are
+ * different findings with the same number. {@link workPerServedLegKJ} normalizes by work done
+ * — a configuration that spends less because it served fewer people has not saved anything.
+ *
+ * ## `NaN`, never `0`, when nothing was recorded
+ *
+ * A record written before travel sampling existed, or by a harness that does not sample, has
+ * no travel samples — and "the cars did not move" and "nobody wrote down how far the cars
+ * moved" are different facts. {@link measured} says which. Zeroing them would make every arm
+ * tie on energy and quietly restore a two-axis front under a three-axis name, which is exactly
+ * what `pareto.ts` refused to do when the proxy was absent.
+ */
+export interface EnergyStatistics {
+  /** Whether the run recorded any travel at all. `false` ⇒ every figure below is `NaN`. */
+  readonly measured: boolean;
+  /** Out-of-balance mechanical work over the window, kilojoules. The Pareto energy axis. */
+  readonly workKJ: number;
+  /** Metres the fleet travelled in the window, summed over cars. */
+  readonly distanceM: number;
+  /** Moves commanded in the window. Each is one motor start. */
+  readonly starts: number;
+  /** {@link workKJ} per leg that alighted in the window. `NaN` when none did. */
+  readonly workPerServedLegKJ: number;
+  /** Cars that moved at least once in the window. */
+  readonly movingCarCount: number;
+}
+
 /**
  * How many people were waiting, building-wide, at one instant.
  *
@@ -570,6 +705,19 @@ export interface RunRecord {
   readonly passengers: readonly PassengerRecord[];
   readonly loadSamples: readonly LoadSample[];
   readonly queueSamples: readonly QueueSample[];
+  /**
+   * One entry per completed car move — the raw input to {@link EnergyStatistics}.
+   *
+   * Optional, so every record written before the energy axis existed still parses and every
+   * stored Phase 5 / 6 record replays unchanged. Absent means *not measured*, and
+   * `summarizeRun` reports `energy.measured: false` with `NaN` figures rather than zeros; see
+   * {@link EnergyStatistics}.
+   *
+   * Recorded rather than reconstructed. Passenger records say where *passengers* went; they
+   * cannot say where the *cars* went, and the difference is precisely the deadheading that
+   * stage 7's repositioning spends energy on — the one stage an energy axis exists to price.
+   */
+  readonly travelSamples?: readonly TravelSample[] | undefined;
   /** Free-form provenance: weight vector id, sweep coordinates, anything Phase 3 wants back. */
   readonly metadata?: Readonly<Record<string, string | number | boolean>> | undefined;
 }
@@ -1173,6 +1321,8 @@ export interface RunSummary {
   /** **TTD**, per journey, spanning every leg and every transfer. */
   readonly timeToDestination: DurationStatistics;
   readonly loadFactor: LoadFactorStatistics;
+  /** What the fleet spent moving over the window — the Pareto front's third axis. */
+  readonly energy: EnergyStatistics;
   readonly handlingCapacity: HandlingCapacity;
   /** **INT**, achieved: the spacing of car departures from the terminal. */
   readonly achievedInterval: IntervalStatistics;
