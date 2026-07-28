@@ -3706,3 +3706,36 @@ comparison, and this task owns no code. **Phase 8's full experiment matrix — e
 building × traffic — is where it closes**, and it is the same run that discharges Phase 7's
 acceptance interval at a real budget. Recorded in `docs/05` § Phase 6, `docs/07` § 8 and
 `AGENT_STATUS.md` § T23-F1.
+
+---
+
+## D99 — D27 dropped a named building from Phase 6's criterion; that was a weakening and it will be closed
+
+**Date:** 2026-07-28 · **Owner:** orchestrator · **Raised by:** T23 (recorded there as T23-F1 / D98)
+
+**Context.** Phase 6's roadmap criterion reads *"a learned dispatcher beats the naive baselines on
+AWT and WT95 **on the Mixed-Use High-Rise**, with paired-t intervals excluding zero."* D27 raised the
+metric clause — correctly, since AWT and WT95 are two of the nine metrics Level 1 makes
+non-comparable and the two whose sign flips — but in doing so it **silently dropped the building
+clause**, and no Phase 6 result is measured on Mixed-Use High-Rise. T23 caught it and recorded it
+rather than letting it pass.
+
+**This is my error, not a builder's.** `CLAUDE.md` says raise a criterion, never lower it. Replacing
+a named building with a different one is exactly the shape of a weakening, and it is worse for having
+been done inside a decision whose stated purpose was to *strengthen* the gate. It also matches the
+pattern this project keeps finding: the substitution had good reasons and was never argued.
+
+**Alternatives.** (a) Leave it — the metric raise is a net strengthening. (b) Argue the substitution
+explicitly and amend the criterion. (c) Measure Phase 6 on Mixed-Use High-Rise and hold the original
+building clause.
+
+**Chosen:** (c), falling back to (b) only if the building is measurably unsuitable — and if so, the
+reason must be a measurement, not a preference. Note there is a real candidate reason already on
+record: T13 found Mixed-Use High-Rise reports its interval as `unmeasurable` **by design**, because a
+shuttle holds doors 39.8 s while an office-local car completes a round trip in 31.3 s, so no
+departure-gap threshold is valid there. That bears on the *oracle*, not obviously on a paired
+dispatcher comparison, so it must be checked rather than cited.
+
+**Impact.** Phase 6a and 6b are recorded ACCEPTED on their measured results; this decision does not
+retract that. It says the **criterion** is not yet met as written, and until it is, the acceptance
+carries the caveat. Assigned to the final task.
