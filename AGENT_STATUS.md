@@ -71,8 +71,10 @@ changed has regressed the suite.
 | T6 `ff2c1bf` | clean | 128 files / **2592** tests | 2590 + 2 | ✅ matches |
 | T8 `1dbfa43` | clean | 128 files / **2610** tests | 2592 + 18 | ✅ matches |
 | T9 `0e509ef` | clean | 129 files / **2623** tests | 2610 + 13 | ✅ matches |
+| T7 `ac01caa` | clean | 129 files / **2627** tests | 2623 + 4 | ✅ matches |
+| T4 `411e920` | clean | 133 files / **2641** tests | 2627 + 14 | ✅ matches |
 
-**Eight merges, eight predicted counts, eight matches.** The suite has grown 2442 → 2623 with no
+**Ten merges, ten predicted counts, ten matches.** The suite has grown 2442 → 2641 with no
 regression at any step. A count that did not match its prediction would be the cheapest possible
 signal that a test was silently dropped; none has.
 
@@ -113,3 +115,37 @@ CLI-level claim was re-run here, where resolution is correct:
 - **2026-07-27** — Baseline captured: `tsc -b` clean, 2,442 tests green.
 - **2026-07-27** — Worktrees created with `node_modules` symlinks (D4). T1, T2, T3, T5 dispatched
   concurrently. T4 held until T1–T3 merge so it documents post-merge truth rather than pre-merge.
+
+---
+
+# WAVE 1 — CLOSED 2026-07-27
+
+**Result:** all 21 register findings closed; Phase 7 **ACCEPTED**; Phase 4 **foundation landed,
+not complete**; suite 2,442 → **2,641** tests, green after every one of ten merges.
+
+## Reconciling the one number two tasks disagreed on
+
+T3 measured "10 of 50 cells differ, `warnings` only". T7 measured "30 of 50, `record` only". T4
+could not re-measure and correctly recorded it as unverified rather than transcribing it. **Both are
+right at their own baselines**, and neither is a defect:
+
+- T3's 10/50 is against pre-T3 `integration`. Its change added the double-deck disclaimer, which
+  reached `SimulationResult.warnings` only — `RunRecord` had no `warnings` field, so the record
+  hash could not move.
+- T7's 30/50 is against pre-T7 `integration`. Its change *added* `RunRecord.warnings` (closing
+  C17), so every cell whose run raises any warning now has a different `record` — 30 of them.
+
+In both measurements `trajectory`, `summary`, `conservation`, `undelivered` and `status` are
+identical in every cell. **No simulated number has moved at any point in wave 1.** T9's
+full-precision benchmark pins, installed independently and after both, are green — which is a
+third, mechanical confirmation of the same fact.
+
+## Carried into wave 2
+
+| # | Item | Owner |
+|---|---|---|
+| C2 | `core`'s barrel re-exports `loadConfig`, which imports `node:fs/promises`, so a browser import throws at module evaluation. `viz` works around it with dev-server shims. Needs an fs-free subpath export. | wave 2 |
+| — | Phase 4 completion: building editor, live metrics overlay, and the full UX cycle over `UX.md`'s 85 scenarios | wave 2 |
+| — | Phase 8: property-based fuzzing (the highest-value track), analytical cross-validation across all five buildings | wave 2 |
+| — | Phase 6: destination dispatch, access control, learned control — contract task first | wave 3 |
+| — | `main` is deliberately **not** updated. Per `MULTI_AGENT_PLAN.md` § 8, `integration` accumulates until the system reaches its definition of done. | orchestrator |
