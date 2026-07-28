@@ -27,6 +27,27 @@
  * *port*: this module still adapts any estimator, and `fixtures.test-helper.ts`'s `docHalfWidth`
  * double deliberately uses the doc's crossover family to prove that.
  *
+ * **What that costs, measured.** `t[n-1] > z` at every `n`, so the shipped rule can only ever run
+ * *more* replications than a normal-approximation one — open item `C4` asked how many more, and
+ * `stoppingBudget.test.ts` is the answer. At the policy that ships (floor 50, checked every 8,
+ * capped at 200) the arithmetic bounds the inflation at **3.9 %** and the realized cost on
+ * `midtown-office`/`eta`/up-peak across six target precisions was **zero replications** — the
+ * 50-replication floor and the 8-replication chunk quantize the whole of it away. With the floor
+ * lowered to 2 it was **+7 replications in 393 (+1.8 %)**.
+ *
+ * What those replications buy is not marginal. `t[1]/z = 3.84`, and below the floor a `z` rule
+ * stopped on intervals that contained the long-run mean **56 %** of the time against a nominal 90 %,
+ * where the shipped rule managed 76 % — it saved 3.1 replications a cell and gave up 20 points of
+ * coverage. Both families under-cover, because a sequentially-stopped interval always does; the gap
+ * between them is the point. Do not trade it away for replications. See `stoppingBudget.test.ts`
+ * and DECISIONS.md's `C4` entry.
+ *
+ * One thing that measurement rules out: the overhead is **not** bounded by one `checkEvery` chunk,
+ * so do not write a bound of that shape. A sample half-width is not monotone in `n`, so a cell where
+ * `z` stopped and `t` did not can run far past the crossing before the next one — **+187** at the
+ * widest cell of C4's seven-configuration sweep (`secure-tower`/`destination-eta`, floor lowered to
+ * 2). The 3.9 % is a bound on the *budget*, not on any one cell.
+ *
  * So this module owns the comparison and injects the arithmetic. {@link halfWidthStoppingRule}
  * adapts any half-width estimator into a {@link StoppingRule}:
  *
