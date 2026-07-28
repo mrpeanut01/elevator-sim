@@ -80,14 +80,33 @@ intervals from the wrong quantile family.
 **Why these five are safe in parallel:** their owned-file sets are disjoint (§ 5). T4 reads what
 T1–T3 land, so it merges last in the wave and re-verifies every number it publishes.
 
-### Wave 2 — Phase 4 UX cycle + Phase 8 track 1 (planned)
+### Wave 2 — in flight (opened 2026-07-27)
 
-| ID | Task | Depends on |
-|---|---|---|
-| T6 | Viz renderer + playback UI, full UX cycle | T5 |
-| T7 | Viz building editor, full UX cycle | T5 |
-| T8 | Phase 8 — property-based fuzzing (highest-value track) | T2, T3 |
-| T9 | Phase 8 — analytical cross-validation across all five buildings | T3, T4 |
+Wave 1 closed with all 21 register findings resolved, Phase 7 accepted, and 2,641 tests green.
+Wave 2 completes Phase 4, opens Phase 8's two highest-value tracks, and does the planning-first
+work for Phase 6.
+
+| ID | Task | Branch | Owns |
+|---|---|---|---|
+| T10 | `core` browser-safe entry point (C2); delete the viz dev shims | `fix/core-browser-entry` | `packages/core/**`, `packages/viz/vite.config.ts`, `packages/viz/dev-shims/**` |
+| T11 | **Phase 4 completion** — building editor, live metrics overlay, full UX cycle | `feat/viz-phase4` | `packages/viz/src/**`, `UX.md`, `index.html`, viz `package.json` |
+| T12 | **Phase 8 — property-based fuzzing** (the highest-value track) | `feat/phase8-fuzzing` | `packages/experiments/src/fuzz/**`, `packages/experiments/src/index.ts` |
+| T13 | **Phase 8 — analytical cross-validation + physics verification** | `feat/phase8-oracle` | `packages/experiments/src/{oracle,validation}/**` except `validation/documentation.test.ts` |
+| T14 | **Phase 6 contract** — design only, no implementation | `design/destination-dispatch` | `docs/09-destination-dispatch-contract.md` (new, sole file) |
+
+**Why T14 is a document and not code.** Risk R9: destination dispatch changes the passenger model
+fundamentally. Phase 5 shipped four dead seams simultaneously because work was partitioned before
+the interfaces were locked. The contract is locked first, then implementation fans out against it.
+
+**Two lessons from wave 1 written into every wave-2 brief.** (a) Mutation-test your own work — 7 of
+8 `frameCar` fields could be replaced with constants while the suite stayed green. (b) Ask what a
+defect could look like that still passes your test — Phase 4's replay criterion was satisfied in
+full by a picture with a 77-metre error.
+
+### Wave 3 — Phase 6 implementation (planned)
+
+Fans out against T14's locked contract. Scope, parallelisation and ownership come from T14's work
+breakdown, not from this table.
 
 ### Wave 3 — Phase 6 (planned)
 

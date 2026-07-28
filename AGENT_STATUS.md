@@ -118,6 +118,22 @@ CLI-level claim was re-run here, where resolution is correct:
 
 ---
 
+# WAVE 2 — IN FLIGHT
+
+| Task | Branch | Status | Blockers |
+|---|---|---|---|
+| T10 | `fix/core-browser-entry` | 🟡 in flight | — |
+| T11 | `feat/viz-phase4` | 🟡 in flight | T10 reports viz import-specifier changes; orchestrator applies at merge |
+| T12 | `feat/phase8-fuzzing` | 🟡 in flight | — |
+| T13 | `feat/phase8-oracle` | 🟡 in flight | needs barrel exports from T12 if any |
+| T14 | `design/destination-dispatch` | 🟡 in flight | — (design only) |
+
+Worktrees now use `.worktree-setup.sh`, which builds a real `node_modules` whose `@elevator-sim/*`
+entries point **into the worktree**. The wave-1 approach (symlink the root `node_modules`) resolved
+via realpath to the main checkout, so built-artifact evidence was about the wrong tree.
+
+---
+
 # WAVE 1 — CLOSED 2026-07-27
 
 **Result:** all 21 register findings closed; Phase 7 **ACCEPTED**; Phase 4 **foundation landed,
