@@ -127,9 +127,17 @@ export interface NextLegInit {
 /**
  * One leg of one passenger's journey.
  *
- * Mutable in exactly three places — {@link Passenger.board}, {@link Passenger.alight} and
- * nothing else — and every mutation is a timestamp that may be written once. Everything
- * else is `readonly`, so a passenger handed to a cost function cannot be edited by it.
+ * Mutable in exactly four places — {@link Passenger.assign}, {@link Passenger.releasePromise},
+ * {@link Passenger.board}, {@link Passenger.alight} and nothing else. The two timestamps are
+ * written once and never revised. Everything else is `readonly`, so a passenger handed to a cost
+ * function cannot be edited by it.
+ *
+ * The assignment is the newest of the four and the only one that is not a timestamp alone: it
+ * is the car a destination-dispatch landing panel named, and it is write-once for a reason a
+ * decision record states rather than a convention (DECISIONS.md § D29). See
+ * {@link Passenger.assign}. The single exception is {@link Passenger.releasePromise}, which voids
+ * a promise whose car has left group control — a promise the named car cannot keep at all, which
+ * is not the case D29 is about. See `the root DECISIONS.md` § T22-D1.
  */
 export class Passenger {
   /** Identity of this leg. Unique within a run. */
@@ -164,6 +172,8 @@ export class Passenger {
 
   #boardedAt: SimTime | undefined;
   #alightedAt: SimTime | undefined;
+  #assignedCarId: string | undefined;
+  #assignedAt: SimTime | undefined;
 
   constructor(init: PassengerInit) {
     if (init.id.length === 0) throw new ModelError('Passenger id must not be empty');
@@ -244,6 +254,112 @@ export class Passenger {
   /** True when this leg ends at the journey's final destination — nothing follows it. */
   get isFinalLeg(): boolean {
     return this.destinationFloorId === this.finalDestinationFloorId;
+  }
+
+  /**
+   * The car the landing panel named, or `undefined` under conventional dispatch.
+   *
+   * Only ever set under destination *dispatch* (`dispatch.passengerAssignment: 'panel'`).
+   * Under conventional dispatch — and under destination *disclosure*, which moves the
+   * destination into the cost request and changes nothing about the passenger — the landing
+   * has an up/down button and any arriving car takes whoever fits, so there is nothing to
+   * record and this stays `undefined`.
+   */
+  get assignedCarId(): string | undefined {
+    return this.#assignedCarId;
+  }
+
+  /** When the panel named a car, or `undefined` if it never did. */
+  get assignedAt(): SimTime | undefined {
+    return this.#assignedAt;
+  }
+
+  /** Whether the landing panel has named a car for this leg. */
+  get isAssigned(): boolean {
+    return this.#assignedCarId !== undefined;
+  }
+
+  /**
+   * Record the car the landing panel named. **Write-once**, exactly as {@link board} is.
+   *
+   * DECISIONS.md § D29: when a car fills up and leaves promised passengers behind, their
+   * assignment *stands* — they wait for the car they were told about. There is deliberately no
+   * mutable "re-assigned to" field and no `reassign()`: a panel that changes its mind is a
+   * different system, and modelling it silently would let a destination-dispatch arm quietly
+   * recover the deferral advantage it is supposed to have surrendered. The count of passengers
+   * a full car leaves behind is a *result* (`ConservationAudit.brokenPromises`), not a failure,
+   * and it is measured rather than engineered away.
+   *
+   * **Write-once, not write-never.** {@link releasePromise} voids a promise whose car has left
+   * group control, after which this may be called again. That is a different case from a full
+   * car and is argued at {@link releasePromise}; a second `assign` without a release in between
+   * is still the bug this throw is for.
+   *
+   * Refused after boarding for the same reason `board` refuses a second call: an assignment
+   * made to somebody already in a car is not an assignment, it is a bookkeeping error that
+   * would make `assignedCarId !== carId` look like a wrong-car boarding.
+   */
+  assign(carId: string, at: SimTime): void {
+    if (carId.length === 0) {
+      throw new ModelError(`Passenger "${this.id}" cannot be assigned to a car with no id.`);
+    }
+    if (this.#assignedCarId !== undefined) {
+      throw new ModelError(
+        `Passenger "${this.id}" was assigned to car "${this.#assignedCarId}" at t=${String(this.#assignedAt)} and cannot be assigned to "${carId}" at t=${at}. A destination assignment is write-once (DECISIONS.md § D29); a bumped passenger waits for the car they were promised.`,
+      );
+    }
+    if (this.#boardedAt !== undefined) {
+      throw new ModelError(
+        `Passenger "${this.id}" boarded at t=${this.#boardedAt} and cannot be assigned to car "${carId}" at t=${at}.`,
+      );
+    }
+    if (!Number.isFinite(at) || at < this.arrivedAt) {
+      throw new ModelError(
+        `Passenger "${this.id}" cannot be assigned at t=${at}: it arrived at t=${this.arrivedAt}. Simulated time never runs backwards.`,
+      );
+    }
+    this.#assignedCarId = carId;
+    this.#assignedAt = at;
+  }
+
+  /**
+   * Void the promise, because the car it names has **left group control**.
+   *
+   * The one exception to {@link assign}'s write-once rule, and it is narrower than it looks.
+   * D29 is an argument about a car that is *full*: the promise stands because the car will empty
+   * and come back, so waiting for it is a real cost of committing at the panel and re-offering the
+   * passenger would be the panel changing its mind to get a better answer. None of that applies to
+   * a car that has gone to `independent`, `fire-recall` or `out-of-service`. It will never accept
+   * a hall call again unless a later schedule entry puts it back, so the promise is not a cost
+   * being paid — it is a promise that cannot be kept, and holding a passenger to it strands them
+   * for the rest of the run while other cars in the same bank stand idle.
+   *
+   * That is not hypothetical: it is the Phase 8 P5 counterexample `fuzz-1000384`, and it was
+   * recorded as a known limitation by T19 (`DECISIONS.md` § D77, limitation 2) before a fuzz
+   * campaign turned it into a blocking finding. `the root DECISIONS.md` § T22-D1 carries
+   * the argument and the measurement.
+   *
+   * The deferral advantage D29 protects is untouched, because this is not a re-optimization: the
+   * only condition under which the runner calls this is `Car.acceptsHallCalls === false` for the
+   * named car, which no scoring decision can produce. Every revocation is counted in
+   * `ConservationAudit.promisesRevoked`, so an arm that somehow started revoking for another
+   * reason would say so in its own books.
+   *
+   * @returns the car id that was released, or `undefined` if nothing was promised.
+   * @throws ModelError if the passenger has already boarded — a promise discharged by boarding is
+   *   not a promise that can be voided, and voiding it would make `assignedCarId !== carId` look
+   *   like a wrong-car boarding.
+   */
+  releasePromise(at: SimTime): string | undefined {
+    if (this.#boardedAt !== undefined) {
+      throw new ModelError(
+        `Passenger "${this.id}" boarded at t=${this.#boardedAt} and its promise cannot be released at t=${at}.`,
+      );
+    }
+    const carId = this.#assignedCarId;
+    this.#assignedCarId = undefined;
+    this.#assignedAt = undefined;
+    return carId;
   }
 
   /** Record boarding. Write-once: a second call is a bug, not an update. */

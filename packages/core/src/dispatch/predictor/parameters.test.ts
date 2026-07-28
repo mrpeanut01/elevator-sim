@@ -318,6 +318,86 @@ describe('PREDICTOR_PARAMETERS', () => {
     expect(description).not.toMatch(/cancels out/);
     expect(description).toMatch(/NOT inert/);
   });
+
+  it('idle.predictorHorizonS is a pure scalar on the forecast at the default cycle, and says so', () => {
+    // Finding #9/#10, measured at the level the *consumers* read rather than at the level the
+    // existing rows above read.
+    //
+    // `expectedDemandByFloor(t, H)` scales linearly with H, so reading a raw cell — which is what
+    // `predictorCycleS` and `predictorPriorRatePerS` are measured by, two tests up — reports the
+    // horizon as the most live row of the six. It is the least. All three consumers of the
+    // forecast reduce it to a **scale-invariant** statistic: `expectedResponseSeconds` and
+    // `demandMisalignmentM` are demand-weighted means and `parkingCandidates` is an argmax. So
+    // the statistic to assert on is the *normalised shape*, and at the default cycle that shape
+    // is identical for every horizon in the whole declared [30, 3600] range — a factor of 120.
+    const tower: readonly string[] = Array.from({ length: 20 }, (_, index) => String(index + 1));
+    const shape = (horizonS: number, cycleS: number): readonly number[] => {
+      const predictor = createArrivalModel({ floorIds: tower, idle: { predictorCycleS: cycleS } });
+      for (let at = 0; at < 1800; at += 7) {
+        predictor.observe(at % 2 === 0 ? '5' : '2', at % 3 === 0 ? 'down' : 'up', at);
+      }
+      const forecast = predictor.expectedDemandByFloor(1800, horizonS);
+      const values = tower.map((floorId) => forecast.get(floorId) ?? 0);
+      const total = values.reduce((sum, value) => sum + value, 0);
+      return values.map((value) => value / total);
+    };
+
+    const HORIZONS = [30, 120, 300, 900, 3600] as const;
+    const atDefault = HORIZONS.map((horizonS) =>
+      shape(horizonS, PREDICTOR_DEFAULTS.predictorCycleS),
+    );
+    for (const [index, normalised] of atDefault.entries()) {
+      // Identical to 12 decimal places, per floor. The residual is float rounding in the 15th
+      // significant figure of a division by a sum of 120x-larger terms — not an effect: a
+      // difference an argmax could act on would be in the first two figures, and a demand
+      // weighting that moved by 1e-15 moves no decision.
+      const reference = atDefault[0] as readonly number[];
+      for (const [floor, value] of normalised.entries()) {
+        expect(
+          value,
+          `horizon ${String(HORIZONS[index])} at the default cycle, floor index ${String(floor)}`,
+        ).toBeCloseTo(reference[floor] as number, 12);
+      }
+    }
+    // The raw magnitudes do move, which is exactly why reading them would have reported the row
+    // as the liveliest of the six.
+    const raw = (horizonS: number): number =>
+      createArrivalModel({ floorIds: tower }).expectedDemandByFloor(0, horizonS).get('5') ?? 0;
+    expect(raw(3600) / raw(30)).toBeCloseTo(120, 6);
+
+    // The other direction: at a short enough cycle a bucket-of-day recurs inside the run, the
+    // window folds, and the shape moves with the horizon. So the dimension is conditional rather
+    // than dead.
+    const folded = HORIZONS.map((horizonS) => shape(horizonS, 600));
+    expect(new Set(folded.map((values) => values.join(','))).size).toBeGreaterThan(1);
+
+    /*
+     * **And the row carries no `activeWhen`, which this test used to pin to `{ max: 1800 }`.**
+     *
+     * That bound was unsound in the direction the module docstring calls the worse of the two:
+     * measured through real runs at seed 20260726, the horizon still produces 2 distinct
+     * passenger-record trajectories on `secure-tower` at a cycle of **3600** — outside the gate,
+     * where a generic optimizer had been told not to look. The condition is relational (a
+     * bucket-of-day has to recur inside the window, roughly `horizon >= cycle`) and `activeWhen`
+     * compares against constants, so no bound is correct for more than the single cycle it is
+     * fitted to.
+     *
+     * Ungated, therefore, and the inertness at the shipped cycle is carried where it can be
+     * falsified: `sim/searchSpaceLiveness.test.ts` holds it in `DECLARED_INERT`, whose entries
+     * must execute the condition under which the dimension IS live. The same file now also
+     * asserts that every surviving gate's gated-**off** region is flat, so this class of wrong
+     * bound is a red test rather than a comment.
+     */
+    const horizon = predictorParameter('idle.predictorHorizonS');
+    expect(horizon?.activeWhen).toBeUndefined();
+
+    // The folding happens above 1800 too, which is the measurement that removed the bound.
+    const above = HORIZONS.map((horizonS) => shape(horizonS, 3600));
+    expect(
+      new Set(above.map((values) => values.join(','))).size,
+      'the forecast no longer folds at a 3600 s cycle, so the bound that was removed would have been sound after all',
+    ).toBeGreaterThan(1);
+  });
 });
 
 describe('PREDICTOR_DEFAULTS', () => {

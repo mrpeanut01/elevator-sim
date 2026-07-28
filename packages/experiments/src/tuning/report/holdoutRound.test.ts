@@ -21,7 +21,7 @@
  * ## What it deliberately does not assert
  *
  * **That the 2 s arm wins with an interval excluding zero.** Measured here at n = 60 on this
- * building: `−0.916 [−2.135, +0.303]` on the tuning seed and `−1.288 [−2.257, −0.319]` on the
+ * building: `−0.916 [−2.161, +0.328]` on the tuning seed and `−1.288 [−2.277, −0.298]` on the
  * holdout seed. The effect is real and the sign is stable; the *significance* at a budget a test
  * suite can afford is not, and asserting it would be a coin flip dressed as a gate — the exact
  * failure CLAUDE.md § Statistical discipline names. docs/03's own table says a ±0.5 s interval costs

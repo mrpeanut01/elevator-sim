@@ -46,7 +46,7 @@
 
 export { Simulation, runSimulation } from './simulation.js';
 
-export type { StageActivity } from './simulation.js';
+export type { StageActivity } from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * Events
@@ -60,6 +60,7 @@ export {
   carDoorEvent,
   dispatchTickEvent,
   queueSampleEvent,
+  serviceChangeEvent,
   transferArrivalEvent,
 } from './events.js';
 
@@ -68,6 +69,7 @@ export type {
   CarEventPayload,
   DispatchTickPayload,
   QueueSamplePayload,
+  ServiceChangePayload,
   SimEventType,
   TransferArrivalPayload,
 } from './events.js';

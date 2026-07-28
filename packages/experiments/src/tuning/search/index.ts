@@ -155,7 +155,7 @@
  *
  * docs/06 leaves `predictive-balanced`'s `idle.repositionThresholdS: 8` as shipped on purpose, so
  * that this phase has ground truth: Phase 5's sweep at n = 300 found an **interior optimum at 2 s**,
- * worth −1.110 s [−1.548, −0.671], with the curve turning back up below it as repositioning churn
+ * worth −1.110 s [−1.550, −0.670], with the curve turning back up below it as repositioning churn
  * sets in.
  *
  * Handed a one-dimensional box on `[0, 10]`, a materializer, and 390 replications — and told
@@ -165,7 +165,7 @@
  * back bit-identical to the shipped 8 s.
  *
  * And it is **not reported as a win.** The paired difference at n = 30 is −0.598 s
- * [−1.991, +0.795] — an interval containing zero. The search located the region; it did not
+ * [−2.051, +0.856] — an interval containing zero. The search located the region; it did not
  * resolve the effect, and `benchmark/verdict.ts` would call this INDISTINGUISHABLE. Phase 5 needed
  * n = 300 for an interval that excludes zero. That gap between "the optimizer found it" and "the
  * statistics may say so" is the whole of CLAUDE.md § Statistical discipline, and this module keeps

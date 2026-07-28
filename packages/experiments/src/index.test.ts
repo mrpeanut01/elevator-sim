@@ -15,10 +15,13 @@ import { describe, expect, it } from 'vitest';
 
 import * as barrel from './index.js';
 import * as benchmarkModule from './benchmark/index.js';
+import * as fuzzModule from './fuzz/index.js';
 import * as oracleModule from './oracle/index.js';
 import * as reportsModule from './reports/index.js';
 import * as runnerModule from './runner/index.js';
 import * as statsModule from './reports/statistics.js';
+import * as tuningModule from './tuning/index.js';
+import { corpus, nonTestImportersOf } from './tuning/callers.test-helper.js';
 
 const submodules = {
   stats: statsModule,
@@ -26,6 +29,8 @@ const submodules = {
   reports: reportsModule,
   oracle: oracleModule,
   benchmark: benchmarkModule,
+  tuning: tuningModule,
+  fuzz: fuzzModule,
 } satisfies Record<string, Record<string, unknown>>;
 
 /**
@@ -99,9 +104,12 @@ describe('Phase 3 is usable through the barrel alone', () => {
     const estimate = barrel.pairedDifferenceEstimate(candidate, baseline, { confidence: 0.95 });
     expect(estimate.n).toBe(10);
     expect(estimate.mean).toBeCloseTo(2, 9);
-    /* n = 10 is at or below `T_DISTRIBUTION_MAX_N`, so the t family is the one the doc prescribes. */
-    expect(barrel.T_DISTRIBUTION_MAX_N).toBe(25);
+    /* Student-t at n − 1, at every n: docs/03 § Part 4, and the only family the barrel exposes. */
     expect(estimate.method).toBe('t');
+    expect(estimate.degreesOfFreedom).toBe(9);
+    /* The n-dependent crossover to a normal quantile is gone from the surface, not merely unused. */
+    expect('halfWidthQuantile' in barrel).toBe(false);
+    expect('T_DISTRIBUTION_MAX_N' in barrel).toBe(false);
     expect(barrel.intervalContainsZero(estimate)).toBe(false);
 
     /* And the same series against itself is the null: an interval of exactly [0, 0]. */
@@ -196,5 +204,129 @@ describe('Phase 5 verdict vocabulary is usable through the barrel alone', () => 
     expect(barrel.ARM_PROFILES).not.toContain(barrel.BASELINE_PROFILE);
     expect(barrel.ARM_PROFILES.length).toBeGreaterThan(0);
     expect(barrel.BENCHMARK_CASES.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Phase 7's contribution to the surface is a **module that had no caller at all**, which is a
+ * different failure from the one every other block here guards against.
+ *
+ * docs/08-review-findings.md § 1: `tuning/` shipped complete, correct, unit-tested and reachable
+ * from nothing — no `tuning/index.ts`, no re-export from this barrel, no CLI command, and every
+ * importer of `randomSearch`, `successiveHalving`, `sepCmaEs`, `runnerObjective` and
+ * `runHoldoutRound` a `*.test.ts` beside it. The roadmap's own rule is not *"is it reachable?"* but
+ * **"name the non-test caller"**, so both halves are asserted below, separately, because the first
+ * one passing is exactly what made the sixth instance invisible.
+ */
+describe('Phase 7 is reachable from the barrel and called from outside its own tests', () => {
+  /** The five entry points docs/08-review-findings.md § 1 names by hand. */
+  const ENTRY_POINTS = [
+    'randomSearch',
+    'successiveHalving',
+    'sepCmaEs',
+    'runnerObjective',
+    'runHoldoutRound',
+  ] as const;
+
+  const scope = corpus();
+
+  it.each(ENTRY_POINTS)('re-exports %s from the package root', (name) => {
+    const value = (barrel as Record<string, unknown>)[name];
+    expect(value, `${name} is not on @elevator-sim/experiments`).toBeTypeOf('function');
+    expect(value).toBe((tuningModule as Record<string, unknown>)[name]);
+  });
+
+  it.each(ENTRY_POINTS)('has at least one non-test, non-barrel importer of %s', (name) => {
+    const callers = nonTestImportersOf(scope, name);
+    expect(
+      callers,
+      `${name} has no non-test caller. A barrel re-export is reachability, not use, and a {@link} ` +
+        'tag is neither — that combination is precisely the state Phase 7 shipped in ' +
+        '(docs/08-review-findings.md § 1). Something outside a *.test.ts must import it',
+    ).not.toEqual([]);
+  });
+
+  it('counts the CLI tune command as the caller, and the barrels as not', () => {
+    /* Named rather than merely counted: "some file imports it" is satisfiable by a second barrel,
+       and the point of the rule is that a specific, shipped, user-reachable path uses it. */
+    for (const name of ENTRY_POINTS) {
+      expect(nonTestImportersOf(scope, name)).toContain('cli/src/commands/tune.ts');
+    }
+    /* And the inverse, so the scanner cannot be passing for the wrong reason: the barrels do bind
+       these names, and must not be what makes the assertion above pass. */
+    expect(nonTestImportersOf(scope, 'randomSearch')).not.toContain('experiments/src/index.ts');
+    expect(nonTestImportersOf(scope, 'randomSearch')).not.toContain(
+      'experiments/src/tuning/index.ts',
+    );
+  });
+
+  it('drives the search space through the barrel alone, with no elevator-specific knowledge', () => {
+    /* CLAUDE.md invariant 8, as a usable surface rather than as a declaration: a generic optimizer
+       reads the schema, draws a point from a named stream, and writes it back as a real profile —
+       and nothing in this test names a floor, a car or a call. */
+    const space = barrel.searchSpace();
+    expect(space.ids.length).toBeGreaterThan(0);
+    expect(space.parameters.every((parameter) => parameter.id.includes('.'))).toBe(true);
+
+    const rng = barrel.policyNoiseStream(20_260_727);
+    const candidate = barrel.sampleCandidate(space, rng);
+    expect(candidate.size).toBeGreaterThan(0);
+
+    /* Exactly in both directions, which is what makes a search's winner a configuration a run can
+       be reproduced from rather than a vector nobody can author. */
+    const profile = barrel.candidateProfile(space, candidate, { id: 'barrel-probe' });
+    expect(profile.id).toBe('barrel-probe');
+    const roundTripped = barrel.candidateFromProfile(space, profile);
+    for (const [id, value] of candidate) expect(roundTripped.get(id)).toEqual(value);
+  });
+
+  it('keeps the two Candidates apart: the space keeps the name, the search is renamed', () => {
+    /* A type-level assertion, so it is `tsc` that enforces it and this test that records why.
+       `tuning/space`'s Candidate is a parameter assignment; `tuning/search`'s is a configuration
+       under evaluation, and its generic is routinely the first. Both are on the surface, under
+       names that cannot be confused. */
+    const point: barrel.Candidate = new Map([['weights.waitTime', 1]]);
+    const underEvaluation: barrel.SearchCandidate<barrel.Candidate> = {
+      id: 'c-1',
+      value: point,
+      origin: 'test',
+    };
+    expect(underEvaluation.value.get('weights.waitTime')).toBe(1);
+  });
+
+  it('exposes the held-out guard as a refusal, not as a warning', () => {
+    /* CLAUDE.md § Tuning discipline. An overlapping holdout set is not a weaker guard against
+       overfitting, it is *no* guard, so the barrel's own function throws rather than annotating —
+       and it is reachable from the package root, which is what this block is about. */
+    const observation = (seed: string): barrel.TuningObservation => ({
+      runId: `run-${seed}`,
+      seed,
+      windowSeconds: 3600,
+      arrivals: 40,
+      served: 40,
+      unserved: 0,
+      awtS: 16,
+      wt95S: 30,
+      pctOverLongWait: 0,
+      ttdS: 60,
+      achievedIntervalS: 40,
+      personsPer5Min: 12,
+      saturated: false,
+      awtIsValid: true,
+    });
+    const evaluation = (
+      tuningSeeds: readonly string[],
+      holdoutSeeds: readonly string[],
+    ): barrel.CandidateEvaluation => ({
+      candidateId: 'c-1',
+      tuning: { seedSetId: 'tune', role: 'tuning', observations: tuningSeeds.map(observation) },
+      holdout: { seedSetId: 'hold', role: 'holdout', observations: holdoutSeeds.map(observation) },
+    });
+
+    expect(() => barrel.assertDisjointSeedSets([evaluation(['1', '2'], ['3', '4'])])).not.toThrow();
+    /* One shared seed is enough: the search optimized against that traffic. */
+    expect(() => barrel.assertDisjointSeedSets([evaluation(['1', '2'], ['2', '4'])])).toThrow(
+      barrel.TuningReportError,
+    );
   });
 });

@@ -16,6 +16,29 @@
  * tunes a weight, loosens a tolerance, or drops a losing arm; every profile in
  * `data/dispatcher-profiles.json` is measured and reported whatever it does.
  *
+ * ## Phase 6a lives in this directory too, and is reported in its own modules
+ *
+ * Everything below this line is **Phase 5**. `destinationDisclosure.ts`, `accessControl.ts` and
+ * `destinationLiveness.ts` are Phase 6a — destination *disclosure* — and
+ * `destinationDispatchContrast.ts` is Phase 6b's C→D contrast, the landing panel measured against
+ * the same profile without it. **None of the five is re-exported below**, deliberately and by the
+ * precedent Phase 6a set: this barrel is Phase 5's published surface, their entry points are
+ * registered in `published.ts`'s `STUDY_ENTRY_POINTS` — which is what forces each to declare
+ * whether it publishes an interval — and their non-test caller is `regeneratePins.ts`. Each carries
+ * its own
+ * written report in its own docstring, for the reason this one exists: a result that is not written
+ * down next to the code that produces it goes stale without anything failing. Their operating points
+ * are `arms.ts`'s `DESTINATION_CASES` rather than {@link BENCHMARK_CASES}, deliberately, and the
+ * decisions behind that split are in `the root DECISIONS.md` in this directory. The shipped
+ * `destination-eta` profile **is** an arm of the Phase 5 table below, because a profile in `data/`
+ * that is neither the baseline nor an arm escapes the gate entirely; it is bit-identical to `eta` on
+ * all three Phase 5 cases, which is correct rather than dead — none of them is access-zoned in a way
+ * a credential changes, and the census and the liveness counts say where it is not. Phase 6b's
+ * `destination-panel` is an arm of it for the same reason, and it is **not** bit-identical to
+ * anything: measured against `nearest-car` it is BETTER on all four metrics at all three cases, and
+ * measured against its own Level-0 twin it is indistinguishable at the primary point and
+ * significantly worse where the write-once promise binds (`destinationDispatchContrast.ts`).
+ *
  * ---
  *
  * # THE VERDICT
@@ -23,7 +46,7 @@
  * | criterion | verdict |
  * |---|---|
  * | *each dispatcher beats `nearest-car` with a paired-t interval excluding zero on at least one building* | **MET — 9 of 9 arms.** One of them, `zoned-uppeak`, is also WORSE than the baseline on a whole building, and it is named rather than averaged away |
- * | *pre-positioning shows measurable AWT improvement on Garden Apartments* | **MET as written, by `zone-center`: −4.88 s [−5.27, −4.49]** (−29.7 %) at n = 500 under CRN. **NOT MET by the *predictive* strategy at the settings the library ships:** `predicted-demand` reads **−0.006 s [−0.031, +0.019]**, a measured near-zero rather than an unresolved one. Retuning one field, `idle.repositionThresholdS`, from 8 s to 3 s takes it to −0.98 s [−1.28, −0.68] — reported as a retune, and the profile is left alone |
+ * | *pre-positioning shows measurable AWT improvement on Garden Apartments* | **MET as written, by `zone-center`: −4.88 s [−5.27, −4.49]** (−29.7 %) at n = 500 under CRN. **NOT MET by the *predictive* strategy at the settings the library ships:** `predicted-demand` reads **−0.006 s [−0.021, +0.010]**, a measured near-zero rather than an unresolved one. Retuning one field, `idle.repositionThresholdS`, from 8 s to 3 s takes it to −0.98 s [−1.28, −0.68] — reported as a retune, and the profile is left alone |
  *
  * **Phase 5 is green on both criteria as the roadmap words them**, and the second one is green on a
  * reading the roadmap's own scope bullet does not support — see the split immediately below, which is
@@ -43,7 +66,7 @@
  * | reading of the criterion | verdict |
  * |---|---|
  * | *idle repositioning* — stage 7, any strategy | **MET.** `zone-center` is `−4.88 [−5.27, −4.49]`, −29.7 %, and `lobby` is `+1.98 [+1.75, +2.20]` the other way. Parking policy dominates this building, exactly as the clause says |
- * | ***predictive* pre-positioning** — the learned arrival model of the phase's own bullet, at the settings the library ships | **NOT MET, and not for want of resolution.** `predicted-demand` vs `stay` on `predictive-balanced` as authored is **−0.006 s [−0.031, +0.019]** at n = 500, and the whole predictor apparatus — the same profile run with and without a forecast — is **−0.007 s [−0.032, +0.018]**, 296 of 300 replications bit-identical |
+ * | ***predictive* pre-positioning** — the learned arrival model of the phase's own bullet, at the settings the library ships | **NOT MET, and not for want of resolution.** `predicted-demand` vs `stay` on `predictive-balanced` as authored is **−0.006 s [−0.021, +0.010]** at n = 500 (review finding #4: this cell used to read `[−0.031, +0.019]`, which is the **n = 300** deadband-sweep bound of § 4 quoted in an n = 500 sentence — same mean to three places, a half-width 59 % too wide), and the whole predictor apparatus — the same profile run with and without a forecast — is **−0.007 s [−0.032, +0.018]**, 296 of 300 replications bit-identical |
  *
  * The second row is a **result, not a null result for want of power.** Garden's half-width here is
  * 0.02 s against a 0.3 s detectable-effect target, so the interval says the true effect is between
@@ -87,15 +110,15 @@
  *
  * | arm | AWT | d, 95 % paired-t | WT95 | d | % > 60 s | TTD | d | verdict |
  * |---|---|---|---|---|---|---|---|---|
- * | `eta` | 15.90 | −6.81 [−7.69, −5.92] | 29.09 | −23.41 [−26.20, −20.62] | 0.00 | 68.10 | −10.31 [−11.70, −8.93] | **BETTER** ×4 |
- * | `collective` | 15.89 | −6.81 [−7.72, −5.91] | 29.13 | −23.37 [−26.16, −20.58] | 0.00 | 68.05 | −10.36 [−11.75, −8.97] | **BETTER** ×4 |
- * | `energy-aware` | 15.94 | −6.76 [−7.65, −5.87] | 29.16 | −23.34 [−26.13, −20.55] | 0.00 | 68.92 | −9.49 [−10.90, −8.09] | **BETTER** ×4 |
- * | `fairness-first` | 15.90 | −6.81 [−7.69, −5.92] | 29.09 | −23.41 [−26.20, −20.62] | 0.00 | 68.10 | −10.31 [−11.70, −8.93] | **BETTER** ×4 |
- * | `capacity-aware` | 15.95 | −6.75 [−7.65, −5.86] | 29.09 | −23.41 [−26.19, −20.62] | 0.00 | 68.21 | −10.20 [−11.61, −8.80] | **BETTER** ×4 |
- * | `predictive-balanced` | 18.90 | −3.81 [−4.80, −2.82] | 32.37 | −20.13 [−22.95, −17.30] | 0.00 | 66.96 | −11.45 [−12.98, −9.92] | **BETTER** ×4 |
- * | `auction` | 16.64 | −6.06 [−6.99, −5.13] | 29.55 | −22.95 [−25.75, −20.15] | 0.00 | 67.35 | −11.06 [−12.54, −9.58] | **BETTER** ×4 |
- * | `auction-multi-round` | 18.08 | −4.63 [−5.59, −3.67] | 31.02 | −21.48 [−24.29, −18.66] | 0.00 | **64.76** | **−13.65 [−15.18, −12.13]** | **BETTER** ×4 |
- * | `zoned-uppeak` | **14.54** | **−8.16 [−9.27, −7.04]** | 31.45 | −21.05 [−24.13, −17.97] | 0.13 | 66.28 | −12.13 [−13.87, −10.40] | **BETTER** ×4 |
+ * | `eta` | 15.90 | −6.81 [−7.70, −5.92] | 29.09 | −23.41 [−26.21, −20.61] | 0.00 | 68.10 | −10.31 [−11.70, −8.92] | **BETTER** ×4 |
+ * | `collective` | 15.89 | −6.81 [−7.72, −5.91] | 29.13 | −23.37 [−26.18, −20.57] | 0.00 | 68.05 | −10.36 [−11.75, −8.96] | **BETTER** ×4 |
+ * | `energy-aware` | 15.94 | −6.76 [−7.65, −5.87] | 29.16 | −23.34 [−26.15, −20.54] | 0.00 | 68.92 | −9.49 [−10.90, −8.08] | **BETTER** ×4 |
+ * | `fairness-first` | 15.90 | −6.81 [−7.70, −5.92] | 29.09 | −23.41 [−26.21, −20.61] | 0.00 | 68.10 | −10.31 [−11.70, −8.92] | **BETTER** ×4 |
+ * | `capacity-aware` | 15.95 | −6.75 [−7.65, −5.86] | 29.09 | −23.41 [−26.20, −20.61] | 0.00 | 68.21 | −10.20 [−11.62, −8.79] | **BETTER** ×4 |
+ * | `predictive-balanced` | 18.90 | −3.81 [−4.80, −2.81] | 32.37 | −20.13 [−22.96, −17.29] | 0.00 | 66.96 | −11.45 [−12.99, −9.91] | **BETTER** ×4 |
+ * | `auction` | 16.64 | −6.06 [−6.99, −5.13] | 29.55 | −22.95 [−25.77, −20.14] | 0.00 | 67.35 | −11.06 [−12.55, −9.57] | **BETTER** ×4 |
+ * | `auction-multi-round` | 18.08 | −4.63 [−5.59, −3.66] | 31.02 | −21.48 [−24.30, −18.65] | 0.00 | **64.76** | **−13.65 [−15.18, −12.12]** | **BETTER** ×4 |
+ * | `zoned-uppeak` | **14.54** | **−8.16 [−9.28, −7.04]** | 31.45 | −21.05 [−24.14, −17.95] | 0.13 | 66.28 | −12.13 [−13.87, −10.39] | **BETTER** ×4 |
  *
  * Baseline WT95 52.50 s, **% > 60 s = 7.35**, TTD 78.41 s. `zoned-uppeak` is the best arm on the mean
  * and the *worst smart arm* on the tail — a 35.9 % AWT gain bought with a WT95 gain smaller than
@@ -109,12 +132,12 @@
  * |---|---|---|---|---|---|
  * | `eta` | 15.39 | −1.28 [−1.49, −1.07] | **BETTER** | −4.23 [−4.95, −3.51] | −1.86 [−2.13, −1.59] |
  * | `collective` | 15.40 | −1.27 [−1.49, −1.05] | **BETTER** | −3.84 [−4.55, −3.14] | −3.68 [−4.11, −3.25] |
- * | `energy-aware` | 15.40 | −1.27 [−1.48, −1.06] | **BETTER** | −4.17 [−4.89, −3.46] | −1.51 [−1.78, −1.25] |
+ * | `energy-aware` | 15.40 | −1.27 [−1.48, −1.06] | **BETTER** | −4.17 [−4.89, −3.45] | −1.51 [−1.78, −1.25] |
  * | `fairness-first` | 15.38 | −1.29 [−1.50, −1.08] | **BETTER** | −4.25 [−4.97, −3.53] | −1.87 [−2.14, −1.60] |
  * | `capacity-aware` | 15.39 | −1.28 [−1.49, −1.07] | **BETTER** | −4.23 [−4.95, −3.51] | −1.93 [−2.20, −1.65] |
- * | `predictive-balanced` | 16.44 | **−0.23 [−0.47, +0.02]** | **INDISTINGUISHABLE** — needs n ≈ 579 | −2.71 [−3.45, −1.97] | −2.01 [−2.43, −1.59] |
+ * | `predictive-balanced` | 16.44 | **−0.23 [−0.47, +0.02]** | **INDISTINGUISHABLE** — needs n ≈ 579 | −2.71 [−3.45, −1.97] | −2.01 [−2.43, −1.58] |
  * | `auction` | 15.41 | −1.26 [−1.47, −1.04] | **BETTER** | −4.19 [−4.92, −3.47] | −1.96 [−2.25, −1.68] |
- * | `auction-multi-round` | 15.42 | −1.25 [−1.47, −1.04] | **BETTER** | −4.17 [−4.89, −3.44] | −1.97 [−2.25, −1.69] |
+ * | `auction-multi-round` | 15.42 | −1.25 [−1.47, −1.04] | **BETTER** | −4.17 [−4.90, −3.44] | −1.97 [−2.26, −1.69] |
  * | `zoned-uppeak` | **10.18** | **−6.49 [−6.91, −6.07]** | **BETTER** | **−11.24 [−12.03, −10.44]** | **−7.10 [−7.56, −6.64]** |
  *
  * One INDISTINGUISHABLE cell in 36. Reported as *below resolution at this budget*, with the budget it
@@ -129,15 +152,15 @@
  *
  * | arm | AWT | d, 95 % paired-t | WT95 d | TTD d | verdict |
  * |---|---|---|---|---|---|
- * | `eta` | 15.12 | −5.76 [−6.53, −4.99] | −19.52 [−22.42, −16.63] | −7.19 [−8.26, −6.13] | **BETTER** ×4 |
- * | `collective` | 15.11 | −5.77 [−6.53, −5.00] | −19.52 [−22.42, −16.63] | −7.19 [−8.25, −6.13] | **BETTER** ×4 |
- * | `energy-aware` | 15.16 | −5.72 [−6.50, −4.93] | −19.51 [−22.41, −16.61] | −6.58 [−7.66, −5.49] | **BETTER** ×4 |
- * | `fairness-first` | 15.12 | −5.76 [−6.53, −4.99] | −19.52 [−22.42, −16.63] | −7.19 [−8.26, −6.13] | **BETTER** ×4 |
- * | `capacity-aware` | 15.30 | −5.57 [−6.36, −4.77] | −19.48 [−22.39, −16.57] | −7.12 [−8.19, −6.06] | **BETTER** ×4 |
- * | `predictive-balanced` | 16.88 | −3.99 [−4.79, −3.20] | −17.84 [−20.77, −14.91] | −6.41 [−7.58, −5.23] | **BETTER** ×4 |
- * | `auction` | 15.41 | −5.47 [−6.26, −4.67] | −19.45 [−22.36, −16.53] | −7.75 [−8.88, −6.61] | **BETTER** ×4 |
- * | `auction-multi-round` | 15.82 | −5.05 [−5.83, −4.27] | −19.05 [−21.95, −16.14] | **−8.55 [−9.72, −7.38]** | **BETTER** ×4 |
- * | `zoned-uppeak` | 22.72 | **+1.85 [+0.59, +3.11]** | **+7.24 [+3.47, +11.02]** | **+2.73 [+1.18, +4.28]** | **WORSE** ×4 |
+ * | `eta` | 15.12 | −5.76 [−6.53, −4.98] | −19.52 [−22.44, −16.60] | −7.19 [−8.26, −6.12] | **BETTER** ×4 |
+ * | `collective` | 15.11 | −5.77 [−6.54, −4.99] | −19.52 [−22.44, −16.60] | −7.19 [−8.25, −6.12] | **BETTER** ×4 |
+ * | `energy-aware` | 15.16 | −5.72 [−6.50, −4.93] | −19.51 [−22.43, −16.58] | −6.58 [−7.67, −5.48] | **BETTER** ×4 |
+ * | `fairness-first` | 15.12 | −5.76 [−6.53, −4.98] | −19.52 [−22.44, −16.60] | −7.19 [−8.26, −6.12] | **BETTER** ×4 |
+ * | `capacity-aware` | 15.30 | −5.57 [−6.37, −4.77] | −19.48 [−22.41, −16.54] | −7.12 [−8.20, −6.05] | **BETTER** ×4 |
+ * | `predictive-balanced` | 16.88 | −3.99 [−4.80, −3.19] | −17.84 [−20.79, −14.89] | −6.41 [−7.59, −5.22] | **BETTER** ×4 |
+ * | `auction` | 15.41 | −5.47 [−6.27, −4.66] | −19.45 [−22.39, −16.51] | −7.75 [−8.89, −6.60] | **BETTER** ×4 |
+ * | `auction-multi-round` | 15.82 | −5.05 [−5.84, −4.26] | −19.05 [−21.98, −16.12] | **−8.55 [−9.73, −7.38]** | **BETTER** ×4 |
+ * | `zoned-uppeak` | 22.72 | **+1.85 [+0.58, +3.12]** | **+7.24 [+3.44, +11.05]** | **+2.73 [+1.17, +4.30]** | **WORSE** ×4 |
  *
  * **One arm is WORSE than the baseline, on one building, on all four metrics**, and it is reported as
  * such rather than absorbed. `zoned-uppeak` still meets the criterion as literally written — it beats
@@ -196,9 +219,9 @@
  *
  * | case | `predictive-balanced` − `eta`, AWT | `predictive-balanced` − `eta`, TTD |
  * |---|---|---|
- * | Midtown Office | **+3.00 [+2.60, +3.41]** | **−1.14 [−1.79, −0.49]** |
+ * | Midtown Office | **+3.00 [+2.59, +3.41]** | **−1.14 [−1.80, −0.48]** |
  * | Garden Apartments | **+1.05 [+0.94, +1.17]** | −0.15 [−0.48, +0.18] |
- * | Secure Tower | **+1.76 [+1.55, +1.98]** | +0.79 [+0.24, +1.34] |
+ * | Secure Tower | **+1.76 [+1.54, +1.98]** | +0.79 [+0.24, +1.34] |
  *
  * On Midtown it buys that with time-to-destination. That is a genuine Pareto trade and exactly what
  * docs/06 § *Do not scalarize too early* warns about: ten terms is not ten improvements, it is a
@@ -238,9 +261,9 @@
  *
  * | strategy vs `stay` | AWT, 95 % paired-t | WT95 | % > 60 s | TTD | verdict on AWT |
  * |---|---|---|---|---|---|
- * | `zone-center` | **−4.88 [−5.27, −4.49]**, −29.7 % | −6.02 [−6.61, −5.43] | +0.02 [−0.04, +0.07] | −4.44 [−4.89, −4.00] | **BETTER** |
- * | `predicted-demand`, deadband 8 s as authored | `−0.006 [−0.031, +0.019]`, 497/500 differences exactly 0 | `0.00 [0.00, 0.00]` — **IDENTICAL**, 500/500 | `0.00 [0.00, 0.00]` — IDENTICAL | −0.01 [−0.02, +0.01] | **INDISTINGUISHABLE** |
- * | `predicted-demand`, deadband 3 s (**a retune**) | **−0.98 [−1.28, −0.68]**, −5.9 % | **−1.03 [−1.45, −0.62]** | +0.03 [−0.03, +0.09] | **−0.60 [−0.93, −0.26]** | **BETTER** |
+ * | `zone-center` | **−4.88 [−5.27, −4.49]**, −29.7 % | −6.02 [−6.61, −5.43] | +0.02 [−0.04, +0.07] | −4.44 [−4.89, −3.99] | **BETTER** |
+ * | `predicted-demand`, deadband 8 s as authored | `−0.006 [−0.021, +0.010]`, 497/500 differences exactly 0 | `0.00 [0.00, 0.00]` — **IDENTICAL**, 500/500 | `0.00 [0.00, 0.00]` — IDENTICAL | −0.01 [−0.02, +0.01] | **INDISTINGUISHABLE** |
+ * | `predicted-demand`, deadband 3 s (**a retune**) | **−0.98 [−1.28, −0.68]**, −5.9 % | **−1.03 [−1.45, −0.62]** | +0.03 [−0.03, +0.09] | **−0.60 [−0.94, −0.26]** | **BETTER** |
  * | `lobby` | **+1.98 [+1.75, +2.20]**, +12.0 % | **+1.61 [+1.30, +1.93]** | +0.01 [−0.01, +0.04] | **+1.85 [+1.58, +2.11]** | **WORSE** |
  *
  * Baseline `stay`: AWT 16.45 s, WT95 27.42 s, % > 60 s 0.010, TTD 48.77 s. The % > 60 s column is
@@ -289,11 +312,11 @@
  * | **8 (as authored)** | 16.30 | **−0.006 [−0.031, +0.019]** | 0.01 | 27.50 |
  * | 6 | 16.28 | −0.021 [−0.087, +0.045] | 0.24 | 26.84 |
  * | 5 | 16.09 | **−0.217 [−0.378, −0.055]** | 0.97 | 24.79 |
- * | 4 | 15.88 | **−0.430 [−0.726, −0.135]** | 2.55 | 20.97 |
- * | 3 | 15.51 | **−0.792 [−1.181, −0.404]** | 4.59 | 15.61 |
- * | **2** | **15.20** | **−1.110 [−1.548, −0.671]** | 6.18 | 11.90 |
- * | 1 | 15.42 | −0.881 [−1.346, −0.416] | 6.89 | 9.95 |
- * | 0 | 15.68 | −0.623 [−1.136, −0.111] | 7.72 | 7.78 |
+ * | 4 | 15.88 | **−0.430 [−0.727, −0.133]** | 2.55 | 20.97 |
+ * | 3 | 15.51 | **−0.792 [−1.182, −0.402]** | 4.59 | 15.61 |
+ * | **2** | **15.20** | **−1.110 [−1.550, −0.670]** | 6.18 | 11.90 |
+ * | 1 | 15.42 | −0.881 [−1.348, −0.414] | 6.89 | 9.95 |
+ * | 0 | 15.68 | −0.623 [−1.138, −0.108] | 7.72 | 7.78 |
  *
  * The optimum is 2 s and the curve turns back up below it — a car churning inside a deadband too small
  * to hold it still. `zoned-uppeak` authors exactly 2.
@@ -307,7 +330,7 @@
  * |---|---|---|---|---|---|
  * | 2 (the criterion's point) | 16.2 | 16.31 | 16.30 | −0.006 [−0.031, +0.019] | 0.01 |
  * | 4 | 31.3 | 16.88 | 16.88 | **0.000 [0.000, 0.000]** — 300/300 identical | 0.00 |
- * | 8 | 62.7 | 17.58 | 17.57 | −0.014 [−0.034, +0.006] | 0.05 |
+ * | 8 | 62.7 | 17.58 | 17.57 | −0.014 [−0.035, +0.006] | 0.05 |
  * | 16 | 124.1 | 21.32 | 21.31 | −0.010 [−0.030, +0.010] | 0.01 |
  *
  * Eight times the demand does not move it. The 8 s deadband is a property of the *shaft* — six floors
@@ -340,8 +363,8 @@
  * | load | `fairness-first` − `eta`: AWT | WT95 | WT99 | % > 60 s | quotable? |
  * |---|---|---|---|---|---|
  * | 1 % | −0.01 [−0.05, +0.02] | −0.05 [−0.13, +0.02] | −0.03 [−0.09, +0.03] | 0.00 exactly | yes; nothing significant |
- * | 2 % | **−0.26 [−0.44, −0.08]** | **−1.66 [−2.55, −0.76]** | **−2.05 [−2.98, −1.11]** | **−0.54 [−0.82, −0.27]** | **yes; all significant** |
- * | 3 % | −1.10 [−1.58, −0.62] | −7.79 [−9.99, −5.58] | −9.65 [−12.16, −7.14] | −1.71 [−2.28, −1.15] | no: `eta` itself saturates |
+ * | 2 % | **−0.26 [−0.45, −0.08]** | **−1.65 [−2.55, −0.76]** | **−2.05 [−2.98, −1.11]** | **−0.54 [−0.82, −0.27]** | **yes; all significant** |
+ * | 3 % | −1.10 [−1.58, −0.62] | −7.79 [−10.01, −5.57] | −9.65 [−12.17, −7.13] | −1.71 [−2.29, −1.14] | no: `eta` itself saturates |
  *
  * **The 2 % row is the phase's one clean demonstration that a tail term does what tail terms are for.**
  * The mean moves 1.30 %; WT95 moves 4.02 %; WT99 moves 4.46 %. The effect *grows as you move out of the
@@ -349,7 +372,7 @@
  * better `waitTime`.
  *
  * **The same study now also prices `zoneAffinity`, and it prices it as a liability here.**
- * `zoned-uppeak` − `eta` at 1 % is `+9.85 [+8.04, +11.67]` on WT95 and `+1.96 [+1.37, +2.55]` on
+ * `zoned-uppeak` − `eta` at 1 % is `+9.85 [+8.03, +11.68]` on WT95 and `+1.96 [+1.36, +2.55]` on
  * % > 60 s, growing to `+31.4` and `+11.9` at 3 %. A contiguous partition on a two-entrance building
  * refuses cross-band pickups the argmin would have taken, and the passengers it refuses are exactly the
  * ones that populate the tail. Together with the Secure Tower WORSE cell this is now the study's
@@ -366,7 +389,7 @@
  * > lose at 3 % — its queues diverge on 43 % of replications.
  *
  * `capacity-aware` falls in the gap and the honest verdict is **INDISTINGUISHABLE from `eta` at every
- * load where all arms are quotable together** (2 %: AWT `−0.19 [−0.48, +0.09]`, WT95
+ * load where all arms are quotable together** (2 %: AWT `−0.19 [−0.48, +0.10]`, WT95
  * `−0.92 [−1.91, +0.07]`; it would need n ≈ 556). Its `loadFactor` and `crowding` weights need cars near
  * their bypass threshold to have anything to price, and by that load something has diverged. One more
  * thing the census shows and no interval can: at 3 % `fairness-first` saturates **0** of 250 where `eta`
@@ -411,7 +434,7 @@
  * | `max(lastObservedAt − queryTime)` over every query | **0.000 s** |
  * | corr(forecast, arrivals in the **preceding** 300 s) | 0.614 |
  * | corr(forecast, arrivals in the **following** 300 s) | 0.324 |
- * | **partial corr(forecast, following 300 s, given every arrival so far)** | **−0.0139 [−0.0315, +0.0036]** |
+ * | **partial corr(forecast, following 300 s, given every arrival so far)** | **−0.0139 [−0.0317, +0.0038]** |
  *
  * The last row is the one that would catch a leak no import graph would. A causal forecast is a
  * function of the observed past, so once the past is partialled out nothing about the future may
@@ -460,9 +483,16 @@
  *
  * | case | AWT | WT95 | TTD |
  * |---|---|---|---|
- * | Midtown Office | **+1.43 [+1.11, +1.76]** | **+1.48 [+1.11, +1.85]** | **−2.59 [−3.06, −2.12]** |
+ * | Midtown Office | **+1.43 [+1.11, +1.76]** | **+1.48 [+1.10, +1.85]** | **−2.59 [−3.06, −2.12]** |
  * | Garden Apartments | +0.01 [−0.01, +0.02] | +0.02 [−0.02, +0.07] | −0.01 [−0.02, +0.01] |
- * | Secure Tower | **+0.42 [+0.27, +0.57]** | **+0.40 [+0.16, +0.64]** | **−0.81 [−1.08, −0.53]** |
+ * | Secure Tower | **+0.42 [+0.26, +0.57]** | **+0.40 [+0.16, +0.64]** | **−0.81 [−1.08, −0.53]** |
+ *
+ * Two lower bounds in that table read `+1.11` and `+0.27` until 2026-07-27. Both were **double
+ * roundings** — `1.104865` and `0.264903` taken to three places and then to two — and both are
+ * wrong under either quantile, so the T2 t/z switch could not have surfaced them. Of the 18 bounds
+ * in this table they are the only two where rounding twice differs from rounding once, which is
+ * how the cause was identified rather than guessed. `published.ts` now re-derives every one of
+ * them from the estimate.
  *
  * **The architecture answer, in the terms docs/01 asked it in.** Decentralizing the argmin buys
  * nothing: moving the computation into the cars changes who computes it, not what it computes, and the
@@ -494,7 +524,7 @@
  * |---|---|---|---|---|---|---|
  * | 1 | 0.00 | **0.00** | 0.00 | n/a | yes | `0.0000 [0.0000, 0.0000]` — 60/60 bit-identical |
  * | 2 | 0.55 | **0.00** | 0.27 | 0.0 % | no (control saturates 1/60) | suppressed |
- * | 3 | 2.77 | **0.00** | 2.07 | 0.0 % | **yes** | **−0.520 [−1.029, −0.010]** |
+ * | 3 | 2.77 | **0.00** | 2.07 | 0.0 % | **yes** | −0.520 [−1.039, +0.000] — **INDISTINGUISHABLE** |
  * | 4 | 6.07 | **0.00** | 5.00 | 0.0 % | no (control saturates 2/60) | suppressed |
  * | 8 | 19.27 | 0.15 | 16.85 | 0.8 % | no — 56/60 diverge | suppressed |
  * | 16 | 40.98 | 1.18 | 34.20 | 2.9 % | no — 60/60 diverge | suppressed |
@@ -506,7 +536,12 @@
  * the distinction the phase lost four behaviours to. The first load at which it migrates anything is
  * 8 %, where 56 of 60 replications have a diverging queue.
  *
- * **The −0.52 s at 3 % is reassignment, and none of it is the capacity trigger.** Switching
+ * **The −0.52 s at 3 % is reassignment, it is not significant at n = 60, and none of it is the
+ * capacity trigger.** The paired-t interval contains zero — by 0.0002 s on the upper bound, which is
+ * a reason to report it as unresolved rather than as a near miss. (It read `[−1.029, −0.010]` while
+ * published intervals used a normal quantile past n = 25; review finding #14 put them back on
+ * Student-t, and this is the one cell in the study whose verdict that moved. The budget cannot be
+ * raised: the control saturates at 4 %.) Switching
  * `reassignmentPolicy` gates *all* of stage 5, so that interval is an interval on reassignment as a
  * whole. Counted through the shipped engine at that load, the treatment arm swaps a call from one car
  * to another **0.017 times per run** and widens an already-assigned landing across a second car under
@@ -623,6 +658,71 @@ export {
 } from './suite.js';
 
 export type { ArmResult, BenchmarkRunOptions, CaseResult } from './suite.js';
+
+/* -------------------------------------------------------------------------- *
+ * Phase 8's experiment matrix, and Phase 7's acceptance interval at a real budget
+ * -------------------------------------------------------------------------- */
+
+export {
+  EXCLUDED_CELLS,
+  MATRIX_ARM_PROFILES,
+  MATRIX_BASELINE,
+  MATRIX_CELLS,
+  MATRIX_METRICS,
+  MATRIX_SEED,
+  MAX_REPLICATIONS,
+  MIN_REPLICATIONS,
+  NEAR_NEIGHBOUR_CORRELATION,
+  TARGET_HALF_WIDTH_S,
+  budgetFor,
+  cellResult,
+  matrixCell,
+  runMatrix,
+  runMatrixCell,
+} from './matrix.js';
+
+export type {
+  BudgetBasis,
+  ExcludedCell,
+  FrontExclusion,
+  MatrixCell,
+  MatrixCellResult,
+  NearNeighbourPair,
+} from './matrix.js';
+
+export {
+  PHASE7_CASE_ID,
+  PHASE7_DEADBANDS_S,
+  PHASE7_HOLDOUT_SEED,
+  PHASE7_REFERENCE_PROFILE,
+  PHASE7_REPLICATIONS,
+  PHASE7_TUNING_SEED,
+  atDeadband,
+  deadbandArmId,
+  runPhase7Acceptance,
+} from './phase7Acceptance.js';
+
+export type {
+  Phase7AcceptanceOptions,
+  Phase7AcceptanceStudy,
+  Phase7Interval,
+} from './phase7Acceptance.js';
+
+export {
+  LIVENESS_REPLICATIONS,
+  LIVENESS_SEED,
+  LIVENESS_STRATEGIES,
+  LIVENESS_PROFILE,
+  atStrategy,
+  measureEnergyLiveness,
+  strategyArmId,
+} from './energyLiveness.js';
+
+export type {
+  EnergyArmMeasurement,
+  EnergyLivenessOptions,
+  EnergyLivenessStudy,
+} from './energyLiveness.js';
 
 /* -------------------------------------------------------------------------- *
  * Reporting

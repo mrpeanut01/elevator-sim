@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { estimateMean } from '../reports/statistics.js';
+import { productionStoppingRule } from '../validation/harness.js';
+
 import { docHalfWidth, docStoppingRule } from './fixtures.test-helper.js';
 import { fixedBudgetStoppingRule, halfWidthStoppingRule } from './stopping.js';
 import type { HalfWidthEstimator } from './stopping.js';
@@ -83,10 +86,66 @@ describe('fixedBudgetStoppingRule', () => {
 });
 
 /**
+ * **The shipped rule, and the one assertion that says which estimator it is.**
+ *
+ * `validation/harness.ts`'s `productionStoppingRule` is the only stopping rule anything outside a
+ * test injects, and what it injects is `reports/statistics`'s `estimateMean` — Student-t at
+ * `n - 1`, at every `n`. docs/03-traffic-and-statistics.md § Part 3 writes the rule with a
+ * `t` (n ≤ 25) / `z` (n > 25) crossover instead; the quantile chooser that implemented that had no
+ * non-test caller once review finding #14 took it off the published path, and is deleted rather
+ * than kept exported behind a caller list nothing satisfies (DECISIONS.md § D7).
+ *
+ * The half-width the loop compares against `acceptableRange` is therefore the *same number* the
+ * report prints for that cell — which is the property worth pinning, because `ConvergenceReport`
+ * decides `converged` from the published half-width. A cheaper quantile here would stop at a
+ * precision the page then declines to call converged, in the direction {@link HalfWidthEstimate}'s
+ * docstring names: "one that stops too early publishes a number it did not earn".
+ */
+describe('productionStoppingRule — the estimator the shipped loop control uses', () => {
+  it('measures the same half-width the published interval will print, on both sides of n = 25', () => {
+    for (const n of [10, 25, 26, 200]) {
+      const samples = Array.from({ length: n }, (_, index) => index * 1.3);
+      const published = estimateMean(samples, { confidence: 0.9 });
+      const stopped = verdict(
+        productionStoppingRule({
+          samples,
+          acceptableRange: Number.POSITIVE_INFINITY,
+          confidence: 0.9,
+          metric: 'awtS',
+          replications: n,
+        }),
+      );
+      expect(published.method, `n = ${n}`).toBe('t');
+      expect(stopped.halfWidth, `n = ${n}`).toBeCloseTo(published.halfWidth, 12);
+    }
+  });
+
+  it('is strictly more conservative than the doc’s crossover past n = 25, never less', () => {
+    // The direction matters and is the whole reason this is the estimator that ships: a wider
+    // half-width stops later. At 90 % and n = 26 the doc's z = 1.65 against t(25) = 1.7081.
+    const samples = Array.from({ length: 26 }, (_, index) => index * 1.3);
+    const input_ = {
+      samples,
+      acceptableRange: Number.POSITIVE_INFINITY,
+      confidence: 0.9,
+      metric: 'awtS' as const,
+      replications: 26,
+    };
+    const shipped = verdict(productionStoppingRule(input_)).halfWidth as number;
+    const doc = docHalfWidth(samples, { confidence: 0.9 }).halfWidth;
+    expect(shipped).toBeGreaterThan(doc);
+  });
+});
+
+/**
  * The test double is checked against the doc's own worked arithmetic, because the runner's stopping
  * tests are only as meaningful as the estimator behind them.
+ *
+ * It implements docs/03 § Part 3's crossover, which the **shipped** rule deliberately does not —
+ * see the block above. That divergence is useful rather than accidental: it is what proves the
+ * port records whatever family the estimator reports instead of re-deriving one.
  */
-describe('docHalfWidth (the stand-in for stats/sequentialStopping)', () => {
+describe('docHalfWidth (an estimator that is deliberately not the shipped one)', () => {
   it('uses the t-distribution to n = 25 and the normal approximation past it', () => {
     const small = docHalfWidth([1, 2, 3, 4], { confidence: 0.9 });
     expect(small.distribution).toBe('t');

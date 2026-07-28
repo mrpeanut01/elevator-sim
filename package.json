@@ -11,7 +11,8 @@
   "workspaces": [
     "packages/core",
     "packages/experiments",
-    "packages/cli"
+    "packages/cli",
+    "packages/viz"
   ],
   "scripts": {
     "build": "tsc -b",

@@ -186,14 +186,44 @@ describe('convergence is reported as what it is', () => {
     expect(report.convergence.status).not.toBe('converged');
   });
 
-  it('records which quantile family the half-width came from', () => {
+  it('records which quantile family the half-width came from — t, at every n', () => {
+    // CHANGED 2026-07-27 (review finding #14). This assertion previously required
+    // `large.convergence.method` to be `'z'` at n = 30, and in doing so pinned the defect: the
+    // convergence report's `method` is copied off the *published* metric estimate, and a
+    // published interval is Student-t at n − 1 at every n (docs/03 § Part 4). The `n > 25` normal
+    // approximation belonged to the sequential stopping rule (docs/03 § Part 3); as of 2026-07-27
+    // it is implemented nowhere at all — see `statistics.test.ts` § "there is exactly one interval
+    // quantile in this module" and DECISIONS.md § D7.
+    //
+    // The old assertion could only pass while a nominal 95 % interval covered 93.9 %, so it was
+    // not a weaker statement of the same claim — it was the bug, written down.
     const small = buildCandidateReport('a', observations([1, 2, 3]));
     const large = buildCandidateReport(
       'b',
       observations(Array.from({ length: 30 }, (_, index) => 5 + index * 0.01)),
     );
     expect(small.convergence.method).toBe('t');
-    expect(large.convergence.method).toBe('z');
+    expect(large.convergence.method).toBe('t');
+    /* And it is the estimate's own family, not a re-derivation: df travels with it. */
+    expect(large.metrics.find((metric) => metric.metricId === 'awt')?.estimate?.degreesOfFreedom)
+      .toBe(29);
+  });
+
+  it('says t rather than z when there is no estimate to read a family off', () => {
+    // Review follow-up to finding #14, one layer down. When the headline metric is suppressed
+    // there is no `MeanEstimate`, so `method` comes from a fallback — and that fallback used to be
+    // an n-dependent quantile chooser that returned `'z'` past n = 25. `formatConvergence` never
+    // prints `method`, so the wrong family was invisible on the page and fully present in any
+    // serialized `ConvergenceReport`, which is exactly the mislabelling finding #14 was about.
+    //
+    // 30 saturated replications: past the old crossover, and with nothing to estimate from.
+    const saturated = observations(
+      Array.from({ length: 30 }, (_, index) => 300 + index),
+      { saturated: true, awtIsValid: false },
+    );
+    const report = buildCandidateReport('overloaded', saturated, { targetHalfWidth: 1 });
+    expect(report.convergence.achievedHalfWidth).toBeNaN();
+    expect(report.convergence.method).toBe('t');
   });
 });
 

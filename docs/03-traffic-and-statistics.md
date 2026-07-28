@@ -42,28 +42,43 @@ a test oracle.** If the simulator's numbers diverge wildly from the closed form 
 up-peak, there is a bug. It is the best free validation available.
 
 ```
-RTT = 2·H·tv + (S+1)·ts + 2·P·tp        round trip time
+RTT = 2·(H·tv + tx) + (S+1)·ts + 2·P·tp  round trip time
 S   = N·(1 − ((N−1)/N)^P)                expected stops among N floors
+H   = N − Σ_{i=1..N−1} (i/N)^P           expected highest reversal floor
 INT = RTT / L                            interval, L = cars in group
 HC5 = 300·P·L / RTT = 300·P / INT        persons handled per 5 minutes, whole group
 %POP = HC5 / population × 100            handling capacity as % of population
 ```
+
+**The `tx` term is not optional, and this block omitted it.** `roundTripTime()`
+computes `2·(H·tv + tx)` and `deriveUpPeakTerms` derives `tx` from real floor heights for *every*
+zoned bank — Secure Tower's high bank runs ~60 m of express, worth ~14 s each way and about **20 %
+of its round trip**. Hand-checking a zoned bank against the expression this document published
+therefore disagreed with the code by tens of seconds of RTT. `tx` is zero only for a bank whose
+served zone starts at the terminal, which is the unzoned case the textbook form assumes.
+
+The `H` line was missing too, while `highestReversalFloor`'s docstring asserted *"that is the
+expression stated in `docs/03-traffic-and-statistics.md` Part 2"* — of a formula this document did
+not contain. Both are [review finding #16](08-review-findings.md), and both are now checked rather
+than trusted: `packages/core/src/analytical/docFormula.test.ts` parses this fenced block and
+evaluates it against `roundTripTime()` on a bank with a non-zero `expressJumpS`.
+
+| Term | Meaning |
+|---|---|
+| `H` | Highest reversal floor — `N − Σ_{i=1..N−1} (i/N)^P`, exact for uniform destinations |
+| `N` | Number of floors served above the lobby |
+| `tv` | Single-floor transit time at rated speed |
+| `tx` | **Express-jump time** — the one-way run from the terminal to the bottom of the served zone. Zero for an unzoned bank, ~14 s for Secure Tower's high bank |
+| `ts` | Time lost per stop (doors, start delay, leveling) |
+| `tp` | Passenger transfer time |
+| `P` | Passengers per trip — **use 80% of rated capacity** |
+| `L` | Number of cars in the group |
 
 `HC5` is the **group** figure: `L` cars each complete `300/RTT` round trips in the window
 and carry `P` people on each. Dropping `L` gives the per-car figure, which is what `%POP`
 must not be measured with — on Midtown Office that reads 1.50% of population per 5 minutes
 against the 11–15% office target above, instead of the correct 6.01%. CIBSE Guide D and
 Barney both write it as `UPPHC = 300·P / INT`.
-
-| Term | Meaning |
-|---|---|
-| `H` | Highest reversal floor |
-| `N` | Number of floors served above the lobby |
-| `tv` | Single-floor transit time at rated speed |
-| `ts` | Time lost per stop (doors, start delay, leveling) |
-| `tp` | Passenger transfer time |
-| `P` | Passengers per trip — **use 80% of rated capacity** |
-| `L` | Number of cars in the group |
 
 ## Part 3: Statistical methodology
 
@@ -125,18 +140,31 @@ From that `s`, the replications a 90% interval on the mean requires:
 
 | Target half-width | as % of AWT | Required n |
 |---|---|---|
-| ±2 s | 12.7% | **9** |
-| ±1 s | 6.3% | 36 |
-| ±0.8 s | 5.1% | 55 |
-| ±0.5 s | 3.2% | 141 |
-| ±0.4 s | 2.5% | 220 |
+| ±2 s | 12.7% | **11** |
+| ±1 s | 6.3% | 37 |
+| ±0.8 s | 5.1% | 57 |
+| ±0.5 s | 3.2% | 143 |
+| ±0.4 s | 2.5% | 222 |
 | ±0.25 s | 1.6% | 563 |
 
+> **This table used to be the deleted normal quantile's answer.** It read
+> **9 / 36 / 55 / 141 / 220 / 563**, and five of those six rows reproduce exactly at `z = 1.6449`
+> rather than at `t[n−1]` — which this simulator uses at **every** `n` (§ Sequential stopping rule,
+> and `DECISIONS.md` § D14). Since `t` is strictly wider than `z`, the old table **understated the
+> budget at every rung**, which is the optimistic direction. Corrected by re-deriving each row from
+> `studentTQuantile` at 90 % two-sided against the same `s = 3.60 s`. **No conclusion in this
+> document changes** — the band is still ±0.5 s to ±0.8 s and the ±2 s row is still small enough to
+> be the point being made. Raised as **C19** by Phase 8's oracle track, and missed by the wave-1
+> blast-radius scan because that scan covered *published intervals* and this is a *planning* table.
+
 So **50–200 replications corresponds to a ±0.5 s to ±0.8 s target** on this configuration —
-and this doc's own worked example of ±2 s at 90% is satisfied at **n = 9** by projection, with
-the sequential rule's unconstrained crossing landing at **n = 10**. That is precisely the run
-count the section above calls a 12% error. The two pieces of guidance were in tension because
-the worked target was far looser than the accuracy the budget exists to buy.
+and this doc's own worked example of ±2 s at 90% is satisfied at **n = 11** by projection, with
+the sequential rule's unconstrained crossing landing at **n = 10** (measured 2026-07-28: the rule
+crosses at n = 10, `rule-satisfied`, half-width 1.876 s, mean 16.780 s, s = 3.237 s; unchanged by
+D14, because that run's own sample sd is smaller than the 3.60 s reference this table projects
+from). Ten is precisely the run count the section above calls a 12% error. The two pieces of
+guidance were in tension because the worked target was far looser than the accuracy the budget
+exists to buy.
 
 Both survive, for different jobs:
 
@@ -176,26 +204,112 @@ and a **confidence level** (e.g. 90%), then run until satisfied:
 
 ```
 after each replication n:
-    halfWidth = t[n-1, conf] * (s / sqrt(n))     # n <= 25, t-distribution
-    halfWidth = z[conf]      * (s / sqrt(n))     # n >  25, normal approximation
+    halfWidth = t[n-1, conf] * (s / sqrt(n))     # every n — no crossover
     if halfWidth < acceptableRange: stop and report mean
 ```
 
-z-values by confidence level:
+**This simulator uses Student-t at every `n`, in the stopping rule as well as in the published
+interval.** The textbook `t` (n ≤ 25) / `z` (n > 25) crossover, which this section previously wrote
+as the rule, describes the literature and **not** this repository. It was removed on 2026-07-27:
+
+- `estimateMean` — and therefore `pairedDifferenceEstimate`, and therefore every interval this
+  project prints — was switching to the normal quantile above n = 25 while the CLI labelled the
+  result "the paired-t interval". At n = 26 that is `z = 1.9600` where `t(25) = 2.0595`: the
+  half-width is 4.83 % too small and a nominal 95 % interval has **93.88 %** actual coverage. Three
+  of 148 real paired comparisons in a sweep at n = 26 flipped from EXCLUDES-ZERO to contains-zero.
+  [Review finding #14](08-review-findings.md).
+- The crossover survived in one function, `halfWidthQuantile`, whose docstring named two callers it
+  did not have. Nothing injected it; `validation/harness.ts` had already been building the
+  production stopping rule out of `estimateMean`. The symbol is **deleted**, and the stopping rule is
+  t-always by decision rather than by accident. The alternative — injecting a crossover estimator so
+  the loop control ran a narrower quantile than the report — would let a cell stop while its own
+  convergence report said IN PROGRESS: two numbers for the same quantity, which is finding #14's
+  failure mode one layer down. [`DECISIONS.md` § D14](../DECISIONS.md).
+
+**No replication count changed** as a result, in the suite or anywhere else. The t quantile is
+strictly wider than z, so the effect on the loop control is to stop *later*, which is the
+conservative direction: a rule that stops too early publishes a number it did not earn.
+
+Quantiles by confidence level. `z` is the `n → ∞` limit and is quoted for reference only — nothing in
+this repository uses it to build a published interval:
 
 | Confidence | 70% | 80% | 90% | 95% | 99% |
 |---|---|---|---|---|---|
-| z | 1.04 | 1.28 | 1.65 | 1.96 | 2.58 |
+| z (limit) | 1.04 | 1.28 | 1.65 | 1.96 | 2.58 |
 
-### Saturation detection
+| n | 26 | 30 | 50 | 100 | 200 | 500 |
+|---|---|---|---|---|---|---|
+| t(n−1, .975) | 2.0595 | 2.0452 | 2.0096 | 1.9842 | 1.9720 | 1.9647 |
+| half-width vs z | +5.08 % | +4.35 % | +2.53 % | +1.24 % | +0.61 % | +0.24 % |
+
+### Saturation detection — and the three other grounds for suppressing an AWT
 
 If demand exceeds handling capacity, queues grow without bound and AWT is not remotely
 normal. The literature's position is that an accurate AWT is unnecessary because the
 configuration fails anyway — but **the simulator must detect saturation and flag it**
 rather than reporting a meaningless mean.
 
-Detection: test for a positive trend in queue length across the run. If present, mark the
+Saturation detection: test for a positive trend in queue length across the run. If present, mark the
 result `SATURATED` and suppress the AWT confidence interval.
+
+**But the trend test is not the only ground, and this section used to say it was.** `RunSummary`
+carries `awtIsValid` with **four** grounds, evaluated in the order below. A run tripping more than
+one reports the most fundamental reason, so adding a ground never changes an existing message.
+
+| # | ground | the shape it sees |
+|---|---|---|
+| 1 | **trend** — `SaturationDiagnosis.saturated` | a queue that never clears and is **still growing** at the horizon |
+| 2 | **emptiness** — no leg boarded in the window | there is no waiting time to average |
+| 3 | **censoring** — unserved fraction over `DEFAULT_MAX_UNSERVED_FRACTION` | a queue that has not cleared **by** the horizon, so the people in it are unserved legs. AWT is then the mean over the legs that boarded, who are systematically the passengers who waited *least* |
+| 4 | **starvation** — a leg past the 900 s abandonment horizon | a queue that grew enormously and then **drained just in time** |
+
+Grounds 1 and 3 are both proxies for one question — *did the backlog clear?* — detected in two
+specific shapes, and **neither sees the third shape**. Ground 4 was added on 2026-07-27 after Phase
+8's fuzz campaign produced a run that escaped both, and the case is worth stating because the
+failure is precisely the one this whole document exists to prevent.
+
+> **`fuzz-1001074`, and why it published.** A fifteen-floor, single-bank, two-car building, 177 legs,
+> **0 undelivered**, run status `completed`. Mean wait **172.1 s**, median 101.8 s, p90 450.5 s,
+> **p95 686.4 s**, p99 897.5 s, **max 922.7 s**, and **67.8 % of legs waited over 60 s** — with
+> `awtIsValid` reporting **true**. It escaped the trend gate because a hump fits a shallow line with
+> large residuals (growth-to-noise 1.32 against a gate of 4 — the *false negative* twin of the false
+> positive the thresholds already document) and the censoring gate because everybody was eventually
+> collected, 177 of 177. Little's Law says the simulator was right about all of it:
+> `λ·W = 0.1235 × 172.07 = 21.2` against a measured mean queue of **20.8**. The model was internally
+> consistent; **what was wrong was the report.** That the run *recovered just in time* is exactly
+> what let it publish, and the passengers in the backlog absorbed the whole cost — "statistics
+> improve as the bug gets worse", which is the failure mode
+> [`CLAUDE.md`](../CLAUDE.md) § Statistical discipline is written against.
+
+Three things about ground 4 are deliberate:
+
+- **It is a fourth `awtIsValid` ground, not a fourth `SaturationVerdict`.** To produce a
+  "bounded-but-unacceptable" *saturation* verdict, the rule would have to threshold queue **level**,
+  and level cannot be made scale-free: by `L = λW`, forty people waiting is a normal morning in a
+  4 000-person tower and a catastrophe in an eleven-floor building with one car. The observable that
+  is already normalised by arrival rate is the **wait**. So `saturation.verdict === 'stable'` still
+  means exactly "the trend test said stable", every existing consumer is unchanged, and **no pinned
+  estimate moved** — the only path from the flag to a number is `stopOnSaturation`, which keys on
+  `saturated`.
+- **Censoring runs in the safe direction.** A leg that never boarded has no waiting time but does
+  have a waiting time *so far* — `endedAt − arrivedAt`, a lower bound. It counts at that bound, and
+  the diagnosis says when the reported figure is one. Excluding the unserved would put the gate's
+  blind spot exactly where service is worst.
+- **900 s is measured against, not chosen.** Over every shipped operating point at every shipped
+  profile, at the budgets the benchmark actually uses, the longest single wait is 203.7 s on Midtown
+  up-peak (n = 250), 136.6 s on Garden residential (n = 500), 121.2 s on Secure Tower up-peak
+  (n = 150) and **344.8 s** on Midtown interfloor-mix (n = 1000) — a margin of 2.6× at the tightest.
+  Every replication of every one of those cells returns `serviceLevel: 'served'`. The cells that
+  *do* produce longer waits already lose their AWT at replication index 0 on grounds 1 and 3. So the
+  horizon sits clear above everything the project publishes and below everything it already refuses
+  to, and `benchmark/saturationCensus.test.ts` re-measures all of it so none of those figures can go
+  stale. **A suppression rule that fires everywhere computes nothing**; this one fires nowhere it
+  should not.
+
+The gate is **per-window**, which is correct — a window statistic is a statement about its window —
+but it means a `peak-5min` report cannot see a passenger starved at minute 25. Phase 8's whole-record
+property scan (`fuzz/properties.ts` P6) is the backstop, and it also covers *servability*, which
+`core` has no notion of. Full reasoning: [`DECISIONS.md` § T21-D1 – T21-D3](../DECISIONS.md).
 
 ## Part 4: Common random numbers — the big win
 

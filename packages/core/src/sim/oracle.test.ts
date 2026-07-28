@@ -59,6 +59,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { CLOSED_FORM_ASSUMPTIONS, CLOSED_FORM_COMPARISON_RULE } from '../analytical/index.js';
+import { assertOracleProfile } from '../analytical/oraclePin.test-helper.js';
 import type { UpPeakAnalysis } from '../analytical/index.js';
 import { analyzeUpPeak } from '../analytical/upPeak.js';
 import type { DispatcherProfile, LoadedConfig } from '../config/types.js';
@@ -129,7 +130,10 @@ function upPeakRuns(pctPopulation5Min: number): readonly Simulation[] {
         building,
         // The operating mode the closed form assumes, expressed entirely as config: a parking
         // strategy, not a code path (CLAUDE.md invariant 7).
-        dispatcherProfile: withParking(profile as DispatcherProfile, 'lobby'),
+        // Pinned to conventional up/down buttons. See `assertOracleProfile`: a destination arm
+        // *should* disagree with the closed form, so the oracle refuses one rather than being
+        // widened to accommodate it.
+        dispatcherProfile: assertOracleProfile(withParking(profile as DispatcherProfile, 'lobby')),
         trafficProfiles: config.trafficProfiles,
         elevatorSpecs: config.elevatorSpecs,
         seed,

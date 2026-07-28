@@ -300,6 +300,18 @@ describe('metricOf', () => {
     expect(metricOf(empty, 'pctPopulationPer5Min')).toBeNaN();
     // Nor may "no arrivals" read as "nobody was left unserved".
     expect(metricOf(empty, 'unservedFraction')).toBeNaN();
+    // The whole energy block is absent from this fixture, and totality has to survive that too.
+    // It did not when the four energy metrics first landed: they dereferenced `summary.energy`
+    // unguarded and this suite went red with a TypeError rather than a NaN. Named individually
+    // rather than left to the loop below, because the loop only checks that the KEYS are present.
+    for (const metric of ['energyKJ', 'carDistanceM', 'carStarts', 'energyPerServedLegKJ'] as const) {
+      expect(metricOf(empty, metric), metric).toBeNaN();
+    }
     expect(Object.keys(metricsOf(empty))).toEqual([...REPLICATION_METRICS]);
+    // Totality over the whole domain, so a metric added later cannot skip this check by not being
+    // named above: every one of them must produce a number on a summary that says almost nothing.
+    for (const metric of REPLICATION_METRICS) {
+      expect(typeof metricOf(empty, metric), metric).toBe('number');
+    }
   });
 });

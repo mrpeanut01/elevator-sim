@@ -46,6 +46,7 @@ import type { AuctionPolicyOptions } from '../dispatch/policies/types.js';
 import type { ArrivalModel } from '../dispatch/predictor/types.js';
 import type { DispatchPolicy } from '../dispatch/types.js';
 import type { SimTime } from '../kernel/types.js';
+import type { RunComparability } from '../metrics/comparability.js';
 import type { SummarizeOptions, WindowSelection } from '../metrics/summarize.js';
 import type { ReportWindow, RunRecord, RunSummary } from '../metrics/types.js';
 import type {
@@ -126,6 +127,22 @@ export const SIM_DEFAULTS = Object.freeze({
    * whose doors keep cycling advances the clock just as well as a moving one.
    */
   drainGraceS: 3600,
+  /**
+   * Seconds a passenger spends walking from a destination-entry panel to the car it named.
+   *
+   * **Zero by default, and that is the whole reason it is a knob rather than a constant.** The
+   * walk is real — a lobby panel is not next to the car it picks — but a non-zero default would
+   * move every destination-dispatch number by an undeclared amount and make the passenger-model
+   * change indistinguishable from the walk. A study sets it explicitly and reports the
+   * sensitivity.
+   *
+   * Charged **between `arrivedAt` and `boardedAt`**, never by moving `arrivedAt` later:
+   * `PassengerRecord.arrivedAt` is the window-membership key, dispatcher-independent by
+   * contract, and moving it would change which passengers fall in the report window per arm —
+   * at which point a paired-t is being taken over differently-populated windows and is not a
+   * paired-t. Inert under every conventional run, where nobody is assigned a car at all.
+   */
+  assignedWalkS: 0,
   /** Evenly spaced building-wide queue samples over the demand horizon. Feeds saturation detection. */
   queueSampleCount: 120,
   /**
@@ -200,6 +217,17 @@ export const SIM_PARAMETERS: readonly SimParameterSpec[] = Object.freeze([
     unit: 's',
     description:
       'Hard timeout: simulated seconds past the end of demand in which the system may finish delivering. Exceeding it is reported as a failed run, never trimmed away.',
+  },
+  {
+    id: 'sim.assignedWalkS',
+    type: 'continuous',
+    range: [0, 30],
+    scale: 'linear',
+    default: SIM_DEFAULTS.assignedWalkS,
+    unit: 's',
+    description:
+      'Walk from a destination-entry panel to the car it named, under dispatch.passengerAssignment "panel". Counted inside waiting time and inside time to destination, never by moving the arrival instant. Deliberately a property of the lobby and NOT authorable in a dispatcher profile: a dispatcher that could tune its own walk distance could tune away its own cost, and the Pareto front would be a lie.',
+    activeWhen: { 'dispatch.passengerAssignment': ['panel'] },
   },
   {
     id: 'sim.queueSampleCount',
@@ -342,6 +370,8 @@ export interface SimulationConfig {
 
   /* ---- the runner's own tunables; see SIM_PARAMETERS ---- */
   readonly transferWalkS?: number | undefined;
+  /** Walk from a destination-entry panel to the named car. See `SIM_DEFAULTS.assignedWalkS`. */
+  readonly assignedWalkS?: number | undefined;
   readonly dispatchRetryS?: number | undefined;
   readonly drainGraceS?: number | undefined;
   readonly queueSampleCount?: number | undefined;
@@ -418,6 +448,63 @@ export interface ConservationAudit {
   readonly legsAlighted: number;
   /** Sky-lobby transfers performed. */
   readonly transfers: number;
+
+  /* ---- destination dispatch; all three are 0 under the conventional passenger model ---- */
+
+  /**
+   * Promises a landing panel made.
+   *
+   * An **event count**, not a leg count, because {@link promisesRevoked} makes a second promise on
+   * the same leg possible. `legsAssigned - promisesRevoked` is the number in force at the end, and
+   * *that* equals {@link legsCreated} on any `completed` destination-dispatch run: a run that
+   * delivered everybody promised everybody. It can fall short on a `timed-out` run, where a leg
+   * whose call no car could ever take is still standing at the landing unpromised — which is a
+   * *diagnosis*, and one the undelivered list already names, rather than a book that does not
+   * balance.
+   */
+  readonly legsAssigned: number;
+  /**
+   * Boardings onto a car other than the one the panel named. **Always 0, or the run threw.**
+   *
+   * Not a statistic: this is the whole of the passenger-model change stated as a number, and the
+   * defect it catches — a destination profile that ships, is configured, is weighted, and boards
+   * people exactly as the conventional model did — is the one the contract names as the most
+   * likely way this phase produces a dead seam.
+   */
+  readonly wrongCarBoardings: number;
+  /**
+   * **Broken promises**: occasions on which a car left behind somebody it had been promised to.
+   *
+   * An **event count, not a headcount**: one passenger bumped from three successive trips of the
+   * car they were promised counts three times, because three times is what it cost them.
+   *
+   * A *result*, not a failure (DECISIONS.md § D29). Those passengers keep their assignment and
+   * wait for the car they were told about; the alternative — re-offering them to the group — is
+   * the panel silently changing its mind, which would let this arm recover the deferral advantage
+   * it is supposed to have surrendered and flatter the very thing being measured. A non-zero
+   * count is the price of committing at call time, which is what this simulator exists to
+   * quantify.
+   */
+  readonly brokenPromises: number;
+  /**
+   * **Promises revoked**: occasions on which the group took a promise back because the car it
+   * named had left group control.
+   *
+   * The narrow exception to {@link brokenPromises}' argument, and the two are counted separately
+   * so they can never be read as one number. A *full* car will empty and come back, so waiting for
+   * it is the cost of committing at the panel and D29 keeps the passenger on it. A car put on
+   * `independent`, `fire-recall` or `out-of-service` will not come back unless a later schedule
+   * entry says so; holding a passenger to it strands them for the rest of the run while the rest
+   * of the bank stands idle, which the Phase 8 P5 property reports as a deadlock — measured, and
+   * `fuzz-1000384` is the counterexample.
+   *
+   * `0` on every conventional run, and `0` on every run with no mid-run service change in it,
+   * which is every shipped building. A non-zero count is only ever produced by
+   * `BuildingConfig.serviceEvents` or a `CarConfig.mode` that a schedule later changes. See
+   * `the root DECISIONS.md` § T22-D1.
+   */
+  readonly promisesRevoked: number;
+
   /** `generated === delivered + undelivered && legsCreated === legsRecorded`. */
   readonly balanced: boolean;
 }
@@ -439,6 +526,83 @@ export interface ConservationAudit {
 export const SIMULATION_STATUSES = ['completed', 'timed-out', 'aborted'] as const;
 
 export type SimulationStatus = (typeof SIMULATION_STATUSES)[number];
+
+/** What stage 5's load-driven trigger and the predictor actually did, for a caller that asks. */
+export interface StageActivity {
+  /** Arrivals fed to the arrival models, summed over banks. Zero means no predictor was built. */
+  readonly predictorObservations: number;
+  /** Cars observed crossing their own hall-call bypass threshold, summed over banks. */
+  readonly capacityCrossings: number;
+  /** Calls stage 5 moved off a car that had just filled up. */
+  readonly capacityMigrations: number;
+  /** Calls it looked at and left where they were, with a gate that kept them. */
+  readonly capacityHeld: number;
+  /**
+   * Courtesy holds the run *asked for*: the doors started closing on a landing that still held
+   * a passenger this car could carry, and there was room for them.
+   *
+   * Counted separately from the two below for the same reason `capacityCrossings` is counted
+   * separately from `capacityMigrations`. A granted count of zero means both "the profile
+   * declined every hold" and "nothing ever calls `requestReopen('lateArrival')`" — which is the
+   * state `answer.reopenOnLateArrival` was in for its whole life — and only a request count
+   * separates them.
+   */
+  readonly lateArrivalHoldsRequested: number;
+  /** Courtesy holds the door machine honoured, reversing a closing door. */
+  readonly lateArrivalHoldsGranted: number;
+  /**
+   * Courtesy holds refused: `answer.reopenOnLateArrival` is off, or the stop's reopen budget
+   * (`answer.maxReopensPerStop`) is spent. The first is `DOOR_REOPEN_REFUSALS.policyDisabled`,
+   * which was an unreachable verdict until the request site existed.
+   */
+  readonly lateArrivalHoldsRefused: number;
+  /**
+   * Passengers the *requested* holds were sized for, summed — the numbers the revised
+   * `DoorStopReason.transferSeconds` was computed from.
+   *
+   * Paired with {@link lateArrivalHoldsBoarded}, this is what makes the dwell falsifiable: the
+   * door grants `boarders x tp` for a hold, so the two counts must agree over a run in which
+   * every request was granted. They did not have to before, because the door re-granted the
+   * whole stop's transfer whatever this number was, and nothing compared them.
+   */
+  readonly lateArrivalHoldsProjected: number;
+  /**
+   * Passengers who actually boarded on the replayed boarding half of a granted hold, summed.
+   *
+   * Zero while holds are being granted is the "delay with no boarding to pay for it" case:
+   * a door reversed, time was spent, and nobody got in.
+   */
+  readonly lateArrivalHoldsBoarded: number;
+  /**
+   * Dwell seconds the door granted to the open periods courtesy holds produced, summed.
+   *
+   * Read off `DoorMachineState.grantedDwellS` when the reversed door reaches fully open, so it
+   * is what the machine actually granted rather than what this class thinks it asked for. That
+   * is what makes it a check on the door instead of a restatement of the request: bound it by
+   * the hold's *own* cohort — `granted x baseHallDwell + projected x tp` — and a reopen that
+   * re-grants the whole stop's transfer fails, which is the defect this counter exists for.
+   *
+   * An obstruction reopen landing inside a held-open period is also counted here, since it
+   * extends the same open period. At the shipped `sim.doorObstructionProbability` of 0 no such
+   * draw is ever taken.
+   */
+  readonly lateArrivalHoldDwellS: number;
+  /**
+   * The largest dwell any single granted hold was given, and the largest cohort any single hold
+   * was sized for.
+   *
+   * The pair the bound is actually checkable on. Run totals are too blunt: a hold's dwell is
+   * `max(base hall dwell, cohort x tp)`, the base term dominates on the shipped buildings, and
+   * summing hides one 40 s re-grant among two hundred 5 s holds. These two are extrema, so a
+   * **single** hold given the interrupted stop's transfer instead of its own pushes
+   * `lateArrivalHoldMaxDwellS` above what `lateArrivalHoldMaxCohort` can justify — and the check
+   * rebuilds that bound from the fleet's own resolved door configs rather than from anything
+   * recorded here. Measured with the defect in place it reached exactly `maxTransferSeconds`.
+   */
+  readonly lateArrivalHoldMaxDwellS: number;
+  /** See {@link lateArrivalHoldMaxDwellS}. Passengers, not seconds. */
+  readonly lateArrivalHoldMaxCohort: number;
+}
 
 /**
  * One replication, complete.
@@ -473,4 +637,23 @@ export interface SimulationResult {
   readonly events: number;
   /** Non-fatal diagnostics from the trace generator, plus any the run itself raised. */
   readonly warnings: readonly string[];
+  /**
+   * What the stages that are easy to wire up and leave unreachable actually did.
+   *
+   * On the *result*, not only on the `Simulation` instance, because `runSimulation()` returns
+   * the result and discards the instance — so every one of these counters was invisible to the
+   * function the CLI, `packages/experiments` and every doc example call. A diagnostic only its
+   * own tests can read is the shape of defect the standing requirement in `docs/05-roadmap.md`
+   * is about, one level down: reachable in principle, unreachable from the shipped entry point.
+   */
+  readonly stageActivity: StageActivity;
+  /**
+   * Which passenger model this run used, and which recorded metrics that makes uncomparable.
+   *
+   * Empty list under every conventional and disclosure-only run. See `metrics/comparability.ts`
+   * for why nine of the twenty-three change construct, and DECISIONS.md § D27 for the gate that
+   * follows from it: TTD with an interval excluding zero, **and** AWT and WT95 reported with
+   * explicit verdicts rather than omitted.
+   */
+  readonly comparability: RunComparability;
 }

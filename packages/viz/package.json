@@ -1,0 +1,33 @@
+{
+  "name": "@elevator-sim/viz",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Visualization of a simulation run: the recording contract, a headless deterministic frame producer, and a Canvas renderer. Depends on core; core never depends on this.",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "tsc -b --clean",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@elevator-sim/core": "*"
+  },
+  "devDependencies": {
+    "vite": "^8.1.5"
+  }
+}

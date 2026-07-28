@@ -347,7 +347,16 @@ describe('elevator-sim run', () => {
 });
 
 describe('elevator-sim compare', () => {
-  it('reports INDISTINGUISHABLE when a dispatcher is compared with itself', async () => {
+  /**
+   * CHANGED 2026-07-27 (review finding #8). This test used to assert `INDISTINGUISHABLE` for a
+   * dispatcher compared with itself, and in doing so pinned the defect: every paired difference in
+   * that run is *exactly* zero, so the honest answer is IDENTICAL and the advice attached to
+   * INDISTINGUISHABLE — raise --reps — is unsatisfiable at any replication count.
+   *
+   * The claim the old assertion was reaching for, that the command refuses to rank two arms it
+   * cannot separate, is kept and strengthened below.
+   */
+  it('names a self-comparison IDENTICAL, not a resolution problem', async () => {
     const { code, text } = await cli([
       'compare',
       '--building',
@@ -366,9 +375,45 @@ describe('elevator-sim compare', () => {
       ...SHORT,
     ]);
     expect(code).toBe(0);
-    expect(text).toContain('INDISTINGUISHABLE');
+    expect(text).toContain('IDENTICAL');
+    expect(text).toContain('VERDICT: IDENTICAL on AWT');
+    expect(text).toContain('4 of 4 paired differences are exactly zero');
+    /* The refusal to rank, which is what the previous assertion was really about. */
     expect(text).not.toContain('is BETTER than');
     expect(text).not.toContain('is WORSE than');
+    /* And the advice that no replication count can satisfy, gone. */
+    expect(text).not.toContain('Raise --reps');
+    expect(text).not.toContain("below this experiment's resolution");
+    expect(text).not.toContain('INDISTINGUISHABLE');
+  });
+
+  it('points a bit-identical comparison of two different profiles at the wiring-bug rule', async () => {
+    // Finding #8's real case: `eta` and `fairness-first` are distinct shipped profiles that agree
+    // on every dispatch decision here, so the paired differences are all exactly zero. The
+    // roadmap's rule is that this is a wiring bug until proven otherwise, and the CLI must say so
+    // rather than suggest more replications.
+    const { code, text } = await cli([
+      'compare',
+      '--building',
+      'garden-apartments',
+      '--a',
+      'eta',
+      '--b',
+      'fairness-first',
+      '--reps',
+      '4',
+      '--seed',
+      '20260726',
+      '--window',
+      'full-run',
+      '--serial',
+      ...SHORT,
+    ]);
+    expect(code).toBe(0);
+    expect(text).toContain('VERDICT: IDENTICAL on AWT');
+    expect(text).toContain('bit-identical result is a wiring bug until proven otherwise');
+    expect(text).not.toContain('Raise --reps');
+    expect(text).not.toContain("below this experiment's resolution");
   });
 
   it('verifies common random numbers rather than assuming them', async () => {
@@ -419,6 +464,71 @@ describe('elevator-sim compare', () => {
     expect(armLine).toBeDefined();
     expect(armLine).toMatch(/\[.*\]/);
   });
+
+  /**
+   * Review finding #19. `--confidence` moves every bound the command prints and was missing from
+   * the `reproduce:` line, so running the printed string could contradict the verdict printed
+   * directly above it: at `--confidence 0.8` the measured case printed "AWT −0.22 s [−0.41, −0.04]
+   * BETTER" and its own reproduce line re-ran at the 0.95 default as "[−0.51, +0.07]
+   * INDISTINGUISHABLE". Both bounds re-measured on this tree; the 0.95 pair was [−0.50, +0.05]
+   * before the published interval became Student-t at every `n` (review finding #14), a 4.35 %
+   * multiplier at n = 30.
+   *
+   * `--serial` is appended to the re-run rather than being expected in the printed line: it picks
+   * an executor and cannot move a number, which is exactly the criterion for what belongs on a
+   * reproduce line and what does not.
+   */
+  it('prints a reproduce line that reproduces the verdict printed above it', async () => {
+    const argv = [
+      'compare',
+      '--building',
+      'midtown-office',
+      '--a',
+      'eta',
+      '--b',
+      'capacity-aware',
+      '--reps',
+      '30',
+      '--seed',
+      '20260726',
+      '--rate',
+      '1',
+      '--duration',
+      '900',
+      '--confidence',
+      '0.8',
+      '--serial',
+    ];
+    const first = await cli(argv);
+    expect(first.code).toBe(0);
+
+    const line = first.text.split('\n').find((candidate) => candidate.includes('reproduce:'));
+    expect(line).toBeDefined();
+    const printed = (line as string).slice((line as string).indexOf('reproduce:') + 10).trim();
+    expect(printed.startsWith('elevator-sim compare')).toBe(true);
+    expect(printed).toContain('--confidence 0.8');
+
+    /* Re-run the printed string verbatim, as a user would. */
+    const second = await cli([...printed.split(/\s+/).slice(1), '--serial']);
+    expect(second.code).toBe(0);
+
+    const awtRows = (text: string): readonly string[] =>
+      text.split('\n').filter((row) => row.trim().startsWith('AWT'));
+    const verdictLines = (text: string): readonly string[] =>
+      text.split('\n').filter((row) => row.includes('VERDICT:'));
+
+    expect(awtRows(second.text)).toEqual(awtRows(first.text));
+    expect(verdictLines(second.text)).toEqual(verdictLines(first.text));
+    expect(verdictLines(first.text).join('\n')).toContain('is BETTER than');
+
+    /* And the reason the flag has to be on the line: dropping it changes the answer. */
+    const withoutConfidence = printed
+      .split(/\s+/)
+      .slice(1)
+      .filter((token, index, tokens) => token !== '--confidence' && tokens[index - 1] !== '--confidence');
+    const third = await cli([...withoutConfidence, '--serial']);
+    expect(verdictLines(third.text)).not.toEqual(verdictLines(first.text));
+  }, 120_000);
 
   it('warns when the replication budget is below the documented range', async () => {
     const { text } = await cli([
@@ -539,4 +649,124 @@ describe('elevator-sim watch', () => {
     expect(text).toContain('has no bank "middle"');
     expect(text).toContain('low, high');
   });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Phase 6b — the destination-dispatch passenger model, through the CLI
+ * -------------------------------------------------------------------------- */
+
+describe('a Level-1 run through the CLI', () => {
+  it('watch renders a populated landing column and says what the column means', async () => {
+    /*
+     * Driven, not reasoned about. `docs/09` § 3.1 predicted an **empty** landing series under a
+     * panel because the series is keyed `(floorId, direction)`; that symptom does not reproduce,
+     * because Phase 6b left `PassengerRecord.direction` populated. What was actually missing was
+     * any statement that the column had changed meaning: under a panel `▲71` is seventy-one
+     * people each already assigned one car, not one hall call with seventy-one behind it.
+     */
+    const { code, text } = await cli([
+      'watch',
+      '--building',
+      'midtown-office',
+      '--dispatcher',
+      'destination-panel',
+      '--seed',
+      '20260727',
+      ...SHORT,
+    ]);
+    expect(code).toBe(0);
+    expect(text).toContain('destination dispatch: the waiting column is a direction bucket');
+
+    // The column is not empty. `waiting` in the plain table is the same `QueueClock` total the
+    // full-frame per-floor arrows are summed from, so a non-zero total is the discriminating
+    // observation available off a TTY.
+    const waiting = [...text.matchAll(/^\s+\d+:\d\d\s+(\d+)\s+\d+/gmu)].map((m) =>
+      Number(m[1]),
+    );
+    expect(waiting.length).toBeGreaterThan(5);
+    expect(Math.max(...waiting)).toBeGreaterThan(0);
+
+    // And the comparability disclaimer reaches the summary `printRunReport` prints at the end.
+    expect(text).toContain('playback finished');
+    expect(text).toContain('destination-dispatch passenger model');
+  }, 120_000);
+
+  it('watch says the conventional thing on a conventional run', async () => {
+    const { text } = await cli([
+      'watch',
+      '--building',
+      'midtown-office',
+      '--dispatcher',
+      'eta',
+      '--seed',
+      '20260727',
+      ...SHORT,
+    ]);
+    expect(text).toContain('pressed a direction button');
+    expect(text).not.toContain('destination dispatch: the waiting column');
+    expect(text).not.toContain('destination-dispatch passenger model');
+  }, 120_000);
+
+  it('compare refuses to gate on AWT when the two arms have different passenger models', async () => {
+    /*
+     * The defect this measured, before the fix: `--a eta --b destination-panel` printed
+     * `VERDICT: INDISTINGUISHABLE on AWT` with nothing said, and AWT is the *first* of the nine
+     * metrics `core`'s own `comparabilityOf` says must not be paired across the two models.
+     */
+    const { code, text } = await cli([
+      'compare',
+      '--building',
+      'midtown-office',
+      '--a',
+      'eta',
+      '--b',
+      'destination-panel',
+      '--reps',
+      '4',
+      '--seed',
+      '20260727',
+      '--rate',
+      '1.5',
+      '--window',
+      'full-run',
+      '--duration',
+      '1800',
+    ]);
+    expect(code).toBe(0);
+    expect(text).toContain('THE TWO ARMS DO NOT SHARE A PASSENGER MODEL');
+    expect(text).toContain('A (eta): conventional');
+    expect(text).toContain('B (destination-panel): destination-dispatch');
+    // The list is core's, not a copy: every id it names must be one of the nine.
+    for (const metric of ['awtS', 'wt95S', 'pctOverLongWait', 'intervalS', 'maxQueueLength']) {
+      expect(text).toContain(metric);
+    }
+    expect(text).toContain('on TTD');
+    expect(text).not.toContain('on AWT at n =');
+  }, 300_000);
+
+  it('compare still gates on AWT when the two arms share a model', async () => {
+    // The negative control. A notice that appeared on every comparison would be indistinguishable
+    // from a module that never looked.
+    const { text } = await cli([
+      'compare',
+      '--building',
+      'midtown-office',
+      '--a',
+      'eta',
+      '--b',
+      'destination-eta',
+      '--reps',
+      '4',
+      '--seed',
+      '20260727',
+      '--rate',
+      '1.5',
+      '--window',
+      'full-run',
+      '--duration',
+      '1800',
+    ]);
+    expect(text).not.toContain('THE TWO ARMS DO NOT SHARE A PASSENGER MODEL');
+    expect(text).toContain('on AWT');
+  }, 300_000);
 });

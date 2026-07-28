@@ -100,9 +100,22 @@ Conflating these is the classic modeling mistake. They must remain separate conc
 | **Access zoning** | Which floors a given credential may reach | Passenger × Floor | Request validation |
 | **Operational zoning** | Dynamic floor partitioning among cars during up-peak | Dispatcher policy | Tunable strategy |
 
-Worth reproducing as a result: destination dispatch is *better* under access control,
-because the system learns the destination before boarding and can authorize and optimize
-in the same step.
+Because the system learns the destination before boarding, a credential-aware dispatcher can
+authorize and optimize in one step where a conventional one **cannot authorize at all**. That is a
+true statement about the code.
+
+> **The performance claim that used to be built on it is refuted, and this paragraph asserted it as
+> fact.** It read *"destination dispatch is better under access control, because … authorize and
+> optimize in the same step."* Measured at n = 150 per building under common random numbers, the
+> difference-of-differences `Δ_secure − Δ_midtown` is **+0.982 s [+0.584, +1.380]**, excluding zero
+> on the **positive** side: given the credential, pricing the destination buys *less* where access is
+> controlled, not more. What the credential does buy is **coverage** — conventional dispatch cannot
+> serve Secure Tower's interfloor traffic under any budget (0 of 30 replications quotable, 33.5 %
+> unserved), because an access-restricted pickup carries no credential and every car answers
+> `accessDenied`. So the saving is real and it is a claim about **authorization**, not about
+> **optimization**. Full result and the reason a single-building interval cannot settle it:
+> [Roadmap § The access-control hypothesis](05-roadmap.md). Seven places asserted the old sentence
+> and no test pinned any of them.
 
 ## Simulation kernel
 
@@ -206,7 +219,12 @@ attributable to the policy rather than to the world.
 
 ## Module layout
 
-As built through Phase 3. `viz/` is Phase 4 and **is not on disk yet**.
+**As built through Phase 7, plus Phase 4's foundation.** This tree is normative, not historical: the
+roadmap's Standing Requirement demands that a phase plan *"name an owner for every file a new
+behaviour must be called from"*, and it cannot be used that way if it is stale. It was scoped "as
+built through Phase 3" for two phases too long, omitting every directory Phases 5 and 7 added
+([review finding #15](08-review-findings.md)); `packages/core/src/sim/moduleTree.test.ts` now fails
+if a source directory exists that this block does not list, or vice versa.
 
 ```
 packages/
@@ -214,8 +232,14 @@ packages/
 │   ├── kernel/            — discrete-event queue, clock, deterministic tie-breaking
 │   ├── random/            — RNG and the per-source StreamSet
 │   ├── physics/           — S-curve motion profiles (motion/), door state machine (doors/)
-│   ├── model/             — Car (car/), Bank, Building, Floor, Passenger
-│   ├── dispatch/          — DispatchPolicy, scoring engine, cost term library (terms/)
+│   │   ├── motion/        — jerk-limited S-curve profiles, travel time
+│   │   └── doors/         — door state machine, reopen causes, dwell
+│   ├── model/             — Bank, Building, Floor, Passenger
+│   │   └── car/           — Car, its shaft, the load sensor, estimateCost
+│   ├── dispatch/          — DispatchPolicy, scoring engine, parameter schemas
+│   │   ├── terms/         — the cost term library
+│   │   ├── policies/      — Phase 5: zoning, pre-positioning, capacity reassignment, auction
+│   │   └── predictor/     — Phase 5: the per-floor per-bucket arrival model
 │   ├── traffic/           — passenger generation, demand profiles, routing
 │   ├── analytical/        — closed-form Barney/CIBSE RTT, the correctness oracle
 │   ├── config/            — data/*.json loading, schema, floorRange expansion
@@ -225,10 +249,46 @@ packages/
 │   ├── runner/            — parallel replication execution, CRN, sequential stopping
 │   ├── reports/           — persistence, replay, re-analysis, and the interval arithmetic
 │   ├── oracle/            — closed-form against measured round trip, reconciled term by term
+│   ├── benchmark/         — Phase 5: the written report and the studies behind it
+│   ├── tuning/            — Phase 7: automated search over the parameter space
+│   │   ├── space/         — the self-describing search space, sampling, encoding
+│   │   ├── search/        — random search, successive halving, sep-CMA-ES, the objective
+│   │   └── report/        — Pareto fronts, the held-out validation round
+│   ├── fuzz/              — Phase 8: randomized buildings, the six properties, shrinking
 │   └── validation/        — the Phase 3 acceptance gate
-├── viz/                   — web visualization, consumes core            (Phase 4, not yet present)
+├── viz/                   — web visualization, consumes core                    (Phase 4 complete)
+│   ├── contract/          — the recording schema and its folded series
+│   ├── record/            — instrumenting a run into a VizRecording
+│   ├── frame/             — the deterministic frame producer
+│   ├── playback/          — the playback clock and its mapping
+│   ├── render/            — layout and the minimal Canvas renderer
+│   ├── replay/            — the replay harness and its per-field negative control
+│   ├── editor/            — building-config edits, validation, history, preview geometry
+│   └── dev/               — the Vite dev entry points, viewer and editor (dev-only)
 └── cli/                   — headless batch entry point
+    └── commands/          — list, run, compare, tune, watch
 ```
+
+> **Layout note — `viz/editor/` exists, and the reason it took two attempts is worth keeping.**
+> `packages/core/src/sim/moduleTree.test.ts` compares this tree against the directories under
+> `packages/*/src` **in both directions**, so a directory and its line here are a single atomic
+> change: add the line first and it is a phantom that reddens the **core** suite; move the files
+> first and the tree is incomplete. The editor's four pure modules — `editorEdits.ts`,
+> `editorValidate.ts`, `editorHistory.ts`, `editorPreview.ts` — were flat files at
+> `packages/viz/src/` for exactly that reason ([`DECISIONS.md` § D65](../DECISIONS.md), § D93): the
+> task that wrote them did not own `docs/`. They **moved into `packages/viz/src/editor/` with the
+> line above added in the same commit** (`f3fd3da`), which is what the guard requires. **C29 is
+> closed.** The next person to move a directory here needs to do the same thing.
+>
+> **The guard is now scoped to packages present on disk, and C28 is closed.** It used to name
+> `viz/*` directories unconditionally, so deleting `packages/viz` turned them into phantoms and
+> reddened `core` — a *documentation* coupling rather than an import, so invariant 6 always held,
+> but a reviewer checking its strong form hit it and could reasonably read it as a violation.
+> `moduleTree.test.ts` now filters its directory set to workspace members that are installed, and
+> asserts `core`'s own presence so the scope cannot degrade into "skip everything". Verified against
+> the strong form rather than argued: with `packages/viz` deleted and deregistered in a scratch
+> copy, `tsc -b` is clean and `core` passes 77 files / 1 832 tests — while the **pre-fix** guard
+> reddens on the same copy. C28 was real. See [`DECISIONS.md` § D104](../DECISIONS.md).
 
 > **Layout note — `experiments/stats/` does not exist.** This doc previously placed the
 > statistics layer at `packages/experiments/src/stats/`. Phase 3 landed that code in

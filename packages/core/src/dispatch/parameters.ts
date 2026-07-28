@@ -48,7 +48,9 @@ import {
   ASSIGNMENT_TIMINGS,
   CALL_TYPES,
   COMMITMENT_POINTS,
+  DESTINATION_CALL_TYPES,
   PARKING_STRATEGIES,
+  PASSENGER_ASSIGNMENT_MODES,
   REASSIGNMENT_POLICIES,
 } from '../config/types.js';
 
@@ -80,6 +82,14 @@ import type {
 export const DISPATCH_DEFAULTS = Object.freeze({
   /** Conventional up/down buttons: neither destination nor credential known at call time. */
   callType: 'up-down-buttons',
+  /**
+   * No landing panel. The conventional passenger model: any car that opens takes whoever fits.
+   *
+   * Default `none` so that declaring destination *dispatch* cannot move a destination
+   * *disclosure* run by one bit — the two are different passenger models and nine of the
+   * twenty-three replication metrics stop being comparable across them.
+   */
+  passengerAssignment: 'none',
   /** No batching. Every press is scored on its own. */
   batchWindowS: 0,
   assignmentTiming: 'immediate',
@@ -196,6 +206,15 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     default: DISPATCH_DEFAULTS.callType,
     description:
       'What is known when the call is registered. up-down-buttons knows neither destination nor credential; destination-entry knows the destination; mobile-credential knows both. Moving information earlier is the entire source of destination dispatch’s advantage, and this is the knob that moves it.',
+  },
+  {
+    id: 'dispatch.passengerAssignment',
+    type: 'categorical',
+    values: [...PASSENGER_ASSIGNMENT_MODES],
+    default: DISPATCH_DEFAULTS.passengerAssignment,
+    description:
+      'Whether the landing panel names a car for each passenger (panel) or the landing keeps its up/down button (none). Under panel the call identity becomes the origin-destination pair rather than the direction, the passenger is told which car to walk to at the moment of registration, and boarding honours that promise — a car that fills up leaves the people it promised behind rather than handing them to whichever car comes next. That commitment is destination dispatch’s cost and this is the switch that pays it. Only meaningful once the destination is known at call time.',
+    activeWhen: { 'dispatch.callType': [...DESTINATION_CALL_TYPES] },
   },
   {
     id: 'dispatch.batchWindowS',

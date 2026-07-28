@@ -224,6 +224,11 @@ export function resolveCar(
   return {
     id: car.id,
     spec: spec.id,
+    // The same default `Car` applies to an absent `CarInit.mode`, stated once here so that
+    // every consumer of a `ResolvedCar` — the runner, a report, the analytical path — reads one
+    // answer instead of each re-deriving it. Unlike `passengerTransferS` there is a safe
+    // default, so this is resolved rather than left absent.
+    mode: car.mode ?? 'in-service',
     ratedSpeedMps: car.ratedSpeedMps ?? spec.ratedSpeedMps.typical,
     acceleration: car.acceleration ?? spec.acceleration.typical,
     jerk: car.jerk ?? spec.jerk.typical,

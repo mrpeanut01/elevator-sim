@@ -7,9 +7,75 @@ reviewer who only reads one directory.
 
 **21 findings — 1 critical, 13 major, 7 minor.** All four
 areas reported. `tsc -b` was clean and 2,442 tests passed at the time of the review, so every
-finding here is by construction something the suite does not catch.
+finding here is by construction something the suite did not catch.
 
-Severity is the reviewer's. Nothing below has been fixed unless its entry says so.
+Severity is the reviewer's.
+
+---
+
+## Dispositions — read this before acting on any finding below
+
+**Worked on 2026-07-27. All 21 are closed.** Each entry carries a `**Disposition.**` paragraph
+naming what closed it and the evidence; the finding text itself is left as written, in the present
+tense of the day it was filed, so the disposition can be checked against the claim rather than
+replacing it. Where a finding offered alternative remedies and the project chose the one that
+*records* a gap rather than filling it, the disposition says so — that is a closure of the finding,
+not of the capability.
+
+| # | Severity | Disposition | Guard |
+|---|---|---|---|
+| 1 | critical | **CLOSED — fixed.** `tuning/index.ts`, a package re-export, `elevator-sim tune` as the non-test caller, and an experiments-side dead-code audit. Phase 7 is now ACCEPTED | `experiments/src/tuning/deadCode.test.ts` |
+| 2 | major | **CLOSED — fixed.** README's Status rewritten; `docs/07` and `docs/08` added to its documentation table | `validation/documentation.test.ts` |
+| 3 | major | **CLOSED — fixed.** `docs/04` § 1 retracts the claim with the measurement; Midtown Office named as the real speed negative control | none — see the entry |
+| 4 | major | **CLOSED — fixed.** Root-caused (an n = 300 bound in an n = 500 row) and corrected in `benchmark/` and in `docs/05`, `docs/07` | `benchmark/published.test.ts` |
+| 5 | major | **CLOSED — deferred by decision (D12).** The detector is not built; the roadmap bullet is marked **not-done** and `patternSwitching` is recorded as deliberately unimplemented scope. This is remedy (b) of the finding's own two | none — the bullet is the record |
+| 6 | major | **CLOSED — fixed.** `rideTime` removed from `docs/06`'s worked example, with the reason | `tuning/space/docExamples.test.ts` |
+| 7 | major | **CLOSED — fixed.** `dispatch.parkingStrategy` → `idle.parkingStrategy` in `docs/06`'s schema example | `tuning/space/docExamples.test.ts` |
+| 8 | major | **CLOSED — fixed.** `compare` has a fourth verdict, IDENTICAL. **See the added caveat on the arm the 30/30 was measured at** | `cli.test.ts` |
+| 9 | major | **CLOSED — fixed (D8, superseded by D21).** The row is ungated and declared inert with an *executed* proof of the condition under which it is live | `sim/searchSpaceLiveness.test.ts` |
+| 10 | major | **CLOSED — fixed.** Same remedy as #9 | `sim/searchSpaceLiveness.test.ts` |
+| 11 | major | **CLOSED — deferred by decision (D11/D22/D23).** Double-deck dispatch is Phase 6; `loadConfig` now raises `double-deck-not-simulated`, the `Simulation` raises it into `result.warnings`, and `RunRecord` carries it. This is remedy (b) of the finding's own two | `config/doubleDeck.test.ts` |
+| 12 | major | **CLOSED — fixed (D9, priced by D25).** The courtesy hold is implemented and ships `false` | `sim/seam.test.ts` |
+| 13 | major | **CLOSED — fixed.** Same remedy as #12 | `sim/seam.test.ts` |
+| 14 | major | **CLOSED — fixed (D14).** Student-t at every `n`; `halfWidthQuantile` deleted; `docs/03` § Part 3 corrected | `reports/statistics.test.ts`, `runner/stopping.test.ts` |
+| 15 | minor | **CLOSED — fixed.** `docs/01`'s module tree regenerated against the tree on disk | `sim/moduleTree.test.ts` |
+| 16 | minor | **CLOSED — fixed.** `docs/03` Part 2 gains the `tx` term and the `H` formula | `analytical/docFormula.test.ts` |
+| 17 | minor | **CLOSED — fixed.** The false one-liner is replaced by a per-study entry-point table | `validation/documentation.test.ts` |
+| 18 | minor | **CLOSED — fixed.** `docs/07`'s opening sentence rewritten and made consistent with its own table and `CLAUDE.md` | `validation/documentation.test.ts` |
+| 19 | minor | **CLOSED — fixed.** The `reproduce:` line carries `--confidence` unconditionally | `cli.test.ts` |
+| 20 | minor | **CLOSED — fixed.** `zoning.ts`'s module docstring corrected — comments only, no logic | none — see the entry |
+| 21 | minor | **CLOSED — fixed (D10).** The declared range floor moved from `1` to `designLoadFactor` | `model/car/loadSensor.test.ts` |
+
+**Three findings closed without a mechanical guard, stated rather than glossed:** #3 (the prescribed
+per-building `buildProfile(...).kind` assertion is not built), #20 (nothing can assert prose; the
+finding's own alternative — a `contiguousZones` band-count assertion during a real run — is not
+built), and #5 (the record *is* the not-done bullet). Each is a doc that can drift again.
+
+### What moved after the dispositions were written (2026-07-28)
+
+All 21 remain closed. Five carry developments that a reader acting on the disposition alone would
+get wrong:
+
+| # | Development |
+|---|---|
+| **14** | The quantile correction had a **seventh** consequence nobody found at the time: `docs/07` § 4 and `docs/03`'s *replication budget by target precision* tables were the **deleted normal quantile's answer**. Five of six rows reproduced at `z`; at `t[n−1]` the budgets are 11 / 37 / 57 / 143 / 222 / 563 against the published 9 / 36 / 55 / 141 / 220 / 563 — understating the budget at every rung. Missed because the blast-radius scan covered *published intervals* and these are **planning** tables. Corrected 2026-07-28; tracked as **C19**. No conclusion changed |
+| **5** | Still not built, and now recorded twice over: the roadmap bullet stays ⬜, and Phase 7's re-confirmation on 2026-07-28 checked that the phase's acceptance does not lean on it |
+| **11** | Double-deck is still not simulated, and *"implementing it is Phase 6"* is now imprecise: Phase 6 split into 6a / 6b / 6c (§ D28) and double-deck belongs to none of the three. It is deferred scope named in the roadmap's Phase 6 section, and the disclaimer reaches `SimulationResult.warnings`, `RunRecord` and the CLI report |
+| **15** | The module-tree guard works and has a known weakness: it couples `core`'s suite to `viz`'s existence on disk, so deleting `packages/viz` turns the doc's `viz/*` rows into phantoms and reddens **core**. Invariant 6 still holds — it is a documentation coupling, not an import — but the guard should scope its directory set to packages that exist. Tracked as **C28**. It also means `docs/01` **must not** gain a `viz/editor/` line until the four `editor*.ts` files move there in the same commit (**C29**) |
+| **17** | The entry-point mapping is guarded, and the guard covers *that table only*. Phase 6a's and 6b's studies are deliberately named by **module path** rather than as barrel exports in the roadmap, because they are not on `benchmark/index.ts` or the package barrel (§ D62, **C27**) — naming them as callable exports would have reproduced this finding exactly |
+
+**A finding of the same class that this register never had.** Seven places asserted, as fact, that
+destination dispatch does better under access control *because* authorization and optimization
+happen in the same step. Measured at n = 150 per building under CRN, the difference-of-differences is
+`+0.982 s [+0.584, +1.380]` — the mechanism is **refuted**. Four of the seven were `core`
+docstrings; three were documents. **No test pinned any of them**, so nothing went red while they were
+wrong and nothing would go red if they returned. That is the same shape as findings #4 and #14 — a
+claim nothing re-derives — one level up, in prose about a mechanism rather than in a number. Tracked
+as **C23**, and now **closed**: `packages/experiments/src/validation/documentation.test.ts` pins all
+seven sites three ways — a claim with no refutation within 400 characters fails, a silently deleted
+correction fails, and `model/car/estimateCost.ts`'s exclusion (its sentence is *descriptive* and
+true) is asserted in **both** directions. All three were watched failing, and the 400-character
+window is four times the measured worst case of 95.
 
 ---
 
@@ -19,6 +85,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 ### 1. Phase 7 is recorded as "green. The machinery is complete and wired" while the entire `tuning/` module has no non-test caller anywhere — the sixth instance of the defect this roadmap section exists to prevent, asserted closed by the roadmap itself.
 
 **`docs/05-roadmap.md:508`** · _doc drift_
+
+> **Disposition: CLOSED — fixed (2026-07-27).** All three of the roadmap's "to accept this phase" requirements are met: `packages/experiments/src/tuning/index.ts` exists, `packages/experiments/src/index.ts` re-exports from it by name, and **the non-test caller is `tuneCommand` in `packages/cli/src/commands/tune.ts`**, which calls `runnerObjective`, `successiveHalving`, `sepCmaEs`, `randomSearch` and `runHoldoutRound` directly and ships as `elevator-sim tune`. `packages/experiments/src/tuning/deadCode.test.ts` audits `experiments/src/tuning/{search,space,report}`. Verified end to end: `tune` searching `idle.repositionThresholdS` from the shipped 8 s returned **2.582 s** against Phase 5's independently measured interior optimum of 2 s, seed sets `DISJOINT`, holdout verdict `GENERALIZES` at `--validate-reps 150`. **Phase 7 is ACCEPTED.**
 
 **Failure.** A reader (or a planning agent) following docs/05-roadmap.md:508-513 and docs/07-handoff.md:20 believes automated tuning ships. It does not run anywhere: there is no `packages/experiments/src/tuning/index.ts`; `packages/experiments/src/index.ts` exports nothing from `tuning/`; the CLI exposes only `list|run|compare|watch`. Every importer of `randomSearch`, `successiveHalving`, `sepCmaEs`, `runnerObjective` and `runHoldoutRound` is a `*.test.ts` in the same directory. The roadmap's own Standing Requirement (lines 22-30) claims the fifth instance was closed because `report/holdoutRound.ts` calls `seedSetFromReplications` — true, but `runHoldoutRound` itself is called only by `holdoutRound.test.ts`, so the seam moved up one level rather than being closed. The rule the roadmap states — "name the non-test caller" — cannot be satisfied for any Phase 7 entry point.
 
@@ -33,6 +101,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 
 **`README.md:52`** · _doc drift_
 
+> **Disposition: CLOSED — fixed.** README's Status section now names the same phase set as `CLAUDE.md` and `docs/07-handoff.md`, carries the current counts (129 test files, 2,627 tests, four packages), and lists all five CLI commands. `docs/07-handoff.md` and `docs/08-review-findings.md` are added to its documentation table. **Guarded** by `packages/experiments/src/validation/documentation.test.ts`, which asserts both halves the finding prescribed: the three phase sets agree, and every `docs/*.md` on disk appears in README's table.
+
 **Failure.** The repository's front door tells a reader (and any agent that reads README before CLAUDE.md) that nothing is built, so there is no build/run instruction and no pointer to docs/07-handoff.md. Everything else in the repo contradicts it: `npm run sim -- list` prints 5 buildings, 10 dispatcher profiles and 14 banks; CLAUDE.md:11 says "Phases 0–3, 5 and 7 landed and green, plus a CLI"; docs/07-handoff.md:26-35 gives the run commands. README's own docs table (lines 38-46) also omits docs/07-handoff.md, which is the current-state brief.
 
 **Evidence.** README.md:52 reads "**Pre-implementation.** Research and architecture are captured; no code yet." `npm run sim -- list` executes and prints the full building/dispatcher inventory. `find packages -name '*.test.ts' -not -path '*/dist/*' | wc -l` = 115. package.json declares workspaces packages/core, packages/experiments, packages/cli and a `sim` script.
@@ -42,6 +112,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 ### 3. docs/04 states Garden Apartments' cars "never reach rated speed" and that faster elevators "demonstrably do not help" there; both halves are measurably false, and the data file records the correction the doc never received.
 
 **`docs/04-test-buildings.md:21`** · _doc drift_
+
+> **Disposition: CLOSED — fixed, without the guard.** `docs/04` § 1 retracts the claim, carries the measurement that refutes it (`speedLimited` at the shipped 0.63 m/s; −17.5 % on a one-floor hop and −32.0 % on the full rise at 1.00 m/s), and names **Midtown Office** as the genuine speed negative control with its own measurement. The prescribed per-building `buildProfile(interfloorM, carConstraints).kind` assertion is **not built** — this doc can drift again.
 
 **Failure.** Anyone sizing an experiment or writing a Phase 8 physics-verification case from docs/04 § 1 treats Garden Apartments as a speed negative control. Run through the repo's own `buildProfile`, a 3.0 m one-floor hop at v=0.63, a=0.6, j=0.8 comes back `kind = speedLimited` — the car does reach rated speed — and raising rated speed from 0.63 to 1.00 m/s cuts that hop from 6.562 s to 5.417 s (−17.5 %) and the 15 m full-rise run from 25.610 s to 17.417 s (−32.0 %). A test written to the doc's claim would pin a bug, which is exactly what data/buildings/garden-apartments.json's own note warns against. The genuine negative control is Midtown Office (3.8 m pitch, 2.5 m/s): `buildProfile(3.8, {v:2.5,a:1.0,j:1.4})` is `accelerationLimited`, and raising v to 4.0 leaves the hop at 4.678 s unchanged.
 
@@ -53,6 +125,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 
 **`docs/05-roadmap.md:302`** · _doc drift_
 
+> **Disposition: CLOSED — fixed and guarded.** Root-caused by T9: `[−0.031, +0.019]` is the correct bound for the **n = 300** deadband sweep, pasted into a row whose prose says n = 500. At n = 500 the comparison is `−0.006 [−0.021, +0.010]` (mean −0.005801020408, SE 0.007965417897). Corrected in `benchmark/index.ts` (T9) and in `docs/05-roadmap.md` § Phase 5 and `docs/07-handoff.md` § 6 (T4). **Guarded** by `packages/experiments/src/benchmark/published.test.ts`, which fails if the n = 300 literal reappears in an n = 500 position.
+
 **Failure.** Re-running `runPrepositioningStudy()` (the module the roadmap names, at its default n=500 and default seed) gives `park-predicted-demand` d = −0.0058 s, 95 % paired-t [−0.0214, +0.0098], 497/500 paired differences exactly 0. The published interval [−0.031, +0.019] implies a half-width of 0.025 s. Every other number in that same study reproduces to the digit — `zone-center` −4.8805 [−5.2678, −4.4932] (−29.67 %), `lobby` +1.9751 [+1.7476, +2.2026] (+12.01 %), deadband-3 arm −0.9761 [−1.2765, −0.6758] (−5.93 %), baselines 16.45 / 27.42 / 0.010 / 48.77 — so this is one row copied from the n=300 deadband sweep (benchmark/index.ts:289) into the n=500 table, not a seed difference. docs/07-handoff.md contradicts itself three lines apart: :194 quotes the wide interval, :198 quotes "half-width 0.016 s", which matches the code. packages/experiments/src/benchmark/prepositioning.ts:34 carries the correct rounded value `-0.01 [-0.02, +0.01]`.
 
 **Evidence.** Scratch vitest run of `runPrepositioningStudy()` with no options (defaults: garden-residential, n=500, BENCHMARK_SEED) dumped via `formatCase`: `| park-predicted-demand | 16.44 | -0.01 [-0.02, 0.01] | -0.0 % | INDISTINGUISHABLE | needs n ≈ 3622 |`, and the raw estimate `d=-0.0058 [-0.0214, 0.0098] exactZero=497/500`. Contradicting text at docs/05-roadmap.md:302, docs/07-handoff.md:194, packages/experiments/src/benchmark/index.ts:26, :46 and :242 — :242 pairs the wrong interval with the correct 497/500 count from the n=500 run.
@@ -62,6 +136,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 ### 5. Phase 7's "Fuzzy traffic-pattern detector with hysteresis, driving per-pattern weight sets" is declared green, but no detector exists; `data/dispatcher-profiles.json` ships a schema-validated `patternSwitching` block that no runtime code reads.
 
 **`docs/05-roadmap.md:481`** · _doc drift_
+
+> **Disposition: CLOSED — deferred by recorded decision, which is remedy (b) of this finding's own two.** The detector is **not built**. `docs/05-roadmap.md`'s Phase 7 bullet is marked ⬜ **NOT DONE** with the measurement behind it, and `DECISIONS.md` § D12 records why building it inside a defect-clearing wave was rejected: a controller that switches the whole weight vector mid-run is a phase of work with its own acceptance question and its own risk to CRN. `config/parse.ts`'s comment no longer describes it as a forthcoming controller. The `patternSwitching` block stays authored and validated, and **still drives nothing**.
 
 **Failure.** `data/dispatcher-profiles.json:163-178` authors a full `patternSwitching` block — `type: "fuzzy"`, four inputs, five patterns, `hysteresisS: 120`, and a `weightSetsByPattern` map naming five profiles. It is validated by `dispatcherProfilesSchema` (config/schema.ts:556-568), typed on the public core barrel (`PatternDetectorConfig`, `PatternSwitchingConfig`), and cross-checked for dangling profile names by `parse.ts:502-508`. Nothing consumes it: no code detects a pattern, no code switches weight sets. A user editing `weightSetsByPattern` sees a clean `loadConfig` and zero behavioural change — configurable, schema-validated, dead in the shipped path, one level up from code into data. `parse.ts:492` still describes it as forward-looking ("describes a Phase 7 controller") while the roadmap now calls Phase 7 complete.
 
@@ -73,6 +149,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 
 **`docs/06-parameterization-and-tuning.md:449`** · _doc drift_
 
+> **Disposition: CLOSED — fixed and guarded.** `rideTime: 0.3` is removed from `docs/06`'s worked example, with a note recording that pasting the old block into `data/dispatcher-profiles.json` turned `policies.test.ts` red and why. **Guarded** by `packages/experiments/src/tuning/space/docExamples.test.ts`, which parses the JSON fenced blocks out of `docs/06` and runs each dispatcher-profile block through the real `parseDispatcherProfiles` and then the same `activeWhen` gate computation `policies.test.ts` applies to the shipped file — the test this entry prescribes. (`unsatisfiedGatesOf` is a helper local to `policies.test.ts`, not an export, so the guard carries its own copy against the *resolved* configuration; sharing it would mean exporting a test helper from `core`.)
+
 **Failure.** Copy docs/06 lines 442-484 into `data/dispatcher-profiles.json` as the doc invites ("Everything above is data. Changing any of it requires no rebuild") and `packages/core/src/dispatch/policies/policies.test.ts:413` ("lets no profile weight a term its own stage settings make inert") goes red, because the example weights `rideTime` while authoring no `dispatch.callType`, leaving it at the `up-down-buttons` default where `rideTimeTerm.activeWhen` declares the term inert. The shipped profile dropped that weight and records why in its own `$comment`; docs/06's worked example was never updated, so the single config the tuning doc presents as canonical is the one the repo forbids.
 
 **Evidence.** docs/06:449 `"rideTime": 0.3,` inside the `predictive-balanced` example. `node -e` dump of data/dispatcher-profiles.json shows the shipped `predictive-balanced.weights` has no `rideTime` key and carries a `$comment` explaining the removal ("a weight that is decoration in every shipped configuration"). policies.test.ts:445-457 builds exactly that offending profile as a fixture and asserts `unsatisfiedGatesOf(offender)` = `['rideTime']`; :467 asserts `authoredProfile?.weights.rideTime` is `undefined` with the message "the dead weight is back in the shipped file".
@@ -82,6 +160,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 ### 7. The self-describing-schema example declares `"id": "dispatch.parkingStrategy"`, which no dispatcher profile can hold; the declared id is `idle.parkingStrategy`.
 
 **`docs/06-parameterization-and-tuning.md:253`** · _doc drift_
+
+> **Disposition: CLOSED — fixed and guarded.** The example declares `idle.parkingStrategy`. **Guarded** by the same `docExamples.test.ts`, which extracts every dotted `id` and every `activeWhen` gate key from `docs/06`'s fenced blocks and asserts each is a member of `collectSearchSpace().ids`.
 
 **Failure.** An optimizer author implementing docs/06 § "The parameter schema — the mechanism that makes it tunable" from the example samples `dispatch.parkingStrategy` and writes it back through the dotted path. `dispatchStageSchema` is a `z.strictObject` with no `parkingStrategy` key, so `parseDispatcherProfiles` rejects the profile and the dimension is unsearchable — while the real knob, `idle.parkingStrategy`, is never sampled. The doc's own next section (§ "`id` is a path a profile can actually hold", lines 302-316) states the contract this example violates: "every declared `id` must be authorable into `data/dispatcher-profiles.json` and survive a `loadConfig` round trip."
 
@@ -93,6 +173,18 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 
 **`packages/cli/src/commands/compare.ts:398`** · _statistics_
 
+> **Disposition: CLOSED — fixed, with a caveat on the reproduction.** `compare` has a fourth verdict. Re-measured on this tree: `--a eta --b eta` and the Garden command below both print `VERDICT: IDENTICAL`, with **zero** occurrences of "Raise --reps" or "below this experiment's resolution".
+>
+> **The caveat, which the finding needs to be reproducible.** The "30/30 exactly-zero at the project's own operating point" for `eta` vs `fairness-first` is true *where it was measured* — a scripted `runExperiment` at the incoming-only-through-`G` arm of `validation/harness.ts` (`directionalSplit { incoming: 1 }`, `entranceWeights { G: 1, P1: 0 }`, 900 s, peak-5 min) — and **the CLI cannot express that arm**: there is no `--split` and no `--entrance-weights`. At the nearest CLI-expressible point on Midtown Office the same comparison is `+0.04 s [−0.04, +0.12] INDISTINGUISHABLE`. A reader reproducing this from the CLI on Midtown will conclude the fix does not work; the arm is the difference. **The CLI-reproducible demonstration is on Garden Apartments, and needs all three flags:**
+>
+> ```
+> $ elevator-sim compare --building garden-apartments --a eta --b fairness-first \
+>     --reps 30 --seed 20260726 --rate 2 --duration 3600 --window full-run
+>   VERDICT: IDENTICAL on AWT — 30 of 30 paired differences are exactly zero.
+> ```
+>
+> Drop `--rate 2 --duration 3600` and keep `--window full-run` and it reads `+0.03 s [−0.05, +0.10] INDISTINGUISHABLE`; drop `--window full-run` as well and both arms come back **SUPPRESSED** with `VERDICT: NONE — an unreportable arm cannot be ranked`, because the demand template's own window saturates. All four commands re-run by T4 on this tree; the Midtown figure and the Garden 30/30 are T6's, reproduced exactly.
+
 **Failure.** `elevator-sim compare --building garden-apartments --a eta --b eta --reps 20 --window full-run` — the CLI's own documented sanity check (compare.ts:157) — prints "AWT  0.00 s  [0.00, 0.00]  INDISTINGUISHABLE" and then "That is not \"the same\"; it is \"below this experiment's resolution\". Raise --reps to resolve a smaller effect." All 20 paired differences are exactly 0 (the interval is literally [0.00, 0.00]), so it *is* "the same" and no --reps resolves anything. This is not confined to an arm compared with itself: at the project's own Phase-3/Phase-5 operating point (midtown-office, 900 s, incoming-only through G, 1% pop/5min, seed 20260726, n=30) the two distinct shipped profiles `eta` and `fairness-first` produce 30/30 exactly-zero paired AWT differences, and `% waits > 60 s` comes back exactly 0.00 [0.00, 0.00] INDISTINGUISHABLE through the plain CLI path too.
 
 **Evidence.** Read compare.ts:451-465 (`verdictOf` returns only BETTER/WORSE/INDISTINGUISHABLE; `intervalContainsZero` on [0,0] is true) and compare.ts:393-402 (the INDISTINGUISHABLE paragraph). Ran `node packages/cli/dist/index.js compare --building garden-apartments --a eta --b eta --reps 20 --seed 42 --window full-run --no-color --serial`: all four metric rows print `0.00 [0.00, 0.00] INDISTINGUISHABLE` and the verdict paragraph prints the "Raise --reps" sentence. Ran a scripted `runExperiment` over all nine shipped profiles at the harness operating point (packages/experiments/src/validation/harness.ts:142-151) and counted exactly-zero paired AWT differences against `eta`: fairness-first 30/30, capacity-aware 29/30, collective 28/30, auction 20/30. The distinguishing machinery exists and is unit-tested but the CLI does not use it: packages/experiments/src/benchmark/verdict.ts:106 returns 'IDENTICAL' for exactly this case, and verdict.ts:16-24 states that collapsing the two "would let an inert cost term be written up as 'a promising direction that needs more replications', which is the specific mistake this project exists not to make". docs/03-traffic-and-statistics.md:311-347 documents the bit-identical-run mechanism; docs/07-handoff.md:270 lists "Three profiles bit-identical to eta" as open debt.
@@ -102,6 +194,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 ### 9. `idle.predictorHorizonS` is exactly inert at the shipped predictor defaults — it is a pure multiplicative factor on a forecast whose every consumer reduces it to a scale-invariant statistic — while the schema's own module docstring positively asserts all six predictor rows are live whenever `parkingStrategy: predicted-demand` or `weights.predictedDemand > 0`.
 
 **`packages/core/src/dispatch/predictor/parameters.ts:150`** · _invariants_
+
+> **Disposition: CLOSED — fixed. The first remedy was wrong and was superseded.** `DECISIONS.md` § D8 gated the row on `activeWhen: { idle.predictorCycleS: { max: 1800 } }`; § **D21 supersedes it**, because re-measurement showed the gate both unnecessary and unsound — the building on which the dimension is live is **`secure-tower`**, not `garden-apartments` as D8 claimed, and at cycle 3 600 (*outside* the gate, where an optimizer was told not to look) the horizon still produces 2 distinct trajectories. The true condition is relational (`horizon ≥ cycle`) and `activeWhen` compares against constants, so no bound is correct for more than the cycle it was fitted to. The row is now **ungated and declared inert** through `DECLARED_INERT`, an entry that names the condition under which it *is* live and whose test **executes** that condition. `PREDICTOR_PARAMETERS`' docstring, which asserted all six rows live, is corrected. **Guarded** by `packages/core/src/sim/searchSpaceLiveness.test.ts`, which now also asserts the contrapositive for every `activeWhen`-gated dimension: outside its gate, a dimension must be flat.
 
 **Failure.** Configuration: building `midtown-office` or `garden-apartments`, profile `predictive-balanced` (which authors `idle.parkingStrategy: predicted-demand`, `weights.predictedDemand: 0.4`, and `idle.predictorHorizonS: 300`), seed 20260726, durationS 1800, at both the shipped 8 s deadband and the 2 s deadband where stage 7 actually fires. Sweeping `idle.predictorHorizonS` over {30, 120, 300, 900, 3600} — the entire declared log-scale range `[30, 3600]`, 120x — yields **one** distinct passenger-record trajectory. Wrong claim: `parameters.ts:131-146` states "every one of these six is live when either the parking strategy is `predicted-demand` or `weights.predictedDemand` is above zero", and the row's own `description` says the horizon "sets what 'likely to appear soon' means". Both conditions are satisfied here and the dimension is bit-identical. Wrong output: an optimizer searching the 48-dimension space treats a two-order-of-magnitude log axis as live, wasting evaluations at 50–200 replications each, and any tuned winner it reports carries a horizon value chosen by noise while reading as a tuned result.
 
@@ -113,6 +207,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 
 **`packages/core/src/dispatch/predictor/parameters.ts:150`** · _dead paths_
 
+> **Disposition: CLOSED — fixed.** Same remedy as #9 (D8, superseded by D21). No shipped run moves; what changed is that a search leaving the cycle at a day skips the horizon because this repository's own test says it is inert there, rather than because an unchecked bound said so.
+
 **Failure.** Run `predictive-balanced` (which authors `"predictorHorizonS": 300` at data/dispatcher-profiles.json:116) with the horizon set to 30 vs 300 vs 3600 — the whole declared range, two orders of magnitude — and the run is bit-identical on every building and at every reposition deadband. Mechanism: at the shipped `predictorCycleS` default of 86400 s, every bucket touched by a forecast window `[fromT, fromT+H]` in a ≤2100 s replication has `completedOccurrences(bucket, fromT) === 0` (arrivalModel.ts:390-394 returns 0 while `fromT < bucketEndInCycle(bucket)`), so `estimatedRate` (arrivalModel.ts:445-461) shrinks every bucket to the same landing-level rate and `forecast()` integrates to exactly `rate × H` for every floor and direction. Both consumers then cancel the factor: `demandMisalignmentM` (terms/predictedDemand.ts:73-91) is a demand-weighted *mean*, and stage 7 uses an argmax over the forecast (`parkingCandidates`, lifecycle.ts:694-716) plus a weighted mean of `moveSeconds` (`expectedResponseSeconds`, lifecycle.ts:650-658). Phase 7 will therefore search a log-scaled [30, 3600] dimension that is a perfectly flat plateau, and `docs/07-handoff.md`'s own warning that finite-difference methods stall on plateaus applies to it.
 
 **Evidence.** Instrumented `runSimulation` at seed 20260726 through `searchSpace()`/`candidateProfile()` off `predictive-balanced`: horizon 30 vs 300 vs 3600 gave IDENTICAL `JSON.stringify(result.summary)` on midtown-office, garden-apartments, secure-tower and mixed-use-high-rise, crossed with reposition deadbands 8 (shipped), 2, 0, and (2, energyWeight 0) — 16 building×setting cells, all identical. Direct check on the estimator: `createArrivalModel({floorIds:['L','2','3','4'], idle:{predictorCycleS: 86400, predictorBucketWidthS: 300}})` fed 1700 s of uneven arrivals, then `expectedDemandByFloor(1700, H)` for H in {30,120,300,900,1800,3600} — the normalised per-floor shape is identical to 9 decimal places for every H (0.221771804 / 0.377267079 / 0.328586733 / 0.072374384). Negative control confirming the mechanism: at `predictorCycleS: 1800` or `600` the window wraps the cycle and the shapes *do* differ, which is why `idle.predictorCycleS` measures LIVE in the same sweep while the horizon does not. `sim/simulation.ts:273` confirms nothing in the runner passes a `horizonS` override, so the model's own configured horizon is always the one used.
@@ -122,6 +218,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 ### 11. The entire double-deck configuration surface — `doubleDeck`, `deckSeparationM`, `ratedLoadLbPerDeck`, `servesFloorPairs`, and the `Bank` deck index built from them — is parsed, cross-validated with two dedicated warning codes, resolved onto `ResolvedCar` and unit-tested, and has zero runtime consumers.
 
 **`packages/core/src/model/bank.ts:106`** · _dead paths_
+
+> **Disposition: CLOSED — deferred by recorded decision, which is remedy (b) of this finding's own two.** Double-deck dispatch is **not implemented** and is Phase 6 scope. What is fixed is the silence: `loadConfig` raises `double-deck-not-simulated` naming the building and the bank, `Simulation` raises the same statement into `result.warnings`, and — correcting D11's own claim — `RunRecord` gained an optional `warnings` field so a *stored* record carries it too (§ D22). Disclaimers are emitted ahead of advisories and the CLI's truncation raised from 6 to 12, so the disclaimer no longer survives by being warning #1. `WARNING_CODES.doubleDeckNotSimulated` also gained a non-test reader, `planRun` in `packages/cli/src/commands/run.ts` (§ D23). **Guarded** by `packages/core/src/config/doubleDeck.test.ts`, which walks `data/buildings/` and asserts the warning in both directions.
 
 **Failure.** `data/buildings/vertical-city.json` declares eight shuttle cars with `"doubleDeck": true`, `"deckSeparationM": 4.5`, `"ratedLoadLbPerDeck": 2000` and `"servesFloorPairs": [["G","2"],["26","27"],["51","52"],["76","77"]]`. `loadConfig` accepts it, resolves `capacityPersonsPerDeck: 13 / designCapacityPersonsPerDeck: 10`, builds `Bank.isDoubleDeck === true` and a full `deckByFloorId` index — and emits no warning at all (`config.warnings.length === 2`, neither about decks). `runSimulation('vertical-city')` then runs each shuttle as a single-deck car: `Car` has no deck concept, so the shuttle makes up to eight separate stops on its run where the declared hardware makes four paired ones. Every shuttle-bank round-trip time, interval and handling-capacity number the simulator reports for vertical-city is therefore for hardware nobody configured, and nothing in the run output says so. `docs/07-handoff.md:217` defers double-deck *dispatch* to Phase 6, which is fine — the defect is that the config layer validates the pairing carefully enough to look wired (parse.ts:380-393 warns "has double-deck cars but declares no servesFloorPairs, so the deck pairing is undefined" and "declares servesFloorPairs but has no double-deck cars; the pairing has no effect") while the runtime ignores it entirely.
 
@@ -133,6 +231,18 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 
 **`packages/core/src/physics/doors/types.ts:548`** · _dead paths_
 
+> **Disposition: CLOSED — fixed (D9), and its published price corrected (D25).** The behaviour is implemented: when the doors start closing on a landing that still holds a passenger this car could carry, and the car is below its design load, the run requests a `lateArrival` reopen — deterministically, with no random draw, because a probability here would spend a stream on something the passenger population already decides (invariant 2). `sim/simulation.ts` now has a second, non-test `requestReopen('lateArrival', …)` call site. **`DOOR_DEFAULTS.reopenOnLateArrival` ships `false`**, and all 50 shipped building × profile cells are bit-identical to the pre-change tree.
+>
+> **The knob's published cost was never quotable, and both published figures were wrong the same way.** "~30 % AWT on `secure-tower`" (D9) and an adversarial review's correction to "+59.1 %" are each a **single-replication point estimate of a mean on a configuration that saturates** — `secure-tower` reports `verdict: 'diverging-queue'` at that seed — which `CLAUDE.md` § Statistical discipline forbids quoting. Re-measured at 50 paired replications under CRN with paired-t intervals and saturated arms suppressed:
+>
+> | 5 buildings × 10 profiles | quotable | significantly worse | significantly better | no significant difference |
+> |---|---|---|---|---|
+> | | 34 of 50 | **0** | 2 | 32 |
+>
+> Both significant cells are *improvements*: `secure-tower|auction-multi-round` −13.2 % (−7.66 s, CI [−12.72, −2.60]) and `vertical-city|predictive-balanced` −14.4 % (−6.80 s, CI [−11.36, −2.23]). **There is no measured AWT cost.** The default is still `false` because the hold moves **41 of the 50** trajectories, which would revalue the runs Phase 5's verdicts were measured on. § D25.
+>
+> The second-order claim in this entry is fixed too: `analytical/types.ts`'s `no-door-interference` assumption no longer charges a divergence source the simulator does not produce, and now states that both reopen causes are off at the shipped defaults.
+
 **Failure.** Set `answer.reopenOnLateArrival: false` (or `true`) on any dispatcher profile in data/dispatcher-profiles.json and run any building. The run is bit-identical either way, with or without door obstructions enabled. `searchSpace()` returns it as one of 48 dimensions, so Phase 7's successive-halving will spend real replications (50–200 per configuration) resolving a boolean that cannot move the objective, and — because the objective is noisy — can attribute a difference to it. Two further consequences: `DoorAccounting.lateArrivals` (reported out through `Car.snapshot()` at car.ts:1195) is structurally always 0 on every run this project can produce, and `DOOR_REOPEN_REFUSALS.policyDisabled` is an unreachable verdict. Worse for the oracle: `packages/core/src/analytical/types.ts:596-600` declares the assumption `no-door-interference` with divergence text "The simulator models photo-eye obstruction and late-arrival reopens, each of which adds a partial door cycle", and that id is listed in `CLOSED_FORM_COMPARISON_RULE.oneSidedUnderIds` (types.ts:662) — i.e. the RTT reconciliation charges a divergence source the simulator provably never produces (late-arrival reopens never, obstruction reopens never at the `doorObstructionProbability: 0` default).
 
 **Evidence.** 1) `rg -n 'requestReopen' packages --type ts` returns exactly one non-test production call site: `packages/core/src/sim/simulation.ts:1516` — `car.requestReopen('obstruction', at);`. 2) `rg -n 'lateArrival' packages --type ts` shows the string appears as a *command* only in `packages/core/src/physics/doors/doorMachine.test.ts` (lines 145-147, 937, 998, 1245); every other hit is a type declaration, a docstring, or the counter. 3) The gate is `doorMachine.ts:638`: `if (cause === 'lateArrival' && !config.reopenOnLateArrival) return 'policyDisabled';` — it is unreachable for `cause === 'obstruction'`. 4) Measured: built the profile through `searchSpace()`/`candidateProfile()` off `predictive-balanced` and ran `runSimulation` at seed 20260726 on all five shipped buildings at `reopenOnLateArrival` false vs true, at `doorObstructionProbability` 0 and 0.5 — `JSON.stringify(result.summary)` IDENTICAL in all 10 pairs. Control: the same harness shows `answer.maxReopensPerStop` 0 vs 20 IDENTICAL at obstruction 0 but *differs* at obstruction 0.3, so the harness does detect a live door knob.
@@ -143,6 +253,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 
 **`packages/core/src/sim/simulation.ts:1516`** · _invariants_
 
+> **Disposition: CLOSED — fixed.** Same remedy as #12. **Guarded** behaviourally by `packages/core/src/sim/seam.test.ts`, in the shape this entry prescribes.
+
 **Failure.** Configuration: building `midtown-office` or `garden-apartments`, profile `eta` or `predictive-balanced`, seed 20260726, durationS 1800, `doorObstructionProbability: 0.5` (so the reopen path is demonstrably exercised). Setting `answer.reopenOnLateArrival: true` versus `false` produces a byte-identical passenger record — same car, same boardedAt, same alightedAt for every leg. Wrong output: `collectSearchSpace()` returns this as one of its 48 boolean dimensions, so a Phase 7 search (successiveHalving/sepCmaEs, 50–200 replications per evaluation) spends budget on a direction whose objective is exactly constant, and reports whichever value the draw happened to hold as part of a "tuned winner". Worse, because the axis is exactly flat rather than noisy, it permanently inflates `countDistinctOutcomes`-based plateau classes and feeds `plateau.ts`/`cmaes.ts` restart logic a direction that can never produce a gradient.
 
 **Evidence.** Grep over all of packages/*/src: `requestReopen` has exactly one non-test call site, `packages/core/src/sim/simulation.ts:1516` -> `car.requestReopen('obstruction', at);`. The string `'lateArrival'` appears in non-test source only in `physics/doors/types.ts` (the `DOOR_REOPEN_CAUSES` tuple and docs) and `physics/doors/doorMachine.ts:623,638`; the gate is `doorMachine.ts:638`: `if (cause === 'lateArrival' && !config.reopenOnLateArrival) return 'policyDisabled';`. Every other occurrence is in `physics/doors/doorMachine.test.ts`. Measured with the built dist (`npx tsc -b` clean) via a scratch script running `core.runSimulation` and diffing `result.record.passengers`: `midtown-office obstructionP=0: reopenOnLateArrival true vs false -> IDENTICAL; maxReopensPerStop 0 vs 20 -> IDENTICAL` / `midtown-office obstructionP=0.5: reopenOnLateArrival true vs false -> IDENTICAL; maxReopensPerStop 0 vs 20 -> differs` and the same pair on `garden-apartments`. The `maxReopensPerStop` column is the non-vacuity control: it proves the reopen machinery is live in that run and only the lateArrival branch is unreachable. Also confirmed at `demand.arrivalRatePctPop5min: 18` on midtown-office: still IDENTICAL. Declared at `packages/core/src/physics/doors/types.ts:548` in `DOOR_PARAMETERS`; present in the collected space (I enumerated `searchSpace().ids` — 48 rows including `answer.reopenOnLateArrival`) and listed as an expected member at `packages/experiments/src/tuning/space/collect.test.ts:333`.
@@ -152,6 +264,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 ### 14. The published paired-difference interval silently switches from Student-t to the normal quantile above n=25, so every `compare` at the documented 50–200 replication budget reports an anticonservative interval that the CLI still labels "the paired-t interval".
 
 **`packages/experiments/src/reports/statistics.ts:321`** · _statistics_
+
+> **Disposition: CLOSED — fixed (D14).** `estimateMean` — and therefore `pairedDifferenceEstimate`, and therefore every interval this repository prints — is Student-t at `n − 1` at **every** `n`. Verified at n = 25/26/30/100/500: all `method = t`, quantiles 2.063899 / 2.059539 / 2.045230 / 1.984217 / 1.964729, converging to z from above. `halfWidthQuantile` and `T_DISTRIBUTION_MAX_N` are **deleted** rather than left as a dead alternative, and the barrel no longer exposes either; `statistics.test.ts` asserts the symbol is gone. The stopping rule is t-always by decision — it always injected `estimateMean`, so **no replication count changed**. `docs/03-traffic-and-statistics.md` § Part 3 no longer states the crossover as this simulator's rule. Blast radius: 73 of 153 printed intervals in `benchmark/index.ts` moved and **one verdict flipped** (Phase 5 capacity reassignment, `[−1.029, −0.010]` BETTER → `[−1.039, +0.000]` INDISTINGUISHABLE at n = 60), all re-rendered from full-precision estimates rather than from arithmetic on printed text.
 
 **Failure.** `elevator-sim compare --reps 26` (or any n>25, including the default 100). `pairedDifferenceEstimate` delegates to `estimateMean`, which calls `halfWidthQuantile(n, conf)`; at n=26 that returns z=1.9600 with `method:'z'` instead of t(25)=2.0595. The half-width is 4.83% too small, so a nominal 95% interval has 93.88% actual coverage (false-positive rate 6.12% instead of 5%). Demonstrated verdict flip on real simulator output: garden-apartments, full-run window, `eta` vs `eta`+0.2·distanceTravelled, seed 18, n=26 — mean difference −0.0827 s, SE 0.0416. Shipped interval [−0.1643, −0.0011] excludes zero → CLI prints "VERDICT: A is BETTER than B on AWT" followed by "The paired-t interval on the difference excludes zero." (compare.ts:404-405). The doc's formula gives [−0.1684, +0.0030], which contains zero → INDISTINGUISHABLE. 3 of 148 real paired comparisons in that sweep flipped.
 
@@ -166,6 +280,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 
 **`docs/01-architecture.md:209`** · _doc drift_
 
+> **Disposition: CLOSED — fixed and guarded.** `docs/01`'s module tree is regenerated against the tree on disk — `dispatch/{policies,predictor}`, `experiments/{benchmark,tuning}` with `tuning/{search,space,report}`, all seven `viz/` directories and `cli/commands/` — and the block is re-scoped from "as built through Phase 3" to normative. **Guarded** by `packages/core/src/sim/moduleTree.test.ts`, which walks `packages/*/src` for directories holding a non-test `.ts` file and asserts the two sets are equal in both directions.
+
 **Failure.** docs/01's tree (lines 211-231) lists `core/dispatch` with only `terms/`, and `experiments/` with only `runner/`, `reports/`, `oracle/`, `validation/`. On disk `packages/core/src/dispatch/` also contains `policies/` and `predictor/` (Phase 5), and `packages/experiments/src/` also contains `benchmark/` (Phase 5) and `tuning/` (Phase 7, with `search/`, `space/`, `report/`). The roadmap's Standing Requirement (line 69) demands a phase plan "name an owner for every file a new behaviour must be called from" — and the canonical map of what files exist is three phases stale, which is the same structural cause the roadmap blames for the four Phase 5 dead seams.
 
 **Evidence.** `find packages -type d -not -path '*/dist/*'` shows packages/core/src/dispatch/{policies,predictor}, packages/experiments/src/{benchmark,tuning}, packages/experiments/src/tuning/{search,space,report}. None appear in docs/01:211-231. The doc's own inline note at :233-241 (the `experiments/stats/` correction) shows this section is maintained as normative rather than historical.
@@ -175,6 +291,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 ### 16. docs/03 Part 2 is cited by the analytical module as the statement of the formulas the repo holds itself to, but it omits the `tx` express term the implementation always evaluates and gives no closed form for `H`, which a code docstring claims it states.
 
 **`docs/03-traffic-and-statistics.md:45`** · _doc drift_
+
+> **Disposition: CLOSED — fixed and guarded.** `docs/03` Part 2 now publishes `RTT = 2·(H·tv + tx) + (S+1)·ts + 2·P·tp`, adds the `H = N − Σ_{i=1..N−1} (i/N)^P` line that `highestReversalFloor`'s docstring already claimed it stated, and gives `tx` a term-table row. **Guarded** by `packages/core/src/analytical/docFormula.test.ts`, which parses the fenced block out of the doc and evaluates it against `roundTripTime()` on a bank with a non-zero `expressJumpS` — the test this entry prescribes.
 
 **Failure.** docs/03:45 gives `RTT = 2·H·tv + (S+1)·ts + 2·P·tp` and a term table with no `tx` row, while `roundTripTime()` computes `2·(H·tv + tx)` and `deriveUpPeakTerms` derives `tx` from real floor heights for every zoned bank — Secure Tower's high bank runs ~60 m express, worth ~14 s each way and ~20 % of its round trip (documented at analytical/types.ts:176-179). Hand-checking a zoned bank against docs/03's published expression therefore disagrees with the code by tens of seconds of RTT. Separately, `highestReversalFloor`'s docstring at packages/core/src/analytical/roundTripTime.ts:141-143 asserts "That is the expression stated in `docs/03-traffic-and-statistics.md` Part 2" for `H = N − Σ_{i=1..N−1}(i/N)^P`; docs/03 Part 2 contains no `H` formula at all, only a one-line gloss ("Highest reversal floor") in the term table.
 
@@ -186,6 +304,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 
 **`docs/05-roadmap.md:296`** · _doc drift_
 
+> **Disposition: CLOSED — fixed and guarded.** The sentence is replaced by a table mapping each block of numbers to the entry point that regenerates it, including the two sweeps for which **no entry point ships**. **Guarded** by `packages/experiments/src/validation/documentation.test.ts`, which asserts every entry point the roadmap names is an actual export of `@elevator-sim/experiments` — so the mapping cannot name a function that does not exist, nor survive one being renamed.
+
 **Failure.** `runBenchmark` iterates `BENCHMARK_CASES` calling `runBenchmarkCase`, and `formatBenchmark` emits per-case metric tables plus `formatCriterionVerdict`. It never calls `runPrepositioningStudy`, `runTailStudy`, `measurePredictorLag`, `auditForecastCausalityInRun`, `measureAuctionAggregation` or `runCapacityReassignmentStudy`. So a reader who runs the stated one-liner to reproduce the −4.88 s [−5.27, −4.49] `zone-center` result (roadmap:302), the deadband sweep (roadmap:343-345), the tail study (roadmap:380-381), the predictor-causality audit (roadmap:366-374), the capacity-reassignment sweep (roadmap:354-365) or the auction aggregation table gets none of them.
 
 **Evidence.** packages/experiments/src/benchmark/suite.ts:216-226 — `runBenchmark` body is a loop over `BENCHMARK_CASES` and `runBenchmarkCase` only. packages/experiments/src/benchmark/report.ts:123-126 — `formatBenchmark` = `results.map(formatCase)` plus `formatCriterionVerdict(results)`. The pre-positioning numbers come from `runPrepositioningStudy()` in prepositioning.ts:187, which I ran separately to reproduce them.
@@ -195,6 +315,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 ### 18. The handoff's opening sentence says Phases 0–5 are complete and simultaneously that Phase 4 remains, contradicting its own status table two lines later and CLAUDE.md.
 
 **`docs/07-handoff.md:3`** · _doc drift_
+
+> **Disposition: CLOSED — fixed and guarded.** `docs/07`'s opening sentence is rewritten and now agrees with its own status table and with `CLAUDE.md`. **Guarded** by `packages/experiments/src/validation/documentation.test.ts`, which parses the phase set from all three and asserts they are equal — and, separately, that no phase appears in both a document's "complete" list and its "remaining" list, which is the exact self-contradiction this entry reports.
 
 **Failure.** docs/07-handoff.md:3 reads "Phases 0–5 and 7 are complete; **Phases 6, 4 and 8 remain**" — Phase 4 is asserted both complete and outstanding in one sentence. The table at :22-24 marks Phase 4 "⬜ NOT STARTED", and CLAUDE.md:11 says "Phases 0–3, 5 and 7 landed and green". An agent resuming cold from the brief's first line — which is what the document exists for — can conclude the visualization phase is done and skip it.
 
@@ -206,6 +328,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 
 **`packages/cli/src/commands/compare.ts:435`** · _statistics_
 
+> **Disposition: CLOSED — fixed.** `--confidence` is appended to the `reproduce:` line unconditionally. Re-measured on this tree at the entry's own operating point: the 0.8 run prints `−0.22 s [−0.41, −0.04] BETTER` and a reproduce line carrying `--confidence 0.8`; the same command at the 0.95 default prints `[−0.51, +0.07] INDISTINGUISHABLE`. That second pair is itself two hundredths wider than this entry records, because the published interval became Student-t at every `n` (#14) after the entry was written.
+
 **Failure.** `elevator-sim compare --building midtown-office --a eta --b capacity-aware --reps 30 --seed 20260726 --rate 1 --duration 900 --confidence 0.8` prints "AWT −0.22 s [−0.41, −0.04] BETTER" and "VERDICT: A (eta) is BETTER than B (capacity-aware) on AWT.", then prints `reproduce: elevator-sim compare --building midtown-office --a eta --b capacity-aware --reps 30 --seed 20260726 --duration 900 --rate 1`. Running that printed line verbatim gives "AWT −0.22 s [−0.50, +0.05]" and "VERDICT: INDISTINGUISHABLE on AWT at n = 30." The label `reproduce:` is attached to a command that does not reproduce the reported claim.
 
 **Evidence.** Read compare.ts:427-441: the array contains --building, --a, --b, --reps, --seed and conditionally --window/--duration/--rate/--traffic; `--confidence` (declared at compare.ts:126-134 and read at compare.ts:192) is never appended, although it is threaded into every `estimateMean`/`pairedDifferenceEstimate` call at compare.ts:522, :561 and therefore into `verdictOf` at :352. Ran both commands above back to back with --no-color --serial and captured the two different VERDICT lines. By contrast `run` builds its reproduce line from every flag that can move a number (packages/cli/src/commands/run.ts:237-247).
@@ -216,6 +340,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 
 **`packages/core/src/dispatch/policies/zoning.ts:26`** · _invariants_
 
+> **Disposition: CLOSED — fixed, comments only, without a guard.** `zoning.ts`'s module docstring now states that `Simulation.#park` supplies the partition through `resolvePrepositionContext`, that `zoned-uppeak` is the shipped profile declaring `zone-center`, and that `zone-center` is the best pre-positioning result the project has; the dangling cross-reference is repointed at `prepositioning.ts` § *"`Simulation.#park` calls this, and the two strategies it feeds are live"*. No logic changed. The finding's alternative — a `contiguousZones` band-count assertion during a real run — is **not built**.
+
 **Failure.** A reader (human or agent) following the standing dead-code audit reads `zoning.ts:26-28` and concludes that `zone-center` is an unwired strategy with no shipped consumer, and either re-plumbs a seam that is already plumbed or discounts `zone-center` results as coming from a dead path. Concretely wrong claims: (1) "`Simulation.#park` supplies no partition today" — `simulation.ts:1719` calls `resolvePrepositionContext`, which at `prepositioning.ts:139` defaults `zones: zoneAssignment(cars)`; (2) "on `midtown-office` it moves all four cars to floor `10`"; (3) "no shipped profile declares `zone-center` yet" — `data/dispatcher-profiles.json` ships `zoned-uppeak` with `idle.parkingStrategy: "zone-center"`; (4) the cross-reference "see `prepositioning.ts` § *`Simulation.#park` still does not call this*" points at a heading that was renamed to "`Simulation.#park` calls this, and the two strategies it feeds are live" (`prepositioning.ts:30`).
 
 **Evidence.** Read `packages/core/src/dispatch/policies/zoning.ts:20-30` against `packages/core/src/sim/simulation.ts:1711-1727` and `packages/core/src/dispatch/policies/prepositioning.ts:30-42,124-143`. Enumerated the shipped profiles from the loaded config: profiles declaring `zone-center` -> `['zoned-uppeak']`. Ran `core.runSimulation` on `midtown-office`, seed 20260726, durationS 1800, base `eta` with `idle.repositionThresholdS: 2`: `parkingStrategy: 'zone-center'` versus `'stay'` -> trajectories differ (live). This is also consistent with docs/07-handoff.md §6, which quotes `zone-center` at −4.88 s AWT on Garden Apartments.
@@ -225,6 +351,8 @@ Severity is the reviewer's. Nothing below has been fixed unless its entry says s
 ### 21. `answer.overloadThreshold` is a declared Phase-7 search dimension over [1, 1.5] that cannot bind on any shipped car, because boarding already stops at the design load of 0.8 × rated.
 
 **`packages/core/src/model/car/loadSensor.ts:452`** · _dead paths_
+
+> **Disposition: CLOSED — fixed (D10).** `LOAD_SENSOR_PARAMETERS`' `answer.overloadThreshold` is declared over `[LOAD_SENSOR_DEFAULTS.designLoadFactor, 1.5]`, which is what this entry's own "missing test" prescribes. The interlock is **one-sided rather than dead**: it starts biting as the threshold approaches the boarding cap from below, because the last boarder is the one that carries the load across. Letting cars board past the design load was rejected as violating the modelling rule that makes every result honest. The default is unchanged at EN 81's 110 %, so no shipped run moves — only the interval a search may explore. `docs/06` § Stage 6 carries the range. **Guarded** by `loadSensor.test.ts`, which asserts the range must start at or below the design load factor.
 
 **Failure.** The only runtime consumer is the boarding predicate at sim/simulation.ts:1565-1577: `overloadKg = ratedLoadKg * overloadThreshold`, tested as `massKg + candidate.massKg < overloadKg` — but the enclosing loop only runs while `car.loadSensor.massKg < designLoadKg` (simulation.ts:1568), and `designLoadKg = 0.8 × ratedLoadKg`. With `overloadThreshold >= 1` the predicate can only reject a candidate heavier than `0.2 × ratedLoadKg`, which is 146 kg on the lightest shipped car (garden-apartments, 730 kg rated) and 360 kg on the heaviest — against a passenger mass distribution of N(75, 15) (data/traffic-profiles.json), i.e. ≥4.7σ. So `Car.isOverloaded`, `doorsHeldByOverload` and the `overloadAlarm` path are dead in every shipped run, and Phase 7 will search a flat [1, 1.5] dimension.
 

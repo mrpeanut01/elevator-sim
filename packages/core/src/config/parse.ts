@@ -44,6 +44,7 @@ import type {
   ResolvedBank,
   ResolvedBuilding,
   ResolvedCar,
+  ResolvedServiceEvent,
   TrafficProfiles,
 } from './types.js';
 
@@ -393,6 +394,29 @@ export function resolveBuilding(
         WARNING_CODES.unusedFloorPairs,
       );
     }
+    /*
+     * The honest half of the double-deck surface: the parser validates the pairing carefully
+     * enough to look wired, and the runtime ignores it entirely.
+     *
+     * Everything above cross-checks decks — the pairing, the separation, the per-deck load and
+     * the per-deck person count — and `resolveCar` puts `capacityPersonsPerDeck` on the resolved
+     * car while `Bank` builds a whole `deckByFloorId` index. Nothing in `sim/`, `model/car/` or
+     * `dispatch/` reads any of it: `Car` has no deck concept, so this bank runs as a bank of
+     * single-deck cars of the same whole-car capacity and makes up to twice the stops the
+     * declared hardware would. Without this warning the only signal was silence, and silence
+     * reads as "modelled".
+     *
+     * One warning per bank rather than per car, and it names the bank because a mixed building
+     * can have one double-deck bank and three conventional ones — only the numbers from this
+     * one are affected.
+     */
+    if (doubleDeckCars.length > 0) {
+      addWarning(
+        `${at}.cars`,
+        `bank "${bank.id}" of building "${building.id}" declares ${doubleDeckCars.length} double-deck car${doubleDeckCars.length === 1 ? '' : 's'}, and double-deck operation is not simulated: each runs as a single-deck car of the same whole-car capacity, so it makes up to twice the stops the declared hardware would and every round-trip time, interval and handling-capacity figure reported for this bank describes different hardware. Double-deck dispatch is Phase 6.`,
+        WARNING_CODES.doubleDeckNotSimulated,
+      );
+    }
 
     // One check per distinct deck separation, not per car, so a bank of eight identical
     // shuttles reports one problem rather than eight.
@@ -448,6 +472,57 @@ export function resolveBuilding(
     });
   });
 
+  /*
+   * The service schedule, with every car located.
+   *
+   * Resolved here rather than at run time for the reason every other cross-reference in this
+   * function is: an event naming a car that does not exist must be a located `ConfigError`, not
+   * an event the runner silently skips. A skipped service event produces a run that completes,
+   * balances its books, and did not do the thing its configuration says it did — which is the
+   * "configured, validated, dead" shape this repository has shipped repeatedly.
+   *
+   * Authored order is preserved. The kernel's total order is `(time, sequence)` and the runner
+   * schedules these in array order, so two events at the same `atS` fire in the order they were
+   * written (CLAUDE.md invariant 4). Sorting here would be a second ordering authority.
+   */
+  const serviceEvents: ResolvedServiceEvent[] = [];
+  (building.serviceEvents ?? []).forEach((event, eventIndex) => {
+    const path = `serviceEvents[${eventIndex}]`;
+    const holders = building.banks.filter(
+      (bank) =>
+        (event.bankId === undefined || bank.id === event.bankId) &&
+        bank.cars.some((car) => car.id === event.carId),
+    );
+    const [holder] = holders;
+    if (holder === undefined) {
+      const known = building.banks.flatMap((bank) =>
+        bank.cars.map((car) => `${bank.id}/${car.id}`),
+      );
+      addIssue(
+        `${path}.carId`,
+        event.bankId === undefined
+          ? `service event at ${event.atS} s names car "${event.carId}", which no bank of this building declares. Known cars (bank/car): ${formatKnown(known)}.`
+          : `service event at ${event.atS} s names car "${event.carId}" in bank "${event.bankId}", which that bank does not declare${building.banks.some((bank) => bank.id === event.bankId) ? '' : ' (and no bank has that id)'}. Known cars (bank/car): ${formatKnown(known)}.`,
+        ISSUE_CODES.unknownServiceEventCar,
+      );
+      return;
+    }
+    if (holders.length > 1) {
+      addIssue(
+        `${path}.carId`,
+        `service event at ${event.atS} s names car "${event.carId}", which exists in ${holders.length} banks (${holders.map((bank) => bank.id).join(', ')}). Car ids are unique per bank, not per building — add "bankId" to say which one.`,
+        ISSUE_CODES.unknownServiceEventCar,
+      );
+      return;
+    }
+    serviceEvents.push({
+      atS: event.atS,
+      bankId: holder.id,
+      carId: event.carId,
+      mode: event.mode,
+    });
+  });
+
   (building.accessZones ?? []).forEach((zone, zoneIndex) => {
     zone.floors.forEach((floorId, floorIndex) => {
       if (floorsById.has(floorId) || floors.length === 0) return;
@@ -480,6 +555,7 @@ export function resolveBuilding(
     transferFloors,
     banks,
     accessZones: building.accessZones ?? [],
+    serviceEvents,
     totalPopulation,
     warnings,
   };
@@ -489,8 +565,21 @@ export function resolveBuilding(
  * Check references that only make sense across files: for now, the per-pattern weight
  * sets, which name dispatcher profiles.
  *
- * Non-fatal by design — `patternSwitching` describes a Phase 7 controller and may name
- * profiles that have not been authored yet.
+ * Non-fatal by design — `patternSwitching` describes a controller that **does not exist**, and
+ * may name profiles that have not been authored yet.
+ *
+ * That sentence used to read *"a Phase 7 controller"*, which was true while Phase 7 was ahead of
+ * this file and stopped being true when Phase 7 landed without it. There is no fuzzy pattern
+ * detector anywhere in the repository: `data/dispatcher-profiles.json` authors a complete
+ * `patternSwitching` block — four inputs, five patterns, `hysteresisS`, and a
+ * `weightSetsByPattern` map — `dispatcherProfilesSchema` validates it, the core barrel types it,
+ * this function cross-checks its profile names, and **nothing reads it**. Editing
+ * `weightSetsByPattern` produces a clean `loadConfig` and zero behavioural change, which is the
+ * *configured, validated, dead in the shipped path* defect one level up from code into data.
+ *
+ * It is left unimplemented deliberately rather than by oversight (see `DECISIONS.md`), so this
+ * comment says so out loud: a reader who finds the block validated here must not read the
+ * validation as evidence that it drives anything.
  */
 export function crossCheckDispatcherProfiles(
   dispatchers: DispatcherProfiles,

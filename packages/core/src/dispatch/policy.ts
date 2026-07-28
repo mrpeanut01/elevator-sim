@@ -37,6 +37,7 @@
  * the same snapshots at the same time makes the same decision, every time.
  */
 
+import { DESTINATION_CALL_TYPES, isDestinationCallType } from '../config/types.js';
 import type { SimTime } from '../kernel/types.js';
 import type { CarSnapshot } from '../model/car/types.js';
 
@@ -169,6 +170,21 @@ export function resolveDispatchConfig(
     );
   }
 
+  const passengerAssignment =
+    dispatchStage?.passengerAssignment ?? DISPATCH_DEFAULTS.passengerAssignment;
+
+  // Deferral is refused for `destination-entry` above and **not** re-refused here, and the
+  // asymmetry is the two call types' own semantics rather than an oversight. A kiosk holds a
+  // person at a screen, so it cannot defer and the throw above says so. A `mobile-credential`
+  // assignment is delivered to the phone of somebody who is still walking in from the street, and
+  // a defer window it waits out is a system that exists. Which of the two a profile buys is the
+  // profile's decision; refusing the pair here would put that decision in code.
+  if (passengerAssignment === 'panel' && !isDestinationCallType(callType)) {
+    throw new DispatchError(
+      `Dispatcher "${source.id}" names a car at the landing panel (dispatch.passengerAssignment: "panel") under dispatch.callType "${callType}", which does not know where the passenger is going. A panel that cannot ask for a destination is an up/down button. Set callType to one of ${DESTINATION_CALL_TYPES.join(', ')}, or leave passengerAssignment at "none".`,
+    );
+  }
+
   const eligibility = source.eligibility;
   const answer = source.answer;
   const idle = source.idle;
@@ -195,6 +211,7 @@ export function resolveDispatchConfig(
     }),
     dispatch: Object.freeze({
       callType,
+      passengerAssignment,
       batchWindowS: nonNegative(
         dispatchStage?.batchWindowS ?? DISPATCH_DEFAULTS.batchWindowS,
         'dispatch.batchWindowS',
@@ -366,7 +383,7 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
       return merged;
     }
 
-    const batchKey = batchKeyOf(call);
+    const batchKey = batchKeyOf(call, this.config);
     const openId = this.#openBatches.get(batchKey);
     const open = openId === undefined ? undefined : this.#lifecycles.get(openId);
     if (open !== undefined && this.config.dispatch.batchWindowS > 0 && at < open.scoreableAt) {

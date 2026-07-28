@@ -55,6 +55,7 @@ import type {
   CallType,
   CommitmentPoint,
   ParkingStrategy,
+  PassengerAssignmentMode,
   ReassignmentPolicy,
 } from '../config/types.js';
 import type { SimTime } from '../kernel/types.js';
@@ -111,6 +112,21 @@ export interface DispatchCall {
   readonly destinationFloorId?: string | undefined;
   /** Known under a mobile credential; absent with up/down buttons. */
   readonly credentialGroup?: CredentialGroup | undefined;
+  /**
+   * The **landing panel already performed the access check** for this request.
+   *
+   * DECISIONS.md § D30 rules that a destination-entry kiosk authorizes: the passenger states a
+   * destination *at the panel*, and the panel is what decides whether they may go there. Set by
+   * the runner only under destination *dispatch*, where a panel physically exists; a bare
+   * disclosure of the destination (Phase 6a's Level 0) has no kiosk and leaves it unset, which
+   * is why turning this feature on cannot move a Level-0 number.
+   *
+   * It is a fact about the call, not a policy switch: `costRequestFor` forwards the credential
+   * for an authorized request so `estimateCost` does not ask a second time whether an *unbadged*
+   * passenger may reach a zoned floor — the question that, unasked, made `destination-entry`
+   * unserviceable on `secure-tower` (51.7 % unserved against conventional's 33.5 %).
+   */
+  readonly panelAuthorized?: boolean | undefined;
   /** Passengers waiting for this call, when somebody counted. */
   readonly waitingPassengers?: number | undefined;
   /** Their total mass, kilograms, when known. */
@@ -614,6 +630,8 @@ export interface EligibilityStageConfig {
 /** Stage 1, 4 and 5 settings, resolved. Mirrors `DispatchStageConfig` with defaults applied. */
 export interface ResolvedDispatchStage {
   readonly callType: CallType;
+  /** Whether the landing panel names a car per passenger. `none` is the conventional model. */
+  readonly passengerAssignment: PassengerAssignmentMode;
   readonly batchWindowS: number;
   readonly assignmentTiming: AssignmentTiming;
   readonly deferWindowS: number;
@@ -928,6 +946,7 @@ export interface DispatcherProfileSource {
   readonly dispatch?:
     | {
         readonly callType?: CallType | undefined;
+        readonly passengerAssignment?: PassengerAssignmentMode | undefined;
         readonly batchWindowS?: number | undefined;
         readonly assignmentTiming?: AssignmentTiming | undefined;
         readonly deferWindowS?: number | undefined;

@@ -69,6 +69,21 @@ export const REPLICATION_METRICS = [
   'queueSlopePersonsPerMinute',
   /** Legs that arrived in the window and never boarded, as a fraction of arrivals. */
   'unservedFraction',
+  /**
+   * **The Pareto front's energy axis** — out-of-balance mechanical work over the window, kJ.
+   *
+   * `NaN` on a record with no travel samples, which is what `RunSummary.energy.measured: false`
+   * means and is deliberately not `0`; the runner counts it in `nonFiniteCount` and a report
+   * suppresses the axis rather than making every arm tie on it. See `core`'s `EnergyStatistics`
+   * for the formula, the counterweight convention and what the proxy omits.
+   */
+  'energyKJ',
+  /** Metres the fleet travelled in the window. One of the two things that can move `energyKJ`. */
+  'carDistanceM',
+  /** Motor starts in the window. The other one. */
+  'carStarts',
+  /** `energyKJ` per leg that alighted in the window — energy normalized by work done. */
+  'energyPerServedLegKJ',
 ] as const;
 
 export type ReplicationMetric = (typeof REPLICATION_METRICS)[number];
@@ -130,6 +145,21 @@ export function metricOf(summary: RunSummary, metric: ReplicationMetric): number
       return summary.counts.arrivals === 0
         ? Number.NaN
         : summary.counts.unserved / summary.counts.arrivals;
+    // Optional-chained for the same reason `pctPopulationPer5Min` is coalesced above: this
+    // function is documented **total**, and a summary that predates the energy block — or a
+    // hand-built one, which is what `experiment.test.ts` checks totality with — must yield `NaN`
+    // rather than throw. `RunSummary.energy` is a required field on the current type, so this is
+    // not defensive programming against the present shape; it is the promise the docstring makes
+    // holding for every shape a caller can actually hand in. `energy.measured: false` already
+    // covers the run that recorded no travel, and both routes land on the same `NaN`.
+    case 'energyKJ':
+      return summary.energy?.workKJ ?? Number.NaN;
+    case 'carDistanceM':
+      return summary.energy?.distanceM ?? Number.NaN;
+    case 'carStarts':
+      return summary.energy?.starts ?? Number.NaN;
+    case 'energyPerServedLegKJ':
+      return summary.energy?.workPerServedLegKJ ?? Number.NaN;
   }
 }
 

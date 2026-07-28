@@ -32,6 +32,7 @@
  * own. Nothing in `dispatch/` reads a profile id.
  */
 
+import { isDestinationCallType } from '../config/types.js';
 import { estimateCost } from '../model/car/estimateCost.js';
 import type { CarSnapshot, CostEstimate, CostRequest, ServedFloor } from '../model/car/types.js';
 import { phaseByName, travelTime } from '../physics/motion/index.js';
@@ -55,15 +56,41 @@ import type {
  * -------------------------------------------------------------------------- */
 
 /**
- * The identity of the button: one live call per floor per direction.
+ * The identity of the request: what counts as "the same call pressed by two people".
  *
- * Calls sharing a batch key inside `batchWindowS` are the *same* button pressed by more
- * people, not two calls, so they are merged into one lifecycle whose `waitingPassengers`
- * accumulates. Scoring them separately would allocate two cars to one button — which is what
- * `assignmentMode: split-demand` is for, and it should be a decision rather than an accident
- * of arrival timing.
+ * Calls sharing a batch key inside `batchWindowS` are the *same* request made by more people,
+ * not two calls, so they are merged into one lifecycle whose `waitingPassengers` accumulates.
+ * Scoring them separately would allocate two cars to one request — which is what
+ * `assignmentMode: split-demand` is for, and it should be a decision rather than an accident of
+ * arrival timing.
+ *
+ * **What the identity is depends on what the landing has**, which is why this takes the config:
+ *
+ * | `dispatch.passengerAssignment` | identity | reading |
+ * |---|---|---|
+ * | `none` | `floorId:direction` | the button: one live call per floor per direction |
+ * | `panel` | `floorId→destinationFloorId` | the request: one live call per origin-destination pair |
+ *
+ * Under a panel there is no direction button to be the identity of, and two people at one
+ * landing going to two different floors are genuinely two requests where today they are one.
+ * That is the mechanical heart of destination dispatch and the reason the call count rises with
+ * the number of distinct destinations rather than with the number of directions.
+ *
+ * A `panel` call with no destination falls back to the button key rather than collapsing every
+ * such call onto one shared identity — the runner always supplies a destination under a panel,
+ * and a hand-built call that does not is better treated as a button than as "the request to
+ * nowhere", which two unrelated landings would then share.
  */
-export function batchKeyOf(call: Pick<DispatchCall, 'floorId' | 'direction'>): string {
+export function batchKeyOf(
+  call: Pick<DispatchCall, 'floorId' | 'direction' | 'destinationFloorId'>,
+  config?: Pick<ResolvedDispatchConfig, 'dispatch'> | undefined,
+): string {
+  if (
+    config?.dispatch.passengerAssignment === 'panel' &&
+    call.destinationFloorId !== undefined
+  ) {
+    return `${call.floorId}→${call.destinationFloorId}`;
+  }
   return `${call.floorId}:${call.direction}`;
 }
 
@@ -98,10 +125,20 @@ export function scoreableAt(registeredAt: number, config: ResolvedDispatchConfig
  * | `mobile-credential` | **known** | **known** |
  *
  * A known destination lets `estimateCost` check the *destination's* service and access zoning
- * before assigning, which is precisely why destination dispatch does better under access
- * control: authorization and optimization happen in the same step. Under `up-down-buttons`
- * the fields are dropped even when a caller supplies them, so a conventional run cannot
+ * before assigning — authorization and optimization in one step. Under `up-down-buttons` the
+ * fields are dropped even when a caller supplies them, so a conventional run cannot
  * accidentally benefit from information the passenger never gave it.
+ *
+ * **This docstring used to go one sentence further and say that the one step is why destination
+ * dispatch does better under access control. Measured, that is false** (DECISIONS.md § D30,
+ * § D60; H-ACCESS-2 at n = 150 per building under CRN). The credential is what makes an
+ * access-controlled building servable at all — conventional dispatch cannot serve it under any
+ * budget — and the destination's contribution to *optimization* is **smaller** there than on an
+ * unzoned building, because once the credential is present the access check has already passed
+ * and Secure Tower's three identical cars per bank leave less for a destination to
+ * differentiate. The mechanism above is a true statement about this function; the performance
+ * claim built on it was refuted, and a docstring asserting an unmeasured mechanism is the same
+ * species of defect as a published number nothing re-derives.
  */
 export function costRequestFor(
   call: DispatchCall,
@@ -109,8 +146,14 @@ export function costRequestFor(
   observation: DispatchObservation,
 ): CostRequest {
   const callType = config.dispatch.callType;
-  const knowsDestination = callType === 'destination-entry' || callType === 'mobile-credential';
-  const knowsCredential = callType === 'mobile-credential';
+  const knowsDestination = isDestinationCallType(callType);
+  // The credential reaches the car when the passenger's device carried it, **or** when a landing
+  // panel already checked it (DECISIONS.md § D30). The second is not the first in disguise: the
+  // panel is a physical kiosk that exists only under `passengerAssignment: 'panel'`, it performs
+  // the access check itself, and forwarding its verdict is what stops `estimateCost` asking a
+  // second time whether an *unbadged* passenger may reach a zoned floor — the question that,
+  // unasked, made a bare `destination-entry` arm unable to serve `secure-tower` at all.
+  const knowsCredential = callType === 'mobile-credential' || call.panelAuthorized === true;
 
   return Object.freeze({
     id: call.id,
@@ -897,7 +940,7 @@ export function newLifecycle(
     stage: 'registration' as const,
     registeredAt: at,
     scoreableAt: scoreableAt(at, config),
-    batchKey: batchKeyOf(call),
+    batchKey: batchKeyOf(call, config),
     waitingPassengers: observation.waitingPassengers,
     waitingMassKg: observation.waitingMassKg,
     carIds: Object.freeze([]),

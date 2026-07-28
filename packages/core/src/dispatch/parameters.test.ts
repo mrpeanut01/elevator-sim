@@ -87,6 +87,7 @@ const PROBE_PROFILE: DispatcherProfileSource = {
   hardConstraints: ['noDirectionReversal'],
   dispatch: {
     callType: 'mobile-credential',
+    passengerAssignment: 'panel',
     batchWindowS: 1.25,
     assignmentTiming: 'deferred',
     deferWindowS: 2.5,
@@ -130,6 +131,7 @@ const PROBE_VALUES: ReadonlyMap<string, number | string | boolean> = new Map<
   ['normalization.distanceM', 44],
   ['constraints.noDirectionReversal', true],
   ['dispatch.callType', 'mobile-credential'],
+  ['dispatch.passengerAssignment', 'panel'],
   ['dispatch.batchWindowS', 1.25],
   ['dispatch.assignmentTiming', 'deferred'],
   ['dispatch.deferWindowS', 2.5],
@@ -445,9 +447,33 @@ function probeFor(parameter: DispatchParameterSpec): number | string | boolean {
   return parameter.type === 'integer' ? (midpoint < high ? midpoint + 1 : midpoint - 1) : (low + midpoint) / 2;
 }
 
-/** The profile a single probe is authored into, as JSON a `data/` file could hold verbatim. */
+/**
+ * The profile a single probe is authored into, as JSON a `data/` file could hold verbatim.
+ *
+ * **Gates are satisfied from the spec, not by hand.** `activeWhen` is the machine-readable
+ * statement of what a knob needs beside it to mean anything, and some of those pairings are
+ * refused outright by the resolver rather than merely being inert — `dispatch.passengerAssignment:
+ * "panel"` under an up/down button is a panel that cannot ask for a destination, which is a
+ * contradiction and not a configuration. An optimizer writing a winner back into `data/` reads the
+ * same `activeWhen` and writes the same accompanying values (`tuning/space/encode.ts` runs the
+ * real `createPolicyFor` for exactly this reason), so authoring the probe any other way would be
+ * testing a round trip nothing performs.
+ */
 function profileWith(id: string, probe: number | string | boolean): Record<string, unknown> {
   const base: Record<string, unknown> = { id: 'probe', name: 'Probe', weights: {} };
+  const spec = EVERY_PARAMETER.find((parameter) => parameter.id === id);
+  for (const [gateId, condition] of Object.entries(spec?.activeWhen ?? {})) {
+    // List-form conditions only: a range condition names a numeric window rather than a value,
+    // and every gate in the schema that a resolver *refuses* is categorical.
+    if (condition === undefined || isActiveWhenRange(condition)) continue;
+    const value = condition[0];
+    if (value === undefined) continue;
+    const gateDot = gateId.indexOf('.');
+    const gateSection = gateId.slice(0, gateDot);
+    const gateKey = gateId.slice(gateDot + 1);
+    if (gateSection === 'weights' || gateSection === 'constraints') continue;
+    base[gateSection] = { ...((base[gateSection] ?? {}) as object), [gateKey]: value };
+  }
   const dot = id.indexOf('.');
   const section = id.slice(0, dot);
   const key = id.slice(dot + 1);
@@ -458,7 +484,7 @@ function profileWith(id: string, probe: number | string | boolean): Record<strin
   if (section === 'constraints') {
     return { ...base, hardConstraints: probe === true ? [key] : [] };
   }
-  return { ...base, [section]: { [key]: probe } };
+  return { ...base, [section]: { ...((base[section] ?? {}) as object), [key]: probe } };
 }
 
 /**

@@ -7,11 +7,11 @@
  * difference is declared only through a paired-t interval that excludes zero, and a saturated
  * configuration has its wait statistics suppressed rather than averaged.
  *
- * May depend on `@elevator-sim/core`; nothing in `core` may depend on this package. Five modules
- * are re-exported below — `stats`, `runner/`, `reports/`, `oracle/` and Phase 5's `benchmark/` —
- * with names listed explicitly rather than with `export *`, matching `core`'s barrel: adding an
- * export becomes a deliberate widening of the package's public surface, and a name collision
- * between two submodules is a compile error here rather than a silent shadow.
+ * May depend on `@elevator-sim/core`; nothing in `core` may depend on this package. Six modules
+ * are re-exported below — `stats`, `runner/`, `reports/`, `oracle/`, Phase 5's `benchmark/` and
+ * Phase 7's `tuning/` — with names listed explicitly rather than with `export *`, matching `core`'s
+ * barrel: adding an export becomes a deliberate widening of the package's public surface, and a
+ * name collision between two submodules is a compile error here rather than a silent shadow.
  *
  * ## Where `stats` lives
  *
@@ -89,16 +89,19 @@
  * stats — the interval arithmetic (`reports/statistics.ts`).
  *
  * Sample moments, the t and normal quantiles, and the paired difference interval.
- * docs/03-traffic-and-statistics.md § Part 3 chooses the quantile family by `n` — t at or below
- * 25, normal above it — and every estimate records which one it used. All pure functions: no RNG
- * (CLAUDE.md invariant 2), no clock (3), no mutation of an input.
+ * Every interval this package produces — published or consulted by the sequential stopping rule —
+ * is Student-t at `n - 1`, at every `n` (docs/03-traffic-and-statistics.md § Part 4), and every
+ * estimate records the family it used. There is no `n`-dependent crossover to a normal quantile
+ * any more; see `reports/statistics.ts` § "One quantile" and DECISIONS.md § D7. `normalQuantile`
+ * remains exported with **no production caller**, deliberately and for the two checkable reasons
+ * its own docstring gives: it is the reference `studentTQuantile` is validated against, and it pins
+ * the `Z_95` literal `benchmark/verdict.ts` hard-codes for replication planning.
+ * All pure functions: no RNG (CLAUDE.md invariant 2), no clock (3), no mutation of an input.
  * -------------------------------------------------------------------------- */
 
 export {
   DEFAULT_CONFIDENCE,
-  T_DISTRIBUTION_MAX_N,
   estimateMean,
-  halfWidthQuantile,
   meanOf,
   normalQuantile,
   pairedDifferenceEstimate,
@@ -405,6 +408,40 @@ export {
   runBenchmark,
   runBenchmarkCase,
   runCapacityReassignmentStudy,
+  // Phase 8's experiment matrix, Phase 7's acceptance interval, and the energy axis's liveness
+  // proof. Re-exported here for the same reason everything else in this block is: a study that
+  // only its own suite can reach is a study nobody outside this package can reproduce.
+  EXCLUDED_CELLS,
+  MATRIX_ARM_PROFILES,
+  MATRIX_BASELINE,
+  MATRIX_CELLS,
+  MATRIX_METRICS,
+  MATRIX_SEED,
+  MAX_REPLICATIONS,
+  MIN_REPLICATIONS,
+  NEAR_NEIGHBOUR_CORRELATION,
+  TARGET_HALF_WIDTH_S,
+  budgetFor,
+  cellResult,
+  matrixCell,
+  runMatrix,
+  runMatrixCell,
+  PHASE7_CASE_ID,
+  PHASE7_DEADBANDS_S,
+  PHASE7_HOLDOUT_SEED,
+  PHASE7_REFERENCE_PROFILE,
+  PHASE7_REPLICATIONS,
+  PHASE7_TUNING_SEED,
+  atDeadband,
+  deadbandArmId,
+  runPhase7Acceptance,
+  LIVENESS_PROFILE,
+  LIVENESS_REPLICATIONS,
+  LIVENESS_SEED,
+  LIVENESS_STRATEGIES,
+  atStrategy,
+  measureEnergyLiveness,
+  strategyArmId,
   runPrepositioningStudy,
   runTailStudy,
   stage5Traffic,
@@ -420,10 +457,22 @@ export type {
   BenchmarkCase,
   BenchmarkRunOptions,
   CaseResult,
+  BudgetBasis,
   CellComparison,
   CellComparisonInput,
   CellVerdict,
   CriterionOutcome,
+  EnergyArmMeasurement,
+  EnergyLivenessOptions,
+  EnergyLivenessStudy,
+  ExcludedCell,
+  FrontExclusion,
+  MatrixCell,
+  MatrixCellResult,
+  NearNeighbourPair,
+  Phase7AcceptanceOptions,
+  Phase7AcceptanceStudy,
+  Phase7Interval,
   DecisionState,
   ForecastCausalityAudit,
   ForecastCausalityOptions,
@@ -440,3 +489,332 @@ export type {
   TailStudy,
   TailStudyOptions,
 } from './benchmark/index.js';
+
+/* -------------------------------------------------------------------------- *
+ * tuning/ — Phase 7: the self-describing search space, the three optimizers,
+ * the seam to the replication runner, and the held-out validation round.
+ *
+ * Exported for the reason `benchmark/` is and `validation/` is not: what a
+ * consumer needs from here is a **library**, not a gate. `tune`, the CLI
+ * command, is the non-test caller — `packages/cli/src/commands/tune.ts` — and
+ * it reaches every one of {@link randomSearch}, {@link successiveHalving},
+ * {@link sepCmaEs}, {@link runnerObjective} and {@link runHoldoutRound} through
+ * this barrel. Before it existed the whole module was reachable and called by
+ * nothing, which is docs/08-review-findings.md § 1 and the sixth instance of
+ * docs/05-roadmap.md's standing requirement. Reachability is not use; a barrel
+ * re-export is not a caller; and `tuning/deadCode.test.ts` is what now fails
+ * when that stops being true.
+ *
+ * **One name renamed, and no name omitted.** `tuning/space` and `tuning/search`
+ * each export a type called `Candidate` — a parameter assignment and a
+ * configuration under evaluation, and the second's generic is routinely the
+ * first. `tuning/index.ts` resolves it there, keeping the space's bare name and
+ * re-exporting the search's as `SearchCandidate`, and states why; this file
+ * inherits the resolved surface. Unlike `canonicalJson` and `DecisionOutcome`
+ * above, nothing needed to be held back: the three tuning barrels' runtime
+ * surfaces are pairwise disjoint and disjoint from everything else here.
+ *
+ * `runnerObjective` and `runHoldoutRound` drive the Phase 3 runner and are
+ * therefore as environment-bound as the rest of `runner/`; `tuning/space`
+ * imports nothing outside `@elevator-sim/core`.
+ * -------------------------------------------------------------------------- */
+
+export {
+  AWT_OBJECTIVE_ID,
+  DOC_RUNGS,
+  ENERGY_OBJECTIVE_ID,
+  NOT_COMPARABLE_LABEL,
+  PARAMETER_SCHEMA_SUFFIX,
+  PROFILE_OBJECT_SECTIONS,
+  PROFILE_SECTIONS,
+  PlateauTally,
+  SAMPLE_SEPARATOR,
+  SEARCH_DEFAULTS,
+  SEARCH_METHODS,
+  SEARCH_METHOD_GATE,
+  SEARCH_PARAMETERS,
+  SEARCH_STREAM,
+  SEED_POLICIES,
+  SEED_SET_ROLES,
+  SearchError,
+  SearchRecorder,
+  SearchSpaceError,
+  TUNING_OBJECTIVES,
+  TuningReportError,
+  WT95_OBJECTIVE_ID,
+  accountSeedSets,
+  activeParameters,
+  activeWhenSatisfied,
+  applyPatch,
+  assertDisjointSeedSets,
+  assertDistinctObjectives,
+  assertLadder,
+  assessHoldout,
+  bestByObjective,
+  buildTuningReport,
+  buildingFeasibility,
+  candidateEvaluationsOf,
+  candidateFromProfile,
+  candidateProfile,
+  candidateSampler,
+  candidatesEqual,
+  collectSearchSpace,
+  compareEvaluations,
+  compareObjective,
+  compareObjectives,
+  countDistinctOutcomes,
+  decodeCandidate,
+  decodeInto,
+  defaultCandidate,
+  discoverParameterSchemas,
+  dominanceOf,
+  dominatesPointwise,
+  encodeCandidate,
+  formatHoldout,
+  formatIndistinguishable,
+  formatObjectiveComparison,
+  formatObjectiveEstimate,
+  formatParetoFront,
+  formatSeedSets,
+  formatTuningReport,
+  formatWinners,
+  fromVector,
+  gainOf,
+  holdoutRoundSpec,
+  isActive,
+  isActiveWhenRange,
+  isFlat,
+  isIndistinguishable,
+  isProfileAuthorable,
+  materializer,
+  normalizeSearchSeed,
+  objectiveMetricSpec,
+  objectiveMetricSpecs,
+  objectivePointOf,
+  objectiveVerdict,
+  outcomeKey,
+  outcomeOf,
+  parameterOf,
+  paretoFrontOfPoints,
+  parseProfile,
+  perturbCandidate,
+  perturbValue,
+  plannedBudget,
+  plateauClasses,
+  policyNoiseStream,
+  probeStepFloor,
+  randomSearch,
+  rankEvaluations,
+  readerFor,
+  reflectInto,
+  roundExperimentSpec,
+  roundSeed,
+  runHoldoutRound,
+  runRound,
+  runnerObjective,
+  runnerUpOf,
+  sameOutcome,
+  sampleCandidate,
+  sampleCandidates,
+  sampleValue,
+  searchRng,
+  searchSpace,
+  seedSetFromReplications,
+  seedsOf,
+  sepCmaEs,
+  sharedSeedsOf,
+  shrinkageInterval,
+  statisticalParetoFront,
+  subspace,
+  successiveHalving,
+  summarizeSeedSet,
+  toVector,
+  traceSeedFor,
+  validateValues,
+  vectorDimensions,
+  vectorSpace,
+} from './tuning/index.js';
+
+export type {
+  ActiveWhenCondition,
+  ActiveWhenConditions,
+  BestByObjectiveInput,
+  BooleanParameter,
+  Candidate,
+  CandidateComparisons,
+  CandidateEvaluation,
+  CandidateEvaluationsInput,
+  CandidateOutcome,
+  CandidateProfileOptions,
+  CandidateSampler,
+  CandidateSummary,
+  CategoricalParameter,
+  CollectOptions,
+  CompareObjectiveOptions,
+  ContinuousParameter,
+  DimensionStepFloor,
+  DominanceVerdict,
+  Evaluation,
+  GateReader,
+  HoldoutAssessment,
+  HoldoutOptions,
+  HoldoutRound,
+  HoldoutRoundInput,
+  HoldoutVerdict,
+  IndistinguishablePair,
+  IntegerParameter,
+  NumericParameter,
+  Objective,
+  ObjectiveArm,
+  ObjectiveComparison,
+  ObjectivePoint,
+  ObjectiveRequest,
+  ObjectiveSpec,
+  ObjectiveVerdict,
+  ObjectiveWinner,
+  ParameterScale,
+  ParameterValue,
+  ParetoEntry,
+  ParetoFront,
+  PerturbOptions,
+  PlateauReport,
+  ProfilePatch,
+  ProfileSection,
+  ProfileSource,
+  RandomSearchOptions,
+  RecordRoundOptions,
+  ReplicationSource,
+  Rung,
+  RungResult,
+  RunnerObjectiveOptions,
+  RunnerUpComparison,
+  SampleOptions,
+  SearchCandidate,
+  SearchDimension,
+  SearchMethodId,
+  SearchParameter,
+  SearchParameterCommon,
+  SearchParameterSpec,
+  SearchParameterType,
+  SearchResult,
+  SearchRound,
+  SearchSpace,
+  SeedPolicy,
+  SeedSetAccounting,
+  SeedSetEvaluation,
+  SeedSetFromReplicationsOptions,
+  SeedSetRole,
+  SeedSetSummary,
+  SepCmaEsOptions,
+  StatisticalFrontInput,
+  StepFloorProbe,
+  StepFloorProbeOptions,
+  SuccessiveHalvingOptions,
+  SuccessiveHalvingResult,
+  TrajectoryPoint,
+  TuningArm,
+  TuningObservation,
+  TuningReport,
+  TuningReportInput,
+  VectorDimension,
+  VectorSpace,
+} from './tuning/index.js';
+
+/* -------------------------------------------------------------------------- *
+ * fuzz/ — Phase 8: randomized buildings and traffic, checked against the six
+ * invariants docs/07-handoff.md § 7 requires of any configuration — no passenger
+ * lost, none delivered to the wrong floor, no car over capacity, no negative
+ * waits, no deadlock, bounded starvation.
+ *
+ * Exported for the reason `benchmark/` and `tuning/` are and `validation/` is
+ * not: what a consumer needs from here is a **library** — a generator, six
+ * predicates over a finished run, and a shrinker — not the gate. The gate is
+ * `fuzz/*.test.ts` and stays there.
+ *
+ * The non-test caller of this surface is `fuzz/campaign.ts` itself, which is
+ * exported here and is what a deep campaign is driven from
+ * (`ELEVATOR_SIM_FUZZ=deep`). That is a weaker claim than `tune` makes for
+ * `tuning/` and it is stated rather than dressed up: this is a track whose
+ * product is an executed campaign and a set of reusable predicates, and
+ * docs/05-roadmap.md's standing requirement is answered by
+ * `fuzz/corpus.test.ts` running the corpus on every `vitest run` rather than by
+ * a CLI command that does not exist yet.
+ *
+ * `runCampaign` and `evaluateCase` drive the real simulator against a
+ * `LoadedConfig`, so treat them as environment-bound executables in the same
+ * sense as `runBenchmark`. `properties.ts`, `shrink.ts` and `generate.ts` are
+ * pure and import nothing outside `@elevator-sim/core`.
+ *
+ * **No name held back, and two renamed at the source.** `fuzz/run.ts` and `fuzz/shrink.ts` each
+ * exported a name this barrel already carries with different semantics — `simulationConfigFor`
+ * (`runner/` builds a *cell's* config from an experiment spec, not a fuzz case) and `formatCase`
+ * (`benchmark/`'s is a benchmark case). Unlike the `canonicalJson` and `DecisionOutcome`
+ * omissions above, these are resolved by **renaming**, following `tuning/index.ts`'s
+ * `SearchCandidate`: they are `fuzzSimulationConfigFor` and `formatFuzzCase`, so a consumer gets
+ * both surfaces and neither can silently shadow the other in a file that imports both. The
+ * collisions were found by `tsc`, which is the whole reason a barrel is written by hand.
+ * -------------------------------------------------------------------------- */
+
+export {
+  DEEP_SPACE,
+  FUZZ_PROPERTIES,
+  FUZZ_SKIP_REASONS,
+  FUZZ_TOPOLOGIES,
+  PROPERTY_BOUNDS,
+  PROPERTY_CHECKS,
+  STANDARD_CORPUS,
+  STANDARD_SPACE,
+  caseFromSeed,
+  checkAll,
+  checkCapacity,
+  checkConservation,
+  checkDestination,
+  checkMonotonicTime,
+  checkStarvation,
+  checkTermination,
+  deepCampaignRequested,
+  deepCampaignSize,
+  deepSeeds,
+  MIN_DURATION_BY_TEMPLATE,
+  evaluateCase,
+  formatFuzzCase,
+  formatOutcome,
+  formatStats,
+  fuzzSimulationConfigFor,
+  generateOptionsFrom,
+  isFailure,
+  minDurationFor,
+  refusedAnswer,
+  refusingToDispatch,
+  reparse,
+  resolveCase,
+  runCampaign,
+  shrinkCase,
+  stallingAfter,
+  starvingFloorUntil,
+  withLostPassenger,
+  withMisdelivery,
+  withCallType,
+  withNegativeWait,
+  withOverfilledCar,
+} from './fuzz/index.js';
+
+export type {
+  CampaignOptions,
+  CampaignResult,
+  CampaignStats,
+  FuzzCase,
+  FuzzOutcome,
+  FuzzProperty,
+  FuzzSkipReason,
+  FuzzSpace,
+  FuzzTopology,
+  GenerateOptions,
+  PropertyBounds,
+  PropertyContext,
+  RefusalPredicate,
+  RunOptions,
+  ShrinkOptions,
+  ShrinkResult,
+  Violation,
+} from './fuzz/index.js';

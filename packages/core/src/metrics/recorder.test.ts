@@ -173,6 +173,52 @@ describe('MetricsRecorder — refuses impossible sequences', () => {
       recorder.recordArrival(leg({ arrivedAt: 10, journeyStartedAt: 20 })),
     ).toThrow(MetricsError);
   });
+
+  it('rejects a second assignment, and accepts one after the promise is released', () => {
+    /* The recorder's half of `Passenger.releasePromise` — see `the root DECISIONS.md` § T22-D1. The
+       record must carry what the model holds or a promise cannot be audited from a stored record,
+       so the release is a recorded event with its own count rather than a silent overwrite. */
+    const recorder = new MetricsRecorder({ seed: SEED });
+    recorder.recordArrival(leg());
+    recorder.recordAssignment('p1', 10, { carId: 'car-A' });
+    expect(recorder.assignedCount).toBe(1);
+    expect(recorder.releasedCount).toBe(0);
+    expect(() => recorder.recordAssignment('p1', 11, { carId: 'car-B' })).toThrow(/write-once/);
+
+    recorder.releaseAssignment('p1', 12);
+    expect(recorder.releasedCount).toBe(1);
+    // Cleared, not re-pointed: a record naming a car the group took the passenger off would tell a
+    // reader they were promised a car that had been out of service for twenty minutes.
+    const released = recorder.finish(100).passengers[0];
+    expect(released?.assignedCarId).toBeUndefined();
+    expect(released?.assignedAt).toBeUndefined();
+
+    // Releasing nothing is a no-op; releasing after boarding is refused, as assigning is.
+    const second = new MetricsRecorder({ seed: SEED });
+    second.recordArrival(leg());
+    second.releaseAssignment('p1', 10);
+    expect(second.releasedCount).toBe(0);
+    second.recordAssignment('p1', 10, { carId: 'car-A' });
+    second.recordBoarding('p1', 11);
+    expect(() => second.releaseAssignment('p1', 12)).toThrow(/boarded at/);
+    expect(() => second.releaseAssignment('ghost', 12)).toThrow(/never recorded as arriving/);
+  });
+
+  it('counts assignment as an event, so a re-promise after a release counts twice', () => {
+    const recorder = new MetricsRecorder({ seed: SEED });
+    recorder.recordArrival(leg());
+    recorder.recordAssignment('p1', 10, { carId: 'car-A' });
+    recorder.releaseAssignment('p1', 12);
+    recorder.recordAssignment('p1', 12, { carId: 'car-B' });
+    expect(recorder.assignedCount).toBe(2);
+    expect(recorder.releasedCount).toBe(1);
+    // `assigned - released` is the number of promises in force, which is what
+    // `Simulation.#reconcile` compares with `legsCreated`.
+    expect(recorder.assignedCount - recorder.releasedCount).toBe(1);
+    const record = recorder.finish(100).passengers[0];
+    expect(record?.assignedCarId).toBe('car-B');
+    expect(record?.assignedAt).toBe(12);
+  });
 });
 
 describe('MetricsRecorder — samples', () => {

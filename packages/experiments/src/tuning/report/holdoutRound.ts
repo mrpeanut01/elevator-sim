@@ -129,12 +129,15 @@ export interface HoldoutRoundInput {
   /**
    * How to read an energy proxy off a replication.
    *
-   * Omit — as every caller in this repository currently must — and the energy axis stays unmeasured
-   * and is reported as unmeasured. `core`'s `RunSummary` records no energy, no metres travelled and
-   * no stop count, and `runner/metrics.ts` projects none of the three, so there is nothing honest to
-   * pass here yet. This parameter is the whole of the wiring on this side: when `core` grows a
-   * per-run travel statistic, one function here and one `ObjectiveSpec.valueOf` activate the third
-   * axis, and no other signature changes. See `pareto.ts` § the objective table.
+   * Omit and the energy axis stays unmeasured and is reported as unmeasured — which is still the
+   * right answer for a stored record written before `core` recorded travel, since a record with no
+   * `travelSamples` summarizes to `energy.measured: false` and `NaN` rather than to zero.
+   *
+   * Supply it and the third axis activates. `benchmark/phase7Acceptance.ts` passes
+   * `(replication) => replication.summary.energy.workKJ` — out-of-balance mechanical work over the
+   * reporting window — and that one lambda is the whole of the wiring on this side, exactly as this
+   * parameter was designed to make it. No other signature changed. See `pareto.ts` § the objective
+   * table for the formula's basis and for what the proxy deliberately omits.
    */
   readonly energyProxyOf?: ((replication: ReplicationSource) => number) | undefined;
   /** Defaults to serial: a fixed, reproducible budget is what a paired interval needs. */
