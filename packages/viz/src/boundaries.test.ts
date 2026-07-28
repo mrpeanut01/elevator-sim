@@ -51,22 +51,144 @@ function stripComments(text: string): string {
   return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
 }
 
+/**
+ * String *contents* removed, so a rule is about code rather than about prose — including the
+ * prose a program prints.
+ *
+ * The same argument as {@link stripComments}, extended to the place the argument actually bites.
+ * Wave 2's viewer says `the document is not a JSON object` when a load fails and draws
+ * `showing 6 of 12 shafts — widen the window`, and under a raw grep for `\bdocument\b` and
+ * `\bwindow\b` both of those are DOM access in a module that has none. Loosening the pattern
+ * instead — matching only `document.` and `window.` — would have been the cheaper fix and a
+ * worse one: it stops catching a bare `document` passed as a value, which is exactly the shape
+ * of the one real finding this rule produced (a method parameter named `document`, shadowing the
+ * global, in `editorHistory.ts`).
+ *
+ * Template literals keep their `${…}` substitutions, because those are code.
+ *
+ * A character scanner rather than a set of regular expressions, and that is not fastidiousness:
+ * the regex version of this function was written first, and its middle-of-template pattern —
+ * `/\}…`/` — anchored on *any* closing brace in the file and then ate everything up to the next
+ * backtick, which silenced the whole of `dev/main.ts`. The positive control below is what caught
+ * it, before the loosened rule could pass a file that really did touch the DOM.
+ */
+function stripStringLiterals(text: string): string {
+  let out = '';
+  let index = 0;
+  /** Depth of `${ … }` nesting inside template literals, innermost last. */
+  const templateDepths: number[] = [];
+  let braceDepth = 0;
+
+  while (index < text.length) {
+    const char = text[index] ?? '';
+
+    if (char === '\\') {
+      out += '  ';
+      index += 2;
+      continue;
+    }
+
+    if (char === "'" || char === '"') {
+      const quote = char;
+      out += quote;
+      index += 1;
+      while (index < text.length && text[index] !== quote && text[index] !== '\n') {
+        index += text[index] === '\\' ? 2 : 1;
+      }
+      out += quote;
+      index += 1;
+      continue;
+    }
+
+    if (char === '`') {
+      out += '`';
+      index += 1;
+      // Consume template text, stopping at `${` (code resumes) or the closing backtick.
+      while (index < text.length) {
+        if (text[index] === '\\') {
+          index += 2;
+          continue;
+        }
+        if (text[index] === '`') {
+          out += '`';
+          index += 1;
+          break;
+        }
+        if (text[index] === '$' && text[index + 1] === '{') {
+          out += '${';
+          index += 2;
+          templateDepths.push(braceDepth);
+          braceDepth += 1;
+          break;
+        }
+        index += 1;
+      }
+      continue;
+    }
+
+    if (char === '{') braceDepth += 1;
+    if (char === '}') {
+      braceDepth -= 1;
+      const resume = templateDepths[templateDepths.length - 1];
+      if (resume !== undefined && braceDepth === resume) {
+        // Back into template text: emit the brace, then keep consuming literal characters.
+        templateDepths.pop();
+        out += '}';
+        index += 1;
+        while (index < text.length) {
+          if (text[index] === '\\') {
+            index += 2;
+            continue;
+          }
+          if (text[index] === '`') {
+            out += '`';
+            index += 1;
+            break;
+          }
+          if (text[index] === '$' && text[index + 1] === '{') {
+            out += '${';
+            index += 2;
+            templateDepths.push(braceDepth);
+            braceDepth += 1;
+            break;
+          }
+          index += 1;
+        }
+        continue;
+      }
+    }
+
+    out += char;
+    index += 1;
+  }
+  return out;
+}
+
 interface SourceFile {
   /** Path relative to `packages/viz/src`, with forward slashes. */
   readonly id: string;
   /** Source with comments removed. */
   readonly code: string;
+  /** Source with comments *and* string contents removed. */
+  readonly identifiers: string;
 }
 
 async function vizSources(): Promise<readonly SourceFile[]> {
   const files = await walk(VIZ_SRC);
   return Promise.all(
-    files.map(async (path) => ({
-      id: relative(VIZ_SRC, path).split('\\').join('/'),
-      code: stripComments(await readFile(path, 'utf8')),
-    })),
+    files.map(async (path) => {
+      const code = stripComments(await readFile(path, 'utf8'));
+      return {
+        id: relative(VIZ_SRC, path).split('\\').join('/'),
+        code,
+        identifiers: stripStringLiterals(code),
+      };
+    }),
   );
 }
+
+/** The DOM globals a browser-free module must not name. */
+const DOM_PATTERN = /\b(?:document|window|requestAnimationFrame|HTMLCanvasElement)\b/;
 
 /** Files whose job is to touch the outside world. */
 const isTest = (id: string): boolean => id.endsWith('.test.ts') || id.endsWith('.test-helper.ts');
@@ -112,12 +234,42 @@ describe('the wall clock has exactly one home', () => {
 });
 
 describe('the DOM is confined to the dev entry point', () => {
-  it('is not touched by the contract, the frame producer, playback or the renderer', async () => {
+  it('is not touched by the contract, the frame producer, playback, the renderer or the editor', async () => {
     const offenders = (await vizSources())
       .filter((file) => !isDev(file.id) && !isTest(file.id))
-      .filter((file) => /\b(?:document|window|requestAnimationFrame|HTMLCanvasElement)\b/.test(file.code))
+      .filter((file) => DOM_PATTERN.test(file.identifiers))
       .map((file) => file.id);
     expect(offenders).toEqual([]);
+  });
+
+  it('positive control: the rule still catches the entry point that does touch the DOM', async () => {
+    // Without this, stripping strings could quietly turn the rule above into a rule that passes
+    // because it matches nothing. `dev/main.ts` and `dev/editor.ts` are the two files in the
+    // package that genuinely use the DOM, and both must still trip the pattern after stripping.
+    const sources = await vizSources();
+    for (const id of ['dev/main.ts', 'dev/editor.ts']) {
+      const file = sources.find((candidate) => candidate.id === id);
+      expect(file, `${id} is missing`).toBeDefined();
+      expect(DOM_PATTERN.test(file?.identifiers ?? ''), `${id} should trip the DOM rule`).toBe(
+        true,
+      );
+    }
+  });
+
+  it('positive control: a bare `document` identifier is caught, not only `document.`', async () => {
+    // The finding this rule actually produced was a method parameter named `document`, which is
+    // never followed by a dot. A pattern that only matched member access would have missed it.
+    expect(DOM_PATTERN.test(stripStringLiterals('function f(document) { return document; }'))).toBe(
+      true,
+    );
+    expect(DOM_PATTERN.test(stripStringLiterals("const message = 'the document is empty';"))).toBe(
+      false,
+    );
+    expect(DOM_PATTERN.test(stripStringLiterals('const t = `widen the window`;'))).toBe(false);
+    // …and a substitution inside a template literal is still code.
+    expect(DOM_PATTERN.test(stripStringLiterals('const t = `w ${window.innerWidth} px`;'))).toBe(
+      true,
+    );
   });
 });
 

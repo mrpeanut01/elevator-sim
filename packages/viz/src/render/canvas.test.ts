@@ -115,6 +115,7 @@ const RECORDING: VizRecording = {
       loadFactor: constantSeries(0),
     },
   ],
+  legs: [],
   landings: [],
   progress: {
     waiting: constantSeries(0),

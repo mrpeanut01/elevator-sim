@@ -48,6 +48,7 @@ import {
   type StepSeries,
   type VizFloor,
   type VizLanding,
+  type VizLeg,
   type VizProgress,
   type VizRecording,
   type VizShaft,
@@ -141,6 +142,7 @@ function describeRun(
   });
 
   const { landings, progress } = foldPassengers(result.record.passengers);
+  const legs = describeLegs(result.record.passengers);
 
   return {
     schemaVersion: VIZ_SCHEMA_VERSION,
@@ -156,6 +158,7 @@ function describeRun(
     floors: building.floors.map(describeFloor),
     shafts,
     landings,
+    legs,
     progress,
     summary: describeSummary(result),
     warnings: result.warnings,
@@ -294,6 +297,39 @@ function loadSeries(result: SimulationResult): ReadonlyMap<string, CarLoadSeries
     built.set(carId, { occupants: builder.occupants.build(), loadFactor: builder.loadFactor.build() });
   }
   return built;
+}
+
+/**
+ * The per-leg projection the fold cannot give back.
+ *
+ * Seven fields of `PassengerRecord`, not thirteen: see {@link VizLeg} for what is left out and
+ * why. Sorted by `(arrivedAt, passengerId)` so the array's order is total and reproducible —
+ * `result.record.passengers` is in generation order, which is deterministic but is not an order
+ * anything downstream may binary-search or compare against.
+ *
+ * `boardedAt`, `carId` and `bankId` are written as *absent* rather than as `undefined` values
+ * when the record has none, because a recording round-trips through JSON in the replay harness
+ * and `JSON.stringify` drops `undefined` — a recording that carried explicit `undefined`s would
+ * not equal itself after the trip. `recordRun.test.ts` § *survives a JSON round trip unchanged*
+ * is the test that says so.
+ */
+function describeLegs(passengers: readonly PassengerRecord[]): readonly VizLeg[] {
+  const legs = passengers.map((passenger): VizLeg => {
+    const leg: {
+      -readonly [K in keyof VizLeg]: VizLeg[K];
+    } = {
+      passengerId: passenger.passengerId,
+      originFloorId: passenger.originFloorId,
+      direction: passenger.direction,
+      arrivedAt: passenger.arrivedAt,
+    };
+    if (passenger.boardedAt !== undefined) leg.boardedAt = passenger.boardedAt;
+    if (passenger.carId !== undefined) leg.carId = passenger.carId;
+    if (passenger.bankId !== undefined) leg.bankId = passenger.bankId;
+    return leg;
+  });
+  legs.sort((a, b) => a.arrivedAt - b.arrivedAt || a.passengerId.localeCompare(b.passengerId));
+  return legs;
 }
 
 /** One change to the landing queues. */

@@ -119,6 +119,17 @@ describe('buildLayout', () => {
   it('handles a building with no cars at all', () => {
     const empty = buildLayout({ width: 800, height: 600, floors: FLOORS, shafts: [] });
     expect(empty.columns).toHaveLength(0);
+    expect(empty.hiddenShaftCount).toBe(0);
     expect(Number.isFinite(empty.yForHeight(0))).toBe(true);
+  });
+
+  it('finds the row nearest a pixel, for hover and click', () => {
+    const row = layout.rows[2];
+    if (row === undefined) throw new Error('missing row');
+    expect(layout.rowNearestY(row.y)?.floorId).toBe(row.floorId);
+    expect(layout.rowNearestY(row.y + 1)?.floorId).toBe(row.floorId);
+    expect(layout.rowNearestY(-1000)?.floorId).toBe('3');
+    expect(layout.rowNearestY(10_000)?.floorId).toBe('B1');
+    expect(buildLayout({ width: 400, height: 300, floors: [], shafts: [] }).rowNearestY(0)).toBeUndefined();
   });
 });
