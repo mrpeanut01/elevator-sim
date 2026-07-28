@@ -7,11 +7,11 @@
  * difference is declared only through a paired-t interval that excludes zero, and a saturated
  * configuration has its wait statistics suppressed rather than averaged.
  *
- * May depend on `@elevator-sim/core`; nothing in `core` may depend on this package. Five modules
- * are re-exported below — `stats`, `runner/`, `reports/`, `oracle/` and Phase 5's `benchmark/` —
- * with names listed explicitly rather than with `export *`, matching `core`'s barrel: adding an
- * export becomes a deliberate widening of the package's public surface, and a name collision
- * between two submodules is a compile error here rather than a silent shadow.
+ * May depend on `@elevator-sim/core`; nothing in `core` may depend on this package. Six modules
+ * are re-exported below — `stats`, `runner/`, `reports/`, `oracle/`, Phase 5's `benchmark/` and
+ * Phase 7's `tuning/` — with names listed explicitly rather than with `export *`, matching `core`'s
+ * barrel: adding an export becomes a deliberate widening of the package's public surface, and a
+ * name collision between two submodules is a compile error here rather than a silent shadow.
  *
  * ## Where `stats` lives
  *
@@ -440,3 +440,233 @@ export type {
   TailStudy,
   TailStudyOptions,
 } from './benchmark/index.js';
+
+/* -------------------------------------------------------------------------- *
+ * tuning/ — Phase 7: the self-describing search space, the three optimizers,
+ * the seam to the replication runner, and the held-out validation round.
+ *
+ * Exported for the reason `benchmark/` is and `validation/` is not: what a
+ * consumer needs from here is a **library**, not a gate. `tune`, the CLI
+ * command, is the non-test caller — `packages/cli/src/commands/tune.ts` — and
+ * it reaches every one of {@link randomSearch}, {@link successiveHalving},
+ * {@link sepCmaEs}, {@link runnerObjective} and {@link runHoldoutRound} through
+ * this barrel. Before it existed the whole module was reachable and called by
+ * nothing, which is docs/08-review-findings.md § 1 and the sixth instance of
+ * docs/05-roadmap.md's standing requirement. Reachability is not use; a barrel
+ * re-export is not a caller; and `tuning/deadCode.test.ts` is what now fails
+ * when that stops being true.
+ *
+ * **One name renamed, and no name omitted.** `tuning/space` and `tuning/search`
+ * each export a type called `Candidate` — a parameter assignment and a
+ * configuration under evaluation, and the second's generic is routinely the
+ * first. `tuning/index.ts` resolves it there, keeping the space's bare name and
+ * re-exporting the search's as `SearchCandidate`, and states why; this file
+ * inherits the resolved surface. Unlike `canonicalJson` and `DecisionOutcome`
+ * above, nothing needed to be held back: the three tuning barrels' runtime
+ * surfaces are pairwise disjoint and disjoint from everything else here.
+ *
+ * `runnerObjective` and `runHoldoutRound` drive the Phase 3 runner and are
+ * therefore as environment-bound as the rest of `runner/`; `tuning/space`
+ * imports nothing outside `@elevator-sim/core`.
+ * -------------------------------------------------------------------------- */
+
+export {
+  AWT_OBJECTIVE_ID,
+  DOC_RUNGS,
+  ENERGY_OBJECTIVE_ID,
+  NOT_COMPARABLE_LABEL,
+  PARAMETER_SCHEMA_SUFFIX,
+  PROFILE_OBJECT_SECTIONS,
+  PROFILE_SECTIONS,
+  PlateauTally,
+  SAMPLE_SEPARATOR,
+  SEARCH_DEFAULTS,
+  SEARCH_METHODS,
+  SEARCH_METHOD_GATE,
+  SEARCH_PARAMETERS,
+  SEARCH_STREAM,
+  SEED_POLICIES,
+  SEED_SET_ROLES,
+  SearchError,
+  SearchRecorder,
+  SearchSpaceError,
+  TUNING_OBJECTIVES,
+  TuningReportError,
+  WT95_OBJECTIVE_ID,
+  accountSeedSets,
+  activeParameters,
+  activeWhenSatisfied,
+  applyPatch,
+  assertDisjointSeedSets,
+  assertDistinctObjectives,
+  assertLadder,
+  assessHoldout,
+  bestByObjective,
+  buildTuningReport,
+  buildingFeasibility,
+  candidateEvaluationsOf,
+  candidateFromProfile,
+  candidateProfile,
+  candidateSampler,
+  candidatesEqual,
+  collectSearchSpace,
+  compareEvaluations,
+  compareObjective,
+  compareObjectives,
+  countDistinctOutcomes,
+  decodeCandidate,
+  decodeInto,
+  defaultCandidate,
+  discoverParameterSchemas,
+  dominanceOf,
+  dominatesPointwise,
+  encodeCandidate,
+  formatHoldout,
+  formatIndistinguishable,
+  formatObjectiveComparison,
+  formatObjectiveEstimate,
+  formatParetoFront,
+  formatSeedSets,
+  formatTuningReport,
+  formatWinners,
+  fromVector,
+  gainOf,
+  holdoutRoundSpec,
+  isActive,
+  isActiveWhenRange,
+  isFlat,
+  isIndistinguishable,
+  isProfileAuthorable,
+  materializer,
+  normalizeSearchSeed,
+  objectiveMetricSpec,
+  objectiveMetricSpecs,
+  objectivePointOf,
+  objectiveVerdict,
+  outcomeKey,
+  outcomeOf,
+  parameterOf,
+  paretoFrontOfPoints,
+  parseProfile,
+  perturbCandidate,
+  perturbValue,
+  plannedBudget,
+  plateauClasses,
+  policyNoiseStream,
+  probeStepFloor,
+  randomSearch,
+  rankEvaluations,
+  readerFor,
+  reflectInto,
+  roundExperimentSpec,
+  roundSeed,
+  runHoldoutRound,
+  runRound,
+  runnerObjective,
+  runnerUpOf,
+  sameOutcome,
+  sampleCandidate,
+  sampleCandidates,
+  sampleValue,
+  searchRng,
+  searchSpace,
+  seedSetFromReplications,
+  seedsOf,
+  sepCmaEs,
+  sharedSeedsOf,
+  shrinkageInterval,
+  statisticalParetoFront,
+  subspace,
+  successiveHalving,
+  summarizeSeedSet,
+  toVector,
+  traceSeedFor,
+  validateValues,
+  vectorDimensions,
+  vectorSpace,
+} from './tuning/index.js';
+
+export type {
+  ActiveWhenCondition,
+  ActiveWhenConditions,
+  BestByObjectiveInput,
+  BooleanParameter,
+  Candidate,
+  CandidateComparisons,
+  CandidateEvaluation,
+  CandidateEvaluationsInput,
+  CandidateOutcome,
+  CandidateProfileOptions,
+  CandidateSampler,
+  CandidateSummary,
+  CategoricalParameter,
+  CollectOptions,
+  CompareObjectiveOptions,
+  ContinuousParameter,
+  DimensionStepFloor,
+  DominanceVerdict,
+  Evaluation,
+  GateReader,
+  HoldoutAssessment,
+  HoldoutOptions,
+  HoldoutRound,
+  HoldoutRoundInput,
+  HoldoutVerdict,
+  IndistinguishablePair,
+  IntegerParameter,
+  NumericParameter,
+  Objective,
+  ObjectiveArm,
+  ObjectiveComparison,
+  ObjectivePoint,
+  ObjectiveRequest,
+  ObjectiveSpec,
+  ObjectiveVerdict,
+  ObjectiveWinner,
+  ParameterScale,
+  ParameterValue,
+  ParetoEntry,
+  ParetoFront,
+  PerturbOptions,
+  PlateauReport,
+  ProfilePatch,
+  ProfileSection,
+  ProfileSource,
+  RandomSearchOptions,
+  RecordRoundOptions,
+  ReplicationSource,
+  Rung,
+  RungResult,
+  RunnerObjectiveOptions,
+  RunnerUpComparison,
+  SampleOptions,
+  SearchCandidate,
+  SearchDimension,
+  SearchMethodId,
+  SearchParameter,
+  SearchParameterCommon,
+  SearchParameterSpec,
+  SearchParameterType,
+  SearchResult,
+  SearchRound,
+  SearchSpace,
+  SeedPolicy,
+  SeedSetAccounting,
+  SeedSetEvaluation,
+  SeedSetFromReplicationsOptions,
+  SeedSetRole,
+  SeedSetSummary,
+  SepCmaEsOptions,
+  StatisticalFrontInput,
+  StepFloorProbe,
+  StepFloorProbeOptions,
+  SuccessiveHalvingOptions,
+  SuccessiveHalvingResult,
+  TrajectoryPoint,
+  TuningArm,
+  TuningObservation,
+  TuningReport,
+  TuningReportInput,
+  VectorDimension,
+  VectorSpace,
+} from './tuning/index.js';
