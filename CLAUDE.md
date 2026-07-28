@@ -8,7 +8,7 @@ An elevator traffic simulator for designing and benchmarking smart dispatch algo
 Read [`docs/00-project-brief.md`](docs/00-project-brief.md) first, then
 [`docs/01-architecture.md`](docs/01-architecture.md).
 
-**Current status: Phases 0–5, 7 and 8 are landed and accepted, plus a five-command CLI. Phase 6 is
+**Current status: Phases 0–5, 7 and 8 are landed and accepted, plus a six-command CLI. Phase 6 is
 partially complete.** Read the two that need care precisely:
 
 - **Phase 6** — 6a (destination *disclosure*) and 6b (destination *dispatch*) are accepted against a
