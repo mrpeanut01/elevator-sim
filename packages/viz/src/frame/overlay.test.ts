@@ -17,7 +17,12 @@
 import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { BUILDING_IDS, DATA_DIR, breadthConfig } from '../fixtures.test-helper.js';
+import {
+  BUILDING_IDS,
+  DATA_DIR,
+  PANEL_DISPATCHER_ID,
+  breadthConfig,
+} from '../fixtures.test-helper.js';
 import { frameAt } from './frameAt.js';
 import { recordRun } from '../record/recordRun.js';
 import type { VizRecording } from '../contract/types.js';
@@ -291,7 +296,7 @@ describe('landing assignments — RV-T3', () => {
     const orphan: VizRecording = {
       ...recording,
       legs: [
-        { passengerId: 'orphan', originFloorId: recording.floors[1]?.id ?? 'G', direction: 'up', arrivedAt: recording.startedAt },
+        { passengerId: 'orphan', originFloorId: recording.floors[1]?.id ?? 'G', destinationFloorId: recording.floors[0]?.id ?? 'G', direction: 'up', arrivedAt: recording.startedAt },
       ],
     };
     const [assignment] = landingAssignmentsAt(orphan, orphan.endedAt);
@@ -314,5 +319,108 @@ describe('purity and clamping', () => {
     const recording = recordingOf('garden-apartments');
     expect(overlayAt(recording, -1e6).simTimeS).toBe(recording.startedAt);
     expect(overlayAt(recording, 1e6).simTimeS).toBe(recording.endedAt);
+  }, 300_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * Version 4 — a landing call under a panel
+ * -------------------------------------------------------------------------- */
+
+describe('landingAssignmentsAt under destination dispatch', () => {
+  const panels = new Map<string, VizRecording>();
+  const panelOf = (id: string): VizRecording => {
+    const cached = panels.get(id);
+    if (cached !== undefined) return cached;
+    const built = recordRun(breadthConfig(config, id, { dispatcherId: PANEL_DISPATCHER_ID }))
+      .recording;
+    panels.set(id, built);
+    return built;
+  };
+
+  it.each(BUILDING_IDS)('partitions the waiting legs into promise groups, on %s', (buildingId) => {
+    const recording = panelOf(buildingId);
+    expect(recording.passengerModel).toBe('destination-dispatch');
+
+    let sawMultipleRowsOnOneFloor = false;
+    for (const t of sampleTimes(recording)) {
+      const rows = landingAssignmentsAt(recording, t);
+      const perFloor = new Map<string, number>();
+      let counted = 0;
+      for (const row of rows) {
+        /* Every row is a real group, and its fields are the group's own — not a constant. */
+        expect(row.destinationFloorId, row.key).toBeDefined();
+        expect(row.promisedCarId, row.key).toBeDefined();
+        expect(row.key).toBe(
+          `${row.floorId} ${row.direction} ${String(row.destinationFloorId)} ${String(row.promisedCarId)}`,
+        );
+        counted += row.waiting;
+        perFloor.set(row.floorId, (perFloor.get(row.floorId) ?? 0) + 1);
+
+        /* Recomputed from the legs, so a row whose fields were pinned would disagree. */
+        const members = recording.legs.filter(
+          (leg) =>
+            leg.arrivedAt <= t &&
+            (leg.boardedAt === undefined || leg.boardedAt > t) &&
+            leg.originFloorId === row.floorId &&
+            leg.destinationFloorId === row.destinationFloorId &&
+            leg.assignedCarId === row.promisedCarId,
+        );
+        expect(members.length, row.key).toBe(row.waiting);
+      }
+      /* The partition is exhaustive: every waiting leg is in exactly one row. */
+      expect(counted).toBe(frameAt(recording, t).totalWaiting);
+      if ([...perFloor.values()].some((n) => n > 1)) sawMultipleRowsOnOneFloor = true;
+    }
+
+    /* Witness — the whole point of the key change. Garden Apartments is the one shipped
+       building small enough that it may not happen, and it is excluded rather than the
+       assertion being softened. */
+    if (buildingId !== 'garden-apartments') {
+      expect(sawMultipleRowsOnOneFloor, `${buildingId} never split a floor into two calls`).toBe(
+        true,
+      );
+    }
+  }, 600_000);
+
+  it.each(BUILDING_IDS)('is keyed by direction alone under the conventional model, on %s', (buildingId) => {
+    const recording = recordingOf(buildingId);
+    for (const t of sampleTimes(recording)) {
+      for (const row of landingAssignmentsAt(recording, t)) {
+        expect(row.destinationFloorId, row.key).toBeUndefined();
+        expect(row.promisedCarId, row.key).toBeUndefined();
+        expect(row.key).toBe(`${row.floorId} ${row.direction}`);
+      }
+    }
+  }, 300_000);
+
+  it('reports a promise for a call no car ever answered', () => {
+    /*
+     * The falsehood version 4 removes. Under a panel, `answeredByCarId === undefined` means the
+     * horizon closed before the promised car arrived — **not** that the call was unassignable.
+     * Measured reachable on a shipped building: Vertical City at 20 % of population per 5
+     * minutes, seed 20260727, ends `timed-out` with 25 promised-but-never-boarded legs. Built
+     * here rather than run there, because reproducing that costs 3557 legs of simulation to
+     * assert one branch.
+     */
+    const base = recordingOf('garden-apartments');
+    const stranded: VizRecording = {
+      ...base,
+      passengerModel: 'destination-dispatch',
+      legs: [
+        {
+          passengerId: 'stranded',
+          originFloorId: base.floors[1]?.id ?? 'G',
+          destinationFloorId: base.floors[0]?.id ?? 'G',
+          direction: 'down',
+          arrivedAt: base.startedAt,
+          assignedCarId: 'main-B',
+        },
+      ],
+    };
+    const [row] = landingAssignmentsAt(stranded, stranded.endedAt);
+    expect(row?.promisedCarId).toBe('main-B');
+    expect(row?.answeredByCarId).toBeUndefined();
+    expect(row?.answeredInS).toBeUndefined();
+    expect(row?.waiting).toBe(1);
   }, 300_000);
 });

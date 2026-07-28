@@ -19,6 +19,7 @@
 import {
   Simulation,
   SimulationError,
+  type PassengerModel,
   type ResolvedBuilding,
   type SimulationResult,
 } from '@elevator-sim/core';
@@ -286,7 +287,7 @@ async function play(
       const t = Math.min(endS, ((Date.now() - startedWall) / 1000) * speed);
       queues.advanceTo(t);
       out.raw(CURSOR_HOME);
-      for (const line of renderFrame(out, plan, building, floors, visibleShafts, shafts.length, loads, queues, t, endS, speed, frame.rowsPerFloor)) {
+      for (const line of renderFrame(out, plan, building, floors, visibleShafts, shafts.length, loads, queues, t, endS, speed, frame.rowsPerFloor, passengerModelOfRun(result))) {
         out.raw(`${line}${CLEAR_LINE}\n`);
       }
       if (stopped || t >= endS) break;
@@ -354,6 +355,7 @@ function renderFrame(
   endS: number,
   speed: number,
   rowsPerFloor: number,
+  model: PassengerModel,
 ): readonly string[] {
   const { bold, dim, cyan, green, yellow, red, magenta } = out.palette;
   const lines: string[] = [];
@@ -447,6 +449,7 @@ function renderFrame(
     );
   }
   lines.push('');
+  lines.push(dim(` ${landingLegend(model)}`));
   lines.push(
     dim(
       ` ${green('▲')} waiting up   ${magenta('▼')} waiting down   ` +
@@ -454,6 +457,36 @@ function renderFrame(
     ),
   );
   return lines;
+}
+
+/**
+ * The passenger model this run used, off the record the run produced.
+ *
+ * `RunRecord.passengerModel` is written only for a destination-dispatch run — `Simulation` omits
+ * it otherwise so a version-1 record still parses — so its absence *is* `conventional`.
+ */
+export function passengerModelOfRun(result: SimulationResult): PassengerModel {
+  return result.record.passengerModel ?? 'conventional';
+}
+
+/**
+ * What the `waiting` column means, which is not the same thing under the two passenger models.
+ *
+ * Under `conventional` the column is a hall call: `▲8` is eight people who pressed one button
+ * and will take whichever car opens. Under `destination-dispatch` there is no direction button —
+ * each of those eight registered a *destination* at a panel and was told which car to walk to,
+ * possibly eight different cars (measured on Midtown Office: 92 origin-destination calls and 132
+ * distinct promises behind 28 direction buckets). The count is still true; what it counts is
+ * not, and a viewer that says nothing lets a reader carry the conventional reading across.
+ *
+ * The full disclaimer — the nine metrics that stop being comparable — is in `result.warnings`
+ * and `printRunReport` prints it when playback ends. This is the one-line version, on screen
+ * while the reader is actually looking at the column.
+ */
+export function landingLegend(model: PassengerModel): string {
+  return model === 'destination-dispatch'
+    ? 'destination dispatch: the waiting column is a direction bucket, but each person there was already assigned one car at the panel'
+    : 'waiting: people at the landing who pressed a direction button; any car that opens may take them';
 }
 
 /** Doors as brackets: shut points in, open points out, moving is round. */
@@ -553,6 +586,7 @@ function playPlain(
   out.line(
     `  ${bold(building.name)} ${dim('·')} ${cyan(plan.dispatcherId)} ${dim('·')} seed ${cyan(plan.seedText)}`,
   );
+  out.line(dim(`  ${landingLegend(passengerModelOfRun(result))}`));
   out.line();
   const labels = shafts.slice(0, 8);
   out.line(

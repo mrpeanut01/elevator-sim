@@ -67,6 +67,7 @@ import { comparePaired, samplesOf } from '../validation/harness.js';
 
 import type { AccessControlStudy } from './accessControl.js';
 import type { DisclosureStudy } from './destinationDisclosure.js';
+import type { DispatchContrastStudy } from './destinationDispatchContrast.js';
 import type { CaseResult } from './suite.js';
 import type { PrepositioningStudy } from './prepositioning.js';
 import type { Stage5Study } from './capacityReassignment.js';
@@ -92,6 +93,7 @@ export const PUBLISHED_STUDY_IDS = Object.freeze([
   'capacity-reassignment',
   'forecast-causality',
   'destination-disclosure',
+  'destination-dispatch',
   'access-control',
 ] as const);
 
@@ -295,6 +297,24 @@ export function disclosureFigures(study: DisclosureStudy): ReadonlyMap<string, P
   }
   for (const control of study.negativeControls) {
     figures.set(`control/${control.id}/${control.ttd.metric}`, estimateOf(control.ttd.estimate));
+  }
+  return figures;
+}
+
+/**
+ * The C→D contrast's figures, keyed `point/metric` — the study's own two nested domains.
+ *
+ * Iterates the points and their cells, so an operating point added to `DISPATCH_POINTS` appears
+ * in the key set immediately and the totality check fails until it has a pin.
+ */
+export function dispatchContrastFigures(
+  study: DispatchContrastStudy,
+): ReadonlyMap<string, PinnedEstimate> {
+  const figures = new Map<string, PinnedEstimate>();
+  for (const point of study.points) {
+    for (const cell of point.cells) {
+      figures.set(`${point.id}/${cell.metric}`, estimateOf(cell.estimate));
+    }
   }
   return figures;
 }
@@ -551,6 +571,7 @@ export const STUDY_ENTRY_POINTS: Readonly<Record<string, PublishedStudyId | 'no-
     measureMultiRoundReachability: 'no-intervals',
     runDestinationDisclosureStudy: 'destination-disclosure',
     runNegativeControls: 'destination-disclosure',
+    runDestinationDispatchStudy: 'destination-dispatch',
     runAccessControlStudy: 'access-control',
     // Counts and nothing else: evaluations, non-zero evaluations, cross-car spread and eligibility
     // refusals by reason. No standard error anywhere in it, so there is nothing for a pin to hold —
@@ -590,6 +611,10 @@ export const PINNED_ESTIMATES: Readonly<
     "garden-residential/destination-eta/pctOverLongWait": { n: 500, mean: -0.43764204457684847, standardError: 0.11226717559957262, lower: -0.6582166641205034, upper: -0.2170674250331936 },
     "garden-residential/destination-eta/ttdMeanS": { n: 500, mean: -1.8582425474835709, standardError: 0.13854583002490287, lower: -2.1304476117322806, upper: -1.5860374832348614 },
     "garden-residential/destination-eta/wt95S": { n: 500, mean: -4.228562437470144, standardError: 0.3661935135175747, lower: -4.948033596267166, upper: -3.5090912786731216 },
+    "garden-residential/destination-panel/awtS": { n: 500, mean: -1.2332632056568171, standardError: 0.11206700777447282, lower: -1.4534445495913684, upper: -1.0130818617222659 },
+    "garden-residential/destination-panel/pctOverLongWait": { n: 500, mean: -0.36098810027904643, standardError: 0.116687635479283, lower: -0.5902477272700501, upper: -0.13172847328804274 },
+    "garden-residential/destination-panel/ttdMeanS": { n: 500, mean: -1.8687391408735783, standardError: 0.14657287268637695, lower: -2.156715171761998, upper: -1.5807631099851587 },
+    "garden-residential/destination-panel/wt95S": { n: 500, mean: -4.093684635092217, standardError: 0.3929108703781397, lower: -4.8656481701626975, upper: -3.3217211000217364 },
     "garden-residential/energy-aware/awtS": { n: 500, mean: -1.2705623141208482, standardError: 0.10906519229330046, lower: -1.4848459029532182, upper: -1.0562787252884782 },
     "garden-residential/energy-aware/pctOverLongWait": { n: 500, mean: -0.43764204457684847, standardError: 0.11226717559957262, lower: -0.6582166641205034, upper: -0.2170674250331936 },
     "garden-residential/energy-aware/ttdMeanS": { n: 500, mean: -1.5138326203400023, standardError: 0.13590677032504084, lower: -1.7808526464318217, upper: -1.246812594248183 },
@@ -638,6 +663,10 @@ export const PINNED_ESTIMATES: Readonly<
     "midtown-up-peak/destination-eta/pctOverLongWait": { n: 250, mean: -7.3548065155836895, standardError: 0.6564266605502094, lower: -8.647663024439378, upper: -6.061950006728002 },
     "midtown-up-peak/destination-eta/ttdMeanS": { n: 250, mean: -10.312463457348638, standardError: 0.7062606596732539, lower: -11.70346986473912, upper: -8.921457049958157 },
     "midtown-up-peak/destination-eta/wt95S": { n: 250, mean: -23.411667367886075, standardError: 1.4220624137272133, lower: -26.212471719807475, upper: -20.610863015964675 },
+    "midtown-up-peak/destination-panel/awtS": { n: 250, mean: -6.380812348722793, standardError: 0.4712944282388003, lower: -7.309044100652598, upper: -5.452580596792987 },
+    "midtown-up-peak/destination-panel/pctOverLongWait": { n: 250, mean: -7.338139848917022, standardError: 0.6573874942865632, lower: -8.632888755240131, upper: -6.043390942593913 },
+    "midtown-up-peak/destination-panel/ttdMeanS": { n: 250, mean: -10.440992075580082, standardError: 0.7324364008816538, lower: -11.883552570318322, upper: -8.998431580841842 },
+    "midtown-up-peak/destination-panel/wt95S": { n: 250, mean: -23.257111926055696, standardError: 1.4277160967027518, lower: -26.06905141503537, upper: -20.44517243707602 },
     "midtown-up-peak/energy-aware/awtS": { n: 250, mean: -6.757922236779572, standardError: 0.4526435569786732, lower: -7.649420410148943, upper: -5.8664240634102 },
     "midtown-up-peak/energy-aware/pctOverLongWait": { n: 250, mean: -7.3548065155836895, standardError: 0.6564266605502094, lower: -8.647663024439378, upper: -6.061950006728002 },
     "midtown-up-peak/energy-aware/ttdMeanS": { n: 250, mean: -9.493603110542796, standardError: 0.715811342253399, lower: -10.903419939386005, upper: -8.083786281699588 },
@@ -686,6 +715,10 @@ export const PINNED_ESTIMATES: Readonly<
     "secure-up-peak/destination-eta/pctOverLongWait": { n: 150, mean: -4.429925122305146, standardError: 0.5119325885714427, lower: -5.441510663410848, upper: -3.4183395811994446 },
     "secure-up-peak/destination-eta/ttdMeanS": { n: 150, mean: -7.194652724499509, standardError: 0.5416545415210114, lower: -8.264969236300216, upper: -6.124336212698802 },
     "secure-up-peak/destination-eta/wt95S": { n: 150, mean: -19.5228660151815, standardError: 1.4782454713303441, lower: -22.443898546389605, upper: -16.601833483973394 },
+    "secure-up-peak/destination-panel/awtS": { n: 150, mean: -5.517769884795915, standardError: 0.4004414603359033, lower: -6.309047487312757, upper: -4.726492282279073 },
+    "secure-up-peak/destination-panel/pctOverLongWait": { n: 150, mean: -4.429925122305146, standardError: 0.5119325885714427, lower: -5.441510663410848, upper: -3.4183395811994446 },
+    "secure-up-peak/destination-panel/ttdMeanS": { n: 150, mean: -8.034833619290676, standardError: 0.5799287096428716, lower: -9.18078039166527, upper: -6.888886846916082 },
+    "secure-up-peak/destination-panel/wt95S": { n: 150, mean: -19.53254242944283, standardError: 1.4866342648697213, lower: -22.47015132722966, upper: -16.594933531656 },
     "secure-up-peak/energy-aware/awtS": { n: 150, mean: -5.715237539321243, standardError: 0.39827114486426696, lower: -6.502226569866389, upper: -4.928248508776097 },
     "secure-up-peak/energy-aware/pctOverLongWait": { n: 150, mean: -4.429925122305146, standardError: 0.5119325885714427, lower: -5.441510663410848, upper: -3.4183395811994446 },
     "secure-up-peak/energy-aware/ttdMeanS": { n: 150, mean: -6.577641981676558, standardError: 0.5532762960452231, lower: -7.6709232335649755, upper: -5.48436072978814 },
@@ -875,6 +908,20 @@ export const PINNED_ESTIMATES: Readonly<
     "eta-deferred/rideMeanS": { n: 150, mean: 0.04178984576931768, standardError: 0.12958213651800538, lower: -0.21426616358337866, upper: 0.297845855122014 },
     "eta-deferred/ttdMeanS": { n: 150, mean: 1.122532381053615, standardError: 0.13886394151119685, lower: 0.848135402721631, upper: 1.396929359385599 },
     "eta-deferred/wt95S": { n: 150, mean: 1.8949586449919775, standardError: 0.22848055472523252, lower: 1.4434780580091853, upper: 2.34643923197477 },
+  }),
+  "destination-dispatch": Object.freeze({
+    "midtown-interfloor-binding/awtS": { n: 150, mean: 6.961670623532294, standardError: 0.7165009281274347, lower: 5.545855347725958, upper: 8.37748589933863 },
+    "midtown-interfloor-binding/rideMeanS": { n: 150, mean: -1.0190148378359796, standardError: 0.30819603228853537, lower: -1.628014258949644, upper: -0.4100154167223151 },
+    "midtown-interfloor-binding/ttdMeanS": { n: 150, mean: 5.942655785696314, standardError: 0.7696984084469723, lower: 4.421721587758711, upper: 7.463589983633916 },
+    "midtown-interfloor-binding/wt95S": { n: 150, mean: 37.34334394706107, standardError: 4.035659767167156, lower: 29.368827066468743, upper: 45.317860827653405 },
+    "midtown-interfloor-mix/awtS": { n: 150, mean: -0.010263039844002826, standardError: 0.04341996241191674, lower: -0.09606145774471898, upper: 0.07553537805671333 },
+    "midtown-interfloor-mix/rideMeanS": { n: 150, mean: 0.11845433668652537, standardError: 0.06494104032138054, lower: -0.00987001476136666, upper: 0.2467786881344174 },
+    "midtown-interfloor-mix/ttdMeanS": { n: 150, mean: 0.10819129684252356, standardError: 0.07411430606504646, lower: -0.03825954859729701, upper: 0.2546421422823441 },
+    "midtown-interfloor-mix/wt95S": { n: 150, mean: 0.1522821775770023, standardError: 0.24485636056663015, lower: -0.33155721754367107, upper: 0.6361215726976757 },
+    "secure-interfloor-mix/awtS": { n: 150, mean: -0.04250644107636893, standardError: 0.028222511550472378, lower: -0.09827449580758732, upper: 0.013261613654849451 },
+    "secure-interfloor-mix/rideMeanS": { n: 150, mean: 0.018284613634465572, standardError: 0.03667389506070267, lower: -0.054183486282672874, upper: 0.09075271355160401 },
+    "secure-interfloor-mix/ttdMeanS": { n: 150, mean: -0.02723385829834124, standardError: 0.054085819991834844, lower: -0.13410815132833154, upper: 0.07964043473164906 },
+    "secure-interfloor-mix/wt95S": { n: 150, mean: -0.21577608643222068, standardError: 0.1206802255633101, lower: -0.45424180243182355, upper: 0.022689629567382158 },
   }),
   "access-control": Object.freeze({
     "difference-of-differences/absolute": { n: 150, mean: 0.9817163614447753, standardError: 0.20187949687645595, lower: 0.5838889567775986, upper: 1.379543766111952 },

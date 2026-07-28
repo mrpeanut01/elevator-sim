@@ -70,6 +70,24 @@ export function describeFrame(input: DescribeFrameInput): string {
     );
   }
 
+  /*
+   * The passenger model, said out loud, and only when it is the one that changes what a landing
+   * queue *is*.
+   *
+   * Under a panel the sentence "6 legs waiting at floor 10" means six people who have each
+   * already been told which car to walk to, and possibly six different cars — not one hall call
+   * with six people behind it. A reader who cannot see the shaft highlight has no other way to
+   * learn that, and version 3 gave the two models the same paragraph. Not said under
+   * `conventional`, because naming the default in every sentence is noise: `KB-13` asks for a
+   * description, not a manifest.
+   */
+  if (recording.passengerModel === 'destination-dispatch') {
+    parts.push(
+      'Destination dispatch: each waiting passenger has already been assigned a car at the ' +
+        'landing panel, so a landing is one call per destination rather than one up or down call.',
+    );
+  }
+
   parts.push(
     `${String(frame.totalWaiting)} legs waiting, ${String(frame.boardedLegs)} boarded so far.`,
   );

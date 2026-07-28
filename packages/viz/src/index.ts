@@ -61,6 +61,7 @@
  * | {@link drawOverlay} | `drawScene`, in `src/render/canvas.ts` |
  * | {@link loadColour}, {@link loadTrackMax}, {@link doorGlyph}, {@link describeSelection} | `src/render/canvas.ts` and `src/render/overlay.ts` |
  * | {@link describeFrame} | `src/dev/main.ts`, as the canvas's `aria-label` and its live region — `KB-13` |
+ * | {@link landingOptionLabel} | `src/dev/main.ts`'s `populateLandings`, one option per landing call |
  * | {@link readRecordingDocument} | `src/dev/main.ts`'s **Load recording** control — the version check's first real caller |
  * | {@link verifyReplay}, {@link recordingFingerprint} | `src/dev/main.ts`'s **Verify replay** control |
  * | {@link validateBuilding}, {@link validateBuildingText}, {@link summariseReport}, {@link issuesMayBeIncomplete} | `src/dev/editor.ts` |
@@ -173,6 +174,7 @@ export {
   doorGlyph,
   drawScene,
   formatClock,
+  landingOptionLabel,
   type Canvas2DLike,
   type SceneInput,
   type SceneSelection,

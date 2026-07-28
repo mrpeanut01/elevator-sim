@@ -139,7 +139,7 @@ describe('Phase 5 criterion — each dispatcher against nearest-car', () => {
         if (cell.verdict !== 'BETTER') notBetter.push(`${result.caseId}/${arm.armId}`);
       }
     }
-    // Two cells of 27, both named and both explained. `predictive-balanced` on Garden is below the
+    // Two cells of 33, both named and both explained. `predictive-balanced` on Garden is below the
     // resolution limit at this budget — the building the pre-positioning criterion is about, which
     // is not a coincidence; see `prepositioning.test.ts`. `zoned-uppeak` on Secure Tower is WORSE,
     // and the assertion above decomposes why.
@@ -176,21 +176,39 @@ describe('Phase 5 criterion — each dispatcher against nearest-car', () => {
         expect(arm.cell('pctOverLongWait').verdict, `${cellId} %>60s`).toBe('BETTER');
       }
     }
-    // And the statement that used to be the strongest single one in the study: on the up-peak cases
-    // the baseline was the only dispatcher in the library that made anybody wait more than a minute
-    // at all. `zoned-uppeak` is now the second — 0.13 % of passengers on Midtown and 8.5 % on Secure
-    // Tower — and it is the only one, so it is named rather than absorbed into a looser bound. Both
-    // are the live `zoneAffinity` weight: the arm is still far better than the baseline on Midtown
-    // (−98.2 % on this metric) and worse than it on Secure Tower.
+    /*
+     * And the statement that used to be the strongest single one in the study: on the up-peak
+     * cases the baseline was the only dispatcher in the library that made anybody wait more than a
+     * minute at all. It now has **two** company, and both are named per cell rather than by arm id,
+     * so an arm that is exempt on one building is still held to exactly zero on the other:
+     *
+     * | cell | mean % > 60 s | why |
+     * |---|---|---|
+     * | `midtown-up-peak/zoned-uppeak` | 0.1323 | the live `zoneAffinity` weight; still −98.2 % against the baseline's 7.355 |
+     * | `secure-up-peak/zoned-uppeak` | 8.539 | the same weight, and worse than the baseline's 4.430 — decomposed in the AWT assertion above |
+     * | `midtown-up-peak/destination-panel` | 0.01667 | **Phase 6b.** The write-once promise (DECISIONS.md § D29): a passenger the panel promised a car that then filled waits for *that* car rather than the next one. −99.8 % against the baseline, and the same mechanism `destinationDispatchContrast.ts` measures at scale — at 4.5 % of population per 5 minutes it costs 37 s of WT95 |
+     *
+     * `secure-up-peak/destination-panel` is **exactly 0**, and the per-cell form is what keeps that
+     * asserted: a blanket exemption by arm id would have stopped checking it.
+     */
+    const OVER_LONG_WAIT_EXEMPT: ReadonlySet<string> = new Set([
+      'midtown-up-peak/zoned-uppeak',
+      'secure-up-peak/zoned-uppeak',
+      'midtown-up-peak/destination-panel',
+    ]);
     for (const caseId of ['midtown-up-peak', 'secure-up-peak']) {
       const result = (await benchmark()).find((entry) => entry.caseId === caseId) as CaseResult;
       expect(result.baselineMeans.pctOverLongWait).toBeGreaterThan(0);
       for (const arm of result.arms) {
-        if (arm.armId === 'zoned-uppeak') continue;
-        expect(arm.means.pctOverLongWait, `${result.caseId}/${arm.armId}`).toBe(0);
+        const cellId = `${result.caseId}/${arm.armId}`;
+        if (OVER_LONG_WAIT_EXEMPT.has(cellId)) {
+          // Exempt from "exactly zero", not from being reported: a named cell must still be
+          // non-zero, or the exemption has outlived the finding it was written for.
+          expect(arm.means.pctOverLongWait, `${cellId} is exempt but no longer non-zero`).toBeGreaterThan(0);
+          continue;
+        }
+        expect(arm.means.pctOverLongWait, cellId).toBe(0);
       }
-      const zoned = result.arms.find((arm) => arm.armId === 'zoned-uppeak') as (typeof result.arms)[number];
-      expect(zoned.means.pctOverLongWait, `${caseId}/zoned-uppeak`).toBeGreaterThan(0);
     }
   }, TIMEOUT_MS);
 

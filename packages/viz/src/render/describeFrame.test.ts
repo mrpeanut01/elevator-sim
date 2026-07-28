@@ -8,7 +8,12 @@
 import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { BUILDING_IDS, DATA_DIR, breadthConfig } from '../fixtures.test-helper.js';
+import {
+  BUILDING_IDS,
+  DATA_DIR,
+  PANEL_DISPATCHER_ID,
+  breadthConfig,
+} from '../fixtures.test-helper.js';
 import { frameAt } from '../frame/frameAt.js';
 import { overlayAt } from '../frame/overlay.js';
 import { recordRun } from '../record/recordRun.js';
@@ -110,5 +115,29 @@ describe('the description carries the two facts a picture must not hide', () => 
     expect(describeFrame({ recording, frame: overloaded })).toContain('OVERLOADED');
     expect(describeFrame({ recording, frame: full })).toContain('full');
     expect(describeFrame({ recording, frame: full })).not.toContain('OVERLOADED');
+  }, 300_000);
+});
+
+describe('the description says which passenger model produced the run — version 4', () => {
+  it('names destination dispatch, and only on a run that used it', () => {
+    /*
+     * `KB-13`'s claim is that a non-sighted reader is told what is on screen. Under a landing
+     * panel "6 legs waiting at floor 10" is six people already assigned to as many as six
+     * different cars, not one hall call — and a version-3 recording gave the two models the
+     * same paragraph because it carried nothing to tell them apart.
+     */
+    const panel = recordRun(
+      breadthConfig(config, 'midtown-office', { dispatcherId: PANEL_DISPATCHER_ID }),
+    ).recording;
+    const conventional = recordRun(breadthConfig(config, 'midtown-office')).recording;
+    expect(panel.passengerModel).toBe('destination-dispatch');
+    expect(conventional.passengerModel).toBe('conventional');
+
+    const at = (r: typeof panel): string =>
+      describeFrame({ recording: r, frame: frameAt(r, r.endedAt / 2) });
+    expect(at(panel)).toContain('Destination dispatch');
+    expect(at(panel)).toContain('one call per destination');
+    // The discriminating half: a constant sentence would appear on both.
+    expect(at(conventional)).not.toContain('Destination dispatch');
   }, 300_000);
 });

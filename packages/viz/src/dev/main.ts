@@ -31,7 +31,12 @@ import { readRecordingDocument, verifyReplay } from '../record/document.js';
 import { Playback } from '../playback/playback.js';
 import { systemClock } from '../playback/clock.js';
 import { buildLayout } from '../render/layout.js';
-import { drawScene, type Canvas2DLike, type SceneSelection } from '../render/canvas.js';
+import {
+  drawScene,
+  landingOptionLabel,
+  type Canvas2DLike,
+  type SceneSelection,
+} from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
 import { mountEditor } from './editor.js';
 import { loadBrowserResources, resolveEdited, type BrowserResources } from './data.js';
@@ -184,6 +189,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
   /** A building the editor handed over, outside `data/`. */
   let adhocBuilding: BuildingConfig | undefined;
   let selection: SceneSelection | undefined;
+  /**
+   * {@link LandingAssignment.key} of the selected call, or `undefined`.
+   *
+   * Not `selection.floorId`: under a landing panel one floor carries one row per
+   * (destination, promised car), so a floor id no longer identifies what the reader picked.
+   */
+  let selectionKey: string | undefined;
   let assignments: readonly LandingAssignment[] = [];
   let lastDescription = '';
   /**
@@ -334,6 +346,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function adopt(next: VizRecording): void {
     recording = next;
     selection = undefined;
+    selectionKey = undefined;
     playback = new Playback(next, systemClock(), {
       speed: Number(ui.speed.value),
       // KB-14: a reader who has asked for reduced motion gets the first frame and a Play button,
@@ -372,30 +385,38 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function populateLandings(next: VizRecording, at: number): void {
     assignments = landingAssignmentsAt(next, at);
     const wanted = assignments
-      .map(
-        (assignment) =>
-          `${assignment.floorId} ${assignment.direction} ${String(assignment.waiting)}`,
-      )
+      .map((assignment) => `${assignment.key} ${String(assignment.waiting)}`)
       .join('|');
     if (wanted === landingOptionsKey) return;
     landingOptionsKey = wanted;
     const chosen = ui.landingSelect.value;
     ui.landingSelect.replaceChildren(new Option('no landing selected', ''));
     for (const assignment of assignments) {
-      ui.landingSelect.append(
-        new Option(
-          `${assignment.floorId} ${assignment.direction} — ${String(assignment.waiting)} waiting` +
-            (assignment.answeredByCarId === undefined
-              ? ' (unassigned)'
-              : ` → ${assignment.answeredByCarId}`),
-          assignment.floorId,
-        ),
-      );
+      ui.landingSelect.append(new Option(landingOptionLabel(assignment), assignment.key));
     }
-    if (assignments.some((assignment) => assignment.floorId === chosen)) {
+    if (assignments.some((assignment) => assignment.key === chosen)) {
       ui.landingSelect.value = chosen;
     }
     ui.landingSelect.disabled = assignments.length === 0;
+  }
+
+  /**
+   * The whole of a call, handed to the renderer.
+   *
+   * Every field is copied rather than a subset chosen per model: the renderer decides what a
+   * `destination-dispatch` selection reads like, and a caller that filtered here would be a
+   * second opinion about the same question.
+   */
+  function selectionOf(assignment: LandingAssignment): SceneSelection {
+    return {
+      floorId: assignment.floorId,
+      answeredByCarId: assignment.answeredByCarId,
+      answeredInS: assignment.answeredInS,
+      waiting: assignment.waiting,
+      oldestWaitS: assignment.oldestWaitS,
+      destinationFloorId: assignment.destinationFloorId,
+      promisedCarId: assignment.promisedCarId,
+    };
   }
 
   /* ------------------------------------------------------------------ *
@@ -572,17 +593,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
   ui.dispatcher.addEventListener('change', syncUrl);
   ui.landingSelect.addEventListener('change', () => {
     selection = undefined;
-    const floorId = ui.landingSelect.value;
-    if (floorId === '') return;
-    const assignment = assignments.find((candidate) => candidate.floorId === floorId);
+    selectionKey = undefined;
+    const key = ui.landingSelect.value;
+    if (key === '') return;
+    const assignment = assignments.find((candidate) => candidate.key === key);
     if (assignment === undefined) return;
-    selection = {
-      floorId: assignment.floorId,
-      answeredByCarId: assignment.answeredByCarId,
-      answeredInS: assignment.answeredInS,
-      waiting: assignment.waiting,
-      oldestWaitS: assignment.oldestWaitS,
-    };
+    selectionKey = assignment.key;
+    selection = selectionOf(assignment);
   });
 
   // KB-03/04/05/06/07 — and KB-08: never while a field has focus.
@@ -809,17 +826,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
           populateLandings(recording, frame.simTimeS);
         }
         if (selection !== undefined) {
-          const fresh = assignments.find((candidate) => candidate.floorId === selection?.floorId);
+          const fresh = assignments.find((candidate) => candidate.key === selectionKey);
           selection =
-            fresh === undefined
-              ? { floorId: selection.floorId, waiting: 0 }
-              : {
-                  floorId: fresh.floorId,
-                  answeredByCarId: fresh.answeredByCarId,
-                  answeredInS: fresh.answeredInS,
-                  waiting: fresh.waiting,
-                  oldestWaitS: fresh.oldestWaitS,
-                };
+            fresh === undefined ? { floorId: selection.floorId, waiting: 0 } : selectionOf(fresh);
         }
       }
 

@@ -71,14 +71,39 @@ export function generateOptionsFrom(
 }
 
 /**
- * A profile with `dispatch.callType` replaced.
+ * A profile with `dispatch.callType` replaced, and anything gated on the old one removed with it.
  *
  * Config, not code. Which information a call carries is the single lever that decides whether
  * an access-restricted landing is servable at all, and it has to be reachable from a generated
  * case without touching the dispatcher.
+ *
+ * ## Why `passengerAssignment` comes off with the gate
+ *
+ * `dispatch.passengerAssignment: 'panel'` declares
+ * `activeWhen: { 'dispatch.callType': ['destination-entry', 'mobile-credential'] }`, and
+ * `resolveDispatchConfig` **refuses** the pair `panel` + `up-down-buttons` outright: a panel that
+ * cannot ask for a destination is an up/down button (`packages/core/DECISIONS-T16.md` § T16-D1).
+ * `generate.ts` picks a call type from the two conventional values without consulting the profile,
+ * so overriding it onto Phase 6b's shipped `destination-panel` used to construct a configuration
+ * the schema declares inadmissible and every fuzz case naming that profile threw — measured, 1
+ * corpus counterexample and the whole trace-invariance suite.
+ *
+ * The fix is here rather than in the generator or in `data/` because this is the function that
+ * *moves* the gate: a helper that overrides a conditional dimension and leaves its dependents
+ * behind produces a profile nobody could author. Dropping the dependent is the same rule
+ * `activeWhen` states, applied in the same direction.
+ *
+ * **Cross-boundary note.** This file is outside T18's ownership (`packages/experiments/src/fuzz/**`).
+ * The edit is made rather than handed back for the reason `DECISIONS-T16.md` § T16-D10 gives for
+ * the same shape: leaving it red blocks integration for concurrent branches over a change that is
+ * mechanical and whose alternative — not shipping the profile — is the task. See
+ * `packages/viz/DECISIONS-T18.md` § T18-D7.
  */
 export function withCallType(profile: DispatcherProfile, callType: CallType): DispatcherProfile {
-  return { ...profile, dispatch: { ...profile.dispatch, callType } };
+  const carriesDestination = callType === 'destination-entry' || callType === 'mobile-credential';
+  const dispatch = { ...profile.dispatch, callType };
+  if (!carriesDestination) delete dispatch.passengerAssignment;
+  return { ...profile, dispatch };
 }
 
 /**

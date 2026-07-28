@@ -49,6 +49,7 @@ import type {
   Direction,
   DoorConfig,
   DoorMachineState,
+  PassengerModel,
   SimTime,
   SimulationStatus,
 } from '@elevator-sim/core/browser';
@@ -67,6 +68,31 @@ import type {
  * | 1 | Wave 1's first shape. |
  * | 2 | `VizProgress.served` / `Frame.served` renamed {@link VizProgress.boardedLegs}, because the counter counts **leg boardings** and the header called them people. See `packages/viz/DECISIONS-T8.md`. |
  * | 3 | {@link VizRecording.legs} added — the per-leg array `UX.md` § 7.2 and `DECISIONS.md` D15 reserved for the wave that acquires a consumer. Wave 2 is that wave: `src/frame/overlay.ts` reads it for the windowed figures the live metrics overlay shows, and `landingAssignmentsAt` reads its `carId`/`bankId` for `RV-T3`. See `packages/viz/DECISIONS-T11.md`. |
+ * | 4 | {@link VizRecording.passengerModel}, {@link VizLeg.destinationFloorId} and {@link VizLeg.assignedCarId} added, so a **Level-1** (destination-dispatch) run can be drawn as the thing it is. `docs/09-destination-dispatch-contract.md` § 3.1 required either this bump or a refusal in `recordRun`; § T18-D1 of `packages/viz/DECISIONS-T18.md` records which was chosen and what was measured. |
+ *
+ * ## What version 4 fixed, measured rather than predicted
+ *
+ * § 3.1 predicted that a Level-1 run would render an **empty** landing series, because
+ * {@link VizLanding} is keyed `(floorId, direction)` and a panel has no direction button. That
+ * symptom does **not** reproduce: Phase 6b kept `PassengerRecord.direction` populated under a
+ * panel, so `foldPassengers` produces the same 28 landings on Midtown Office under either model.
+ * The defect is one level subtler and was measured at seed 20260727, 900 s, `eta` weights plus
+ * `mobile-credential` + `panel`:
+ *
+ * | building | landings drawn | landing **calls** under the panel | promise groups `(floor, destination, promised car)` |
+ * |---|---|---|---|
+ * | Midtown Office | 28 | 92 | **132** |
+ * | Mixed-Use High-Rise | 48 | 93 | **230** |
+ * | Secure Tower | 22 | 55 | **106** |
+ * | Vertical City | 102 | 219 | **535** |
+ *
+ * A version-3 recording collapses those 132 promises into 28 direction buckets and carries no
+ * field from which the collapse could be undone — `VizLeg` had seven fields and none of them was
+ * the assignment. So the viewer could not tell a Level-1 recording from a Level-0 one and drew
+ * them identically, which is the same class of defect as wave 1's cars-at-their-final-position:
+ * deterministic, replay-identical, and a picture of a different building.
+ *
+ * ## Reading it
  *
  * Wave 1 *read* this number nowhere, and said so: the guard that existed compared a recording's
  * version with the constant compiled into the same bundle, which in the shipped path could not
@@ -75,7 +101,7 @@ import type {
  * a recording arrives from somewhere other than this build and the versions genuinely can
  * disagree (`UX.md` `PB-07`/`PB-15`).
  */
-export const VIZ_SCHEMA_VERSION = 3;
+export const VIZ_SCHEMA_VERSION = 4;
 
 /* -------------------------------------------------------------------------- *
  * Geometry
@@ -212,9 +238,15 @@ export interface VizProgress {
  *
  * ## What is deliberately not here
  *
- * `massKg`, `journeyId`, `legIndex`, `credentialGroup`, `destinationFloorId` and `alightedAt`
- * are all on `PassengerRecord` and none of them is copied. Nothing in this package reads them,
- * and copying them "while we are here" is how a contract acquires six fields and one consumer.
+ * `massKg`, `journeyId`, `legIndex`, `credentialGroup` and `alightedAt` are all on
+ * `PassengerRecord` and none of them is copied. Nothing in this package reads them, and copying
+ * them "while we are here" is how a contract acquires six fields and one consumer.
+ *
+ * {@link destinationFloorId} and {@link assignedCarId} *were* on that list until version 4, and
+ * they come off it for the same reason `legs` came on in version 3: they acquire a consumer in
+ * the same change. `landingAssignmentsAt` keys a Level-1 landing on the destination and reports
+ * the promise, `describeSelection` says the promise out loud, and `describeFrame` puts it in the
+ * sentence a screen reader hears. See {@link VizRecording.passengerModel}.
  *
  * ## Ordering
  *
@@ -227,6 +259,15 @@ export interface VizLeg {
   readonly passengerId: string;
   /** Where the wait happened — the landing this leg registered a call at. */
   readonly originFloorId: string;
+  /**
+   * Where this leg is going. **The call identity under a panel** (docs/09 § 1.3): a Level-1
+   * landing is one call per origin-destination pair, not one per direction.
+   *
+   * Present under both models, because it is a fact about the passenger rather than about the
+   * dispatcher, and because a Level-0 viewer that wanted to show *why* a car was chosen would
+   * need it too. It is only *keyed on* under `destination-dispatch`.
+   */
+  readonly destinationFloorId: string;
   readonly direction: Direction;
   /** When the wait began. The window membership key, exactly as in `PassengerRecord`. */
   readonly arrivedAt: SimTime;
@@ -236,6 +277,18 @@ export interface VizLeg {
   readonly carId?: string | undefined;
   /** The bank that served this leg. `undefined` while unserved. */
   readonly bankId?: string | undefined;
+  /**
+   * The car the **landing panel promised** this passenger, written once at arrival.
+   *
+   * `undefined` under the conventional model, where there is no panel and no promise. Under
+   * `destination-dispatch` it is present on every leg from the instant it arrives — *including*
+   * a leg that never boards, which is the distinction a version-3 recording could not draw:
+   * `carId` is `undefined` for both an unassignable call and a promised passenger still waiting
+   * when the horizon closed, and `describeSelection` said *"no car answered this call"* about
+   * both. Measured reachable: Vertical City at 20 % of population per 5 minutes, seed 20260727,
+   * ends `timed-out` with **25** promised-but-never-boarded legs.
+   */
+  readonly assignedCarId?: string | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -278,6 +331,19 @@ export interface VizRecording {
   readonly buildingName: string;
   readonly dispatcherProfileId: string;
   readonly trafficProfileId?: string | undefined;
+  /**
+   * Which passenger model produced this run — **the one field a renderer branches on.**
+   *
+   * Copied from `RunRecord.passengerModel`, never re-derived from the profile: `core` computes it
+   * from the *resolved* dispatch stage (`passengerModelOf`), and a viewer that re-read
+   * `dispatcherProfile.dispatch.passengerAssignment` would be a second source of truth about a
+   * question `core` has already answered — which is the failure this project has a rule about.
+   *
+   * `conventional` covers both the up/down button and destination *disclosure*. Only
+   * `destination-dispatch` means the landing has no direction button and every waiting passenger
+   * has already been told which car to walk to.
+   */
+  readonly passengerModel: PassengerModel;
   readonly status: SimulationStatus;
   /** Simulated time the run started. */
   readonly startedAt: SimTime;

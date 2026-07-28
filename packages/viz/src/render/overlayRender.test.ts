@@ -26,10 +26,11 @@ import {
   type VizLeg,
   type VizRecording,
 } from '../contract/types.js';
-import { overlayAt } from '../frame/overlay.js';
+import { overlayAt, type LandingAssignment } from '../frame/overlay.js';
 import {
   DEFAULT_THEME,
   describeSelection,
+  landingOptionLabel,
   doorGlyph,
   drawScene,
   fitLabel,
@@ -106,11 +107,11 @@ class RecordingContext implements Canvas2DLike {
  * -------------------------------------------------------------------------- */
 
 const LEGS: readonly VizLeg[] = [
-  { passengerId: 'p1', originFloorId: 'G', direction: 'up', arrivedAt: 10, boardedAt: 22, carId: 'main-A', bankId: 'main' },
-  { passengerId: 'p2', originFloorId: 'G', direction: 'up', arrivedAt: 12, boardedAt: 40, carId: 'main-B', bankId: 'main' },
-  { passengerId: 'p3', originFloorId: '2', direction: 'down', arrivedAt: 30, boardedAt: 75, carId: 'high-A', bankId: 'high' },
-  { passengerId: 'p4', originFloorId: '3', direction: 'down', arrivedAt: 50 },
-  { passengerId: 'p5', originFloorId: '3', direction: 'down', arrivedAt: 55, boardedAt: 500, carId: 'high-A', bankId: 'high' },
+  { passengerId: 'p1', originFloorId: 'G', destinationFloorId: '2', direction: 'up', arrivedAt: 10, boardedAt: 22, carId: 'main-A', bankId: 'main' },
+  { passengerId: 'p2', originFloorId: 'G', destinationFloorId: '3', direction: 'up', arrivedAt: 12, boardedAt: 40, carId: 'main-B', bankId: 'main' },
+  { passengerId: 'p3', originFloorId: '2', destinationFloorId: 'G', direction: 'down', arrivedAt: 30, boardedAt: 75, carId: 'high-A', bankId: 'high' },
+  { passengerId: 'p4', originFloorId: '3', destinationFloorId: 'G', direction: 'down', arrivedAt: 50 },
+  { passengerId: 'p5', originFloorId: '3', destinationFloorId: 'G', direction: 'down', arrivedAt: 55, boardedAt: 500, carId: 'high-A', bankId: 'high' },
 ];
 
 function shaft(carId: string, bankId: string, label: string): VizRecording['shafts'][number] {
@@ -137,6 +138,7 @@ const RECORDING: VizRecording = {
   buildingId: 'synthetic',
   buildingName: 'Synthetic Tower',
   dispatcherProfileId: 'eta',
+  passengerModel: 'conventional',
   status: 'completed',
   startedAt: 0,
   endedAt: 600,
@@ -315,6 +317,7 @@ describe('the live metrics panel draws the metrics it was given', () => {
       legs: Array.from({ length: 40 }, (_, index) => ({
         passengerId: `q${String(index)}`,
         originFloorId: 'G',
+        destinationFloorId: '3',
         direction: 'up' as const,
         arrivedAt: 10 + index,
         boardedAt: 20 + index,
@@ -368,6 +371,7 @@ describe('the live metrics panel draws the metrics it was given', () => {
     const legs = Array.from({ length: 30 }, (_, index) => ({
       passengerId: `q${String(index)}`,
       originFloorId: 'G',
+      destinationFloorId: '3',
       direction: 'up' as const,
       arrivedAt: 10 + index,
       boardedAt: 20 + index,
@@ -423,6 +427,7 @@ describe('the live metrics panel draws the metrics it was given', () => {
       legs: Array.from({ length: 60 }, (_, index) => ({
         passengerId: `r${String(index)}`,
         originFloorId: 'G',
+        destinationFloorId: '3',
         direction: 'up' as const,
         arrivedAt: 10 + index,
         boardedAt: 20 + index,
@@ -603,6 +608,104 @@ describe('landing selection — RV-T3', () => {
       ).length;
     expect(highlights(outlined)).toBe(1);
     expect(highlights(bare)).toBe(0);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Version 4 — the landing panel, drawn
+ *
+ * Every value added here is checked against a *different* value in the same fixture, so a field
+ * replaced by a constant changes the assertion's answer rather than merely its wording. That is
+ * the discipline `frameAt.test.ts` records at length after seven of eight frame-car mutants
+ * survived the suite.
+ * -------------------------------------------------------------------------- */
+
+describe('a selected destination call — version 4', () => {
+  const promised = {
+    floorId: '3',
+    destinationFloorId: '12',
+    promisedCarId: 'high-A',
+    answeredByCarId: 'high-A',
+    answeredInS: 400,
+    waiting: 2,
+    oldestWaitS: 50,
+  };
+
+  it('says where the call is going and which car the panel named', () => {
+    const text = describeSelection(promised);
+    // The destination is read from `destinationFloorId`, not from `floorId`: a constant, or the
+    // origin repeated, fails both halves.
+    expect(text).toContain('floor 3 → 12');
+    expect(text).not.toContain('floor 3 → 3');
+    expect(text).toContain('panel promised car high-A');
+    expect(text).toContain('2 waiting');
+    expect(text).toContain('50 s');
+    expect(text).toContain('boards in 400 s');
+    // …and it is drawn, not merely computed.
+    expect(draw(frame(), RECORDING, { selection: promised }).texts.join('\n')).toContain(text);
+  });
+
+  it('never calls a promised passenger an unanswered call — the version-3 falsehood', () => {
+    /*
+     * A passenger the panel promised a car, still standing when the horizon closed. Version 3
+     * had no field for the promise, so `answeredByCarId === undefined` was the only signal and
+     * the caption read "unassigned — no car answered this call in this run". Under a landing
+     * panel that is a dispatcher failure being reported where none happened. Measured reachable:
+     * Vertical City at 20 % pop/5 min, seed 20260727, 25 such legs.
+     */
+    const stranded = { ...promised, answeredByCarId: undefined, answeredInS: undefined };
+    const text = describeSelection(stranded);
+    expect(text).toContain('panel promised car high-A');
+    expect(text).toContain('still waiting when the run ended');
+    expect(text).not.toContain('unassigned');
+    // The conventional reading is untouched: with no promise, the same shape still reads RV-08.
+    expect(describeSelection({ ...stranded, promisedCarId: undefined, destinationFloorId: undefined }))
+      .toContain('unassigned');
+  });
+
+  it('outlines the promised shaft, not the one that happened to answer', () => {
+    // `promisedCarId` and `answeredByCarId` are deliberately different cars here. A renderer
+    // still boxing `answeredByCarId` would outline `main-A`; there is exactly one highlight, so
+    // the two cannot both be drawn and the assertion discriminates.
+    const disagreeing = { ...promised, promisedCarId: 'high-A', answeredByCarId: 'main-A' };
+    const ctx = draw(frame(), RECORDING, { selection: disagreeing });
+    const highlightRects = ctx.calls.filter(
+      (call) => call.op === 'strokeRect' && call.args[4] === DEFAULT_THEME.highlight,
+    );
+    expect(highlightRects.length).toBe(1);
+    const layout = layoutFor(RECORDING);
+    const highA = layout.columns.find((column) => column.carId === 'high-A');
+    const mainA = layout.columns.find((column) => column.carId === 'main-A');
+    expect(highA?.x).not.toBe(mainA?.x);
+    expect(highlightRects[0]?.args[0]).toBe(highA?.x);
+  });
+
+  it('labels a landing option by the call, not by the floor', () => {
+    const panelRow: LandingAssignment = {
+      key: '3 up 12 high-A',
+      floorId: '3',
+      direction: 'up',
+      destinationFloorId: '12',
+      promisedCarId: 'high-A',
+      waiting: 2,
+      oldestWaitS: 50,
+      answeredByCarId: undefined,
+      answeredByBankId: undefined,
+      answeredInS: undefined,
+    };
+    expect(landingOptionLabel(panelRow)).toBe('3 → 12 — 2 waiting → high-A');
+    // Conventional: the direction is the identity and the outcome is what there is to show.
+    const plain: LandingAssignment = {
+      ...panelRow,
+      key: '3 up',
+      destinationFloorId: undefined,
+      promisedCarId: undefined,
+      answeredByCarId: 'main-A',
+    };
+    expect(landingOptionLabel(plain)).toBe('3 up — 2 waiting → main-A');
+    expect(landingOptionLabel({ ...plain, answeredByCarId: undefined })).toBe(
+      '3 up — 2 waiting (unassigned)',
+    );
   });
 });
 

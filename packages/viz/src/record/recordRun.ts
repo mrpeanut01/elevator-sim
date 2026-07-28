@@ -152,6 +152,10 @@ function describeRun(
     buildingName: building.name,
     dispatcherProfileId: result.dispatcherProfileId,
     trafficProfileId: result.record.trafficProfileId,
+    // `RunRecord.passengerModel` is omitted rather than written when the run is conventional —
+    // `Simulation` only stamps it for a destination-dispatch run, so a version-1 record still
+    // parses. `conventional` is therefore the honest reading of its absence, not a fallback.
+    passengerModel: result.record.passengerModel ?? 'conventional',
     status: result.status,
     startedAt: result.record.startedAt,
     endedAt: result.record.endedAt,
@@ -302,16 +306,16 @@ function loadSeries(result: SimulationResult): ReadonlyMap<string, CarLoadSeries
 /**
  * The per-leg projection the fold cannot give back.
  *
- * Seven fields of `PassengerRecord`, not thirteen: see {@link VizLeg} for what is left out and
+ * Nine fields of `PassengerRecord`, not fifteen: see {@link VizLeg} for what is left out and
  * why. Sorted by `(arrivedAt, passengerId)` so the array's order is total and reproducible —
  * `result.record.passengers` is in generation order, which is deterministic but is not an order
  * anything downstream may binary-search or compare against.
  *
- * `boardedAt`, `carId` and `bankId` are written as *absent* rather than as `undefined` values
- * when the record has none, because a recording round-trips through JSON in the replay harness
- * and `JSON.stringify` drops `undefined` — a recording that carried explicit `undefined`s would
- * not equal itself after the trip. `recordRun.test.ts` § *survives a JSON round trip unchanged*
- * is the test that says so.
+ * `boardedAt`, `carId`, `bankId` and `assignedCarId` are written as *absent* rather than as
+ * `undefined` values when the record has none, because a recording round-trips through JSON in
+ * the replay harness and `JSON.stringify` drops `undefined` — a recording that carried explicit
+ * `undefined`s would not equal itself after the trip. `recordRun.test.ts` § *survives a JSON
+ * round trip unchanged* is the test that says so.
  */
 function describeLegs(passengers: readonly PassengerRecord[]): readonly VizLeg[] {
   const legs = passengers.map((passenger): VizLeg => {
@@ -320,12 +324,14 @@ function describeLegs(passengers: readonly PassengerRecord[]): readonly VizLeg[]
     } = {
       passengerId: passenger.passengerId,
       originFloorId: passenger.originFloorId,
+      destinationFloorId: passenger.destinationFloorId,
       direction: passenger.direction,
       arrivedAt: passenger.arrivedAt,
     };
     if (passenger.boardedAt !== undefined) leg.boardedAt = passenger.boardedAt;
     if (passenger.carId !== undefined) leg.carId = passenger.carId;
     if (passenger.bankId !== undefined) leg.bankId = passenger.bankId;
+    if (passenger.assignedCarId !== undefined) leg.assignedCarId = passenger.assignedCarId;
     return leg;
   });
   legs.sort((a, b) => a.arrivedAt - b.arrivedAt || a.passengerId.localeCompare(b.passengerId));

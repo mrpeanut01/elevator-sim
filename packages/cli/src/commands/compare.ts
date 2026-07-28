@@ -46,7 +46,14 @@ import {
   type ExperimentSpec,
   type MeanEstimate,
 } from '@elevator-sim/experiments';
-import type { LoadedConfig } from '@elevator-sim/core';
+import {
+  comparabilityOf,
+  passengerModelOf,
+  resolveDispatchConfig,
+  type DispatcherProfile,
+  type LoadedConfig,
+  type PassengerModel,
+} from '@elevator-sim/core';
 
 import {
   booleanFlag,
@@ -72,7 +79,11 @@ import { ABSENT, count, num, renderEstimate, renderSignedEstimate } from '../for
 import { BINARY, printCommandHelp, wrap, type CommandHelp } from '../help.js';
 import { field, heading, padColumn, type Output } from '../output.js';
 
-/** The metrics the verdict table reports. AWT decides; the others are context. */
+/**
+ * The metrics the verdict table reports. AWT decides — **unless the two arms do not share a
+ * passenger model**, in which case AWT is one of the nine metrics that stop measuring the same
+ * thing and {@link gateMetricFor} moves the verdict to TTD. See {@link crossModelNotice}.
+ */
 const REPORTED: readonly {
   readonly metric: ReplicationMetric;
   readonly label: string;
@@ -273,6 +284,9 @@ export async function runCompare(
   const cellA = requireCell(result.cells, 'A');
   const cellB = requireCell(result.cells, 'B');
 
+  const crossModel = crossModelNotice(aProfile, bProfile);
+  const gate = gateMetricFor(crossModel);
+
   // CRN is the whole basis of the comparison, so it is verified rather than assumed.
   const crn = crnStatus(cellA, cellB);
 
@@ -315,6 +329,41 @@ export async function runCompare(
     )}  ${cellB.aggregate.saturated ? red(saturatedRow(cellB)) : dim(saturatedRow(cellB))}`,
   );
   out.line(dim(`  every mean carries its ${num(confidence * 100, 0)} % interval; there is no bare mean here`));
+
+  /*
+   * The two arms do not have the same passenger model, and nine of the nineteen recorded
+   * metrics stop measuring the same thing when they do not.
+   *
+   * Measured, not theorised: this command used to print `VERDICT: INDISTINGUISHABLE on AWT` for
+   * `--a eta --b destination-panel` with nothing said, and AWT is the first of the nine —
+   * under a landing panel the arrival-to-boarding span contains the walk to a named car and
+   * excludes the option of taking whichever car opens. `core` already declares the partition
+   * (`comparabilityOf`) and already raises a disclaimer into `result.warnings`, which `run`
+   * prints and this command never read. So the list is taken from `core` rather than restated,
+   * and the verdict moves to the metric the contract nominates.
+   */
+  if (crossModel !== undefined) {
+    out.line();
+    out.line(
+      yellow(bold('  !!  THE TWO ARMS DO NOT SHARE A PASSENGER MODEL — most of this table is not comparable.')),
+    );
+    out.line(yellow(`      A (${aId}): ${crossModel.aModel}`));
+    out.line(yellow(`      B (${bId}): ${crossModel.bModel}`));
+    out.line(
+      wrap(
+        `${count(crossModel.notComparable.length)} of the recorded metrics change construct between these two models and must not be paired: ${crossModel.notComparable.join(', ')}.`,
+        Math.min(out.columns - 6, 92),
+        '      ',
+      ),
+    );
+    out.line(
+      wrap(
+        `The verdict below is therefore taken on ${gate.label}, which keeps its definition under both models (docs/09 § 1.6, DECISIONS.md § D27: gate on TTD, and report AWT and WT95 beside it with explicit verdicts rather than omitting them).`,
+        Math.min(out.columns - 6, 92),
+        '      ',
+      ),
+    );
+  }
 
   const anySaturated = cellA.aggregate.saturated || cellB.aggregate.saturated;
   if (suppressed.length > 0) {
@@ -373,7 +422,7 @@ export async function runCompare(
       continue;
     }
     const verdict = verdictOf(difference, entry.direction);
-    if (entry.metric === 'awtS') {
+    if (entry.metric === gate.metric) {
       headline = verdict;
       headlineDifference = difference;
     }
@@ -418,10 +467,10 @@ export async function runCompare(
       out.line(bold('  finding about capacity, and it does not need a mean to be true.'));
     }
   } else if (headline === undefined) {
-    out.line(yellow(bold('  VERDICT: NONE — AWT could not be estimated on both arms.')));
+    out.line(yellow(bold(`  VERDICT: NONE — ${gate.label} could not be estimated on both arms.`)));
   } else if (headline === 'IDENTICAL') {
     const pairs = headlineDifference?.differences.length ?? reps;
-    out.line(cyan(bold(`  VERDICT: IDENTICAL on AWT — ${count(pairs)} of ${count(pairs)} paired differences are exactly zero.`)));
+    out.line(cyan(bold(`  VERDICT: IDENTICAL on ${gate.label} — ${count(pairs)} of ${count(pairs)} paired differences are exactly zero.`)));
     out.line(
       wrap(
         `${aId} and ${bId} produced bit-identical runs at every replication, so this is no effect at all rather than an effect too small to see. ` +
@@ -441,7 +490,7 @@ export async function runCompare(
       ),
     );
   } else if (headline === 'INDISTINGUISHABLE') {
-    out.line(yellow(bold(`  VERDICT: INDISTINGUISHABLE on AWT at n = ${count(reps)}.`)));
+    out.line(yellow(bold(`  VERDICT: INDISTINGUISHABLE on ${gate.label} at n = ${count(reps)}.`)));
     out.line(
       wrap(
         `The ${num(confidence * 100, 0)} % interval on the difference contains zero, so ${aId} and ${bId} are not ranked. ` +
@@ -451,10 +500,10 @@ export async function runCompare(
       ),
     );
   } else if (headline === 'BETTER') {
-    out.line(green(bold(`  VERDICT: A (${aId}) is BETTER than B (${bId}) on AWT.`)));
+    out.line(green(bold(`  VERDICT: A (${aId}) is BETTER than B (${bId}) on ${gate.label}.`)));
     out.line(dim('  The paired-t interval on the difference excludes zero.'));
   } else {
-    out.line(red(bold(`  VERDICT: A (${aId}) is WORSE than B (${bId}) on AWT.`)));
+    out.line(red(bold(`  VERDICT: A (${aId}) is WORSE than B (${bId}) on ${gate.label}.`)));
     out.line(dim('  The paired-t interval on the difference excludes zero.'));
   }
 
@@ -507,6 +556,73 @@ export async function runCompare(
   );
   out.line();
   return 0;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Passenger models — the comparison this command could not previously refuse
+ * -------------------------------------------------------------------------- */
+
+/** What is not comparable between two arms, when their passenger models differ. */
+export interface CrossModelNotice {
+  readonly aModel: PassengerModel;
+  readonly bModel: PassengerModel;
+  /** Metric ids that change construct across the two models. Taken from `core`, never listed here. */
+  readonly notComparable: readonly string[];
+}
+
+/**
+ * The passenger model an arm will run under, off the **resolved** dispatch stage.
+ *
+ * `resolveDispatchConfig` is what applies the defaults and what refuses `panel` under a call type
+ * that cannot ask for a destination, and `passengerModelOf` is the same function `Simulation`
+ * uses to stamp `RunRecord.passengerModel`. Reading the authored
+ * `profile.dispatch?.passengerAssignment` instead would be a second opinion about a question
+ * `core` has already answered, and would disagree the first time a default changed.
+ */
+export function modelOfProfile(profile: DispatcherProfile): PassengerModel {
+  return passengerModelOf(resolveDispatchConfig(profile).dispatch);
+}
+
+/**
+ * `undefined` when the two arms share a passenger model, and the notice when they do not.
+ *
+ * `notComparable` is `core`'s own list — `comparabilityOf('destination-dispatch')` — so a metric
+ * added to or removed from the nine appears here without this file being edited. That matters:
+ * the list exists precisely because nobody remembers it, and a copy in the CLI would be the
+ * stale-published-number shape one directory over.
+ */
+export function crossModelNotice(
+  a: DispatcherProfile,
+  b: DispatcherProfile,
+): CrossModelNotice | undefined {
+  const aModel = modelOfProfile(a);
+  const bModel = modelOfProfile(b);
+  if (aModel === bModel) return undefined;
+  return {
+    aModel,
+    bModel,
+    notComparable: comparabilityOf('destination-dispatch').notComparableMetrics,
+  };
+}
+
+/**
+ * Which metric the headline verdict is taken on.
+ *
+ * AWT within one passenger model; **TTD** across two, because AWT is the first of the nine
+ * metrics that stop measuring the same thing — docs/09 § 1.6 and `DECISIONS.md` § D27. Asserted
+ * rather than assumed: the fallback is looked up in {@link REPORTED} so a gate metric that
+ * stopped being reported is a build error rather than a silent reversion to AWT.
+ */
+export function gateMetricFor(notice: CrossModelNotice | undefined): {
+  readonly metric: ReplicationMetric;
+  readonly label: string;
+} {
+  const wanted: ReplicationMetric = notice === undefined ? 'awtS' : 'ttdMeanS';
+  const entry = REPORTED.find((candidate) => candidate.metric === wanted);
+  if (entry === undefined) {
+    throw new Error(`compare: the gate metric "${wanted}" is not in the reported table.`);
+  }
+  return { metric: entry.metric, label: entry.label };
 }
 
 /* -------------------------------------------------------------------------- *
