@@ -13,6 +13,8 @@
  * | `render/describeFrame.ts` | the canvas's `aria-label` and the live region |
  * | `record/document.ts` | **Load recording** (`readRecordingDocument`) and **Verify replay** (`verifyReplay`) |
  * | `editor*.ts` | `dev/editor.ts`, mounted below |
+ * | `dev/bootstrap.ts` | {@link main}, which is the only thing that loads `data/` — `RV-17`/`RV-21` |
+ * | `dev/motion.ts` | `adopt`, which asks it whether a new recording may start moving — `KB-14` |
  *
  * ## Two surfaces, one page
  *
@@ -44,6 +46,8 @@ import {
 } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
 import { mountEditor } from './editor.js';
+import { createLoader } from './bootstrap.js';
+import { shouldAutoplay } from './motion.js';
 import { loadBrowserResources, resolveEdited, type BrowserResources } from './data.js';
 
 /** `PB-T1`: ×1 … ×120, and `[`/`]` step this ladder — `KB-07`. */
@@ -129,51 +133,55 @@ function elements(): Elements {
   };
 }
 
-/** `KB-14` — the reader has asked for no motion beyond the simulation itself. */
-function prefersReducedMotion(): boolean {
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** The controls that need something on screen before they mean anything — UX.md § B.3. */
+function transportControls(ui: Elements): readonly (HTMLButtonElement | HTMLInputElement)[] {
+  return [ui.playPause, ui.stepBack, ui.stepForward, ui.scrub, ui.exportPng];
+}
+
+/**
+ * `RV-17` — say what failed, and offer a Retry that refetches without a page reload (`RV-21`).
+ *
+ * The message is `data.ts`'s, which names the path in every failure mode. This function is only
+ * responsible for putting it where the reader is, moving focus to it (`KB-11`), and making the
+ * second failure as visible as the first.
+ */
+function showLoadFailure(ui: Elements, error: unknown, retry: () => Promise<boolean>): void {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = 'Retry';
+  button.addEventListener('click', () => {
+    ui.error.textContent = '';
+    ui.status.textContent = 'loading data…';
+    retry().catch((failure: unknown) => {
+      // Only reachable if `boot` itself throws. It used to reach nothing at all: the retry ran
+      // inside a floating `async` IIFE, so the page cleared its own error message and then died
+      // in silence. See `bootstrap.ts`.
+      ui.error.textContent = `the viewer failed to start after loading data/: ${message(failure)}`;
+      ui.error.focus();
+    });
+  });
+  ui.error.replaceChildren(`could not load data/: ${message(error)} `, button);
+  ui.error.focus();
 }
 
 async function main(): Promise<void> {
   const ui = elements();
   ui.status.textContent = 'loading data…';
+  // Nothing is playable until `data/` has loaded — UX.md § B.3's empty state. `boot` re-enables
+  // them once there is a recording; a failed load must not leave five live-looking controls
+  // wired to nothing, which is what `RV-17` shipped with.
+  for (const control of transportControls(ui)) control.disabled = true;
 
-  let resources: BrowserResources;
-  const load = async (): Promise<boolean> => {
-    try {
-      resources = await loadBrowserResources();
-      return true;
-    } catch (error) {
-      // RV-17: what failed, and a Retry that refetches without a page reload (RV-21).
-      ui.error.replaceChildren(
-        `could not load data/: ${message(error)} `,
-        (() => {
-          const retry = document.createElement('button');
-          retry.type = 'button';
-          retry.textContent = 'Retry';
-          retry.addEventListener('click', () => {
-            void (async () => {
-              ui.error.textContent = '';
-              ui.status.textContent = 'loading data…';
-              if (await load()) start();
-            })();
-          });
-          return retry;
-        })(),
-      );
-      ui.error.focus();
-      return false;
-    }
-  };
-  if (!(await load())) return;
-
-  let started = false;
-  function start(): void {
-    if (started) return;
-    started = true;
-    boot(ui, resources);
-  }
-  start();
+  const loader = createLoader<BrowserResources>({
+    load: loadBrowserResources,
+    start: (resources) => {
+      boot(ui, resources);
+    },
+    fail: (error, retry) => {
+      showLoadFailure(ui, error, retry);
+    },
+  });
+  await loader.attempt();
 }
 
 function boot(ui: Elements, resources: BrowserResources): void {
@@ -352,6 +360,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
           : `run failed (seed ${seed.toString()}): ${message(error)}`,
       );
       ui.status.textContent = 'no run on screen.';
+      syncTransport();
       return;
     }
     adopt(recording);
@@ -366,8 +375,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
     playback = new Playback(next, systemClock(), {
       speed: Number(ui.speed.value),
       // KB-14: a reader who has asked for reduced motion gets the first frame and a Play button,
-      // not a building that starts moving on its own.
-      autoplay: !prefersReducedMotion(),
+      // not a building that starts moving on its own. The decision is `motion.ts`'s, so it can be
+      // asserted without an operating system that has the preference switched on.
+      autoplay: shouldAutoplay((query) => window.matchMedia(query)),
       loop: ui.loop.checked,
     });
     ui.playPause.textContent = playback.state === 'playing' ? 'Pause' : 'Play';
@@ -376,6 +386,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
     populateBankFilter(next);
     landingOptionsKey = NO_OPTIONS_YET;
     populateLandings(next, next.startedAt);
+    syncTransport();
+  }
+
+  /**
+   * The transport follows the recording — UX.md § B.3's empty state.
+   *
+   * A function declaration, and called from {@link adopt} rather than hung off the **Run**
+   * button's click, because the click was not the only way a recording arrives. `ED-04` hands one
+   * over from the editor without any click on **Run**, so after a failed run — which disables
+   * these five — *"Run this building"* put a run on screen that could not be paused, stepped,
+   * scrubbed or exported. Found while verifying `RV-11`, which is reached through exactly that
+   * door.
+   */
+  function syncTransport(): void {
+    for (const control of transportControls(ui)) control.disabled = recording === undefined;
   }
 
   function populateBankFilter(next: VizRecording): void {
@@ -896,23 +921,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ui.description.textContent = lastDescription;
   }, 2000);
 
-  // The transport is disabled until there is something to play — UX.md § B.3's empty state.
-  for (const control of [ui.playPause, ui.stepBack, ui.stepForward, ui.scrub, ui.exportPng]) {
-    control.disabled = true;
-  }
-  const enable = (): void => {
-    for (const control of [ui.playPause, ui.stepBack, ui.stepForward, ui.scrub, ui.exportPng]) {
-      control.disabled = recording === undefined;
-    }
-  };
-  ui.run.addEventListener('click', enable);
-  ui.loadRecording.addEventListener('change', () => {
-    window.setTimeout(enable, 0);
-  });
+  // Nothing to play until the first run lands. `adopt` and `runOnce`'s failure path keep it
+  // honest from here, so there is no second opinion about when these are live.
+  syncTransport();
 
   ui.status.textContent = 'ready — press Run, or open the building editor';
   runOnce();
-  enable();
 }
 
 /**
@@ -995,4 +1009,9 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-void main();
+void main().catch((error: unknown) => {
+  // A page that stops without saying so is the failure `RV-21` shipped with. There is no state to
+  // recover here, so the last thing this file does is refuse to fail quietly.
+  const node = document.getElementById('error');
+  if (node !== null) node.textContent = `the viewer failed to start: ${message(error)}`;
+});

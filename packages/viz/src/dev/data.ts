@@ -54,12 +54,48 @@ export interface BrowserResources {
   readonly warnings: readonly string[];
 }
 
+/**
+ * Fetch and parse one JSON file, **naming the path in every failure mode** — `UX.md` `RV-17`.
+ *
+ * Only the `!response.ok` branch used to name it, and driving `RV-17` for the first time found
+ * that on this dev server that branch is the one a missing file does *not* take. Vite's HTML
+ * fallback answers any request whose `Accept` includes `* / *` — which is what `fetch()` sends —
+ * with `index.html` and a **200**, so deleting `data/elevator-specs.json` produced
+ *
+ * ```text
+ * could not load data/: Unexpected token '<', "<!doctype "... is not valid JSON
+ * ```
+ *
+ * — a true sentence about a file it declined to name, for a 404 it declined to call a 404. A
+ * network failure (`TypeError: Failed to fetch`) named no path either. All three paths now do,
+ * and the HTML-for-JSON case says what it means, because a reader who has just seen this needs to
+ * know a file is missing rather than malformed.
+ */
 async function fetchJson(path: string): Promise<unknown> {
-  const response = await fetch(path);
+  let response: Response;
+  try {
+    response = await fetch(path);
+  } catch (cause) {
+    throw new Error(`could not fetch ${path}: ${describe(cause)}`, { cause });
+  }
   if (!response.ok) {
     throw new Error(`could not fetch ${path}: ${String(response.status)} ${response.statusText}`);
   }
-  return response.json();
+  const contentType = response.headers.get('content-type') ?? 'no content-type';
+  try {
+    return await response.json();
+  } catch (cause) {
+    const html = contentType.includes('text/html');
+    throw new Error(
+      `${path} did not parse as JSON: ${describe(cause)} (the server answered ${String(response.status)} ${contentType}` +
+        `${html ? ', which is what this dev server sends when the file is missing from data/' : ''})`,
+      { cause },
+    );
+  }
+}
+
+function describe(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 /** Everything a run needs, fetched and validated. Throws `ConfigError` on invalid data. */
