@@ -13,6 +13,7 @@ Live state of every task. Updated by the orchestrator as reports come in.
 | T6 | blast-radius + statistics follow-ups | `fix/blast-radius` | `.worktrees/T6-blast-radius` | ✅ **merged** `ff2c1bf` | — | **T4 unblocked on numbers** |
 | T7 | courtesy-hold + gate remediation | `fix/courtesy-hold` | `.worktrees/T7-courtesy-hold` | 🟡 in flight | — | **blocks T4** (3 doc figures) |
 | T8 | viz frame defects (from T5 review REJECT) | `fix/viz-frame-defects` | `.worktrees/T8-viz-fix` | 🟡 in flight | — | await report |
+| T9 | unreproducible benchmark numbers (C13, C14) + a drift guard | `fix/unreproducible-benchmarks` | `.worktrees/T9-benchmarks` | 🟡 in flight | — | await root cause |
 | T5 | viz foundation builder | `feat/viz-foundation` | `.worktrees/T5-viz` | ✅ **merged** `a3cb937` | — | independent review in flight |
 
 ## Review / test assignments
@@ -64,6 +65,7 @@ changed has regressed the suite.
 | T2 `0342982` | clean | 124 files / **2543** tests | 2531 + 12 | ✅ matches |
 | T1 `2f835d0` | clean | 126 files / **2578** tests | 2543 + 35 | ✅ matches |
 | T3 `9fb32e8` | clean | 128 files / **2590** tests | 2578 + 12 | ✅ matches |
+| T6 `ff2c1bf` | clean | 128 files / **2592** tests | 2590 + 2 | ✅ matches |
 
 **All five wave-1 builders merged.** Worktrees for T1, T2, T3 and T5 removed and their branches
 deleted after merge + green suite, per the plan's worktree policy. `.worktrees/T6-blast-radius`
