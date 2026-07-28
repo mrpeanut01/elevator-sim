@@ -48,6 +48,7 @@ This project exists to make those comparisons rigorous.
 | [Handoff](docs/07-handoff.md) | Current state, measured facts that bound what you may claim, known-answer tests, open debt |
 | [Review findings](docs/08-review-findings.md) | The whole-system review register, with each finding's disposition |
 | [Destination dispatch contract](docs/09-destination-dispatch-contract.md) | Phase 6's locked interface contract, its measured comparison design, and the open questions that gate implementation |
+| [Experience layer contract](docs/10-experience-layer-contract.md) | Phase 9's design: the rules that keep a gamified surface honest, novice/expert modes, a schema-generated dispatcher and traffic editor, and access-zone credentials |
 
 Machine-readable configuration lives in [`data/`](data/).
 
