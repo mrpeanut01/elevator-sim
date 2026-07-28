@@ -11,11 +11,10 @@
 import { Pcg32 } from '@elevator-sim/core';
 import { describe, expect, it } from 'vitest';
 
+import * as statistics from './statistics.js';
 import {
   DEFAULT_CONFIDENCE,
-  T_DISTRIBUTION_MAX_N,
   estimateMean,
-  halfWidthQuantile,
   meanOf,
   normalQuantile,
   pairedDifferenceEstimate,
@@ -47,6 +46,10 @@ describe('normalQuantile', () => {
   });
 
   it('matches published quantiles to ten decimal places', () => {
+    // 1.959963984540054 is also the literal `benchmark/verdict.ts` hard-codes as `Z_95` for its
+    // replication-planning arithmetic. That is the only `z` left in the repository — no interval is
+    // normal-theory any more (DECISIONS.md § D7) — and this assertion is what stops the copy there
+    // drifting from the function here. `Z_95` is module-private, so it is pinned by value.
     expect(normalQuantile(0.975)).toBeCloseTo(1.959963984540054, 10);
     expect(normalQuantile(0.95)).toBeCloseTo(1.6448536269514722, 10);
     expect(normalQuantile(0.5)).toBeCloseTo(0, 12);
@@ -92,38 +95,27 @@ describe('studentTQuantile', () => {
   });
 });
 
-describe('halfWidthQuantile — the sequential stopping rule’s quantile, and only that', () => {
-  it('still uses the t-distribution up to n = 25 and the normal approximation above it', () => {
-    // docs/03-traffic-and-statistics.md § Part 3 "Sequential stopping rule" (doc lines ~177-182)
-    // prescribes exactly this split; it is not a house preference, and it is deliberately NOT
-    // changed by the fix for review finding #14. The crossover is correct where it came from: it
-    // decides when a run loop stops, where being 5 % optimistic costs replications, not validity.
-    //
-    // This test exists to make that intent explicit. If it ever fails, the stopping rule's rule
-    // has been edited — which is a different decision from the published interval's, and needs
-    // its own argument.
-    const atCrossover = halfWidthQuantile(T_DISTRIBUTION_MAX_N, 0.95);
-    const pastCrossover = halfWidthQuantile(T_DISTRIBUTION_MAX_N + 1, 0.95);
-    expect(atCrossover.method).toBe('t');
-    expect(atCrossover.quantile).toBeCloseTo(2.06389856, 6);
-    expect(pastCrossover.method).toBe('z');
-    expect(pastCrossover.quantile).toBeCloseTo(1.959963984540054, 9);
+describe('there is exactly one interval quantile in this module', () => {
+  it('exports no n-dependent quantile chooser at all', () => {
+    // The symbol this describe block used to be about. `halfWidthQuantile` implemented
+    // docs/03-traffic-and-statistics.md § Part 3's `t` (n ≤ 25) / `z` (n > 25) crossover. Once
+    // review finding #14 took it off the published path it had no non-test caller left — the
+    // "callers" its own docstring named were an injection nothing performed and a fallback label
+    // `formatConvergence` never prints — so it is deleted rather than kept exported behind a
+    // caller list nothing satisfies (docs/05-roadmap.md § *Standing requirement*, DECISIONS.md
+    // § D7). A test asserting its absence is what stops it coming back without an argument.
+    expect(statistics).not.toHaveProperty('halfWidthQuantile');
+    expect(statistics).not.toHaveProperty('T_DISTRIBUTION_MAX_N');
   });
 
-  it('is not what any published interval reaches for', () => {
-    // The whole of review finding #14 in four lines: the two rules disagree above n = 25, and
-    // `estimateMean` follows the published one. `quantileUsedBy` reads the quantile back off an
-    // estimate as halfWidth / standardError, which is the only external evidence of the family
-    // there is — and exactly what a reader re-deriving the interval by hand would do.
-    const n = T_DISTRIBUTION_MAX_N + 1;
-    const stoppingRule = halfWidthQuantile(n, 0.95).quantile;
+  it('never widens to a normal quantile, which is what review finding #14 measured', () => {
+    // `quantileUsedBy` reads the quantile back off an estimate as halfWidth / standardError, which
+    // is the only external evidence of the family there is — and exactly what a reader re-deriving
+    // the interval by hand would do. At n = 26 the two families differ by 0.0995.
+    const n = 26;
     const published = quantileUsedBy(estimateMean(Array.from({ length: n }, (_, i) => i)));
-    expect(published).toBeGreaterThan(stoppingRule);
-    expect(published - stoppingRule).toBeGreaterThan(0.09);
-  });
-
-  it('refuses a confidence given as a percentage', () => {
-    expect(() => halfWidthQuantile(10, 95)).toThrow(/strictly inside \(0, 1\)/);
+    expect(published).toBeGreaterThan(normalQuantile(0.975));
+    expect(published - normalQuantile(0.975)).toBeGreaterThan(0.09);
   });
 });
 

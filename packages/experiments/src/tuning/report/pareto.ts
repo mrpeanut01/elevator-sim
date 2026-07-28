@@ -501,6 +501,24 @@ export function compareObjectives(
  * unplaceable and emptied the front — measured as `front: []` over three candidates, with no error
  * anywhere. Placeability is decided from a candidate's **own** point; see
  * {@link ParetoEntry.indeterminate}.
+ *
+ * ## Widening an interval is **not** one-way here
+ *
+ * It is tempting to argue that a wider interval can only ever weaken a claim — an interval that
+ * excluded zero may stop excluding it, never the reverse. That is true of a single comparison and
+ * **false of this function.** `'dominates'` requires `better > 0 && worse === 0`, so a widening
+ * that turns a `WORSE` axis into `INDISTINGUISHABLE` moves a pair from `'mutually-non-dominated'`
+ * to `'dominates'` — a strictly *stronger* claim, and one that drops the rival off the front.
+ * {@link isIndistinguishable} has the same shape, as does any criterion phrased "must not be
+ * significantly worse".
+ *
+ * So a change to the quantile family, the confidence level or `maxInvalidFraction` has to be
+ * checked against the fronts it produces rather than waved through as conservative. Measured for
+ * the Student-t change of 2026-07 (review finding #14): no verdict on any published front moves.
+ * Every fixture front in this module's suites runs at `n ≤ 24`, where the published interval was
+ * already `t`; the one front built from real runs — the holdout round on Garden Apartments — was
+ * re-measured at both `n = 24` and `n = 60`, and each of its 12 (candidate, role, objective)
+ * verdicts is the same under `z` and under `t`. See T2-BLAST-RADIUS.md § 1.
  */
 export function dominanceOf(comparisons: readonly ObjectiveComparison[]): DominanceVerdict {
   if (comparisons.length === 0) return 'indeterminate';

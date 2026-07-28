@@ -36,7 +36,7 @@
  * |---|---|---|---|---|
  * | 1 % | 0.00 | **0.00** | yes | `0.0000 [0.0000, 0.0000]` — 60/60 bit-identical |
  * | 2 % | 0.55 | **0.00** | no — the control saturates 1/60 | (suppressed) |
- * | 3 % | 2.77 | **0.00** | yes | `−0.52 [−1.03, −0.01]` |
+ * | 3 % | 2.77 | **0.00** | yes | `−0.52 [−1.04, +0.00]` — INDISTINGUISHABLE at n = 60 |
  * | 4 % | 6.07 | **0.00** | no — the control saturates 2/60 | (suppressed) |
  * | 8 % | 19.27 | 0.15 | no — 56/60 replications diverge | (suppressed) |
  * | 16 % | 40.98 | 1.18 | no — 60/60 diverge | (suppressed) |
@@ -51,8 +51,13 @@
  * tail terms in `tailStudy.ts`: **the regime where the mechanism works is past the regime where any
  * result may be reported.**
  *
- * **2. Reassignment as a whole is worth `−0.52 s [−1.03, −0.01]` of AWT at 3 %**, the highest load
- * quotable on both arms — and none of that is the load-crossing trigger. Counted through the shipped
+ * **2. Reassignment as a whole moves AWT by `−0.52 s [−1.04, +0.00]` at 3 %**, the highest load
+ * quotable on both arms — an **unresolved** effect at n = 60, not a gain: the paired-t interval
+ * contains zero by 0.0002 s, so the sign is stable and the significance is not. (It read
+ * `[−1.03, −0.01]` while published intervals used a normal quantile past n = 25; review finding
+ * #14 put them back on Student-t and the upper bound crossed zero. n = 60 is the study's budget
+ * because the control saturates immediately above this load, so more replications are not
+ * available here as a remedy.) Whatever it is worth, none of it is the load-crossing trigger. Counted through the shipped
  * engine at that load, the treatment arm swaps a call from one car to another **0.017 times per run**
  * and widens an already-assigned landing across a second car under `split-demand` **0.367 times per
  * run**; the control does neither, because `never` short-circuits the gate before scoring. So the

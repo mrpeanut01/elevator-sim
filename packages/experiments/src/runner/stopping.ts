@@ -17,6 +17,16 @@
  * into "run more replications", and it is inseparable from the batching, the minimum replication
  * count and the reproducibility argument that live next door.
  *
+ * **The shipped rule does not use the doc's crossover.** `validation/harness.ts`'s
+ * `productionStoppingRule` injects `reports/statistics`'s `estimateMean`, which is Student-t at
+ * `n - 1` at every `n`, so the half-width this rule compares against `acceptableRange` is the same
+ * number the report will print. A `z` above n = 25 is 2–5 % narrower and would stop *earlier* than
+ * the published interval justifies — the direction the last paragraph of {@link HalfWidthEstimate}
+ * warns about. § Part 3's four-line rule therefore needs correcting to `t[n-1]` at every `n`; the
+ * quantile chooser that implemented it is deleted (DECISIONS.md § D7). What survives here is the
+ * *port*: this module still adapts any estimator, and `fixtures.test-helper.ts`'s `docHalfWidth`
+ * double deliberately uses the doc's crossover family to prove that.
+ *
  * So this module owns the comparison and injects the arithmetic. {@link halfWidthStoppingRule}
  * adapts any half-width estimator into a {@link StoppingRule}:
  *
@@ -50,7 +60,11 @@ export interface HalfWidthEstimate {
   readonly n?: number | undefined;
   readonly mean?: number | undefined;
   readonly stdDev?: number | undefined;
-  /** `'t'` for `n ≤ 25`, `'z'` beyond it, or whatever the estimator calls it. */
+  /**
+   * Whatever the estimator calls its quantile family. `'t'` from the shipped estimator, at every
+   * `n`; the `docHalfWidth` double says `'z'` past 25, which is how the runner's tests prove this
+   * field is recorded verbatim rather than re-derived.
+   */
   readonly distribution?: string | undefined;
 }
 

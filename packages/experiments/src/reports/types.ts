@@ -412,15 +412,27 @@ export interface MetricSpec {
  * Interval estimates
  * -------------------------------------------------------------------------- */
 
-/** Which quantile family produced an interval's half-width. */
+/**
+ * Which quantile family produced an interval's half-width.
+ *
+ * **Nothing in this package produces `'z'` any more.** Every estimator here is Student-t at
+ * `n - 1`, at every `n` — on the published path and in the sequential stopping rule alike (see
+ * `statistics.ts` § "One quantile" and DECISIONS.md § D7). `'z'` is retained in the union for two
+ * reasons: a *stored* `RunSet` written before 2026-07 carries `method: 'z'` and must still parse
+ * and replay, and `formatMeanEstimate` keeps a `normal(z)` arm so that a hand-built or future
+ * normal-approximation estimate announces itself instead of hiding behind a `t`-shaped label.
+ * Narrowing this to `'t'` would break the first and silence the second.
+ */
 export type IntervalMethod = 't' | 'z';
 
 /**
  * A mean and the interval around it, never one without the other.
  *
- * docs/03-traffic-and-statistics.md § "Sequential stopping rule" prescribes the method: the
- * t-distribution for `n <= 25`, the normal approximation above it. Both are recorded on the
- * estimate ({@link method}, {@link degreesOfFreedom}) so a half-width can be re-derived by hand.
+ * docs/03-traffic-and-statistics.md § Part 4, "Use a paired-t interval", prescribes the method:
+ * Student-t at `n - 1` degrees of freedom, with no `n` in the choice of family. Both are recorded
+ * on the estimate ({@link method}, {@link degreesOfFreedom}) so a half-width can be re-derived by
+ * hand. § Part 3's `n > 25` normal approximation is **not** what any estimator in this package
+ * uses; conflating the two was review finding #14.
  *
  * Also from that section, and the reason AWT is treated as normal at all: Peters & Abbi rejected
  * Cox's lognormal interval because at 1000 runs it put a 5 s mean between 0.7 s and 36.1 s. The
@@ -437,7 +449,7 @@ export interface MeanEstimate {
   /** Two-sided confidence level as a fraction, e.g. `0.95`. */
   readonly confidence: number;
   readonly method: IntervalMethod;
-  /** `n - 1`, or `NaN` for the normal approximation. */
+  /** `n - 1`. `NaN` only for `n < 2`, or on a stored estimate that predates the t-always fix. */
   readonly degreesOfFreedom: number;
   /** `quantile * standardError`. `NaN` for `n < 2`: one run has no measurable spread. */
   readonly halfWidth: number;

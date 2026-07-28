@@ -89,16 +89,19 @@
  * stats — the interval arithmetic (`reports/statistics.ts`).
  *
  * Sample moments, the t and normal quantiles, and the paired difference interval.
- * docs/03-traffic-and-statistics.md § Part 3 chooses the quantile family by `n` — t at or below
- * 25, normal above it — and every estimate records which one it used. All pure functions: no RNG
- * (CLAUDE.md invariant 2), no clock (3), no mutation of an input.
+ * Every interval this package produces — published or consulted by the sequential stopping rule —
+ * is Student-t at `n - 1`, at every `n` (docs/03-traffic-and-statistics.md § Part 4), and every
+ * estimate records the family it used. There is no `n`-dependent crossover to a normal quantile
+ * any more; see `reports/statistics.ts` § "One quantile" and DECISIONS.md § D7. `normalQuantile`
+ * remains exported with **no production caller**, deliberately and for the two checkable reasons
+ * its own docstring gives: it is the reference `studentTQuantile` is validated against, and it pins
+ * the `Z_95` literal `benchmark/verdict.ts` hard-codes for replication planning.
+ * All pure functions: no RNG (CLAUDE.md invariant 2), no clock (3), no mutation of an input.
  * -------------------------------------------------------------------------- */
 
 export {
   DEFAULT_CONFIDENCE,
-  T_DISTRIBUTION_MAX_N,
   estimateMean,
-  halfWidthQuantile,
   meanOf,
   normalQuantile,
   pairedDifferenceEstimate,
