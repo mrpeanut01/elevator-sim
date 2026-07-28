@@ -25,22 +25,36 @@
  * capacity, no negative wait — hold anyway. A saturated run is a legitimate measurement of an
  * overloaded building; it is never a licence to lose a passenger.
  *
- * ## Two cases are unreachable, and are recorded as unreachable
+ * ## The two service-mode cases are now reachable, and are covered in both arms
  *
- * "All cars out of service" and "mid-run mode changes" cannot be produced by any authorable
- * configuration: `carConfigSchema` has no service-mode field, `Simulation` keeps `#carsById`
- * private, and nothing schedules a mode change. `validation/serviceMode.ts` states the gap in
- * full. What is done here is the reachable half — the dispatcher's view of an out-of-service car,
- * injected through `SimulationConfig.createPolicy`, which reaches `INELIGIBILITY_REASONS`'
- * `serviceMode` through the shipped eligibility stage in a real run — plus a **skipped, documented
- * test** naming the `core` change that would make the physical half reachable. There is no test
- * here that appears to cover the physical half.
+ * "All cars out of service" and "mid-run mode changes" used to be unauthorable, and this file
+ * used to carry a skipped test naming the `core` change that would fix it. That change landed:
+ * `carConfigSchema.mode` and `BuildingConfig.serviceEvents` are authored data, resolved by
+ * `resolveBuilding` into `CarInit.mode` and a kernel-scheduled `Car.setMode`. The skipped test is
+ * now a real one.
+ *
+ * The old `Proxy` is kept, and not out of sentiment. It is the **dispatcher-view control arm**:
+ * it changes what the group controller believes about a car without changing what the car is, and
+ * the difference between the two arms turns out to be a measurable property of the simulator
+ * rather than an artefact of the instrument —
+ *
+ * > with a *dispatcher-blinded* fleet the group allocates nothing and **people still board**,
+ * > because `#loadWhileIdle` opens a car already standing at an occupied landing without asking
+ * > the dispatcher; with a *physically recalled* fleet the group allocates nothing and **nobody
+ * > boards**, because `#carCanCarry` refuses the car.
+ *
+ * So `legsBoarded === 0` is false of one arm and true of the other, from the same reason code and
+ * the same zero allocations. Both are asserted, on one building at one seed, in
+ * "the two arms differ in exactly one place" below. `validation/serviceMode.ts` carries the
+ * row-by-row table.
  */
 
 import {
   runSimulation,
   type DispatcherProfile,
   type LoadedConfig,
+  type ServiceEventConfig,
+  type ServiceMode,
   type SimulationConfig,
   type SimulationResult,
 } from '@elevator-sim/core';
@@ -49,7 +63,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { checkAll } from '../fuzz/properties.js';
 import { PROPERTY_BOUNDS, type FuzzCase, type Violation } from '../fuzz/types.js';
 import { withCallType } from '../fuzz/run.js';
-import { seenAsMode } from './serviceMode.js';
+import { seenAsMode, watchDispatch } from './serviceMode.js';
 import { syntheticBuilding } from './syntheticBuilding.js';
 import { loadResources } from './harness.js';
 
@@ -488,28 +502,325 @@ describe('service mode', () => {
     expect(outcome.result.conservation.balanced).toBe(true);
   }, 300_000);
 
+});
+
+/* -------------------------------------------------------------------------- *
+ * 5b and 6b. Service mode — the physical half, from an authored configuration
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The fixture for the physical arm: one bank, **two** cars, three occupied floors.
+ *
+ * Two cars rather than one because the load-bearing claim is that a recalled car's committed hall
+ * calls are handed *back to the group*, and a group of one has nowhere to hand them. Synthetic
+ * rather than a shipped building because putting a `mode` or a `serviceEvents` entry into
+ * `data/buildings/*.json` would move every published pin in `benchmark/published.ts` for a
+ * demonstration a fixture makes just as well — and because `syntheticBuilding` goes through
+ * `parseBuilding`/`resolveBuilding`, which is the exact path `loadConfig` takes, so nothing here
+ * is reachable that `data/` could not also contain.
+ */
+function serviceFixture(
+  id: string,
+  options: {
+    readonly carModes?: Readonly<Record<string, ServiceMode>>;
+    readonly serviceEvents?: readonly ServiceEventConfig[];
+  } = {},
+): SimulationConfig['building'] {
+  return syntheticBuilding(
+    {
+      id,
+      floors: 3,
+      carsPerBank: 2,
+      banks: 1,
+      populationPerFloor: 90,
+      type: 'residential',
+      trafficProfile: 'residential',
+      ...(options.carModes === undefined ? {} : { carModes: options.carModes }),
+      ...(options.serviceEvents === undefined ? {} : { serviceEvents: options.serviceEvents }),
+    },
+    config.elevatorSpecs,
+    config.trafficProfiles.profiles.map((entry) => entry.id),
+  );
+}
+
+/** Authored car ids, which is what a `serviceEvents` entry names. */
+const AUTHORED_A = '1-1';
+const AUTHORED_B = '1-2';
+
+/**
+ * The ids the *dispatcher* uses, derived rather than written out.
+ *
+ * `Simulation` namespaces a car by its bank — `` `${bankId}-${spec.id}` `` — so the authored
+ * `"1-1"` of bank `"bank-1"` is `"bank-1-1-1"` at run time, which is exactly the kind of string
+ * nobody should hand-write into an assertion. Derived from the building the test just built, so a
+ * change to either naming convention fails on the *behaviour* rather than on a stale literal.
+ */
+function runtimeCarIds(building: SimulationConfig['building']): { a: string; b: string } {
+  const bank = building.banks[0];
+  if (bank === undefined) throw new Error('the service fixture has no bank');
+  const find = (authored: string): string => {
+    const car = bank.cars.find((entry) => entry.id === authored);
+    if (car === undefined) throw new Error(`the service fixture has no car "${authored}"`);
+    return `${bank.id}-${car.id}`;
+  };
+  return { a: find(AUTHORED_A), b: find(AUTHORED_B) };
+}
+
+const RECALL_AT = 300;
+const RETURN_AT = 600;
+
+/**
+ * The corner's run parameters, identical across every arm below so the arms are comparable.
+ *
+ * 1800 s because {@link runCorner} drives every corner from `constant-iso`, which discards its
+ * first 15 minutes and last 5 and therefore has no measurement window at all below 20 minutes.
+ * It refuses rather than trimming, which is the correct refusal and is why this is stated here
+ * rather than discovered.
+ */
+const SERVICE_RUN = {
+  seed: 20260728,
+  durationS: 1800,
+  arrivalRatePctPop5min: 20,
+  drainGraceS: 600,
+} as const;
+
+describe('service mode, physically — a car the group does not merely disbelieve in', () => {
   /**
-   * **UNREACHABLE — recorded rather than faked.**
+   * The test that used to be skipped, and the three claims its own docstring promised.
    *
-   * This is the physical half of the two service-mode cases, and it is skipped because no
-   * configuration, and no injection seam this repository exposes, can produce it. Enabling it
-   * needs a `core` change, named here so the test is a request rather than a lament:
+   * A car is recalled at `RECALL_AT` and returned at `RETURN_AT` by an authored `serviceEvents`
+   * schedule. The claims are that the recalled car **releases its committed hall calls**, that
+   * those calls are **re-offered to the rest of the group** and land on the other car, and that
+   * the car **picks work up again** when it comes back.
    *
-   * 1. **`mode` on `carConfigSchema`** (`core/src/config/schema.ts`), carried through
-   *    `ResolvedCar` and passed as `CarInit.mode` where `Simulation` builds its cars. That alone
-   *    makes "all cars out of service" authorable, and makes `INELIGIBILITY_REASONS.serviceMode`
-   *    reachable from `data/` rather than only from a test proxy.
-   * 2. **A schedule for changing it** — either an authored `serviceEvents: [{ atS, carId, mode }]`
-   *    on the building, or a `SimulationConfig.serviceSchedule` hook alongside `createPolicy`.
-   *    `Car.setMode` already exists and already releases the work the new mode cannot do; what is
-   *    missing is only something that calls it at a simulated time.
+   * Every measurement is taken through `createPolicy` — the documented instrumentation seam —
+   * because none of the three is readable off a `SimulationResult`: the record says which car
+   * carried a leg, not which decisions the controller was asked for.
    *
-   * With either in place, this test asserts what the injected version cannot: that a recalled car
-   * **releases its committed hall calls**, that those calls are re-offered to the rest of the
-   * group, and that a car returning to service picks up work again.
+   * **The control is in the same test, and it is what makes this not vacuous.** The identical
+   * building at the identical seed *without* the schedule is run alongside, and the assertions
+   * are stated as differences against it: the control keeps allocating to the recalled car after
+   * `RECALL_AT` and refuses nobody for `serviceMode`. Written as bare assertions on the scheduled
+   * run alone, every claim below could be satisfied by a run in which the group simply happened to
+   * prefer the other car.
    */
-  it.skip('releases committed hall calls when a car is physically taken out of service — needs carConfigSchema.mode and a serviceEvents schedule in core', () => {
-    /* Intentionally empty. See the docstring above: writing a body against the injection seam
-       would produce a green test that does not test what its name says. */
-  });
+  it('releases committed hall calls when a car is physically taken out of service, re-offers them, and takes it back', () => {
+    const building = serviceFixture('adversarial-recall', {
+      serviceEvents: [
+        { atS: RECALL_AT, carId: AUTHORED_A, mode: 'out-of-service' },
+        { atS: RETURN_AT, carId: AUTHORED_A, mode: 'in-service' },
+      ],
+    });
+    const { a: CAR_A, b: CAR_B } = runtimeCarIds(building);
+    const seen = watchDispatch();
+    const scheduled = runCorner({
+      ...SERVICE_RUN,
+      id: 'adversarial/physical-recall',
+      building,
+      dispatcherProfile: profile('collective'),
+      createPolicy: seen.createPolicy,
+    });
+
+    const control = watchDispatch();
+    runCorner({
+      ...SERVICE_RUN,
+      id: 'adversarial/physical-recall-control',
+      building: serviceFixture('adversarial-recall-control'),
+      dispatcherProfile: profile('collective'),
+      createPolicy: control.createPolicy,
+    });
+
+    const before = seen.allocations.filter((entry) => entry.at < RECALL_AT);
+    const during = seen.allocations.filter((entry) => entry.at > RECALL_AT && entry.at < RETURN_AT);
+    const after = seen.allocations.filter((entry) => entry.at >= RETURN_AT);
+
+    /* Which calls car A was still holding when the recall fired, rebuilt from the allocation
+       stream: a call leaves A the moment a later decision names somebody else. `#completeCall`
+       is invisible from out here, so this is an *upper* bound on what A held — the safe direction,
+       because the assertion below is that the re-offer covers some of them. */
+    const heldByA = new Set<string>();
+    for (const entry of before) {
+      if (entry.carIds.includes(CAR_A)) heldByA.add(entry.callId);
+      else heldByA.delete(entry.callId);
+    }
+
+    /* The premise: A really was working before the recall. */
+    expect(before.length).toBeGreaterThan(0);
+    expect(heldByA.size).toBeGreaterThan(0);
+
+    /* **Claim 1 — the release, at the instant itself.** `#onServiceChange` re-offers every
+       released call and dispatches the bank at the event's own simulated time, so the group is
+       asked about exactly those call ids at exactly `RECALL_AT`. Asserting the instant is what
+       makes this the recall rather than a coincidence: a call id is `bank#floor:direction` and
+       recurs every time that landing fills again. */
+    const askedAtTheRecall = seen.decisions.filter(
+      (entry) => entry.at === RECALL_AT && heldByA.has(entry.callId),
+    );
+    expect(askedAtTheRecall.length).toBeGreaterThan(0);
+
+    /* **Claim 2 — the re-offer, and where it lands.** A `register` carrying a `registeredAt`
+       older than the newest instant the group has been asked about cannot be a first
+       registration: the button has been lit since the original press and nobody re-pressed it,
+       which is why `#reofferCall` keeps the original time. */
+    expect(seen.reoffers.length).toBeGreaterThan(0);
+    expect(seen.reoffers.some((entry) => heldByA.has(entry.callId))).toBe(true);
+    const rehomed = [...heldByA].filter((callId) => {
+      const first = seen.allocations.find(
+        (entry) => entry.at >= RECALL_AT && entry.callId === callId && entry.carIds.length > 0,
+      );
+      return first !== undefined && first.carIds.includes(CAR_B);
+    });
+    expect(rehomed.length).toBeGreaterThan(0);
+
+    /* And the group never names A again while it is out. `Car.assignHallCall` throws rather than
+       accepting one, so a single A here would be a crashed run rather than a soft failure. */
+    for (const entry of during) expect(entry.carIds).not.toContain(CAR_A);
+    expect(seen.refusals.get('serviceMode') ?? 0).toBeGreaterThan(0);
+
+    /* **Claim 3 — it comes back.** No special handling exists for a returning car and none is
+       needed: `serviceMode` is deliberately absent from `STRUCTURAL_INELIGIBILITY`, so calls no
+       car could take stayed retry-able and the pending dispatch tick finds A the moment it is
+       back. Boardings, not merely allocations — the car has to actually carry somebody. */
+    const allocatedToAAfterReturn = after.filter((entry) => entry.carIds.includes(CAR_A));
+    const carriedByAAfterReturn = scheduled.result.record.passengers.filter(
+      (leg) => leg.carId === CAR_A && leg.boardedAt !== undefined && leg.boardedAt >= RETURN_AT,
+    );
+    expect(allocatedToAAfterReturn.length).toBeGreaterThan(0);
+    expect(carriedByAAfterReturn.length).toBeGreaterThan(0);
+
+    /* ---- the control: none of the above is true of a fleet that is in service ---- */
+    const controlAfterRecall = control.allocations.filter((entry) => entry.at >= RECALL_AT);
+    const controlToA = controlAfterRecall.filter((entry) => entry.carIds.includes(CAR_A));
+
+    console.log(
+      `[adversarial] physical recall: allocations before=${String(before.length)}, ` +
+        `during the recall=${String(during.length)} (to A: 0 by assertion), after the return=${String(after.length)}, ` +
+        `calls held by A at the recall=${String(heldByA.size)}, re-decided at the instant=${String(askedAtTheRecall.length)}, ` +
+        `re-homed to B=${String(rehomed.length)}, re-offers=${String(seen.reoffers.length)}, ` +
+        `serviceMode refusals=${String(seen.refusals.get('serviceMode') ?? 0)}, ` +
+        `legs carried by A after the return=${String(carriedByAAfterReturn.length)} | ` +
+        `control: allocations after ${String(RECALL_AT)} s=${String(controlAfterRecall.length)}, of them to A=${String(controlToA.length)}, ` +
+        `serviceMode refusals=${String(control.refusals.get('serviceMode') ?? 0)}, re-offers=${String(control.reoffers.length)}`,
+    );
+
+    /* The same building at the same seed with the schedule removed keeps using A right through
+       the window in which the scheduled run refuses to, and never reaches the reason code. Every
+       assertion above is therefore about the schedule and not about this dispatcher's taste in
+       cars.
+       Re-offers are deliberately *not* asserted to be zero in the control: `#reofferCall` is also
+       the path a car that filled up and left people behind uses, so a healthy run legitimately
+       produces some. What the control pins is that none of them is a `serviceMode` release. */
+    expect(controlToA.length).toBeGreaterThan(0);
+    expect(control.refusals.get('serviceMode') ?? 0).toBe(0);
+
+    /* And the books balance across a mid-run recall, which is the claim that outlives the rest. */
+    expect(scheduled.result.conservation.balanced).toBe(true);
+    expectNoViolations('physical recall', scheduled);
+  }, 300_000);
+
+  /**
+   * The whole fleet, physically withdrawn from t=0 — the corner the fuzz generator deliberately
+   * cannot reach (`fuzz/generate.ts` § "Service mode is generated") because P5 legitimately fires
+   * on it. Here that is the assertion rather than a problem: `termination` must fire, and must be
+   * the only one that does.
+   */
+  it('boards nobody at all when every car is authored out of service, and loses nobody either', () => {
+    const seen = watchDispatch();
+    const outcome = runCorner({
+      ...SERVICE_RUN,
+      id: 'adversarial/all-cars-physically-out-of-service',
+      building: serviceFixture('adversarial-all-out', {
+        carModes: { [AUTHORED_A]: 'out-of-service', [AUTHORED_B]: 'out-of-service' },
+      }),
+      dispatcherProfile: profile('collective'),
+      createPolicy: seen.createPolicy,
+    });
+    const audit = outcome.result.conservation;
+    console.log(
+      `${describeOutcome('all cars physically out of service', outcome)}, ` +
+        `serviceMode refusals=${String(seen.refusals.get('serviceMode') ?? 0)}, ` +
+        `allocations=${String(seen.allocations.length)}, ` +
+        `boarded=${String(audit.legsBoarded)}/${String(audit.legsCreated)}`,
+    );
+
+    /* The reason code, reached through the shipped eligibility stage from nothing but a config. */
+    expect(seen.refusals.get('serviceMode') ?? 0).toBeGreaterThan(0);
+    expect(seen.allocations).toHaveLength(0);
+    expect(outcome.result.trace.passengerCount).toBeGreaterThan(0);
+
+    /* **And nobody boards.** This is the assertion the dispatcher-view arm cannot make and must
+       not make: there the cars are physically in service and `#loadWhileIdle` keeps collecting
+       people from an occupied landing. Here `#carCanCarry` refuses, which is not cosmetic —
+       `Car.board` registers a car call and `registerCarCall` throws for a mode that does not
+       honour one, so without that clause this configuration would crash the run outright. */
+    expect(audit.legsBoarded).toBe(0);
+
+    /* Nobody is lost even so: every generated journey is a named undelivered one. */
+    expect(audit.balanced).toBe(true);
+    expect(outcome.result.undelivered).toHaveLength(audit.generated);
+    expect(outcome.result.status).toBe('timed-out');
+
+    /* And the campaign's own deadlock detector agrees, which is the cross-check that the corner
+       is real: a fleet that sits while a servable passenger waits *is* a deadlock, and it must be
+       the only property that fires — nobody lost, nobody misdelivered, nothing overfilled, no
+       negative time. */
+    expect(outcome.violations.map((violation) => violation.property)).toEqual(['termination']);
+  }, 300_000);
+
+  /**
+   * **The two arms, side by side.** One building, one seed, one dispatcher; the only difference
+   * is whether the fleet is withdrawn from the dispatcher's *view* or from the *building*.
+   *
+   * The pin: both arms allocate exactly nothing, and they disagree about boarding. That
+   * disagreement is a real property of the simulator — `#loadWhileIdle` deliberately does not
+   * consult the dispatcher — and pinning it here means a change that made it consult the
+   * dispatcher would fail this test rather than quietly making the two arms identical and every
+   * "out of service" assertion in this file interchangeable.
+   */
+  it('differ in exactly one place: the blinded fleet still boards, the recalled fleet cannot', () => {
+    const blinded = seenAsMode('out-of-service', 0);
+    const armA = runCorner({
+      ...SERVICE_RUN,
+      id: 'adversarial/arm-a-dispatcher-blinded',
+      building: serviceFixture('adversarial-arm-a'),
+      dispatcherProfile: profile('collective'),
+      createPolicy: blinded.createPolicy,
+    });
+
+    const recalled = watchDispatch();
+    const armB = runCorner({
+      ...SERVICE_RUN,
+      id: 'adversarial/arm-b-physically-recalled',
+      building: serviceFixture('adversarial-arm-b', {
+        carModes: { [AUTHORED_A]: 'out-of-service', [AUTHORED_B]: 'out-of-service' },
+      }),
+      dispatcherProfile: profile('collective'),
+      createPolicy: recalled.createPolicy,
+    });
+
+    console.log(
+      `[adversarial] arm A (dispatcher-blinded): rewrites=${String(blinded.rewrites)}, ` +
+        `allocations=${String(blinded.allocations)}, legsBoarded=${String(armA.result.conservation.legsBoarded)}, ` +
+        `delivered=${String(armA.result.conservation.delivered)}/${String(armA.result.conservation.generated)} | ` +
+        `arm B (physically recalled): allocations=${String(recalled.allocations.length)}, ` +
+        `legsBoarded=${String(armB.result.conservation.legsBoarded)}, ` +
+        `delivered=${String(armB.result.conservation.delivered)}/${String(armB.result.conservation.generated)}`,
+    );
+
+    /* Both injections actually fired, so neither zero below is a silent no-op. */
+    expect(blinded.rewrites).toBeGreaterThan(0);
+    expect(recalled.decisions.length).toBeGreaterThan(0);
+
+    /* The half they agree on: the group controller allocated nothing, in either arm. */
+    expect(blinded.allocations).toBe(0);
+    expect(recalled.allocations).toHaveLength(0);
+
+    /* The half they do not, and the reason the `Proxy` is kept rather than deleted. */
+    expect(armA.result.conservation.legsBoarded).toBeGreaterThan(0);
+    expect(armB.result.conservation.legsBoarded).toBe(0);
+
+    /* Both are honest runs whatever else they are. */
+    expect(armA.result.conservation.balanced).toBe(true);
+    expect(armB.result.conservation.balanced).toBe(true);
+  }, 300_000);
 });

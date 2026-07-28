@@ -68,3 +68,66 @@ describe.skipIf(!deepCampaignRequested())('the deep campaign', () => {
     expect(campaign.stats.generatedPassengers).toBeGreaterThan(cases * 20);
   }, 3_600_000);
 });
+
+/* -------------------------------------------------------------------------- *
+ * An open counterexample, named rather than filtered out
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **OPEN FINDING — the deep campaign is red on this, deliberately.**
+ *
+ * Widening the generator to emit service modes turned up one counterexample in 2 000 deep cases,
+ * and it is **not** a service-mode bug. Reproduce the parent with
+ * `caseFromSeed(1001074, generateOptionsFrom(config, DEEP_SPACE))`:
+ *
+ * ```
+ * case      fuzz-1001074      simSeed 2110294577
+ * topology  single-bank       tags: basement, mixed-use, initial-service-mode
+ * dispatch  auction-multi-round / mobile-credential
+ * demand    6.1 %pop/5min over 1433 s, drain 1800 s
+ * service   initial: main/main-2 = independent      schedule: none
+ * status    completed, 177 passengers
+ * violations
+ *   [starvation] leg "p106" (13 to G) waited 922.7 s, past the 900 s bound,
+ *                in a run reporting saturation verdict "stable" with a valid AWT
+ *   [starvation] leg "p107" (13 to G) waited 922.7 s, …
+ * ```
+ *
+ * The service mode is only how the campaign *reached* it. `main-2` is `independent`, so the
+ * fourteen-floor building is served by one car for hall calls — and **the shrinker removed the
+ * mode**, reducing in five steps to an eleven-floor, genuinely single-car building with the whole
+ * fleet in service, which reproduces both violations exactly. Nothing about the counterexample
+ * requires `CarConfig.mode` to exist; the old corpus simply never drew a building of that shape
+ * at that rate.
+ *
+ * ## What actually disagrees
+ *
+ * Two definitions, both defensible, and the run satisfies one:
+ *
+ * - `metrics/summarize.ts` calls the run **`stable`**, and by its own definition it is right: the
+ *   verdict is a regression on queue length over the report window, and this queue does not
+ *   *diverge* — it spikes under a transient overload the single car cannot absorb, and then
+ *   clears. The run `completed`; nobody is undelivered.
+ * - `properties.ts` `checkStarvation` calls it **starvation**, and by `CLAUDE.md`'s discipline it
+ *   is also right: the run publishes an AWT while two people waited 15.4 minutes, which is the
+ *   "statistics improve as the bug gets worse" failure the whole track exists to catch.
+ *
+ * So "the queue is not diverging" and "nobody was abandoned" are being treated as one claim and
+ * are two. The resolution belongs in `core/src/metrics/summarize.ts` — a run that produced a
+ * quarter-hour wait should say so in its own verdict, whether or not its queue diverges — and
+ * that file is **not owned by this package**. **HANDBACK.**
+ *
+ * `PROPERTY_BOUNDS.starvationBoundS` is deliberately **not** moved. 900 s is two orders of
+ * magnitude past the 10–30 s AWT the shipped buildings run at; raising it to make this case pass
+ * is exactly the move this track exists to prevent, and the generator is not narrowed to avoid
+ * the case either.
+ */
+describe('deep campaign counterexample fuzz-1001074 (starvation vs. a "stable" verdict)', () => {
+  it.skip('a run that starves a passenger for 922.7 s should not report a quotable AWT — needs a resolution in core/src/metrics/summarize.ts', () => {
+    /* Intentionally empty. The reproduction is the seed in the docstring above, and the assertion
+       that would go here is one this package cannot make true: either `summarize.ts` widens what
+       it is willing to call unquotable, or the project accepts that a transient single-car
+       overload is a legitimate `stable` run with a legitimate 15-minute wait — and if it is the
+       second, that decision belongs beside `SaturationThresholds`, not in a fuzz bound. */
+  });
+});

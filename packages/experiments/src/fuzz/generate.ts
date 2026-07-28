@@ -21,6 +21,26 @@
  * moves. With separate streams, `caseFromSeed(s)` is stable under local edits to this file in
  * a way one stream would not be, and there is no `Math.random()` anywhere in the directory.
  *
+ * The service-mode axis (below) is drawn from its own `fuzz.service` stream for exactly that
+ * reason and for one more: every building the corpus generated before that axis existed is
+ * **bit-identical** apart from the keys the axis adds, so the pinned coverage assertions in
+ * `generate.test.ts` — floor counts, topologies, entrance arrangements — did not have to move
+ * to accommodate a widening that has nothing to do with them.
+ *
+ * ## Service mode is generated, and the fleet is never wholly withdrawn
+ *
+ * `CarConfig.mode` and `BuildingConfig.serviceEvents` make "a car is out of service" and "a car
+ * changes mode mid-run" authorable, so both are generated here — see {@link generateService}.
+ * One rule is enforced by construction and is not a convenience: **every bank keeps at least one
+ * hall-call-accepting car at every instant of the run.** A bank with none is a bank whose
+ * landings nobody can collect, and `properties.ts` `isServable` reasons about topology and
+ * access credentials, not about service mode — so it would call those passengers servable and
+ * P5 would report a deadlock. That report would be correct (the property working), and it would
+ * also be a *generator* artefact rather than a simulator finding, which is the same mistake
+ * `unroutable` exists to keep out of the campaign. The corner itself is not lost: it is covered
+ * deliberately, with the expected `timed-out` status asserted, in
+ * `validation/adversarial.test.ts` and `core/src/sim/serviceMode.test.ts`.
+ *
  * ## Connectivity is a construction guarantee, not a filter
  *
  * `RoutePlanner.requireRoute` throws when no chain of banks connects two floors, which is
@@ -40,6 +60,8 @@ import {
   type ElevatorSpecs,
   type Rng,
   type ResolvedBuilding,
+  type ServiceEventConfig,
+  type ServiceMode,
   StreamSet,
 } from '@elevator-sim/core';
 
@@ -87,6 +109,16 @@ export interface FuzzSpace {
   readonly maxDurationS: number;
   readonly maxArrivalRatePctPop5min: number;
   readonly drainGraceS: number;
+  /**
+   * Probability that a bank of two or more cars starts the run with **one** of them in a
+   * degraded service mode.
+   *
+   * Per bank, not per building, so a shuttle layout is three independent draws. Never applied to
+   * a single-car bank: see {@link generateService} for why the fleet is never wholly withdrawn.
+   */
+  readonly initialServiceModeProbability: number;
+  /** Probability that a case carries a mid-run {@link ServiceEventConfig} schedule at all. */
+  readonly serviceScheduleProbability: number;
 }
 
 /** The always-on corpus space. Deliberately small; the cost is stated, never silently capped. */
@@ -99,6 +131,8 @@ export const STANDARD_SPACE: FuzzSpace = Object.freeze({
   maxDurationS: 900,
   maxArrivalRatePctPop5min: 30,
   drainGraceS: 900,
+  initialServiceModeProbability: 0.2,
+  serviceScheduleProbability: 0.25,
 });
 
 /** The opt-in campaign space: taller buildings, longer horizons, demand well past capacity. */
@@ -111,6 +145,10 @@ export const DEEP_SPACE: FuzzSpace = Object.freeze({
   maxDurationS: 1800,
   maxArrivalRatePctPop5min: 28,
   drainGraceS: 1800,
+  // Wider than the always-on corpus on the same axis rather than on a new one, which is the rule
+  // the whole deep space follows: a deep finding must shrink into the standard space when it can.
+  initialServiceModeProbability: 0.3,
+  serviceScheduleProbability: 0.4,
 });
 
 /** Everything the generator needs from the loaded reference data. Ids are data, never literals. */
@@ -367,6 +405,109 @@ function generateBanks(
 }
 
 /* -------------------------------------------------------------------------- *
+ * Service mode
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The three modes that are not `in-service`.
+ *
+ * All three are generated, not just `out-of-service`, because they are three different
+ * behaviours and only one of them is the obvious one. `acceptsHallCalls` is true for
+ * `in-service` alone, so all three take the car out of *group* control; but `acceptsCarCalls` is
+ * also true for `independent`, so an `independent` car still answers the buttons pressed inside
+ * it and finishes the journeys of whoever is already aboard, while an `out-of-service` or
+ * `fire-recall` car strands them. Generating only `out-of-service` would leave the branch that
+ * distinguishes them unvisited.
+ */
+const DEGRADED_MODES: readonly ServiceMode[] = Object.freeze([
+  'out-of-service',
+  'independent',
+  'fire-recall',
+]);
+
+/** `mode` per `bankId/carId`, plus the authored schedule. Both go straight into the config. */
+interface ServicePlan {
+  readonly modes: ReadonlyMap<string, ServiceMode>;
+  readonly events: readonly ServiceEventConfig[];
+  /** A car left its bank and came back. Tagged, because the return path is its own behaviour. */
+  readonly returns: boolean;
+}
+
+/**
+ * Draw an initial mode per car and a mid-run schedule, under one hard constraint.
+ *
+ * **Every bank holds at least one `in-service` car at every instant of the run**, and two clauses
+ * are what enforce it: an initial degradation is drawn only for a bank of two or more cars, and a
+ * scheduled withdrawal only for a bank that still has two *serving* cars once the initial draw is
+ * in. Both leave one behind. The module docstring gives the reason at length; the short form is
+ * that a bank with no serving car makes P5 fire on a passenger `properties.ts` believes is
+ * servable, and that verdict would be *correct* — which makes it a generator defect, not a
+ * simulator finding, and the campaign must not report it as one.
+ *
+ * Times are drawn as fractions of `durationS` rather than as absolute seconds, so a 360 s case
+ * and an 1800 s case both get a schedule that fires inside their own demand horizon. A withdrawal
+ * lands in the first half and a return, when there is one, strictly before the horizon ends —
+ * past it the entry is legal but the simulator refuses it with a warning
+ * (`sim/simulation.ts` `#scheduleServiceEvents`), which would silently make the case inert.
+ */
+function generateService(
+  rng: Rng,
+  space: FuzzSpace,
+  banks: readonly GeneratedBank[],
+  durationS: number,
+): ServicePlan {
+  const modes = new Map<string, ServiceMode>();
+  const events: ServiceEventConfig[] = [];
+
+  for (const bank of banks) {
+    if (bank.cars.length < 2) continue;
+    if (rng.nextFloat() >= space.initialServiceModeProbability) continue;
+    const car = pick(rng, bank.cars);
+    modes.set(`${bank.id}/${car.id}`, pick(rng, DEGRADED_MODES));
+  }
+
+  let returns = false;
+  if (rng.nextFloat() < space.serviceScheduleProbability) {
+    // A bank that would still be serving its landings with the car withdrawn: at least two cars
+    // currently `in-service`, so removing one leaves one.
+    const servingOf = (bank: GeneratedBank): readonly GeneratedCar[] =>
+      bank.cars.filter((car) => !modes.has(`${bank.id}/${car.id}`));
+    const eligible = banks.filter((bank) => servingOf(bank).length >= 2);
+    if (eligible.length > 0) {
+      const bank = pick(rng, eligible);
+      const car = pick(rng, servingOf(bank));
+      const outAt = Math.round(durationS * uniform(rng, 0.15, 0.5, 3));
+      events.push({
+        atS: outAt,
+        carId: car.id,
+        // Car ids are `<bankId>-<n>` and bank ids are distinct, so they are unique building-wide
+        // and `bankId` is genuinely optional here. Both forms are drawn: the resolver's
+        // unqualified lookup is a real path and an unfuzzed one is an untested one.
+        ...(rng.nextFloat() < 0.5 ? { bankId: bank.id } : {}),
+        mode: pick(rng, DEGRADED_MODES),
+      });
+      // Drawn, not implied. `outAt` is inside the first half and the gap is at most 35 % of the
+      // horizon, so a return would *always* fit — which would make "withdrawn for the rest of the
+      // run" unreachable and the `service-return` tag vacuous. The two are different runs: a car
+      // that comes back re-enters group control and the retry timer finds it, and a car that does
+      // not leaves its bank one car short to the end.
+      const backAt = Math.round(outAt + durationS * uniform(rng, 0.15, 0.35, 3));
+      if (rng.nextFloat() < 0.6 && backAt < durationS) {
+        returns = true;
+        events.push({
+          atS: backAt,
+          carId: car.id,
+          ...(rng.nextFloat() < 0.5 ? { bankId: bank.id } : {}),
+          mode: 'in-service',
+        });
+      }
+    }
+  }
+
+  return { modes, events, returns };
+}
+
+/* -------------------------------------------------------------------------- *
  * The case
  * -------------------------------------------------------------------------- */
 
@@ -397,6 +538,7 @@ export function caseFromSeed(fuzzSeed: number | bigint, options: GenerateOptions
   const carRng = streams.derive('fuzz.cars');
   const accessRng = streams.derive('fuzz.access');
   const runRng = streams.derive('fuzz.run');
+  const serviceRng = streams.derive('fuzz.service');
 
   const buildingType = pick(shape, ['office', 'residential', 'hotel', 'mixed-use'] as const);
   const trafficProfile = pick(shape, options.trafficProfileIds);
@@ -455,6 +597,22 @@ export function caseFromSeed(fuzzSeed: number | bigint, options: GenerateOptions
         ? 'up-down-buttons'
         : 'mobile-credential';
 
+  // Drawn here rather than inline in the returned object literal, in exactly the order they were
+  // drawn before this axis existed — `arrivalRatePctPop5min`, then `durationS`, then
+  // `doorObstructionProbability` — because the service schedule needs the horizon in hand and a
+  // reordered draw would move every case in the pinned corpus for no reason anybody could read.
+  const arrivalRatePctPop5min = uniform(runRng, 2, space.maxArrivalRatePctPop5min, 1);
+  const durationS = runRng.nextIntInclusive(
+    Math.max(space.minDurationS, minDurationFor(demandTemplate)),
+    Math.max(space.maxDurationS, minDurationFor(demandTemplate)),
+  );
+  // Zero most of the time, because a non-zero probability draws from the `doorObstruction`
+  // stream and the determinism tests rely on it being untouched at the default.
+  const doorObstructionProbability =
+    runRng.nextFloat() < 0.25 ? uniform(runRng, 0.05, 0.5, 2) : 0;
+
+  const service = generateService(serviceRng, space, banks, durationS);
+
   const authored = {
     id: `fuzz-${String(fuzzSeed)}`,
     name: `Fuzz building ${String(fuzzSeed)}`,
@@ -472,9 +630,15 @@ export function caseFromSeed(fuzzSeed: number | bigint, options: GenerateOptions
     banks: banks.map((bank) => ({
       id: bank.id,
       servesFloors: [...bank.servesFloors],
-      cars: bank.cars.map((car) => ({ ...car })),
+      cars: bank.cars.map((car) => {
+        const mode = service.modes.get(`${bank.id}/${car.id}`);
+        // Absent, not `'in-service'`: `CarConfig.mode` is optional and its absence means the
+        // default, so an unaffected car authors exactly the JSON it authored before.
+        return { ...car, ...(mode === undefined ? {} : { mode }) };
+      }),
     })),
     accessZones,
+    ...(service.events.length === 0 ? {} : { serviceEvents: [...service.events] }),
   };
 
   const tags: string[] = [topology];
@@ -485,6 +649,9 @@ export function caseFromSeed(fuzzSeed: number | bigint, options: GenerateOptions
   if (floors.some((floor) => floor.index < 0)) tags.push('basement');
   if (floors.filter((floor) => floor.isEntrance === true).length > 1) tags.push('two-entrances');
   if (buildingType === 'mixed-use') tags.push('mixed-use');
+  if (service.modes.size > 0) tags.push('initial-service-mode');
+  if (service.events.length > 0) tags.push('service-schedule');
+  if (service.returns) tags.push('service-return');
 
   return Object.freeze({
     caseId: `fuzz-${String(fuzzSeed)}`,
@@ -495,15 +662,10 @@ export function caseFromSeed(fuzzSeed: number | bigint, options: GenerateOptions
     building: parseBuilding(authored, `fuzz-${String(fuzzSeed)}.json`),
     dispatcherProfileId,
     callType,
-    arrivalRatePctPop5min: uniform(runRng, 2, space.maxArrivalRatePctPop5min, 1),
+    arrivalRatePctPop5min,
     demandTemplate,
-    durationS: runRng.nextIntInclusive(
-      Math.max(space.minDurationS, minDurationFor(demandTemplate)),
-      Math.max(space.maxDurationS, minDurationFor(demandTemplate)),
-    ),
-    // Zero most of the time, because a non-zero probability draws from the `doorObstruction`
-    // stream and the determinism tests rely on it being untouched at the default.
-    doorObstructionProbability: runRng.nextFloat() < 0.25 ? uniform(runRng, 0.05, 0.5, 2) : 0,
+    durationS,
+    doorObstructionProbability,
     drainGraceS: space.drainGraceS,
     tags: Object.freeze(tags),
   });

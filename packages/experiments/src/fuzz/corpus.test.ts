@@ -1,9 +1,12 @@
 /**
  * The always-on fuzz gate.
  *
- * Twenty-eight generated buildings, one replication each, all six properties checked on every
- * one. Pinned seeds rather than fresh ones, so this is a **regression** suite: the same
- * twenty-eight buildings on every machine forever, and a failure is a seed somebody can type.
+ * {@link STANDARD_CORPUS} generated buildings, one replication each, all six properties checked
+ * on every one. Pinned seeds rather than fresh ones, so this is a **regression** suite: the same
+ * buildings on every machine forever, and a failure is a seed somebody can type. (The count is
+ * `STANDARD_CORPUS.length` and is deliberately not written out here: it has been 28 and is now
+ * 64, and a number in prose that nothing executes is the one artefact in this repository that
+ * goes stale silently.)
  *
  * The cost is printed rather than assumed, because a fuzz track that quietly grows into a
  * ten-minute suite gets disabled and then protects nothing.

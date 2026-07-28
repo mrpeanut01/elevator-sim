@@ -13,9 +13,20 @@
  * `loadConfig` applies to `data/buildings/*.json`. `fuzz/generate.ts` states the reason and it is
  * worth repeating: a generator that emits configurations the loader would reject is testing the
  * validator, not the simulator. So the constructor here can produce nothing the repository could
- * not also have on disk — which is exactly what makes the *unreachable* cases in
- * `adversarial.test.ts` unreachable. A service mode cannot be set here because
- * `carConfigSchema` has no field for one, and this module is not permitted to route around that.
+ * not also have on disk — and, equally, it may produce anything that could be on disk.
+ *
+ * ## Service mode is now one of those things
+ *
+ * This module used to say a service mode "cannot be set here because `carConfigSchema` has no
+ * field for one", and to name that as what made two of `adversarial.test.ts`'s corners
+ * unreachable. `carConfigSchema.mode` and `BuildingConfig.serviceEvents` both exist now, so
+ * {@link SyntheticBuildingSpec.carModes} and {@link SyntheticBuildingSpec.serviceEvents} pass
+ * them straight through `parseBuilding` and the rule above is unchanged: what comes out is a
+ * config `loadConfig` would accept off disk, and nothing here routes around the schema.
+ *
+ * No shipped building was given a mode or a schedule to make that reachable, and none needed to
+ * be — every published pin in `benchmark/published.ts` is measured on `data/buildings/*.json`,
+ * and a fixture demonstrates the behaviour without moving any of them.
  *
  * ## Why not reuse `fuzz/generate.ts`
  *
@@ -32,6 +43,8 @@ import {
   type BuildingType,
   type ElevatorSpecs,
   type ResolvedBuilding,
+  type ServiceEventConfig,
+  type ServiceMode,
 } from '@elevator-sim/core';
 
 /** How to shape a synthetic building. Every field has an explicit default; nothing is random. */
@@ -51,6 +64,21 @@ export interface SyntheticBuildingSpec {
   readonly spec?: string;
   readonly type?: BuildingType;
   readonly trafficProfile?: string;
+  /**
+   * Initial `CarConfig.mode` per car id — `"<bank>-<car>"`, e.g. `"1-2"` for the second car of
+   * the first bank. A car not named here authors no `mode` key at all, which is not the same as
+   * authoring `"in-service"` only in that it is the JSON the building had before the field
+   * existed. Both resolve to `in-service`.
+   */
+  readonly carModes?: Readonly<Record<string, ServiceMode>>;
+  /**
+   * The building's `serviceEvents` schedule, in **authored order**, which is the order the
+   * kernel fires it in: entries are queued in array order and the kernel's total order is
+   * `(time, sequence)`, so two entries at the same `atS` fire in the order written here
+   * (CLAUDE.md invariant 4). Not sorted, for the reason `resolveBuilding` does not sort it —
+   * two ordering authorities is how one of them drifts.
+   */
+  readonly serviceEvents?: readonly ServiceEventConfig[];
 }
 
 /**
@@ -89,10 +117,11 @@ export function syntheticBuildingConfig(spec: SyntheticBuildingSpec): BuildingCo
       id: `bank-${String(bankIndex + 1)}`,
       name: `Bank ${String(bankIndex + 1)}`,
       servesFloors: ['G', ...slice.map((floor) => floor.id)],
-      cars: Array.from({ length: spec.carsPerBank }, (_ignored, carIndex) => ({
-        id: `${String(bankIndex + 1)}-${String(carIndex + 1)}`,
-        spec: elevatorSpec,
-      })),
+      cars: Array.from({ length: spec.carsPerBank }, (_ignored, carIndex) => {
+        const id = `${String(bankIndex + 1)}-${String(carIndex + 1)}`;
+        const mode = spec.carModes?.[id];
+        return { id, spec: elevatorSpec, ...(mode === undefined ? {} : { mode }) };
+      }),
     };
   }).filter((bank) => bank.servesFloors.length > 1);
 
@@ -109,6 +138,7 @@ export function syntheticBuildingConfig(spec: SyntheticBuildingSpec): BuildingCo
     totalPopulation: spec.floors * population,
     banks: bankConfigs,
     accessZones: [],
+    ...(spec.serviceEvents === undefined ? {} : { serviceEvents: spec.serviceEvents }),
   };
 
   return parseBuilding(config, `${spec.id}.synthetic.json`);

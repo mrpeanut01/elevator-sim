@@ -70,6 +70,18 @@ interface DraftBuilding {
   totalPopulation?: number;
   banks: { id: string; servesFloors: string[]; cars: Record<string, unknown>[] }[];
   accessZones: { id: string; floors: string[]; credentialGroups: string[] }[];
+  /**
+   * The authored service schedule, carried through every reduction.
+   *
+   * Carrying it is not optional and dropping it would be the quiet kind of wrong: a shrinker
+   * that silently removed the schedule would report a "minimal" counterexample that no longer
+   * contains the mid-run mode change the original was about, and the reduction step that did it
+   * would look exactly like a legitimate one because the candidate still fails — for a different
+   * reason. So it is carried, and {@link dropServiceEvent} removes entries **one at a time and
+   * on purpose**, so that "the schedule was not needed" is a measured reduction rather than an
+   * accident of the draft shape.
+   */
+  serviceEvents: { atS: number; carId: string; bankId?: string; mode: string }[];
 }
 
 function draftOf(fuzzCase: FuzzCase): DraftBuilding {
@@ -97,7 +109,71 @@ function draftOf(fuzzCase: FuzzCase): DraftBuilding {
       floors: [...zone.floors],
       credentialGroups: [...zone.credentialGroups],
     })),
+    serviceEvents: (building.serviceEvents ?? []).map((event) => ({
+      atS: event.atS,
+      carId: event.carId,
+      ...(event.bankId === undefined ? {} : { bankId: event.bankId }),
+      mode: event.mode,
+    })),
   };
+}
+
+/**
+ * Which cars a draft still declares, as the ids a `serviceEvents` entry may name.
+ *
+ * `bankId` is optional in the authored form and generated ids are unique building-wide, so an
+ * entry is matched the way `resolveBuilding` matches it: by car id, restricted to the named bank
+ * when there is one.
+ */
+function eventIsResolvable(draft: DraftBuilding, event: DraftBuilding['serviceEvents'][number]): boolean {
+  return draft.banks.some(
+    (bank) =>
+      (event.bankId === undefined || bank.id === event.bankId) &&
+      bank.cars.some((car) => car['id'] === event.carId),
+  );
+}
+
+/**
+ * Whether every bank of a draft keeps at least one hall-call-accepting car for the whole run.
+ *
+ * The same construction rule `generate.ts` enforces, re-checked here because a reducer can break
+ * it in a way the generator never would: dropping the *other* car of a two-car bank leaves the
+ * degraded one alone, and a bank with no serving car makes P5 fire on a passenger the property
+ * believes is servable. Under shrinking that failure would be indistinguishable from the one
+ * being reduced — same property, different cause — and the campaign would print a minimal
+ * counterexample that is a generator artefact. So such a candidate is discarded, exactly as a
+ * candidate that disconnects the bank graph is.
+ *
+ * `in-service` is the only mode `acceptsHallCalls` admits, and the schedule is replayed in
+ * authored order because that is the order the kernel fires it in (CLAUDE.md invariant 4).
+ */
+function everyBankAlwaysServes(draft: DraftBuilding): boolean {
+  const serving = new Map<string, Set<string>>();
+  for (const bank of draft.banks) {
+    serving.set(
+      bank.id,
+      new Set(
+        bank.cars
+          .filter((car) => (car['mode'] ?? 'in-service') === 'in-service')
+          .map((car) => String(car['id'])),
+      ),
+    );
+  }
+  const short = (): boolean => [...serving.values()].some((cars) => cars.size === 0);
+  if (short()) return false;
+
+  for (const event of draft.serviceEvents) {
+    for (const bank of draft.banks) {
+      if (event.bankId !== undefined && bank.id !== event.bankId) continue;
+      if (!bank.cars.some((car) => car['id'] === event.carId)) continue;
+      const cars = serving.get(bank.id);
+      if (cars === undefined) continue;
+      if (event.mode === 'in-service') cars.add(event.carId);
+      else cars.delete(event.carId);
+    }
+    if (short()) return false;
+  }
+  return true;
 }
 
 /**
@@ -120,6 +196,11 @@ function candidateFrom(
   if (!draft.floors.some((floor) => floor.population > 0)) return undefined;
   if (draft.banks.length === 0) return undefined;
   if (draft.banks.some((bank) => bank.servesFloors.length < 2 || bank.cars.length === 0)) return undefined;
+  // A schedule entry naming a car this draft no longer declares is a `ConfigError` from
+  // `resolveBuilding`, which would silently discard every candidate that dropped a scheduled car.
+  // Dropped with the car instead, the way `dropFloor` drops every reference to a floor.
+  draft.serviceEvents = draft.serviceEvents.filter((event) => eventIsResolvable(draft, event));
+  if (!everyBankAlwaysServes(draft)) return undefined;
   draft.totalPopulation = draft.floors.reduce((sum, floor) => sum + floor.population, 0);
 
   const caseId = `${parent.caseId}-s${String(step)}`;
@@ -222,11 +303,49 @@ const emptyFloor: Reducer = (fuzzCase) => {
   return drafts;
 };
 
+/** Drop one entry of the service schedule. "The recall was not needed" is a real reduction. */
+const dropServiceEvent: Reducer = (fuzzCase) => {
+  const drafts: DraftBuilding[] = [];
+  const events = fuzzCase.building.serviceEvents ?? [];
+  for (let i = 0; i < events.length; i += 1) {
+    const draft = draftOf(fuzzCase);
+    draft.serviceEvents.splice(i, 1);
+    drafts.push(draft);
+  }
+  return drafts;
+};
+
+/**
+ * Put one car that starts the run in a degraded mode back `in-service`.
+ *
+ * The counterpart of {@link dropServiceEvent} for the *initial* mode, and the reason both exist
+ * is the honesty rule at the top of this file: the smallest case that still fails is the one
+ * worth reporting, and a case that still fails with the fleet whole says something quite
+ * different from one that needs a car withdrawn. The reduction is only accepted if the failure
+ * survives it, so which of the two it is gets measured rather than assumed.
+ */
+const restoreCarMode: Reducer = (fuzzCase) => {
+  const drafts: DraftBuilding[] = [];
+  fuzzCase.building.banks.forEach((bank, bankIndex) => {
+    bank.cars.forEach((car, carIndex) => {
+      if (car.mode === undefined || car.mode === 'in-service') return;
+      const draft = draftOf(fuzzCase);
+      const target = draft.banks[bankIndex]?.cars[carIndex];
+      if (target === undefined) return;
+      delete target['mode'];
+      drafts.push(draft);
+    });
+  });
+  return drafts;
+};
+
 const STRUCTURAL_REDUCERS: readonly Reducer[] = Object.freeze([
   dropBank,
   dropFloor,
   dropCar,
   dropAccessZone,
+  dropServiceEvent,
+  restoreCarMode,
   emptyFloor,
 ]);
 
@@ -268,11 +387,21 @@ function sizeOf(fuzzCase: FuzzCase): number {
   const floors = (fuzzCase.building.floors ?? []).length;
   const cars = fuzzCase.building.banks.reduce((sum, bank) => sum + bank.cars.length, 0);
   const population = (fuzzCase.building.floors ?? []).reduce((sum, floor) => sum + floor.population, 0);
+  // A schedule entry and a withdrawn car are both *things a reader has to hold in their head* to
+  // understand the counterexample, so both carry weight — otherwise `dropServiceEvent` and
+  // `restoreCarMode` would produce candidates the size guard rejects as no smaller, and the two
+  // reducers would never fire.
+  const degraded = fuzzCase.building.banks.reduce(
+    (sum, bank) => sum + bank.cars.filter((car) => car.mode !== undefined && car.mode !== 'in-service').length,
+    0,
+  );
   return (
     floors * 1000 +
     fuzzCase.building.banks.length * 5000 +
     cars * 800 +
     (fuzzCase.building.accessZones ?? []).length * 400 +
+    (fuzzCase.building.serviceEvents ?? []).length * 300 +
+    degraded * 300 +
     population +
     fuzzCase.durationS
   );
@@ -352,6 +481,17 @@ export function shrinkCase(original: FuzzOutcome, options: RunOptions & ShrinkOp
  * failure that can only be described is a failure that will be argued about.
  */
 export function formatFuzzCase(fuzzCase: FuzzCase): string {
+  // Both service-mode facts on one line, above the config rather than buried in it. A withdrawn
+  // car and a mid-run recall are the two things that most change how a run reads, and a reader
+  // scanning a counterexample should not have to diff two hundred lines of JSON to find them.
+  const withdrawn = fuzzCase.building.banks.flatMap((bank) =>
+    bank.cars
+      .filter((car) => car.mode !== undefined && car.mode !== 'in-service')
+      .map((car) => `${bank.id}/${car.id}=${String(car.mode)}`),
+  );
+  const schedule = (fuzzCase.building.serviceEvents ?? []).map(
+    (event) => `${String(event.atS)}s ${event.bankId === undefined ? '' : `${event.bankId}/`}${event.carId}→${event.mode}`,
+  );
   const lines = [
     `case      ${fuzzCase.caseId}`,
     `fuzzSeed  ${fuzzCase.fuzzSeed}   (caseFromSeed reproduces the *unshrunk* parent)`,
@@ -359,6 +499,7 @@ export function formatFuzzCase(fuzzCase: FuzzCase): string {
     `topology  ${fuzzCase.topology}   tags: ${fuzzCase.tags.join(', ')}`,
     `dispatch  ${fuzzCase.dispatcherProfileId} / ${fuzzCase.callType}`,
     `demand    ${String(fuzzCase.arrivalRatePctPop5min)} %pop/5min over ${String(fuzzCase.durationS)} s, drain ${String(fuzzCase.drainGraceS)} s, obstruction ${String(fuzzCase.doorObstructionProbability)}`,
+    `service   initial: ${withdrawn.length === 0 ? 'all in-service' : withdrawn.join(', ')}   schedule: ${schedule.length === 0 ? 'none' : schedule.join('; ')}`,
     'building',
     JSON.stringify(fuzzCase.building, null, 2),
   ];
