@@ -18,11 +18,22 @@
 > the four ⚠️ unverified UX rows, and the full experiment matrix (⬜, the one track between Phase 8
 > and acceptance). The two rows that were ❌ or ⚠️ when this file was last written — `fuzz-1000384`
 > and the unpinned refuted mechanism — are **both closed**, and are marked so below.
+>
+> > **Since close:** the full experiment matrix **landed** (`f895a16`) and its row below is ✅;
+> > **Phase 8 is accepted** ([`DECISIONS.md` § D108](DECISIONS.md)). **C7** and the UX rows are
+> > unchanged by this — and the UX ledger in `packages/viz/UX.md` is **under active edit at the time
+> > of writing**, so its row states are not restated here.
 
 Legend: ⬜ not started · 🟡 in progress · ✅ passing · ❌ failing · ⚪ n/a
 
 **Suite at close, measured on `docs/handoff` 2026-07-28: 168 files, 3,138 tests (3,130 passing,
 8 skipped), 460 s, `tsc -b` clean.**
+
+> **Superseded, and left standing as the close-of-delivery record.** Phase 8's eighth track landed
+> after this board was retired (`f895a16`) and added 34 tests and one skip. Measured on
+> `docs/drift-sweep` 2026-07-28: **172 files, 3 172 tests (3 163 passing, 9 skipped)**, `tsc -b`
+> clean. The runtime is not restated because it is load-dependent and this board's 460 s was never
+> reproducible as a property of the code — see [`docs/07`](docs/07-handoff.md) § *Running it*.
 
 ---
 
@@ -102,7 +113,7 @@ untested**, and that distinction is the point of publishing the ledger instead o
 | Determinism regression | golden runs replay byte-identically from stored seeds | ✅ `validation/goldenRuns.test.ts`, `fuzz/determinism.test.ts` |
 | Scale & performance | large buildings, long sweeps, memory profile | ✅ `validation/perfScaling.test.ts` — always-on tier asserts **simulation outputs** (legs, kernel events); wall-clock gates are `ELEVATOR_SIM_DEEP=1` (D91) |
 | Adversarial edge cases | saturation, single car, all calls one floor, access lockout, all cars out of service, mid-run mode changes | ✅ `validation/adversarial.test.ts`, `fuzz/faults.test.ts` |
-| Full experiment matrix | every dispatcher × building × traffic; Pareto front over (AWT, energy, WT95) with explicit INDISTINGUISHABLE verdicts | ⬜ **not started** — carries Phase 7's acceptance interval at 50–200 replications with it. **The one track between Phase 8 and acceptance** |
+| Full experiment matrix | every dispatcher × building × traffic; Pareto front over (AWT, energy, WT95) with explicit INDISTINGUISHABLE verdicts | ✅ **landed after this board was retired**, in `f895a16` — `benchmark/matrix.ts` + `matrix.test.ts` (8 cells × 12 profiles, per-cell derived budgets n = 50…200), `benchmark/matrixCensus.test.ts` (opt-in census), `benchmark/phase7Acceptance.ts` (Phase 7's interval at n = 150 on disjoint seeds). **Phase 8 is accepted** (§ D108) |
 
 ### Findings from the campaign — all four closed
 

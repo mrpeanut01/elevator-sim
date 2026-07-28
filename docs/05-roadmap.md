@@ -232,7 +232,9 @@ The part that makes results trustworthy. **Do not skip or defer this.**
    construction at 95% confidence, and asserting it would be an untrue statement about the
    method:
    - **Same traces, same config → paired differences are *exactly* zero.** Bit-identical on
-     all 19 metrics, `rho = 1`, interval `[0, 0]`. This is the real determinism check. An
+     **all 23** replication metrics (nineteen when this was written; `f895a16` added `energyKJ`,
+     `carDistanceM`, `carStarts` and `energyPerServedLegKJ`, and the check is over
+     `REPLICATION_METRICS`, so it covers them without editing), `rho = 1`, interval `[0, 0]`. This is the real determinism check. An
      interval merely *containing* zero would also happily contain a leaked `Date.now()`, a
      `Map` iteration order, or a dispatcher drawing from a shared stream.
    - **Across 40 disjoint seed pairs, the interval contains zero at the nominal rate.**
@@ -969,11 +971,49 @@ detection, the Pareto reporting and the held-out validation round are built, ind
 
 | criterion | verdict |
 |---|---|
-| a tuned weight vector beats hand-authored `predictive-balanced` on **held-out** seeds with a paired-t interval excluding zero | **MET as a measurement, NOT as a gate** — at n = 60 on Garden Apartments, `idle.repositionThresholdS` 8 s → 2 s gives **−1.288 s [−2.277, −0.298]** on the holdout seed set, which excludes zero. On the *tuning* seed set the same arm gives **−0.916 [−2.161, +0.328]**, which does not |
+| a tuned weight vector beats hand-authored `predictive-balanced` on **held-out** seeds with a paired-t interval excluding zero | **MET, as a gate, at n = 150.** See § *The acceptance interval at a real budget* immediately below. The n = 60 measurement that used to sit here is retained there as the record of what the verdict was before Phase 8 discharged it |
 | candidates below the interval half-width are reported as indistinguishable rather than ranked | **MET** — `pareto.ts` places an arm on the front only where another is significantly better on ≥1 objective and significantly worse on none; ties are reported as `indeterminate`, never ordered |
 
-**Why the interval is measured but not asserted.** The sign is stable and the effect is real, but
-significance at a budget a test suite can afford is not reproducible — docs/03's own table prices a
+### The acceptance interval at a real budget. **MET at n = 150 (2026-07-28).**
+
+`benchmark/phase7Acceptance.ts`, Garden Apartments, `predictive-balanced` as shipped (deadband 8 s)
+as the reference, tuning seed set `tune-20260726` against holdout `hold-981234567`, realized
+`DISJOINT`, n = 150 in CLAUDE.md's 50–200 band. Every figure below is a pin in
+`benchmark/published.ts` § `phase7-acceptance` and was re-derived by running
+`runPhase7Acceptance()` on this tree for this section.
+
+| candidate | holdout AWT vs shipped | holdout verdict | retained | holdout energy |
+|---|---|---|---|---|
+| `c-deadband-2` (Phase 5's interior optimum) | **−1.088 s [−1.680, −0.495]** | BETTER · GENERALIZES | **94 %** | **+122.15 kJ [+108.65, +135.65]** — WORSE |
+| `c-deadband-2.582` (what `elevator-sim tune` found blind) | **−1.105 s [−1.674, −0.536]** | BETTER · GENERALIZES | **122 %** | **+111.72 kJ [+98.59, +124.86]** — WORSE |
+| `c-deadband-5` (negative control) | −0.221 s [−0.459, +0.017] | INDISTINGUISHABLE | — | +28.72 kJ — WORSE |
+
+Both tuned arms clear; the negative control correctly does not, with 103 of 150 paired differences
+exactly zero. `retained` is `holdoutGain / tuningGain`, so the 2.582 arm's 122 % means it did
+*better* on traffic the search never saw, not that a gain grew.
+
+**The cost is visible for the first time**, because the energy axis did not exist when Phase 7 was
+accepted. Against the holdout reference's **402.958 kJ**, `c-deadband-2` spends **525.110 kJ** — a
+**+30.3 %** energy bill for 1.09 s of wait — and `c-deadband-2.582` spends **514.679 kJ**, **+27.7 %**
+for 1.11 s. Both are on the holdout Pareto front over (AWT, energy, WT95) together with the shipped
+profile, and this document does not rank them: **which of those trades an operator wants is the
+operator's call** (CLAUDE.md § Tuning discipline). The shipped 8 s deadband in
+`data/dispatcher-profiles.json` is deliberately untouched — it is Phase 7's known-answer test.
+
+### The n = 60 verdict this replaces, kept because the reasoning is still right
+
+> **What this section said until 2026-07-28:** *MET as a measurement, NOT as a gate* — at n = 60 on
+> Garden Apartments, `idle.repositionThresholdS` 8 s → 2 s gives **−1.288 s [−2.277, −0.298]** on the
+> holdout seed set, which excludes zero; on the *tuning* seed set the same arm gives
+> **−0.916 [−2.161, +0.328]**, which does not.
+>
+> The n = 150 measurement above confirms the sign on both arms and both seed sets, so nothing below
+> is retracted. It is kept because **the argument for not gating at n = 60 is still correct**, and it
+> is the reason the number was produced at a real budget rather than the gate being lowered to fit
+> the budget a test suite can afford.
+
+**Why the interval was measured but not asserted at n = 60.** The sign is stable and the effect is
+real, but significance at a budget a test suite can afford is not reproducible — docs/03's own table prices a
 ±0.5 s interval at 143 replications and ±0.25 s at 563 (corrected 2026-07-28 — the table was the
 deleted normal quantile's answer, **C19**; the argument here only gets stronger, since both budgets
 moved up). A gate asserting significance at n = 60
@@ -1018,9 +1058,10 @@ covers `tuning/{search,space,report}`; (c) no pinned estimate moved in waves 2�
 `benchmark/published.test.ts`'s partition is green and T21 verified explicitly that its gate cannot
 reach any pin, because `aggregateMetric` never consults `awtIsValid`; (d) the search space grew by
 one declared row for `metrics.maxWaitHorizonS`, and `SPACE.parameters.length` is **unmoved at 49**
-because `metrics.*` is excluded from the searchable space. The one thing still outstanding is the
-one this section already assigns elsewhere: **producing the acceptance interval at a 50–200
-replication budget is Phase 8's job**, and it is listed there as not done.
+because `metrics.*` is excluded from the searchable space. The one thing then outstanding — the one
+this section assigned elsewhere, **producing the acceptance interval at a 50–200 replication
+budget** — was Phase 8's job, and Phase 8 has done it: see § *The acceptance interval at a real
+budget* above. Nothing is left outstanding against this phase's criteria.
 
 ---
 
@@ -1036,10 +1077,13 @@ The largest phase by replication count, and the one whose failures block release
 - Scale & performance: large buildings, long sweeps, memory profile
 - Adversarial edge cases: saturation, single car, all calls one floor, access lockout, all cars
   out of service, mid-run mode changes
-- ⬜ **NOT DONE — the full experiment matrix at a real budget.** Every dispatcher × building ×
-  traffic with a Pareto front over (AWT, energy, WT95) and explicit INDISTINGUISHABLE verdicts, and
-  with it Phase 7's acceptance interval re-measured at 50–200 replications rather than at n = 60.
-  § Phase 7 assigns that measurement here explicitly and accepting Phase 7 did not discharge it.
+- ✅ **DONE — the full experiment matrix at a real budget.** Every dispatcher × building × traffic
+  with a Pareto front over (AWT, energy, WT95) and explicit INDISTINGUISHABLE verdicts, and with it
+  Phase 7's acceptance interval re-measured at 50–200 replications rather than at n = 60. § Phase 7
+  assigns that measurement here explicitly and accepting Phase 7 did not discharge it; `f895a16`
+  did. `benchmark/matrix.ts` (8 cells × 12 profiles, budgets derived per cell, n = 50…200) and
+  `benchmark/phase7Acceptance.ts` (n = 150, disjoint seed sets) are the two entry points, and the
+  energy axis they need is the `RunSummary.energy` proxy that landed in the same commit.
 
 **Acceptance:** every track lands, **and no property violation is outstanding**. A Phase 8 failure is
 **blocking** — a simulator producing confident numbers from broken mechanics is worse than one that
@@ -1055,21 +1099,27 @@ crashes.
 > today. `CLAUDE.md` forbids inventing a criterion after the fact as firmly as it forbids weakening
 > one, and the way to honour that when a phase genuinely lacked a written gate is to say so.
 
-**Status: ⚠️ PARTIAL — the blocking clause is DISCHARGED; the phase is not yet accepted, because
-one track has not landed.**
+**Status: ✅ ACCEPTED (2026-07-28) — the blocking clause is DISCHARGED and all eight tracks have
+landed.**
 
-The change that matters is the first one: **no property violation is outstanding.** Both findings
+> **This section read ⚠️ PARTIAL until the eighth track shipped**, and the reasoning for *not*
+> rounding it up while the matrix was outstanding is [§ D102](../DECISIONS.md). That reasoning is
+> not retracted — it is discharged by measurement. The track landed in `f895a16` with its own
+> always-on suite (`matrix.test.ts`, `phase7Acceptance.test.ts`, `energyLiveness.test.ts`) and
+> every published figure pinned in `benchmark/published.ts`. The acceptance is recorded in
+> [§ D108](../DECISIONS.md).
+
+The change that matters first is: **no property violation is outstanding.** Both findings
 that blocked this phase are closed, and *neither was closed by moving a bound* —
 `deadlockIdleBoundS` is untouched at 600 s and `PROPERTY_BOUNDS` is unchanged line for line, which
 is what `RISKS.md` R22 existed to prevent. The deep tier is green at 2 000 cases (1 396 887
 passengers, 0 violations) and the oracle's deep campaign is green at 11 measurable banks × n = 128.
 
-What is left is a **scheduled measurement, not a defect**: the eighth track below. The criterion is
-*every track lands, **and** no property violation is outstanding*; the second clause now passes and
-the first does not, so the phase is recorded partial rather than accepted. The reasoning for not
-rounding that up is [`DECISIONS.md` § D102](../DECISIONS.md) — in short, the tracks clause was
-written down late and flagged as such, and deleting a clause at the moment it becomes load-bearing
-is the shape § D99 had to own.
+The second clause is *every track lands*, and the eighth track — a **scheduled measurement, not a
+defect** — is what it was waiting on. It landed. Both clauses now pass, so the phase is accepted.
+The interval between the two states was carried honestly rather than papered over: the tracks clause
+was written down late and flagged as such, and deleting a clause at the moment it becomes
+load-bearing is the shape [§ D99](../DECISIONS.md) had to own.
 
 | track | state | evidence |
 |---|---|---|
@@ -1080,7 +1130,7 @@ is the shape § D99 had to own.
 | Determinism regression, golden runs | ✅ built | `validation/goldenRuns.test.ts`, `validation/golden/manifest.json`, `fuzz/determinism.test.ts` |
 | Scale & performance | ✅ built | `validation/perfScaling.test.ts`, `perfSweep.test.ts` — see § D91 on why the wall-clock gates are opt-in |
 | Adversarial edge cases | ✅ built | `validation/adversarial.test.ts`, `fuzz/faults.test.ts` |
-| Full experiment matrix + Pareto at a real budget | ⬜ **not done** | — |
+| Full experiment matrix + Pareto at a real budget | ✅ built | `benchmark/matrix.ts` + `matrix.test.ts` (8 cells × 12 profiles, per-cell derived budgets n = 50…200, front over AWT / energy / WT95), `benchmark/phase7Acceptance.ts` + its test (n = 150, disjoint seeds), `benchmark/matrixCensus.test.ts` (opt-in 200-replication census that re-derives the budgets), `benchmark/energyLiveness.ts` for the axis they need |
 
 ### Campaign statistics, measured on this code
 
@@ -1191,6 +1241,46 @@ fingerprint) once the new always-zero `promisesRevoked` field is stripped, and `
 0 in all 60 — necessarily, since no shipped building carries a `serviceEvents` schedule or a
 non-default `CarConfig.mode`.
 
+### What the matrix found. The eighth track produced four results, and three of them are about profiles that ship.
+
+Re-measured for this section by running `runMatrix()` on this tree (8 cells, 12 arms, CRN within
+each cell, budgets as derived in `matrix.ts`), not transcribed from the commit that produced it.
+
+**1. `nearest-car` is on the Pareto front at six of the eight cells** — and it is there *because it
+is worse at serving people*. Measured front membership, one row per cell:
+
+| cell | n | front |
+|---|---|---|
+| `midtown-up-peak` | 81 | **nearest-car**, energy-aware, capacity-aware |
+| `midtown-down-peak` | 78 | eta, energy-aware, fairness-first, zoned-uppeak, destination-eta |
+| `midtown-interfloor` | 200 | **nearest-car**, eta, energy-aware, destination-eta |
+| `garden-residential` | 65 | collective, **nearest-car**, energy-aware, zoned-uppeak |
+| `garden-down-peak` | 51 | collective, **nearest-car**, eta, energy-aware, fairness-first, capacity-aware, auction, auction-multi-round, zoned-uppeak, destination-eta |
+| `secure-up-peak` | 119 | **nearest-car**, energy-aware |
+| `mixed-use-up-peak` | 50 | energy-aware |
+| `vertical-city-up-peak` | 50 | **nearest-car**, eta, energy-aware, destination-eta |
+
+`nearest-car` is the arm this document elsewhere calls too weak a baseline to separate anything, and
+it is the viewer's default. It reaches the front by being **best on energy and worst on wait**: a
+dispatcher that drives less carries fewer people, and a front is non-domination, not merit. This is
+the whole reason [`docs/10`](10-experience-layer-contract.md) § 5.5 forbids an aggregated "eco"
+score — one would rank the worst dispatcher first. **Energy is an axis, never a score.**
+
+**2. `destination-eta` is bit-identical to `eta` at all eight cells.** It differs in two authored
+fields and weights `rideTime` at zero, so the destination reaches `estimateCost` and changes no
+decision. Phase 6a's accepted result stands — it was measured on *derived* arms that weight
+`rideTime` — but the value is not in the profile that ships. **A builder is authoring the weight
+that changes this, so neither state should be quoted as settled.**
+
+**3. Two more identity classes.** `fairness-first` is bit-identical to `eta` at five cells and
+`auction-multi-round` to `auction` at both Garden cells. Reported rather than filtered: an arm that
+is secretly another arm is a result about that arm.
+
+**4. Saturation ceilings are a property of (building, traffic, seed), not of a building.** Midtown
+up-peak's `nearest-car` ceiling is **287** in `arms.ts` at seed 20 260 726 and **174** in `matrix.ts`
+at its own seed and operating point. Neither is wrong; inheriting either across studies is. See
+[`docs/07` § 4](07-handoff.md).
+
 ### Known coverage gaps, checked rather than inherited
 
 1. **A bank with no serving car is generated by neither corpus** — a construction rule, not a
@@ -1238,13 +1328,15 @@ non-default `CarConfig.mode`.
 
 | Item | Where it is recorded |
 |---|---|
-| **Phase 8's full experiment matrix + Pareto front at a real budget**, and with it Phase 7's acceptance interval at 50–200 replications. **This is the only thing between Phase 8 and acceptance** | § Phase 8 above |
 | **Phase 6c — learned control** | § Phase 6c above; deferred with reasons, not dropped |
+| **`destination-eta` ships a destination it does not use** — bit-identical to `eta` at all eight matrix cells. **In flight**: a builder is authoring the weight that changes it, so do not quote either state as settled | § *What the matrix found* above |
 | **Double-deck simulation and Vertical City** | § Phase 6 above; disclaimed on every run of that building |
 | **Fuzzy traffic-pattern switching** | § Phase 7 above; authored in `data/`, read by nothing |
 | **The Level-1 panel does not clear the Phase 6 gate on `mixed-use-high-rise`** | § *Phase 6 on the building the criterion names* above. A measured result, not a task — but it is what a reader planning 6c needs |
 | Open items C4, C5, C7, C24, C27, C30, C32 | [`AGENT_STATUS.md`](../AGENT_STATUS.md) § Carried forward, and [`docs/07`](07-handoff.md) § 8 |
 
-**Closed since this table was last written:** `fuzz-1000384` (§ Phase 8, finding 4), C2, C19, C20,
-C21, C22, C23, C26, C28, C29, C31. Each was verified rather than taken on report; see
-[`docs/07`](07-handoff.md) § 8.
+**Closed since this table was last written:** **Phase 8's full experiment matrix and Pareto front at
+a real budget, and with it Phase 7's acceptance interval at 50–200 replications** — both landed in
+`f895a16`, and Phase 8 is accepted ([`DECISIONS.md` § D108](../DECISIONS.md)). Also
+`fuzz-1000384` (§ Phase 8, finding 4), C2, C19, C20, C21, C22, C23, C26, C28, C29, C31. Each was
+verified rather than taken on report; see [`docs/07`](07-handoff.md) § 8.

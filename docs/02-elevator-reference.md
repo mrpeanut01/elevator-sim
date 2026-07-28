@@ -101,6 +101,53 @@ production features, not inventions:
 Model passenger mass as a distribution (drawn from the `passengerMass` stream), not a
 constant, so the load sensor has something meaningful to measure.
 
+## Energy and the counterweight
+
+A traction lift's counterweight is sized at `car mass + 0.4…0.5 × rated load`. At the balance point
+the drive sees **zero static out-of-balance**, and the worst case — a full car going up, an empty car
+coming down — is symmetric about it. This is why ISO 25745-2's reference-cycle energy measurement is
+taken at **empty, half and full load**: the mid point is the balance point.
+
+| Quantity | Convention | Notes |
+|---|---|---|
+| Counterweight balance ratio | **0.5** of rated load | Literature range 0.4–0.5. `COUNTERWEIGHT_BALANCE_RATIO` in `core/src/metrics/types.ts`; a code constant, never configuration — see below |
+| Standard gravity | 9.80665 m/s² | CODATA / ISO 80000-3 conventional value |
+| Regeneration | **Assumed absent** | A drive without regeneration dissipates the overhauling direction in a brake resistor, so both directions cost |
+
+### The simulator's energy proxy
+
+`RunSummary.energy` reports **out-of-balance mechanical work**, summed per completed car move:
+
+```
+workJ = |loadKg − 0.5 · ratedLoadKg| · g · distanceM
+```
+
+It is sampled **per move and attributed at arrival**, so it windows exactly as every other statistic
+does — a whole-run odometer beside a peak-5-minute AWT would not be describing the same 300 seconds.
+`EnergyStatistics` publishes `workKJ` (the Pareto axis), `distanceM` and `starts` beside it, because
+a dispatcher that cut energy by carrying fuller cars and one that cut it by driving less are
+different findings with the same number — and `workPerServedLegKJ`, because **a configuration that
+spends less by serving fewer people has not saved anything**.
+
+**This is not kWh, and must not be read as kWh.** It deliberately omits acceleration losses (which
+need car and counterweight masses, which no shipped spec carries), drive and gearing efficiency,
+door-motor energy, and **standby/idle power** — ISO 25745-2's other half, which on a lightly-used
+lift dominates the running term and is a property of the machine rather than of the dispatcher. What
+it measures is *the work the dispatch decisions caused*, which is the quantity a comparison between
+dispatchers is asking about. Because regeneration is assumed absent, a regenerative installation's
+true consumption is bounded **above** by this figure.
+
+**Why 0.5 is a constant.** A per-run counterweight ratio would let two arms of one comparison be
+scored on different scales, and every figure this project publishes is a paired difference between
+arms. 0.5 is also the value at which the proxy is symmetric — an empty car and a full car of equal
+travel cost the same — so the number describes how far cars drove out of balance rather than one
+installation's counterweight order. Full reasoning: [`DECISIONS.md` § D106](../DECISIONS.md).
+
+**Energy is an axis, never a score.** Measured across the full experiment matrix, `nearest-car` — the
+weakest shipped dispatcher — is on the Pareto front at six of eight cells, because it is best on
+energy and worst on wait. Any aggregate "efficiency" number ranks it first. Report energy beside
+AWT and WT95, never instead of them.
+
 ## Sources
 
 - [Elevator Types — Archtoolbox](https://www.archtoolbox.com/elevator-types/)
@@ -109,7 +156,9 @@ constant, so the load sensor has something meaningful to measure.
 - [Applying ISO 8100-32:2020 to Rated Load and Available Car Area — Elevator World](https://elevatorworld.com/article/applying-iso-8100-322020-to-rated-load-and-available-car-area/)
 - [How Is Elevator Capacity Calculated? — TK Elevator](https://www.tkelevator.com/us-en/company/insights/how-is-elevator-capacity-calculated.html)
 - [ISO 8100-32:2020 Guidance — Elevator World](https://elevatorworld.com/article/iso-8100-322020-guidance/)
-- [CIBSE Guide D: Transportation Systems in Buildings (2020)](https://www.cibse.org/knowledge-research/knowledge-portal/guide-d-transportation-systems-in-buildings-2020/)
+- [CIBSE Guide D: Transportation Systems in Buildings (2020)](https://www.cibse.org/knowledge-research/knowledge-portal/guide-d-transportation-systems-in-buildings-2020/) — § 13 covers lift power and energy, and is the basis for the counterweight balance ratio above
+- [ISO 25745-2:2015 — Energy performance of lifts, escalators and moving walks, Part 2: Energy calculation and classification for lifts](https://www.iso.org/standard/61551.html) — the reference cycle measured at empty / half / full load, the non-regenerative measurement convention, and the standby term this project's proxy deliberately omits
+- Barney, G. and Al-Sharif, L., *Elevator Traffic Handbook: Theory and Practice* (2nd ed., Routledge 2016) — drive sizing, counterbalancing, and the round-trip-time derivation this project's oracle implements
 - [World's Fastest Elevators — e-architect](https://www.e-architect.com/worlds-fastest-elevators)
 - [KONE Destination Control brochure](https://www.kone.us/Images/kone-destination-brochure_tcm25-18769.pdf)
 - [Elevator Access Control Systems — Genea](https://www.getgenea.com/blog/elevator-access-control-systems-everything-you-need-to-know/)

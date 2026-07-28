@@ -159,6 +159,11 @@ The stop decision and what happens at the floor.
 > |---|---|---|---|---|
 > | | 34 of 50 | **0** | 2 | 32 |
 >
+> *(That grid is **as measured**: ten profiles shipped at the time. Twelve ship now —
+> `destination-eta` and `destination-panel` were added in Phase 6 — so the study covers 50 of
+> today's 60 cells. The two significant results are unaffected; nothing here has been re-run at
+> 5 × 12, and this table is not a current census.)*
+>
 > Both significant cells are *improvements*: `secure-tower|auction-multi-round` −13.2 % (−7.66 s,
 > CI [−12.72, −2.60]) and `vertical-city|predictive-balanced` −14.4 % (−6.80 s, CI [−11.36, −2.23]).
 > The remaining 16 cells saturate in nearly every replication — `midtown-office` on all ten profiles,
@@ -483,6 +488,24 @@ new traffic. This risk is rarely mentioned in the elevator literature and is ent
 **Do not scalarize too early.** Report the **Pareto front** over (AWT, energy, WT95) rather
 than collapsing to a single number. Reducing energy generally costs waiting time; that
 tradeoff is a decision for the building operator, not a constant to bake in.
+
+> **The energy axis is now measurable, and that changes what this guardrail costs to honour.** Until
+> `f895a16`, `RunSummary` recorded no energy, no metres travelled and no stop count, so every front
+> this project produced silently degenerated to two axes with the third reported `inactive` — the
+> guardrail above was correct advice that could not be followed. `RunSummary.energy` now carries an
+> out-of-balance mechanical-work proxy over the reporting window, `runner/metrics.ts` projects
+> `energyKJ`, `carDistanceM`, `carStarts` and `energyPerServedLegKJ`, and both `matrix.ts` and
+> `phase7Acceptance.ts` decide their fronts over all three axes. Basis, constants and enumerated
+> omissions: [`docs/02` § Energy and the counterweight](02-elevator-reference.md) and
+> [`DECISIONS.md` § D106](../DECISIONS.md).
+>
+> **The tradeoff it exposes is real and it is expensive.** Phase 7's acceptance arms buy 1.09 s of
+> AWT on Garden Apartments for **+30.3 %** energy (2 s deadband) and 1.11 s for **+27.7 %**
+> (2.582 s), measured at n = 150 on held-out seeds. Report both. And note the direction the axis
+> cuts: measured across the whole matrix, **`nearest-car` — the weakest shipped dispatcher — is on
+> the front at six of eight cells**, because it is best on energy and worst on wait. That is why
+> energy is an **axis and never a score**: any aggregate that folds it into one number ranks the
+> worst dispatcher first.
 
 **Report the noise floor.** If two candidates differ by less than the confidence-interval
 half-width, they are **indistinguishable**. Say so. Do not rank them.

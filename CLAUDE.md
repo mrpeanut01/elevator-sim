@@ -8,9 +8,8 @@ An elevator traffic simulator for designing and benchmarking smart dispatch algo
 Read [`docs/00-project-brief.md`](docs/00-project-brief.md) first, then
 [`docs/01-architecture.md`](docs/01-architecture.md).
 
-**Current status: Phases 0–5 and 7 are landed and accepted, plus a five-command CLI. Phases 6 and 8
-are partially complete.** Each of those two is partial for a different reason, so read them
-precisely:
+**Current status: Phases 0–5, 7 and 8 are landed and accepted, plus a five-command CLI. Phase 6 is
+partially complete.** Read the two that need care precisely:
 
 - **Phase 6** — 6a (destination *disclosure*) and 6b (destination *dispatch*) are accepted against a
   **raised** criterion, now measured on the building that criterion names ([§ D100](DECISIONS.md)).
@@ -19,11 +18,18 @@ precisely:
   operation is configured, validated, disclaimed on every run — and not simulated.
 - **Phase 8** — **both blocking property violations are closed**, and neither was closed by moving a
   bound: `fuzz-1001074` by a fourth `awtIsValid` ground, `fuzz-1000384` by revoking a promise a
-  withdrawn car cannot keep. The deep tier is green at 2 000 cases. Seven of eight tracks have
-  landed; the eighth — the full experiment matrix and Pareto front at a real budget, which carries
-  Phase 7's acceptance interval at 50–200 replications — has not, so the phase's criterion (*every
-  track lands, and no property violation is outstanding*) is not yet met
-  ([§ D102](DECISIONS.md)).
+  withdrawn car cannot keep. The deep tier is green at 2 000 cases. **All eight tracks have landed**;
+  the eighth — the full experiment matrix and Pareto front at a real budget, which carries Phase 7's
+  acceptance interval at 50–200 replications — landed in `f895a16`, so the phase's criterion (*every
+  track lands, and no property violation is outstanding*) is met ([§ D108](DECISIONS.md); § D102 is
+  the superseded partial verdict, left standing).
+
+**Energy is an axis, never a score.** The matrix that closed Phase 8 measured `nearest-car` — the
+weakest shipped dispatcher and the viewer's default — **on the Pareto front at six of eight cells**,
+because it is best on energy and worst on wait. A dispatcher that drives less carries fewer people.
+So the energy proxy may be shown **beside** AWT and WT95 and never aggregated into a grade, and
+`EnergyStatistics.workPerServedLegKJ` goes beside the raw figure: a configuration that spends less
+by serving fewer people has not saved anything. See [§ D106](DECISIONS.md).
 
 [`docs/07-handoff.md`](docs/07-handoff.md) is the resume brief. Work proceeds by the phases
 in [`docs/05-roadmap.md`](docs/05-roadmap.md), which carries each phase's acceptance verdict and the
