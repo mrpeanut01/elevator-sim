@@ -241,6 +241,7 @@ packages/
 │   │   ├── space/         — the self-describing search space, sampling, encoding
 │   │   ├── search/        — random search, successive halving, sep-CMA-ES, the objective
 │   │   └── report/        — Pareto fronts, the held-out validation round
+│   ├── fuzz/              — Phase 8: randomized buildings, the six properties, shrinking
 │   └── validation/        — the Phase 3 acceptance gate
 ├── viz/                   — web visualization, consumes core          (Phase 4 foundation only)
 │   ├── contract/          — the recording schema and its folded series

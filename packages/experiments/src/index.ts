@@ -673,3 +673,102 @@ export type {
   VectorDimension,
   VectorSpace,
 } from './tuning/index.js';
+
+/* -------------------------------------------------------------------------- *
+ * fuzz/ — Phase 8: randomized buildings and traffic, checked against the six
+ * invariants docs/07-handoff.md § 7 requires of any configuration — no passenger
+ * lost, none delivered to the wrong floor, no car over capacity, no negative
+ * waits, no deadlock, bounded starvation.
+ *
+ * Exported for the reason `benchmark/` and `tuning/` are and `validation/` is
+ * not: what a consumer needs from here is a **library** — a generator, six
+ * predicates over a finished run, and a shrinker — not the gate. The gate is
+ * `fuzz/*.test.ts` and stays there.
+ *
+ * The non-test caller of this surface is `fuzz/campaign.ts` itself, which is
+ * exported here and is what a deep campaign is driven from
+ * (`ELEVATOR_SIM_FUZZ=deep`). That is a weaker claim than `tune` makes for
+ * `tuning/` and it is stated rather than dressed up: this is a track whose
+ * product is an executed campaign and a set of reusable predicates, and
+ * docs/05-roadmap.md's standing requirement is answered by
+ * `fuzz/corpus.test.ts` running the corpus on every `vitest run` rather than by
+ * a CLI command that does not exist yet.
+ *
+ * `runCampaign` and `evaluateCase` drive the real simulator against a
+ * `LoadedConfig`, so treat them as environment-bound executables in the same
+ * sense as `runBenchmark`. `properties.ts`, `shrink.ts` and `generate.ts` are
+ * pure and import nothing outside `@elevator-sim/core`.
+ *
+ * **No name held back, and two renamed at the source.** `fuzz/run.ts` and `fuzz/shrink.ts` each
+ * exported a name this barrel already carries with different semantics — `simulationConfigFor`
+ * (`runner/` builds a *cell's* config from an experiment spec, not a fuzz case) and `formatCase`
+ * (`benchmark/`'s is a benchmark case). Unlike the `canonicalJson` and `DecisionOutcome`
+ * omissions above, these are resolved by **renaming**, following `tuning/index.ts`'s
+ * `SearchCandidate`: they are `fuzzSimulationConfigFor` and `formatFuzzCase`, so a consumer gets
+ * both surfaces and neither can silently shadow the other in a file that imports both. The
+ * collisions were found by `tsc`, which is the whole reason a barrel is written by hand.
+ * -------------------------------------------------------------------------- */
+
+export {
+  DEEP_SPACE,
+  FUZZ_PROPERTIES,
+  FUZZ_SKIP_REASONS,
+  FUZZ_TOPOLOGIES,
+  PROPERTY_BOUNDS,
+  PROPERTY_CHECKS,
+  STANDARD_CORPUS,
+  STANDARD_SPACE,
+  caseFromSeed,
+  checkAll,
+  checkCapacity,
+  checkConservation,
+  checkDestination,
+  checkMonotonicTime,
+  checkStarvation,
+  checkTermination,
+  deepCampaignRequested,
+  deepCampaignSize,
+  deepSeeds,
+  MIN_DURATION_BY_TEMPLATE,
+  evaluateCase,
+  formatFuzzCase,
+  formatOutcome,
+  formatStats,
+  fuzzSimulationConfigFor,
+  generateOptionsFrom,
+  isFailure,
+  minDurationFor,
+  refusedAnswer,
+  refusingToDispatch,
+  reparse,
+  resolveCase,
+  runCampaign,
+  shrinkCase,
+  stallingAfter,
+  starvingFloorUntil,
+  withLostPassenger,
+  withMisdelivery,
+  withCallType,
+  withNegativeWait,
+  withOverfilledCar,
+} from './fuzz/index.js';
+
+export type {
+  CampaignOptions,
+  CampaignResult,
+  CampaignStats,
+  FuzzCase,
+  FuzzOutcome,
+  FuzzProperty,
+  FuzzSkipReason,
+  FuzzSpace,
+  FuzzTopology,
+  GenerateOptions,
+  PropertyBounds,
+  PropertyContext,
+  RefusalPredicate,
+  RunOptions,
+  ShrinkOptions,
+  ShrinkResult,
+  Violation,
+} from './fuzz/index.js';
