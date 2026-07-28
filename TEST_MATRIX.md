@@ -5,7 +5,7 @@
 > **What it was for.** Scenario-level coverage during the orchestrated completion of this project.
 > It exists because component tests alone do not close a row: this project's dominant defect class —
 > *configurable, unit-tested in isolation, dead in the shipped path* — passes every component test
-> it has, eight times over.
+> it has, **nine times over in code and once in `data/`**.
 >
 > **Where the live information is now.** [`docs/05-roadmap.md`](docs/05-roadmap.md) carries each
 > phase's acceptance verdict and the measurements behind it;
@@ -18,11 +18,38 @@
 > the four ⚠️ unverified UX rows, and the full experiment matrix (⬜, the one track between Phase 8
 > and acceptance). The two rows that were ❌ or ⚠️ when this file was last written — `fuzz-1000384`
 > and the unpinned refuted mechanism — are **both closed**, and are marked so below.
+>
+> > **Since close:** the full experiment matrix **landed** (`f895a16`) and its row below is ✅;
+> > **Phase 8 is accepted** ([`DECISIONS.md` § D108](DECISIONS.md)).
+>
+> > ### ✅ **Final disposition of the three, after the closing wave (2026-07-28)**
+> >
+> > - **The full experiment matrix** — landed, ✅ below.
+> > - **C7** — **CLOSED.** Both scanner holes fixed, both watched failing first, **no new dead
+> >   exports surfaced**, allowlist unchanged in both directions. The second hole had made an
+> >   existing assertion *unfalsifiable*, which is worse than a missing one because it reads as
+> >   coverage. [`DECISIONS.md` § D114](DECISIONS.md).
+> > - **The four ⚠️ UX rows** — **unchanged, and still not passing.** `RV-11`, `RV-17`, `RV-21`,
+> >   `KB-14`, built and reachable, neither driven nor tested. Confirmed against
+> >   `packages/viz/UX.md` § 7.0 after its edits landed: the ledger is now **88** rows, **79 ✅**,
+> >   and § A.3's **Success** and **Saturated** rows were found *false* rather than unverified and
+> >   are re-marked ([§ D111](DECISIONS.md)).
 
 Legend: ⬜ not started · 🟡 in progress · ✅ passing · ❌ failing · ⚪ n/a
 
 **Suite at close, measured on `docs/handoff` 2026-07-28: 168 files, 3,138 tests (3,130 passing,
 8 skipped), 460 s, `tsc -b` clean.**
+
+> **Superseded, and left standing as the close-of-delivery record.** Phase 8's eighth track landed
+> after this board was retired (`f895a16`) and added 34 tests and one skip. Measured on
+> `docs/drift-sweep` 2026-07-28: **172 files, 3 172 tests (3 163 passing, 9 skipped)**, `tsc -b`
+> clean. The runtime is not restated because it is load-dependent and this board's 460 s was never
+> reproducible as a property of the code — see [`docs/07`](docs/07-handoff.md) § *Running it*.
+>
+> > **Superseded again, at true close.** The closing wave added 48 tests in no new files. Measured
+> > on `docs/final-truth` 2026-07-28: **172 files, 3 220 tests (3 211 passing, 9 skipped)**,
+> > `tsc -b` clean, exit 0. +19 from [§ D111](DECISIONS.md) and +29 from
+> > [§ D112](DECISIONS.md) / [§ D114](DECISIONS.md), accounted test by test.
 
 ---
 
@@ -55,7 +82,8 @@ Legend: ⬜ not started · 🟡 in progress · ✅ passing · ❌ failing · ⚪
 | Guard | What it protects | Status |
 |---|---|---|
 | `core/src/sim/seam.test.ts` | behavioural liveness of dispatch behaviours | ✅ |
-| `core/src/dispatch/deadCode.test.ts` | mechanical dead-export audit | ✅ — two scanner holes remain open as **C7** |
+| `core/src/dispatch/deadCode.test.ts` | mechanical dead-export audit | ✅ — **C7 closed**: both scanner holes fixed and watched failing first, no new dead exports surfaced, allowlist unchanged in both directions ([§ D114](DECISIONS.md)) |
+| `experiments/src/index.test.ts` § study entry points | every study in `STUDY_ENTRY_POINTS` — **derived from the `benchmark/` directory**, not a hand-written list — has a non-test, non-barrel caller | ✅ — added by the closing wave, after the whole `'no-intervals'` half of `benchmark/` was found dead ([§ D114](DECISIONS.md)) |
 | `experiments/src/tuning/deadCode.test.ts` | the same audit for `tuning/{search,space,report}` | ✅ |
 | `estimateCost` purity (3 guards) | invariant 1 | ✅ |
 | No global RNG / no wall-clock in `core/` | invariants 2, 3 | ✅ |
@@ -102,7 +130,7 @@ untested**, and that distinction is the point of publishing the ledger instead o
 | Determinism regression | golden runs replay byte-identically from stored seeds | ✅ `validation/goldenRuns.test.ts`, `fuzz/determinism.test.ts` |
 | Scale & performance | large buildings, long sweeps, memory profile | ✅ `validation/perfScaling.test.ts` — always-on tier asserts **simulation outputs** (legs, kernel events); wall-clock gates are `ELEVATOR_SIM_DEEP=1` (D91) |
 | Adversarial edge cases | saturation, single car, all calls one floor, access lockout, all cars out of service, mid-run mode changes | ✅ `validation/adversarial.test.ts`, `fuzz/faults.test.ts` |
-| Full experiment matrix | every dispatcher × building × traffic; Pareto front over (AWT, energy, WT95) with explicit INDISTINGUISHABLE verdicts | ⬜ **not started** — carries Phase 7's acceptance interval at 50–200 replications with it. **The one track between Phase 8 and acceptance** |
+| Full experiment matrix | every dispatcher × building × traffic; Pareto front over (AWT, energy, WT95) with explicit INDISTINGUISHABLE verdicts | ✅ **landed after this board was retired**, in `f895a16` — `benchmark/matrix.ts` + `matrix.test.ts` (8 cells × 12 profiles, per-cell derived budgets n = 50…200), `benchmark/matrixCensus.test.ts` (opt-in census), `benchmark/phase7Acceptance.ts` (Phase 7's interval at n = 150 on disjoint seeds). **Phase 8 is accepted** (§ D108) |
 
 ### Findings from the campaign — all four closed
 
@@ -119,7 +147,7 @@ untested**, and that distinction is the point of publishing the ledger instead o
 |---|---|---|
 | The gate metric | TTD beats the baseline with a paired-t interval excluding zero (D27) | ✅ 6a `−1.562 [−1.916, −1.208] s` |
 | The reporting clause | AWT and WT95 carry explicit verdicts, including WORSE | ✅ 6a AWT `+0.514`, WT95 `+1.010`, both WORSE and both published |
-| Disclosure is worth zero until something prices it | shipped `destination-eta` vs `eta` on an unzoned building | ✅ 150/150 paired differences exactly zero, every metric |
+| Disclosure is worth zero until something prices it | the **`destination-eta-unpriced`** arm vs `eta` on an unzoned building | ✅ 150/150 paired differences exactly zero, every metric. *(This control was the **shipped** `destination-eta` until [§ D112](DECISIONS.md) authored `weights.rideTime: 0.5`. It is now bound to the **configuration** rather than to the id: measurement unchanged, only the name moved. Left bound to the id, the shipped profile's new weight would have falsified this row by a pin regeneration alone.)* |
 | Coverage under access control (H-ACCESS-1) | conventional dispatch cannot serve `secure-tower` interfloor traffic at any budget | ✅ 0/30 quotable, 33.5 % unserved, vs 30/30 and 0.00 % |
 | Optimization under access control (H-ACCESS-2) | difference-of-differences across two buildings | ✅ measured, and it **REFUTES** the roadmap's mechanism: `+0.982 [+0.584, +1.380] s` |
 | Every leg promised, promise kept, promise bites | zero wrong-car boardings on 5 buildings; 70 of 96 legs board a different car than under conventional dispatch | ✅ `sim/destinationDispatch.test.ts` |

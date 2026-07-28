@@ -22,6 +22,25 @@ replacing it. Where a finding offered alternative remedies and the project chose
 *records* a gap rather than filling it, the disposition says so — that is a closure of the finding,
 not of the capability.
 
+> ### Figures in this document are **frozen at 2026-07-26 / 27** and several have since moved
+>
+> That is deliberate — see the paragraph above — but a reader quoting a number out of this register
+> will quote a stale one, and two of the sentences below are inside *Disposition* paragraphs that
+> say "current". Measured on this tree 2026-07-28:
+>
+> | as written here | measured now | where it appears |
+> |---|---|---|
+> | 115 / 129 test files, 2 379 / 2 442 / 2 627 tests | **172 files, 3 220 tests** (3 211 pass, 9 skip) | finding 2 and its disposition |
+> | "three shipped packages" | **four** — `core`, `experiments`, `cli`, `viz` | finding 2 title, § *Math.random* |
+> | "`viz/` does not exist, so invariant 6 was verified only in its weaker live form" | `packages/viz` exists (17 test files); invariant 6 is now verified in its **strong** form ([`DECISIONS.md` § D104](../DECISIONS.md)) | § *What I could not cover* (a) |
+> | "`searchSpace()` (48 dimensions)", and the 12+2+1+10+2+9+9+3 breakdown | **49** — Phase 6b added one row; `collect.test.ts` pins it | findings 9/10 area, § *Coverage* |
+> | "10 shipped profiles" / "all nine shipped profiles" | **12** | several |
+> | "`rideTime` is weighted by no profile", "all eleven weighted terms" | **Both** destination profiles now weight `rideTime` — `destination-panel` at 1.0 and `destination-eta` at **0.5** ([`DECISIONS.md` § D112](../DECISIONS.md)) — so all **twelve** declared terms are weighted somewhere | § *Coverage*, item on cost terms |
+> | "`npm run sim -- list` prints … 10 dispatcher profiles" | 5 buildings, **12** profiles, 14 banks | finding 2 evidence |
+>
+> None of these changes a disposition. They are listed so that this register is quotable as *history*
+> and never as *current state* — for current state read [`docs/07-handoff.md`](07-handoff.md).
+
 | # | Severity | Disposition | Guard |
 |---|---|---|---|
 | 1 | critical | **CLOSED — fixed.** `tuning/index.ts`, a package re-export, `elevator-sim tune` as the non-test caller, and an experiments-side dead-code audit. Phase 7 is now ACCEPTED | `experiments/src/tuning/deadCode.test.ts` |
@@ -76,6 +95,17 @@ seven sites three ways — a claim with no refutation within 400 characters fail
 correction fails, and `model/car/estimateCost.ts`'s exclusion (its sentence is *descriptive* and
 true) is asserted in **both** directions. All three were watched failing, and the 400-character
 window is four times the measured worst case of 95.
+
+**The same class again, and this time it was caught before it published.** The refuted mechanism's
+number, `Δ_secure − Δ_midtown = +0.982 [+0.584, +1.380]`, was measured by an arm resolved from the
+**shipped `destination-eta` id** — which was correct only while that profile happened to weight
+`rideTime` at zero. Authoring the weight would have silently redefined `Δ` as the marginal effect of
+0.5 → 1.0 rather than the effect of pricing the destination at all: mean **+0.208**, same sign, same
+REFUTED verdict, **a fifth of the magnitude**, and nothing to mark the change but a pin
+regeneration. Bound to the *configuration* instead, the six access-control pins do not move. **An
+arm resolved by a shipped id is an arm that can be redefined by editing `data/`** —
+[`DECISIONS.md` § D112](../DECISIONS.md). Findings #4, #14, C23 and this are one defect class seen
+four times: *a claim nothing re-derives*.
 
 ---
 

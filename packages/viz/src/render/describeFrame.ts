@@ -28,6 +28,15 @@ export interface DescribeFrameInput {
   readonly recording: VizRecording;
   readonly frame: Frame;
   readonly metrics?: OverlayMetrics | undefined;
+  /**
+   * Floors with a waiting call no car answers in this run — `D10`, and the same list the canvas
+   * marks with `✗`.
+   *
+   * Said in words for the reason the door phase and the overload are: the glyph is the sighted
+   * half of a signal, and a fact this repository calls never-hideable cannot live only in a
+   * `<select>` that is dropped below 1280 px.
+   */
+  readonly unansweredCallFloorIds?: readonly string[] | undefined;
   /** Cap on the number of cars named individually, so a 24-car tower is still a paragraph. */
   readonly maxCars?: number;
 }
@@ -91,6 +100,14 @@ export function describeFrame(input: DescribeFrameInput): string {
   parts.push(
     `${String(frame.totalWaiting)} legs waiting, ${String(frame.boardedLegs)} boarded so far.`,
   );
+
+  const unanswered = input.unansweredCallFloorIds ?? [];
+  if (unanswered.length > 0) {
+    parts.push(
+      `${String(unanswered.length)} landing${unanswered.length === 1 ? '' : 's'} with a call no car ` +
+        `answers in this run: ${unanswered.join(', ')}.`,
+    );
+  }
 
   const metrics = input.metrics;
   if (metrics !== undefined) {

@@ -58,6 +58,7 @@
  * | {@link overlayAt} | `src/dev/main.ts`'s draw loop, every animation frame; and `drawScene` draws its result |
  * | {@link landingAssignmentsAt} | `src/dev/main.ts`'s landing selector and its draw loop |
  * | {@link landingAssignmentAt} | `landingAssignmentsAt`'s single-floor form. **No caller outside this package** |
+ * | {@link meansAreSuppressed} | three of them, which is the point: `overlayAt` here, `drawHeader` in `src/render/canvas.ts`, and `statusLine` in `src/dev/main.ts` — `D1` |
  * | {@link drawOverlay} | `drawScene`, in `src/render/canvas.ts` |
  * | {@link loadColour}, {@link loadTrackMax}, {@link doorGlyph}, {@link describeSelection} | `src/render/canvas.ts` and `src/render/overlay.ts` |
  * | {@link describeFrame} | `src/dev/main.ts`, as the canvas's `aria-label` and its live region — `KB-13` |
@@ -195,6 +196,7 @@ export {
   DEFAULT_WINDOW_S,
   landingAssignmentAt,
   landingAssignmentsAt,
+  meansAreSuppressed,
   overlayAt,
   type BankMetrics,
   type LandingAssignment,

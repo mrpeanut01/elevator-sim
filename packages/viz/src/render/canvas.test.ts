@@ -19,6 +19,7 @@ import { FIXTURE_DOOR_CONFIG } from '../fixtures.test-helper.js';
 import { constantSeries } from '../contract/series.js';
 import { VIZ_SCHEMA_VERSION, type Frame, type VizRecording } from '../contract/types.js';
 import { buildLayout } from './layout.js';
+import { meansAreSuppressed } from '../frame/overlay.js';
 import { DEFAULT_THEME, drawScene, formatClock, type Canvas2DLike } from './canvas.js';
 
 /* -------------------------------------------------------------------------- *
@@ -238,23 +239,161 @@ describe('drawScene', () => {
     expect(widths[2] ?? 0).toBeGreaterThan(widths[1] ?? 0);
   });
 
-  it('shows the running mean as an em dash before anybody has been served', () => {
-    const ctx = draw(frame({ boardedLegs: 0, runningMeanWaitS: undefined }));
-    expect(ctx.transcript).toContain('mean wait so far —');
+  /* ------------------------------------------------------------------ *
+   * The header's three counters, each proved to be read rather than typed
+   *
+   * `render/canvas.ts`'s own docstring notes that this package shipped a frame seven of whose
+   * eight fields could be replaced by a constant with the suite still green. These are the
+   * mutation controls for the three the header draws: replace the field with a constant and one
+   * of these goes red.
+   * ------------------------------------------------------------------ */
+
+  it('draws the frame’s own waiting count, not a constant', () => {
+    expect(draw(frame({ totalWaiting: 5 })).transcript).toContain('waiting 5');
+    expect(draw(frame({ totalWaiting: 41 })).transcript).toContain('waiting 41');
+    expect(draw(frame({ totalWaiting: 41 })).transcript).not.toContain('waiting 5');
   });
 
-  it('says so, loudly, when the run saturated', () => {
-    const saturated: VizRecording = {
-      ...RECORDING,
-      summary: {
-        ...RECORDING.summary,
-        saturated: true,
-        awtIsValid: false,
-        awtInvalidReason: 'queue diverged',
-      },
-    };
-    expect(draw(frame(), saturated).transcript).toContain('SATURATED — AWT suppressed');
+  it('draws the frame’s own boarded count, not a constant', () => {
+    expect(draw(frame({ boardedLegs: 12 })).transcript).toContain('boarded 12 legs');
+    expect(draw(frame({ boardedLegs: 137 })).transcript).toContain('boarded 137 legs');
+    expect(draw(frame({ boardedLegs: 137 })).transcript).not.toContain('boarded 12 legs');
+  });
+
+  it('draws the frame’s own running mean, to one decimal, not a constant', () => {
+    expect(draw(frame({ runningMeanWaitS: 18.25 })).transcript).toContain('mean wait so far 18.3 s');
+    expect(draw(frame({ runningMeanWaitS: 4.02 })).transcript).toContain('mean wait so far 4.0 s');
+    expect(draw(frame({ runningMeanWaitS: 4.02 })).transcript).not.toContain('18.3');
+  });
+
+  it('shows the running mean as an em dash before anybody has been served', () => {
+    // Only meaningful on a run whose mean the summary stands behind — an em dash means "nobody
+    // has been served yet", and the suppressed run below must not be able to borrow that reading.
+    const ctx = draw(frame({ boardedLegs: 0, runningMeanWaitS: undefined }));
+    expect(ctx.transcript).toContain('mean wait so far —');
+    expect(RECORDING.summary.saturated).toBe(false);
+    expect(RECORDING.summary.awtIsValid).toBe(true);
+  });
+
+  /* ------------------------------------------------------------------ *
+   * `D1` — the header never prints a mean the same element says does not exist
+   *
+   * The defect these two rows were half a test away from catching: `drawHeader` drew
+   * `mean wait so far 87.7 s` on the line immediately below the `SATURATED — AWT suppressed`
+   * banner *it also drew*, on the one `<canvas role="img">` whose `aria-label` says the mean is
+   * suppressed — and `Export PNG` baked the number into a shareable file. Both suppression
+   * grounds are asserted, because it leaked on both.
+   * ------------------------------------------------------------------ */
+
+  /** A run the summary refuses to publish a mean for, on either of the two grounds. */
+  function suppressed(
+    summary: Partial<VizRecording['summary']>,
+    status: VizRecording['status'] = 'completed',
+  ): VizRecording {
+    return { ...RECORDING, status, summary: { ...RECORDING.summary, ...summary } };
+  }
+
+  it('says so, loudly, when the run saturated — and prints no mean beside the banner', () => {
+    const run = suppressed({
+      saturated: true,
+      awtIsValid: false,
+      awtInvalidReason: 'queue diverged',
+    });
+    const transcript = draw(frame({ runningMeanWaitS: 87.7 }), run).transcript;
+    expect(transcript).toContain('SATURATED — AWT suppressed');
+    // The assertion the original row stopped one short of.
+    expect(transcript).not.toContain('mean wait so far');
+    expect(transcript).not.toContain('87.7');
+    expect(transcript).toContain('mean wait suppressed');
     expect(draw(frame()).transcript).not.toContain('SATURATED');
+  });
+
+  it('prints no mean on the other suppression ground either: awtIsValid false without saturation', () => {
+    // Secure Tower, seed 16757712606996968457: `TIMED-OUT — 20 undelivered · AWT suppressed`
+    // was drawn beside `mean wait so far 21.0 s`. `saturated` is false here on purpose.
+    const run = suppressed(
+      { saturated: false, awtIsValid: false, awtInvalidReason: 'censored above the limit', undelivered: 20 },
+      'timed-out',
+    );
+    const transcript = draw(frame({ runningMeanWaitS: 21 }), run).transcript;
+    expect(transcript).toContain('TIMED-OUT — 20 undelivered');
+    expect(transcript).toContain('AWT suppressed');
+    expect(transcript).not.toContain('SATURATED');
+    expect(transcript).not.toContain('mean wait so far');
+    expect(transcript).not.toContain('21.0');
+    expect(transcript).toContain('mean wait suppressed');
+  });
+
+  it('suppresses on the summary’s grounds, so the picture and the report can never disagree', () => {
+    // The gate is `saturated || !awtIsValid` and nothing else — UX.md § 7.1.4 forbids the viewer
+    // holding a second opinion about whether a mean may be shown.
+    expect(meansAreSuppressed(RECORDING)).toBe(false);
+    expect(meansAreSuppressed(suppressed({ saturated: true }))).toBe(true);
+    expect(meansAreSuppressed(suppressed({ awtIsValid: false }))).toBe(true);
+    // …and a mean survives every *other* thing that can be wrong with a run.
+    expect(meansAreSuppressed(suppressed({ undelivered: 20 }, 'timed-out'))).toBe(false);
+    expect(draw(frame(), suppressed({ undelivered: 20 }, 'timed-out')).transcript).toContain(
+      'mean wait so far 18.3 s',
+    );
+  });
+
+  /* ------------------------------------------------------------------ *
+   * `D10` — a call no car answers has a surface that is not the landing selector
+   * ------------------------------------------------------------------ */
+
+  it('marks a landing whose call no car answers, and names the count in the banner', () => {
+    const plain = draw(frame());
+    expect(plain.transcript).not.toContain('unanswered');
+
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: RECORDING,
+      frame: frame(),
+      layout,
+      theme: DEFAULT_THEME,
+      unansweredCallFloorIds: ['G'],
+    });
+    expect(ctx.transcript).toContain('1 landing unanswered');
+    // Drawn on the landing itself, in the warning colour, and not on the quiet floors.
+    const marks = ctx.calls.filter(
+      (call) => call.op === 'fillText' && call.args[0] === '✗',
+    );
+    expect(marks).toHaveLength(1);
+    expect(marks[0]?.args[3]).toBe(DEFAULT_THEME.warning);
+  });
+
+  it('counts the unanswered landings it was given, not a constant', () => {
+    const two = new RecordingContext();
+    drawScene(two, {
+      recording: RECORDING,
+      frame: frame(),
+      layout,
+      theme: DEFAULT_THEME,
+      unansweredCallFloorIds: ['G', '2'],
+    });
+    expect(two.transcript).toContain('2 landings unanswered');
+    expect(two.calls.filter((call) => call.op === 'fillText' && call.args[0] === '✗')).toHaveLength(
+      2,
+    );
+  });
+
+  it('does not confuse an unanswered call with a floor no shaft serves', () => {
+    // `⊘` is geometry — RV-08's unassignable landing. `✗` is an outcome. Different glyphs,
+    // different gutters, because they are different claims about the same building.
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: RECORDING,
+      frame: frame(),
+      layout,
+      theme: DEFAULT_THEME,
+      unservedFloorIds: ['3'],
+      unansweredCallFloorIds: ['G'],
+    });
+    const glyphs = ctx.calls
+      .filter((call) => call.op === 'fillText')
+      .map((call) => String(call.args[0]));
+    expect(glyphs.some((text) => text.includes('⊘'))).toBe(true);
+    expect(glyphs.some((text) => text === '✗')).toBe(true);
   });
 
   it('draws a shaft only over the floors it serves', () => {

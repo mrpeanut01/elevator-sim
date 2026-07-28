@@ -10,10 +10,12 @@
  *
  * This suite asserts the shape of that profile through the **real** `loadConfig`. It **carried** a
  * skipped regression naming the one-line `packages/core` fixture fix that stood between the file
- * and a shipped `rideTime` weight; T16 made that fix, Phase 6b ships the weight, and the test is
- * un-skipped below — against `destination-panel` rather than against `destination-eta`, for a
- * reason that is a published result rather than a preference. See `the root DECISIONS.md` § T15-1 and
- * § T15-2, and `the root DECISIONS.md` § T18-D4.
+ * and a shipped `rideTime` weight; T16 made that fix, Phase 6b shipped the weight on
+ * `destination-panel`, and **T30 finished the job on `destination-eta`** — which had been carrying
+ * `dispatch.callType` and no weight that read the destination, and was therefore bit-identical to
+ * `eta` at 8 of 8 matrix cells. Two authored fields and no code is still the whole of Phase 6a's
+ * implementation; one of them now has a value that changes a decision. See
+ * `the root DECISIONS.md` § T15-1 and § T15-2, and `the root DECISIONS.md` § T18-D4.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -64,10 +66,18 @@ describe('the shipped destination profile', () => {
 
   it('weights no term its own stage settings make inert', async () => {
     // The rule `core/src/dispatch/policies/policies.test.ts` enforces over the whole file, asserted
-    // here for the one profile this phase added so the reason it holds is legible: the profile
-    // weights `waitTime` only, and `waitTime` declares no `activeWhen`.
+    // here for the one profile this phase added so the reason it holds is legible. It weights
+    // `waitTime`, which declares no `activeWhen`, and `rideTime`, whose `activeWhen` names exactly
+    // the `callType` the assertion above proves this profile authors — so the gate is satisfied
+    // rather than merely unviolated.
+    //
+    // The pairing is the point. A `rideTime` weight without a destination `callType` is the dead
+    // weight `predictive-balanced` shipped for two phases; a destination `callType` without a
+    // `rideTime` weight is the inert profile *this* one shipped as, disclosing a destination that
+    // nothing priced. The two failures are mirror images and only both fields together avoid them.
     const profile = (await loadResources()).dispatcherProfilesById.get(DISCLOSURE_PROFILE);
-    expect(Object.keys(profile?.weights ?? {})).toEqual(['waitTime']);
+    expect(Object.keys(profile?.weights ?? {}).sort()).toEqual(['rideTime', 'waitTime']);
+    expect(profile?.weights.rideTime).toBeGreaterThan(0);
   });
 
   /**
@@ -81,18 +91,23 @@ describe('the shipped destination profile', () => {
    * fixture (`the root DECISIONS.md` § T16-D8), so a shipped `rideTime` weight is now
    * possible, and Phase 6b ships one.
    *
-   * **It is not `destination-eta`, and that is the part worth reading before trusting the
-   * assertion.** The skipped test named `DISCLOSURE_PROFILE`, and moving the weight there would
-   * have deleted a published result rather than fixed a fixture note:
-   * `destinationDisclosure.test.ts` asserts the shipped Level-0 profile is `IDENTICAL` to `eta`
-   * on all four metrics at n = 150, and *that* is the decomposition which attributes Phase 6a's
-   * −1.562 s to the weight rather than to the call type. A `destination-eta` that priced ride
-   * time would be its own treatment arm, the control would be gone, and twelve pinned estimates
-   * would move to make a fixture comment come true.
+   * **Both destination profiles weight it now, and the second one took a further task.** Phase 6b
+   * put the weight on `destination-panel` and left `destination-eta` alone, on the ground that
+   * `destinationDisclosure.test.ts` asserted the shipped Level-0 profile `IDENTICAL` to `eta` on
+   * all four metrics at n = 150 — the decomposition attributing Phase 6a's −1.562 s to the weight
+   * rather than to the call type — and that promoting the weight would spend a published result to
+   * make a fixture comment come true.
    *
-   * So the claim is asserted where it is true and the exclusion is asserted beside it, which is
-   * strictly more than the skipped version checked: **some** shipped profile weights the gated
-   * term (C26 is really closed), and the decomposition arm still weights nothing else.
+   * The reservation was real and the conclusion was wrong, because it cost more than it saved: a
+   * shipped Level-0 destination profile that priced nothing was bit-identical to `eta` at **8 of 8**
+   * matrix cells, which is a configured, tested, shipped behaviour with no effect on any shipped
+   * path. T30 authored `weights.rideTime: 0.5` and kept the decomposition by *deriving* the arm it
+   * needs (`destination-eta-unpriced`) instead of shipping it. Same two configurations, same
+   * measurement, different id on one of them — and forty pinned estimates moved, deliberately.
+   *
+   * So the claim is now asserted on both, and the third assertion is the one that matters: the
+   * gated term is weighted **and** the gate that makes it live is authored, on every profile that
+   * carries it.
    */
   it('ships a profile that weights rideTime — C26 closed', async () => {
     const config = await loadResources();
@@ -104,9 +119,24 @@ describe('the shipped destination profile', () => {
     // dead-weight shape `predictive-balanced` shipped and `policies.test.ts` now rejects.
     expect(priced?.dispatch?.callType).toBe('mobile-credential');
 
-    // The Phase 6a decomposition arm is deliberately left unpriced. See the docstring.
+    // And the Level-0 profile, which used to be the exception. See the docstring.
     const disclosure = config.dispatcherProfilesById.get(DISCLOSURE_PROFILE);
-    expect(Object.keys(disclosure?.weights ?? {})).toEqual(['waitTime']);
+    expect(
+      disclosure?.weights.rideTime,
+      'the shipped Level-0 destination profile prices no destination again, which is the inert ' +
+        'shipped behaviour T30 removed — it was bit-identical to eta at 8 of 8 matrix cells',
+    ).toBeGreaterThan(0);
+    expect(disclosure?.dispatch?.callType).toBe('mobile-credential');
+
+    // Every profile in the file that weights the gated term authors the gate. Derived from the
+    // file rather than from these two names, so a third destination profile is covered on arrival.
+    for (const profile of config.dispatcherProfilesById.values()) {
+      if ((profile.weights.rideTime ?? 0) === 0) continue;
+      expect(
+        profile.dispatch?.callType,
+        `${profile.id} weights rideTime without a destination call type`,
+      ).toMatch(/^(destination-entry|mobile-credential)$/);
+    }
   });
 
 });

@@ -4274,3 +4274,814 @@ a criterion (§ D99), set worktrees up so builders linked against the main check
 merged a document without linking it from `README.md`, which a guard caught (R20). A project whose
 dominant defect class is *"nobody noticed"* does not delete its own account of what it failed to
 notice.
+
+---
+
+## D106 — the energy proxy: its basis, its one constant, what it omits, and why it is an **axis and never a score**
+
+**Date:** 2026-07-28 · **Owner:** T31 · **Records:** the decision `f895a16` shipped with a citation
+in a code docstring and no entry here
+
+`CLAUDE.md` § Working agreements: *"If you hit a decision the docs don't cover, record it in the
+relevant doc rather than only in a commit message."* `f895a16` added a brand-new published metric —
+the third Pareto axis this project had declared for three phases and never had — and this file
+contained **zero occurrences of the word "energy"**. That is the defect, and this entry closes it.
+Nothing below is new engineering; it is the reasoning that already exists in
+`core/src/metrics/types.ts` and `benchmark/matrix.ts`, written down where a decision is looked for.
+
+### What the proxy is
+
+Out-of-balance mechanical work, summed per completed car move:
+
+```
+workJ = |loadKg − COUNTERWEIGHT_BALANCE_RATIO · ratedLoadKg| · g · distanceM
+```
+
+`RunSummary.energy` (`EnergyStatistics`) summarizes it over the reporting window as `workKJ`,
+`distanceM`, `starts`, `workPerServedLegKJ` and `movingCarCount`; `runner/metrics.ts` projects
+`energyKJ`, `carDistanceM`, `carStarts` and `energyPerServedLegKJ` as replication metrics.
+
+**Basis, cited.** The counterweight of a traction lift is sized at `car mass + 0.4…0.5 × rated
+load`, so the drive sees zero static out-of-balance at half load and a symmetric worst case:
+Barney & Al-Sharif, *Elevator Traffic Handbook*, on drive sizing and counterbalancing;
+**CIBSE Guide D § 13** on lift power and energy; **ISO 25745-2**, whose reference-cycle energy
+measurement is taken at empty, half and full load *precisely because the mid point is the balance
+point*. The absolute value is the **non-regenerative convention** — a drive without regeneration
+dissipates the overhauling direction in a brake resistor, so both directions cost. ISO 25745-2
+measures a non-regenerative unit exactly this way, and it is the conservative choice: a regenerative
+drive's true figure is bounded **above** by this one.
+
+### Why 0.5 is a code constant and not configuration
+
+`COUNTERWEIGHT_BALANCE_RATIO = 0.5` is a `const` in `core/src/metrics/types.ts`. It is deliberately
+**not** a tunable, and invariant 7 does not reach it: invariant 7 governs *dispatch strategy*, which
+is data. This is reference data about the machine.
+
+**The load-bearing reason is comparability.** A per-run counterweight ratio would let two arms of one
+comparison be scored on different scales, and every number this project publishes is a *paired*
+difference between arms. A configurable balance ratio is a fitted constant sitting inside a published
+axis, and the first person to tune it would be tuning the ruler rather than the building.
+
+0.5 rather than the literature's 0.4–0.5 range for a second, checkable reason: 0.5 is the value at
+which the proxy is **symmetric** — an empty car and a full car of the same travel cost the same — so
+the number is a statement about how far cars drove out of balance rather than about one
+installation's counterweight order.
+
+### What it omits, enumerated rather than implied
+
+Acceleration losses (which need car and counterweight masses, which no shipped spec carries), drive
+and gearing efficiency, door-motor energy, and **standby/idle power** — ISO 25745-2's other half,
+which on a lightly-used lift dominates the running term and is a property of the *machine*, not of
+the dispatcher. **Do not read `energyKJ` as kWh.** It is a proxy for *the work the dispatch
+decisions caused*, which is the quantity a Pareto front over dispatchers is asking about.
+
+### Why `workPerServedLegKJ` exists
+
+Because **a configuration that spends less by serving fewer people has not saved anything.** The raw
+`workKJ` is monotone in how much the fleet moved, and the cheapest possible dispatcher is one that
+never answers a call. `workPerServedLegKJ` normalizes by work done, and `distanceM` and `starts` are
+published beside both because a single scalar cannot say *which* of the two moved it: a dispatcher
+that cut energy by carrying fuller cars and one that cut it by driving less are different findings
+with the same number.
+
+`NaN`, never `0`, when nothing was recorded — `measured: false`. "The cars did not move" and "nobody
+wrote down how far the cars moved" are different facts, and zeroing them would make every arm tie on
+energy and quietly restore a two-axis front under a three-axis name.
+
+### **Energy is an axis, never a score.** This is the part that is a decision rather than a citation.
+
+The matrix that closed Phase 8 measured `nearest-car` **on the Pareto front at six of the eight
+cells** (re-derived for `docs/05` § *What the matrix found* by running `runMatrix()`; the two cells
+it misses are `midtown-down-peak` and `mixed-use-up-peak`). `nearest-car` is the profile this
+project's own roadmap calls too weak a baseline to separate anything, the arm `docs/07` § 4 names a
+poor reference, and the **viewer's default**. It is on the front because it is **best on energy and
+worst on wait** — a front is non-domination, not merit.
+
+**Therefore a standalone eco score ranks the worst dispatcher first.** The rule, which
+`docs/10` § 5.5 and `CLAUDE.md` now both carry:
+
+1. Energy is displayed **only beside** AWT and WT95, as one axis of a front.
+2. It is **never aggregated** into a grade, a letter, a star rating or an "efficiency" number.
+3. `workPerServedLegKJ` is shown **beside** the raw figure, always.
+4. Where two arms are non-dominated, they are **reported and not ordered** — the wait-versus-energy
+   tradeoff is the building operator's call, which is what `CLAUDE.md` § Tuning discipline has said
+   since before the axis existed.
+
+The prohibition on an energy *score* in `docs/10` predates the metric and was originally justified by
+*"the quantity does not exist"*. That justification is now false and the prohibition is **stronger**,
+not weaker: it survives on the measurement rather than on the absence of one.
+
+---
+
+## D107 — `REPLICATION_METRICS` is **23**, and four places in this file still say nineteen
+
+**Date:** 2026-07-28 · **Owner:** T31 · **Corrects, without rewriting:** § D-entries at the lines
+carrying "nineteen" below
+
+Measured on this tree:
+
+```
+$ node --input-type=module -e "import * as e from './packages/experiments/dist/index.js';
+                               console.log(e.REPLICATION_METRICS.length)"
+23
+```
+
+The list, in declaration order (`packages/experiments/src/runner/metrics.ts`): `awtS`, `wt95S`,
+`wt99S`, `maxWaitS`, `pctOverLongWait`, `ttdMeanS`, `ttdP95S`, `rideMeanS`, `intervalS`,
+`intervalCoV`, `personsPer5Min`, `pctPopulationPer5Min`, `offeredPer5Min`, `meanLoadFactor`,
+`fractionAtDesignLoad`, `meanQueueLength`, `maxQueueLength`, `queueSlopePersonsPerMinute`,
+`unservedFraction`, **`energyKJ`, `carDistanceM`, `carStarts`, `energyPerServedLegKJ`**. The last
+four are `f895a16`'s energy projection; nineteen was correct until that commit.
+
+**This file is append-only, so the four earlier sentences are corrected here rather than edited.**
+They read "all nineteen" / "nine of the nineteen" / "partition the nineteen":
+
+| where | what it says | what is now true |
+|---|---|---|
+| § D-entry at `DECISIONS.md:2108` | *"conflate a change that keeps all nineteen…"* | all **23** |
+| § D-entry at `DECISIONS.md:2225` | *"nine of the nineteen replication metrics"* | nine of the **23** |
+| § D-entry at `DECISIONS.md:2235` | *"the two lists partition the nineteen"* | partition the **23** |
+| § D-entry at `DECISIONS.md:2390` | *"partition the nineteen and resolve against a real summary"* | the **23** |
+
+**The nine does not change.** `MODEL_SENSITIVE_METRICS` in `core/src/metrics/comparability.ts` is
+still nine, `COMPARABLE_METRIC_IDS` is now **14**, and 9 + 14 = 23 — the partition
+`metrics/comparability.test.ts` asserts is intact, and it is intact because the four new metrics
+were added to the comparable side rather than left out of both. The same "19" appears in
+`docs/05` § Phase 5, `docs/07` § 5 and `docs/09` arms C and D; those are prose and are corrected in
+place, with `docs/09`'s arm D moving from "10 metrics" to **14** because it was derived from the
+stale total.
+
+---
+
+## D108 — Phase 8 is **ACCEPTED**: the eighth track landed, and Phase 7's interval was produced at a real budget
+
+**Date:** 2026-07-28 · **Owner:** T31 · **Supersedes:** § D102 (which is left standing)
+
+§ D102 recorded Phase 8 as **partial** because its criterion is *every track lands, **and** no
+property violation is outstanding*, and the eighth track — the full experiment matrix — had not
+landed. It landed in `f895a16`. Both clauses now pass.
+
+**§ D102 is not retracted.** It was right when it was written, and it is the record of a phase
+declining to round itself up at the moment its own late-written clause became load-bearing. It is
+discharged by measurement, which is the only way a criterion should ever stop applying.
+
+### What discharges it, named
+
+| clause | discharged by |
+|---|---|
+| no property violation outstanding | `fuzz-1001074` closed by a fourth `awtIsValid` ground; `fuzz-1000384` closed by revoking a promise a withdrawn car cannot keep. Neither by moving a bound — `deadlockIdleBoundS` untouched at 600 s, `PROPERTY_BOUNDS` unchanged line for line. Deep tier green at 2 000 cases |
+| every track lands | `benchmark/matrix.ts` + `matrix.test.ts` — 8 cells × 12 profiles, baselined on `collective`, budgets derived per cell from that cell's own 200-replication census (n = 50…200), front over (AWT, energy, WT95) with ties reported and never ordered; `benchmark/matrixCensus.test.ts` as the opt-in census that re-derives those budgets; `benchmark/phase7Acceptance.ts` for Phase 7's interval |
+
+### Phase 7's acceptance interval, at n = 150
+
+Re-derived by running `runPhase7Acceptance()` on this tree, not transcribed. Garden Apartments,
+`predictive-balanced` as shipped (8 s deadband) as reference, tuning seeds `tune-20260726` against
+holdout `hold-981234567`, realized `DISJOINT`, n = 150 — inside `CLAUDE.md`'s 50–200 band, at the
+rung `docs/03` prices a ±0.5 s interval at (143). Every figure is a pin in `published.ts`
+§ `phase7-acceptance`.
+
+| candidate | holdout AWT | verdict | retained | holdout energy | reference energy | cost |
+|---|---|---|---|---|---|---|
+| `c-deadband-2` | **−1.088 s [−1.680, −0.495]** | BETTER · GENERALIZES | **94 %** | 525.110 kJ (+122.15 [+108.65, +135.65]) | 402.958 kJ | **+30.3 %** |
+| `c-deadband-2.582` | **−1.105 s [−1.674, −0.536]** | BETTER · GENERALIZES | **122 %** | 514.679 kJ (+111.72 [+98.59, +124.86]) | 402.958 kJ | **+27.7 %** |
+| `c-deadband-5` | −0.221 s [−0.459, +0.017] | INDISTINGUISHABLE | — | 431.674 kJ (+28.72) | 402.958 kJ | +7.1 % |
+
+**A correction to how this has been summarized elsewhere.** The two clearing arms have been
+described in one breath, and their figures do not belong to the same arm. **−1.105 [−1.674, −0.536]
+is the optimizer-found 2.582 s arm; 94 % retained and the ≈30 % energy bill are the 2 s arm.** The
+2.582 arm retains **122 %** — it did *better* on traffic the search never saw — and costs **27.7 %**.
+Both clear; neither is ranked against the other here, because both are on the holdout Pareto front
+together with the shipped profile and choosing between them is the operator's call.
+
+`c-deadband-5` is the negative control and behaves as one: 103 of 150 paired differences exactly
+zero, and no rank order reported on AWT.
+
+**The cost is visible for the first time.** When Phase 7 was accepted, `energy` was in
+`inactiveObjectiveIds` on every report — the axis was not merely unreported, it was *unmeasurable*.
+`holdoutRound.ts` declared an `energyProxyOf` parameter and its own docstring said it was impossible
+to fill. § D106 is what fills it. The shipped 8 s deadband in `data/dispatcher-profiles.json` is
+still untouched, deliberately: it is Phase 7's known-answer test.
+
+### What the eighth track found, which a green tick would have hidden
+
+1. **`nearest-car` is on the Pareto front at six of eight cells** — best on energy, worst on wait.
+   § D106 turns this into the rule that energy is an axis and never a score.
+2. **`destination-eta` is bit-identical to `eta` at all eight cells.** It weights `rideTime` at zero,
+   so the destination reaches `estimateCost` and changes no decision. Phase 6a's accepted result
+   stands — it was measured on *derived* arms that weight `rideTime` — but the value is not in the
+   profile that ships. **In flight at the time of writing:** a builder is authoring the weight that
+   changes this, so neither state is recorded here as settled.
+3. **Two more identity classes**: `fairness-first` ≡ `eta` at five cells, `auction-multi-round` ≡
+   `auction` at both Garden cells.
+4. **A saturation ceiling belongs to a (building, traffic, seed), not to a building.** Midtown
+   up-peak's `nearest-car` ceiling is **287** in `arms.ts` at seed 20 260 726 and **174** in
+   `matrix.ts` at its own seed. This repository has inherited a ceiling across studies twice and
+   corrected it twice; `docs/07` § 4 now carries it as a standing caution.
+
+---
+
+## D109 — `docs/10` is **accepted with changes**: three classes of error corrected in place, two rules added
+
+**Date:** 2026-07-28 · **Owner:** T31 · **Concerns:** `docs/10-experience-layer-contract.md`
+
+The Phase 9 design was reviewed independently and **13 of its 16 measurements re-derived exactly**.
+It is accepted. Three classes of error were found, and every correction is marked in place rather
+than silently applied — a design document that quietly changes its own findings is the drift this
+repository exists to guard against.
+
+**Class 1 — the energy sections were inverted, and the fix is not a simple inversion.** § 2.9, § 5.1,
+§ 5.5, § 7.3, M13 and W2's field list all asserted no energy metric exists. It does (§ D106); the
+document was authored before `f895a16` and merged after it.
+
+The important part is what happens to the *prohibition*. § 5.5 forbade an "efficiency" or "energy"
+score **because the quantity did not exist**. That justification is now false, and a naive inversion
+would delete the rule. Instead the rule is kept and given a measured reason, as **R11**: `nearest-car`
+— the viewer's default and the arm `docs/07` § 4 calls a poor reference — is on the Pareto front at
+**six of eight** matrix cells *because it is worse at serving people*, best on energy and worst on
+wait. **A standalone eco score ranks the worst dispatcher first.** So: energy is shown only beside
+AWT and WT95, never aggregated into a grade, always with `workPerServedLegKJ` beside the raw figure,
+and non-dominated arms are reported and never ordered.
+
+**Class 2 — M10 is refuted, and the document already contradicted itself about it.** M10 claimed
+schema discovery runs client-side "with no package change". It does not: `discoverParameterSchemas`
+and `collectSearchSpace` live in `packages/experiments`, whose `package.json` declares only `"."` and
+`"./package.json"` — no browser condition, so a deep import is **refused by the resolver** — and
+whose one entry reaches `node:worker_threads` through `runner/parallel.ts`. § 8.5 already said
+plainly *"a browser cannot import the tuner today."* § 8.5 is the statement that matches the code.
+
+What M10 **does** establish and is true: the schema *data* in `core/browser` is complete, and
+discovery run against either barrel gives identical results. § 13's open question 1 is promoted from
+optional to **prerequisite** for W4.
+
+**Class 3 — six smaller errors, each verified:**
+
+| what | correction |
+|---|---|
+| R5 | *"a scoring function takes `VizSummary` … and its type must make the estimate fields unreachable"* — mutually exclusive, because `VizSummary` **does** carry `meanWaitS`. The scorer takes a narrowed type; `VizSummary` is not it |
+| `meanLoadFactor` row | *"0.62 → about 6 in 10 full"* mixed two denominators. `meanLoadFactor` is a fraction of **rated**; at an 80 % design load, 0.62 of rated is 0.775 of design — 7.75 in ten "full", not 6 in 10 |
+| `intervalCoV` row | mapped a dispersion statistic onto *"clumpy"* / *"even"* across an unstated threshold. **That is the error R10 itself bans**, one type down. Show the number with its definition, or nothing |
+| § 10.4 | *"indistinguishable from a long wait"* is refuted by a shipped renderer: `viz/src/render/canvas.ts:451` draws *"unassigned — no car answered this call in this run"*. The real gap is that the viewer cannot say **why** |
+| M2 | the TTD clause matches **9** of 12 dispatchers, not 10 — `energy-aware` returns **39.592 s** against the shared 39.302 s. The AWT and WT95 clauses are 10 of 12 and stand. Re-measured |
+| R10 | the regressive-misreading finding is **Budescu et al.** (2009, 2014), not the two IPCC-commentary sources cited — and the remedy AR5 adopted was **dual presentation**, the word *plus* the numerical range, not abolition. That is a stronger result for R10: a likelihood word *without* a number is the documented failure mode |
+
+### Two rules the review found missing, both measured on this tree
+
+**R13 — minimum-n disclosure.** No estimate may be displayed without the count it was computed from,
+and a natural-frequency restatement is **forbidden when the denominator is smaller than the frequency
+it names**. Measured: Garden Apartments, `collective`, 900 s, default peak-5-minute window — the
+quotable AWT is computed over **5** legs at seed 42 (11.319 s), **1** at seed 4, **11** at seed 1,
+all with `awtIsValid: true`. § 7.1's flagship translation would render `WT95` on that run as
+*"1 in 20 riders…"*, inventing a denominator — in the section whose whole justification is the
+natural-frequency literature, which is about making denominators *visible*.
+
+**R12 — one-run goals need measured variance.** A goal judged on a single run must have its
+across-seed variance measured and published, or it is a batch goal. Measured on the design's own
+stage-5 building — Secure Tower, `collective`, seeds 1000–1019, 900 s — of the five single-run goals
+in § 5.2: `deliver-everyone` **0/20**, `nobody-abandoned` **20/20**, `answer-the-demand` **0/20**
+(three constants, carrying zero information), `long-waits-under` **11/20** at a ≤ 10 % threshold (a
+coin flip whose rate is set by the author's threshold, not by play), and `everyone-can-get-there`
+**not evaluable at all** — which surfaced a further internal contradiction: § 5.2 says it is checkable
+from "zero locked-out calls" while § 10.4 says the recording cannot distinguish a locked-out call
+today. § 10.4 matches the code.
+
+Four measurements were added to § 12: **M17** (leg counts behind a quotable Garden AWT), **M18** (the
+goal batch), **M19** (`nearest-car`'s front membership, 6 of 8), and M2's re-derivation.
+
+### What was deliberately **not** written as settled
+
+Two things were changing while this pass ran and are marked **in flight** wherever they appear:
+the `destination-eta` bit-identity finding (a builder is authoring the `rideTime` weight that
+changes it) and `packages/viz/UX.md`'s row states (owned by another builder). Recording either as
+current would be the same defect this pass exists to remove, one iteration later.
+
+---
+
+## D110 — the drift sweep itself: what was found beyond the register, and the one rule that generalizes
+
+**Date:** 2026-07-28 · **Owner:** T31
+
+`f895a16` shipped a phase-completing track — the full experiment matrix, a real Pareto front,
+Phase 7's acceptance interval at budget, and a brand-new published metric — and **touched no prose at
+all**. Everything § D106–§ D109 corrects follows from that single fact.
+
+Beyond the items handed to this pass, the sweep found:
+
+| drift | believed |
+|---|---|
+| `README.md`, `TEST_MATRIX.md`, `docs/07` all published **168 files / 3 138 tests**; measured **172 / 3 172** (3 163 pass, 9 skip) | the code |
+| `docs/09` § 1.2 asserted, in a table headed *"each was checked by running the code"*, that **all ten** shipped profiles author no `dispatch.callType` and **none** weights `rideTime`. Twelve ship; two declare `mobile-credential`; `destination-panel` weights `rideTime: 1` | the code |
+| `docs/09` arm D said *"comparable on 10 metrics"* — arithmetic on the stale 19. It is **14** (23 − 9), and the **nine** is unchanged | the code |
+| `docs/09` § Wave A row A1 plans `destination-eta` (`destination-entry`, weighting `rideTime`) and a profile called `destination-secure`. Neither shipped as planned: both shipped profiles declare `mobile-credential`, the second is `destination-panel`, and `destination-eta` weights `rideTime` at **zero**. **A1's liveness criterion was never wired to a test, so nothing failed** — the standing requirement's exact shape, in a planning document | the code |
+| `docs/08`'s register carries **48 dimensions** (now 49), *"three shipped packages"* (four), *"`viz/` does not exist"* (it does, and invariant 6 is now verified in its strong form), *"`rideTime` is weighted by no profile"* (`destination-panel` weights it) and several profile counts — two of them inside *Disposition* paragraphs that say "current" | the code, via a dated correction block; the finding text is left as filed, per that document's own rule |
+| `MULTI_AGENT_PLAN.md`, `TEST_MATRIX.md` and `RISKS.md` each stated the matrix as not started and Phase 8 as partial, in **final-state headers** that read as current | the code, via supersession notes; the retired boards are not rewritten (§ D105) |
+| `docs/06`'s `reopenOnLateArrival` study is a 5 × **10** grid presented without a date — true as measured, stale as a census | the code, via a scope note; the study is not re-run |
+| `docs/02` had **no energy section and no ISO 25745-2 source**, while `core/src/metrics/types.ts` said *"See docs/02-elevator-reference.md"* about the counterweight ratio — a forward reference to a section that did not exist | the code |
+| `docs/03` § Part 5's *what to record* omitted the energy axis | the code |
+
+**Runtime figures are not facts about the code and should stop being published as if they were.**
+`README`, `TEST_MATRIX` and `docs/07` each carried a wall-clock (~460 s). `f895a16` measured 519 s;
+a re-run of the same tree under concurrent load measured **793 s**. All three are true. The suite
+*counts* are pinned and worth publishing; the *duration* is not, and `docs/07` now says so.
+
+**The rule that generalizes, and it is the same one twice.** This project already knows that a
+behaviour with no non-test caller passes every check it has. A *number* with no non-test re-deriver
+is the same defect: `published.ts` closed that hole for figures inside `benchmark/`, and the
+phase-status guard closed it for four documents. Everything corrected above sat outside both. The
+cheapest available extension is not a new guard but a habit — **a commit that changes what a
+published number is must name the prose that quotes it** — and the mechanical form of that, if one
+is wanted later, is a check that greps `docs/**` for the metric-count and suite-count shapes and
+compares them to the code, in the manner of `validation/documentation.test.ts`. It is **specified
+here, not built**, and that is stated rather than left as an implication.
+
+**Addendum to § D110, measured after it was written.** `T9-FINDINGS.md`'s header states
+`published.ts` carries **401 pinned estimate entries** "as of 2026-07-28". It carries **771**.
+Counted identically on both trees —
+`grep -cE '^\s+"[^"]+": \{ n: ' packages/experiments/src/benchmark/published.ts` — `f895a16^` gives
+401 and this tree gives 771. **No existing pin moved**: a sorted key-and-value diff of the 401
+against the 771 leaves **zero** lines on the old side. That is the guard `T9-FINDINGS.md` exists to
+have built, working exactly as designed on a commit that added 370 pins — and it is also the ninth
+instance of the same drift, in the document that reports drift.
+
+---
+
+## D111 — the viewer and the CLI stopped printing a mean the same run says does not exist
+
+**Date:** 2026-07-28 · **Owner:** T32, recording T29 · **Source:** `packages/viz/DECISIONS-T29.md`
+(which may be deleted once this entry lands) · **Corrects nothing above; adds what was missing**
+
+### The defect, and why it was worse than a display bug
+
+`render/canvas.ts`'s `drawHeader` drew `mean wait so far 87.7 s` **on the header line immediately
+below the `SATURATED — AWT suppressed` banner the same function drew.** Not two surfaces
+disagreeing: one `<canvas role="img">`, whose `aria-label` — written by `describeFrame` from the
+same summary — read *"Mean waiting time is suppressed"*. **The sighted reader saw a number the
+non-sighted reader was told did not exist**, and `Export PNG` baked it into a shareable file,
+because the canvas *is* the export source.
+
+It leaked on **both** suppression grounds, not only saturation: Secure Tower seed
+16757712606996968457 showed `TIMED-OUT — 19 undelivered · AWT suppressed` beside
+`mean wait so far 16.6 s`. Reproduced on screen and in the exported PNG before the fix, and shown
+gone after, on both grounds.
+
+### The decision: the gate has one home, and it is in `frame/`, not in `render/`
+
+`saturated || !awtIsValid` was written out **three** times — in `overlayAt`, in `dev/main.ts`'s
+status line, and in `drawHeader`. Two were right. It now lives once, as
+`meansAreSuppressed(recording)` in `frame/overlay.ts`, and all three call it.
+
+`frame/` and not `render/` because *may this run's estimates be shown* is a fact about the
+**recording**, not about drawing, and `frame/` is where the package already keeps pure
+`(recording, …) → fact` producers. Putting it in `render/` would have made the metrics module depend
+on the renderer — the wrong direction; putting it in `contract/types.ts` would have put behaviour in
+a file that is types. The barrel's caller table names all three non-test callers, so this is not
+another export whose only caller is its own test.
+
+**What it is deliberately not sensitive to:** a `timed-out` status, and undelivered passengers.
+Those are the banner's business. A run can end with people still in the system and still have a mean
+the statistics module stands behind — `awtIsValid` is the summary's own verdict and already accounts
+for censoring, on the four grounds `CLAUDE.md` § Statistical discipline lists. Suppressing on
+*status* instead would have replaced a false positive with a false negative and looked just as fixed.
+
+### `mean wait suppressed`, not `mean wait so far —`
+
+The obvious alternative reused the existing placeholder. Rejected: `—` already means *nobody has
+been served yet*, which is a **different fact** and one the reader can act on (wait, or scrub
+forward). Collapsing "no data yet" into "this figure is not admissible" would have been a smaller
+lie in place of a larger one. The string also no longer contains `mean wait so far` **at all** on a
+suppressed run, which is what lets `canvas.test.ts` assert `not.toContain('mean wait so far')`
+rather than something weaker. That assertion was watched failing against the unfixed gate.
+
+### The same defect in `elevator-sim watch`, which no prior report had caught
+
+The brief said the reviewer had confirmed no other render site leaks, and asked for that to be
+**checked rather than trusted**. Checked, and it did not come out clean.
+`packages/cli/src/commands/watch.ts` printed the running mean unconditionally on **both** of its
+render paths — `mean wait so far 41.5 s` in the TTY frame, and a `mean wait` column of figures in
+the piped/too-small fallback — for the whole of a run, with no suppression anywhere on the screen.
+`printRunReport` then said `AWT  SUPPRESSED` about the same run, on the same terminal, seconds
+later. `run` and `compare` were clean: both go through `renderAwt`, which has refused since it was
+written.
+
+The fix is the CLI's own idiom rather than the viewer's: `format.ts` gains `renderRunningMean`,
+returning the module's existing `RenderedMetric` shape, so the refusal reads `SUPPRESSED` — the word
+`renderAwt` already uses — and carries no digits. The reason is printed **in the frame** rather than
+waiting for the report at the end of playback, because a column of `SUPPRESSED` with no reason
+beside it explains nothing.
+
+**Honest limit, stated rather than glossed.** The fallback path was driven end to end (`--plain`).
+The TTY frame path was **not** driven in a real terminal. Both call the same `renderRunningMean`,
+which is unit-tested and mutation-checked three ways, but *"driven on a TTY"* is not claimed.
+
+### The editor's floor lists are ordered by `index`, not by reversing the array
+
+The reported defect: the form listed `G, 2, 3, 4, 5, 6` downward while the preview beside it drew
+`6` at the top — two views of one building, on one screen, reading in opposite directions.
+
+Three orderings were candidates and **only one is right on every shipped building**:
+
+| candidate | verdict |
+|---|---|
+| leave it | the defect |
+| reverse the declaration array | **wrong on `midtown-office.json`**, which declares index `0` before index `-1`. Reversed, its basement draws *above* the lobby in the form and below it in the picture — the same defect on one building instead of five, which is **worse**, because it looks fixed |
+| sort by `index`, descending | correct. `index` is what a building means by *which floor is above which*: `expandFloors` sorts its output by it, `resolveBuilding` re-sorts by it, and `buildLayout` places rows by the height `index` is required to agree with |
+
+`floorsInBuildingOrder` lives in `editor/editorPreview.ts` rather than `dev/editor.ts`, because
+`dev/editor.ts`'s own docstring says everything with a decision in it lives in `editor*.ts` and is
+tested under Node — **and a sort is a decision**. Its test compares the list order against the pixel
+`y` that `buildLayout` assigns each floor, on **every** shipped building, so the list and the picture
+cannot be wrong in the same direction.
+
+### The ⇧/⇩ buttons: a wart made honest, and the scope call handed back
+
+`moveFloor` moves a floor within the **declaration array** and deliberately renumbers neither `index`
+nor `heightM`. Its docstring gives a good reason: the loader fails a building whose two disagree
+(`floor-height-order`), and an editor that silently rewrote either would settle a modelling error by
+fiat. **Which means those two buttons never moved a floor in the building** — they reformat the
+JSON. Under the old array-ordered table that was invisible, because the two orders coincided on four
+of five buildings; under an `index`-ordered table it is visible.
+
+Three options were weighed. **(1) Repurpose them to swap `index`/`heightM`** — rejected, it is
+exactly the fiat the docstring forbids. **(2) Delete them** — that leaves `moveFloor` with no
+non-test caller, which is this repository's signature defect, so the honest version of "delete them"
+is "delete `moveFloor` too", a larger change than the report asked for that also removes a real if
+minor authoring feature. **(3) Keep them and say what they do** — taken. The glyphs are `⇧`/`⇩` and
+the titles read *move floor 30 earlier in the JSON declaration list (does not change its index or
+height)*.
+
+**Handback, recorded rather than resolved:** the floors table and the declaration list are two
+different orders sharing one widget. A later change should either give the declaration its own view,
+or drop `moveFloor` and let `index` be the only control over ordering. That is a scope decision for
+the owner, and it is carried in [`docs/07`](docs/07-handoff.md) § 8 rather than settled here.
+
+### Two deliberate non-changes in the same audit
+
+**Access-zone floor lists** (`zone.floors.join(' ')`) — a single-line text field bound to the
+document's own array, read left-to-right. Not a vertical column, so there is no direction to
+disagree with, and reordering it on display would mean committing a rewritten document the next time
+the field changed. **The access-zone rows themselves** — a list of *credentials* keyed by zone id,
+not by height; a zone's floors are an arbitrary set, so "the zone's lowest floor" is a weak sort key
+that would make rows jump while the reader types into them. The Document (JSON) textarea keeps
+declaration order necessarily: it **is** the file.
+
+### What this cost the UX ledger, and what it did not
+
+`packages/viz/UX.md` § A.3's **Success** and **Saturated** rows each carried a *"must not show"*
+clause about the running mean. **Both clauses were false**, and both now hold; they are re-marked
+with the evidence rather than ticked. The ledger moved from 87 rows to **88** (`ED-01a` is new) and
+79 are ✅. **The four ⚠️ rows are unchanged and still not passing** — `RV-11`, `RV-17`, `RV-21`,
+`KB-14`, built and reachable, neither driven nor tested; the pass drove three buildings at one
+viewport and did not re-exercise them. Stating that is the point: *a count that ticks them is a
+count that lies.*
+
+---
+
+## D112 — `destination-eta` weights `rideTime` at **0.5**, and the decomposition arms are bound to the configuration rather than to the shipped id
+
+**Date:** 2026-07-28 · **Owner:** T32, recording T30 · **Source:**
+`packages/experiments/DECISIONS-T30.md` §§ T30-D1 – T30-D2 (which may be deleted once this entry
+lands) · **Makes stale:** every sentence saying `destination-eta` is bit-identical to `eta`, weights
+`waitTime` only, or that the promotion is blocked
+
+### The defect: the standing requirement's shape, one level up from code into `data/`
+
+`data/dispatcher-profiles.json`'s `destination-eta` authored `dispatch.callType: mobile-credential`
+and a weight vector of `{ waitTime: 1.0 }` — **identical to `eta`'s**. The destination reached
+`estimateCost` and changed no decision. Measured through the full experiment matrix at seed
+20 260 728, the shipped Level-0 destination profile was **bit-identical to `eta` at 8 of 8 cells**:
+a configured, schema-valid, separately-tested, *shipped* behaviour with no effect on any shipped
+path. Invariant 7 makes dispatch strategy **data**; it does not put data outside the standing
+requirement, and this is the first instance of the defect that lives in a `.json` file.
+
+**The blocker its own `$comment` recorded was stale.** It said the promotion was blocked by
+`policies.test.ts`'s `contributionScenarios()` building calls with no `destinationFloorId`. T16
+closed that gap and `policies.test.ts` carries an explicit regression pin for the promotion.
+Verified by measurement rather than by reading: with the weight authored, `policies.test.ts` is green
+on all 31 tests, including *"has no weight that contributes nothing"* and *"lets no profile weight a
+term its own stage settings make inert"*.
+
+### Why 0.5 — two criteria, both stated **before** the sweep that produced the number
+
+**1. A shipped default may not make a published metric significantly worse.** This rules out the top
+of the bracket. Midtown Office interfloor-mix, n = 150, CRN, WT95 against `eta`:
+
+| `rideTime` | WT95 | verdict |
+|---|---|---|
+| 0.3 | `+0.369 [−0.311, +1.049]` | INDISTINGUISHABLE |
+| **0.5** | `+0.374 [−0.303, +1.051]` | INDISTINGUISHABLE |
+| 0.7 | `+0.620 [−0.033, +1.274]` | INDISTINGUISHABLE, marginally |
+| 1.0 | `+1.010 [+0.292, +1.729]` | **WORSE** |
+| 2.0 | `+1.331 [+0.623, +2.039]` | **WORSE** |
+
+**2. A shipped default may not be observationally inert at a shipped operating point** — the whole
+reason the weight exists. This rules out the bottom. On Midtown up-peak at the matrix's own seed and
+budget, replications differing from `eta`: **0 of 81** at 0.3, **5** at 0.5, **6** at 0.7, **16** at
+1.0. At the bracket's floor the shipped profile would still have been the baseline under another
+name at a shipped operating point — the defect being fixed, one notch smaller.
+
+**0.5 is the smallest bracket point that clears both.** What it costs against 0.3 is `+0.113 s` of
+AWT for `−0.224 s` of TTD and `−0.337 s` in the car; against the unpriced profile,
+`+0.295 [+0.154, +0.437] s` of AWT for `−1.217 [−1.531, −0.902] s` of TTD and
+`−1.512 [−1.813, −1.211] s` in the car. § D27's reporting clause requires saying so.
+
+**What is deliberately not claimed.** 1.0 and 2.0 remain **study arms**; the aggressive end of an
+unscalarized trade is the operator's to opt into by deriving an arm (`CLAUDE.md` § Tuning
+discipline). Phase 6a's `−1.562 [−1.916, −1.208] s` headline at `rideTime 1` is untouched.
+`destination-panel` stays at 1.0: Level 1 has already committed the passenger to a named car at the
+landing, so the wait-versus-ride trade it makes is not the trade a Level-0 disclosure profile makes,
+and the two are not required to agree.
+
+### Liveness, counted through the shipped engine rather than argued
+
+Seed 20 260 726, through `runSimulation`, on the profile `data/` carries:
+
+| configuration | building | `rideTime` non-zero | cross-car spread |
+|---|---|---|---|
+| shipped, `mobile-credential` | `midtown-office` | **260 / 260** | **12 / 65 decisions** |
+| shipped, `up-down-buttons` (gate off) | `midtown-office` | 0 / 248 | 0 / 62 decisions |
+| shipped, `mobile-credential` | `secure-tower` | 159 / 159 | 2 / 53 decisions |
+
+Before the change the shipped profile weighted no gated term, so the count was **0 evaluations**.
+The gated-off side is flat, which is `docs/09` § 8 R6-2's proof obligation discharged in the same
+measurement, and the non-zero count with spread is what R6-1's mitigation column asked for and never
+had. Trajectories separate at **7 of 8** matrix cells.
+
+**`garden-down-peak` stays identical, and it is structural rather than under-weighted.** 0 of 51
+replications differ at 0.3, at 1.0 **and** at 2.0. Every down trip ends at the lobby, so the
+destination carries nothing the direction button did not. **Raising the weight fourfold not moving
+it is how a blind operating point is told from a dead seam** — and it is the reason this is recorded
+as an open question rather than as remaining debt. `destination-panel` at `rideTime 1` lands in the
+same identity class there, independently.
+
+### The near miss, which is the most instructive part of this entry
+
+Three studies used the shipped `destination-eta` as their *"call type disclosed, nothing pricing it"*
+control — correct **only while the shipped profile happened to be that configuration**. Each is now
+bound to a derived arm, `destination-eta-unpriced` (`weights.rideTime: 0`, everything else
+inherited), so the measurement is unchanged and only the id moved:
+
+| study | arm | what would have happened otherwise |
+|---|---|---|
+| `destinationDisclosure.ts` | `DISCLOSURE_UNPRICED_ARM` | the Phase 6a decomposition would have been deleted |
+| `accessControl.ts` | `CREDENTIAL_ARM` | **H-ACCESS-2 silently redefined** — below |
+| `mixedUseHighRise.ts` | `DECOMPOSITION_ARM` | the *"call type alone is worth zero"* claim falsified |
+
+`accessControl.ts` is the one worth stating in full, because it is the case where a **pin
+regeneration would have hidden a change of *meaning* rather than a change of value.** H-ACCESS-2 is
+defined as `Δ = TTD(credential + destination priced) − TTD(credential alone)`. With the control bound
+to the shipped id, `Δ` becomes the marginal effect from 0.5 to 1.0 rather than the effect of pricing
+the destination at all. Measured: the published difference-of-differences
+`+0.982 [+0.584, +1.380]` falls to a mean of **+0.208**, interval still excluding zero on the
+positive side — **same sign, same REFUTED verdict, a fifth of the magnitude**, and the only thing
+marking the change would have been a regenerated pin. Bound to the configuration, the six
+access-control pins do not move at all.
+
+**The decomposition was preserved by inverting which arm is derived**: the *unpriced control* is now
+the derived one and the *priced treatment* is the shipped profile, where it used to be the other way
+round. The evidence that `rideTime: 0` ≡ the term being absent is itself a measurement rather than
+an argument about the scoring engine: `destination-eta-unpriced` is in `eta`'s identity class at
+n = 150, **150 of 150** paired differences of exactly zero on all seven identity metrics — which is
+what the shipped profile used to do.
+
+**The rule this generalizes to, and it is new:** *an arm resolved by a shipped profile id is an arm
+that can be redefined by editing `data/`.* A study whose control is a **configuration** should name
+that configuration.
+
+### Blast radius, measured
+
+**Pins: 40 changed, 12 added, 0 removed**, all `destination-eta` rows;
+`published.ts` goes from 771 to **783** entries. **Behaviour: 4 of 60 shipped cells move** (5
+buildings × 12 profiles), all `destination-eta`, and **`garden-apartments` does not move at all**.
+`docs/10`'s M1 and M2 therefore reproduce exactly, and were re-run rather than assumed. At the
+primary point the shipped profile is bit-identical to the derived study arm at its own weight —
+`destination-eta ≡ destination-eta+ride0.5`, 150 of 150 — so it is not merely *somewhere* on the
+published curve, it is exactly the measured point.
+
+**`docs/09` § 8's risk R6-1 — *"a destination profile lands in `data/` and changes nothing"* —
+HAPPENED.** It is recorded there as an instance, not as a risk, together with the reason its
+mitigation could not fire: `searchSpaceLiveness.test.ts` needs only one shipped building to differ,
+and A1's evaluation-count criterion was never wired to a test.
+
+---
+
+## D113 — the energy proxy: § D106 completed, and one sentence in it corrected
+
+**Date:** 2026-07-28 · **Owner:** T32 · **Corrects, without rewriting:** [§ D106](#d106--the-energy-proxy-its-basis-its-one-constant-what-it-omits-and-why-it-is-an-axis-and-never-a-score)
+
+`packages/experiments/DECISIONS-T30.md` § T30-D6 was written against a tree where this file had
+**zero** occurrences of the word "energy", and asked the documentation task to record the proxy from
+scratch. By the time it merged, **§ D106 already existed** and records it. This entry is therefore
+not the record T30-D6 asked for; it is the **delta** between that request and § D106, verified
+against `packages/core/src/metrics/types.ts` line by line rather than against either prose.
+
+### One sentence in § D106 is wrong, and it is the sentence T30 fixed in the code
+
+§ D106 says: *"`workPerServedLegKJ` normalizes by work done."* **It does not.** Work done is what it
+*divides*; what it divides **by** is legs delivered. `EnergyStatistics.workPerServedLegKJ`'s own
+docstring, corrected in the same commit that authored the `rideTime` weight, now reads: it *"divides
+the work by the **legs delivered** rather than leaving it as a fleet total, and it exists because the
+total is trivially gameable in the wrong direction: a configuration that spends less because it
+served fewer people has not saved anything."* The reasoning in § D106 is right and its rendering of
+the ratio is inverted. **Believe the code.**
+
+### Three things § D106 does not state, and the code does
+
+1. **`g = 9.80665`** — `STANDARD_GRAVITY_MPS2`, CODATA / ISO 80000-3's conventional value, named
+   rather than inlined so the arithmetic can be read against the formula. § D106 writes `g` in the
+   formula and never gives it a number.
+2. **The sample is per completed move and is attributed at *arrival*.** `TravelSample.at` is the
+   moment the car **levelled**, not the moment it started, so a move that straddles a window boundary
+   is charged whole to the window it *ended* in — exactly as a leg is assigned whole to the window
+   its arrival falls in. This is the whole reason the proxy is a per-move sample rather than an
+   odometer read at the end: the shipped operating points report a 300 s peak out of a 900 s run, and
+   a cumulative reading would put a whole-run energy figure beside a peak-window AWT in the same
+   Pareto point.
+3. **`measured: false` is the carrier of the `NaN` decision.** § D106 gives the reason; the field
+   that says which case obtained is `EnergyStatistics.measured`.
+
+### Everything else in T30-D6 checks out against the code, and is already in § D106
+
+The basis `|loadKg − 0.5 · ratedLoadKg| · g · distanceM`; the 0.4–0.5 literature range with Barney &
+Al-Sharif on drive sizing and counterbalancing, CIBSE Guide D § 13, and ISO 25745-2's reference cycle
+measured at empty / half / full load *because the mid point is the balance point*; **0.5 because it
+is the symmetric point**, so the number describes travel out of balance rather than one machine's
+counterweight order; **a code constant and not config**, because a per-run ratio would score two arms
+of one comparison on different scales and put a fitted per-installation constant inside a published
+axis; the enumerated omissions — acceleration losses (no shipped spec carries car and counterweight
+masses), drive and gearing efficiency, door motors, standby/idle power, and the non-regenerative
+absolute value that bounds a regenerative drive **from above**; and `NaN` never `0`, because *"the
+cars did not move"* and *"nobody wrote down how far the cars moved"* are different facts and zeroing
+them restores a two-axis front under a three-axis name.
+
+**Energy is an axis, never a score**, and § D106's reason for it survives this correction untouched.
+
+---
+
+## D114 — the ninth dead seam was a whole half of `benchmark/`, and `core`'s dead-code scanner had two holes (**C7 CLOSED**)
+
+**Date:** 2026-07-28 · **Owner:** T32, recording T30 · **Source:**
+`packages/experiments/DECISIONS-T30.md` §§ T30-D3 – T30-D4
+
+### The ninth: five studies, not one
+
+`measureEnergyLiveness` had no non-test caller — two barrels, a string key in `published.ts` and its
+own test — and the repository's own scanner reported `measureEnergyLiveness -> []`. **It was not a
+one-off.** `published.ts` § `STUDY_ENTRY_POINTS` splits `benchmark/` in two: everything mapped to a
+`PublishedStudyId` publishes a confidence interval, and every one of those has a non-test caller
+because `regeneratePins.ts` runs them all — a pin table has to be regenerable from the code that
+produced it. Everything mapped to `'no-intervals'` publishes **counts**, and that half had **no
+driver at all**. All five members were dead by the same measure: `measureAuctionAggregation`,
+`measureDestinationLiveness`, `measureEnergyLiveness`, `measureMultiRoundReachability`,
+`measurePredictorLag`.
+
+**The fix is symmetric rather than special-cased.** `benchmark/livenessSuite.ts` is the categorical
+half's `regeneratePins.ts`: it runs all five, formats their counts, and carries a command shell
+(`node packages/experiments/dist/benchmark/livenessSuite.js [--fast]`). **It asserts nothing** — each
+of the five already has a suite that asserts its own claim at its own budget, and duplicating those
+thresholds would create a second place for them to drift.
+
+**The guard is widened to be derived rather than hard-coded.** `src/index.test.ts` previously listed
+five Phase-7 entry points by hand, so a study added later was invisible to it. It now iterates
+`Object.keys(STUDY_ENTRY_POINTS)` — a categorical whose totality against the `benchmark/` directory
+`published.test.ts` already asserts in **both** directions — and requires each member to have a
+non-test, non-barrel caller, or a use inside its own module beyond its declaration. It deliberately
+does **not** assert barrel re-export: six live study entry points are on no barrel, and
+`measureEnergyLiveness` was on two and dead.
+
+Watched failing twice, by machine: removing `measureEnergyLiveness` from `livenessSuite.ts`
+reproduces the pre-fix state exactly; a synthetic `export async function measureProbeStudy` added to
+`benchmark/` fails `published.test.ts` first (*"benchmark/ exports a study entry point that
+published.ts does not classify"*), and classifying it then fails `index.test.ts` (*"has no caller
+outside its own tests"*) — two stages, neither of them a human reading.
+
+### C7: the guard on the guard, closed
+
+`packages/core/src/dispatch/deadCode.test.ts` is one of the two permanent guards and had two holes
+that `experiments/src/tuning`'s copy had already fixed. `core` may not import from `experiments`, so
+the fixes are **ported inline** rather than shared — two copies of one audit that need not agree is
+a standing hazard the dependency direction imposes.
+
+| hole | how it was made to bite | unfixed audit | fixed audit |
+|---|---|---|---|
+| `EXPORTED` skips `export async function` | an uncalled `export async function probeUncalledAsyncExport` added to `policies/zoning.ts` | **4 passed** — never scanned | **fails**, naming `policies/probeUncalledAsyncExport` |
+| `code()` keeps string literals | both real importers of `createArrivalModel` deleted | **4 passed** — `PredictorError(\`createArrivalModel: …\`)` read as a self-use | **fails**, naming `predictor/createArrivalModel` |
+
+Measured self-use counts under the two implementations: `createArrivalModel` 3 → 1, `PredictorError`
+2 → 1. **Both were live regardless of who imported them** before the fix — the second hole made an
+existing assertion *unfalsifiable*, which is strictly worse than a missing one, because it reads as
+coverage.
+
+**Closing them surfaced no new dead exports.** The allowlist is unchanged in both directions. What
+changed is that three existing assertions became falsifiable, and three assertions were added pinning
+the two fixes against **synthetic** input, because `dispatch/{policies,predictor}` contains no
+`export async function` today and a latent scanner gap is invisible until the first symbol falls into
+it.
+
+**C7 is closed.** It had been carried forward across three passes as *known and not fixed*, which was
+the honest disposition each time; it is now fixed, and the count of dead-seam instances in
+`docs/07` § 3 is the length of that table rather than a number in prose.
+
+---
+
+## D115 — the final truth pass: what the sweep found beyond its brief, and what is left open
+
+**Date:** 2026-07-28 · **Owner:** T32 · **Closes:** the orchestrated delivery's documentation
+
+Three fix tasks landed and deliberately left the prose stale. This entry records the sweep that made
+it true, the drift it found that nobody had listed, and — the part that matters most to whoever
+reads this next — **what is still open.**
+
+### Measured on this tree before anything was written
+
+`npx tsc -b` clean. `npx vitest run --testTimeout=120000` → **172 files / 3 220 tests, 3 211 passed,
+9 skipped**, exit 0, 578 s. That is 3 172 + 19 (§ D111) + 29 (§ D112, § D114), **accounted test by
+test**. The file count is unchanged at 172 — `livenessSuite.ts` is a driver, not a test.
+
+Two figures were re-derived rather than transcribed, because they are outputs of code the fix tasks
+changed:
+
+- **`runMatrix()` re-run in full.** `nearest-car` is still on the Pareto front at **6 of 8** cells,
+  on the same two exceptions, so `docs/10`'s R11 and § D106's argument are intact. **Two rows moved**:
+  `destination-eta` **joins** the front at `midtown-up-peak` and **leaves** it at
+  `midtown-interfloor` and `vertical-city-up-peak`. Those two departures are the interesting ones —
+  it was on those fronts only by being bit-identical to an arm already on them, so it left by
+  *becoming a distinct dispatcher*, not by getting worse.
+- **The 5 × 12 quotability grid re-run** through `elevator-sim run --seed 42 --duration 900`.
+  `docs/10`'s M1 reproduces exactly: 14 of 60 quotable, 40 saturated, 6 censoring failures.
+
+### Drift found beyond what the fix tasks listed
+
+| drift | believed |
+|---|---|
+| **A new identity class nobody had reported** — `destination-eta ≡ capacity-aware` at `garden-residential`, and `garden-down-peak`'s class also contains `destination-panel`. Both fall out of the same `runMatrix()` re-run; neither appears in any prior report | the code |
+| **The Pareto front table in `docs/05`** would have gone stale in exactly the way `published.ts` exists to prevent: front *membership* is derived from the matrix and is pinned by nothing, so the two moved rows would have sat there indefinitely with no test able to see them | the code |
+| **§ D106 already recorded the energy proxy**, so T30-D6's *"`DECISIONS.md` has zero mentions of energy"* was true when written and false when it merged — and § D106 contains the one wording error T30 had just fixed in the code (§ D113) | the code |
+| The UX ledger is **88** rows and **79 ✅**, not 87/78, in `README.md`, `docs/05` and `docs/07` | `packages/viz/UX.md` |
+| `docs/06`'s `activeWhen` worked example said *"`destination-eta` ships the call type and not the weight, so the two profiles together are the worked example of both sides of that gate"* — now false on both halves | the code |
+| `docs/08`'s correction block still read *"`rideTime` is weighted by no profile → `destination-panel` weights it"*; **both** destination profiles weight it | the code |
+| `docs/09` § 8's header asserted **eight** instances and framed R6-1 as a risk; `docs/09` § 0's verified-by-running table and § 7's Wave A rows both asserted the zero weight | the code |
+| `docs/10`'s § 11 remediation list carried six items with no state; two are done, one is done and re-marked, and three are **still open** and now say so | the code |
+| The dead-seam count in `CLAUDE.md`, `docs/05`, `docs/07` and `docs/09` (eight) | `livenessSuite.ts`, which names the ninth |
+| `T9-FINDINGS.md`'s pin count was corrected to 771 by § D110's addendum; it is now **783** (771 + 12 added) | `grep -cE '^\s+"[^"]+": \{ n: '` |
+
+### What remains open, stated in one place
+
+**Nothing here is a defect being hidden; each is a decision or a measurement someone must make.**
+
+1. **Phase 6c — learned control.** Deferred out of Phase 6 with three reasons (§ D28). Needs its own
+   *acceptance question* before it needs an implementation.
+2. **Phase 9 — the experience layer.** `docs/10` is a complete design and **not one line is built**.
+   No status table carries a Phase 9 row, deliberately: a design is not a phase in progress.
+3. **`packages/experiments` has no browser export**, which **blocks** Phase 9's generated editor.
+   The package declares `"."` and `"./package.json"` only, so a deep import of `tuning/space` is
+   refused by the resolver, and the one entry it declares reaches `node:worker_threads` through
+   `runner/parallel.ts`. `docs/10` § 13 q1, a **prerequisite** and not an optimization.
+4. **Four UX rows are ⚠️ unverified** — `RV-11`, `RV-17`, `RV-21`, `KB-14`. Built, reachable, neither
+   driven nor tested. `KB-14` is one of the seven ⛔ non-negotiable keyboard rows.
+5. **`ED-12` / `ED-13` contradict the schema** (**C30**). A zero-car bank is a schema *error*, not a
+   warning; a per-car `servesFloors` does not exist, service zoning is per **bank**. Re-marked
+   rather than ticked; `ED-12` is a `core` schema question.
+6. **`garden-down-peak` is `destination-eta`'s remaining identity class**, and it is *structural* —
+   bit-identical at `rideTime` 0.3, 1.0 **and** 2.0. Whether a destination can carry information at
+   a down-peak whose every trip ends at the lobby is an open question, not debt.
+7. **The `moveFloor` scope call** (§ D111). Give the declaration list its own view, or drop
+   `moveFloor` and let `index` be the only ordering control.
+8. **`C4`, `C5`, `C24`, `C27`, `C32`**, double-deck simulation, `patternSwitching`, the mixed-use
+   study's six-replication margin, and the viewer's `nearest-car` default.
+9. **No test asserts any phase's *status*.** `documentation.test.ts` asserts the four documents
+   **agree**; it would be perfectly happy with four documents that agreed and were all wrong. The
+   only defence is `CLAUDE.md` § Working agreements and a reader who checks. **This is the largest
+   un-mechanised risk in the repository**, and every phase verdict in it rests on that discipline.
+
+### The orchestration artifacts are final, and the mistakes stay in the record
+
+`MULTI_AGENT_PLAN.md`, `AGENT_STATUS.md`, `RISKS.md` and `TEST_MATRIX.md` are marked final and
+retired in place (§ D105), not deleted: `docs/01`, `docs/05`, `docs/08`, `core/src/analytical/`
+and `packages/viz/UX.md` cite them. Five process mistakes are kept in them **because they are the
+most transferable thing the delivery produced**:
+
+1. **The orchestrator weakened an acceptance criterion** by silently dropping a named building from
+   Phase 6's gate — inside a decision whose stated purpose was to *strengthen* it (§ D27 → § D99),
+   which is the only reason it was invisible for a wave. Closed by **measuring** the dropped clause
+   (§ D100), not by arguing it away.
+2. **Worktrees were mis-set-up, so builders linked against stale code.** A symlinked root
+   `node_modules` resolves to its realpath, so `@elevator-sim/*` pointed at the **main checkout's**
+   `dist`. vitest was unaffected; every built-artifact claim was about the wrong tree.
+3. **Two design documents were merged without being linked from `README.md`.** A guard caught it —
+   both times.
+4. **A brief conflated two study arms**, attributing one arm's interval and another's retention and
+   energy figures to a single row. Caught by re-running `runPhase7Acceptance()` rather than by
+   reading the brief.
+5. **A tree was reported clean when a file-sync client had polluted it** with duplicate artifacts.
+
+**Two of the five are the same failure**: a claim accepted because it was *reported* rather than
+*measured*. That is what `docs/07` § 9's *"reviewers must run things, not read them"* is for, and it
+is why every number in this pass names the command that produced it.
+
+### The rule this pass adds to § D110's
+
+§ D110 said a *number* with no non-test re-deriver is the same defect as a *behaviour* with no
+non-test caller. This pass adds the third form: **a study arm resolved by a shipped identifier is an
+arm that can be redefined by editing `data/`** (§ D112). The near miss on H-ACCESS-2 is the proof —
+same sign, same verdict, a fifth of the magnitude, and nothing but a regenerated pin to mark it.
+`published.ts` would have re-derived the number faithfully and been **right about the arithmetic and
+wrong about the question.**

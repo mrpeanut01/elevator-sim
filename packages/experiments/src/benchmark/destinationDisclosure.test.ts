@@ -23,12 +23,23 @@
  *
  * ## The effect is the *pricing*, not the call type, and the study separates them
  *
- * The shipped `destination-eta` — `mobile-credential`, no `rideTime` weight — is **bit-identical to
+ * `destination-eta-unpriced` — `mobile-credential`, no `rideTime` weight — is **bit-identical to
  * `eta`** on this building, 150 of 150 paired differences exactly zero, on every metric. Midtown
  * Office declares no `accessZones`, so disclosing the destination changes nothing that nothing
  * prices. Moving the information earlier is worth **exactly zero** until something reads it, and the
  * arm that reads it is worth −1.562 s. Two arms, one variable, and the decomposition is not an
  * inference.
+ *
+ * That arm was the **shipped** profile until T30, and the swap is the point rather than a detail.
+ * A Level-0 destination profile that priced nothing was a configured, tested, shipped behaviour
+ * that changed no decision anywhere — the matrix measured it bit-identical to `eta` at 8 of 8 cells
+ * — so `data/dispatcher-profiles.json` now weights `rideTime` at **0.5** and the unpriced
+ * configuration is derived here instead. The decomposition is unchanged; only which of the two
+ * configurations ships is. Why 0.5 rather than the 1.0 this file headlines, and rather than the
+ * bracket's own floor of 0.3, is argued from the table in `destinationDisclosure.ts` § *Why the
+ * shipped default is 0.5*. Both criteria that decide it are asserted below rather than described:
+ * a WT95 interval that contains zero at the shipped weight and excludes it at 1.0 and 2.0, and a
+ * shipped profile that is no longer bit-identical to `eta` at the primary point.
  *
  * ## The cost destination dispatch is supposed to pay is negative here (OQ-4)
  *
@@ -45,11 +56,15 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { loadResources } from '../validation/harness.js';
+
 import {
   DISCLOSURE_METRICS,
   DISCLOSURE_PROFILE,
+  DISCLOSURE_UNPRICED_ARM,
   DEFERRED_ARM,
   RIDE_TIME_WEIGHTS,
+  SHIPPED_RIDE_TIME_WEIGHT,
   disclosureArm,
   formatDisclosureStudy,
   rideArmId,
@@ -151,23 +166,92 @@ describe('Phase 6a — destination disclosure at the primary operating point', (
   }, TIMEOUT_MS);
 
   it('separates the call type from the weight: disclosure alone is worth exactly zero here', async () => {
-    // The decomposition, and the reason the shipped profile is in the study as an arm rather than as
-    // a footnote. Midtown Office declares no `accessZones`, so `mobile-credential` moves information
-    // that nothing on this building reads — and an argmin over an unchanged cost function is an
-    // unchanged argmin. 150 of 150 paired differences exactly zero, on every metric.
-    const arm = disclosureArm(await study(), DISCLOSURE_PROFILE);
+    // The decomposition. Midtown Office declares no `accessZones`, so `mobile-credential` moves
+    // information that nothing on this building reads — and an argmin over an unchanged cost
+    // function is an unchanged argmin. 150 of 150 paired differences exactly zero, on every metric.
+    //
+    // **This used to be the shipped profile, and it is now a derived arm.** That is T30's change and
+    // it is the reverse of a weakening: the shipped `destination-eta` weighting nothing was itself
+    // the defect (bit-identical to `eta` at 8 of 8 matrix cells — a profile named for a mechanism
+    // that changed no decision), and the fix would have deleted this row along with it, because the
+    // row that separates the call type from the pricing has to *be* the call type without pricing.
+    // So the configuration was kept and its id moved. Same two arms, same measurement, same result.
+    const arm = disclosureArm(await study(), DISCLOSURE_UNPRICED_ARM);
     for (const cell of arm.cells) {
       expect(cell.verdict, cell.metric).toBe('IDENTICAL');
       expect(cell.comparison.exactZeroCount, cell.metric).toBe(cell.comparison.n);
     }
     expect(
       (await study()).identityClasses.some(
-        (members) => members.includes('eta') && members.includes(DISCLOSURE_PROFILE),
+        (members) => members.includes('eta') && members.includes(DISCLOSURE_UNPRICED_ARM),
       ),
     ).toBe(true);
     // …and the same profile with the ride priced is identical to nothing.
     const priced = disclosureArm(await study(), HEADLINE);
     expect(priced.cell('ttdMeanS').verdict).not.toBe('IDENTICAL');
+  }, TIMEOUT_MS);
+
+  it('finds the SHIPPED profile on the curve rather than beside it, and no longer at zero', async () => {
+    /*
+     * **The liveness assertion for `data/dispatcher-profiles.json`, and the one that would have
+     * caught the defect T30 closed.** Before it, this arm was four rows of `IDENTICAL` — the
+     * shipped Level-0 destination profile disclosing a destination that nothing priced, which is
+     * docs/05-roadmap.md § Standing requirement's shape one level up from code into data.
+     *
+     * Two claims, and the second is what makes the first mean something:
+     *
+     * 1. The shipped arm is no longer identical to the baseline on the gate metric — the profile
+     *    changes decisions.
+     * 2. It is **bit-identical to the derived arm at the same weight**, so it is not merely
+     *    *somewhere* on the curve, it is exactly the measured point the study publishes at 0.5.
+     *    An identity class is the strongest form that claim can take: 150 of 150 replications.
+     */
+    const result = await study();
+    const shipped = disclosureArm(result, DISCLOSURE_PROFILE);
+
+    expect(shipped.cell('ttdMeanS').verdict).toBe('BETTER');
+    expect(shipped.cell('ttdMeanS').estimate.upper).toBeLessThan(0);
+    expect(shipped.cell('rideMeanS').verdict).toBe('BETTER');
+    // The tail is the reason the shipped weight is not 1.0 or 2.0: at 0.5 the WT95
+    // interval contains zero, and at both larger weights it does not. Asserted rather than
+    // described — a default justified by a property nothing checks is a default justified by
+    // nothing.
+    expect(shipped.cell('wt95S').verdict).toBe('INDISTINGUISHABLE');
+    for (const weight of [1, 2]) {
+      expect(disclosureArm(result, rideArmId(weight)).cell('wt95S').verdict, `rideTime ${weight}`)
+        .toBe('WORSE');
+    }
+
+    expect(
+      result.identityClasses.some(
+        (members) =>
+          members.includes(DISCLOSURE_PROFILE) &&
+          members.includes(rideArmId(SHIPPED_RIDE_TIME_WEIGHT)),
+      ),
+      'the shipped profile is not bit-identical to the study arm at its own weight, so either ' +
+        'data/dispatcher-profiles.json has drifted from SHIPPED_RIDE_TIME_WEIGHT or something ' +
+        'other than the weight differs between them',
+    ).toBe(true);
+    // And it is emphatically not in the baseline's class any more, which is where it used to live.
+    expect(
+      result.identityClasses.some(
+        (members) => members.includes('eta') && members.includes(DISCLOSURE_PROFILE),
+      ),
+    ).toBe(false);
+  }, TIMEOUT_MS);
+
+  it('measures the shipped weight against the file, so the two cannot drift apart', async () => {
+    const config = await loadResources();
+    const profile = config.dispatcherProfilesById.get(DISCLOSURE_PROFILE);
+    expect(profile, `data/ has no profile "${DISCLOSURE_PROFILE}"`).toBeDefined();
+    expect(
+      profile?.weights.rideTime,
+      'the shipped destination profile does not weight rideTime at the value this study brackets ' +
+        'it at. A Level-0 profile that discloses a destination and prices nothing is the inert ' +
+        'shipped behaviour T30 removed',
+    ).toBe(SHIPPED_RIDE_TIME_WEIGHT);
+    // The bracket must contain the shipped point, or the study reports a curve the default is not on.
+    expect(RIDE_TIME_WEIGHTS).toContain(SHIPPED_RIDE_TIME_WEIGHT);
   }, TIMEOUT_MS);
 
   it('finds the trade monotone in the weight, in both directions', async () => {

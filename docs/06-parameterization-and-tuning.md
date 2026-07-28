@@ -159,6 +159,11 @@ The stop decision and what happens at the floor.
 > |---|---|---|---|---|
 > | | 34 of 50 | **0** | 2 | 32 |
 >
+> *(That grid is **as measured**: ten profiles shipped at the time. Twelve ship now —
+> `destination-eta` and `destination-panel` were added in Phase 6 — so the study covers 50 of
+> today's 60 cells. The two significant results are unaffected; nothing here has been re-run at
+> 5 × 12, and this table is not a current census.)*
+>
 > Both significant cells are *improvements*: `secure-tower|auction-multi-round` −13.2 % (−7.66 s,
 > CI [−12.72, −2.60]) and `vertical-city|predictive-balanced` −14.4 % (−6.80 s, CI [−11.36, −2.23]).
 > The remaining 16 cells saturate in nearly every replication — `midtown-office` on all ten profiles,
@@ -484,6 +489,24 @@ new traffic. This risk is rarely mentioned in the elevator literature and is ent
 than collapsing to a single number. Reducing energy generally costs waiting time; that
 tradeoff is a decision for the building operator, not a constant to bake in.
 
+> **The energy axis is now measurable, and that changes what this guardrail costs to honour.** Until
+> `f895a16`, `RunSummary` recorded no energy, no metres travelled and no stop count, so every front
+> this project produced silently degenerated to two axes with the third reported `inactive` — the
+> guardrail above was correct advice that could not be followed. `RunSummary.energy` now carries an
+> out-of-balance mechanical-work proxy over the reporting window, `runner/metrics.ts` projects
+> `energyKJ`, `carDistanceM`, `carStarts` and `energyPerServedLegKJ`, and both `matrix.ts` and
+> `phase7Acceptance.ts` decide their fronts over all three axes. Basis, constants and enumerated
+> omissions: [`docs/02` § Energy and the counterweight](02-elevator-reference.md) and
+> [`DECISIONS.md` § D106](../DECISIONS.md).
+>
+> **The tradeoff it exposes is real and it is expensive.** Phase 7's acceptance arms buy 1.09 s of
+> AWT on Garden Apartments for **+30.3 %** energy (2 s deadband) and 1.11 s for **+27.7 %**
+> (2.582 s), measured at n = 150 on held-out seeds. Report both. And note the direction the axis
+> cuts: measured across the whole matrix, **`nearest-car` — the weakest shipped dispatcher — is on
+> the front at six of eight cells**, because it is best on energy and worst on wait. That is why
+> energy is an **axis and never a score**: any aggregate that folds it into one number ranks the
+> worst dispatcher first.
+
 **Report the noise floor.** If two candidates differ by less than the confidence-interval
 half-width, they are **indistinguishable**. Say so. Do not rank them.
 
@@ -552,12 +575,21 @@ Everything above is data. Changing any of it requires no rebuild — which is th
 > shipped profile, and 468/468 non-zero under `destination-entry`.
 >
 > **That corroboration is now historical, and the reason is the point of the example.** Phase 6
-> shipped two more profiles — `data/dispatcher-profiles.json` carries **twelve** — and one of them,
-> `destination-panel`, *does* weight `rideTime`. It is allowed to precisely because it also authors
-> `dispatch.callType: mobile-credential`, which satisfies the term's `activeWhen`. The rule the red
-> suite was enforcing has not changed: a profile may weight `rideTime` **iff** its own stage
-> settings make the term live. `destination-eta` ships the call type and *not* the weight, so the
-> two profiles together are the worked example of both sides of that gate.
+> shipped two more profiles — `data/dispatcher-profiles.json` carries **twelve** — and **both** of
+> them, `destination-panel` and `destination-eta`, weight `rideTime` (at 1.0 and **0.5**). They are
+> allowed to precisely because both also author `dispatch.callType: mobile-credential`, which
+> satisfies the term's `activeWhen`. The rule the red suite was enforcing has not changed: a profile
+> may weight `rideTime` **iff** its own stage settings make the term live.
+>
+> > **Corrected 2026-07-28.** This paragraph read *"`destination-eta` ships the call type and not the
+> > weight, so the two profiles together are the worked example of both sides of that gate"*. That
+> > was true when written and is now false: [`DECISIONS.md` § D112](../DECISIONS.md) authored
+> > `weights.rideTime: 0.5`, because a profile that discloses a destination nothing prices is a
+> > shipped behaviour with no effect on any shipped path — measured **bit-identical to `eta` at 8 of
+> > 8 matrix cells**. The *gate* is unchanged; what changed is that no shipped profile now sits on
+> > its permissive side without using it. The other side of the gate — a profile weighting `rideTime`
+> > **without** the call type — is still exercised, by `policies.test.ts` rather than by `data/`,
+> > which is the right place for a configuration that must stay illegal.
 > [Review finding #6](08-review-findings.md); the JSON blocks in this file are now parsed and run
 > through the real `parseDispatcherProfiles` and the same `activeWhen` gate computation by
 > `packages/experiments/src/tuning/space/docExamples.test.ts`, so this example can no longer drift

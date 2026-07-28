@@ -43,3 +43,11 @@ pnpm-debug.log*
 
 # Multi-agent worktrees
 .worktrees/
+
+# Finder / file-sync duplicates. A sync client on at least one dev machine creates
+# "name 2.ts" copies of every file during a large checkout. They are untracked, but the
+# vitest globs match them, so a polluted working tree produces a red suite that has
+# nothing to do with the code. Ignore them so `git status` stays readable; delete them
+# with:  git clean -n '* 2.*'   then   git clean -f '* 2.*'
+* 2.*
+* 2

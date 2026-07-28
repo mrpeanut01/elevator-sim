@@ -21,7 +21,15 @@ import * as reportsModule from './reports/index.js';
 import * as runnerModule from './runner/index.js';
 import * as statsModule from './reports/statistics.js';
 import * as tuningModule from './tuning/index.js';
-import { corpus, nonTestImportersOf } from './tuning/callers.test-helper.js';
+import { STUDY_ENTRY_POINTS } from './benchmark/published.js';
+import {
+  PACKAGES_DIR,
+  code,
+  corpus,
+  isTest,
+  nonTestImportersOf,
+  type Corpus,
+} from './tuning/callers.test-helper.js';
 
 const submodules = {
   stats: statsModule,
@@ -219,7 +227,15 @@ describe('Phase 5 verdict vocabulary is usable through the barrel alone', () => 
  * one passing is exactly what made the sixth instance invisible.
  */
 describe('Phase 7 is reachable from the barrel and called from outside its own tests', () => {
-  /** The five entry points docs/08-review-findings.md § 1 names by hand. */
+  /**
+   * The five entry points docs/08-review-findings.md § 1 names by hand.
+   *
+   * A **fixed historical set**, and deliberately so: it pins one named finding, and `tuning/`'s own
+   * exports are audited exhaustively — derived from the directory — by `tuning/deadCode.test.ts`.
+   * What a hand-written list *cannot* do is notice a study that did not exist when it was written,
+   * and this one did not: `measureEnergyLiveness` shipped with no caller and was invisible here for
+   * a whole phase. That gap is closed by the derived block below, not by adding names to this one.
+   */
   const ENTRY_POINTS = [
     'randomSearch',
     'successiveHalving',
@@ -327,6 +343,125 @@ describe('Phase 7 is reachable from the barrel and called from outside its own t
     /* One shared seed is enough: the search optimized against that traffic. */
     expect(() => barrel.assertDisjointSeedSets([evaluation(['1', '2'], ['2', '4'])])).toThrow(
       barrel.TuningReportError,
+    );
+  });
+});
+
+/**
+ * **The same rule as the block above, over a domain nobody maintains by hand.**
+ *
+ * The Phase 7 block asserts five names. It cannot assert a sixth, because the sixth did not exist
+ * when it was written — and a sixth is exactly what shipped. `measureEnergyLiveness` lives in
+ * `benchmark/energyLiveness.ts`, a module whose own docstring is about not shipping a dead seam,
+ * and its only importers were two barrels, a string key in `published.ts` and its own test. By this
+ * repository's own scanner: `measureEnergyLiveness -> []`. Nothing failed, because nothing looked.
+ *
+ * So the domain here is **derived**: `STUDY_ENTRY_POINTS`, whose keys `published.test.ts` already
+ * asserts — in both directions — are exactly the `export (async )?function (run|measure|audit)Xxx`
+ * declarations `benchmark/` contains. That is `sim/seam.test.ts`'s convention: iterate a
+ * categorical's own domain rather than a copy of it, so a member added tomorrow is in scope today.
+ * Add a study to `benchmark/` and it must be classified in `published.ts`; classify it and this
+ * block demands a caller for it.
+ *
+ * ## What counts as a caller here
+ *
+ * The definition the two permanent dead-code audits use, and for the same reasons: a real
+ * `import`/`export … from` binding in a file that is neither a test nor a barrel, **or** a use
+ * inside the entry point's own module beyond its declaration. The second is not a loophole — it is
+ * how `runNegativeControls` (called by `runDestinationDisclosureStudy`) and `runMatrixCell` (called
+ * by `runMatrix`) are legitimately live, and it is measured on comment-**and**-string-stripped
+ * source so a `{@link}` tag or a symbol named in its own error message cannot supply it.
+ *
+ * The interval-publishing half of `benchmark/` has always satisfied this: `regeneratePins.ts` runs
+ * every one of them. The categorical half had no such driver, which is the *class* the ninth
+ * instance belonged to rather than a one-off. `livenessSuite.ts` is that driver.
+ */
+describe('every study entry point benchmark/ declares is called from outside its own tests', () => {
+  const scope = corpus();
+
+  /** The domain, derived. Sorted so a failure reads in a stable order. */
+  const ENTRY_POINTS = Object.keys(STUDY_ENTRY_POINTS).sort();
+
+  /** The module that declares `name`, from comment-stripped source so a code fence cannot claim it. */
+  function definingFile(candidates: Corpus, name: string): string | undefined {
+    const declared = new RegExp(String.raw`export\s+(?:async\s+)?function\s+${name}\b`);
+    return candidates.files.find((path) => !isTest(path) && declared.test(code(candidates.text(path))));
+  }
+
+  /** Non-test, non-barrel importers, plus the entry point's own module when it uses it itself. */
+  function callSitesOf(name: string): readonly string[] {
+    const sites = [...nonTestImportersOf(scope, name)];
+    const own = definingFile(scope, name);
+    if (own !== undefined) {
+      const uses = (code(scope.text(own)).match(new RegExp(`\\b${name}\\b`, 'g')) ?? []).length;
+      if (uses > 1) sites.push(`${own.slice(PACKAGES_DIR.length)} (used in its own module)`);
+    }
+    return sites;
+  }
+
+  it('takes its domain from the classification published.ts derives from the directory', () => {
+    /* Non-vacuous, and non-vacuous about the right thing: an empty or tiny domain would make every
+       assertion below pass by not looking, which is the failure this block exists to end. */
+    expect(ENTRY_POINTS.length).toBeGreaterThan(15);
+    /* The ninth instance, and the driver that answers it. If either name ever disappears from the
+       classification, this block has stopped covering the case it was written for. */
+    expect(ENTRY_POINTS).toContain('measureEnergyLiveness');
+    expect(ENTRY_POINTS).toContain('runLivenessSuite');
+    /* And the five categorical studies are all in scope, not just the interval-publishing ones —
+       the half that had no driver at all. */
+    for (const name of [
+      'measureAuctionAggregation',
+      'measureDestinationLiveness',
+      'measureMultiRoundReachability',
+      'measurePredictorLag',
+    ]) {
+      expect(ENTRY_POINTS).toContain(name);
+    }
+  });
+
+  /*
+   * There is deliberately **no** "…is re-exported from the package root" assertion here, and the
+   * omission is the block's whole thesis rather than an oversight. The Phase 7 block above asserts
+   * re-export because docs/08-review-findings.md § 1 named that as one of two separate properties;
+   * repeating it over this domain would assert *reachability*, which is the exact property all nine
+   * dead behaviours already had. Six study entry points are not on the barrel at all
+   * (`runNegativeControls`, `runAccessControlStudy`, `runDestinationDisclosureStudy`,
+   * `runDestinationDispatchStudy`, `runMixedUseHighRiseStudy`, `measureDestinationLiveness`) and
+   * every one of them is live; `measureEnergyLiveness` was on **two** barrels and was dead. The
+   * barrel says nothing either way, so this block asks only the question that does.
+   */
+
+  it.each(ENTRY_POINTS)('has at least one non-test, non-barrel caller of %s', (name) => {
+    expect(
+      callSitesOf(name),
+      `${name} has no caller outside its own tests. A barrel re-export is reachability, not use; a ` +
+        '{@link} tag is neither; and a string key in published.ts is a classification rather than a ' +
+        'call. That combination is the exact state measureEnergyLiveness shipped in — the ninth ' +
+        'instance of docs/05-roadmap.md § Standing requirement. Wire it into a driver ' +
+        '(regeneratePins.ts for an interval study, livenessSuite.ts for a categorical one), give it ' +
+        'a CLI command, or delete it',
+    ).not.toEqual([]);
+  });
+
+  it('names livenessSuite.ts as the caller of the five that publish no interval', () => {
+    /* Named rather than merely counted, for the reason the Phase 7 block gives: "some file imports
+       it" is satisfiable by a second barrel. These five are the ones that had nothing. */
+    for (const name of [
+      'measureAuctionAggregation',
+      'measureDestinationLiveness',
+      'measureEnergyLiveness',
+      'measureMultiRoundReachability',
+      'measurePredictorLag',
+    ]) {
+      expect(callSitesOf(name), name).toContain('experiments/src/benchmark/livenessSuite.ts');
+    }
+    /* And the inverse, so this cannot pass for the wrong reason: the barrels do bind these names,
+       and must not be what makes the assertion above pass. */
+    expect(nonTestImportersOf(scope, 'measureEnergyLiveness')).not.toContain(
+      'experiments/src/benchmark/index.ts',
+    );
+    expect(nonTestImportersOf(scope, 'measureEnergyLiveness')).not.toContain(
+      'experiments/src/index.ts',
     );
   });
 });

@@ -31,6 +31,35 @@ import {
 import type { VizFloor } from '../contract/types.js';
 import type { ShaftGeometry } from '../render/layout.js';
 
+/**
+ * A floor list in **building order**: highest first, ground at the bottom — `U1`.
+ *
+ * The editor's form used to list floors in declaration order, top-first, so Garden Apartments
+ * read `G, 2, 3, 4, 5, 6` downward while the preview six inches to its right drew `6` at the top
+ * and the lobby at the bottom. Two views of one building on one screen, running in opposite
+ * directions. Every floor-ordered list in the editor now goes through here.
+ *
+ * ## Why `index` and not the reverse of the array
+ *
+ * `index` is what a building means by *which floor is above which*: `expandFloors` sorts its
+ * output by it, `resolveBuilding` re-sorts by it, and `buildLayout` places rows by the height
+ * that `index` is required to agree with. The declaration array is only the order somebody typed
+ * the floors in, and it is not always the building's — `data/buildings/midtown-office.json`
+ * declares index `0` before index `-1`, so reversing the array would draw the basement *above*
+ * the lobby in the form and below it in the picture. That is the same defect on one building
+ * instead of five, which is worse than the defect, because it looks fixed.
+ *
+ * Pure, and it copies: the caller renders from the result and commits from the original, so the
+ * document's own order is never rewritten by looking at it.
+ */
+export function floorsInBuildingOrder(
+  floors: readonly FloorConfig[],
+): readonly FloorConfig[] {
+  // A stable tie-break on height, for the malformed document where two floors share an index —
+  // the loader rejects that, but the preview and the form both run on documents it would reject.
+  return [...floors].sort((a, b) => b.index - a.index || b.heightM - a.heightM);
+}
+
 export interface PreviewGeometry {
   readonly floors: readonly VizFloor[];
   readonly shafts: readonly ShaftGeometry[];

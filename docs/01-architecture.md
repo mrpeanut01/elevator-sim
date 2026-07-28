@@ -249,7 +249,7 @@ packages/
 │   ├── runner/            — parallel replication execution, CRN, sequential stopping
 │   ├── reports/           — persistence, replay, re-analysis, and the interval arithmetic
 │   ├── oracle/            — closed-form against measured round trip, reconciled term by term
-│   ├── benchmark/         — Phase 5: the written report and the studies behind it
+│   ├── benchmark/         — Phase 5's report and studies, and Phase 8's full experiment matrix
 │   ├── tuning/            — Phase 7: automated search over the parameter space
 │   │   ├── space/         — the self-describing search space, sampling, encoding
 │   │   ├── search/        — random search, successive halving, sep-CMA-ES, the objective
