@@ -865,3 +865,108 @@ in the `record` field"*. On the merged `integration` tree the figure reported is
 one rather than on `vertical-city` alone. **NOT RE-MEASURED by T4** — closing it would need a
 fingerprint of the pre-merge tree, which this worktree does not have built. Recorded with its
 provenance rather than transcribed as a measurement. No simulated number moves either way.
+
+---
+
+## D27 — Phase 6's acceptance criterion is **raised**, because its stated metrics stop being comparable (OQ-7)
+
+**Date:** 2026-07-27 · **Owner:** orchestrator · **Escalated by:** T14
+
+**Context.** `docs/05-roadmap.md` states Phase 6's gate as *"a learned dispatcher beats the naive
+baselines on **AWT and WT95** on the Mixed-Use High-Rise, with paired-t intervals excluding zero."*
+T14 measured that AWT and WT95 are two of the **nine** metrics Level 1 makes non-comparable, and
+that they are the two whose **sign flips**: at Midtown interfloor-mix, n=40 under CRN, ΔAWT is
+`+0.355 ± 0.337` (worse) while ΔTTD is `−1.821 ± 0.738` (better). Both exclude zero, in opposite
+directions, from the same runs.
+
+So the phase's gate, as written, would reject a genuine improvement — or, worse, be quietly
+reinterpreted by whoever runs it.
+
+**Alternatives.** (a) Keep the criterion and let the phase fail on a metric that penalises it by
+construction. (b) Replace AWT/WT95 with TTD — a **weakening**, since it drops the metrics on which
+destination dispatch looks worst. (c) Gate on TTD **and** require AWT and WT95 to be reported with
+explicit verdicts.
+
+**Chosen:** (c). **Why:** `CLAUDE.md` forbids weakening a criterion and requires raising it instead.
+(b) is the comfortable move and hides the honest cost of the approach — `docs/07-handoff.md` says
+that cost "is a documented cost of the approach and this simulator can quantify it", so hiding it
+would discard the point. (c) is strictly stronger than the original: it adds a metric the phase must
+win on and keeps both metrics it might lose on, in public, with verdicts rather than silence.
+
+**Impact.** Phase 6's gate becomes: beat the baseline on **TTD** with a paired-t interval excluding
+zero, **and** report AWT and WT95 with explicit BETTER / WORSE / INDISTINGUISHABLE / IDENTICAL
+verdicts. A WORSE verdict on AWT does not fail the phase; **omitting it does.**
+
+---
+
+## D28 — Phase 6 splits into 6a and 6b; learned control (6c) leaves the phase
+
+**Date:** 2026-07-27 · **Owner:** orchestrator · **Recommended by:** T14
+
+**Context.** T14 established that "Phase 6" is two unrelated bodies of work plus a third that shares
+no interface with either.
+
+**Chosen.**
+- **6a — destination *disclosure*.** `dispatch.callType: destination-entry` is already wired end to
+  end. Needs profiles in `data/` and a study, **no `core` change**. Ships two real measured results.
+- **6b — destination *dispatch*.** Per-passenger car assignment: the passenger-model change, and
+  where R9 actually lives. **Strictly serial on `sim/simulation.ts`** — B1–B5 all edit overlapping
+  methods of one 2,765-line file.
+- **6c — learned control.** Deferred out of Phase 6. It shares no interface with 6a or 6b, it
+  strains invariant 8 (is a 400-parameter policy vector a declarable tunable?), and decisively its
+  acceptance criterion is stated in the metrics 6b makes non-comparable.
+
+**Why not one wave:** four owners against one 2,765-line file, with OQ-1 unanswered and an
+acceptance criterion contradicting the phase's own comparison metric, is the Phase 5 configuration
+with a larger blast radius. Splitting by method inside `simulation.ts` reproduces the documented
+root cause exactly.
+
+**Impact.** Wave 3 is 6a. 6b follows with a single named seam owner. 6c is recorded as deferred
+scope in the roadmap, not silently dropped.
+
+---
+
+## D29 — A destination assignment is **write-once**; a bumped passenger is recorded, not re-assigned (OQ-1)
+
+**Date:** 2026-07-27 · **Owner:** orchestrator · **Escalated by:** T14
+
+**Context.** When a car fills and leaves promised passengers behind, either their `assignedCarId`
+stands, or the system re-offers the call to the group. `#reofferCall` currently re-offers, which is
+the destination panel silently changing its mind.
+
+**Alternatives.** (a) Write-once — the passenger waits for the car they were told. (b) Re-offer.
+(c) Make it a tunable.
+
+**Chosen:** (a), with an explicit **broken-promise** counter, and re-assignment recorded as
+out-of-scope for 6b rather than built. **Why:** committing at call time **is** destination
+dispatch's cost, and `docs/07-handoff.md` says this simulator exists to quantify it. (b) quietly
+recovers the deferral advantage Level 1 is supposed to surrender, which flatters the thing being
+measured — the failure mode this project's statistical discipline exists to prevent. (c) invents a
+knob nobody has asked for, and an unrequested tunable is this repository's documented defect class;
+if re-assignment is later wanted it arrives with its own liveness proof and its own study.
+
+**Impact.** 6b must override `#reofferCall` for assigned passengers and add the broken-promise
+count to the recorded metrics. A non-zero count is a *result*, not a failure.
+
+---
+
+## D30 — A destination-entry kiosk **authorizes** (OQ-3)
+
+**Date:** 2026-07-27 · **Owner:** orchestrator · **Escalated by:** T14
+
+**Context.** Does entering a destination at a kiosk perform the access check? T14 measured that
+`destination-entry` without a credential breaks `secure-tower` outright — undelivered 0 → 43.2,
+5/5 replications timed out — because `estimateCost` checks destination access against
+`request.credentialGroup`, which `costRequestFor` drops under `destination-entry`.
+
+**Chosen:** panel-stage authorization (T14's option (b)). **Why:** option (a) makes the roadmap's
+own sentence — that destination dispatch does better under access control *because* authorization
+and optimization happen in the same step — vacuous, and an unfalsifiable hypothesis is not one.
+
+**Note, and it matters:** T14's pilot has already **refuted** that mechanism claim. Given the
+credential, disclosure helps *less* on the access-controlled building (−0.455 ± 0.328 on
+`secure-tower` against −0.962 ± 0.651 on `midtown-office`). The saving is real and it is entirely in
+the credential. Three documents plus a `core` docstring
+(`packages/core/src/dispatch/lifecycle.ts:100-104`) assert the mechanism as fact; all four need
+correcting once the confirmatory study lands. A docstring asserting an unmeasured mechanism is the
+same species of defect as a published number nothing re-derives.
