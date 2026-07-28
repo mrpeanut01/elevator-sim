@@ -54,7 +54,7 @@ changed has regressed the suite.
 | baseline | clean | 115 files / 2442 tests | — | ✅ |
 | T5 `a3cb937` | clean | 124 files / **2531** tests | 2442 + 89 | ✅ matches |
 | T2 `0342982` | clean | 124 files / **2543** tests | 2531 + 12 | ✅ matches |
-| T1 `2f835d0` | clean | pending | 2543 + 41 | 🟡 |
+| T1 `2f835d0` | clean | 126 files / **2578** tests | 2543 + 35 | ✅ matches |
 
 ### Orchestrator re-verification of T2, run in the main checkout (C8 remediation)
 
