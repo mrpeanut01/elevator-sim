@@ -8,7 +8,7 @@ Live state of every task. Updated by the orchestrator as reports come in.
 |---|---|---|---|---|---|---|
 | T1 | tuning-seam builder | `feat/tuning-seam` | `.worktrees/T1-tuning-seam` | ✅ **merged** `2f835d0` | — | review pending |
 | T2 | statistics builder | `fix/statistics-integrity` | `.worktrees/T2-statistics` | ✅ **merged** `0342982` | — | independent review in flight |
-| T3 | inert-tunables builder | `fix/inert-tunables` | `.worktrees/T3-inert-tunables` | 🟡 in flight | — | await report + behaviour-change list |
+| T3 | inert-tunables builder | `fix/inert-tunables` | `.worktrees/T3-inert-tunables` | ✅ **merged** `9fb32e8` | — | independent review in flight |
 | T4 | docs builder | `docs/register-drift` | `.worktrees/T4-docs` | ⬜ held | wave-1 merges | dispatch after T1–T3 merge |
 | T6 | blast-radius + statistics follow-ups | `fix/blast-radius` | `.worktrees/T6-blast-radius` | 🟡 in flight | — | **blocks T4** |
 | T5 | viz foundation builder | `feat/viz-foundation` | `.worktrees/T5-viz` | ✅ **merged** `a3cb937` | — | independent review in flight |
@@ -19,7 +19,7 @@ Live state of every task. Updated by the orchestrator as reports come in.
 |---|---|---|---|
 | T1 | pending | orchestrator verified `tune` end to end + known-answer test | ✅ passed |
 | T2 | ✅ done — **ACCEPT WITH FOLLOW-UPS** | orchestrator re-verified in main checkout | ✅ passed, 6 follow-ups → T6 |
-| T3 | required (high risk — writes `sim/simulation.ts`) | required | — |
+| T3 | 🟡 in flight — adversarial; the 10-of-50-warnings-only claim is load-bearing | orchestrator (post-merge suite) | pending |
 | T4 | orchestrator re-verification | — | — |
 | T5 | 🟡 in flight — adversarial, instructed to run not read | orchestrator (post-merge suite) | pending |
 
@@ -35,7 +35,9 @@ Live state of every task. Updated by the orchestrator as reports come in.
 | C7 | **NEW DEFECT — the permanent mechanical guard is partly unearned.** `packages/core/src/dispatch/deadCode.test.ts` has two scanner holes T1 found and fixed in its own copy: (a) the export pattern does not match `export async function`, so those exports were never scanned at all; (b) it strips comments but not string literals, so a symbol that names itself in its own error message counts as self-used and becomes unfalsifiably live. T1 demonstrated (a)+(b) by removing a real importer and watching the unfixed audit stay **green**. The same holes exist in core's copy today. | T1 | new task, wave 2 |
 | C8 | **ENVIRONMENT DEFECT in D4.** `node_modules/@elevator-sim/*` symlinks resolve to `../../packages/*` — the **main checkout's** packages — so a worktree running a *built* artifact links against the main checkout's `dist`, not its own. vitest is unaffected (`resolve.alias` maps to worktree-local source) and `packages/core` is unaffected (no workspace deps), but any worktree-built CLI or `experiments` consumer was stale. T1 hit it and worked around it with worktree-local symlinks. **Consequence: T2's built-CLI evidence was produced against stale `experiments`; the orchestrator re-verified all of it in the main checkout — see below.** | T1 | orchestrator (done) |
 | C9 | `docs/05-roadmap.md` § Phase 7 and `docs/07-handoff.md` still record Phase 7 as NOT ACCEPTED and the CLI as four commands. Both are now false. | T1 | T4 |
-| C3 | `patternSwitching` roadmap bullet may need marking not-done — pending T3's decision. | plan | T4 |
+| C3 | **CONFIRMED by T3 (D12): `patternSwitching` is NOT implemented.** `docs/05-roadmap.md:481` lists "Fuzzy traffic-pattern detector with hysteresis, driving per-pattern weight sets" as a delivered Phase 7 bullet and **must be marked not-done**. T3 does not own `docs/`. | T3 | T4 |
+| C10 | `docs/06-parameterization-and-tuning.md` now states a stale range for `answer.overloadThreshold` — narrowed from `[1, 1.5]` to `[designLoadFactor, 1.5]` by T3 (D10). | T3 | T4 |
+| C11 | `DOOR_DEFAULTS.reopenOnLateArrival` changed `true` → `false` (T3, D9). Any doc quoting the old default is stale. | T3 | T4 |
 
 ## Baseline
 
