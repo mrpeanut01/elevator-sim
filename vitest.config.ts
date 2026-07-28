@@ -12,6 +12,11 @@ const src = (pkg: string): string =>
   fileURLToPath(new URL(`./packages/${pkg}/src/index.ts`, import.meta.url));
 
 const alias = {
+  // Longest first: these are prefix matches, so `@elevator-sim/core` would otherwise swallow
+  // `@elevator-sim/core/browser` and resolve it to `…/core/src/index.ts/browser`.
+  '@elevator-sim/core/browser': fileURLToPath(
+    new URL('./packages/core/src/browser.ts', import.meta.url),
+  ),
   '@elevator-sim/core': src('core'),
   '@elevator-sim/experiments': src('experiments'),
   '@elevator-sim/cli': src('cli'),

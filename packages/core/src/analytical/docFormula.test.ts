@@ -34,7 +34,8 @@ import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { loadConfig, type LoadedConfig } from '../config/index.js';
+import { type LoadedConfig } from '../config/index.js';
+import { loadConfig } from '../config/loader.js';
 
 import { roundTripTime } from './roundTripTime.js';
 import { deriveUpPeakTerms } from './upPeak.js';
