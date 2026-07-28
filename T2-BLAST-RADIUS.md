@@ -1,5 +1,12 @@
 # T2 — blast radius of the statistics-integrity fix
 
+> **🏁 Retired 2026-07-28 with the delivery; still authoritative, no longer updated.** It is a
+> *measurement record*, not a status board: it enumerates every published number one change moved.
+> It is cited from live source (`experiments/src/tuning/report/{format,pareto}.ts` § 1 and § 4c,
+> `experiments/src/reports/format.ts`), and its one known scope gap — planning tables, not just
+> published intervals — was found later and closed as **C19**. Kept for that reason and because a
+> future statistics change should be scoped the same way.
+
 Branch `fix/statistics-integrity`; **§ 1, § 3 and § 4 regenerated on `fix/blast-radius` (T6),
 2026-07-27.** Handover to **T4 (documentation)**: this file enumerates every published number the
 change moves, and states for each whether it moves, by how much, and whether a verdict flips.

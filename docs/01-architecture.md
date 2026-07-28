@@ -269,24 +269,26 @@ packages/
     └── commands/          — list, run, compare, tune, watch
 ```
 
-> **Layout note — there is deliberately no `viz/editor/`, and this doc must not invent one.**
-> [`AGENT_STATUS.md`](../AGENT_STATUS.md) **C29** asked for a `viz/editor/` line here. **Refuted by
-> disk:** the editor's four pure modules are flat files at `packages/viz/src/` —
-> `editorEdits.ts`, `editorValidate.ts`, `editorHistory.ts`, `editorPreview.ts` — and
+> **Layout note — `viz/editor/` exists, and the reason it took two attempts is worth keeping.**
 > `packages/core/src/sim/moduleTree.test.ts` compares this tree against the directories under
-> `packages/*/src` **in both directions**, so adding the line would turn it into a phantom and redden
-> the **core** suite. They are flat for the same reason
-> ([`DECISIONS.md` § D65](../DECISIONS.md)): the guard is bidirectional, a new directory needs a line
-> in this doc, and `docs/` was not that task's to edit. Moving the four files into `viz/editor/` and
-> adding the line **must happen in one commit** — it spans `packages/viz/**` and `docs/**`, which no
-> single task in this wave owned. Recorded as outstanding, not done.
+> `packages/*/src` **in both directions**, so a directory and its line here are a single atomic
+> change: add the line first and it is a phantom that reddens the **core** suite; move the files
+> first and the tree is incomplete. The editor's four pure modules — `editorEdits.ts`,
+> `editorValidate.ts`, `editorHistory.ts`, `editorPreview.ts` — were flat files at
+> `packages/viz/src/` for exactly that reason ([`DECISIONS.md` § D65](../DECISIONS.md), § D93): the
+> task that wrote them did not own `docs/`. They **moved into `packages/viz/src/editor/` with the
+> line above added in the same commit** (`f3fd3da`), which is what the guard requires. **C29 is
+> closed.** The next person to move a directory here needs to do the same thing.
 >
-> **A known weakness in that guard, reported rather than edited (C28).** Because the tree names
-> `viz/*` directories and the guard is bidirectional, removing `packages/viz` from disk turns them
-> into phantoms and reddens `core`'s suite. Invariant 6 still holds — this is a *documentation*
-> coupling, not an import — but a reviewer checking the strong form ("`core` builds and tests with
-> `viz` absent") hits it. The guard should scope its directory set to packages that exist on disk.
-> `core/src/sim/moduleTree.test.ts` is a `packages/core` file and was another task's this round.
+> **The guard is now scoped to packages present on disk, and C28 is closed.** It used to name
+> `viz/*` directories unconditionally, so deleting `packages/viz` turned them into phantoms and
+> reddened `core` — a *documentation* coupling rather than an import, so invariant 6 always held,
+> but a reviewer checking its strong form hit it and could reasonably read it as a violation.
+> `moduleTree.test.ts` now filters its directory set to workspace members that are installed, and
+> asserts `core`'s own presence so the scope cannot degrade into "skip everything". Verified against
+> the strong form rather than argued: with `packages/viz` deleted and deregistered in a scratch
+> copy, `tsc -b` is clean and `core` passes 77 files / 1 832 tests — while the **pre-fix** guard
+> reddens on the same copy. C28 was real. See [`DECISIONS.md` § D104](../DECISIONS.md).
 
 > **Layout note — `experiments/stats/` does not exist.** This doc previously placed the
 > statistics layer at `packages/experiments/src/stats/`. Phase 3 landed that code in

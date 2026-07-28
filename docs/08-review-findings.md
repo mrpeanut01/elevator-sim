@@ -71,7 +71,11 @@ happen in the same step. Measured at n = 150 per building under CRN, the differe
 docstrings; three were documents. **No test pinned any of them**, so nothing went red while they were
 wrong and nothing would go red if they returned. That is the same shape as findings #4 and #14 — a
 claim nothing re-derives — one level up, in prose about a mechanism rather than in a number. Tracked
-as **C23**, with a proposed guard in `AGENT_STATUS.md` § **T23-R1**.
+as **C23**, and now **closed**: `packages/experiments/src/validation/documentation.test.ts` pins all
+seven sites three ways — a claim with no refutation within 400 characters fails, a silently deleted
+correction fails, and `model/car/estimateCost.ts`'s exclusion (its sentence is *descriptive* and
+true) is asserted in **both** directions. All three were watched failing, and the 400-character
+window is four times the measured worst case of 95.
 
 ---
 

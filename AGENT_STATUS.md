@@ -1,5 +1,52 @@
 # Agent status board
 
+> ## 🏁 FINAL STATE — the delivery closed 2026-07-28. This board is no longer updated.
+>
+> **What it was for.** The live state of every task across four waves — branch, worktree, status,
+> blockers, review verdict — plus the **carried-forward register (C1 – C32)**, which is the part
+> that outlived the delivery. `docs/01`, `docs/05`, `docs/08`, `core/src/analytical/upPeak.ts` and
+> `core/src/sim/moduleTree.test.ts` all cite C-numbers from it, which is why it is retired in place
+> rather than deleted.
+>
+> ### Carried-forward register at close
+>
+> | | Items |
+> |---|---|
+> | ✅ **Closed** | C1, C2, C3, C6, C8, C9, C10, C11, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C25, C26, C28, C29, C31 |
+> | ⬜ **Still open** | **C4** (the sequential stopping rule's budget — needs a decision, not a default) · **C5** (a `'z'` fallback label can still print on a convergence report) · **C7** (two holes in `core`'s dead-code scanner) · **C24** (`fuzz/`'s only non-test caller is a test) · **C27** (Phase 6a/6b/mixed-use studies are off the package barrel) · **C30** (`ED-12`/`ED-13` contradict the schema) · **C32** (the fuzz generator picks call types blind to the profile) |
+>
+> All seven open items are carried into [`docs/07-handoff.md`](docs/07-handoff.md) § 8, which is the
+> document a cold reader is pointed at. Nothing here is the only record of an open item.
+>
+> ### The four recommendations T23 handed back are all built
+>
+> **T23-R1** the refuted-mechanism guard, **T23-R2** the fourth phase-status vocabulary term
+> (`partial`, now used by all four guard-coupled documents), **T23-R3** scoping
+> `moduleTree.test.ts` to packages that exist, **T23-R4** the two `core` docstrings — **re-measured
+> rather than transcribed, and one of the handed-back figures did not reproduce** (see below) — and
+> **T23-R5** the `viz/editor/` move with the `docs/01` line in the same commit.
+>
+> ### T23-F1 / D99 is closed by measurement
+>
+> Phase 6's criterion named the Mixed-Use High-Rise; § D27 dropped the building clause; § D99 owned
+> that as a weakening and § D100 measured it there. **Met by the Level-0 arm** (ΔTTD −21.239 /
+> −2.072 / −2.116 against the three baselines, all BETTER, at up-peak 4 %, n = 200); **not met by
+> the Level-1 panel at any measured point.**
+>
+> ### The two figures this board recorded as *unverified* — now measured, and one was wrong
+>
+> - **C20** — `deriveUpPeakTerms` is **82.5 % / 21.2 %** at the declared `tp = 1.75 s`. The
+>   published 102.8 % / 26.3 % reproduces **only at `tp = 1.2 s`**, which no car of that bank
+>   declares.
+> - **C21** — `vertical-city/zone-5-local`'s departure band is **1.23 s**, and **2.95×** tighter
+>   than the next narrowest. **The "5×" this board handed back did not reproduce** over the
+>   fourteen-bank sweep. The 1.23 s figure is confirmed.
+>
+> ### And the four ⚠️ UX rows are still unverified, not passing
+>
+> `RV-11`, `RV-17`, `RV-21`, `KB-14` — built and reachable, neither driven nor tested. Carried
+> forward exactly as this board recorded them, because a count that ticks them is a count that lies.
+
 Live state of every task. Updated by the orchestrator as reports come in.
 
 **Wave 1 · opened 2026-07-27 · integration branch `integration` (base `6b20687`)**
