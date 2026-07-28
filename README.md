@@ -46,6 +46,7 @@ This project exists to make those comparisons rigorous.
 | [Parameterization & Tuning](docs/06-parameterization-and-tuning.md) | How to tweak every model without recoding, and how to search for an optimum |
 | [Handoff](docs/07-handoff.md) | Current state, measured facts that bound what you may claim, known-answer tests, open debt |
 | [Review findings](docs/08-review-findings.md) | The whole-system review register, with each finding's disposition |
+| [Destination dispatch contract](docs/09-destination-dispatch-contract.md) | Phase 6's locked interface contract, its measured comparison design, and the open questions that gate implementation |
 
 Machine-readable configuration lives in [`data/`](data/).
 
