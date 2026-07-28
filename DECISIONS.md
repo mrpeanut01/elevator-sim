@@ -453,12 +453,12 @@ had to break it in its first week and would have been right to.
 | Adding the per-leg array `RV-T3` and a windowed overlay need | **no** | Nothing in wave 1 would read it. A configurable, unit-tested field with no consumer is the exact defect class this repository has shipped five times; shipping one here to be helpful would make it six. Wave 2 adds it **with its first consumer** and bumps to 3. |
 
 **Consequence for the version number.** `VIZ_SCHEMA_VERSION` is stamped on every recording and
-currently read by nothing — see D-T8-2. It is carried because a wave-2 file-load path will check
+currently read by nothing — see D16. It is carried because a wave-2 file-load path will check
 it, and bumping it now is how a deliberate shape change is recorded rather than discovered.
 
 ---
 
-## D-T8-2 — Two dead exports deleted, not wired
+## D16 — Two dead exports deleted, not wired
 
 **`isSupportedRecording`** (was `frame/frameAt.ts`): deleted. It compared a recording's
 `schemaVersion` with the constant compiled into the same bundle. In the shipped path the only
@@ -476,7 +476,7 @@ test helper whose only defensible caller is a test, with no test calling it, is 
 
 ---
 
-## D-T8-3 — `frameTimes` refuses to truncate rather than truncating in silence
+## D17 — `frameTimes` refuses to truncate rather than truncating in silence
 
 `maxFrames` used to clip: the grid stopped at `maxFrames - 1` points and jumped to `endedAt`, so
 a caller asking for a long run at a slow speed silently received the head of the replay plus one
@@ -490,7 +490,7 @@ Memory is still bounded. The cap is no longer silent.
 
 ---
 
-## D-T8-4 — `KB-15` re-marked rather than papered over
+## D18 — `KB-15` re-marked rather than papered over
 
 The row claimed "colour is never the only signal — door state, direction and overload each carry
 a glyph as well as a colour ✅ w1". Direction does (▲/▼). Door state is a fill-width gap and
