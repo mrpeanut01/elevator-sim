@@ -71,6 +71,10 @@
  *   promise **stands** (DECISIONS.md § D29) and `#candidateCars` gives the call straight back to
  *   the same car. `ConservationAudit.brokenPromises` counts how often that happens, and it is a
  *   *result* — the price of committing at the panel — not a failure;
+ * - a car that leaves **group control** is the one exception: a promise it holds is revoked
+ *   (`#revokePromisesTo`), because D29's argument is about a car that will empty and come back and
+ *   an `independent` car will not. Counted separately in `ConservationAudit.promisesRevoked`;
+ *   `DECISIONS-T22.md` § T22-D1, and the Phase 8 P5 counterexample it closed;
  * - the panel performs the access check, so an authorized request is not refused a second time by
  *   `estimateCost` for want of a credential (§ D30).
  *
@@ -471,12 +475,14 @@ export class Simulation {
   readonly #disclaimers: string[] = [];
   readonly #warnings: string[] = [];
   #transfers = 0;
-  /** Legs a landing panel named a car for. See {@link ConservationAudit.legsAssigned}. */
+  /** Promises a landing panel made. See {@link ConservationAudit.legsAssigned}. */
   #legsAssigned = 0;
   /** Boardings onto a car other than the promised one. Asserted `0`; see `#reconcile`. */
   #wrongCarBoardings = 0;
   /** Passengers a full car left behind after promising them a place. D29's *result*. */
   #brokenPromises = 0;
+  /** Promises voided because the car they named left group control. See `#revokePromisesTo`. */
+  #promisesRevoked = 0;
   #capacityCrossings = 0;
   #capacityMigrations = 0;
   #capacityHeld = 0;
@@ -1012,6 +1018,18 @@ export class Simulation {
    * dispatch tick finds the returning car too. `#stepCar` inside `#dispatchBank` then gives it
    * its first instruction.
    *
+   * **Handing the call back is not enough under a panel**, and that half was missing. A re-offered
+   * call whose waiters are promised to the withdrawn car is handed straight back to it by
+   * {@link #candidateCars} — D29's write-once promise, enforced at the candidate set (T16-D3) —
+   * so it is refused `serviceMode`, retried every `dispatchRetryS`, and refused again until the
+   * drain deadline while the rest of the bank stands idle. So {@link #revokePromisesTo} voids
+   * those promises first: a promise to a car that cannot accept a hall call is not a cost being
+   * paid, it is a promise that cannot be kept. See `DECISIONS-T22.md` § T22-D1.
+   *
+   * The sweep is over **every active call of the bank**, not only the ones `setMode` released,
+   * because a call whose promised car was full at its last re-offer is active and held by nobody:
+   * it would not appear in the released list and its waiters would be stranded exactly as before.
+   *
    * **What this does not model**, stated because the books still balance either way: a car put
    * into `fire-recall` or `out-of-service` with passengers aboard keeps them aboard. `setMode`
    * clears its car calls, so it has no reason to move and they end the run as
@@ -1034,13 +1052,71 @@ export class Simulation {
       );
     }
 
+    const released = new Set<string>();
     for (const call of car.setMode(event.mode)) {
       const active = this.#activeCalls.get(call.id);
       if (active === undefined) continue;
+      released.add(active.id);
       this.#noteRefusal(active, car.id, 'serviceMode');
       this.#reofferCall(car, active, at);
     }
+    // Every *other* live call of this bank whose waiters were promised to the withdrawn car —
+    // a call it was not holding, because the last decision for it found the car full and left it
+    // unassigned. Materialized into an array first, and each entry re-checked against
+    // `#activeCalls`, because `#reofferCall` extinguishes a call whose landing has emptied.
+    if (!car.acceptsHallCalls) {
+      const stranded = [...this.#activeCalls.values()].filter(
+        (active) =>
+          !released.has(active.id) &&
+          active.bankId === car.bankId &&
+          this.#promisedTo(active, car).length > 0,
+      );
+      for (const active of stranded) {
+        if (!this.#activeCalls.has(active.id)) continue;
+        this.#reofferCall(car, active, at);
+      }
+      for (const active of [...released, ...stranded.map((call) => call.id)]) {
+        const live = this.#activeCalls.get(active);
+        if (live !== undefined) this.#revokePromisesTo(live, car, at);
+      }
+    }
     this.#dispatchBank(car.bankId, at);
+  }
+
+  /** The waiters of this call whom the panel promised to this car. Empty conventionally. */
+  #promisedTo(active: ActiveCall, car: Car): readonly Passenger[] {
+    if (!this.#panelAssigns) return [];
+    const floor = this.#building.requireFloor(active.floorId);
+    return this.#waitingForCall(floor, active).filter(
+      (passenger) => passenger.assignedCarId === car.id,
+    );
+  }
+
+  /**
+   * Void every promise this call's waiters hold to a car that has left group control.
+   *
+   * **The one place a promise is ever taken back**, and the condition is a fact about the car
+   * rather than about the score: `acceptsHallCalls === false`. No dispatch decision can produce
+   * that, so D29's deferral advantage is not recoverable through this path — a promise is never
+   * revoked because another car turned out to be closer, or because the promised car is full.
+   * The car it names has simply stopped being a car the group may send anywhere.
+   *
+   * Called **after** {@link #reofferCall}, which is what keeps `brokenPromises` honest: those
+   * passengers were promised this car and this car left them, and that is counted at the same
+   * moment and for the same reason as a full car leaving them. The revocation is counted
+   * separately in `ConservationAudit.promisesRevoked`, so the two are never conflated.
+   *
+   * The waiters are left unpromised rather than re-promised here. The pending
+   * `#dispatchBank(bankId, at)` re-decides the re-registered call over the whole bank, and
+   * `#tellThePanel` names whichever car it chooses — including the withdrawn car's replacement, or
+   * the withdrawn car itself if a later schedule entry has already put it back in service.
+   */
+  #revokePromisesTo(active: ActiveCall, car: Car, at: SimTime): void {
+    for (const passenger of this.#promisedTo(active, car)) {
+      passenger.releasePromise(at);
+      this.#recorder.releaseAssignment(passenger, at);
+      this.#promisesRevoked += 1;
+    }
   }
 
   /* ---------------------------------------------------------------- *
@@ -3062,9 +3138,24 @@ export class Simulation {
         `${this.#legsAssigned} landing-panel assignments were made but ${this.#recorder.assignedCount} reached the recorder; a promise the record does not carry cannot be audited from the record`,
       );
     }
-    if (this.#panelAssigns && undelivered.length === 0 && this.#legsAssigned !== legsCreated) {
+    if (this.#promisesRevoked !== this.#recorder.releasedCount) {
       problems.push(
-        `${legsCreated} legs were created and every journey was delivered, but only ${this.#legsAssigned} were ever assigned a car by the landing panel; ${legsCreated - this.#legsAssigned} boarded without being promised anything`,
+        `${this.#promisesRevoked} landing-panel promises were revoked but ${this.#recorder.releasedCount} reached the recorder; a record still naming a car the group took the passenger back off is a promise no reader could audit`,
+      );
+    }
+    /*
+     * `legsAssigned` counts promise *events*, so a leg whose promise was revoked when its car left
+     * group control and then re-made counts twice. The invariant is on promises **in force**:
+     * every revocation is either followed by a fresh promise or leaves that leg unpromised, and a
+     * leg that boarded held a promise when it did (`#boardFrom` refuses otherwise), so on a run
+     * that delivered everybody `assigned - revoked` is exactly one per leg. Comparing the raw
+     * event count instead would fail every run with a mid-run service change in it, which is the
+     * shape this arithmetic exists to survive.
+     */
+    const promisesInForce = this.#legsAssigned - this.#promisesRevoked;
+    if (this.#panelAssigns && undelivered.length === 0 && promisesInForce !== legsCreated) {
+      problems.push(
+        `${legsCreated} legs were created and every journey was delivered, but ${promisesInForce} promises were in force at the end (${this.#legsAssigned} made, ${this.#promisesRevoked} revoked); ${legsCreated - promisesInForce} boarded without being promised anything`,
       );
     }
 
@@ -3080,6 +3171,7 @@ export class Simulation {
       legsAssigned: this.#legsAssigned,
       wrongCarBoardings: this.#wrongCarBoardings,
       brokenPromises: this.#brokenPromises,
+      promisesRevoked: this.#promisesRevoked,
       balanced:
         problems.length === 0 &&
         legsCreated === legsRecorded &&
