@@ -56,21 +56,18 @@ function buildingsManifest() {
   };
 }
 
-const NODE_SHIM = fileURLToPath(new URL('./dev-shims/node-builtins.js', import.meta.url));
-
 export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
-  resolve: {
-    // `@elevator-sim/core`'s single entry point re-exports `loadConfig`, which imports
-    // `node:fs/promises` and `node:path`. Vite's default externalisation stub throws at module
-    // *evaluation*, so the whole viewer fails to boot before it runs a line. `viz` may not edit
-    // `core`, so the two builtins are aliased to a shim that throws only if actually called —
-    // which the browser path never does. See `dev-shims/node-builtins.js` for the proper fix.
-    alias: [
-      { find: /^node:fs\/promises$/, replacement: NODE_SHIM },
-      { find: /^node:path$/, replacement: NODE_SHIM },
-    ],
-  },
+  // No `resolve.alias`. There used to be one: `@elevator-sim/core` published a single entry
+  // point that re-exported `loadConfig`, so importing the package pulled `node:fs/promises` and
+  // `node:path` into the browser graph, and Vite's externalisation stub for a Node builtin throws
+  // at module *evaluation* — the viewer died before running a line. The two builtins were aliased
+  // to a throwing shim in `dev-shims/`. Both are deleted: `core` now publishes a `browser` export
+  // condition that resolves the plain specifier to its fs-free barrel (`core/src/browser.ts`),
+  // which Vite selects on its own for a browser build. `core/src/browser.test.ts` walks that
+  // barrel's transitive import graph and fails if a `node:` import returns to it, so the shim
+  // cannot become necessary again without a red test first.
+  //
   // The reference data is the viewer's static content in dev. Nothing is copied on build,
   // because there is no production build of this package.
   publicDir: DATA_DIR,

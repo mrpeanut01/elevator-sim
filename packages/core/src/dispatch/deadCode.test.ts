@@ -128,7 +128,19 @@ function sourceFiles(root: string): readonly string[] {
 
 const isTest = (path: string): boolean =>
   path.endsWith('.test.ts') || path.endsWith('.test-helper.ts');
-const isBarrel = (path: string): boolean => basename(path) === 'index.ts';
+/**
+ * A file whose job is to re-export, and which therefore proves reachability rather than use.
+ *
+ * `index.ts` anywhere, **plus `core/src/browser.ts`** — the package's fs-free entry point, which
+ * is the same barrel as `core/src/index.ts` under a different name (`index.ts` is now that file
+ * plus `loadConfig`; see `core/src/browser.ts` for why they are split). It is not called
+ * `index.ts` and so does not look like a barrel, but it re-exports every public symbol in the
+ * package. Counting it as a caller would make all of them read as live — which is the exact
+ * confusion this file exists to prevent, and it silently emptied the allowlist the first time
+ * the split landed.
+ */
+const isBarrel = (path: string): boolean =>
+  basename(path) === 'index.ts' || path.replace(/\\/g, '/').endsWith('core/src/browser.ts');
 
 /** Named bindings a file imports, or re-exports from elsewhere. Never a bare textual match. */
 function boundNames(source: string): ReadonlySet<string> {

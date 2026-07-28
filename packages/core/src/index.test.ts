@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import * as barrel from './index.js';
 import * as analyticalModule from './analytical/index.js';
 import * as configModule from './config/index.js';
+import * as configLoaderModule from './config/loader.js';
 import * as dispatchModule from './dispatch/index.js';
 import * as kernelModule from './kernel/index.js';
 import * as metricsModule from './metrics/index.js';
@@ -21,10 +22,16 @@ import * as trafficModule from './traffic/index.js';
 /**
  * Integration guard for the package's public surface.
  *
- * `src/index.ts` is the only file every consumer touches, and it is the one file no module
- * owner edits while working inside their own module. That makes it the natural place for
- * drift: a submodule gains an export, the barrel does not, and the symbol is invisible to
+ * The barrel is the only file every consumer touches, and it is the one file no module owner
+ * edits while working inside their own module. That makes it the natural place for drift: a
+ * submodule gains an export, the barrel does not, and the symbol is invisible to
  * `@elevator-sim/core` even though the module tests are green.
+ *
+ * The barrel is two files: `src/browser.ts` declares the whole surface and `src/index.ts` is
+ * that plus `loadConfig`, the package's only filesystem access. `index.ts` is what these tests
+ * import, so the coverage below is over the union. `browser.test.ts` owns the other half of the
+ * contract — that the two differ by exactly `loadConfig`, and that nothing reachable from
+ * `browser.ts` imports a `node:` builtin.
  *
  * These tests are deliberately structural rather than a hand-maintained name list, so the
  * barrel stays in sync automatically as modules land — add the module to `submodules` below
@@ -34,6 +41,11 @@ const submodules = {
   kernel: kernelModule,
   random: randomModule,
   config: configModule,
+  /* `config/loader.ts` is a submodule of its own here rather than part of `config/`, because it
+     is the package's only filesystem access and `config/index.ts` deliberately does not re-export
+     it — see `src/browser.ts`. It reaches the barrel through `src/index.ts` directly, and this
+     entry is what keeps the "re-exports everything / invents nothing" pair below total. */
+  'config/loader': configLoaderModule,
   'physics/motion': motionModule,
   'physics/doors': doorsModule,
   model: modelModule,
