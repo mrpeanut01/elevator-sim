@@ -17,7 +17,9 @@
  * dead-seam shape the pins exist to catch.
  */
 
+import { runAccessControlStudy } from './accessControl.js';
 import { runCapacityReassignmentStudy } from './capacityReassignment.js';
+import { runDestinationDisclosureStudy } from './destinationDisclosure.js';
 import { auditForecastCausalityInRun } from './predictorLag.js';
 import { runPrepositioningStudy } from './prepositioning.js';
 import { TAIL_CENSUS_LOADS, runTailStudy } from './tailStudy.js';
@@ -25,9 +27,11 @@ import { runBenchmark } from './suite.js';
 import { loadResources, withProfiles } from '../validation/harness.js';
 import {
   PUBLISHED_STUDY_IDS,
+  accessControlFigures,
   benchmarkFigures,
   capacityFigures,
   causalityFigures,
+  disclosureFigures,
   prepositioningFigures,
   tailFigures,
   type PinnedEstimate,
@@ -45,6 +49,8 @@ export async function measureAllPublishedFigures(): Promise<
     prepositioning: prepositioningFigures(await runPrepositioningStudy({})),
     'capacity-reassignment': capacityFigures(await runCapacityReassignmentStudy({})),
     'forecast-causality': causalityFigures(await auditForecastCausalityInRun({ replications: 100 })),
+    'destination-disclosure': disclosureFigures(await runDestinationDisclosureStudy({})),
+    'access-control': accessControlFigures(await runAccessControlStudy({})),
   };
 }
 

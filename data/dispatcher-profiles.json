@@ -158,6 +158,14 @@
         "repositionThresholdS": 2,
         "repositionEnergyWeight": 0.1
       }
+    },
+    {
+      "id": "destination-eta",
+      "$comment": "The first destination dispatcher in this file, and the only profile that authors a dispatch.callType. Phase 6a needed no code at all: the seam was already wired end to end — costRequestFor forwards the destination (and, under mobile-credential, the credential) into the CostRequest, estimateCost authorizes the destination against it, and Simulation #callValue supplies the head-of-queue passenger's destinationFloorId — and nothing shipped used it, because all ten other profiles run at the up-down-buttons default. Two authored fields, no class, no branch: invariant 7 read forwards. mobile-credential and NOT destination-entry, and that is a measurement rather than a preference. DECISIONS.md D30 rules that a destination kiosk authorizes; panel-stage authorization is a core change that belongs to Phase 6b, and until it lands mobile-credential is the only shipped call type that carries the credential as far as estimateCost. Measured at the interfloor-mix operating point, seed 20260726, 300 replications: destination-entry without the credential leaves secure-tower with 55 % of journeys unserved and no quotable AWT on 259 of 300, WORSE than the conventional arm's 34 % — every access-zoned destination comes back destinationAccessDenied, so the call is permanently unassignable. Under mobile-credential the same building completes 300 of 300 with 0 unserved. On a building with no accessZones the two call types are bit-identical, so the choice costs nothing and buys the three access-zoned buildings. This profile deliberately does NOT weight rideTime, and the reason is a blocker rather than a judgement: dispatch/policies/policies.test.ts's contributionScenarios() build their call from fixtures.test-helper.ts's call(), which carries no destinationFloorId, so rideTime is structurally unable to contribute in the only fixture that guards 'no weight that contributes nothing' — and a shipped profile weighting it turns that suite red for a fixture gap rather than a defect. The measured value of the weight is real and is in benchmark/destinationDisclosure.ts, on derived arms at 0.3, 1.0 and 2.0; see benchmark/DECISIONS-T15.md § T15-2 for the one-line core fix that promotes it into this file.",
+      "name": "Destination disclosure, credential-aware",
+      "role": "destination",
+      "weights": { "waitTime": 1.0 },
+      "dispatch": { "callType": "mobile-credential" }
     }
   ],
   "patternSwitching": {

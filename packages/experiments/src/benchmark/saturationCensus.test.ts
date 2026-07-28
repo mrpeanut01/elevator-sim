@@ -24,7 +24,22 @@ import { describe, expect, it } from 'vitest';
 import type { TrafficArmSpec } from '../runner/types.js';
 import { loadResources, runGateExperiment, withProfiles } from '../validation/harness.js';
 
-import { ARM_PROFILES, BASELINE_PROFILE, BENCHMARK_CASES } from './arms.js';
+import {
+  ARM_PROFILES,
+  BASELINE_PROFILE,
+  BENCHMARK_CASES,
+  DESTINATION_CASES,
+  destinationCase,
+} from './arms.js';
+import {
+  DEFERRED_ARM,
+  DISCLOSURE_BASELINE,
+  DISCLOSURE_PROFILE,
+  RIDE_TIME_WEIGHTS,
+  disclosureProfiles,
+  rideArmId,
+} from './destinationDisclosure.js';
+import { BARE_KIOSK_ARM, accessControlProfiles } from './accessControl.js';
 import { BENCHMARK_SEED } from './suite.js';
 
 const ALL_PROFILES = [BASELINE_PROFILE, ...ARM_PROFILES];
@@ -186,4 +201,142 @@ describe('Phase 5 — the operating points are the highest at which an interval 
     // whole justification for `reportWindow: 'full-run'` on this case.
     expect(invalidByRate[1]?.[1]).toBeGreaterThan(0);
   }, TIMEOUT_MS);
+});
+
+/* -------------------------------------------------------------------------- *
+ * Phase 6a — the census OQ-5 says may not be inherited
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **OQ-5: does any arm saturate at the interfloor-mix operating points?**
+ *
+ * docs/09 § 2.5 is explicit that `arms.ts`'s recorded ceilings — `nearest-car` first losing its AWT
+ * at replication 287 on Midtown up-peak and 190 on Secure Tower up-peak — are *for up-peak with
+ * `nearest-car`* and **may not be reused**, and that the whole Phase 6 budget depends on the answer.
+ * So it is re-measured here, at the new points, over the same 1000 replications, for every arm the
+ * Phase 6a studies actually run.
+ *
+ * The two answers could hardly be more different from each other, and neither is Phase 5's:
+ *
+ * - **Midtown interfloor-mix: nothing saturates, at all, in 1000 replications** — not even
+ *   `nearest-car`, which is the binding constraint on two of Phase 5's three cases. The 1800 s
+ *   full-run window at 1.5 % of population per 5 minutes is a *pattern* rather than a peak, and the
+ *   lobby plateau that breaks `nearest-car` at up-peak never forms. So `n` is a choice and the study
+ *   derives it from its own measured spread instead of from a ceiling.
+ * - **Secure Tower interfloor-mix: both conventional arms are invalid from replication index 0**,
+ *   and no budget changes it. That is H-ACCESS-1 in the census rather than in the study, and it is
+ *   the reason `DESTINATION_CASES` records `admissibleReplications: 0` for that row: there is no
+ *   budget at which every arm has a quotable AWT, so the case has no interval table and its result
+ *   is reported as counts.
+ */
+describe('Phase 6a — the interfloor-mix operating points, censused rather than inherited', () => {
+  async function destinationResources() {
+    const config = await loadResources();
+    const baseline = config.dispatcherProfilesById.get(DISCLOSURE_BASELINE);
+    const destination = config.dispatcherProfilesById.get(DISCLOSURE_PROFILE);
+    if (baseline === undefined || destination === undefined) {
+      throw new Error('data/dispatcher-profiles.json must ship eta and destination-eta');
+    }
+    return withProfiles(config, [
+      ...disclosureProfiles(baseline, destination),
+      ...accessControlProfiles(baseline, destination),
+    ]);
+  }
+
+  /** Every arm either Phase 6a study puts on a building, plus `nearest-car` for the comparison. */
+  const DESTINATION_ARMS = [
+    BASELINE_PROFILE,
+    DISCLOSURE_BASELINE,
+    DISCLOSURE_PROFILE,
+    ...RIDE_TIME_WEIGHTS.map((weight) => rideArmId(weight)),
+    DEFERRED_ARM,
+    BARE_KIOSK_ARM,
+  ];
+
+  it('finds no ceiling at all on Midtown interfloor-mix, over 1000 replications', async () => {
+    const spec = destinationCase('midtown-interfloor-mix');
+    const result = await runGateExperiment({
+      id: `census/destination/${spec.id}`,
+      seed: BENCHMARK_SEED,
+      building: spec.building,
+      dispatchers: DESTINATION_ARMS,
+      traffic: spec.traffic,
+      replications: 1000,
+      resources: await destinationResources(),
+    });
+
+    const firstInvalidByArm = new Map<string, number>();
+    for (const cell of result.cells) {
+      const index = cell.replications.findIndex((record) => !record.awtIsValid);
+      if (index >= 0) firstInvalidByArm.set(cell.dispatcherArmId, index);
+    }
+    console.log(
+      `${spec.label}: first invalid replication by arm over 1000 — ` +
+        (firstInvalidByArm.size === 0
+          ? 'none, on any arm — including nearest-car'
+          : [...firstInvalidByArm].map(([arm, index]) => `${arm}@${index}`).join(', ')),
+    );
+
+    // The recorded ceiling and the measurement agree, and the measurement is the stronger claim:
+    // `undefined` here means *nothing in 1000*, which is what makes the study's `n` a choice.
+    expect([...firstInvalidByArm.keys()]).toEqual([]);
+    expect(spec.admissibleReplications).toBeUndefined();
+    expect(result.saturated).toBe(false);
+    // Phase 5's ceilings are not reused, and this is the assertion that says so: `nearest-car`
+    // diverges at 287 on Midtown up-peak and never here, on the same building.
+    expect(firstInvalidByArm.get(BASELINE_PROFILE)).toBeUndefined();
+  }, TIMEOUT_MS);
+
+  it('finds the conventional arms invalid from replication zero on Secure Tower interfloor-mix', async () => {
+    const spec = destinationCase('secure-interfloor-mix');
+    const result = await runGateExperiment({
+      id: `census/destination/${spec.id}`,
+      seed: BENCHMARK_SEED,
+      building: spec.building,
+      dispatchers: DESTINATION_ARMS,
+      traffic: spec.traffic,
+      replications: 300,
+      resources: await destinationResources(),
+    });
+
+    const firstInvalidByArm = new Map<string, number>();
+    for (const cell of result.cells) {
+      const index = cell.replications.findIndex((record) => !record.awtIsValid);
+      if (index >= 0) firstInvalidByArm.set(cell.dispatcherArmId, index);
+    }
+    console.log(
+      `${spec.label}: first invalid replication by arm over 300 — ` +
+        [...firstInvalidByArm].map(([arm, index]) => `${arm}@${index}`).join(', '),
+    );
+
+    // The three arms with no credential fail immediately and structurally: an access-restricted
+    // pickup carries no credential under `up-down-buttons`, and `destination-entry` forwards the
+    // destination while dropping the credential, so both are refused by every car.
+    for (const armId of [BASELINE_PROFILE, DISCLOSURE_BASELINE, BARE_KIOSK_ARM]) {
+      expect(firstInvalidByArm.get(armId), `${armId} should be invalid from the first replication`).toBe(
+        0,
+      );
+    }
+    // Every credentialled arm is clean over the whole census.
+    for (const armId of [DISCLOSURE_PROFILE, ...RIDE_TIME_WEIGHTS.map((w) => rideArmId(w))]) {
+      expect(firstInvalidByArm.get(armId), `${armId} lost its AWT`).toBeUndefined();
+    }
+    // Which is exactly what `admissibleReplications: 0` records: no budget makes this case's arm
+    // list uniformly quotable, so it has counts rather than an interval table.
+    expect(spec.admissibleReplications).toBe(0);
+  }, TIMEOUT_MS);
+
+  it('covers every case Phase 6a declares', async () => {
+    expect(DESTINATION_CASES.map((spec) => spec.id)).toEqual([
+      'midtown-interfloor-mix',
+      'secure-interfloor-mix',
+    ]);
+    // And the Phase 5 cases are untouched by this phase: a fourth case added to `BENCHMARK_CASES`
+    // would silently change what the Phase 5 criterion was argued on.
+    expect(BENCHMARK_CASES.map((spec) => spec.id)).toEqual([
+      'midtown-up-peak',
+      'garden-residential',
+      'secure-up-peak',
+    ]);
+  });
 });
