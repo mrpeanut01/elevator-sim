@@ -24,7 +24,7 @@
  * exactly the statement that it holds.
  */
 
-import { doorOpenFractionAt, positionAt, type SimTime } from '@elevator-sim/core';
+import { doorOpenFractionAt, positionAt, type SimTime } from '@elevator-sim/core/browser';
 
 import { lastAtOrBefore, stepValueAt } from '../contract/series.js';
 import {

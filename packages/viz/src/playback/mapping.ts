@@ -18,7 +18,7 @@
  * resuming, seeking and changing speed all re-anchor. Nothing accumulates.
  */
 
-import type { SimTime } from '@elevator-sim/core';
+import type { SimTime } from '@elevator-sim/core/browser';
 
 /** Where the two clocks were pinned together, and how fast simulated time runs. */
 export interface PlaybackAnchor {

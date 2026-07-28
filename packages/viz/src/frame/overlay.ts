@@ -43,7 +43,7 @@
  * make this impure and break scrubbing backwards.
  */
 
-import type { Direction, SimTime } from '@elevator-sim/core';
+import type { Direction, SimTime } from '@elevator-sim/core/browser';
 
 import type { VizLeg, VizRecording } from '../contract/types.js';
 

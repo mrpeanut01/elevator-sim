@@ -40,7 +40,7 @@ import {
   type SimTime,
   type SimulationConfig,
   type SimulationResult,
-} from '@elevator-sim/core';
+} from '@elevator-sim/core/browser';
 
 import { StepSeriesBuilder, constantSeries } from '../contract/series.js';
 import {

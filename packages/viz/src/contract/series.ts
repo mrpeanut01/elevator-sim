@@ -13,7 +13,7 @@
  *    instant twice, and both get the same answer.
  */
 
-import type { SimTime } from '@elevator-sim/core';
+import type { SimTime } from '@elevator-sim/core/browser';
 
 import type { StepSeries } from './types.js';
 

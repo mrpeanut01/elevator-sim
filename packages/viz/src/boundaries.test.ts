@@ -282,6 +282,27 @@ describe('the browser-facing modules import no node builtins', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('reaches core through the browser subpath, so the types match the bundle', async () => {
+    // `core`'s default entry re-exports `loadConfig`, which imports `node:fs/promises`. The
+    // package's `browser` export condition already routes a bundler to the fs-free barrel, so a
+    // bare specifier produces a correct *bundle* — but TypeScript's NodeNext resolution does not
+    // apply that condition, so a browser file importing the bare specifier still SEES `loadConfig`
+    // in its types. Calling it would typecheck and fail at runtime. The explicit subpath closes
+    // that gap. Test helpers and the dev entry's data loader legitimately run under Node.
+    const offenders = (await vizSources())
+      .filter((file) => !isTest(file.id))
+      .filter((file) => /from\s+['"]@elevator-sim\/core['"]/.test(file.code))
+      .map((file) => file.id);
+    expect(offenders).toEqual([]);
+  });
+
+  it('positive control: the rule catches a bare-specifier import', () => {
+    const bare = "import type { SimTime } from '@elevator-sim/core';";
+    const subpath = "import type { SimTime } from '@elevator-sim/core/browser';";
+    expect(/from\s+['"]@elevator-sim\/core['"]/.test(bare)).toBe(true);
+    expect(/from\s+['"]@elevator-sim\/core['"]/.test(subpath)).toBe(false);
+  });
+
   it('does not reach into another workspace package’s source', async () => {
     // `viz` depends on `core` and on nothing else in the repository. A deep import of `cli` or
     // `experiments` would make the browser bundle drag in `node:fs`.

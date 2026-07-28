@@ -51,7 +51,7 @@ import type {
   DoorMachineState,
   SimTime,
   SimulationStatus,
-} from '@elevator-sim/core';
+} from '@elevator-sim/core/browser';
 
 /**
  * Bumped when the shape below changes incompatibly.

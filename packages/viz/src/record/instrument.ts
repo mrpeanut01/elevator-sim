@@ -29,7 +29,7 @@
  * cars standing on screen with their doors open forever.
  */
 
-import type { Car, CarMotion, DoorStep, SimTime } from '@elevator-sim/core';
+import type { Car, CarMotion, DoorStep, SimTime } from '@elevator-sim/core/browser';
 
 import type { VizDoorMark } from '../contract/types.js';
 

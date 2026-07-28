@@ -28,7 +28,7 @@ import {
   type BuildingType,
   type CarConfig,
   type FloorConfig,
-} from '@elevator-sim/core';
+} from '@elevator-sim/core/browser';
 
 import {
   OPERATIONAL_ZONING_NOTE,

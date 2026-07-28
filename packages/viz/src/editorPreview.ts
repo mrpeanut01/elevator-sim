@@ -26,7 +26,7 @@ import {
   type BuildingConfig,
   type FloorConfig,
   type ResolvedBuilding,
-} from '@elevator-sim/core';
+} from '@elevator-sim/core/browser';
 
 import type { VizFloor } from './contract/types.js';
 import type { ShaftGeometry } from './render/layout.js';

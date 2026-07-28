@@ -12,7 +12,7 @@
  * `playback.test.ts` against a {@link ManualClock}, with no timers anywhere.
  */
 
-import type { SimTime } from '@elevator-sim/core';
+import type { SimTime } from '@elevator-sim/core/browser';
 
 import { frameAt } from '../frame/frameAt.js';
 import type { Frame, VizRecording } from '../contract/types.js';

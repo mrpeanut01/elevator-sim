@@ -31,7 +31,7 @@
  * RS-05's: never silently truncated.
  */
 
-import type { SimTime } from '@elevator-sim/core';
+import type { SimTime } from '@elevator-sim/core/browser';
 
 import type { Frame, VizRecording } from '../contract/types.js';
 import { frameAt } from './frameAt.js';

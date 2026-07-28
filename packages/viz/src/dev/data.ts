@@ -25,7 +25,7 @@ import {
   type ElevatorSpecs,
   type ResolvedBuilding,
   type TrafficProfiles,
-} from '@elevator-sim/core';
+} from '@elevator-sim/core/browser';
 
 /**
  * A building as both the runner and the editor need it.

@@ -37,7 +37,7 @@ import {
   type ConfigWarning,
   type ElevatorSpecs,
   type ResolvedBuilding,
-} from '@elevator-sim/core';
+} from '@elevator-sim/core/browser';
 
 /** How far validation got before it stopped. */
 export type ValidationStage = 'json' | 'schema' | 'resolve';

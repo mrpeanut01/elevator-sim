@@ -13,7 +13,7 @@
  * is what `ED-23`'s "warned before navigation" has to mean if the warning is to stay credible.
  */
 
-import type { BuildingConfig } from '@elevator-sim/core';
+import type { BuildingConfig } from '@elevator-sim/core/browser';
 
 /** `ED-21` asks for at least 20. */
 export const MIN_HISTORY_DEPTH = 20;

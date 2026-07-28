@@ -36,7 +36,7 @@ import type {
   FloorConfig,
   FloorRange,
   TrafficProfiles,
-} from '@elevator-sim/core';
+} from '@elevator-sim/core/browser';
 
 /**
  * What the editor says where an operational-zoning control would otherwise go — `ED-T6`.

@@ -21,7 +21,7 @@
  * had already chosen.
  */
 
-import { SimulationError, type BuildingConfig, type SimulationConfig } from '@elevator-sim/core';
+import { SimulationError, type BuildingConfig, type SimulationConfig } from '@elevator-sim/core/browser';
 
 import type { VizRecording } from '../contract/types.js';
 import { frameSequence, serializeFrames } from '../frame/sequence.js';
