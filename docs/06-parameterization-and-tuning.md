@@ -547,9 +547,17 @@ Everything above is data. Changing any of it requires no rebuild — which is th
 > asserts `unsatisfiedGatesOf(offender) === ['rideTime']`. The shipped `predictive-balanced` dropped
 > the weight in Phase 5 and records why in its own `$comment` — *"a weight that is decoration in
 > every shipped configuration"* — and this worked example was never updated, so the one config the
-> tuning doc presented as canonical was the one the repository forbids. Independently corroborated:
-> across all 5 buildings × 10 profiles, `rideTime` gets **0 evaluations** under every shipped
-> profile, and 468/468 non-zero under `destination-entry`.
+> tuning doc presented as canonical was the one the repository forbids. Independently corroborated
+> at the time: across all 5 buildings × 10 profiles, `rideTime` got **0 evaluations** under every
+> shipped profile, and 468/468 non-zero under `destination-entry`.
+>
+> **That corroboration is now historical, and the reason is the point of the example.** Phase 6
+> shipped two more profiles — `data/dispatcher-profiles.json` carries **twelve** — and one of them,
+> `destination-panel`, *does* weight `rideTime`. It is allowed to precisely because it also authors
+> `dispatch.callType: mobile-credential`, which satisfies the term's `activeWhen`. The rule the red
+> suite was enforcing has not changed: a profile may weight `rideTime` **iff** its own stage
+> settings make the term live. `destination-eta` ships the call type and *not* the weight, so the
+> two profiles together are the worked example of both sides of that gate.
 > [Review finding #6](08-review-findings.md); the JSON blocks in this file are now parsed and run
 > through the real `parseDispatcherProfiles` and the same `activeWhen` gate computation by
 > `packages/experiments/src/tuning/space/docExamples.test.ts`, so this example can no longer drift

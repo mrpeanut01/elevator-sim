@@ -19,10 +19,15 @@ Concretely, four bodies of work remain:
 | Body | State |
 |---|---|
 | Review register — 21 findings (1 critical, 13 major, 7 minor) | ✅ **all 21 closed** (wave 1) |
-| Phase 7 — Automated tuning | ✅ **ACCEPTED** 2026-07-27 (wave 1) |
-| Phase 4 — Visualization | 🟡 foundation landed; editor + metrics overlay in flight (T11) |
-| Phase 8 — Testing campaign | 🟡 fuzzing (T12) and oracle (T13) in flight |
-| Phase 6 — Destination dispatch & learned control | ⬜ contract in flight (T14), implementation wave 3 |
+| Phase 7 — Automated tuning | ✅ **ACCEPTED** 2026-07-27 (wave 1); re-confirmed 2026-07-28 |
+| Phase 4 — Visualization | ✅ **COMPLETE** — viewer, editor, live metrics overlay, playback from a stored seed, 87-scenario UX ledger |
+| Phase 6a / 6b — destination disclosure and dispatch | ✅ **ACCEPTED** against the criterion D27 raised |
+| Phase 6c — learned control | ⬜ **deferred out of the phase** with reasons (D28) — not dropped, and it needs its own acceptance question first |
+| Phase 8 — Testing campaign | ⚠️ seven tracks landed and found four defects, three fixed. **`fuzz-1000384` is open and blocks acceptance**; the full experiment matrix at a real budget is not started |
+
+**The one thing between here and § 7's definition of done:** close `fuzz-1000384`, then run the full
+experiment matrix at 50–200 replications — which also discharges Phase 7's acceptance interval, a
+measurement the roadmap assigns to Phase 8 and that accepting Phase 7 did not discharge.
 
 ## 2. Architecture snapshot
 
@@ -110,15 +115,24 @@ full by a picture with a 77-metre error.
 Fans out against T14's locked contract. Scope, parallelisation and ownership come from T14's work
 breakdown, not from this table.
 
-### Wave 4 — Phase 8 campaign + acceptance (planned)
+### Wave 3 — Phase 6 (landed)
 
-Task ids continue from T15; the wave-2 ids T10–T14 are taken.
+| ID | Task | Outcome |
+|---|---|---|
+| T15 | Phase 6a — destination disclosure, the studies, the access-control hypothesis | ✅ 6a accepted; **H-ACCESS-2 refuted**, H-ACCESS-1 confirmed categorically |
+| T16 | Phase 6b — the `core` seam: write-once promises, broken-promise counter, comparability | ✅ |
+| T18 | Phase 6b — the user-facing surface: viz schema 4, the panel profile, the C→D contrast | ✅ 6b accepted; found that `compare` was ranking two passenger models on AWT |
 
-| ID | Task |
-|---|---|
-| T15 | Determinism regression, scale & performance, adversarial edge cases |
-| T16 | Full experiment matrix + Pareto front, at a real replication budget |
-| T17 | Phase 7's acceptance number at 50–200 replications — the roadmap explicitly assigns this to Phase 8, and accepting the phase did not discharge it |
+### Wave 4 — Phase 8 campaign + closing pass
+
+| ID | Task | Outcome |
+|---|---|---|
+| T19 | `CarConfig.mode` and `BuildingConfig.serviceEvents` — making the out-of-service corner authorable | ✅ exposed a crash: an out-of-service car at an occupied landing killed the run |
+| T20 | Service-mode coverage, adversarial corners, scale & performance | ✅ found that P5 termination was blind to a fleet that never moves; found `fuzz-1001074` |
+| T21 | The fourth `awtIsValid` ground | ✅ no pinned estimate moved; uncovered `fuzz-1000384` while verifying |
+| T22 | `fuzz-1000384` — the open P5 deadlock | 🟡 in flight |
+| **T23** | **Closing documentation pass** — phase statuses with evidence, the refuted hypothesis, the measured corrections | ✅ this pass |
+| — | Full experiment matrix + Pareto front at a real replication budget, carrying Phase 7's acceptance number at 50–200 replications | ⬜ **not started** — the last piece of Phase 8 |
 
 ## 5. Ownership map — wave 1
 

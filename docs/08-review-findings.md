@@ -51,6 +51,28 @@ per-building `buildProfile(...).kind` assertion is not built), #20 (nothing can 
 finding's own alternative — a `contiguousZones` band-count assertion during a real run — is not
 built), and #5 (the record *is* the not-done bullet). Each is a doc that can drift again.
 
+### What moved after the dispositions were written (2026-07-28)
+
+All 21 remain closed. Five carry developments that a reader acting on the disposition alone would
+get wrong:
+
+| # | Development |
+|---|---|
+| **14** | The quantile correction had a **seventh** consequence nobody found at the time: `docs/07` § 4 and `docs/03`'s *replication budget by target precision* tables were the **deleted normal quantile's answer**. Five of six rows reproduced at `z`; at `t[n−1]` the budgets are 11 / 37 / 57 / 143 / 222 / 563 against the published 9 / 36 / 55 / 141 / 220 / 563 — understating the budget at every rung. Missed because the blast-radius scan covered *published intervals* and these are **planning** tables. Corrected 2026-07-28; tracked as **C19**. No conclusion changed |
+| **5** | Still not built, and now recorded twice over: the roadmap bullet stays ⬜, and Phase 7's re-confirmation on 2026-07-28 checked that the phase's acceptance does not lean on it |
+| **11** | Double-deck is still not simulated, and *"implementing it is Phase 6"* is now imprecise: Phase 6 split into 6a / 6b / 6c (§ D28) and double-deck belongs to none of the three. It is deferred scope named in the roadmap's Phase 6 section, and the disclaimer reaches `SimulationResult.warnings`, `RunRecord` and the CLI report |
+| **15** | The module-tree guard works and has a known weakness: it couples `core`'s suite to `viz`'s existence on disk, so deleting `packages/viz` turns the doc's `viz/*` rows into phantoms and reddens **core**. Invariant 6 still holds — it is a documentation coupling, not an import — but the guard should scope its directory set to packages that exist. Tracked as **C28**. It also means `docs/01` **must not** gain a `viz/editor/` line until the four `editor*.ts` files move there in the same commit (**C29**) |
+| **17** | The entry-point mapping is guarded, and the guard covers *that table only*. Phase 6a's and 6b's studies are deliberately named by **module path** rather than as barrel exports in the roadmap, because they are not on `benchmark/index.ts` or the package barrel (§ D62, **C27**) — naming them as callable exports would have reproduced this finding exactly |
+
+**A finding of the same class that this register never had.** Seven places asserted, as fact, that
+destination dispatch does better under access control *because* authorization and optimization
+happen in the same step. Measured at n = 150 per building under CRN, the difference-of-differences is
+`+0.982 s [+0.584, +1.380]` — the mechanism is **refuted**. Four of the seven were `core`
+docstrings; three were documents. **No test pinned any of them**, so nothing went red while they were
+wrong and nothing would go red if they returned. That is the same shape as findings #4 and #14 — a
+claim nothing re-derives — one level up, in prose about a mechanism rather than in a number. Tracked
+as **C23**, with a proposed guard in `AGENT_STATUS.md` § **T23-R1**.
+
 ---
 
 

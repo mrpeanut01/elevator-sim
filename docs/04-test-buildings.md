@@ -91,7 +91,10 @@ ground.
 > configured.** The config layer used to validate the pairing carefully enough to look wired and then
 > go silent, and silence reads as "modelled". It now raises `double-deck-not-simulated` naming the
 > building and the bank, `Simulation` raises the same statement into `result.warnings`, and
-> `RunRecord` carries it so a stored run keeps the disclaimer. Implementing decks is Phase 6.
+> `RunRecord` carries it so a stored run keeps the disclaimer. **Still not implemented as of
+> 2026-07-28, and no longer inside a live phase:** Phase 6 split into 6a / 6b / 6c
+> ([`DECISIONS.md` § D28](../DECISIONS.md)) and double-deck belongs to none of the three. It is
+> deferred scope named in [the roadmap](05-roadmap.md) § Phase 6, which is where it now lives.
 > [Review finding #11](08-review-findings.md); [`DECISIONS.md` § D11, § D22, § D23](../DECISIONS.md).
 
 ---

@@ -3524,3 +3524,185 @@ metrics layer. Recorded in `fuzz/deep.test.ts`'s header rather than filtered out
    two hundred both come back `starved`. The count is on the diagnosis so a reader can tell them
    apart; the *flag* deliberately does not, because one abandoned passenger is already enough to
    make the mean a description of a system nobody experienced.
+
+---
+
+Decisions taken during the **closing documentation pass (T23)**, branch `docs/final-status`,
+2026-07-28. This task owns `docs/**`, `README.md`, `CLAUDE.md` and the orchestration files, and no
+file under `packages/**` or `data/**`. Anything marked **HANDBACK** needs an owner in code.
+
+Baseline verified before any edit, in this worktree: `npx tsc -b` clean; `npx vitest run
+--testTimeout=60000` → **167 files / 3,100 tests (3,092 passed, 8 skipped)**, 343 s. Delta after the
+pass: zero.
+
+## D92 — every figure this pass publishes names its source, and two were re-derived here
+
+The standing rule for this pass was that no number may be written that cannot be traced. Three
+classes were used and they are labelled differently in the documents:
+
+| class | example | how it is written |
+|---|---|---|
+| **re-derived in this worktree** | the replication-budget table; the sequential rule's crossing | stated with the run that produced it |
+| **pinned by a test that re-derives it** | `−1.562 [−1.916, −1.208] s`; `+0.982 [+0.584, +1.380] s` | stated with the study module that regenerates it |
+| **transcribed from a decision record** | C20's 82.5 % / 21.2 %; C21's 1.23 s | stated **as transcribed**, and the doc says it was not re-measured here |
+
+Two figures were re-derived rather than transcribed, because both were cheap and both were load
+bearing:
+
+- **The replication budget.** `studentTQuantile(0.95, n−1) · 3.60 / √n ≤ target`, smallest `n`:
+  **11 / 37 / 57 / 143 / 222 / 563**. The published row was 9 / 36 / 55 / 141 / 220 / 563; the
+  normal quantile gives 9 / 36 / 55 / 141 / 220 / **562**, so five of six published rows are `z`'s
+  answer exactly. Since `t > z` at every finite `n`, the published table **understated the budget at
+  every rung** — the optimistic direction. Corrected in `docs/07` § 4 **and** `docs/03`, which
+  carried the same six numbers and which C19 did not mention.
+- **The sequential rule's unconstrained crossing**, because correcting the projection from 9 to 11
+  put it *above* the crossing and that needed checking rather than assuming. Measured through
+  `runGateExperiment` with `productionStoppingRule`, `minReplications: 2`, `checkEvery: 1`,
+  ±2 s at 90 % on Midtown up-peak `eta`: **n = 10**, `rule-satisfied`, half-width 1.8762 s, mean
+  16.7797 s, s = 3.2366 s. Unchanged by D14. The projection and the crossing disagree because the
+  crossing run's own sample sd (3.24 s) is smaller than the 3.60 s reference the table projects
+  from, which is stated in the doc rather than smoothed over.
+
+## D93 — C29 is refuted by disk, and the doc is **not** given the line it asked for
+
+**C29 asks `docs/01-architecture.md`'s module tree to gain `viz/editor/`. There is no such
+directory.** The editor's four pure modules are flat files at `packages/viz/src/`
+(`editorEdits.ts`, `editorValidate.ts`, `editorHistory.ts`, `editorPreview.ts`) — § D65 records that
+they were written as `editor/` and moved out precisely because `core/src/sim/moduleTree.test.ts`
+compares the doc against disk **in both directions** and `docs/` was not that task's to edit.
+
+Adding the line would therefore have made it a **phantom** and reddened the **core** suite — which
+is the `experiments/stats/` error that guard exists to catch, committed deliberately this time.
+
+**Chosen:** record it in `docs/01` as outstanding, with the constraint stated: the file move and the
+doc line **must land in one commit**, because neither half is valid alone. **HANDBACK** —
+`packages/viz/**` plus `docs/**`, which no single task in this wave owned.
+
+This is also why C29's sibling **C28** is reported and not fixed: `moduleTree.test.ts` is a
+`packages/core` file another builder owns this round. The precise defect and the precise remedy —
+scope the guard's directory set to packages that exist on disk — are written into `docs/01` and
+`docs/07` § 8 so the next owner does not have to rediscover them.
+
+## D94 — Phase 8 is recorded as NOT ACCEPTED, over a finding it produced itself
+
+`fuzz-1000384` is an open P5 termination violation and a fix is in flight in T22. Three shapes were
+available: mark Phase 8 accepted with the finding as a footnote; withhold the phase status until
+T22 lands; or record the tracks as landed and the phase as not accepted, with the finding stated in
+full.
+
+**Chosen: the third.** Phase 8's own acceptance rule — inherited from `docs/07` § 7 and written into
+the roadmap section this pass created — is that *any Phase 8 failure is blocking*. A rule that is
+suspended for the first finding it catches is not a rule, and this project's recorded history is of
+acceptance criteria being satisfied in form while the thing they protect fails. Withholding the
+status entirely was worse: `docs/05` had **no Phase 8 section at all** before this pass, and "no
+status" is the state that let `packages/viz` appear on disk for a whole wave without the register
+noticing (§ D26).
+
+So every document records the finding with its seed, its characterisation, its shrink and its
+**pre-existence proof** (it reproduces to the same decimal at `c072f97` with T21's changes stashed),
+and none of them declares Phase 8 clean. The orchestrator finalises the verdict at merge.
+
+**A corollary, recorded because it is the tempting move:** `deadlockIdleBoundS` is a single number
+and raising it makes the red go away. R22 in `RISKS.md` names that explicitly. The precedent is D86,
+which fixed a P5 blindness by making the property **strictly stronger** and left the bound at 600 s,
+and D91, which refused a third threshold loosening.
+
+## D95 — Phase 8's findings are published as findings, not folded into a green tick
+
+The campaign's four defects are written up in `docs/05` § Phase 8 and `docs/07` § 7 with the
+mechanism of each, not merely counted. **A testing campaign that reports only "all green" has hidden
+its own value**, and three of these four are cases where every other check in the repository passed:
+
+- `fuzz-1001074` — `awtIsValid: true` beside a 922.7 s wait, on a run that **completed with zero
+  undelivered**. Little's Law confirms the simulator was right about all of it; the *report* was
+  wrong. Only a randomly generated building produced the shape (a queue that grew enormously and
+  drained just in time) that both existing gates miss.
+- The out-of-service crash — unreachable until T19 made the corner authorable, and then reachable
+  immediately. "Untested" and "unrunnable" looked identical from outside.
+- P5's blindness — the most extreme corner in the adversarial suite **passed all six properties**. A
+  property demonstrated to fail on one shape is not a property demonstrated to fail on every shape.
+
+## D96 — the phase-status vocabulary is honoured and its limitation is disclosed — **HANDBACK**
+
+`packages/experiments/src/validation/documentation.test.ts` recognises exactly three phase states in
+prose: *landed and accepted*, *a foundation only*, *not started*. Neither Phase 6 (6a and 6b
+accepted, 6c deferred out of the phase) nor Phase 8 (tracks landed, one finding open) is "a
+foundation only".
+
+**Alternatives.** (a) Edit the guard — not this task's file. (b) Round Phase 6 and Phase 8 to
+*landed* or *not started* — both false. (c) Use the phrase the guard reads and put the accurate
+statement immediately beside it, in all three documents.
+
+**Chosen:** (c), with the limitation named in the text rather than left for a reader to trip over.
+`CLAUDE.md`, `README.md` and `docs/07` each carry the guard's phrase and, directly under it, a
+two-bullet statement of what is actually true of each phase. **HANDBACK:** add a fourth term
+(`are partially complete` → `'partial'`) and migrate the three documents in one commit —
+`AGENT_STATUS.md` § T23-R2.
+
+## D97 — the refuted mechanism is corrected in prose and a guard is **specified, not built** — **HANDBACK**
+
+§ D60 records that none of the seven mechanism sites was pinned by a test, so nothing went red while
+they were wrong. The obvious response is a guard, and the obvious guard is a string assertion in
+`validation/documentation.test.ts` — a `packages/experiments` file this task does not own.
+
+Writing it anyway was not available; writing nothing would leave the correction exactly as
+unprotected as the error was. **Chosen:** specify it precisely enough to be dropped in, including
+the exclusion that makes it correct — `core/src/model/car/estimateCost.ts:123` says only that a
+destination *lets* a dispatcher authorize and optimize in one step, which is a true description of
+the code and must not be caught. Recorded as **T23-R1** with the falsification step named: re-insert
+the old sentence in one file and watch it go red before trusting it. Also raised as **R23**.
+
+**Verified rather than assumed:** all four `core` sites were read at their current line numbers and
+carry the correction (`dispatch/lifecycle.ts:133`, `model/types.ts:122`, `model/car/types.ts:470`,
+`sim/simulation.ts:2410`). C20 and C21 were checked the same way and are **still present**, so they
+are recorded as open rather than closed — the brief said the concurrent builder "may have fixed"
+them, and it had not.
+
+## Known limitations of this pass
+
+1. **Two figures are transcribed, not re-derived** — C20's 82.5 % / 21.2 % and C21's 1.23 s band.
+   Both are stated as transcribed in `docs/07` § 8. Re-deriving them means running
+   `deriveUpPeakTerms` and `departureGapBracket` over the shipped banks, which is cheap; it was not
+   done because the correction lands in `core` files this task cannot edit, and a figure published
+   here would be a second authority for a number that belongs in the docstring.
+2. **`fuzz-1000384` has no verdict here**, by design. Its status in every document is *open*.
+3. **The 87-row UX ledger's four ⚠️ rows are carried through as unverified**, not re-driven. This
+   pass has no browser.
+4. **Phase 6's acceptance is recorded as the criterion words it**, which at the primary operating
+   point means 6b is accepted on INDISTINGUISHABLE metrics plus a reporting clause rather than on a
+   win. The documents say that in those words rather than implying a gain.
+5. **No test asserts any phase *status*.** The guards assert that the three documents *agree* about
+   the phase set, not that the set is true. A wave that marks a phase landed in all three places
+   passes every check in this repository.
+
+## D98 — **FINDING (T23-F1).** Phase 6's criterion named a building; the raise dropped it, and nothing was measured there
+
+`docs/05-roadmap.md`'s original Phase 6 gate read *"a learned dispatcher beats the naive baselines on
+AWT and WT95 **on the Mixed-Use High-Rise**, with paired-t intervals excluding zero."* § D27 raised
+the **metric** clause — gate on TTD, report AWT and WT95 with explicit verdicts — and did not carry
+the **building** clause. Every Phase 6a and 6b result is measured on Midtown Office and Secure Tower
+interfloor-mix. **None is on `mixed-use-high-rise`.**
+
+The chosen operating points have stated reasons and they are good ones: Secure Tower is the only
+building with `accessZones`, and Midtown is the unzoned control without which H-ACCESS-2's
+difference-of-differences cannot be formed at all. What is missing is that the substitution was never
+*argued*. A criterion that named a building was replaced by one that does not, and the replacement
+is the document that records the raise.
+
+**Recorded as a finding rather than repaired**, for two reasons that pull in opposite directions and
+are both stated:
+
+- Dropping a named building from an acceptance criterion is the shape of a weakening, and
+  `CLAUDE.md` § Working agreements forbids weakening one. On that reading Phase 6's acceptance is
+  incomplete rather than wrong.
+- `mixed-use-high-rise` is separately the building whose achieved interval is reported
+  `unmeasurable` **by design** — a shuttle holds its doors 39.8 s while an office-local car
+  completes a whole round trip in 31.3 s, so no departure-gap threshold is valid there and refusing
+  to report one is the correct answer. That is a real obstacle to running the original criterion as
+  written, not an excuse for not having.
+
+Neither reading is available to this pass to settle: choosing between them means running the
+comparison, and this task owns no code. **Phase 8's full experiment matrix — every dispatcher ×
+building × traffic — is where it closes**, and it is the same run that discharges Phase 7's
+acceptance interval at a real budget. Recorded in `docs/05` § Phase 6, `docs/07` § 8 and
+`AGENT_STATUS.md` § T23-F1.

@@ -7,6 +7,15 @@ change moves, and states for each whether it moves, by how much, and whether a v
 Fixes covered: review findings **#14** (published paired interval switched Student-t → normal above
 n = 25), **#8** (`compare` could not say IDENTICAL), **#19** (`reproduce:` omitted `--confidence`).
 
+> **Still authoritative as of 2026-07-28, with one known gap in its scope.** Every figure below
+> stands. The scan enumerated **published intervals**, and there was a second population it did not
+> cover: **planning tables built from the same quantile.** `docs/07` § 4's and `docs/03`'s
+> replication-budget rows were the normal quantile's answer — 9 / 36 / 55 / 141 / 220 / 563 against
+> `t`'s 11 / 37 / 57 / 143 / 222 / 563 — and neither is an interval, so neither appears here. Found
+> by Phase 8's oracle track, tracked as **C19**, corrected 2026-07-28. Nothing in this document
+> changes; the lesson is that "every number this change moves" is a wider set than "every interval
+> this change moves".
+
 ---
 
 ## 0. Status of this document — read this before transcribing anything

@@ -100,9 +100,22 @@ Conflating these is the classic modeling mistake. They must remain separate conc
 | **Access zoning** | Which floors a given credential may reach | Passenger × Floor | Request validation |
 | **Operational zoning** | Dynamic floor partitioning among cars during up-peak | Dispatcher policy | Tunable strategy |
 
-Worth reproducing as a result: destination dispatch is *better* under access control,
-because the system learns the destination before boarding and can authorize and optimize
-in the same step.
+Because the system learns the destination before boarding, a credential-aware dispatcher can
+authorize and optimize in one step where a conventional one **cannot authorize at all**. That is a
+true statement about the code.
+
+> **The performance claim that used to be built on it is refuted, and this paragraph asserted it as
+> fact.** It read *"destination dispatch is better under access control, because … authorize and
+> optimize in the same step."* Measured at n = 150 per building under common random numbers, the
+> difference-of-differences `Δ_secure − Δ_midtown` is **+0.982 s [+0.584, +1.380]**, excluding zero
+> on the **positive** side: given the credential, pricing the destination buys *less* where access is
+> controlled, not more. What the credential does buy is **coverage** — conventional dispatch cannot
+> serve Secure Tower's interfloor traffic under any budget (0 of 30 replications quotable, 33.5 %
+> unserved), because an access-restricted pickup carries no credential and every car answers
+> `accessDenied`. So the saving is real and it is a claim about **authorization**, not about
+> **optimization**. Full result and the reason a single-building interval cannot settle it:
+> [Roadmap § The access-control hypothesis](05-roadmap.md). Seven places asserted the old sentence
+> and no test pinned any of them.
 
 ## Simulation kernel
 
@@ -243,17 +256,36 @@ packages/
 │   │   └── report/        — Pareto fronts, the held-out validation round
 │   ├── fuzz/              — Phase 8: randomized buildings, the six properties, shrinking
 │   └── validation/        — the Phase 3 acceptance gate
-├── viz/                   — web visualization, consumes core          (Phase 4 foundation only)
+├── viz/                   — web visualization, consumes core                    (Phase 4 complete)
 │   ├── contract/          — the recording schema and its folded series
 │   ├── record/            — instrumenting a run into a VizRecording
 │   ├── frame/             — the deterministic frame producer
 │   ├── playback/          — the playback clock and its mapping
 │   ├── render/            — layout and the minimal Canvas renderer
 │   ├── replay/            — the replay harness and its per-field negative control
-│   └── dev/               — the Vite dev entry point (dev-only)
+│   └── dev/               — the Vite dev entry points, viewer and editor (dev-only)
 └── cli/                   — headless batch entry point
     └── commands/          — list, run, compare, tune, watch
 ```
+
+> **Layout note — there is deliberately no `viz/editor/`, and this doc must not invent one.**
+> [`AGENT_STATUS.md`](../AGENT_STATUS.md) **C29** asked for a `viz/editor/` line here. **Refuted by
+> disk:** the editor's four pure modules are flat files at `packages/viz/src/` —
+> `editorEdits.ts`, `editorValidate.ts`, `editorHistory.ts`, `editorPreview.ts` — and
+> `packages/core/src/sim/moduleTree.test.ts` compares this tree against the directories under
+> `packages/*/src` **in both directions**, so adding the line would turn it into a phantom and redden
+> the **core** suite. They are flat for the same reason
+> ([`DECISIONS.md` § D65](../DECISIONS.md)): the guard is bidirectional, a new directory needs a line
+> in this doc, and `docs/` was not that task's to edit. Moving the four files into `viz/editor/` and
+> adding the line **must happen in one commit** — it spans `packages/viz/**` and `docs/**`, which no
+> single task in this wave owned. Recorded as outstanding, not done.
+>
+> **A known weakness in that guard, reported rather than edited (C28).** Because the tree names
+> `viz/*` directories and the guard is bidirectional, removing `packages/viz` from disk turns them
+> into phantoms and reddens `core`'s suite. Invariant 6 still holds — this is a *documentation*
+> coupling, not an import — but a reviewer checking the strong form ("`core` builds and tests with
+> `viz` absent") hits it. The guard should scope its directory set to packages that exist on disk.
+> `core/src/sim/moduleTree.test.ts` is a `packages/core` file and was another task's this round.
 
 > **Layout note — `experiments/stats/` does not exist.** This doc previously placed the
 > statistics layer at `packages/experiments/src/stats/`. Phase 3 landed that code in
