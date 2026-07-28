@@ -824,3 +824,122 @@ describe('service mode, physically — a car the group does not merely disbeliev
     expect(armB.result.conservation.balanced).toBe(true);
   }, 300_000);
 });
+
+/* -------------------------------------------------------------------------- *
+ * 7. Destination dispatch × a service schedule — handback H6 / T22 § limitation 4
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The crossing this package did not have, and it is the one the deadlock lived in.**
+ *
+ * `packages/core/DECISIONS-T22.md` § *Known limitations* item 4 handed this back precisely:
+ * {@link runCorner} and `fuzz/run.ts`'s `fuzzSimulationConfigFor` both drove **conventional**
+ * dispatch here, so `serviceEvents` crossed with `dispatch.passengerAssignment: 'panel'` was
+ * covered in `core` (`sim/serviceMode.test.ts` § 4) and by the fuzz generator — which is how
+ * `fuzz-1000384` was found — but nowhere in `experiments/validation`.
+ *
+ * That crossing is not an arbitrary hole. It is exactly where the P5 deadlock was: a promise pinned
+ * by D29's write-once rule to a car the schedule then put on `independent`, `#candidateCars`
+ * restricting the re-offered call to that car, and 1 694 s of fleet inactivity with a servable
+ * journey outstanding while another car in the same bank stood idle. `Simulation.#revokePromisesTo`
+ * fixed it; nothing in *this* package would have noticed if it regressed.
+ *
+ * So the corner is run through the same six properties every other corner here is, and three things
+ * are asserted that only this crossing can produce:
+ *
+ * 1. the promise machinery **engaged** — a non-zero `legsAssigned`, so a green result is not the
+ *    green of a run in which no promise was ever made;
+ * 2. the schedule **bit** — a non-zero `promisesRevoked`, which is `0` on every conventional run
+ *    and on every run without a mid-run service change, so it cannot be produced by accident;
+ * 3. the books still balance, including the audit's netting claim
+ *    `legsAssigned − promisesRevoked === legsCreated` on a run that delivered everybody.
+ *
+ * **The control is the same building at the same seed with no schedule**, because "the panel and a
+ * schedule coexist" is only interesting against a run where the schedule is the single difference.
+ */
+describe('destination dispatch crossed with a service schedule (handback H6)', () => {
+  it('revokes the promises a withdrawn car cannot keep, and stays conserved', () => {
+    const scheduled = runCorner({
+      ...SERVICE_RUN,
+      id: 'adversarial/panel-with-service-schedule',
+      building: serviceFixture('adversarial-panel-schedule', {
+        serviceEvents: [
+          { atS: RECALL_AT, carId: AUTHORED_A, mode: 'independent' },
+          { atS: RETURN_AT, carId: AUTHORED_A, mode: 'in-service' },
+        ],
+      }),
+      dispatcherProfile: profile('destination-panel'),
+    });
+
+    const control = runCorner({
+      ...SERVICE_RUN,
+      id: 'adversarial/panel-without-service-schedule',
+      building: serviceFixture('adversarial-panel-control'),
+      dispatcherProfile: profile('destination-panel'),
+    });
+
+    const audit = scheduled.result.conservation;
+    const baseline = control.result.conservation;
+    console.log(
+      `[adversarial] panel × schedule: ${describeOutcome('panel-with-schedule', scheduled)}, ` +
+        `legsAssigned=${String(audit.legsAssigned)}, brokenPromises=${String(audit.brokenPromises)}, ` +
+        `promisesRevoked=${String(audit.promisesRevoked)} | control: ` +
+        `legsAssigned=${String(baseline.legsAssigned)}, promisesRevoked=${String(baseline.promisesRevoked)}`,
+    );
+
+    /* The six properties the whole campaign is written against. P5 is the one that reported the
+       deadlock, and it is in `checkAll` rather than restated here. */
+    expectNoViolations('adversarial/panel-with-service-schedule', scheduled);
+    expectNoViolations('adversarial/panel-without-service-schedule', control);
+
+    /* 1. The passenger model engaged. Without this the rest is the green of an empty run. */
+    expect(
+      audit.legsAssigned,
+      'no leg was ever promised a car, so `passengerAssignment: "panel"` did not engage and this ' +
+        'corner is testing conventional dispatch under a different profile id.',
+    ).toBeGreaterThan(0);
+    expect(baseline.legsAssigned).toBeGreaterThan(0);
+
+    /* 2. The schedule bit, and only in the scheduled arm. `promisesRevoked` is 0 on every
+          conventional run and on every run with no mid-run service change, so a non-zero here is
+          produced by this crossing and by nothing else. */
+    expect(
+      audit.promisesRevoked,
+      'the schedule withdrew a car that was holding promises and none was revoked. That is the ' +
+        'fuzz-1000384 configuration: the promise outlives the car’s ability to keep it, the call ' +
+        'is re-offered only to that car, and the bank deadlocks.',
+    ).toBeGreaterThan(0);
+    expect(baseline.promisesRevoked).toBe(0);
+
+    /* 3. The books, including the netting claim `legsAssigned` was redefined for. */
+    expect(scheduled.result.conservation.balanced).toBe(true);
+    expect(control.result.conservation.balanced).toBe(true);
+    expect(scheduled.result.undelivered).toHaveLength(0);
+    expect(audit.legsAssigned - audit.promisesRevoked).toBe(audit.legsCreated);
+  }, 300_000);
+
+  /**
+   * The same crossing through `fuzzSimulationConfigFor`, which is the other half of the handback.
+   *
+   * `withCallType` is what a `FuzzCase` uses to select a passenger model, and it **deletes**
+   * `passengerAssignment` under `up-down-buttons` — so a case that draws `destination-panel` with a
+   * conventional call type is not this crossing at all. Asserted here rather than assumed, because
+   * that deletion is precisely why the corner above had to be written by hand.
+   */
+  it('reaches the panel through fuzzSimulationConfigFor’s own call-type selection', () => {
+    const panel = profile('destination-panel');
+    expect(panel.dispatch?.passengerAssignment).toBe('panel');
+
+    const conventional = withCallType(panel, 'up-down-buttons');
+    expect(
+      conventional.dispatch?.passengerAssignment,
+      'withCallType no longer drops passengerAssignment under up-down-buttons. If a conventional ' +
+        'call type can now carry a panel, the fuzz corpus has changed shape and the assumption ' +
+        'this corner was written against is gone.',
+    ).toBeUndefined();
+
+    const credentialed = withCallType(panel, 'mobile-credential');
+    expect(credentialed.dispatch?.passengerAssignment).toBe('panel');
+    expect(credentialed.dispatch?.callType).toBe('mobile-credential');
+  });
+});

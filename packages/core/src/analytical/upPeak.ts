@@ -239,7 +239,7 @@ function selectUpperFloors(
  * | `v` | mean `ratedSpeedMps` of the bank's cars |
  * | `tv` | `df / v` — **at rated speed**, the classic simplification |
  * | `ts` | `doorOpenS + doorCloseS + motorStartDelayS + levelingSettleS` |
- * | `tp` | `elevator-specs.json → timing.passengerTransferS[building.type]` |
+ * | `tp` | `options.passengerTransferS`, else `elevator-specs.json → timing.passengerTransferS[building.type]` — and the table has **no `mixed-use` row**, so on a mixed-use tower the option is not optional: this function throws `RangeError` without it |
  * | `P` | `capacityPersons × designLoadFactor`, **not rounded** |
  * | `L` | number of cars in the bank |
  * | `U` | population of the served floors above the terminal |
@@ -250,11 +250,31 @@ function selectUpperFloors(
  * the passengers are going. It is wrong whenever they are a transfer point: Mixed-Use
  * High-Rise's shuttle serves only `G` and the sky lobby at `31`, whose declared population
  * of 260 is its amenity occupants — while the shuttle also lifts all 754 residents of
- * floors 32–60, for a true `U` of 1014. The default reports 102.8 % of population per five
- * minutes instead of 26.3 %. `UP_PEAK_WARNING_CODES.destinationsAreTransferFloors` fires
- * on exactly this shape, and `analyzeUpPeak` adds `implausibleHandlingCapacity` when the
- * resulting `%POP` clears {@link IMPLAUSIBLE_PERCENT_POPULATION_5MIN}; the fix is
+ * floors 32–60, for a true `U` of 1014. The default reports **82.5 %** of population per
+ * five minutes instead of **21.2 %**. `UP_PEAK_WARNING_CODES.destinationsAreTransferFloors`
+ * fires on exactly this shape, and `analyzeUpPeak` adds `implausibleHandlingCapacity` when
+ * the resulting `%POP` clears {@link IMPLAUSIBLE_PERCENT_POPULATION_5MIN}; the fix is
  * `options.servedPopulation`.
+ *
+ * **Those two figures are `tp`-dependent, and this docstring used to quote the wrong `tp`**
+ * (`AGENT_STATUS.md` C20). It read *102.8 % … instead of 26.3 %*, which reproduces only at
+ * `tp = 1.2 s` — a value **no car of that bank declares**. Every shuttle car in
+ * `data/buildings/mixed-use-high-rise.json` authors `passengerTransferS: 1.75`, and the
+ * building's own notes say why: the shuttle is the only route to floors 32–60, residents
+ * are on it every trip, and understating `tp` understates the round trip in the optimistic
+ * direction `CLAUDE.md` warns about. Re-measured through `analyzeUpPeak` rather than
+ * transcribed:
+ *
+ * | `tp` | default `U` = 260 | stated `U` = 1014 | RTT | INT |
+ * |---|---|---|---|---|
+ * | 1.2 s (**not declared by any car here**) | 102.8 % | 26.3 % | 93.42 s | 23.36 s |
+ * | **1.75 s (declared)** | **82.5 %** | **21.2 %** | 116.30 s | 29.08 s |
+ *
+ * The ratio is unchanged — `%POP` scales as `1 / U` and both columns move together with
+ * `tp` — so the *point* the paragraph makes survives; only the numbers were from a bank
+ * that does not exist. Both rows still clear
+ * {@link IMPLAUSIBLE_PERCENT_POPULATION_5MIN} at the default `U`, which is what the
+ * warning is for.
  *
  * ## `df` and `tx` together are exact
  *

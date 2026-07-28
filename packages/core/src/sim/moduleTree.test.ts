@@ -19,11 +19,25 @@
  * somebody noticed by eye. Asserting only the first would leave the second uncovered, so the two
  * sets are compared for equality.
  *
- * ## Why it lives here
+ * ## Why it lives here, and the coupling that had to be removed for that to be safe
  *
  * In `core/src/sim/` because it walks `packages/<pkg>/src` and `core` is the package every other one
  * depends on, so a test here cannot invert the package graph. It reads directories, not modules,
  * and imports nothing from a sibling package.
+ *
+ * **That was not enough, and `AGENT_STATUS.md` C28 reported why.** The doc's tree names `viz/*`
+ * directories and the comparison ran in both directions over *every* label in it, so deleting
+ * `packages/viz` from disk turned six of them into phantoms and reddened the **core** suite.
+ * Invariant 6 is *"`core` builds and tests with `viz` absent"*, and a reviewer checking its strong
+ * form by removing the package hit a documentation coupling and reasonably read it as a violation.
+ *
+ * The fix is to **scope**, not to weaken: {@link documentedDirectories} is filtered to the packages
+ * that are actually on disk, and inside that scope both directions are compared exactly as before.
+ * A directory of a present package that the doc omits still fails; a directory the doc names that a
+ * present package does not have still fails — that is the `experiments/stats/` error and it stays
+ * caught. What no longer fails is a doc line about a package that is not installed, which was never
+ * a statement about `core`. {@link presentPackages} is asserted non-empty and asserted to contain
+ * `core`, so the scoping cannot quietly become "skip everything".
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -52,6 +66,26 @@ const SKIP = new Set(['dist', 'node_modules', '.vite']);
  * directory an acceptance criterion is asserted in is not doing its job. The looser rule is also
  * strictly harder to satisfy, so nothing is let through by it.
  */
+/**
+ * Every package under `packages/` that has a `src` directory on disk.
+ *
+ * The scope of the comparison below. A workspace member that is not installed — `viz` removed to
+ * check invariant 6's strong form, a package not yet created — contributes neither directories nor
+ * expectations, because the doc's lines about it are not claims about the packages that *are* here.
+ */
+function presentPackages(): ReadonlySet<string> {
+  const present = new Set<string>();
+  for (const pkg of readdirSync(PACKAGES)) {
+    if (SKIP.has(pkg)) continue;
+    try {
+      if (statSync(join(PACKAGES, pkg, 'src')).isDirectory()) present.add(pkg);
+    } catch {
+      /* not a package with sources; nothing to compare either way */
+    }
+  }
+  return present;
+}
+
 function sourceDirectories(): readonly string[] {
   const found: string[] = [];
 
@@ -121,16 +155,28 @@ function documentedDirectories(): readonly string[] {
 
 describe('docs/01 § Module layout', () => {
   it('names every source directory on disk, and no directory that is not (review finding #15)', () => {
+    const present = presentPackages();
     const onDisk = sourceDirectories();
     const documented = documentedDirectories();
+
+    // Non-vacuity for the scoping (C28): it narrows the comparison to installed packages, and it
+    // must never narrow it to nothing. `core` is the package this suite lives in, so its absence
+    // would mean the walk is broken rather than that the package was removed.
+    expect(present.size, 'no packages with a src/ directory — the walk is broken').toBeGreaterThan(0);
+    expect(present.has('core'), 'packages/core/src is missing; the walk is broken, not the doc').toBe(
+      true,
+    );
 
     expect(onDisk.length, 'no source directories found — the walk is broken, not the doc')
       .toBeGreaterThan(10);
     expect(documented.length, 'no directories parsed out of the doc — the fence shape changed')
       .toBeGreaterThan(10);
 
-    const missing = onDisk.filter((dir) => !documented.includes(dir));
-    const phantom = documented.filter((dir) => !onDisk.includes(dir));
+    // Scoped to what is installed. Both directions still hold inside the scope; see the module
+    // docstring for why a doc line about an absent package is not a claim about `core`.
+    const inScope = documented.filter((dir) => present.has(dir.split('/')[0] as string));
+    const missing = onDisk.filter((dir) => !inScope.includes(dir));
+    const phantom = inScope.filter((dir) => !onDisk.includes(dir));
 
     expect(
       missing,

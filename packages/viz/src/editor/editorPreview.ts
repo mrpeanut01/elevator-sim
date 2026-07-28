@@ -28,8 +28,8 @@ import {
   type ResolvedBuilding,
 } from '@elevator-sim/core/browser';
 
-import type { VizFloor } from './contract/types.js';
-import type { ShaftGeometry } from './render/layout.js';
+import type { VizFloor } from '../contract/types.js';
+import type { ShaftGeometry } from '../render/layout.js';
 
 export interface PreviewGeometry {
   readonly floors: readonly VizFloor[];

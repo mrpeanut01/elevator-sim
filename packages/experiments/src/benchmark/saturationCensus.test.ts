@@ -41,6 +41,15 @@ import {
   rideArmId,
 } from './destinationDisclosure.js';
 import { BARE_KIOSK_ARM, accessControlProfiles } from './accessControl.js';
+import {
+  DECOMPOSITION_ARM,
+  LEVEL_0_ARM,
+  LEVEL_1_ARM,
+  MIXED_USE_BUILDING,
+  MIXED_USE_POINTS,
+  baselineProfileIds,
+  mixedUseProfiles,
+} from './mixedUseHighRise.js';
 import { BENCHMARK_SEED } from './suite.js';
 
 const ALL_PROFILES = [BASELINE_PROFILE, ...ARM_PROFILES];
@@ -390,6 +399,152 @@ describe('Phase 6a — the interfloor-mix operating points, censused rather than
       'midtown-up-peak',
       'garden-residential',
       'secure-up-peak',
+    ]);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Phase 6 on the building its criterion names — DECISIONS.md § D99
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The Mixed-Use High-Rise ceilings, censused here rather than inherited from anywhere.**
+ *
+ * § D99 puts back the building clause D27 dropped, and the first thing that needs is an operating
+ * point. `arms.ts`'s ceilings do not transfer — `nearest-car` first loses its AWT at replication 287
+ * on Midtown up-peak and 190 on Secure Tower up-peak, and neither number applies to any row below.
+ * Reusing another study's ceiling is a mistake this project has made and corrected once already
+ * (contract OQ-5), so every number `mixedUseHighRise.ts` spends is measured here.
+ *
+ * **The rate that is excluded is excluded by its ceiling and not by its answer.** At 3 % of
+ * population per 5 minutes the destination arm's gain over `eta` is *larger* than at 2 % — it would
+ * have been the flattering choice — and `nearest-car` loses its AWT on replication 22, so no budget
+ * in this project's 50–200 band can be spent there with the naive baseline in the cell. That is
+ * asserted below rather than mentioned, because "we dropped the rate that did not suit us" and "we
+ * dropped the rate whose baseline saturates" look identical in a results table.
+ */
+describe('Phase 6 — the Mixed-Use High-Rise operating points, censused rather than inherited', () => {
+  async function mixedUseResources() {
+    const config = await loadResources();
+    const destination = config.dispatcherProfilesById.get(DISCLOSURE_PROFILE);
+    if (destination === undefined) {
+      throw new Error('data/dispatcher-profiles.json must ship destination-eta');
+    }
+    return {
+      resources: withProfiles(config, [...mixedUseProfiles(destination)]),
+      baselines: baselineProfileIds(config.dispatcherProfilesById),
+    };
+  }
+
+  /** Every arm the study puts on this building. */
+  function mixedUseArms(baselines: readonly string[]): readonly string[] {
+    return [...baselines, DECOMPOSITION_ARM, LEVEL_0_ARM, LEVEL_1_ARM];
+  }
+
+  /** `arm → index of its first invalid replication`, absent when it never lost its AWT. */
+  async function firstInvalid(
+    rate: number,
+    replications: number,
+  ): Promise<ReadonlyMap<string, number>> {
+    const { resources, baselines } = await mixedUseResources();
+    const traffic: TrafficArmSpec = {
+      id: `up-peak-${String(rate)}pct`,
+      durationS: 900,
+      demand: {
+        directionalSplit: { incoming: 1, outgoing: 0, interfloor: 0 },
+        arrivalRatePctPop5min: rate,
+        peakWindowS: 300,
+      },
+    };
+    const result = await runGateExperiment({
+      id: `census/mixed-use/up-peak-${String(rate)}`,
+      seed: BENCHMARK_SEED,
+      building: MIXED_USE_BUILDING,
+      dispatchers: [...mixedUseArms(baselines)],
+      traffic,
+      replications,
+      resources,
+    });
+    const found = new Map<string, number>();
+    for (const cell of result.cells) {
+      const index = cell.replications.findIndex((record) => !record.awtIsValid);
+      if (index >= 0) found.set(cell.dispatcherArmId, index);
+    }
+    console.log(
+      `[census] mixed-use up-peak ${String(rate)} %, n = ${String(replications)}: ` +
+        (found.size === 0
+          ? 'no arm lost its AWT'
+          : [...found]
+              .sort(([a], [b]) => (a < b ? -1 : 1))
+              .map(([arm, index]) => `${arm}@${String(index)}`)
+              .join(', ')),
+    );
+    return found;
+  }
+
+  it('finds no ceiling at all at 1 %, over 1000 replications', async () => {
+    const found = await firstInvalid(1, 1000);
+    expect(
+      [...found.keys()],
+      'an arm lost its AWT at 1 % of population per 5 minutes. MIXED_USE_POINTS records the ' +
+        'ceiling there as undefined — "none in 1000" — and a budget is chosen against it.',
+    ).toEqual([]);
+    const point = MIXED_USE_POINTS.find((entry) => entry.id === 'up-peak-1pct');
+    expect(point?.ceiling).toBeUndefined();
+  }, TIMEOUT_MS);
+
+  it('finds the naive baseline setting the ceiling at 2 %, above the budget spent there', async () => {
+    const point = MIXED_USE_POINTS.find((entry) => entry.id === 'up-peak-2pct');
+    expect(point).toBeDefined();
+    if (point === undefined) return;
+
+    const found = await firstInvalid(2, 400);
+    // It is `nearest-car` that sets it, which is the handoff's § 4 observation about this profile
+    // holding on a second building: it is the only arm that saturates anywhere here.
+    expect(found.get(BASELINE_PROFILE)).toBeDefined();
+    expect([...found.keys()]).toEqual([BASELINE_PROFILE]);
+    // The recorded ceiling is the measured one, and the budget sits under it.
+    expect(found.get(BASELINE_PROFILE)).toBe(point.ceiling);
+    expect(point.replications).toBeLessThan(point.ceiling as number);
+  }, TIMEOUT_MS);
+
+  it('excludes 3 % because its ceiling is 22, not because of what it measures', async () => {
+    const found = await firstInvalid(3, 100);
+    const ceiling = found.get(BASELINE_PROFILE);
+    expect(
+      ceiling,
+      'nearest-car no longer loses its AWT early at 3 %. That was the whole reason the rate is not ' +
+        'an operating point; if it has changed, 3 % should be reconsidered on its merits.',
+    ).toBeDefined();
+    expect(ceiling as number).toBeLessThan(50);
+    // Non-vacuity: 3 % is excluded, so no point may be budgeted at it.
+    expect(MIXED_USE_POINTS.map((entry) => entry.traffic.id)).not.toContain('up-peak-3pct');
+  }, TIMEOUT_MS);
+
+  it('finds the panel setting the ceiling at 4 %, above the budget spent there', async () => {
+    const point = MIXED_USE_POINTS.find((entry) => entry.id === 'up-peak-4pct');
+    expect(point).toBeDefined();
+    if (point === undefined) return;
+
+    const found = await firstInvalid(4, 210);
+    // At the heavy point it is the *panel* that binds, not the naive baseline — the write-once
+    // promise under a filling car, which is the same mechanism the 4 % result reports.
+    const earliest = Math.min(...[...found.values()]);
+    expect(found.get(LEVEL_1_ARM)).toBe(point.ceiling);
+    expect(earliest).toBe(point.ceiling);
+    expect(point.replications).toBeLessThan(point.ceiling as number);
+  }, TIMEOUT_MS);
+
+  it('covers every point Phase 6 declares on this building', () => {
+    expect(MIXED_USE_POINTS.map((entry) => entry.id)).toEqual([
+      'up-peak-1pct',
+      'up-peak-2pct',
+      'up-peak-4pct',
+    ]);
+    // Exactly one point is declared blind, and it is the lightest. A study whose every point was
+    // declared blind would pass the blindness check by never claiming anything.
+    expect(MIXED_USE_POINTS.filter((entry) => entry.blind).map((entry) => entry.id)).toEqual([
+      'up-peak-1pct',
     ]);
   });
 });

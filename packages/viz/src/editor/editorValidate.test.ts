@@ -12,7 +12,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { DATA_DIR } from './fixtures.test-helper.js';
+import { DATA_DIR } from '../fixtures.test-helper.js';
 import {
   issuesMayBeIncomplete,
   summariseReport,

@@ -13,10 +13,10 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { BUILDING_IDS, DATA_DIR, breadthConfig } from './fixtures.test-helper.js';
-import { recordRun } from './record/recordRun.js';
-import { buildLayout } from './render/layout.js';
-import { describePreview } from './render/preview.js';
+import { BUILDING_IDS, DATA_DIR, breadthConfig } from '../fixtures.test-helper.js';
+import { recordRun } from '../record/recordRun.js';
+import { buildLayout } from '../render/layout.js';
+import { describePreview } from '../render/preview.js';
 import { addCar, removeFloor, updateFloor } from './editorEdits.js';
 import { previewGeometry } from './editorPreview.js';
 import { validateBuilding } from './editorValidate.js';

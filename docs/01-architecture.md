@@ -263,6 +263,7 @@ packages/
 │   ├── playback/          — the playback clock and its mapping
 │   ├── render/            — layout and the minimal Canvas renderer
 │   ├── replay/            — the replay harness and its per-field negative control
+│   ├── editor/            — building-config edits, validation, history, preview geometry
 │   └── dev/               — the Vite dev entry points, viewer and editor (dev-only)
 └── cli/                   — headless batch entry point
     └── commands/          — list, run, compare, tune, watch

@@ -89,6 +89,15 @@ function statusFromProse(source: string, where: string): ReadonlyMap<number, Sta
   const clauses: readonly (readonly [RegExp, Status])[] = [
     [/Phases? ([\d\s,–\-]+?(?:and[\d\s,–\-]+)?) (?:are|is) landed and accepted/, 'landed'],
     [/Phases? ([\d\s,–\-]+?(?:and[\d\s,–\-]+)?) (?:are|is) a foundation only/, 'partial'],
+    // The fourth term (T23-R2 / handback H2). `⚠️` covers two different situations — a phase that
+    // has barely begun and a phase that is mostly done with a named piece outstanding — and until
+    // this line the only prose the guard recognised for either was *"a foundation only"*. That is
+    // false of Phase 6 (6a and 6b accepted against a raised criterion, 6c deferred with reasons)
+    // and of Phase 8 (seven tracks landed, four defects found), so all three documents were forced
+    // to write the guard's phrase and then spend a paragraph explaining that it is the guard's and
+    // not the author's — in the first line of the resume brief, which is the exact position review
+    // finding #18 was about. A vocabulary term is cheaper than a paragraph of apology.
+    [/Phases? ([\d\s,–\-]+?(?:and[\d\s,–\-]+)?) (?:are|is) partially complete/, 'partial'],
     [/Phases? ([\d\s,–\-]+?(?:and[\d\s,–\-]+)?) (?:are|is) not started/, 'not-started'],
   ];
 
@@ -169,6 +178,202 @@ describe('the phase set, stated in three documents', () => {
       sorted(opening),
       "docs/07-handoff.md's opening sentence and its status table describe different projects.",
     ).toEqual(sorted(table));
+  });
+});
+
+describe('the phase-status vocabulary', () => {
+  /**
+   * The fourth term is live, and the three that were there still are.
+   *
+   * Tested on synthetic sentences rather than on the documents, deliberately: a term nothing in
+   * `docs/` uses *yet* would otherwise be exercised by nothing, which is this repository's own
+   * documented defect class one level down. The migration of the three documents to the new phrase
+   * is `docs/`-owned and is handed back; the vocabulary is here and works either way, which is what
+   * lets the two land in either order.
+   */
+  it('reads "partially complete" and "a foundation only" as the same status', () => {
+    const foundation = statusFromProse('Phases 6 and 8 are a foundation only.', 'synthetic');
+    const partial = statusFromProse('Phases 6 and 8 are partially complete.', 'synthetic');
+    expect([...partial.entries()].sort()).toEqual([...foundation.entries()].sort());
+    expect(partial.get(6)).toBe('partial');
+    expect(partial.get(8)).toBe('partial');
+  });
+
+  it('still reads the other three terms, and mixes them in one sentence', () => {
+    const map = statusFromProse(
+      'Phases 0–3, 5 and 7 are landed and accepted. Phases 6 and 8 are partially complete. Phase 9 is not started.',
+      'synthetic',
+    );
+    expect(sorted(map)).toEqual([
+      [0, 'landed'],
+      [1, 'landed'],
+      [2, 'landed'],
+      [3, 'landed'],
+      [5, 'landed'],
+      [6, 'partial'],
+      [7, 'landed'],
+      [8, 'partial'],
+      [9, 'not-started'],
+    ]);
+  });
+
+  it('maps ⚠️ to the same status the prose terms produce, so a document may use either', () => {
+    const table = statusFromTable(
+      ['| 5 — Benchmarks | ✅ |', '| 6 — Destination | ⚠️ |', '| 9 — Later | ⬜ |'].join('\n'),
+      'synthetic',
+    );
+    expect(table.get(6)).toBe(statusFromProse('Phase 6 is partially complete.', 'synthetic').get(6));
+    expect(sorted(table)).toEqual([
+      [5, 'landed'],
+      [6, 'partial'],
+      [9, 'not-started'],
+    ]);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The refuted mechanism — handback H1 / T23-R1 / DECISIONS.md § D60
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The seven places that asserted a refuted mechanism, pinned.**
+ *
+ * `DECISIONS.md` § D60 grepped seven places asserting, as fact, that destination dispatch does
+ * better under access control **because** authorization and optimization happen in the same step.
+ * Measured at n = 150 per building under common random numbers, the difference-of-differences
+ * `Δ_secure − Δ_midtown` is `+0.982 s [+0.584, +1.380]` — excluding zero on the **positive** side.
+ * It buys *less* where access is controlled, and the saving is entirely in the credential
+ * (`benchmark/accessControl.ts` § H-ACCESS-1).
+ *
+ * All seven are corrected. **Nothing went red while they were wrong, and nothing would go red if
+ * they came back** — which is the same defect class as a published number nothing re-derives, one
+ * level up. `published.ts` closed that hole for figures; this closes it for the one *mechanism*
+ * sentence this project has measured and refuted.
+ *
+ * ## What is a claim and what is a description
+ *
+ * The distinction is the whole design, and § D60 states it: *"`estimateCost.ts:123` says only that
+ * the destination **lets** a dispatcher authorize and optimize in one step. That is a description of
+ * the code and it is true; what is refuted is the performance claim built on it."*
+ *
+ * So {@link CLAIM_PATTERNS} matches only the **performance** shapes — *better* under access control,
+ * *cheaper* under access control, the mechanism named as the reason — and the descriptive
+ * "authorize and optimize in one step" is not one of them. `estimateCost.ts` is then asserted
+ * **both** ways: it carries the descriptive phrase, and it carries no claim phrase. An exclusion
+ * asserted in only one direction is an exclusion that goes stale silently.
+ */
+const REFUTED_MECHANISM_SITES: readonly string[] = Object.freeze([
+  'docs/01-architecture.md',
+  'docs/05-roadmap.md',
+  'docs/07-handoff.md',
+  'packages/core/src/dispatch/lifecycle.ts',
+  'packages/core/src/model/types.ts',
+  'packages/core/src/model/car/types.ts',
+  'packages/core/src/sim/simulation.ts',
+]);
+
+/** § D60's excluded site: descriptive, and true. Asserted in both directions below. */
+const DESCRIPTIVE_SITE = 'packages/core/src/model/car/estimateCost.ts';
+
+/** The **performance** claim, in every wording the seven used. Not the descriptive mechanism. */
+const CLAIM_PATTERNS = new RegExp(
+  [
+    'better under access control',
+    'cheaper under access control',
+    'access control cheaper',
+    'authorization and optimization happen in the same step',
+    'authorisation and optimisation happen in the same step',
+  ].join('|'),
+  'gi',
+);
+
+/** The descriptive sentence that is true, and that `estimateCost.ts` is excluded for carrying. */
+const DESCRIPTIVE_PATTERN = /authoriz\w+ and optimiz\w+ in (?:one|the same) step/i;
+
+/**
+ * A sentence that marks the claim as refuted rather than asserted.
+ *
+ * Several wordings because the seven corrections were written by different tasks and none of them
+ * had this guard to write against; requiring one blessed phrase would have failed on prose that is
+ * already correct. Measured across the seven, the furthest any claim occurrence sits from its
+ * nearest marker is **95 characters**, so {@link MARKER_WINDOW} is not a tolerance chosen to make
+ * the current tree pass — it is four times the observed worst case.
+ */
+const REFUTATION_MARKERS =
+  /refut\w*|measured,? that is false|measured false|not measured when it was written|the measurements support/gi;
+
+/** Characters either side of a claim in which a refutation marker must appear. */
+const MARKER_WINDOW = 400;
+
+describe('the refuted access-control mechanism stays refuted (DECISIONS.md § D60)', () => {
+  /** Emphasis stripped and whitespace collapsed, so a line wrap cannot hide a match. */
+  const sourceOf = (file: string): string => plain(read(...file.split('/')));
+
+  /** Distance from a claim occurrence to the nearest refutation marker, or `Infinity`. */
+  function nearestMarker(text: string, start: number, end: number): number {
+    let best = Number.POSITIVE_INFINITY;
+    for (const marker of text.matchAll(REFUTATION_MARKERS)) {
+      const from = marker.index;
+      const to = from + marker[0].length;
+      const distance = from >= end ? from - end : to <= start ? start - to : 0;
+      if (distance < best) best = distance;
+    }
+    return best;
+  }
+
+  it('never states the performance claim without a refutation beside it', () => {
+    const unmarked: string[] = [];
+    for (const file of REFUTED_MECHANISM_SITES) {
+      const text = sourceOf(file);
+      for (const claim of text.matchAll(CLAIM_PATTERNS)) {
+        const start = claim.index;
+        const distance = nearestMarker(text, start, start + claim[0].length);
+        if (distance > MARKER_WINDOW) {
+          unmarked.push(
+            `${file}: "${claim[0]}" with no refutation within ${String(MARKER_WINDOW)} characters ` +
+              `(nearest ${Number.isFinite(distance) ? String(distance) : 'none in the file'}). ` +
+              'Measured, that claim is false: Δ_secure − Δ_midtown = +0.982 s [+0.584, +1.380], ' +
+              'excluding zero on the positive side (DECISIONS.md § D60).',
+          );
+        }
+      }
+    }
+    expect(unmarked.join('\n'), unmarked.join('\n')).toBe('');
+  });
+
+  it('still carries the correction in every one of the seven — it cannot be silently deleted', () => {
+    // The other direction. Without this, deleting the whole paragraph passes the check above by
+    // having nothing left to match, and the repository quietly forgets that it measured this.
+    const missing: string[] = [];
+    for (const file of REFUTED_MECHANISM_SITES) {
+      const text = sourceOf(file);
+      const marked = [...text.matchAll(CLAIM_PATTERNS)].some((claim) =>
+        Number.isFinite(nearestMarker(text, claim.index, claim.index + claim[0].length)),
+      );
+      if (!marked) missing.push(file);
+    }
+    expect(
+      missing,
+      'named by DECISIONS.md § D60 as having asserted the refuted mechanism, and no longer ' +
+        'carrying the correction. Seven places said it and no test pinned any of them; this is ' +
+        'that test.',
+    ).toEqual([]);
+  });
+
+  it('excludes estimateCost.ts, and the exclusion is asserted in both directions', () => {
+    const text = sourceOf(DESCRIPTIVE_SITE);
+    expect(
+      DESCRIPTIVE_PATTERN.test(text),
+      `${DESCRIPTIVE_SITE} no longer carries the descriptive "authorize and optimize in one step". ` +
+        'The exclusion in § D60 exists because that sentence is there and is TRUE; if it has gone, ' +
+        'the exclusion is stale and should be deleted rather than left standing.',
+    ).toBe(true);
+    expect(
+      [...text.matchAll(CLAIM_PATTERNS)].map((claim) => claim[0]),
+      `${DESCRIPTIVE_SITE} is excluded from the guard because it describes the code rather than ` +
+        'claiming a performance result. It now carries a performance claim, so either the claim ' +
+        'goes or the file joins REFUTED_MECHANISM_SITES.',
+    ).toEqual([]);
   });
 });
 
