@@ -650,3 +650,123 @@ describe('elevator-sim watch', () => {
     expect(text).toContain('low, high');
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * Phase 6b — the destination-dispatch passenger model, through the CLI
+ * -------------------------------------------------------------------------- */
+
+describe('a Level-1 run through the CLI', () => {
+  it('watch renders a populated landing column and says what the column means', async () => {
+    /*
+     * Driven, not reasoned about. `docs/09` § 3.1 predicted an **empty** landing series under a
+     * panel because the series is keyed `(floorId, direction)`; that symptom does not reproduce,
+     * because Phase 6b left `PassengerRecord.direction` populated. What was actually missing was
+     * any statement that the column had changed meaning: under a panel `▲71` is seventy-one
+     * people each already assigned one car, not one hall call with seventy-one behind it.
+     */
+    const { code, text } = await cli([
+      'watch',
+      '--building',
+      'midtown-office',
+      '--dispatcher',
+      'destination-panel',
+      '--seed',
+      '20260727',
+      ...SHORT,
+    ]);
+    expect(code).toBe(0);
+    expect(text).toContain('destination dispatch: the waiting column is a direction bucket');
+
+    // The column is not empty. `waiting` in the plain table is the same `QueueClock` total the
+    // full-frame per-floor arrows are summed from, so a non-zero total is the discriminating
+    // observation available off a TTY.
+    const waiting = [...text.matchAll(/^\s+\d+:\d\d\s+(\d+)\s+\d+/gmu)].map((m) =>
+      Number(m[1]),
+    );
+    expect(waiting.length).toBeGreaterThan(5);
+    expect(Math.max(...waiting)).toBeGreaterThan(0);
+
+    // And the comparability disclaimer reaches the summary `printRunReport` prints at the end.
+    expect(text).toContain('playback finished');
+    expect(text).toContain('destination-dispatch passenger model');
+  }, 120_000);
+
+  it('watch says the conventional thing on a conventional run', async () => {
+    const { text } = await cli([
+      'watch',
+      '--building',
+      'midtown-office',
+      '--dispatcher',
+      'eta',
+      '--seed',
+      '20260727',
+      ...SHORT,
+    ]);
+    expect(text).toContain('pressed a direction button');
+    expect(text).not.toContain('destination dispatch: the waiting column');
+    expect(text).not.toContain('destination-dispatch passenger model');
+  }, 120_000);
+
+  it('compare refuses to gate on AWT when the two arms have different passenger models', async () => {
+    /*
+     * The defect this measured, before the fix: `--a eta --b destination-panel` printed
+     * `VERDICT: INDISTINGUISHABLE on AWT` with nothing said, and AWT is the *first* of the nine
+     * metrics `core`'s own `comparabilityOf` says must not be paired across the two models.
+     */
+    const { code, text } = await cli([
+      'compare',
+      '--building',
+      'midtown-office',
+      '--a',
+      'eta',
+      '--b',
+      'destination-panel',
+      '--reps',
+      '4',
+      '--seed',
+      '20260727',
+      '--rate',
+      '1.5',
+      '--window',
+      'full-run',
+      '--duration',
+      '1800',
+    ]);
+    expect(code).toBe(0);
+    expect(text).toContain('THE TWO ARMS DO NOT SHARE A PASSENGER MODEL');
+    expect(text).toContain('A (eta): conventional');
+    expect(text).toContain('B (destination-panel): destination-dispatch');
+    // The list is core's, not a copy: every id it names must be one of the nine.
+    for (const metric of ['awtS', 'wt95S', 'pctOverLongWait', 'intervalS', 'maxQueueLength']) {
+      expect(text).toContain(metric);
+    }
+    expect(text).toContain('on TTD');
+    expect(text).not.toContain('on AWT at n =');
+  }, 300_000);
+
+  it('compare still gates on AWT when the two arms share a model', async () => {
+    // The negative control. A notice that appeared on every comparison would be indistinguishable
+    // from a module that never looked.
+    const { text } = await cli([
+      'compare',
+      '--building',
+      'midtown-office',
+      '--a',
+      'eta',
+      '--b',
+      'destination-eta',
+      '--reps',
+      '4',
+      '--seed',
+      '20260727',
+      '--rate',
+      '1.5',
+      '--window',
+      'full-run',
+      '--duration',
+      '1800',
+    ]);
+    expect(text).not.toContain('THE TWO ARMS DO NOT SHARE A PASSENGER MODEL');
+    expect(text).toContain('on AWT');
+  }, 300_000);
+});

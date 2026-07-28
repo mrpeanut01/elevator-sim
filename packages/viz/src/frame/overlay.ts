@@ -175,7 +175,7 @@ export function overlayAt(
  * -------------------------------------------------------------------------- */
 
 /**
- * One landing at one instant, with the assignment the run itself recorded.
+ * One landing **call** at one instant, with the assignment the run itself recorded.
  *
  * {@link answeredByCarId} is forward-looking on purpose, and the label the renderer draws says
  * so ("→ car A in 12 s"). This is a *replay*, not a live system: the recording already knows
@@ -183,12 +183,46 @@ export function overlayAt(
  * shown matches the record", and taking it straight off the record is the only way to guarantee
  * that rather than to hope for it.
  *
- * `undefined` means the run never answered this call — `UX.md` `RV-08`'s unassignable landing,
- * which must read as unassignable rather than as an ever-growing wait.
+ * ## What a *call* is depends on the passenger model, and that is the whole of version 4
+ *
+ * Under `conventional` — the up/down button, and destination *disclosure* too — a call is one
+ * `(floorId, direction)` button, everybody pressing it is pressing the same thing, and whichever
+ * car opens takes whoever fits. One row per landing is the truth.
+ *
+ * Under `destination-dispatch` there is no direction button. docs/09 § 1.3: the call identity is
+ * the origin-destination pair, and the panel has already named a car for each. So a row here is
+ * a `(floorId, destinationFloorId, promisedCarId)` group, and there are **several rows per
+ * floor**: measured on Midtown Office, 92 calls and 132 promise groups behind the 28 landings a
+ * version-3 recording drew.
+ *
+ * `answeredByCarId === undefined` means the run never answered this call — `UX.md` `RV-08`'s
+ * unassignable landing. Under a panel that reading is only available when {@link promisedCarId}
+ * is *also* absent, which it never is: a promised passenger still waiting at the horizon is not
+ * an unassignable call, and saying so was the falsehood version 4 exists to remove.
  */
 export interface LandingAssignment {
+  /**
+   * Identity of this row, total and stable across instants.
+   *
+   * `floorId` alone stopped being a key under a panel, and a selector keyed on it would offer
+   * several options with the same value. The renderer highlights a *floor row* from
+   * {@link floorId}; a caller that has to remember which call the reader picked uses this.
+   */
+  readonly key: string;
   readonly floorId: string;
   readonly direction: Direction;
+  /**
+   * The destination this call is for, under `destination-dispatch`. `undefined` conventionally,
+   * where the landing is one button and its passengers are going to different places.
+   */
+  readonly destinationFloorId: string | undefined;
+  /**
+   * The car the landing panel promised this group, under `destination-dispatch`.
+   *
+   * Known from the instant each passenger arrived — this is a fact the run recorded, not an
+   * inference from who eventually boarded. `undefined` conventionally, where nothing promises.
+   */
+  readonly promisedCarId: string | undefined;
   readonly waiting: number;
   /** Wait of the longest-standing leg at this landing, seconds. */
   readonly oldestWaitS: number | undefined;
@@ -199,9 +233,38 @@ export interface LandingAssignment {
 }
 
 /**
- * Every landing with somebody standing at it, at `t`, sorted by `(floorId, direction)`.
+ * The grouping key, which is what the passenger model decides.
  *
- * Landings with nobody waiting are omitted rather than listed as empty rows: the caller is a
+ * Sorted-tuple form rather than a template literal per model, so the sort below can be a plain
+ * comparison on the same fields the key is built from and the two cannot disagree.
+ */
+function callGroupOf(
+  leg: VizLeg,
+  model: VizRecording['passengerModel'],
+): { readonly key: string; readonly destinationFloorId: string | undefined; readonly promisedCarId: string | undefined } {
+  if (model !== 'destination-dispatch') {
+    return {
+      key: `${leg.originFloorId} ${leg.direction}`,
+      destinationFloorId: undefined,
+      promisedCarId: undefined,
+    };
+  }
+  // Two arrivals for the same OD pair inside `batchWindowS` merge into one call and share a car;
+  // two outside it are two calls and need not. So the promise is part of the identity, not a
+  // property of the (floor, destination) pair — measured: 30 OD pairs on Midtown Office are
+  // promised more than one car over a 900 s run.
+  const promised = leg.assignedCarId;
+  return {
+    key: `${leg.originFloorId} ${leg.direction} ${leg.destinationFloorId} ${promised ?? ''}`,
+    destinationFloorId: leg.destinationFloorId,
+    promisedCarId: promised,
+  };
+}
+
+/**
+ * Every landing call with somebody standing at it, at `t`, sorted by {@link LandingAssignment.key}.
+ *
+ * Calls with nobody waiting are omitted rather than listed as empty rows: the caller is a
  * hover lookup and a panel, and an entry per floor per direction on a 60-floor building is 120
  * rows of nothing.
  */
@@ -210,17 +273,31 @@ export function landingAssignmentsAt(
   simTimeS: SimTime,
 ): readonly LandingAssignment[] {
   const t = clamp(simTimeS, recording.startedAt, recording.endedAt);
-  const byKey = new Map<string, { floorId: string; direction: Direction; waiting: number; oldest: VizLeg }>();
+  const byKey = new Map<
+    string,
+    {
+      key: string;
+      floorId: string;
+      direction: Direction;
+      destinationFloorId: string | undefined;
+      promisedCarId: string | undefined;
+      waiting: number;
+      oldest: VizLeg;
+    }
+  >();
 
   for (const leg of recording.legs) {
     if (leg.arrivedAt > t) break;
     if (!isWaitingAt(leg, t)) continue;
-    const key = `${leg.originFloorId} ${leg.direction}`;
-    const entry = byKey.get(key);
+    const group = callGroupOf(leg, recording.passengerModel);
+    const entry = byKey.get(group.key);
     if (entry === undefined) {
-      byKey.set(key, {
+      byKey.set(group.key, {
+        key: group.key,
         floorId: leg.originFloorId,
         direction: leg.direction,
+        destinationFloorId: group.destinationFloorId,
+        promisedCarId: group.promisedCarId,
         waiting: 1,
         oldest: leg,
       });
@@ -237,8 +314,11 @@ export function landingAssignmentsAt(
     .map((entry): LandingAssignment => {
       const { oldest } = entry;
       return {
+        key: entry.key,
         floorId: entry.floorId,
         direction: entry.direction,
+        destinationFloorId: entry.destinationFloorId,
+        promisedCarId: entry.promisedCarId,
         waiting: entry.waiting,
         oldestWaitS: t - oldest.arrivedAt,
         answeredByCarId: oldest.carId,
@@ -246,10 +326,18 @@ export function landingAssignmentsAt(
         answeredInS: oldest.boardedAt === undefined ? undefined : oldest.boardedAt - t,
       };
     })
-    .sort((a, b) => a.floorId.localeCompare(b.floorId) || a.direction.localeCompare(b.direction));
+    .sort((a, b) => a.key.localeCompare(b.key));
 }
 
-/** The assignment at one landing, or `undefined` when nobody is waiting there. */
+/**
+ * The first call at one landing, or `undefined` when nobody is waiting there.
+ *
+ * *First*, not *the*: under `destination-dispatch` a floor carries one row per
+ * `(destination, promised car)` and this returns the lowest-keyed of them. A caller that means a
+ * specific call holds its {@link LandingAssignment.key} and filters
+ * {@link landingAssignmentsAt} itself — which is what `dev/main.ts` does, and the reason `key`
+ * is on the type.
+ */
 export function landingAssignmentAt(
   recording: VizRecording,
   floorId: string,

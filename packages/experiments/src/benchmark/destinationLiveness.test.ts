@@ -59,9 +59,20 @@ async function liveness(): Promise<readonly DestinationLiveness[]> {
   return cached;
 }
 
-function at(rows: readonly DestinationLiveness[], profileId: string): DestinationLiveness {
-  const found = rows.find((row) => row.profileId === profileId);
-  if (found === undefined) throw new Error(`no liveness row for "${profileId}"`);
+function at(
+  rows: readonly DestinationLiveness[],
+  profileId: string,
+  buildingId?: string,
+): DestinationLiveness {
+  // `buildingId` is not optional decoration: `destination-panel` is measured on two buildings, so
+  // an id-only lookup silently returns whichever case happens to come first in `livenessCases`.
+  const found = rows.find(
+    (row) =>
+      row.profileId === profileId && (buildingId === undefined || row.building === buildingId),
+  );
+  if (found === undefined) {
+    throw new Error(`no liveness row for "${profileId}"${buildingId === undefined ? '' : ` on ${buildingId}`}`);
+  }
   return found;
 }
 
@@ -124,5 +135,81 @@ describe('Phase 6a liveness — counted through the shipped engine', () => {
         `mobile-credential ${credentialled.eligibility.accessRefusals} / ` +
         `${credentialled.eligibility.decisionsWhollyRefused}`,
     );
+  }, TIMEOUT_MS);
+});
+
+/**
+ * **Phase 6b's liveness, on the same terms.**
+ *
+ * docs/09 § 8 names *"a destination profile ships and changes nothing"* as the most likely ninth
+ * dead seam, and `data/dispatcher-profiles.json` now ships a second one. Measured through
+ * `runSimulation` at seed 20260726, Midtown Office interfloor-mix:
+ *
+ * | configuration | `rideTime` non-zero | cross-car spread | decisions | promised | wrong-car | broken |
+ * |---|---|---|---|---|---|---|
+ * | shipped `destination-panel` (arm D) | **356 / 356** | **16 / 92** | 92 | **96 / 96** | **0** | 4 |
+ * | the same profile without the panel (arm C) | 248 / 248 | 12 / 62 | 62 | **0 / 96** | 0 | 0 |
+ *
+ * The decision count rising 62 → 92 is the mechanical heart of the change (docs/09 § 1.3): under
+ * a panel a landing is one call per origin-destination pair, so there are more of them.
+ */
+describe('Phase 6b liveness — the shipped landing-panel profile', () => {
+  it('promises every leg a car, and every promise is kept', async () => {
+    const row = at(await liveness(), 'destination-panel', 'midtown-office');
+    expect(row.panel.passengerModel).toBe('destination-dispatch');
+    expect(row.panel.legs).toBeGreaterThan(0);
+    expect(row.panel.promisedLegs).toBe(row.panel.legs);
+    // `#reconcile` fails the run on this; counted here independently, because a claim checked
+    // only by the code that makes it is not checked.
+    expect(row.panel.wrongCarBoardings).toBe(0);
+    // The cost of the write-once rule, paid and counted rather than hidden (T16 § D3).
+    expect(row.panel.brokenPromises).toBeGreaterThan(0);
+
+    // The promise **bites**: a majority of legs board a car conventional dispatch would not have
+    // sent them to. T16 measured 70 of 96; the assertion is a floor, not a pin.
+    expect(row.panel.differentCarThanConventional / row.panel.comparedLegs).toBeGreaterThan(0.2);
+
+    // And the gated term is live inside it, with spread — a term that returns the same number
+    // for every candidate is a constant, and a constant cannot move an argmin.
+    expect(row.panel.legs).toBeGreaterThan(0);
+    expect(row.ridePricing.nonZero / row.ridePricing.evaluations).toBeGreaterThan(0.9);
+    expect(row.ridePricing.decisionsWithSpread).toBeGreaterThan(0);
+
+    console.log(
+      `destination-panel: ${row.panel.promisedLegs}/${row.panel.legs} promised, ` +
+        `${row.panel.wrongCarBoardings} wrong-car, ${row.panel.brokenPromises} broken, ` +
+        `${row.panel.differentCarThanConventional}/${row.panel.comparedLegs} legs on a different car than eta, ` +
+        `rideTime ${row.ridePricing.nonZero}/${row.ridePricing.evaluations} non-zero with spread in ` +
+        `${row.ridePricing.decisionsWithSpread}/${row.ridePricing.decisions} decisions`,
+    );
+  }, TIMEOUT_MS);
+
+  it('promises nobody on the gate’s off side, and opens fewer calls there', async () => {
+    // The half that makes the half above mean something. Same weights, same call type, same
+    // credential — `passengerAssignment` removed and nothing else.
+    const rows = await liveness();
+    const on = at(rows, 'destination-panel', 'midtown-office');
+    const off = at(rows, 'liveness-panel-off', 'midtown-office');
+
+    expect(off.panel.passengerModel).toBe('conventional');
+    expect(off.panel.promisedLegs).toBe(0);
+    expect(off.panel.brokenPromises).toBe(0);
+    expect(off.panel.legs).toBe(on.panel.legs);
+
+    // docs/09 § 1.3: a landing under a panel is one call per origin-destination pair, so the
+    // decision count rises. That is the mechanism, counted rather than described.
+    expect(on.totalDecisions).toBeGreaterThan(off.totalDecisions);
+    console.log(
+      `decisions: arm C ${off.totalDecisions} → arm D ${on.totalDecisions} on the same trace`,
+    );
+  }, TIMEOUT_MS);
+
+  it('keeps its promises on the access-controlled building too', async () => {
+    const secure = at(await liveness(), 'destination-panel', 'secure-tower');
+    expect(secure.panel.passengerModel).toBe('destination-dispatch');
+    expect(secure.panel.promisedLegs).toBe(secure.panel.legs);
+    expect(secure.panel.wrongCarBoardings).toBe(0);
+    // D30/T16-D2: the panel is what authorizes, so the credentialled building is served.
+    expect(secure.eligibility.decisionsWhollyRefused).toBe(0);
   }, TIMEOUT_MS);
 });

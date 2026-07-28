@@ -23,7 +23,7 @@
  * the frame sequences matching.
  */
 
-import type { OverlayMetrics } from '../frame/overlay.js';
+import type { LandingAssignment, OverlayMetrics } from '../frame/overlay.js';
 import type { DoorPhase, Frame, VizRecording } from '../contract/types.js';
 import type { Layout } from './layout.js';
 import { LOAD_ALARM, drawOverlay, loadColour } from './overlay.js';
@@ -124,13 +124,23 @@ export interface SceneInput {
   readonly unservedFloorIds?: readonly string[] | undefined;
 }
 
-/** What the reader has picked out, and what the record says about it. */
+/**
+ * What the reader has picked out, and what the record says about it.
+ *
+ * The three destination fields are absent under the conventional model and present under
+ * `destination-dispatch`, where the thing selected is a *destination call* rather than a
+ * direction button. See {@link LandingAssignment}.
+ */
 export interface SceneSelection {
   readonly floorId: string;
   readonly answeredByCarId?: string | undefined;
   readonly answeredInS?: number | undefined;
   readonly waiting?: number | undefined;
   readonly oldestWaitS?: number | undefined;
+  /** Where this call is going, under `destination-dispatch`. */
+  readonly destinationFloorId?: string | undefined;
+  /** The car the landing panel named, under `destination-dispatch`. */
+  readonly promisedCarId?: string | undefined;
 }
 
 const FONT = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
@@ -387,7 +397,10 @@ function drawSelection(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void
   ctx.lineTo(layout.plot.x + layout.plot.width, row.y);
   ctx.stroke();
 
-  const column = layout.columns.find((candidate) => candidate.carId === selection.answeredByCarId);
+  // Under a panel the reader has been *told* which car to walk to, so that is the shaft to box —
+  // and it is known even for a call nobody ever answered, which `answeredByCarId` is not.
+  const highlighted = selection.promisedCarId ?? selection.answeredByCarId;
+  const column = layout.columns.find((candidate) => candidate.carId === highlighted);
   if (column !== undefined) {
     ctx.strokeStyle = theme.highlight;
     ctx.lineWidth = 2;
@@ -403,7 +416,10 @@ function drawSelection(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void
 
 /** The caption for a selected landing. Exported so a text alternative can reuse the wording. */
 export function describeSelection(selection: SceneSelection): string {
-  const where = `floor ${selection.floorId}`;
+  const where =
+    selection.destinationFloorId === undefined
+      ? `floor ${selection.floorId}`
+      : `floor ${selection.floorId} → ${selection.destinationFloorId}`;
   const waiting =
     selection.waiting === undefined ? '' : ` · ${String(selection.waiting)} waiting`;
   const oldest =
@@ -412,12 +428,50 @@ export function describeSelection(selection: SceneSelection): string {
   // of a completed run and reading "unassigned — no car answered this call" about a landing that
   // simply has nobody standing at it is a claim about the dispatcher that is not true.
   if (selection.waiting === 0) return `${where} · nobody is waiting here at this instant`;
+  const when =
+    selection.answeredInS === undefined ? '' : ` in ${selection.answeredInS.toFixed(0)} s`;
+
+  /*
+   * The panel case, and the sentence version 4 exists to make sayable.
+   *
+   * A promised passenger still standing at the horizon has `answeredByCarId === undefined`, and
+   * the branch below would have called that "unassigned — no car answered this call". Under a
+   * landing panel that is false: the panel named a car at the instant they arrived, and a
+   * viewer saying otherwise reports a dispatcher failure that did not happen. Measured
+   * reachable — Vertical City at 20 % pop/5 min, seed 20260727, 25 such legs.
+   */
+  if (selection.promisedCarId !== undefined) {
+    const boarding =
+      selection.answeredByCarId === undefined
+        ? ' · still waiting when the run ended'
+        : `${when === '' ? '' : ` · boards${when}`}`;
+    return `${where}${waiting}${oldest} · panel promised car ${selection.promisedCarId}${boarding}`;
+  }
   if (selection.answeredByCarId === undefined) {
     return `${where}${waiting}${oldest} · unassigned — no car answered this call in this run`;
   }
-  const when =
-    selection.answeredInS === undefined ? '' : ` in ${selection.answeredInS.toFixed(0)} s`;
   return `${where}${waiting}${oldest} · answered by car ${selection.answeredByCarId}${when}`;
+}
+
+/**
+ * One line for the landing selector — the same three facts as {@link describeSelection}, short.
+ *
+ * Here in `render/` rather than in `dev/main.ts` for the reason the whole of this directory is:
+ * a label built inside the DOM entry point is a rendered value no test can reach, and this
+ * package has already shipped a frame seven of whose eight fields could be replaced by constants
+ * with the suite still green. `canvas.test.ts` mutation-tests every field this reads.
+ */
+export function landingOptionLabel(assignment: LandingAssignment): string {
+  const where =
+    assignment.destinationFloorId === undefined
+      ? `${assignment.floorId} ${assignment.direction}`
+      : `${assignment.floorId} → ${assignment.destinationFloorId}`;
+  const head = `${where} — ${String(assignment.waiting)} waiting`;
+  // The promise first, because under a panel it is what the passenger was actually told, and it
+  // is known for a call no car ever reached. Only then the outcome.
+  if (assignment.promisedCarId !== undefined) return `${head} → ${assignment.promisedCarId}`;
+  if (assignment.answeredByCarId === undefined) return `${head} (unassigned)`;
+  return `${head} → ${assignment.answeredByCarId}`;
 }
 
 function drawLandings(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {

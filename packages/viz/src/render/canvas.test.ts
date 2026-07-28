@@ -91,6 +91,7 @@ const RECORDING: VizRecording = {
   buildingId: 'synthetic',
   buildingName: 'Synthetic Tower',
   dispatcherProfileId: 'eta',
+  passengerModel: 'conventional',
   status: 'completed',
   startedAt: 0,
   endedAt: 120,

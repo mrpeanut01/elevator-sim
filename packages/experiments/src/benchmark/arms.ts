@@ -55,8 +55,11 @@
  * is a claim about `eta` too, and because `eta` turns out to be the yardstick the interesting arms
  * fail against.
  *
- * `data/dispatcher-profiles.json` ships **two** auction profiles, and that is why {@link ARM_PROFILES}
- * has nine entries rather than eight. `config/schema.ts` carries an `auction` section and
+ * `data/dispatcher-profiles.json` ships **two** auction profiles, and that is one of the two
+ * reasons {@link ARM_PROFILES} has eleven entries rather than nine — the other being that it ships
+ * **two** destination profiles, Phase 6a's Level-0 `destination-eta` and Phase 6b's Level-1
+ * `destination-panel`, which are different *systems* rather than different weights (docs/09 § 1.1).
+ * `config/schema.ts` carries an `auction` section and
  * `dispatch/policies/registry.ts` selects the policy factory from `auction.aggregation`, so the
  * aggregation is a profile field: `auction` is sealed bid at one round (provably the centralized
  * argmin) and `auction-multi-round` is three rounds with a 25 s reserve, identical everywhere else.
@@ -78,6 +81,19 @@ import type { ReplicationMetric } from '../runner/metrics.js';
 export const BASELINE_PROFILE = 'nearest-car';
 
 /**
+ * Phase 6b's shipped profile — Level 1, `mobile-credential` + `passengerAssignment: 'panel'`.
+ *
+ * Named `destination-panel` rather than `destination-dispatch`, which is what
+ * `packages/core/DECISIONS-T16.md` § T16-D7 handed back, and the reason is a guard rather than a
+ * preference: `core/src/dispatch/policies/policies.test.ts` asserts that `sim/simulation.ts`
+ * contains no shipped profile id as a string literal (invariant 7), and `simulation.ts`
+ * legitimately contains the `PassengerModel` literal `'destination-dispatch'`. A profile id that
+ * collides with a passenger-model name leaves that guard unable to tell a name clash from a real
+ * branch. Renaming the profile costs a word; relaxing the guard costs the invariant.
+ */
+export const DESTINATION_DISPATCH_PROFILE = 'destination-panel';
+
+/**
  * Every other profile in `data/dispatcher-profiles.json`, in file order.
  *
  * Not filtered, not reordered, and nothing dropped for losing. A profile that fails to beat the
@@ -94,6 +110,7 @@ export const ARM_PROFILES: readonly string[] = Object.freeze([
   'auction-multi-round',
   'zoned-uppeak',
   'destination-eta',
+  'destination-panel',
 ]);
 
 /* -------------------------------------------------------------------------- *

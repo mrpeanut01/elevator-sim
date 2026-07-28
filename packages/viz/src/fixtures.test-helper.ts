@@ -54,6 +54,16 @@ export const FIXTURE_BUILDING_ID = 'garden-apartments';
 export const FIXTURE_DISPATCHER_ID = 'eta';
 
 /**
+ * The shipped Phase 6b profile — `mobile-credential` + `passengerAssignment: 'panel'`.
+ *
+ * The **shipped** one out of `data/dispatcher-profiles.json`, not a profile derived in a test.
+ * A Level-1 suite built on a locally-patched profile would prove that a locally-patched profile
+ * renders; the claim this package makes is about the run a reader can actually produce from the
+ * viewer's dispatcher dropdown, and that list is `data/`.
+ */
+export const PANEL_DISPATCHER_ID = 'destination-panel';
+
+/**
  * Every building the project ships, in load order — the same list `core`'s `sim/seam.test.ts`
  * iterates, kept here rather than imported because a test helper is not part of `core`'s
  * published surface.

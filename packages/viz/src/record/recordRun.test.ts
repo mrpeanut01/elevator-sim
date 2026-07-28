@@ -32,7 +32,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import {
   BUILDING_IDS,
   DATA_DIR,
+  FIXTURE_DISPATCHER_ID,
   FIXTURE_SEED,
+  PANEL_DISPATCHER_ID,
   breadthConfig,
   fixtureConfig,
   requireBuilding,
@@ -276,4 +278,115 @@ describe('shortCarLabel', () => {
     expect(shortCarLabel('A', 'main')).toBe('A');
     expect(shortCarLabel('shuttle-1', 'main')).toBe('shuttle-1');
   });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Version 4 — a Level-1 run is recorded as the thing it is
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The three fields version 4 added, each asserted against the source it was copied from.
+ *
+ * Written as equality against `result.record` rather than against a literal, for the reason
+ * `frameAt.test.ts` gives at length: a field pinned to a constant survives every test that only
+ * checks a shape. Each suite below also carries its **witness** — the run must be seen to
+ * exhibit the value, or a constant equal to what a quiet run happens to hold would pass.
+ */
+describe('the passenger model reaches the recording', () => {
+  it.each(BUILDING_IDS)('stamps what core computed, on %s', (buildingId) => {
+    const conventional = recordRun(breadthConfig(config, buildingId));
+    const panel = recordRun(
+      breadthConfig(config, buildingId, { dispatcherId: PANEL_DISPATCHER_ID }),
+    );
+
+    /* Equality: copied from the record, never re-derived from the profile. */
+    expect(conventional.recording.passengerModel).toBe(
+      conventional.result.record.passengerModel ?? 'conventional',
+    );
+    expect(panel.recording.passengerModel).toBe(panel.result.record.passengerModel ?? 'conventional');
+
+    /* Witness: the two models are actually both reachable from `data/`, so a constant fails. */
+    expect(conventional.recording.passengerModel).toBe('conventional');
+    expect(panel.recording.passengerModel).toBe('destination-dispatch');
+  }, 300_000);
+
+  it.each(BUILDING_IDS)('copies every leg’s destination and promise, on %s', (buildingId) => {
+    for (const dispatcherId of [FIXTURE_DISPATCHER_ID, PANEL_DISPATCHER_ID]) {
+      const { recording, result } = recordRun(
+        breadthConfig(config, buildingId, { dispatcherId }),
+      );
+      const byId = new Map(result.record.passengers.map((p) => [p.passengerId, p]));
+
+      let promised = 0;
+      let wrongCar = 0;
+      const destinationsPerLanding = new Map<string, Set<string>>();
+      for (const leg of recording.legs) {
+        const source = byId.get(leg.passengerId);
+        expect(source, leg.passengerId).toBeDefined();
+        expect(leg.destinationFloorId).toBe(source?.destinationFloorId);
+        expect(leg.assignedCarId).toBe(source?.assignedCarId);
+        expect(leg.destinationFloorId).not.toBe(leg.originFloorId);
+
+        if (leg.assignedCarId !== undefined) {
+          promised += 1;
+          if (leg.carId !== undefined && leg.carId !== leg.assignedCarId) wrongCar += 1;
+        }
+        const key = `${leg.originFloorId} ${leg.direction}`;
+        const seen = destinationsPerLanding.get(key) ?? new Set<string>();
+        seen.add(leg.destinationFloorId);
+        destinationsPerLanding.set(key, seen);
+      }
+
+      /* Witnesses. `destinationFloorId` is present under both models — it is a fact about the
+         passenger — and the promise is present under exactly one of them. */
+      if (dispatcherId === PANEL_DISPATCHER_ID) {
+        expect(promised, 'every leg of a Level-1 run is promised a car').toBe(
+          recording.legs.length,
+        );
+      } else {
+        expect(promised, 'a conventional run promises nobody').toBe(0);
+      }
+      expect(wrongCar, 'a promised passenger boarded a car they were not promised').toBe(0);
+    }
+  }, 300_000);
+
+  it('the direction bucket a version-3 recording drew is a collapse of several calls', () => {
+    /*
+     * The measurement that decided the bump, restated as a test rather than as a docstring.
+     *
+     * Not run over every building: Garden Apartments has six floors and two cars, and its five
+     * landings really are five origin-destination pairs — measured, 0 landings there carry more
+     * than one destination. So the collapse is asserted where it exists and the small building
+     * is left alone rather than the assertion being weakened to `>= 0`.
+     */
+    for (const buildingId of ['midtown-office', 'mixed-use-high-rise', 'secure-tower']) {
+      const { recording } = recordRun(
+        breadthConfig(config, buildingId, { dispatcherId: PANEL_DISPATCHER_ID }),
+      );
+      const landings = new Set<string>();
+      const calls = new Set<string>();
+      const promises = new Set<string>();
+      for (const leg of recording.legs) {
+        landings.add(`${leg.originFloorId} ${leg.direction}`);
+        calls.add(`${leg.originFloorId}->${leg.destinationFloorId}`);
+        promises.add(`${leg.originFloorId}->${leg.destinationFloorId}@${String(leg.assignedCarId)}`);
+      }
+      expect(calls.size, `${buildingId}: calls vs landings`).toBeGreaterThan(landings.size);
+      expect(promises.size, `${buildingId}: promises vs calls`).toBeGreaterThan(calls.size);
+      // …and the landings the fold produced are exactly the direction buckets, which is the
+      // collapse: `recording.landings` cannot represent any of the extra rows.
+      expect(recording.landings.length).toBe(landings.size);
+    }
+  }, 300_000);
+
+  it('a Level-1 recording still survives a JSON round trip', () => {
+    // `assignedCarId` is written as *absent* under the conventional model. The round-trip rule
+    // the wave-2 legs were added under applies to it too.
+    const { recording } = recordRun(
+      breadthConfig(config, 'midtown-office', { dispatcherId: PANEL_DISPATCHER_ID }),
+    );
+    const roundTripped = JSON.parse(JSON.stringify(recording)) as typeof recording;
+    expect(JSON.stringify(roundTripped)).toBe(JSON.stringify(recording));
+    expect(roundTripped.passengerModel).toBe('destination-dispatch');
+  }, 300_000);
 });

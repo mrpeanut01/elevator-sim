@@ -20,6 +20,7 @@
 import { runAccessControlStudy } from './accessControl.js';
 import { runCapacityReassignmentStudy } from './capacityReassignment.js';
 import { runDestinationDisclosureStudy } from './destinationDisclosure.js';
+import { runDestinationDispatchStudy } from './destinationDispatchContrast.js';
 import { auditForecastCausalityInRun } from './predictorLag.js';
 import { runPrepositioningStudy } from './prepositioning.js';
 import { TAIL_CENSUS_LOADS, runTailStudy } from './tailStudy.js';
@@ -29,6 +30,7 @@ import {
   PUBLISHED_STUDY_IDS,
   accessControlFigures,
   benchmarkFigures,
+  dispatchContrastFigures,
   capacityFigures,
   causalityFigures,
   disclosureFigures,
@@ -50,6 +52,7 @@ export async function measureAllPublishedFigures(): Promise<
     'capacity-reassignment': capacityFigures(await runCapacityReassignmentStudy({})),
     'forecast-causality': causalityFigures(await auditForecastCausalityInRun({ replications: 100 })),
     'destination-disclosure': disclosureFigures(await runDestinationDisclosureStudy({})),
+    'destination-dispatch': dispatchContrastFigures(await runDestinationDispatchStudy({})),
     'access-control': accessControlFigures(await runAccessControlStudy({})),
   };
 }

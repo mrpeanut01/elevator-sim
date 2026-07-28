@@ -19,7 +19,13 @@
  * ## Phase 6a lives in this directory too, and is reported in its own modules
  *
  * Everything below this line is **Phase 5**. `destinationDisclosure.ts`, `accessControl.ts` and
- * `destinationLiveness.ts` are Phase 6a — destination *disclosure* — and each carries its own
+ * `destinationLiveness.ts` are Phase 6a — destination *disclosure* — and
+ * `destinationDispatchContrast.ts` is Phase 6b's C→D contrast, the landing panel measured against
+ * the same profile without it. **None of the five is re-exported below**, deliberately and by the
+ * precedent Phase 6a set: this barrel is Phase 5's published surface, their entry points are
+ * registered in `published.ts`'s `STUDY_ENTRY_POINTS` — which is what forces each to declare
+ * whether it publishes an interval — and their non-test caller is `regeneratePins.ts`. Each carries
+ * its own
  * written report in its own docstring, for the reason this one exists: a result that is not written
  * down next to the code that produces it goes stale without anything failing. Their operating points
  * are `arms.ts`'s `DESTINATION_CASES` rather than {@link BENCHMARK_CASES}, deliberately, and the
@@ -27,7 +33,11 @@
  * `destination-eta` profile **is** an arm of the Phase 5 table below, because a profile in `data/`
  * that is neither the baseline nor an arm escapes the gate entirely; it is bit-identical to `eta` on
  * all three Phase 5 cases, which is correct rather than dead — none of them is access-zoned in a way
- * a credential changes, and the census and the liveness counts say where it is not.
+ * a credential changes, and the census and the liveness counts say where it is not. Phase 6b's
+ * `destination-panel` is an arm of it for the same reason, and it is **not** bit-identical to
+ * anything: measured against `nearest-car` it is BETTER on all four metrics at all three cases, and
+ * measured against its own Level-0 twin it is indistinguishable at the primary point and
+ * significantly worse where the write-once promise binds (`destinationDispatchContrast.ts`).
  *
  * ---
  *
