@@ -5,7 +5,7 @@
  * than a paragraph. Three claims, in the order they matter:
  *
  * 1. **The budget is justified.** The contract's `n = 150` was set for arms A–F with `sd(ΔTTD)`
- *    measured on the A→C contrast, and `packages/core`'s `DECISIONS-T16.md` records that the C→D
+ *    measured on the A→C contrast, and `packages/core`'s `the root DECISIONS.md` records that the C→D
  *    spread was **unmeasured**, so the number did not apply to arm D. It does now: measured
  *    `sd(ΔTTD) = 0.908 s` at the primary point, which needs `n = 13` for a ±0.5 s half-width.
  * 2. **Zero at the primary point is a measurement, not an absence.** 27 of 150 replications are

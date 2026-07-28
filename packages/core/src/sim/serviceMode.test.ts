@@ -494,7 +494,7 @@ describe('a scheduled service change is replayable', () => {
  * Everything above drives `collective`, which is conventional dispatch: nobody is promised
  * anything, so withdrawing a car is finished the moment `#reofferCall` hands its calls back. That
  * left the interaction of `serviceEvents` with `dispatch.passengerAssignment: 'panel'` untested —
- * `validation/DECISIONS-T20.md` names it as the clearest next step on this axis — and the fuzz
+ * `validation/the root DECISIONS.md` names it as the clearest next step on this axis — and the fuzz
  * campaign found what was in the gap.
  *
  * `fuzz-1000384`, shrunk to a single bank of two cars: at t = 460 a passenger bound for the top
@@ -508,7 +508,7 @@ describe('a scheduled service change is replayable', () => {
  *
  * The fix is `#revokePromisesTo`: a promise whose car has left group control is voided, because
  * D29's argument is about a car that is **full** and will come back. See
- * `packages/core/DECISIONS-T22.md` § T22-D1.
+ * `the root DECISIONS.md` § T22-D1.
  *
  * The fixture below is the walk-up with the same shape: one bank, two cars, and a recall timed so
  * that somebody is holding a promise to the recalled car when it fires.

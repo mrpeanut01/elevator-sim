@@ -148,7 +148,7 @@ export function formatStats(stats: CampaignStats): string {
  *   `timed-out` status is asserted rather than avoided.
  *
  * See `DECISIONS.md` § "What remains unfuzzed" for the axes neither corpus reaches, and
- * `validation/DECISIONS-T20.md` for the two rows of that table which are no longer true —
+ * `validation/the root DECISIONS.md` for the two rows of that table which are no longer true —
  * out-of-service cars and mid-run mode changes are both generated as of this corpus.
  */
 export const STANDARD_CORPUS: readonly number[] = Object.freeze([

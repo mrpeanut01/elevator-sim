@@ -156,7 +156,7 @@ describe('the two behavioural properties fail on a real run with a faulty contro
    * project that noticed the fifteen-minute wait.
    *
    * `RunSummary.awtIsValid` now has a fourth gate (`core/src/metrics/summarize.ts` §
-   * `diagnoseServiceLevel`, and `packages/core/DECISIONS-T21.md`), so **the model catches this
+   * `diagnoseServiceLevel`, and `the root DECISIONS.md`), so **the model catches this
    * fault itself** and P6's escape clause — *"a fifteen-minute wait is legitimate in a run that
    * says so"* — is satisfied. A version of this test that still demanded a P6 violation would be
    * demanding that the simulator go back to publishing a mean beside an abandoned passenger.

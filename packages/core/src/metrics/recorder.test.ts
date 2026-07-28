@@ -175,7 +175,7 @@ describe('MetricsRecorder — refuses impossible sequences', () => {
   });
 
   it('rejects a second assignment, and accepts one after the promise is released', () => {
-    /* The recorder's half of `Passenger.releasePromise` — see `DECISIONS-T22.md` § T22-D1. The
+    /* The recorder's half of `Passenger.releasePromise` — see `the root DECISIONS.md` § T22-D1. The
        record must carry what the model holds or a promise cannot be audited from a stored record,
        so the release is a recorded event with its own count rather than a silent overwrite. */
     const recorder = new MetricsRecorder({ seed: SEED });

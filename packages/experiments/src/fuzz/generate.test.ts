@@ -192,7 +192,7 @@ describe('the service-mode axis', () => {
 
     // Counts, not merely "at least one": a corpus that drifted down to a single case of each
     // would still satisfy a `toBeGreaterThan(0)` while covering almost nothing, and these are
-    // the numbers the campaign statistics in `DECISIONS-T20.md` are quoted from.
+    // the numbers the campaign statistics in `the root DECISIONS.md` are quoted from.
     expect(withMode.map((entry) => entry.fuzzSeed)).toEqual([
       '101', '102', '107', '111', '116', '121', '128', '137', '181',
     ]);

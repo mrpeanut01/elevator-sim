@@ -79,7 +79,7 @@
  * `docs/05-roadmap.md`, `packages/core/src/dispatch/lifecycle.ts` and
  * `docs/06-parameterization-and-tuning.md` each assert the mechanism as fact in prose this
  * measurement contradicts. None of them is this task's to edit; the corrections are listed in
- * `DECISIONS-T15.md` § T15-5.
+ * `the root DECISIONS.md` § T15-5.
  */
 
 import { describe, expect, it } from 'vitest';

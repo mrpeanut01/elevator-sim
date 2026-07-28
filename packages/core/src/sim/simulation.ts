@@ -74,7 +74,7 @@
  * - a car that leaves **group control** is the one exception: a promise it holds is revoked
  *   (`#revokePromisesTo`), because D29's argument is about a car that will empty and come back and
  *   an `independent` car will not. Counted separately in `ConservationAudit.promisesRevoked`;
- *   `DECISIONS-T22.md` § T22-D1, and the Phase 8 P5 counterexample it closed;
+ *   `the root DECISIONS.md` § T22-D1, and the Phase 8 P5 counterexample it closed;
  * - the panel performs the access check, so an authorized request is not refused a second time by
  *   `estimateCost` for want of a credential (§ D30).
  *
@@ -1024,7 +1024,7 @@ export class Simulation {
    * so it is refused `serviceMode`, retried every `dispatchRetryS`, and refused again until the
    * drain deadline while the rest of the bank stands idle. So {@link #revokePromisesTo} voids
    * those promises first: a promise to a car that cannot accept a hall call is not a cost being
-   * paid, it is a promise that cannot be kept. See `DECISIONS-T22.md` § T22-D1.
+   * paid, it is a promise that cannot be kept. See `the root DECISIONS.md` § T22-D1.
    *
    * The sweep is over **every active call of the bank**, not only the ones `setMode` released,
    * because a call whose promised car was full at its last re-offer is active and held by nobody:

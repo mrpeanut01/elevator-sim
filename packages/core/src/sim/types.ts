@@ -501,7 +501,7 @@ export interface ConservationAudit {
    * `0` on every conventional run, and `0` on every run with no mid-run service change in it,
    * which is every shipped building. A non-zero count is only ever produced by
    * `BuildingConfig.serviceEvents` or a `CarConfig.mode` that a schedule later changes. See
-   * `packages/core/DECISIONS-T22.md` § T22-D1.
+   * `the root DECISIONS.md` § T22-D1.
    */
   readonly promisesRevoked: number;
 

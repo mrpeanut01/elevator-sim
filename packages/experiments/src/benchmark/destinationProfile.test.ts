@@ -12,8 +12,8 @@
  * skipped regression naming the one-line `packages/core` fixture fix that stood between the file
  * and a shipped `rideTime` weight; T16 made that fix, Phase 6b ships the weight, and the test is
  * un-skipped below — against `destination-panel` rather than against `destination-eta`, for a
- * reason that is a published result rather than a preference. See `DECISIONS-T15.md` § T15-1 and
- * § T15-2, and `packages/viz/DECISIONS-T18.md` § T18-D4.
+ * reason that is a published result rather than a preference. See `the root DECISIONS.md` § T15-1 and
+ * § T15-2, and `the root DECISIONS.md` § T18-D4.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -78,7 +78,7 @@ describe('the shipped destination profile', () => {
    * `destinationFloorId`, so `rideTime` — the only term in the library with an `activeWhen` —
    * returned 0 for every car in every scenario *by construction*, and the *"has no weight that
    * contributes nothing"* assertion failed any shipped profile that weighted it. T16 fixed the
-   * fixture (`packages/core/DECISIONS-T16.md` § T16-D8), so a shipped `rideTime` weight is now
+   * fixture (`the root DECISIONS.md` § T16-D8), so a shipped `rideTime` weight is now
    * possible, and Phase 6b ships one.
    *
    * **It is not `destination-eta`, and that is the part worth reading before trusting the

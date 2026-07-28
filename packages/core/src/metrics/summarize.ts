@@ -37,7 +37,7 @@
  * Such a run reports `completed`, nought unserved, and a trend diluted by its own hump, and it
  * publishes a mean beside a passenger who waited a quarter of an hour. {@link diagnoseServiceLevel}
  * is the gate for that, and {@link RunSummary.serviceLevel} carries its evidence; see
- * `packages/core/DECISIONS-T21.md` for the counterexample that found it.
+ * `the root DECISIONS.md` for the counterexample that found it.
  *
  * ## Both halves of the Phase 2 oracle live here
  *
@@ -192,11 +192,11 @@ export const DEFAULT_MAX_UNSERVED_FRACTION = 0.05;
  *
  * **It is deliberately the same number as `fuzz/types.ts`'s `PROPERTY_BOUNDS.starvationBoundS`,
  * and deliberately not imported from it.** The project should state one abandonment horizon, and
- * it belongs in the model rather than in a test bound — which is the handback `DECISIONS-T20.md`
+ * it belongs in the model rather than in a test bound — which is the handback `the root DECISIONS.md`
  * § D83 made. The fuzz property keeps its own copy on purpose: it scans the *whole record*
  * including legs outside the report window, it re-derives servability from the building, and a
  * constant shared between a check and the thing it checks makes the check vacuous. See
- * `packages/core/DECISIONS-T21.md` § T21-D3 for what P6 still catches that this does not.
+ * `the root DECISIONS.md` § T21-D3 for what P6 still catches that this does not.
  */
 export const DEFAULT_MAX_WAIT_HORIZON_S = 900;
 

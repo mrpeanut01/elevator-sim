@@ -160,7 +160,7 @@ export const DEFERRED_ARM = 'eta-deferred';
  * their call from a fixture that carries no `destinationFloorId`, so the one gated term in the
  * library cannot contribute in the only fixture that guards *"no weight that contributes nothing"*.
  * A shipped profile weighting it turns that suite red for a fixture gap. See
- * `DECISIONS-T15.md` § T15-2 for the one-line fix and the promotion it unblocks.
+ * `the root DECISIONS.md` § T15-2 for the one-line fix and the promotion it unblocks.
  */
 export function disclosureProfiles(
   baseline: DispatcherProfile,

@@ -12,7 +12,7 @@
  * `fiveBuildings.test.ts` is the always-on reconciliation across all five buildings,
  * `bankCensus.test.ts` the arithmetic-only census over all fourteen banks, and
  * `deepCampaign.test.ts` the opt-in campaign over the eleven measurable ones at n = 128.
- * `./DECISIONS-T13.md` records the decisions those took, and the four defects they surfaced in
+ * `the root DECISIONS.md` records the decisions those took, and the four defects they surfaced in
  * code outside this module.
  *
  * ```ts

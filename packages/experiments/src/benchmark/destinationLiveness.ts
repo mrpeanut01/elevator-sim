@@ -137,7 +137,7 @@ export interface PanelCounts {
   /**
    * Times a promised passenger was left behind by a full car — `ConservationAudit.brokenPromises`.
    *
-   * An **event** count, not a headcount (DECISIONS-T16 § T16-D3): a passenger bumped from three
+   * An **event** count, not a headcount (the root DECISIONS.md, the T16 block: a promise is enforced at the candidate set): a passenger bumped from three
    * successive trips counts three times, because three times is what it cost them. Non-zero is
    * the cost of the write-once rule being paid, not a defect.
    */

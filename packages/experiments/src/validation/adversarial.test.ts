@@ -832,7 +832,7 @@ describe('service mode, physically — a car the group does not merely disbeliev
 /**
  * **The crossing this package did not have, and it is the one the deadlock lived in.**
  *
- * `packages/core/DECISIONS-T22.md` § *Known limitations* item 4 handed this back precisely:
+ * `the root DECISIONS.md` § *Known limitations* item 4 handed this back precisely:
  * {@link runCorner} and `fuzz/run.ts`'s `fuzzSimulationConfigFor` both drove **conventional**
  * dispatch here, so `serviceEvents` crossed with `dispatch.passengerAssignment: 'panel'` was
  * covered in `core` (`sim/serviceMode.test.ts` § 4) and by the fuzz generator — which is how

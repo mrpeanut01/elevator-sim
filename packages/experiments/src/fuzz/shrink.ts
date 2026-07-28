@@ -5,7 +5,7 @@
  *
  * The obvious move is `fast-check`. It was considered and rejected, and the reason is not
  * dependency hygiene alone (though `core` keeps exactly one runtime dependency and
- * `experiments` keeps none beyond `core`, so adding one is a real decision — `DECISIONS-T12.md`
+ * `experiments` keeps none beyond `core`, so adding one is a real decision — `the root DECISIONS.md`
  * records it). The reason is that a generic shrinker shrinks *values*, and a building config is
  * a graph of **cross-references**: `servesFloors` names floor ids, `accessZones.floors` names
  * floor ids, `servesFloorPairs` names pairs of them, and a transfer floor is meaningful only

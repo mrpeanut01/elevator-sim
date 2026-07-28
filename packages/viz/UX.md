@@ -324,7 +324,7 @@ Two consequences already applied in wave 1's remediation:
 What was deliberately **not** done: adding the per-leg array that RV-T3 and a windowed overlay
 need. Nothing in wave 1 would read it, and a field with no reader is the defect this repository
 has shipped five times, not a head start. Wave 2 adds it together with its first consumer, and
-bumps the version to 3. The full reasoning is in `packages/viz/DECISIONS-T8.md`.
+bumps the version to 3. The full reasoning is in `the root DECISIONS.md`.
 
 **Done in wave 2.** `VIZ_SCHEMA_VERSION` is **3**. `VizRecording.legs` carries seven fields of
 `PassengerRecord` — `passengerId`, `originFloorId`, `direction`, `arrivedAt`, `boardedAt?`,
@@ -333,4 +333,4 @@ the windowed figures and the per-bank split, `landingAssignmentsAt` for `RV-T3`.
 copied across; six further fields of `PassengerRecord` are still deliberately absent, and
 `VizProgress` was **not** replaced, so the fold and the leg array remain two independent
 projections of the same passengers that `recordRun.test.ts` compares. See
-`packages/viz/DECISIONS-T11.md` § T11-1.
+`the root DECISIONS.md` § T11-1.

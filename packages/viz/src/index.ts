@@ -37,7 +37,7 @@
  * the overlay is a pure `(recording, t) → …` producer exactly like `frameAt`, and reading a
  * recording belongs with writing one — so those two are homes rather than compromises. The
  * editor is the compromise, and it is recorded as a handback in
- * `packages/viz/DECISIONS-T11.md`: **`docs/01` should gain `viz/editor/`, and these four files
+ * `the root DECISIONS.md`: **`docs/01` should gain `viz/editor/`, and these four files
  * should move into it in the same change.**
  *
  * ## Named non-test callers

@@ -8,7 +8,7 @@
  * `docs/09-destination-dispatch-contract.md` § 2.3 names six arms and says *"A→B and C→D are the
  * two contrasts that carry the interesting claims"*. A→C is measured in `destinationDisclosure.ts`.
  * **C→D is this module**, and it was the one thing Phase 6b shipped without: `packages/core`'s
- * `DECISIONS-T16.md` records the mechanism verified — every leg promised, zero wrong-car boardings,
+ * `the root DECISIONS.md` records the mechanism verified — every leg promised, zero wrong-car boardings,
  * broken promises counted — and the *effect* unmeasured, with `sd(ΔTTD)` unknown and therefore the
  * contract's `n = 150` unjustified for arm D.
  *

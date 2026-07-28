@@ -4,7 +4,7 @@
  * ## What this is a regression on
  *
  * The counterexample is `fuzz-1001074`, found by the Phase 8 property campaign's deep tier and
- * handed back to `core` by `validation/DECISIONS-T20.md` § D83. Its shrunk form is an eleven-floor,
+ * handed back to `core` by `validation/the root DECISIONS.md` § D83. Its shrunk form is an eleven-floor,
  * single-bank, single-car, all-in-service building at 6.1 % of population per 5 minutes, and it
  * reported:
  *

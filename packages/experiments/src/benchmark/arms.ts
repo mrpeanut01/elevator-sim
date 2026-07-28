@@ -84,7 +84,7 @@ export const BASELINE_PROFILE = 'nearest-car';
  * Phase 6b's shipped profile — Level 1, `mobile-credential` + `passengerAssignment: 'panel'`.
  *
  * Named `destination-panel` rather than `destination-dispatch`, which is what
- * `packages/core/DECISIONS-T16.md` § T16-D7 handed back, and the reason is a guard rather than a
+ * `the root DECISIONS.md` § T16-D7 handed back, and the reason is a guard rather than a
  * preference: `core/src/dispatch/policies/policies.test.ts` asserts that `sim/simulation.ts`
  * contains no shipped profile id as a string literal (invariant 7), and `simulation.ts`
  * legitimately contains the `PassengerModel` literal `'destination-dispatch'`. A profile id that

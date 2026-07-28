@@ -272,7 +272,7 @@ describe('the landing panel names a car and boarding honours it', () => {
   it('allows a second promise only after the first is released, and never after boarding', () => {
     /* `releasePromise` is the single exception to write-once, and it is the model half of the
        Phase 8 P5 fix: a promise whose car has left group control cannot be kept, so it is voided
-       rather than held (`DECISIONS-T22.md` § T22-D1). The guard that keeps it from becoming a
+       rather than held (`the root DECISIONS.md` § T22-D1). The guard that keeps it from becoming a
        general `reassign()` lives at the one call site — `Simulation.#revokePromisesTo`, gated on
        `Car.acceptsHallCalls` — and is asserted in `sim/serviceMode.test.ts`; what is asserted here
        is that the model itself still refuses everything else. */

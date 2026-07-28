@@ -824,7 +824,7 @@ export type ServiceLevelVerdict = (typeof SERVICE_LEVEL_VERDICTS)[number];
  * diluted by its own hump — and it publishes a mean beside a passenger who stood at a landing for
  * a quarter of an hour. That is the *"statistics improve as the bug gets worse"* failure
  * `CLAUDE.md` § Statistical discipline is written against, and it was reached by a real
- * counterexample rather than imagined: `packages/core/DECISIONS-T21.md` records it, with figures.
+ * counterexample rather than imagined: `the root DECISIONS.md` records it, with figures.
  *
  * ## Why the wait and not the queue
  *

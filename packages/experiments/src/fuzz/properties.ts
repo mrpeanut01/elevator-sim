@@ -396,7 +396,7 @@ export function checkDestination(context: PropertyContext): Violation[] {
  * Occupancy is rebuilt with a `Map` re-summed on every change, exactly as `LoadSensor` does,
  * rather than with a running total that would accumulate a different rounding history. The two
  * admission conditions are then stated in their **order-invariant** form — see the comment at
- * the check itself, and `DECISIONS-T12.md` § D5 — because a stop boards several people at one
+ * the check itself, and `the root DECISIONS.md` § D5 — because a stop boards several people at one
  * simulated instant and the record does not preserve the order they went in.
  */
 export function checkCapacity(context: PropertyContext): Violation[] {

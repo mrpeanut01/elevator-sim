@@ -29,7 +29,7 @@
  * written report in its own docstring, for the reason this one exists: a result that is not written
  * down next to the code that produces it goes stale without anything failing. Their operating points
  * are `arms.ts`'s `DESTINATION_CASES` rather than {@link BENCHMARK_CASES}, deliberately, and the
- * decisions behind that split are in `DECISIONS-T15.md` in this directory. The shipped
+ * decisions behind that split are in `the root DECISIONS.md` in this directory. The shipped
  * `destination-eta` profile **is** an arm of the Phase 5 table below, because a profile in `data/`
  * that is neither the baseline nor an arm escapes the gate entirely; it is bit-identical to `eta` on
  * all three Phase 5 cases, which is correct rather than dead — none of them is access-zoned in a way

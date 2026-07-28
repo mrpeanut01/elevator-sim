@@ -27,13 +27,13 @@
  * T21's open P5 finding — `fuzz-1000384` — is **closed**, by a `core` fix rather than by anything
  * in this package. `checkTermination` and `PROPERTY_BOUNDS` are unchanged line for line, and the
  * generator was not narrowed. See the block at the bottom of this file for the reproduction, and
- * `packages/core/DECISIONS-T22.md` § T22-D1 for the mechanism.
+ * `the root DECISIONS.md` § T22-D1 for the mechanism.
  *
  * The 2 000-case pass was diffed **per case** across the fix on
  * `(status, simulatedSeconds, violations)`: **8 cases move, 1 992 are identical**, and all eight are
  * `destination-panel` runs with a `serviceEvents` schedule, which is exactly the path the fix
  * touches. Seven drain sooner; one (`1001011`) loses its last trip to the drain deadline and turns
- * `completed` into `timed-out` without anybody failing to board. `DECISIONS-T22.md` § "Blast radius"
+ * `completed` into `timed-out` without anybody failing to board. `the root DECISIONS.md` § "Blast radius"
  * carries the table.
  */
 
@@ -126,7 +126,7 @@ describe.skipIf(!deepCampaignRequested())('the deep campaign', () => {
  * not diverging" and "nobody was abandoned" were being treated as one claim and are two.
  *
  * The resolution is in `core`, not here. `RunSummary.awtIsValid` gained a **fourth** gate — see
- * `metrics/summarize.ts` § `diagnoseServiceLevel` and `packages/core/DECISIONS-T21.md` — because
+ * `metrics/summarize.ts` § `diagnoseServiceLevel` and `the root DECISIONS.md` — because
  * the trend gate and the censoring gate are both proxies for "did the backlog clear?" and neither
  * sees a backlog that cleared *late*. The run now reports `awtIsValid: false` with the passenger
  * named, and P6's existing escape clause (*"a fifteen-minute wait is legitimate in a run that says
@@ -253,7 +253,7 @@ describe('deep campaign counterexample fuzz-1001074 (starvation vs. a "stable" v
  * ## The fix, and what it is not
  *
  * `Simulation.#revokePromisesTo`, gated on `Car.acceptsHallCalls === false` — see
- * `packages/core/DECISIONS-T22.md` § T22-D1. D29's argument is about a car that is **full**: the
+ * `the root DECISIONS.md` § T22-D1. D29's argument is about a car that is **full**: the
  * promise stands because the car will empty and come back, and re-offering the passenger would be
  * the panel changing its mind to get a better answer. A car on `independent` will not come back,
  * so the promise is not a cost being paid but a promise that cannot be kept. Every revocation is

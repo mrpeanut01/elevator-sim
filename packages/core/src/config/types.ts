@@ -683,7 +683,7 @@ export interface AccessZone extends Commented {
 /**
  * One scheduled service-mode change, at a simulated time.
  *
- * **Data, not a hook** (CLAUDE.md invariant 7, and DECISIONS-T19). A schedule authored here is
+ * **Data, not a hook** (CLAUDE.md invariant 7, and the root DECISIONS.md, the T19 block). A schedule authored here is
  * part of the building, so it travels with `buildingId` through the persisted run envelope and a
  * stored run replays it exactly; a `SimulationConfig` callback would be a function, would not
  * serialize, and would be silently absent from every replay — which is Phase 4's acceptance

@@ -137,7 +137,7 @@ export interface NextLegInit {
  * decision record states rather than a convention (DECISIONS.md § D29). See
  * {@link Passenger.assign}. The single exception is {@link Passenger.releasePromise}, which voids
  * a promise whose car has left group control — a promise the named car cannot keep at all, which
- * is not the case D29 is about. See `packages/core/DECISIONS-T22.md` § T22-D1.
+ * is not the case D29 is about. See `the root DECISIONS.md` § T22-D1.
  */
 export class Passenger {
   /** Identity of this leg. Unique within a run. */
@@ -336,7 +336,7 @@ export class Passenger {
    *
    * That is not hypothetical: it is the Phase 8 P5 counterexample `fuzz-1000384`, and it was
    * recorded as a known limitation by T19 (`DECISIONS.md` § D77, limitation 2) before a fuzz
-   * campaign turned it into a blocking finding. `packages/core/DECISIONS-T22.md` § T22-D1 carries
+   * campaign turned it into a blocking finding. `the root DECISIONS.md` § T22-D1 carries
    * the argument and the measurement.
    *
    * The deferral advantage D29 protects is untouched, because this is not a re-optimization: the
