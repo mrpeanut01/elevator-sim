@@ -440,9 +440,10 @@ export interface VizServiceLevel {
  * Five numbers rather than one, and the plurality is the rule rather than generosity:
  *
  * - {@link workKJ} is the axis, and it is drawn **only beside** AWT and WT95. Measured across the
- *   full experiment matrix, `nearest-car` — the viewer's default and the arm `docs/07` § 4 calls
- *   a poor reference — is on the Pareto front at **six of eight cells**, because it is best on
- *   energy and worst on wait. A standalone eco score ranks the worst dispatcher first.
+ *   full experiment matrix, `nearest-car` — the arm `docs/07` § 4 calls a poor reference, and which
+ *   was the viewer's default until § D134 and `elevator-sim list`'s first example until T73 — is on
+ *   the Pareto front at **six of eight cells**, because it is best on energy and worst on wait. A
+ *   standalone eco score ranks the worst dispatcher first.
  * - {@link workPerServedLegKJ} goes beside it, always. *A configuration that spends less by
  *   serving fewer people has not saved anything*, and the total alone cannot tell the two apart.
  * - {@link deliveredLegCount} is that ratio's denominator — R13, and the reason a per-leg figure

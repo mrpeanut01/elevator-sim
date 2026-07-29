@@ -10074,3 +10074,34 @@ the whole of `docs/10` § 1 exists to prevent.
 
 **Impact.** Phase 9 gains a criterion and still gains **no status row until it is measured against
 it** — the row and the verdict land together or neither does.
+
+---
+
+## D164 — the viewer's default was **already right and nothing pinned it**, and the one live site was the CLI's own example list
+
+**Date:** 2026-07-29 · **Owner:** T73 (wave 9) · **Continues:** [§ D134](#d134) · **Corrects:** `docs/10` § 2.2's identity figure and four documents' prose · **Moves no published figure**
+
+**Context.** [`docs/07`](docs/07-handoff.md) § 8 carried `nearest-car` as *"still the viewer's default in places"* — the only profile that saturates, the binding ceiling at five cells, and on `docs/10` § 2.2's argument the worst possible first contact for a newcomer.
+
+**The row was half wrong, and the half it got wrong is the instructive one.** The viewer's picker had already moved to `collective` in [§ D134](#d134) — but **nothing pinned it**. A whole wave passed with the correct value held only by the fact that nobody edited it. The register was describing a defect that had been fixed and was undefended, which is a different thing from the defect it named.
+
+**The one genuinely live site was `elevator-sim list`'s Try block**, which derived its three examples from `data/dispatcher-profiles.json`'s **file order** — and `nearest-car` is first in that file. The newcomer's copy-pasteable first command was the weakest shipped dispatcher, on the building where nine of twelve dispatchers are indistinguishable.
+
+### The identity measurement, re-derived rather than quoted
+
+`docs/10` § 2.2 says *ten of twelve* shipped dispatchers are byte-identical or near-identical on the default pair. Measured now on Garden Apartments, seed 42, 900 s, all twelve:
+
+- **9 of 12** — not ten — give the identical `(AWT 11.319, WT95 24.548, TTD 39.302)` triple. `energy-aware` matches on wait and returns **TTD 39.592**, so ten match on AWT+WT95 *alone*.
+- **6 byte-identical recordings**; **7 distinct** overall. Only `zoned-uppeak` (2.500 s) and `predictive-balanced` (11.919 s) move.
+
+§ 2.2's prose is corrected. **The document's own review had already flagged this and it was never fixed in place** — the same shape as the six register rows wave 6 found wrong about themselves.
+
+### The building default was measured and **kept**
+
+All twelve dispatchers × five buildings at the viewer's settings, counting those publishing a mean: **14 of 60**, reproducing **M1** exactly. `garden-apartments` is **12/12 quotable**; midtown 0/12, vertical-city 0/12, mixed-use and secure 1/12 each.
+
+**There is no better shipped building.** Every alternative trades *"nothing you change matters"* for *"nothing you do produces a number"*, and the second is worse: a newcomer who changes a dial and sees no difference has learned something true about near-neighbour dispatchers, while one who changes a dial and gets a suppression banner has learned nothing at all. § 2.2's own remedy — a scenario library at usable demand — remains the only one the evidence supports. **Changed nothing, and published the table.**
+
+**Rejected alternatives.** *Reorder `data/dispatcher-profiles.json`* — it moves `profiles[0]` for every consumer at once, a sweep whose blast radius nobody had measured; the consumer was fixed instead of the data. *Drop `nearest-car` from the Try block entirely* — a weak arm is the wrong thing to **run** and the right thing to **compare against**, and pairing two near neighbours would print *"the interval contains zero"*, which teaches that the tool cannot tell rather than that the pair does not differ. *Change `BASELINE_PROFILE`* — every Phase 5 figure and every `published.ts` pin is measured against it. *Assert `toBe('collective')`* — a change detector; the pin is written against the **property** (does this default saturate?) with a discriminating control, because § 4's claim is a claim about saturation and not about a name.
+
+**Impact.** The products' defaults — viewer, batch panel, CLI Try block — now agree with each other **and are pinned**. Authored examples were left curated rather than churned. `nearest-car` is kept wherever it is a study arm, a published pin, a test fixture or a **contrast** arm, each with its reason. The newcomer's first `compare` now runs in 1.7 s and returns `AWT −2.27 s [−2.92, −1.62] BETTER`, 0/100 saturated on both arms — a real result on the first command.

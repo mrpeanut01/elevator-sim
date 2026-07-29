@@ -1551,7 +1551,7 @@ is worse at serving people*. Measured front membership, one row per cell:
 | `vertical-city-up-peak` | 50 | collective, **nearest-car**, energy-aware |
 
 `nearest-car` is the arm this document elsewhere calls too weak a baseline to separate anything, and
-it is the viewer's default. It reaches the front by being **best on energy and worst on wait**: a
+it was the viewer's default until [§ D134](../DECISIONS.md). It reaches the front by being **best on energy and worst on wait**: a
 dispatcher that drives less carries fewer people, and a front is non-domination, not merit. This is
 the whole reason [`docs/10`](10-experience-layer-contract.md) § 5.5 forbids an aggregated "eco"
 score — one would rank the worst dispatcher first. **Energy is an axis, never a score.**

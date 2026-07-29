@@ -26,6 +26,11 @@ import type { BatchRequest, BatchWorkerMessage, BatchWorkerRequest } from '../ba
 import { batchReport, type BatchComparisonRow, type BatchReport } from '../batch/report.js';
 import { goalReport, type GoalReport, type GoalReportRow } from '../scenario/goalReport.js';
 import type { BrowserResources } from './data.js';
+import {
+  PREFERRED_BATCH_BASELINE,
+  PREFERRED_BATCH_CANDIDATE,
+  preferredDispatcherId,
+} from './defaults.js';
 
 export interface BatchPanelElements {
   readonly building: HTMLSelectElement;
@@ -60,10 +65,6 @@ export interface BatchPanelHandle {
   prefill(): void;
 }
 
-/** `collective` is `docs/07` § 4's recommended reference arm; `eta` is the other measured one. */
-const PREFERRED_BASELINE = ['collective', 'eta'] as const;
-const PREFERRED_CANDIDATE = ['eta', 'collective'] as const;
-
 export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
   const { resources, elements: ui } = options;
   const doc = ui.output.ownerDocument;
@@ -77,13 +78,14 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
       select.append(new Option(profile.id, profile.id));
     }
   }
-  applyPreference(ui.baseline, PREFERRED_BASELINE);
-  applyPreference(ui.candidate, PREFERRED_CANDIDATE);
+  // `collective` is `docs/07` § 4's recommended reference arm and `eta` the other measured one;
+  // the lists and the reason live in `dev/defaults.ts`, which `dev/defaults.test.ts` pins. This
+  // function is their named non-test caller alongside `dev/main.ts`.
+  applyPreference(ui.baseline, PREFERRED_BATCH_BASELINE);
+  applyPreference(ui.candidate, PREFERRED_BATCH_CANDIDATE);
 
   function applyPreference(select: HTMLSelectElement, preferred: readonly string[]): void {
-    const found = preferred.find((id) =>
-      resources.dispatcherProfiles.some((profile) => profile.id === id),
-    );
+    const found = preferredDispatcherId(preferred, resources.dispatcherProfiles);
     if (found !== undefined) select.value = found;
   }
 

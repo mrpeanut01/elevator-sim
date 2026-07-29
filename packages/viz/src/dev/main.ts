@@ -74,6 +74,7 @@ import {
   type CampaignPanelHandle,
 } from './campaignPanel.js';
 import { createLoader } from './bootstrap.js';
+import { PREFERRED_VIEWER_DISPATCHERS, preferredDispatcherId } from './defaults.js';
 import { shouldAutoplay } from './motion.js';
 import { loadBrowserResources, loadCampaign, resolveEdited, type BrowserResources } from './data.js';
 
@@ -311,10 +312,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * A preference list rather than one id, and a fallback to whatever `data/` lists first, so this
    * cannot break the viewer if a profile is renamed — the URL's `dispatcher` parameter is applied
    * after this and still wins.
+   *
+   * The list itself moved to `dev/defaults.ts` in wave 9 (T73), because it lived here for a whole
+   * wave with **no test at all**: § D134 chose it and nothing would have noticed it being chosen
+   * back. `dev/defaults.test.ts` now pins it, and this is its named non-test caller.
    */
-  const PREFERRED_DEFAULT_DISPATCHERS = ['collective', 'eta'] as const;
-  const preferred = PREFERRED_DEFAULT_DISPATCHERS.find((id) =>
-    resources.dispatcherProfiles.some((profile) => profile.id === id),
+  const preferred = preferredDispatcherId(
+    PREFERRED_VIEWER_DISPATCHERS,
+    resources.dispatcherProfiles,
   );
   if (preferred !== undefined) ui.dispatcher.value = preferred;
   for (const speed of SPEEDS) {

@@ -81,7 +81,7 @@ npm run sim -- run --building garden-apartments --dispatcher eta --seed 42
 npm run sim -- compare --building midtown-office --a eta --b nearest-car --reps 100
 npm run sim -- tune --building garden-apartments --params idle.repositionThresholdS --seed 42
 npm run sim -- fuzz --cases 8                  # or: --tier deep --cases 2000, the overnight pass
-npm run sim -- watch --building garden-apartments --dispatcher nearest-car --speed 10
+npm run sim -- watch --building garden-apartments --dispatcher eta --speed 10
 npm test        # 190 files, 3,505 tests — the benchmarks execute real replications, so this is minutes, not seconds
 ```
 
