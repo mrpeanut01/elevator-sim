@@ -63,7 +63,9 @@ import {
   type SceneSelection,
 } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
-import { runSummaryFigures } from '../render/runSummary.js';
+import { disclosureItems, rowClassesOf } from '../mode/disclosure.js';
+import { parityRefusal } from '../mode/parity.js';
+import { isViewMode, itemsIn, type DisclosureItem, type ViewMode } from '../mode/types.js';
 import { buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { mountEditor } from './editor.js';
 import { mountParameterForm } from './parameterForm.js';
@@ -137,6 +139,9 @@ interface Elements {
   readonly description: HTMLElement;
   /** Where `render/runSummary.ts`'s figures are drawn — `docs/10` § 11 W2. */
   readonly runSummary: HTMLElement;
+  /** § 4's mode toggle, and the place `mode/parity.ts` puts a refusal it finds. */
+  readonly viewMode: HTMLSelectElement;
+  readonly modeParity: HTMLElement;
   /** § 10.3's pre-run compatibility note. Empty when there is nothing to say. */
   readonly accessNote: HTMLElement;
   /** Where `render/mood.ts`'s gauge is drawn — `docs/10` § 6 / D4, W6's U4. */
@@ -166,6 +171,8 @@ function elements(): Elements {
   };
   return {
     canvas: find<HTMLCanvasElement>('stage'),
+    viewMode: find<HTMLSelectElement>('view-mode'),
+    modeParity: find<HTMLElement>('mode-parity'),
     building: find<HTMLSelectElement>('building'),
     dispatcher: find<HTMLSelectElement>('dispatcher'),
     duration: find<HTMLInputElement>('duration'),
@@ -234,6 +241,11 @@ function elements(): Elements {
       error: find<HTMLElement>('campaign-error'),
       brief: find<HTMLElement>('campaign-brief'),
       output: find<HTMLElement>('campaign-output'),
+      edit: find<HTMLInputElement>('campaign-edit'),
+      weightsBar: find<HTMLElement>('campaign-weights-bar'),
+      weights: find<HTMLElement>('campaign-weights'),
+      weightsStatus: find<HTMLElement>('campaign-weights-status'),
+      weightsRefusal: find<HTMLElement>('campaign-weights-refusal'),
     },
     confirm: find<HTMLDialogElement>('confirm'),
     confirmMessage: find<HTMLElement>('confirm-message'),
@@ -376,6 +388,91 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   let currentTab: TabName = isTabName(params.get('tab')) ? (params.get('tab') as TabName) : 'viewer';
 
+  /* ------------------------------------------------------------------ *
+   * § 4 — Basic and Advanced
+   * ------------------------------------------------------------------ */
+
+  /** Where the remembered mode lives. § 4: *"Advanced is one control away and is remembered."* */
+  const MODE_KEY = 'elevator-sim.viewMode';
+
+  /**
+   * The mode this page opens in: the URL if it names one, then what the reader last chose, then
+   * **Basic** — which is § 4's default and its reason: *"`UX.md`'s Newcomer role has a stated
+   * failure cost and the Analyst's does not depend on which mode opens."*
+   *
+   * `localStorage` is read inside a `try`, because a browser with storage disabled throws on
+   * access rather than returning null, and a viewer that will not start because it could not
+   * remember a preference is worse than one that forgets.
+   */
+  function initialMode(): ViewMode {
+    const fromUrl = params.get('mode');
+    if (isViewMode(fromUrl)) return fromUrl;
+    try {
+      const remembered = window.localStorage.getItem(MODE_KEY);
+      if (isViewMode(remembered)) return remembered;
+    } catch {
+      /* no storage; Basic it is. */
+    }
+    return 'basic';
+  }
+
+  let viewMode: ViewMode = initialMode();
+  ui.viewMode.value = viewMode;
+
+  /**
+   * Every player-facing item of the run on screen, in both modes.
+   *
+   * The single-run viewer passes **no fail states**: a fail state's frequency comes from a batch
+   * and R2 forbids reading one off a single replication. What it does pass is the locked-out
+   * landings, which are a fact about *this* run's legs, and the dispatcher's display name, so
+   * Basic can show a name where Advanced shows an id (§ 4).
+   */
+  function disclosureFor(next: VizRecording): readonly DisclosureItem[] {
+    const profile = resources.dispatcherProfiles.profiles.find(
+      (candidate) => candidate.id === next.dispatcherProfileId,
+    );
+    return disclosureItems({
+      recording: next,
+      ...(profile === undefined ? {} : { dispatcherName: profile.name }),
+      lockedOut: lockedOutLandingsAt({
+        recording: next,
+        at: next.endedAt,
+        restrictedFloorIds: access.restrictedFloorIds,
+        carriesCredential: access.carriesCredential,
+      }),
+    });
+  }
+
+  /** Redraw the run summary in the current mode, and say so if parity is broken. */
+  function drawSummaryNow(): void {
+    if (recording === undefined) {
+      ui.runSummary.replaceChildren();
+      ui.modeParity.textContent = '';
+      return;
+    }
+    const items = disclosureFor(recording);
+    /*
+     * The check runs on exactly what is about to be mounted, on every draw, in the shipped path —
+     * not only in the suite. § D163's clause 2 is a property of the product, and a property
+     * asserted only in a test is a property that holds in a test.
+     */
+    ui.modeParity.textContent = parityRefusal(items) ?? '';
+    drawRunSummary(ui.runSummary, items, viewMode);
+  }
+
+  ui.viewMode.addEventListener('change', () => {
+    if (!isViewMode(ui.viewMode.value)) return;
+    viewMode = ui.viewMode.value;
+    try {
+      window.localStorage.setItem(MODE_KEY, viewMode);
+    } catch {
+      /* nothing to remember it with. The mode still applies to this page. */
+    }
+    drawSummaryNow();
+    campaign?.refresh();
+    syncUrl();
+  });
+
   function syncUrl(): void {
     const next = new URLSearchParams({
       building: ui.building.value,
@@ -384,6 +481,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       duration: ui.duration.value,
       speed: ui.speed.value,
       tab: currentTab,
+      mode: viewMode,
     });
     window.history.replaceState(null, '', `?${next.toString()}`);
   }
@@ -606,10 +704,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ui.playPause.textContent = playback.state === 'playing' ? 'Pause' : 'Play';
     ui.status.textContent = statusLine(next);
     ui.banner.textContent = `${next.buildingName} · ${next.dispatcherProfileId} · seed ${next.seed}`;
-    // `docs/10` § 11 W2's non-test caller. Drawn on adoption rather than in {@link tick}: every
-    // figure is a property of the whole run, so redrawing them at 60 Hz would cost a DOM rebuild
-    // per frame to display numbers that cannot have changed.
-    drawRunSummary(ui.runSummary, next);
+    // `docs/10` § 11 W2's non-test caller, now through § 4's mode layer. Drawn on adoption rather
+    // than in {@link tick}: every figure is a property of the whole run, so redrawing them at
+    // 60 Hz would cost a DOM rebuild per frame to display numbers that cannot have changed.
+    drawSummaryNow();
     populateBankFilter(next);
     landingOptionsKey = NO_OPTIONS_YET;
     populateLandings(next, next.startedAt);
@@ -1103,7 +1201,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let campaign: CampaignPanelHandle | undefined;
   loadCampaign(resources)
     .then((loaded) => {
-      campaign = mountCampaignPanel({ resources, loaded, elements: ui.campaign });
+      campaign = mountCampaignPanel({
+        resources,
+        loaded,
+        elements: ui.campaign,
+        mode: () => viewMode,
+      });
     })
     .catch((error: unknown) => {
       ui.campaign.error.textContent = `the campaign could not be loaded: ${message(error)}`;
@@ -1309,28 +1412,41 @@ function applyParam(select: HTMLSelectElement, value: string | null): void {
  *
  * Thin on purpose, and thin in the specific way the rest of this package is: every decision about
  * *what* a figure says, whether it is suppressed, what its `n` is and whether a natural-frequency
- * restatement is admissible is made in `render/runSummary.ts`, where it is asserted against a
- * recomputation under plain Node. This function knows only how to turn a {@link SummaryFigure}
- * into elements.
+ * restatement is admissible is made in `render/runSummary.ts`; every decision about **which mode
+ * shows it and what must survive when Basic does not** is made in `mode/`. Both are asserted
+ * against a recomputation under plain Node. This function knows only how to turn a rendering into
+ * elements.
  *
- * **Nothing here keys on a figure id.** The classes are derived from `kind` and `severity`, so a
- * twelfth figure appears with no edit to this file and no edit to `index.html` — the same rule W4
- * kept for the parameter form, and the reason neither surface holds a list of metric names.
+ * **Nothing here keys on a figure id.** The classes are derived from the item's origin and its
+ * severity, so a twelfth figure appears with no edit to this file and no edit to `index.html` —
+ * the same rule W4 kept for the parameter form, and the reason neither surface holds a list of
+ * metric names.
  *
  * The first figure names the seed, which is R7: *"the seed stays visible and copyable in every
  * mode"*. It is rendered as text rather than into the canvas, and that is the copyable half — a
  * bitmap cannot be selected, and `Export PNG` is exactly the path that turns this screen into one.
+ * `mode/parity.ts` is what makes *"in every mode"* a check rather than a promise.
  */
-function drawRunSummary(container: HTMLElement, recording: VizRecording): void {
+function drawRunSummary(
+  container: HTMLElement,
+  items: readonly DisclosureItem[],
+  mode: ViewMode,
+): void {
   const doc = container.ownerDocument;
   container.replaceChildren();
-  for (const item of runSummaryFigures(recording)) {
+  for (const entry of itemsIn(items, mode)) {
+    const item = entry.rendering;
     const row = doc.createElement('div');
-    row.className = `figure figure-${item.kind}${item.severity === 'warning' ? ' figure-warning' : ''}`;
+    /*
+     * Derived in `mode/disclosure.ts`, not here. **Nothing in this file keys on a figure id or on
+     * an origin kind**, which is the same rule this function has kept since W2 and the reason a
+     * twelfth figure needs no edit to `index.html`.
+     */
+    row.className = rowClassesOf(entry, entry.rendering).join(' ');
 
     const label = doc.createElement('span');
     label.className = 'figure-label';
-    label.textContent = `${item.label} `;
+    label.textContent = `${entry.label} `;
     row.append(label);
 
     const value = doc.createElement('span');

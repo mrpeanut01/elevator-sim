@@ -766,6 +766,15 @@ For every shipped scenario, run in Basic and in Advanced, `JSON.stringify(record
 identical. A mode that changes a run is not a view. This is a cheap test and it is the one that
 stops Basic mode from quietly lowering the demand to make the picture nicer.
 
+> **Built 2026-07-29 as `packages/viz/src/mode/`, and the criterion above is the *cheap* half.**
+> The half that decides Phase 9 is [§ D163](../DECISIONS.md) clause 2: the parity must be
+> **derived**, so the set of failure states, suppression reasons and fail-state diagnoses is
+> computed from the code and never written down. See § 11 W6 for how, for the fictional fifth fail
+> state it is proved against, and for the two items on the list above that were true of nothing —
+> **warnings** and **the undelivered count** were both on the never-hide list and visible in no
+> mode at all, because nothing in `viz` read `VizRecording.warnings` and `runSummaryFigures` has no
+> undelivered row.
+
 ---
 
 ## 5. U3 — Gamification
@@ -1642,9 +1651,10 @@ evaluates goals from finished recordings and batches.
   `saturationCensus.test.ts` chooses one: **the highest load at which every arm, including the
   baseline, still returns a valid AWT**, measured over a batch.
 
-### W6 — Basic / Advanced *(depends on W2, W4, W5)*
+### W6 — Basic / Advanced *(depends on W2, W4, W5)* — ✅ **DONE 2026-07-29, both halves**
 
-One state, two views, § 4's hide/never-hide lists.
+One state, two views, § 4's hide/never-hide lists — **and the live weight editor**, which is the
+same unit because both are about turning a shipped surface into something a player can act on.
 
 - **Acceptance:** the mode-parity test — for every shipped scenario, the recording produced in Basic
   is byte-identical to Advanced; every item on § 4's never-hide list is asserted present in Basic on
@@ -1652,6 +1662,61 @@ One state, two views, § 4's hide/never-hide lists.
 - **Liveness evidence:** the parity test fails if any control's Basic default differs from its
   Advanced value.
 - **Non-test caller:** the app shell.
+
+> **Built as `packages/viz/src/mode/`, and the parity check is derived rather than listed.**
+> `mode/disclosure.ts` takes `runSummaryFigures` and `failStateReports` **unaltered** and answers
+> one further question — which of them may Basic leave out, and what must survive when it does.
+> `mode/parity.ts` reads two things and nothing else: the item's **origin**, and the strings the
+> run itself produced (`mustCarry`). It names no fail state, no suppression ground, no warning code
+> and no figure id, which is what makes it a check rather than a second list
+> ([§ D163](../DECISIONS.md) clause 2).
+>
+> Proved against a **fifth fail state, a suppression reason no `core` branch emits and a warning
+> code `core` never raises** — § D134's fictional-schema technique, at a union instead of a schema
+> (`mode/fictionalFailState.test-helper.ts`). Hiding the fifth state from Basic turns the check red
+> naming `flooded`; keeping its row and rewording its diagnosis turns it red quoting the diagnosis.
+>
+> **Three findings, and the first two are corrections to this section.**
+>
+> 1. **§ 4 item 7 was true of nothing.** `VizRecording.warnings` has been on the contract since
+>    schema 1, `recordRun` copies `result.warnings` into it, and **no surface in this package read
+>    it** — so *"warnings, including `double-deck-not-simulated`"* was on the never-hide list while
+>    being visible in **no** mode. It has an item now, and the parity check is what would notice if
+>    it lost one again.
+> 2. **§ 4 item 2 had no home either.** `runSummaryFigures` has no `undelivered` row, so the count
+>    reached the screen only through `dev/main.ts`'s status line.
+> 3. **Basic does not shorten the suppression reason, and cannot without a second source of
+>    truth.** § 4's table sends the raw `awtInvalidReason` *"behind 'why?' on the plain-language
+>    form"*, and R3 permits shortening. `core` emits that reason as **prose with no ground code**
+>    (`metrics/summarize.ts` returns one of four sentences as a `string`), so a per-ground Basic
+>    rewording would have to re-decide *which* ground fired from `saturated`, `waitCount`,
+>    `unservedCount` and `serviceLevel.verdict` in `core`'s own precedence order — **R9's forbidden
+>    operation**, and wrong in the case that matters, because the fourth ground exists precisely
+>    for a run that looks unsaturated and uncensored and is refused anyway. Basic therefore leads
+>    with a **ground-free** plain sentence and carries the measurement's own words underneath.
+>    Closing this properly needs `core` to carry the ground beside the prose; until it does, the
+>    honest Basic form is the one that cannot contradict Advanced.
+>
+> **The live weight editor** is the second half. A campaign stage's candidate arm may now be an
+> **edited weight vector** rather than a dropdown choice: the W4 controls, restricted to the
+> dimensions the stage declares editable, resolved through `controls/editedProfile.ts` —
+> `candidateProfile` → `parseDispatcherProfiles`, the same trip a tuned winner takes, so an edit is
+> data and not a special kind of arm. An invalid edit is refused **at the control**, in three
+> places: an id the space does not declare, a value the dimension cannot hold (through
+> `applyControlEdit`, the same function the form uses), and a *combination* every dimension admits
+> and `core` will not build (through `SearchSpace.validate`, in `core`'s own words). `Run this
+> stage` is disabled behind the refusal.
+>
+> **Measured: stage 2 clears on an edited vector — and the same vector loses on the holdout seeds.**
+> § D161 recorded that four of seven stages need an authored weight vector; stage 2 is one of them,
+> and `weights.loadFactor: 2.25` on `collective` clears all three of its goals at n = 50, ahead on
+> 95th-percentile wait and door-to-door time with nothing resolving against it. On stage 2's own
+> **disjoint holdout seed set** the same vector is beaten by the shipped setting on three measures.
+> The sweep that found it is that sharp — `2.2`, `2.25` and `2.3` clear and `2.35` does not. **The
+> campaign judges on the tuning seeds only, so a live weight editor makes overfitting them the
+> dominant strategy**, and nothing on the shipped surface says so. That is a finding about the
+> campaign rather than about this vector, and it is asserted in `campaign.test.ts` in both
+> directions so the suite carries the unflattering half.
 
 ### W7 — Rider queues and the credential lens *(depends on W1; W7b depends on W2)* — ✅ **DONE 2026-07-29, both halves**
 

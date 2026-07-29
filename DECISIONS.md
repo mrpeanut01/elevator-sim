@@ -10232,3 +10232,47 @@ A second eroded guard was found in the same sweep: `buildingConnectivity.test.ts
 The `−14.4 %` door-hold figure has **no shipped entry point** — the 50-cell study lives in the commit that measured it. 40 of its 50 cells provably cannot have moved; the 10 `vertical-city` cells can have. A like-for-like probe reproduced the figure on **neither** base nor branch, which proves the probe differs from the original harness and says nothing about the number. Marked *"measured on the pre-escalator configuration"*. Two superseded intervals are declared under a **new, stated third kind** — *superseded figures, quoted as history* — and the alternative of rewording them until the scanner stops matching is named in the docstring as **evading a guard rather than answering it**.
 
 **Impact.** `data/scenario-goals.json` stage 6 regenerated, and `long-waits-under` became **withheld** — 49/50 tuning against 50/50 holdout, so the classification stops surviving the holdout — which under [§ D160](#d160)'s own rule **removed a goal from a shipped campaign stage**. That is the machinery working rather than a regression. **Known limits:** one-way escalators are not expressible (nothing would read a direction, and an unread field is the dead seam this repository names eleven times); `vertical-city` still declares no escalator at `26↔27`, `51↔52`, `76↔77`, so a cross-lobby interfloor journey still rides to the ground lobby and back — a building question, not a `core` one.
+
+---
+
+## D168 — Phase 9's mode parity, and **the never-hide list contained an item no mode had ever drawn**
+
+**Date:** 2026-07-29 · **Owner:** T76 (wave 9) · **Satisfies:** [§ D163](#d163) clause 2 · **Opens:** a `core` gap and a campaign-design hazard
+
+**Context.** [§ D163](#d163) gave Phase 9 a criterion and defended it structurally: *the clauses that decide the phase must be ones the product currently fails.* **Clause 2 — mode parity — failed because only one mode existed.** `docs/10` § 4's rule is *Basic mode may hide complexity; it may never hide a failure*, with a non-negotiable never-hide list.
+
+### The parity set is derived, and proved against a case the product does not ship
+
+`parity.ts` contains **no fail state, no suppression ground, no warning code and no figure id**. Members arrive by *existing*: the disclosure layer takes the shipped figure and fail-state lists unaltered, and each item carries its origin plus the reason, diagnosis or seed **verbatim from the source datum**. The three categories § D163 names are a discriminated union with an exhaustive switch, so a tenth is a **compile error** rather than a silent omission — which is the hand-written-list defect [§ D152](#d152) closed one layer down, refused here in advance.
+
+Proved against a **fictional fifth fail state**, a suppression reason no `core` branch emits, and a warning code `core` never raises. Watched red:
+
+> `Basic hides "fail-state-flooded" (fail-state), which Advanced draws as "in 50 runs, 37 ended this way." § 4: Basic mode may hide complexity; it may never hide a failure.`
+
+And critically, `parityRefusal` runs **in the shipped path**, on exactly the items about to be mounted — so parity is a property of the product, not only of the suite.
+
+### The finding: the never-hide list contained an item **no mode had ever drawn**
+
+**`VizRecording.warnings` had no non-test reader anywhere in `viz`.** § 4 item 7 put warnings on the never-hide list, and they were visible in **no** mode at all — hidden not by Basic but by the product. The **twelfth** instance of this repository's signature defect, and the first one found *by a rule that existed to prevent exactly it*. § 4 item 2 (undelivered) had no home in the run summary either.
+
+On Secure Tower at seed 20260729 that is **thirteen warnings now appearing in both modes that no viewer surface had ever shown**, plus the locked-out row and *"14 people never got where they were going."*
+
+### The class this clause cannot be satisfied for — reported, not weakened
+
+**Basic cannot *shorten* a suppression reason.** `core` returns one of four sentences as a bare `string` with **no ground code**, so a per-ground rewording would have to re-decide which ground fired — [R9](../docs/10-experience-layer-contract.md)'s forbidden operation, and wrong precisely on the fourth ground. Basic therefore leads with a ground-free sentence and carries `core`'s own words underneath.
+
+§ D163 says a clause may not be satisfied by a hand-written exemption list, and this is not one: it is a stated structural limit with a named fix — **`core` must carry the ground beside the prose.** Recorded as debt rather than absorbed.
+
+### The live weight editor, and the hazard it creates
+
+A campaign stage can now be cleared with an **edited** weight vector rather than a dropdown choice — the thing [§ D161](#d161) recorded as impossible. Stage 2 cleared live on `weights.loadFactor: 2.25`, all three goals at n = 50.
+
+**And the unflattering half is recorded with it.** On that stage's **declared holdout seed set the same vector is beaten on three measures**, and the sweep is sharp — 2.20, 2.25 and 2.30 clear; 2.35 does not. The campaign judges on tuning seeds only, so **a live editor makes overfitting the tuning seeds the dominant strategy.** That is `CLAUDE.md` § *Tuning discipline*'s own warning arriving inside the game: *tune on one seed set, validate on a disjoint one, or the gain vanishes on new traffic.* Asserted in both directions and carried as live debt.
+
+### False-negative hunt — four of five found
+
+The instructive one: **`severity` lived on the item, and the de-escalation rule compared it with itself** — a guard that could not fire under any input. Moved onto the rendering, and it now does. Also: an origin kind collided with a severity class, making a `not.toContain` assertion unfalsifiable; and `basicText` omitted the label, so a Basic mode that dropped a fail state's *name* would have gone unseen.
+
+**The mutation harness reported GREEN three times before those were fixed** — which is the point. [§ D161](#d161)'s fifth variant is guarded here rather than assumed, because both outcomes were demonstrably reachable.
+
+**Impact.** § D163 clause 2 is satisfied. **Known limits:** thirteen warning rows on Secure Tower is a wall, and grouping is deliberately **not** done — parity requires each warning's text in Basic, and a summarising group is the first place one could go missing. Basic's curated three-dimension subset (§ 8.3) is not built; the campaign editor is restricted to each stage's declared editable set instead, which is data. **And one item from `WAVE9_PLAN.md`'s T76 row was never briefed and is not done** — *the structural-refusal reason is prose, keyed on a call id `VizLeg` does not carry* — an orchestration error, recorded here rather than quietly dropped.

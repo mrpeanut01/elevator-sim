@@ -155,12 +155,19 @@ export function formStatusLine(
   return `${String(controls.length)} dimensions, ${String(live)} live${withheld} — ${verdict}. Authorability is a schema check: docs/10 § 8.2 says a profile that passes it is authorable and has no dead gate, not that it is sound.`;
 }
 
-/** One {@link ControlNode} tree, instantiated. The only DOM construction in W4. */
-function instantiate(doc: Document, node: ControlNode): HTMLElement {
+/**
+ * One {@link ControlNode} tree, instantiated. The only DOM construction in W4.
+ *
+ * **Exported** since W6: `dev/campaignPanel.ts` mounts the same controls, restricted to the
+ * dimensions a stage declares editable, and a second `createElement` walk there would be a second
+ * answer to *"what does a control look like in the DOM"* — the shape `campaign/stageRun.ts` was
+ * extracted to avoid one layer down.
+ */
+export function instantiateControlNode(doc: Document, node: ControlNode): HTMLElement {
   const element = doc.createElement(node.tag);
   for (const [name, value] of Object.entries(node.attrs)) element.setAttribute(name, value);
   if (node.text !== undefined) element.textContent = node.text;
-  for (const child of node.children) element.append(instantiate(doc, child));
+  for (const child of node.children) element.append(instantiateControlNode(doc, child));
   return element;
 }
 
@@ -216,9 +223,9 @@ export function mountParameterForm(options: ParameterFormOptions): ParameterForm
 
     const space = source.space;
     const controls = controlsFor(space, values);
-    container.append(instantiate(doc, renderControls(controls)));
+    container.append(instantiateControlNode(doc, renderControls(controls)));
     const unsearchable = renderUnsearchable(space.unsearchable);
-    if (unsearchable !== undefined) container.append(instantiate(doc, unsearchable));
+    if (unsearchable !== undefined) container.append(instantiateControlNode(doc, unsearchable));
 
     status.textContent = formStatusLine(space, controls, values);
   }
