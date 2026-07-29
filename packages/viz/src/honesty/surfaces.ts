@@ -44,8 +44,12 @@ import { playerSafeDescription } from '../campaign/words.js';
 import type { CampaignStage } from '../campaign/types.js';
 import type { VizRecording } from '../contract/types.js';
 import { applyControlEdit, controlsFor, defaultValues, resetControl } from '../controls/controls.js';
+import { admitEditedVector, resolveEditedProfile, type EditedVector } from '../controls/editedProfile.js';
 import type { ControlValues } from '../controls/types.js';
 import { renderControls, renderUnsearchable, type ControlNode } from '../controls/render.js';
+import { disclosureItems } from '../mode/disclosure.js';
+import { parityRefusal, parityViolations } from '../mode/parity.js';
+import { itemsIn, VIEW_MODES, type DisclosureOrigin } from '../mode/types.js';
 import { OPERATIONAL_ZONING_NOTE } from '../editor/editorEdits.js';
 import { previewGeometry } from '../editor/editorPreview.js';
 import { summariseReport, validateBuilding, type ValidationReport } from '../editor/editorValidate.js';
@@ -63,7 +67,7 @@ import { AWT_ID, ENERGY_ID, TTD_ID, WT95_ID, runSummaryFigures, windowClause } f
 import { goalReport } from '../scenario/goalReport.js';
 import { goalLabel, GOAL_BLOCKER } from '../scenario/goals.js';
 import type { PublishedScenario } from '../scenario/published.js';
-import type { HonestyCase, RenderedText, TextRole } from './types.js';
+import type { HonestyCase, RenderedText, TextProvenance, TextRole } from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * The context an adapter is handed
@@ -173,6 +177,28 @@ function flatten(node: ControlNode, into: string[]): void {
   for (const child of node.children) flatten(child, into);
 }
 
+/**
+ * The class `controls/render.ts` puts on the node that carries `SearchParameter.description`.
+ *
+ * Read rather than guessed: `renderControl` draws the description into
+ * `node('p', { class: 'control-help', … }, [], control.help)`, and `control.help` **is**
+ * `parameter.description`, verbatim. That is what makes {@link TextProvenance} `schema` a
+ * structural fact about where a string came from rather than a judgement about what it says —
+ * see `properties.ts` § *Scoped to result-bearing text*.
+ */
+const CONTROL_HELP_CLASS = 'control-help';
+
+/** Flatten, remembering which nodes are `core`'s own schema text rather than the viewer's. */
+function flattenTagged(
+  node: ControlNode,
+  into: { readonly text: string; readonly schema: boolean }[],
+  schema = false,
+): void {
+  const isSchema = schema || node.attrs['class'] === CONTROL_HELP_CLASS;
+  if (node.text !== undefined && node.text.trim() !== '') into.push({ text: node.text, schema: isSchema });
+  for (const child of node.children) flattenTagged(child, into, isSchema);
+}
+
 /** The instants a single-run surface is sampled at: start, quarters, and the very end. */
 export function sampleTimes(recording: VizRecording): readonly number[] {
   const span = recording.endedAt - recording.startedAt;
@@ -183,6 +209,13 @@ interface TextSeed {
   readonly field: string;
   readonly text: string;
   readonly role?: TextRole;
+  /**
+   * Overrides the surface's default provenance.
+   *
+   * Only ever narrower, and only ever for the one class the adapter can identify structurally:
+   * a string a *schema* authored, which a surface re-prints unaltered.
+   */
+  readonly provenance?: TextProvenance;
   readonly declaredCount?: number | null | undefined;
   readonly countShown?: boolean | undefined;
   readonly energyAxis?: boolean | undefined;
@@ -197,7 +230,7 @@ function singleRun(surfaceId: string, seeds: readonly TextSeed[]): readonly Rend
       field: seed.field,
       text: seed.text,
       role: seed.role ?? 'prose',
-      provenance: 'single-run' as const,
+      provenance: seed.provenance ?? ('single-run' as const),
       declaredCount: seed.declaredCount,
       countShown: seed.countShown,
       energyAxis: seed.energyAxis,
@@ -705,21 +738,34 @@ const CONTROLS: SurfaceAdapter = {
       if (control.help !== undefined) {
         /*
          * The Parameters tab prints `SearchParameter.description` — text `core` authored for a
-         * schema reader and a viewer re-prints unchanged. `campaign/words.ts` records that one of
-         * them contains a probability word and that the campaign briefing replaces it; whether
-         * *this* surface may print it is exactly the question R10 asks, so it is rendered rather
-         * than exempted.
+         * schema reader and a viewer re-prints unchanged. It is rendered rather than exempted,
+         * and it is marked `schema` rather than `single-run`, which is a fact about **where the
+         * string came from** and not an exemption from a rule: R3, R11, R13's frequency clause
+         * and R2's ordering clause all still apply to it, and only R10 — which is about
+         * translating a *result* into a probability word — does not. § D171 is the decision;
+         * `properties.ts` § *Scoped to result-bearing text* is the reasoning.
          */
-        seeds.push({ field: `controlsFor.${control.id}.help`, text: control.help, role: 'prose' });
+        seeds.push({
+          field: `controlsFor.${control.id}.help`,
+          text: control.help,
+          role: 'prose',
+          provenance: 'schema',
+        });
       }
       if (control.inactiveReason !== undefined) {
         seeds.push({ field: `controlsFor.${control.id}.inactiveReason`, text: control.inactiveReason, role: 'reason' });
       }
     }
-    const rendered: string[] = [];
-    flatten(renderControls(controls), rendered);
-    for (const [index, text] of rendered.entries()) {
-      seeds.push({ field: `renderControls.text[${String(index)}]`, text, role: 'label' });
+    const rendered: { readonly text: string; readonly schema: boolean }[] = [];
+    flattenTagged(renderControls(controls), rendered);
+    for (const [index, node] of rendered.entries()) {
+      seeds.push({
+        field: `renderControls.text[${String(index)}]`,
+        text: node.text,
+        role: 'label',
+        // The `control-help` node, and only it, carries `core`'s own description. See above.
+        ...(node.schema ? { provenance: 'schema' as const } : {}),
+      });
     }
     const unsearchable = renderUnsearchable(context.space.unsearchable);
     if (unsearchable !== undefined) {
@@ -745,10 +791,27 @@ const CONTROLS: SurfaceAdapter = {
      * text the Parameters tab prints, so the *filter* is searched as well as the surface: if it
      * ever returns a string with a probability word in it, that is a hole in the remedy rather
      * than in the surface.
+     *
+     * **The provenance is decided by what the filter did**, which is the whole of the
+     * classification and needs no word list:
+     *
+     * - **passed through** — the return value *is* `control.help`, so the string is `core`'s own
+     *   description and is marked `schema`, exactly as the `.help` seed above. It cannot carry a
+     *   probability word (the filter guarantees that), and its numbers are schema constants that
+     *   have nothing to do with this run. R3 read them anyway and reported a `meanWaitS` of 50 s
+     *   matching a `50` in `answer.reopenOnLateArrival`'s prose — `honesty-9100022`, deep tier;
+     * - **rewritten** — the return value is this package's own refusal sentence, so it stays
+     *   result-bearing and R10 reads it. That is the case the drive exists for.
      */
     for (const control of controls) {
       const safe = playerSafeDescription(control.help);
-      if (safe !== null) seeds.push({ field: `playerSafeDescription(${control.id})`, text: safe, role: 'prose' });
+      if (safe === null) continue;
+      seeds.push({
+        field: `playerSafeDescription(${control.id})`,
+        text: safe,
+        role: 'prose',
+        ...(safe === control.help ? { provenance: 'schema' as const } : {}),
+      });
     }
     return singleRun(this.id, seeds);
   },
@@ -894,6 +957,208 @@ const GOAL_REPORT: SurfaceAdapter = {
   },
 };
 
+/**
+ * Basic and Advanced, both drawn, and the parity check that runs on what was drawn.
+ *
+ * ## Why both modes, when `HONESTY_MODES` currently names one
+ *
+ * A `DisclosureItem` carries **both** renderings at once — that is what makes parity a comparison
+ * rather than a re-derivation — so a mode is a projection of one datum, not a second run. Driving
+ * only `context.case.mode` would leave every Basic string unsearched while the corpus looked
+ * complete, and the Basic strings are the ones with new prose in them: `SUPPRESSION_LEAD`, the
+ * plain-language locked-out note, `BASIC_WINDOW_VALUE`. Both projections cost one call.
+ *
+ * ## The inputs are `dev/main.ts`'s, line for line
+ *
+ * The dispatcher's display name, and the locked-out landings at `endedAt`. **No fail states**, for
+ * the reason the shipped call site gives in as many words: *"a fail state's frequency comes from
+ * a batch and R2 forbids reading one off a single replication."* Inventing a batch here to make
+ * the adapter louder would be the adapter judging.
+ */
+const MODE: SurfaceAdapter = {
+  id: 'mode/disclosure.ts#disclosureItems',
+  covers: [
+    'mode/disclosure.ts#disclosureItems',
+    'mode/disclosure.ts#SUPPRESSION_LEAD',
+    'mode/disclosure.ts#BASIC_WINDOW_VALUE',
+    'mode/parity.ts#parityViolations',
+    'mode/parity.ts#parityRefusal',
+  ],
+  render(context) {
+    const { recording } = context;
+    const seeds: TextSeed[] = [];
+    const profile = context.profiles.find(
+      (candidate) => candidate.id === recording.dispatcherProfileId,
+    );
+    const items = disclosureItems({
+      recording,
+      ...(profile?.name === undefined ? {} : { dispatcherName: profile.name }),
+      lockedOut: context.bundleAt(recording.endedAt).lockedOut,
+    });
+
+    for (const mode of VIEW_MODES) {
+      for (const item of itemsIn(items, mode)) {
+        const { rendering } = item;
+        const shape = disclosureShapeOf(item.origin);
+        const common = {
+          role: shape.role,
+          declaredCount: rendering.count === undefined ? undefined : countOf(rendering.count),
+          countShown: rendering.count !== undefined,
+          energyAxis: shape.energyAxis,
+          gated: shape.gated,
+        };
+        seeds.push({ field: `${mode}.${item.id}.label`, text: item.label, role: 'label' });
+        seeds.push({ ...common, field: `${mode}.${item.id}.value`, text: rendering.value });
+        if (rendering.note !== undefined) {
+          seeds.push({
+            ...common,
+            field: `${mode}.${item.id}.note`,
+            /* A refused statistic's note **is** the refusal, and a refusal quotes its own numbers. */
+            ...(shape.role === 'suppressed' ? { role: 'reason' as const } : {}),
+            text: rendering.note,
+          });
+        }
+        for (const [index, bar] of rendering.bars.entries()) {
+          seeds.push({
+            field: `${mode}.${item.id}.bars[${String(index)}]`,
+            text: `${bar.label}: ${bar.text}`,
+            role: 'observation',
+            energyAxis: shape.energyAxis,
+          });
+        }
+      }
+    }
+
+    /*
+     * The refusal, on exactly the items above — the same call `dev/main.ts` makes on every draw.
+     *
+     * It is silent while the shipped product keeps § 4, which is a fact about the product rather
+     * than a gap in the search: `mode/parity.test.ts` breaks each of the three rules on purpose
+     * and watches all three fire. What this drive adds is that if parity *did* break on a
+     * generated case, the sentence it puts on screen would itself be checked for honesty.
+     */
+    for (const [index, broken] of parityViolations(items).entries()) {
+      seeds.push({ field: `parityViolations[${String(index)}]`, text: broken.message, role: 'reason' });
+    }
+    const refusal = parityRefusal(items);
+    if (refusal !== undefined) seeds.push({ field: 'parityRefusal', text: refusal, role: 'reason' });
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * What R3, R11 and R13 need to know about a disclosure item, from its **origin**.
+ *
+ * The same three facts the run-summary adapter takes from a `SummaryFigure`, reached through
+ * `DisclosureOrigin` because that is the classification `mode/` carries. Nothing here re-decides
+ * whether a statistic is refused: an item whose origin is `suppression` is one
+ * `render/runSummary.ts` already returned with `kind: 'suppressed'`.
+ */
+function disclosureShapeOf(origin: DisclosureOrigin): {
+  readonly role: TextRole;
+  readonly gated: boolean;
+  readonly energyAxis: boolean;
+} {
+  const gatedId = (id: string): boolean => id === AWT_ID || id === WT95_ID || id === TTD_ID;
+  switch (origin.kind) {
+    case 'suppression':
+      return { role: 'suppressed', gated: gatedId(origin.figureId), energyAxis: origin.figureId === ENERGY_ID };
+    case 'figure':
+      return {
+        role:
+          origin.figureKind === 'estimate'
+            ? 'estimate'
+            : origin.figureKind === 'observation'
+              ? 'observation'
+              : origin.figureKind === 'suppressed'
+                ? 'suppressed'
+                : 'label',
+        gated: gatedId(origin.figureId),
+        energyAxis: origin.figureId === ENERGY_ID,
+      };
+    case 'undelivered':
+    case 'locked-out':
+    case 'fail-state':
+      return { role: 'observation', gated: false, energyAxis: false };
+    case 'run-identity':
+      return { role: 'label', gated: false, energyAxis: false };
+    case 'warning':
+    case 'passenger-model':
+    case 'fail-state-diagnosis':
+      return { role: 'prose', gated: false, energyAxis: false };
+  }
+}
+
+/**
+ * A weight vector the player edited, admitted or refused **at the control**.
+ *
+ * Four points, and three of them are refusals, because the refusals are the strings: a dimension
+ * the space does not declare, a value the dimension cannot hold, and a combination the declared
+ * box admits and `core` refuses. `editedProfile.ts` names all three in its own docstring and says
+ * the third *"is not a theoretical branch"* — one uniform draw in eight violates it.
+ *
+ * The fourth is the admitted vector, whose profile carries a **name a report prints** —
+ * *"…(edited from collective)"* — which is the only string on this surface that is not a refusal.
+ */
+const EDITED_PROFILE: SurfaceAdapter = {
+  id: 'controls/editedProfile.ts#resolveEditedProfile',
+  covers: [
+    'controls/editedProfile.ts#resolveEditedProfile',
+    'controls/editedProfile.ts#admitEditedVector',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const base = context.profiles.find(
+      (candidate) => candidate.id === context.case.baselineProfileId,
+    );
+    if (base === undefined) return [];
+
+    const declared = new Set(context.space.parameters.map((parameter) => parameter.id));
+    const first = context.space.parameters[0];
+    const edits: readonly { readonly label: string; readonly edit: EditedVector['values'] }[] = [
+      { label: 'undeclared-dimension', edit: { 'not.a.declared.dimension': 1 } },
+      ...(first === undefined ? [] : [{ label: 'unholdable-value', edit: { [first.id]: Number.NaN } }]),
+      /*
+       * The one constraint `SearchSpace.validate` enforces that the declared box does not:
+       * a `destination-entry` dispatcher may not defer. Named by id and **guarded** — if `core`
+       * renames either dimension this simply stops being driven rather than throwing, and
+       * `derive.test.ts` still requires the declaration to be covered.
+       */
+      ...(declared.has('dispatch.callType') && declared.has('dispatch.assignmentTiming')
+        ? [
+            {
+              label: 'infeasible-combination',
+              edit: {
+                'dispatch.callType': 'destination-entry',
+                'dispatch.assignmentTiming': 'deferred',
+              } as EditedVector['values'],
+            },
+          ]
+        : []),
+      { label: 'admitted', edit: {} },
+    ];
+
+    for (const { label, edit } of edits) {
+      const admission = admitEditedVector(context.space, base, edit);
+      if (admission.reason !== undefined) {
+        seeds.push({ field: `admitEditedVector.${label}.reason`, text: admission.reason, role: 'reason' });
+      }
+      const resolved = resolveEditedProfile(context.space, base, {
+        baseProfileId: base.id,
+        profileId: `${base.id}-edited`,
+        values: edit,
+      });
+      if (resolved.ok) {
+        seeds.push({ field: `resolveEditedProfile.${label}.name`, text: resolved.profile.name, role: 'label' });
+      } else {
+        seeds.push({ field: `resolveEditedProfile.${label}.reason`, text: resolved.reason, role: 'reason' });
+      }
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
 /* ---- campaign surfaces, driven only on a case that names a stage ---- */
 
 const CAMPAIGN: SurfaceAdapter = {
@@ -999,8 +1264,10 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   MOOD,
   RIDER_QUEUE,
   ACCESS,
+  MODE,
   EDITOR,
   CONTROLS,
+  EDITED_PROFILE,
   REPLAY,
   BATCH_REPORT,
   GOAL_REPORT,

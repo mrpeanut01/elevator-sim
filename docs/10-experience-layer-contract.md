@@ -100,6 +100,15 @@ better."* If the product wants to say the second thing — and § 5 argues it sh
 replication batch, and § 11.W3 costs that out (**M6**: 2–196 ms per replication; a 50-replication
 batch is 0.1 s on Garden Apartments and 9.8 s on Vertical City).
 
+**And a batch is not enough on its own — the budget is part of the rule.** The honesty search found
+`batch/report.ts#compareMetric` naming a winner as soon as the paired interval excluded zero, which
+needs `n >= 2`, while the Compare panel refused only `replications < 1`; measured at n = 7 and n = 8
+on observation-class rows, which survive at small n precisely because the estimate-class rows
+suppress first. Since [§ D171](../DECISIONS.md), a row below `MIN_REPLICATION_BUDGET` carries the
+verdict `under-budget`: **the measured interval is drawn and no arm is named**, with the reason in
+the verdict's own sentence rather than in a separate budget row. A qualification a reader can quote
+apart from the claim it qualifies is R13 clause one's defect one level up.
+
 ### R3 — Suppression replaces the number, it never hides it.
 
 When a statistic is suppressed, the surface shows the *reason*, in the reader's register. It never
@@ -220,6 +229,18 @@ framing § 3.4 cites, applied to the quantity this project actually has.
 > *Provenance: this correction comes from the design review, and unlike every other figure in this
 > document it was **not** re-derived by running anything — the two papers were not fetched. It is
 > recorded as a citation correction to be checked against the sources, not as a measurement.*
+
+**Scope: result-bearing surfaces.** [§ D163](../DECISIONS.md) clause 1 restated this rule as *"no
+probability word **anywhere**"*, and the honesty search found the one place that reads: `core`'s
+`idle.predictorHorizonS` declares a `SearchParameter.description` containing *"likely to appear
+soon"*, which the Parameters tab re-prints unaltered, and `campaign/words.ts` had already recorded
+that exemption without a reason. [§ D171](../DECISIONS.md) adjudicated it and **narrowed the rule
+rather than the product**: R10 is about translating a *result* — an interval, a rate, a difference
+— into a word for how sure it is, and a schema's description of what a dial does carries no result
+to translate. `campaign/words.ts#playerSafeDescription` is unchanged and still rewrites that text
+wherever a *result* is briefed; the Parameters tab shows the schema text whole; and
+`honesty/properties.ts` scopes the property by the string's **provenance**, so a probability word a
+viewer writes itself is still red on every surface including that one.
 
 ### R11 — Energy is an axis, never a score.
 
@@ -364,6 +385,28 @@ disagreement is stated.
 > and the fix was driven in a browser and in the exported PNG on both suppression grounds.
 > **Honest limit:** the CLI's TTY frame path was not driven in a real terminal — both paths call the
 > same unit-tested `renderRunningMean`, but "driven on a TTY" is not claimed.
+>
+> **There is no third, and that was established rather than assumed.** The honesty search
+> (§ D163 clause 1) reported `suppressed-mean` violations at `render/describeFrame.ts`,
+> `render/canvas.ts` and `render/runSummary.ts` on refused runs — thirteen in the always-on tier
+> and more in the deep one — which would have been this defect in several further places. **Every
+> one was a false positive in the check**, and the evidence is in the strings: not one printed a
+> mean, and several said *"suppressed"* or *"not reported"* in the very clause that triggered the
+> report. What the numbers actually were: `summary.undelivered` (61, which happened to equal
+> `meanWaitS` rounded); `frame.boardedLegs` (28, ditto); the rolling window's own length (300 s,
+> beside a `wait95S` of 300.4 and a cue naming a different quantity); the mean quoted **inside
+> `core`'s own refusal**, which the fourth `awtIsValid` ground states on purpose; a constant in a
+> `SearchParameter.description`; and — twice — a single digit matched *inside* a longer number,
+> the `9` of *"95th percentile"* and the `3` of *"the last 300 seconds"*.
+>
+> The decisive one is `describeFrame(@0s)`: at that instant the frame carries `0 legs waiting,
+> 0 boarded`, so a running mean of 61 s could not exist. Corrected in `honesty/properties.ts` in
+> four ways, each strictly more specific than what it replaced — the claim window is bounded by the
+> numeral's own clause; a cue must name the quantity whose value it is paired with; the run's own
+> `awtInvalidReason` is cut out by identity before the scan; and a form is compared against a whole
+> number token rather than a substring. Guarded by a fault that injects the header string above
+> verbatim, so the narrowing has something it must still catch. **§ D111's own fix was re-confirmed
+> by that fault, not by rereading it.**
 
 
 

@@ -82,8 +82,12 @@ import {
 /**
  * What a row is entitled to say.
  *
- * - `resolved` — the paired interval on the difference excludes zero, and the metric is one that
- *   may be ordered. The only verdict from which a caller may say one arm did better.
+ * - `resolved` — the paired interval on the difference excludes zero, the metric is one that may
+ *   be ordered, **and the batch is inside the project's replication budget**. The only verdict
+ *   from which a caller may say one arm did better.
+ * - `under-budget` — the interval excludes zero and the batch is below
+ *   {@link MIN_REPLICATION_BUDGET}. The interval is **drawn**; the winner is **not named**, and
+ *   the reason sits where the winner would have. See {@link compareMetric}.
  * - `unresolved` — the interval contains zero, or there was no spread to form one. The two arms
  *   are **not ordered**. W3's own liveness criterion: a profile against itself lands here.
  * - `shown` — R11's class. An interval, and a refusal to rank on it.
@@ -91,7 +95,13 @@ import {
  * - `unmeasured` — at least one pair on which the quantity was never measured. Distinct from
  *   `suppressed`, which is a refusal, and from zero, which is a measurement.
  */
-export type BatchVerdict = 'resolved' | 'unresolved' | 'shown' | 'suppressed' | 'unmeasured';
+export type BatchVerdict =
+  | 'resolved'
+  | 'under-budget'
+  | 'unresolved'
+  | 'shown'
+  | 'suppressed'
+  | 'unmeasured';
 
 /** One metric, compared across two arms. */
 export interface BatchComparisonRow {
@@ -490,6 +500,46 @@ function compareMetric(
         `${candidate.dispatcherProfileId} and ${baseline.dispatcherProfileId} was ${range}. That ` +
         `interval includes zero, so the two are not ordered at n = ${String(n)}.`,
       note: arithmetic,
+    };
+  }
+
+  /*
+   * **Below the budget: publish the observation, refuse the claim.** — § D171, and it is the
+   * shape the rest of this product already has.
+   *
+   * `compareMetric` used to emit `resolved` and name a winner as soon as the paired interval
+   * excluded zero, which needs `pairing.candidate.length >= 2` and nothing else, while
+   * `dev/batchPanel.ts` refuses only `replications < 1`. The honesty search produced that row at
+   * n = 7 and n = 8 on observation-class metrics — which survive at small n precisely because
+   * the estimate-class rows suppress first. R2's own text requires *"a paired-t interval
+   * excluding zero over 50–200 replications under common random numbers"*, and
+   * {@link MIN_REPLICATION_BUDGET} is that lower bound as a shipped constant, read here rather
+   * than restated.
+   *
+   * `budgetNote` already said so — **in a different row**, which is the deeper half of the
+   * finding: a qualification a reader can quote apart from the claim it qualifies is R13 clause
+   * one's defect one level up. So the reason goes **where the verdict would have been**, in the
+   * row's own sentence, and the interval is still drawn: the measurement happened and is not
+   * hidden, and what is withheld is the ordering it cannot support.
+   */
+  if (estimate.n < MIN_REPLICATION_BUDGET) {
+    return {
+      ...base,
+      verdict: 'under-budget',
+      estimate,
+      pairs: n,
+      // The whole point: an interval that excludes zero over too few pairs orders nothing.
+      favours: null,
+      sentence:
+        `in ${runs(n)}, ${candidate.dispatcherProfileId}'s ${presentation.label} differed from ` +
+        `${baseline.dispatcherProfileId}'s by ${range}, and no arm is named ahead on this row: ` +
+        `${runs(n)} is below this project's replication budget of ` +
+        `${String(MIN_REPLICATION_BUDGET)}–${String(MAX_REPLICATION_BUDGET)}, and an interval ` +
+        'that excludes zero over too few paired runs is a direction this batch cannot support.',
+      note:
+        `${arithmetic} Ten replications produced a 12 % error against the converged mean in the ` +
+        'reference study, which is why the budget is what it is. The interval above is the ' +
+        'measurement and it is not withheld; the ordering is.',
     };
   }
 

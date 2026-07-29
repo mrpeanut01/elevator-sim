@@ -94,7 +94,9 @@ export interface GenerateOptions {
  * `replications` deliberately reaches below `MIN_REPLICATION_BUDGET`. That is not sloppiness: the
  * viewer's replication control accepts any integer ≥ 1 (`dev/batchPanel.ts` refuses only `< 1`),
  * so a batch of four is a configuration a reader can produce, and R2 is precisely a rule about
- * what may be said over one.
+ * what may be said over one. **That decision paid**: it is what produced § D171's second finding
+ * — a winner named at n = 7 — and it is what now exercises `batch/report.ts`'s `under-budget`
+ * verdict on every case in this tier.
  */
 export const STANDARD_SPACE: HonestySpace = Object.freeze({
   buildingIds: Object.freeze([

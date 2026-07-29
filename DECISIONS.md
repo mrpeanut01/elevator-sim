@@ -10394,3 +10394,42 @@ Playable and measurably clearable: at the shipped setting all three count goals 
 **Three false positives are recorded on the rules they corrected**, because they were the harness being wrong rather than the product: a bare `energy` match flagged the *dispatcher's name*; a bare `than` flagged four of `core`'s own parameter descriptions; and a cue-and-number-anywhere match flagged an eight-sentence paragraph whose number was a queue count in a different sentence.
 
 **Impact.** Both findings resolved as above. Always-on tier: 48 pinned seeds, **80 501 strings**, 550 simulations, 74 s. Deep tier behind a flag, clean at 24 cases. **The mode dimension plugs in at one line** — a tuple in `types.ts` — and the corpus assertion tightens automatically. **Known limits:** the three DOM panels are statically swept for probability words rather than driven, which is weaker and is stated as a limitation rather than presented as coverage; and the always-on tier reaches no batch at n ≥ 50, so R2's budget clause is only satisfiable in the deep tier.
+
+---
+
+## D172 — the suppressed-mean finding was a **false positive**, and narrowing the property correctly surfaced **five more of the same class**
+
+**Date:** 2026-07-29 · **Owner:** T80 (wave 9) · **Resolves:** [§ D171](#d171)'s two findings and two merge-exposed ones · **Empties** the `OUTSTANDING` register
+
+**Context.** [§ D171](#d171) landed the generated honesty search. Merging it onto an `integration` that meanwhile carried four other lanes produced two new failures: ten unclassified text producers, and **eight R3 violations reporting a suppressed mean reaching `describeFrame`**. This repository has closed that exact leak **twice** ([§ D111](#d111)), so a third was live — and the same search had already produced three false positives, so a fourth was equally live. The lane was told to settle it by evidence and forbidden to widen an exclusion list.
+
+### Verdict: false positive, and the evidence is decisive rather than persuasive
+
+The matched `61` was **`summary.undelivered`**, in its own sentence, with the estimate cue 64 characters later being **the first word of the refusal itself**: *"…with 61 passengers undelivered. **Mean waiting time is suppressed:** Queue length rose by 97.3 persons…"*. Three of the eight strings **say "suppressed" in the very clause that triggered the report**.
+
+**The decisive fact is arithmetical, not textual:** at playback instant `@0s` the frame carries **0 legs waiting and 0 boarded**. A running mean of 61 s cannot exist there. And the value is identical at all five instants **because it is a run-level count, not a running mean.**
+
+### Narrowing it exposed five more of the same class, each strictly more specific
+
+This is the part worth carrying. Fixing the property did not make the report empty — it made the **next** false positive visible, five times over, each requiring an independent narrowing and each *more* specific than what it replaced:
+
+1. **The claim window is bounded by the numeral's own clause** — and deliberately **not** broken on `:`, because that separates a label from its value and breaking there would have stopped the R3 fault firing.
+2. **Cues are keyed to the quantity looked for** — `wait95S = 300.4` was matching the `300` inside *"Rolling mean wait over the last 300 seconds is not reported."*
+3. **The run's own refusal text is cut out by identity** — `awtIsValid`'s fourth ground writes *"a mean of 49.6 s reported beside a wait of 1339.6 s"*, which carries value, cue and refusal in one clause **by design**.
+4. **Forms are compared against whole number tokens** — `wait95S → 9` was matching inside *"95th percentile"*, the cue itself, and `61` had been silently matching inside *"loaded at 0.61 of rated load"* **all along**.
+
+### The guard against the obvious risk of narrowing a property
+
+A property narrowed five times is a property that might now be blind. So the lane added an R3 fault, `suppressedMeanInProse`, which **injects § D111's canvas header verbatim** — `waiting 61   boarded 368 legs   mean wait so far 61.0 s` — on a prose string, so only the textual half can catch it.
+
+**§ D111's fix is therefore re-confirmed by a fault rather than by rereading the code**, which is the only form of reassurance that survives the next refactor.
+
+### The other three items
+
+**R10 scoped by provenance, not by exemption.** `RenderedText.provenance` already carried a `'schema'` value **that nothing set**. The controls adapter now sets it from the class the renderer puts on the node carrying `SearchParameter.description`. `core`'s text is untouched, the sanitiser is untouched and **still searched** — its *rewritten* output stays result-bearing and only its pass-through is schema — and an exhaustive switch makes a fifth provenance a **compile error rather than a silent exemption**.
+
+**The Compare panel gained an `under-budget` verdict.** Below the minimum replication budget the measured interval is drawn, no winner is named, and **the reason sits in the verdict's own sentence** rather than a neighbouring row. The exhaustive switch in the panel produced the compile error that forced the decision, which is the type system doing the work a review would otherwise have to.
+
+**Ten producers classified: seven driven, three excluded with individual reasons.** The mode adapter renders both projections, so Basic's own strings are searched and not just Advanced's.
+
+**Impact.** `OUTSTANDING` is **empty — both entries deleted because both were resolved, neither by widening the register.** The both-ways assertions stay, plus a new negative control proving an empty register still accepts nothing. Always-on tier: 48 cases, **86 587 strings**, 0 failures. Deep tier at 24 cases: 46 442 strings, 0 failures. **Known limit, stated as deduction rather than measurement:** the deep tier was already red on `integration` before this lane, and the argument for that rests on both narrowings being **strict refinements** of the old predicate — the baseline control run was blocked and the claim stands on the refinement relation, not on a run.
