@@ -487,7 +487,11 @@ because the whole is mostly motion and motion does not scale with passengers.
 ### 2.5 Reading the queue is free
 
 **M4**: `landingAssignmentsAt` costs **0.02 ms/frame** on Midtown Office and **0.07 ms/frame** on
-Vertical City with 3 222 legs, against a 16.7 ms 60 Hz budget. A per-rider queue renderer built on a
+Vertical City with 3 222 legs, against a 16.7 ms 60 Hz budget. (That leg count was measured before
+`vertical-city` declared its ground-lobby escalator, which removed about 8 % of the building's lift
+legs — 3 141 at 1800 s under `collective` at the standard seed. These are headroom figures and the
+count moved in the safe direction, so every claim in § 2 holds with more margin than it was
+measured with, not less.) A per-rider queue renderer built on a
 sibling selector will be in the same class. Frame budget is not a constraint on U4.
 
 ### 2.6 The parameter surface is real, complete, and already generic

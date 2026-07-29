@@ -114,6 +114,7 @@ export type {
  * -------------------------------------------------------------------------- */
 
 export { RoutePlanner, legDestinations, routeTopologyOf } from './route.js';
+export type { RoutePlan, RouteSegment } from './route.js';
 
 export type { RouteTopology } from './route.js';
 

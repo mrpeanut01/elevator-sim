@@ -237,6 +237,16 @@ export interface PassengerRecord {
   readonly arrivedAt: SimTime;
   /** When the whole journey began. Equal to {@link arrivedAt} on the first leg. */
   readonly journeyStartedAt: SimTime;
+  /**
+   * Seconds of declared non-lift travel owed **after** this leg alights, when the journey's last
+   * segment is the building's escalator or stair rather than a lift.
+   *
+   * **Absent, not `0`, on every leg that owes none**, which is every leg of every building that
+   * declares no `transportModes` — so a record from such a run is the object it was before this
+   * field existed. {@link buildJourneys} adds it to the completion instant, which is what stops
+   * removing a spurious lift leg from silently handing the passenger free seconds.
+   */
+  readonly egressTransitSeconds?: number | undefined;
   /** When the passenger entered the car, or absent if they were never served. */
   readonly boardedAt?: SimTime | undefined;
   /** When the passenger left the car, or absent if they never boarded or never arrived. */

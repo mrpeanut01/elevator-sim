@@ -87,6 +87,38 @@ dispatcher applies dynamically. See
 
 Floors not covered by any access zone are unrestricted.
 
+## Transport modes — the connections that are not lifts
+
+```json
+"transportModes": [
+  { "id": "lobby-escalator", "name": "Ground lobby escalator pair", "connects": ["G", "2"], "traversalTimeS": 21.2 }
+]
+```
+
+| Field | On | Meaning |
+|---|---|---|
+| `id` | mode | Unique within the building. |
+| `name` | mode | Optional human name. |
+| `connects` | mode | Exactly two floor ids, which must differ and must both exist. Order carries no meaning — the edge is traversed either way at the same cost. |
+| `traversalTimeS` | mode | Landing-to-landing seconds, **including** stepping on and stepping off. Deterministic. |
+
+A transport mode is an **edge of the routing graph beside the banks**, and where a floor is
+reachable in the same number of segments by both a mode and a lift, the mode wins — that is the
+whole preference rule, and it is expansion order rather than a cost comparison. A hop is **not** a
+leg: it lights no landing button, joins no queue and occupies no car, so it does not appear in
+`awtS`, `wt95S` or `rideMeanS`. Its seconds *are* charged, to `ttdMeanS`, either as a delay before
+the next leg starts waiting or as seconds added after the last alighting.
+
+The `traversalTimeS` is reference data and must be cited in the mode's `$comment`; see
+[docs/02 § Non-lift transport](../../docs/02-elevator-reference.md). Declared by
+[`vertical-city.json`](vertical-city.json) and by no other shipped building: before it existed,
+**292 of that building's 3,549 lift legs at the standard seed were the `G ↔ 2` lobby hop**, which
+is the single largest modelling limit the repository had recorded
+([`DECISIONS.md` § D147](../../DECISIONS.md) § 6).
+
+Three things a mode deliberately cannot express, because nothing would read them: what kind of
+machine it is, a direction (so a one-way escalator is not expressible), and a capacity or headway.
+
 ## Transfer floors and per-floor traffic
 
 | Field | On | Meaning |

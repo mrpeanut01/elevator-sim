@@ -43,21 +43,39 @@
  * a fabric that reads `servesFloorPairs`: on a double-deck shuttle a passenger boarding at `G` — the
  * lower floor of the pair `["G", "2"]` — may only alight on a *lower* floor of a pair, so the sky
  * lobbies reachable in one leg are 26, 51 and 76. Zone 3 is anchored to 26 and **zone 4 to 27**, so
- * every journey into zone 4 (and into the 27-side of the upper zones) gains a leg: `G → 2` on a
- * ground-lobby local, then `2 → 27` on the shuttle. Measured at the operating points below, the
- * double-deck arm runs about a tenth more legs than the control over an identical journey set.
+ * every journey into zone 4 (and into the 27-side of the upper zones) has to reach the upper lobby
+ * level first. It used to do that on a ground-lobby local — `G → 2` as a lift leg, then `2 → 27` on
+ * the shuttle — and the double-deck arm therefore ran about a tenth more legs than the control over
+ * an identical journey set.
  *
- * That is a fact about the hardware and not an artefact: a passenger at street level bound for a
- * destination served only by the upper deck really does have to get to the upper lobby level. What
- * *is* an artefact is the **mode**: this simulator has no escalator, so the lobby-level change is
- * charged as an elevator leg on a local bank. See § 6.
+ * That was a fact about the hardware wrapped around an artefact, and **the artefact has since been
+ * removed**. A passenger at street level bound for a destination served only by the upper deck
+ * really does have to get to the upper lobby level; what was wrong was the **mode**, because the
+ * simulator had no escalator and charged that change to a local lift bank. `vertical-city` now
+ * declares its ground-lobby escalator (`transportModes`, `G ↔ 2`, 21.2 s), and **at these two
+ * operating points the decompositions become identical**: over six replication seeds at up-peak
+ * 1 %, both arms plan 933 legs for the same 933, and the same journeys fall in the window on both.
+ *
+ * The study still reports **+1.32 % / +1.70 %** more legs on the double-deck arm, and that residual
+ * is a different thing that must not be mistaken for the old one. It is **window membership, not
+ * decomposition**: `legsDoubleDeck` counts legs whose *own* `arrivedAt` falls in the report window,
+ * and a 27-side journey's first lift leg now begins waiting 21.2 s later than the control's,
+ * because it spends those seconds on the escalator. Some legs cross into the window and some cross
+ * out; the net is about 300 in 23 000. The per-leg rows are therefore still reported with verdicts
+ * and still never gated on — the denominators differ for a smaller and more boring reason than
+ * they used to.
+ *
+ * A genuine decomposition difference does survive, but not in this regime: under the building's own
+ * *mixed* demand a cross-lobby interfloor journey — 31 → 46 and its kind — still rides down to the
+ * ground lobby and back, because this building declares an escalator at `G ↔ 2` and none at its
+ * three sky-lobby pairs. Incoming-only up-peak contains no such journey. See § 6.
  *
  * The consequence for the statistics is exact and is the reason this study is gated on TTD:
  *
  * | metric | denominator | comparable across the arms? |
  * |---|---|---|
  * | `ttdMeanS`, `ttdP95S` | **journeys** — identical set, identical count, per replication | **yes** — the gate |
- * | `awtS`, `wt95S`, `rideMeanS` | **legs** — the double-deck arm has ~10 % more of them, and the extra ones are short lobby hops | reported with a verdict, never gated on |
+ * | `awtS`, `wt95S`, `rideMeanS` | **legs** — the double-deck arm has ~1.5 % more of them (it was ~10 % before the escalator was declared) | reported with a verdict, never gated on |
  * | `energyKJ`, `carDistanceM`, `carStarts` | the fleet's own odometers | yes |
  * | `energyPerServedLegKJ` | legs again, in the denominator | reported beside `energyKJ`, and the leg counts beside both |
  *
@@ -87,23 +105,33 @@
  * **Incoming-only up-peak is the one comparable regime**, and it is the only one by construction:
  * `G` is this building's only entrance and the only floor outside both access zones.
  *
- * The rate census, both arms, n = 100 at {@link BENCHMARK_SEED} — saturated replications per cell:
+ * The rate census, both arms, n = 100 at {@link BENCHMARK_SEED} — replications with no quotable
+ * AWT, per cell, **re-measured on the current configuration** (`vertical-city` with its
+ * ground-lobby escalator declared; the figures this table carried before that are in the row
+ * beneath each one, in parentheses):
  *
  * | rate | `eta` | `collective` | `nearest-car` |
  * |---|---|---|---|
- * | 0.5 % | 0 / 0 | 0 / 0 | 0 / 0 |
- * | **1 %** | **0 / 0** | **0 / 0** | 0 / **1, first invalid at 26** |
- * | **1.5 %** | **0 / 0** | **0 / 0** | **8 / 4, first invalid at 6 and 2** |
- * | 2 % | 8 / 2 | 0 / 1 | 11 / 4 |
- * | 3 % | 52 / 22 | 5 / 22 | 61 / 35 |
- * | 4 % | 90 / 77 | 29 / 77 | 95 / 82 |
+ * | 0.5 % | 0 / 0  (was 0 / 0) | 0 / 0  (was 0 / 0) | 0 / 0  (was 0 / 0) |
+ * | **1 %** | **0 / 0**  (was 0 / 0) | **0 / 0**  (was 0 / 0) | 1 / 1, first invalid at 59 and 26  (was 0 / 1) |
+ * | 1.5 % | **0 / 0**  (was 0 / 0) | **1 / 0, first invalid at 90**  (was 0 / 0) | 7 / 4, first invalid at 2 and 2  (was 8 / 4) |
+ * | 2 % | 9 / 2  (was 8 / 2) | 1 / 1  (was 0 / 1) | 16 / 4  (was 11 / 4) |
+ * | 3 % | 61 / 22  (was 52 / 22) | 4 / 22  (was 5 / 22) | 69 / 35  (was 61 / 35) |
+ * | 4 % | 97 / 77  (was 90 / 77) | 28 / 77  (was 29 / 77) | 99 / 82  (was 95 / 82) |
  *
  * (double-deck / single-deck; a cell is quotable only at `0 / 0`.)
  *
+ * **Both arms moved, and only one of them should surprise anyone.** The control arm has the
+ * escalator too — {@link singleDeckControlArm} strips `servesFloorPairs` and nothing else — so its
+ * routes changed as well; its counts moved barely at all because it never needed the lobby hop.
+ * The double-deck arm's got **worse** at almost every rate, and 1.5 % stopped being a `0 / 0` rate
+ * for the pair this study runs. § 5 gives the mechanism: the escalator delivers a batch to the
+ * upper lobby in one lump where a lift metered it.
+ *
  * **`nearest-car` is excluded by its ceiling and not by its answer** — the distinction
- * `saturationCensus.test.ts` exists to keep honest. Its first invalid replication is at index 26 at
- * 1 % and at index 6 (double-deck) and 2 (single-deck) at 1.5 %, so no budget in this project's
- * 50–200 band can be spent with it in the cell. `docs/07-handoff.md` § 4 already records it as the
+ * `saturationCensus.test.ts` exists to keep honest. Its first invalid replication is at index 59
+ * (double-deck) and 26 (single-deck) at 1 %, and at index 2 on both arms at 1.5 %, so no budget in
+ * this project's 50–200 band can be spent with it in the cell. `docs/07-handoff.md` § 4 already records it as the
  * only profile that saturates and a poor reference arm; this is that finding on a fifth building.
  * {@link CEILING_EXCLUDED_ARMS} carries it with its census rather than dropping it silently.
  *
@@ -114,52 +142,84 @@
  * deviation of the paired ΔTTD on the binding pair and `h = |d| / 1.5`, from a pilot at
  * {@link PILOT_SEED}, which is disjoint from the study seed.
  *
- * | point | ceiling | n | basis |
- * |---|---|---|---|
- * | up-peak 1 % | **951** | **153** | variance-derived on the binding pair (`collective`); well under the ceiling |
- * | up-peak 1.5 % | **386** | **200** | ceiling-bound: the pilot puts the binding pair (`eta`) at n ≈ 606 against a ceiling of 386, and the measured spread at the study seed puts it at **869**, so that pair is reported **unresolved** rather than quoted |
+ * | point | ceiling (pre-escalator) | ceiling (current) | n | basis |
+ * |---|---|---|---|---|
+ * | up-peak 1 % | 951 | **284** | **153** | variance-derived on the binding pair (`collective`); still under the ceiling |
+ * | up-peak 1.5 % | 386 | **90** | **200** | ceiling-bound, and now ceiling-**excluded**: the budget sits above the ceiling and the point returns UNQUOTABLE |
  *
- * 1.5 % is the highest rate at which every arm in the cell keeps a quotable AWT, which is
- * `arms.ts`'s rule and not this module's. It is also the marginal one, and that is published rather
- * than smoothed: at the *pilot* seed the double-deck `eta` cell lost its AWT inside 100
- * replications, which is what a ceiling of 386 at the study seed looks like from one seed over.
+ * **Both ceilings were re-censused when `vertical-city` declared its ground-lobby escalator, and
+ * both fell.** Per cell over 1000 replications at the study seed: at 1 % the first invalid
+ * replication is 284 on *both* double-deck cells and there is none at all on either single-deck
+ * cell; at 1.5 % it is 90 (DD `collective`) and 104 (DD `eta`) against 905 on both single-deck
+ * cells. The double-deck arm sets the ceiling in every case and the single-deck arm is far more
+ * robust, which is § 5's metering mechanism showing up in the census rather than in the means.
  *
- * # 5. The result, and it is dispatcher-dependent
+ * 1.5 % **was** the highest rate at which every arm in the cell keeps a quotable AWT —
+ * `arms.ts`'s rule, not this module's — and on the current configuration it is not: the premise
+ * the point was chosen on has stopped holding. The budget is left at its pre-registered 200 and
+ * the point is published UNQUOTABLE, rather than lowered to something that fits under 90, because
+ * a budget chosen after seeing the answer is the thing {@link PILOT_SEED} exists to prevent.
  *
- * The digits, with their intervals, are in `DECISIONS.md` § T51, are pinned in `published.ts`'s
- * `PINNED_ESTIMATES` under `'double-deck'` (see § 7) and are re-derived from the study by
- * `doubleDeck.test.ts` rather than transcribed. What belongs here is the shape of the answer:
+ * # 5. The result — and it moved when the lobby hop stopped being a lift leg
  *
- * | pair | gate (ΔTTD) | ΔAWT | ΔWT95 | Δride | energy |
- * |---|---|---|---|---|---|
- * | `eta` @ 1 % | **WORSE** | BETTER | INDIST. | BETTER | **WORSE** on total, INDIST. per leg |
- * | `collective` @ 1 % | **BETTER** | BETTER | BETTER | BETTER | **WORSE** on both |
- * | `eta` @ 1.5 % | INDIST., and **unresolvable** — required n above the ceiling | WORSE | WORSE | BETTER | **WORSE** on both |
- * | `collective` @ 1.5 % | **BETTER** | BETTER | INDIST. | BETTER | **WORSE** on both |
+ * The digits, with their intervals, are pinned in `published.ts`'s `PINNED_ESTIMATES` under
+ * `'double-deck'` (see § 7) and are re-derived from the study by `doubleDeck.test.ts` rather than
+ * transcribed. What belongs here is the shape of the answer, **and the fact that it changed**.
  *
- * Stated plainly: **on the gate the sign depends on the dispatcher, so there is no verdict of the
- * form "double-deck is better".** It is BETTER under `collective` at both points, WORSE under `eta`
- * at 1 %, and at 1.5 % under `eta` the effect is smaller than this operating point can ever resolve.
- * T44's refusal to claim a sign from n = 1 was right, and the reason it was right is now measured:
- * the sign is real and it is not the same sign for every dispatcher.
+ * This study was first run against a `vertical-city` with no escalator, where the `G → 2` lobby hop
+ * was charged to a local lift bank and the double-deck arm therefore carried ~10 % more legs than
+ * the control over an identical journey set. That was published as `DISPATCHER-DEPENDENT`, with
+ * the WORSE-under-`eta` row explicitly labelled *an upper bound on the cost of double-deck rather
+ * than its true cost*. The building now declares that escalator and the study has been re-run at
+ * the same seed and the same pre-registered budgets. **The verdict moved, and it moved in the
+ * direction the earlier entry said it would:**
+ *
+ * | | before the escalator | after |
+ * |---|---|---|
+ * | excess legs, 1 % / 1.5 % | +10.80 % / +11.56 % | **+1.32 % / +1.70 %** |
+ * | `eta` @ 1 %, ΔTTD | **+1.950 [+0.975, +2.925] WORSE** | **−2.729 [−3.550, −1.907] BETTER** |
+ * | `collective` @ 1 %, ΔTTD | −1.408 [−2.400, −0.416] BETTER | **−6.262 [−7.210, −5.315] BETTER** |
+ * | the 1.5 % point | quotable; `collective` BETTER, `eta` unresolvable | **UNQUOTABLE — both double-deck cells lose their AWT inside the pre-registered n = 200** |
+ * | gate | `DISPATCHER-DEPENDENT` | **`BETTER-EVERYWHERE`** |
+ *
+ * **Read that with two cautions, because it is the flattering direction.**
+ *
+ * 1. **The evidence base narrowed while the verdict widened.** `BETTER-EVERYWHERE` is now derived
+ *    from **two** cells at one operating point, where `DISPATCHER-DEPENDENT` was derived from four
+ *    cells at two. The 1.5 % point did not agree — it **dropped out**. Its budget was
+ *    pre-registered against a ceiling of 386 and is deliberately not moved to fit the new answer;
+ *    the point is published as UNQUOTABLE.
+ * 2. **AWT went the other way, and for two reasons that are both real.** The first is the same
+ *    denominator effect read backwards: the legs removed were the *cheap* ones — one-floor lobby
+ *    hops, answered fast by a five-car local — so removing them raises the mean wait over what is
+ *    left. `eta` @ 1 % ΔAWT went from −0.355 BETTER to **+0.785 WORSE**, and `collective` @ 1 %
+ *    from −0.927 BETTER to +0.019 INDISTINGUISHABLE.
+ *
+ *    The second is a **modelling consequence worth naming**: the lift the escalator replaced was
+ *    also *metering* the upper lobby. A batch bound for the 27-side used to reach floor 2 spread
+ *    out, in car-loads, after a wait; now the whole batch reaches it together, exactly 21.2 s
+ *    after arriving at the street. The shuttle queue at floor 2 is therefore burstier than it
+ *    was, and it shows: the 1 % point's measured ceiling — the first replication at which any
+ *    arm loses its AWT over 1000 — fell from **951 to 284**, and the 1.5 % point lost its AWT
+ *    inside the budget altogether. An escalator really does deliver people in a lump; this is
+ *    that fact arriving in the statistics, and it is why the wait rows got worse while the
+ *    journey rows got better.
  *
  * **Energy is an axis and never a score** (§ D106), and this is the case where that rule earns its
  * keep in the opposite direction from the usual one. Double-deck makes *fewer stops on the shuttle*
  * and is expected to drive less; measured, it drives **more** — more metres, more starts, more
- * kilojoules — in **all four** cells, and `workPerServedLegKJ` is WORSE in three of the four and
- * INDISTINGUISHABLE in the remaining one. It has therefore not saved anything by serving fewer
- * people either: the unserved fraction is exactly zero on both arms at every replication of both
- * points. The mechanism is § 2's: the extra lobby-level legs are served by the ground-lobby locals,
- * and a leg the control arm never makes is fleet distance the treatment arm pays for.
+ * kilojoules — in every quotable cell, and `workPerServedLegKJ` is WORSE in both. **That sign did
+ * not change when the lobby hop stopped being a lift leg**, which is what the earlier entry
+ * predicted when it declined to discount the energy direction. It has not saved anything by
+ * serving fewer people either: the unserved fraction is exactly zero on both arms at every
+ * replication of both points.
  *
  * **The resolution regime is the coarse one.** Double-deck against single-deck is a *structurally*
  * different configuration, not a near-neighbour weight vector, so `docs/07-handoff.md` § 4's ~1.9 s
  * figure is the right order of magnitude to read the wait numbers against rather than its ~0.20 s
- * one. Measured on this cell, CRN pairs the gate metric well (ρ ≈ 0.80–0.85 on ΔTTD) and the wait
- * metrics poorly (ρ ≈ 0.34–0.75 on ΔAWT and ΔWT95). Every ΔAWT and ΔWT95 effect measured here is
- * **below 1.9 s in magnitude** — they clear zero at these budgets because the budgets are 153 and
- * 200 rather than 100 and because this cell's own spread is smaller than Midtown's, and they should
- * be read as small effects on a confounded denominator rather than as the headline.
+ * one. Every ΔAWT and ΔWT95 effect measured at the quotable point is still **below 1.9 s in
+ * magnitude**; they clear zero at n = 153 and should be read as small effects on a confounded
+ * denominator rather than as the headline.
  *
  * **No cell is bit-identical except the one that has to be.** `IDENTICAL` would be a wiring bug
  * here rather than a small effect (`docs/07-handoff.md` § 4), and the exactly-zero counts are
@@ -169,13 +229,25 @@
  *
  * # 6. What this module does not answer
  *
- * **The lobby-level change is charged as an elevator leg.** This simulator has no escalator and no
- * stair, so the `G → 2` hop a real two-level double-deck lobby serves with an escalator is routed
- * onto a local bank. It costs the double-deck arm legs, waiting time, in-car time and fleet
- * distance that the hardware would not really pay. This is named rather than corrected — correcting
- * it means a non-elevator transport mode in `core`, which is out of this lane's scope — and it is
- * the largest single reason to treat the WORSE-under-`eta` row as an upper bound on the cost of
- * double-deck rather than as its true cost.
+ * **The sky lobbies have no escalator, and the ground lobby does.** `core` now has a non-elevator
+ * transport mode and `vertical-city` declares one, at `G ↔ 2`, which is the hop this module's
+ * earlier revision named as its largest limit. It declares **none** at `26 ↔ 27`, `51 ↔ 52` or
+ * `76 ↔ 77`. So a cross-lobby *interfloor* journey — zone 3 to zone 4, `31 → 46` and its kind —
+ * still rides the shuttle down to the ground lobby, crosses on the escalator there, and rides back
+ * up. Whether those three pairs should also be joined is a question about the *building*, not
+ * about `core`, and it is left to whoever owns `data/buildings/vertical-city.json`. Note that the
+ * study's comparable regime is incoming-only up-peak, where no such journey occurs, so it is the
+ * shipped *mixed* demand this affects and not the two operating points' own results — § 2 shows
+ * the up-peak decompositions coming out identical leg for leg.
+ *
+ * **The 1.5 % point has been re-censused and its budget has not been re-derived.** The budget of
+ * 200 was chosen against a ceiling of 386 measured on the pre-escalator configuration; the ceiling
+ * is now 90. Both double-deck cells lose their AWT inside 200, so the point is reported UNQUOTABLE
+ * at its
+ * pre-registered budget. Moving the budget to make it quotable would be choosing a budget after
+ * seeing the answer, so it is not moved. Whether this building has a *different* second operating
+ * point that is quotable on the current configuration is an open question and the next lane's
+ * work — the answer is not "lower n until it fits".
  *
  * **The closed-form oracle is untouched.** `vertical-city/shuttle` remains unmeasurable by the
  * Barney/CIBSE round trip for the four reasons `docs/07-handoff.md` § 5 gives; T44 answered one of
@@ -306,8 +378,9 @@ export const CEILING_EXCLUDED_ARMS: readonly CeilingExclusion[] = Object.freeze(
   Object.freeze({
     armId: 'nearest-car',
     reason:
-      'first invalid replication at index 26 at up-peak 1 % (single-deck arm) and at 6 and 2 at ' +
-      'up-peak 1.5 %, over n = 100 at the study seed. No budget in the 50–200 band fits under ' +
+      'first invalid replication at index 59 (double-deck) and 26 (single-deck) at up-peak 1 %, ' +
+      'and at index 2 on both arms at up-peak 1.5 %, over n = 100 at the study seed. No budget ' +
+      'in the 50–200 band fits under ' +
       'that, so both operating points would be UNQUOTABLE with it in the cell. docs/07 § 4 ' +
       'records it as the only profile that saturates and a poor reference arm; this is that ' +
       'finding on a fifth building.',
@@ -415,7 +488,12 @@ export const DOUBLE_DECK_POINTS: readonly DoubleDeckPoint[] = Object.freeze([
     label: 'Vertical City, incoming-only up-peak 1 % — variance-derived budget',
     traffic: upPeakAt(1),
     replications: 153,
-    ceiling: 951,
+    // **Re-censused after `vertical-city` declared its ground-lobby escalator**, and it moved a
+    // long way: 951 -> 284, set by both double-deck cells at replication index 284 while neither
+    // single-deck cell loses its AWT anywhere in 1000. The escalator delivers a whole batch to the
+    // upper lobby at once where a lift metered it, so the shuttle queue at floor 2 is burstier.
+    // The pre-registered budget of 153 is unchanged and still sits under it.
+    ceiling: 284,
     budgetBasis:
       'ceil((z95 · s / h)²) with s = 6.609 s, the pilot standard deviation of ΔTTD on the binding ' +
       'pair (collective) at PILOT_SEED, and h = |d| / 1.5 = 1.048 s. That is 153, far under the ' +
@@ -433,7 +511,13 @@ export const DOUBLE_DECK_POINTS: readonly DoubleDeckPoint[] = Object.freeze([
     label: 'Vertical City, incoming-only up-peak 1.5 % — ceiling-bound budget',
     traffic: upPeakAt(1.5),
     replications: 200,
-    ceiling: 386,
+    // **Re-censused, and this is the one that broke the point**: 386 -> 90, set by DD/collective
+    // at 90 and DD/eta at 104, against SD cells that hold to 905. The pre-registered budget of 200
+    // is now *above* the ceiling, so no budget in this project's 50-200 band fits under it and the
+    // point is UNQUOTABLE by construction rather than by luck of the seed — the same category
+    // `nearest-car` is in, and reported the same way. The budget is deliberately NOT lowered:
+    // choosing one after seeing the answer is the thing `PILOT_SEED` exists to prevent.
+    ceiling: 90,
     budgetBasis:
       'Ceiling-bound rather than variance-derived: the pilot’s requirement for the binding pair ' +
       '(eta, s = 6.439 s against a 0.770 s effect, h = |d| / 1.5) is 606 against a measured ' +

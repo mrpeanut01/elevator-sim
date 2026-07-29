@@ -490,6 +490,16 @@ export interface ConservationAudit {
   readonly legsAlighted: number;
   /** Sky-lobby transfers performed. */
   readonly transfers: number;
+  /**
+   * Hops taken on a declared non-lift connection — an escalator, a stair.
+   *
+   * `0` on every building that declares no `transportModes`, which is every building
+   * except `vertical-city`. Counted separately from {@link transfers} because it is the
+   * number that says how many lift legs this run did **not** charge: before transport
+   * modes existed each of these was a hall call, a wait, a ride and the fleet distance to
+   * answer it (`DECISIONS.md` § D147 § 6).
+   */
+  readonly transportHops: number;
 
   /* ---- destination dispatch; all three are 0 under the conventional passenger model ---- */
 

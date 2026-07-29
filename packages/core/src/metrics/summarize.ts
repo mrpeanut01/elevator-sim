@@ -250,8 +250,16 @@ export function buildJourneys(records: readonly PassengerRecord[]): readonly Jou
       totalRideSeconds += rideSecondsOf(leg) ?? 0;
     }
 
-    const isComplete = last.isFinalLeg && last.alightedAt !== undefined;
-    const completedAt = isComplete ? last.alightedAt : undefined;
+    // A journey whose last segment is the building's escalator is complete when the passenger
+    // reaches the far landing, not when they step off the lift. The seconds are a constant on
+    // the leg rather than an event, because nothing a dispatcher does can change them — but
+    // dropping them would make removing a spurious lift leg look like free time saved.
+    const alightedAt = last.alightedAt;
+    const isComplete = last.isFinalLeg && alightedAt !== undefined;
+    const completedAt =
+      isComplete && alightedAt !== undefined
+        ? alightedAt + (last.egressTransitSeconds ?? 0)
+        : undefined;
     const timeToDestinationSeconds = completedAt === undefined ? undefined : completedAt - startedAt;
     const transferSeconds =
       timeToDestinationSeconds === undefined

@@ -148,6 +148,38 @@ weakest shipped dispatcher — is on the Pareto front at six of eight cells, bec
 energy and worst on wait. Any aggregate "efficiency" number ranks it first. Report energy beside
 AWT and WT95, never instead of them.
 
+## Non-lift transport
+
+A building may declare **transport modes** — escalators, stairs — as edges of the routing graph
+(`BuildingConfig.transportModes`). One edge, two floors, one landing-to-landing traversal time.
+They exist for one reason: before them, the ground hop of a two-level lobby had nowhere to go but
+a lift, and a journey was charged an entire elevator leg the real building never pays.
+
+**The traversal time is a reference value, so it is derived and cited rather than chosen.** For
+`vertical-city`'s `G ↔ 2` pair, rise 4.5 m:
+
+| step | value | source |
+|---|---|---|
+| inclination | 30° | BS EN 115-1 — the only permitted angle above a 6 m rise, and the usual commercial compromise below it |
+| nominal speed | 0.5 m/s | the common commercial nominal speed; EN 115-1 permits up to **0.75 m/s** at ≤ 30° and caps 30–35° at **0.50 m/s** |
+| incline length | `4.5 / sin 30° = 9.00 m` | geometry |
+| time on the incline | `9.00 / 0.5 = 18.0 s` | |
+| flat steps | 2 at each landing (rise ≤ 6 m; 3 above it), step depth **0.40 m** | BS EN 115-1 |
+| time on the flat steps | `2 × 2 × 0.40 / 0.5 = 3.2 s` | |
+| **landing to landing** | **21.2 s** | |
+
+**What could not be cited, stated plainly:** no CIBSE Guide D page giving a *lumped* escalator
+door-to-door traversal time was available while this was written, so the figure above is
+constructed from EN 115-1's geometry and speed limits rather than quoted from a table. If a Guide D
+figure is later found and disagrees, the number moves and every `vertical-city` pin moves with it —
+which is the normal treatment of a moved published figure, not an exception.
+
+**Three things the model deliberately does not have**, each because nothing would read them:
+a `kind` enum (nothing branches on escalator-versus-stair), a direction (a one-way escalator is a
+real configuration and is not expressible), and a capacity or headway (an escalator's handling
+capacity dwarfs a lift's, and modelling it would put a queue on the one edge that exists to remove
+one). See `packages/core/src/config/types.ts`.
+
 ## Sources
 
 - [Elevator Types — Archtoolbox](https://www.archtoolbox.com/elevator-types/)
@@ -159,6 +191,8 @@ AWT and WT95, never instead of them.
 - [CIBSE Guide D: Transportation Systems in Buildings (2020)](https://www.cibse.org/knowledge-research/knowledge-portal/guide-d-transportation-systems-in-buildings-2020/) — § 13 covers lift power and energy, and is the basis for the counterweight balance ratio above
 - [ISO 25745-2:2015 — Energy performance of lifts, escalators and moving walks, Part 2: Energy calculation and classification for lifts](https://www.iso.org/standard/61551.html) — the reference cycle measured at empty / half / full load, the non-regenerative measurement convention, and the standby term this project's proxy deliberately omits
 - Barney, G. and Al-Sharif, L., *Elevator Traffic Handbook: Theory and Practice* (2nd ed., Routledge 2016) — drive sizing, counterbalancing, and the round-trip-time derivation this project's oracle implements
+- [BS EN 115-1:2017 — Safety of escalators and moving walks, Part 1: Construction and installation](https://standards.iteh.ai/catalog/standards/cen/89597718-b77e-4b2d-b8da-287ce6d9b9b3/en-115-1-2017) — inclination limits (30°, and 35° only for rises ≤ 6 m), the nominal-speed caps (0.75 m/s at ≤ 30°, 0.50 m/s at 30–35°), and the flat-step requirement (2 for a rise ≤ 6 m, 3 above it) behind the `G ↔ 2` traversal time above
+- [KONE Planning guide — Escalators, ramps and autowalks](https://distributors.kone.com/en/Images/KONE-Escalator-Planning-Guide_tcm90-100695.pdf) — 30° as the commercial/infrastructure compromise angle, 0.5 m/s as the common commercial nominal speed, and the 0.40 m standard step depth
 - [World's Fastest Elevators — e-architect](https://www.e-architect.com/worlds-fastest-elevators)
 - [KONE Destination Control brochure](https://www.kone.us/Images/kone-destination-brochure_tcm25-18769.pdf)
 - [Elevator Access Control Systems — Genea](https://www.getgenea.com/blog/elevator-access-control-systems-everything-you-need-to-know/)

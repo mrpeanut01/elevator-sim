@@ -186,9 +186,15 @@ describe('the two arms share a passenger population and do not share a leg decom
     expect(demandMismatches).toBe(0);
     // The hazard `comparabilityOf` does not model: the same journeys, decomposed differently.
     // Non-vacuous in both directions — some journeys change and most do not.
+    // **The decompositions still differ in content and no longer differ in count**, which is the
+    // whole of what the escalator changed here. The same 110 journeys of 593 are routed over
+    // different floors — the double-deck passenger rides `2 -> 27` after crossing the lobby on the
+    // escalator, the single-deck one rides `G -> 27` on the unpaired shuttle — and both then take
+    // one local. Measured at these six seeds: 110 journeys decomposed differently, and 961 legs on
+    // each arm. It was 961 against a larger number before, and that difference was the artefact.
     expect(legMismatches).toBeGreaterThan(0);
     expect(legMismatches).toBeLessThan(compared);
-    expect(legsTreatment).toBeGreaterThan(legsControl);
+    expect(legsTreatment).toBe(legsControl);
   }, TIMEOUT_MS);
 
   it('carries the denominator shift into the study, journeys equal and legs not', async () => {
@@ -202,9 +208,15 @@ describe('the two arms share a passenger population and do not share a leg decom
         `[double-deck] ${point.id}: ${(excess * 100).toFixed(2)} % more legs on the double-deck arm ` +
           `over an identical journey set (${point.journeysDoubleDeck} journeys)`,
       );
-      // A tenth more legs, not a rounding difference and not a different building.
-      expect(excess).toBeGreaterThan(0.05);
-      expect(excess).toBeLessThan(0.2);
+      // It was a tenth more legs, and the escalator `vertical-city` now declares at `G <-> 2`
+      // took that away: the test above shows the *decompositions* are now identical at this
+      // regime, journey for journey. What is left — +1.32 % and +1.70 %, down from +10.80 % and
+      // +11.56 % — is **window membership**: this counter takes legs whose own `arrivedAt` falls
+      // in the report window, and a 27-side journey's first lift leg begins 21.2 s later than the
+      // control's because it spends those seconds on the escalator. Still strictly positive,
+      // still not a rounding difference, and an order of magnitude smaller.
+      expect(excess).toBeGreaterThan(0.005);
+      expect(excess).toBeLessThan(0.05);
     }
   }, TIMEOUT_MS);
 });
@@ -290,9 +302,18 @@ describe('where an interval may be quoted at all, censused on this cell and not 
       expect(measured, `${point.id}: the recorded ceiling is not the measured one`).toBe(
         point.ceiling,
       );
-      // …and the budget spent sits under it, which is what a ceiling is for.
+      // …and whether the budget sits under it, which is what a ceiling is for. **One point no
+      // longer does.** Since `vertical-city` declared its ground-lobby escalator the 1.5 % point's
+      // ceiling is 90 against a pre-registered budget of 200, so that budget cannot be spent and
+      // the point returns UNQUOTABLE. That is asserted here rather than fixed by lowering the
+      // budget: a budget chosen after seeing the answer is what `PILOT_SEED` exists to prevent,
+      // and a point whose premise has stopped holding is a finding.
       if (point.ceiling !== undefined) {
-        expect(point.replications).toBeLessThan(point.ceiling);
+        if (point.id === 'up-peak-1.5pct') {
+          expect(point.replications).toBeGreaterThan(point.ceiling);
+        } else {
+          expect(point.replications).toBeLessThan(point.ceiling);
+        }
       }
     }
   }, TIMEOUT_MS);
@@ -303,11 +324,23 @@ describe('where an interval may be quoted at all, censused on this cell and not 
  * -------------------------------------------------------------------------- */
 
 describe('the double-deck verdict', () => {
-  it('is quotable at both points, with the population paired and nothing bit-identical', async () => {
+  it('is quotable at the 1 % point and no longer at the 1.5 % one, with nothing bit-identical', async () => {
     const result = await study();
     console.log(formatDoubleDeckStudy(result));
+
+    // **The 1.5 % point dropped out when the lobby hop stopped being a lift leg**, and it is
+    // reported that way rather than rescued by a larger budget. Its n = 200 was pre-registered
+    // against a ceiling measured on the pre-escalator configuration; both double-deck cells now
+    // lose their AWT inside it. Moving the budget to make the point quotable again would be
+    // choosing a budget after seeing the answer.
+    const first = doubleDeckPoint(result, 'up-peak-1pct');
+    const second = doubleDeckPoint(result, 'up-peak-1.5pct');
+    expect(first?.quotable, `up-peak-1pct: ${first?.unquotableCells.join(', ') ?? ''}`).toBe(true);
+    expect(second?.quotable).toBe(false);
+    expect([...(second?.unquotableCells ?? [])].sort()).toEqual(['DD/collective', 'DD/eta']);
+
     for (const point of result.points) {
-      expect(point.quotable, `${point.id}: ${point.unquotableCells.join(', ')}`).toBe(true);
+      if (!point.quotable) continue;
       for (const cell of point.cells) {
         // An interval of exactly [0, 0] with rho = 1 is a wiring bug, not a small effect
         // (docs/07-handoff.md § 4). `unservedFraction` is the one legitimate all-zero column:
@@ -321,27 +354,30 @@ describe('the double-deck verdict', () => {
     }
   }, TIMEOUT_MS);
 
-  it('answers DISPATCHER-DEPENDENT on the gate, which is the finding', async () => {
+  it('answers BETTER-EVERYWHERE on the gate — on a narrower base than the answer it replaced', async () => {
     const result = await study();
     const first = doubleDeckPoint(result, 'up-peak-1pct');
-    const second = doubleDeckPoint(result, 'up-peak-1.5pct');
     expect(first).toBeDefined();
-    expect(second).toBeDefined();
-    if (first === undefined || second === undefined) return;
+    if (first === undefined) return;
 
-    // The two halves of the finding, named rather than inferred from the aggregate verdict.
-    expect(first.cell('eta', DOUBLE_DECK_GATE).verdict).toBe('WORSE');
+    // **The sign under `eta` flipped** when the `G -> 2` lobby hop stopped being charged to a
+    // local lift bank: it was WORSE and it is BETTER. That is the correction the earlier revision
+    // predicted when it published the WORSE row as *an upper bound on the cost of double-deck*.
+    // The two intervals themselves live in `doubleDeck.ts` section 5 and in the pin table; this
+    // asserts the verdicts, so a future change that reverted the sign would be visible here
+    // whatever the digits did.
+    expect(first.cell('eta', DOUBLE_DECK_GATE).verdict).toBe('BETTER');
     expect(first.cell('collective', DOUBLE_DECK_GATE).verdict).toBe('BETTER');
-    expect(second.cell('collective', DOUBLE_DECK_GATE).verdict).toBe('BETTER');
 
-    // And the cell no budget at this operating point can resolve, reported as that rather than as
-    // an absence of effect: its required n is above the point's own ceiling.
-    const unresolved = second.cell('eta', DOUBLE_DECK_GATE);
-    expect(unresolved.verdict).toBe('INDISTINGUISHABLE');
-    expect(unresolved.requiredReplications).toBeGreaterThan(second.ceiling as number);
-    expect(unresolved.resolvableWithinCeiling).toBe(false);
+    expect(result.verdict.gate).toBe('BETTER-EVERYWHERE');
 
-    expect(result.verdict.gate).toBe('DISPATCHER-DEPENDENT');
+    // The base narrowed while the verdict widened, and that is the caution the aggregate word
+    // hides: two cells at one operating point, where the previous answer had four at two.
+    expect(result.verdict.byCell).toHaveLength(2);
+    expect([...result.verdict.byCell].sort()).toEqual([
+      'collective@up-peak-1pct:BETTER',
+      'eta@up-peak-1pct:BETTER',
+    ]);
     console.log(`[double-deck] GATE ${result.verdict.gate} — ${result.verdict.byCell.join(', ')}`);
   }, TIMEOUT_MS);
 
@@ -349,12 +385,21 @@ describe('the double-deck verdict', () => {
     const result = await study();
     expect(result.verdict.costsEnergyEverywhere).toBe(true);
     for (const point of result.points) {
+      if (!point.quotable) continue;
       for (const dispatcher of result.dispatchers) {
-        // The axis, never a score (DECISIONS.md § D106): total work, the two things that move it,
+        // The axis, never a score (DECISIONS.md § D106): total work, the thing that dominates it,
         // and the per-served-leg figure beside the raw one.
         expect(point.cell(dispatcher, 'energyKJ').verdict).toBe('WORSE');
         expect(point.cell(dispatcher, 'carDistanceM').verdict).toBe('WORSE');
-        expect(point.cell(dispatcher, 'carStarts').verdict).toBe('WORSE');
+        // `carStarts` used to be WORSE in every cell too and is now INDISTINGUISHABLE under `eta`
+        // at 1 % (+0.634 [-0.045, +1.313]), because the extra lobby-level leg the treatment arm
+        // used to make was a *start* the control never made and it is gone. The axis has not
+        // changed sign — energy and distance are still WORSE everywhere — so this is bounded
+        // rather than dropped: a start count that came back BETTER would be a different finding
+        // and must not pass silently.
+        expect(['WORSE', 'INDISTINGUISHABLE']).toContain(
+          point.cell(dispatcher, 'carStarts').verdict,
+        );
         // "A configuration that spends less by serving fewer people has not saved anything" — the
         // converse also has to be checked: this one spends more and serves exactly as many.
         const unserved = point.cell(dispatcher, 'unservedFraction');
@@ -376,6 +421,7 @@ describe('the double-deck verdict', () => {
     // Every ΔAWT and ΔWT95 here is smaller than that in magnitude, which is why the gate is TTD and
     // why these rows are reported as costs rather than as the headline.
     for (const point of result.points) {
+      if (!point.quotable) continue;
       for (const dispatcher of result.dispatchers) {
         for (const metric of ['awtS', 'wt95S'] as const) {
           const cell = point.cell(dispatcher, metric);

@@ -22,7 +22,15 @@ import type { BuildingConfig, LoadedConfig, ResolvedBuilding, TrafficProfiles } 
 import { Passenger } from '../model/index.js';
 import { StreamSet } from '../random/index.js';
 
-import { generateTrace, planDemand, routeOf, toPassengerInit, transferFloorsOf } from './generator.js';
+import {
+  egressTransitSecondsOf,
+  generateTrace,
+  planDemand,
+  routeOf,
+  toPassengerInit,
+  transferFloorsOf,
+  transportHopBefore,
+} from './generator.js';
 import { RoutePlanner } from './route.js';
 import { TrafficError, type PassengerTrace } from './types.js';
 
@@ -864,7 +872,17 @@ describe('transfer floors', () => {
           expect(leg.legIndex).toBe(index);
           expect(leg.originFloorId).not.toBe(leg.destinationFloorId);
           if (index > 0) {
-            expect(leg.originFloorId).toBe(passenger.legs[index - 1]?.destinationFloorId);
+            // Contiguous through the *journey*, which is not the same as contiguous through the
+            // legs: a declared escalator may carry the passenger between one leg's alighting
+            // floor and the next leg's boarding floor, and then the hop is what joins them.
+            const hop = transportHopBefore(passenger, index);
+            const previous = passenger.legs[index - 1]?.destinationFloorId;
+            if (hop === undefined) {
+              expect(leg.originFloorId).toBe(previous);
+            } else {
+              expect(hop.originFloorId).toBe(previous);
+              expect(leg.originFloorId).toBe(hop.destinationFloorId);
+            }
           }
         }
       }
@@ -1074,8 +1092,17 @@ describe('every shipped building generates a well-formed trace', () => {
         expect(passenger.journeyId).toBe(record.journeyId);
         expect(passenger.journeyStartedAt).toBe(record.arrivalTimeS);
         expect(passenger.massKg).toBe(record.massKg);
-        expect(passenger.finalDestinationFloorId).toBe(record.finalDestinationFloorId);
+        // `Passenger.finalDestinationFloorId` is where the *lifts* stop, which is the journey's
+        // destination except on a route that finishes on a declared escalator.
+        const terminus = record.legs[record.legs.length - 1]?.destinationFloorId;
+        expect(passenger.finalDestinationFloorId).toBe(terminus);
+        if (transportHopBefore(record, record.legs.length) === undefined) {
+          expect(terminus).toBe(record.finalDestinationFloorId);
+        }
         expect(passenger.isFinalLeg).toBe(record.legs.length === 1);
+        expect(passenger.egressTransitS).toBe(
+          record.legs.length === 1 ? egressTransitSecondsOf(record) : 0,
+        );
       }
     }
   });

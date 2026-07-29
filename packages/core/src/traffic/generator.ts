@@ -142,6 +142,7 @@ import {
   type PassengerTrace,
   type ResolvedDemandTemplate,
   type TraceLeg,
+  type TraceTransportHop,
   type TrafficConfig,
 } from './types.js';
 
@@ -725,15 +726,33 @@ function credentialForRoute(
 }
 
 /** Why an origin-destination pair was rejected, or `ok`. */
-type TripFeasibility = 'ok' | 'unreachable' | 'too-many-legs' | 'no-credential';
+type TripFeasibility = 'ok' | 'unreachable' | 'too-many-legs' | 'no-credential' | 'no-lift-leg';
 
 const REJECTION_REASONS: Readonly<Record<TripFeasibility, string>> = {
   ok: 'they are fine',
   unreachable: 'no chain of banks connects them',
   'too-many-legs': 'the shortest route exceeds the maxLegs limit',
   'no-credential': 'no single credential group is permitted on every restricted floor of the route',
+  'no-lift-leg':
+    'the whole route is served by a declared escalator or stair, so it is not lift demand',
 };
 
+/**
+ * `maxLegs` bounds **elevator** legs, which is what its error message has always said. A
+ * transport hop does not count against it: the limit exists to catch a building whose zoning
+ * makes somebody change lifts five times, and an escalator is the opposite of that problem.
+ *
+ * A route with no elevator leg at all is refused rather than generated. It is a real journey and
+ * the building really serves it, but it is not *lift* demand: it would enter no queue, board no
+ * car and produce no observation, and a passenger record with zero legs cannot become a
+ * `Passenger` at all. Refusing it here puts it in the rejection census beside the other four
+ * reasons rather than crashing trace materialization later.
+ *
+ * `vertical-city` *has* such a pair — `G → 2` is its escalator and nothing else — and never
+ * generates it: floor 2 carries no population and is not an entrance, so it is neither an origin
+ * nor a destination of any demand source. `transportRoute.test.ts` asserts both halves, because a
+ * refusal no configuration can reach and a refusal nothing ever trips look the same from here.
+ */
 function classifyTrip(
   planner: RoutePlanner,
   permitted: ReadonlyMap<string, readonly CredentialGroup[]>,
@@ -742,10 +761,11 @@ function classifyTrip(
   originFloorId: string,
   destinationFloorId: string,
 ): TripFeasibility {
-  const route = planner.route(originFloorId, destinationFloorId);
-  if (route === undefined) return 'unreachable';
-  if (route.length - 1 > maxLegs) return 'too-many-legs';
-  if (enforceAccess && credentialForRoute(route, permitted) === null) return 'no-credential';
+  const plan = planner.plan(originFloorId, destinationFloorId);
+  if (plan === undefined) return 'unreachable';
+  if (plan.elevatorLegCount > maxLegs) return 'too-many-legs';
+  if (plan.elevatorLegCount === 0) return 'no-lift-leg';
+  if (enforceAccess && credentialForRoute(plan.floors, permitted) === null) return 'no-credential';
   return 'ok';
 }
 
@@ -877,24 +897,41 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
           `Generated a trip from floor "${pick.floorId}" to itself. A trip that goes nowhere has no direction and no waiting time; it must not reach the model layer.`,
         );
       }
-      const route = planner.requireRoute(batch.originFloor.id, pick.floorId, options.maxLegs);
+      const plan = planner.requirePlan(batch.originFloor.id, pick.floorId, options.maxLegs);
+      const route = plan.floors;
 
       const legs: TraceLeg[] = [];
-      for (let index = 0; index + 1 < route.length; index += 1) {
-        const fromId = route[index];
-        const toId = route[index + 1];
-        if (fromId === undefined || toId === undefined) {
-          throw new TrafficError(`Route ${route.join(' -> ')} has a hole at leg ${index}.`);
+      const hops: TraceTransportHop[] = [];
+      for (const segment of plan.segments) {
+        const from = requireFloor(segment.fromFloorId);
+        const to = requireFloor(segment.toFloorId);
+        if (segment.kind === 'transport') {
+          hops.push({
+            modeId: segment.modeId,
+            originFloorId: from.id,
+            originFloorIndex: from.index,
+            destinationFloorId: to.id,
+            destinationFloorIndex: to.index,
+            // The hop sits immediately before whatever leg comes next, which is the number of
+            // legs already emitted — and equals `legs.length` at the end, meaning "after the
+            // last one".
+            beforeLegIndex: legs.length,
+            traversalTimeS: segment.traversalTimeS,
+          });
+          continue;
         }
-        const from = requireFloor(fromId);
-        const to = requireFloor(toId);
         legs.push({
-          legIndex: index,
+          legIndex: legs.length,
           originFloorId: from.id,
           originFloorIndex: from.index,
           destinationFloorId: to.id,
           destinationFloorIndex: to.index,
         });
+      }
+      if (legs.length === 0) {
+        throw new TrafficError(
+          `Route ${route.join(' -> ')} has no elevator leg; planDemand should have refused this pair.`,
+        );
       }
 
       passengerCount += 1;
@@ -913,6 +950,9 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
         finalDestinationFloorId: pick.floorId,
         finalDestinationFloorIndex: pick.floorIndex,
         legs: Object.freeze(legs),
+        // Omitted, not emptied, when the route used no transport edge: a record from a building
+        // that declares none must be the object it was before this field existed.
+        ...(hops.length === 0 ? {} : { transportHops: Object.freeze(hops) }),
         // Mass is drawn here, in final trace order, so the mass column is a function of the
         // sorted trace rather than of the order the sources happened to be sampled in.
         massKg: drawMass(streams.passengerMass, config.profiles),
@@ -982,11 +1022,53 @@ function drawMass(rng: Rng, profiles: TrafficProfiles): number {
  * Consuming a trace
  * -------------------------------------------------------------------------- */
 
-/** The floors a journey visits, in order: `[origin, ...transfer floors, destination]`. */
+/**
+ * The floors a journey visits, in order: `[origin, ...transfer floors, destination]`.
+ *
+ * Transport hops are part of the journey, so they are part of this: a `G → 2` escalator hop
+ * followed by a `2 → 27` shuttle leg reads `["G", "2", "27"]`, not `["2", "27"]`.
+ */
 export function routeOf(record: GeneratedPassenger): readonly string[] {
   const first = record.legs[0];
   if (first === undefined) return [record.originFloorId];
-  return [first.originFloorId, ...record.legs.map((leg) => leg.destinationFloorId)];
+  const hops = record.transportHops ?? [];
+  const floors: string[] = [];
+  for (const [index, leg] of record.legs.entries()) {
+    const before = hops.find((hop) => hop.beforeLegIndex === index);
+    if (before !== undefined) floors.push(before.originFloorId);
+    floors.push(leg.originFloorId);
+    floors.push(leg.destinationFloorId);
+  }
+  const after = hops.find((hop) => hop.beforeLegIndex === record.legs.length);
+  if (after !== undefined) floors.push(after.destinationFloorId);
+  // Consecutive duplicates arise where a hop's far end is the next leg's origin, which is
+  // always. Collapse them rather than special-casing the join.
+  return floors.filter((floorId, index) => index === 0 || floors[index - 1] !== floorId);
+}
+
+/**
+ * The transport hop immediately before elevator leg `legIndex`, or `undefined`.
+ *
+ * `legIndex === record.legs.length` asks for the hop that *ends* the journey — the escalator a
+ * passenger rides after their last lift ride. See {@link TraceTransportHop.beforeLegIndex}.
+ */
+export function transportHopBefore(
+  record: GeneratedPassenger,
+  legIndex: number,
+): TraceTransportHop | undefined {
+  return (record.transportHops ?? []).find((hop) => hop.beforeLegIndex === legIndex);
+}
+
+/**
+ * Seconds of non-lift travel a journey still owes after its **last** elevator leg alights.
+ *
+ * `0` for every journey that ends on a lift, which is every journey in every building that
+ * declares no transport mode. Charged onto time-to-destination rather than thrown away: the
+ * whole point of removing the spurious leg is to stop charging the *lifts* for it, not to hand
+ * the passenger free seconds.
+ */
+export function egressTransitSecondsOf(record: GeneratedPassenger): number {
+  return transportHopBefore(record, record.legs.length)?.traversalTimeS ?? 0;
 }
 
 /** The transfer floors a journey passes through. Empty for a single-leg journey. */
@@ -1006,12 +1088,35 @@ export function transferFloorsOf(record: GeneratedPassenger): readonly string[] 
  * fresh mass from the `passengerMass` stream, but the trace already carries one drawn at
  * generation time. Using the trace's value is what keeps the passenger population a pure
  * function of `(seed, config)` and independent of the order the run happens to create people.
+ *
+ * ## Two fields the transport modes moved, and neither moves on a building without one
+ *
+ * `arrivedAt` is the batch's instant **plus** any escalator hop that comes before the first lift
+ * ride: a passenger walking onto the escalator at `G` is not standing at the `2` landing yet, and
+ * a leg whose `arrivedAt` said otherwise would report their escalator ride as *waiting*.
+ * `journeyStartedAt` stays the batch instant, so time-to-destination still spans the hop.
+ * {@link leadingTransitSecondsOf} is what the runner schedules the delayed admission on.
+ *
+ * That moves *window membership* for such a leg by the traversal time, because
+ * `PassengerRecord.arrivedAt` is the window key. It stays the property that key exists for — a
+ * **dispatcher-independent** instant, identical under every configuration being compared, because
+ * the traversal time is a constant of the building. A journey arriving inside the window whose
+ * first lift leg begins outside it is a journey whose lift service genuinely happened outside it.
+ *
+ * `finalDestinationFloorId` is the **last elevator leg's** destination rather than the journey's
+ * declared one. On every journey that ends on a lift those are the same floor and this is a
+ * no-op; on one that ends on an escalator they differ, and it is this field that
+ * `Passenger.isFinalLeg` is derived from — so making it the lift terminus is what keeps "the
+ * highest-indexed planned leg is the final leg" true, which `fuzz/properties.ts` asserts
+ * directly. The seconds to the real destination travel separately, as `egressTransitS`.
  */
 export function toPassengerInit(record: GeneratedPassenger): PassengerInit {
   const first = record.legs[0];
-  if (first === undefined) {
+  const last = record.legs[record.legs.length - 1];
+  if (first === undefined || last === undefined) {
     throw new TrafficError(`Trace record "${record.id}" has no legs; it cannot become a passenger.`);
   }
+  const egressTransitS = egressTransitSecondsOf(record);
   return {
     id: record.id,
     journeyId: record.journeyId,
@@ -1020,11 +1125,24 @@ export function toPassengerInit(record: GeneratedPassenger): PassengerInit {
     originFloorIndex: first.originFloorIndex,
     destinationFloorId: first.destinationFloorId,
     destinationFloorIndex: first.destinationFloorIndex,
-    finalDestinationFloorId: record.finalDestinationFloorId,
+    finalDestinationFloorId: last.destinationFloorId,
     journeyOriginFloorId: record.originFloorId,
     journeyStartedAt: record.arrivalTimeS,
     massKg: record.massKg,
-    arrivedAt: record.arrivalTimeS,
+    arrivedAt: record.arrivalTimeS + leadingTransitSecondsOf(record),
+    // Only when leg 0 is also the last leg does the egress hop belong to it.
+    ...(record.legs.length === 1 && egressTransitS > 0 ? { egressTransitS } : {}),
     ...(record.credentialGroup === undefined ? {} : { credentialGroup: record.credentialGroup }),
   };
+}
+
+/**
+ * Seconds between a journey's arrival instant and the landing where its first lift ride begins.
+ *
+ * `0` unless the route opens with a transport hop. The runner delays the passenger's admission
+ * by this, which is why it is a separate export rather than folded into `toPassengerInit`: the
+ * init states *when* the leg begins waiting, and the runner has to know *how long from now*.
+ */
+export function leadingTransitSecondsOf(record: GeneratedPassenger): number {
+  return transportHopBefore(record, 0)?.traversalTimeS ?? 0;
 }

@@ -723,6 +723,62 @@ export interface BankConfig extends Commented {
 }
 
 /**
+ * A **non-elevator** connection between two floors: an escalator, a stair, an inclined walk.
+ *
+ * ## Why this exists
+ *
+ * `traffic/route.ts` plans a journey as graph reachability over service zoning, and until this
+ * type existed **every edge of that graph was an elevator bank**. A two-level lobby served in
+ * reality by an escalator therefore had its ground-level hop routed onto a local lift, and the
+ * journey was charged a whole extra leg — a hall call, a wait, a ride, and the fleet distance to
+ * answer it — that the real building never pays. On `vertical-city` that cost the double-deck arm
+ * roughly a tenth of its legs, which is why `DECISIONS.md` § D147 § 6 had to publish its
+ * WORSE-under-`eta` row as an *upper bound on the cost of double-deck* rather than as the cost.
+ * See `DECISIONS.md` for the entry that closes it.
+ *
+ * ## What it is, and what it deliberately is not
+ *
+ * It is **one edge with one number**: two floors, and the door-to-door seconds a passenger spends
+ * getting between them on the machine. It has no capacity, no queue, no direction and no
+ * breakdown, because none of those would be read by anything — the simulator measures lift
+ * service, and this type exists to stop the lifts being charged for work they do not do.
+ *
+ * Three things were deliberately **not** declared, each because nothing in the tree would consult
+ * them and an unread field is the dead seam `CLAUDE.md` names ten times over:
+ *
+ * - **No `kind` enum** (`escalator` / `stair` / `walk`). Nothing branches on it. What the machine
+ *   is belongs in `name` and `$comment`, beside the citation for {@link traversalTimeS}.
+ * - **No direction.** A one-way escalator is a real configuration and this cannot express it; the
+ *   edge is traversable both ways at the same cost. Named as a limitation rather than half-built.
+ * - **No capacity or headway.** An escalator's handling capacity is enormous relative to a lift's
+ *   and modelling it would put a queue on the one edge that exists to *remove* a queue.
+ */
+export interface TransportModeConfig extends Commented {
+  /** Unique within the building, e.g. `lobby-escalator`. */
+  readonly id: string;
+  /** Optional human name, e.g. `Ground lobby escalator pair`. */
+  readonly name?: string | undefined;
+  /**
+   * The two floor ids it joins, `[a, b]`. Both must exist in the building and must differ.
+   * Order carries no meaning: the edge is traversed either way at the same cost.
+   */
+  readonly connects: readonly [string, string];
+  /**
+   * Landing-to-landing seconds, **including** stepping on and stepping off.
+   *
+   * A *deterministic* number, not a distribution, and deliberately so: a random draw would need a
+   * new named stream on `StreamSet`, and adding a stream shifts every downstream draw, which
+   * desynchronizes common random numbers against every run already stored (CLAUDE.md invariant 2,
+   * and `random/streams.ts`). The gain — a few seconds of spread on a segment nobody queues for —
+   * does not buy back the comparison power.
+   *
+   * **Reference value, so it must be cited** in the declaring building's `$comment`; see
+   * `docs/02-elevator-reference.md` § *Non-lift transport*.
+   */
+  readonly traversalTimeS: number;
+}
+
+/**
  * Credential-based zoning. Floors covered by no access zone are unrestricted. Distinct
  * from service zoning (`BankConfig.servesFloors`) and from operational zoning.
  */
@@ -774,6 +830,16 @@ export interface BuildingConfig extends Commented {
   /** Declared occupancy. Cross-checked against the sum of floor populations. */
   readonly totalPopulation?: number | undefined;
   readonly banks: readonly BankConfig[];
+  /**
+   * Non-lift connections between floors, in authored order. Absent means "this building is
+   * served by lifts and nothing else", which is what every building in `data/buildings/` said
+   * before `vertical-city` declared its lobby escalator.
+   *
+   * **Absent and empty mean the same thing here**, unlike {@link serviceEvents}: a transport mode
+   * is a fact about the fabric, and a building that declares none has none. The resolved view
+   * flattens both to `[]`.
+   */
+  readonly transportModes?: readonly TransportModeConfig[] | undefined;
   readonly accessZones?: readonly AccessZone[] | undefined;
   /**
    * Mid-run service-mode changes, in authored order. Absent means "nothing changes".
@@ -896,6 +962,16 @@ export interface ResolvedBuilding {
   /** Floors flagged `isTransferFloor` (sky lobbies), in floor order. */
   readonly transferFloors: readonly FloorConfig[];
   readonly banks: readonly ResolvedBank[];
+  /**
+   * Non-lift edges of the routing graph, in authored order. `[]` when the building declares none,
+   * which is the shipped default and the case every figure published before
+   * `DECISIONS.md` § D147 was measured under.
+   *
+   * **Required rather than optional**, unlike {@link serviceEvents}, and for the reason that
+   * field's own docstring regrets: a hand-built `ResolvedBuilding` that silently lacked this
+   * would route as if the escalator were not there and nothing would say so.
+   */
+  readonly transportModes: readonly TransportModeConfig[];
   readonly accessZones: readonly AccessZone[];
   /**
    * The building's service-mode schedule, every car located, in authored order.

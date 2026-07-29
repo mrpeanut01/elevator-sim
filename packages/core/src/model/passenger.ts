@@ -104,8 +104,23 @@ export interface PassengerInit {
   readonly journeyOriginFloorId?: string | undefined;
   /** When the journey started. Defaults to this leg's `arrivedAt`. */
   readonly journeyStartedAt?: SimTime | undefined;
-  /** Where the journey ends. Defaults to this leg's destination (a single-leg journey). */
+  /**
+   * Where the *lift* journey ends. Defaults to this leg's destination (a single-leg journey).
+   *
+   * On a journey whose last segment is an escalator this is the lift terminus, not the floor the
+   * passenger was going to; {@link PassengerInit.egressTransitS} carries the rest. See
+   * {@link Passenger.isFinalLeg}.
+   */
   readonly finalDestinationFloorId?: string | undefined;
+  /**
+   * Seconds of declared non-lift travel still owed **after** this leg alights. Defaults to `0`.
+   *
+   * Non-zero only on the last leg of a journey that finishes on a building's declared escalator
+   * or stair, and only ever added to {@link Passenger.timeToDestinationS}. It is not a wait, not
+   * a ride, and not something a dispatcher can influence — which is exactly why it is a constant
+   * carried on the leg rather than another event.
+   */
+  readonly egressTransitS?: number | undefined;
 }
 
 /** The parts of the next leg that are not inherited from the leg that produced it. */
@@ -122,6 +137,18 @@ export interface NextLegInit {
   readonly arrivedAt: SimTime;
   /** Re-routing only. Defaults to the journey's existing final destination. */
   readonly finalDestinationFloorId?: string | undefined;
+  /**
+   * Where the next leg boards, when that is **not** the floor this one alighted at.
+   *
+   * Supplied only when a declared non-lift connection carries the passenger between the two — an
+   * escalator from the shuttle's upper lobby down to the local bank's landing. Defaults to the
+   * alighting floor, which is every transfer in every building that declares no transport mode.
+   */
+  readonly originFloorId?: string | undefined;
+  /** Shaft ordering of {@link NextLegInit.originFloorId}. Required with it. */
+  readonly originFloorIndex?: number | undefined;
+  /** See {@link PassengerInit.egressTransitS}. Defaults to `0`. */
+  readonly egressTransitS?: number | undefined;
 }
 
 /**
@@ -169,6 +196,11 @@ export class Passenger {
   readonly arrivedAt: SimTime;
   /** Which way this leg travels, from the floor *indices*. */
   readonly direction: Direction;
+  /**
+   * Seconds of non-lift travel owed after this leg alights. `0` on every leg of every journey
+   * that ends on a lift. See {@link PassengerInit.egressTransitS}.
+   */
+  readonly egressTransitS: number;
 
   #boardedAt: SimTime | undefined;
   #alightedAt: SimTime | undefined;
@@ -221,6 +253,13 @@ export class Passenger {
     this.credentialGroup = init.credentialGroup;
     this.arrivedAt = init.arrivedAt;
     this.direction = init.destinationFloorIndex > init.originFloorIndex ? 'up' : 'down';
+    const egressTransitS = init.egressTransitS ?? 0;
+    if (!Number.isFinite(egressTransitS) || egressTransitS < 0) {
+      throw new ModelError(
+        `Passenger "${init.id}" needs a non-negative finite egressTransitS; received ${egressTransitS}.`,
+      );
+    }
+    this.egressTransitS = egressTransitS;
   }
 
   /** When the passenger entered the car, or `undefined` while still waiting. */
@@ -422,7 +461,7 @@ export class Passenger {
    */
   get timeToDestinationS(): number | undefined {
     if (!this.isFinalLeg || this.#alightedAt === undefined) return undefined;
-    return this.#alightedAt - this.journeyStartedAt;
+    return this.#alightedAt + this.egressTransitS - this.journeyStartedAt;
   }
 
   /**
@@ -457,12 +496,22 @@ export class Passenger {
       );
     }
 
+    // The next leg boards where this one alighted, unless a declared non-lift connection carried
+    // the passenger somewhere else in between. Both halves are supplied together or not at all.
+    const originFloorId = init.originFloorId ?? this.destinationFloorId;
+    const originFloorIndex = init.originFloorIndex ?? this.destinationFloorIndex;
+    if ((init.originFloorId === undefined) !== (init.originFloorIndex === undefined)) {
+      throw new ModelError(
+        `Passenger "${this.id}" was given only half of a re-boarding floor for its next leg: originFloorId and originFloorIndex must be supplied together.`,
+      );
+    }
+
     return new Passenger({
       id: init.id,
       journeyId: this.journeyId,
       legIndex: this.legIndex + 1,
-      originFloorId: this.destinationFloorId,
-      originFloorIndex: this.destinationFloorIndex,
+      originFloorId,
+      originFloorIndex,
       destinationFloorId: init.destinationFloorId,
       destinationFloorIndex: init.destinationFloorIndex,
       finalDestinationFloorId,
@@ -471,6 +520,7 @@ export class Passenger {
       massKg: this.massKg,
       ...(this.credentialGroup === undefined ? {} : { credentialGroup: this.credentialGroup }),
       arrivedAt: init.arrivedAt,
+      ...(init.egressTransitS === undefined ? {} : { egressTransitS: init.egressTransitS }),
     });
   }
 }
@@ -494,6 +544,13 @@ export interface TransferRequest {
   readonly arrivedAt: SimTime;
   /** Re-routing only. Defaults to the journey's existing final destination. */
   readonly finalDestinationFloorId?: string | undefined;
+  /**
+   * Where the next leg boards, when a declared non-lift connection carried the passenger there
+   * from the alighting floor. Defaults to the alighting floor. Must also be a transfer floor.
+   */
+  readonly originFloorId?: string | undefined;
+  /** See {@link PassengerInit.egressTransitS}. */
+  readonly egressTransitS?: number | undefined;
 }
 
 export interface PassengerFactoryOptions {
@@ -605,6 +662,22 @@ export class PassengerFactory {
       this.#requireFloorIndex(request.finalDestinationFloorId, 'final destination');
     }
 
+    // A re-boarding floor reached by escalator gets the *same* check the alighting floor gets,
+    // for the same reason: a journey that resumes at an ordinary floor is a routing bug that
+    // would otherwise show up only as an inexplicably good time-to-destination.
+    let reboard: { originFloorId: string; originFloorIndex: number } | undefined;
+    if (request.originFloorId !== undefined && request.originFloorId !== transferFloorId) {
+      if (!this.#topology.isTransferFloor(request.originFloorId)) {
+        throw new ModelError(
+          `Passenger "${passenger.id}" cannot resume at floor "${request.originFloorId}": that floor is not flagged isTransferFloor. Only a declared sky lobby joins two legs of one journey.`,
+        );
+      }
+      reboard = {
+        originFloorId: request.originFloorId,
+        originFloorIndex: this.#requireFloorIndex(request.originFloorId, 're-boarding'),
+      };
+    }
+
     return passenger.beginNextLeg({
       id: this.#nextPassengerId(),
       destinationFloorId: request.destinationFloorId,
@@ -613,6 +686,8 @@ export class PassengerFactory {
       ...(request.finalDestinationFloorId === undefined
         ? {}
         : { finalDestinationFloorId: request.finalDestinationFloorId }),
+      ...(reboard ?? {}),
+      ...(request.egressTransitS === undefined ? {} : { egressTransitS: request.egressTransitS }),
     });
   }
 

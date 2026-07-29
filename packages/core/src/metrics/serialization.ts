@@ -66,6 +66,9 @@ export const passengerRecordSchema = z.strictObject({
   credentialGroup: z.string().min(1).optional(),
   arrivedAt: simTime,
   journeyStartedAt: simTime,
+  // Absent on every run of every building that declares no transport mode, so a stored record
+  // written before transport modes existed parses unchanged.
+  egressTransitSeconds: z.number().nonnegative().finite().optional(),
   boardedAt: simTime.optional(),
   alightedAt: simTime.optional(),
   carId: z.string().min(1).optional(),

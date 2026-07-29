@@ -10173,3 +10173,62 @@ Declared rows **106 → 106**; dimensions **56 → 56**; `traffic.*` / `sim.*` i
 **A value with two readers, found and closed:** `SearchSpace.unsearchable` is read by the drawn list *and* by the status-line count, and only the list was exercised. The status line was extracted pure and both are now asserted together — [§ D154](#d154)'s `wait95S` shape, in a third place.
 
 **Impact.** Both `docs/07` § 8 rows close. **Known limits:** the four `traffic.*` rows remain unsearchable, and that is the **honest state rather than a deferral** — closing it needs the decision `docs/10` § 9.3 q6 already defers. `SearchSpace.unsearchable` has one caller and one instance shape, so its generality is asserted by derivation and not by a second case — the same caveat § D155 records for `partiallyActiveWhen`. And `log → linear` is a **worse search parametrization** for two wide ranges; nothing samples them today, and if anything ever does, the right fix is a sampler that understands *"zero plus a log range"*, not a bound moved after the fact.
+
+---
+
+## D167 — `core` gets a **non-elevator transport mode**, and the double-deck verdict **flips while its evidence base narrows**
+
+**Date:** 2026-07-29 · **Owner:** T71 (wave 9) · **Closes:** [`docs/07`](docs/07-handoff.md) § 8's *largest modelling debt* · **Supersedes:** [§ D147](#d147)'s gate word and 90 published pins · **Authorised by** the owner to move published figures
+
+**Context.** [§ D147](#d147) § 6 named this as the largest modelling debt in the repository: `core` had **no escalator and no stair**, so the ground-level hop a real two-level double-deck lobby serves with an escalator was routed onto a local bank. On `vertical-city`, **292 journeys** were charged a lift leg the hardware would never pay for — which is why § D147's WORSE-under-`eta` row had to be read as an **upper bound on the cost** rather than the cost.
+
+### What was built
+
+`BuildingConfig.transportModes` — data, schema-validated, cross-checked against declared floors. `route.ts` gained a **second edge kind**, and the preference rule is **expansion order, not cost**: transport edges expand before bank edges in the breadth-first search. *A 21.2 s escalator can be slower than a 6 s lift hop and the passenger still takes it* — a cost comparison would make the route a function of the numbers rather than of the building, and would let a fast lift win back the very hop this exists to remove.
+
+**A hop is not a leg** — no button, no queue, no car, and absent from every wait statistic — but its seconds are charged three ways: an opening hop delays admission to leg 0, a middle hop replaces the transfer walk and moves the boarding floor, and a closing hop is added to the completion instant.
+
+**The traversal time is derived, not quoted, and that is stated rather than glossed.** 21.2 s for `G ↔ 2`: 4.5 m rise at 30° and 0.5 m/s (BS EN 115-1) gives 9.00 m of incline → 18.0 s, plus two flat steps of 0.40 m at each landing → 3.2 s. **No CIBSE Guide D page giving a lumped door-to-door escalator time could be obtained**, so the figure is constructed from EN 115-1 geometry and says so in `docs/02`, in the building's own comment, and in the sources list.
+
+### Byte-identity, proved against a *different tree*
+
+A SHA-256 of the whole `SimulationResult` for five buildings × three dispatchers, **produced by running the base commit in a separate git worktree** rather than by this one. All **12 digests for the four buildings that declare no transport mode reproduce exactly.** Corroborated one layer up: **871 of 961 published pins did not move, and every one of the 90 that did names `vertical-city`.**
+
+The one added result field is **excluded** from the hash and separately asserted zero — excluding a field and hiding one are different things.
+
+### The leg that started it
+
+| | before | after |
+|---|---|---|
+| journeys | 1 956 | 1 956 |
+| lift legs | 3 549 | **3 257** |
+| `G ↔ 2` charged as a lift leg | **292** | **0** |
+
+### The verdict flipped, and the flattering reading is refused
+
+| | before | after |
+|---|---|---|
+| **gate** | `DISPATCHER-DEPENDENT` | **`BETTER-EVERYWHERE`** |
+| `eta` @ 1 %, ΔTTD | **+1.950 [+0.975, +2.925] WORSE** | **−2.729 [−3.550, −1.907] BETTER** |
+| `collective` @ 1 %, ΔTTD | −1.408 BETTER | −6.262 BETTER |
+| 1.5 % point | quotable, 4 cells | **UNQUOTABLE at any budget in the band** |
+| `eta` @ 1 %, ΔAWT | −0.355 BETTER | **+0.785 WORSE** |
+| excess legs | +10.80 % / +11.56 % | +1.32 % / +1.70 % |
+
+**Three things must be read with it, and none of them is optional.**
+
+1. **The evidence base narrowed while the verdict widened** — two cells at one operating point, where the old answer had four at two. The 1.5 % point *dropped out*, and its budget is left at the pre-registered 200 rather than lowered to fit under the new ceiling of 90. **A better word on a narrower base is not a stronger result.**
+2. **Waiting time moved the other way**, and the mechanism is the interesting part: the removed legs were the **cheap** ones, and **the lift the escalator replaced had been metering the upper lobby.** A batch now arrives at floor 2 in one lump, so the shuttle queue is burstier — which is why both saturation ceilings fell (951 → 284 and 386 → 90) and the wait rows worsened while the journey rows improved. **Removing a bottleneck made the queue behind it burstier.**
+3. **The residual +1.3 % is not a decomposition difference.** Both arms plan *identical* leg counts journey for journey (933 = 933 over six seeds). The residual is **report-window membership**: a leg that begins 21.2 s later crosses a window boundary.
+
+### A dead seam created by the fix, caught by the fix
+
+**`#deckAllows`' cross-deck refusal lost its only shipped trigger** — the `G ↔ 2` leg *was* the 200 refusals it counted. It is now asserted **zero on shipped data** and exercised live against `vertical-city` **minus its transport modes**, which is exactly the pre-change building. A behaviour that becomes unreachable because its cause was fixed is still unreachable, and this repository has shipped that shape eleven times without noticing.
+
+A second eroded guard was found in the same sweep: `buildingConnectivity.test.ts` had silently become a *subset* model of the real planner, and is now documented as a deliberate narrowing **plus** a cross-model assertion that the planner never needs more lift legs than the lift-only model — non-vacuous, because `vertical-city` is strictly cheaper.
+
+### Two figures that could not be re-derived, annotated rather than quietly kept
+
+The `−14.4 %` door-hold figure has **no shipped entry point** — the 50-cell study lives in the commit that measured it. 40 of its 50 cells provably cannot have moved; the 10 `vertical-city` cells can have. A like-for-like probe reproduced the figure on **neither** base nor branch, which proves the probe differs from the original harness and says nothing about the number. Marked *"measured on the pre-escalator configuration"*. Two superseded intervals are declared under a **new, stated third kind** — *superseded figures, quoted as history* — and the alternative of rewording them until the scanner stops matching is named in the docstring as **evading a guard rather than answering it**.
+
+**Impact.** `data/scenario-goals.json` stage 6 regenerated, and `long-waits-under` became **withheld** — 49/50 tuning against 50/50 holdout, so the classification stops surviving the holdout — which under [§ D160](#d160)'s own rule **removed a goal from a shipped campaign stage**. That is the machinery working rather than a regression. **Known limits:** one-way escalators are not expressible (nothing would read a direction, and an unread field is the dead seam this repository names eleven times); `vertical-city` still declares no escalator at `26↔27`, `51↔52`, `76↔77`, so a cross-lobby interfloor journey still rides to the ground lobby and back — a building question, not a `core` one.

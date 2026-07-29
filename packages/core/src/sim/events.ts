@@ -1,5 +1,5 @@
 /**
- * The seven things that can happen in a run, as kernel events.
+ * The eight things that can happen in a run, as kernel events.
  *
  * The whole simulation is these and nothing else. There is no tick, no polling loop and no
  * "advance by dt": the clock jumps from one of these to the next, which is what makes a
@@ -10,6 +10,7 @@
  * |---|---|---|
  * | `sim.batchArrival` | a trace batch's time comes | materializes its passengers, lights the buttons, runs dispatch |
  * | `sim.transferArrival` | a sky-lobby walk completes | re-injects the journey's next leg as a fresh arrival |
+ * | `sim.transportArrival` | a journey's *opening* escalator or stair hop completes | admits its first lift leg at the far landing |
  * | `sim.dispatchTick` | a defer window closes, or a call is due to be re-offered | runs stages 2–5 for one bank |
  * | `sim.carArrived` | a car is levelled | completes the move and asks the car what to do next |
  * | `sim.carDoor` | the door's next automatic transition is due | runs the door forward; transfers passengers when it reaches open |
@@ -43,6 +44,7 @@ import { createEvent, type EventHandler, type SimEvent, type SimTime } from '../
 export const SIM_EVENT_TYPES = Object.freeze({
   batchArrival: 'sim.batchArrival',
   transferArrival: 'sim.transferArrival',
+  transportArrival: 'sim.transportArrival',
   dispatchTick: 'sim.dispatchTick',
   carArrived: 'sim.carArrived',
   carDoor: 'sim.carDoor',
@@ -82,6 +84,22 @@ export interface BatchArrivalPayload {
 export interface TransferArrivalPayload {
   /** Id of the completed leg whose journey continues. */
   readonly fromLegId: string;
+}
+
+/**
+ * A journey that begins on something that is not a lift, arriving at the landing where its
+ * first lift leg starts.
+ *
+ * Indexed into `PassengerTrace.passengers` for the reason {@link BatchArrivalPayload} gives:
+ * the handler must read the trace the run is actually driving. A *mid-journey* hop needs no
+ * event of its own — it is a different number of seconds on the transfer that already exists —
+ * and a hop that *ends* a journey needs none either, because it is a constant added to the
+ * completion instant. Only the opening hop has no leg to hang itself on, which is why this is
+ * one event and not three.
+ */
+export interface TransportArrivalPayload {
+  /** Index into `PassengerTrace.passengers`. */
+  readonly passengerIndex: number;
 }
 
 /** One bank's group controller is due to look at its live calls. */
@@ -138,6 +156,14 @@ export function transferArrivalEvent(
   handler: EventHandler<TransferArrivalPayload>,
 ): SimEvent<TransferArrivalPayload> {
   return createEvent(SIM_EVENT_TYPES.transferArrival, payload, handler);
+}
+
+/** An opening escalator or stair hop completing, so the journey's first lift leg joins a queue. */
+export function transportArrivalEvent(
+  payload: TransportArrivalPayload,
+  handler: EventHandler<TransportArrivalPayload>,
+): SimEvent<TransportArrivalPayload> {
+  return createEvent(SIM_EVENT_TYPES.transportArrival, payload, handler);
 }
 
 /** A bank's group controller running stages 2 to 5 over its live calls. */
