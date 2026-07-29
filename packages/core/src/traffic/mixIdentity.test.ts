@@ -74,10 +74,26 @@ const BASELINE_TRACE_DIGESTS: Readonly<Record<string, string>> = {
     '022e163901a9f1c268126cdcb610f7cfe6b6736dec48bb74ca18408142506607',
   'secure-tower|constant-iso':
     '02cae53573243fefbe20d811114a1184f88e2c840791aab8df58a7b73790c668',
+  /*
+   * **The two `vertical-city` digests are re-pinned, and the cause is a different lane's data
+   * change rather than this file's code.**
+   *
+   * Both were generated at `9f1adf7`, and both moved when `vertical-city` declared escalators at
+   * its three sky lobbies ([§ D170](../../../../DECISIONS.md)) — a concurrent lane that branched
+   * from the same commit, so neither lane could see the other's guard. The trace moved because
+   * **26 journeys are routed over different floors**: `30 → 45` stops going `30>26>G>2>27>45` and
+   * goes `30>26>27>45`, and lift legs fall 3 257 → 3 245 across the same 1 956 journeys.
+   *
+   * What proves this is a route change and not a demand change: **`BASELINE_PASSENGER_COUNTS` did
+   * not move** — same passengers, same arrival instants, different floors between them — and the
+   * eight digests for the four buildings that declare no transport mode reproduce untouched. A
+   * change that had leaked into the generator rather than into one building's data would have
+   * moved those too, and that is the assertion doing the work here.
+   */
   'vertical-city|rise-and-fall':
-    'bae45134787217870e5d8f9ed8f0fbf19340e47597099f361e60663ff613ae4b',
+    'a37d59c4e101bd0f229d6cec130efb36da44214f6f9ebd02090a165486899502',
   'vertical-city|constant-iso':
-    '4f351754e469ef2edf342b203e79675fe816a3b7e8c9a42fe6e71b24df400be3',
+    '74e108c52d7468b65853665e1f72b77a47bfac7c36dcd6563b2779a633a6be52',
 };
 
 /** Passenger counts at the same seed, so a failure says *how much* moved as well as *that* it did. */
