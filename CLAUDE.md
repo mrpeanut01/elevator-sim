@@ -17,7 +17,15 @@ partially complete.** Read the two that need care precisely:
   both. 6c (learned control) is **no longer deferred — it is implemented, measured, and NOT
   ACCEPTED**: ΔTTD `−0.213 [−0.440, +0.014]` against `collective` at n = 200 on a disjoint seed, an
   interval containing zero, unchanged at 24 and 64 search candidates ([§ D139](DECISIONS.md) is the
-  criterion, dated before the code; [§ D145](DECISIONS.md) is the verdict). Double-deck operation is
+  criterion, dated before the code; [§ D145](DECISIONS.md) is the verdict). **That refusal is now
+  swept over eight pre-registered operating points and it held** — NOT ACCEPTED at all five PRIMARY
+  cells under Holm–Bonferroni, with the resolution limit measured on **TTD at each cell** rather
+  than inherited, and two cells that clear the correction refused anyway because the effect is a
+  third to a half of what the apparatus can resolve there ([§ D151](DECISIONS.md) is the protocol,
+  dated before any sweep ΔTTD; [§ D152](DECISIONS.md) is the result). The one cell that clears every
+  gate is a **secondary** one, and what its policy learned is a *busy/idle schedule* rather than a
+  traffic-pattern selection — because the shipped demand template varies the **level** and never the
+  **directional split**, which § D152 measures rather than asserts. Double-deck operation is
   **simulated** — paired stops, per-deck design load, deck-bound legs ([§ D131](DECISIONS.md)) — and
   the disclaimer survives only in the narrower case of a double-deck bank declaring no
   `servesFloorPairs`, which no shipped building raises.

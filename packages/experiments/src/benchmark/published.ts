@@ -83,6 +83,7 @@ import type { Stage5Study } from './capacityReassignment.js';
 import type { ForecastCausalityAudit } from './predictorLag.js';
 import type { TailStudy } from './tailStudy.js';
 import type { SelectionStudy } from './weightSetSelection.js';
+import type { SelectionSweep } from './selectionSweep.js';
 
 /* -------------------------------------------------------------------------- *
  * The domain
@@ -110,6 +111,7 @@ export const PUBLISHED_STUDY_IDS = Object.freeze([
   'phase7-acceptance',
   'down-peak-destination',
   'weight-set-selection',
+  'selection-sweep',
   'double-deck',
 ] as const);
 
@@ -380,6 +382,33 @@ export function downPeakFigures(
  * verdict rather than folded into it. A pin table holding only the gate would make the costs
  * unfalsifiable prose.
  */
+/**
+ * The sweep's figures: every cell's gate interval and every cost beside it, on both arms.
+ *
+ * Keyed by `cell/arm/role/metric` so a reader tracing a quoted number lands on exactly one run.
+ * The **verdict** is deliberately not pinned here — a pin holds an estimate, and whether that
+ * estimate clears a Holm-corrected level is arithmetic `selectionSweep.test.ts` re-derives from the
+ * estimate itself. Pinning the verdict would let a moved interval and a moved rule cancel.
+ */
+export function selectionSweepFigures(sweep: SelectionSweep): ReadonlyMap<string, PinnedEstimate> {
+  const figures = new Map<string, PinnedEstimate>();
+  for (const row of [...sweep.primary, ...sweep.secondary]) {
+    for (const arm of row.study.arms) {
+      figures.set(
+        `${row.cell.id}/${arm.armId}/gate/${arm.gate.metric}`,
+        estimateOf(arm.gate.estimate),
+      );
+      for (const cost of arm.costs) {
+        figures.set(
+          `${row.cell.id}/${arm.armId}/cost/${cost.metric}`,
+          estimateOf(cost.estimate),
+        );
+      }
+    }
+  }
+  return figures;
+}
+
 export function weightSetSelectionFigures(
   study: SelectionStudy,
 ): ReadonlyMap<string, PinnedEstimate> {
@@ -760,6 +789,11 @@ export const STUDY_ENTRY_POINTS: Readonly<Record<string, PublishedStudyId | 'no-
     // Phase 6c's gate and its costs, and Phase 7's fuzzy detector measured beside it. Publishes
     // intervals, so `regeneratePins.ts` is its non-test caller.
     runWeightSetSelectionStudy: 'weight-set-selection',
+    // Phase 6c's **sweep**: the same gate at eight pre-registered operating points, Holm-corrected
+    // within two families that are never pooled. Publishes a paired-t interval per cell per arm,
+    // so `regeneratePins.ts` is its non-test caller and `selectionSweep.test.ts` compares the pins
+    // against a fresh run. DECISIONS.md § D151.
+    runSelectionSweep: 'selection-sweep',
     // Counts and a trajectory divergence index: how many patterns the detector entered, whether
     // the shipped weight-set map and a permuted one produce different car trajectories, and
     // whether the selector switched off is bit-identical to the profile run without it. There is
@@ -1661,6 +1695,88 @@ export const PINNED_ESTIMATES: Readonly<
     "learned/cost/energyPerServedLegKJ": { n: 200, mean: 4.807179602393214, standardError: 0.5966794619558817, lower: 3.630553632568674, upper: 5.983805572217754 },
     "learned/cost/wt95S": { n: 200, mean: 0.6746101110913333, standardError: 0.3762814730038012, lower: -0.06740060207921705, upper: 1.4166208242618836 },
     "learned/gate/ttdMeanS": { n: 200, mean: -0.2126738011766477, standardError: 0.11505015212659633, lower: -0.43954770157985373, upper: 0.01420009922655835 },
+  }),
+  "selection-sweep": Object.freeze({
+    "garden-down-peak-2pct/fuzzy/cost/awtS": { n: 200, mean: -0.12281297604772816, standardError: 0.04118151148177824, lower: -0.20402112711640114, upper: -0.04160482497905518 },
+    "garden-down-peak-2pct/fuzzy/cost/energyKJ": { n: 200, mean: 3.0206756739324936, standardError: 1.3713602338543005, lower: 0.31641288625683606, upper: 5.724938461608151 },
+    "garden-down-peak-2pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 0.21391902980790192, standardError: 0.09047294988779082, lower: 0.035510304198908244, upper: 0.3923277554168956 },
+    "garden-down-peak-2pct/fuzzy/cost/wt95S": { n: 200, mean: -0.35225452754548087, standardError: 0.12992794211414344, lower: -0.6084667832786342, upper: -0.0960422718123275 },
+    "garden-down-peak-2pct/fuzzy/gate/ttdMeanS": { n: 200, mean: -0.1891113049553149, standardError: 0.06068428014887685, lower: -0.3087780683281018, upper: -0.069444541582528 },
+    "garden-down-peak-2pct/learned/cost/awtS": { n: 200, mean: -0.12510868425085786, standardError: 0.04210769656954349, lower: -0.20814323206453794, upper: -0.04207413643717778 },
+    "garden-down-peak-2pct/learned/cost/energyKJ": { n: 200, mean: 3.3428241264324936, standardError: 1.405214772448594, lower: 0.5718016598231941, upper: 6.113846593041793 },
+    "garden-down-peak-2pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 0.24971330230790187, standardError: 0.09690009838515876, lower: 0.05863051915864542, upper: 0.4407960854571583 },
+    "garden-down-peak-2pct/learned/cost/wt95S": { n: 200, mean: -0.3672573457446645, standardError: 0.1311064117007511, lower: -0.6257934922913306, upper: -0.10872119919799844 },
+    "garden-down-peak-2pct/learned/gate/ttdMeanS": { n: 200, mean: -0.19140701315844463, standardError: 0.06230781476216987, lower: -0.314275316236734, upper: -0.06853871008015525 },
+    "garden-residential-2pct/fuzzy/cost/awtS": { n: 200, mean: -0.04156718820292118, standardError: 0.06246553981949952, lower: -0.16474651824020425, upper: 0.08161214183436188 },
+    "garden-residential-2pct/fuzzy/cost/energyKJ": { n: 200, mean: 3.881014567952195, standardError: 1.5445205581605093, lower: 0.8352871455561459, upper: 6.926741990348244 },
+    "garden-residential-2pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 0.3763017721620814, standardError: 0.14769634790360703, lower: 0.08505099235147384, upper: 0.6675525519726889 },
+    "garden-residential-2pct/fuzzy/cost/wt95S": { n: 200, mean: -0.198894545902648, standardError: 0.11045678174719653, lower: -0.4167105195260242, upper: 0.018921427720728246 },
+    "garden-residential-2pct/fuzzy/gate/ttdMeanS": { n: 200, mean: -0.1389492146751261, standardError: 0.06486253680516461, lower: -0.2668553186048433, upper: -0.011043110745408924 },
+    "garden-residential-2pct/learned/cost/awtS": { n: 200, mean: -0.0364300929870959, standardError: 0.06178059385870126, lower: -0.158258739354524, upper: 0.0853985533803322 },
+    "garden-residential-2pct/learned/cost/energyKJ": { n: 200, mean: 5.067213221485638, standardError: 1.7024034413952387, lower: 1.710147614269522, upper: 8.424278828701754 },
+    "garden-residential-2pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 0.43029597312212503, standardError: 0.15744664573582895, lower: 0.11981802969286343, upper: 0.7407739165513867 },
+    "garden-residential-2pct/learned/cost/wt95S": { n: 200, mean: -0.1886006548113123, standardError: 0.10858951138089762, lower: -0.40273445241597794, upper: 0.025533142793353364 },
+    "garden-residential-2pct/learned/gate/ttdMeanS": { n: 200, mean: -0.11053631822971845, standardError: 0.06950705173560612, lower: -0.24760120377139488, upper: 0.026528567311958004 },
+    "midtown-down-peak-1pct/fuzzy/cost/awtS": { n: 200, mean: -1.5586333735833053, standardError: 0.2094644588600445, lower: -1.9716881840205307, upper: -1.14557856314608 },
+    "midtown-down-peak-1pct/fuzzy/cost/energyKJ": { n: 200, mean: 374.77448024334836, standardError: 40.805714605116385, lower: 294.3073842849181, upper: 455.2415762017786 },
+    "midtown-down-peak-1pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 21.56374141385832, standardError: 2.4428901210727676, lower: 16.74646825272082, upper: 26.38101457499582 },
+    "midtown-down-peak-1pct/fuzzy/cost/wt95S": { n: 200, mean: -7.120676728296931, standardError: 0.7380088956456584, lower: -8.575998199781425, upper: -5.665355256812436 },
+    "midtown-down-peak-1pct/fuzzy/gate/ttdMeanS": { n: 200, mean: -2.120811960471577, standardError: 0.3044764800305503, lower: -2.7212263478385714, upper: -1.520397573104583 },
+    "midtown-down-peak-1pct/learned/cost/awtS": { n: 200, mean: -1.577901721818829, standardError: 0.20866870779344118, lower: -1.9893873457326705, upper: -1.1664160979049873 },
+    "midtown-down-peak-1pct/learned/cost/energyKJ": { n: 200, mean: 362.02634369513703, standardError: 40.917561495991635, lower: 281.3386905282911, upper: 442.71399686198293 },
+    "midtown-down-peak-1pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 20.705172262125874, standardError: 2.4454526931463616, lower: 15.882845820217733, upper: 25.527498704034016 },
+    "midtown-down-peak-1pct/learned/cost/wt95S": { n: 200, mean: -7.154337651542963, standardError: 0.7365690330502783, lower: -8.606819776559675, upper: -5.70185552652625 },
+    "midtown-down-peak-1pct/learned/gate/ttdMeanS": { n: 200, mean: -2.12986734673333, standardError: 0.30450047127632307, lower: -2.7303290437944305, upper: -1.5294056496722295 },
+    "midtown-hotel-1.5pct/fuzzy/cost/awtS": { n: 200, mean: 0.3570138257262967, standardError: 0.07683543208647035, lower: 0.20549769259296724, upper: 0.5085299588596262 },
+    "midtown-hotel-1.5pct/fuzzy/cost/energyKJ": { n: 200, mean: 303.71810890337946, standardError: 38.334860599806, lower: 228.12342967061178, upper: 379.3127881361471 },
+    "midtown-hotel-1.5pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 3.3583082324313107, standardError: 0.4415595047963524, lower: 2.4875720772715626, upper: 4.229044387591059 },
+    "midtown-hotel-1.5pct/fuzzy/cost/wt95S": { n: 200, mean: 0.9676482622620898, standardError: 0.3768432874447279, lower: 0.22452967542809887, upper: 1.7107668490960806 },
+    "midtown-hotel-1.5pct/fuzzy/gate/ttdMeanS": { n: 200, mean: -0.08110255652011272, standardError: 0.09720989485265698, lower: -0.2727962448408384, upper: 0.11059113180061295 },
+    "midtown-hotel-1.5pct/learned/cost/awtS": { n: 200, mean: 0.28835248808844144, standardError: 0.07230988729177808, lower: 0.14576053262931007, upper: 0.4309444435475728 },
+    "midtown-hotel-1.5pct/learned/cost/energyKJ": { n: 200, mean: 262.2430547608433, standardError: 36.841624420497986, lower: 189.5929723839756, upper: 334.89313713771094 },
+    "midtown-hotel-1.5pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 2.8601862828593907, standardError: 0.40659839733426684, lower: 2.0583919123537924, upper: 3.661980653364989 },
+    "midtown-hotel-1.5pct/learned/cost/wt95S": { n: 200, mean: 0.7661669426295282, standardError: 0.3581221034040376, lower: 0.05996571718071875, upper: 1.4723681680783378 },
+    "midtown-hotel-1.5pct/learned/gate/ttdMeanS": { n: 200, mean: -0.08512579780815735, standardError: 0.08974627776882896, lower: -0.2621015575766389, upper: 0.09184996196032416 },
+    "midtown-interfloor-1.0pct/fuzzy/cost/awtS": { n: 200, mean: 0.14669362108319287, standardError: 0.04474398588716329, lower: 0.058460425297091334, upper: 0.2349268168692944 },
+    "midtown-interfloor-1.0pct/fuzzy/cost/energyKJ": { n: 200, mean: 146.1390499992873, standardError: 28.567929616224806, lower: 89.80433423684816, upper: 202.47376576172644 },
+    "midtown-interfloor-1.0pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 2.404452193585284, standardError: 0.49220960718238965, lower: 1.433836237558366, upper: 3.3750681496122015 },
+    "midtown-interfloor-1.0pct/fuzzy/cost/wt95S": { n: 200, mean: 0.2906400097730424, standardError: 0.21489745268829535, lower: -0.13312842839868178, upper: 0.7144084479447665 },
+    "midtown-interfloor-1.0pct/fuzzy/gate/ttdMeanS": { n: 200, mean: -0.13719996643652685, standardError: 0.06646752120008882, lower: -0.26827102984723683, upper: -0.0061289030258168675 },
+    "midtown-interfloor-1.0pct/learned/cost/awtS": { n: 200, mean: 0.2112568248273087, standardError: 0.04906784959462372, lower: 0.11449715770682775, upper: 0.3080164919477897 },
+    "midtown-interfloor-1.0pct/learned/cost/energyKJ": { n: 200, mean: 223.90401442016847, standardError: 32.50894154611285, lower: 159.79779439161223, upper: 288.0102344487247 },
+    "midtown-interfloor-1.0pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 3.743808890886852, standardError: 0.5623983415789086, lower: 2.6347838007339677, upper: 4.852833981039736 },
+    "midtown-interfloor-1.0pct/learned/cost/wt95S": { n: 200, mean: 0.29687184864601435, standardError: 0.24232617381514554, lower: -0.18098483565225948, upper: 0.7747285329442881 },
+    "midtown-interfloor-1.0pct/learned/gate/ttdMeanS": { n: 200, mean: -0.2648280414795633, standardError: 0.08306130130823353, lower: -0.42862131816840443, upper: -0.10103476479072213 },
+    "midtown-interfloor-2.0pct/fuzzy/cost/awtS": { n: 200, mean: 0.858504254741524, standardError: 0.13769685819679928, lower: 0.5869720340974345, upper: 1.1300364753856136 },
+    "midtown-interfloor-2.0pct/fuzzy/cost/energyKJ": { n: 200, mean: 373.5036096986524, standardError: 76.29639044483329, lower: 223.05044325817337, upper: 523.9567761391314 },
+    "midtown-interfloor-2.0pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 3.1961116588324194, standardError: 0.6297467179395249, lower: 1.9542784971704852, upper: 4.437944820494353 },
+    "midtown-interfloor-2.0pct/fuzzy/cost/wt95S": { n: 200, mean: 2.9890201362613396, standardError: 0.5857229601515171, lower: 1.833999911872023, upper: 4.144040360650656 },
+    "midtown-interfloor-2.0pct/fuzzy/gate/ttdMeanS": { n: 200, mean: 0.7700448420102868, standardError: 0.21021898807555744, lower: 0.35550213274870157, upper: 1.184587551271872 },
+    "midtown-interfloor-2.0pct/learned/cost/awtS": { n: 200, mean: 1.6420719663566872, standardError: 0.14874934601897402, lower: 1.348744720021397, upper: 1.9353992126919775 },
+    "midtown-interfloor-2.0pct/learned/cost/energyKJ": { n: 200, mean: 1121.4691901659128, standardError: 75.78017612607444, lower: 972.0339759295468, upper: 1270.9044044022787 },
+    "midtown-interfloor-2.0pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 9.424999134181439, standardError: 0.6434984079473108, lower: 8.15604823741413, upper: 10.693950030948749 },
+    "midtown-interfloor-2.0pct/learned/cost/wt95S": { n: 200, mean: 4.567713389385008, standardError: 0.5570679332355025, lower: 3.469199632848438, upper: 5.666227145921578 },
+    "midtown-interfloor-2.0pct/learned/gate/ttdMeanS": { n: 200, mean: -0.1140968587627772, standardError: 0.22236112545674946, lower: -0.5525833352944084, upper: 0.324389617768854 },
+    "secure-up-peak-2pct/fuzzy/cost/awtS": { n: 126, mean: -0.19938270102712635, standardError: 0.054104728792215055, lower: -0.30646267421363416, upper: -0.09230272784061852 },
+    "secure-up-peak-2pct/fuzzy/cost/energyKJ": { n: 126, mean: -91.76116877488262, standardError: 28.300156452691894, lower: -147.77069071087016, upper: -35.7516468388951 },
+    "secure-up-peak-2pct/fuzzy/cost/energyPerServedLegKJ": { n: 126, mean: -5.107515575701308, standardError: 1.6562049830894194, lower: -8.385350787881384, upper: -1.8296803635212324 },
+    "secure-up-peak-2pct/fuzzy/cost/wt95S": { n: 126, mean: -0.08457804947473001, standardError: 0.04201084664285095, lower: -0.16772272892290147, upper: -0.0014333700265585642 },
+    "secure-up-peak-2pct/fuzzy/gate/ttdMeanS": { n: 126, mean: -0.22515287150239127, standardError: 0.067098137926129, lower: -0.35794841396943533, upper: -0.09235732903534719 },
+    "secure-up-peak-2pct/learned/cost/awtS": { n: 126, mean: -0.18863868709910442, standardError: 0.049729869011550715, lower: -0.28706026981835103, upper: -0.09021710437985782 },
+    "secure-up-peak-2pct/learned/cost/energyKJ": { n: 126, mean: -75.74604634299139, standardError: 25.5262095842503, lower: -126.26558315338556, upper: -25.226509532597227 },
+    "secure-up-peak-2pct/learned/cost/energyPerServedLegKJ": { n: 126, mean: -4.115737123301034, standardError: 1.5089054590924842, lower: -7.1020482962321285, upper: -1.129425950369939 },
+    "secure-up-peak-2pct/learned/cost/wt95S": { n: 126, mean: -0.07265215714862193, standardError: 0.04045426302294784, lower: -0.15271616442630898, upper: 0.007411850129065117 },
+    "secure-up-peak-2pct/learned/gate/ttdMeanS": { n: 126, mean: -0.21441487477441387, standardError: 0.06571061669157235, lower: -0.3444643405138095, upper: -0.08436540903501827 },
+    "vertical-city-up-peak-1pct/fuzzy/cost/awtS": { n: 200, mean: 0.2534947166394348, standardError: 0.05742836134844459, lower: 0.14024848365271275, upper: 0.36674094962615683 },
+    "vertical-city-up-peak-1pct/fuzzy/cost/energyKJ": { n: 200, mean: 716.111546734273, standardError: 232.8551809754452, lower: 256.93124874680814, upper: 1175.291844721738 },
+    "vertical-city-up-peak-1pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 9.406034190372957, standardError: 2.7566104311828767, lower: 3.970118210649124, upper: 14.841950170096789 },
+    "vertical-city-up-peak-1pct/fuzzy/cost/wt95S": { n: 200, mean: 0.4083682104132139, standardError: 0.17269871482847798, lower: 0.06781384952332253, upper: 0.7489225713031054 },
+    "vertical-city-up-peak-1pct/fuzzy/gate/ttdMeanS": { n: 200, mean: 0.20178093535347366, standardError: 0.17400972461448924, lower: -0.14135867986352077, upper: 0.5449205505704681 },
+    "vertical-city-up-peak-1pct/learned/cost/awtS": { n: 200, mean: 0.4014936311038306, standardError: 0.07206504367031574, lower: 0.25938449662636015, upper: 0.5436027655813009 },
+    "vertical-city-up-peak-1pct/learned/cost/energyKJ": { n: 200, mean: 1306.3711277870755, standardError: 292.80391728922126, lower: 728.9745269060347, upper: 1883.7677286681162 },
+    "vertical-city-up-peak-1pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 18.55919260155251, standardError: 3.5165479002050066, lower: 11.624712956568345, upper: 25.493672246536676 },
+    "vertical-city-up-peak-1pct/learned/cost/wt95S": { n: 200, mean: 0.5081202814644618, standardError: 0.22334188224103352, lower: 0.0676997951737423, upper: 0.9485407677551811 },
+    "vertical-city-up-peak-1pct/learned/gate/ttdMeanS": { n: 200, mean: 0.25793502837306725, standardError: 0.20226920334816093, lower: -0.14093105086993546, upper: 0.65680110761607 },
   }),
   "double-deck": Object.freeze({
     "up-peak-1.5pct/collective−collective@single-deck/awtS": { n: 200, mean: -0.6417523432044138, standardError: 0.12466580723726337, lower: -0.8875878976303678, upper: -0.3959167887784597 },

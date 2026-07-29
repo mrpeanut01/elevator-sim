@@ -1056,6 +1056,48 @@ whose interior optimum is 2 s while 8 s ships — the same machinery returned **
 candidates, 1.490 s at 128, 1.874 s at 256**. It rediscovers ~2 s blind. The candidate count was
 calibrated on *that* dimension, whose answer was known, and not on the 6c result.
 
+#### The sweep — eight operating points, and the refusal holds ([§ D151](../DECISIONS.md), [§ D156](../DECISIONS.md))
+
+**The one-operating-point objection is closed by measurement, and the verdict did not move.** § D151
+pre-registered the cell set, the arms, the metric, the correction and what "accepted" would mean
+**before any sweep ΔTTD existed**; § D156 is the result. Five PRIMARY cells across three buildings
+and four traffic patterns, Holm–Bonferroni corrected across the family, n = 200, CRN, validated on a
+disjoint seed:
+
+| cell | ΔTTD | Holm | below this cell's own TTD limit? | verdict |
+|---|---|---|---|---|
+| Midtown interfloor-mix 1.0 % | **−0.265 [−0.429, −0.101]** | REJECT H0 at α = 0.010 | **yes**, 0.509 s | NOT ACCEPTED |
+| Midtown interfloor-mix 2.0 % | −0.114 [−0.553, +0.324] | retain | yes, 0.615 s | NOT ACCEPTED |
+| Garden residential 2 % | −0.111 [−0.248, +0.027] | retain | yes, 0.917 s | NOT ACCEPTED |
+| Garden down-peak 2 % | **−0.191 [−0.314, −0.069]** | REJECT H0 at α = 0.0125 | **yes**, 0.786 s | NOT ACCEPTED |
+| Midtown @ `hotel` profile 1.5 % | −0.085 [−0.262, +0.092] | retain | yes, 0.758 s | NOT ACCEPTED |
+
+**Two of the five clear the correction and are still refused**, and [§ D140](../DECISIONS.md)'s
+raise is the whole reason: both are a third to a half of their own cell's smallest detectable
+effect. **The limits are now measured on TTD at each cell** rather than inherited from § 4's
+AWT-measured 1.9 s — and every measured structural limit is **smaller** (0.509–0.991 s), which is
+the *permissive* direction, so the refusal is robust to the choice rather than propped up by it.
+
+**One SECONDARY cell clears every gate and does not accept the phase.** Midtown **down-peak 1 %**:
+ΔTTD **−2.130 [−2.730, −1.529]**, Holm-rejected, above its own 0.991 s limit, generalizing. It is
+reported and not banked, for the two reasons § D151 fixed in advance — a secondary cell is admitted
+only by excluding an arm on its ceiling and cannot accept the phase, and a significant effect at a
+cell the regime screen calls **one-regime** is a bug report until investigated. It was investigated:
+it is **not** a constant weight override (pinning the dominant weight set for the whole run is
+**+1.157 [+0.719, +1.595] WORSE**), and the learned arm really does alternate — `fairness-first`
+79.7 % of decisions, `energy-aware` 20.3 %, five changes a run. **What it learned is a busy/idle
+schedule, not a traffic-pattern selection.**
+
+**The regime screen is the finding to carry forward.** Measured before any ΔTTD: the directional
+split **does not vary within a run** at any cell — Pearson homogeneity over the time-bin ×
+direction-category table is inside its own noise everywhere, largest standardized deviation **+1.83 σ**
+— because `DemandPhase` carries a scalar intensity and `generator.ts` applies one `intensity(t)` to
+every demand source. What *does* move is the **level**, and exactly one of the five authored patterns
+(`idle`) is level-triggered. **So the shipped demand template cannot express the condition weight-set
+selection exists to exploit**, and that is a different finding from *learned control does not help*.
+
+**No status moves. Phase 6 stays ⚠️ partial.**
+
 ### Also still not built in this phase's original scope
 
 - **Double-deck operation and Vertical City. SIMULATED, and benchmarked to a dispatcher-dependent
