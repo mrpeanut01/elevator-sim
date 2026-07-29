@@ -132,6 +132,39 @@
       .figure-bar-fill { height: 100%; background: var(--focus); }
       .figure-bar-text { color: var(--text); min-width: 4em; text-align: right; }
 
+      /* docs/10 § 6 / D4 — the building mood gauge. Keyed on `level` and `provisional` only,
+         never on a driver id, for the reason above: `render/mood.ts` decides what the drivers
+         are, and a sixth one must appear here with no edit.
+
+         Deliberately **not** a dial. R11's argument against an eco score applies to a needle for
+         the same reason — a single pointer invites the reader to optimise it, and the thing they
+         would be optimising is one replication of one seed. The shape is carried by the glyph the
+         mount emits as text (KB-15), so the colours below are the second signal and never the
+         first. */
+      .building-mood {
+        padding: 6px 12px; border-top: 1px solid var(--edge); background: var(--panel2);
+        /* Capped low, and it scrolls. The gauge is six short lines and the canvas is the thing
+           the reader is looking at: driven on Midtown Office, a taller panel squeezed 21 floors
+           into 110 px and put every landing below the pitch at which a queue can be drawn as
+           anything but a bar. A panel that degrades the picture it explains is the wrong trade. */
+        max-height: 14vh; overflow: auto;
+      }
+      .mood-head { margin: 0 0 4px; font-weight: 600; }
+      .mood-glyph { font-size: 1.1em; }
+      .mood-driver { margin: 1px 0; }
+      /* `padding-right` and not only the trailing space the mount emits: an inline-block collapses
+         the space at its edge, so the label ran into the sentence — `standing right now196
+         standing at 2 floors`. The same defect W2 found on `figure-count`, one panel over. */
+      .mood-label { color: var(--dim); min-width: 9em; padding-right: 8px; display: inline-block; }
+      .mood-calm { color: var(--text); }
+      .mood-frustrated { color: var(--warn); }
+      .mood-distressed { color: var(--bad, var(--warn)); }
+      /* R6 — an outcome read before the playhead reaches the end of the run is a preview, and the
+         word "So far" in the headline says so. The rule stays because a reader who has learned to
+         ignore the word still sees the panel is unfinished. */
+      .mood-provisional { font-style: italic; }
+      .mood-caveat { color: var(--dim); margin: 4px 0 0; }
+
       .sr-only {
         position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
         overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -224,6 +257,13 @@
              the figure list; nothing below keys on a figure id, because a stylesheet that named
              one would be the first list of metric names in this product's UI. -->
         <section id="run-summary" class="run-summary" aria-label="Run summary"></section>
+
+        <!-- docs/10 § 6 / D4 — the building mood gauge, from observations alone (R1). It is
+             drawn on every run, including the ~46 of 60 shipped configurations whose mean wait
+             is legitimately refused, which is the single most valuable property of the feature:
+             nothing here is routed through `awtIsValid`, and `render/mood.ts` cannot reach a
+             suppressible field because its input type does not carry one. -->
+        <section id="building-mood" class="building-mood" aria-label="Building mood"></section>
 
         <footer class="bar">
           <button id="play-pause">Play</button>

@@ -1422,6 +1422,32 @@ One state, two views, § 4's hide/never-hide lists.
 
 ### W7 — Rider queues and the credential lens *(depends on W1; W7b depends on W2)*
 
+> **W7a is DONE, 2026-07-29** ([`DECISIONS.md` § D157](../DECISIONS.md)). `queueAt` is in
+> `frame/overlay.ts`, the renderer is `render/riderQueue.ts` plus `drawLandings`, the § 6.3 clause
+> is in `describeFrame`, and D4's mood treatment lands with it as `render/mood.ts`. **The zero-field
+> claim in § 2.3 holds** — `VIZ_SCHEMA_VERSION` is unchanged at 5 — with one wording correction:
+> `isWaitingAt` was module-*private*, not *"already exposed"*.
+>
+> **Three deviations and one limitation, stated rather than absorbed:**
+>
+> 1. **`FloorQueue` carries `groups` and `worstBand` beyond § 6.1's four fields**, because § 6.2
+>    requires the glyphs to be grouped by promised car and the § 6.1 type cannot express that. It
+>    also carries `recentlyBoarded`, which is the relief transition: a boarding is otherwise
+>    invisible, because the queue simply gets shorter between two frames.
+> 2. **The band boundaries are read off `VizSummary`**, which D154 made possible, rather than from
+>    `DEFAULT_MAX_WAIT_HORIZON_S`. Same numbers on the shipped buildings; the run's own numbers on
+>    any other.
+> 3. **The mood scorer omits `awtIsValid` too**, which R5's corrected example would have allowed. A
+>    scorer that cannot see the suppression flag cannot come to branch on it.
+> 4. **Limitation.** On a row too tight for the layout's own `FloorRow.labelled`, the bar is drawn
+>    with **no count beside it** — the one place this feature does not keep *a bar never carries its
+>    value alone*. The count stays in `describeFrame`, the landing selector and the header.
+>
+> **Frame budget, re-measured with the rendering in place** (600 instants, `nearest-car`, seed
+> 20 260 727): whole frame including `drawScene` is **0.051 ms** on Midtown Office at 900 s and
+> **0.197 ms** on Vertical City at 1800 s, against 16.7 ms — 1.2 % at worst. The deepest single
+> landing queue seen was **450**, deeper than **M5**'s 379.
+
 - **W7a — `queueAt` + renderer + `describeFrame` clause.** No contract change (§ 6.1).
 - **W7b — `VizLeg.credentialGroup`, the locked-out marker, and the credential lens** (§ 10).
 - **Acceptance (a):** `sum(queueAt(r,t).total) === frameAt(r,t).totalWaiting` on every shipped

@@ -23,12 +23,19 @@
  * the frame sequences matching.
  */
 
-import type { LandingAssignment, OverlayMetrics } from '../frame/overlay.js';
+import type { FloorQueue, LandingAssignment, OverlayMetrics, WaitBand } from '../frame/overlay.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import type { DoorPhase, Frame, VizRecording } from '../contract/types.js';
 import type { Layout } from './layout.js';
 import { LOAD_ALARM, drawOverlay, loadColour } from './overlay.js';
 import { windowClause } from './runSummary.js';
+import type { BuildingMood } from './mood.js';
+import {
+  BAND_GLYPH,
+  MAX_INDIVIDUAL_GLYPHS,
+  planQueueRow,
+  type QueueRowPlan,
+} from './riderQueue.js';
 
 /** The subset of a 2D canvas context this renderer uses. */
 export interface Canvas2DLike {
@@ -76,6 +83,20 @@ export interface Theme {
   readonly badge: string;
   /** A landing no car may serve — `RV-08`. */
   readonly restricted: string;
+  /**
+   * One colour per wait-age band — `docs/10` § 6.2, and **never the only signal**.
+   *
+   * Every band also has a distinct *shape* (`render/riderQueue.ts`'s `BAND_GLYPH`), because
+   * `UX.md` KB-15 forbids colour as the sole carrier and § 3.1 restates it for this feature: Mini
+   * Metro's players report losing to a station they never saw fill, and legibility of the fail
+   * state is a separate problem from the fail state being good. These four exist so a sighted
+   * reader gets the band *twice*; deleting them would cost nothing but contrast, which is what
+   * `riderQueue.test.ts`'s colour-removal test asserts by planning a row under a theme whose four
+   * are the same string.
+   */
+  readonly queueBands: Readonly<Record<WaitBand, string>>;
+  /** A boarding that just happened — the relief transition. */
+  readonly queueRelief: string;
 }
 
 /** Readable on a projector and in a screenshot, which is the whole specification. */
@@ -100,6 +121,19 @@ export const DEFAULT_THEME: Theme = Object.freeze({
   highlight: '#f2f6fa',
   badge: '#6f7dd6',
   restricted: '#8a6f4a',
+  queueBands: Object.freeze({
+    // Not `textDim`, which is the same grey: a test identifying a settling rider by its fill also
+    // matched every floor label and every dimmed caption. The third time this file has needed the
+    // rule that two different claims never share a colour.
+    settling: '#8fa0b3',
+    waiting: '#e0b040',
+    long: '#e0773a',
+    abandoned: '#e0473a',
+  }),
+  // Distinct from `waitingUp` and `carLight`, which are the same green. They would read the same
+  // on screen, and a test that identified the relief mark by its fill would then also match every
+  // up-call badge and every lightly-loaded car — which it did.
+  queueRelief: '#7fd6b0',
 });
 
 export interface SceneInput {
@@ -140,6 +174,27 @@ export interface SceneInput {
    * recording-wide scan of its own.
    */
   readonly unansweredCallFloorIds?: readonly string[] | undefined;
+  /**
+   * Per-floor rider queues at this instant — `docs/10` § 6, U4.
+   *
+   * Omitted, the landings draw exactly what they drew before: the `▲n ▼n` direction counts. Given,
+   * the counts stay *and* every waiting person is drawn — individually while there are few enough
+   * of them, then with a `+N`, then as a log-scaled bar (§ 6.2). The counts are not replaced,
+   * because they are the only thing on the row that says which way people want to go.
+   *
+   * Passed in rather than computed here for the reason {@link SceneInput.overlay} is: `drawScene`
+   * stays a pure function of its inputs, so `canvas.test.ts` can assert what was drawn without
+   * running a simulation.
+   */
+  readonly queues?: readonly FloorQueue[] | undefined;
+  /**
+   * The building's mood, from observations alone — D4, and R1's payoff.
+   *
+   * On the canvas because the canvas is what **Export PNG** writes to a file: a mood that lived
+   * only in the DOM would be absent from the one artefact that leaves the building. The gauge's
+   * reasons stay in the DOM, where they can be read and copied.
+   */
+  readonly mood?: BuildingMood | undefined;
 }
 
 /**
@@ -260,6 +315,23 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   if (banner.length > 0) {
     ctx.fillStyle = theme.warning;
     ctx.fillText(banner.join('   ·   '), layout.width - 12, 10);
+  }
+
+  /*
+   * The mood, on the bitmap — D4.
+   *
+   * The **glyph first**, then the word, then (when it is one) the provisional marker. All three are
+   * text, so a greyscale export carries the whole claim: KB-15's rule is not satisfied by drawing
+   * the same fact in two colours.
+   *
+   * Nothing here is suppressible, which is the point of R1 — this line is drawn on the 46 of 60
+   * shipped configurations (**M1**) where the header two lines up says `mean wait suppressed`.
+   */
+  const mood = input.mood;
+  if (mood !== undefined) {
+    ctx.textAlign = 'left';
+    ctx.fillStyle = mood.level === 'calm' ? theme.textDim : theme.warning;
+    ctx.fillText(`${mood.glyph} ${mood.headline}`, 12, 48);
   }
 }
 
@@ -544,18 +616,45 @@ export function landingOptionLabel(assignment: LandingAssignment): string {
  */
 const UNANSWERED_GLYPH = '✗';
 
+/**
+ * Smallest floor pitch at which a rider glyph is a glyph rather than a smear — § 6.2's second bar
+ * trigger, *"or the floor pitch is below the glyph height"*.
+ *
+ * 12 px is the font size this renderer draws at, so a row shorter than that cannot hold one
+ * without touching its neighbours. Vertical City's 100 floors at 700 px are under 8 px, which is
+ * exactly the case the bar exists for.
+ */
+const MIN_GLYPH_PITCH_PX = 12;
+
+/** Height of the bar a degraded row draws, pixels. Shorter than the pitch, always. */
+const QUEUE_BAR_HEIGHT_PX = 5;
+/** Shortest track a bar is scaled against, so a narrow gutter shortens it rather than erasing it. */
+const MIN_BAR_TRACK_PX = 24;
+/** Longest, so the count and the oldest wait always have room after it. Driven, not guessed. */
+const MAX_BAR_TRACK_PX = 56;
+
 function drawLandings(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   const { frame, layout } = input;
   const rowById = new Map(layout.rows.map((row) => [row.floorId, row]));
   const unanswered = new Set(input.unansweredCallFloorIds ?? []);
+  const queueByFloor = new Map((input.queues ?? []).map((queue) => [queue.floorId, queue]));
+  // The deepest queue anywhere at this instant, for the bar's log scale. Taken from the frame
+  // rather than pinned, because the measured extremes differ by a factor of two between buildings
+  // (M5: 175 on Midtown Office, 379 on Vertical City) and either pin makes the other unreadable.
+  const scaleTotal = (input.queues ?? []).reduce((max, queue) => Math.max(max, queue.total), 0);
   const x = layout.plot.x + layout.plot.width + 10;
+  // Everything right of the landings, up to the metrics panel if there is one. This is the *"row
+  // width"* § 6.2 degrades against, and it is a property of the viewport rather than of the
+  // building — which is why the same building degrades differently on a narrow window.
+  const rightEdge = (layout.overlay?.x ?? layout.width) - 12;
   ctx.font = FONT;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   for (const landing of frame.landings) {
     const row = rowById.get(landing.floorId);
     if (row === undefined) continue;
-    if (landing.waitingUp === 0 && landing.waitingDown === 0) {
+    const queue = queueByFloor.get(landing.floorId);
+    if (landing.waitingUp === 0 && landing.waitingDown === 0 && queue === undefined) {
       ctx.fillStyle = theme.textDim;
       ctx.fillText('·', x, row.y);
       continue;
@@ -576,8 +675,146 @@ function drawLandings(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void 
     if (unanswered.has(landing.floorId)) {
       ctx.fillStyle = theme.warning;
       ctx.fillText(UNANSWERED_GLYPH, cursor, row.y);
+      cursor += 8 * 2;
+    }
+    if (queue === undefined) continue;
+    cursor = drawQueueRow(ctx, theme, queue, {
+      x: cursor,
+      y: row.y,
+      widthPx: rightEdge - cursor,
+      pitchPx: layout.pitchPx,
+      scaleTotal,
+      // The layout has already decided which rows are far enough apart to carry 12 px of text —
+      // `FloorRow.labelled`, at `MIN_LABEL_PITCH_PX`. Reused rather than re-derived, because a
+      // queue caption drawn on a row whose own floor label was thinned away is text nothing
+      // identifies, on top of its neighbour. Driven on Midtown Office at 21 floors in a short
+      // canvas, where two adjacent captions overlapped and neither was readable.
+      labelled: row.labelled,
+    });
+  }
+}
+
+interface QueueRowBox {
+  readonly x: number;
+  readonly y: number;
+  readonly widthPx: number;
+  readonly pitchPx: number;
+  readonly scaleTotal: number;
+  /**
+   * Whether this row can carry text — `FloorRow.labelled`.
+   *
+   * **This is a stated limitation, not a silent one.** On a building whose rows are too close to
+   * label — Vertical City's 100 floors, and Midtown Office in a short window — a queue is drawn as
+   * a bar with **no count beside it**, which is the one place this feature does not keep the rule
+   * that a bar never carries its value alone. The count is still reachable: `describeFrame` names
+   * the busiest floors with their numbers, the landing selector lists them, and the header states
+   * the building total. Drawing it anyway was tried and produced two captions on top of each other
+   * at 7 px pitch, which carries less than nothing.
+   */
+  readonly labelled: boolean;
+}
+
+/**
+ * One landing's queue, drawn — § 6.2's three modes, and D4's mood painted on the same glyphs.
+ *
+ * The plan is made by `render/riderQueue.ts` and this function only puts it on the context, which
+ * is the split the whole of `render/` uses: what to draw is arithmetic and testable under Node,
+ * where to draw it is pixels. Returns the cursor, so a caller could put something after the row.
+ */
+function drawQueueRow(
+  ctx: Canvas2DLike,
+  theme: Theme,
+  queue: FloorQueue,
+  box: QueueRowBox,
+): number {
+  /*
+   * Cells the row must keep back for the text that follows the glyphs.
+   *
+   * Without this the glyphs fill the row to its last pixel and the `+N` is drawn under the metrics
+   * panel — seen on Midtown Office at 5:05, seed 42, where the Garage row read `18 waiti` with the
+   * rest behind the panel. A count that is clipped is worse than a count that was never promised,
+   * because the reader cannot tell which digits are missing.
+   *
+   * Constants rather than a measurement, because the text's length depends on the mode and the
+   * mode depends on the capacity: `+999` and `999 waiting` both fit in twelve cells, and the
+   * relief mark is `✓` plus at most three digits.
+   */
+  const reserved =
+    (queue.total > MAX_INDIVIDUAL_GLYPHS ? 12 : 0) + (queue.recentlyBoarded > 0 ? 5 : 0);
+  const plan: QueueRowPlan = planQueueRow({
+    queue,
+    capacityCells: Math.floor(box.widthPx / CHAR_ADVANCE_PX) - reserved,
+    // A row that cannot carry its own floor label cannot carry twelve glyphs and a `+N` either, so
+    // it aggregates all the way to a bar. One rule, in the direction § 6.2 already goes.
+    pitchFits: box.labelled && box.pitchPx >= MIN_GLYPH_PITCH_PX,
+    scaleTotal: box.scaleTotal,
+  });
+  let cursor = box.x;
+
+  if (plan.mode === 'bar') {
+    // The bar carries the *shape* of its worst band too, as the colour of the track's own outline
+    // would not survive greyscale: the glyph is drawn beside the bar, at every depth.
+    ctx.fillStyle = theme.queueBands[plan.worstBand];
+    // The track is a fraction of the row rather than *the row less the caption*, so that a narrow
+    // gutter shortens the bar instead of collapsing it to nothing — which is what the first
+    // version did, and a bar of one pixel says the same thing about 175 and 379. It is also
+    // **capped**: at 45 % of the gutter and no ceiling, the caption ran off the end and Midtown
+    // Office's Lobby read `● 55 waiting ·` with the wait behind the metrics panel. The count is
+    // the thing that must survive, so the bar yields to it.
+    const width = Math.max(
+      1,
+      plan.barFraction * Math.min(MAX_BAR_TRACK_PX, Math.max(MIN_BAR_TRACK_PX, box.widthPx * 0.45)),
+    );
+    ctx.fillRect(cursor, box.y - QUEUE_BAR_HEIGHT_PX / 2, width, QUEUE_BAR_HEIGHT_PX);
+    cursor += width + 6;
+    if (!box.labelled) return cursor;
+    /*
+     * The caption, shortened rather than clipped.
+     *
+     * Driven on Midtown Office at 5:45, seed 42: the Lobby's bar read
+     * `● 50 waiting · longest 9` with the rest behind the metrics panel. A number cut off mid-digit
+     * is worse than one that was never offered, because the reader cannot tell how much is missing.
+     * So the row drops the *secondary* fact — the oldest wait — and keeps the count, which is the
+     * one a bar must never carry alone. Both remain in `describeFrame`.
+     */
+    const room = Math.floor((box.x + box.widthPx - cursor) / CHAR_ADVANCE_PX);
+    const full = `${BAND_GLYPH[plan.worstBand]} ${plan.text}`;
+    const caption =
+      full.length <= room ? full : `${BAND_GLYPH[plan.worstBand]} ${String(plan.total)} waiting`;
+    ctx.fillStyle = theme.text;
+    ctx.fillText(caption, cursor, box.y);
+    cursor += CHAR_ADVANCE_PX * (caption.length + 1);
+    if (plan.reliefText !== undefined) {
+      ctx.fillStyle = theme.queueRelief;
+      ctx.fillText(plan.reliefText, cursor, box.y);
+      cursor += CHAR_ADVANCE_PX * (plan.reliefText.length + 1);
+    }
+    return cursor;
+  }
+
+  for (const segment of plan.segments) {
+    if (segment.label !== undefined) {
+      ctx.fillStyle = theme.badge;
+      ctx.fillText(`${segment.label} `, cursor, box.y);
+      cursor += CHAR_ADVANCE_PX * (segment.label.length + 1);
+    }
+    for (const glyph of segment.glyphs) {
+      ctx.fillStyle = theme.queueBands[glyph.band];
+      ctx.fillText(glyph.glyph, cursor, box.y);
+      cursor += CHAR_ADVANCE_PX;
     }
   }
+  if (plan.text !== '') {
+    ctx.fillStyle = theme.text;
+    ctx.fillText(plan.text, cursor, box.y);
+    cursor += CHAR_ADVANCE_PX * (plan.text.length + 1);
+  }
+  if (plan.reliefText !== undefined) {
+    ctx.fillStyle = theme.queueRelief;
+    ctx.fillText(plan.reliefText, cursor, box.y);
+    cursor += CHAR_ADVANCE_PX * (plan.reliefText.length + 1);
+  }
+  return cursor;
 }
 
 function drawFooter(

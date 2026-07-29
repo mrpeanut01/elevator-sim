@@ -9410,3 +9410,107 @@ deliberately still open and needs its own entry, dated before that measurement.
 measured and NOT ACCEPTED*, now over eight operating points rather than one. § D145 stands as
 written and is not superseded — its cell is not in this grid, and its figures still reproduce from
 `runWeightSetSelectionStudy()` with no arguments.
+
+---
+
+## D157 — rider queues are **derived, not carried**, and the mood they are painted with is scored from observations only
+
+**Date:** 2026-07-29 · **Unit:** wave 8 T61 — `docs/10-experience-layer-contract.md` § 6 (**U4**),
+§ 11 **W7a**, plus the directions document's **D1 + D4** rendering treatment · **Status:** landed
+
+### The contract change is zero fields, and the claim was checked before it was relied on
+
+§ 2.3 says a per-floor queue of individual riders is derivable from `VizLeg` with **no contract
+change at all**. It is, and `queueAt` in `frame/overlay.ts` is the derivation: membership is
+`arrivedAt <= t && (boardedAt === undefined || boardedAt > t)`, the wait is `t - arrivedAt`, the
+destination is `destinationFloorId` and the promise is `assignedCarId`. `VIZ_SCHEMA_VERSION` stays
+at **5**.
+
+One wording correction: § 2.3 and the task brief describe `isWaitingAt` as *already exposed*. It was
+module-**private** in `frame/overlay.ts` — correct about the code existing, wrong about it being
+reachable. This change gives it a second caller inside its own file rather than exporting it, which
+keeps the right-continuity convention in one place.
+
+### The bands are the run's own numbers
+
+§ 6.2 names *"under 30 s, 30–60 s, over 60 s, over the horizon"* and sources the last two to
+`metrics.longWaitThresholdS` and `DEFAULT_MAX_WAIT_HORIZON_S`. Since D154 both are carried on
+`VizSummary`, so `waitBandsOf(summary)` reads them off the run and derives the first boundary as
+half the long-wait threshold. A building that reports long waits at 45 s bands its riders at 45 s.
+Nothing here imports the constant.
+
+### R1 is the reason this feature exists, and the type is what enforces it
+
+**M1**: at the viewer's defaults only **14 of 60** building × dispatcher cells produce a quotable
+mean. A mood derived from a mean would be blank on the 46 cells whose mood is worth showing — which
+are exactly the runs where the queues diverged.
+
+So `buildingMood` takes `MoodObservations`, whose summary half is a `Pick` that omits `meanWaitS`,
+`wait95S`, `meanTimeToDestinationS`, `achievedInterval`, `energy` — **and `awtIsValid` and
+`awtInvalidReason`**, which R5's own corrected example would have allowed. A scorer that cannot see
+the suppression flag cannot come to branch on it. `moodObservationsOf` is the single narrowing
+point and is written as an explicit field-by-field copy rather than a spread with deletions,
+because a spread would carry the *next* estimate somebody adds into the scorer automatically.
+
+Proved rather than asserted: `mood.test.ts` takes a **real saturated recording** (Midtown Office,
+seed 20 260 727, 900 s), moves all seven omitted fields to absurd values, and requires the mood to
+be byte-identical. Mutating the narrowing to carry `meanWaitS` turns it red.
+
+### R2 and R6, as behaviour rather than as prose
+
+**R2** — the mood carries a caveat naming **M7**'s measurement (*"the same configuration on Secure
+Tower returned a quotable average on 6 of 20 consecutive seeds"*), every headline is past-tense and
+about *the building*, and a test greps every string the gauge can produce on a real run for a
+dispatcher id and for five comparative forms.
+
+**R6** — a mood read before the playhead reaches `endedAt` is a **preview**, exactly as the design
+says a mid-playback goal is, and `BuildingMood.provisional` plus the words *"So far — the run has
+not finished, so this can still change"* carry it in both the flag and the sentence.
+
+### Shape, not colour — and the two places it is asserted
+
+Four bands, four **distinct shapes** (`○ ◑ ● ✖`), asserted injective and asserted against `✗` and
+`⊘`, which the renderer already owns for two *different* claims. The canvas test plans a row under a
+theme whose four band colours are the **same string** and requires the four bands still to be four
+different marks. `describeFrame` says the same four facts in words, per floor, busiest first.
+
+### The scaling answer, and the limitation it leaves
+
+§ 3.2's finding is that SimTower's elevator micromanagement became unwieldy at scale and Project
+Highrise escaped by abstracting elevators away — an exit this project cannot take. So the queue
+**aggregates**: individual glyphs to 12, glyphs plus `+N` to 40, then a `log(1 + n)` bar with the
+count. Two triggers, not one: the depth, **or** a floor pitch below the glyph height.
+
+**Stated limitation.** A row too tight for the layout's own `FloorRow.labelled` draws its bar with
+**no count beside it** — the one place this feature does not keep *a bar never carries its value
+alone*. Drawing it anyway was tried and produced two captions on top of each other at 7 px pitch on
+Midtown Office. The count remains in `describeFrame`, in the landing selector and in the header.
+
+### Frame budget, re-measured with the rendering in place
+
+§ 2.5 measured the sibling selector at 0.02–0.07 ms. Measured here at 600 sampled instants,
+`nearest-car`, seed 20 260 727, against a 16.7 ms 60 Hz budget:
+
+| run | legs | floors | deepest landing queue | `queueAt` | whole frame incl. `drawScene` | `describeFrame` |
+|---|---|---|---|---|---|---|
+| Midtown Office, 900 s | 406 | 21 | 163 | 0.013 ms | **0.051 ms** | 0.012 ms |
+| Vertical City, 1800 s | 3 347 | 100 | **450** | 0.044 ms | **0.197 ms** | 0.033 ms |
+
+**1.2 % of the frame budget at worst.** The 450 figure is deeper than **M5**'s 379 — a different
+seed and 600 sampled instants rather than a few — so the bar mode is exercised at a depth the
+shipped data really reaches.
+
+### One false negative in the mutation evidence, recorded rather than smoothed over
+
+`FloorQueue.worstBand` frozen to `'settling'` came back **green** against `mood.test.ts`. Not a dead
+field — the bar's colour, its glyph and the gauge all read it — but every reader was exercised
+against a hand-built `FloorQueue` whose `worstBand` the test itself had set. This is T60's
+two-readers false negative in this unit. Closed by recomputing `worstBand` from the riders' own
+bands in `overlay.test.ts`, after which the same mutation is red. Two more came back green for the
+same reason and are closed the same way: the relief mark in the **glyph** branch (the existing test
+was exercising the *bar* branch, because the default 76 px gutter leaves no cells) and the promised-
+car label on the canvas.
+
+**Non-test callers.** `render/canvas.ts` `drawLandings`/`drawHeader`, `render/describeFrame.ts`, and
+`dev/main.ts`'s draw loop, which computes `queueAt` and `buildingMood` every animation frame and
+mounts the gauge as DOM.

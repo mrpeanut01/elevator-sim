@@ -63,6 +63,15 @@
  * | {@link loadColour}, {@link loadTrackMax}, {@link doorGlyph}, {@link describeSelection} | `src/render/canvas.ts` and `src/render/overlay.ts` |
  * | {@link describeFrame} | `src/dev/main.ts`, as the canvas's `aria-label` and its live region — `KB-13` |
  * | {@link runSummaryFigures} | `drawRunSummary` in `src/dev/main.ts`, called from `adopt` on every recording — `docs/10` § 11 **W2** |
+ * | {@link queueAt} | `src/dev/main.ts`'s draw loop, every animation frame — `docs/10` § 6, **U4** |
+ * | {@link waitBandsOf}, {@link waitBandOf} | `queueAt`, in `src/frame/overlay.ts`, once per rider |
+ * | {@link worseBand} | `queueAt`, for `FloorQueue.worstBand` |
+ * | {@link planQueueRow} | `drawQueueRow` in `src/render/canvas.ts`, once per landing per frame |
+ * | {@link riderMoodOf} | `planQueueRow`, which puts the mood on every glyph it emits |
+ * | {@link describeQueue} | `describeFrame` in `src/render/describeFrame.ts` — § 6.3's clause |
+ * | {@link BAND_GLYPH}, {@link BAND_WORDS}, {@link RELIEF_GLYPH} | `src/render/canvas.ts` and `describeQueue`. The shapes KB-15 requires beside the colours |
+ * | {@link buildingMood}, {@link moodObservationsOf} | `src/dev/main.ts`'s draw loop; `drawMood` mounts the result and `drawScene` draws its headline |
+ * | {@link MOOD_GLYPH} | `buildingMood`, in `src/render/mood.ts`. The building-scale half of KB-15 |
  * | {@link windowClause} | `drawFooter`, in `src/render/canvas.ts` — § 7.4 on the surface `Export PNG` writes to a file |
  * | {@link landingOptionLabel} | `src/dev/main.ts`'s `populateLandings`, one option per landing call |
  * | {@link readRecordingDocument} | `src/dev/main.ts`'s **Load recording** control — the version check's first real caller |
@@ -213,16 +222,59 @@ export {
 export { describePreview, drawPreview, type PreviewInput } from './render/preview.js';
 
 export {
+  DEFAULT_RELIEF_WINDOW_S,
   DEFAULT_WINDOW_S,
   landingAssignmentAt,
   landingAssignmentsAt,
   meansAreSuppressed,
   overlayAt,
+  queueAt,
+  waitBandOf,
+  waitBandsOf,
+  worseBand,
   type BankMetrics,
+  type FloorQueue,
   type LandingAssignment,
   type OverlayMetrics,
   type OverlayOptions,
+  type QueueGroup,
+  type QueueOptions,
+  type QueuedRider,
+  type WaitBand,
+  type WaitBandThresholds,
 } from './frame/overlay.js';
+
+/* -------------------------------------------------------------------------- *
+ * U4 — rider queues and the mood treatment painted on them (docs/10 § 6, D1 + D4)
+ * -------------------------------------------------------------------------- */
+
+export {
+  BAND_GLYPH,
+  BAND_WORDS,
+  MAX_GLYPHS_WITH_COUNT,
+  MAX_INDIVIDUAL_GLYPHS,
+  RELIEF_GLYPH,
+  describeQueue,
+  planQueueRow,
+  riderMoodOf,
+  type QueueGlyph,
+  type QueueRowInput,
+  type QueueRowMode,
+  type QueueRowPlan,
+  type QueueSegment,
+  type RiderMood,
+} from './render/riderQueue.js';
+
+export {
+  MOOD_GLYPH,
+  buildingMood,
+  moodObservationsOf,
+  type BuildingMood,
+  type MoodDriver,
+  type MoodLevel,
+  type MoodObservations,
+  type MoodSummary,
+} from './render/mood.js';
 
 export {
   readRecordingDocument,
