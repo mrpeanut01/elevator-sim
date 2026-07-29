@@ -36,7 +36,7 @@ import {
   fitLabel,
   type Canvas2DLike,
 } from './canvas.js';
-import { buildLayout } from './layout.js';
+import { MIN_HEADER_PX, buildLayout } from './layout.js';
 import { LOAD_ALARM, LOAD_FULL, loadColour, loadTrackMax } from './overlay.js';
 
 /* -------------------------------------------------------------------------- *
@@ -316,10 +316,13 @@ describe('the live metrics panel draws the metrics it was given', () => {
         bankId: `bank-${String(index % 12)}`,
       })),
     };
-    // A short viewport as well as a long list, so both sections are genuinely over budget.
+    // A short viewport as well as a long list, so both sections are genuinely over budget. The
+    // height is written as *what it leaves the panel* — 224 px — rather than as a total, because
+    // the total is not the quantity this test cares about and it moved when the header band grew
+    // a row (`render/layout.ts`'s `MIN_HEADER_PX`). Stated this way it cannot move again.
     const layout = buildLayout({
       width: 1200,
-      height: 340,
+      height: 224 + 24 + MIN_HEADER_PX + 28,
       floors: manyBanks.floors,
       shafts: manyBanks.shafts,
       overlayWidthPx: 250,

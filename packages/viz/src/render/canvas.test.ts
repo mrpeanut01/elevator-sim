@@ -18,11 +18,12 @@ import { describe, expect, it } from 'vitest';
 import { FIXTURE_DOOR_CONFIG, fixtureSummary } from '../fixtures.test-helper.js';
 import { constantSeries } from '../contract/series.js';
 import { VIZ_SCHEMA_VERSION, type Frame, type VizRecording } from '../contract/types.js';
-import { buildLayout } from './layout.js';
+import { MIN_HEADER_PX, buildLayout } from './layout.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import { DEFAULT_THEME, drawScene, formatClock, type Canvas2DLike, type Theme } from './canvas.js';
 import type { FloorQueue, QueuedRider, WaitBand } from '../frame/overlay.js';
 import { MOOD_GLYPH, type BuildingMood } from './mood.js';
+import { BAND_GLYPH } from './riderQueue.js';
 import { windowClause } from './runSummary.js';
 
 /* -------------------------------------------------------------------------- *
@@ -473,9 +474,10 @@ describe('formatClock', () => {
  * U4 — rider queues and the mood, on the bitmap (`docs/10` § 6, D1 + D4)
  * -------------------------------------------------------------------------- */
 
+const BANDS: readonly WaitBand[] = ['settling', 'waiting', 'long', 'abandoned'];
+
 describe('drawScene draws the rider queue', () => {
-  const band = (index: number): WaitBand =>
-    (['settling', 'waiting', 'long', 'abandoned'] as const)[index % 4] ?? 'settling';
+  const band = (index: number): WaitBand => BANDS[index % BANDS.length] ?? 'settling';
 
   function queue(total: number, overrides: Partial<FloorQueue> = {}): FloorQueue {
     const riders: QueuedRider[] = Array.from({ length: total }, (_, index) => ({
@@ -518,7 +520,10 @@ describe('drawScene draws the rider queue', () => {
     const glyphs = withQueues([queue(4)])
       .calls.filter((call) => call.op === 'fillText')
       .map((call) => String(call.args[0]));
-    for (const wanted of ['○', '◑', '●', '✖']) {
+    // Read from the shipped map, never transcribed: the abandoned band was re-spelled to break a
+    // *shape* collision with `✗` (`render/landingMarks.test.ts`), and a test carrying its own
+    // copy of the four marks would have gone red for the change rather than for a defect.
+    for (const wanted of BANDS.map((band) => BAND_GLYPH[band])) {
       expect(glyphs, `band glyph ${wanted}`).toContain(wanted);
     }
   });
@@ -539,7 +544,7 @@ describe('drawScene draws the rider queue', () => {
       .map((call) => String(call.args[0]));
     expect(new Set(marks).size).toBe(4);
     expect([...new Set(marks)].sort((a, b) => a.localeCompare(b))).toEqual(
-      ['○', '◑', '●', '✖'].sort((a, b) => a.localeCompare(b)),
+      BANDS.map((band) => BAND_GLYPH[band]).sort((a, b) => a.localeCompare(b)),
     );
   });
 
@@ -664,7 +669,8 @@ describe('drawScene draws the rider queue', () => {
     const drawn = ctx.calls
       .filter((call) => call.op === 'fillText')
       .map((call) => String(call.args[0]));
-    const glyphCount = drawn.filter((line) => ['○', '◑', '●', '✖'].includes(line)).length;
+    const bandMarks: readonly string[] = BANDS.map((band) => BAND_GLYPH[band]);
+    const glyphCount = drawn.filter((line) => bandMarks.includes(line)).length;
     expect(glyphCount).toBeGreaterThan(0);
     expect(glyphCount).toBeLessThan(20);
     expect(drawn).toContain(`+${String(20 - glyphCount)}`);
@@ -880,8 +886,11 @@ describe('a building whose rows cannot be labelled aggregates all the way to a b
      */
     const between = buildLayout({
       width: 900,
-      // 20 gaps at 13 px, plus the header, footer and padding the layout subtracts.
-      height: 20 * 13 + 24 + 64 + 28,
+      // 20 gaps at 13 px, plus the header, footer and padding the layout subtracts. The header is
+      // `MIN_HEADER_PX` and not a literal, because it is *derived* from the rows the band holds
+      // (`render/layout.ts`) — a transcribed 64 stopped being true the moment the band grew a row,
+      // and this test's whole point is the two-pixel window it lands the pitch in.
+      height: 20 * 13 + 24 + MIN_HEADER_PX + 28,
       floors: tall.floors.slice(0, 21),
       shafts: tall.shafts,
     });

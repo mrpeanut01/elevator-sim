@@ -257,6 +257,7 @@ export function drawScene(ctx: Canvas2DLike, input: SceneInput): void {
   drawCars(ctx, input, theme);
   drawLandings(ctx, input, theme);
   drawSelection(ctx, input, theme);
+  drawNotices(ctx, input, theme);
   drawFooter(ctx, recording, frame, layout, theme);
   if (input.overlay !== undefined) {
     drawOverlay(ctx, { recording, frame, layout, theme, metrics: input.overlay });
@@ -292,25 +293,34 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   ctx.textBaseline = 'top';
   ctx.font = FONT_BOLD;
   ctx.fillStyle = theme.text;
-  ctx.fillText(recording.buildingName, 12, 10);
+  ctx.fillText(recording.buildingName, 12, layout.header.titleY);
 
   ctx.font = FONT;
   ctx.fillStyle = theme.textDim;
-  ctx.fillText(
-    `${recording.dispatcherProfileId} · seed ${recording.seed} · ${formatClock(frame.simTimeS)} / ${formatClock(recording.endedAt)}`,
-    12,
-    30,
-  );
+  const meta = `${recording.dispatcherProfileId} · seed ${recording.seed} · ${formatClock(frame.simTimeS)} / ${formatClock(recording.endedAt)}`;
+  ctx.fillText(meta, 12, layout.header.metaY);
 
   ctx.textAlign = 'right';
   ctx.fillStyle = theme.text;
+  /*
+   * Clipped against the meta line, for the reason the banner is clipped against the title.
+   *
+   * The two share a row and nothing stopped them meeting: on a narrow canvas the counters were
+   * drawn straight through the seed, and `R7` makes the seed the one thing on that line that may
+   * never be lost. So the counters yield — they are also the line that repeats what the run
+   * summary panel says at length, and the seed is not.
+   */
+  const metaPx = 12 + meta.length * CHAR_ADVANCE_PX + 16;
   ctx.fillText(
-    `waiting ${String(frame.totalWaiting)}   boarded ${String(frame.boardedLegs)} legs   ${meanClause(
-      recording,
-      frame,
-    )}`,
+    fitLabel(
+      `waiting ${String(frame.totalWaiting)}   boarded ${String(frame.boardedLegs)} legs   ${meanClause(
+        recording,
+        frame,
+      )}`,
+      layout.width - 12 - metaPx,
+    ),
     layout.width - 12,
-    30,
+    layout.header.metaY,
   );
 
   // The one statistic a viewer must never quietly average. `awtIsValid` is copied from the
@@ -367,7 +377,7 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
     ctx.fillText(
       fitLabel(banner.join('   ·   '), layout.width - 12 - titlePx),
       layout.width - 12,
-      10,
+      layout.header.titleY,
     );
   }
 
@@ -380,12 +390,21 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
    *
    * Nothing here is suppressible, which is the point of R1 — this line is drawn on the 46 of 60
    * shipped configurations (**M1**) where the header two lines up says `mean wait suppressed`.
+   *
+   * `layout.header.moodY` and not `48`: the literal `48` put this line straight through the bank
+   * labels on every multi-bank building, because `drawShafts` writes those at `plot.y − 18` and the
+   * 64 px header left the two rows ten pixels apart. Both numbers were locally correct and neither
+   * owned the row. See {@link HeaderBand}.
    */
   const mood = input.mood;
   if (mood !== undefined) {
     ctx.textAlign = 'left';
     ctx.fillStyle = mood.level === 'calm' ? theme.textDim : theme.warning;
-    ctx.fillText(`${mood.glyph} ${mood.headline}`, 12, 48);
+    ctx.fillText(
+      fitLabel(`${mood.glyph} ${mood.headline}`, layout.width - 24),
+      12,
+      layout.header.moodY,
+    );
   }
 }
 
@@ -484,13 +503,14 @@ function drawShafts(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
     // Clipped to the column, like the floor labels: a 16-shaft building gives each column about
     // 30 px, and `shuttle`/`office-low` run into their neighbours long before that. Found by
     // running the viewer on Mixed-Use High-Rise.
-    ctx.fillText(fitLabel(column.label, column.width), column.centreX, layout.plot.y - 4);
+    ctx.fillText(fitLabel(column.label, column.width), column.centreX, layout.header.shaftY);
     // RV-06: banks are grouped and *labelled*. Only when there is more than one — repeating
     // "main" over every column of a single-bank building is noise, and the shipped buildings
-    // that have several banks are exactly the ones where the grouping is the point.
+    // that have several banks are exactly the ones where the grouping is the point. The *row* is
+    // reserved either way, so a bank filter does not move the picture — see {@link HeaderBand}.
     if (bankCount > 1) {
       ctx.fillStyle = theme.badge;
-      ctx.fillText(fitLabel(column.bankId, column.width), column.centreX, layout.plot.y - 18);
+      ctx.fillText(fitLabel(column.bankId, column.width), column.centreX, layout.header.bankY);
     }
   }
 }
@@ -550,17 +570,48 @@ function drawCars(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
       ctx.fillText(doorGlyph(car.doorPhase), column.centreX, y + h + 8);
     }
   }
+}
+
+/**
+ * The notices row: the shaft-count warning and the selected landing's caption, on **one** row.
+ *
+ * They were drawn by two different functions at the same `y` (`plot.y − 20`), left-aligned at the
+ * same `x`, so a reader who selected a landing on a window too narrow for every shaft got the two
+ * sentences written through each other. They are drawn here in one place, in order, with the
+ * cursor carried between them — which is the only way two left-aligned strings share a row.
+ *
+ * Both keep their own colour: `RS-05`'s warning is a warning and `RV-T3`'s caption is a selection.
+ */
+function drawNotices(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
+  const { layout, selection } = input;
+  const selected =
+    selection === undefined
+      ? undefined
+      : layout.rows.find((candidate) => candidate.floorId === selection.floorId);
+
+  ctx.font = FONT;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'bottom';
+  let cursor = layout.plot.x;
+  const rightEdge = layout.plot.x + layout.plot.width;
 
   if (layout.hiddenShaftCount > 0) {
     // RS-05: never silently truncated. The CLI's `watch` says "showing N of M" and so does this.
-    ctx.font = FONT;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'bottom';
     ctx.fillStyle = theme.warning;
-    ctx.fillText(
+    const text = fitLabel(
       `showing ${String(layout.columns.length)} of ${String(layout.columns.length + layout.hiddenShaftCount)} shafts — widen the window`,
-      layout.plot.x,
-      layout.plot.y - 20,
+      rightEdge - cursor,
+    );
+    ctx.fillText(text, cursor, layout.header.noticeY);
+    cursor += CHAR_ADVANCE_PX * (text.length + 2);
+  }
+
+  if (selection !== undefined && selected !== undefined) {
+    ctx.fillStyle = theme.highlight;
+    ctx.fillText(
+      fitLabel(describeSelection(selection), rightEdge - cursor),
+      cursor,
+      layout.header.noticeY,
     );
   }
 }
@@ -593,12 +644,7 @@ function drawSelection(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void
     ctx.lineWidth = 2;
     ctx.strokeRect(column.x, layout.plot.y, column.width, layout.plot.height);
   }
-
-  ctx.font = FONT;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'bottom';
-  ctx.fillStyle = theme.highlight;
-  ctx.fillText(describeSelection(selection), layout.plot.x, layout.plot.y - 20);
+  // The caption is drawn by `drawNotices`, which owns the row it shares with `RS-05`'s warning.
 }
 
 /** The caption for a selected landing. Exported so a text alternative can reuse the wording. */
@@ -667,8 +713,14 @@ export function landingOptionLabel(assignment: LandingAssignment): string {
  * `✗` and not `⊘`: `⊘` already means *this floor is served by no shaft* on the label gutter, and
  * the two are different claims — one about the building's geometry, one about what the dispatcher
  * did with a call it could legally have taken. Colour is not the only signal either way.
+ *
+ * Exported so the shape guard in `render/landingMarks.test.ts` reads the shipped value rather than
+ * a transcription of it. It kept its spelling through that guard's first red run; the band glyph
+ * it collided with is the one that moved (`render/riderQueue.ts`), because `D10` had `✗` first and
+ * because `✗` is named in `UX.md` RV-08, `access/lockedOut.ts` and `docs/10` § 10.4, while the
+ * band's spelling has exactly one definition and every reader goes through it.
  */
-const UNANSWERED_GLYPH = '✗';
+export const UNANSWERED_GLYPH = '✗';
 
 /**
  * The glyph for a landing whose call no car **may** answer — `docs/10` § 10.4.
@@ -685,6 +737,19 @@ const UNANSWERED_GLYPH = '✗';
  * 12 px mark cannot carry that.
  */
 const LOCKED_OUT_GLYPH = STATE_GLYPHS['not-permitted'];
+
+/**
+ * The direction a landing call was registered in, and the mark for a landing with nobody at it.
+ *
+ * Named rather than inlined for one reason: they are marks on the **same row** as `✗`, `▩`, the
+ * relief `✓` and the four wait bands, and `render/landingMarks.test.ts` checks that no two claims
+ * on that row share a silhouette. A guard that read a transcribed copy of these three would keep
+ * passing after somebody edited the renderer, which is the false negative that family of guards
+ * exists to avoid.
+ */
+export const WAITING_UP_GLYPH = '▲';
+export const WAITING_DOWN_GLYPH = '▼';
+export const EMPTY_LANDING_GLYPH = '·';
 
 /**
  * Smallest floor pitch at which a rider glyph is a glyph rather than a smear — § 6.2's second bar
@@ -736,19 +801,19 @@ function drawLandings(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void 
       !lockedOut.has(landing.floorId)
     ) {
       ctx.fillStyle = theme.textDim;
-      ctx.fillText('·', x, row.y);
+      ctx.fillText(EMPTY_LANDING_GLYPH, x, row.y);
       continue;
     }
     let cursor = x;
     if (landing.waitingUp > 0) {
       ctx.fillStyle = theme.waitingUp;
-      const text = `▲${String(landing.waitingUp)}`;
+      const text = `${WAITING_UP_GLYPH}${String(landing.waitingUp)}`;
       ctx.fillText(text, cursor, row.y);
       cursor += 8 * (text.length + 1);
     }
     if (landing.waitingDown > 0) {
       ctx.fillStyle = theme.waitingDown;
-      const text = `▼${String(landing.waitingDown)}`;
+      const text = `${WAITING_DOWN_GLYPH}${String(landing.waitingDown)}`;
       ctx.fillText(text, cursor, row.y);
       cursor += 8 * (text.length + 1);
     }
@@ -770,12 +835,14 @@ function drawLandings(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void 
      * W6/U4 and W7b/U8, because that is where the two first shared a row.
      *
      * They are different subjects: `✗`/`▩` say something about the *call* at this landing, and
-     * `●◑○✖` say something about the *people* standing at it. Run together they read as one
-     * string, and the abandoned band's `✖` (U+2716) sits one codepoint from the unanswered `✗`
-     * (U+2717) — distinct characters, near-identical marks at 12 px, and they co-occur
-     * systematically, because a call nobody answers is exactly a call whose riders pass the
-     * abandonment horizon. The gap does not fix that; it stops the two groups being read as one
-     * word. See the merge report: the glyph collision itself is not this lane's to resolve.
+     * `●◑○◆` say something about the *people* standing at it. Run together they read as one
+     * string, and the gap stops the two groups being read as one word.
+     *
+     * The gap was all this row had when the abandoned band was `✖` (U+2716), one codepoint and no
+     * distance at all from the unanswered `✗` (U+2717). That is a *shape* problem and a cell of
+     * air does not touch it, so the band moved to `◆` — see `render/riderQueue.ts`'s `BAND_GLYPH`
+     * and the family rule in `render/landingMarks.test.ts`. The gap stays, because separating the
+     * two groups and separating the two marks are two different jobs.
      */
     if (marked) cursor += 8;
     if (queue === undefined) continue;

@@ -74,11 +74,75 @@ export interface FloorRow {
   readonly isTransferFloor: boolean;
 }
 
+/**
+ * The text rows stacked above the plot — **one arithmetic place for the whole header band.**
+ *
+ * ## Why this exists rather than six literals in the renderer
+ *
+ * It shipped as six literals in two files, and they collided. The mood headline `render/canvas.ts`
+ * draws at `y = 48` with `textBaseline: 'top'` occupies `[48, 60]`; the bank label `drawShafts`
+ * writes at `plot.y − 18` with `textBaseline: 'bottom'` occupies `[46, 58]`. **Ten pixels of
+ * overprint on every building with more than one bank**, confirmed arithmetically and on screen.
+ * The hidden-shaft notice (`plot.y − 20`, so `[44, 56]`) overprinted *both*, and the selected
+ * landing's caption is drawn at the same `y` as the hidden-shaft notice, so those two overprinted
+ * each other as well. Four claims, three rows of space, no owner.
+ *
+ * The two literals were each locally correct and were written by different lanes months apart.
+ * That is the shape of the defect: **a header row is a shared resource and nothing owned it.** So
+ * the band is computed here, once, from the rows it must hold, and `headerPx`'s default is
+ * *derived* from that stack rather than being a number somebody picked.
+ *
+ * ## The bank row is reserved even when there is one bank
+ *
+ * `render/canvas.ts` draws a bank label only when the building has more than one bank (`RV-06`) —
+ * repeating `main` over every column of a single-bank building is noise. The **row** is reserved
+ * either way, because `dev/main.ts` filters the shafts by bank and a building drawn through that
+ * filter has exactly one bank: a band that shrank would make the whole picture jump 14 px when the
+ * reader picked a bank out of a `<select>`. Fourteen pixels of stable geometry is worth more than
+ * fourteen pixels of plot that appear and disappear.
+ */
+export interface HeaderBand {
+  /** Top y of the title and the warning banner. Drawn with `textBaseline: 'top'`. */
+  readonly titleY: number;
+  /** Top y of the run-meta line and the right-aligned counters. `textBaseline: 'top'`. */
+  readonly metaY: number;
+  /** Top y of the building-mood line — `docs/10` § 6, D4. `textBaseline: 'top'`. */
+  readonly moodY: number;
+  /**
+   * Baseline y of the notices row — the hidden-shaft count and the selected landing's caption.
+   *
+   * One row for both, because both are left-aligned at {@link Rect.x} and drawing them at the same
+   * `y` is what the two of them did. Drawn with `textBaseline: 'bottom'`, like everything else
+   * anchored upward from the plot.
+   */
+  readonly noticeY: number;
+  /** Baseline y of the bank-label row — `RV-06`. Reserved on every building; see above. */
+  readonly bankY: number;
+  /** Baseline y of the per-shaft label row. */
+  readonly shaftY: number;
+  /**
+   * Height of one text row in this band, pixels — the box a 12 px line occupies.
+   *
+   * Carried so a test can rebuild every row's rectangle from the layout rather than from a
+   * transcribed constant, which is what `render/headerBand.test.ts` does.
+   */
+  readonly linePx: number;
+  /** The same, for the bold 14 px face the title uses. */
+  readonly titleLinePx: number;
+}
+
 export interface Layout {
   readonly width: number;
   readonly height: number;
   /** The shaft area: everything between the label gutters and below the header. */
   readonly plot: Rect;
+  /**
+   * Where each row of text above the plot goes — see {@link HeaderBand}.
+   *
+   * Every renderer that writes above {@link Layout.plot} reads it from here. Nothing in `render/`
+   * may compute a header y of its own; that is the defect this field closes.
+   */
+  readonly header: HeaderBand;
   readonly columns: readonly ShaftColumn[];
   readonly rows: readonly FloorRow[];
   /**
@@ -120,7 +184,14 @@ export interface LayoutOptions {
   readonly gutterLeftPx?: number;
   /** Room for the waiting-passenger counts. */
   readonly gutterRightPx?: number;
-  /** Room for the title and the counters. */
+  /**
+   * Room for the title, the counters, the mood line and the labels above the plot.
+   *
+   * Defaults to {@link MIN_HEADER_PX}, which is *derived* from {@link HeaderBand}'s row stack
+   * rather than chosen. A smaller value is clamped up to it: a caller asking for a header too
+   * short to hold its own rows is asking for the overprint this band exists to prevent, and
+   * silently drawing two labels on top of each other is the worse of the two failures.
+   */
   readonly headerPx?: number;
   readonly footerPx?: number;
   readonly paddingPx?: number;
@@ -134,12 +205,59 @@ export interface LayoutOptions {
   readonly overlayWidthPx?: number;
 }
 
+/* -------------------------------------------------------------------------- *
+ * The header band's row stack
+ * -------------------------------------------------------------------------- */
+
+/** Line box of the 12 px monospace face `render/` draws body text in. */
+const HEADER_LINE_PX = 14;
+/** Line box of the bold 14 px face the title uses. */
+const HEADER_TITLE_LINE_PX = 16;
+/** Where the title sits. Two pixels above the padding line, which is where it has always been. */
+const HEADER_TOP_PX = 10;
+/** Air between the last header row and the first row anchored upward from the plot. */
+const HEADER_GAP_PX = 2;
+/** Air between the shaft label and the plot's top edge. */
+const SHAFT_LABEL_GAP_PX = 4;
+
+/** Rows anchored upward from the plot: notices, bank labels, shaft labels. */
+const PLOT_LABEL_ROWS = 3;
+
+const DEFAULT_PADDING_PX = 12;
+
+/**
+ * The smallest header that holds its own rows, for a given padding — computed, not chosen.
+ *
+ * `HEADER_TOP_PX − paddingPx` is the distance the title sits above the padding line; the rest is
+ * {@link HeaderBand}'s six rows plus the air between the two groups and above the plot.
+ */
+export function minHeaderPx(paddingPx: number = DEFAULT_PADDING_PX): number {
+  return (
+    HEADER_TOP_PX -
+    paddingPx +
+    HEADER_TITLE_LINE_PX +
+    2 * HEADER_LINE_PX +
+    HEADER_GAP_PX +
+    PLOT_LABEL_ROWS * HEADER_LINE_PX +
+    SHAFT_LABEL_GAP_PX
+  );
+}
+
+/**
+ * The shipped minimum: **90 px**, against the 64 px it was before.
+ *
+ * 64 px was never enough for six rows, which is exactly why four of them overlapped. The 26 px
+ * this costs the plot is paid back, and then some, by the panel strip in `index.html` — the run
+ * summary and the mood gauge now share a row instead of stacking, which is worth ~126 px at
+ * 900 px of viewport. Measured before and after; see the delivery report.
+ */
+export const MIN_HEADER_PX = minHeaderPx(DEFAULT_PADDING_PX);
+
 const DEFAULTS = {
   gutterLeftPx: 72,
   gutterRightPx: 76,
-  headerPx: 64,
   footerPx: 28,
-  paddingPx: 12,
+  paddingPx: DEFAULT_PADDING_PX,
 } as const;
 
 /** Largest shaft width that still looks like a shaft, and the smallest that is still legible. */
@@ -158,9 +276,11 @@ const MIN_LABEL_PITCH_PX = 14;
 export function buildLayout(options: LayoutOptions): Layout {
   const gutterLeft = options.gutterLeftPx ?? DEFAULTS.gutterLeftPx;
   const gutterRight = options.gutterRightPx ?? DEFAULTS.gutterRightPx;
-  const header = options.headerPx ?? DEFAULTS.headerPx;
   const footer = options.footerPx ?? DEFAULTS.footerPx;
   const padding = options.paddingPx ?? DEFAULTS.paddingPx;
+  // Clamped, not trusted: a header shorter than its own rows draws two labels on top of each
+  // other, which is the defect this band exists to close. See {@link LayoutOptions.headerPx}.
+  const header = Math.max(minHeaderPx(padding), options.headerPx ?? minHeaderPx(padding));
   const overlayWidth = Math.max(0, options.overlayWidthPx ?? 0);
 
   const plot: Rect = {
@@ -168,6 +288,20 @@ export function buildLayout(options: LayoutOptions): Layout {
     y: padding + header,
     width: Math.max(1, options.width - 2 * padding - gutterLeft - gutterRight - overlayWidth),
     height: Math.max(1, options.height - 2 * padding - header - footer),
+  };
+
+  // Two anchors, meeting in the middle: the three text rows hang from the top of the canvas, and
+  // the three label rows stand on the plot. `header` is clamped above so the two never meet.
+  const shaftY = plot.y - SHAFT_LABEL_GAP_PX;
+  const headerBand: HeaderBand = {
+    titleY: HEADER_TOP_PX,
+    metaY: HEADER_TOP_PX + HEADER_TITLE_LINE_PX,
+    moodY: HEADER_TOP_PX + HEADER_TITLE_LINE_PX + HEADER_LINE_PX,
+    noticeY: shaftY - 2 * HEADER_LINE_PX,
+    bankY: shaftY - HEADER_LINE_PX,
+    shaftY,
+    linePx: HEADER_LINE_PX,
+    titleLinePx: HEADER_TITLE_LINE_PX,
   };
 
   const overlay: Rect | undefined =
@@ -293,6 +427,7 @@ export function buildLayout(options: LayoutOptions): Layout {
     width: options.width,
     height: options.height,
     plot,
+    header: headerBand,
     columns,
     rows,
     hiddenShaftCount: total - count,

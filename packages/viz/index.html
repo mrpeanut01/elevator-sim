@@ -107,6 +107,31 @@
       .control-inactive { color: var(--warn); margin: 4px 0 0; }
       .control-reset { margin-left: 6px; }
 
+      /* The panel strip — the answer to *three panels compete for one column and the canvas
+         loses*.
+
+         The run summary and the mood gauge used to **stack** below the stage, so the column paid
+         `max(summary) + max(mood)` and the canvas paid it. Measured at 1440×900: the summary sat
+         at its 30vh cap of 270 px and the gauge at its 14vh cap of 126 px, so the two of them took
+         396 px of a 900 px window and the `#stage` canvas was left with **168 px**. They are now
+         laid side by side in one grid row, so the column pays `max(summary, mood)` — 271 px — and
+         the canvas gets **293 px**. The next panel added here joins the row rather than pushing
+         the picture down again.
+
+         Nothing is hidden and nothing is capped tighter: both children keep their own scroll and
+         the mood gauge's ceiling goes **up**, from 14vh to 30vh, because in a row its height is
+         free until it exceeds its neighbour's. Below ~720 px of viewport `auto-fit` puts them back
+         one above the other, which is the arrangement that was right there anyway. */
+      .panel-strip {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+        align-items: start;
+        border-top: 1px solid var(--edge); background: var(--panel2);
+      }
+      /* `min-width: 0` or a grid child refuses to shrink below its widest unbreakable row, and the
+         summary's figure notes are long sentences. Without it the strip forces a horizontal
+         scrollbar on the whole page instead of wrapping. */
+      .panel-strip > * { min-width: 0; }
+
       /* docs/10 § 11 W2 — the run summary. Keyed on the classes the mount emits for *every*
          figure, never on a figure id: `render/runSummary.ts` decides what a figure is, and a
          stylesheet that knew the difference between `awt` and `energy` would be a second place
@@ -114,7 +139,6 @@
       .run-summary {
         display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
         gap: 2px 18px; padding: 6px 12px; max-height: 30vh; overflow: auto;
-        border-top: 1px solid var(--edge); background: var(--panel2);
       }
       .figure { padding: 4px 0; border-bottom: 1px solid var(--edge); }
       .figure-label { color: var(--dim); }
@@ -142,12 +166,15 @@
          mount emits as text (KB-15), so the colours below are the second signal and never the
          first. */
       .building-mood {
-        padding: 6px 12px; border-top: 1px solid var(--edge); background: var(--panel2);
-        /* Capped low, and it scrolls. The gauge is six short lines and the canvas is the thing
-           the reader is looking at: driven on Midtown Office, a taller panel squeezed 21 floors
-           into 110 px and put every landing below the pitch at which a queue can be drawn as
-           anything but a bar. A panel that degrades the picture it explains is the wrong trade. */
-        max-height: 14vh; overflow: auto;
+        padding: 6px 12px;
+        /* It still scrolls, and the cap is now the strip's rather than its own.
+           The old cap was 14vh with this reasoning: *"a taller panel squeezed 21 floors into
+           110 px and put every landing below the pitch at which a queue can be drawn as anything
+           but a bar"*. That reasoning was about a gauge **stacked above the stage**, where every
+           pixel it took came out of the picture. Beside the run summary it costs the column
+           nothing until it is the taller of the two, so the cap goes up rather than down and the
+           trade it was protecting against no longer exists. */
+        max-height: 30vh; overflow: auto;
       }
       .mood-head { margin: 0 0 4px; font-weight: 600; }
       .mood-glyph { font-size: 1.1em; }
@@ -279,18 +306,23 @@
 
         <p id="frame-description" class="sr-only" aria-live="polite"></p>
 
-        <!-- docs/10 § 11 W2 — the run summary. Every field VizSummary gained at schema 5 is
-             drawn here, by `render/runSummary.ts` through `dev/main.ts`. Rows are emitted from
-             the figure list; nothing below keys on a figure id, because a stylesheet that named
-             one would be the first list of metric names in this product's UI. -->
-        <section id="run-summary" class="run-summary" aria-label="Run summary"></section>
+        <!-- The panel strip: one row, not a stack. See `.panel-strip` above for the measurement
+             that put them side by side. A panel added to this column belongs *inside* this
+             element — outside it, the canvas pays for it again. -->
+        <div class="panel-strip">
+          <!-- docs/10 § 11 W2 — the run summary. Every field VizSummary gained at schema 5 is
+               drawn here, by `render/runSummary.ts` through `dev/main.ts`. Rows are emitted from
+               the figure list; nothing below keys on a figure id, because a stylesheet that named
+               one would be the first list of metric names in this product's UI. -->
+          <section id="run-summary" class="run-summary" aria-label="Run summary"></section>
 
-        <!-- docs/10 § 6 / D4 — the building mood gauge, from observations alone (R1). It is
-             drawn on every run, including the ~46 of 60 shipped configurations whose mean wait
-             is legitimately refused, which is the single most valuable property of the feature:
-             nothing here is routed through `awtIsValid`, and `render/mood.ts` cannot reach a
-             suppressible field because its input type does not carry one. -->
-        <section id="building-mood" class="building-mood" aria-label="Building mood"></section>
+          <!-- docs/10 § 6 / D4 — the building mood gauge, from observations alone (R1). It is
+               drawn on every run, including the ~46 of 60 shipped configurations whose mean wait
+               is legitimately refused, which is the single most valuable property of the feature:
+               nothing here is routed through `awtIsValid`, and `render/mood.ts` cannot reach a
+               suppressible field because its input type does not carry one. -->
+          <section id="building-mood" class="building-mood" aria-label="Building mood"></section>
+        </div>
 
         <footer class="bar">
           <button id="play-pause">Play</button>

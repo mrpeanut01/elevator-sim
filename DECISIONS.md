@@ -10105,3 +10105,41 @@ All twelve dispatchers × five buildings at the viewer's settings, counting thos
 **Rejected alternatives.** *Reorder `data/dispatcher-profiles.json`* — it moves `profiles[0]` for every consumer at once, a sweep whose blast radius nobody had measured; the consumer was fixed instead of the data. *Drop `nearest-car` from the Try block entirely* — a weak arm is the wrong thing to **run** and the right thing to **compare against**, and pairing two near neighbours would print *"the interval contains zero"*, which teaches that the tool cannot tell rather than that the pair does not differ. *Change `BASELINE_PROFILE`* — every Phase 5 figure and every `published.ts` pin is measured against it. *Assert `toBe('collective')`* — a change detector; the pin is written against the **property** (does this default saturate?) with a discriminating control, because § 4's claim is a claim about saturation and not about a name.
 
 **Impact.** The products' defaults — viewer, batch panel, CLI Try block — now agree with each other **and are pinned**. Authored examples were left curated rather than churned. `nearest-car` is kept wherever it is a study arm, a published pin, a test fixture or a **contrast** arm, each with its reason. The newcomer's first `compare` now runs in 1.7 s and returns `AWT −2.27 s [−2.92, −1.62] BETTER`, 0/100 saturated on both arms — a real result on the first command.
+
+---
+
+## D165 — three shipped viewer defects, and **two of the three reports were wrong about their own cause**
+
+**Date:** 2026-07-29 · **Owner:** T74 (wave 9) · **Closes:** [`docs/07`](docs/07-handoff.md) § 8's three *Opened by wave 8* viewer rows · **Corrects:** two of those rows · **No `core` change, no schema bump**
+
+**Context.** Wave 8 built the experience layer in parallel lanes, and three visual defects fell out of the seams between them. Each was **reported rather than patched** by the lane that found it, because in each case the glyph or the layout belonged to a different unit — which was right, and is why they were still open to be fixed properly rather than locally.
+
+### Defect 1 — the glyph clash, and **the latency was the run length, not the seed**
+
+`✗` (a call no car answers) and `✖` (the `abandoned` wait band) are near-identical at 12 px and share a landing row. § D159 recorded the pair as **latent** at Secure Tower / seed 20260729 because nobody there passes the 900-second abandonment horizon.
+
+**That attribution was wrong, and the correction is the useful part.** A headless probe over three buildings × two dispatchers × two horizons × five seeds reproduced the collision at **the same building, the same dispatcher and the same seed the report called latent** — at `durationS: 1800` instead of 900. Floor 25, t ≈ 1673–1859 s: one rider standing **1149 s** at a landing no car answers. **The variable was the reporting horizon, not the seed** — a 900-second window simply cannot contain a 900-second abandonment. Driven in the browser at that instant, floor 25 renders `▼1 ✗ ▩ ◆` while floors 23 and 15 render `▼1 ✗ ▩ ●`.
+
+**Fixed by moving the band, not the call mark:** `✖` → **`◆`** (U+25C6). `✗` is named in `UX.md` RV-08, in `access/lockedOut.ts` and in `docs/10` § 10.4; the band has one definition every reader goes through. **The guard is stronger than "four distinct characters":** no two claims drawn on one landing row may share a **shape family**, checked with **every field of the theme collapsed to a single string**, with the claim inventory read from the shipped maps and an exhaustiveness check that throws when an unclassified mark reaches a landing row.
+
+### Defect 2 — the header held **four** overlapping claims, not two
+
+§ D159 reported the mood headline overprinting the bank labels by 10 px. **It was worse than reported:** the hidden-shaft notice overprinted *both* the mood line and the bank label, and the selection caption was drawn at the same `x` **and** `y` as that notice.
+
+Closed at the layout rather than by nudging a coordinate: a declared `HeaderBand` with six named rows, a header height **derived from the stack** rather than a constant (64 → 90 px minimum, and a smaller request is clamped up rather than honoured, because silently drawing two labels on top of each other is the worse failure). **Nothing in `render/` computes a header `y` any more.** The bank row is reserved even on single-bank buildings — 14 px, bought so the picture does not jump when the reader picks a bank. Two further clipping holes closed on the way, including the counters now clipping against the meta line so that **R7's seed wins**.
+
+The check that it moved nothing else: the three plot-anchored rows land at exactly `plot.y − 4 / −18 / −32`, i.e. **the fix moved the plot down and moved no label relative to it**, and that equality is now pinned.
+
+### Defect 3 — three panels, one column
+
+The run summary and mood gauge now share one `auto-fit` grid row, so the column pays `max(...)` rather than the sum. Nothing is hidden and nothing is capped tighter — the gauge's ceiling *rises*, 14vh → 30vh, because in a row its height is free until it exceeds its neighbour's.
+
+Measured live at 1440×900 on Secure Tower: panel stack **396 → 271 px**, canvas **168 → 293 px (+74 %)**, and the drawable plot **52 → 151 px — 2.9×**. Mixed-Use High-Rise measures identically.
+
+### Three equivalent mutants, recorded rather than smoothed over
+
+**15 mutations, 12 red.** The three green are **equivalent mutants**: `header.shaftY/bankY/noticeY` equal `plot.y − 4/−18/−32` exactly, so substituting the old literals produces an *identical program*. That is not a gap in the guard — there is nothing to detect — and saying so is better than manufacturing a difference to make a number read 15/15.
+
+**Two real false negatives were found and closed**, both the two-readers shape one level deeper than expected: `BAND_GLYPH` has **three** readers in the bar branch — glyph loop, full caption, shortened caption — and only the glyph loop was exercised. The first fix then used only the default gutter and so took the *short* caption branch, **two readers again, one level down**. Closed by asserting the mark per band at two gutter widths.
+
+**Impact.** `docs/07` § 8's three viewer rows close. **Known limits:** the shape-family table is a hand-written judgement — it cannot go stale silently, but it can be *wrong*, and `▲` against `◆` is the closest remaining pair. Text metrics are approximate (no `measureText` on the canvas port by design), right for a defect measured in tens of pixels and unable to catch a 1–2 px overlap. **Defect 3 has no automated guard** — it is CSS and this repository has no DOM-layout harness — so it is measured and published rather than pinned.
