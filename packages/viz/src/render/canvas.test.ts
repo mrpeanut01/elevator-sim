@@ -20,7 +20,9 @@ import { constantSeries } from '../contract/series.js';
 import { VIZ_SCHEMA_VERSION, type Frame, type VizRecording } from '../contract/types.js';
 import { buildLayout } from './layout.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
-import { DEFAULT_THEME, drawScene, formatClock, type Canvas2DLike } from './canvas.js';
+import { DEFAULT_THEME, drawScene, formatClock, type Canvas2DLike, type Theme } from './canvas.js';
+import type { FloorQueue, QueuedRider, WaitBand } from '../frame/overlay.js';
+import { MOOD_GLYPH, type BuildingMood } from './mood.js';
 import { windowClause } from './runSummary.js';
 
 /* -------------------------------------------------------------------------- *
@@ -464,5 +466,463 @@ describe('formatClock', () => {
 
   it('does not produce a negative clock', () => {
     expect(formatClock(-30)).toBe('0:00');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * U4 — rider queues and the mood, on the bitmap (`docs/10` § 6, D1 + D4)
+ * -------------------------------------------------------------------------- */
+
+describe('drawScene draws the rider queue', () => {
+  const band = (index: number): WaitBand =>
+    (['settling', 'waiting', 'long', 'abandoned'] as const)[index % 4] ?? 'settling';
+
+  function queue(total: number, overrides: Partial<FloorQueue> = {}): FloorQueue {
+    const riders: QueuedRider[] = Array.from({ length: total }, (_, index) => ({
+      passengerId: `p${String(index)}`,
+      waitedS: 100 - index,
+      direction: 'up' as const,
+      destinationFloorId: 'G',
+      promisedCarId: undefined,
+      band: band(index),
+    }));
+    return {
+      floorId: 'G',
+      riders,
+      groups: [
+        { key: '', promisedCarId: undefined, riders, total, oldestWaitS: riders[0]?.waitedS ?? 0 },
+      ],
+      total,
+      oldestWaitS: riders[0]?.waitedS ?? 0,
+      worstBand: total > 3 ? 'abandoned' : band(Math.max(0, total - 1)),
+      recentlyBoarded: 0,
+      ...overrides,
+    };
+  }
+
+  function withQueues(queues: readonly FloorQueue[], theme = DEFAULT_THEME): RecordingContext {
+    const ctx = new RecordingContext();
+    drawScene(ctx, { recording: RECORDING, frame: frame(), layout, theme, queues });
+    return ctx;
+  }
+
+  it('draws nothing new when no queues are supplied — the shipped picture is unchanged', () => {
+    // The regression guard for every other test in this file: U4 is additive, and a viewer that
+    // has not computed a queue draws exactly what it drew before.
+    const ctx = new RecordingContext();
+    drawScene(ctx, { recording: RECORDING, frame: frame(), layout, theme: DEFAULT_THEME });
+    expect(ctx.transcript).toBe(draw(frame()).transcript);
+  });
+
+  it('draws one glyph per waiting rider, in that rider’s own band', () => {
+    const glyphs = withQueues([queue(4)])
+      .calls.filter((call) => call.op === 'fillText')
+      .map((call) => String(call.args[0]));
+    for (const wanted of ['○', '◑', '●', '✖']) {
+      expect(glyphs, `band glyph ${wanted}`).toContain(wanted);
+    }
+  });
+
+  it('keeps the band distinguishable when every band colour is the same — KB-15', () => {
+    /*
+     * The acceptance test for *"bands must be distinguishable by SHAPE, not colour alone"*, on the
+     * surface a reader actually looks at. The theme's four band colours are collapsed to one
+     * string — a greyscale display, a monochrome printer, a screenshot run through a filter — and
+     * the four bands must still be four different marks.
+     */
+    const flat: Theme = {
+      ...DEFAULT_THEME,
+      queueBands: { settling: '#fff', waiting: '#fff', long: '#fff', abandoned: '#fff' },
+    };
+    const marks = withQueues([queue(4)], flat)
+      .calls.filter((call) => call.op === 'fillText' && call.args[3] === '#fff')
+      .map((call) => String(call.args[0]));
+    expect(new Set(marks).size).toBe(4);
+    expect([...new Set(marks)].sort((a, b) => a.localeCompare(b))).toEqual(
+      ['○', '◑', '●', '✖'].sort((a, b) => a.localeCompare(b)),
+    );
+  });
+
+  it('degrades to a bar past the glyph budget, with the count beside it', () => {
+    // 175 waiting is M5's measured depth on Midtown Office. The bar is a `fillRect`; the number
+    // is drawn as text beside it, because a bar is never the only carrier of its value.
+    const ctx = withQueues([queue(175)]);
+    const text = ctx.calls.filter((call) => call.op === 'fillText').map((call) => String(call.args[0]));
+    // The count survives at every gutter width. It is the value a bar may never carry alone.
+    expect(text.some((line) => line.includes('175 waiting'))).toBe(true);
+    // The oldest wait is the *secondary* fact and is dropped when the row is too narrow for it,
+    // rather than being drawn off the end of the canvas. This layout's gutter is the 76 px
+    // default, so it is dropped here — and present when there is room, below.
+    expect(text.some((line) => line.includes('longest'))).toBe(false);
+    const roomy = new RecordingContext();
+    drawScene(roomy, {
+      recording: RECORDING,
+      frame: frame(),
+      layout: buildLayout({
+        width: 900,
+        height: 640,
+        floors: RECORDING.floors,
+        shafts: RECORDING.shafts,
+        gutterRightPx: 360,
+      }),
+      theme: DEFAULT_THEME,
+      queues: [queue(175)],
+    });
+    expect(
+      roomy.calls
+        .filter((call) => call.op === 'fillText')
+        .some((call) => String(call.args[0]).includes('175 waiting · longest')),
+    ).toBe(true);
+    // …and a bar rectangle in one of the band colours, which no other part of the scene draws.
+    const bars = ctx.calls.filter(
+      (call) => call.op === 'fillRect' && call.args[4] === DEFAULT_THEME.queueBands.abandoned,
+    );
+    expect(bars.length).toBe(1);
+    /*
+     * Deeper queue, longer bar — and not proportionally, which is what the log scale is for.
+     *
+     * Both queues in **one** scene, because that is the comparison the scale is defined for: the
+     * bars are scaled against the deepest queue at this instant, so two of them drawn separately
+     * would each fill their own track and comparing across draws would assert nothing. Drawn
+     * together, 175 against 379 is 175 against 379.
+     */
+    const both = withQueues([queue(379), { ...queue(175), floorId: '2' }]);
+    const widths = both.calls
+      .filter((call) => call.op === 'fillRect' && call.args[4] === DEFAULT_THEME.queueBands.abandoned)
+      .map((call) => Number(call.args[2]));
+    expect(widths).toHaveLength(2);
+    const [deep, shallow] = widths as [number, number];
+    expect(deep).toBeGreaterThan(shallow);
+    // Linear would put 175 at 46 % of 379. Logarithmic puts it far higher — which is the property
+    // that keeps a queue of 20 visible on a building whose worst landing holds 379.
+    expect(shallow / deep).toBeGreaterThan(0.8);
+    expect(shallow / deep).toBeCloseTo(Math.log1p(175) / Math.log1p(379), 6);
+  });
+
+  it('draws the promised car above its riders, so a Level-1 landing is not drawn as a Level-0 one', () => {
+    const riderFor = (id: string, carId: string): QueuedRider => ({
+      passengerId: id,
+      waitedS: 20,
+      direction: 'up',
+      destinationFloorId: '3',
+      promisedCarId: carId,
+      band: 'settling',
+    });
+    const a = [riderFor('a1', 'main-A'), riderFor('a2', 'main-A')];
+    const b = [riderFor('b1', 'main-B')];
+    const panelQueue: FloorQueue = {
+      floorId: 'G',
+      riders: [...a, ...b],
+      groups: [
+        { key: 'main-A', promisedCarId: 'main-A', riders: a, total: 2, oldestWaitS: 20 },
+        { key: 'main-B', promisedCarId: 'main-B', riders: b, total: 1, oldestWaitS: 20 },
+      ],
+      total: 3,
+      oldestWaitS: 20,
+      worstBand: 'settling',
+      recentlyBoarded: 0,
+    };
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: RECORDING,
+      frame: frame(),
+      layout: buildLayout({
+        width: 900,
+        height: 640,
+        floors: RECORDING.floors,
+        shafts: RECORDING.shafts,
+        gutterRightPx: 300,
+      }),
+      theme: DEFAULT_THEME,
+      queues: [panelQueue],
+    });
+    const labels = ctx.calls
+      .filter((call) => call.op === 'fillText' && call.args[3] === DEFAULT_THEME.badge)
+      .map((call) => String(call.args[0]));
+    // The entrance badge shares the badge colour, so it is filtered out by shape rather than the
+    // assertion being loosened: `⌂ G` is the floor gutter's, and the two promises are the row's.
+    expect(labels.filter((line) => line.includes('main'))).toEqual(['main-A ', 'main-B ']);
+  });
+
+  it('draws the `+N` the plan produced, inside the row, not a constant', () => {
+    // 20 riders into a row that fits a few of them. The number is the row's, recomputed here.
+    const narrowLayout = buildLayout({
+      width: 900,
+      height: 640,
+      floors: RECORDING.floors,
+      shafts: RECORDING.shafts,
+      gutterRightPx: 150,
+    });
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: RECORDING,
+      frame: frame(),
+      layout: narrowLayout,
+      theme: DEFAULT_THEME,
+      queues: [queue(20)],
+    });
+    const drawn = ctx.calls
+      .filter((call) => call.op === 'fillText')
+      .map((call) => String(call.args[0]));
+    const glyphCount = drawn.filter((line) => ['○', '◑', '●', '✖'].includes(line)).length;
+    expect(glyphCount).toBeGreaterThan(0);
+    expect(glyphCount).toBeLessThan(20);
+    expect(drawn).toContain(`+${String(20 - glyphCount)}`);
+
+    /*
+     * …and it is drawn **inside** the canvas, not past its right edge.
+     *
+     * Driven on Midtown Office at 5:05, seed 42, where the Garage row read `18 waiti` with the
+     * rest under the metrics panel. The glyphs fill to the row width and the count follows them,
+     * so the row has to keep cells back for it — and nothing else in this file would notice if it
+     * stopped. A clipped count is worse than no count: the reader cannot tell which digits are
+     * missing.
+     */
+    const label = `+${String(20 - glyphCount)}`;
+    const call = ctx.calls.find((entry) => entry.op === 'fillText' && entry.args[0] === label);
+    const x = Number(call?.args[1] ?? 0);
+    expect(x).toBeGreaterThan(0);
+    expect(x + label.length * 7.2).toBeLessThanOrEqual(narrowLayout.width - 12);
+  });
+
+  it('draws the counts and the queue, not one instead of the other', () => {
+    // The direction split is the only thing on the row that says which way people want to go, so
+    // U4 adds to it rather than replacing it.
+    const ctx = withQueues([queue(3)]);
+    expect(ctx.transcript).toContain('▲3');
+    expect(ctx.transcript).toContain('○');
+  });
+
+  it('marks a boarding that just happened, on both the bar row and the glyph row', () => {
+    /*
+     * **Both**, and the second half is here because the first was passing for the wrong reason.
+     * The default 76 px gutter leaves five cells, and a queue that reserves five for its own
+     * count has none left — so this row was a *bar*, and the mutation that deleted the relief mark
+     * from the **glyph** branch came back green. The wide layout below exercises that branch.
+     */
+    const narrow = withQueues([queue(2, { recentlyBoarded: 3 })]);
+    expect(
+      narrow.calls
+        .filter((call) => call.op === 'fillText' && call.args[3] === DEFAULT_THEME.queueRelief)
+        .map((call) => String(call.args[0])),
+    ).toEqual(['✓3']);
+
+    const wide = new RecordingContext();
+    drawScene(wide, {
+      recording: RECORDING,
+      frame: frame(),
+      layout: buildLayout({
+        width: 900,
+        height: 640,
+        floors: RECORDING.floors,
+        shafts: RECORDING.shafts,
+        gutterRightPx: 300,
+      }),
+      theme: DEFAULT_THEME,
+      queues: [queue(2, { recentlyBoarded: 3 })],
+    });
+    const drawn = wide.calls.filter((call) => call.op === 'fillText');
+    // Glyph mode: two riders, each drawn, and the relief mark after them.
+    expect(drawn.filter((call) => call.args[3] === DEFAULT_THEME.queueBands.settling)).toHaveLength(1);
+    expect(
+      drawn
+        .filter((call) => call.args[3] === DEFAULT_THEME.queueRelief)
+        .map((call) => String(call.args[0])),
+    ).toEqual(['✓3']);
+  });
+});
+
+describe('drawScene draws the building mood — D4, and R1’s payoff', () => {
+  const mood = (level: 'calm' | 'frustrated' | 'distressed', provisional = false): BuildingMood => ({
+    level,
+    glyph: MOOD_GLYPH[level],
+    headline: `headline for ${level}`,
+    drivers: [],
+    provisional,
+    caveat: 'not a verdict on the dispatcher',
+  });
+
+  it('puts the glyph and the headline on the canvas, so Export PNG carries them', () => {
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: RECORDING,
+      frame: frame(),
+      layout,
+      theme: DEFAULT_THEME,
+      mood: mood('distressed'),
+    });
+    expect(ctx.transcript).toContain(`${MOOD_GLYPH.distressed} headline for distressed`);
+  });
+
+  it('is drawn on a run whose mean is refused — the whole point of R1', () => {
+    /*
+     * The header two lines up says `mean wait suppressed`. The mood line is still there, because
+     * nothing it is made of is routed through `awtIsValid` — which is what makes the treatment
+     * available on the ~46 of 60 shipped configurations where no mean may be shown (M1).
+     */
+    const run = { ...RECORDING, summary: { ...RECORDING.summary, saturated: true, awtIsValid: false } };
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: run,
+      frame: frame(),
+      layout,
+      theme: DEFAULT_THEME,
+      mood: mood('distressed'),
+    });
+    expect(ctx.transcript).toContain('mean wait suppressed');
+    expect(ctx.transcript).toContain('headline for distressed');
+  });
+
+  it('reads the mood it is given rather than deriving one of its own', () => {
+    const calm = new RecordingContext();
+    drawScene(calm, {
+      recording: RECORDING,
+      frame: frame(),
+      layout,
+      theme: DEFAULT_THEME,
+      mood: mood('calm'),
+    });
+    expect(calm.transcript).toContain('headline for calm');
+    expect(calm.transcript).not.toContain('headline for distressed');
+  });
+
+  it('draws no mood line at all when none is supplied', () => {
+    expect(draw(frame()).transcript).not.toContain('headline');
+  });
+});
+
+describe('a building whose rows cannot be labelled aggregates all the way to a bar', () => {
+  /*
+   * The case driven in a browser and fixed there: Midtown Office's 21 floors in a short canvas put
+   * the floor lines 7 px apart, and two queue captions were drawn on top of each other — text that
+   * carries less than nothing. `FloorRow.labelled` is the layout's own answer to "can this row
+   * hold 12 px of type", so the queue reuses it rather than inventing a second threshold.
+   *
+   * The **limitation this test pins** is stated rather than hidden: on those rows the bar is drawn
+   * with no count beside it. The count still reaches the reader through `describeFrame`, which
+   * names the busiest floors with their numbers.
+   */
+  const tall: VizRecording = {
+    ...RECORDING,
+    floors: Array.from({ length: 40 }, (_, index) => ({
+      id: `F${String(index)}`,
+      index,
+      heightM: index * 3,
+      isEntrance: index === 0,
+      isTransferFloor: false,
+      population: 20,
+    })),
+    shafts: [shaft({ servedFloorIds: Array.from({ length: 40 }, (_, i) => `F${String(i)}`) })],
+  };
+  const tallLayout = buildLayout({
+    width: 900,
+    height: 400,
+    floors: tall.floors,
+    shafts: tall.shafts,
+  });
+
+  it('draws bars everywhere and a caption only where a label fits', () => {
+    const unlabelled = tallLayout.rows.filter((row) => !row.labelled);
+    expect(unlabelled.length).toBeGreaterThan(0);
+
+    const queues: FloorQueue[] = tall.floors.map((floor) => {
+      const rider: QueuedRider = {
+        passengerId: `p-${floor.id}`,
+        waitedS: 200,
+        direction: 'up',
+        destinationFloorId: 'F0',
+        promisedCarId: undefined,
+        band: 'long',
+      };
+      return {
+        floorId: floor.id,
+        riders: [rider, rider],
+        groups: [{ key: '', promisedCarId: undefined, riders: [rider, rider], total: 2, oldestWaitS: 200 }],
+        total: 2,
+        oldestWaitS: 200,
+        worstBand: 'long',
+        recentlyBoarded: 0,
+      };
+    });
+
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: tall,
+      frame: frame({
+        landings: tall.floors.map((floor) => ({ floorId: floor.id, waitingUp: 2, waitingDown: 0 })),
+      }),
+      layout: tallLayout,
+      theme: DEFAULT_THEME,
+      queues,
+    });
+
+    // Every floor gets a bar — the aggregation is what makes a 40-storey building drawable.
+    const bars = ctx.calls.filter(
+      (call) => call.op === 'fillRect' && call.args[4] === DEFAULT_THEME.queueBands.long,
+    );
+    expect(bars).toHaveLength(40);
+    // No glyphs: a row that cannot hold a label cannot hold twelve of these either.
+    const text = ctx.calls.filter((call) => call.op === 'fillText').map((call) => String(call.args[0]));
+    expect(text).not.toContain('●');
+    // …and the captions are exactly as many as the rows that can carry one.
+    const captions = text.filter((line) => line.includes('2 waiting'));
+    expect(captions.length).toBe(tallLayout.rows.filter((row) => row.labelled).length);
+    expect(captions.length).toBeLessThan(40);
+    expect(captions.length).toBeGreaterThan(0);
+  });
+
+  it('aggregates a row that has the pitch for a glyph but not the room for a label', () => {
+    /*
+     * The window between the two thresholds — pitch at least `MIN_GLYPH_PITCH_PX` (12) and less
+     * than the layout's `MIN_LABEL_PITCH_PX` (14) — where a row *could* hold a glyph and cannot
+     * hold the text that identifies it. Without this, the mutation that drops `labelled` from the
+     * decision comes back green, because every other case is already decided by the pitch alone.
+     */
+    const between = buildLayout({
+      width: 900,
+      // 20 gaps at 13 px, plus the header, footer and padding the layout subtracts.
+      height: 20 * 13 + 24 + 64 + 28,
+      floors: tall.floors.slice(0, 21),
+      shafts: tall.shafts,
+    });
+    expect(between.pitchPx).toBeGreaterThanOrEqual(12);
+    expect(between.pitchPx).toBeLessThan(14);
+    const thinned = between.rows.filter((row) => !row.labelled);
+    expect(thinned.length).toBeGreaterThan(0);
+
+    const rider: QueuedRider = {
+      passengerId: 'p',
+      waitedS: 200,
+      direction: 'up',
+      destinationFloorId: 'F0',
+      promisedCarId: undefined,
+      band: 'long',
+    };
+    const queues: FloorQueue[] = between.rows.map((row) => ({
+      floorId: row.floorId,
+      riders: [rider],
+      groups: [{ key: '', promisedCarId: undefined, riders: [rider], total: 1, oldestWaitS: 200 }],
+      total: 1,
+      oldestWaitS: 200,
+      worstBand: 'long',
+      recentlyBoarded: 0,
+    }));
+
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: { ...tall, floors: tall.floors.slice(0, 21) },
+      frame: frame({
+        landings: between.rows.map((row) => ({ floorId: row.floorId, waitingUp: 1, waitingDown: 0 })),
+      }),
+      layout: between,
+      theme: DEFAULT_THEME,
+      queues,
+    });
+
+    // One glyph per labelled row, a bar for every row — the thinned rows aggregate rather than
+    // drawing a mark nothing on the screen identifies.
+    const glyphs = ctx.calls.filter((call) => call.op === 'fillText' && call.args[0] === '●');
+    expect(glyphs).toHaveLength(between.rows.filter((row) => row.labelled).length);
+    expect(glyphs.length).toBeLessThan(between.rows.length);
   });
 });

@@ -37,6 +37,7 @@ import {
   landingAssignmentsAt,
   meansAreSuppressed,
   overlayAt,
+  queueAt,
   type LandingAssignment,
 } from '../frame/overlay.js';
 import { recordRun } from '../record/recordRun.js';
@@ -52,6 +53,7 @@ import {
 } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
 import { runSummaryFigures } from '../render/runSummary.js';
+import { buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { mountEditor } from './editor.js';
 import { mountParameterForm } from './parameterForm.js';
 import { createLoader } from './bootstrap.js';
@@ -60,6 +62,15 @@ import { loadBrowserResources, resolveEdited, type BrowserResources } from './da
 
 /** `PB-T1`: ×1 … ×120, and `[`/`]` step this ladder — `KB-07`. */
 const SPEEDS = [1, 2, 5, 10, 30, 60, 120] as const;
+/**
+ * Width of the right gutter, where the landing counts and U4's rider queues are drawn.
+ *
+ * `buildLayout`'s own default is 76 px, which is room for `▲12 ▼7` and nothing else. A queue row
+ * needs the rest, and how much of it there is decides where § 6.2's degradation bites — so this is
+ * the one number in the viewer that turns *"how many riders get their own glyph"* into a property
+ * of the window rather than of the building.
+ */
+const QUEUE_GUTTER_PX = 280;
 /** Width reserved for the live metrics panel. Dropped below this viewport width — `RS-03`. */
 const OVERLAY_WIDTH_PX = 250;
 const OVERLAY_MIN_VIEWPORT_PX = 900;
@@ -107,6 +118,8 @@ interface Elements {
   readonly description: HTMLElement;
   /** Where `render/runSummary.ts`'s figures are drawn — `docs/10` § 11 W2. */
   readonly runSummary: HTMLElement;
+  /** Where `render/mood.ts`'s gauge is drawn — `docs/10` § 6 / D4, W6's U4. */
+  readonly mood: HTMLElement;
   /** Tab button and its panel, per surface. Keyed by {@link TabName}, so a fourth is one entry. */
   readonly tabs: Readonly<Record<TabName, HTMLButtonElement>>;
   readonly panels: Readonly<Record<TabName, HTMLElement>>;
@@ -151,6 +164,7 @@ function elements(): Elements {
     banner: find<HTMLElement>('banner'),
     description: find<HTMLElement>('frame-description'),
     runSummary: find<HTMLElement>('run-summary'),
+    mood: find<HTMLElement>('building-mood'),
     tabs: {
       viewer: find<HTMLButtonElement>('tab-viewer'),
       editor: find<HTMLButtonElement>('tab-editor'),
@@ -934,6 +948,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
         height: cssHeight,
         floors: recording.floors,
         shafts,
+        // U4's rider queues live in the right gutter, so it is widened to make room for them —
+        // and it is the *width* that decides how many riders get an individual glyph before the
+        // row degrades to `+N` (`docs/10` § 6.2). A narrow window is therefore not a broken
+        // picture; it is the same picture, aggregated sooner.
+        gutterRightPx: QUEUE_GUTTER_PX,
         overlayWidthPx: wantsOverlay ? OVERLAY_WIDTH_PX : 0,
       });
       // The assignments are refreshed *before* the draw, not after it, because `D10` makes them
@@ -956,6 +975,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
       const metrics = overlayAt(recording, frame.simTimeS);
       const unanswered = unansweredCallFloors(recording, assignments);
+      // U4 and D4, every frame. Measured with the rendering in place rather than assumed from
+      // § 2.5's 0.02–0.07 ms for the sibling selector — see the delivery report for the figure.
+      const queues = queueAt(recording, frame.simTimeS);
+      const mood = buildingMood(moodObservationsOf(recording, queues, frame.simTimeS));
       drawScene(surface, {
         recording,
         frame,
@@ -964,7 +987,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
         selection,
         unservedFloorIds: unservedFloors(recording),
         unansweredCallFloorIds: unanswered,
+        queues,
+        mood,
       });
+      drawMood(ui.mood, mood);
 
       // KB-13: the canvas is not a hole in the page. Updated at most twice a second, because a
       // live region that changes 60 times a second is unusable rather than accessible.
@@ -973,6 +999,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
         frame,
         metrics,
         unansweredCallFloorIds: unanswered,
+        queues,
+        mood,
       });
       if (description !== lastDescription) {
         lastDescription = description;
@@ -1119,6 +1147,74 @@ function drawRunSummary(container: HTMLElement, recording: VizRecording): void {
     }
     container.append(row);
   }
+}
+
+/**
+ * The last mood put on screen, so the gauge's DOM is rebuilt when it changes and not at 60 Hz.
+ *
+ * The same shape `lastDescription` uses one level up, and for the same reason: replacing a
+ * subtree sixty times a second moves focus, defeats text selection and makes the caveat
+ * impossible to read. The key is the whole rendered content, so any change to any driver's text
+ * — which is the thing a mutation would freeze — still redraws.
+ */
+let lastMoodKey = '';
+
+/**
+ * The building mood gauge, instantiated — `docs/10` § 6 / D4's named non-test caller.
+ *
+ * Thin, exactly as {@link drawRunSummary} is: every decision about *what* the mood is, which
+ * observations it looked at and whether it is still provisional is made in `render/mood.ts`, under
+ * plain Node, where it is asserted against a recomputation. This function knows how to make
+ * elements.
+ *
+ * **Nothing here keys on a driver id.** The classes come from `level` and `provisional`, so a sixth
+ * observation appears with no edit to this file and none to `index.html` — the rule W4 kept for the
+ * parameter form and W2 kept for the summary.
+ *
+ * The glyph is emitted as text rather than as a coloured dot, which is KB-15 in the DOM: a reader
+ * with a monochrome display, a screenshot in greyscale, or no colour perception at all reads the
+ * same three shapes the canvas draws.
+ */
+function drawMood(container: HTMLElement, mood: BuildingMood): void {
+  const key = `${mood.level}|${String(mood.provisional)}|${mood.headline}|${mood.drivers
+    .map((driver) => `${driver.id}:${driver.level}:${driver.text}`)
+    .join('|')}`;
+  if (key === lastMoodKey) return;
+  lastMoodKey = key;
+
+  const doc = container.ownerDocument;
+  container.replaceChildren();
+
+  const head = doc.createElement('p');
+  head.className = `mood-head mood-${mood.level}${mood.provisional ? ' mood-provisional' : ''}`;
+  const glyph = doc.createElement('span');
+  glyph.className = 'mood-glyph';
+  glyph.textContent = `${mood.glyph} `;
+  const headline = doc.createElement('span');
+  headline.className = 'mood-headline';
+  headline.textContent = mood.headline;
+  head.append(glyph, headline);
+  container.append(head);
+
+  for (const driver of mood.drivers) {
+    const row = doc.createElement('p');
+    row.className = `mood-driver mood-${driver.level}`;
+    const label = doc.createElement('span');
+    label.className = 'mood-label';
+    label.textContent = `${driver.label} `;
+    const text = doc.createElement('span');
+    text.className = 'mood-text';
+    text.textContent = driver.text;
+    row.append(label, text);
+    container.append(row);
+  }
+
+  // R2, in the component rather than in a manual. It is the last thing in the panel because it is
+  // what the reader should leave with, and it is never elided in any mode.
+  const caveat = doc.createElement('p');
+  caveat.className = 'mood-caveat';
+  caveat.textContent = mood.caveat;
+  container.append(caveat);
 }
 
 function statusLine(recording: VizRecording): string {

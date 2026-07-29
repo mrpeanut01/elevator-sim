@@ -45,7 +45,7 @@
 
 import type { Direction, SimTime } from '@elevator-sim/core/browser';
 
-import type { VizLeg, VizRecording } from '../contract/types.js';
+import type { VizLeg, VizRecording, VizSummary } from '../contract/types.js';
 
 /**
  * The trailing window, in simulated seconds.
@@ -347,6 +347,253 @@ export function landingAssignmentsAt(
       };
     })
     .sort((a, b) => a.key.localeCompare(b.key));
+}
+
+/* -------------------------------------------------------------------------- *
+ * U4 — the per-floor rider queue (`docs/10-experience-layer-contract.md` § 6)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * How long somebody has been standing, banded — `docs/10` § 6.2.
+ *
+ * Four bands, and **three of the four boundaries are the run's own numbers rather than this
+ * module's**: `longWaitThresholdS` and `serviceLevel.horizonS` are carried on {@link VizSummary}
+ * since schema 5, so a building that reports long waits at 45 s bands its riders at 45 s. Only the
+ * first boundary is derived — half the long-wait threshold — and it is derived rather than written
+ * down for the same reason.
+ *
+ * The names are the *fact*, not the feeling: `long` means *past the threshold this run counts a
+ * long wait at*, and `abandoned` means *past the horizon beyond which `core` stops counting the
+ * wait at all*. The mood vocabulary is a separate mapping in `render/riderQueue.ts`, so a change to
+ * how a queue *feels* cannot quietly change what a band *is*.
+ */
+export type WaitBand = 'settling' | 'waiting' | 'long' | 'abandoned';
+
+/** The three boundaries between the four {@link WaitBand}s, in simulated seconds. */
+export interface WaitBandThresholds {
+  /** Below this, `settling`. Half the long-wait threshold. */
+  readonly settlingS: number;
+  /** At or above this, `long`. `RunSummary.waiting.longWaitThresholdS`, never assumed. */
+  readonly longS: number;
+  /** At or above this, `abandoned`. `RunSummary.serviceLevel.horizonS`, never assumed. */
+  readonly horizonS: number;
+}
+
+/**
+ * The bands this run's own summary implies.
+ *
+ * Takes the summary rather than the recording so that a caller cannot accidentally band by a
+ * *different* run's thresholds than the one it is drawing, and so the function is callable from a
+ * test with a summary alone.
+ */
+export function waitBandsOf(
+  summary: Pick<VizSummary, 'longWaitThresholdS' | 'serviceLevel'>,
+): WaitBandThresholds {
+  const longS = summary.longWaitThresholdS;
+  return { settlingS: longS / 2, longS, horizonS: summary.serviceLevel.horizonS };
+}
+
+/**
+ * Which band a wait of `waitedS` falls in.
+ *
+ * Tested descending so the classification is monotone in `waitedS` whatever order the thresholds
+ * happen to be in. A building whose horizon is below its long-wait threshold is a misconfiguration
+ * and not this function's to diagnose, but it must not produce a band that goes *down* as somebody
+ * waits longer, which an ascending chain would.
+ */
+export function waitBandOf(waitedS: number, thresholds: WaitBandThresholds): WaitBand {
+  if (waitedS >= thresholds.horizonS) return 'abandoned';
+  if (waitedS >= thresholds.longS) return 'long';
+  if (waitedS >= thresholds.settlingS) return 'waiting';
+  return 'settling';
+}
+
+/** Ascending severity, so a caller can take the worst of a set without a comparison table. */
+const BAND_ORDER: readonly WaitBand[] = ['settling', 'waiting', 'long', 'abandoned'];
+
+/** The more severe of two bands. Total, and the only place the ordering is decided. */
+export function worseBand(a: WaitBand, b: WaitBand): WaitBand {
+  return BAND_ORDER.indexOf(a) >= BAND_ORDER.indexOf(b) ? a : b;
+}
+
+/** One person standing at a landing, at one instant. */
+export interface QueuedRider {
+  readonly passengerId: string;
+  /** `t - arrivedAt`. The individual's own wait, not the landing's oldest. */
+  readonly waitedS: number;
+  readonly direction: Direction;
+  readonly destinationFloorId: string;
+  /** The car the landing panel promised them. `undefined` under the conventional model. */
+  readonly promisedCarId: string | undefined;
+  readonly band: WaitBand;
+}
+
+/**
+ * One promise group at a landing — the partition `docs/10` § 6.2 requires under a panel.
+ *
+ * *"The renderer must therefore group the glyphs by promised car and label the group, or it will
+ * draw a Level-1 building as a Level-0 one — the exact defect version 4 exists to prevent."*
+ * Conventionally there is exactly one group per floor and its {@link promisedCarId} is `undefined`,
+ * so the renderer has one shape to draw rather than two code paths.
+ */
+export interface QueueGroup {
+  /** `promisedCarId ?? ''`. Stable, and what the groups are sorted by. */
+  readonly key: string;
+  readonly promisedCarId: string | undefined;
+  /** Members, in the array's own `(arrivedAt, passengerId)` order — first come, first drawn. */
+  readonly riders: readonly QueuedRider[];
+  readonly total: number;
+  readonly oldestWaitS: number;
+}
+
+/** Everybody standing at one floor, at one instant. */
+export interface FloorQueue {
+  readonly floorId: string;
+  /** Every rider at this floor, oldest first. */
+  readonly riders: readonly QueuedRider[];
+  /** The same riders, partitioned by promised car. One group conventionally. */
+  readonly groups: readonly QueueGroup[];
+  readonly total: number;
+  readonly oldestWaitS: number;
+  /** The worst band anybody here is in — what the floor's own marker shows. */
+  readonly worstBand: WaitBand;
+  /**
+   * Legs that boarded **at this floor** within {@link QueueOptions.reliefWindowS} of `t`.
+   *
+   * The relief transition, as an observation. A rider who boards leaves the queue and would
+   * otherwise vanish between two frames with nothing on screen distinguishing *"a car came"* from
+   * *"they were never here"* — which is the one moment in a run where the dispatcher visibly did
+   * its job. Counted rather than listed: the glyph is a tally at the landing, not a manifest.
+   */
+  readonly recentlyBoarded: number;
+}
+
+export interface QueueOptions {
+  /**
+   * How long a boarding stays on screen as relief, in **simulated** seconds.
+   *
+   * A display dwell, and the only number in this module that is not the run's own. It is not a
+   * modelling constant and nothing statistical reads it: it decides how long a `✓` lingers. The
+   * caller may override it; five seconds is roughly a door cycle on the shipped buildings, so the
+   * mark is still up while the car that caused it is still at the floor.
+   */
+  readonly reliefWindowS?: number;
+}
+
+export const DEFAULT_RELIEF_WINDOW_S = 5;
+
+/**
+ * Every floor with somebody standing at it, at `t` — `docs/10` § 6.1's `queueAt`.
+ *
+ * ## Why this needed no contract change
+ *
+ * § 2.3 claims a per-floor queue of individual riders is derivable from `VizLeg` with **zero** new
+ * fields, and it is: {@link isWaitingAt} decides membership, `t - arrivedAt` is the wait,
+ * `destinationFloorId` is where they are going and `assignedCarId` is the promise. The claim was
+ * checked against the code before this function was written and holds, with one wording
+ * correction recorded in the delivery report: `isWaitingAt` was module-*private*, not "already
+ * exposed", so this is the change that gives it a second caller inside its own file.
+ *
+ * ## Ordering, and what it means on screen
+ *
+ * Floors come back in the **building's** order (`recording.floors`), never sorted by id — sorting
+ * floor ids as strings reads `11, 12, 16, 20, 3, 4` and puts the third storey above the twentieth.
+ * Riders come back in `legs` order, which the contract states is `(arrivedAt, passengerId)`, so a
+ * row drawn left to right is first-come-first-served and the reader can see the queue's age
+ * gradient without a legend.
+ *
+ * Floors with nobody on them are omitted rather than returned empty, exactly as
+ * {@link landingAssignmentsAt} omits them: a 100-floor building would otherwise return 100 rows of
+ * nothing every frame. `sum(total)` therefore still equals `Frame.totalWaiting`, which
+ * `queue.test.ts` asserts on every shipped building at every sampled instant.
+ */
+export function queueAt(
+  recording: VizRecording,
+  simTimeS: SimTime,
+  options: QueueOptions = {},
+): readonly FloorQueue[] {
+  const t = clamp(simTimeS, recording.startedAt, recording.endedAt);
+  const reliefWindowS = options.reliefWindowS ?? DEFAULT_RELIEF_WINDOW_S;
+  const thresholds = waitBandsOf(recording.summary);
+  const panel = recording.passengerModel === 'destination-dispatch';
+
+  interface Draft {
+    readonly riders: QueuedRider[];
+    readonly groups: Map<string, QueuedRider[]>;
+    boarded: number;
+  }
+  const byFloor = new Map<string, Draft>();
+  const draftFor = (floorId: string): Draft => {
+    const existing = byFloor.get(floorId);
+    if (existing !== undefined) return existing;
+    const created: Draft = { riders: [], groups: new Map(), boarded: 0 };
+    byFloor.set(floorId, created);
+    return created;
+  };
+
+  for (const leg of recording.legs) {
+    if (leg.arrivedAt > t) break; // sorted by arrivedAt, exactly as `overlayAt` relies on
+    if (isWaitingAt(leg, t)) {
+      const waitedS = t - leg.arrivedAt;
+      // The promise is a fact about the passenger under a panel and absent otherwise. It is read
+      // off the leg rather than inferred from who eventually boarded — `carId` would be the
+      // outcome, and a promise nobody kept is precisely the case version 4 exists to draw.
+      const promisedCarId = panel ? leg.assignedCarId : undefined;
+      const rider: QueuedRider = {
+        passengerId: leg.passengerId,
+        waitedS,
+        direction: leg.direction,
+        destinationFloorId: leg.destinationFloorId,
+        promisedCarId,
+        band: waitBandOf(waitedS, thresholds),
+      };
+      const draft = draftFor(leg.originFloorId);
+      draft.riders.push(rider);
+      const key = promisedCarId ?? '';
+      const group = draft.groups.get(key);
+      if (group === undefined) draft.groups.set(key, [rider]);
+      else group.push(rider);
+      continue;
+    }
+    const boardedAt = leg.boardedAt;
+    if (boardedAt === undefined || boardedAt > t || boardedAt <= t - reliefWindowS) continue;
+    draftFor(leg.originFloorId).boarded += 1;
+  }
+
+  const queues: FloorQueue[] = [];
+  for (const floor of recording.floors) {
+    const draft = byFloor.get(floor.id);
+    if (draft === undefined) continue;
+    if (draft.riders.length === 0 && draft.boarded === 0) continue;
+    const groups: QueueGroup[] = [...draft.groups.entries()]
+      .map(([key, riders]): QueueGroup => {
+        const first = riders[0];
+        return {
+          key,
+          promisedCarId: key === '' ? undefined : key,
+          riders,
+          total: riders.length,
+          // `riders` is filled in `legs` order, so the first is the oldest. Reduced anyway rather
+          // than indexed: the ordering is a property of the contract and a lookup that silently
+          // depended on it would break quietly if it ever moved.
+          oldestWaitS: riders.reduce((best, rider) => Math.max(best, rider.waitedS), first?.waitedS ?? 0),
+        };
+      })
+      .sort((a, b) => a.key.localeCompare(b.key));
+    queues.push({
+      floorId: floor.id,
+      riders: draft.riders,
+      groups,
+      total: draft.riders.length,
+      oldestWaitS: draft.riders.reduce((best, rider) => Math.max(best, rider.waitedS), 0),
+      worstBand: draft.riders.reduce<WaitBand>(
+        (worst, rider) => worseBand(worst, rider.band),
+        'settling',
+      ),
+      recentlyBoarded: draft.boarded,
+    });
+  }
+  return queues;
 }
 
 /**

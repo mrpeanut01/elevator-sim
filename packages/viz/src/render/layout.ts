@@ -91,6 +91,16 @@ export interface Layout {
   readonly hiddenShaftCount: number;
   /** Pixel height of a drawn car. Shrinks with the floor pitch so cars never overlap. */
   readonly carHeightPx: number;
+  /**
+   * Pixel distance between two adjacent floor lines.
+   *
+   * Carried rather than left to be re-derived, because `docs/10` § 6.2 makes it a *decision*
+   * input: a rider queue degrades to a bar when *"the floor pitch is below the glyph height"*, and
+   * a renderer that recovered the pitch by inverting {@link carHeightPx} would get it wrong at both
+   * ends, where that value is clamped. One floor has no pitch; it gets the plot height, matching
+   * {@link yForHeight}'s single-floor case.
+   */
+  readonly pitchPx: number;
   /** The metrics panel's rectangle, when one was asked for. Never overlaps {@link plot}. */
   readonly overlay: Rect | undefined;
   /** Pixel y for a height above datum, in metres. Continuous, and clamped to the plot. */
@@ -287,6 +297,7 @@ export function buildLayout(options: LayoutOptions): Layout {
     rows,
     hiddenShaftCount: total - count,
     carHeightPx,
+    pitchPx,
     overlay,
     yForHeight,
     heightForY,
