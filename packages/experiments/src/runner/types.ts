@@ -600,6 +600,12 @@ export type RawReplicationOutcome =
       readonly traceDigest: string;
       readonly tracePassengers: number;
       readonly undeliveredCount: number;
+      /**
+       * `StageActivity.kioskRefusedLegs` — see {@link ReplicationRecord.kioskRefusedLegs}.
+       *
+       * A plain number, so the worker path carries it through `postMessage` without a codec.
+       */
+      readonly kioskRefusedLegs: number;
       readonly warnings: readonly string[];
     }
   | {
@@ -636,6 +642,24 @@ export interface ReplicationRecord {
   readonly tracePassengers: number;
   readonly conservation: ConservationAudit;
   readonly undeliveredCount: number;
+  /**
+   * `StageActivity.kioskRefusedLegs`: distinct legs the **bare kiosk** refused — a destination
+   * disclosed with no credential beside it, on a floor an access zone covers.
+   *
+   * The **one** field of `StageActivity`'s twenty that this record carries, and it is here because
+   * it has a reader in the same commit (`benchmark/accessControl.ts`'s coverage column). The other
+   * nineteen are deliberately not copied: DECISIONS.md § D63 (`VizRecording.legs`) is the rule —
+   * a field lands *with* its first consumer, and copying the rest "while we are in there" is how a
+   * contract acquires twenty fields and one reader. `capacityReassignment.ts` still reaches its
+   * three counters by driving `Simulation` directly, which is the honest cost of that rule rather
+   * than an oversight.
+   *
+   * Zero for every profile `data/dispatcher-profiles.json` ships — all twelve run at
+   * `up-down-buttons` or `mobile-credential` — so a non-zero value here names a *derived* arm.
+   * It is the half an unserved fraction cannot express: an unserved leg says somebody was not
+   * carried, and this says the interface refused them before any car was asked.
+   */
+  readonly kioskRefusedLegs: number;
   /** Present iff the plan asked for records. */
   readonly record?: RunRecord | undefined;
   readonly warnings: readonly string[];

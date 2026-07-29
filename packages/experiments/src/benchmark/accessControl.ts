@@ -30,14 +30,30 @@
  * has no interval unless *every* arm in it returns a valid one — is what forces the shape: the
  * conventional arm is absent from Secure Tower's interval table rather than present with a
  * suppressed mean. So H-ACCESS-1 is reported as **counts**: replications with no quotable AWT,
- * undelivered journeys per run, and unserved fraction, per arm per building, plus a bit-identity
- * check of the credential arm against the conventional arm on the building with no access zones.
+ * undelivered journeys per run, unserved fraction, and **legs the kiosk itself refused**, per arm
+ * per building, plus a bit-identity check of the credential arm against the conventional arm on the
+ * building with no access zones.
  *
  * The mechanism is in `simulation.ts`'s own words: an access-restricted pickup carries no credential
  * under `up-down-buttons`, so every car returns `accessDenied` and the call is permanently
  * unassignable. The failure is **structural rather than load-driven**, which is why lowering the
  * arrival rate does not rescue it and why no operating point exists at which the two arms could be
  * compared with an interval.
+ *
+ * ## The fourth count, and why an unserved fraction needed it
+ *
+ * The two failing arms on Secure Tower fail for **different reasons** and the first three counts
+ * cannot tell them apart — `33.5 %` and `100 %` unserved are the same *kind* of number. The
+ * conventional arm's passengers are refused at the **pickup**: `up-down-buttons` carries no
+ * credential, so a zoned *origin* is unassignable. The bare kiosk's are refused at the
+ * **interface**, one at a time, before any car is asked. `kiosk-refused/run` separates them —
+ * **0.0 for the conventional arm and 29.0 for the bare kiosk**, at the same operating point on the
+ * same 30 replications — which is § D137's *who rather than a rate* arriving as a column.
+ *
+ * The counter has been on `StageActivity` since § D137 and was read by nothing here, which
+ * § D137 item 2 and § D149 item 2 both record as debt. It reaches this module through
+ * `ReplicationRecord.kioskRefusedLegs`; before that field existed the replication runner discarded
+ * it, so *"no consumer in `benchmark/`"* was a statement about the runner and not about this study.
  *
  * This module also settles the premise of DECISIONS.md § D30 by measurement rather than by citation:
  * a `destination-entry` arm that discloses the destination **without** the credential is run
@@ -188,6 +204,25 @@ export interface CoverageRow {
   readonly meanUndelivered: number;
   /** Mean fraction of legs that arrived in the window and never boarded. */
   readonly meanUnservedFraction: number;
+  /**
+   * Mean distinct legs per replication that the **kiosk itself** refused —
+   * `StageActivity.kioskRefusedLegs`, a destination disclosed with no credential beside it, on a
+   * floor an access zone covers.
+   *
+   * **This is the column {@link meanUnservedFraction} cannot be**, and it is why this row exists
+   * in two shapes rather than one. An unserved fraction says a leg was not carried; it does not
+   * say *why*, and on this building the two arms that fail it fail it for opposite reasons. The
+   * conventional arm's legs are refused at the **pickup** — `up-down-buttons` carries no
+   * credential, so a zoned *origin* is unassignable — and the bare kiosk's are refused at the
+   * **interface**, before any car is asked about them. Read off the unserved fraction alone,
+   * `33.5 %` and `100 %` are the same kind of number. Read beside this column they are not: this
+   * one is **0 for the conventional arm at every replication** and non-zero only for the kiosk.
+   *
+   * DECISIONS.md § D137 item 2 and § D149 item 2 record the counter's *absence* here as the
+   * ninth-dead-seam shape one notch down. This field is that debt discharged, and
+   * `ReplicationRecord.kioskRefusedLegs` is the plumbing it needed.
+   */
+  readonly meanKioskRefusedLegs: number;
   /** `true` when the whole cell has a quotable AWT. */
   readonly quotable: boolean;
 }
@@ -235,6 +270,13 @@ export interface PinnedCoverage {
   readonly withoutQuotableAwt: number;
   readonly meanUndelivered: number;
   readonly meanUnservedFraction: number;
+  /**
+   * See {@link CoverageRow.meanKioskRefusedLegs}. Pinned for the same reason the Midtown zeros
+   * are: **here the zero is half the finding.** A conventional arm that started refusing at the
+   * kiosk, or a kiosk arm that stopped, would be a change in what this study measures, and
+   * neither would move any of the five fields above enough for an inequality to notice.
+   */
+  readonly meanKioskRefusedLegs: number;
   readonly quotable: boolean;
 }
 
@@ -250,6 +292,12 @@ export interface PinnedCoverage {
  * pins its zero `rideTime` rows: **there the zero is the finding.** It is the null half of
  * H-ACCESS-1 — a building with no access zones does not move under any of the three call types —
  * and a null nobody pinned is a null that can quietly stop being one.
+ *
+ * **{@link PinnedCoverage.meanKioskRefusedLegs} was added on 2026-07-28 by a re-run of the same
+ * entry point at the same budget, and the other five fields reproduced to the last digit** — all
+ * six rows, `Object.is`-equal. That is stated because it is the evidence that the new column is a
+ * column of the *same* study rather than a new measurement wearing its name: nothing about the
+ * runs changed, only what the runner was asked to carry back from them.
  */
 export const PINNED_COVERAGE: Readonly<Record<string, PinnedCoverage>> = Object.freeze({
   'secure-tower/eta': Object.freeze({
@@ -258,6 +306,7 @@ export const PINNED_COVERAGE: Readonly<Record<string, PinnedCoverage>> = Object.
     withoutQuotableAwt: 30,
     meanUndelivered: 18.166666666666668,
     meanUnservedFraction: 0.3353422721842136,
+    meanKioskRefusedLegs: 0,
     quotable: false,
   }),
   'secure-tower/destination-entry-bare': Object.freeze({
@@ -266,6 +315,7 @@ export const PINNED_COVERAGE: Readonly<Record<string, PinnedCoverage>> = Object.
     withoutQuotableAwt: 30,
     meanUndelivered: 52.233333333333334,
     meanUnservedFraction: 1,
+    meanKioskRefusedLegs: 28.966666666666665,
     quotable: false,
   }),
   'secure-tower/destination-eta-unpriced': Object.freeze({
@@ -274,6 +324,7 @@ export const PINNED_COVERAGE: Readonly<Record<string, PinnedCoverage>> = Object.
     withoutQuotableAwt: 0,
     meanUndelivered: 0,
     meanUnservedFraction: 0,
+    meanKioskRefusedLegs: 0,
     quotable: true,
   }),
   'midtown-office/eta': Object.freeze({
@@ -282,6 +333,7 @@ export const PINNED_COVERAGE: Readonly<Record<string, PinnedCoverage>> = Object.
     withoutQuotableAwt: 0,
     meanUndelivered: 0,
     meanUnservedFraction: 0,
+    meanKioskRefusedLegs: 0,
     quotable: true,
   }),
   'midtown-office/destination-entry-bare': Object.freeze({
@@ -290,6 +342,7 @@ export const PINNED_COVERAGE: Readonly<Record<string, PinnedCoverage>> = Object.
     withoutQuotableAwt: 0,
     meanUndelivered: 0,
     meanUnservedFraction: 0,
+    meanKioskRefusedLegs: 0,
     quotable: true,
   }),
   'midtown-office/destination-eta-unpriced': Object.freeze({
@@ -298,6 +351,7 @@ export const PINNED_COVERAGE: Readonly<Record<string, PinnedCoverage>> = Object.
     withoutQuotableAwt: 0,
     meanUndelivered: 0,
     meanUnservedFraction: 0,
+    meanKioskRefusedLegs: 0,
     quotable: true,
   }),
 });
@@ -313,6 +367,7 @@ export function coveragePinOf(row: CoverageRow): PinnedCoverage {
     withoutQuotableAwt: row.withoutQuotableAwt,
     meanUndelivered: row.meanUndelivered,
     meanUnservedFraction: row.meanUnservedFraction,
+    meanKioskRefusedLegs: row.meanKioskRefusedLegs,
     quotable: row.quotable,
   });
 }
@@ -323,15 +378,23 @@ export function coveragePinOf(row: CoverageRow): PinnedCoverage {
  *
  * The quotable column is `replications − withoutQuotableAwt` because that is the column the tables
  * actually print — `0 of 30` for an arm that lost its AWT on every replication. Emphasis and cell
- * padding are normalized away by the caller; what is compared is the three numbers and their
+ * padding are normalized away by the caller; what is compared is the numbers and their
  * denominators.
+ *
+ * **`kiosk` renders the fourth column, and the two widths are both real rather than a tolerance.**
+ * `accessControl.test.ts`'s H-ACCESS-1 table carries `kiosk-refused/run`; `docs/05-roadmap.md`'s
+ * does not, and deliberately — its three columns are the ones six other documents quote, and
+ * widening a published table is a change to what this repository claims rather than to how it
+ * prints. So the vocabulary renders both, and each width is used by a table that exists. It is not
+ * the *"second precision nobody uses"* {@link derivedCoverageForms} refuses.
  */
-export function publishedCoverageRow(pin: PinnedCoverage, places = 1): string {
+export function publishedCoverageRow(pin: PinnedCoverage, places = 1, kiosk = false): string {
   const quotable = pin.replications - pin.withoutQuotableAwt;
   return (
     `${String(quotable)} of ${String(pin.replications)} | ` +
     `${pin.meanUndelivered.toFixed(1)} | ` +
-    `${(pin.meanUnservedFraction * 100).toFixed(places)} %`
+    `${(pin.meanUnservedFraction * 100).toFixed(places)} %` +
+    (kiosk ? ` | ${pin.meanKioskRefusedLegs.toFixed(1)}` : '')
   );
 }
 
@@ -342,12 +405,22 @@ export function publishedCoverageRow(pin: PinnedCoverage, places = 1): string {
  * table's credential row writes `0.00 %`, and a vocabulary that assumed one would reject the other
  * as undeclared. The undelivered mean is 1 dp everywhere, which is what `formatAccessControlStudy`
  * prints, so it is not varied — a second precision nobody uses would only widen what passes.
+ *
+ * **Two widths, for the same reason and under the same rule.** Since the kiosk column landed, the
+ * three-column form is what `docs/05-roadmap.md` prints and the four-column form is what
+ * `accessControl.test.ts`'s own H-ACCESS-1 table prints. Both are in the vocabulary because both
+ * are published; neither is here speculatively. **The kiosk figure is a fifth pinned number and it
+ * is guarded exactly like the other four** — a table that quoted a refusal count `PINNED_COVERAGE`
+ * cannot render fails the same way a drifted unserved fraction does, which is the whole of § D149's
+ * lesson applied to the column it said was missing.
  */
 export function derivedCoverageForms(): ReadonlySet<string> {
   const forms = new Set<string>();
   for (const pin of Object.values(PINNED_COVERAGE)) {
-    forms.add(publishedCoverageRow(pin, 1));
-    forms.add(publishedCoverageRow(pin, 2));
+    for (const places of [1, 2]) {
+      forms.add(publishedCoverageRow(pin, places));
+      forms.add(publishedCoverageRow(pin, places, true));
+    }
   }
   return forms;
 }
@@ -545,6 +618,10 @@ function coverageRow(
         : undelivered.reduce((total, value) => total + value, 0) / undelivered.length,
     meanUnservedFraction:
       finite.length === 0 ? Number.NaN : finite.reduce((total, value) => total + value, 0) / finite.length,
+    meanKioskRefusedLegs:
+      records.length === 0
+        ? Number.NaN
+        : records.reduce((total, record) => total + record.kioskRefusedLegs, 0) / records.length,
     quotable: cell.aggregate.awtIsValid,
   });
 }
@@ -702,7 +779,10 @@ export function formatAccessControlStudy(study: AccessControlStudy): string {
         `no-quotable-AWT ${String(row.withoutQuotableAwt).padStart(3)}/${row.replications}  ` +
         `not-completed ${String(row.notCompleted).padStart(3)}/${row.replications}  ` +
         `undelivered/run ${row.meanUndelivered.toFixed(1).padStart(6)}  ` +
-        `unserved ${(row.meanUnservedFraction * 100).toFixed(2)} %`,
+        `unserved ${(row.meanUnservedFraction * 100).toFixed(2).padStart(6)} %  ` +
+        /* The column DECISIONS.md § D137 item 2 and § D149 item 2 record as missing. It sits
+           beside `unserved` deliberately: the pair is the finding, not either number alone. */
+        `kiosk-refused/run ${row.meanKioskRefusedLegs.toFixed(1).padStart(6)}`,
     );
   }
   lines.push(

@@ -424,6 +424,7 @@ function stubRecord(replication: number, awtS: number): ReplicationRecord {
     tracePassengers: 1,
     conservation: { balanced: true } as unknown as ReplicationRecord['conservation'],
     undeliveredCount: 0,
+    kioskRefusedLegs: 0,
     warnings: [],
   };
 }
