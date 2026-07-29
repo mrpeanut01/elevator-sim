@@ -646,6 +646,8 @@ export {
   GARDEN_RESIDENTIAL_2PCT,
   METRIC_LABELS,
   MIDTOWN_INTERFLOOR_MIX,
+  MIDTOWN_LUNCH_FLAT_CONTROL,
+  MIDTOWN_LUNCH_TWO_WAY,
   MIDTOWN_UP_PEAK_1PCT,
   SECURE_INTERFLOOR_MIX,
   SECURE_UP_PEAK_2PCT,
@@ -743,6 +745,22 @@ export type {
   EnergyLivenessOptions,
   EnergyLivenessStudy,
 } from './energyLiveness.js';
+
+export {
+  DETECTOR_INPUTS,
+  LUNCH_TWO_WAY_BUILDING,
+  LUNCH_TWO_WAY_SEED,
+  MIX_TIME_BINS,
+  formatLunchTwoWayMix,
+  measureLunchTwoWayMix,
+} from './lunchTwoWay.js';
+
+export type {
+  DetectorInput,
+  LunchTwoWayMixOptions,
+  LunchTwoWayMixStudy,
+  MixHomogeneity,
+} from './lunchTwoWay.js';
 
 /* -------------------------------------------------------------------------- *
  * Reporting

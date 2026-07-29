@@ -25,7 +25,7 @@ import { loadConfig } from '../config/loader.js';
 import type { LoadedConfig, ResolvedBuilding, TrafficProfiles } from '../config/types.js';
 import { StreamSet } from '../random/index.js';
 
-import { intensityAt } from './demandTemplate.js';
+import { intensityAt, splitAt } from './demandTemplate.js';
 import { planDemand, generateTrace } from './generator.js';
 import { TRAFFIC_DEFAULTS, TRAFFIC_PARAMETERS, type TrafficConfig } from './types.js';
 
@@ -80,6 +80,8 @@ const PARAMETERS_BY_CONFIG_FIELD = {
     'traffic.constant.durationS',
     'traffic.constant.discardFirstS',
     'traffic.constant.discardLastS',
+    'traffic.lunchTwoWay.durationS',
+    'traffic.lunchTwoWay.mixAmplitude',
   ],
   demandLevel: ['traffic.demandLevel'],
   arrivalRatePctPop5min: ['traffic.arrivalRatePctPop5min'],
@@ -206,6 +208,9 @@ describe('traffic tunables declare their schema', () => {
       'traffic.constant.discardLastS',
     ]) {
       expect(gate(id), id).toEqual({ 'traffic.template': ['constant-iso'] });
+    }
+    for (const id of ['traffic.lunchTwoWay.durationS', 'traffic.lunchTwoWay.mixAmplitude']) {
+      expect(gate(id), id).toEqual({ 'traffic.template': ['lunch-two-way'] });
     }
     // The parameters that are always live declare no gate.
     for (const id of ['traffic.demandLevel', 'traffic.maxLegs', 'traffic.entranceWeight']) {
@@ -387,6 +392,27 @@ const PROBES: readonly Probe[] = [
       return durationS - reportWindowEndS;
     },
     expected: 120,
+  },
+  {
+    ids: ['traffic.lunchTwoWay.durationS'],
+    buildingId: 'midtown-office',
+    probe: { template: 'lunch-two-way', templateOverrides: { durationS: 2400 } },
+    observe: (config) => planDemand(config).template.durationS,
+    expected: 2400,
+  },
+  {
+    // Observed on the arc rather than on the field it was written into: the amplitude's whole job
+    // is to move the mix at a time, and a probe that read the option back would pass on a template
+    // that stored it and never applied it. 0.5 halves the distance from the period mean (0.45) to
+    // the authored endpoint (0.90), so the mix at the end of the run is 0.675 outgoing.
+    ids: ['traffic.lunchTwoWay.mixAmplitude'],
+    buildingId: 'midtown-office',
+    probe: { template: 'lunch-two-way', templateOverrides: { mixAmplitude: 0.5 } },
+    observe: (config) => {
+      const { template } = planDemand(config);
+      return splitAt(template, 0)?.outgoing;
+    },
+    expected: 0.675,
   },
 ];
 

@@ -148,6 +148,57 @@ weakest shipped dispatcher — is on the Pareto front at six of eight cells, bec
 energy and worst on wait. Any aggregate "efficiency" number ranks it first. Report energy beside
 AWT and WT95, never instead of them.
 
+## Traffic mix by period, and the one period whose mix moves inside it
+
+The three directional shares are not a constant of a building — they are a constant of a *period*.
+An office's morning up-peak, its lunch period and its evening down-peak have different mixes, and
+`data/traffic-profiles.json`'s per-building-type `directionalSplit` describes the **governing** one.
+
+| period | incoming / outgoing / interfloor | source |
+|---|---|---|
+| morning up-peak, standard office | 85 / 5 / 10 | the shipped `office-standard` profile |
+| **lunch two-way** | **45 / 45 / 10** | CIBSE Guide D (2010, carried into 2020); BCO *Guide to Specification 2014* pairs it with a 13 %/5 min lunchtime two-way demand |
+| lunch two-way, alternatives | 40 / 40 / 20 (Barney 2003a); 42 / 42 / 16 (BCO 2009) | recorded because they differ, not to be averaged with the above |
+
+The lunch peak is worth designing for on its own: measured office lunch-hour demand runs **12–16 %
+of population per 5 minutes**, and the period's intensity can exceed the up-peak handling capacity
+by **20–30 %**, so a system tuned only for the morning can disappoint at midday.
+
+### What could not be cited, stated plainly
+
+The three rows above give the lunch period's mix as **one triple for the whole period**. No CIBSE
+Guide D or BCO page giving that mix *as a function of time within the period* was available while
+this was written, and the shipped `lunch-two-way` template needs one — so it is **derived from the
+mechanism the same sources describe**, not quoted, exactly as the escalator traversal time below is
+derived from EN 115-1 geometry rather than quoted from a table.
+
+The mechanism: occupants ride down to the terminal to leave the building and ride back up on their
+return, so the same period is outgoing-dominant early and incoming-dominant late. Three stated
+assumptions close the arithmetic:
+
+| step | value | source |
+|---|---|---|
+| interfloor share, held constant through the period | 10 % | the cited period mix |
+| incoming share at the instant the period opens | 0 % | nobody has returned yet — the mechanism, not a table |
+| the arc between the ends | linear in time, symmetric about the midpoint | assumption |
+| ⇒ mix at the start | **0 / 90 / 10** | derived |
+| ⇒ mix at the end | **90 / 0 / 10** | the mirror |
+| ⇒ time-average of the arc | `(0+90)/2 / (90+0)/2 / (10+10)/2` = **45 / 45 / 10** | **reproduces the cited figure** |
+
+The last row is the check: the endpoints are pinned by the mechanism *and* by having to integrate
+to the published period mean, rather than being a plausible-looking pair set beside it.
+
+**The limitation cuts the wrong way and is therefore stated first, not last.** An endpoint of
+exactly zero incoming is the **widest** arc consistent with the cited mean; a measured building's
+departures and returns overlap, so a real arc is smoother at its ends. A wider arc is the one a
+traffic-pattern-sensitive dispatcher would find easiest to exploit, so this is **not** a
+conservative choice and must not be reported as one. `traffic.lunchTwoWay.mixAmplitude` narrows it,
+and 0 collapses it to a flat 45/45/10 at identical total demand.
+
+**The period's *length* is not cited either.** The template inherits the CIBSE rise-and-fall run's
+own 30-minute horizon, its 5-minute hold and its zero baseline, so it introduces no duration that
+no source supports. The cited part of `lunch-two-way` is its mix, not its clock.
+
 ## Non-lift transport
 
 A building may declare **transport modes** — escalators, stairs — as edges of the routing graph
@@ -193,6 +244,9 @@ one). See `packages/core/src/config/types.ts`.
 - Barney, G. and Al-Sharif, L., *Elevator Traffic Handbook: Theory and Practice* (2nd ed., Routledge 2016) — drive sizing, counterbalancing, and the round-trip-time derivation this project's oracle implements
 - [BS EN 115-1:2017 — Safety of escalators and moving walks, Part 1: Construction and installation](https://standards.iteh.ai/catalog/standards/cen/89597718-b77e-4b2d-b8da-287ce6d9b9b3/en-115-1-2017) — inclination limits (30°, and 35° only for rises ≤ 6 m), the nominal-speed caps (0.75 m/s at ≤ 30°, 0.50 m/s at 30–35°), and the flat-step requirement (2 for a rise ≤ 6 m, 3 above it) behind the `G ↔ 2` traversal time above
 - [KONE Planning guide — Escalators, ramps and autowalks](https://distributors.kone.com/en/Images/KONE-Escalator-Planning-Guide_tcm90-100695.pdf) — 30° as the commercial/infrastructure compromise angle, 0.5 m/s as the common commercial nominal speed, and the 0.40 m standard step depth
+- [Fundamentals of Traffic Analysis — Elevator World](https://elevatorworld.com/article/fundamentals-of-traffic-analysis/) — the four office traffic types (up-peak, down-peak, lunch mixed-peak, random interfloor), the lunch period's leave-and-return mechanism, and the 12–16 %/5 min lunch demand band behind the traffic-mix table above
+- [Lift Passenger Demand in Office Buildings — Elevator World](https://elevatorworld.com/article/lift-passenger-demand-in-office-buildings/) — the 45 % / 45 % / 10 % lunch mix attributed to CIBSE (2010), the 40/40/20 (Barney 2003a) and 42/42/16 (BCO 2009) alternatives, and the BCO *Guide to Specification 2014* lunchtime two-way demand of 13 %/5 min
+- [Traffic planning methodology — Siikonen, KONE (CTBUH)](https://global.ctbuh.org/resources/papers/download/1049-traffic-planning-methodology.pdf) — lunch mixed-peak as a distinct design condition rather than a variant of up-peak
 - [World's Fastest Elevators — e-architect](https://www.e-architect.com/worlds-fastest-elevators)
 - [KONE Destination Control brochure](https://www.kone.us/Images/kone-destination-brochure_tcm25-18769.pdf)
 - [Elevator Access Control Systems — Genea](https://www.getgenea.com/blog/elevator-access-control-systems-everything-you-need-to-know/)

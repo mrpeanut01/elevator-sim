@@ -94,18 +94,23 @@ export type { BatchArrivalOptions } from './poissonBatch.js';
  * -------------------------------------------------------------------------- */
 
 export {
+  LUNCH_TWO_WAY_SPLIT_AT_END,
+  LUNCH_TWO_WAY_SPLIT_AT_START,
   constantDemandTemplate,
   expectedPassengers,
   inReportWindow,
   integratedIntensityS,
   intensityAt,
+  lunchTwoWayTemplate,
   resolveDemandTemplate,
   riseAndFallTemplate,
+  splitAt,
 } from './demandTemplate.js';
 
 export type {
   ConstantDemandOptions,
   DemandTemplateSpec,
+  LunchTwoWayOptions,
   RiseAndFallOptions,
 } from './demandTemplate.js';
 

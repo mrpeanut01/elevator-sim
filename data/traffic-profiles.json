@@ -66,6 +66,17 @@
       "discardFirstMin": 15,
       "discardLastMin": 5,
       "$comment": "Single long run. Incompatible with confidence intervals across replications because waiting times within one run are correlated. Supported for cross-checking only."
+    },
+    {
+      "id": "lunch-two-way",
+      "name": "CIBSE Guide D lunch two-way template",
+      "recommended": true,
+      "durationMin": 30,
+      "reportWindow": "full-run",
+      "shape": "the rise-and-fall intensity, with the directional mix swinging from outgoing-dominant to incoming-dominant across the period",
+      "directionalSplitAtStart": { "incoming": 0.0, "outgoing": 0.9, "interfloor": 0.1 },
+      "directionalSplitAtEnd": { "incoming": 0.9, "outgoing": 0.0, "interfloor": 0.1 },
+      "$comment": "The lunch mixed peak: occupants ride down to the terminal to leave the building, and later ride up again on their return, so the SAME period is outgoing-dominant early and incoming-dominant late. CITED: the period's mix is 45% incoming / 45% outgoing / 10% interfloor (CIBSE Guide D, 2010, carried into 2020; the same split is what BCO Guide to Specification 2014 pairs with a 13%/5min lunchtime two-way demand). Alternatives in the literature are 40/40/20 (Barney 2003a) and 42/42/16 (BCO 2009); the CIBSE figure is taken because Guide D is this project's primary reference. DERIVED, and not quoted from any table: the two endpoints. At the instant the period opens nobody has returned yet, so incoming is 0; interfloor is held at the cited 10% throughout; the mix is linear in time and symmetric about the midpoint, so its time-average is (start+end)/2 = 45/45/10 exactly -- the cited figure is REPRODUCED by the endpoints rather than assumed beside them. NOT CITED, and inherited rather than invented: every geometric number here. durationMin, the 5-minute hold and the zero baseline are the rise-and-fall record's own, so this template adds no uncited duration. LIMITATION: an endpoint of exactly 0 incoming is the widest arc consistent with the cited mean, and a measured building's arc is smoother at its ends; `traffic.lunchTwoWay.mixAmplitude` scales the arc about that mean, and 0 collapses it to a flat 45/45/10 at identical total demand."
     }
   ],
   "passengerMass": {

@@ -41,6 +41,7 @@
 import { measureAuctionAggregation, measureMultiRoundReachability } from './auctionAggregation.js';
 import { measureDestinationLiveness } from './destinationLiveness.js';
 import { measureEnergyLiveness } from './energyLiveness.js';
+import { formatLunchTwoWayMix, measureLunchTwoWayMix } from './lunchTwoWay.js';
 import { measurePredictorLag } from './predictorLag.js';
 import {
   measureWeightSetSelectionLiveness,
@@ -50,6 +51,7 @@ import {
 import type { AuctionEnsembleResult, MultiRoundReachability } from './auctionAggregation.js';
 import type { DestinationLiveness } from './destinationLiveness.js';
 import type { EnergyLivenessStudy } from './energyLiveness.js';
+import type { LunchTwoWayMixStudy } from './lunchTwoWay.js';
 import type { PredictorLagStudy } from './predictorLag.js';
 import type {
   DeadbandKnownAnswer,
@@ -74,6 +76,15 @@ export interface LivenessSuiteResult {
    * worth nothing if the fitting procedure cannot find a known optimum.
    */
   readonly deadband: DeadbandKnownAnswer;
+  /**
+   * Does the lunch two-way template's directional mix actually move? Wave 9's addition.
+   *
+   * Categorical for the same reason the rest is: a chi-square over a time-bin x direction table
+   * and its worst standardized residual, against the same table shape `DECISIONS.md` § D156
+   * measured the shipped templates flat over. It constructs no `Simulation` — § D162 condition 3
+   * forbids a selector result in the commit that adds the template — so it costs seconds.
+   */
+  readonly lunchTwoWayMix: LunchTwoWayMixStudy;
 }
 
 export interface LivenessSuiteOptions {
@@ -117,6 +128,13 @@ export async function runLivenessSuite(
     options.fastOnly === true ? { ...seedOption, candidates: 32, replications: 12 } : seedOption,
   );
 
+  // Trace generation only, so `fastOnly` narrows it rather than dropping it — and narrowing it
+  // still leaves every field measured, which is this driver's own rule about skipped studies.
+  const lunchTwoWayMix = await measureLunchTwoWayMix({
+    ...seedOption,
+    ...(options.fastOnly === true ? { replications: 8 } : {}),
+  });
+
   return Object.freeze({
     predictorLag,
     auctionAggregation,
@@ -125,6 +143,7 @@ export async function runLivenessSuite(
     energy,
     weightSets,
     deadband,
+    lunchTwoWayMix,
   });
 }
 
@@ -234,6 +253,9 @@ export function formatLivenessSuite(result: LivenessSuiteResult): string {
       `ΔAWT=${result.deadband.winnerMeanDeltaAwtS.toFixed(4)} s ` +
       `rediscovered=${String(result.deadband.rediscovered)}`,
   );
+
+  lines.push('', 'lunch two-way mix (lunchTwoWay.ts)');
+  lines.push(...formatLunchTwoWayMix(result.lunchTwoWayMix));
 
   return lines.join('\n');
 }

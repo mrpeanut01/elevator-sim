@@ -10276,3 +10276,49 @@ The instructive one: **`severity` lived on the item, and the de-escalation rule 
 **The mutation harness reported GREEN three times before those were fixed** — which is the point. [§ D161](#d161)'s fifth variant is guarded here rather than assumed, because both outcomes were demonstrably reachable.
 
 **Impact.** § D163 clause 2 is satisfied. **Known limits:** thirteen warning rows on Secure Tower is a wall, and grouping is deliberately **not** done — parity requires each warning's text in Basic, and a summarising group is the first place one could go missing. Basic's curated three-dimension subset (§ 8.3) is not built; the campaign editor is restricted to each stage's declared editable set instead, which is data. **And one item from `WAVE9_PLAN.md`'s T76 row was never briefed and is not done** — *the structural-refusal reason is prose, keyed on a call id `VizLeg` does not carry* — an orchestration error, recorded here rather than quietly dropped.
+
+---
+
+## D169 — a demand template whose **directional mix varies within the run**, built by a lane forbidden to measure a selector on it
+
+**Date:** 2026-07-29 · **Owner:** T70 (wave 9) · **Satisfies:** [§ D162](#d162) conditions 1, 2 and 3 · **Creates the condition** [§ D156](#d156) found absent · **Runs no selector arm**
+
+**Context.** [§ D156](#d156) refused Phase 6c across eight operating points and named the mechanism: `DemandPhase` carried a scalar intensity, so the directional mix was fixed for a whole run and **the condition learned selection exists to exploit did not occur anywhere in the shipped set.** This lane builds that condition. It does **not** measure on it, and that separation is the entire defence against § D162's own objection — that a template authored knowing what a selector exploits is a test built to pass.
+
+### What was built
+
+`DemandPhase` gains optional `startSplit`/`endSplit`, and `splitAt()` is `intensityAt()`'s twin over the same knots. **`lunch-two-way`** is a third shipped template: the CIBSE rise-and-fall **intensity curve unchanged**, with the *mix* swinging across the period — departures first, returns after.
+
+### Cited where citable, derived where not, and the difference stated
+
+**Cited:** the lunch mix **45/45/10** — CIBSE Guide D, with BCO's *Guide to Specification* pairing the same split with 13 %/5 min two-way demand. Alternatives are **recorded rather than averaged**: 40/40/20 (Barney) and 42/42/16 (BCO 2009).
+
+**Derived, and said plainly** — [§ D167](#d167)'s method: **no source publishes the mix as a function of time *within* the period.** The endpoints come from the mechanism the sources describe (people leave, then people return) plus three stated assumptions: interfloor held at the cited 10 %, incoming zero at the instant the period opens because nobody has yet returned, and a linear symmetric arc. The arithmetic is shown, and it is the right way round: `(0+90)/2 = 45`, `(90+0)/2 = 45`, `(10+10)/2 = 10` — **the cited mean is reproduced by the endpoints rather than asserted beside them.**
+
+**Not cited, and inherited rather than invented:** every geometric number — the 30-minute period, the five-minute hold, the zero baseline — is the existing rise-and-fall record's own. **The cited part of this template is its mix, not its clock.**
+
+### The mix genuinely varies — same statistic, same apparatus
+
+| arm | χ² (10 df) | worst z | lobby : down, first → last bin |
+|---|---|---|---|
+| **`lunch-two-way`** | **383.4** | **+8.36 σ** | 0.06 → 9.70 — **×165** |
+| flat-mix control | 4.8 | +1.03 σ | ×1.2 |
+| `rise-and-fall`, same point | 15.6 | +3.05 σ | ×1.4 |
+
+Both flat arms sit inside the 0.05 critical value of 18.31; the arc is past the 0.001 value of 29.59 **by an order of magnitude**. § D156's own **+1.83 σ** is *quoted rather than compared against*, because its windows carried 4–36 arrivals where a ratio is counting noise — the third row is the like-for-like baseline measured in the same apparatus, which is the honest comparison.
+
+### The negative control is shipped, not assembled by whoever measures
+
+`mixAmplitude` is a **declared tunable** with a schema, a default and a parameter probe. That gives [§ D162](#d162) condition 5's flat-mix control first-class status: the lane that eventually measures cannot quietly build its own control and let it drift from the treatment. And **at amplitude 0 the phases still carry the mix, equal to the mean** — dropping the splits would return the building to `office-standard`'s 85/5/10 and make the "control" differ in mean mix as well as in variation, which is not a control.
+
+### The mutant that survived `core`'s entire traffic suite
+
+**Freezing the mix multiplier to a constant 1 — storing the arc and never applying it — passed 53 tests, all green.** It is the *two-or-more readers* shape at its most instructive: the parameter probe, the schema, the resolver and the byte-identity test all read the **template**; **not one of them read the passengers.** It was caught only by the new liveness study, which is why that study exists and why its header says so.
+
+A second guard failed for a real reason on first run: `resolveDemandTemplate` passes a pre-resolved template through untouched, so a hand-built template with only one authored endpoint reached the generator and **dropped its arc silently**. Now refused at three layers.
+
+### Byte-identity, and the choice not to be clever
+
+Digests generated in a **detached worktree at the base commit**, against that tree's own build and data. All five buildings × both shipped templates reproduce the serialized trace bit for bit, **with no field excluded** — the three new fields are omitted rather than emptied. And `mixAmplitude: 0` takes the **pre-existing static code path deliberately**, because rescaling by a multiplier of one sums in a different order and moved every arrival time by one unit in the last place.
+
+**Impact.** `midtown-office` gains a lunch two-way operating point — chosen because it is the project's primary office building and Phase 2 validation case, it shipped no lunch point, and `docs/03` has named two-way a governing peak since it was written. The new point copies the interfloor point exactly, so **the only difference is where the mix comes from** and the rate is not a free choice made here. **Known limits, and the first is the uncomfortable one:** the arc's amplitude is the **widest consistent with the citation**, and a real building's departures and returns overlap — *a wider arc is the one a selector finds easiest to exploit*, so it is stated first in three places rather than last. The point has **no saturation census**; whoever measures must derive their budget from their own. And no selector arm was constructed, run or measured — **the commit ordering is the evidence.**

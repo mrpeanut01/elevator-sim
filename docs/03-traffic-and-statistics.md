@@ -26,14 +26,43 @@ loading and stop patterns. Batch size distribution is a per-building-type parame
 
 ### Demand templates
 
-Two established shapes:
+Three shapes:
 
 - **Constant demand** (draft ISO 8100-32): steady rate for the whole run
 - **Rise-and-fall template** (CIBSE Guide D): demand ramps up to a peak and back down,
   with results reported for the peak 5 minutes
+- **Lunch two-way template** (CIBSE Guide D): the rise-and-fall intensity, with the **directional
+  mix** swinging across the period from outgoing-dominant to incoming-dominant, reported over the
+  whole run
 
-Use the **rise-and-fall template**. Rationale in Part 3 — the constant-demand approach is
-incompatible with confidence intervals for our purposes.
+Use the **rise-and-fall template** unless the question is about a changing mix. Rationale in Part 3
+— the constant-demand approach is incompatible with confidence intervals for our purposes.
+
+**Only the third varies the mix, and that is measured rather than claimed.**
+[`DECISIONS.md`](../DECISIONS.md) § D156 screened all eight of Phase 6c's operating points with a
+Pearson homogeneity statistic over a time-bin × direction-category table and found the shipped
+templates flat: *"the largest standardized deviation across the whole grid is +1.83 σ"*, with four
+cells carrying one direction category and therefore 0 df. That was structural — `DemandPhase`
+carried a scalar intensity multiplier, so `directionalSplit` was read once per floor at plan time
+and could not move. `DemandPhase` now carries an optional pair of endpoint mixes; the two templates
+that shipped before it declare none and reproduce their traces byte for byte
+(`core/src/traffic/mixIdentity.test.ts`).
+
+Measured in the same apparatus at Midtown Office, 1.5 %/5 min over 1800 s, 6 time bins × 3 detector
+inputs, 24 replications (`experiments/src/benchmark/lunchTwoWay.ts`):
+
+| arm | χ² on 10 df | worst standardized deviation | lobby : down, first bin → last |
+|---|---|---|---|
+| `lunch-two-way` | **383.4** | **+8.36 σ** | 0.06 → 9.70 (**×165**) |
+| the same, mix arc collapsed | 4.8 | +1.03 σ | 1.02 → 0.84 (×1.2) |
+| `rise-and-fall`, same point | 15.6 | +3.05 σ | 7.60 → 10.40 (×1.4) |
+
+The third row is what makes the first legible, and it is why § D156's own +1.83 is quoted rather
+than compared against: its windows held **4 to 36 arrivals**, where an observed ratio is dominated
+by counting noise, and these hold ~88 per replication pooled over 24. Both flat arms are inside the
+0.05 critical value for their own table (18.31); the arc is past the 0.001 value (29.59) by an order
+of magnitude. The **ratio** column is the quantity § D151 § 5 says the question is about — *"which
+pattern am I in lives in their ratios, not their level."*
 
 ## Part 2: The analytical baseline
 

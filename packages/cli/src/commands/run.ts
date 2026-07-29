@@ -18,9 +18,11 @@
  */
 
 import {
+  DEMAND_TEMPLATE_IDS,
   SimulationError,
   Simulation,
   WARNING_CODES,
+  type DemandTemplateId,
   type LoadedConfig,
   type SimulationConfig,
   type SimulationResult,
@@ -105,7 +107,7 @@ export const RUN_FLAGS: readonly FlagSpec[] = [
     kind: 'string',
     placeholder: '<id>',
     summary: 'demand template',
-    choices: ['rise-and-fall', 'constant-iso'],
+    choices: [...DEMAND_TEMPLATE_IDS],
     defaultText: 'rise-and-fall',
   },
   {
@@ -228,6 +230,18 @@ export interface RunPlan {
 /** Config-warning codes the CLI repeats before a run, because they qualify its numbers. */
 const DISCLAIMER_CODES: readonly string[] = [WARNING_CODES.missingFloorPairs];
 
+/**
+ * Whether a `--template` value is one core knows how to build.
+ *
+ * Derived from `DEMAND_TEMPLATE_IDS` rather than a disjunction of string literals, which is what
+ * the flag's `choices` list is derived from too — so a template added to `core` is offered, parsed
+ * and applied by this command without anybody remembering three places. The predicate is not
+ * redundant with `choices`: `planRun` is exported and is called in tests with hand-built args.
+ */
+function isDemandTemplateId(value: string | undefined): value is DemandTemplateId {
+  return value !== undefined && (DEMAND_TEMPLATE_IDS as readonly string[]).includes(value);
+}
+
 export function planRun(config: LoadedConfig, parsed: ParsedArgs): RunPlan {
   const buildingId = requiredStringFlag(parsed, 'building');
   const dispatcherId = requiredStringFlag(parsed, 'dispatcher');
@@ -264,9 +278,7 @@ export function planRun(config: LoadedConfig, parsed: ParsedArgs): RunPlan {
     // and let the summary's own saturation test decide what may be quoted.
     onTimeout: 'report',
     ...(durationS === undefined ? {} : { durationS }),
-    ...(template === 'constant-iso' || template === 'rise-and-fall'
-      ? { demandTemplate: template }
-      : {}),
+    ...(isDemandTemplateId(template) ? { demandTemplate: template } : {}),
     ...(rate === undefined ? {} : { demand: { arrivalRatePctPop5min: rate } }),
     ...(window === 'full-run' || window === 'peak-5min' ? { reportWindow: window } : {}),
   };
