@@ -172,6 +172,7 @@ export function runOneReplication(
       traceDigest: traceDigest(result.trace),
       tracePassengers: result.trace.passengerCount,
       undeliveredCount: result.undelivered.length,
+      kioskRefusedLegs: result.stageActivity.kioskRefusedLegs,
       warnings: result.warnings,
     };
   } catch (error) {

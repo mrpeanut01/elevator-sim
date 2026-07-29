@@ -461,6 +461,37 @@ export function printRunReport(out: Output, plan: RunPlan, result: SimulationRes
   );
 
   /*
+   * Who the interface turned away, beside the counts that would otherwise absorb them.
+   *
+   * **This is one of the two non-test callers `StageActivity.kioskRefusedLegs` did not have**
+   * (DECISIONS.md § D137 item 2, § D149 item 2); the other is `benchmark/accessControl.ts`'s
+   * coverage column. It goes *inside* the Passengers block rather than in a block of its own
+   * because that is the block whose `undelivered` figure it explains: a refused leg is counted
+   * there too, and without this line a reader cannot tell a passenger the building could not
+   * reach from one the kiosk declined to ask about. That distinction is the whole reason the
+   * counter exists — § D137 states the bare kiosk's cost as *who* rather than as a rate, which
+   * is the half an unserved fraction cannot see.
+   *
+   * A run already raises a warning for this, and the warning is not a substitute: it is prose in
+   * a list that a busy run truncates at twelve, and it names the mechanism rather than the
+   * magnitude. This is the magnitude, in the table.
+   *
+   * Shown only when non-zero, like the door holds above. Every profile
+   * `data/dispatcher-profiles.json` ships runs at `up-down-buttons` or `mobile-credential`, so a
+   * shipped run prints nothing here — the line exists for the reader who authors
+   * `dispatch.callType: "destination-entry"` on an access-zoned building, which is exactly the
+   * configuration nothing else in the report distinguishes from ordinary overflow.
+   */
+  if (result.stageActivity.kioskRefusedLegs > 0) {
+    field(
+      out,
+      'refused at the kiosk',
+      `${count(result.stageActivity.kioskRefusedLegs)} leg(s) ${dim('— a destination disclosed with no credential, on an access-zoned floor')}`,
+      24,
+    );
+  }
+
+  /*
    * The courtesy hold, whenever the run asked for one at all.
    *
    * **This is the non-test caller `StageActivity.lateArrivalHolds*` did not have.** The counters

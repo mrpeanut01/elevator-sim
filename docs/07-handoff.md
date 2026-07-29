@@ -901,7 +901,7 @@ against the code rather than read.
 | **The weight-set library reaches studies and not the shipped runner** — **CLOSED by T53** | It travelled as a `DispatchPolicyOptions` field, which `runner/experiment.ts` already plumbs per dispatcher arm, so a **study** could enable the selector and **`elevator-sim run` / `tune` / `watch` could not**. **Fixed as the row said it should be**: `SimulationConfig.dispatcherProfiles` carries the file the way `elevatorSpecs` already did, `Simulation` derives the arms through `dispatch/policy.ts`'s `weightSetSourceFrom`, and `cli/src/commands/run.ts`'s `planRun` — the function `runCommand` calls — supplies it, with `compare` and `tune` supplied through `ExperimentResources`. **The non-test caller is named**: `run.ts:planRun` → `simulation.ts` → `weightSetSourceFrom` → `resolveWeightSets` → `selectWeightSet`. A profile now opts in **as data**, and `cli/src/commands/run.selector.test.ts` proves it by editing a copy of `data/dispatcher-profiles.json` and running the command: default-off is byte-identical to a config that never carried the file, permuting `weightSetsByPattern` moves the car trajectories, and permuting a regime the point never enters does not. Two smaller holes closed with it — `dispatcherOptionsOf` dropped `selection` silently, and a hand-built `weightSets` library is now refused at store time rather than stored as a record that replays a different dispatcher. **Still open, narrowed**: the browser viewer cannot — `viz/src/dev/data.ts`'s resource bundle carries the profile *array* and never the file-level block, so `dev/main.ts` has nothing to hand `SimulationConfig.dispatcherProfiles`; a selecting profile is refused there by name rather than run, which is the safe failure but is not the seam. Unchanged and deliberate: **no shipped profile opts into a selector** — both arms are *derived* in `benchmark/weightSetSelection.ts`, the precedent being `destination-eta-unpriced`, and on § D145's measurement neither has earned a shipped slot |
 | **§ 4's two resolution limits were measured on AWT and were applied to TTD** | 0.20 s near-neighbour, 1.9 s structural, read as absolute seconds against a metric whose scale is different — at § D145's cell TTD is ~54 s against AWT's ~15 s, so 1.9 s is 3.5 % of TTD where § 4 measured 12 % of AWT. **The absolute reading is the more permissive of the two**, so reading it relatively would put both arms *further* below the limit and **no verdict turns on the choice**. But the limits have **not been measured on TTD directly**, and that is unmeasured rather than settled ([§ D145](../DECISIONS.md)) |
 | **Phase 6c's refusal is one operating point** | One building, one traffic pattern, one reference arm. § D139 asked for the operating point's own census and got it; it did **not** ask for a sweep, and a sweep is the obvious follow-up. Nothing in the verdict says a selector cannot help somewhere else — it says it did not help measurably **here** ([§ D145](../DECISIONS.md)) |
-| **`kioskRefusedLegs` has no consumer in `benchmark/`** | It is on `StageActivity` and therefore on `SimulationResult`, so the CLI, `experiments` and the viewer can all read it, and its warning reaches `result.warnings`. **Nothing reports it as a column.** That is the ninth-dead-seam shape one notch down, stated here rather than left to be discovered — and it is the half an unserved-fraction study **cannot** express: the bare-kiosk arm now publishes `100 %` unserved, and *who* was refused at the kiosk is available and unread ([§ D137](../DECISIONS.md) item 2, [§ D149](../DECISIONS.md)) |
+| **`kioskRefusedLegs` had no consumer in `benchmark/` — CLOSED, and the cause was one package out** | Opened by wave 6 and closed by T56 with **two** named non-test readers: `benchmark/accessControl.ts`'s `coverageRow` (the `kiosk-refused/run` column of H-ACCESS-1, pinned in `PINNED_COVERAGE`) and `cli/src/commands/run.ts`'s `printRunReport` (a `refused at the kiosk` row inside the Passengers block, beside the `undelivered` figure it explains). **The row as written was right about the symptom and wrong about the location**: nothing in `benchmark/` *could* read the counter, because `ReplicationRecord` did not carry it — `StageActivity` reached `SimulationResult` and stopped at the replication runner, which is § D23's shape in a second place. `ReplicationRecord.kioskRefusedLegs` is that one field, landed **with** its readers. What it buys, measured: on `secure-tower` the conventional arm and the bare kiosk are both unserved and the column separates them, **0.0 against 29.0 refusals per run**, which an unserved fraction cannot do ([§ D137](../DECISIONS.md) item 2, [§ D149](../DECISIONS.md)) |
 | **`stopCount` has no `activeWhen`, and two shipped profiles sit one authored field away from a measured cost** | `energy-aware` (`stopCount` 0.3) and `predictive-balanced` (`stopCount` 0.2) become destination-sensitive at `garden-down-peak` the moment anybody authors `dispatch.callType` on them — at a cost measured **WORSE on AWT, WT95 and TTD**. `stopCount` is the one destination-reading term with no `activeWhen` declaring its gate, so `docs/06`'s parameter schema does not tell an optimizer that half of it only exists under a destination call type. **A configuration hazard nothing warns about** ([§ D136](../DECISIONS.md)) |
 | **`nearest-car` is unusable on `vertical-city` at any budget in the band — a fifth building** | Its first invalid replication is at 26 (1 %) and at 6 (1.5 %), so no budget in 50–200 fits under it and both double-deck points would be `UNQUOTABLE` with it in the cell. Excluded **by its ceiling and not by its answer**, published rather than dropped, and carried in the study object as `CEILING_EXCLUDED_ARMS`. § 4 already records it as the only profile that saturates; **this is that finding on a fifth building, and it is still the viewer's default in places** — the editor's own picker was moved to `collective` in wave 6 ([§ D147](../DECISIONS.md), [§ D134](../DECISIONS.md)) |
 | **`RunRecord` has no car-move series, and now has two consumers wanting it** | TWIN's **P7** separation property needs one to be more than a tautology, and § 5's `mixed-use-high-rise/residential-local` oracle gap has needed one since it was recorded. **That is the argument for doing it once** rather than twice or never ([§ D148](../DECISIONS.md)) |
@@ -922,7 +922,6 @@ against the code rather than read.
 | `prepositionPlan` | Zero callers — superseded by `resolvePrepositionContext`. **Classified**, not deleted: one of the 14 entries in `dispatch/deadCode.test.ts`'s `PUBLIC_API_ONLY`, asserted in both directions |
 | Mixed-use achieved **interval** | Reports `unmeasurable` by design: a shuttle holds doors 39.8 s while an office-local car completes a round trip in 31.3 s, so **no** departure-gap threshold is valid there. Constrains the oracle; **does not** constrain a TTD comparison, which § D100 checked rather than assumed |
 | `C5` — a `'z'` label can still print | `reports/compare.ts:607` can print `'z'` as a fallback family label on a convergence report, in the branch where `achievedHalfWidth` is already `NaN`. Cosmetic, and it is the exact mislabelling finding #14 was about. Distinct from `C33`, which is closed |
-| `C27` — Phase 6a/6b studies are off the package barrel | Reachable at their module paths with `regeneratePins.ts` as the non-test caller, but not on `benchmark/index.ts` or `src/index.ts`. Name list in § D62; both files must change in one commit. `runMixedUseHighRiseStudy` is in the same position |
 | `estimateMean` returns `halfWidth = 0` on a zero-variance sample | **Resolved against the docstring rather than the code, and pinned**: zero is the *true* half-width of an interval around a constant sample, and Phase 3's first acceptance criterion depends on it — making the estimator decline to bound such a sample turns **five** assertions red, including the one that pins *"a candidate compared against itself is INDISTINGUISHABLE, not unmeasurable."* What stays uncomfortable is recorded rather than fixed: a rule that stops the moment every replication agrees declares convergence on exactly the evidence that usually means the replications were never independent. Unreachable in anything shipped, because **no study injects a stopping rule at all** ([§ D127](../DECISIONS.md)) |
 | Multi-replication statistics over generated buildings | One replication per case, as everywhere in `fuzz/`. Nothing there says a *mean* under a degraded fleet is right, only that the mechanics under it are sound |
 | A **zone** cannot be changed mid-run | The dispatcher half of this row is **closed**: `selectWeightSet` changes the weight vector mid-run, off an explicit `SelectorState` threaded through deterministic simulation state, consuming **no** random stream — so a stored run still replays byte-identically and every paired comparison keeps its pairing, re-run rather than reasoned about ([§ D141](../DECISIONS.md)). A car's availability could already change (`BuildingConfig.serviceEvents`). **Zoning still has no mechanism** |
@@ -1020,6 +1019,32 @@ sentences is the whole reason a register is kept.
 And a seventh, about the guards rather than the register: **`published.test.ts` missed a stale
 published figure at both of its layers by construction**, and the story is in § 3.
 
+**And an eighth, found in wave 7 and the same shape as `C32`'s: `C27`'s row outlived its own
+closure by two waves.** The row in § *Standing* read *"Reachable at their module paths … but not on
+`benchmark/index.ts` or `src/index.ts`. Name list in § D62; both files must change in one commit."*
+Every clause of that was false when it was written. [§ D118](../DECISIONS.md) put § D62's list on
+both barrels in wave 5 and **this document's own § *Closed by wave 5* paragraph says so, four
+screens below the row** — the second time a register has disagreed with itself inside one section.
+Checked rather than taken on report: all **34** names — § D62's fenced 33 plus
+`runMixedUseHighRiseStudy` — are bound on `benchmark/index.ts` *and* on `src/index.ts`, and
+`Object.is`-identical between the two. `benchmark/index.ts`'s own docstring and
+`src/index.test.ts`'s comment both narrate the C27 work in the past tense.
+
+**Nothing checked the list, which is why the row could rot without anything going red.** The two
+structural barrel guards compare `src/index.ts` against `benchmark/index.ts`, so an edit that
+dropped all 34 names from **both** — the exact edit § D62's *"in the same commit"* was written
+against — leaves them green. `src/index.test.ts` § *DECISIONS.md § D62's handback list is on both
+barrels* now parses the list out of § D62's fence and asserts presence on each barrel and identity
+across them; watched failing on two names removed from `benchmark/index.ts` alone. One correction
+falls out of the parse: § D118 calls it *"§ D62's 34 names plus `runMixedUseHighRiseStudy`"*, and
+the fence holds **33** — the 34th *is* `runMixedUseHighRiseStudy`.
+
+The short-form list below reads `C27` as *"`runDestinationDispatchStudy` off both barrels"*, and
+**that sentence is true and is not what `C27` was**. `runDestinationDispatchStudy` is deliberately on
+neither barrel — § D62 does not list it and § D118 refused to invent a list — and it is *live*
+regardless, which `src/index.test.ts` pins in both directions as its standing demonstration that
+reachability and liveness come apart. It is a note, not debt.
+
 **Still open, in one place, because a reader planning work needs the list and not the prose:**
 
 *Deferred by a recorded argument, not by neglect* — Phase 9 beyond W4 · **TWIN**, designed and not
@@ -1027,14 +1052,14 @@ built · the double-deck closed-form RTT · a **sweep** behind Phase 6c's one-op
 
 *Live debt* — the **`G → 2` lobby leg** charged as an elevator leg · the seed-marginal 1.5 %
 double-deck point · the **liveness sweep's** section list hand-written, and its seven
-`selection.*` rows unprobed until the selector reaches `sim/` · the selector not reaching
-`run` / `tune` / `watch` · the resolution limits **unmeasured on TTD** · `kioskRefusedLegs` with no
-consumer · **W4's U7 half blocked on a `core` fix** · `stopCount` with no `activeWhen` ·
+`selection.*` rows unprobed because the sweep passes no `dispatcherProfiles` · the resolution
+limits **unmeasured on TTD** · **W4's U7 half blocked on a `core` fix** · `stopCount` with no
+`activeWhen` · the **viewer** still unable to enable a selector ·
 `nearest-car` unusable on a **fifth** building and still a default in places · `RunRecord`'s missing
 **car-move series**, now with two consumers · `published.test.ts` holding nothing for the
 categorical **class** · the structural-refusal reason being prose keyed on a call id `VizLeg` does
 not carry · the W4 candidate not routed into Run · `viz` now depending on `experiments` · **C5**
-(`compare.ts:607` can still print `'z'`) · **C27** (`runDestinationDispatchStudy` off both barrels) ·
+(`compare.ts:607` can still print `'z'`) ·
 the mixed-use study's six-replication margin · `stats/` consolidation · zoning still unchangeable
 mid-run.
 

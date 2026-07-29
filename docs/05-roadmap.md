@@ -838,8 +838,12 @@ with `weights.rideTime: 1` against `eta`, all four figures from the same runs. R
 > `runMixedUseHighRiseStudy` on both in one commit ([§ D118](../DECISIONS.md)) — **but a barrel
 > re-export is *reachability*, not liveness**, which is the exact property all ten dead behaviours **in code**
 > already had, and `measureEnergyLiveness` was on two barrels and was dead. Their non-test caller is `benchmark/regeneratePins.ts`, exactly as
-> `runTailStudy`'s is, and they are reachable at their module paths. Putting them on the package
-> surface is tracked as **C27**; the name list is in § D62.
+> `runTailStudy`'s is, and they are reachable at their module paths. **This paragraph used to end
+> *"putting them on the package surface is tracked as C27"*, in the present tense, two sentences
+> after saying wave 5 had done it** — a live contradiction inside one blockquote, and the same rot
+> that left `docs/07` § 8 carrying C27 as standing debt for two waves. The list is now guarded:
+> `src/index.test.ts` parses § D62's own fence and requires every name on **both** barrels, bound
+> identically, which is the check that did not exist while the row was wrong.
 
 | metric | difference | verdict |
 |---|---|---|

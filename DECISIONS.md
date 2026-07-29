@@ -7384,6 +7384,17 @@ option (4) in § D130's own disposition.
    ninth-dead-seam shape one notch down**, stated here rather than left to be discovered: the counter is
    asserted by `bareKiosk.test.ts` in both directions, which is the minimum bar, and a study that wants the
    count has an unpinned figure until it asks for it.
+
+   **CLOSED by T56 (wave 7), and the diagnosis in this paragraph was one package short.** *"`packages/experiments`
+   can read it"* was true of `SimulationResult` and false of anything a study actually holds: `runExperiment`
+   returns `ReplicationRecord`s, and that type carried no field of `StageActivity` at all, so no study could
+   have asked. `ReplicationRecord.kioskRefusedLegs` is that field — one field, landed with its readers — and
+   the two non-test readers are `benchmark/accessControl.ts`'s `coverageRow` (the `kiosk-refused/run` column
+   of H-ACCESS-1, pinned in `PINNED_COVERAGE` and asserted against the rendered report) and
+   `cli/src/commands/run.ts`'s `printRunReport` (a `refused at the kiosk` row inside the Passengers block,
+   beside the `undelivered` figure it explains). What the column buys is measured rather than argued: on
+   `secure-tower` the conventional arm and the bare kiosk are **both** unserved and the column separates
+   them, **0.0 against 29.0 refusals per run** at the same operating point on the same 30 replications.
 3. `#kioskAllows` is called from three sites and **counts on refusal**, so a call in a *predicate* evaluated
    speculatively would inflate the count. All three current sites are real eligibility questions about a real
    waiting passenger. **A fourth site added carelessly would not fail a test.**
@@ -8433,10 +8444,16 @@ digit. It is listed here so the next reader does not go looking. A ninth site §
    than the instance**: `published.test.ts` holds nothing for any *other* categorical study, for
    the two structural reasons this entry gives, and `DECISIONS.md`'s own copies of these counts are
    still transcribed.
-2. **`kioskRefusedLegs` is still not a column in any study.** § D137's own item 2, unchanged: the
-   bare-kiosk arm now publishes `100 % unserved`, and the count of *who was refused at the kiosk* —
-   which is the half an unserved fraction cannot express — is available on `StageActivity` and read
-   by nothing in `benchmark/`.
+2. **CLOSED by T56 (wave 7) — it is a column now.** As written: *"`kioskRefusedLegs` is still not a
+   column in any study. § D137's own item 2, unchanged: the bare-kiosk arm now publishes
+   `100 % unserved`, and the count of who was refused at the kiosk — which is the half an unserved
+   fraction cannot express — is available on `StageActivity` and read by nothing in `benchmark/`."*
+   It is now `CoverageRow.meanKioskRefusedLegs`, printed by `formatAccessControlStudy` and pinned in
+   `PINNED_COVERAGE`; the other five pinned fields reproduced to the last digit on the run that added
+   it, which is the evidence that the column is a column of *this* study rather than a new
+   measurement wearing its name. See § D137 item 2 for the full note, including the part of the
+   diagnosis that was wrong: nothing in `benchmark/` **could** read the counter, because
+   `ReplicationRecord` did not carry it.
 
 ---
 

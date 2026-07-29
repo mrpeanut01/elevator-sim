@@ -131,6 +131,7 @@ function recordOf(outcome: Extract<RawReplicationOutcome, { ok: true }>): Replic
     tracePassengers: outcome.tracePassengers,
     conservation: outcome.conservation,
     undeliveredCount: outcome.undeliveredCount,
+    kioskRefusedLegs: outcome.kioskRefusedLegs,
     ...(outcome.record === undefined ? {} : { record: outcome.record }),
     warnings: outcome.warnings,
   };

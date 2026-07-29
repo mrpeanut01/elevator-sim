@@ -14,11 +14,20 @@
  * at its own budget, seed 20 260 726, re-run 2026-07-28 on the tree carrying § T50-D1 and pinned in
  * {@link PINNED_COVERAGE}:
  *
- * | arm | replications with a quotable AWT | undelivered journeys per run | unserved |
- * |---|---|---|---|
- * | `eta`, `up-down-buttons` — conventional | **0 of 30** | 18.2 | 33.5 % |
- * | `eta`, `destination-entry`, no credential | **0 of 30** | **52.2** | **100.0 %** |
- * | `destination-eta`, `mobile-credential` | **30 of 30** | **0.0** | **0.00 %** |
+ * | arm | replications with a quotable AWT | undelivered journeys per run | unserved | legs refused at the kiosk, per run |
+ * |---|---|---|---|---|
+ * | `eta`, `up-down-buttons` — conventional | **0 of 30** | 18.2 | 33.5 % | **0.0** |
+ * | `eta`, `destination-entry`, no credential | **0 of 30** | **52.2** | **100.0 %** | **29.0** |
+ * | `destination-eta`, `mobile-credential` | **30 of 30** | **0.0** | **0.00 %** | **0.0** |
+ *
+ * **The last column is new, and the two zeros in it are half of what it buys.** The conventional
+ * arm and the bare kiosk both leave the building unserved, and until this column existed the
+ * report could not say that they do it for opposite reasons: conventional legs die at the pickup
+ * for want of a credential on a zoned *origin*, kiosk legs die at the interface before a car is
+ * asked. `0.0` against `29.0` is that distinction, measured. The column is
+ * `StageActivity.kioskRefusedLegs`, which DECISIONS.md § D137 item 2 and § D149 item 2 both record
+ * as having no reader in `benchmark/`; it reaches here through `ReplicationRecord`, and the other
+ * five figures in this table reproduced to the last digit on the run that added it.
  *
  * **The middle row used to read `27.6` and `51.7 %`**, measured before § T50-D1 made a
  * credential-less kiosk refuse the *passenger* rather than the whole landing call. It moved in the
@@ -189,6 +198,68 @@ describe('H-ACCESS-1 — coverage, and it is not a confidence interval', () => {
         `journeys/run undelivered on secure-tower against conventional's ${conventional.meanUndelivered.toFixed(1)}`,
     );
   }, TIMEOUT_MS);
+
+  /*
+   * The column DECISIONS.md § D137 item 2 and § D149 item 2 record as missing, asserted for the
+   * property that makes it worth having rather than for being non-zero somewhere.
+   *
+   * A test that only said `bare.meanKioskRefusedLegs > 0` would pass just as well if the counter
+   * were wired to the unserved count, which is the thing it must not be. So both directions are
+   * asserted at the same operating point, on the same 30 replications: **two arms that are both
+   * unserved, one of which is refused at the kiosk and one of which is not.**
+   */
+  it('separates the two ways this building goes unserved, which the unserved fraction cannot', async () => {
+    const result = await study();
+    const conventional = row(result, 'secure-tower', DISCLOSURE_BASELINE);
+    const bare = row(result, 'secure-tower', BARE_KIOSK_ARM);
+    const credential = row(result, 'secure-tower', CREDENTIAL_ARM);
+
+    // Both failing arms genuinely fail, and the kiosk fails harder — the premise above, restated
+    // so this assertion cannot pass on a building where only one arm is in trouble.
+    expect(conventional.meanUnservedFraction).toBeGreaterThan(0);
+    expect(bare.meanUnservedFraction).toBeGreaterThan(conventional.meanUnservedFraction);
+
+    // …and only one of them is refused at the interface. This is the discriminating pair.
+    expect(conventional.meanKioskRefusedLegs, 'up-down-buttons refuses nothing at a kiosk').toBe(0);
+    expect(credential.meanKioskRefusedLegs, 'a credential is not refused at a kiosk').toBe(0);
+    expect(bare.meanKioskRefusedLegs).toBeGreaterThan(0);
+
+    // The null half, and it is not a formality: Midtown declares no `accessZones`, so a kiosk with
+    // no credential has nothing to refuse there. A counter that fired on call type alone rather
+    // than on `(call type, floor)` would be non-zero here, and § D137 § *Why this is narrow* is
+    // precisely the claim that it is not.
+    expect(row(result, 'midtown-office', BARE_KIOSK_ARM).meanKioskRefusedLegs).toBe(0);
+
+    console.log(
+      `kiosk refusals per run on secure-tower: conventional ${conventional.meanKioskRefusedLegs.toFixed(1)}, ` +
+        `bare kiosk ${bare.meanKioskRefusedLegs.toFixed(1)}, credential ${credential.meanKioskRefusedLegs.toFixed(1)}`,
+    );
+  }, TIMEOUT_MS);
+
+  /*
+   * The guard that goes red if the column stops being *reported*.
+   *
+   * The assertion above reads the study object, which is a field; this reads the rendered report,
+   * which is what a human sees. They are different failures — a formatter that dropped the column
+   * would leave every field assertion in this file green — and the whole of § D137 item 2 is that
+   * a value on a result object nobody prints is not a consumer.
+   */
+  it('prints the kiosk column in the report, at the value pinned for it', async () => {
+    const text = formatAccessControlStudy(await study());
+    expect(text).toContain('kiosk-refused/run');
+
+    const line = text
+      .split('\n')
+      .find((row) => row.includes('secure-tower') && row.includes(BARE_KIOSK_ARM));
+    expect(line, 'no secure-tower bare-kiosk row in the printed report').toBeDefined();
+    expect(line).toMatch(/kiosk-refused\/run\s+29\.0\b/u);
+
+    // And the negative control on the same rendering, so this cannot pass by printing a constant.
+    const conventionalLine = text
+      .split('\n')
+      .find((row) => row.includes('secure-tower') && row.includes(`${DISCLOSURE_BASELINE} `));
+    expect(conventionalLine).toMatch(/kiosk-refused\/run\s+0\.0\b/u);
+  }, TIMEOUT_MS);
 });
 
 describe('H-ACCESS-2 — the optimization claim, as a difference-of-differences', () => {
@@ -335,7 +406,16 @@ describe('the counts this study publishes still come out of it', () => {
         .split('|')
         .map((cell) => cell.replaceAll('*', '').trim())
         .filter((cell) => cell.length > 0);
-      rows.push(cells.slice(-3).join(' | '));
+      /*
+       * Every cell after the arm label, which is `documentation.test.ts`'s rule for the same table
+       * in `docs/05-roadmap.md`. **This used to be `slice(-3)`, and it was the weaker of the two:**
+       * on a three-column row the last three cells happen to be all of them, but on the four-column
+       * row this table now carries it would have silently dropped `0 of 30` — the denominator — and
+       * checked the three numbers to its right instead. A guard that reads a fixed number of
+       * columns stops reading the first one the moment a column is added, which is the shape of
+       * quiet loosening this whole layer exists to prevent.
+       */
+      rows.push(cells.slice(1).join(' | '));
     }
     expect(rows.length, 'the H-ACCESS-1 table is gone, so this guard is checking nothing').toBe(3);
     for (const row of rows) {
