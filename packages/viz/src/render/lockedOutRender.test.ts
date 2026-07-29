@@ -24,6 +24,7 @@ import {
   lockedOutLandingsAt,
   type LockedOutLanding,
 } from '../access/lockedOut.js';
+import { STATE_GLYPHS } from '../access/zoning.js';
 import { constantSeries } from '../contract/series.js';
 import { VIZ_SCHEMA_VERSION, type Frame, type VizRecording } from '../contract/types.js';
 import { FIXTURE_DOOR_CONFIG, fixtureSummary } from '../fixtures.test-helper.js';
@@ -32,7 +33,7 @@ import { describeFrame } from './describeFrame.js';
 import { buildLayout } from './layout.js';
 
 class Recorder implements Canvas2DLike {
-  readonly texts: { text: string; fill: string }[] = [];
+  readonly texts: { text: string; x: number; y: number; fill: string }[] = [];
   fillStyle = '';
   strokeStyle = '';
   lineWidth = 1;
@@ -50,8 +51,19 @@ class Recorder implements Canvas2DLike {
   moveTo(): void {}
   lineTo(): void {}
   stroke(): void {}
-  fillText(text: string): void {
-    this.texts.push({ text, fill: this.fillStyle });
+  fillText(text: string, x: number, y: number): void {
+    this.texts.push({ text, x, y, fill: this.fillStyle });
+  }
+
+  /**
+   * Only the marks drawn **on a landing row**, which is not the same set as "every `▩` on the
+   * canvas": the banner carries the glyph too, at `y = 10`. Keying on position is what stops a
+   * mutation that deletes the landing mark — or that spells it with the *unanswered* glyph —
+   * passing because the banner still mentions it. That two-reader false negative is the shape
+   * `DECISIONS.md` § D154 records, and both mutations survived the first version of this file.
+   */
+  marks(): readonly string[] {
+    return this.texts.filter((entry) => entry.y > 40).map((entry) => entry.text);
   }
 
   /** Everything drawn, colour discarded. */
@@ -155,28 +167,32 @@ function draw(input: Partial<Parameters<typeof drawScene>[1]> = {}): Recorder {
 }
 
 describe('the three barriers stay three marks', () => {
-  it('draws `▩` beside a locked-out landing and nothing when there is none', () => {
-    expect(draw({ lockedOutLandings: LOCKED_OUT }).colourless).toContain('▩');
-    expect(draw().colourless).not.toContain('▩');
+  it('draws the mark on the landing row itself, not only in the banner', () => {
+    expect(draw({ lockedOutLandings: LOCKED_OUT }).marks()).toContain(
+      STATE_GLYPHS['not-permitted'],
+    );
+    expect(draw().marks()).not.toContain(STATE_GLYPHS['not-permitted']);
   });
 
   it('is not the glyph for "no car answered" and not the glyph for "no shaft reaches"', () => {
-    const both = draw({
+    const marks = draw({
       lockedOutLandings: LOCKED_OUT,
       unansweredCallFloorIds: ['3'],
       unservedFloorIds: ['3'],
-    }).colourless;
-    // All three present, all three different, on one picture.
-    expect(both).toContain('▩');
-    expect(both).toContain('✗');
-    expect(both).toContain('⊘');
-    expect(new Set(['▩', '✗', '⊘']).size).toBe(3);
+    }).marks();
+    // All three drawn, all three different, on one picture — asserted over what reached the
+    // **rows**, so spelling one barrier with another's glyph cannot pass on the banner's copy.
+    expect(marks).toContain(STATE_GLYPHS['not-permitted']);
+    expect(marks).toContain('✗');
+    expect(marks.some((mark) => mark.includes(STATE_GLYPHS['not-served']))).toBe(true);
+    expect(STATE_GLYPHS['not-permitted']).not.toBe('✗');
+    expect(STATE_GLYPHS['not-permitted']).not.toBe(STATE_GLYPHS['not-served']);
   });
 
   it('draws both marks when a landing is unanswered *and* locked out, never one instead of the other', () => {
-    const ctx = draw({ lockedOutLandings: LOCKED_OUT, unansweredCallFloorIds: ['2'] });
-    expect(ctx.colourless).toContain('✗');
-    expect(ctx.colourless).toContain('▩');
+    const marks = draw({ lockedOutLandings: LOCKED_OUT, unansweredCallFloorIds: ['2'] }).marks();
+    expect(marks.filter((mark) => mark === '✗')).toHaveLength(1);
+    expect(marks.filter((mark) => mark === STATE_GLYPHS['not-permitted'])).toHaveLength(1);
   });
 });
 

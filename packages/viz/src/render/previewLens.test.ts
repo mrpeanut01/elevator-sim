@@ -112,11 +112,19 @@ describe('not served and not permitted are different marks', () => {
     for (const glyph of Object.values(STATE_GLYPHS)) expect(drawn).toContain(glyph);
   });
 
-  it('puts the word beside the glyph, so the distinction survives the colour being removed', () => {
-    // The whole assertion: with every `fillStyle` discarded, both failures are still readable
-    // *and* still tell apart. If the renderer ever leaned on colour alone this goes red.
-    expect(drawn).toContain(STATE_WORDS['not-served']);
-    expect(drawn).toContain(STATE_WORDS['not-permitted']);
+  it('puts the word on the floor’s own row, so the distinction survives the colour being removed', () => {
+    /*
+     * The whole assertion: with every `fillStyle` discarded, both failures are still readable
+     * *and* still tell apart. Keyed on the **row** rather than on the canvas as a whole, because
+     * the legend at the bottom-left spells both words too — a mutation that deleted the per-row
+     * word passed a presence-only version of this test, which is the two-reader false negative
+     * `DECISIONS.md` § D154 records.
+     */
+    const rows = ctx.texts
+      .filter((entry) => entry.x > 300 && entry.y < 560)
+      .map((entry) => entry.text);
+    expect(rows.some((text) => text.includes(STATE_WORDS['not-served']))).toBe(true);
+    expect(rows.some((text) => text.includes(STATE_WORDS['not-permitted']))).toBe(true);
     expect(STATE_WORDS['not-served']).not.toBe(STATE_WORDS['not-permitted']);
   });
 
