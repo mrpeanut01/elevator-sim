@@ -73,7 +73,7 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
     ui.building.append(new Option(`${building.name} (${building.id})`, building.id));
   }
   for (const select of [ui.baseline, ui.candidate]) {
-    for (const profile of resources.dispatcherProfiles) {
+    for (const profile of resources.dispatcherProfiles.profiles) {
       select.append(new Option(profile.id, profile.id));
     }
   }
@@ -82,7 +82,7 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
 
   function applyPreference(select: HTMLSelectElement, preferred: readonly string[]): void {
     const found = preferred.find((id) =>
-      resources.dispatcherProfiles.some((profile) => profile.id === id),
+      resources.dispatcherProfiles.profiles.some((profile) => profile.id === id),
     );
     if (found !== undefined) select.value = found;
   }

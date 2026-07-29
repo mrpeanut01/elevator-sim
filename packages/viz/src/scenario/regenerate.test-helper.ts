@@ -43,7 +43,7 @@ export async function measurePublishedGoalRates(): Promise<PublishedGoalRates> {
   const scenarios = CANDIDATE_SCENARIOS.map((scenario) => {
     const resources: BatchResources = {
       building: requireBuilding(config, scenario.buildingId),
-      dispatcherProfilesById: config.dispatcherProfilesById,
+      dispatcherProfiles: config.dispatcherProfiles,
       trafficProfiles: config.trafficProfiles,
       elevatorSpecs: config.elevatorSpecs,
     };

@@ -38,7 +38,7 @@
  */
 
 import type {
-  DispatcherProfile,
+  DispatcherProfiles,
   ElevatorSpecs,
   ResolvedBuilding,
   ServiceLevelVerdict,
@@ -212,7 +212,17 @@ export interface BatchRequest {
 /** The resolved objects a batch needs. Assembled by the caller; never fetched here. */
 export interface BatchResources {
   readonly building: ResolvedBuilding;
-  readonly dispatcherProfilesById: ReadonlyMap<string, DispatcherProfile>;
+  /**
+   * The whole of `data/dispatcher-profiles.json`, **not** a map of its profiles.
+   *
+   * It was `dispatcherProfilesById` until T75. The map was enough to *name* an arm's profile and
+   * not enough to *run* one that opts into a weight-set selector, because a selector chooses among
+   * other profiles' weight vectors and reads the file-level `patternSwitching` block — see
+   * `SimulationConfig.dispatcherProfiles`. Every caller built the map from this object anyway, so
+   * the map was a projection carried instead of the thing, and `runBatch` derives it where it
+   * needs it. One source of truth for *"what are this build's dispatchers"*.
+   */
+  readonly dispatcherProfiles: DispatcherProfiles;
   readonly trafficProfiles: TrafficProfiles;
   readonly elevatorSpecs: ElevatorSpecs;
 }

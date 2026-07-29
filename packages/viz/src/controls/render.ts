@@ -322,3 +322,33 @@ export function renderControls(controls: readonly Control[]): ControlNode {
   );
   return node('div', { class: 'control-form' }, sections);
 }
+
+/**
+ * The rows this schema declares and no search can draw from — drawn, never dropped.
+ *
+ * `SearchSpace.unsearchable` is populated only when the collector was asked for
+ * `nullDefault: 'exclude'`, which is what the generated form asks for when it points at one of
+ * `core`'s ten schemas. Under the shipped dispatcher space it is empty and this returns
+ * `undefined`, so the form gains nothing to draw and nothing to explain.
+ *
+ * Rendered as a `<section>` rather than a `<fieldset>` on purpose: a fieldset is a group of
+ * controls, and the point of this list is that there are none. Each entry carries the collector's
+ * own sentence, so the form never paraphrases a refusal it did not compute.
+ */
+export function renderUnsearchable(unsearchable: ReadonlyMap<string, string>): ControlNode | undefined {
+  if (unsearchable.size === 0) return undefined;
+  const rows = [...unsearchable]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([id, reason]) =>
+      node('li', { class: 'control-inactive', 'data-unsearchable': id }, [], reason),
+    );
+  return node('section', { class: 'control-unsearchable' }, [
+    node(
+      'p',
+      {},
+      [],
+      `${String(unsearchable.size)} declared ${unsearchable.size === 1 ? 'row is' : 'rows are'} not searchable, and ${unsearchable.size === 1 ? 'it is' : 'they are'} listed rather than hidden:`,
+    ),
+    node('ul', {}, rows),
+  ]);
+}

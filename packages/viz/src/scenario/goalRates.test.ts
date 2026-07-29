@@ -137,7 +137,7 @@ describe('the published counts reproduce from the code that produced them', () =
       for (const scenario of CANDIDATE_SCENARIOS) {
         const resources: BatchResources = {
           building: requireBuilding(config, scenario.buildingId),
-          dispatcherProfilesById: config.dispatcherProfilesById,
+          dispatcherProfiles: config.dispatcherProfiles,
           trafficProfiles: config.trafficProfiles,
           elevatorSpecs: config.elevatorSpecs,
         };

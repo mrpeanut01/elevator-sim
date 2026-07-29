@@ -19,7 +19,11 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { DISPATCH_PARAMETERS } from '@elevator-sim/core/browser';
 import { collectSearchSpace, discoverParameterSchemas } from '@elevator-sim/experiments/browser';
+import type { SearchSpace } from '@elevator-sim/experiments/browser';
+
+import { collectFormSource, formStatusLine } from '../dev/parameterForm.js';
 
 import {
   applyControlEdit,
@@ -30,6 +34,7 @@ import {
   resetControl,
 } from './controls.js';
 import { orchardSpace } from './fictionalSchema.test-helper.js';
+import { renderUnsearchable } from './render.js';
 
 describe('the form is generated, and the evidence is a schema this product does not ship', () => {
   it('draws one control of the right kind for every row of a fictional schema', () => {
@@ -228,46 +233,136 @@ describe('coverage of the shipped schema — the one claim that needs the real o
     expect(silent.map((control) => control.id)).toEqual([]);
   });
 
-  it('says which discovered schemas the form cannot point at, and why', () => {
+  it('points at every discovered schema, and names the rows inside them that cannot be searched', () => {
     /*
-     * **A finding, pinned rather than worked around.** docs/10 § 11 W4 says the `TRAFFIC_PARAMETERS`
-     * half of W4 is *"unblocked either way, because that schema is on the `core/browser` barrel"* —
-     * which is true about *reachability* and false about *collectability*. Measured here: of the
-     * schemas `discoverParameterSchemas()` finds, exactly two refuse to collect into a search
-     * space, and both refusals are `core`'s own declarations being honest:
+     * **The successor to § D134's finding, and the shape of the finding changed.** That entry
+     * measured *two of the ten schemas refusing to collect at all* and had the form draw the
+     * refusal; it also said, in as many words, that the sets were derived from discovery *"so a
+     * fix in `core` turns this red rather than leaving a stale sentence."* T75 is that fix, this
+     * test went red, and the sentence is rewritten rather than patched.
      *
-     * - `TRAFFIC_PARAMETERS` — `traffic.arrivalRatePctPop5min` declares a `null` default, which is
-     *   the *"only honest default"* docs/10 § 9.3 quotes approvingly, and which a search space
-     *   cannot start from.
-     * - `SIM_PARAMETERS` — a `log` scale over a range starting at zero.
+     * What the two refusals turned out to be is not the same thing twice:
      *
-     * The form draws the refusal rather than hiding the schema (`dev/parameterForm.ts`). This test
-     * is what stops that becoming a stale sentence: the sets are derived from discovery, so a fix
-     * in `core` turns this red and the claim gets rewritten instead of rotting.
+     * - `SIM_PARAMETERS` was a **defect** — `sim.drainGraceS` and `sim.queueSampleCount` declared
+     *   a `log` scale over a range starting at zero. Zero is a *named mode* in both (a deadline at
+     *   the demand horizon; the fallback to the reconstructed queue series), so the bound was
+     *   right and the scale was wrong. Fixed in `core`, and `sim/simulation.test.ts` now reds on a
+     *   regression from `core`'s own side.
+     * - `TRAFFIC_PARAMETERS` was **honest**. Its four `default: null` rows say *"there is no
+     *   default; unset is meaningful"*, which `traffic/parameters.test.ts` defends with a
+     *   measurement — 12 %/5 min imposed on Garden Apartments is 2.4x its demand. Honest and
+     *   unsearchable at once, which is a distinction `collectSearchSpace` could not previously
+     *   draw, and `nullDefault: 'exclude'` is where it draws it now.
+     *
+     * Two properties keep this from becoming the next stale sentence, and neither is a name in a
+     * list. The **schema** set is derived from discovery and the **row** set is derived from the
+     * spaces, so a fifth null default, or a sixth, or one appearing in a schema nobody has thought
+     * about, reds this. And the collection goes through `collectFormSource` — the function the
+     * mount calls — so a test that passes is a statement about the shipped form.
      */
     const refused = new Map<string, string>();
-    const collected: string[] = [];
-    for (const [name, rows] of discoverParameterSchemas()) {
-      try {
-        collectSearchSpace({ source: { [name]: rows }, include: () => true });
-        collected.push(name);
-      } catch (error) {
-        refused.set(name, error instanceof Error ? error.message : String(error));
-      }
+    const spaces = new Map<string, SearchSpace>();
+    for (const name of discoverParameterSchemas().keys()) {
+      const source = collectFormSource(name);
+      if (source.ok) spaces.set(name, source.space);
+      else refused.set(name, source.reason);
     }
 
-    expect([...refused.keys()].sort()).toEqual(['SIM_PARAMETERS', 'TRAFFIC_PARAMETERS']);
-    expect(refused.get('TRAFFIC_PARAMETERS')).toContain('traffic.arrivalRatePctPop5min');
-    expect(refused.get('TRAFFIC_PARAMETERS')).toContain('default is null');
-    expect(refused.get('SIM_PARAMETERS')).toContain('log scale over a range starting at 0');
     // Every schema is accounted for: none is silently absent from both lists.
-    expect(collected.length + refused.size).toBe(discoverParameterSchemas().size);
-    // …and every one that does collect renders.
-    for (const name of collected) {
-      const rows = discoverParameterSchemas().get(name);
-      const space = collectSearchSpace({ source: { [name]: rows }, include: () => true });
-      expect(controlsFor(space, defaultValues(space))).toHaveLength(space.ids.length);
+    expect(spaces.size + refused.size).toBe(discoverParameterSchemas().size);
+    // The claim § D134 could not make: the form can be pointed at all ten.
+    expect([...refused.keys()]).toEqual([]);
+
+    // Derived from the collected spaces, not enumerated: the rows that declare no origin.
+    const unsearchable = new Map<string, string>();
+    for (const space of spaces.values()) {
+      for (const [id, reason] of space.unsearchable) unsearchable.set(id, reason);
     }
+    expect([...unsearchable.keys()].sort()).toEqual([
+      'traffic.arrivalRatePctPop5min',
+      'traffic.directionalSplit.incoming',
+      'traffic.directionalSplit.interfloor',
+      'traffic.directionalSplit.outgoing',
+    ]);
+    for (const [id, reason] of unsearchable) {
+      expect(reason, id).toContain(id);
+      expect(reason, id).toContain('default is null');
+      expect(reason, id).toContain('A search needs a point it can start from');
+    }
+
+    // Every collected row renders a control, and every unsearchable row is drawn as itself.
+    for (const [name, space] of spaces) {
+      expect(controlsFor(space, defaultValues(space)), name).toHaveLength(space.ids.length);
+      const drawn = renderUnsearchable(space.unsearchable);
+      if (space.unsearchable.size === 0) {
+        expect(drawn, name).toBeUndefined();
+        continue;
+      }
+      expect(drawn, `${name} has unsearchable rows and must draw them`).toBeDefined();
+      const text = JSON.stringify(drawn ?? null);
+      for (const [id, reason] of space.unsearchable) {
+        expect(text, `${name} must draw ${id}`).toContain(id);
+        // Compared JSON-escaped, because the collector's sentence quotes the id it is about.
+        expect(text, `${name} must draw its reason`).toContain(JSON.stringify(reason).slice(1, -1));
+      }
+    }
+  });
+
+  it('says the same count in the status line as it draws in the list', () => {
+    /*
+     * The second reader. `space.unsearchable` is read twice — by `renderUnsearchable`, which draws
+     * one entry per row, and by `formStatusLine`, which counts them — and § D154 records a mutation
+     * that came back green for exactly this shape: *"that value has two independent readers … and
+     * freezing one leaves the other live."* Asserted together, and against both a schema that has
+     * such rows and one that does not, so neither branch is untested.
+     */
+    const traffic = collectFormSource('TRAFFIC_PARAMETERS');
+    expect(traffic.ok).toBe(true);
+    if (!traffic.ok) return;
+    const space = traffic.space;
+    const values = defaultValues(space);
+    const line = formStatusLine(space, controlsFor(space, values), values);
+    expect(line).toContain(`${String(space.ids.length)} dimensions`);
+    expect(line).toContain(`${String(space.unsearchable.size)} declared but not searchable`);
+    expect(JSON.stringify(renderUnsearchable(space.unsearchable)).match(/data-unsearchable/g)).toHaveLength(
+      space.unsearchable.size,
+    );
+
+    // …and a schema with none says nothing about them rather than saying "0".
+    const dispatch = collectFormSource('DISPATCH_PARAMETERS');
+    expect(dispatch.ok).toBe(true);
+    if (!dispatch.ok) return;
+    const clean = dispatch.space;
+    const cleanValues = defaultValues(clean);
+    expect(formStatusLine(clean, controlsFor(clean, cleanValues), cleanValues)).not.toContain(
+      'not searchable',
+    );
+  });
+
+  it('keeps the dispatcher space refusing a dimension with no origin, rather than shrinking by one', () => {
+    /*
+     * The other half of `nullDefault`, and the reason it is an option rather than the new
+     * behaviour everywhere. `'exclude'` is for a caller collecting a schema it does not own; the
+     * **shipped dispatcher space** must still throw, because `defaultCandidate` is the point every
+     * tuned result is compared against and a space that quietly lost a dimension would be a search
+     * over a system nobody configured.
+     *
+     * Asserted both ways so neither half can pass vacuously: the real space carries no
+     * unsearchable row at all, and a manufactured null default reaches the throw.
+     */
+    expect(collectSearchSpace().unsearchable.size).toBe(0);
+    const nulled = { ...DISPATCH_PARAMETERS[0], default: null };
+    expect(() => collectSearchSpace({ source: { X_PARAMETERS: [nulled] }, include: () => true })).toThrow(
+      /A search needs a point it can start from/,
+    );
+    // …and the same row under the form's setting is excluded rather than fatal.
+    const excluded = collectSearchSpace({
+      source: { X_PARAMETERS: [nulled] },
+      include: () => true,
+      nullDefault: 'exclude',
+    });
+    expect([...excluded.unsearchable.keys()]).toEqual([nulled.id]);
+    expect(excluded.ids).toEqual([]);
   });
 
   it('disables at least one shipped dimension, so the gate rule is exercised on real data', () => {

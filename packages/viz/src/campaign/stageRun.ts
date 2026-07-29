@@ -25,6 +25,7 @@
 import { replicationSeed } from '@elevator-sim/experiments/browser';
 import type {
   DispatcherProfile,
+  DispatcherProfiles,
   ElevatorSpecs,
   ResolvedBuilding,
   SimulationConfig,
@@ -67,6 +68,13 @@ export interface DemonstrationInput {
   readonly dispatcherProfile: DispatcherProfile;
   readonly trafficProfiles: TrafficProfiles;
   readonly elevatorSpecs: ElevatorSpecs;
+  /**
+   * The whole of `data/dispatcher-profiles.json`, so a stage whose profile opts into a weight-set
+   * selector replays with one rather than being refused by name — `SimulationConfig`'s field of
+   * the same name, § D153. A demonstration that ran a *different* dispatcher from the batch it
+   * illustrates would be the worst version of this seam being open.
+   */
+  readonly dispatcherProfiles: DispatcherProfiles;
   /** Which replication of the batch to replay. `0` is the one the report names. */
   readonly replication?: number;
 }
@@ -91,6 +99,7 @@ export function demonstrationConfigFor(input: DemonstrationInput): SimulationCon
     dispatcherProfile: input.dispatcherProfile,
     trafficProfiles: input.trafficProfiles,
     elevatorSpecs: input.elevatorSpecs,
+    dispatcherProfiles: input.dispatcherProfiles,
     seed: stageReplicationSeed(input.stage, replication),
     durationS: input.stage.durationS,
     onTimeout: 'report',

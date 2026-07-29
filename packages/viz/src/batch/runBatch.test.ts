@@ -39,9 +39,24 @@ beforeAll(async () => {
 function resourcesFor(buildingId: string): BatchResources {
   return {
     building: requireBuilding(config, buildingId),
-    dispatcherProfilesById: config.dispatcherProfilesById,
+    dispatcherProfiles: config.dispatcherProfiles,
     trafficProfiles: config.trafficProfiles,
     elevatorSpecs: config.elevatorSpecs,
+  };
+}
+
+/**
+ * The shipped file plus one profile that is another under a second id.
+ *
+ * The two liveness tests below need two *arms* whose dispatcher is the same, and the resource
+ * bundle carries the file rather than a map since T75 — so the alias is authored into the file,
+ * which is also how a reader would author it. Everything else about the file, `patternSwitching`
+ * included, is the shipped one.
+ */
+function withAlias(id: string, alias: string): typeof config.dispatcherProfiles {
+  return {
+    ...config.dispatcherProfiles,
+    profiles: [...config.dispatcherProfiles.profiles, { ...requireDispatcher(config, id), id: alias }],
   };
 }
 
@@ -251,10 +266,7 @@ describe('what a batch records', () => {
     const resources = resourcesFor('secure-tower');
     const result = runBatch(requestFor('secure-tower', 4, ['collective', 'collective2']), {
       ...resources,
-      dispatcherProfilesById: new Map([
-        ['collective', requireDispatcher(config, 'collective')],
-        ['collective2', requireDispatcher(config, 'collective')],
-      ]),
+      dispatcherProfiles: withAlias('collective', 'collective2'),
     });
     for (const arm of result.arms) {
       for (const replication of arm.replications) {
@@ -424,10 +436,7 @@ describe('suppression propagates from the replication to the batch', () => {
     const resources = resourcesFor('midtown-office');
     const result = runBatch(requestFor('midtown-office', 50, ['eta', 'eta-again'], 3), {
       ...resources,
-      dispatcherProfilesById: new Map([
-        ['eta', requireDispatcher(config, 'eta')],
-        ['eta-again', requireDispatcher(config, 'eta')],
-      ]),
+      dispatcherProfiles: withAlias('eta', 'eta-again'),
     });
     const report = batchReport(result);
     for (const row of report.comparisons[0]?.rows ?? []) {

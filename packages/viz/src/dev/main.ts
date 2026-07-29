@@ -76,6 +76,7 @@ import {
 import { createLoader } from './bootstrap.js';
 import { shouldAutoplay } from './motion.js';
 import { loadBrowserResources, loadCampaign, resolveEdited, type BrowserResources } from './data.js';
+import { viewerRunConfig } from './runConfig.js';
 
 /** `PB-T1`: ×1 … ×120, and `[`/`]` step this ladder — `KB-07`. */
 const SPEEDS = [1, 2, 5, 10, 30, 60, 120] as const;
@@ -295,7 +296,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
   for (const building of resources.buildings) {
     ui.building.append(new Option(`${building.name} (${building.id})`, building.id));
   }
-  for (const profile of resources.dispatcherProfiles) {
+  for (const profile of resources.dispatcherProfiles.profiles) {
     ui.dispatcher.append(new Option(profile.id, profile.id));
   }
   /*
@@ -314,7 +315,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   const PREFERRED_DEFAULT_DISPATCHERS = ['collective', 'eta'] as const;
   const preferred = PREFERRED_DEFAULT_DISPATCHERS.find((id) =>
-    resources.dispatcherProfiles.some((profile) => profile.id === id),
+    resources.dispatcherProfiles.profiles.some((profile) => profile.id === id),
   );
   if (preferred !== undefined) ui.dispatcher.value = preferred;
   for (const speed of SPEEDS) {
@@ -438,7 +439,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     dispatcherProfileId: string,
   ): { restrictedFloorIds: readonly string[]; carriesCredential: boolean } {
     const shipped = resources.buildings.find((candidate) => candidate.id === buildingId);
-    const profile = resources.dispatcherProfiles.find(
+    const profile = resources.dispatcherProfiles.profiles.find(
       (candidate) => candidate.id === dispatcherProfileId,
     );
     if (shipped === undefined || profile === undefined) {
@@ -462,7 +463,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   function renderAccessNote(): void {
     const building = currentBuilding();
-    const profile = resources.dispatcherProfiles.find(
+    const profile = resources.dispatcherProfiles.profiles.find(
       (candidate) => candidate.id === ui.dispatcher.value,
     );
     if (building === undefined || profile === undefined) {
@@ -475,7 +476,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
         floorIds: building.floorIds,
         accessZones: building.accessZones,
         profile,
-        profiles: resources.dispatcherProfiles,
+        profiles: resources.dispatcherProfiles.profiles,
       }).warning ?? '';
   }
 
@@ -498,7 +499,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const resolvedBuilding = resources.buildings.find(
       (candidate) => candidate.id === ui.building.value,
     );
-    const dispatcherProfile = resources.dispatcherProfiles.find(
+    const dispatcherProfile = resources.dispatcherProfiles.profiles.find(
       (candidate) => candidate.id === ui.dispatcher.value,
     );
     if (dispatcherProfile === undefined) {
@@ -544,30 +545,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
       return;
     }
 
-    const config: SimulationConfig = {
+    // `viewerRunConfig` is where *what a viewer run is* is decided, including the
+    // `dispatcherProfiles` file that lets a profile opt into a weight-set selector as data.
+    const config: SimulationConfig = viewerRunConfig(resources, {
       building: resolved,
       dispatcherProfile,
-      trafficProfiles: resources.trafficProfiles,
-      elevatorSpecs: resources.elevatorSpecs,
       seed,
       durationS,
-      /**
-       * `report`, not the kernel's default `throw`.
-       *
-       * At the shipped traffic rates, Mixed-Use High-Rise, Secure Tower and Vertical City
-       * routinely end a 900 s run with people still in the system, and `Simulation` treats that
-       * as a failed run — correctly, because a mean over a system that never cleared is the
-       * confident nonsense this project exists to avoid. But under `throw` there is no recording
-       * at all, so pressing **Run** on three of the five shipped buildings produced an error
-       * message and an empty canvas rather than the playback UX.md RV-01 promises.
-       *
-       * `report` gives the viewer the recording it has to be able to draw, and the run's
-       * `timed-out` status and undelivered count now lead the canvas banner as well as the
-       * status line — UX.md RV-16. Nothing about the statistics moves: `awtIsValid` still comes
-       * from the summary and still suppresses every mean, in the header and in the overlay.
-       */
-      onTimeout: 'report',
-    };
+    });
 
     ui.status.textContent = `simulating ${resolved.name} for ${String(durationS)} s — this blocks the page for about a second…`;
     lastConfig = config;

@@ -85,7 +85,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   for (const [index, stage] of loaded.campaign.stages.entries()) {
     ui.stage.append(new Option(`${String(index + 1)}. ${stage.name}`, stage.id));
   }
-  for (const profile of resources.dispatcherProfiles) {
+  for (const profile of resources.dispatcherProfiles.profiles) {
     ui.profile.append(new Option(profile.id, profile.id));
   }
 
@@ -94,7 +94,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   }
 
   function profileById(id: string): DispatcherProfile | undefined {
-    return resources.dispatcherProfiles.find((profile) => profile.id === id);
+    return resources.dispatcherProfiles.profiles.find((profile) => profile.id === id);
   }
 
   function fail(text: string): void {
@@ -292,6 +292,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
         dispatcherProfile: profile,
         trafficProfiles: resources.trafficProfiles,
         elevatorSpecs: resources.elevatorSpecs,
+        dispatcherProfiles: resources.dispatcherProfiles,
       }),
     );
     const evidence = evidenceFrom({

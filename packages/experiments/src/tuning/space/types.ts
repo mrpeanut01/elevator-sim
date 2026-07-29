@@ -399,4 +399,19 @@ export interface SearchSpace {
    * away."* One in eight uniform draws over the full space violates it.
    */
   readonly validate: (values: Candidate) => string | undefined;
+  /**
+   * Declared rows this collection **excluded because they are not searchable**, by id, each with
+   * the collector's own reason — empty unless `CollectOptions.nullDefault` asked for it.
+   *
+   * The distinction this field exists to keep is between a row that is *not a member* of the
+   * space (`traffic.*` under the shipped `include`: a dispatcher profile cannot hold it, and it
+   * was never a candidate for this space) and a row that **is** a member and cannot be drawn from
+   * (`traffic.arrivalRatePctPop5min` under `include: () => true`: it belongs, and it declares no
+   * point a search could start from). The first is silence and correctly so; the second must be
+   * *said*, because a surface that looks complete because the incomplete parts are invisible is
+   * this repository's signature defect pointed at a schema.
+   *
+   * Empty under the default `nullDefault: 'refuse'`, where such a row throws instead.
+   */
+  readonly unsearchable: ReadonlyMap<string, string>;
 }

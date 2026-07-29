@@ -232,6 +232,9 @@ function baseConfigFor(
     dispatcherProfile,
     trafficProfiles: resources.trafficProfiles,
     elevatorSpecs: resources.elevatorSpecs,
+    // The file beside the profile, so an arm whose profile opts into a weight-set selector runs
+    // one rather than being refused by name — `SimulationConfig.dispatcherProfiles`, § D153.
+    dispatcherProfiles: resources.dispatcherProfiles,
     durationS: request.durationS,
     onTimeout: 'report',
     ...(request.arrivalRatePctPop5min === null
@@ -245,7 +248,9 @@ function requireProfile(
   armId: string,
   profileId: string,
 ): DispatcherProfile {
-  const profile = resources.dispatcherProfilesById.get(profileId);
+  const profile = resources.dispatcherProfiles.profiles.find(
+    (candidate) => candidate.id === profileId,
+  );
   if (profile === undefined) {
     throw new BatchError(
       `dispatcher profile "${profileId}" for arm "${armId}" is not in this build's data/. A batch cannot run an arm it cannot resolve.`,
