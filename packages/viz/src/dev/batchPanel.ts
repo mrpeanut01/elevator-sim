@@ -246,6 +246,14 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
     switch (item.verdict) {
       case 'resolved':
         return 'figure-estimate';
+      /*
+       * The same class as `unresolved` and `shown`, and for the same reason: the row draws its
+       * interval and orders nothing. `figure-estimate` is the class of a row a reader may act on,
+       * and a direction measured over fewer paired runs than the project budgets for is not one
+       * — § D171. The refusal is in the sentence, not only in the styling.
+       */
+      case 'under-budget':
+        return 'figure-observation';
       case 'unresolved':
         return 'figure-observation';
       case 'shown':

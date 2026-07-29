@@ -86,9 +86,11 @@ describe('every property fires when the thing it protects is broken', () => {
         const faultedHits = faulted.violations.filter((found) => found.property === property);
 
         // The fault produced *new* violations of *this* property. Comparing against the clean run
-        // rather than against zero is what keeps the assertion meaningful on a property that
-        // already has an outstanding finding — the R10 leak on the Parameters tab is present on
-        // every case, and an assertion of `> 0` would pass for that reason alone.
+        // rather than against zero is what keeps the assertion meaningful on a property that has
+        // an outstanding finding on every case — as `probability-word` did until § D171 resolved
+        // it — because an assertion of `> 0` would pass for that reason alone. The comparison is
+        // kept now the register is empty: it costs nothing and it is the form that survives the
+        // next finding.
         expect(
           faultedHits.length,
           `${name} produced no new ${property} violation (clean ${String(cleanHits.length)}, ` +
@@ -113,9 +115,13 @@ describe('every property fires when the thing it protects is broken', () => {
     // violated on every case — the mirror image of the dead-harness failure, and just as useless.
     const clean = evaluateCase(quotable, resources);
     const properties = new Set(clean.violations.map((found) => found.property));
-    // The one exception is the outstanding R10 finding, which is real and is not this file's to
-    // fix. Everything else must be quiet on a clean run, or the faults prove nothing.
-    expect([...properties].sort()).toEqual(['probability-word']);
+    /*
+     * **Empty, and it did not used to be.** The R10 finding on the Parameters tab was here as the
+     * one exception until § D171 narrowed the rule to result-bearing surfaces; the exception is
+     * gone with the finding rather than kept as a habit. Every property must be quiet on a clean
+     * run, or the faults above prove nothing.
+     */
+    expect([...properties].sort()).toEqual([]);
   });
 
   it('a fault survives shrinking, and the shrunk case is smaller', () => {

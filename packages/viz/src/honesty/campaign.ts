@@ -165,7 +165,11 @@ export function formatFailure(failure: HonestyShrinkResult): string {
  *   sets `stageProbability: 0` for that reason. Every campaign surface is therefore unexercised
  *   in the always-on tier, and `honesty.test.ts` asserts that fact rather than letting the
  *   adapter's silence pass for coverage;
- * - batches at or above `MIN_REPLICATION_BUDGET`, so **R2's third clause cannot fire here**;
+ * - batches at or above `MIN_REPLICATION_BUDGET` — every batch here is below it, so **no row in
+ *   this tier may carry a `resolved` verdict at all**. Since § D171 that is a fact about the
+ *   product rather than about the corpus: `batch/report.ts` withholds the ordering below the
+ *   budget and emits `under-budget` instead, so R2's third clause is now defence in depth on
+ *   both tiers rather than a leak this tier could still find;
  * - horizons above 900 s, and demand above 12 %/5 min;
  * - `mode`, which has one value until the Basic/Advanced split lands.
  */

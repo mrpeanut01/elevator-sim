@@ -61,6 +61,27 @@ export function probabilityWordIn(text: string): string | null {
  * Parameters tab is a schema surface and may show it. So the text is **replaced, with the reason
  * and the word named** — R3's shape applied to R10 — and the dial is still named, so nothing is
  * hidden.
+ *
+ * ## The exemption's stated reason — [§ D171](../../../../DECISIONS.md), and it was adjudicated
+ *
+ * *"The Parameters tab is a schema surface and may show it"* was a decision this module made
+ * without one, and the honesty search (`honesty/`) reported the collision as a finding rather
+ * than resolving it: § D163 clause 1 says *"no probability word **anywhere**"*, and two shipped
+ * sentences disagreeing is not a harness author's call. § D171 adjudicated it, and **narrowed the
+ * rule rather than the product**:
+ *
+ * > R10 exists to stop a confidence interval being translated into a probability word. A
+ * > parameter description saying a demand predictor forecasts floors where traffic is *likely* is
+ * > technical prose about **what a dial does**, not a claim about a result — and rewriting
+ * > `core`'s own description of its own parameter would cost precision to satisfy a rule aimed at
+ * > something else.
+ *
+ * So the exemption **stands, with a reason** rather than as an unexplained special case, and it
+ * is now enforced where it belongs: `honesty/properties.ts` scopes R10 to result-bearing
+ * provenance, and the Parameters tab is the one surface whose text has no result behind it. This
+ * function is unchanged, still applies everywhere a *result* is being briefed, and is itself
+ * searched — if it ever returns a string carrying a probability word, that is a hole in the
+ * remedy and the search is red.
  */
 export function playerSafeDescription(text: string | undefined): string | null {
   if (text === undefined) return null;

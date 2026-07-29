@@ -197,20 +197,52 @@ describe('a counterexample shrinks', () => {
 });
 
 /**
- * What the search **found**, pinned in both directions.
+ * What the search **found**, pinned in both directions. **Currently empty — and that is a state,
+ * not an absence.**
  *
- * A found violation is a result before it is a patch. Fixing this one is not this lane's call —
- * `campaign/words.ts` records a deliberate decision that the Parameters tab is a schema surface
- * and *"may show it"*, and § D163 clause 1 says *"no probability word **anywhere**"*; those two
- * sentences disagree, and resolving a disagreement between a shipped decision and a phase gate is
- * the orchestrator's, not a harness author's.
- *
- * So it is recorded here, asserted **both ways**, which is what stops the register becoming a
+ * A found violation is a result before it is a patch, so a finding is recorded here rather than
+ * quietly fixed, and the register is asserted **both ways**, which is what stops it becoming a
  * suppression list:
  *
  * - nothing outside it may fail — a new violation is red;
  * - everything in it must still be found — a finding that is fixed, or that the search stops
  *   being able to see, is also red, with a message saying to delete the entry.
+ *
+ * ## The two entries that were here, and what closed each
+ *
+ * Both were escalated rather than resolved in the harness author's lane, both were adjudicated by
+ * [§ D171](../../../../DECISIONS.md), and **neither was closed by widening this list**:
+ *
+ * 1. **R10 on the Parameters tab.** `core`'s `idle.predictorHorizonS` description contains
+ *    *"likely to appear soon"*, and `campaign/words.ts` recorded a deliberate exemption for the
+ *    schema surface while § D163 clause 1 said *"anywhere"*. Resolved by **narrowing the rule**:
+ *    R10 exists to stop a confidence interval being translated into a probability word, and a
+ *    description of what a dial does is not that. `properties.ts` now scopes the property to
+ *    result-bearing provenance and `controls/controls.ts`'s description reaches it as `schema`.
+ *    `core`'s text is unchanged and the Parameters tab still prints it whole.
+ * 2. **R2's budget clause in the Compare panel.** `compareMetric` named a winner as soon as the
+ *    paired interval excluded zero, which needs `n >= 2`. Resolved in the **product**: below
+ *    `MIN_REPLICATION_BUDGET` the row draws its interval and refuses the ordering, with the
+ *    reason where the verdict would have been — `batch/report.ts`'s `under-budget` verdict.
+ *
+ * ## Two further findings that were **not** product defects, and were corrected in the rule
+ *
+ * Both arrived with the merge, both were R3's textual half, and each is recorded on the rule it
+ * corrected in `properties.ts` — § D171's own pattern for a false positive.
+ *
+ * 3. **Eight reports on `describeFrame` and `drawScene`** (`honesty-9021`, `honesty-9045`): a
+ *    run-level count — `61` undelivered passengers, `28` boarded legs — in a **different sentence**
+ *    from the estimate cue that flagged it, and in three of the eight the cue was the word
+ *    *"suppressed"* doing its job. The 64-character window crossed sentence boundaries; it is now
+ *    bounded by the numeral's own clause.
+ * 4. **Five reports on `describeFrame`** (`honesty-9010`): `wait95S = 300.4` matched the `300` in
+ *    *"Rolling mean wait over the last 300 seconds is not reported"* — a window length, beside a
+ *    cue naming a **different** quantity, in `describeFrame`'s own refusal. The cues are now keyed
+ *    to the quantity whose value is being looked for.
+ *
+ * Both narrowings are guarded by a second R3 fault — `suppressedMeanInProse`, which injects
+ * § D111's canvas header verbatim — because a correction to a check is a change to what the check
+ * can no longer see, and the thing it must still see should be injected rather than argued.
  */
 const OUTSTANDING: readonly {
   readonly property: string;
@@ -226,42 +258,7 @@ const OUTSTANDING: readonly {
    */
   readonly fieldContains?: string;
   readonly finding: string;
-}[] = Object.freeze([
-  {
-    property: 'probability-word',
-    surfaceId: 'controls/controls.ts#controlsFor',
-    contains: 'likely to appear soon',
-    finding:
-      "R10 leak on the Parameters tab. `core`'s `idle.predictorHorizonS` declares a " +
-      'SearchParameter.description containing the words "likely to appear soon"; `controlsFor` ' +
-      'copies it verbatim into `Control.help`, `renderControls` puts it in a `<p class=' +
-      '"control-help">`, and `dev/parameterForm.ts` writes that node\'s text into the page. The ' +
-      'shipped remedy for exactly this string — `campaign/words.ts#playerSafeDescription` — ' +
-      'exists, is driven by this search on the same text, and correctly replaces it; the ' +
-      'Parameters tab is the one surface that does not call it. `words.ts` records the exemption ' +
-      'deliberately ("the Parameters tab is a schema surface and may show it"), and § D163 ' +
-      'clause 1 says "no probability word anywhere". Reported, not patched.',
-  },
-  {
-    property: 'single-run-comparative',
-    surfaceId: 'batch/report.ts#batchReport',
-    fieldContains: 'comparisons[',
-    finding:
-      'R2 budget leak in the Compare panel. `compareMetric` emits `verdict: "resolved"` and names ' +
-      'a winner — "…the zoned-uppeak arm is the one that came out ahead on this row" — as soon as ' +
-      'the paired interval excludes zero, which needs `pairing.candidate.length >= 2` and nothing ' +
-      'else. `dev/batchPanel.ts` refuses only `replications < 1`, so a reader can produce that row ' +
-      'over 2–49 replications, and the search does: measured here at n = 7 and n = 8 on ' +
-      'observation-class rows (rides over the long-wait threshold, persons per 5 min, unserved ' +
-      'fraction), which survive at small n because the estimate-class rows suppress first. R2\'s ' +
-      'own text requires "a paired-t interval excluding zero over 50–200 replications under ' +
-      'common random numbers", and `MIN_REPLICATION_BUDGET` is that lower bound as a shipped ' +
-      'constant. **The counter-argument, recorded rather than ignored:** `batchReport` does emit ' +
-      '`budgetNote` below 50 and `dev/batchPanel.ts` draws it, so the reader is told — in a ' +
-      'different row. Whether that satisfies R2 or is R13 clause one\'s defect one level up is a ' +
-      'judgement about the contract, not about the code. Reported, not patched.',
-  },
-]);
+}[] = Object.freeze([]);
 
 function matchesOutstanding(found: {
   property: string;
@@ -312,22 +309,41 @@ describe('§ D163 clause 1 — no player-facing string asserts what the run refu
     }
   });
 
-  it('shrinks the outstanding finding to a case a reader can re-run', () => {
-    // The finding is configuration-independent — it is a schema string on a surface every case
-    // renders — so its minimal case should be the smallest the reducers can reach: the smallest
-    // building, the shortest horizon, two replications, one arm, no demand override.
-    const failure = standard.failures.find((candidate) =>
-      candidate.minimal.violations.some((found) => found.property === 'probability-word'),
-    );
-    expect(failure).toBeDefined();
-    const minimal = failure?.minimal.case;
-    expect(minimal?.buildingId).toBe('garden-apartments');
-    expect(minimal?.durationS).toBe(600);
-    expect(minimal?.replications).toBe(2);
-    expect(minimal?.arrivalRatePctPop5min).toBeNull();
-    expect(minimal?.baselineProfileId).toBe(minimal?.candidateProfileId);
-    console.log(`\noutstanding finding, shrunk:\n${formatFailure(failure!)}\n`);
-  });
+  it('negative control: the empty register accepts nothing — an injected violation is unexpected', () => {
+    /*
+     * **The assertion that stops an empty `OUTSTANDING` from being decoration.** Both entries
+     * were deleted when § D171 resolved them, and an empty register makes the two assertions
+     * above cheap in opposite ways: the second iterates nothing, and the first would pass on a
+     * `matchesOutstanding` that had silently become a wildcard. So a real violation is produced
+     * — by fault, on a real case over the shipped data — and asserted **not** matched.
+     */
+    const faulted: HonestyResources = { ...resources, corruptTexts: FAULTS['probability-word'][0]?.fault };
+    const outcome = evaluateCase(caseFromSeed(9013, { space: STANDARD_SPACE }), faulted);
+    expect(outcome.violations.length).toBeGreaterThan(0);
+    expect(outcome.violations.filter((found) => !matchesOutstanding(found))).not.toEqual([]);
+  }, 300_000);
+
+  it('shrinks a counterexample to a case a reader can re-run', () => {
+    /*
+     * Driven with a fault, because the shipped surfaces now have nothing to shrink — which is
+     * itself the point of the assertion above. The fault is configuration-independent (it
+     * rewrites the first prose string every case renders), so its minimal case is the smallest
+     * the reducers can reach: the smallest building, the shortest horizon, two replications, one
+     * arm, no demand override. That is a claim about the **shrinker**, and it was worth keeping
+     * when the finding it used to be made about was fixed.
+     */
+    const faulted: HonestyResources = { ...resources, corruptTexts: FAULTS['probability-word'][0]?.fault };
+    const outcome = evaluateCase(caseFromSeed(9021, { space: STANDARD_SPACE }), faulted);
+    const shrunk = shrinkCase(outcome, faulted, { budget: 40 });
+    const minimal = shrunk.minimal.case;
+    expect(shrunk.minimal.violations.some((found) => found.property === 'probability-word')).toBe(true);
+    expect(minimal.buildingId).toBe('garden-apartments');
+    expect(minimal.durationS).toBe(600);
+    expect(minimal.replications).toBe(2);
+    expect(minimal.arrivalRatePctPop5min).toBeNull();
+    expect(minimal.baselineProfileId).toBe(minimal.candidateProfileId);
+    console.log(`\ncounterexample, shrunk:\n${formatFailure(shrunk)}\n`);
+  }, 600_000);
 
   it.runIf(deepCampaignRequested(environment))(
     'holds across the deep corpus, which is the only tier that reaches stages and the 50-run budget',

@@ -117,6 +117,27 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'editor/editorEdits.ts#serializeBuilding',
       ],
     },
+    /*
+     * The mode-split lane's three, and the reason is stated **per name** rather than shared,
+     * because the group is small and each one is excluded for its own reason. Everything else
+     * `mode/` exports is driven: `disclosureItems` renders both projections of every item, and
+     * `parityViolations` / `parityRefusal` run on exactly what was rendered.
+     */
+    {
+      reason:
+        'Produces a classification or a stylesheet hook, not a sentence — and each is checked ' +
+        'where it is used rather than here. `rowClassesOf` returns CSS class names (`figure`, ' +
+        '`figure-origin-suppression`, `figure-warning`); a class asserts nothing to a reader, and ' +
+        'driving it would put "figure-warning" in the corpus as though a surface had said it. ' +
+        '`disclosureClassOf` returns `must-show` or `may-hide` — § 4\'s line, which `parityViolations` ' +
+        'is derived over and which is driven through it. `isViewMode` is a type guard over the ' +
+        'two mode ids and returns a boolean.',
+      ids: [
+        'mode/disclosure.ts#rowClassesOf',
+        'mode/types.ts#disclosureClassOf',
+        'mode/types.ts#isViewMode',
+      ],
+    },
     {
       reason:
         'The offline measurement pipeline, not a viewer surface. `measureScenario` runs the ' +

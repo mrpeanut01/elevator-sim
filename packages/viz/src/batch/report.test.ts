@@ -92,6 +92,7 @@ describe('R10 — no probability word reaches the reader', () => {
       batchReport(fakeResult({ delta: -3, aligned: false })), // CRN broken
       batchReport(fakeResult({ delta: -3, replications: 1 })), // no spread
       batchReport(fakeResult({ delta: -3, replications: 300 })), // over budget
+      batchReport(fakeResult({ delta: -3, replications: 8 })), // under budget
     ];
     const verdicts = new Set(
       reports.flatMap((report) => report.comparisons[0]?.rows.map((row) => row.verdict) ?? []),
@@ -101,6 +102,7 @@ describe('R10 — no probability word reaches the reader', () => {
       'resolved',
       'shown',
       'suppressed',
+      'under-budget',
       'unmeasured',
       'unresolved',
     ]);
@@ -259,6 +261,34 @@ describe('the verdicts', () => {
       expect(row.note, row.metric).toContain('arithmetic on unrelated runs');
     }
     expect(report.crnSentence).toContain('passengers[7]');
+  });
+
+  it('R2: below the budget it draws the interval and refuses to name a winner', () => {
+    /*
+     * § D171. The row used to resolve as soon as the interval excluded zero, which needs two
+     * pairs; R2 requires 50–200. The fix is not silence — the measurement happened — it is the
+     * observation published and the claim refused, with **the reason where the verdict would
+     * have been** rather than in a separate budget row a reader can quote apart from the claim.
+     */
+    const report = batchReport(fakeResult({ delta: -3, replications: 8 }));
+    const awt = rowFor(report, 'awtS');
+    expect(awt.verdict).toBe('under-budget');
+    expect(awt.favours).toBeNull();
+    // The interval is drawn, not withheld.
+    expect(awt.estimate?.upper).toBeLessThan(0);
+    expect(awt.pairs).toBe(8);
+    expect(awt.sentence).toContain('differed from');
+    // …and the refusal, with its reason, is in the row's own sentence.
+    expect(awt.sentence).toContain('no arm is named ahead');
+    expect(awt.sentence).toContain('50–200');
+    expect(awt.sentence).not.toContain('came out ahead');
+    expect(awt.sentence).not.toMatch(/\b(?:lower|higher) than\b/);
+    // The separate note still exists and is no longer the only place the reader is told.
+    expect(report.budgetNote).toContain('12 %');
+    // At the budget the row resolves exactly as before.
+    const atBudget = rowFor(batchReport(fakeResult({ delta: -3, replications: 50 })), 'awtS');
+    expect(atBudget.verdict).toBe('resolved');
+    expect(atBudget.favours).toBe('candidate');
   });
 
   it('forms no interval from one replication', () => {

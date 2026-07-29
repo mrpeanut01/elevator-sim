@@ -81,6 +81,48 @@ export const suppressedMeanLeak: TextFault = (texts, context) => {
   );
 };
 
+/**
+ * R3 again, textually only, and inside a **composite** string — § D111's canvas header, verbatim.
+ *
+ * This fault exists because of what fixing a false positive risks. The textual half of R3 asks
+ * whether a forbidden number sits beside an estimate cue, and it used to ask that over a window
+ * of 64 characters, which crossed sentence boundaries and reported eight non-violations on
+ * `describeFrame` and `drawScene` — a run-level count in one sentence, the word *"Mean"* opening
+ * the **refusal** in the next. The window is now bounded by the numeral's own clause. A
+ * correction to a check is a change to what the check can no longer see, so the thing it must
+ * still see is injected here rather than argued:
+ *
+ * > `waiting 61   boarded 368 legs   mean wait so far 61.0 s`
+ *
+ * That is `render/canvas.ts`'s header band with `meanClause` no longer consulting
+ * `meansAreSuppressed` — the exact defect [`DECISIONS.md` § D111](../../../../DECISIONS.md)
+ * closed, in the exact layout the shipped renderer draws: three fields joined by three spaces,
+ * each field carrying its own label beside its own value. The clause bound must fall between the
+ * fields and not between *"mean wait so far"* and its number.
+ *
+ * It guards the **second** narrowing too, which landed in the same lane: the cue that must catch
+ * this string is *"mean"*, and the number it must be paired with is `meanWaitS` — the same
+ * quantity. A cue map that lost the pairing would stop seeing this.
+ *
+ * Distinct from {@link suppressedMeanLeak} in the half it exercises: this one leaves the string's
+ * `role` at `prose`, so the structural check cannot see it and only the textual check can fire.
+ */
+export const suppressedMeanInProse: TextFault = (texts, context) => {
+  if (!context.suppressed) return texts;
+  const { summary } = context.recording;
+  if (!Number.isFinite(summary.meanWaitS)) return texts;
+  return replaceFirst(
+    texts,
+    (text) => text.provenance === 'single-run' && text.role === 'prose',
+    (text) => ({
+      ...text,
+      text:
+        `waiting ${String(summary.undelivered)}   boarded ${String(summary.waitCount)} legs   ` +
+        `mean wait so far ${summary.meanWaitS.toFixed(1)} s`,
+    }),
+  );
+};
+
 /** R2 — a single-run surface ordering two dispatchers. */
 export const comparativeOnOneRun: TextFault = (texts, context) =>
   replaceFirst(
@@ -164,12 +206,17 @@ export const goalWithoutRate: TextFault = (texts) =>
 /**
  * One fault per property, so the suite can iterate rather than list.
  *
- * `estimate-without-n` carries two, because R13 is two clauses and a fault for one says nothing
- * about the other. The map's value is a list for that reason and not for symmetry.
+ * Two of them carry a second, and in both cases because the property has two halves a fault for
+ * one says nothing about: `estimate-without-n` is R13's two clauses, and `suppressed-mean` is
+ * R3's structural and textual checks — the second was added when the textual check's window was
+ * narrowed, so that the narrowing has something it must still catch.
  */
 export const FAULTS: Readonly<Record<HonestyProperty, readonly { readonly name: string; readonly fault: TextFault }[]>> =
   Object.freeze({
-    'suppressed-mean': [{ name: 'suppressedMeanLeak', fault: suppressedMeanLeak }],
+    'suppressed-mean': [
+      { name: 'suppressedMeanLeak', fault: suppressedMeanLeak },
+      { name: 'suppressedMeanInProse', fault: suppressedMeanInProse },
+    ],
     'single-run-comparative': [{ name: 'comparativeOnOneRun', fault: comparativeOnOneRun }],
     'probability-word': [{ name: 'probabilityWordLeak', fault: probabilityWordLeak }],
     'estimate-without-n': [

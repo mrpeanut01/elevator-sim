@@ -265,6 +265,14 @@ function judgeComparisonGoal(spec: GoalSpec, report: BatchReport): StageGoalVerd
   const suppressed = orderable.filter(
     (row) => row.verdict === 'suppressed' || row.verdict === 'unmeasured',
   );
+  /*
+   * Rows whose interval excludes zero over fewer paired runs than the project budgets for
+   * (§ D171). Every shipped stage runs 50, so this is empty on `data/campaign.json` today — it
+   * is here because {@link comparisonSentence}'s "no measure separated the two settings" clause
+   * would otherwise be **false** on a batch that had one, and a sentence that is only true of
+   * the data we happen to ship is the kind this repository keeps finding.
+   */
+  const underBudget = orderable.filter((row) => row.verdict === 'under-budget');
   const met = ahead.length > 0 && behind.length === 0;
 
   return {
@@ -272,7 +280,7 @@ function judgeComparisonGoal(spec: GoalSpec, report: BatchReport): StageGoalVerd
     label,
     met,
     reproduced: null,
-    sentence: `${label}: ${comparisonSentence(report.replications, ahead, behind)}`,
+    sentence: `${label}: ${comparisonSentence(report.replications, ahead, behind, underBudget)}`,
     note:
       `${suppressionClause(suppressed, report.replications)} Energy is not in this test: it is an ` +
       'axis and never a score, and the arm that spends least is routinely the arm that carried ' +
@@ -284,16 +292,29 @@ function comparisonSentence(
   replications: number,
   ahead: readonly BatchComparisonRow[],
   behind: readonly BatchComparisonRow[],
+  underBudget: readonly BatchComparisonRow[],
 ): string {
   const runs = `${String(replications)} runs`;
+  const names = (rows: readonly BatchComparisonRow[]): string =>
+    rows.map((row) => row.label).join(', ');
+  /*
+   * Named rather than folded into *"had no number"*: these rows **have** a number.
+   *
+   * Only the first branch below can carry it, and that is arithmetic rather than an oversight —
+   * every row that forms an interval forms it over the same `n`, so a report with an
+   * `under-budget` row has no `resolved` row and therefore nothing ahead and nothing behind.
+   */
+  const budgetClause =
+    underBudget.length === 0
+      ? ''
+      : ` The interval on ${names(underBudget)} excludes zero and is drawn, and it orders ` +
+        'nothing: this batch is below the project’s replication budget.';
   if (ahead.length === 0 && behind.length === 0) {
     return (
       `in ${runs}, no measure separated the two settings — every interval on the difference ` +
-      'included zero, or had no number to form one. The two are not ordered.'
+      `included zero, or had no number to form one. The two are not ordered.${budgetClause}`
     );
   }
-  const names = (rows: readonly BatchComparisonRow[]): string =>
-    rows.map((row) => row.label).join(', ');
   if (behind.length === 0) {
     return (
       `in ${runs}, your setting came out ahead on ${names(ahead)} — the interval on the ` +

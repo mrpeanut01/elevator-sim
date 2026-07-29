@@ -30,7 +30,12 @@ import { probabilityWordIn } from '../campaign/words.js';
 import { GOAL_JUDGEMENT, GOAL_KINDS } from '../scenario/goals.js';
 import { MIN_SEEDS_PER_GOAL } from '../scenario/published.js';
 import type { HonestyContext } from './surfaces.js';
-import type { HonestyProperty, HonestyViolation, RenderedText } from './types.js';
+import type {
+  HonestyProperty,
+  HonestyViolation,
+  RenderedText,
+  TextProvenance,
+} from './types.js';
 
 /** How much of an offending string a violation quotes. Enough to find it; never a paraphrase. */
 const QUOTE_LIMIT = 220;
@@ -54,15 +59,50 @@ function violation(
  * -------------------------------------------------------------------------- */
 
 /**
- * Words that make a number a claim about a *cohort* rather than about a person or a moment.
+ * Words that make a number a claim about a *cohort* rather than about a person or a moment —
+ * **per quantity**, not as one list.
  *
  * Deliberately narrow. `docs/10` § 1's whole distinction is observation versus estimate, and
  * *"the longest wait was 88 s"* is an observation that is drawn on a saturated run **on purpose**
- * — R4: *"seeing the divergence is the point."* So the cue list names the three estimate classes
+ * — R4: *"seeing the divergence is the point."* So the cues name the three estimate classes
  * `VizSummary.awtIsValid` actually speaks for and nothing else.
+ *
+ * ## Why they are keyed by quantity, and what one flat list cost — the **fifth** false positive
+ * this search has corrected in the rule rather than in the product
+ *
+ * A flat list pairs *any* cue with *any* of the three refused values, and that is not what R3
+ * says: R3 forbids a surface presenting **this quantity's** refused value. Measured on
+ * `honesty-9010` (Vertical City, `nearest-car`, saturated, `wait95S = 300.4`), the flat list
+ * reported `describeFrame` as printing `wait95S` — on this sentence:
+ *
+ * > `Rolling mean wait over the last 300 seconds is not reported.`
+ *
+ * The `300` is the **reporting window's length in seconds**, which happens to equal `wait95S`
+ * rounded; the cue that paired with it is *"mean"*, which names a different quantity; and the
+ * sentence is `describeFrame`'s **refusal**, produced by the very branch § D111 added. Keying the
+ * cues to the quantity whose value is being looked for makes the check say what the rule says.
+ *
+ * **What it costs, stated rather than glossed:** a surface that published `wait95S` under a word
+ * this map assigns to `meanWaitS` — *"typical wait: 171.6 s"* — would now be missed, where the
+ * flat list would have caught it by accident. That is a real narrowing and it is the right trade:
+ * a check that fires on a coincidence between two unrelated quantities is not evidence about
+ * either, and the mislabelled-figure case is R13's and R9's territory — the figure's own `kind`
+ * and `gated` flag, which the structural half reads and which no wording can talk it out of.
  */
-const ESTIMATE_CUE =
-  /\b(?:average|mean|awt|typical|95th|wt95|percentile|time to destination|ttd|one in twenty|1 in 20)\b/i;
+const ESTIMATE_CUES: Readonly<Record<'meanWaitS' | 'wait95S' | 'meanTimeToDestinationS', RegExp>> =
+  Object.freeze({
+    meanWaitS: /\b(?:average|mean|awt|typical)\b/i,
+    wait95S: /\b(?:95th|wt95|percentile|one in twenty|1 in 20)\b/i,
+    meanTimeToDestinationS: /\b(?:time to destination|ttd)\b/i,
+  });
+
+/** Any of them — the cheap pre-filter, derived from the map rather than restated beside it. */
+const ANY_ESTIMATE_CUE = new RegExp(
+  Object.values(ESTIMATE_CUES)
+    .map((cue) => cue.source)
+    .join('|'),
+  'i',
+);
 
 /** Every rendering of a number a reader could match against the printed figure. */
 function renderings(value: number): readonly string[] {
@@ -80,20 +120,113 @@ function renderings(value: number): readonly string[] {
  * the number appeared *in the same string* reported the paragraph as printing `meanWaitS = 29`.
  * The 29 was a queue count, the cue was in a different sentence, and the surface was doing
  * exactly the right thing. 64 characters is about a clause.
+ *
+ * It is a **cap** on the clause, not the clause itself. See {@link clauseSpans}.
  */
 const CLAIM_PROXIMITY = 64;
 
-/** Whether `text` states `number` as the thing an estimate cue names, rather than nearby by luck. */
-function claimsNear(text: string, numeral: string): boolean {
+/**
+ * Where one clause ends and the next begins — and the **fourth false positive this search has
+ * corrected in the rule rather than in the product**.
+ *
+ * ## The finding
+ *
+ * A character count is not a clause, and the difference is not academic. Measured on
+ * `honesty-9021` (Mixed-Use High-Rise, `eta`, saturated, `meanWaitS = 60.996`), the rule above
+ * reported **eight** violations across `describeFrame` and `drawScene`, at five playback instants
+ * on one run. Every one of them was this shape:
+ *
+ * > `…, with 61 passengers undelivered.` **`Mean waiting time is suppressed:`** ` Queue length
+ * > rose by 97.3 persons…`
+ *
+ * The `61` is the **undelivered passenger count** — `summary.undelivered`, which happens to equal
+ * `meanWaitS.toFixed(0)` on this run — in its own sentence. The estimate cue 64 characters later
+ * is the first word of **the refusal**. The canvas cases are the same defect with a different
+ * separator: `waiting 61   boarded 368 legs   mean wait suppressed` and `TIMED-OUT — 61
+ * undelivered   ·   SATURATED — AWT suppressed`. Not one of the eight strings printed a mean;
+ * three of them said *"suppressed"* in the very clause that triggered the report, and
+ * `describeFrame` said *"Rolling mean wait … is **not reported**"* in the same paragraph. The
+ * decisive evidence is `@0s`: at that instant the frame has `0 legs waiting, 0 boarded`, so a
+ * running mean of 61 s could not exist — the number is a run-level count the playback carries
+ * unchanged at every instant, which is what all five instants reporting the *same* value showed.
+ *
+ * `properties.ts` already knows this: *"the refusal is the one string entitled to quote the
+ * numbers it is refusing"*, which is why `role === 'reason'` is skipped. What it could not
+ * express is a refusal **embedded** in a longer string — a paragraph, a canvas status line —
+ * whose role as a whole is `prose`.
+ *
+ * ## The correction, and what it deliberately is not
+ *
+ * The window is bounded by the clause the numeral is actually in. A claim is made *in* a clause;
+ * the character count approximated one and crossed sentence boundaries, which is the same
+ * correction § D171 records for this rule's third false positive, applied one level finer.
+ *
+ * The rejected alternative was to treat a cue governed by a refusal word (*"suppressed"*, *"not
+ * reported"*) as not a cue. That is an **allow-word**, and an allow-word is a place for a leak to
+ * hide: *"the mean wait, 61.0 s, is suppressed"* would pass it. Clause bounding needs no such
+ * list, and it clears all eight.
+ *
+ * **It did not clear everything, and the run that proved it is worth reading.** With this bound in
+ * place the corpus produced a *ninth* report — `wait95S` matched inside `describeFrame`'s own
+ * refusal, in one clause with a cue naming a different quantity. That one is corrected by
+ * {@link ESTIMATE_CUES} and not by widening this. Two independent narrowings, each of which makes
+ * the check more specific rather than more forgiving.
+ *
+ * ## What counts as a break, and what deliberately does not
+ *
+ * - Sentence punctuation **followed by whitespace**, so `0.61`, `16:22` and `97.3` are untouched.
+ * - `·`, the separator `describeLockedOut` and the canvas banner join fields with.
+ * - A run of two or more spaces — the canvas's column gap. `drawScene`'s header joins three
+ *   fields with three spaces and keeps each field's own label beside its own value, so § D111's
+ *   defect (`mean wait so far 21.0 s`) still lands inside **one** clause. `faults.ts` injects
+ *   exactly that string, so this bound is falsifiable rather than argued.
+ * - **Not `:`.** A colon separates a label from its value — `average wait: 61.0 s` is one claim —
+ *   and breaking on it would have made the R3 fault stop firing textually. Found by running it.
+ */
+const CLAUSE_BREAK = /[.;!?](?=\s|$)|\s·\s|\s{2,}|\n/;
+
+/**
+ * The half-open spans of `text` between clause breaks. One pass, reused for every numeral.
+ *
+ * Compiles its own global copy rather than adding `g` to {@link CLAUSE_BREAK}: a module-level
+ * global regex carries `lastIndex` between calls, which makes the *second* caller of a shared
+ * instance read a different string from the first. That is a bug this file is not going to have.
+ */
+function clauseSpans(text: string): readonly { readonly from: number; readonly to: number }[] {
+  const spans: { from: number; to: number }[] = [];
+  const breaks = new RegExp(CLAUSE_BREAK.source, 'g');
+  let from = 0;
+  for (let match = breaks.exec(text); match !== null; match = breaks.exec(text)) {
+    spans.push({ from, to: match.index });
+    from = match.index + match[0].length;
+  }
+  spans.push({ from, to: text.length });
+  return spans;
+}
+
+/** Whether `text` states `numeral` as the value `cue` names, rather than nearby by luck. */
+function claimsNear(
+  text: string,
+  numeral: string,
+  spans: readonly { readonly from: number; readonly to: number }[],
+  cue: RegExp,
+): boolean {
   let from = 0;
   for (;;) {
     const at = text.indexOf(numeral, from);
     if (at < 0) return false;
-    // Named `clause`, not `window`: `boundaries.test.ts` bans a bare `window` identifier anywhere
-    // outside `dev/`, precisely because a local of that name shadowing the global is how a DOM
-    // reference hides. It caught this one.
-    const clause = text.slice(Math.max(0, at - CLAIM_PROXIMITY), at + numeral.length + CLAIM_PROXIMITY);
-    if (ESTIMATE_CUE.test(clause)) return true;
+    const end = at + numeral.length;
+    const span = spans.find((candidate) => at >= candidate.from && end <= candidate.to);
+    if (span !== undefined) {
+      // Named `clause`, not `window`: `boundaries.test.ts` bans a bare `window` identifier anywhere
+      // outside `dev/`, precisely because a local of that name shadowing the global is how a DOM
+      // reference hides. It caught this one.
+      const clause = text.slice(
+        Math.max(span.from, at - CLAIM_PROXIMITY),
+        Math.min(span.to, end + CLAIM_PROXIMITY),
+      );
+      if (cue.test(clause)) return true;
+    }
     from = at + 1;
   }
 }
@@ -109,10 +242,12 @@ function claimsNear(text: string, numeral: string): boolean {
  *    surface's own; disagreeing with the summary is the defect. **Not** every estimate: the
  *    achieved interval is an estimate `awtIsValid` does not speak for and is legitimately drawn.
  * 2. **Textual.** On the same run, no string other than the refusal itself may carry the printed
- *    value of `meanWaitS`, `wait95S` or `meanTimeToDestinationS` **within a clause of** an
- *    estimate cue. Both halves are required, and so is the distance: a bare number is not a
- *    claim, a cue with no number is a label, and the two at opposite ends of a paragraph are
- *    neither.
+ *    value of `meanWaitS`, `wait95S` or `meanTimeToDestinationS` **within a clause of a cue that
+ *    names that quantity**. All three halves are required: a bare number is not a claim, a cue
+ *    with no number is a label, two in **different sentences** are neither (see
+ *    {@link CLAUSE_BREAK}), and a number matching *one* quantity beside a cue for *another* is a
+ *    coincidence (see {@link ESTIMATE_CUES}). The last two were both found by running this over
+ *    the shipped surfaces, and both were corrected here rather than in the product.
  */
 function checkSuppressedMean(
   context: HonestyContext,
@@ -122,13 +257,18 @@ function checkSuppressedMean(
   const { summary } = context.recording;
   const found: HonestyViolation[] = [];
 
-  const forbidden: { readonly name: string; readonly forms: readonly string[] }[] = [];
+  const forbidden: {
+    readonly name: string;
+    readonly cue: RegExp;
+    readonly forms: readonly string[];
+  }[] = [];
   for (const [name, value] of [
     ['meanWaitS', summary.meanWaitS],
     ['wait95S', summary.wait95S],
     ['meanTimeToDestinationS', summary.meanTimeToDestinationS],
   ] as const) {
-    if (Number.isFinite(value)) forbidden.push({ name, forms: renderings(value) });
+    // Keyed by the field name, so a quantity added to the triple without a cue is a type error.
+    if (Number.isFinite(value)) forbidden.push({ name, cue: ESTIMATE_CUES[name], forms: renderings(value) });
   }
 
   for (const text of texts) {
@@ -147,15 +287,16 @@ function checkSuppressedMean(
     }
     // The refusal is the one string entitled to quote the numbers it is refusing.
     if (text.role === 'reason') continue;
-    if (!ESTIMATE_CUE.test(text.text)) continue;
-    for (const { name, forms } of forbidden) {
-      const hit = forms.find((form) => claimsNear(text.text, form));
+    if (!ANY_ESTIMATE_CUE.test(text.text)) continue;
+    const spans = clauseSpans(text.text);
+    for (const { name, cue, forms } of forbidden) {
+      const hit = forms.find((form) => claimsNear(text.text, form, spans, cue));
       if (hit === undefined) continue;
       found.push(
         violation(
           'suppressed-mean',
           text,
-          `prints ${name} (${hit}) beside an estimate cue on a run whose summary refuses it. ` +
+          `prints ${name} (${hit}) beside a cue that names it, on a run whose summary refuses it. ` +
             `Reason on the run: ${summary.awtInvalidReason ?? '(none recorded)'}`,
         ),
       );
@@ -197,6 +338,12 @@ const ORDERING_CLAIM =
  *    R2's own text is explicit that the requirement is *"a paired-t interval excluding zero over
  *    50–200 replications under common random numbers"*, and `MIN_REPLICATION_BUDGET` is the
  *    shipped constant for the lower bound — this check reads it rather than naming 50.
+ *
+ * **Clause 3 is the one this search found, and it is now defence in depth rather than live.**
+ * `compareMetric` used to resolve at `n >= 2`; since § D171 it emits `under-budget` below the
+ * budget, draws the interval and names no arm, so no shipped row can reach this clause. The
+ * clause stays because the *product* is what changed: a future caller that constructs a row
+ * itself, or a regression in `compareMetric`, is exactly what a property is for.
  */
 function checkSingleRunComparative(
   context: HonestyContext,
@@ -260,18 +407,58 @@ function checkSingleRunComparative(
 /**
  * R10 — *"Do not translate a confidence interval into a probability word."*
  *
- * The word list is `campaign/words.ts`'s, by import. § D163's clause says **anywhere**, which is
- * broader than R10's own text (which is about *translating an interval*), and the search reports
- * what it finds rather than deciding the disagreement: a hit on a string that is not an interval
- * restatement is still reported, with its provenance in the message, so a reader can see which
- * kind it is.
+ * The word list is `campaign/words.ts`'s, by import.
+ *
+ * ## Scoped to result-bearing text, and here is the disagreement that scoped it
+ *
+ * § D163 clause 1 says **anywhere**; R10's own text is about *translating an interval*; and
+ * `campaign/words.ts` records a **deliberate** exemption — *"the Parameters tab is a schema
+ * surface and may show it"*. The first run of this search reported the resulting collision as a
+ * finding rather than resolving it in the lane, and § D171 resolved it: **the rule is narrowed,
+ * not the product.**
+ *
+ * > R10 exists to stop a confidence interval being translated into a probability word. A
+ * > parameter description saying a demand predictor forecasts floors where traffic is *likely* is
+ * > technical prose about **what a dial does**, not a claim about a result — and rewriting
+ * > `core`'s own description of its own parameter would cost precision to satisfy a rule aimed at
+ * > something else.
+ *
+ * So the property applies to text with a **result behind it** — `single-run`, `batch` and
+ * `authored` — and not to {@link TextProvenance} `schema`, which is text `core` wrote into a
+ * `SearchParameter.description` and a viewer re-prints unaltered.
+ *
+ * **This is a scope, not an exclusion list.** The distinction is carried by where a string came
+ * from, set by the adapter from the shipped surface's own structure — `Control.help` *is*
+ * `parameter.description`, and `controls/render.ts` marks the node it draws it in — so a schema
+ * description reaching a *result* surface is still reported, and so is a probability word a
+ * viewer writes itself on the Parameters tab. `playerSafeDescription`, the shipped remedy, keeps
+ * its result-bearing provenance and is therefore still searched on the same text: if the filter
+ * ever returns a probability word, that is a hole in the remedy and it is red.
  */
+function isResultBearing(provenance: TextProvenance): boolean {
+  switch (provenance) {
+    /* Driven from one recording, from a batch, or written into `data/` about one. */
+    case 'single-run':
+    case 'batch':
+    case 'authored':
+      return true;
+    /*
+     * `core`'s own description of one of its own dials, re-printed by the Parameters tab. There
+     * is no run behind it and no interval for a word to translate. An exhaustive switch with no
+     * `default`, so a fifth provenance is a compile error here rather than a silent exemption.
+     */
+    case 'schema':
+      return false;
+  }
+}
+
 function checkProbabilityWord(
   _context: HonestyContext,
   texts: readonly RenderedText[],
 ): readonly HonestyViolation[] {
   const found: HonestyViolation[] = [];
   for (const text of texts) {
+    if (!isResultBearing(text.provenance)) continue;
     const word = probabilityWordIn(text.text);
     if (word === null) continue;
     found.push(
