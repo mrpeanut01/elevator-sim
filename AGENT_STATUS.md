@@ -506,3 +506,63 @@ wave paid for: **parallelise the work, serialise the measurement.**
   measure ΔTTD and independently refused a *second* measurement — the operating point's detector-input
   rates — on the grounds that it "predicts a selector that never switches, which is outcome
   information wearing a feasibility label." That objection is why § D151 § 5 exists.
+
+## Waves 7 and 8 — CLOSED 2026-07-29
+
+**Final:** `0342868` — **209 test files, 3903 passed, 9 skipped**, `tsc -b` clean, 30 commits.
+Baseline was `da411ea` — 190 files, 3496 passed. All worktrees removed, all lane branches deleted.
+
+| ID | Unit | Verdict |
+|---|---|---|
+| T50 | Sweep feasibility census | 18 cells, **no ΔTTD measured anywhere** |
+| T51 | § D151 — the sweep, pre-registered | committed before any comparison existed |
+| T52 | The sweep | **Phase 6c NOT ACCEPTED at all five PRIMARY cells** |
+| T53 | Selector → shipped runner | § D153 — twelfth signature defect, caught pre-ship |
+| T54 | Search space derived from schema | § D152 — counts unmoved, which *is* the claim |
+| T55 | `stopCount`'s `activeWhen` | § D155 — **written, measured, refused** |
+| T56 | `kioskRefusedLegs` + C27 | C27 was **not open** — first pessimistic register row |
+| T60–T65 | Phase 9, W2/W3/W5/W6/W7/W9 | §§ D154, D157–D161 |
+
+### Phase status — unchanged, and that is the result
+
+**Phases 1–5 and 7 accepted. Phase 6 ⚠️ partial. Phase 8 accepted.** No verdict moved. Phase 6c
+was swept over eight pre-registered operating points under a protocol dated before any ΔTTD, and
+refused. The mechanism is now named rather than guessed: **the shipped demand template varies the
+*level* and never the *directional split*, so the condition learned selection exists to exploit does
+not occur at any shipped operating point.**
+
+### The one finding that outranks the rest
+
+**Six lanes, six tests that could not fail — and the sixth was the instrument that checks for tests
+that cannot fail.** Five distinct mechanisms, none catchable by reading:
+
+1. **Two readers** — freezing one leaves the other live (T60, `wait95S`).
+2. **A fixture routing past the subject** — the default gutter left zero cells, so every "glyph"
+   test silently exercised the **bar** path (T61). Three mutations green.
+3. **A control returning before the live half** — the CRN negative control compared traces at
+   different *seeds*, returning at the `seed` scalar before the per-passenger loop, which is the
+   only half that can fire in production (T62).
+4. **A guard whose *meaning* eroded while every assertion stayed true** — `marks()` filtered
+   `y > 40` to mean "landing rows"; another lane drew at `y = 48`. Nothing went red, because the
+   test is the thing that moved (T63).
+5. **The mutation harness itself** — `--reporter=basic` no longer exists in vitest 4, so **every
+   mutation reported "no failures."** A sweep that would have certified a dead suite as fully
+   live (T65).
+
+**A test that cannot fail is invisible to every other check this repository runs**, including the
+one built to find it. Hunting all five is now a standing item in a lane brief, not a lucky catch.
+
+### Process notes for the next wave
+
+- **Allocate `DECISIONS.md` entry numbers up front.** Seven collisions. The danger is not the
+  collision: a wrong cross-reference points at a **real, unrelated entry**, so nothing reads as
+  broken to anyone who does not follow the link. `CLAUDE.md` spent one commit pointing readers at
+  the schema-derivation entry while describing the sweep. No test catches this.
+- **Hand a conflicted merge back to the lane that wrote it.** T61 and T63 collided on 11 hunks
+  across three rendering files. Resolving them centrally would have shipped both an eroded guard
+  and an unasserted spacing change; the lane found both.
+- **Serialise the measurement, parallelise the work** — still true, and wave 7 paid it again: the
+  full suite ran ~8.5 min alone and ~13 min under load, and a loaded runner produced **eight**
+  spurious timeout failures that said nothing about the code.
+- **Every unit found its governing document wrong about the code at least once**, and `docs/10`
+  three times. Being *binding* does not make a document *right*.
