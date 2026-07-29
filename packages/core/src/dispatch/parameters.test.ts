@@ -440,6 +440,51 @@ describe('the schema and the engine agree about what is tunable', () => {
     expect(gated).toEqual(['weights.rideTime']);
   });
 
+  it('carries a partly-conditional term’s condition into its weight’s description', () => {
+    /*
+     * The declaration that is deliberately **not** a gate, and the assertion that it reaches a
+     * schema consumer anyway.
+     *
+     * `weights.stopCount` is live under every call type — `energy-aware` and
+     * `predictive-balanced` weight it at `up-down-buttons` today, and
+     * `sim/searchSpaceLiveness.test.ts` measured it still moving a run there — so gating it would
+     * hide a live region, which is the one error `activeWhen` exists to make impossible. What is
+     * conditional is *what the term prices*, not *whether the dimension is worth searching*, and
+     * the honest place for that is the row's prose: docs/06 calls `description` the part of the
+     * schema a search reads to decide where to spend budget.
+     *
+     * Derived from `term.partiallyActiveWhen` in both directions, so a thirteenth term declaring
+     * one gets the same treatment with no edit here, and deleting the fold-in turns this red.
+     */
+    const declared = COST_TERMS.filter((term) => term.partiallyActiveWhen !== undefined);
+    expect(declared.map((term) => term.id), 'no term declares partiallyActiveWhen').not.toEqual([]);
+
+    for (const term of declared) {
+      const row = dispatchParameter(`weights.${term.id}`);
+      expect(row, `weights.${term.id} is not declared`).toBeDefined();
+      // Not a gate: an optimizer must keep searching this dimension on both sides.
+      expect(row?.activeWhen, `weights.${term.id} is gated as well as partly conditional`)
+        .toBeUndefined();
+      for (const [gateId, values] of Object.entries(term.partiallyActiveWhen ?? {})) {
+        expect(row?.description, `weights.${term.id} hides its condition on ${gateId}`).toContain(
+          gateId,
+        );
+        for (const value of values) {
+          expect(
+            row?.description,
+            `weights.${term.id} names ${gateId} without the value ${value}`,
+          ).toContain(value);
+        }
+      }
+      // The gate it names has to exist and admit the values, exactly as `activeWhen`'s does.
+      for (const [gateId, values] of Object.entries(term.partiallyActiveWhen ?? {})) {
+        const gate = dispatchParameter(gateId);
+        expect(gate, `${term.id} names ${gateId}, which is not a declared parameter`).toBeDefined();
+        for (const value of values) expect(gate?.values, gateId).toContain(value);
+      }
+    }
+  });
+
   it('reports an unknown id rather than guessing', () => {
     expect(dispatchParameterValue(PROBED, 'dispatch.nonsense')).toBeUndefined();
     expect(dispatchParameterValue(PROBED, 'nonsense.batchWindowS')).toBeUndefined();

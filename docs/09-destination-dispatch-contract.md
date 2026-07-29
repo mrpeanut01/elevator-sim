@@ -412,7 +412,7 @@ order it binds:
 | `SIM_PARAMETERS` | `core/src/sim/types.ts` | `sim.assignedWalkS` |
 | `SimulationConfig` | same | `assignedWalkS?: number` |
 | `DISPATCH_PARAMETERS` | `core/src/dispatch/parameters.ts` | any new stage-1 knob (§ 3.2), each with `activeWhen: { 'dispatch.callType': ['destination-entry', 'mobile-credential'] }` |
-| `COST_TERMS` | `core/src/dispatch/terms/index.ts` | any new term, each with the same `activeWhen` |
+| `COST_TERMS` | `core/src/dispatch/terms/index.ts` | any new term, each with the same `activeWhen` — **or `partiallyActiveWhen`, if only part of its raw value is destination-priced.** `stopCount` is the case: the gate was written and refused by measurement, because the term still separates candidate cars under `up-down-buttons` and a gate there hides a live dimension. `terms/destinationDisclosure.test.ts` decides which form a term needs by measuring it |
 | `REPLICATION_METRICS` | `experiments/src/runner/metrics.ts` | `walkS` if the walk is reported separately (optional; see OQ-2) |
 
 **Behaviourally changed, not type-changed:**
@@ -475,7 +475,8 @@ sim.assignedWalkS                 (new)     continuous [0,30] default 0 — NOT 
 
 Any new stage-1 knob (e.g. a destination-batching window distinct from `batchWindowS`) must carry
 `activeWhen` on `dispatch.callType`, **and — per the roadmap's new rule — must prove its gated-off
-region is flat.** `searchSpaceLiveness.test.ts`'s header is explicit that
+region is flat.** If it cannot, the honest declaration is `partiallyActiveWhen`, which claims the
+opposite about that region and carries the opposite proof obligation. `searchSpaceLiveness.test.ts`'s header is explicit that
 `idle.predictorHorizonS` was *"a live dimension declared dead"* and that *"every remaining gate has to
 assert that its gated-off region is flat."* A destination-only knob that turns out to move a run
 under `up-down-buttons` is a wiring bug in the gate, not a bonus.

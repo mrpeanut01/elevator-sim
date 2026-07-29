@@ -359,6 +359,42 @@ spent 50–200 replications an evaluation on a dimension that cannot move the ob
 whose evaluation rule differs from every other gate is exactly the elevator-specific knowledge
 this schema exists to remove.
 
+### A gate is a claim, and the wrong claim costs more than no claim
+
+`activeWhen` says *"outside this condition the dimension is dead — skip it"*. That is a
+machine-readable assertion with a proof obligation, and
+`packages/core/src/sim/searchSpaceLiveness.test.ts` § *finds no activeWhen gate that hides a live
+region* executes the contrapositive: **outside the gate, the dimension must be flat**. A gate that
+fails it is not documentation, it is a false statement that costs an optimizer a whole live
+dimension.
+
+So a knob whose *value* is conditional is not automatically a knob whose *dimension* is. The two
+destination-reading cost terms are the worked example of both sides, and they need **opposite**
+declarations:
+
+| term | raw value without a destination | spread between candidate cars without one | declaration |
+|---|---|---|---|
+| `rideTime` | 0, always | **0** — a constant cannot move an `argmin` | `activeWhen` — a gate |
+| `stopCount` | the pickup stop, still counted | **1** — it still separates two cars | `partiallyActiveWhen` — **not** a gate |
+
+Measured over 4 320 (car, call) pairs on `midtown-office` by
+`dispatch/terms/destinationDisclosure.test.ts`, which derives the classification from
+`policy.score()` rather than reading it off these paragraphs. Gating `stopCount` was tried first
+and refused by measurement: the liveness sweep found `weights.stopCount` still moving a run at
+`dispatch.callType: up-down-buttons`, *outside* the proposed gate, and the two shipped profiles
+that weight it there — `energy-aware` and `predictive-balanced` — became invalid under the rule
+that no profile may weight a term its own stage settings make inert.
+
+`partiallyActiveWhen` is therefore declared on the **term**, not as a `DispatchParameterSpec`
+field, and `dispatch/parameters.ts` folds it into the row's `description`. An optimizer must keep
+searching the dimension on both sides of the condition, so there is nothing for a new structural
+field to change; what the sentence tells a tuner is that **the term prices a different quantity on
+either side, so a weight tuned under one call type does not transfer to another** — the same rule
+this document already states for traffic patterns, one axis over. The cost of not knowing it was
+measured: at `garden-down-peak`, authoring a destination call type onto a `stopCount`-weighted
+profile moves AWT by `+1.320 [+0.988, +1.653] s` at weight 1, n = 200 — worse, by an interval that
+excludes zero ([DECISIONS.md § D136](../DECISIONS.md)).
+
 ### `id` is a path a profile can actually hold
 
 The contract's other half: **every declared `id` must be authorable into

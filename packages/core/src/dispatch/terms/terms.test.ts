@@ -120,6 +120,37 @@ describe('the cost-term registry', () => {
     }
   });
 
+  it('lets a term declare the configuration that changes what its weight prices', () => {
+    // `partiallyActiveWhen` is the other half, and the two are opposites rather than degrees.
+    // `activeWhen` says the dimension is dead outside the condition; `partiallyActiveWhen` says
+    // it is alive outside it and pricing something else. `stopCount` is the case: the pickup is
+    // counted under every call type, the destination stop only when one is disclosed.
+    // `destinationDisclosure.test.ts` is where each declaration is checked against measurement;
+    // this file checks the shape, and that no term claims both about one setting.
+    expect(costTerm('stopCount')?.partiallyActiveWhen).toEqual({
+      'dispatch.callType': ['destination-entry', 'mobile-credential'],
+    });
+    expect(costTerm('stopCount')?.activeWhen).toBeUndefined();
+
+    for (const term of COST_TERMS) {
+      if (term.partiallyActiveWhen === undefined) continue;
+      expect(Object.isFrozen(term.partiallyActiveWhen), term.id).toBe(true);
+      const conditions = Object.entries(term.partiallyActiveWhen);
+      expect(conditions.length, term.id).toBeGreaterThan(0);
+      for (const [parameterId, values] of conditions) {
+        expect(parameterId, term.id).toContain('.');
+        expect(values.length, `${term.id} → ${parameterId}`).toBeGreaterThan(0);
+        // Contradictory on one key: a dimension cannot be both dead and live outside a
+        // condition, and a consumer that read both would have to pick one and be wrong half
+        // the time.
+        expect(
+          term.activeWhen?.[parameterId],
+          `${term.id} declares ${parameterId} in both activeWhen and partiallyActiveWhen`,
+        ).toBeUndefined();
+      }
+    }
+  });
+
   it('returns a finite, non-negative number from every term on every plausible context', () => {
     // The contract `scoreCar` enforces at runtime, asserted here across a spread of car states so
     // a term that can produce a NaN or a bonus fails in this file rather than mid-replication.
