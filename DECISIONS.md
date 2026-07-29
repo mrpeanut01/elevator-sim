@@ -9887,3 +9887,98 @@ Four variants were named going in and **all four were found**:
 A fail state printed `0 of 50` **while suggesting a dial to try** — a sentence that is technically true and useless. The definitions were reworded out of the indicative and the hint attached only where the state actually arose, asserted both ways.
 
 **Impact.** `data/campaign.json` is pinned field-for-field to `data/scenario-goals.json`, so regenerating the goal table without regenerating the campaign turns the suite red — intended. **Known limits:** the player's move is a **shipped profile**, not a live weight editor — wiring W4's form into the arm is W6's — so four stages need an authored weight vector to clear. `everyone-can-get-there` reaches the briefing as **withheld**, blocked on W7. `PROBABILITY_WORDS` is now a third copy of that pattern and the divergence is pinned by a superset assertion rather than left to drift.
+
+---
+
+## D162 — **may a mix-varying operating point accept Phase 6c?** Conditionally yes, and the conditions are what stop it being a test built to pass
+
+**Date:** 2026-07-29 · **Owner:** orchestrator, wave 9 · **Discharges:** [§ D151](#d151) § 7's one
+open question · **Gates:** T77's measurement · **Dated before** the template exists and before any
+arm runs on it
+
+**Context.** [§ D156](#d156) refused Phase 6c across eight pre-registered operating points and named
+the mechanism: `DemandPhase` carries a scalar intensity, so the directional split is fixed for a
+whole run, and **the condition learned selection exists to exploit does not occur at any shipped
+operating point.** [§ D151](#d151) § 7 anticipated the follow-on — a demand template whose split
+varies by phase — and fixed three constraints on it in advance, then stopped:
+
+> Whether such a cell may accept Phase 6c at all is deliberately left **open** here and must be
+> decided in its own entry, dated before that measurement.
+
+**This is that entry.** It is written before the template exists, for the reason § D139 gives about
+itself: a criterion written after a result is indistinguishable from a criterion fitted to it.
+
+### The objection, stated at full strength before it is answered
+
+A demand template whose directional mix changes mid-run is **authored by us**, and it is authored
+knowing that mix variation is precisely the thing a weight-set selector can exploit. Measuring 6c
+there and accepting it is, on its face, **constructing the test so the arm passes**. That is not a
+subtle risk. It is the same shape as choosing a reference arm after seeing the result, which
+[§ D139](#d139) lists among the four things that would make its criterion bad — and it would be
+worse, because the arm would clear a gate nobody weakened, on a stage nobody checked.
+
+**If the honest answer were "no", this entry would say no.** The alternatives were: (a) refuse any
+mix-varying cell outright and leave 6c permanently unresolvable; (b) accept such a cell on the
+unchanged gate; (c) accept it only under conditions that make the template a **product artifact
+rather than a test fixture**.
+
+### Chosen: (c). The five conditions, all of which must hold
+
+1. **The template is authored from reference evidence, cited, and not tuned.** Its phases, their
+   durations and their splits come from `docs/02`'s sources — CIBSE Guide D, ISO 8100-32, the
+   lift-engineering literature — in the same way every other reference value in `data/` does, with
+   the citation in the file. **A split chosen because it made an arm win is a fabricated
+   measurement**, and `CLAUDE.md` § Reference data already requires a cited reason to change a
+   reference value. No exception is made here because the value is new.
+2. **It ships as a shipped operating point of at least one building, for its own reasons.** It must
+   be something the product uses because a real building really does go from up-peak through
+   two-way to down-peak inside a measurement window — not a fixture that exists only for this
+   comparison. **This is the load-bearing condition.** A template that is part of the product is a
+   thing the world made; a template that exists only to be measured on is a thing we made to pass.
+3. **It is authored, cited and committed before any 6c arm runs on it**, and the commit that adds
+   it may not also add a selector result. The ordering is the evidence.
+4. **The gate is [§ D139](#d139) as raised by [§ D140](#d140), unchanged.** TTD and only TTD;
+   paired-t interval excluding zero under CRN; Holm–Bonferroni across the pre-registered cell set;
+   the resolution limit **measured on TTD at the cell**, per [§ D156](#d156); costs published
+   beside and never folded in; tuned on one seed set and validated on a **disjoint** one; the 2 s
+   deadband known-answer still rediscovered blind. **Nothing about the gate is relaxed to
+   accommodate a new kind of cell.**
+5. **A negative control, and it is the clause that can still refuse the phase.** The same template
+   with the **mix change removed and total demand held equal** must be measured in the same run.
+   If the selector's advantage survives on the flat-mix control, **the advantage is not about mix
+   variation** — it is the busy/idle schedule [§ D156](#d156) already found, or a wiring fault, and
+   in either case it is **a bug report and not an acceptance**. § D156's one significant cell
+   learned exactly that, and it is why this clause exists rather than being assumed unnecessary.
+
+### What acceptance would then be allowed to say, and what it would not
+
+**Allowed:** *"Learned weight-set selection improves TTD under traffic whose directional mix changes
+within the run, at cell X, by N s [CI], against the best shipped profile at that point."*
+
+**Not allowed, in any document:** *"learned control works"*, *"Phase 6c is accepted"* without the
+traffic condition attached, or any sentence that lets a reader carry the result to a
+fixed-mix operating point. [§ D147](#d147) is the model — *WORSE under `eta`, BETTER under
+`collective`, one cell permanently unresolvable* — and its closing sentence is the standard:
+**there is no verdict of the form "double-deck is better."**
+
+**And Phase 6's status must then name the condition in the same breath as the verdict.** A phase
+that is accepted only under a traffic condition the shipped buildings did not previously express is
+a phase whose status sentence is longer, not shorter.
+
+### What would make *this* a bad criterion, so a reviewer can check
+
+Authoring the template's splits after seeing a selector result. Shipping it as a building's operating
+point *only* to satisfy condition 2 while nothing else in the product uses it. Dropping the
+flat-mix negative control, or running it at a different total demand so it is not a control.
+Reading condition 1's citation requirement as satisfied by a plausible-sounding number with no
+source. Accepting on the mix-varying cell while quietly leaving § D156's eight refusals unstated.
+
+### The outcome this decision explicitly permits
+
+**A third refusal.** The template may ship, be cited, be part of the product, and the selector may
+still fail to clear the gate on it — or clear it and be refused by the flat-mix control. That is a
+permitted and reportable outcome, and it would close the question § D156 opened rather than leaving
+it open a third time.
+
+**Impact.** Gates T77. Constrains T70's template authoring. Nothing in § D139, § D140, § D151 or
+§ D156 is weakened; condition 5 is new and is a **raise**.
