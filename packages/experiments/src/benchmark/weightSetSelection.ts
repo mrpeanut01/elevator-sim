@@ -46,6 +46,17 @@
  *   an all-zero difference `IDENTICAL` rather than as a small effect, and this study reports the
  *   count rather than the interval.
  *
+ * ## One cell by default, and eight when the sweep asks
+ *
+ * Every entry point here takes an optional {@link SelectionCell} and defaults to § D145's own
+ * operating point, so `runWeightSetSelectionStudy()` with no arguments is still exactly the run
+ * that produced § D145's figures and its pins reproduce byte-for-byte. `selectionSweep.ts` is what
+ * supplies the other seven, together with the two things § D151 raises over § D145: a
+ * **Holm-corrected** level per family, and a resolution limit **measured on TTD at the cell**
+ * rather than inherited from `docs/07` § 4's AWT-measured pair. The seam for the second is
+ * {@link SelectionStudyOptions.resolutionProbe}, which runs after the census fixes the reference arm
+ * and before any ΔTTD is graded against it.
+ *
  * ## The learning, and why it is a declarable tunable rather than a tensor
  *
  * § D28's second objection to 6c was that *a 400-parameter policy vector is not obviously a
@@ -77,6 +88,7 @@ import type {
   DispatcherArmSpec,
   ExperimentResources,
   ExperimentResult,
+  ReplicationRecord,
   TrafficArmSpec,
 } from '../runner/types.js';
 import { policyNoiseStream, sampleCandidate } from '../tuning/space/sample.js';
@@ -125,6 +137,32 @@ export const SELECTION_POINT: TrafficArmSpec = Object.freeze({
     arrivalRatePctPop5min: 1.5,
     peakWindowS: 300,
   }),
+});
+
+/**
+ * **One operating point this study can be run at.**
+ *
+ * The study used to name `SELECTION_BUILDING` and `SELECTION_POINT` directly, in eight places. It
+ * is parameterized because `DECISIONS.md` § D151 pre-registers a **sweep** over eight of them and
+ * § D145's single-cell refusal is the first row of it. The default is § D145's own cell, so every
+ * pinned figure this module publishes reproduces byte-for-byte from `runWeightSetSelectionStudy()`
+ * with no arguments — the parameterization is a broadening, not a re-measurement.
+ *
+ * `building` is a key into `ExperimentResources.buildingsById`, which is what lets § D151's cell 5
+ * be a **derived** building (`midtown-office` re-pointed at the `hotel` traffic profile) without a
+ * line of code knowing that a traffic profile is a thing a cell can move.
+ */
+export interface SelectionCell {
+  readonly id: string;
+  readonly building: string;
+  readonly point: TrafficArmSpec;
+}
+
+/** § D145's operating point, and this module's default. */
+export const SELECTION_CELL: SelectionCell = Object.freeze({
+  id: 'midtown-interfloor-1.5pct',
+  building: SELECTION_BUILDING,
+  point: SELECTION_POINT,
 });
 
 /** The gate metric, and only the gate metric. § D126. */
@@ -267,6 +305,7 @@ function trajectoryOf(
   config: LoadedConfig,
   seed: number,
   options: { readonly selection?: SelectionStageConfig; readonly weightSets?: WeightSetSource },
+  point: TrafficArmSpec,
 ): {
   readonly moves: readonly string[];
   readonly ttdMeanS: number;
@@ -278,9 +317,9 @@ function trajectoryOf(
     trafficProfiles: config.trafficProfiles,
     elevatorSpecs: config.elevatorSpecs,
     seed,
-    durationS: SELECTION_POINT.durationS as number,
-    reportWindow: 'full-run',
-    demand: SELECTION_POINT.demand,
+    durationS: point.durationS as number,
+    reportWindow: point.reportWindow ?? 'full-run',
+    demand: point.demand,
     onTimeout: 'report',
     ...(options.selection === undefined && options.weightSets === undefined
       ? {}
@@ -376,15 +415,18 @@ export async function measureWeightSetSelectionLiveness(
     readonly seed?: number;
     readonly config?: LoadedConfig;
     readonly profileId?: string;
+    readonly cell?: SelectionCell;
+    readonly buildings?: ReadonlyMap<string, ResolvedBuilding>;
   } = {},
 ): Promise<WeightSetLivenessResult> {
   const seed = options.seed ?? BENCHMARK_SEED;
   const config = options.config ?? (await loadResources());
+  const cell = options.cell ?? SELECTION_CELL;
   const profileId = options.profileId ?? 'eta';
   const profile = config.dispatcherProfilesById.get(profileId);
-  const building = config.buildingsById.get(SELECTION_BUILDING);
+  const building = (options.buildings ?? config.buildingsById).get(cell.building);
   if (profile === undefined || building === undefined) {
-    throw new Error(`No profile "${profileId}" or building "${SELECTION_BUILDING}" in data/.`);
+    throw new Error(`No profile "${profileId}" or building "${cell.building}" in data/.`);
   }
 
   const library = weightSetLibrary(config);
@@ -402,19 +444,31 @@ export async function measureWeightSetSelectionLiveness(
   const fuzzy: SelectionStageConfig = { policy: 'fuzzy' };
   const off: SelectionStageConfig = { policy: 'off' };
 
-  const bare = trajectoryOf(building, profile, config, seed, {});
-  const switchedOff = trajectoryOf(building, profile, config, seed, {
-    selection: off,
-    weightSets: library,
-  });
-  const shipped = trajectoryOf(building, profile, config, seed, {
-    selection: fuzzy,
-    weightSets: library,
-  });
-  const permuted = trajectoryOf(building, profile, config, seed, {
-    selection: fuzzy,
-    weightSets: withWeightSets(library, permutedMap),
-  });
+  const bare = trajectoryOf(building, profile, config, seed, {}, cell.point);
+  const switchedOff = trajectoryOf(
+    building,
+    profile,
+    config,
+    seed,
+    { selection: off, weightSets: library },
+    cell.point,
+  );
+  const shipped = trajectoryOf(
+    building,
+    profile,
+    config,
+    seed,
+    { selection: fuzzy, weightSets: library },
+    cell.point,
+  );
+  const permuted = trajectoryOf(
+    building,
+    profile,
+    config,
+    seed,
+    { selection: fuzzy, weightSets: withWeightSets(library, permutedMap) },
+    cell.point,
+  );
 
   const { patternsVisited, switches } = await tracePatterns(
     building,
@@ -422,11 +476,12 @@ export async function measureWeightSetSelectionLiveness(
     config,
     seed,
     library,
+    cell.point,
   );
 
   return Object.freeze({
     seed,
-    building: SELECTION_BUILDING,
+    building: cell.building,
     profileId,
     patternsVisited,
     switches,
@@ -452,6 +507,7 @@ async function tracePatterns(
   config: LoadedConfig,
   seed: number,
   library: WeightSetSource,
+  point: TrafficArmSpec,
 ): Promise<{ readonly patternsVisited: readonly string[]; readonly switches: number }> {
   const visited: string[] = [];
   let switches = 0;
@@ -478,9 +534,9 @@ async function tracePatterns(
     trafficProfiles: config.trafficProfiles,
     elevatorSpecs: config.elevatorSpecs,
     seed,
-    durationS: SELECTION_POINT.durationS as number,
-    reportWindow: 'full-run',
-    demand: SELECTION_POINT.demand,
+    durationS: point.durationS as number,
+    reportWindow: point.reportWindow ?? 'full-run',
+    demand: point.demand,
     onTimeout: 'report',
     createPolicy: (candidate, policyOptions) =>
       new Traced(
@@ -585,7 +641,9 @@ export async function learnSelectionPolicy(input: {
   readonly tuningSeed: number;
   readonly candidates: number;
   readonly replications: number;
+  readonly cell?: SelectionCell | undefined;
 }): Promise<LearnedPolicy> {
+  const cell = input.cell ?? SELECTION_CELL;
   const space = learnedSubspace();
   // The gate the search is not moving still has to be readable, or every dimension it gates
   // deactivates and the narrowed search silently becomes narrower still — `subspace`'s own
@@ -614,11 +672,11 @@ export async function learnSelectionPolicy(input: {
   ];
 
   const experiment = await runGateExperiment({
-    id: 'phase6c/learn',
+    id: `phase6c/learn/${cell.id}`,
     seed: input.tuningSeed,
-    building: SELECTION_BUILDING,
+    building: cell.building,
     dispatchers: arms,
-    traffic: SELECTION_POINT,
+    traffic: cell.point,
     replications: input.replications,
     resources: input.resources,
   });
@@ -809,6 +867,8 @@ export function toResources(config: LoadedConfig): ExperimentResources {
 export interface CensusRow {
   readonly profileId: string;
   readonly quotable: boolean;
+  /** Measured and published, but not a candidate for the reference arm. § D147's device. */
+  readonly ceilingExcluded: boolean;
   readonly meanTtdS: number;
   readonly firstInvalidReplication: number | undefined;
 }
@@ -819,8 +879,13 @@ export interface SelectionCensus {
   readonly rows: readonly CensusRow[];
   /** The best **quotable** shipped profile on the gate metric. The reference arm. */
   readonly referenceProfileId: string;
-  /** The lowest ceiling any quotable arm imposes, or `undefined` when none saturates. */
+  /**
+   * The **reference arm's own** ceiling — the declared arm set's, and the one the budget clamps to.
+   * `undefined` when the reference arm keeps a quotable AWT across the whole census.
+   */
   readonly ceiling: number | undefined;
+  /** The conservative min-over-twelve. Reported beside the budget, and never the budget. */
+  readonly allArmCeiling: number | undefined;
 }
 
 /**
@@ -836,41 +901,61 @@ export async function censusSelectionPoint(input: {
   readonly seed: number;
   readonly replications: number;
   readonly resources: ExperimentResources;
+  readonly cell?: SelectionCell | undefined;
+  /**
+   * Arms excluded from the reference-arm choice by their **ceiling**, never by their answer.
+   *
+   * [§ D147](../../../../DECISIONS.md)'s `CEILING_EXCLUDED_ARMS` device, and § D151 § 1 admits its
+   * three SECONDARY cells only with it. An excluded arm's census row is still measured and still
+   * published — the exclusion is from *candidacy*, so a reader sees what was left out and why.
+   */
+  readonly ceilingExcludedArms?: readonly string[] | undefined;
 }): Promise<SelectionCensus> {
+  const cell = input.cell ?? SELECTION_CELL;
+  const excluded = new Set(input.ceilingExcludedArms ?? []);
   const profileIds = [...input.resources.dispatcherProfilesById.keys()];
   const experiment = await runGateExperiment({
-    id: 'phase6c/census',
+    id: `phase6c/census/${cell.id}`,
     seed: input.seed,
-    building: SELECTION_BUILDING,
+    building: cell.building,
     dispatchers: profileIds,
-    traffic: SELECTION_POINT,
+    traffic: cell.point,
     replications: input.replications,
     resources: input.resources,
   });
 
   const rows: CensusRow[] = profileIds.map((profileId) => {
-    const cell = cellOf(experiment, profileId);
+    const armCell = cellOf(experiment, profileId);
     const samples = samplesOf(experiment, profileId, SELECTION_GATE);
     const mean =
       samples.length === 0 ? Number.NaN : samples.reduce((a, b) => a + b, 0) / samples.length;
     return Object.freeze({
       profileId,
-      quotable: cell.aggregate.awtIsValid,
+      quotable: armCell.aggregate.awtIsValid,
+      ceilingExcluded: excluded.has(profileId),
       meanTtdS: mean,
-      firstInvalidReplication: firstInvalidOf(cell),
+      firstInvalidReplication: firstInvalidOf(armCell.replications),
     });
   });
 
-  const quotable = rows.filter((row) => row.quotable && Number.isFinite(row.meanTtdS));
+  const quotable = rows.filter(
+    (row) => row.quotable && !row.ceilingExcluded && Number.isFinite(row.meanTtdS),
+  );
   if (quotable.length === 0) {
     throw new Error(
-      `No shipped profile has a quotable AWT at ${SELECTION_BUILDING}/${SELECTION_POINT.id} at seed ${String(input.seed)}; there is no reference arm and therefore no comparison.`,
+      `No shipped profile has a quotable AWT at ${cell.building}/${cell.point.id} at seed ${String(input.seed)}; there is no reference arm and therefore no comparison.`,
     );
   }
   let best = quotable[0] as CensusRow;
   for (const row of quotable) if (row.meanTtdS < best.meanTtdS) best = row;
 
-  const ceilings = rows
+  // **Which ceiling — § D151 § 2, declared because it changes three cells.** A ceiling is an
+  // *arm-set* property, not only a `(building, traffic, seed)` property, and the two diverge
+  // sharply: at `vertical-city` up-peak the all-twelve ceiling is 10 and the reference arm's own
+  // is above 200. The budget is clamped by the **declared arm set** — the reference arm, which is
+  // the only member of it that exists before the selector is built — and the conservative
+  // min-over-twelve is reported beside it and is **not** the budget.
+  const allArmCeilings = rows
     .map((row) => row.firstInvalidReplication)
     .filter((value): value is number => value !== undefined);
 
@@ -879,14 +964,34 @@ export async function censusSelectionPoint(input: {
     replications: input.replications,
     rows: Object.freeze(rows),
     referenceProfileId: best.profileId,
-    ceiling: ceilings.length === 0 ? undefined : Math.min(...ceilings),
+    ceiling: best.firstInvalidReplication,
+    allArmCeiling: allArmCeilings.length === 0 ? undefined : Math.min(...allArmCeilings),
   });
 }
 
-function firstInvalidOf(cell: ReturnType<typeof cellOf>): number | undefined {
-  const index = cell.replications.findIndex(
-    (record) => record.summary !== undefined && record.summary.saturation.saturated,
-  );
+/**
+ * The replication index at which this arm first stops being quotable — **all four grounds**.
+ *
+ * This is what turns a census into a *budget*, so getting it wrong is not a reporting defect: the
+ * number it returns clamps every downstream `n`. It used to read `summary.saturation.saturated`
+ * alone, which is one of `awtIsValid`'s four grounds, and `CLAUDE.md` § Statistical discipline is
+ * explicit that saturation is *one* of them and not the whole rule — the others are an empty
+ * reporting window, censoring above the unserved limit, and a leg past the 900 s abandonment
+ * horizon.
+ *
+ * **The under-report was measured rather than argued.** At `garden-apartments` under
+ * `interfloor-mix` 1.5 % over 1800 s, reported full-run, *nothing saturates* at either censused
+ * seed and yet no arm keeps a quotable AWT: every one of the twelve fails with *"No passenger was
+ * served within the reporting window"*. The strict ceiling there is **32** at seed 20260726 and
+ * **22** at 20260728; the saturation-only reading returned `none` at both — "no ceiling, budget
+ * freely" — at a cell where no arm is quotable at all. `DECISIONS.md` § D151 § 2 records it and
+ * forbids reusing this function unfixed.
+ *
+ * `ReplicationRecord.awtIsValid` is the flag the runner already computes from `RunSummary`, so the
+ * fix consults the rule rather than re-deriving a second copy of it.
+ */
+export function firstInvalidOf(records: readonly ReplicationRecord[]): number | undefined {
+  const index = records.findIndex((record) => !record.awtIsValid);
   return index < 0 ? undefined : index;
 }
 
@@ -905,12 +1010,36 @@ export interface SelectionArmResult {
   readonly belowResolutionLimit: boolean;
 }
 
+/**
+ * The two smallest detectable effects that decide {@link SelectionArmResult.belowResolutionLimit}.
+ *
+ * `docs/07` § 4 published one pair, measured on **AWT** at Midtown up-peak, and § D145 applied it
+ * to **TTD** as absolute seconds — which the open-debt register records as *unmeasured rather than
+ * settled*. § D151 § 3 raises that: the sweep measures the limit on TTD **at each cell** and gates
+ * on it. This type is the seam through which a measured pair replaces the inherited one; the
+ * default is still § 4's, so `runWeightSetSelectionStudy()` with no arguments reproduces § D145.
+ */
+export interface ResolutionLimits {
+  readonly nearNeighbourS: number;
+  readonly structuralS: number;
+  /** Where these two numbers came from, printed beside every verdict they decide. */
+  readonly provenance: string;
+}
+
+export const INHERITED_RESOLUTION_LIMITS: ResolutionLimits = Object.freeze({
+  nearNeighbourS: NEAR_NEIGHBOUR_RESOLUTION_S,
+  structuralS: STRUCTURAL_RESOLUTION_S,
+  provenance: 'docs/07 § 4, measured on AWT at Midtown up-peak and applied to TTD as absolute seconds',
+});
+
 export interface SelectionStudy {
   readonly seed: number;
   readonly holdoutSeed: number;
   readonly seedsDisjoint: boolean;
+  readonly cellId: string;
   readonly building: string;
   readonly point: string;
+  readonly resolutionLimits: ResolutionLimits;
   readonly gateMetric: ReplicationMetric;
   readonly census: SelectionCensus;
   readonly learned: LearnedPolicy;
@@ -937,6 +1066,24 @@ export interface SelectionStudyOptions {
   readonly replications?: number;
   readonly searchCandidates?: number;
   readonly searchReplications?: number;
+  /** The operating point. Defaults to {@link SELECTION_CELL}, which is § D145's. */
+  readonly cell?: SelectionCell | undefined;
+  /** Arms excluded from reference-arm candidacy by their ceiling. § D147's device. */
+  readonly ceilingExcludedArms?: readonly string[] | undefined;
+  /**
+   * Measure this cell's own TTD resolution limits, **after** the census fixes the reference arm
+   * and **before** any ΔTTD is graded against them. § D151 § 3. Omitted, § 4's inherited pair
+   * stands and the study is § D145's exactly.
+   */
+  readonly resolutionProbe?:
+    | ((input: {
+        readonly cell: SelectionCell;
+        readonly census: SelectionCensus;
+        readonly resources: ExperimentResources;
+        readonly seed: number;
+        readonly replications: number;
+      }) => Promise<ResolutionLimits>)
+    | undefined;
 }
 
 /**
@@ -952,14 +1099,32 @@ export async function runWeightSetSelectionStudy(
   const seed = options.seed ?? BENCHMARK_SEED;
   const holdoutSeed = options.holdoutSeed ?? seed + 811;
   const config = options.config ?? (await loadResources());
-  const resources = toResources(config);
+  const cell = options.cell ?? SELECTION_CELL;
+  const resources = options.resources ?? toResources(config);
   const library = weightSetLibrary(config);
 
   const census = await censusSelectionPoint({
     seed,
     replications: options.censusReplications ?? CENSUS_REPLICATIONS,
     resources,
+    cell,
+    ...(options.ceilingExcludedArms === undefined
+      ? {}
+      : { ceilingExcludedArms: options.ceilingExcludedArms }),
   });
+
+  // The budget: the criterion's 50–200 band, clamped by the **declared arm set's** own census
+  // ceiling (§ D151 § 2), not by the conservative min over twelve.
+  const requested = options.replications ?? VERDICT_REPLICATIONS;
+  const replications =
+    census.ceiling === undefined ? requested : Math.min(requested, census.ceiling);
+
+  // Measured before the learning, so nothing about the limit can be a function of the result it
+  // grades. § D151 § 3.
+  const resolutionLimits =
+    options.resolutionProbe === undefined
+      ? INHERITED_RESOLUTION_LIMITS
+      : await options.resolutionProbe({ cell, census, resources, seed, replications });
 
   const learned = await learnSelectionPolicy({
     referenceProfileId: census.referenceProfileId,
@@ -968,12 +1133,8 @@ export async function runWeightSetSelectionStudy(
     tuningSeed: seed,
     candidates: options.searchCandidates ?? SEARCH_CANDIDATES,
     replications: options.searchReplications ?? SEARCH_REPLICATIONS,
+    cell,
   });
-
-  // The budget: the criterion's 50–200 band, clamped by this cell's own census ceiling.
-  const requested = options.replications ?? VERDICT_REPLICATIONS;
-  const replications =
-    census.ceiling === undefined ? requested : Math.min(requested, census.ceiling);
 
   const armSpecs: DispatcherArmSpec[] = [
     Object.freeze({ id: 'reference', profile: census.referenceProfileId }),
@@ -982,11 +1143,11 @@ export async function runWeightSetSelectionStudy(
   ];
 
   const experiment = await runGateExperiment({
-    id: 'phase6c/verdict',
+    id: `phase6c/verdict/${cell.id}`,
     seed: holdoutSeed,
-    building: SELECTION_BUILDING,
+    building: cell.building,
     dispatchers: armSpecs,
-    traffic: SELECTION_POINT,
+    traffic: cell.point,
     replications,
     resources,
   });
@@ -1044,7 +1205,7 @@ export async function runWeightSetSelectionStudy(
     // of the run, and `docs/07` § 4's coarser limit applies. Derived from the measurement, not
     // assumed from the configuration.
     const structural = identical < replications;
-    const limit = structural ? STRUCTURAL_RESOLUTION_S : NEAR_NEIGHBOUR_RESOLUTION_S;
+    const limit = structural ? resolutionLimits.structuralS : resolutionLimits.nearNeighbourS;
     arms.push(
       Object.freeze({
         armId,
@@ -1078,14 +1239,18 @@ export async function runWeightSetSelectionStudy(
     seed,
     config,
     profileId: census.referenceProfileId,
+    cell,
+    buildings: resources.buildingsById,
   });
 
   return Object.freeze({
     seed,
     holdoutSeed,
     seedsDisjoint: seed !== holdoutSeed,
-    building: SELECTION_BUILDING,
-    point: SELECTION_POINT.id,
+    cellId: cell.id,
+    building: cell.building,
+    point: cell.point.id,
+    resolutionLimits,
     gateMetric: SELECTION_GATE,
     census,
     learned,
@@ -1123,8 +1288,10 @@ export function formatWeightSetSelection(study: SelectionStudy): string {
     `holdout seed     ${String(study.holdoutSeed)}  ${study.seedsDisjoint ? 'DISJOINT' : 'NOT DISJOINT'}`,
     `budget           ${String(study.replications)} replications` +
       (study.census.ceiling === undefined
-        ? ' (no arm saturated in the census; the budget is a choice)'
-        : ` (census ceiling ${String(study.census.ceiling)})`),
+        ? ' (the reference arm kept a quotable AWT across the census; the budget is a choice)'
+        : ` (reference-arm ceiling ${String(study.census.ceiling)})`) +
+      ` — all-arm ceiling ${study.census.allArmCeiling === undefined ? 'none' : String(study.census.allArmCeiling)}, reported beside the budget and never the budget`,
+    `resolution       near-neighbour ${study.resolutionLimits.nearNeighbourS.toFixed(3)} s, structural ${study.resolutionLimits.structuralS.toFixed(3)} s — ${study.resolutionLimits.provenance}`,
     `CRN aligned      ${String(study.crnAligned)}`,
     `quotable         ${String(study.quotable)}${study.unquotableArms.length === 0 ? '' : ` — unquotable: ${study.unquotableArms.join(', ')}`}`,
     '',

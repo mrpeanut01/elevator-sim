@@ -8800,3 +8800,221 @@ operating points, which is strictly more than this repository knows today. Phase
 **Impact.** Phase 6c's verdict and Phase 6's status. `docs/05-roadmap.md` § Phase 6c,
 `docs/07-handoff.md` § 8. Nothing in § D139 or § D140 is weakened; §§ 3 and 5 raise two clauses and
 § 1 broadens coverage from one cell to eight.
+
+---
+
+## D152 — **Phase 6c: swept, and NOT ACCEPTED at any PRIMARY cell** — and the one cell that clears every gate is a SECONDARY cell whose second regime is the *level*, not the mix
+
+**Date:** 2026-07-29 · **Owner:** T52 (wave 7) · **Measures against:** [§ D151](#d151), which is
+[§ D139](#d139) as raised by [§ D140](#d140) and broadened from one cell to eight ·
+**Verdict:** `NOT ACCEPTED` · **Closes:** [§ D145](#d145)'s *"Phase 6c's refusal is one operating
+point"* and `docs/07` § 8's *"the resolution limits are unmeasured on TTD"*
+
+Every figure below comes from `benchmark/selectionSweep.ts`'s `runSelectionSweep()` at tuning seed
+**20260726** and holdout seed **20261537**, and `benchmark/selectionSweep.test.ts` re-derives it
+against `published.ts`'s `'selection-sweep'` pin table. Two independent runs of the whole sweep
+returned identical figures to every published digit.
+
+### 0. A defect in the shipped machinery, fixed before it was reused
+
+§ D151 § 2 recorded it and forbade reusing it unfixed. `censusSelectionPoint`'s `firstInvalidOf`
+read `record.summary.saturation.saturated` — **one** of `awtIsValid`'s four grounds — so a cell
+whose arms lose their AWT to an **empty reporting window** reported a ceiling of `none` and a budget
+of *whatever you asked for*. It now reads `ReplicationRecord.awtIsValid`, which is the rule itself
+rather than a second copy of it.
+
+**Measured, not argued.** At `garden-apartments` under `interfloor-mix` 1.5 % over 1800 s reported
+full-run — § D151 § 1's own excluded cell — **nothing saturates** at either censused seed and **no
+arm keeps a quotable AWT**: all twelve fail with *"No passenger was served within the reporting
+window"*. The strict ceiling is **32** at seed 20260726 and **22** at 20260728, exactly the pair
+§ D151 § 2 quotes; the old reading returned `none` at both. Reproducing that pair is also this
+lane's apparatus check, in the manner T50 used three published ceilings for.
+
+### 1. The regime screen, reported before any ΔTTD — and the traffic model's answer
+
+§ D151 § 5 asked whether the three detector inputs move in **ratio** enough to cross the selector's
+own switching margin. Measured at every cell on the shipped detector, warm-up discarded:
+
+| cell | regimes | distinct | changes | median mix L/I/D | window arrivals | split homogeneity |
+|---|---|---|---|---|---|---|
+| `midtown-interfloor-1.0pct` | **4** | 5 | 40 | 50.0/12.5/36.4 | 17 | X² 12.6 on 10 df, z **+0.59** |
+| `midtown-interfloor-2.0pct` | **3** | 5 | 26 | 42.9/14.3/41.2 | 36 | X² 17.0 on 10 df, z **+1.57** |
+| `garden-residential-2pct` | **3** | 4 | 19 | 0.0/0.0/100.0 | 4 | X² 18.2 on 10 df, z **+1.83** |
+| `garden-down-peak-2pct` | **2** | 2 | 11 | 0.0/0.0/100.0 | 4 | one category — **0 df** |
+| `midtown-hotel-1.5pct` | **3** | 4 | 20 | 46.7/10.3/40.6 | 26 | X² 18.2 on 10 df, z **+1.83** |
+| `secure-up-peak-2pct` | **1** | 1 | 2 | 100.0/0.0/0.0 | 20 | one category — **0 df** |
+| `midtown-down-peak-1pct` | **1** | 1 | 2 | 0.0/0.0/100.0 | 19 | one category — **0 df** |
+| `vertical-city-up-peak-1pct` | **2** | 3 | 212 | 60.8/39.2/0.0 | 126 | one category — **0 df** |
+
+**The directional split does not vary within a run, and that is now measured rather than read off a
+type.** Pearson's homogeneity statistic over the time-bin × direction-category table is inside its
+own noise at **every** cell that has more than one category — the largest standardized deviation
+across the whole grid is **+1.83 σ** — and four cells have one direction category by construction
+and cannot vary at all. The structural reading § D151 § 5 gave is correct: `DemandPhase` carries
+`startIntensity`/`endIntensity`, a **scalar**, `generator.ts` applies one `intensity(t)` to every
+demand source, and `splitOf(profile)` is read once per floor at plan time.
+
+**But the screen's own reading needed one correction, and it is the useful finding of the wave.**
+*Something* does move within a run — the **level** — and one of the five authored patterns is
+level-discriminating rather than mix-discriminating: `idle` is the only arm whose three ramps all
+*fall* to zero. So the regime transition the shipped traffic model can reliably produce is
+**busy ↔ idle**, and not up-peak ↔ down-peak. Every cell the screen calls one-regime is one-regime
+*in the mix*; the learned arms at two of them recruit `idle` and switch on the level (§ 4 below).
+
+The mix ratios the screen sees do wobble — the reported spreads run to 100 % — and the reason is in
+the same table: with **4 to 36 arrivals** in the detector's whole 300 s window, an observed ratio is
+dominated by counting noise. A screen that reported a moving ratio without that column would let
+sampling noise read as traffic variety.
+
+### 2. The resolution limit, measured on TTD at each cell — and it is 2–4× *smaller* than the figure it replaces
+
+`docs/07` § 4 publishes **0.20 s** near-neighbour and **1.9 s** structural, both measured on **AWT**
+at Midtown up-peak; § D145 applied them to TTD as absolute seconds and the open-debt register called
+that unmeasured rather than settled. § D151 § 3 required them measured on TTD at the cell.
+
+**The formula is calibrated against § 4's own figure rather than asserted.**
+`validation/crippledVariant.test.ts` is where the 0.20 s comes from — the `+0.4 distanceTravelled`
+rung, detected on 8 of 10 disjoint seed sets of n = 100, at a measured effect of 0.2002 s. The
+analytic 80 %-power figure `(t[0.975,n-1] + t[0.80,n-1]) · s_D / √n` returns **0.2165 s** on that
+same rung against a measured `s_D` of 0.7728 s: agreement to 8 %.
+
+**§ 4's two numbers were not computed the same way, and this entry says so rather than smoothing
+it.** The structural pair (`eta` vs `nearest-car`) measures `s_D = 7.973 s` on AWT there, which the
+80 %-power formula prices at **2.23 s** while § 4 publishes 1.9 s — and 1.9 s is what
+`1.96 · s_D / √n` returns at § 4's own quoted spread, a *just-significant* figure rather than an
+80 %-power one. This lane uses the 80 %-power definition at both regimes, because that is what § 4's
+own label states and because it is the **larger** of the two, which is the only direction
+[`CLAUDE.md`](CLAUDE.md) § Working agreements permits.
+
+Probed at the **tuning** seed and never the holdout seed, so no limit is a function of the data it
+grades. Near-neighbour probe: the reference profile against itself at `distanceTravelled = 0.4`.
+Structural probe: the reference profile against each of the five weight vectors
+`weightSetsByPattern` names — the set the selector may actually adopt — median over the quotable:
+
+| cell | n | TTD scale | near-neighbour s_D → limit | structural s_D → limit |
+|---|---|---|---|---|
+| `midtown-interfloor-1.0pct` | 200 | 48.43 s | 1.363 → **0.271 s** | 2.559 → **0.509 s** |
+| `midtown-interfloor-2.0pct` | 200 | 60.12 s | 3.653 → **0.727 s** | 3.090 → **0.615 s** |
+| `garden-residential-2pct` | 200 | 43.55 s | 0.453 → **0.090 s** | 4.608 → **0.917 s** |
+| `garden-down-peak-2pct` | 200 | 41.86 s | 0.587 → **0.117 s** | 3.949 → **0.786 s** |
+| `midtown-hotel-1.5pct` | 200 | 56.12 s | 1.635 → **0.325 s** | 3.805 → **0.758 s** |
+| `secure-up-peak-2pct` | 126 | 55.89 s | 0.612 → **0.154 s** | 3.351 → **0.843 s** |
+| `midtown-down-peak-1pct` | 200 | 47.13 s | 2.702 → **0.538 s** | 4.978 → **0.991 s** |
+| `vertical-city-up-peak-1pct` | 200 | 106.95 s | 0.385 → **0.077 s** | 4.106 → **0.817 s** |
+
+**The measured structural limit is between 0.509 s and 0.991 s — everywhere *smaller* than the
+1.9 s § D145 inherited**, which is the **permissive** direction: measuring it made the gate *easier*
+at every one of the eight cells. **No verdict on the grid turns on the choice**, and the refusal is
+therefore robust to it rather than propped up by it. That closes the open-debt row as *measured*.
+
+### 3. The verdict. PRIMARY family, Holm–Bonferroni across five, n = 200, CRN, disjoint holdout
+
+| cell | ΔTTD (the gate) | p | Holm α | adj-p | Holm | below limit? | regimes | verdict |
+|---|---|---|---|---|---|---|---|---|
+| `midtown-interfloor-1.0pct` | **−0.265 [−0.429, −0.101]** BETTER | 0.00166 | 0.01000 | 0.0083 | **REJECT** | **yes** (0.509 s) | 4 | **NOT ACCEPTED** |
+| `midtown-interfloor-2.0pct` | −0.114 [−0.553, +0.324] INDIST. | 0.60844 | 0.05000 | 0.6880 | retain | yes (0.615 s) | 3 | NOT ACCEPTED |
+| `garden-residential-2pct` | −0.111 [−0.248, +0.027] INDIST. | 0.11336 | 0.01667 | 0.3401 | retain | yes (0.917 s) | 3 | NOT ACCEPTED |
+| `garden-down-peak-2pct` | **−0.191 [−0.314, −0.069]** BETTER | 0.00242 | 0.01250 | 0.0097 | **REJECT** | **yes** (0.786 s) | 2 | **NOT ACCEPTED** |
+| `midtown-hotel-1.5pct` | −0.085 [−0.262, +0.092] INDIST. | 0.34402 | 0.02500 | 0.6880 | retain | yes (0.758 s) | 3 | NOT ACCEPTED |
+
+**Two of the five clear Holm and are still refused, and § D140's raise is the entire reason.** Both
+survive a correction that judged them at α = 0.010 and α = 0.0125 rather than 0.05, and both are a
+*third to a half* of their own cell's smallest detectable effect. An interval that excludes zero at
+an effect the apparatus cannot resolve is not a win; it is the pattern this repository already
+agreed to report as *below the resolution limit*, and § D140 made it a gate condition before either
+arm was run.
+
+Costs, published beside the gate and never folded into it, at those same five cells: ΔAWT **WORSE**
+at three, INDISTINGUISHABLE at one, BETTER at one; ΔWT95 WORSE at two, INDIST. at two, BETTER at
+one; and the energy proxy **WORSE at all five on both the raw figure and per served leg**
+([§ D106](#d106): energy is an axis, never a score, and this is the honest direction — a selector
+that switches into `capacity-aware` and `predictive-balanced` drives more).
+
+### 4. SECONDARY family — one cell clears every gate, and it is reported as what it is
+
+Corrected as its **own** family of three, which § D151 § 3 forbids pooling with the primary one.
+
+| cell | ΔTTD | adj-p | below limit? | regimes | verdict |
+|---|---|---|---|---|---|
+| `secure-up-peak-2pct` | −0.214 [−0.344, −0.084] BETTER | 0.0028 | **yes** (0.843 s) | **1** | NOT ACCEPTED |
+| `midtown-down-peak-1pct` | **−2.130 [−2.730, −1.529]** BETTER | <0.0001 | **no** (0.991 s) | **1** | **ACCEPTED at this cell** |
+| `vertical-city-up-peak-1pct` | +0.258 [−0.141, +0.657] INDIST. | 0.2037 | yes (0.817 s) | 2 | NOT ACCEPTED |
+
+**`midtown-down-peak-1pct` clears the interval, the correction, its own measured limit and the
+holdout — and it does not accept Phase 6c**, for two independent reasons stated in § D151 before it
+was measured:
+
+1. **§ D151 § 6: a SECONDARY cell alone does not accept the phase.** It is admitted only by
+   excluding `nearest-car` on its ceiling (all-arm ceiling 87), and an arm admitted by excluding
+   other arms is weaker evidence.
+2. **§ D151 § 5: a significant effect at a one-regime cell is a bug report, not a result.**
+
+**And the bug report was investigated rather than filed.** Three measurements:
+
+- **It is not a constant weight override.** Pinning the dominant regime's weight set
+  (`fairness-first`) for the whole run, against the same reference and the same traffic, is
+  **+1.157 [+0.719, +1.595] WORSE**, while the learned arm is −2.130 BETTER — and learned against
+  constant is **−3.287 [−3.993, −2.580] BETTER** with 11 of 200 replications bit-identical. The
+  effect is *not* explained by the selector degenerating into a static hybrid profile.
+- **The learned arm really does alternate.** Instrumented on the holdout traffic it holds **two**
+  weight sets — `fairness-first` 79.7 % and `energy-aware` 20.3 % — with **5** pattern changes a
+  run. `secure-up-peak-2pct` is the same shape: `capacity-aware` 79.6 %, `energy-aware` 20.4 %, 9
+  changes.
+- **The second regime is the `idle` one, and `idle` is triggered by the level.** So the screen and
+  the arm are both right and they are not measuring the same thing: the screen is a property of the
+  **cell** under the shipped detector at its authored gains, and a `contextual` policy multiplies
+  each input by a **learned gain** before the memberships are read. What the learned policy found at
+  this cell is *"run `fairness-first` while busy and `energy-aware` while the tail drains"*, which
+  is a real and reproducible policy — and it is **not** the claim Phase 6c is about. It exploits the
+  intensity ramp, which is the one thing the shipped demand template does vary.
+
+**Stated plainly, in § D147's form and for § D147's reason:** there is no verdict of the shape
+*learned control works*. It is refused at all five primary cells; it clears every gate at one
+secondary cell, where what it learned is a busy/idle schedule rather than a traffic-pattern
+selection; and its energy cost is worse at seven of the eight cells and better at one.
+
+### 5. Two things the sweep found that nobody was looking for
+
+- **`eta` and `collective` are byte-identical weight vectors** — both `{ waitTime: 1.0 }` — and the
+  selector switches **weights and nothing else** (deliberately: `dispatch.callType` decides the
+  passenger model and `comparabilityOf` lists nine metrics that stop being comparable across it). So
+  at every cell referenced on `collective`, the `interfloor` regime selects a vector the run already
+  had, and each replication spent there is bit-identical **by construction**. That is the
+  measured discharge of § D151 § 4's *"a high identical count is a wiring bug until proven
+  otherwise"* at three of the eight cells, and it is carried in the study object as `noOpWeightSets`
+  rather than in prose.
+- **`midtown-interfloor-2.0pct`'s census returns `auction`, where § D151 pre-registered
+  `auction-multi-round`.** The two carry identical weight vectors and differ in stage settings, and
+  the TTD gap between them at this cell is inside noise. **Reported, not substituted**: § D139
+  forbids choosing the reference arm after seeing the result, so the census picks it and the
+  pre-registration is checked *against* the census. The study object carries
+  `referenceMatchesPreRegistration: false` for that one cell.
+
+### 6. The known-answer check, unchanged
+
+`docs/07` § 5's 2 s deadband still ships at **8 s**, and the same search that fitted all eight cells'
+policies — pointed at `idle.repositionThresholdS`, on a different building, at a different metric,
+knowing nothing about deadbands — returned **1.691 s** at ΔAWT **−2.189 s**. It rediscovers the
+interior optimum blind. **The search is not what failed**, which is what makes every ΔTTD above a
+fact about the policy rather than about the machinery that fitted it.
+
+### 7. What this closes, and what it opens
+
+**Closes.** § D145's *"one building, one traffic pattern, one reference arm"* — now eight named
+operating points across five buildings and five traffic patterns. `docs/07` § 8's *"the resolution
+limits are unmeasured on TTD"* — now measured at every cell, and the inherited figure was the
+conservative one.
+
+**Opens, and § D151 § 7 already fixed the constraints on it.** The screen's answer is that the
+shipped demand template cannot express a *mid-run change of directional mix*, so the condition under
+which weight-set **selection** could pay for itself does not exist at any shipped operating point.
+The work that creates it is a demand template whose split varies by phase — a `core` change to
+`DemandPhase` — and § D151 § 7 requires it to be opt-in and byte-identical when unused, to keep the
+same reference rule, and to state a win there as *"selection helps when the directional mix changes
+mid-run"* and never as *"selection helps"*. Whether such a cell may accept Phase 6c at all is
+deliberately still open and needs its own entry, dated before that measurement.
+
+**Impact.** **No phase status moves.** Phase 6 stays ⚠️ **partial**; Phase 6c stays *implemented,
+measured and NOT ACCEPTED*, now over eight operating points rather than one. § D145 stands as
+written and is not superseded — its cell is not in this grid, and its figures still reproduce from
+`runWeightSetSelectionStudy()` with no arguments.

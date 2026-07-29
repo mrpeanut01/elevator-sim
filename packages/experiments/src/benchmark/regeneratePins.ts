@@ -30,6 +30,7 @@ import { auditForecastCausalityInRun } from './predictorLag.js';
 import { runPrepositioningStudy } from './prepositioning.js';
 import { TAIL_CENSUS_LOADS, runTailStudy } from './tailStudy.js';
 import { runWeightSetSelectionStudy } from './weightSetSelection.js';
+import { runSelectionSweep } from './selectionSweep.js';
 import { runBenchmark } from './suite.js';
 import { loadResources, withProfiles } from '../validation/harness.js';
 import {
@@ -48,6 +49,7 @@ import {
   prepositioningFigures,
   tailFigures,
   weightSetSelectionFigures,
+  selectionSweepFigures,
   type PinnedEstimate,
   type PublishedStudyId,
 } from './published.js';
@@ -71,6 +73,7 @@ export async function measureAllPublishedFigures(): Promise<
     'phase7-acceptance': phase7Figures(await runPhase7Acceptance({})),
     'down-peak-destination': downPeakFigures(await runDownPeakDestinationStudy({})),
     'weight-set-selection': weightSetSelectionFigures(await runWeightSetSelectionStudy({})),
+    'selection-sweep': selectionSweepFigures(await runSelectionSweep({})),
     'double-deck': doubleDeckFigures(await runDoubleDeckStudy({ resources })),
   };
 }

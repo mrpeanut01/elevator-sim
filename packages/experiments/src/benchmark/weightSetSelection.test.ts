@@ -28,15 +28,18 @@ import {
   SELECTION_GATE,
   STRUCTURAL_RESOLUTION_S,
   VERDICT_REPLICATIONS,
+  firstInvalidOf,
   learnedSubspace,
   measureWeightSetSelectionLiveness,
   runDeadbandKnownAnswer,
   runWeightSetSelectionStudy,
+  toResources,
   weightSetLibrary,
   type SelectionStudy,
   type WeightSetLivenessResult,
 } from './weightSetSelection.js';
-import { loadResources } from '../validation/harness.js';
+import { loadResources, runGateExperiment } from '../validation/harness.js';
+import type { ReplicationRecord } from '../runner/types.js';
 
 const TIMEOUT_MS = 600_000;
 
@@ -123,6 +126,86 @@ describe('the weight-set selector is live in a real run, measured on trajectorie
       expect(Object.keys(membership[pattern] ?? {}).length, pattern).toBeGreaterThan(0);
     }
   });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The ceiling this study budgets against — all four grounds, not one
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **`DECISIONS.md` § D151 § 2's recorded defect, closed.**
+ *
+ * `firstInvalidOf` is what turns a census into a *budget*: the replication index at which an arm
+ * first stops being quotable is the ceiling every downstream `n` is clamped by. It used to read
+ * `record.summary.saturation.saturated` — **one** of `awtIsValid`'s four grounds — so a cell whose
+ * arms lose their AWT to an **empty reporting window**, to censoring above the unserved limit, or
+ * to a leg past the 900 s abandonment horizon reported a ceiling of `none` and a budget of
+ * "whatever you asked for". `CLAUDE.md` § Statistical discipline is explicit that saturation is one
+ * of four grounds and not the whole rule, and this function had the whole rule wrong in the
+ * direction that publishes numbers.
+ *
+ * Both halves are asserted, because they fail for different reasons: the synthetic case pins the
+ * arithmetic exactly, and the real one pins that the case is not hypothetical on shipped data.
+ */
+describe('the census ceiling reads every ground awtIsValid has, not just saturation', () => {
+  /** A record carrying only the two fields the ceiling reads. */
+  const record = (awtIsValid: boolean, saturated: boolean): ReplicationRecord =>
+    ({
+      awtIsValid,
+      saturated,
+      summary: { saturation: { saturated } },
+    }) as unknown as ReplicationRecord;
+
+  it('finds an invalid replication that never saturated', () => {
+    // The empty-window shape: the queue never diverged, so `saturation.saturated` is false on
+    // every replication, and yet replication 2 has no quotable AWT. Reading saturation alone
+    // returns `undefined` here — "no ceiling, budget freely" — which is exactly backwards.
+    expect(firstInvalidOf([record(true, false), record(true, false), record(false, false)])).toBe(2);
+  });
+
+  it('still finds a saturated replication, and takes whichever comes first', () => {
+    expect(firstInvalidOf([record(true, false), record(false, true)])).toBe(1);
+    expect(firstInvalidOf([record(false, false), record(false, true)])).toBe(0);
+    expect(firstInvalidOf([record(true, false), record(true, false)])).toBeUndefined();
+  });
+
+  it('reports a real ceiling at garden interfloor-mix, where saturation alone reports none', async () => {
+    // § D151 § 1's own excluded cell, and the one that exposed the defect: `garden-apartments`
+    // under an interfloor mix has **no quotable arm at either censused seed** — every profile
+    // fails on the same replications with "No passenger was served within the reporting window" —
+    // while nothing there saturates at all. So the strict ceiling is a small number and the
+    // saturation-only reading is `none`. Cheap: this building runs in about a millisecond a
+    // replication.
+    const resources = toResources(await loadResources());
+    const experiment = await runGateExperiment({
+      id: 'phase6c/ceiling-grounds',
+      seed: 20_260_726,
+      building: 'garden-apartments',
+      dispatchers: [...resources.dispatcherProfilesById.keys()],
+      traffic: {
+        id: 'interfloor-mix-1.5pct',
+        durationS: 1800,
+        reportWindow: 'full-run' as const,
+        demand: {
+          directionalSplit: { incoming: 0.4, outgoing: 0.3, interfloor: 0.3 },
+          arrivalRatePctPop5min: 1.5,
+          peakWindowS: 300,
+        },
+      },
+      replications: 200,
+      resources,
+    });
+    const ceilings: (number | undefined)[] = [];
+    for (const cell of experiment.cells) {
+      // Nothing saturates here — the queue never diverges — and yet nothing is quotable either.
+      expect(cell.replications.some((r) => r.saturated), cell.dispatcherArmId).toBe(false);
+      expect(cell.aggregate.awtIsValid, cell.dispatcherArmId).toBe(false);
+      ceilings.push(firstInvalidOf(cell.replications));
+    }
+    // § D151 § 2's own figure, reproduced exactly: 32 at this seed. The saturation-only reading
+    // returned `undefined` for every one of these twelve arms.
+    expect(Math.min(...ceilings.map((value) => value ?? Number.POSITIVE_INFINITY))).toBe(32);
+  }, TIMEOUT_MS);
 });
 
 /* -------------------------------------------------------------------------- *
