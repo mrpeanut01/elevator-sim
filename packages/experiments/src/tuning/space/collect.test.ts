@@ -282,6 +282,14 @@ describe('every parameter core declares is accounted for', () => {
     // `encode.ts`'s `PROFILE_OBJECT_SECTIONS` is a hand-written list of profile sections, so all
     // seven were reported unauthorable and silently dropped from the space until `selection` was
     // added to it. The biconditional above is what caught it.
+    //
+    // **The list is no longer hand-written.** It is derived from `dispatcherProfileSchema`'s own
+    // shape by `core`'s `objectSectionsOf`, so an eighth section reaches this count with no edit
+    // in `experiments` at all; `config/schema.test.ts` proves the derivation against a fictional
+    // schema the product does not ship, and `encode.test.ts` pins `encode.ts` to it by identity.
+    // These two numbers are unchanged by that work — 106 and 56 before and after — which is the
+    // claim, since a derivation that moved a count would be a second defect wearing the fix's
+    // clothes.
     expect(rows).toBe(106);
     expect(SPACE.parameters.length).toBe(56);
     // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or

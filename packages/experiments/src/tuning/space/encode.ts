@@ -45,6 +45,7 @@
 
 import {
   COST_TERMS,
+  DISPATCHER_PROFILE_OBJECT_SECTIONS,
   createPolicyFor,
   parseDispatcherProfiles,
   resolveDoorConfig,
@@ -117,25 +118,24 @@ const CONSTRAINTS_SECTION = 'constraints';
 /**
  * Sections written as `profile.<section>.<key>`, which is every other one.
  *
- * **A hand-written list, in the module whose sibling's docstring argues against hand-written
- * lists**, and it is worth saying so rather than quietly appending to it. `collect.ts` derives
- * the *parameters* from `core`'s `_PARAMETERS` exports precisely so a new schema needs no edit
- * here; the *sections* are still enumerated, so a new profile section is invisible to the search
- * until this array names it. `selection` was the seventh, and the symptom was exactly the one
- * `collect.ts` predicts for a hand-listed space: seven declared, round-trip-tested,
- * profile-authorable dimensions that `collectSearchSpace()` reported as unauthorable and dropped,
- * with nothing anywhere reading as wrong. Deriving this list from `dispatcherProfileSchema`'s own
- * shape is the real fix and is recorded as debt rather than done in passing.
+ * **Derived from `dispatcherProfileSchema`'s own shape, not written down**, which is the whole of
+ * the argument this module's sibling opens with applied to the one place `collect.ts` did not
+ * reach. `collect.ts` derives the *parameters* from `core`'s `_PARAMETERS` exports so a new schema
+ * needs no edit here; the *sections* were still enumerated, and the failure was exactly the one it
+ * predicts. `selection` landed in `config/schema.ts` with seven declared, round-trip-tested rows,
+ * this array did not gain it, and all seven were reported **unauthorable** by
+ * `collectSearchSpace()` and silently dropped — nothing anywhere read as wrong
+ * ([DECISIONS.md § D146](../../../../../DECISIONS.md)). Adding `selection` to the list fixed
+ * that instance and left the mechanism; this closes the mechanism.
+ *
+ * The derivation lives in `core` — {@link DISPATCHER_PROFILE_OBJECT_SECTIONS} — because that is
+ * where the schema is and because `experiments` does not depend on `zod`. An **eighth** section
+ * added to `dispatcherProfileSchema` reaches the search space with no edit to this file, and
+ * `config/schema.test.ts` proves it against a fictional schema the product does not ship, for the
+ * reason § D134 gives about W4's control renderers: a list that looks derived only because the
+ * shipped schema happens to fit it is not derived.
  */
-export const PROFILE_OBJECT_SECTIONS: readonly string[] = Object.freeze([
-  'normalization',
-  'dispatch',
-  'eligibility',
-  'answer',
-  'idle',
-  'auction',
-  'selection',
-]);
+export const PROFILE_OBJECT_SECTIONS: readonly string[] = DISPATCHER_PROFILE_OBJECT_SECTIONS;
 
 /** Every section a {@link ProfilePatch} can carry, including the two pseudo-sections. */
 export const PROFILE_SECTIONS: readonly string[] = Object.freeze([

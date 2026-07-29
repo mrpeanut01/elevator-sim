@@ -600,6 +600,95 @@ export const dispatcherProfileSchema = z.strictObject({
   selection: selectionStageSchema.optional(),
 });
 
+/**
+ * The keys of an object schema whose values are themselves object schemas, in declaration order.
+ *
+ * ## Why this exists
+ *
+ * A dispatcher profile holds its tunables in **sections** — `profile.idle.predictorCycleS`, and so
+ * on — and `experiments/src/tuning/space/encode.ts` has to know which keys those are in order to
+ * write a candidate down as a profile and read it back. It knew by carrying a hand-written list,
+ * and CLAUDE.md's *Standing requirement* names exactly what happens next: `selection` landed in
+ * this file with seven declared, round-trip-tested rows, the list did not gain it, and all seven
+ * were reported *unauthorable* by `collectSearchSpace()` and dropped from the search space — with
+ * nothing anywhere reading as wrong ([DECISIONS.md § D146](../../../../DECISIONS.md)).
+ *
+ * So the list is derived from the schema, and it is derived **here** rather than in `experiments`
+ * for a reason that is not convenience: `experiments` does not depend on `zod` and must not start,
+ * and the fact being read is a fact about `core`'s schema. A consumer gets
+ * {@link DISPATCHER_PROFILE_OBJECT_SECTIONS}; nobody outside this file re-derives it.
+ *
+ * ## The rule, and what it deliberately does not admit
+ *
+ * A key is a section when unwrapping every wrapper that exposes an `innerType` — `.optional()`,
+ * `.default()`, `.nullable()`, `.readonly()` — reaches a `ZodObject`. Under that rule the shipped
+ * profile schema yields seven, and the seven fields that are *not* sections are each excluded for
+ * a reason rather than by name: `$comment`, `id`, `name`, `role` and `engine` are strings,
+ * `hardConstraints` is an array, and `weights` is a **record** — an open map of term id to number,
+ * which `encode.ts` handles as a pseudo-section precisely because it has no fixed keys.
+ *
+ * That last exclusion is also the honest statement of the blind spot: a future section authored as
+ * a `z.record`, a `z.union`, a `z.intersection`, a `z.lazy` or a pipe would **not** be found, and
+ * would fail the same silent way `selection` did. `schema.test.ts` asserts the rule against a
+ * fictional schema the product does not ship, including those shapes, so the boundary is pinned
+ * rather than assumed.
+ *
+ * Declaration order rather than sorted, because it is the order a profile is authored in and the
+ * order a decoded patch's JSON keys come out in; an object literal's key order is fixed by the
+ * language, unlike a module namespace's, which is why `collect.ts` sorts and this does not.
+ */
+export function objectSectionsOf(schema: {
+  readonly shape: Readonly<Record<string, unknown>>;
+}): readonly string[] {
+  return Object.freeze(
+    Object.keys(schema.shape).filter((key) => unwrapSchema(schema.shape[key]).type === 'object'),
+  );
+}
+
+/** The `def` of a zod schema, as much of it as {@link objectSectionsOf} reads. */
+interface SchemaDef {
+  readonly type?: string;
+  readonly innerType?: unknown;
+}
+
+function defOf(schema: unknown): SchemaDef | undefined {
+  if (typeof schema !== 'object' || schema === null) return undefined;
+  const def = (schema as { readonly def?: unknown }).def;
+  return typeof def === 'object' && def !== null ? (def as SchemaDef) : undefined;
+}
+
+/**
+ * Peel wrappers until the schema underneath, whatever the wrappers are.
+ *
+ * Generic in the wrapper rather than a list of them: every zod wrapper that has an inside exposes
+ * it as `def.innerType`, so `.optional().readonly()` needs no more code than `.optional()`. The
+ * depth bound is not defensive about zod — it stops a malformed cyclic `def` from hanging this
+ * module at import time, which is where the constant below is built.
+ */
+function unwrapSchema(schema: unknown): SchemaDef {
+  let def = defOf(schema);
+  for (let depth = 0; depth < 8; depth += 1) {
+    const inner = def?.innerType;
+    if (inner === undefined) break;
+    def = defOf(inner);
+  }
+  return def ?? {};
+}
+
+/**
+ * Every section a dispatcher profile writes as `profile.<section>.<key>`, from the schema itself.
+ *
+ * Seven today: `normalization`, `dispatch`, `eligibility`, `answer`, `idle`, `auction`,
+ * `selection`. An eighth added to {@link dispatcherProfileSchema} appears here, and therefore in
+ * the tuning search space, with no edit anywhere else — which is the half of CLAUDE.md invariant 8
+ * that a generic optimizer depends on and that no test used to hold.
+ *
+ * The two pseudo-sections are correctly absent: `weights` and `hardConstraints` are not written as
+ * `profile.<section>.<key>` and `encode.ts` translates them itself.
+ */
+export const DISPATCHER_PROFILE_OBJECT_SECTIONS: readonly string[] =
+  objectSectionsOf(dispatcherProfileSchema);
+
 export const dispatcherProfilesSchema = z
   .strictObject({
     $comment: comment,
