@@ -68,12 +68,15 @@ import type {
   RunSummary,
   SimulationConfig,
 } from '@elevator-sim/core/browser';
-import { metricOf, replicationSeed, traceKeyOf } from '@elevator-sim/experiments/browser';
+import { collectSearchSpace, metricOf, replicationSeed, traceKeyOf } from '@elevator-sim/experiments/browser';
+
+import { resolveEditedProfile } from '../controls/editedProfile.js';
 
 import type { DisplayClock } from '../playback/clock.js';
 import { recordRun } from '../record/recordRun.js';
 import {
   BATCH_METRICS,
+  type BatchArmRequest,
   type BatchArmResult,
   type BatchCrnAudit,
   type BatchCrnMismatch,
@@ -116,9 +119,7 @@ export function runBatch(
   assertRequest(request);
 
   const startedMs = options.clock?.now() ?? 0;
-  const configs = request.arms.map((arm) =>
-    baseConfigFor(request, resources, requireProfile(resources, arm.armId, arm.dispatcherProfileId)),
-  );
+  const configs = request.arms.map((arm) => baseConfigFor(request, resources, armProfile(resources, arm)));
 
   /*
    * The equivalence class, recorded — **not** checked, and the difference is the point.
@@ -191,7 +192,17 @@ export function runBatch(
 
   const arms: BatchArmResult[] = request.arms.map((arm, index) => ({
     armId: arm.armId,
-    dispatcherProfileId: arm.dispatcherProfileId,
+    /*
+     * The **resolved** dispatcher's id, which is the base's id for an unedited arm and the edited
+     * profile's for an edited one.
+     *
+     * Found by driving W6: with the request's id here, a batch comparing `collective` against an
+     * edited `collective` printed *"the difference in average wait between collective and
+     * collective"* on every row, and the arm summaries read *"setting yours collective"*. The
+     * report is the surface that has to be able to tell two arms apart, so it is handed the name
+     * of the thing that actually ran.
+     */
+    dispatcherProfileId: configs[index]?.dispatcherProfile.id ?? arm.dispatcherProfileId,
     replications: armReplications[index] ?? [],
   }));
 
@@ -243,20 +254,36 @@ function baseConfigFor(
   };
 }
 
-function requireProfile(
-  resources: BatchResources,
-  armId: string,
-  profileId: string,
-): DispatcherProfile {
+/**
+ * The dispatcher one arm runs: the shipped profile, or that profile with the player's edit applied.
+ *
+ * The edit is resolved through `controls/editedProfile.ts` — the **same** module
+ * `dev/campaignPanel.ts` calls before it enables Run — so a vector the control admitted cannot be
+ * refused here and a vector the control refused cannot reach a simulation. Two implementations of
+ * *"is this vector runnable"* would be two answers, and this repository has a rule about that.
+ *
+ * `collectSearchSpace()` is called here rather than carried on the request because a search space
+ * is derived from `core`'s own declarations and is the same object on both sides of the worker
+ * boundary; sending it would be sending a projection of something the receiver already has.
+ */
+function armProfile(resources: BatchResources, arm: BatchArmRequest): DispatcherProfile {
   const profile = resources.dispatcherProfiles.profiles.find(
-    (candidate) => candidate.id === profileId,
+    (candidate) => candidate.id === arm.dispatcherProfileId,
   );
   if (profile === undefined) {
     throw new BatchError(
-      `dispatcher profile "${profileId}" for arm "${armId}" is not in this build's data/. A batch cannot run an arm it cannot resolve.`,
+      `dispatcher profile "${arm.dispatcherProfileId}" for arm "${arm.armId}" is not in this build's data/. A batch cannot run an arm it cannot resolve.`,
     );
   }
-  return profile;
+  if (arm.edit === undefined) return profile;
+
+  const resolved = resolveEditedProfile(collectSearchSpace(), profile, arm.edit);
+  if (!resolved.ok) {
+    throw new BatchError(
+      `arm "${arm.armId}" carries an edited weight vector that cannot be run: ${resolved.reason}`,
+    );
+  }
+  return resolved.profile;
 }
 
 function assertRequest(request: BatchRequest): void {

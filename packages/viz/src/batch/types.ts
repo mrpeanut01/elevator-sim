@@ -47,6 +47,8 @@ import type {
 } from '@elevator-sim/core/browser';
 import type { ReplicationMetric } from '@elevator-sim/experiments/browser';
 
+import type { EditedVector } from '../controls/editedProfile.js';
+
 /* -------------------------------------------------------------------------- *
  * The metrics a batch compares
  * -------------------------------------------------------------------------- */
@@ -177,6 +179,23 @@ export interface BatchArmRequest {
   /** Stable within one request. The reader sees {@link dispatcherProfileId}. */
   readonly armId: string;
   readonly dispatcherProfileId: string;
+  /**
+   * A **live edit** of that profile's weight vector, or absent to run the shipped profile as-is.
+   *
+   * `docs/10` § 11 **W6**, closing [§ D161](../../../../DECISIONS.md)'s known limitation: *"the
+   * player's move is a shipped profile, not a live weight editor."*
+   *
+   * It is a *point of the declared search space*, not a profile document, and that is CLAUDE.md
+   * invariant 7 kept rather than bent: `controls/editedProfile.ts` decodes it through the same
+   * `candidateProfile` an optimizer's winner goes through and parses the result with
+   * `parseDispatcherProfiles`. A patch that does not parse never becomes an arm.
+   *
+   * On the arm rather than on the request, for the reason {@link BatchRequest} gives: the
+   * dispatcher is the one field the passenger trace is **not** a function of, so two arms may
+   * differ here and only here without breaking CRN. {@link dispatcherProfileId} stays the id of
+   * the **base**, so a report that names the arm names something `data/` contains.
+   */
+  readonly edit?: EditedVector | undefined;
 }
 
 /**

@@ -146,6 +146,13 @@
       /* KB-15: the warning colour is a second signal. The words in `figure-note` are the first. */
       .figure-warning .figure-value { color: var(--warn); }
       .figure-absent .figure-value, .figure-suppressed .figure-value { color: var(--warn); }
+      /* docs/10 § 4 — the mode layer's own row kinds. They are the *origins* of § 4's
+         non-negotiable list, not figure ids: a run's identity, the people it left behind, a
+         warning it raised, the passenger model, a locked-out call and the fail states. The
+         classes come from `mode/disclosure.ts`'s `rowClassesOf`, so this block is styling a
+         taxonomy the code derives rather than a list a stylesheet maintains. */
+      .figure-origin-run-identity .figure-value { color: var(--text); }
+      .figure-warning .figure-note { color: var(--dim); }
       .figure-count { color: var(--dim); margin-left: 6px; }
       .figure-note { color: var(--dim); margin: 2px 0 0; }
       /* § 3.5's paired bar. The number is printed beside every bar, so length is never the only
@@ -261,6 +268,16 @@
           Campaign
         </button>
       </div>
+      <!-- docs/10 § 4 / U2 — Basic is the default, Advanced is one control away and is
+           remembered. It sits in the header rather than in a panel because it governs every
+           surface, and `mode/parity.ts` is what stops it from ever hiding a failure. -->
+      <label class="dim">view
+        <select id="view-mode">
+          <option value="basic" selected>Basic</option>
+          <option value="advanced">Advanced</option>
+        </select>
+      </label>
+      <span id="mode-parity" role="alert" class="dim"></span>
       <span class="dim" id="banner"></span>
     </header>
 
@@ -511,12 +528,24 @@
         <div class="bar">
           <label>stage <select id="campaign-stage"></select></label>
           <label>your setting <select id="campaign-profile"></select></label>
+          <!-- docs/10 § 11 W6 — the live weight editor. § D161's known limitation was that "the
+               player's move is a shipped profile, not a live weight editor", which is why four of
+               the seven stages needed an authored weight vector to clear. Ticking this turns the
+               candidate arm into an *edited* vector: the same W4 controls, restricted to the
+               dimensions the stage declares editable, refused at the control by
+               `controls/editedProfile.ts` before a replication runs. -->
+          <label><input type="checkbox" id="campaign-edit" /> edit the weights</label>
           <button id="campaign-run">Run this stage</button>
           <button id="campaign-cancel">Cancel</button>
           <progress id="campaign-progress" value="0" max="1" aria-label="stage progress"></progress>
           <span id="campaign-status" role="status"></span>
           <span id="campaign-error" role="alert" tabindex="-1"></span>
         </div>
+        <div class="bar" id="campaign-weights-bar" hidden>
+          <span id="campaign-weights-status" role="status"></span>
+          <span id="campaign-weights-refusal" role="alert" tabindex="-1"></span>
+        </div>
+        <div class="editor-form" id="campaign-weights" hidden aria-label="Your weight vector"></div>
         <div class="editor-body">
           <div class="editor-form batch-report" id="campaign-brief" aria-label="Stage briefing"></div>
           <div class="editor-form batch-report" id="campaign-output" aria-label="Stage result"></div>

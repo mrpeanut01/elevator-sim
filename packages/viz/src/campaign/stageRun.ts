@@ -33,6 +33,7 @@ import type {
 } from '@elevator-sim/core/browser';
 
 import type { BatchRequest } from '../batch/types.js';
+import type { EditedVector } from '../controls/editedProfile.js';
 import type { CampaignStage } from './types.js';
 
 /** The arm ids a stage runs. The second may name the same profile as the first — that is the control. */
@@ -48,6 +49,16 @@ export const CANDIDATE_ARM_ID = 'yours';
 export function batchRequestForStage(
   stage: CampaignStage,
   candidateProfileId: string,
+  /**
+   * The player's **edited** weight vector, or absent to run `candidateProfileId` as shipped.
+   *
+   * `docs/10` § 11 **W6**. It rides on the candidate arm only: the baseline is the stage's own
+   * shipped setting and stays that, because the count goals' bar is *that setting's published
+   * count on these seeds* and `judge.ts` refuses to judge at all when the baseline arm does not
+   * reproduce it. An edit on the baseline would move the bar and the run that is supposed to check
+   * it in the same step.
+   */
+  edit?: EditedVector | undefined,
 ): BatchRequest {
   return {
     buildingId: stage.building,
@@ -56,7 +67,11 @@ export function batchRequestForStage(
     replications: stage.replications,
     arms: [
       { armId: BASELINE_ARM_ID, dispatcherProfileId: stage.dispatcher.startingProfileId },
-      { armId: CANDIDATE_ARM_ID, dispatcherProfileId: candidateProfileId },
+      {
+        armId: CANDIDATE_ARM_ID,
+        dispatcherProfileId: candidateProfileId,
+        ...(edit === undefined ? {} : { edit }),
+      },
     ],
     arrivalRatePctPop5min: stage.traffic.arrivalRatePctPop5min,
   };

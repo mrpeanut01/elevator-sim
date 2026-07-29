@@ -62,7 +62,7 @@
  * | {@link drawOverlay} | `drawScene`, in `src/render/canvas.ts` |
  * | {@link loadColour}, {@link loadTrackMax}, {@link doorGlyph}, {@link describeSelection} | `src/render/canvas.ts` and `src/render/overlay.ts` |
  * | {@link describeFrame} | `src/dev/main.ts`, as the canvas's `aria-label` and its live region — `KB-13` |
- * | {@link runSummaryFigures} | `drawRunSummary` in `src/dev/main.ts`, called from `adopt` on every recording — `docs/10` § 11 **W2** |
+ * | {@link runSummaryFigures} | `disclosureItems` in `src/mode/disclosure.ts`, which `src/dev/main.ts` calls from `adopt` on every recording — `docs/10` § 11 **W2**, now through § 4's mode layer |
  * | {@link queueAt} | `src/dev/main.ts`'s draw loop, every animation frame — `docs/10` § 6, **U4** |
  * | {@link waitBandsOf}, {@link waitBandOf} | `queueAt`, in `src/frame/overlay.ts`, once per rider |
  * | {@link worseBand} | `queueAt`, for `FloorQueue.worstBand` |
@@ -119,6 +119,16 @@
  * | {@link batchRequestForStage}, {@link demonstrationConfigFor}, {@link stageReplicationSeed} | `src/dev/campaignPanel.ts`, and `campaign.test.ts` calls the same two rather than assembling a second request — the shape § D159 calls *a fixture routing the test to the wrong code path*, one level up |
  * | {@link failStateCounts}, {@link evidenceFrom}, {@link failStateReports} | `src/dev/campaignPanel.ts` — § 5.3's four states, counted over the batch and diagnosed on one replayed replication |
  * | {@link PROBABILITY_WORDS}, {@link probabilityWordIn} | `src/campaign/parse.ts`, which refuses an authored brief that trips it — R10 at load time rather than in review |
+ * | {@link disclosureItems} | `drawSummaryNow` in `src/dev/main.ts`, on every adopted recording and on every mode change; and `failStateDisclosure` in `src/dev/campaignPanel.ts` — `docs/10` § 4, **W6** |
+ * | {@link parityRefusal} | the same two functions, on **exactly the items they are about to mount**, so § 4 is a property of the shipped path and not only of the suite |
+ * | {@link parityViolations} | `parityRefusal`, in `src/mode/parity.ts`, and `mode/parity.test.ts`'s fictional fifth fail state |
+ * | {@link itemsIn}, {@link renderingIn} | `drawRunSummary` in `src/dev/main.ts` and `draw` in `src/dev/campaignPanel.ts` — the one place a mode decides what is on screen |
+ * | {@link disclosureClassOf} | `parityViolations`. **Inside the module only** — it is the classification the check is derived over, and a caller outside would be a second opinion about § 4's non-negotiable list |
+ * | {@link VIEW_MODES}, {@link isViewMode} | `src/dev/main.ts`'s mode toggle, its URL key and its remembered preference |
+ * | {@link resolveEditedProfile} | `armProfile` in `src/batch/runBatch.ts`, inside the worker, and `candidateProfileFor` in `src/dev/campaignPanel.ts`, before Run is enabled — **the same function on both sides**, which is what stops a pre-flight from passing what a run then rejects |
+ * | {@link admitEditedVector} | `resolveEditedProfile`, and `dev/campaignPanel.ts` through it |
+ * | {@link valuesFromProfile} | `src/dev/campaignPanel.ts`'s editor, to open on the chosen profile's own point |
+ * | {@link applyEdit} | `admitEditedVector`, in `src/controls/editedProfile.ts`. Inside the module only — every write goes through `applyControlEdit`, so a second entry point would be a second bounds check |
  *
  * `frameSequence` and `serializeFrames` exist because Phase 4's acceptance criterion needs a
  * headless, browser-free way to compare two replays. They would have shipped as "configurable,
@@ -564,3 +574,53 @@ export {
   type FailStateReportInput,
   type NamedLanding,
 } from './campaign/failStates.js';
+
+/* -------------------------------------------------------------------------- *
+ * Basic and Advanced — `docs/10-experience-layer-contract.md` § 4, W6
+ *
+ * A mode is a presentation, never a run: `mode/disclosure.ts` takes the run
+ * summary and the fail states unaltered and answers one further question —
+ * which of them may Basic leave out, and what must survive when it does.
+ * `mode/parity.ts` is the check `DECISIONS.md` § D163 clause 2 measures Phase 9
+ * against, and the reason it is a check rather than a second list is that it
+ * names no fail state, no suppression ground and no figure id.
+ * -------------------------------------------------------------------------- */
+
+export {
+  VIEW_MODES,
+  disclosureClassOf,
+  isViewMode,
+  itemsIn,
+  renderingIn,
+  type DisclosureClass,
+  type DisclosureItem,
+  type DisclosureOrigin,
+  type Rendering,
+  type Severity,
+  type ViewMode,
+} from './mode/types.js';
+
+export {
+  BASIC_HIDES,
+  BASIC_WINDOW_VALUE,
+  SUPPRESSION_LEAD,
+  disclosureItems,
+  type DisclosureInput,
+  type FailStateDisclosure,
+} from './mode/disclosure.js';
+
+export { parityRefusal, parityViolations, type ParityViolation } from './mode/parity.js';
+
+/* -------------------------------------------------------------------------- *
+ * The live weight editor — § 11 W6, closing § D161's known limitation
+ * -------------------------------------------------------------------------- */
+
+export {
+  admitEditedVector,
+  applyEdit,
+  resolveEditedProfile,
+  valuesFromProfile,
+  type EditAdmission,
+  type EditedProfileOutcome,
+  type EditedVector,
+} from './controls/editedProfile.js';

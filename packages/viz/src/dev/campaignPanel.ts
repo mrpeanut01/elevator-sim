@@ -29,12 +29,14 @@
  * It is 2–229 ms on the shipped buildings, it is labelled *Run 1*, and its seed is printed.
  */
 
+import type { ParameterValue } from '@elevator-sim/experiments/browser';
 import type { DispatcherProfile } from '@elevator-sim/core/browser';
 
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { restrictedFloorIds } from '../access/zoning.js';
 import { batchReport, type BatchReport } from '../batch/report.js';
 import type { BatchRequest, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
+import type { VizRecording } from '../contract/types.js';
 import { briefingFor, type StageBriefing } from '../campaign/brief.js';
 import { admitProfile } from '../campaign/dimensions.js';
 import {
@@ -51,8 +53,20 @@ import {
   stageReplicationSeed,
 } from '../campaign/stageRun.js';
 import type { CampaignStage } from '../campaign/types.js';
+import { applyControlEdit, controlsFor } from '../controls/controls.js';
+import {
+  resolveEditedProfile,
+  valuesFromProfile,
+  type EditedVector,
+} from '../controls/editedProfile.js';
+import { renderControls, valueAtSliderPosition } from '../controls/render.js';
+import type { Control, ControlValues } from '../controls/types.js';
+import { disclosureItems, rowClassesOf } from '../mode/disclosure.js';
+import { parityRefusal } from '../mode/parity.js';
+import { itemsIn, type ViewMode } from '../mode/types.js';
 import { recordRun } from '../record/recordRun.js';
 import type { BrowserResources, LoadedCampaign } from './data.js';
+import { instantiateControlNode } from './parameterForm.js';
 
 export interface CampaignPanelElements {
   readonly stage: HTMLSelectElement;
@@ -64,12 +78,23 @@ export interface CampaignPanelElements {
   readonly error: HTMLElement;
   readonly brief: HTMLElement;
   readonly output: HTMLElement;
+  /** W6 — turn the player's move from a dropdown choice into an edited weight vector. */
+  readonly edit: HTMLInputElement;
+  readonly weightsBar: HTMLElement;
+  readonly weights: HTMLElement;
+  readonly weightsStatus: HTMLElement;
+  readonly weightsRefusal: HTMLElement;
 }
 
 export interface CampaignPanelOptions {
   readonly resources: BrowserResources;
   readonly loaded: LoadedCampaign;
   readonly elements: CampaignPanelElements;
+  /**
+   * The current view mode — § 4. A getter rather than a value, because the toggle lives in the
+   * page header and this panel must read it at draw time rather than at mount time.
+   */
+  readonly mode: () => ViewMode;
 }
 
 export interface CampaignPanelHandle {
@@ -77,10 +102,40 @@ export interface CampaignPanelHandle {
   refresh(): void;
 }
 
+/**
+ * Read one input back as the value its control declares — `dev/parameterForm.ts`'s rule, applied
+ * to the second mount of the same controls.
+ *
+ * Keyed on the control's own `kind` and never on the element's type, so the two cannot disagree
+ * about what a control holds. A slider reports a **position** and is converted through the
+ * declaration's own scale.
+ */
+function valueFrom(control: Control, input: HTMLInputElement | HTMLSelectElement): ParameterValue {
+  const role = input.dataset['role'];
+  switch (control.kind) {
+    case 'slider':
+      return role === 'slider'
+        ? valueAtSliderPosition(control, Number(input.value))
+        : Number(input.value);
+    case 'stepper':
+      return Number(input.value);
+    case 'checkbox':
+      return (input as HTMLInputElement).checked;
+    case 'select':
+      return input.value;
+  }
+}
+
 export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanelHandle {
   const { resources, loaded, elements: ui } = options;
   const doc = ui.output.ownerDocument;
   let worker: Worker | undefined;
+  /**
+   * The replication this report diagnoses, kept so the mode layer can draw the run-level
+   * non-negotiables — the seed, the warnings, the undelivered count — from the same run the floor
+   * ids came from. A second recording here would be a second run behind one report.
+   */
+  let lastDemonstration: VizRecording | undefined;
 
   for (const [index, stage] of loaded.campaign.stages.entries()) {
     ui.stage.append(new Option(`${String(index + 1)}. ${stage.name}`, stage.id));
@@ -102,11 +157,142 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     ui.error.focus();
   }
 
+  /* ------------------------------------------------------------------ *
+   * W6 — the live weight editor
+   * ------------------------------------------------------------------ */
+
+  /**
+   * The player's point, held whole.
+   *
+   * Every dimension, gated-off ones included, exactly as `controls/controls.ts` holds them and for
+   * its reasons: a disabled control still shows a value beside its reason, and a gate flipped back
+   * on restores what the reader last set rather than resetting to the declared default.
+   *
+   * Rebuilt from the chosen profile whenever the stage or the profile changes, because an edit is
+   * *of* a base and a base that moved underneath it is a different edit.
+   */
+  let weightValues: ControlValues = new Map();
+  let weightBaseId = '';
+
+  function editableSetFor(stage: CampaignStage): ReadonlySet<string> {
+    return new Set(editableIdsOf(stage.dispatcher.editable, loaded.space.ids));
+  }
+
+  /** The controls this stage opens, in the space's own gate order. */
+  function editableControls(stage: CampaignStage): readonly Control[] {
+    const editable = editableSetFor(stage);
+    return controlsFor(loaded.space, weightValues).filter((control) => editable.has(control.id));
+  }
+
+  function resetWeights(): void {
+    const base = profileById(ui.profile.value);
+    weightBaseId = ui.profile.value;
+    weightValues = base === undefined ? new Map() : valuesFromProfile(loaded.space, base);
+  }
+
+  /**
+   * Only what the player moved.
+   *
+   * A patch rather than the whole point, and the difference is the one `decodeCandidate` draws:
+   * *"a candidate that omitted an inactive knob produces a profile that omits it too and the
+   * resolver applies its default — which is exactly what 'inactive' means."* Sending all 56 would
+   * author every dimension onto the profile and turn *"I moved one weight"* into a diff of
+   * everything.
+   */
+  function editRecord(stage: CampaignStage): Readonly<Record<string, ParameterValue>> {
+    const base = profileById(weightBaseId);
+    if (base === undefined) return {};
+    const origin = valuesFromProfile(loaded.space, base);
+    const moved: Record<string, ParameterValue> = {};
+    for (const control of editableControls(stage)) {
+      const now = weightValues.get(control.id);
+      if (now === undefined) continue;
+      if (String(origin.get(control.id)) === String(now)) continue;
+      moved[control.id] = now;
+    }
+    return moved;
+  }
+
+  /** The player's move, when the checkbox is on and something has actually moved. */
+  function editFor(stage: CampaignStage): EditedVector | undefined {
+    if (!ui.edit.checked) return undefined;
+    const values = editRecord(stage);
+    return {
+      baseProfileId: weightBaseId,
+      profileId: `${weightBaseId}-edited`,
+      values,
+    };
+  }
+
+  /**
+   * The dispatcher the candidate arm will run, or the reason it cannot run one.
+   *
+   * One function, called by the pre-flight *and* by the demonstration replay, so the profile the
+   * report diagnoses is the profile the batch ran. `resolveEditedProfile` is the same call
+   * `batch/runBatch.ts` makes inside the worker.
+   */
+  function candidateProfileFor(
+    stage: CampaignStage,
+  ): { readonly ok: true; readonly profile: DispatcherProfile } | { readonly ok: false; readonly reason: string } {
+    const base = profileById(ui.profile.value);
+    if (base === undefined) {
+      return { ok: false, reason: 'this build’s data/ does not carry the profile you picked.' };
+    }
+    const edit = editFor(stage);
+    if (edit === undefined) return { ok: true, profile: base };
+    const resolved = resolveEditedProfile(loaded.space, base, edit);
+    return resolved.ok ? { ok: true, profile: resolved.profile } : { ok: false, reason: resolved.reason };
+  }
+
+  function drawWeights(): void {
+    const stage = currentStage();
+    ui.weights.hidden = !ui.edit.checked;
+    ui.weightsBar.hidden = !ui.edit.checked;
+    ui.weights.replaceChildren();
+    if (stage === undefined || !ui.edit.checked) {
+      weightsRefused = false;
+      ui.run.disabled = false;
+      return;
+    }
+    if (weightBaseId !== ui.profile.value) resetWeights();
+
+    const controls = editableControls(stage);
+    ui.weights.append(instantiateControlNode(doc, renderControls(controls)));
+
+    const moved = Object.keys(editRecord(stage)).length;
+    const outcome = candidateProfileFor(stage);
+    /*
+     * The refusal is drawn **here**, at the control, and `Run this stage` is disabled behind it —
+     * which is the requirement W6 carries: an edit that produces an invalid profile is refused at
+     * the control, not at the simulator. The sentence is `core`'s own, through
+     * `SearchSpace.validate`; nothing in this file decides what a runnable dispatcher is.
+     */
+    ui.weightsRefusal.textContent = outcome.ok ? '' : outcome.reason;
+    weightsRefused = !outcome.ok;
+    ui.run.disabled = weightsRefused;
+    ui.weightsStatus.textContent =
+      `${String(controls.length)} of ${String(loaded.space.ids.length)} declared dimensions are ` +
+      `open on this stage · ${String(moved)} moved · ` +
+      (outcome.ok
+        ? 'this vector is authorable and buildable'
+        : 'this vector cannot be run — see the refusal beside it');
+  }
+
+  /**
+   * Whether the weight editor is currently refusing the vector on screen.
+   *
+   * Held rather than re-derived at each caller, because {@link setRunning} runs **after** a batch
+   * finishes and would otherwise re-enable *Run* on a vector the editor had just refused —
+   * a refusal that survives until the reader looks away, which is worse than no refusal.
+   */
+  let weightsRefused = false;
+
   function setRunning(running: boolean): void {
-    ui.run.disabled = running;
+    ui.run.disabled = running || weightsRefused;
     ui.cancel.disabled = !running;
     ui.stage.disabled = running;
     ui.profile.disabled = running;
+    ui.edit.disabled = running;
   }
 
   function stopWorker(): void {
@@ -170,10 +356,22 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   /** What the chosen profile moves, and whether this stage opened it. */
   function admissionNode(stage: CampaignStage): HTMLElement {
     const baseline = profileById(stage.dispatcher.startingProfileId);
-    const candidate = profileById(ui.profile.value);
-    if (baseline === undefined || candidate === undefined) {
-      return row('your setting', 'no profile selected', undefined, 'figure-absent');
+    /*
+     * The **resolved** dispatcher, so the briefing describes what the candidate arm will actually
+     * run. Reading the base profile here drew *"runs the same system on every declared
+     * dimension"* beside a weight the player had just moved — found by driving, in the session
+     * that first turned the editor on.
+     */
+    const outcome = candidateProfileFor(stage);
+    if (baseline === undefined || !outcome.ok) {
+      return row(
+        'your setting',
+        outcome.ok ? 'no profile selected' : outcome.reason,
+        undefined,
+        'figure-absent',
+      );
     }
+    const candidate = outcome.profile;
     const admission = admitProfile(
       loaded.space,
       baseline,
@@ -196,15 +394,25 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
 
   function requestFor(stage: CampaignStage): BatchRequest | undefined {
     const baseline = profileById(stage.dispatcher.startingProfileId);
-    const candidate = profileById(ui.profile.value);
-    if (baseline === undefined || candidate === undefined) {
+    if (baseline === undefined) {
       fail('this build’s data/ does not carry one of the two dispatcher profiles this stage needs.');
       return undefined;
     }
+    const outcome = candidateProfileFor(stage);
+    if (!outcome.ok) {
+      fail(outcome.reason);
+      return undefined;
+    }
+    /*
+     * The admission is asked of the **resolved** dispatcher, edited or not. That is the point of
+     * routing an edit through a real `DispatcherProfile`: `admitProfile` diffs two systems that
+     * will run, so a vector that moves a dimension the stage did not open is refused with the
+     * dimension named, by the same function and the same sentence a shipped profile would be.
+     */
     const admission = admitProfile(
       loaded.space,
       baseline,
-      candidate,
+      outcome.profile,
       editableIdsOf(stage.dispatcher.editable, loaded.space.ids),
     );
     if (!admission.admissible) {
@@ -212,7 +420,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       return undefined;
     }
     /* One statement of what a stage run is, shared with the suite — see `campaign/stageRun.ts`. */
-    return batchRequestForStage(stage, candidate.id);
+    return batchRequestForStage(stage, ui.profile.value, editFor(stage));
   }
 
   function start(): void {
@@ -281,8 +489,14 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   ): readonly FailStateReport[] {
     const counts = failStateCounts(replications);
     const building = resources.buildings.find((candidate) => candidate.id === stage.building);
-    const profile = profileById(ui.profile.value);
-    if (building === undefined || profile === undefined) return [];
+    /*
+     * The **resolved** dispatcher, so an edited vector is diagnosed by the run it actually
+     * produced. Replaying the base profile here would put a floor id from a different dispatcher
+     * beside a count taken from the fifty, which is the worst version of this seam being open.
+     */
+    const outcome = candidateProfileFor(stage);
+    if (building === undefined || !outcome.ok) return [];
+    const profile = outcome.profile;
 
     const seed = stageReplicationSeed(stage, 0);
     const { recording } = recordRun(
@@ -295,6 +509,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
         dispatcherProfiles: resources.dispatcherProfiles,
       }),
     );
+    lastDemonstration = recording;
     const evidence = evidenceFrom({
       recording,
       replication: 0,
@@ -370,13 +585,23 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
         'figure-observation',
       ),
     );
-    for (const state of states) {
+    /*
+     * § 4 — the fail states go through the mode layer, and the parity check runs on exactly the
+     * items this panel is about to mount. A Basic mode that dropped one of them puts its own
+     * refusal on screen rather than silently drawing three rows where there were four.
+     */
+    const items = failStateDisclosure(states);
+    const refusal = parityRefusal(items);
+    if (refusal !== undefined) {
+      ui.output.append(row('mode parity', refusal, undefined, 'figure-warning'));
+    }
+    for (const item of itemsIn(items, options.mode())) {
       ui.output.append(
         row(
-          state.state,
-          state.frequency,
-          `${state.sentence} ${state.diagnosis} ${state.lever}`,
-          state.occurredInDemonstration ? 'figure-warning' : 'figure-observation',
+          item.label,
+          item.rendering.value,
+          item.rendering.note,
+          rowClassesOf(item, item.rendering).filter((name) => name !== 'figure').join(' '),
         ),
       );
     }
@@ -417,16 +642,66 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     void stage;
   }
 
+  /**
+   * The fail-state reports as mode items.
+   *
+   * A synthetic recording is **not** built here: `disclosureItems` takes the fail states beside a
+   * recording, and the campaign's own recording is the demonstration replay. Passing the reports
+   * alone would need a recording anyway, so the panel hands over the one it already replayed —
+   * which is also what makes the run-level non-negotiables (the seed, the warnings, the
+   * undelivered count) appear on this surface without a second implementation of them.
+   */
+  function failStateDisclosure(states: readonly FailStateReport[]) {
+    const recording = lastDemonstration;
+    if (recording === undefined) return [];
+    return disclosureItems({ recording, failStates: states });
+  }
+
   ui.stage.addEventListener('change', () => {
     const stage = currentStage();
     if (stage !== undefined) ui.profile.value = stage.dispatcher.startingProfileId;
     ui.output.replaceChildren();
     ui.error.textContent = '';
     ui.status.textContent = '';
+    resetWeights();
     drawBrief();
+    drawWeights();
   });
   ui.profile.addEventListener('change', () => {
     ui.error.textContent = '';
+    resetWeights();
+    drawBrief();
+    drawWeights();
+  });
+  ui.edit.addEventListener('change', () => {
+    ui.error.textContent = '';
+    if (ui.edit.checked) resetWeights();
+    drawWeights();
+    drawBrief();
+  });
+  /*
+   * One route from an input back to the model, exactly as `dev/parameterForm.ts` has: the value is
+   * read through the control's own `kind`, written through `applyControlEdit`, and the form is
+   * redrawn either way — on acceptance because a gate may have cascaded, on refusal because the
+   * input has to go back to what the model holds rather than keeping what was refused.
+   */
+  ui.weights.addEventListener('change', (event) => {
+    const stage = currentStage();
+    if (stage === undefined) return;
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return;
+    const id = target.dataset['parameter'];
+    if (id === undefined) return;
+    const control = editableControls(stage).find((candidate) => candidate.id === id);
+    if (control === undefined) return;
+    const edit = applyControlEdit(loaded.space, weightValues, id, valueFrom(control, target));
+    if (edit.accepted) {
+      weightValues = edit.values;
+      ui.weightsRefusal.textContent = '';
+    } else {
+      ui.weightsRefusal.textContent = edit.reason;
+    }
+    drawWeights();
     drawBrief();
   });
   ui.run.addEventListener('click', start);
@@ -444,7 +719,14 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   }
   setRunning(false);
   ui.progress.hidden = true;
+  resetWeights();
   drawBrief();
+  drawWeights();
 
-  return { refresh: drawBrief };
+  return {
+    refresh: () => {
+      drawBrief();
+      drawWeights();
+    },
+  };
 }

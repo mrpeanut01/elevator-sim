@@ -269,6 +269,7 @@ packages/
 │   ├── batch/             — Phase 9 W3: N paired replications, and the paired-t report on them
 │   ├── scenario/          — Phase 9 W9: goal predicates, their measured across-seed pass rates
 │   ├── campaign/          — Phase 9 W5: the scenario schema, the seven stages, the four fail states
+│   ├── mode/              — Phase 9 W6: Basic and Advanced, and the derived mode-parity check
 │   └── dev/               — the Vite dev entry points, viewer and editor (dev-only)
 └── cli/                   — headless batch entry point
     └── commands/          — list, run, compare, tune, watch
@@ -306,6 +307,12 @@ packages/
 > fail states ([`docs/10`](10-experience-layer-contract.md) § 5) — was added on 2026-07-29 with its
 > line above in the same commit. The prediction held for the fourth time running: the `core` suite
 > reddened on the directory before a single `viz` test was written.
+>
+> **And so did W6, for the fifth time.** `viz/mode/` — § 4's Basic/Advanced split and the parity
+> check [`DECISIONS.md` § D163](../DECISIONS.md) clause 2 measures Phase 9 against — was added on
+> 2026-07-29 with its line above in the same commit. The prediction held again, and the sequence is
+> now long enough to be a procedure rather than an anecdote: **write the directory, watch `core` go
+> red, add the line.**
 >
 > **The guard is now scoped to packages present on disk, and C28 is closed.** It used to name
 > `viz/*` directories unconditionally, so deleting `packages/viz` turned them into phantoms and

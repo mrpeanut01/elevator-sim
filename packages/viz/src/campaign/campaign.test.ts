@@ -37,6 +37,7 @@ import { PROBABILITY_WORDS, playerSafeDescription, probabilityWordIn } from './w
 import { restrictedFloorIds } from '../access/zoning.js';
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { batchReport, type BatchReport } from '../batch/report.js';
+import { resolveEditedProfile, type EditedVector } from '../controls/editedProfile.js';
 import { runBatch } from '../batch/runBatch.js';
 import type { BatchResources, BatchResult } from '../batch/types.js';
 import { recordRun } from '../record/recordRun.js';
@@ -127,8 +128,18 @@ function requireProfile(id: string): DispatcherProfile {
   return profile;
 }
 
-/** Run a stage exactly as `dev/campaignPanel.ts` does: two arms, the stage's own seeds. */
-function playStage(stage: CampaignStage, candidateProfileId: string): {
+/**
+ * Run a stage exactly as `dev/campaignPanel.ts` does: two arms, the stage's own seeds.
+ *
+ * `edit` is W6's player move — an **edited weight vector** instead of a dropdown choice. It goes
+ * through the same `batchRequestForStage` the panel calls, so the suite cannot exercise a second
+ * version of what a stage run with an edit is.
+ */
+function playStage(
+  stage: CampaignStage,
+  candidateProfileId: string,
+  edit?: EditedVector,
+): {
   result: BatchResult;
   report: BatchReport;
   verdict: StageReport;
@@ -137,7 +148,7 @@ function playStage(stage: CampaignStage, candidateProfileId: string): {
    * The **shipped** request constructor, not a second copy of it. A suite that assembled its own
    * would keep passing while the panel drifted.
    */
-  const result = runBatch(batchRequestForStage(stage, candidateProfileId), resourcesFor(stage));
+  const result = runBatch(batchRequestForStage(stage, candidateProfileId, edit), resourcesFor(stage));
   const report = batchReport(result);
   return { result, report, verdict: judgeStage({ stage, published: publishedFor(stage), result, report }) };
 }
@@ -757,6 +768,123 @@ describe('stage 4, played — a stage that can actually be cleared', () => {
     /* R2 survives the good news: the headline still says what the number is about. */
     expect(played.verdict.headline).toContain('not a ranking of dispatchers');
   }, 300_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * Stage 2, played on an **edited** weight vector — W6, and § D161's known limit
+ * -------------------------------------------------------------------------- */
+
+describe('stage 2, played on an edited weight vector — the thing a dropdown could not do', () => {
+  /**
+   * The vector, and it is not a shipped profile.
+   *
+   * [§ D161](../../../../DECISIONS.md) measured that **three** of the seven stages clear from the
+   * dispatcher dropdown alone — 3, 4 and 7 — and named the reason the other four do not:
+   * *"the player's move is a shipped profile, not a live weight editor … so four stages need an
+   * authored weight vector to clear."* Stage 2 is one of the four. This is that vector.
+   *
+   * Two dimensions, both inside the sixteen stage 2 declares editable. Found by sweeping
+   * `weights.loadFactor` on the stage's own tuning seeds, which is exactly the thing the second
+   * test below is about.
+   */
+  const EDIT: EditedVector = {
+    baseProfileId: 'collective',
+    profileId: 'collective-edited',
+    values: { 'weights.waitTime': 1, 'weights.loadFactor': 2.25 },
+  };
+
+  it('clears — three goals, and the comparison resolves for the candidate on two measures', () => {
+    const stage = stageAt(1);
+    const played = playStage(stage, stage.dispatcher.startingProfileId, EDIT);
+    expect(played.verdict.cleared).toBe(true);
+    for (const goal of played.verdict.goals) {
+      expect(goal.met, goal.sentence).toBe(true);
+    }
+    const rows = played.report.comparisons[0]?.rows ?? [];
+    expect(rows.filter((row) => row.favours === 'candidate').length).toBeGreaterThan(0);
+    expect(rows.filter((row) => row.favours === 'baseline')).toEqual([]);
+    /* R2 survives the good news, as it does on stage 4. */
+    expect(played.verdict.headline).toContain('not a ranking of dispatchers');
+  }, 300_000);
+
+  it('runs a profile `data/` does not contain, and the report names the thing that ran', () => {
+    // The claim W6 actually makes. `data/dispatcher-profiles.json` has no `collective-edited`, so
+    // a batch that resolved arms by id alone could not have run this at all — which is precisely
+    // what § D161 recorded as the limitation.
+    expect(config.dispatcherProfilesById.has('collective-edited')).toBe(false);
+    const stage = stageAt(1);
+    const played = playStage(stage, stage.dispatcher.startingProfileId, EDIT);
+    /*
+     * The **resolved** id on the result, and the base id on the request. Found by driving: with
+     * the request's id on the result the comparison rows read *"the difference between collective
+     * and collective"* on a batch whose two arms were a shipped profile and an edit of it, so the
+     * one surface whose job is telling two arms apart could not.
+     */
+    expect(played.result.arms[0]?.dispatcherProfileId).toBe('collective');
+    expect(played.result.arms[1]?.dispatcherProfileId).toBe('collective-edited');
+    const rows = played.report.comparisons[0]?.rows ?? [];
+    expect(rows.some((row) => row.sentence.includes('collective-edited'))).toBe(true);
+  }, 300_000);
+
+  it('**does not survive the holdout seed set**, and the suite carries that half too', () => {
+    /*
+     * CLAUDE.md § Tuning discipline, arriving as a measurement rather than as a caution: *"Hold
+     * out traffic seeds. Tune on one seed set, validate on a disjoint one, or you overfit the
+     * weight vector to specific passenger traces and the gain vanishes on new traffic."*
+     *
+     * It vanished, and worse than vanished. On stage 2's declared holdout seeds the same vector is
+     * beaten by the shipped setting on **three** measures, and `beat-the-baseline` resolves
+     * against it. The sensitivity is visible in the sweep that found it: `2.2`, `2.25` and `2.3`
+     * clear and `2.35` does not.
+     *
+     * This is asserted rather than mentioned because the alternative — a suite that records the
+     * clear and not the failure to generalise — would be publishing the flattering half of a
+     * measurement, and § 11 W6's *"a stage cleared on an edited vector"* would read as a stronger
+     * result than it is. **The campaign judges on the tuning seeds, so a live weight editor makes
+     * overfitting them the dominant strategy**, and nothing in the shipped surface says so. That is
+     * a finding about the campaign, not about this vector.
+     */
+    const stage = stageAt(1);
+    const onHoldout: CampaignStage = {
+      ...stage,
+      seeds: stage.holdoutSeeds,
+      holdoutSeeds: stage.seeds,
+    };
+    const played = playStage(onHoldout, stage.dispatcher.startingProfileId, EDIT);
+    expect(played.verdict.cleared).toBe(false);
+    const rows = played.report.comparisons[0]?.rows ?? [];
+    expect(rows.filter((row) => row.favours === 'baseline').length).toBeGreaterThan(0);
+    /*
+     * And the count goals are `null` there rather than failed, which is `judge.ts` refusing to
+     * judge against a bar that does not reproduce — the published counts are the tuning set's.
+     * Stated so a reader does not mistake a refusal for a defeat.
+     */
+    const counts = played.verdict.goals.filter((goal) => goal.kind !== 'beat-the-baseline');
+    expect(counts.length).toBeGreaterThan(0);
+    for (const goal of counts) expect(goal.met).toBeNull();
+  }, 300_000);
+
+  it('refuses an edited vector that leaves the dimensions this stage opened', () => {
+    // `idle.parkingStrategy` is a real dimension and stage 2 does not declare it editable. The
+    // refusal is `admitProfile`'s, on the **resolved** dispatcher, so an edit is held to exactly
+    // the rule a shipped profile is.
+    const stage = stageAt(1);
+    const outOfScope = resolveEditedProfile(space, requireProfile('collective'), {
+      baseProfileId: 'collective',
+      profileId: 'collective-edited',
+      values: { 'idle.parkingStrategy': 'lobby' },
+    });
+    expect(outOfScope.ok, outOfScope.ok ? '' : outOfScope.reason).toBe(true);
+    if (!outOfScope.ok) return;
+    const admission = admitProfile(
+      space,
+      requireProfile(stage.dispatcher.startingProfileId),
+      outOfScope.profile,
+      editableIdsOf(stage.dispatcher.editable, space.ids),
+    );
+    expect(admission.admissible).toBe(false);
+    expect(admission.sentence).toContain('idle.parkingStrategy');
+  });
 });
 
 describe('the decoder refuses rather than dropping', () => {
