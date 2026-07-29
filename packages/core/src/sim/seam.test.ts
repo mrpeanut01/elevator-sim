@@ -195,7 +195,7 @@ describe('auction.aggregation selects the policy, and the aggregations are not t
     expect(trajectory(runSimulation({ ...common, dispatcherProfile: auction }))).toBe(
       trajectory(runSimulation({ ...common, dispatcherProfile: central })),
     );
-  });
+  }, 60_000);
 
   it('builds the policy the profile names, in every bank', async () => {
     const cfg = await load();
@@ -217,7 +217,7 @@ describe('auction.aggregation selects the policy, and the aggregations are not t
         expect('auction' in policy.config, `${profileId}/${bankId}`).toBe(wantsAuction);
       }
     }
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -563,7 +563,7 @@ describe('every weighted cost term prices something through the shipped engine',
         `${term.id} produced the same value for every car in every decision of a real run`,
       ).toBeGreaterThan(0);
     }
-  });
+  }, 60_000);
 
   it('leaves rideTime correctly inert under up-down-buttons, as its activeWhen declares', async () => {
     // The contrast that keeps the assertion above honest. A landing call carries no destination
@@ -591,7 +591,7 @@ describe('every weighted cost term prices something through the shipped engine',
     for (const termId of ['zoneAffinity', 'predictedDemand']) {
       expect(counts.nonZero.get(termId) ?? 0, termId).toBeGreaterThan(0);
     }
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *

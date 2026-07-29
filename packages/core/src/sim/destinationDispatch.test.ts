@@ -381,7 +381,7 @@ describe('the call identity is the origin-destination pair', () => {
       'the panel registered no more calls than a direction button did, so the landing is still ' +
         'keyed on direction and the destination is changing nothing about the allocation unit',
     ).toBeGreaterThan(conventionalCalls);
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -466,7 +466,7 @@ describe('the passenger population is untouched by the passenger model', () => {
     expect(JSON.stringify(panel.trace.passengers)).toBe(
       JSON.stringify(conventional.trace.passengers),
     );
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *

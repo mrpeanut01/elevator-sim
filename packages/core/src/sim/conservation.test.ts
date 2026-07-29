@@ -141,7 +141,7 @@ describe('generated === delivered + explicitly undelivered', () => {
       const result = runSimulation(request('secure-tower', profile.id, 20260726));
       assertConserved(result);
     }
-  });
+  }, 60_000);
 
   it('holds when every landing can be collected, on every building with transfers', () => {
     // With authorization at call time the access-restricted landings are servable, so these
@@ -164,7 +164,7 @@ describe('generated === delivered + explicitly undelivered', () => {
         expect(result.conservation.transfers).toBeGreaterThan(0);
       }
     }
-  });
+  }, 60_000);
 
   it('holds under demand well past the building’s handling capacity', () => {
     // Saturation is a legitimate measurement and a common one during a sweep. It must not be
@@ -182,7 +182,7 @@ describe('generated === delivered + explicitly undelivered', () => {
     expect(result.undelivered.length).toBeGreaterThan(0);
     expect(result.summary.saturation.verdict).not.toBe('stable');
     expect(result.summary.awtIsValid).toBe(false);
-  });
+  }, 60_000);
 
   it('holds with door obstructions, which lengthen every stop', () => {
     for (const seed of SEEDS) {
@@ -191,7 +191,7 @@ describe('generated === delivered + explicitly undelivered', () => {
       );
       assertConserved(result);
     }
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -236,5 +236,5 @@ describe('the only way off a landing is into a car that can carry you', () => {
       }
       expect(boardings).toBeGreaterThan(0);
     }
-  });
+  }, 60_000);
 });

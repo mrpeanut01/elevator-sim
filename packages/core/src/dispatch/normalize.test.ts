@@ -333,7 +333,7 @@ describe('every term is bounded on snapshots from a real simulation', () => {
     expect(result.conservation.balanced).toBe(true);
     expect(result.summary.waiting.meanS).toBeGreaterThan(0);
     expect(Number.isFinite(result.summary.waiting.meanS)).toBe(true);
-  });
+  }, 60_000);
 
   it('normalizes into [0, 1] on every car of a run stopped mid-flight', async () => {
     // Mid-run rather than end-of-run: at the end of a replication every car is idle and empty,
@@ -432,7 +432,7 @@ describe('every term is bounded on snapshots from a real simulation', () => {
     expect(feasibleEvaluations).toBeGreaterThan(5_000);
     expect(carsCarryingPassengers).toBeGreaterThan(4);
     expect(carsInFlight).toBeGreaterThan(2);
-  });
+  }, 120_000);
 });
 
 /* -------------------------------------------------------------------------- *

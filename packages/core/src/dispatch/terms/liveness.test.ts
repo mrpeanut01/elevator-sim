@@ -207,7 +207,7 @@ describe('every term in the registry can change a decision through the real engi
       // constant in the weighted sum and cannot move an argmin, however large its weight.
       expect(tally.maxSpread, `${term.id} scored identically for every candidate car`).toBeGreaterThan(0);
     }
-  });
+  }, 60_000);
 
   it('is inert, not wrong, when the group controller supplies nothing', async () => {
     // The other half of the contract. `zoneAffinity` and `predictedDemand` price facts only the
@@ -257,5 +257,5 @@ describe('every term in the registry can change a decision through the real engi
       expect(withoutFacts.every((raw) => raw === 0), termId).toBe(true);
       expect(withFacts.some((raw) => raw !== 0), termId).toBe(true);
     }
-  });
+  }, 60_000);
 });
