@@ -23,6 +23,9 @@
  * the frame sequences matching.
  */
 
+import type { LockedOutLanding } from '../access/lockedOut.js';
+import { describeLockedOut } from '../access/lockedOut.js';
+import { STATE_GLYPHS } from '../access/zoning.js';
 import type { FloorQueue, LandingAssignment, OverlayMetrics, WaitBand } from '../frame/overlay.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import type { DoorPhase, Frame, VizRecording } from '../contract/types.js';
@@ -175,6 +178,27 @@ export interface SceneInput {
    */
   readonly unansweredCallFloorIds?: readonly string[] | undefined;
   /**
+   * Landings whose calls **no car may legally answer** — `docs/10` § 10.4, `U8`.
+   *
+   * The third member of a family whose two existing members it must not be confused with, and
+   * the reason all three are separate inputs rather than one *"unavailable"* list:
+   *
+   * | input | the fact | the fix |
+   * |---|---|---|
+   * | {@link SceneInput.unservedFloorIds} | **service** zoning: no shaft reaches this floor | build a bank that serves it |
+   * | {@link SceneInput.unansweredCallFloorIds} | an **outcome**: a car could have taken this call and none did | more cars, a better policy |
+   * | this | **access** zoning: the call carries no credential the cars will accept | a dispatcher that reads credentials, or a credential for the rider |
+   *
+   * `CLAUDE.md` forbids collapsing the three kinds of zoning, and a renderer that drew a floor no
+   * shaft reaches the same way as a floor no credential opens would do exactly that in the one
+   * place a reader actually looks.
+   *
+   * Derived by the caller from `access/lockedOut.ts`, for the reason {@link SceneInput.overlay}
+   * and {@link SceneInput.unansweredCallFloorIds} are: which floors are access-controlled is a
+   * fact about the *building*, and `drawScene` stays a pure function of what it is handed.
+   */
+  readonly lockedOutLandings?: readonly LockedOutLanding[] | undefined;
+  /**
    * Per-floor rider queues at this instant — `docs/10` § 6, U4.
    *
    * Omitted, the landings draw exactly what they drew before: the `▲n ▼n` direction counts. Given,
@@ -300,6 +324,20 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
       `${recording.status.toUpperCase()} — ${String(recording.summary.undelivered)} undelivered`,
     );
   }
+  /*
+   * `docs/10` § 10.4, **second** — before saturation and before the unanswered count, and after
+   * the status for `RV-16`'s reason.
+   *
+   * Order is priority here, because the line is clipped from the right when it does not fit
+   * (below). A structural refusal — these calls could never have been answered by anybody —
+   * outranks both a statistic being suppressed and a count of calls that merely went unanswered,
+   * and it is the one of the four a reader can act on. It does **not** replace the unanswered
+   * clause: the two are different claims about different calls, and a reader needs both counts.
+   *
+   * The `short` form: the floors are already marked `▩` on their own rows, and this is one line.
+   */
+  const lockedOut = describeLockedOut(input.lockedOutLandings ?? [], { short: true });
+  if (lockedOut !== '') banner.push(lockedOut);
   if (recording.summary.saturated) banner.push('SATURATED — AWT suppressed');
   else if (!recording.summary.awtIsValid) banner.push('AWT suppressed');
   // `D10` — a call no car answered is never left to the landing selector alone. See
@@ -314,7 +352,23 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   }
   if (banner.length > 0) {
     ctx.fillStyle = theme.warning;
-    ctx.fillText(banner.join('   ·   '), layout.width - 12, 10);
+    /*
+     * Clipped so it cannot overprint the building name.
+     *
+     * The banner is right-aligned on the **same line** as the title, which is drawn at `x = 12`
+     * in the bold face. Nothing stopped the two meeting in the middle, and on Secure Tower at
+     * 800 px they did — *"⊘Secure Tower"* with the banner's tail written through it, which was
+     * already true of the four-clause banner before § 10.4 added a fifth. Found by driving it.
+     *
+     * The full sentence is never lost: `describeFrame` writes it into the canvas's `aria-label`
+     * unabbreviated, which is the surface with no width limit.
+     */
+    const titlePx = 12 + recording.buildingName.length * BOLD_CHAR_ADVANCE_PX + 16;
+    ctx.fillText(
+      fitLabel(banner.join('   ·   '), layout.width - 12 - titlePx),
+      layout.width - 12,
+      10,
+    );
   }
 
   /*
@@ -617,6 +671,22 @@ export function landingOptionLabel(assignment: LandingAssignment): string {
 const UNANSWERED_GLYPH = '✗';
 
 /**
+ * The glyph for a landing whose call no car **may** answer — `docs/10` § 10.4.
+ *
+ * The **same** glyph the credential lens uses for `not-permitted` (`access/zoning.ts`), on
+ * purpose: the editor's lens and the run viewer are two views of one fact, and a reader who
+ * learned `▩` on the preview must not have to learn a second spelling of it here. It is neither
+ * `⊘` (no shaft reaches this floor) nor `✗` (a car could have come and none did), which is the
+ * whole point — three barriers, three glyphs, none of them a recolouring of another.
+ *
+ * Both lockout causes draw it. The glyph names the **barrier**, which is access zoning either
+ * way; the banner and the screen-reader sentence name the **cause**, because *"the dispatcher
+ * cannot read this credential"* and *"this rider has no credential"* have different fixes and a
+ * 12 px mark cannot carry that.
+ */
+const LOCKED_OUT_GLYPH = STATE_GLYPHS['not-permitted'];
+
+/**
  * Smallest floor pitch at which a rider glyph is a glyph rather than a smear — § 6.2's second bar
  * trigger, *"or the floor pitch is below the glyph height"*.
  *
@@ -637,6 +707,7 @@ function drawLandings(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void 
   const { frame, layout } = input;
   const rowById = new Map(layout.rows.map((row) => [row.floorId, row]));
   const unanswered = new Set(input.unansweredCallFloorIds ?? []);
+  const lockedOut = new Set((input.lockedOutLandings ?? []).map((landing) => landing.floorId));
   const queueByFloor = new Map((input.queues ?? []).map((queue) => [queue.floorId, queue]));
   // The deepest queue anywhere at this instant, for the bar's log scale. Taken from the frame
   // rather than pinned, because the measured extremes differ by a factor of two between buildings
@@ -654,7 +725,16 @@ function drawLandings(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void 
     const row = rowById.get(landing.floorId);
     if (row === undefined) continue;
     const queue = queueByFloor.get(landing.floorId);
-    if (landing.waitingUp === 0 && landing.waitingDown === 0 && queue === undefined) {
+    // The empty-landing dot, and the two reasons a landing is not empty even when the direction
+    // counts are zero: somebody is in the queue (U4), or the caller has told us this landing is
+    // locked out (U8). A row the caller named must draw its mark — a guard that dropped it would
+    // be the picture disagreeing with the banner about the same landing.
+    if (
+      landing.waitingUp === 0 &&
+      landing.waitingDown === 0 &&
+      queue === undefined &&
+      !lockedOut.has(landing.floorId)
+    ) {
       ctx.fillStyle = theme.textDim;
       ctx.fillText('·', x, row.y);
       continue;
@@ -672,11 +752,32 @@ function drawLandings(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void 
       ctx.fillText(text, cursor, row.y);
       cursor += 8 * (text.length + 1);
     }
+    let marked = false;
     if (unanswered.has(landing.floorId)) {
       ctx.fillStyle = theme.warning;
       ctx.fillText(UNANSWERED_GLYPH, cursor, row.y);
       cursor += 8 * 2;
+      marked = true;
     }
+    if (lockedOut.has(landing.floorId)) {
+      ctx.fillStyle = theme.restricted;
+      ctx.fillText(LOCKED_OUT_GLYPH, cursor, row.y);
+      cursor += 8 * 2;
+      marked = true;
+    }
+    /*
+     * A cell of air between the **call** marks and the **rider** glyphs — added at the merge of
+     * W6/U4 and W7b/U8, because that is where the two first shared a row.
+     *
+     * They are different subjects: `✗`/`▩` say something about the *call* at this landing, and
+     * `●◑○✖` say something about the *people* standing at it. Run together they read as one
+     * string, and the abandoned band's `✖` (U+2716) sits one codepoint from the unanswered `✗`
+     * (U+2717) — distinct characters, near-identical marks at 12 px, and they co-occur
+     * systematically, because a call nobody answers is exactly a call whose riders pass the
+     * abandonment horizon. The gap does not fix that; it stops the two groups being read as one
+     * word. See the merge report: the glyph collision itself is not this lane's to resolve.
+     */
+    if (marked) cursor += 8;
     if (queue === undefined) continue;
     cursor = drawQueueRow(ctx, theme, queue, {
       x: cursor,
@@ -862,6 +963,16 @@ function drawFooter(
  * characters fit in a gutter.
  */
 const CHAR_ADVANCE_PX = 7.2;
+
+/**
+ * The same measure for the **bold 14 px** face the two headings use.
+ *
+ * Only one caller needs it — `drawHeader`, to reserve the building name's own width before it
+ * right-aligns the warning banner on the same line. Approximate for the same reason
+ * {@link CHAR_ADVANCE_PX} is, and rounded **up** rather than down, because being generous here
+ * clips a warning slightly early and being stingy overprints the title.
+ */
+const BOLD_CHAR_ADVANCE_PX = 8.5;
 
 /**
  * Clip a label to a pixel budget, with an ellipsis — `RV-09` and `RS-04`.

@@ -9745,3 +9745,50 @@ budget clause holds in the environment it is actually claimed for.
 that file's layout note states. `VIZ_SCHEMA_VERSION` is untouched — a batch record is not a
 recording, and nothing about the recording contract moved. **No phase status moves**: Phase 9 has no
 row in any status table, deliberately, and W3 is a work unit rather than a phase.
+
+---
+
+## D159 — access zoning reaches the screen, and **three of `docs/10`'s four claims about it were wrong about the code**
+
+**Date:** 2026-07-29 · **Owner:** T63 (wave 8) · **Implements:** [`docs/10`](docs/10-experience-layer-contract.md) § 10 (U8) / W7b · **Corrects:** § 10.3 and § 10.4 · **Schema:** `VIZ_SCHEMA_VERSION` 5 → **6**
+
+**Context.** Ten of twelve shipped dispatcher profiles cannot read credentials, so an access-restricted call under them is permanently unassignable — and nothing on screen said so before Run. A newcomer met this as *"the simulator is broken"* rather than *"I chose a dispatcher that cannot do this."* [`docs/10`](docs/10-experience-layer-contract.md) § 10.3 calls the compatibility warning *"the highest-value item in U8"*.
+
+**What landed.** `VizLeg.credentialGroup` (absent, not `undefined`, when the route needs none, so the JSON round trip still equals itself); a **credential lens** over the editor preview drawing three states with three glyphs, three words and three legend rows each naming the zoning that produced it — `● reachable` / `⊘ not served (service zoning)` / `▩ not permitted (access zoning)`; and a pre-run compatibility note on both surfaces, `role="status"`, with **Run never disabled**.
+
+### The count was right and its reason was not — the third stale mechanism this wave
+
+Derived through `core`'s own `resolveDispatchConfig` → `passengerModelOf` → `callCarriesCredential`, never a name list: **2 of 12**. So § 2.8's *"ten of twelve"* is **correct**. Its stated *reason* — that the two are the ones which *"declare a credential-carrying `dispatch.callType`"* — is **not**: the mechanism is `callType === 'mobile-credential' || panelAuthorized`, so a `destination-entry` profile with `passengerAssignment: 'panel'` carries one too, because the kiosk authorizes ([§ D30](#d30)). No shipped profile is in that state, which is why the count survived while the explanation did not. A test asserts that adding a thirteenth credential-aware profile changes the message to *"3 of the 13…"*, so the claim is derived and not transcribed.
+
+### Three corrections to the binding contract
+
+1. **§ 10.4's predicate over-claims.** A leg carries a credential when *any* floor on its route is restricted, so a lobby→office trip carries one — and that call **is** answerable, because a conventional `estimateCost` checks access at the pickup floor and, with no destination disclosed, nowhere else. **That is why the conventional arm leaves 33.5 % unserved and not 100 %.** The shipped predicate is *"registered a call **at** a restricted floor"*.
+2. **There are two lockout causes, not one — and this is the correction that matters.** A rider the dispatcher cannot read is one. A rider with **no credential at all** on a restricted floor (`credentialAssignment: 'none'`) is another, and **no dispatcher fixes it.** A tutorial built on § 10 as written would have told that player to switch to `destination-eta` — advice that does not work.
+3. **§ 10.3's example message hard-codes "33 %".** That is H-ACCESS-1's measurement of one arm, one building, one seed, one traffic profile, inside a message that fires on *any* building under *any* credential-blind profile. The shipped message names the floors instead, and a test asserts it contains **no `%` at all** and no verdict words. It states a fact, never a judgement — there is a Pareto front here, not a right answer.
+
+### Measured on Secure Tower, seed 20260729
+
+| dispatcher | reads credential | locked-out legs | undelivered |
+|---|---|---|---|
+| `nearest-car` | no | 17 | **17** |
+| `collective` | no | 14 | **14** |
+| `destination-eta` / `destination-panel` | yes | 0 | 0 |
+
+**The locked-out leg count equals the undelivered count exactly on both conventional arms**: on this building the entire undelivered population is explained by the credential. That is the puzzle's payload, measured rather than asserted.
+
+### The liveness finding, and it is a **fourth** variant of the family this wave keeps hitting
+
+T60 found a mutation green because a value had two readers; T61 found three because a fixture routed the test to the wrong code path; T62 found one because a negative control returned before the half that fires in production. **This one is subtler than all three: the guard did not break — its *meaning* did.**
+
+`marks()` filtered canvas writes to `y > 40` to separate landing rows from the banner at `y = 10`. T61's mood line is drawn at **`y = 48`** — inside that cut. Every assertion still passed, because mood text does not equal `'▩'`, so **nothing went red** — but the filter had silently stopped meaning *"landing rows"* and started meaning *"landing rows plus whatever T61 draws"*. Re-cut to `y >= layout.plot.y`, which is the real boundary. **A merge can erode a guard's meaning while leaving every one of its assertions true**, and no test can see that, because the test is the thing that moved.
+
+A second mutation went green outright — the newly-added cell of air had no assertion — and was re-reddened with a pixel test. Final battery: **15 mutations, 15 red.**
+
+### Two collisions reported rather than resolved, because neither glyph is this lane's
+
+- **`✗` (U+2717, unanswered call) vs `✖` (U+2716, T61's `abandoned` band)** — different characters, near-identical at 12 px, now on the same row, and they **co-occur systematically**: a call nobody answers is exactly a call whose riders pass the abandonment horizon. Latent, not observed at this seed. The cell of air separates the groups; it does not fix the shape clash.
+- **T61's mood headline overprints the bank labels by 10 px on every building with more than one bank** — `y = 48` `textBaseline: 'top'` against `drawShafts`' label at `plot.y − 18 = 58` `textBaseline: 'bottom'`. Confirmed arithmetically and visually. The 64 px header has no free row, so the fix is `headerPx`, which is W7a's call.
+
+**Vertical space was traded and measured**, not estimated: at 1440×900 the canvas had fallen to **149 px for a 30-floor building**. Naming floors as **runs** — `29 of its 30 floors (2–30)`, over consecutive *positions in the building's own floor order*, never arithmetic on the id, because ids are strings like `G` and `B2` — took the note 78 → **59 px** and the stage 149 → **281 px**. Nothing is hidden: the count is still stated separately.
+
+**Impact.** `docs/10` § 10.3 / § 10.4 corrected in place. `VIZ_SCHEMA_VERSION` 6; `record/document.ts` refuses a version-5 recording with *"re-record it from its seed"*, the behaviour it already had for version 4. **Known limitation:** a recording loaded from a file for a building this build does not ship gets `restrictedFloorIds: []` and makes **no** lockout claim — silence beats inference, and it means the `▩` mark is absent there.

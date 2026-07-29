@@ -1247,6 +1247,28 @@ copied). **This is the one genuine contract widening U8 needs**, and it lands wi
 - Cost: `credentialGroup` is a short string on a fraction of legs; against § 2.4's budget (legs are
   5–8 % of the recording) it is negligible.
 
+> **✅ LANDED 2026-07-29, at version 6 and not 5, and one clause above is wrong.** W2 took version 5
+> first, so this is the same field at the next number. Two corrections to the paragraph above,
+> both found in the code rather than argued:
+>
+> 1. **The credential alone over-claims, and the origin floor is what does not.** A leg carries a
+>    credential when *any* floor on its route is restricted, so a lobby-to-office trip on Secure
+>    Tower carries one too — and that call **is** answerable, because a conventional `estimateCost`
+>    checks access at the pickup floor and, with no destination disclosed, nowhere else. That is why
+>    conventional dispatch leaves 33.5 % of Secure Tower unserved rather than 100 %. The predicate
+>    is *"registered a call **at** a restricted floor"*, and which floors those are is a fact about
+>    the **building** — passed in by the caller, exactly as `unservedFloorIds` already is, not added
+>    as a second field.
+> 2. **There are two causes, not one, and no dispatcher fixes the second.** A rider with a
+>    credential the dispatcher cannot read is one failure; a rider with **no** credential on a
+>    restricted floor (`credentialAssignment: 'none'`) is another, and telling that reader to switch
+>    to `destination-eta` would be advice that does not work. `access/lockedOut.ts` separates them,
+>    and the field is what makes the second visible at all.
+>
+> Landed in `src/access/lockedOut.ts`, `render/canvas.ts` (the `▩` mark and the banner),
+> `render/describeFrame.ts` (the clause, which names the credential the glyph cannot carry), driven
+> by `dev/main.ts`.
+
 Whether a *stronger* signal is needed — an explicit "this call was refused on access grounds" event
 rather than an inference from credential plus zone — is § 13's open question 4.
 
@@ -1458,13 +1480,18 @@ One state, two views, § 4's hide/never-hide lists.
   Advanced value.
 - **Non-test caller:** the app shell.
 
-### W7 — Rider queues and the credential lens *(depends on W1; W7b depends on W2)*
+### W7 — Rider queues and the credential lens *(depends on W1; W7b depends on W2)* — ✅ **DONE 2026-07-29, both halves**
 
 > **W7a is DONE, 2026-07-29** ([`DECISIONS.md` § D157](../DECISIONS.md)). `queueAt` is in
 > `frame/overlay.ts`, the renderer is `render/riderQueue.ts` plus `drawLandings`, the § 6.3 clause
 > is in `describeFrame`, and D4's mood treatment lands with it as `render/mood.ts`. **The zero-field
-> claim in § 2.3 holds** — `VIZ_SCHEMA_VERSION` is unchanged at 5 — with one wording correction:
-> `isWaitingAt` was module-*private*, not *"already exposed"*.
+> claim in § 2.3 holds** — W7a adds **no** field — with one wording correction: `isWaitingAt` was
+> module-*private*, not *"already exposed"*.
+>
+> *(Corrected at the W7a/W7b merge: this note said `VIZ_SCHEMA_VERSION` **is unchanged at 5**, and
+> that was true of W7a alone. W7b bumps it to **6** for `VizLeg.credentialGroup`, so the sentence
+> went stale between the two lanes landing. W7a's own claim — that it needs no field — is
+> untouched.)*
 >
 > **Three deviations and one limitation, stated rather than absorbed:**
 >
@@ -1497,7 +1524,35 @@ One state, two views, § 4's hide/never-hide lists.
   on Secure Tower showing both states.
 - **Non-test caller:** `render/canvas.ts`, `render/describeFrame.ts`, `render/preview.ts`.
 
-### W8 — Access-zoning editor and the dispatcher compatibility warning *(depends on W7b)*
+> **W7b landed 2026-07-29.** `VizLeg.credentialGroup` at `VIZ_SCHEMA_VERSION` **6** (W2 took 5), the
+> `▩` locked-out mark in `render/canvas.ts`, the credential lens in `render/preview.ts` +
+> `access/zoning.ts`, driven by `dev/main.ts` and `dev/editor.ts`. Acceptance (b) is asserted on the
+> shipped Secure Tower at seed 20 260 729 in `access/lockedOut.test.ts`.
+>
+> **Merged with W7a on 2026-07-29, and the two share a landing row.** Three things came out of
+> that and none of them was in either lane's plan:
+>
+> 1. **Order on the row is `▲n ▼n` · `✗` · `▩` · one cell of air · the rider glyphs.** The call
+>    marks go first because a long queue caption would otherwise push them past the metrics panel,
+>    and the cell of air is there because `✗`/`▩` are statements about the **call** and `●◑○✖` are
+>    statements about the **people**: run together they read as one string.
+> 2. **A latent glyph collision, reported not resolved.** W7a's `abandoned` band is `✖` (U+2716)
+>    and `D10`'s unanswered-call mark is `✗` (U+2717) — different characters, near-identical marks
+>    at 12 px, and they co-occur *systematically*, because a call nobody answers is exactly a call
+>    whose riders pass the abandonment horizon. Not observed on Secure Tower at seed 20 260 729
+>    (nobody there passes the 900 s horizon), so it is latent. Neither glyph belongs to W7b and
+>    changing either is not this lane's call.
+> 3. **The empty-landing branch gained a third condition.** `queue === undefined` was W7a's; a
+>    landing the caller has *named* as locked out must survive it too, or the picture and the
+>    banner disagree about the same floor.
+>
+> **One collision that is neither lane's and is reported for routing:** the mood headline is drawn
+> at canvas `y = 48` with `textBaseline: 'top'`, and `drawShafts` draws the bank label at
+> `plot.y - 18 = 58` with `textBaseline: 'bottom'`. They overlap by 10 px on **every building with
+> more than one bank** — Secure Tower, Mixed-Use High-Rise, Vertical City — and the 64 px header
+> has no free row, so the fix is `headerPx`, which is W7a's decision to make.
+
+### W8 — Access-zoning editor and the dispatcher compatibility warning *(depends on W7b)* — **the warning ✅ DONE 2026-07-29; the editor controls open**
 
 Floor multi-select, credential autocomplete, coverage matrix, and § 10.3's pre-run warning in both
 the editor and the viewer.
@@ -1509,6 +1564,35 @@ the editor and the viewer.
   is derived from `data/dispatcher-profiles.json` rather than hard-coded, so adding a third profile
   changes the message.
 - **Non-test caller:** `dev/editor.ts` and `dev/main.ts`.
+
+> **§ 10.3's warning landed 2026-07-29**, on both surfaces, with all three acceptance cases
+> asserted in `access/dispatcherCredentials.test.ts` and driven in the browser. **Two deliberate
+> departures from the wording above:**
+>
+> - **No percentage.** § 10.3's example sentence reads *"33 % of riders will not be served"*. That
+>   figure is `benchmark/accessControl.ts` H-ACCESS-1's measurement of one arm, one building, one
+>   seed and one traffic profile; reproducing it in a message that fires on **any** building under
+>   **any** credential-blind profile would publish a number nothing re-derives, which `CLAUDE.md`
+>   forbids in those words. The message names the restricted floors instead — derived, exact, and
+>   the thing the reader can act on. A test asserts the message carries no `%` at all.
+> - **§ 2.8's mechanism is narrower than the code's.** The prose says the two credential-aware
+>   profiles are the ones that *"declare a credential-carrying `dispatch.callType`"*. Measured
+>   through `core`'s own `callCarriesCredential`, a `destination-entry` profile with
+>   `passengerAssignment: 'panel'` **also** carries a credential, because the kiosk performs the
+>   access check and forwards its verdict (§ D30). The count — **2 of 12** — is right and is
+>   re-derived in the test rather than quoted; the stated reason for it was incomplete.
+>
+> **The floor list is written as runs**, not as 29 comma-separated ids: *"29 of its 30 floors
+> (2–30)"*. Both facts survive — the reader still learns the count — and the runs are consecutive
+> **positions in the building's own floor order**, never arithmetic on the id, because floor ids
+> are strings (`G`, `B2`, `Zone 5 hotel`). Changed at the W7a merge for a measured reason: the
+> note is a paragraph in the same flex column as the canvas, and at 1440 × 900 with W6's mood
+> gauge and W2's summary already in that column the stage had fallen to **149 px** for a 30-floor
+> building. The runs take the note from 78 px to 59 px and the stage back to **281 px**.
+>
+> **Still open from § 10.2:** the floor multi-select and the floors × credential-groups coverage
+> matrix. The credential *autocomplete* is landed in its § 10.2 form (options over the groups the
+> building already uses, no fixed vocabulary) as the lens's own picker.
 
 ### Dependency graph
 

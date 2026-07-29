@@ -257,6 +257,7 @@ packages/
 │   ├── fuzz/              — Phase 8: randomized buildings, the six properties, shrinking
 │   └── validation/        — the Phase 3 acceptance gate
 ├── viz/                   — web visualization, consumes core                    (Phase 4 complete)
+│   ├── access/            — access zoning made visible: the credential lens, the locked-out landing, the dispatcher compatibility check
 │   ├── contract/          — the recording schema and its folded series
 │   ├── record/            — instrumenting a run into a VizRecording
 │   ├── frame/             — the deterministic frame producer

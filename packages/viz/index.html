@@ -253,6 +253,13 @@
           <button id="export-png" class="wide-only">Export PNG</button>
         </div>
 
+        <!-- docs/10 § 10.3 — the dispatcher compatibility note, stated BEFORE Run rather than
+             diagnosed after it. `role="status"` and not `role="alert"`: it is a fact about the
+             pairing on screen, not an error, and Run stays enabled (ED-15). Written by
+             `access/dispatcherCredentials.ts` through `dev/main.ts`; empty when there is nothing
+             to say, which is every building that declares no access zone. -->
+        <p id="access-note" class="warn" role="status" style="margin: 4px 0"></p>
+
         <div class="stage-wrap">
           <canvas id="stage" role="img" aria-label="No run yet.">
             <p id="stage-fallback">
@@ -351,6 +358,24 @@
               </p>
               <div id="ed-zones"></div>
               <button id="ed-add-zone">Add access zone</button>
+              <!-- docs/10 § 10.1 — the credential lens. A *mode* over the preview to the right:
+                   pick a credential and every floor is drawn reachable, not served, or not
+                   permitted. The two failure states are different concepts with different fixes,
+                   so they get different glyphs and different sentences and are never merged. -->
+              <p style="margin: 8px 0 0">
+                <label
+                  >credential lens
+                  <select id="ed-lens">
+                    <option value="">off</option>
+                  </select></label
+                >
+                <span class="dim" id="ed-lens-note"></span>
+              </p>
+              <!-- docs/10 § 10.3 — the same pre-run compatibility fact the viewer states, against
+                   the dispatcher the viewer currently has selected. A fact, not a verdict: Run
+                   stays enabled (ED-15), and this list is separate from the validation issues
+                   below because it is not a defect in the document. -->
+              <p class="warn" id="ed-access-note" role="status" style="margin: 8px 0 0"></p>
             </fieldset>
 
             <fieldset>
