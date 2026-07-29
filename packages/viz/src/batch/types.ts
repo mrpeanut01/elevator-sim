@@ -233,6 +233,21 @@ export interface BatchReplication {
   readonly saturated: boolean;
   readonly status: SimulationStatus;
   readonly serviceLevelVerdict: ServiceLevelVerdict;
+  /**
+   * Demand offered over the window, persons per 5 minutes — a field, deliberately **not** a
+   * {@link BatchMetric}.
+   *
+   * `answer-the-demand` (`docs/10` § 5.2) is `personsPer5Min >= offeredPer5Min`, so a goal
+   * evaluator needs both halves of § 3.5's paired bar and the batch only carried the carried
+   * half. The offered half is a property of the **trace**, not of the dispatcher: every arm of a
+   * batch sees the same passengers by construction (that is the whole of CRN), so a comparison
+   * row on it would be a paired difference of a value with itself — the shape § D158 § 3 records
+   * *deleting* rather than keeping as decoration. It is a fact about the replication, like
+   * {@link seed}, and it is stored where the other such facts are.
+   *
+   * `null` where the run measured nothing, by the same `NaN` → `null` rule as {@link metrics}.
+   */
+  readonly offeredPer5Min: number | null;
   /** `null` where the run measured nothing — see the module docstring on `NaN` versus `null`. */
   readonly metrics: Readonly<Record<BatchMetric, number | null>>;
 }

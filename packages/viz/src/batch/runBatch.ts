@@ -173,6 +173,7 @@ export function runBatch(
         saturated: summary.saturated,
         status: recording.status,
         serviceLevelVerdict: summary.serviceLevel.verdict,
+        offeredPer5Min: finiteOrNull(metricOf(result.summary, 'offeredPer5Min')),
         metrics: metricsFor(result.summary),
       });
 
@@ -286,10 +287,14 @@ function assertRequest(request: BatchRequest): void {
 function metricsFor(summary: RunSummary): Readonly<Record<BatchMetric, number | null>> {
   const out: Partial<Record<BatchMetric, number | null>> = {};
   for (const metric of BATCH_METRICS) {
-    const value = metricOf(summary, metric);
-    out[metric] = Number.isFinite(value) ? value : null;
+    out[metric] = finiteOrNull(metricOf(summary, metric));
   }
   return Object.freeze(out as Record<BatchMetric, number | null>);
+}
+
+/** The contract edge, in one place: `core`'s *"not measured"* `NaN` becomes JSON's `null`. */
+function finiteOrNull(value: number): number | null {
+  return Number.isFinite(value) ? value : null;
 }
 
 /* -------------------------------------------------------------------------- *

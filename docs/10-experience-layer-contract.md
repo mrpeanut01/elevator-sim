@@ -263,6 +263,52 @@ batch goal, judged over the scenario's declared `replications` with the fraction
 § 5.2 already does for `no-divergence` and `beat-the-baseline` and which § 3.4 says lay readers read
 well.
 
+> ## Measured across the whole progression 2026-07-29, and **R12 empties its own middle category**
+> (**M30**, **M31**; § 11 **W9**; the table is `data/scenario-goals.json`)
+>
+> **The trichotomy above is exhaustive over `[0, 1]`.** A rate of 0 or 1 is a configuration fact;
+> anything else is a batch goal; there is nothing left for a single-run goal to be. That is not a
+> reading chosen to be tidy — it is what the rule says, and the implementation has no `single-run`
+> disposition because there is nothing for one to hold. **A campaign built on § 5.2's table is a
+> campaign of batch goals and briefing facts.** Said plainly: R12, applied honestly, does not
+> *filter* the single-run goal category; it **abolishes** it, and the seven-stage measurement below
+> is what it looks like when it does.
+>
+> Measured on all seven of § 5.4's stages — every stage a candidate for every kind, two disjoint
+> seed sets of **50** each, `durationS: 900`, `onTimeout: 'report'` — the 35 (goal × stage) cells
+> with a per-run predicate land: **14 batch goals, 19 configuration facts, 2 unjudgeable.** Every
+> stage keeps at least one; stage 1 and stage 3 keep exactly one, and on stage 3 — *Overwhelmed* —
+> the one that survives is `nobody-abandoned`, with saturation, delivery and answered demand all
+> decided before the player arrives. That is the right shape for the stage § 5.4 says is about
+> *diagnosing* a building rather than beating it, and it was measured rather than arranged.
+> `beat-the-baseline` ships on every stage besides these, unmeasured and undemoted, because it was
+> never a one-run goal for R12 to reach.
+>
+> **M18's own table is corrected by its own rule.** M18 called `answer-the-demand` a constant on
+> Secure Tower at 0/20. At n = 50 on two disjoint seed sets it is **3/50 and 1/50** — a very
+> low-rate *variable*, not a constant, and therefore a batch goal rather than a briefing fact. A
+> classification taken at twenty seeds moved at fifty, which is § D158's operational finding
+> arriving exactly where it was predicted to. `deliver-everyone` (**0/50**, 0/50) and
+> `nobody-abandoned` (**50/50**, 50/50) reproduce as constants.
+>
+> Two clauses this measurement adds to R12, because the rule as written does not cover the cases
+> the data produced:
+>
+> - **A goal no seed could judge is not a goal either.** On Garden Apartments 1 of 50 tuning seeds
+>   and 2 of 50 holdout seeds serve nobody in the reporting window, so `deliver-everyone` and
+>   `long-waits-under` have no verdict on those runs. The judgeable seeds are **not** counted on
+>   their own: that is selection on the outcome in § D158's exact sense — the runs that fall out are
+>   the hard ones — and it would report a rate with an honest-looking denominator while having the
+>   bias. Those two are `unjudgeable` on that stage and ship nowhere.
+> - **A classification is checked on a disjoint seed set, and both sets are the same size.** The
+>   first is CLAUDE.md § Tuning discipline. The second is arithmetic: a goal passing 49 of 50 is
+>   `variable` and the same goal on 20 seeds is very often `constant-pass`, so unequal sets
+>   manufacture a *"it did not generalise"* out of the denominator alone.
+>
+> `everyone-can-get-there` remains **not evaluable**, as § 10.4 says and as this row said; it is
+> blocked on W7 and is published as withheld rather than omitted, because a kind missing from the
+> table is indistinguishable from a kind that passed.
+
 ### R13 — No estimate is displayed without the count it was computed from, and a frequency restatement is forbidden when the denominator is smaller than the frequency it names.
 
 Two clauses, one measurement.
@@ -749,6 +795,17 @@ frequency, which § 3.4 says lay readers read well.
 > (§ 10)"; § 10.4 says the recording carries no `credentialGroup` on a `VizLeg` and so cannot
 > distinguish *"nobody came"* from *"nobody may come"*. § 10.4 matches the code. The goal is
 > **blocked on W7**, not available now.
+
+> **Measured on all seven stages 2026-07-29 — and the "Judged on" column is now wrong in one
+> direction on every row.** W9 landed R12's mechanism: `data/scenario-goals.json` carries every
+> kind's across-seed pass rate on every stage, and `packages/viz/src/scenario/goalRates.test.ts`
+> refuses a table in which any kind is unaccounted for. **Not one of the five "one run" rows above
+> survives as a one-run goal anywhere**, because R12's trichotomy leaves no such category — see the
+> box under R12. What each row *is* varies by stage and is published per stage rather than asserted
+> here: `deliver-everyone` is a constant on five stages, a batch goal on one and unjudgeable on one;
+> `nobody-abandoned` is a constant on six stages and the **only** live goal on stage 3.
+> `beat-the-baseline` and `no-divergence` are unchanged — they were already batch, for the reason
+> R2 gives, and the measurement agrees.
 
 ### 5.3 Fail states
 
@@ -1594,6 +1651,56 @@ the editor and the viewer.
 > matrix. The credential *autocomplete* is landed in its § 10.2 form (options over the groups the
 > building already uses, no fixed vocabulary) as the lens's own picker.
 
+### W9 — R12, made mechanical *(depends on W3)* — ✅ **DONE 2026-07-29, and it emptied a category**
+
+> The unit this document did not have when it was written. R12 was added by the design review as a
+> rule and left as an aspiration: *"before a goal ships as single-run, run it over at least 20
+> seeds… and publish the pass rate in the scenario file beside the goal."* Nothing ran it, nothing
+> published it, and nothing could fail. W9 is the mechanism.
+
+Measure every candidate goal's across-seed pass rate on every scenario it is a candidate for;
+publish the counts in `data/`; demote by the measured rate rather than by intent; and guard the
+whole of it.
+
+- **What landed.** `packages/viz/src/scenario/`: `goals.ts` (the seven kinds as predicates over one
+  replication, plus R12's classification), `candidates.ts` (§ 5.4's seven stages as configurations,
+  every stage a candidate for every kind), `measure.ts` (two seed sets through **W3's** runner —
+  no second runner and no second estimator), `published.ts` (the file shape and the validator),
+  `goalReport.ts` (the same instrument over whatever batch the Compare tab just ran).
+  `data/scenario-goals.json` is the published table.
+- **Acceptance, met:** every shipped goal carries its measured rate with its `n`; nothing strictly
+  between 0 and 1 ships as a single-run goal (nothing ships as one at all — see R12's box);
+  a goal kind with no measured rate on a scenario is a **guard failure**, not an omission.
+- **Liveness evidence, watched red before green.** Three source mutations: disabling the
+  completeness clause reds *"catches a goal kind that ships with no measured rate at all"* with
+  `expected '' to contain 'goal kind "no-divergence" has no measured pass rate here and is in no
+  bucket'`; counting the judgeable seeds instead of poisoning the batch reds both the unit
+  assertion **and** the re-derivation, which reports the survivor-counted `"rateClass":
+  "constant-pass"` over `"passes": 49, "unmeasured": 1`; freezing the new `offeredPer5Min` field to
+  `null` reds the re-derivation, which is what proves the field is read on the shipped path rather
+  than only in a test. Ten data mutations run permanently as negative controls, applied to the
+  **real** loaded table rather than to a fixture, and two of them exist for the false-negative shape
+  this wave hit three times — `disposition` and `rateClass` are both stored *and* derived, so each
+  is mutated alone **and** mutated consistently with its bucket, and the derivation from the
+  published counts is what fails in every case.
+- **Non-test caller:** `src/dev/main.ts` → `src/dev/batchPanel.ts` → `src/scenario/goalReport.ts` →
+  `src/scenario/goals.ts`. The Compare tab prints, under the comparison rows, what each candidate
+  goal **is** on the configuration just run — a batch goal, a fact about the configuration, or not
+  judgeable here — with no verdict and no badge.
+- **What it cost W3's contract:** one field. `BatchReplication.offeredPer5Min`, because
+  `answer-the-demand` is `personsPer5Min >= offeredPer5Min` and the batch carried only the carried
+  half. It is a **field and not a `BatchMetric`** on purpose: every arm sees the same passengers by
+  construction, so a comparison row on it would be a paired difference of a value with itself, which
+  is the shape § D158 § 3 records deleting rather than keeping as decoration.
+- **One correction this lane made to itself, kept rather than absorbed.** The first draft filed
+  **every** kind with no per-run predicate as unshippable, which quietly demoted
+  `beat-the-baseline` — a goal § 5.2 already ships, as a **batch** goal, because R2 says a
+  comparison needs a batch. R12 governs goals judged on *one run*; a goal that was never one is not
+  demoted by it. The routing is now `batch-only → goals`, `blocked → withheld`, pinned in **both**
+  directions by negative controls.
+- **Known limit.** `everyone-can-get-there` is measured as **unmeasurable** and published as
+  withheld, blocked on W7. It is not implemented here and W9 depends on none of W7's files.
+
 ### Dependency graph
 
 ```
@@ -1686,6 +1793,28 @@ below are not directly comparable with theirs and are not read as re-measurement
 | **M27** | Midtown Office, 50 replications per arm, `collective` baseline against `eta`, `demand: { arrivalRatePctPop5min: r }`. Quotable `collective`/`eta` and the paired ΔAWT: r = 1.0 → 50/50, `+0.322 [−0.355, +1.000]`; r = 1.5 → 50/50, `−0.461 [−1.211, +0.289]`; r = 2.0 → **49**/50, **suppressed**; r = 2.5 → 50/50, `−1.779 [−3.271, −0.286]`; r = 3.0 → 50/50, `−2.399 [−4.090, −0.707]`. The 2.0 % dip is **one replication** and is not read as refuting **M20**; what it shows is that under the complete-case suppression rule a single replication suppresses the estimate half, so a demand level must be validated at the batch size that will be run. Note also that r = 2.5's `1.779 s` is **below** `docs/07` § 4's 1.9 s resolution limit between structurally different dispatchers. |
 | **M28** | Wall-clock through `runBatch`, 50 replications × 2 arms including the recording fold and the field-for-field CRN comparison: Garden Apartments **0.16 s**, Secure Tower **2.53 s**, Midtown Office **5.18 s**, Vertical City **22.91 s** — that is 1.6 / 25.3 / 51.8 / 229.1 ms per arm-replication, every one of which is within **−12 % to +8 %** of **M23**'s bare `runSimulation` figure for the same building, so the fold and the audit are inside the machine noise rather than a measured overhead. Reproduces **M6**/**M23** within the difference those two account for. Not asserted by any test — § D91 records what happens to a gate whose threshold is a property of the machine. |
 | **M29** | Garden Apartments, 50 replications: some replications report **no** `waiting.pctOverLongWait` at all, because it is a percentage of the rides served **in the reporting window** and this is the building **M17** measures as quoting an AWT over five legs at one seed and one at another. Those pairs are `null`, the batch row's verdict is `unmeasured` rather than `suppressed` or `0 %`, and the surviving pairs are not averaged. An observation can be absent without being refused, and the two states are drawn differently. |
+| **M30** | **The goal pass-rate table**, § 11 **W9**, pinned in `data/scenario-goals.json` and re-derived by `packages/viz/src/scenario/goalRates.test.ts`. Seven stages of § 5.4, `collective`, `durationS: 900`, `onTimeout: 'report'`, two **disjoint** seed sets of **50** replications each (masters `20260730` and `20260731`, disjointness checked over the derived `replicationSeed`s). `long-waits-under` at **≤ 10 %**, M18's threshold. Cells are `tuning, holdout`. See the table below. Of the 35 (goal × stage) cells with a per-run predicate: **14 batch goals, 19 configuration facts, 2 unjudgeable** — and **0 single-run goals**, which is R12's own trichotomy applied without slack rather than a threshold anyone chose. |
+| **M31** | **M18 is corrected by M30 at a larger `n`.** Secure Tower, `collective`, shipped demand — M18's own cell, at 50 seeds rather than 20 and on two disjoint sets. `deliver-everyone` **0/50, 0/50** (M18: 0/20 — reproduces as a constant); `nobody-abandoned` **50/50, 50/50** (M18: 20/20 — reproduces); `long-waits-under (≤ 10 %)` **32/50, 30/50** (M18: 11/20 — reproduces as variable); and `answer-the-demand` **3/50, 1/50**, which M18 recorded as a **constant** at 0/20. It is a very low-rate variable, so R12 makes it a **batch goal** on that stage rather than a briefing fact. A classification taken at twenty seeds moved at fifty: § D158's *"a level validated at n = 20 can suppress at n = 50"* arriving on a goal instead of on an estimate. |
+
+**M30 — the goal pass-rate table.** `tuning, holdout`, each of 50 replications. A cell that is `0/50`
+or `50/50` on both sets is a **fact about the configuration**, not a goal; anything strictly between
+on both is a **batch goal**; a cell with any unjudgeable run is neither.
+
+| stage | building, demand | `deliver-everyone` | `no-divergence` | `nobody-abandoned` | `answer-the-demand` | `long-waits-under` ≤ 10 % |
+|---|---|---|---|---|---|---|
+| **1 first call** | `garden-apartments`, shipped | 49/50, 48/50 † | 50/50, 50/50 | 50/50, 50/50 | **38/50, 48/50** | 49/50, 48/50 † |
+| **2 morning rush** | `midtown-office`, 2.5 % | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **24/50, 20/50** | **41/50, 45/50** |
+| **3 overwhelmed** | `midtown-office`, shipped | 50/50, 50/50 | 0/50, 0/50 | **28/50, 29/50** | 0/50, 0/50 | 0/50, 0/50 |
+| **4 two banks** | `mixed-use-high-rise`, 1.5 % | 0/50, 0/50 | **13/50, 14/50** | 50/50, 50/50 | 0/50, 0/50 | **43/50, 42/50** |
+| **5 credentials** | `secure-tower`, shipped | 0/50, 0/50 | **35/50, 32/50** | 50/50, 50/50 | **3/50, 1/50** | **32/50, 30/50** |
+| **6 the tall one** | `vertical-city`, 0.5 % | **4/50, 9/50** | **38/50, 42/50** | 50/50, 50/50 | **4/50, 5/50** | **49/50, 49/50** |
+| **7 prove it** | `midtown-office`, 1.5 % | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **26/50, 31/50** | 50/50, 50/50 |
+
+Bold is a shipping batch goal. † is **unjudgeable**: 1 of 50 tuning seeds and 2 of 50 holdout seeds
+serve nobody in the reporting window, so those runs have no verdict and the judgeable ones are not
+counted on their own — see R12's box. `everyone-can-get-there` and `beat-the-baseline` are withheld
+on every stage, the first blocked on W7 and the second because it compares two arms.
+
 
 ---
 

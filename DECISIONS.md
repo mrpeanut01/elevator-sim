@@ -9792,3 +9792,53 @@ A second mutation went green outright — the newly-added cell of air had no ass
 **Vertical space was traded and measured**, not estimated: at 1440×900 the canvas had fallen to **149 px for a 30-floor building**. Naming floors as **runs** — `29 of its 30 floors (2–30)`, over consecutive *positions in the building's own floor order*, never arithmetic on the id, because ids are strings like `G` and `B2` — took the note 78 → **59 px** and the stage 149 → **281 px**. Nothing is hidden: the count is still stated separately.
 
 **Impact.** `docs/10` § 10.3 / § 10.4 corrected in place. `VIZ_SCHEMA_VERSION` 6; `record/document.ts` refuses a version-5 recording with *"re-record it from its seed"*, the behaviour it already had for version 4. **Known limitation:** a recording loaded from a file for a building this build does not ship gets `restrictedFloorIds: []` and makes **no** lockout claim — silence beats inference, and it means the `▩` mark is absent there.
+
+---
+
+## D160 — R12 is made mechanical, and applied honestly it **abolishes the single-run goal** rather than filtering it
+
+**Date:** 2026-07-29 · **Owner:** T64 (wave 8) · **Implements:** [`docs/10`](docs/10-experience-layer-contract.md) § 1 R12 as W9 · **Builds on:** [§ D158](#d158) · **Corrects:** `docs/10` § 12's **M18**
+
+**Context.** Phase 9's campaign is built on goals. R12 says *a goal judged on one run must have its across-seed variance measured and published, or it is a batch goal* — and it was left as an aspiration: nothing ran it, nothing published a rate, and nothing could fail. [`WAVE8_PLAN.md`](WAVE8_PLAN.md) § 2 made measuring it a precondition of the campaign rather than a follow-up, because § 5.2's own M18 already showed three of the seven kinds were constants on Secure Tower and a fourth a coin flip.
+
+### The finding, and it is structural rather than empirical
+
+**R12's trichotomy is exhaustive over `[0, 1]`.** A rate of 0 or 1 is a fact about the configuration — the player cannot move it. Anything strictly between is, by R12's own words, a batch goal. **There is no remaining interval for a single-run goal to occupy.** Applied honestly the rule does not *filter* the category; it **empties** it.
+
+So `GoalDisposition` has no `single-run` member, because there is nothing for one to hold, and a test asserts it rather than a comment claiming it. **A campaign built on § 5.2's table is a campaign of batch goals and briefing facts.** That is not a limitation discovered late — it is what R12 always said, read without flinching.
+
+### The measured table
+
+Seven stages of § 5.4, `collective`, 900 s, two **disjoint** seed sets of **50** each — disjointness checked over the *derived* `replicationSeed`s and not the masters. Of **35** (goal × stage) cells carrying a per-run predicate:
+
+| disposition | count |
+|---|---|
+| **batch goals** (shipping) | **14** |
+| configuration facts (published, never shipped as goals) | 19 |
+| unjudgeable — no seed could judge them | 2 |
+| **single-run goals** | **0** |
+
+Every stage keeps at least one live goal. Stage 3 — *Overwhelmed* — keeps exactly one, `nobody-abandoned`, with saturation, delivery and answered demand all decided before the player arrives. **That was measured, not arranged**, and it is the right shape for the stage § 5.4 says is about diagnosis rather than victory.
+
+### M18 is corrected by its own rule, at a larger `n`
+
+M18 called `answer-the-demand` a **constant** on Secure Tower at **0/20**. At 50 seeds on two disjoint sets it is **3/50 and 1/50** — a very low-rate *variable*, so a **batch goal**, not a briefing fact. `deliver-everyone` (0/50) and `nobody-abandoned` (50/50) reproduce as constants and `long-waits-under` reproduces as variable.
+
+This is [§ D158](#d158)'s *"a level validated at n = 20 can suppress at n = 50"* arriving on a **goal** instead of an estimate. The inheritance was acted on rather than cited — which is the difference between reading a register and using one.
+
+### Two clauses the data forced, stated rather than absorbed
+
+1. **A goal no seed could judge is not a goal.** Counting only the judgeable seeds is selection on the outcome in § D158's exact sense: the runs that fall out are the hard ones. Garden's `deliver-everyone` and `long-waits-under` are **unjudgeable** — 1 of 50 tuning and 2 of 50 holdout seeds serve nobody inside the reporting window — and are not shippable rather than quietly counted at 49/49.
+2. **Both seed sets must be the same size.** Unequal ones manufacture a *"did not generalise"* out of the denominator: at 20 against 50 in exploration, **four cells reported spurious disagreement that vanished at 50/50.**
+
+### The correction this lane made to itself
+
+Its first draft filed **every** kind with no per-run predicate as unshippable — which quietly demoted `beat-the-baseline`, a goal § 5.2 already ships as a **batch** goal because R2 requires a batch for any comparison. **R12 governs goals judged on one run; a goal that never was one is not reached by it.** Routing is now `batch-only → goals`, `blocked → withheld`, pinned in **both** directions by negative controls. Recorded because a rule applied one category too wide is the mirror image of a rule not applied at all, and only one of the two announces itself.
+
+### The guard
+
+`validatePublishedGoalRates` refuses a table in which any goal kind is unaccounted for on any scenario, so **a goal shipping without a measured rate is mechanically a kind in no bucket**. A separate test **re-derives every published count by re-running the batches** (~25 s), which is the only thing that catches a wholesale fabrication of the table.
+
+**On the false-negative shape this wave hit four times:** `disposition` and `rateClass` are both *stored* and *derived*, so a mutation that moves a constant into `goals` **and** rewrites its disposition to match would satisfy a naive check. It still fires, because `expected` is derived from the published **counts**, never from the stored value. All ten permanent data controls are applied to the **real loaded table**, deep-cloned — never a hand-built fixture. A genuine fixture false negative was also found and fixed on first run: `fakeReplication`'s `?? baseValue` silently discarded the `null` override the unmeasured test depended on.
+
+**Impact.** `data/scenario-goals.json` is the published table and T65 must take its goals only from its `goals` buckets. **Known limits:** `everyone-can-get-there` is published as **withheld**, blocked on W7 — the guard keeps it there until someone writes the predicate and re-measures, which is the intended behaviour. The `long-waits-under` threshold (10 %, M18's) is a free parameter and the rate is a function of it; it is published beside every rate it produced, and a different threshold is a different measurement.

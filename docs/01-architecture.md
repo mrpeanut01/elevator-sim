@@ -267,6 +267,7 @@ packages/
 │   ├── editor/            — building-config edits, validation, history, preview geometry
 │   ├── controls/          — the schema-generated parameter form: four control renderers
 │   ├── batch/             — Phase 9 W3: N paired replications, and the paired-t report on them
+│   ├── scenario/          — Phase 9 W9: goal predicates, their measured across-seed pass rates
 │   └── dev/               — the Vite dev entry points, viewer and editor (dev-only)
 └── cli/                   — headless batch entry point
     └── commands/          — list, run, compare, tune, watch
@@ -295,6 +296,10 @@ packages/
 > ([`docs/10`](10-experience-layer-contract.md) § 11, [`DECISIONS.md` § D158](../DECISIONS.md)) —
 > was added on 2026-07-29 with its line above in the same commit, for the same reason and by the
 > same rule.
+>
+> **And the one after that.** `viz/scenario/` — W9's goal pass-rate measurement
+> ([`docs/10`](10-experience-layer-contract.md) § 11 W9) — was added on 2026-07-29 the same way,
+> and the guard reddened `core` first, exactly as this note predicts it will.
 >
 > **The guard is now scoped to packages present on disk, and C28 is closed.** It used to name
 > `viz/*` directories unconditionally, so deleting `packages/viz` turned them into phantoms and
