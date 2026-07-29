@@ -37,6 +37,7 @@
 import type {
   DirectionalSplit,
   DispatcherProfile,
+  DispatcherProfiles,
   ElevatorSpecs,
   ResolvedBank,
   ResolvedBuilding,
@@ -304,6 +305,28 @@ export interface SimulationConfig {
    * pair; supply it so the run and the reference data cannot drift apart.
    */
   readonly elevatorSpecs?: ElevatorSpecs | undefined;
+  /**
+   * The whole of `data/dispatcher-profiles.json`, for its file-level `patternSwitching` block.
+   *
+   * **The plural is not a typo and it is not {@link SimulationConfig.dispatcherProfile}.** That
+   * field is the one profile this run dispatches with; this one is the file it came from, supplied
+   * for the same reason {@link SimulationConfig.elevatorSpecs} is — so the run and the reference
+   * data cannot drift apart. It is named after its file, as `trafficProfiles` and `elevatorSpecs`
+   * are, because inventing a third name for `LoadedConfig['dispatcherProfiles']` would be the
+   * drift.
+   *
+   * A weight-set selector chooses among *other profiles'* weight vectors, so a policy built from
+   * one profile cannot resolve its own arms; `patternSwitching` and the profiles it names are both
+   * file-level. Supply this and `Simulation` derives the library through `weightSetSourceFrom`,
+   * which is what lets a profile opt into `selection.policy` **as data** and have
+   * `elevator-sim run` honour it (CLAUDE.md invariant 7).
+   *
+   * Omit it and a profile that asks for a selector is refused by name rather than run without one.
+   * Every shipped profile leaves `selection.policy` at `off`, under which the derived library is
+   * never read and supplying it changes nothing — byte-identical, by the same construction
+   * `dispatch/selector.ts` describes.
+   */
+  readonly dispatcherProfiles?: DispatcherProfiles | undefined;
   /** Master seed. Persisted with the record, and the whole of invariant 5. */
   readonly seed: number | bigint;
   /** `rise-and-fall` (default), `constant-iso`, or an already-resolved template. */

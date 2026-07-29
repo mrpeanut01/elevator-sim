@@ -53,6 +53,7 @@ import type {
   DemandTemplateId,
   DispatchPolicyOptions,
   DispatcherProfile,
+  DispatcherProfiles,
   ElevatorSpecs,
   ResolvedBuilding,
   RunRecord,
@@ -471,6 +472,18 @@ export interface ExperimentResources {
   readonly dispatcherProfilesById: ReadonlyMap<string, DispatcherProfile>;
   readonly trafficProfiles: TrafficProfiles;
   readonly elevatorSpecs?: ElevatorSpecs | undefined;
+  /**
+   * The whole of `data/dispatcher-profiles.json`, for its file-level `patternSwitching` block.
+   *
+   * Copied onto every cell's `SimulationConfig.dispatcherProfiles`, which is what lets a profile
+   * opt into a weight-set selector as data and have `compare` and `tune` honour it. Optional and
+   * satisfied by `LoadedConfig` for free, so a caller that hands `loadConfig()` straight in gets
+   * it; a caller that assembles derived resources by hand and omits it gets what it got before,
+   * and a profile of its that then asks for a selector is refused by name rather than run without
+   * one. `DispatcherArmSpec.options.weightSets` still overrides it, for a study switching among a
+   * *derived* library rather than the shipped one.
+   */
+  readonly dispatcherProfiles?: DispatcherProfiles | undefined;
 }
 
 /* -------------------------------------------------------------------------- *

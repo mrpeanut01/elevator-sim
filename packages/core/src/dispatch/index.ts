@@ -90,7 +90,10 @@ export {
   createDispatchPolicy,
   resolveDispatchConfig,
   resolveWeights,
+  weightSetSourceFrom,
 } from './policy.js';
+
+export type { WeightSetLibrarySource } from './policy.js';
 
 /* -------------------------------------------------------------------------- *
  * The scoring engine (stage 3)

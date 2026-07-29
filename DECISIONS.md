@@ -8903,3 +8903,82 @@ fictional `plaza`: *"a section the schema declares is neither probed by this swe
 a reason: expected `['plaza', 'selection']` to strictly equal `['selection']`"* — and `selection`
 becoming runnable fails it too. That is the difference between an exclusion and the silent
 staleness the list had before.
+
+---
+
+## D153 — the weight-set selector reaches the **shipped runner**, and two invariant-5 holes opened by making it reachable
+
+**Date:** 2026-07-29 · **Owner:** T53 (wave 7) · **Closes:** [`docs/07`](docs/07-handoff.md) § 8's
+*"the weight-set library reaches studies and not the shipped runner"* · **Extends:**
+[§ D141](#d141) · **Corrects:** a reason string in `sim/searchSpaceLiveness.test.ts`
+
+**Context.** [§ D141](#d141) built the selector and wired it through `DispatchPolicyOptions`, which
+`runner/experiment.ts` plumbs per dispatcher arm. So a **study** could enable it and
+`elevator-sim run` / `tune` / `watch` could not. **The row was right about the code**: before this
+change a profile could author `"selection": {"policy": "fuzzy"}`, `selectionStageSchema` would
+validate it, `loadConfig` would accept it, and `elevator-sim run --dispatcher <that>` would **throw**
+`DispatchError: …no patternSwitching library was supplied`. Configurable, schema-validated,
+unit-tested, and unreachable from any shipped path — the twelfth instance of this repository's
+signature defect, caught before it shipped rather than after.
+
+**The named non-test call path**, because the standing requirement asks for a caller and not for
+reachability: `cli/src/commands/run.ts:164` `runCommand` → `planRun` → `run.ts:261` sets
+`dispatcherProfiles` on the `SimulationConfig` → `sim/simulation.ts:697`
+`weightSetSourceFrom(config.dispatcherProfiles)` → `dispatch/policy.ts:228` `resolveWeightSets` →
+`sim/simulation.ts:1465` `policy.dispatch(...)` → `dispatch/policy.ts:815` **`selectWeightSet`**.
+`compare` and `tune` reach the same step through `ExperimentResources.dispatcherProfiles`. No barrel
+re-export and no `{@link}` is load-bearing anywhere on it.
+
+**Decisions.**
+
+1. **`SimulationConfig` carries the file, not a pre-built library** — `dispatcherProfiles?:
+   DispatcherProfiles`, named for its file exactly as `trafficProfiles` and `elevatorSpecs` are, and
+   satisfied verbatim by `LoadedConfig`. *Rejected:* a `weightSetLibrary?: WeightSetSource` field,
+   which avoids the near-collision with `dispatcherProfile` but makes every caller build the library
+   itself — a third name for one object, and the drift `elevatorSpecs`'s docstring argues against.
+2. **Precedence is `override > derived`, and default-off preserves object *identity***, not
+   equality — `buildPolicy` receives the same object when nothing changed. Identity is the stronger
+   statement of *byte-identical*, and it is what the test asserts.
+3. **No `--selection` flag. Opting in is data** (invariant 7). A flag would be a code path only the
+   CLI has, and would let `run` and `compare` disagree about how a selector is enabled.
+4. **Nothing is switched on.** All twelve shipped profiles keep `selection.policy` at `off`,
+   asserted against the real file. On [§ D145](#d145)'s measurement neither arm has earned a slot.
+5. **One derivation, not two** — `benchmark/weightSetSelection.ts` delegates to core's
+   `weightSetSourceFrom` and keeps only its own refusal. Two answers to *"what are this file's weight
+   sets"* is the failure `runner/metrics.ts`'s docstring names.
+
+**Two invariant-5 holes, opened by making the selector reachable and closed here.**
+(a) `reports/persistence.ts`'s `dispatcherOptionsOf` **silently dropped `selection`** — harmless
+while nothing could turn the selector on, and the moment something can, a stored record replays as
+`off`, which is **a different dispatcher**, without saying so. (b) A hand-built `weightSets` library
+has no reference into `data/`, so no replay can rebuild it; `createStoredRun` now **refuses** such a
+config rather than storing half of one, and the shipped-data library is re-derived on replay the
+same way the profile is re-read. *Rejected:* storing the library inline (megabytes per record, and
+it freezes a snapshot of `data/` into every envelope) and a `usesWeightSets` boolean (a boolean
+cannot say **which** permuted library).
+
+### The correction this landing forced, and it is the instructive part
+
+[§ D152](#d152)'s `searchSpaceLiveness.test.ts` entry excused `selection` from the sweep with the
+reason *"runSimulation builds no weight-set selector, so a non-`off` policy cannot be run."* T54
+built that entry with a guard designed to fail **the day `selection` becomes runnable**. This lane
+is that day — and **the guard stayed green.**
+
+It was right to. The *claim* survived and the **reason did not**: `runSimulation` now does build a
+selector. What actually keeps the section unprobeable is one level down — the sweep passes no
+`dispatcherProfiles`, the field is optional, so no library reaches the policy and `resolveWeightSets`
+returns before reading one. The entry read as true while its stated mechanism had become false,
+which is exactly the failure [`CLAUDE.md`](CLAUDE.md) § *A stated mechanism goes stale the same way*
+names. **Corrected in place, with the superseded wording kept beside it**, because a reason that
+outlives its mechanism is only visible if the old one is still readable.
+
+**The general lesson, and it is not comfortable:** a guard keyed on an *outcome* ("is this section
+runnable?") does not catch a change to the *reason* that outcome holds. Both were true before and
+both are true now, and the sentence in between stopped being true without anything going red.
+
+**Impact.** `elevator-sim run` / `compare` / `tune` can enable a selector from data.
+`SimulationConfig`, `ExperimentResources`, `StoredDispatcherOptions`. Nothing about
+[§ D145](#d145)'s verdict moves — no shipped profile opts in and no published number changed.
+**Not closed:** the browser viewer still cannot enable one — `viz/src/dev/data.ts` bundles only the
+profile array and never the file-level block, so a selecting profile is refused there by name.
+Recorded in § 8 rather than fixed here.

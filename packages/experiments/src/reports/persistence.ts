@@ -64,6 +64,7 @@ import {
   METRICS_SCHEMA_VERSION,
   PERCENTILE_METHODS,
   TIMEOUT_POLICIES,
+  WEIGHT_SET_POLICIES,
   normalizeSeed,
   parseRunRecord,
   summarizeRun,
@@ -175,6 +176,20 @@ export function createStoredRun(input: CreateStoredRunInput): StoredRunRecord {
   if (!Number.isInteger(input.replication) || input.replication < 0) {
     throw new ReportsError(
       `replication must be a non-negative integer; received ${input.replication}`,
+    );
+  }
+  // A configuration this module cannot reconstruct must not be stored as though it could be.
+  //
+  // `dispatcherOptions.weightSets` is a hand-built weight-set library — the study half of § D141,
+  // where the arms are a *permutation* of the shipped map rather than the shipped map itself. It
+  // has no id and no reference into `data/`, so nothing a replay re-reads can rebuild it, and a
+  // record that omitted it would replay a dispatcher with different arms and report the divergence
+  // as a determinism failure. The shipped route needs none of this: a profile opts in through
+  // `selection.policy`, and `SimulationConfig.dispatcherProfiles` derives the arms from the same
+  // file the replay re-reads.
+  if (config.dispatcherOptions?.weightSets !== undefined) {
+    throw new ReportsError(
+      `Refusing to store run "${result.runId}": its dispatcherOptions carry a hand-built weightSets library, which has no reference into data/ and therefore cannot be reconstructed on replay. A record that dropped it would replay a dispatcher with different weight-set arms and look like a determinism failure (CLAUDE.md invariant 5). Opt the profile into selection.policy and let SimulationConfig.dispatcherProfiles derive the arms, or do not persist this run.`,
     );
   }
 
@@ -695,7 +710,13 @@ function parseDemandOptions(value: unknown, path: Path): StoredDemandOptions {
 
 function parseDispatcherOptions(value: unknown, path: Path): StoredDispatcherOptions {
   const object = expectObject(value, path);
-  rejectUnknownKeys(object, path, ['eligibility', 'normalization', 'weights', 'hardConstraints']);
+  rejectUnknownKeys(object, path, [
+    'eligibility',
+    'normalization',
+    'weights',
+    'hardConstraints',
+    'selection',
+  ]);
 
   const eligibility = readOptional(object, 'eligibility', path, (entry, entryPath) => {
     const inner = expectObject(entry, entryPath);
@@ -724,6 +745,42 @@ function parseDispatcherOptions(value: unknown, path: Path): StoredDispatcherOpt
     });
   });
 
+  const selection = readOptional(object, 'selection', path, (entry, entryPath) => {
+    const inner = expectObject(entry, entryPath);
+    rejectUnknownKeys(inner, entryPath, [
+      'policy',
+      'hysteresisS',
+      'observationWindowS',
+      'lobbyArrivalRateGain',
+      'interfloorRateGain',
+      'downPeakRateGain',
+      'switchMargin',
+    ]);
+    return Object.freeze({
+      ...spread('policy', readOptional(inner, 'policy', entryPath, (raw, rawPath) =>
+        expectEnum(raw, rawPath, WEIGHT_SET_POLICIES),
+      )),
+      ...spread('hysteresisS', readOptional(inner, 'hysteresisS', entryPath, expectNumber)),
+      ...spread(
+        'observationWindowS',
+        readOptional(inner, 'observationWindowS', entryPath, expectNumber),
+      ),
+      ...spread(
+        'lobbyArrivalRateGain',
+        readOptional(inner, 'lobbyArrivalRateGain', entryPath, expectNumber),
+      ),
+      ...spread(
+        'interfloorRateGain',
+        readOptional(inner, 'interfloorRateGain', entryPath, expectNumber),
+      ),
+      ...spread(
+        'downPeakRateGain',
+        readOptional(inner, 'downPeakRateGain', entryPath, expectNumber),
+      ),
+      ...spread('switchMargin', readOptional(inner, 'switchMargin', entryPath, expectNumber)),
+    });
+  });
+
   return Object.freeze({
     ...spread('eligibility', eligibility),
     ...spread('normalization', normalization),
@@ -732,6 +789,7 @@ function parseDispatcherOptions(value: unknown, path: Path): StoredDispatcherOpt
       'hardConstraints',
       readOptional(object, 'hardConstraints', path, expectStringArray),
     ),
+    ...spread('selection', selection),
   });
 }
 
@@ -890,6 +948,14 @@ function dispatcherOptionsOf(
     ...spread('normalization', options.normalization),
     ...spread('weights', options.weights),
     ...spread('hardConstraints', options.hardConstraints),
+    // `selection` joined this list when T53 made the weight-set selector reachable from a shipped
+    // run. It was dropped silently before that, which was invisible while nothing could turn the
+    // selector on and an invariant-5 violation the moment something could: a record that stored a
+    // `selection` override as nothing replays as the default, `off`, and replays a **different
+    // dispatcher** without saying so. Six scalars round-trip exactly; the *library* those scalars
+    // select among does not, which is why {@link createStoredRun} refuses a `weightSets` override
+    // rather than storing half of one.
+    ...spread('selection', options.selection),
   });
 }
 

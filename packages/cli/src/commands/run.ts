@@ -248,6 +248,17 @@ export function planRun(config: LoadedConfig, parsed: ParsedArgs): RunPlan {
     dispatcherProfile: profile,
     trafficProfiles: config.trafficProfiles,
     elevatorSpecs: config.elevatorSpecs,
+    // The file, beside the one profile taken out of it — and **this is the shipped caller the
+    // weight-set selector did not have.** § D141 built the mechanism and reached it only through
+    // `DispatchPolicyOptions.weightSets`, which `experiments/src/runner/experiment.ts` plumbs and
+    // no CLI command does, so a study could switch weight sets mid-run and `run` / `watch` could
+    // not. `patternSwitching` and the profiles its arms name are both file-level; handing over
+    // the file is what lets a profile opt in through `selection.policy` as **data** rather than
+    // through a code path only a study can reach (CLAUDE.md invariant 7).
+    //
+    // Unconditional, and there is no `--selection` flag: no shipped profile opts in, so this is
+    // inert on every command line anybody types today, and it is the data file that turns it on.
+    dispatcherProfiles: config.dispatcherProfiles,
     seed,
     // A run that cannot clear its demand is a measurement of saturation, not a crash. Report it
     // and let the summary's own saturation test decide what may be quoted.

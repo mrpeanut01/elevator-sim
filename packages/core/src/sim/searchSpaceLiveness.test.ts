@@ -146,7 +146,15 @@ const PROFILE_OBJECT_SECTIONS = [
  * cannot outlive its reason.
  */
 const SECTIONS_THIS_SWEEP_CANNOT_RUN: Readonly<Record<string, string>> = Object.freeze({
-  selection: 'runSimulation builds no weight-set selector, so a non-`off` policy cannot be run',
+  // Corrected when T53 landed. The *claim* survived that change and the *reason* did not:
+  // `runSimulation` now does build a weight-set selector — `weightSetSourceFrom(config
+  // .dispatcherProfiles)` — so the old wording ("builds no weight-set selector") became false
+  // while this entry still read as true. What actually keeps `selection` unprobeable here is one
+  // level down: this sweep hands `runSimulation` no `dispatcherProfiles`, and the field is
+  // optional, so no library reaches the policy and `resolveWeightSets` returns before reading one.
+  // Supplying the file here is what would make the section runnable, and is the real gate.
+  selection:
+    'this sweep passes no `dispatcherProfiles`, so no weight-set library reaches the policy and a non-`off` policy cannot be run',
 });
 
 function isParameterSpec(value: unknown): value is DispatchParameterSpec {

@@ -99,6 +99,7 @@ export function withProfiles(
     dispatcherProfilesById,
     trafficProfiles: config.trafficProfiles,
     elevatorSpecs: config.elevatorSpecs,
+    dispatcherProfiles: config.dispatcherProfiles,
   });
 }
 
