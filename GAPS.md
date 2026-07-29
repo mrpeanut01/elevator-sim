@@ -1,6 +1,7 @@
 # Known gaps — stated, measured where possible, and not closed
 
-**As of:** 2026-07-29, wave 9 · **Suite:** 225 files / ~4 117 tests · **Branch:** `integration`
+**As of:** 2026-07-29, wave 9 closed · **Suite:** 225 files / 4 122 tests, 10 skipped, `tsc -b`
+clean · **Branch:** `integration` at `55f04f8`, pushed
 
 This document exists because the alternative is worse. Every item here is something the project
 **does not do**, **cannot yet say**, or **says with a caveat** — collected in one place rather than
@@ -83,9 +84,14 @@ callers and is classified rather than deleted · `stats/` consolidation is unsta
 
 - **Phase 9 has a criterion for the first time** ([§ D163](DECISIONS.md)), written **after** seven of
   its nine units existed. Its defence is structural, not chronological: the clauses that decide it
-  were ones the product **failed** at the time of writing. **It still has no status row**, because
-  it has not been measured against as a whole — and the row and the verdict land together or
-  neither does.
+  were ones the product **failed** at the time of writing. **Both load-bearing clauses now measure
+  as satisfied** — clause 2 (mode parity) by [§ D168](DECISIONS.md), clause 1 (the honesty property
+  under search) by [§ D171](DECISIONS.md)/[§ D172](DECISIONS.md), whose `OUTSTANDING` register is
+  empty. **That is not the same as a formal acceptance pass.** Clauses 3–5 (goal pass rates, the
+  named non-test caller, the viewer driven rather than read) are standing requirements this wave
+  checked per-lane rather than swept once as a whole, and no phase-status row has been written. **It
+  still has no status row**, deliberately — the row and the verdict land together or neither does,
+  and that measurement is a distinct piece of work this wave did not do.
 - **Phase 9's own contract has been wrong about the code four times** in this wave — a reachability
   claim, a field list, a hard-coded percentage in an example message, and a goal table disagreeing
   with the shipped data in three of five cells. Being *binding* does not make a document *right*.

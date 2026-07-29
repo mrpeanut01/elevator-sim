@@ -566,3 +566,59 @@ one built to find it. Hunting all five is now a standing item in a lane brief, n
   spurious timeout failures that said nothing about the code.
 - **Every unit found its governing document wrong about the code at least once**, and `docs/10`
   three times. Being *binding* does not make a document *right*.
+
+---
+
+# Wave 9 — CLOSED 2026-07-29
+
+**Scope, by explicit instruction:** drive the debt affecting gameplay or simulation toward zero,
+in parallel where possible. Six items were out of scope by that filter (internal hygiene that
+cannot produce a wrong number or a wrong screen) and stayed listed rather than closed quietly.
+
+**Final:** `55f04f8`, pushed to `origin/integration`. **225 test files, 4 122 tests passed, 10
+skipped**, `tsc -b` clean. Baseline at wave open: `3fec814` — 209 files, 3 903 passed. All wave 9
+worktrees and branches removed.
+
+| ID | Unit | Verdict |
+|---|---|---|
+| T71 | Non-elevator transport mode in `core` | § D167 — largest modelling debt closed; double-deck verdict **flipped while its evidence base narrowed** |
+| T73 | `nearest-car` defaults | § D164 — the viewer's default was already fixed and **undefended**; live site was the CLI's example list |
+| T74 | Three viewer defects | § D165 — two of three reports were wrong about their own cause |
+| T75 | Viewer selector + two `core` schema rows | § D166 — both "blocked on a `core` fix" refusals understated themselves, in opposite directions |
+| T76 | Phase 9 U2 mode split + live weight editor | § D168 — mode parity satisfies § D163 clause 2; found a never-hide item **no mode had ever drawn** |
+| T78 | Honesty property under search | § D171 — satisfies § D163 clause 1; found **two real contract violations**, both owner-resolved |
+| T79 | Sky-lobby escalators + campaign stage 6 | § D170 — corrected the orchestrator's own false premise about the building's geometry |
+| T70 | Phase-varying directional split | § D169 — built the condition Phase 6c's refusal named; **ran no selector arm**, by design |
+| T80 | Two merge-exposed honesty findings | § D172 — suppressed-mean report was a **false positive**; narrowing it surfaced five more of the same class |
+
+## Where Phases 1–7 and 9 stand at close
+
+**Phase 6 is still ⚠️ partial.** The condition its refusal named — no shipped template varying
+directional mix within a run — no longer exists, but **no selector arm has been measured on the
+new template**. That measurement is explicitly the next piece of work, not done here. See
+[`GAPS.md`](GAPS.md) § 1.
+
+**Phase 9 has a criterion for the first time** ([§ D163](DECISIONS.md)), and both of its
+load-bearing clauses now measure as satisfied. It still carries no status row — a formal
+acceptance pass is a distinct piece of work this wave did not do, deliberately, per § D163's own
+rule that the row and the verdict land together.
+
+## The two results worth carrying past this wave
+
+**A negative result, stated as cleanly as the positive ones.** The honesty search found two real
+contract violations — a probability word reaching a schema surface, and a comparison panel naming
+a winner at n = 2 against a stated floor of 50. Both were owner judgement calls, not code defects,
+and both are resolved with the reasoning on the record rather than silently patched.
+
+**A false positive, and the discipline of narrowing a property instead of widening an exclusion.**
+The suppressed-mean report looked exactly like a third instance of a leak this repository has
+closed twice before. It was arithmetically impossible instead — a run-level count matched by an
+over-eager cue window — and narrowing the check correctly surfaced **five more of the same class**
+before it stabilised. The closed leak from two waves ago is now reconfirmed by an injected fault
+rather than by rereading the code that fixed it.
+
+## Full gap register
+
+[`GAPS.md`](GAPS.md) — every known limitation in one place, ordered by whether it can produce a
+wrong number, a wrong screen, or neither. Written so the next reader does not have to reconstruct
+it from thirty commit messages.
