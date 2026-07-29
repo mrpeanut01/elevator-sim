@@ -197,6 +197,36 @@ async function vizSources(): Promise<readonly SourceFile[]> {
 /** The DOM globals a browser-free module must not name. */
 const DOM_PATTERN = /\b(?:document|window|requestAnimationFrame|HTMLCanvasElement)\b/;
 
+/**
+ * Member names removed, so the rule is about **globals** rather than about spelling.
+ *
+ * The third narrowing this file has needed, and the same argument as {@link stripComments} and
+ * {@link stripStringLiterals}: a rule about code must not fire on something that is provably not
+ * code of the kind it forbids. `foo.window` is a property of `foo`. It cannot be the DOM's
+ * `window` under any binding, because the global is reached by a *bare* reference — so matching it
+ * is a false positive by construction, not a judgement call about how likely a collision is.
+ *
+ * It bit on a real field. `core`'s `RunSummary.window` is the {@link ReportWindow} every cohort
+ * statistic is computed over, and `docs/10-experience-layer-contract.md` § 7.4 makes carrying it
+ * into the recording a prerequisite for the whole of U5 — *"riders waited 25 seconds on average"*
+ * is false without *"during the busiest 5 minutes"*. `record/recordRun.ts` has to read
+ * `summary.window` to copy it, and no rename in this package can change what `core` calls its own
+ * field.
+ *
+ * **What is deliberately still caught**, and why the narrowing does not hollow the rule out:
+ *
+ * - `document.getElementById(…)` — the receiver is a bare reference, not a member.
+ * - `const x = document;` and `foo(document)` — the finding this rule actually produced was a
+ *   parameter named `document` shadowing the global, passed as a value. Bare, so still caught.
+ * - `window.matchMedia(…)`, `requestAnimationFrame(…)` — bare.
+ *
+ * Only `x.window`, `x.document` and friends are exempted, and the positive control below is what
+ * proves the narrowing did not silence the two files that genuinely touch the DOM.
+ */
+function stripMemberNames(text: string): string {
+  return text.replace(/\.\s*[A-Za-z_$][\w$]*/g, '.');
+}
+
 /** Files whose job is to touch the outside world. */
 const isTest = (id: string): boolean => id.endsWith('.test.ts') || id.endsWith('.test-helper.ts');
 const isDev = (id: string): boolean => id.startsWith('dev/');
@@ -244,9 +274,26 @@ describe('the DOM is confined to the dev entry point', () => {
   it('is not touched by the contract, the frame producer, playback, the renderer or the editor', async () => {
     const offenders = (await vizSources())
       .filter((file) => !isDev(file.id) && !isTest(file.id))
-      .filter((file) => DOM_PATTERN.test(file.identifiers))
+      .filter((file) => DOM_PATTERN.test(stripMemberNames(file.identifiers)))
       .map((file) => file.id);
     expect(offenders).toEqual([]);
+  });
+
+  it('negative control: a bare global is caught, and a property of that name is not', () => {
+    // The narrowing, stated as a test rather than as a comment. The first four are the shapes
+    // `dev/main.ts` uses; the last two are the shapes `record/recordRun.ts` and
+    // `contract/types.ts` need in order to carry `RunSummary.window` into the recording.
+    for (const caught of [
+      'document.getElementById(id)',
+      'const node = document;',
+      'window.matchMedia(query)',
+      'requestAnimationFrame(tick)',
+    ]) {
+      expect(DOM_PATTERN.test(stripMemberNames(caught)), caught).toBe(true);
+    }
+    for (const allowed of ['summary.window.startS', 'result.summary.window', 'a.document.b']) {
+      expect(DOM_PATTERN.test(stripMemberNames(allowed)), allowed).toBe(false);
+    }
   });
 
   it('positive control: the rule still catches the entry point that does touch the DOM', async () => {
@@ -257,9 +304,12 @@ describe('the DOM is confined to the dev entry point', () => {
     for (const id of ['dev/main.ts', 'dev/editor.ts']) {
       const file = sources.find((candidate) => candidate.id === id);
       expect(file, `${id} is missing`).toBeDefined();
-      expect(DOM_PATTERN.test(file?.identifiers ?? ''), `${id} should trip the DOM rule`).toBe(
-        true,
-      );
+      // Through the *same* narrowing the rule above applies. Testing the un-narrowed form here
+      // would leave the positive control passing for a reason the real rule no longer uses.
+      expect(
+        DOM_PATTERN.test(stripMemberNames(file?.identifiers ?? '')),
+        `${id} should trip the DOM rule`,
+      ).toBe(true);
     }
   });
 

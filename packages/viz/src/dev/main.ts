@@ -51,6 +51,7 @@ import {
   type SceneSelection,
 } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
+import { runSummaryFigures } from '../render/runSummary.js';
 import { mountEditor } from './editor.js';
 import { mountParameterForm } from './parameterForm.js';
 import { createLoader } from './bootstrap.js';
@@ -104,6 +105,8 @@ interface Elements {
   readonly error: HTMLElement;
   readonly banner: HTMLElement;
   readonly description: HTMLElement;
+  /** Where `render/runSummary.ts`'s figures are drawn — `docs/10` § 11 W2. */
+  readonly runSummary: HTMLElement;
   /** Tab button and its panel, per surface. Keyed by {@link TabName}, so a fourth is one entry. */
   readonly tabs: Readonly<Record<TabName, HTMLButtonElement>>;
   readonly panels: Readonly<Record<TabName, HTMLElement>>;
@@ -147,6 +150,7 @@ function elements(): Elements {
     error: find<HTMLElement>('error'),
     banner: find<HTMLElement>('banner'),
     description: find<HTMLElement>('frame-description'),
+    runSummary: find<HTMLElement>('run-summary'),
     tabs: {
       viewer: find<HTMLButtonElement>('tab-viewer'),
       editor: find<HTMLButtonElement>('tab-editor'),
@@ -437,6 +441,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ui.playPause.textContent = playback.state === 'playing' ? 'Pause' : 'Play';
     ui.status.textContent = statusLine(next);
     ui.banner.textContent = `${next.buildingName} · ${next.dispatcherProfileId} · seed ${next.seed}`;
+    // `docs/10` § 11 W2's non-test caller. Drawn on adoption rather than in {@link tick}: every
+    // figure is a property of the whole run, so redrawing them at 60 Hz would cost a DOM rebuild
+    // per frame to display numbers that cannot have changed.
+    drawRunSummary(ui.runSummary, next);
     populateBankFilter(next);
     landingOptionsKey = NO_OPTIONS_YET;
     populateLandings(next, next.startedAt);
@@ -1032,6 +1040,85 @@ function unservedFloors(recording: VizRecording): readonly string[] {
 function applyParam(select: HTMLSelectElement, value: string | null): void {
   if (value === null) return;
   if ([...select.options].some((option) => option.value === value)) select.value = value;
+}
+
+/**
+ * The run summary, instantiated — `docs/10-experience-layer-contract.md` § 11 **W2**'s named
+ * non-test caller.
+ *
+ * Thin on purpose, and thin in the specific way the rest of this package is: every decision about
+ * *what* a figure says, whether it is suppressed, what its `n` is and whether a natural-frequency
+ * restatement is admissible is made in `render/runSummary.ts`, where it is asserted against a
+ * recomputation under plain Node. This function knows only how to turn a {@link SummaryFigure}
+ * into elements.
+ *
+ * **Nothing here keys on a figure id.** The classes are derived from `kind` and `severity`, so a
+ * twelfth figure appears with no edit to this file and no edit to `index.html` — the same rule W4
+ * kept for the parameter form, and the reason neither surface holds a list of metric names.
+ *
+ * The first figure names the seed, which is R7: *"the seed stays visible and copyable in every
+ * mode"*. It is rendered as text rather than into the canvas, and that is the copyable half — a
+ * bitmap cannot be selected, and `Export PNG` is exactly the path that turns this screen into one.
+ */
+function drawRunSummary(container: HTMLElement, recording: VizRecording): void {
+  const doc = container.ownerDocument;
+  container.replaceChildren();
+  for (const item of runSummaryFigures(recording)) {
+    const row = doc.createElement('div');
+    row.className = `figure figure-${item.kind}${item.severity === 'warning' ? ' figure-warning' : ''}`;
+
+    const label = doc.createElement('span');
+    label.className = 'figure-label';
+    label.textContent = `${item.label} `;
+    row.append(label);
+
+    const value = doc.createElement('span');
+    value.className = 'figure-value';
+    value.textContent = item.value;
+    row.append(value);
+
+    if (item.count !== undefined) {
+      const count = doc.createElement('span');
+      count.className = 'figure-count';
+      // R13: the count is in the same visual unit as the figure, never in a tooltip and never
+      // behind a disclosure. `n = 5` is not a caveat on `11.3 s`; it is part of what it means.
+      //
+      // The leading space is not decoration. Adjacent inline elements have no whitespace between
+      // them in the *text* layer, so a margin separates them on screen and a screen reader — and
+      // the clipboard — get `suppressedn = 234 rides`. Seen in the driven session before it was
+      // fixed. `KB-13`'s whole point is that the two readers are told the same thing.
+      count.textContent = ` ${item.count}`;
+      row.append(count);
+    }
+
+    for (const bar of item.bars) {
+      const line = doc.createElement('div');
+      line.className = 'figure-bar';
+      const barLabel = doc.createElement('span');
+      barLabel.className = 'figure-bar-label';
+      barLabel.textContent = bar.label;
+      const track = doc.createElement('span');
+      track.className = 'figure-bar-track';
+      const fill = doc.createElement('span');
+      fill.className = 'figure-bar-fill';
+      fill.style.display = 'block';
+      fill.style.width = `${String(Math.round(bar.fraction * 1000) / 10)}%`;
+      track.append(fill);
+      const text = doc.createElement('span');
+      text.className = 'figure-bar-text';
+      text.textContent = bar.text;
+      line.append(barLabel, track, text);
+      row.append(line);
+    }
+
+    if (item.note !== undefined) {
+      const note = doc.createElement('p');
+      note.className = 'figure-note';
+      note.textContent = item.note;
+      row.append(note);
+    }
+    container.append(row);
+  }
 }
 
 function statusLine(recording: VizRecording): string {

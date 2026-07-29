@@ -20,6 +20,8 @@ import {
   type SimulationConfig,
 } from '@elevator-sim/core';
 
+import type { VizSummary } from './contract/types.js';
+
 /**
  * Door timings for the synthetic buildings the unit tests draw.
  *
@@ -127,6 +129,58 @@ export interface FixtureOptions {
    * about the statistics changes, and `VizSummary.awtIsValid` still carries the suppression.
    */
   readonly onTimeout?: 'throw' | 'report';
+}
+
+/**
+ * A schema-version-5 {@link VizSummary}, for the suites that build a synthetic recording.
+ *
+ * Written here rather than inline in four test files, and the reason is the change that created
+ * it: `docs/10` § 11 W2 added eleven fields to `VizSummary` in one commit, and four suites held
+ * a hand-written literal that then failed to compile. A helper means the twelfth field is one
+ * edit, and — more importantly — means a suite cannot quietly keep an *old* summary shape by
+ * spreading a stale literal.
+ *
+ * The defaults describe a small, healthy, fully-measured run: nothing suppressed, energy
+ * recorded, an interval reconstructed. A test that wants a refusal overrides the field that
+ * causes it, which is the direction that makes the override visible in the diff.
+ */
+export function fixtureSummary(overrides: Partial<VizSummary> = {}): VizSummary {
+  return {
+    saturated: false,
+    awtIsValid: true,
+    meanWaitS: 12,
+    wait95S: 30,
+    meanTimeToDestinationS: 40,
+    generated: 50,
+    delivered: 50,
+    undelivered: 0,
+    reportWindow: { id: 'peak-5min', startS: 60, endS: 360 },
+    windowSeconds: 300,
+    waitCount: 44,
+    timeToDestinationCount: 40,
+    pctOverLongWait: 9,
+    longWaitThresholdS: 60,
+    unservedCount: 2,
+    handlingCapacity: { personsPer5Min: 41, offeredPer5Min: 62, pctPopulationPer5Min: 12.4 },
+    achievedInterval: { meanS: 30, coefficientOfVariation: 0.4, count: 11 },
+    serviceLevel: {
+      verdict: 'served',
+      longestWaitS: 88,
+      longestWaitIsCensored: false,
+      overHorizonCount: 0,
+      arrivalCount: 46,
+      horizonS: 900,
+    },
+    energy: {
+      measured: true,
+      workKJ: 1234.5,
+      workPerServedLegKJ: 30.8,
+      deliveredLegCount: 40,
+      distanceM: 2100,
+      starts: 96,
+    },
+    ...overrides,
+  };
 }
 
 export function requireBuilding(config: LoadedConfig, id: string): ResolvedBuilding {

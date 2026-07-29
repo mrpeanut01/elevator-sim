@@ -8999,3 +8999,111 @@ both are true now, and the sentence in between stopped being true without anythi
 **Not closed:** the browser viewer still cannot enable one — `viz/src/dev/data.ts` bundles only the
 profile array and never the file-level block, so a selecting profile is refused there by name.
 Recorded in § 8 rather than fixed here.
+
+---
+
+## D154 — `VizSummary` is widened to what U5 needs, **`null` where `core` says `NaN`**, and the twelfth dead seam is closed on the way
+
+**Date:** 2026-07-29 · **Owner:** T60 (wave 8) · **Delivers:** `docs/10-experience-layer-contract.md`
+§ 11 **W2** · **Opens:** nothing · **Applies:** [§ D111](#d111) (the one suppression gate),
+[§ D106](#d106) (energy is an axis)
+
+**Context.** `VizSummary` carried nine fields. `docs/10` § 2.9 lists what `RunSummary` has and it
+does not — the reporting window, the long-wait triple, handling capacity, the achieved interval,
+the service level and, after that section's own correction, energy — and § 7.4 makes the window a
+**prerequisite** for every plain-language figure rather than a label: *"riders waited 25 seconds on
+average"* is false without *"during the busiest 5 minutes"*. W2 adds them, and W2's stated risk is
+that it *"is the unit most likely to acquire a field with no consumer"*.
+
+**Four decisions, and the second is the one that is not obvious.**
+
+### 1. One field, one figure, same commit — and liveness measured twice, not once
+
+Every field lands with `src/render/runSummary.ts`, mounted by `drawRunSummary` in
+`src/dev/main.ts`. A field can go dead in **two** places and the standing requirement only names
+one, so both are asserted: the **renderer** must read the field (change it, the named figure's text
+must change) and the **recorder** must copy it from the `RunSummary` the simulation produced (a
+recorder writing a plausible constant satisfies every renderer test and describes a different run).
+
+Measured, not asserted: **30 renderer mutations and 25 recorder mutations, 55 of 55 red.** The one
+that came back green first — `wait95S` — was a false negative in the *mutation*, not a dead field:
+that value has two independent readers (the figure and its natural-frequency note) and freezing one
+leaves the other live. Recorded because it is the shape of mutation testing's own failure mode.
+
+A guard derives the field list from `fixtureSummary()` by walking its leaves, so a twelfth field
+added without a liveness row fails the suite rather than shipping unread.
+
+### 2. The contract says `null` where `core` says `NaN`, and the difference is not cosmetic
+
+`core` uses `NaN` for *"not measured"* so an absent measurement cannot arrive disguised as a zero,
+and `docs/10` § 7.3 clause 5 restates it for energy. A **recording is serialised**: the replay
+harness round-trips one through JSON, **Save recording** writes one to a file, and
+`readRecordingDocument` reads one back. `JSON.stringify(NaN)` is `null`. So a `number`-typed field
+holding `NaN` comes back as a `null` the type system says is a number, and the first `.toFixed(1)`
+on it throws or prints an invention — **on the loaded copy only**, which is the half of the viewer
+no unit test builds by hand.
+
+**Alternatives.** (a) Keep `NaN` and accept the loaded-copy hazard. (b) Keep `NaN` and add a
+custom serialiser — a second encoding of the recording, and a second thing to keep in step with the
+schema version. (c) `null`, converted once, in `describeSummary`.
+
+**Chosen: (c).** It carries the same fact — *not measured*, never zero — in the encoding JSON
+already has, and it makes the renderer's obligation structural: there is no zero to draw, because
+there is no number. `runSummary.test.ts` asserts the round trip is exact **and** that no leaf is
+non-finite, because `toEqual` treats `NaN` as equal to itself and would pass on the very value the
+convention exists to exclude.
+
+This is a **stated deviation** from § 7.3's *"`NaN`-not-zero"* wording, in the direction of the
+rule's reason rather than its letter.
+
+### 3. `VizSummary.reportWindow`, not `VizSummary.window` — a rename, and the rule that forced it
+
+`docs/10` § 11 W2 names the field `window`. `packages/viz/src/boundaries.test.ts` confines the DOM
+to `src/dev/` by forbidding browser-free modules to name `window`, `document`,
+`requestAnimationFrame` or `HTMLCanvasElement`, and its own docstring argues **against** loosening
+the pattern, because loosening it stops catching a bare `document` passed as a value — which is the
+one real finding the rule has produced.
+
+**Alternatives.** (a) Name the field `window` and allowlist the three files. (b) Loosen the pattern
+to `window.`. (c) Rename the contract's field.
+
+**Chosen: (c) for the contract, plus one narrowing that is not (b).** The field is `reportWindow`;
+`windowSeconds` is unchanged and never tripped the rule. `record/recordRun.ts` still has to *read*
+`core`'s own `summary.window`, and no rename here can change what `core` calls its field — so the
+rule now strips **member-access positions** before matching. `foo.window` is a property of `foo`
+and cannot be the global under any binding, so matching it is a false positive by construction.
+`document.getElementById(…)`, `const x = document;`, `foo(document)` and `window.matchMedia(…)` are
+all still caught; a negative control asserts both halves and the existing positive control was
+re-pointed through the same narrowing so it cannot pass for a reason the live rule no longer uses.
+
+**The disagreement with `docs/10` is reported rather than papered over**: the doc's field list was
+written without knowing this package forbids the identifier.
+
+### 4. The panel is DOM, not canvas — a stated deviation from W2's named caller
+
+W2 names `render/overlay.ts` and `render/canvas.ts`. The figures are drawn in the DOM instead, for
+three reasons: R3 replaces a suppressed figure with a **reason**, and the shipped reason strings run
+past 200 characters against a canvas panel whose remaining height is allocated by arithmetic three
+browser measurements went into; R7 wants the seed **copyable**, and a bitmap cannot be selected;
+and every figure is a property of the **run**, not the frame, so redrawing them at 60 Hz is the
+wrong surface. The one clause that must be on the bitmap **is**: `drawFooter` now names the window,
+because **Export PNG** is what turns this screen into a file that leaves the building.
+
+### What was found on the way
+
+**A twelfth dead seam, inside the type W2 widens.** `VizSummary.meanTimeToDestinationS` has existed
+since version 1 and had **no non-test caller**: every reference in the tree was `canvas.test.ts`,
+`overlayRender.test.ts` or `playback.test.ts`. On a sky-lobby building it is *the* number that
+matters and AWT is not (§ 7.1), and the viewer never drew it. It is drawn now, as `door to door`,
+with `n = <journeys>` beside it. The count above — ten in code, one in `data/` — moves to **eleven
+in code**, and the earlier numbering elsewhere in these documents is not renumbered.
+
+**Three shipped buildings reconstruct no departure interval at all.** Measured at seed 20 260 727,
+900 s, `eta`, `onTimeout: 'report'`: `achievedInterval.count === 0` on `garden-apartments`,
+`mixed-use-high-rise` and `vertical-city`. This is `IntervalStatistics`' documented `unmeasurable`
+and too-few-departures behaviour reaching a screen for the first time, and the figure says so in
+words rather than printing a zero. It is a fact about those buildings, not a defect found here.
+
+**Impact.** `VIZ_SCHEMA_VERSION` 4 → 5. `record/document.ts` is the reader: it refuses a version-4
+recording on load with *"re-record it from its seed"*, which is the behaviour it already had for a
+version-3 one and the reason the constant exists.

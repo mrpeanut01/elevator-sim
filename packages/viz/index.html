@@ -107,6 +107,31 @@
       .control-inactive { color: var(--warn); margin: 4px 0 0; }
       .control-reset { margin-left: 6px; }
 
+      /* docs/10 § 11 W2 — the run summary. Keyed on the classes the mount emits for *every*
+         figure, never on a figure id: `render/runSummary.ts` decides what a figure is, and a
+         stylesheet that knew the difference between `awt` and `energy` would be a second place
+         that had to be edited when a twelfth figure arrives. */
+      .run-summary {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2px 18px; padding: 6px 12px; max-height: 30vh; overflow: auto;
+        border-top: 1px solid var(--edge); background: var(--panel2);
+      }
+      .figure { padding: 4px 0; border-bottom: 1px solid var(--edge); }
+      .figure-label { color: var(--dim); }
+      .figure-value { color: var(--text); }
+      /* KB-15: the warning colour is a second signal. The words in `figure-note` are the first. */
+      .figure-warning .figure-value { color: var(--warn); }
+      .figure-absent .figure-value, .figure-suppressed .figure-value { color: var(--warn); }
+      .figure-count { color: var(--dim); margin-left: 6px; }
+      .figure-note { color: var(--dim); margin: 2px 0 0; }
+      /* § 3.5's paired bar. The number is printed beside every bar, so length is never the only
+         carrier of a value — a bar clipped by a narrow column must still be readable. */
+      .figure-bar { display: flex; gap: 6px; align-items: center; margin-top: 2px; }
+      .figure-bar-label { color: var(--dim); min-width: 5em; }
+      .figure-bar-track { flex: 1; min-width: 40px; height: 8px; background: var(--bg); border: 1px solid var(--edge); }
+      .figure-bar-fill { height: 100%; background: var(--focus); }
+      .figure-bar-text { color: var(--text); min-width: 4em; text-align: right; }
+
       .sr-only {
         position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
         overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -193,6 +218,12 @@
         </div>
 
         <p id="frame-description" class="sr-only" aria-live="polite"></p>
+
+        <!-- docs/10 § 11 W2 — the run summary. Every field VizSummary gained at schema 5 is
+             drawn here, by `render/runSummary.ts` through `dev/main.ts`. Rows are emitted from
+             the figure list; nothing below keys on a figure id, because a stylesheet that named
+             one would be the first list of metric names in this product's UI. -->
+        <section id="run-summary" class="run-summary" aria-label="Run summary"></section>
 
         <footer class="bar">
           <button id="play-pause">Play</button>
