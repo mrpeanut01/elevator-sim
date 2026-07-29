@@ -81,9 +81,10 @@ describe('Secure Tower, before Run', () => {
     expect(warning).toContain('nearest-car does not read credentials');
     expect(warning).toContain('up-down-buttons');
     expect(warning).toContain('permanently unassignable');
-    // Named, in building order, all of them.
-    expect(warning).toContain('(2, 3, 4');
-    expect(warning).toContain('29, 30)');
+    // Named, in building order, as one run — every affected floor and no reader asked to parse
+    // 29 comma-separated ids. The count is stated separately, so nothing is hidden.
+    expect(warning).toContain('(2–30)');
+    expect(warning).toContain('29 of its 30 floors');
     expect(result.restrictedFloorIds).toHaveLength(29);
   });
 

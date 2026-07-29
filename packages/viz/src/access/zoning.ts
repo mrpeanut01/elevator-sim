@@ -158,6 +158,45 @@ export function restrictedFloorIds(
 }
 
 /**
+ * A floor-id list as **runs**, using the building's own order — `2, 3, … 30` becomes `2–30`.
+ *
+ * Written for § 10.3's message, and it is a legibility fix rather than a length one: on Secure
+ * Tower the warning named 29 floors as 29 comma-separated ids, which no reader parses, and which
+ * took five lines of the viewer's column away from the canvas underneath it. The count is stated
+ * separately and is never replaced by this, so nothing is hidden — a reader still learns that 29
+ * floors are affected, and now also learns that they are contiguous.
+ *
+ * Runs are consecutive **positions in `orderedIds`**, never arithmetic on the id. Floor ids are
+ * strings — `G`, `Zone 5 hotel`, `B2` — and `expandFloors` guarantees nothing about them being
+ * numbers. `2–8, 16–22` on a building whose zones are not contiguous is exactly right, and would
+ * be wrong under any numeric reading of `G`.
+ *
+ * A run of two is written out in full (`2, 3`), because `2–3` is longer to read than what it
+ * replaces and says less.
+ */
+export function floorRunsOf(
+  orderedIds: readonly string[],
+  selected: readonly string[],
+): string {
+  const chosen = new Set(selected);
+  const runs: string[][] = [];
+  let current: string[] = [];
+  for (const id of orderedIds) {
+    if (chosen.has(id)) current.push(id);
+    else if (current.length > 0) {
+      runs.push(current);
+      current = [];
+    }
+  }
+  if (current.length > 0) runs.push(current);
+  return runs
+    .map((run) =>
+      run.length > 2 ? `${String(run[0])}–${String(run[run.length - 1])}` : run.join(', '),
+    )
+    .join(', ');
+}
+
+/**
  * Every credential group this building mentions, in declared zone order then declared group
  * order, de-duplicated.
  *

@@ -48,6 +48,7 @@ import {
   landingAssignmentsAt,
   meansAreSuppressed,
   overlayAt,
+  queueAt,
   type LandingAssignment,
 } from '../frame/overlay.js';
 import { recordRun } from '../record/recordRun.js';
@@ -63,14 +64,25 @@ import {
 } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
 import { runSummaryFigures } from '../render/runSummary.js';
+import { buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { mountEditor } from './editor.js';
 import { mountParameterForm } from './parameterForm.js';
+import { mountBatchPanel, type BatchPanelElements } from './batchPanel.js';
 import { createLoader } from './bootstrap.js';
 import { shouldAutoplay } from './motion.js';
 import { loadBrowserResources, resolveEdited, type BrowserResources } from './data.js';
 
 /** `PB-T1`: ×1 … ×120, and `[`/`]` step this ladder — `KB-07`. */
 const SPEEDS = [1, 2, 5, 10, 30, 60, 120] as const;
+/**
+ * Width of the right gutter, where the landing counts and U4's rider queues are drawn.
+ *
+ * `buildLayout`'s own default is 76 px, which is room for `▲12 ▼7` and nothing else. A queue row
+ * needs the rest, and how much of it there is decides where § 6.2's degradation bites — so this is
+ * the one number in the viewer that turns *"how many riders get their own glyph"* into a property
+ * of the window rather than of the building.
+ */
+const QUEUE_GUTTER_PX = 280;
 /** Width reserved for the live metrics panel. Dropped below this viewport width — `RS-03`. */
 const OVERLAY_WIDTH_PX = 250;
 const OVERLAY_MIN_VIEWPORT_PX = 900;
@@ -86,7 +98,7 @@ const FRAME_S = 1 / 60;
  * `[tab, other, which]` triples that only works for exactly two tabs. Three of anything is where
  * that stops being cheaper than a loop.
  */
-const TABS = ['viewer', 'editor', 'parameters'] as const;
+const TABS = ['viewer', 'editor', 'parameters', 'compare'] as const;
 type TabName = (typeof TABS)[number];
 
 const isTabName = (value: string | null): value is TabName =>
@@ -120,6 +132,8 @@ interface Elements {
   readonly runSummary: HTMLElement;
   /** § 10.3's pre-run compatibility note. Empty when there is nothing to say. */
   readonly accessNote: HTMLElement;
+  /** Where `render/mood.ts`'s gauge is drawn — `docs/10` § 6 / D4, W6's U4. */
+  readonly mood: HTMLElement;
   /** Tab button and its panel, per surface. Keyed by {@link TabName}, so a fourth is one entry. */
   readonly tabs: Readonly<Record<TabName, HTMLButtonElement>>;
   readonly panels: Readonly<Record<TabName, HTMLElement>>;
@@ -127,6 +141,8 @@ interface Elements {
   readonly paramForm: HTMLElement;
   readonly paramStatus: HTMLElement;
   readonly paramRefusal: HTMLElement;
+  /** The Compare surface's controls — `docs/10` § 11 **W3**. */
+  readonly batch: BatchPanelElements;
   readonly confirm: HTMLDialogElement;
   readonly confirmMessage: HTMLElement;
   readonly confirmOk: HTMLButtonElement;
@@ -165,20 +181,38 @@ function elements(): Elements {
     description: find<HTMLElement>('frame-description'),
     runSummary: find<HTMLElement>('run-summary'),
     accessNote: find<HTMLElement>('access-note'),
+    mood: find<HTMLElement>('building-mood'),
     tabs: {
       viewer: find<HTMLButtonElement>('tab-viewer'),
       editor: find<HTMLButtonElement>('tab-editor'),
       parameters: find<HTMLButtonElement>('tab-parameters'),
+      compare: find<HTMLButtonElement>('tab-compare'),
     },
     panels: {
       viewer: find<HTMLElement>('panel-viewer'),
       editor: find<HTMLElement>('panel-editor'),
       parameters: find<HTMLElement>('panel-parameters'),
+      compare: find<HTMLElement>('panel-compare'),
     },
     paramSource: find<HTMLSelectElement>('param-source'),
     paramForm: find<HTMLElement>('param-form'),
     paramStatus: find<HTMLElement>('param-status'),
     paramRefusal: find<HTMLElement>('param-refusal'),
+    batch: {
+      building: find<HTMLSelectElement>('batch-building'),
+      baseline: find<HTMLSelectElement>('batch-baseline'),
+      candidate: find<HTMLSelectElement>('batch-candidate'),
+      duration: find<HTMLInputElement>('batch-duration'),
+      seed: find<HTMLInputElement>('batch-seed'),
+      replications: find<HTMLInputElement>('batch-replications'),
+      demand: find<HTMLInputElement>('batch-demand'),
+      run: find<HTMLButtonElement>('batch-run'),
+      cancel: find<HTMLButtonElement>('batch-cancel'),
+      progress: find<HTMLProgressElement>('batch-progress'),
+      status: find<HTMLElement>('batch-status'),
+      error: find<HTMLElement>('batch-error'),
+      output: find<HTMLElement>('batch-output'),
+    },
     confirm: find<HTMLDialogElement>('confirm'),
     confirmMessage: find<HTMLElement>('confirm-message'),
     confirmOk: find<HTMLButtonElement>('confirm-ok'),
@@ -847,7 +881,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ) {
       return;
     }
-    if (ui.panels.editor.hidden === false) return;
+    // The transport shortcuts belong to the viewer. Any other surface being on screen disables
+    // them, so `[`/`]` on the Compare tab does not silently re-speed a playhead nobody can see.
+    if (ui.panels.viewer.hidden) return;
     if (playback === undefined) return;
     switch (event.key) {
       case ' ':
@@ -902,6 +938,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       editor.showBuilding(ui.building.value);
       editor.refresh();
     }
+    // `D11` again, one surface further along: a batch opened after several single runs should be
+    // about the building and the seed the reader was just looking at. Once per session, so it
+    // never overwrites a choice they made on this panel.
+    if (which === 'compare') batch.prefill();
     syncUrl();
   }
 
@@ -1017,6 +1057,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
     refusal: ui.paramRefusal,
   });
 
+  /* ------------------------------------------------------------------ *
+   * The replication batch — docs/10 § 11 W3, and this file is its named non-test caller.
+   *
+   * The chain is `main.ts → dev/batchPanel.ts → dev/batchWorker.ts → batch/runBatch.ts`, with
+   * `batch/report.ts` called back on this thread once the worker returns. Mounted here rather
+   * than lazily for the same reason the parameter form is: a panel that fails to build should
+   * say so on the first paint, not on the first visit.
+   * ------------------------------------------------------------------ */
+
+  const batch = mountBatchPanel({
+    resources,
+    elements: ui.batch,
+    inherit: () => ({
+      buildingId: ui.building.value,
+      seed: ui.seed.value,
+      durationS: ui.duration.value,
+    }),
+  });
+
   // `D11`: `?tab=editor` survives a reload, and opens on the building the URL names. After the
   // mount, because `selectTab('editor')` hands the building over to the editor.
   if (currentTab !== 'viewer') selectTab(currentTab);
@@ -1074,6 +1133,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
         height: cssHeight,
         floors: recording.floors,
         shafts,
+        // U4's rider queues live in the right gutter, so it is widened to make room for them —
+        // and it is the *width* that decides how many riders get an individual glyph before the
+        // row degrades to `+N` (`docs/10` § 6.2). A narrow window is therefore not a broken
+        // picture; it is the same picture, aggregated sooner.
+        gutterRightPx: QUEUE_GUTTER_PX,
         overlayWidthPx: wantsOverlay ? OVERLAY_WIDTH_PX : 0,
       });
       // The assignments are refreshed *before* the draw, not after it, because `D10` makes them
@@ -1105,6 +1169,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
         restrictedFloorIds: access.restrictedFloorIds,
         carriesCredential: access.carriesCredential,
       });
+      // U4 and D4, every frame. Measured with the rendering in place rather than assumed from
+      // § 2.5's 0.02–0.07 ms for the sibling selector — see the delivery report for the figure.
+      const queues = queueAt(recording, frame.simTimeS);
+      const mood = buildingMood(moodObservationsOf(recording, queues, frame.simTimeS));
       drawScene(surface, {
         recording,
         frame,
@@ -1114,7 +1182,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
         unservedFloorIds: unservedFloors(recording),
         unansweredCallFloorIds: unanswered,
         lockedOutLandings: lockedOut,
+        queues,
+        mood,
       });
+      drawMood(ui.mood, mood);
 
       // KB-13: the canvas is not a hole in the page. Updated at most twice a second, because a
       // live region that changes 60 times a second is unusable rather than accessible.
@@ -1124,6 +1195,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
         metrics,
         unansweredCallFloorIds: unanswered,
         lockedOutLandings: lockedOut,
+        queues,
+        mood,
       });
       if (description !== lastDescription) {
         lastDescription = description;
@@ -1274,6 +1347,74 @@ function drawRunSummary(container: HTMLElement, recording: VizRecording): void {
     }
     container.append(row);
   }
+}
+
+/**
+ * The last mood put on screen, so the gauge's DOM is rebuilt when it changes and not at 60 Hz.
+ *
+ * The same shape `lastDescription` uses one level up, and for the same reason: replacing a
+ * subtree sixty times a second moves focus, defeats text selection and makes the caveat
+ * impossible to read. The key is the whole rendered content, so any change to any driver's text
+ * — which is the thing a mutation would freeze — still redraws.
+ */
+let lastMoodKey = '';
+
+/**
+ * The building mood gauge, instantiated — `docs/10` § 6 / D4's named non-test caller.
+ *
+ * Thin, exactly as {@link drawRunSummary} is: every decision about *what* the mood is, which
+ * observations it looked at and whether it is still provisional is made in `render/mood.ts`, under
+ * plain Node, where it is asserted against a recomputation. This function knows how to make
+ * elements.
+ *
+ * **Nothing here keys on a driver id.** The classes come from `level` and `provisional`, so a sixth
+ * observation appears with no edit to this file and none to `index.html` — the rule W4 kept for the
+ * parameter form and W2 kept for the summary.
+ *
+ * The glyph is emitted as text rather than as a coloured dot, which is KB-15 in the DOM: a reader
+ * with a monochrome display, a screenshot in greyscale, or no colour perception at all reads the
+ * same three shapes the canvas draws.
+ */
+function drawMood(container: HTMLElement, mood: BuildingMood): void {
+  const key = `${mood.level}|${String(mood.provisional)}|${mood.headline}|${mood.drivers
+    .map((driver) => `${driver.id}:${driver.level}:${driver.text}`)
+    .join('|')}`;
+  if (key === lastMoodKey) return;
+  lastMoodKey = key;
+
+  const doc = container.ownerDocument;
+  container.replaceChildren();
+
+  const head = doc.createElement('p');
+  head.className = `mood-head mood-${mood.level}${mood.provisional ? ' mood-provisional' : ''}`;
+  const glyph = doc.createElement('span');
+  glyph.className = 'mood-glyph';
+  glyph.textContent = `${mood.glyph} `;
+  const headline = doc.createElement('span');
+  headline.className = 'mood-headline';
+  headline.textContent = mood.headline;
+  head.append(glyph, headline);
+  container.append(head);
+
+  for (const driver of mood.drivers) {
+    const row = doc.createElement('p');
+    row.className = `mood-driver mood-${driver.level}`;
+    const label = doc.createElement('span');
+    label.className = 'mood-label';
+    label.textContent = `${driver.label} `;
+    const text = doc.createElement('span');
+    text.className = 'mood-text';
+    text.textContent = driver.text;
+    row.append(label, text);
+    container.append(row);
+  }
+
+  // R2, in the component rather than in a manual. It is the last thing in the panel because it is
+  // what the reader should leave with, and it is never elided in any mode.
+  const caveat = doc.createElement('p');
+  caveat.className = 'mood-caveat';
+  caveat.textContent = mood.caveat;
+  container.append(caveat);
 }
 
 function statusLine(recording: VizRecording): string {

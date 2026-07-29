@@ -26,7 +26,17 @@ import {
 import { frameAt } from './frameAt.js';
 import { recordRun } from '../record/recordRun.js';
 import type { VizRecording } from '../contract/types.js';
-import { DEFAULT_WINDOW_S, landingAssignmentsAt, overlayAt } from './overlay.js';
+import {
+  DEFAULT_RELIEF_WINDOW_S,
+  DEFAULT_WINDOW_S,
+  landingAssignmentsAt,
+  overlayAt,
+  queueAt,
+  waitBandOf,
+  waitBandsOf,
+  worseBand,
+  type WaitBand,
+} from './overlay.js';
 
 let config: LoadedConfig;
 const recordings = new Map<string, VizRecording>();
@@ -422,5 +432,268 @@ describe('landingAssignmentsAt under destination dispatch', () => {
     expect(row?.answeredByCarId).toBeUndefined();
     expect(row?.answeredInS).toBeUndefined();
     expect(row?.waiting).toBe(1);
+  }, 300_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * U4 — the per-floor rider queue (`docs/10-experience-layer-contract.md` § 6)
+ *
+ * In this file rather than in a new one so the five 900 s recordings above are paid for once. The
+ * claims are the ones § 11 W7a states as acceptance, plus the two that keep the *bands* honest:
+ * they are the run's own thresholds, and they are monotone in the wait.
+ * -------------------------------------------------------------------------- */
+
+describe('queueAt — the acceptance identity', () => {
+  it.each(BUILDING_IDS)(
+    '%s: the queues account for exactly the legs the frame says are waiting',
+    (buildingId) => {
+      /*
+       * `docs/10` § 11 W7a: *"sum(queueAt(r,t).total) === frameAt(r,t).totalWaiting on every
+       * shipped building at every sampled instant"*. The two come from different structures —
+       * this walks `legs`, the frame samples the folded landing series — so equality is evidence
+       * rather than a tautology, exactly as the `waitingNow` check above is.
+       */
+      const recording = recordingOf(buildingId);
+      for (const t of sampleTimes(recording)) {
+        const queues = queueAt(recording, t);
+        const total = queues.reduce((sum, queue) => sum + queue.total, 0);
+        expect(`${String(t)}: ${String(total)}`).toBe(
+          `${String(t)}: ${String(frameAt(recording, t).totalWaiting)}`,
+        );
+        // …and each floor's own count, recomputed from the legs without calling `queueAt`.
+        for (const queue of queues) {
+          const here = recording.legs.filter(
+            (leg) =>
+              leg.originFloorId === queue.floorId &&
+              leg.arrivedAt <= t &&
+              (leg.boardedAt === undefined || leg.boardedAt > t),
+          );
+          expect(queue.total, `${buildingId} ${queue.floorId} @ ${String(t)}`).toBe(here.length);
+          expect(queue.riders).toHaveLength(here.length);
+        }
+      }
+    },
+    300_000,
+  );
+
+  it.each(BUILDING_IDS)('%s: every rider carries their own wait, not the landing’s', (buildingId) => {
+    /*
+     * The mutation this exists for: `waitedS` replaced by the floor's `oldestWaitS` would satisfy
+     * any bound-style assertion and would draw every glyph in the same band, which is the whole
+     * feature. Recomputed per passenger from `arrivedAt`.
+     */
+    const recording = recordingOf(buildingId);
+    const arrivals = new Map(recording.legs.map((leg) => [leg.passengerId, leg.arrivedAt]));
+    let sawTwoBandsAtOneFloor = false;
+    for (const t of sampleTimes(recording)) {
+      for (const queue of queueAt(recording, t)) {
+        const bands = new Set<WaitBand>();
+        for (const rider of queue.riders) {
+          expect(rider.waitedS).toBeCloseTo(t - (arrivals.get(rider.passengerId) ?? 0), 9);
+          expect(rider.band).toBe(waitBandOf(rider.waitedS, waitBandsOf(recording.summary)));
+          bands.add(rider.band);
+        }
+        if (bands.size > 1) sawTwoBandsAtOneFloor = true;
+        /*
+         * `worstBand` recomputed here, and this assertion exists because the mutation that froze
+         * it to `'settling'` came back **green** on the first attempt. Not because the field is
+         * dead — the bar's colour, its glyph and the mood gauge all read it — but because every
+         * one of those readers was exercised against a hand-built `FloorQueue` whose `worstBand`
+         * the test itself had set. That is the false negative T60 found, in this unit: the
+         * producer had no reader that recomputed it from the run.
+         */
+        const order: readonly WaitBand[] = ['settling', 'waiting', 'long', 'abandoned'];
+        const expectedWorst = queue.riders.reduce<WaitBand>(
+          (worst, rider) => (order.indexOf(rider.band) > order.indexOf(worst) ? rider.band : worst),
+          'settling',
+        );
+        expect(queue.worstBand, `${queue.floorId} @ ${String(t)}`).toBe(expectedWorst);
+        expect(queue.oldestWaitS).toBeCloseTo(
+          Math.max(...queue.riders.map((rider) => rider.waitedS), 0),
+          9,
+        );
+      }
+    }
+    // A witness that the per-rider figure is doing work somewhere in the run — without it the
+    // assertion above is satisfied by a building where everybody happens to be in one band.
+    if (buildingId !== 'garden-apartments') {
+      expect(sawTwoBandsAtOneFloor, `${buildingId} never had two bands at one landing`).toBe(true);
+    }
+  }, 300_000);
+
+  it.each(BUILDING_IDS)('%s: every floor with a queue has a landing row to draw it on', (buildingId) => {
+    /*
+     * The renderer walks `Frame.landings` and draws each floor's queue beside its counts, so a
+     * floor that has a queue and no landing row would be counted everywhere and drawn nowhere —
+     * the silent half of a truncation, and exactly the class of defect `RS-05` exists for.
+     *
+     * It holds because `foldPassengers` emits a landing per `(floorId, direction)` that ever had a
+     * call, including under a panel where `PassengerRecord.direction` is still populated. Asserted
+     * rather than reasoned, because that is a property of `core` this package does not own.
+     */
+    const recording = recordingOf(buildingId);
+    for (const t of sampleTimes(recording)) {
+      const drawable = new Set(frameAt(recording, t).landings.map((landing) => landing.floorId));
+      for (const queue of queueAt(recording, t)) {
+        if (queue.total === 0) continue;
+        expect(drawable.has(queue.floorId), `${queue.floorId} @ ${String(t)}`).toBe(true);
+      }
+    }
+  }, 300_000);
+
+  it.each(BUILDING_IDS)('%s: floors come back in the building’s order, never sorted by id', (buildingId) => {
+    // Sorting floor ids as strings reads `11, 12, 16, 20, 3, 4` and puts the third storey above
+    // the twentieth — the defect `unansweredCallFloors` already records having made once.
+    const recording = recordingOf(buildingId);
+    const order = recording.floors.map((floor) => floor.id);
+    for (const t of sampleTimes(recording)) {
+      const ids = queueAt(recording, t).map((queue) => queue.floorId);
+      const expected = order.filter((id) => ids.includes(id));
+      expect(ids).toEqual(expected);
+    }
+  }, 300_000);
+
+  it.each(BUILDING_IDS)('%s: riders within a floor are oldest first', (buildingId) => {
+    // First-come-first-served, left to right, which is itself information (§ 6.1).
+    const recording = recordingOf(buildingId);
+    for (const t of sampleTimes(recording)) {
+      for (const queue of queueAt(recording, t)) {
+        const waits = queue.riders.map((rider) => rider.waitedS);
+        expect(waits).toEqual([...waits].sort((a, b) => b - a));
+      }
+    }
+  }, 300_000);
+
+  it('counts a boarding as relief for exactly the window it is given', () => {
+    const recording = recordingOf('midtown-office');
+    const t = recording.startedAt + (recording.endedAt - recording.startedAt) * 0.5;
+    const expected = (windowS: number): number =>
+      recording.legs.filter(
+        (leg) =>
+          leg.boardedAt !== undefined && leg.boardedAt <= t && leg.boardedAt > t - windowS,
+      ).length;
+    const relief = (windowS: number): number =>
+      queueAt(recording, t, { reliefWindowS: windowS }).reduce(
+        (sum, queue) => sum + queue.recentlyBoarded,
+        0,
+      );
+    expect(relief(DEFAULT_RELIEF_WINDOW_S)).toBe(expected(DEFAULT_RELIEF_WINDOW_S));
+    expect(relief(60)).toBe(expected(60));
+    // …and it is a window, not a cumulative count: a wider one holds strictly more, somewhere.
+    expect(relief(60)).toBeGreaterThan(relief(1));
+  }, 300_000);
+
+  it('is pure and clamps, like every other selector here', () => {
+    const recording = recordingOf('garden-apartments');
+    const times = sampleTimes(recording);
+    const forward = times.map((t) => JSON.stringify(queueAt(recording, t)));
+    const backward = [...times].reverse().map((t) => JSON.stringify(queueAt(recording, t)));
+    expect(backward.reverse()).toEqual(forward);
+    expect(queueAt(recording, -1e6)).toEqual(queueAt(recording, recording.startedAt));
+    expect(queueAt(recording, 1e6)).toEqual(queueAt(recording, recording.endedAt));
+  }, 300_000);
+});
+
+describe('wait bands are the run’s own thresholds', () => {
+  it('reads them off the summary rather than assuming 30 / 60 / 900', () => {
+    /*
+     * The liveness control for the bands. § 6.2 names `metrics.longWaitThresholdS` and
+     * `DEFAULT_MAX_WAIT_HORIZON_S`; both are carried on `VizSummary` since schema 5, so a building
+     * that reports long waits at 45 s must band its riders at 45 s. Pinning either constant makes
+     * this red.
+     */
+    const base = recordingOf('garden-apartments');
+    const moved: VizRecording = {
+      ...base,
+      summary: {
+        ...base.summary,
+        longWaitThresholdS: 45,
+        serviceLevel: { ...base.summary.serviceLevel, horizonS: 200 },
+      },
+    };
+    expect(waitBandsOf(moved.summary)).toEqual({ settlingS: 22.5, longS: 45, horizonS: 200 });
+    const bands = waitBandsOf(moved.summary);
+    expect(waitBandOf(0, bands)).toBe('settling');
+    expect(waitBandOf(22.4, bands)).toBe('settling');
+    expect(waitBandOf(22.5, bands)).toBe('waiting');
+    expect(waitBandOf(44.9, bands)).toBe('waiting');
+    expect(waitBandOf(45, bands)).toBe('long');
+    expect(waitBandOf(199.9, bands)).toBe('long');
+    expect(waitBandOf(200, bands)).toBe('abandoned');
+    // …and the default run bands at its own numbers, which are different ones.
+    expect(waitBandsOf(base.summary)).toEqual({
+      settlingS: base.summary.longWaitThresholdS / 2,
+      longS: base.summary.longWaitThresholdS,
+      horizonS: base.summary.serviceLevel.horizonS,
+    });
+  }, 300_000);
+
+  it('is monotone in the wait, even when a building’s horizon sits below its threshold', () => {
+    // A misconfiguration, and not this function's to diagnose — but it must never produce a band
+    // that goes *down* as somebody waits longer, which an ascending chain of tests would.
+    const bands = { settlingS: 10, longS: 400, horizonS: 100 };
+    const rank = (band: WaitBand): number =>
+      ['settling', 'waiting', 'long', 'abandoned'].indexOf(band);
+    let last = -1;
+    for (let waited = 0; waited <= 500; waited += 5) {
+      const seen = rank(waitBandOf(waited, bands));
+      expect(seen).toBeGreaterThanOrEqual(last);
+      last = seen;
+    }
+  });
+
+  it('orders the four bands in exactly one place', () => {
+    expect(worseBand('settling', 'waiting')).toBe('waiting');
+    expect(worseBand('abandoned', 'long')).toBe('abandoned');
+    expect(worseBand('long', 'long')).toBe('long');
+    expect(worseBand('waiting', 'settling')).toBe('waiting');
+  });
+});
+
+describe('queueAt under destination dispatch — § 6.2’s grouping requirement', () => {
+  it('partitions a floor by promised car, so a Level-1 building is not drawn as a Level-0 one', () => {
+    const recording = recordRun(
+      breadthConfig(config, 'midtown-office', { dispatcherId: PANEL_DISPATCHER_ID }),
+    ).recording;
+    expect(recording.passengerModel).toBe('destination-dispatch');
+
+    let sawSeveralGroupsOnOneFloor = false;
+    for (const t of sampleTimes(recording)) {
+      for (const queue of queueAt(recording, t)) {
+        // Exhaustive and disjoint: every rider is in exactly one group.
+        expect(queue.groups.reduce((sum, group) => sum + group.total, 0)).toBe(queue.total);
+        const ids = queue.groups.flatMap((group) => group.riders.map((r) => r.passengerId));
+        expect(new Set(ids).size).toBe(queue.total);
+        for (const group of queue.groups) {
+          for (const rider of group.riders) expect(rider.promisedCarId).toBe(group.promisedCarId);
+          // The promise is read off the leg, not inferred from who eventually boarded.
+          for (const rider of group.riders) {
+            const leg = recording.legs.find((l) => l.passengerId === rider.passengerId);
+            expect(rider.promisedCarId).toBe(leg?.assignedCarId);
+          }
+        }
+        // Deterministic order, not Map insertion.
+        expect(queue.groups.map((group) => group.key)).toEqual(
+          [...queue.groups.map((group) => group.key)].sort((a, b) => a.localeCompare(b)),
+        );
+        if (queue.groups.length > 1) sawSeveralGroupsOnOneFloor = true;
+      }
+    }
+    expect(sawSeveralGroupsOnOneFloor).toBe(true);
+  }, 600_000);
+
+  it('gives a conventional floor exactly one, unlabelled group', () => {
+    const recording = recordingOf('midtown-office');
+    expect(recording.passengerModel).toBe('conventional');
+    for (const t of sampleTimes(recording)) {
+      for (const queue of queueAt(recording, t)) {
+        // A floor that appears only because somebody *boarded* there has no groups, which is the
+        // honest answer: an empty queue is not one group of nobody.
+        expect(queue.groups).toHaveLength(queue.total === 0 ? 0 : 1);
+        if (queue.total === 0) continue;
+        expect(queue.groups[0]?.promisedCarId).toBeUndefined();
+        for (const rider of queue.riders) expect(rider.promisedCarId).toBeUndefined();
+      }
+    }
   }, 300_000);
 });

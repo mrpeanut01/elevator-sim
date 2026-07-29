@@ -266,6 +266,7 @@ packages/
 │   ├── replay/            — the replay harness and its per-field negative control
 │   ├── editor/            — building-config edits, validation, history, preview geometry
 │   ├── controls/          — the schema-generated parameter form: four control renderers
+│   ├── batch/             — Phase 9 W3: N paired replications, and the paired-t report on them
 │   └── dev/               — the Vite dev entry points, viewer and editor (dev-only)
 └── cli/                   — headless batch entry point
     └── commands/          — list, run, compare, tune, watch
@@ -289,6 +290,11 @@ packages/
 > had been told not to edit `docs/` outside its own document; it edited this one line anyway and
 > said so, because the alternative was either a red suite or flattening a directory the wave plan
 > names by path. **The atomicity is the rule, and it is stronger than a file-ownership boundary.**
+>
+> **And so did the one after.** `viz/batch/` — W3's replication batch runner
+> ([`docs/10`](10-experience-layer-contract.md) § 11, [`DECISIONS.md` § D158](../DECISIONS.md)) —
+> was added on 2026-07-29 with its line above in the same commit, for the same reason and by the
+> same rule.
 >
 > **The guard is now scoped to packages present on disk, and C28 is closed.** It used to name
 > `viz/*` directories unconditionally, so deleting `packages/viz` turned them into phantoms and

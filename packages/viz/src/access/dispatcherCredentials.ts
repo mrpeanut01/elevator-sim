@@ -48,7 +48,7 @@ import {
   type DispatcherProfileSource,
 } from '@elevator-sim/core/browser';
 
-import { restrictedFloorIds } from './zoning.js';
+import { floorRunsOf, restrictedFloorIds } from './zoning.js';
 
 /** What one dispatcher profile can see of a call, as far as access control is concerned. */
 export interface CredentialCapability {
@@ -203,7 +203,7 @@ export function checkAccessCompatibility(input: AccessCompatibilityInput): Acces
     warning:
       `${input.buildingName} has ${String(zoneCount)} access zone${zoneCount === 1 ? '' : 's'} ` +
       `covering ${String(restricted.length)} of its ${String(input.floorIds.length)} floors ` +
-      `(${restricted.join(', ')}). ${input.profile.id} does not read credentials — ` +
+      `(${floorRunsOf(input.floorIds, restricted)}). ${input.profile.id} does not read credentials — ` +
       `${capability.reason} — so a call from any of those floors reaches every car as an ` +
       'unbadged request, every car refuses it on access grounds, and the call is permanently ' +
       `unassignable.${kiosk} ${alternatives} ` +

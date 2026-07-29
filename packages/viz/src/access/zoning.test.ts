@@ -28,6 +28,7 @@ import {
   credentialGroupsIn,
   credentialLensFor,
   describeCredentialLens,
+  floorRunsOf,
   permittedGroupsByFloor,
   restrictedFloorIds,
 } from './zoning.js';
@@ -143,6 +144,23 @@ describe('Secure Tower under one credential at a time', () => {
     expect(ids).toHaveLength(29);
     // The failure this ordering exists to prevent: `['11','12', … ,'2','20']`.
     expect(ids.slice(0, 3)).toEqual(['2', '3', '4']);
+  });
+
+  it('names its restricted floors as runs, in building order, never as arithmetic on the id', () => {
+    const { floors, accessZones } = secureTower();
+    const ids = floors.map((floor) => floor.id);
+    expect(floorRunsOf(ids, restrictedFloorIds(ids, accessZones))).toBe('2–30');
+    // A gap makes two runs; a run of two is written out, because `2–3` says less than `2, 3`.
+    expect(floorRunsOf(ids, ['2', '3', '4', '9', '10'])).toBe('2–4, 9, 10');
+    // The lobby is first in building order and is not restricted, so it never opens a run.
+    expect(floorRunsOf(ids, restrictedFloorIds(ids, accessZones)).startsWith('G')).toBe(false);
+  });
+
+  it('builds runs from position, not from the id — so non-numeric ids survive', () => {
+    const ids = ['B2', 'B1', 'G', 'M', '2', '3'];
+    // Positions 0–2 are consecutive; `B2, B1, G` is a run even though nothing about those
+    // strings is ordered. A numeric reading would produce nonsense here.
+    expect(floorRunsOf(ids, ['B2', 'B1', 'G', '3'])).toBe('B2–G, 3');
   });
 
   it('offers the credential picker every group the building mentions, de-duplicated', () => {

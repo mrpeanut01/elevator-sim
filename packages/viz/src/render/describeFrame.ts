@@ -22,9 +22,11 @@
 import type { LockedOutLanding } from '../access/lockedOut.js';
 import { describeLockedOut } from '../access/lockedOut.js';
 import type { Frame, VizRecording } from '../contract/types.js';
-import type { OverlayMetrics } from '../frame/overlay.js';
+import type { FloorQueue, OverlayMetrics } from '../frame/overlay.js';
 import { LOAD_ALARM, LOAD_FULL } from './overlay.js';
 import { formatClock } from './canvas.js';
+import { describeQueue } from './riderQueue.js';
+import type { BuildingMood } from './mood.js';
 
 export interface DescribeFrameInput {
   readonly recording: VizRecording;
@@ -50,6 +52,24 @@ export interface DescribeFrameInput {
   readonly lockedOutLandings?: readonly LockedOutLanding[] | undefined;
   /** Cap on the number of cars named individually, so a 24-car tower is still a paragraph. */
   readonly maxCars?: number;
+  /**
+   * Per-floor rider queues — `docs/10` § 6.3, and *"not optional"* in the design's own words.
+   *
+   * *"This is how the individual-glyph information reaches a reader who cannot see it."* The
+   * canvas draws four shapes; this says the same four facts in words, per floor with anybody on
+   * it, busiest first.
+   */
+  readonly queues?: readonly FloorQueue[] | undefined;
+  /**
+   * Cap on the number of floors described individually.
+   *
+   * `KB-13` asks for a description, not a manifest, and Vertical City has 100 floors. The floors
+   * left out are **counted and their people are counted**, so the sentence never understates the
+   * queue — it only stops naming where it is.
+   */
+  readonly maxQueueFloors?: number;
+  /** The building's mood, said in words — D4, and observation-only, so it survives suppression. */
+  readonly mood?: BuildingMood | undefined;
 }
 
 /** Words for a load factor. The `!` glyph's spoken equivalent. */
@@ -120,8 +140,47 @@ export function describeFrame(input: DescribeFrameInput): string {
     );
   }
 
+  /*
+   * `docs/10` § 10.4, and **before** the per-floor clauses below for the reason the banner puts
+   * it second: a call nobody may legally answer is a different kind of statement from a queue
+   * being long, and a reader hearing the floors described one by one should already know which
+   * of them could never have been served. Unabridged here — this is the surface with no width.
+   */
   const lockedOut = describeLockedOut(input.lockedOutLandings ?? []);
   if (lockedOut !== '') parts.push(`${lockedOut}.`);
+
+  /*
+   * § 6.3 — the per-floor clause, which lands *with* the renderer rather than after it.
+   *
+   * Busiest first, not building order, because the reader is being told where the trouble is and a
+   * paragraph that walks the building bottom to top makes them count. The tail is summarised
+   * rather than dropped: "and 14 more floors with 62 people between them" is still true when the
+   * cap bites, which "and 14 more floors" would not be.
+   */
+  const queues = (input.queues ?? []).filter((queue) => queue.total > 0 || queue.recentlyBoarded > 0);
+  if (queues.length > 0) {
+    const maxFloors = input.maxQueueFloors ?? 6;
+    const ranked = [...queues].sort(
+      (a, b) => b.total - a.total || b.oldestWaitS - a.oldestWaitS || a.floorId.localeCompare(b.floorId),
+    );
+    for (const queue of ranked.slice(0, maxFloors)) parts.push(describeQueue(queue));
+    const rest = ranked.slice(maxFloors);
+    if (rest.length > 0) {
+      const people = rest.reduce((sum, queue) => sum + queue.total, 0);
+      parts.push(
+        `${String(rest.length)} further floors with ${String(people)} people between them are not described.`,
+      );
+    }
+  }
+
+  const mood = input.mood;
+  if (mood !== undefined) {
+    // Every driver, not only the level: the level is a maximum over these, and a reader who is
+    // told only the maximum cannot tell which observation produced it.
+    parts.push(
+      `${mood.headline} ${mood.drivers.map((driver) => driver.text).join(' ')} ${mood.caveat}`,
+    );
+  }
 
   const metrics = input.metrics;
   if (metrics !== undefined) {

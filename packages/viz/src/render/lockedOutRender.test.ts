@@ -25,6 +25,7 @@ import {
   type LockedOutLanding,
 } from '../access/lockedOut.js';
 import { STATE_GLYPHS } from '../access/zoning.js';
+import type { FloorQueue, QueuedRider } from '../frame/overlay.js';
 import { constantSeries } from '../contract/series.js';
 import { VIZ_SCHEMA_VERSION, type Frame, type VizRecording } from '../contract/types.js';
 import { FIXTURE_DOOR_CONFIG, fixtureSummary } from '../fixtures.test-helper.js';
@@ -61,9 +62,15 @@ class Recorder implements Canvas2DLike {
    * mutation that deletes the landing mark — or that spells it with the *unanswered* glyph —
    * passing because the banner still mentions it. That two-reader false negative is the shape
    * `DECISIONS.md` § D154 records, and both mutations survived the first version of this file.
+   *
+   * **The cut is the top of the plot, not an arbitrary 40 px**, and that was tightened at the
+   * W6/U4 merge rather than after another survivor: `drawHeader` now writes the building mood at
+   * `y = 48`, so a threshold chosen to clear the two header lines no longer did. Anything above
+   * `layout.plot.y` is header — title, sub-line, counters, banner, mood — and none of it is a
+   * landing.
    */
   marks(): readonly string[] {
-    return this.texts.filter((entry) => entry.y > 40).map((entry) => entry.text);
+    return this.texts.filter((entry) => entry.y >= layout.plot.y).map((entry) => entry.text);
   }
 
   /** Everything drawn, colour discarded. */
@@ -147,6 +154,27 @@ const LOCKED_OUT: readonly LockedOutLanding[] = [
   { floorId: '2', cause: 'credential-not-read', legCount: 4, credentialGroups: ['tenant-alpha-staff'] },
 ];
 
+/** Four riders standing at floor `2`, so the row carries T61's glyph run beside the marks. */
+function queueAtFloorTwo(): FloorQueue {
+  const riders: QueuedRider[] = [0, 1, 2, 3].map((n) => ({
+    passengerId: `p${String(n)}`,
+    waitedS: 30 + n,
+    direction: 'down' as const,
+    destinationFloorId: 'G',
+    promisedCarId: undefined,
+    band: 'long' as const,
+  }));
+  return {
+    floorId: '2',
+    riders,
+    groups: [{ key: '', promisedCarId: undefined, riders, total: riders.length, oldestWaitS: 33 }],
+    total: riders.length,
+    oldestWaitS: 33,
+    worstBand: 'long',
+    recentlyBoarded: 0,
+  };
+}
+
 const layout = buildLayout({
   width: 900,
   height: 640,
@@ -172,6 +200,61 @@ describe('the three barriers stay three marks', () => {
       STATE_GLYPHS['not-permitted'],
     );
     expect(draw().marks()).not.toContain(STATE_GLYPHS['not-permitted']);
+  });
+
+  it('still marks a locked-out landing whose direction counts have gone to zero', () => {
+    /*
+     * The empty-landing branch draws `·` and returns, and it gained a third condition at the
+     * W6/U4 merge (`queue === undefined`). A landing the caller has *named* as locked out must
+     * survive that branch: dropping it would put the picture and the banner in disagreement about
+     * the same floor, which is the failure `meanClause`'s docstring records in the other
+     * direction.
+     */
+    const quiet: Frame = {
+      ...FRAME,
+      landings: FRAME.landings.map((landing) =>
+        landing.floorId === '2' ? { ...landing, waitingUp: 0, waitingDown: 0 } : landing,
+      ),
+    };
+    const ctx = new Recorder();
+    drawScene(ctx, {
+      recording: RECORDING,
+      frame: quiet,
+      layout,
+      theme: DEFAULT_THEME,
+      lockedOutLandings: LOCKED_OUT,
+    });
+    expect(ctx.texts.filter((entry) => entry.y >= layout.plot.y).map((e) => e.text)).toContain(
+      STATE_GLYPHS['not-permitted'],
+    );
+  });
+
+  it('keeps a cell of air between the call marks and the rider glyphs', () => {
+    /*
+     * The two groups say different things about the same landing — `✗`/`▩` about the **call**,
+     * `●◑○✖` about the **people** — and after the W6/U4 merge they share a row. Run together
+     * they read as one string, and the abandoned band's `✖` is one codepoint from the unanswered
+     * `✗`. Asserted in pixels because it is a pixel decision: the mark occupies one cell, the
+     * advance past it is two, and the separator makes three before the queue may start.
+     */
+    const ctx = new Recorder();
+    drawScene(ctx, {
+      recording: RECORDING,
+      frame: FRAME,
+      layout,
+      theme: DEFAULT_THEME,
+      lockedOutLandings: LOCKED_OUT,
+      queues: [queueAtFloorTwo()],
+    });
+    const mark = ctx.texts.find(
+      (entry) => entry.text === STATE_GLYPHS['not-permitted'] && entry.y >= layout.plot.y,
+    );
+    expect(mark).toBeDefined();
+    const after = ctx.texts.filter(
+      (entry) => entry.y === mark?.y && entry.x > (mark?.x ?? 0),
+    );
+    expect(after.length).toBeGreaterThan(0);
+    expect((after[0]?.x ?? 0) - (mark?.x ?? 0)).toBeGreaterThanOrEqual(24);
   });
 
   it('is not the glyph for "no car answered" and not the glyph for "no shaft reaches"', () => {
