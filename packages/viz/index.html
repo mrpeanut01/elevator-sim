@@ -169,6 +169,11 @@
          because a batch row and a run row are the same kind of claim one level up, and because
          nothing in either surface may key on a metric id. */
       #panel-compare .editor-form { width: 100%; }
+      /* docs/10 § 5 — the campaign. Two columns of the same `.figure` rows: the briefing on the
+         left, the stage's result on the right. Nothing below keys on a goal kind or a fail state,
+         because `campaign/` decides what those are and a stylesheet that named one would be the
+         first list of goal names in this product's UI. */
+      #panel-campaign .editor-form { width: 50%; overflow: auto; }
       .batch-report .figure { max-width: 90em; }
       .batch-report .figure-value { display: block; margin-top: 2px; }
       progress { width: 180px; }
@@ -224,6 +229,9 @@
         </button>
         <button role="tab" id="tab-compare" aria-selected="false" aria-controls="panel-compare" tabindex="-1">
           Compare
+        </button>
+        <button role="tab" id="tab-campaign" aria-selected="false" aria-controls="panel-campaign" tabindex="-1">
+          Campaign
         </button>
       </div>
       <span class="dim" id="banner"></span>
@@ -456,6 +464,30 @@
         </div>
         <div class="editor-body">
           <div class="editor-form batch-report" id="batch-output" aria-label="Batch report"></div>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Surface E — the campaign (docs/10 § 5, W5)                          -->
+      <!--                                                                     -->
+      <!-- Seven stages, each a fully-specified configuration plus a goal set  -->
+      <!-- plus a replication budget. Every verdict on this surface comes from -->
+      <!-- a batch (R2), every goal comes from data/scenario-goals.json's      -->
+      <!-- measured `goals` bucket (R12), and nothing here is a score.         -->
+      <!-- ------------------------------------------------------------------ -->
+      <section role="tabpanel" id="panel-campaign" aria-labelledby="tab-campaign" hidden>
+        <div class="bar">
+          <label>stage <select id="campaign-stage"></select></label>
+          <label>your setting <select id="campaign-profile"></select></label>
+          <button id="campaign-run">Run this stage</button>
+          <button id="campaign-cancel">Cancel</button>
+          <progress id="campaign-progress" value="0" max="1" aria-label="stage progress"></progress>
+          <span id="campaign-status" role="status"></span>
+          <span id="campaign-error" role="alert" tabindex="-1"></span>
+        </div>
+        <div class="editor-body">
+          <div class="editor-form batch-report" id="campaign-brief" aria-label="Stage briefing"></div>
+          <div class="editor-form batch-report" id="campaign-output" aria-label="Stage result"></div>
         </div>
       </section>
     </main>

@@ -68,9 +68,14 @@ import { buildingMood, moodObservationsOf, type BuildingMood } from '../render/m
 import { mountEditor } from './editor.js';
 import { mountParameterForm } from './parameterForm.js';
 import { mountBatchPanel, type BatchPanelElements } from './batchPanel.js';
+import {
+  mountCampaignPanel,
+  type CampaignPanelElements,
+  type CampaignPanelHandle,
+} from './campaignPanel.js';
 import { createLoader } from './bootstrap.js';
 import { shouldAutoplay } from './motion.js';
-import { loadBrowserResources, resolveEdited, type BrowserResources } from './data.js';
+import { loadBrowserResources, loadCampaign, resolveEdited, type BrowserResources } from './data.js';
 
 /** `PB-T1`: ×1 … ×120, and `[`/`]` step this ladder — `KB-07`. */
 const SPEEDS = [1, 2, 5, 10, 30, 60, 120] as const;
@@ -98,7 +103,7 @@ const FRAME_S = 1 / 60;
  * `[tab, other, which]` triples that only works for exactly two tabs. Three of anything is where
  * that stops being cheaper than a loop.
  */
-const TABS = ['viewer', 'editor', 'parameters', 'compare'] as const;
+const TABS = ['viewer', 'editor', 'parameters', 'compare', 'campaign'] as const;
 type TabName = (typeof TABS)[number];
 
 const isTabName = (value: string | null): value is TabName =>
@@ -143,6 +148,8 @@ interface Elements {
   readonly paramRefusal: HTMLElement;
   /** The Compare surface's controls — `docs/10` § 11 **W3**. */
   readonly batch: BatchPanelElements;
+  /** The Campaign surface's controls — `docs/10` § 5, W5. */
+  readonly campaign: CampaignPanelElements;
   readonly confirm: HTMLDialogElement;
   readonly confirmMessage: HTMLElement;
   readonly confirmOk: HTMLButtonElement;
@@ -187,12 +194,14 @@ function elements(): Elements {
       editor: find<HTMLButtonElement>('tab-editor'),
       parameters: find<HTMLButtonElement>('tab-parameters'),
       compare: find<HTMLButtonElement>('tab-compare'),
+      campaign: find<HTMLButtonElement>('tab-campaign'),
     },
     panels: {
       viewer: find<HTMLElement>('panel-viewer'),
       editor: find<HTMLElement>('panel-editor'),
       parameters: find<HTMLElement>('panel-parameters'),
       compare: find<HTMLElement>('panel-compare'),
+      campaign: find<HTMLElement>('panel-campaign'),
     },
     paramSource: find<HTMLSelectElement>('param-source'),
     paramForm: find<HTMLElement>('param-form'),
@@ -212,6 +221,17 @@ function elements(): Elements {
       status: find<HTMLElement>('batch-status'),
       error: find<HTMLElement>('batch-error'),
       output: find<HTMLElement>('batch-output'),
+    },
+    campaign: {
+      stage: find<HTMLSelectElement>('campaign-stage'),
+      profile: find<HTMLSelectElement>('campaign-profile'),
+      run: find<HTMLButtonElement>('campaign-run'),
+      cancel: find<HTMLButtonElement>('campaign-cancel'),
+      progress: find<HTMLProgressElement>('campaign-progress'),
+      status: find<HTMLElement>('campaign-status'),
+      error: find<HTMLElement>('campaign-error'),
+      brief: find<HTMLElement>('campaign-brief'),
+      output: find<HTMLElement>('campaign-output'),
     },
     confirm: find<HTMLDialogElement>('confirm'),
     confirmMessage: find<HTMLElement>('confirm-message'),
@@ -942,6 +962,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // about the building and the seed the reader was just looking at. Once per session, so it
     // never overwrites a choice they made on this panel.
     if (which === 'compare') batch.prefill();
+    if (which === 'campaign') campaign?.refresh();
     syncUrl();
   }
 
@@ -1075,6 +1096,28 @@ function boot(ui: Elements, resources: BrowserResources): void {
       durationS: ui.duration.value,
     }),
   });
+
+  /* ------------------------------------------------------------------ *
+   * The campaign — docs/10 § 5, W5, and this file is its named non-test caller.
+   *
+   * `main.ts → dev/campaignPanel.ts → dev/batchWorker.ts → batch/runBatch.ts`, with
+   * `campaign/judge.ts` and `campaign/failStates.ts` called back on this thread.
+   *
+   * Loaded asynchronously and mounted when it arrives, because it fetches two more files —
+   * `data/campaign.json` and `data/scenario-goals.json` — and the other four surfaces must not
+   * wait on them. A failure is drawn where the reader is (`RV-17`'s rule, one panel over) rather
+   * than thrown into the console: a campaign whose goal table does not validate is exactly the
+   * case that must say so.
+   * ------------------------------------------------------------------ */
+
+  let campaign: CampaignPanelHandle | undefined;
+  loadCampaign(resources)
+    .then((loaded) => {
+      campaign = mountCampaignPanel({ resources, loaded, elements: ui.campaign });
+    })
+    .catch((error: unknown) => {
+      ui.campaign.error.textContent = `the campaign could not be loaded: ${message(error)}`;
+    });
 
   // `D11`: `?tab=editor` survives a reload, and opens on the building the URL names. After the
   // mount, because `selectTab('editor')` hands the building over to the editor.

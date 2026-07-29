@@ -268,6 +268,7 @@ packages/
 │   ├── controls/          — the schema-generated parameter form: four control renderers
 │   ├── batch/             — Phase 9 W3: N paired replications, and the paired-t report on them
 │   ├── scenario/          — Phase 9 W9: goal predicates, their measured across-seed pass rates
+│   ├── campaign/          — Phase 9 W5: the scenario schema, the seven stages, the four fail states
 │   └── dev/               — the Vite dev entry points, viewer and editor (dev-only)
 └── cli/                   — headless batch entry point
     └── commands/          — list, run, compare, tune, watch
@@ -300,6 +301,11 @@ packages/
 > **And the one after that.** `viz/scenario/` — W9's goal pass-rate measurement
 > ([`docs/10`](10-experience-layer-contract.md) § 11 W9) — was added on 2026-07-29 the same way,
 > and the guard reddened `core` first, exactly as this note predicts it will.
+>
+> **And so did W5.** `viz/campaign/` — the scenario schema, § 5.4's seven stages and § 5.3's four
+> fail states ([`docs/10`](10-experience-layer-contract.md) § 5) — was added on 2026-07-29 with its
+> line above in the same commit. The prediction held for the fourth time running: the `core` suite
+> reddened on the directory before a single `viz` test was written.
 >
 > **The guard is now scoped to packages present on disk, and C28 is closed.** It used to name
 > `viz/*` directories unconditionally, so deleting `packages/viz` turned them into phantoms and

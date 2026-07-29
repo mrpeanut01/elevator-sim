@@ -109,6 +109,17 @@ export interface BatchComparisonRow {
   readonly sentence: string;
   /** Why, in the same register. Never a tooltip; the mount draws it. */
   readonly note: string;
+  /**
+   * Which arm this row came out ahead on, or `null` when the row does not order the two.
+   *
+   * `null` on every verdict but `resolved`, and `null` on an `axis` row **however** the interval
+   * fell — R11: *"a row of this class reports its interval and refuses to name a winner."*
+   *
+   * It exists because the sentence already contains this fact and a caller that needed it was
+   * otherwise going to re-derive it from `estimate.upper < 0` and `lowerIsBetter`, which is a
+   * second place deciding what *better* means. `campaign/judge.ts` is that caller.
+   */
+  readonly favours: 'candidate' | 'baseline' | null;
 }
 
 /** How one arm behaved across the batch, before any comparison. */
@@ -377,6 +388,7 @@ function compareMetric(
       verdict: 'suppressed',
       estimate: null,
       pairs: 0,
+      favours: null,
       sentence: `in ${runs(totalPairs)}, no ${presentation.label} comparison is made.`,
       note: crnSentence(result),
     };
@@ -389,6 +401,7 @@ function compareMetric(
       verdict: 'suppressed',
       estimate: null,
       pairs: 0,
+      favours: null,
       sentence:
         `in ${runs(totalPairs)}, there is no ${presentation.label} to compare: ` +
         `${String(pairing.suppressedPairs)} of ${String(totalPairs)} paired runs had at least one ` +
@@ -408,6 +421,7 @@ function compareMetric(
       verdict: 'unmeasured',
       estimate: null,
       pairs: 0,
+      favours: null,
       sentence:
         `in ${runs(totalPairs)}, ${String(pairing.unmeasuredPairs)} paired runs never measured ` +
         `${presentation.label}, so there is nothing to compare.`,
@@ -424,6 +438,7 @@ function compareMetric(
       verdict: 'unresolved',
       estimate: null,
       pairs: pairing.candidate.length,
+      favours: null,
       sentence:
         `in ${runs(totalPairs)}, ${presentation.label} is not resolved: a single replication has ` +
         'no measurable spread, so no interval can be formed.',
@@ -450,6 +465,8 @@ function compareMetric(
       verdict: 'shown',
       estimate,
       pairs: n,
+      // R11, structurally: an energy row cannot name a winner even when its interval excludes zero.
+      favours: null,
       sentence:
         `in ${runs(n)}, ${candidate.dispatcherProfileId}'s ${presentation.label} differed from ` +
         `${baseline.dispatcherProfileId}'s by ${range}.`,
@@ -467,6 +484,7 @@ function compareMetric(
       verdict: 'unresolved',
       estimate,
       pairs: n,
+      favours: null,
       sentence:
         `in ${runs(n)}, the difference in ${presentation.label} between ` +
         `${candidate.dispatcherProfileId} and ${baseline.dispatcherProfileId} was ${range}. That ` +
@@ -498,6 +516,12 @@ function compareMetric(
     verdict: 'resolved',
     estimate,
     pairs: n,
+    favours:
+      presentation.lowerIsBetter === null
+        ? null
+        : candidateIsLower === presentation.lowerIsBetter
+          ? 'candidate'
+          : 'baseline',
     sentence:
       `in ${runs(n)}, ${candidate.dispatcherProfileId}'s ${presentation.label} was ${direction} ` +
       `than ${baseline.dispatcherProfileId}'s, by between ${magnitude}` +
