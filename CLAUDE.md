@@ -54,8 +54,8 @@ API — is closed by simulating it ([§ D131](DECISIONS.md)). None of that was a
 verdict up.
 
 **Energy is an axis, never a score.** The matrix that closed Phase 8 measured `nearest-car` — the
-weakest shipped dispatcher and the viewer's default — **on the Pareto front at six of eight cells**,
-because it is best on energy and worst on wait. A dispatcher that drives less carries fewer people.
+weakest shipped dispatcher, and the viewer's default until § D134 — **on the Pareto front at six of
+eight cells**, because it is best on energy and worst on wait. A dispatcher that drives less carries fewer people.
 So the energy proxy may be shown **beside** AWT and WT95 and never aggregated into a grade, and
 `EnergyStatistics.workPerServedLegKJ` goes beside the raw figure: a configuration that spends less
 by serving fewer people has not saved anything. See [§ D106](DECISIONS.md).

@@ -395,16 +395,52 @@ every rule in § 1 is undermined by one unlabelled mean in the largest type on t
 
 ### 2.2 The default configuration is the worst one available
 
-The viewer opens on Garden Apartments with `nearest-car`. Both defaults are poor:
+> **Half of this is closed, and the other half is closed by measurement rather than by a change**
+> (2026-07-29, T73, wave 9). The **dispatcher** default moved to `collective` in wave 6
+> ([§ D134](../DECISIONS.md)); this section's opening sentence was written before that and is
+> corrected below, as is the TTD clause, which the review at the head of this document had already
+> refuted in **M2** without correcting here. The **building** default is measured and **kept** — see
+> the refutation after the second bullet. What was still open in wave 9 was a *third* site nobody had
+> looked at: `elevator-sim list`'s **Try** block, which derived its examples from `data/`'s file
+> order and so told a newcomer to `run` and `watch` `nearest-car`. Fixed in T73.
+
+The viewer opens on Garden Apartments with ~~`nearest-car`~~ **`collective`**. Both defaults were
+poor; one still is, and not for the reason first written:
 
 - `docs/07-handoff.md` § 4 says in its own words that **`nearest-car` is a poor reference arm** —
   *"the **only** profile that saturates"* at the benchmark operating points — and recommends
-  `collective` or `eta`. It is the viewer's default dispatcher.
-- Garden Apartments generates **16 passengers in 900 s**. **M2**: ten of the twelve shipped
-  dispatchers return AWT 11.319 s / WT95 24.548 s / TTD 39.302 s — identical to three decimals — and
-  six of them (`eta`, `fairness-first`, `capacity-aware`, `auction`, `auction-multi-round`,
-  `destination-eta`) produce a **byte-identical** recording. The two that differ are `zoned-uppeak`
-  (2.500 s) and `predictive-balanced` (11.919 s).
+  `collective` or `eta`. ~~It is the viewer's default dispatcher.~~ **It was, by accident of being
+  first in `data/dispatcher-profiles.json`. § D134 made the choice explicit and the viewer now opens
+  on `collective`; `dev/defaults.test.ts` pins it, which nothing did between D134 and T73.**
+- Garden Apartments generates **16 passengers in 900 s** (5 of them inside the 300–600 s reporting
+  window, which is the `n` every figure below is over — **R13**). **M2, as corrected in § 12**: ten of
+  the twelve shipped dispatchers return AWT 11.319 s and WT95 24.548 s, but only **nine** of them also
+  return TTD 39.302 s — `energy-aware` matches on wait and returns **39.592 s** on journey time. Six
+  (`eta`, `fairness-first`, `capacity-aware`, `auction`, `auction-multi-round`, `destination-eta`)
+  produce a **byte-identical** recording. The two that differ on wait are `zoned-uppeak` (2.500 s) and
+  `predictive-balanced` (11.919 s). ~~ten … / TTD 39.302 s — identical to three decimals~~ was the
+  original sentence and it over-counted the TTD clause by one; re-derived independently by T73 and it
+  reproduces M2's correction exactly, including the seven distinct recordings.
+
+**The building default is measured and kept, and this is the correction the section most needed.**
+T73 ran all twelve dispatchers on all five buildings at the viewer's own settings — seed 42, 900 s,
+each building's shipped traffic profile, `onTimeout: 'report'`:
+
+| building | dispatchers publishing a mean |
+|---|---|
+| **garden-apartments** | **12 of 12** |
+| midtown-office | 0 of 12 |
+| mixed-use-high-rise | 1 of 12 (`destination-panel`) |
+| secure-tower | 1 of 12 (`destination-eta`) |
+| vertical-city | 0 of 12 |
+
+That is **14 of 60**, which reproduces **M1** exactly, and it means *there is no better shipped
+building to open on*. Every alternative gives a newcomer a first run whose headline number is
+legitimately refused on eleven or twelve of the twelve dispatchers. Garden Apartments is not the
+default because it is good; it is the default because it is the only one where the number exists at
+all, and swapping it would trade *"nothing you change matters"* for *"nothing you do produces a
+number"*. The remedy this section already names — **a scenario library at usable demand levels** — is
+still the remedy, and it is the only one the evidence supports.
 
 So the newcomer's first act — change the dispatcher and press Run — produces, six times out of
 twelve, *literally the same picture*. This is not a rendering problem and it is not a bug: it is the
@@ -563,8 +599,8 @@ against *seconds of empty travel* and is still not this.
 **So Phase 9 may show energy — and still may not score it.** The prohibition below is unchanged and
 its justification is now a measurement rather than an absence: across the full experiment matrix,
 **`nearest-car` is on the Pareto front at six of eight cells**, because it is best on energy and
-worst on wait. `nearest-car` is the viewer's default and the arm `docs/07` § 4 calls a poor
-reference. **A standalone eco score ranks the worst dispatcher first.** The replacement rule —
+worst on wait. `nearest-car` was the viewer's default until [§ D134](../DECISIONS.md), and is the
+arm `docs/07` § 4 calls a poor reference. **A standalone eco score ranks the worst dispatcher first.** The replacement rule —
 *energy is an axis, never a score* — is § 7.3.
 
 `VizSummary` does not carry any of it today; § 11.W2 is where it would land if Phase 9 wants it.
@@ -859,7 +895,7 @@ losing condition is real.**
 - A grade letter derived from AWT.
 - **An "efficiency" or "energy" score.** The quantity now exists (§ 2.9), and the prohibition is
   *stronger* for that, not weaker: measured across the full experiment matrix, `nearest-car` — the
-  viewer's default and the weakest shipped dispatcher — is **on the Pareto front at six of eight
+  viewer's default until § D134, and the weakest shipped dispatcher — is **on the Pareto front at six of eight
   cells**, because it is best on energy and worst on wait. An eco score ranks it first. Energy is an
   axis, never a score (R11, § 7.3).
 - **A single-run goal whose across-seed variance has not been measured** (R12).
@@ -991,8 +1027,8 @@ corrected), and the rule that replaces the old one is narrower and better founde
 
 **Why the prohibition on a score survived the metric arriving.** Measured across the full experiment
 matrix, `nearest-car` is on the Pareto front at **six of eight cells** — and it is there because it
-is **worse at serving people**: best on energy, worst on wait. `nearest-car` is the viewer's default
-and the arm the handoff brief calls a poor reference. A standalone eco score would put it at the top
+is **worse at serving people**: best on energy, worst on wait. `nearest-car` was the viewer's default
+until § D134 and is the arm the handoff brief calls a poor reference. A standalone eco score would put it at the top
 of the table. That is not a presentation bug that careful labelling fixes; it is what happens when a
 non-domination relation is flattened into a rank.
 

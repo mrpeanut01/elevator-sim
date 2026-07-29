@@ -158,9 +158,7 @@ export function printList(out: Output, config: LoadedConfig): void {
   out.line();
   out.line(bold('Try'));
   const firstBuilding = config.buildings[0]?.id ?? 'garden-apartments';
-  const profiles = config.dispatcherProfiles.profiles;
-  const a = profiles[0]?.id ?? 'eta';
-  const b = profiles[1]?.id ?? 'nearest-car';
+  const { a, b } = tryDispatchers(config.dispatcherProfiles.profiles);
   out.line(
     `  ${dim('$')} ${BINARY} run --building ${firstBuilding} --dispatcher ${a} --seed 42`,
   );
@@ -169,6 +167,73 @@ export function printList(out: Output, config: LoadedConfig): void {
   );
   out.line(`  ${dim('$')} ${BINARY} watch --building ${firstBuilding} --dispatcher ${a} --speed 10`);
   out.line();
+}
+
+/* -------------------------------------------------------------------------- *
+ * The Try block's two dispatchers
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The dispatcher the Try block tells a newcomer to **run** and to **watch**.
+ *
+ * Before wave 9 this was `profiles[0]`, and `data/dispatcher-profiles.json` lists `nearest-car`
+ * first, so `elevator-sim list` — the first command of the README's own six-command tour, and the
+ * first thing anyone types — printed:
+ *
+ * ```text
+ *   $ elevator-sim run --building garden-apartments --dispatcher nearest-car --seed 42
+ *   $ elevator-sim watch --building garden-apartments --dispatcher nearest-car --speed 10
+ * ```
+ *
+ * `docs/07-handoff.md` § 4 measures `nearest-car` as *"the **only** profile that saturates"* — its
+ * first invalid replication is **287** on Midtown up-peak at `arms.ts`' seed, **174** at
+ * `matrix.ts`', **12** at Midtown down-peak, and (§ D147) **26** and **6** on Vertical City, so on
+ * three of the eight matrix cells there is no budget in CLAUDE.md's 50–200 band that fits under it.
+ * The curated example lists — `help.ts`' *Start here*, `run.ts`, `watch.ts`, `compare.ts` — were all
+ * moved off it. **This one was missed because it is derived rather than authored**, which is the
+ * whole shape of the debt: a preference nobody wrote is a preference nobody reviewed.
+ *
+ * Same construction as the viewer's (§ D134, `viz/src/dev/defaults.ts`): a preference list with a
+ * fallback to file order, so renaming a profile cannot empty the block.
+ */
+export const TRY_RECOMMENDED_DISPATCHERS: readonly string[] = Object.freeze(['collective', 'eta']);
+
+/**
+ * The **B** arm of the Try block's `compare`, and `nearest-car` is deliberately kept here.
+ *
+ * A weak arm is the wrong thing to *run* and the right thing to *compare against*: the pair has to
+ * be structurally different for a first comparison to return a verdict rather than a refusal.
+ * `docs/03` § Variance reduction measures `eta` against `nearest-car` at `rho = 0.6083` — the widest
+ * separation any shipped pair has — and the Try block's own command, measured on this tree, returns
+ * `AWT −2.27 s [−2.92, −1.62]` with **0 of 100** replications saturated on either arm. A newcomer's
+ * first `compare` therefore prints a verdict with a reason, which is the point of the command.
+ *
+ * Pairing two near neighbours instead would print *"the interval contains zero"* — honest, and a
+ * poor first lesson, because it teaches that the tool cannot tell rather than that this pair does
+ * not differ.
+ */
+export const TRY_CONTRAST_DISPATCHERS: readonly string[] = Object.freeze([
+  'nearest-car',
+  'zoned-uppeak',
+]);
+
+/**
+ * The Try block's `(a, b)`, preference first and `data/`'s file order as the fallback.
+ *
+ * `b` is never allowed to equal `a`: `compare --a X --b X` is a real and useful command (it is one
+ * of `compare`'s own examples, and it must print IDENTICAL) but it is not a first thing to try.
+ */
+export function tryDispatchers(profiles: readonly { readonly id: string }[]): {
+  readonly a: string;
+  readonly b: string;
+} {
+  const has = (id: string): boolean => profiles.some((profile) => profile.id === id);
+  const a = TRY_RECOMMENDED_DISPATCHERS.find(has) ?? profiles[0]?.id ?? 'eta';
+  const b =
+    TRY_CONTRAST_DISPATCHERS.find((id) => has(id) && id !== a) ??
+    profiles.find((profile) => profile.id !== a)?.id ??
+    a;
+  return { a, b };
 }
 
 /** Bank composition, when a building has more than one bank worth mentioning. */
