@@ -120,6 +120,7 @@ import {
   expectedPassengers as expectedPassengersOver,
   intensityAt,
   resolveDemandTemplate,
+  splitAt,
 } from './demandTemplate.js';
 import {
   batchesPerSecond,
@@ -278,6 +279,19 @@ function rateText(passengersPerSecondValue: number): string {
   return `${passengersPerSecondValue.toPrecision(3)} passengers/second (${(passengersPerSecondValue * 300).toPrecision(3)} per 5 min)`;
 }
 
+/**
+ * Spread `categoryRates` onto a source, or **omit the key** when there is nothing to say.
+ *
+ * Omitted rather than zero-filled for the reason `GeneratedPassenger.transportHops` is: a trace
+ * from a run that does not vary its mix must be the object it was before mixes could vary, so that
+ * `traffic/mixIdentity.test.ts` can hold a whole run to a digest rather than to a field list.
+ */
+function withCategoryRates(
+  rates: Readonly<Record<DirectionCategory, number>> | undefined,
+): { categoryRates?: Readonly<Record<DirectionCategory, number>> } {
+  return rates === undefined ? {} : { categoryRates: rates };
+}
+
 interface ResolvedOptions {
   readonly demandLevel: DemandLevel;
   readonly interfloorWeighting: InterfloorWeighting;
@@ -389,8 +403,28 @@ export function planDemand(config: DemandConfig): DemandPlan {
 
   const rateOf = (profile: TrafficProfile): number =>
     config.arrivalRatePctPop5min ?? profile.arrivalRatePctPop5min[options.demandLevel];
+
+  // A template that varies the mix states the mix, so it takes precedence over every floor's
+  // profile — the same relationship `config.directionalSplit` already has, one level up. Combining
+  // the two is refused rather than resolved: one of them would have to win silently, and a caller
+  // who set an explicit split and got the template's instead would have no way to notice.
+  const templateSplit = template.meanDirectionalSplit;
+  if (templateSplit !== undefined && options.directionalSplit !== undefined) {
+    throw new TrafficError(
+      `Demand template "${template.id}" varies the directional mix within the run, and directionalSplit fixes it for the whole run. Set one or the other. To hold this template's mix flat at its own period mean, use templateOverrides.mixAmplitude = 0, which is the negative control rather than a different mean.`,
+    );
+  }
   const splitOf = (profile: TrafficProfile): DirectionalSplit =>
-    options.directionalSplit ?? profile.directionalSplit;
+    templateSplit ?? options.directionalSplit ?? profile.directionalSplit;
+  /** Per-category passengers/second, attached only under a mix-varying template. */
+  const categoryRatesOf = (
+    destinations: readonly DestinationWeight[],
+  ): Readonly<Record<DirectionCategory, number>> | undefined => {
+    if (templateSplit === undefined) return undefined;
+    const rates: Record<DirectionCategory, number> = { incoming: 0, outgoing: 0, interfloor: 0 };
+    for (const destination of destinations) rates[destination.category] += destination.weight;
+    return Object.freeze(rates);
+  };
 
   const entranceFloors = building.entranceFloors;
   const populatedFloors = building.floors.filter((floor) => floor.population > 0);
@@ -525,6 +559,7 @@ export function planDemand(config: DemandConfig): DemandPlan {
       peakBatchesPerSecond: batchesPerSecond(incomingRate, meanBatchSize),
       meanBatchSize,
       destinations: incomingDestinations,
+      ...withCategoryRates(categoryRatesOf(incomingDestinations)),
     });
   }
 
@@ -629,7 +664,23 @@ export function planDemand(config: DemandConfig): DemandPlan {
       peakBatchesPerSecond: batchesPerSecond(rate, profile.batchSize.mean),
       meanBatchSize: profile.batchSize.mean,
       destinations,
+      ...withCategoryRates(categoryRatesOf(destinations)),
     });
+  }
+
+  // A mix arc rescales each source's rate by `split_c(t) / meanSplit_c`, which conserves the
+  // building's total demand *exactly* only while every floor's three shares survive the
+  // feasibility filter: a share that was redistributed at the period's mean mix stays redistributed
+  // in that proportion at every other instant, rather than following the arc. No shipped building
+  // that runs this template raises it — Midtown Office declares no access zones and every floor is
+  // reachable from every entrance — so this says so rather than being silently approximate.
+  if (
+    templateSplit !== undefined &&
+    (warnings.length > 0 || strandedIncoming.length > 0 || rejections.size > 0)
+  ) {
+    warnings.push(
+      `Building "${building.id}" runs demand template "${template.id}", whose directional mix varies within the run, and some of its demand was redistributed or dropped by the feasibility filter (see the warnings beside this one). The redistribution is computed once, at the template's period-mean mix; it does not follow the arc. The building's total arrival rate is therefore conserved exactly at the mean mix and only approximately away from it.`,
+    );
   }
 
   if (strandedIncoming.length > 0) {
@@ -773,6 +824,102 @@ function classifyTrip(
  * Trace generation
  * -------------------------------------------------------------------------- */
 
+/* -------------------------------------------------------------------------- *
+ * The mix arc, as one source sees it
+ * -------------------------------------------------------------------------- */
+
+/**
+ * How a mix-varying template rescales one demand source over time.
+ *
+ * Two numbers come out of the same multiplier, and keeping them together is what stops them
+ * drifting apart:
+ *
+ * - {@link multiplier} reweights the source's **destination table**, so a batch at time `t` picks
+ *   its floor in the proportions the mix has at `t`.
+ * - {@link thinning} reweights the source's **rate**, because a source that carries only outgoing
+ *   trips genuinely has fewer of them when the outgoing share is small. It is normalized by
+ *   {@link peakScale} so the thinning intensity stays inside `[0, 1]` — the condition
+ *   `sampleBatchArrivalTimes` requires for the acceptance test to be exact rather than
+ *   silently lossy.
+ *
+ * The plan's own base mix cancels out of the destination weights: `weight_d ∝ λ · mean_c` and the
+ * multiplier is `split_c(t) / mean_c`, so the product is `λ · split_c(t)` whatever the base was.
+ * That is why `planDemand` may plan at the period mean for numerical safety without that choice
+ * being a modelling claim.
+ *
+ * `undefined` for every source under a template that declares no mix, which is the byte-identity
+ * path: the caller then uses the single static table and the unscaled rate it always used.
+ */
+interface MixSchedule {
+  /** Largest value {@link thinning} would take before normalization. */
+  readonly peakScale: number;
+  /** `split_c(t) / meanSplit_c`, the destination-weight multiplier for category `c`. */
+  multiplier(timeS: number, category: DirectionCategory): number;
+  /** The source's rate at `t` as a fraction of its peak, in `[0, 1]`. */
+  thinning(timeS: number): number;
+}
+
+/** Exact equality of three shares. Exact, not tolerant: an ulp of mix is an ulp of arrival time. */
+function isSameSplit(split: DirectionalSplit | undefined, other: DirectionalSplit): boolean {
+  return (
+    split !== undefined &&
+    split.incoming === other.incoming &&
+    split.outgoing === other.outgoing &&
+    split.interfloor === other.interfloor
+  );
+}
+
+function mixScheduleFor(
+  template: ResolvedDemandTemplate,
+  source: DemandSource,
+): MixSchedule | undefined {
+  const mean = template.meanDirectionalSplit;
+  const rates = source.categoryRates;
+  if (mean === undefined || rates === undefined || source.peakPassengersPerSecond <= 0) {
+    return undefined;
+  }
+  // A template that *states* a mix but never moves it — `mixAmplitude: 0`, the negative control —
+  // takes the static path, and that is a correctness requirement rather than an optimization.
+  // Rescaling by a multiplier that is 1 is not free in floating point: the rate would be summed in
+  // a different order from the one `planDemand` used, and the last ulp would move every arrival
+  // time. The control must be the *same run* as an ordinary fixed-split one, so it takes the same
+  // code path. `traffic/mixIdentity.test.ts` asserts the resulting equality.
+  if (template.phases.every((phase) => isSameSplit(phase.startSplit, mean) && isSameSplit(phase.endSplit, mean))) {
+    return undefined;
+  }
+
+  const multiplier = (timeS: number, category: DirectionCategory): number => {
+    const split = splitAt(template, timeS) ?? mean;
+    const base = mean[category];
+    // A mean share of zero can only arise from two zero endpoints, so the arc is zero there too and
+    // the source carries no rate in that category. Returning 0 rather than dividing is the same
+    // answer without the NaN.
+    return base <= 0 ? 0 : split[category] / base;
+  };
+  /** The source's rate at `t`, in passengers per second, before the template's intensity. */
+  const rateAt = (timeS: number): number =>
+    rates.incoming * multiplier(timeS, 'incoming') +
+    rates.outgoing * multiplier(timeS, 'outgoing') +
+    rates.interfloor * multiplier(timeS, 'interfloor');
+
+  // `rateAt` is piecewise-linear over exactly the phase knots — each `split_c` is — so its maximum
+  // is attained at a knot and this enumeration is exact rather than a sampled approximation.
+  let peakRate = 0;
+  for (const phase of template.phases) {
+    peakRate = Math.max(peakRate, rateAt(phase.startS), rateAt(phase.endS));
+  }
+  if (!(peakRate > 0)) return undefined;
+  const peakScale = peakRate / source.peakPassengersPerSecond;
+
+  return {
+    peakScale,
+    multiplier,
+    // Clamped at 1 against floating-point overshoot at the knot that attains the maximum. The
+    // clamp can only bind by an ulp: anything larger would mean `peakRate` was not the maximum.
+    thinning: (timeS: number): number => Math.min(1, rateAt(timeS) / peakRate),
+  };
+}
+
 /** A batch before it has been sorted into trace order and given its ids. */
 interface RawBatch {
   readonly timeS: number;
@@ -831,17 +978,21 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
   for (const source of plan.sources) {
     if (source.peakBatchesPerSecond <= 0 || source.destinations.length === 0) continue;
 
-    const destinationTable = new WeightedTable(
-      source.destinations,
-      source.destinations.map((destination) => destination.weight),
-    );
+    const mix = mixScheduleFor(template, source);
+    const staticTable =
+      mix === undefined
+        ? new WeightedTable(
+            source.destinations,
+            source.destinations.map((destination) => destination.weight),
+          )
+        : undefined;
 
     // Pass A: every arrival time for this source, drawn from `arrivals` alone.
     const times = sampleBatchArrivalTimes({
       rng: streams.arrivals,
-      peakBatchesPerSecond: source.peakBatchesPerSecond,
+      peakBatchesPerSecond: source.peakBatchesPerSecond * (mix?.peakScale ?? 1),
       durationS: template.durationS,
-      intensityAt: intensity,
+      intensityAt: mix === undefined ? intensity : (timeS) => intensity(timeS) * mix.thinning(timeS),
     });
 
     // A resident source's origin is fixed and needs no draw; an entrance source's is drawn
@@ -853,6 +1004,24 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
     for (const timeS of times) {
       const originFloor = fixedOrigin ?? entranceTable.pick(streams.origins);
       const size = drawBatchSize(streams.arrivals, profileFor(originFloor).batchSize);
+      // Under a mix arc the table is the batch's own: the same destinations, reweighted by the
+      // directional mix at the instant the batch appears. Rebuilt rather than mutated so that
+      // `pick` stays one uniform draw whatever the weights are — a rejection scheme here would
+      // make the draw count depend on the mix and desynchronize common random numbers between two
+      // configurations that differ only in it.
+      const destinationTable =
+        staticTable ??
+        new WeightedTable(
+          source.destinations,
+          source.destinations.map(
+            (destination) => destination.weight * (mix?.multiplier(timeS, destination.category) ?? 1),
+          ),
+        );
+      if (destinationTable.size === 0) {
+        throw new TrafficError(
+          `Demand source "${source.id}" has no destination with positive weight at t=${timeS} under template "${template.id}". The thinning intensity should have refused this batch; that it did not is a mismatch between the rate schedule and the destination weights.`,
+        );
+      }
 
       const picks: DestinationWeight[] = [];
       if (options.batchSharesDestination) {

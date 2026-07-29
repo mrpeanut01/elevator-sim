@@ -3761,6 +3761,7 @@ function traceConfigFor(config: SimulationConfig, streams: StreamSet): TrafficCo
     ...(demand.baselineFraction === undefined
       ? {}
       : { baselineFraction: demand.baselineFraction }),
+    ...(demand.mixAmplitude === undefined ? {} : { mixAmplitude: demand.mixAmplitude }),
   };
 
   return {

@@ -68,8 +68,13 @@ export class TrafficError extends Error {
  * times are serially correlated, so it supports **no** confidence interval and exists here
  * for cross-checking only — see docs/03-traffic-and-statistics.md § The independence
  * condition.
+ *
+ * `lunch-two-way` is the third, and the only one whose **directional mix moves within the run**:
+ * the lunch mixed peak, outgoing-dominant as occupants leave the building and incoming-dominant
+ * as they return. Its intensity geometry is `rise-and-fall`'s, unchanged, so the only thing it
+ * adds is the mix arc — see {@link DemandPhase.startSplit}.
  */
-export const DEMAND_TEMPLATE_IDS = ['rise-and-fall', 'constant-iso'] as const;
+export const DEMAND_TEMPLATE_IDS = ['rise-and-fall', 'constant-iso', 'lunch-two-way'] as const;
 
 export type DemandTemplateId = (typeof DEMAND_TEMPLATE_IDS)[number];
 
@@ -86,6 +91,26 @@ export interface DemandPhase {
   readonly startIntensity: number;
   /** Multiplier at {@link endS}, 0..1. */
   readonly endIntensity: number;
+  /**
+   * Directional mix at {@link startS}, or absent when this phase declares none.
+   *
+   * **Absent — not a copy of the profile's split — on every phase of both templates that shipped
+   * before it existed**, and that is what makes the field opt-in rather than a rewrite of the
+   * traffic model. `DECISIONS.md` § D151 § 7 fixed the requirement in advance: *"It must be opt-in
+   * and byte-identical when unused."* A phase with no split leaves every floor on its own traffic
+   * profile's `directionalSplit`, read once at plan time, which is what every published figure in
+   * this repository was measured under.
+   *
+   * A phase that declares one interpolates linearly between {@link startSplit} and
+   * {@link endSplit}, exactly as {@link startIntensity} and {@link endIntensity} do — so the mix
+   * is piecewise-linear over the same knots the intensity is, and a template may put a step at a
+   * phase boundary by giving neighbouring phases different endpoint mixes.
+   *
+   * Declared with {@link endSplit} or not at all; the resolver rejects one alone.
+   */
+  readonly startSplit?: DirectionalSplit | undefined;
+  /** Directional mix at {@link endS}. See {@link startSplit}. */
+  readonly endSplit?: DirectionalSplit | undefined;
 }
 
 /**
@@ -116,6 +141,23 @@ export interface ResolvedDemandTemplate {
    * the generator against.
    */
   readonly intensityIntegralS: number;
+  /**
+   * The period's own directional mix — the time-average of the phases' splits — or **absent** when
+   * no phase declares one.
+   *
+   * Present exactly when the template varies the mix, so this field is the one thing the rest of
+   * the module tests to decide which path it is on. Two consequences, both deliberate:
+   *
+   * 1. It is the split the *plan* is built at, so `planDemand` never divides by a zero share and
+   *    the plan's headline rate is the rate of the period rather than of one instant. Which base
+   *    is chosen cannot change a destination weight — the base cancels out of
+   *    `weight · split(t)/base` — so this is a reporting and numerical-safety choice, not a
+   *    modelling one.
+   * 2. It is what the flat-mix negative control is flat *at*. `mixAmplitude: 0` leaves this value
+   *    in place and every phase knot equal to it, so the control differs from the treatment in the
+   *    variation of the mix and in nothing else — not in the mean mix, and not in total demand.
+   */
+  readonly meanDirectionalSplit?: DirectionalSplit | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -192,6 +234,19 @@ export interface DemandSource {
    * {@link peakPassengersPerSecond}; an empty table means the source generates nothing.
    */
   readonly destinations: readonly DestinationWeight[];
+  /**
+   * {@link peakPassengersPerSecond} broken out by direction category — **present only under a
+   * template that varies the directional mix**, and omitted (not zero-filled) otherwise.
+   *
+   * Omitted rather than emptied for the same reason `GeneratedPassenger.transportHops` is: a trace
+   * from a run that does not use the feature must be the object it was before the feature existed,
+   * and `traffic/mixIdentity.test.ts` holds it to that byte for byte.
+   *
+   * It exists because a mix-varying run has to rescale a source's rate over time, and the scale is
+   * `Σ_c categoryRates[c] · split_c(t) / meanSplit_c` — which needs the split of the source's own
+   * rate, not just its total. Serializable, so a stored trace still replays.
+   */
+  readonly categoryRates?: Readonly<Record<DirectionCategory, number>> | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -411,6 +466,21 @@ export interface DemandTemplateOverrides {
   readonly discardFirstS?: number | undefined;
   /** Cool-down discarded at the end, seconds. `constant-iso` only. */
   readonly discardLastS?: number | undefined;
+  /**
+   * How much of the authored mix arc to keep, `[0, 1]`. `lunch-two-way` only, default 1.
+   *
+   * `split(t) = mean + amplitude · (authored(t) − mean)`, so **1 is the authored arc and 0 is a
+   * flat run at the period's own mean mix with the total demand unchanged**. Zero is not a
+   * curiosity: `DECISIONS.md` § D162 condition 5 requires a flat-mix negative control at equal
+   * total demand to be measured in the same run as any mix-varying result, and this is that
+   * control, declared as a tunable rather than assembled as a fixture.
+   *
+   * At 0 the phases still *carry* the mix — every knot equal to the mean — rather than dropping it,
+   * which is the difference between a control and a different experiment: dropping it would return
+   * each floor to its own profile's split (85/5/10 on a standard office) and the control would
+   * differ from the treatment in the mean mix as well as in its variation.
+   */
+  readonly mixAmplitude?: number | undefined;
 }
 
 /** Everything {@link generateTrace} needs. Only `building`, `profiles` and `streams` are required. */
@@ -526,6 +596,18 @@ export const TRAFFIC_DEFAULTS = Object.freeze({
   constantDurationS: 7200,
   constantDiscardFirstS: 900,
   constantDiscardLastS: 300,
+  /**
+   * The lunch two-way period's length, seconds.
+   *
+   * **Inherited from {@link riseAndFallDurationS} rather than measured**, and that is stated
+   * plainly rather than dressed up: no CIBSE Guide D or BCO page giving a lunch-*period* length in
+   * minutes was available when this was written, so the template borrows the shipped terminating
+   * run's own horizon and adds no uncited duration of its own. The cited part of `lunch-two-way`
+   * is its **mix**, not its clock. See `data/traffic-profiles.json`.
+   */
+  lunchTwoWayDurationS: 1800,
+  /** Full authored arc. See {@link DemandTemplateOverrides.mixAmplitude}. */
+  mixAmplitude: 1,
 } as const satisfies {
   readonly templateId: DemandTemplateId;
   readonly demandLevel: DemandLevel;
@@ -539,6 +621,8 @@ export const TRAFFIC_DEFAULTS = Object.freeze({
   readonly constantDurationS: number;
   readonly constantDiscardFirstS: number;
   readonly constantDiscardLastS: number;
+  readonly lunchTwoWayDurationS: number;
+  readonly mixAmplitude: number;
 });
 
 /* -------------------------------------------------------------------------- *
@@ -766,5 +850,26 @@ export const TRAFFIC_PARAMETERS: readonly TrafficParameterSpec[] = [
     unit: 's',
     description: 'Cool-down discarded at the end of the run. ISO 8100-32 discards 5 minutes.',
     activeWhen: { 'traffic.template': ['constant-iso'] },
+  },
+  {
+    id: 'traffic.lunchTwoWay.durationS',
+    type: 'continuous',
+    range: [600, 5400],
+    scale: 'linear',
+    default: TRAFFIC_DEFAULTS.lunchTwoWayDurationS,
+    unit: 's',
+    description:
+      "Length of one lunch two-way period. Inherited from the CIBSE rise-and-fall run length rather than measured: the cited part of this template is its directional mix, not its clock.",
+    activeWhen: { 'traffic.template': ['lunch-two-way'] },
+  },
+  {
+    id: 'traffic.lunchTwoWay.mixAmplitude',
+    type: 'continuous',
+    range: [0, 1],
+    scale: 'linear',
+    default: TRAFFIC_DEFAULTS.mixAmplitude,
+    description:
+      "How much of the authored mix arc to keep. 1 is the arc as authored — outgoing-dominant early, incoming-dominant late; 0 collapses it to a flat run at the period's own mean mix with the total demand unchanged, which is the negative control any mix-varying result must be measured against.",
+    activeWhen: { 'traffic.template': ['lunch-two-way'] },
   },
 ];

@@ -236,6 +236,17 @@ export interface DemandTemplate extends Commented {
   readonly discardFirstMin?: number | undefined;
   /** Cool-down to discard, minutes. */
   readonly discardLastMin?: number | undefined;
+  /**
+   * Directional mix at the **start** of the period, for a template whose mix varies within a run.
+   *
+   * Absent on both of the templates that shipped before `lunch-two-way`, and absent is not the
+   * same as flat: a record carrying neither endpoint declares no mix of its own and every floor
+   * keeps its traffic profile's split, which is what every published figure in this repository was
+   * measured under. Declared together with {@link directionalSplitAtEnd} or not at all.
+   */
+  readonly directionalSplitAtStart?: DirectionalSplit | undefined;
+  /** Directional mix at the **end** of the period. See {@link directionalSplitAtStart}. */
+  readonly directionalSplitAtEnd?: DirectionalSplit | undefined;
 }
 
 /** Body-mass distribution. Must be a distribution: the load sensor measures it. */

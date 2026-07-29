@@ -290,7 +290,17 @@ describe('every parameter core declares is accounted for', () => {
     // These two numbers are unchanged by that work — 106 and 56 before and after — which is the
     // claim, since a derivation that moved a count would be a second defect wearing the fix's
     // clothes.
-    expect(rows).toBe(106);
+    //
+    // **106 → 108 and the space unmoved at 56 in wave 9**, which is the `sim.assignedWalkS`
+    // relationship again rather than a new one. Both rows are `TRAFFIC_PARAMETERS`' —
+    // `traffic.lunchTwoWay.durationS` and `traffic.lunchTwoWay.mixAmplitude`, the geometry and the
+    // mix-arc amplitude of the third demand template — and neither is authorable in a dispatcher
+    // profile, correctly: they describe the *traffic a dispatcher is measured under*, and a
+    // dispatcher that could tune the demand it is scored on could tune away the demand it is bad
+    // at. The second is the one that matters, because it is the flat-mix negative control
+    // `DECISIONS.md` § D162 condition 5 requires — a control an arm could set for itself would
+    // not be one.
+    expect(rows).toBe(108);
     expect(SPACE.parameters.length).toBe(56);
     // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
     // always said `false` would satisfy the biconditional above only by accident.

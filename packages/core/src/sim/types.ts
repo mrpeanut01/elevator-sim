@@ -296,6 +296,14 @@ export interface SimulationDemandOptions {
   readonly peakWindowS?: number | undefined;
   /** Intensity at both ends as a fraction of peak. `rise-and-fall` only. */
   readonly baselineFraction?: number | undefined;
+  /**
+   * How much of the authored directional-mix arc to keep, `[0, 1]`. `lunch-two-way` only.
+   *
+   * 1 is the arc as authored; **0 holds the mix flat at the period's own mean with the total
+   * demand unchanged**, which is the negative control `DECISIONS.md` § D162 condition 5 requires
+   * beside any result measured under a varying mix.
+   */
+  readonly mixAmplitude?: number | undefined;
 }
 
 /** What to do when the drain deadline fires with passengers still in the system. */

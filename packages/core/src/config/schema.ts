@@ -384,6 +384,16 @@ export const elevatorSpecsSchema = z
 
 const DIRECTIONAL_SPLIT_TOLERANCE = 1e-6;
 
+/** The three shares, each in `[0, 1]` and summing to 1. Shared by profiles and templates. */
+const directionalSplitSchema = z
+  .strictObject({ incoming: fraction, outgoing: fraction, interfloor: fraction })
+  .refine(
+    (split) =>
+      Math.abs(split.incoming + split.outgoing + split.interfloor - 1) <=
+      DIRECTIONAL_SPLIT_TOLERANCE,
+    { message: 'incoming + outgoing + interfloor must sum to 1' },
+  );
+
 export const trafficProfileSchema = z.strictObject({
   $comment: comment,
   id: identifier,
@@ -397,14 +407,7 @@ export const trafficProfileSchema = z.strictObject({
     distribution: z.string().min(1),
     mean: z.number().gte(1, 'a batch contains at least one passenger'),
   }),
-  directionalSplit: z
-    .strictObject({ incoming: fraction, outgoing: fraction, interfloor: fraction })
-    .refine(
-      (split) =>
-        Math.abs(split.incoming + split.outgoing + split.interfloor - 1) <=
-        DIRECTIONAL_SPLIT_TOLERANCE,
-      { message: 'incoming + outgoing + interfloor must sum to 1' },
-    ),
+  directionalSplit: directionalSplitSchema,
 });
 
 export const trafficProfilesSchema = z
@@ -424,6 +427,8 @@ export const trafficProfilesSchema = z
         shape: z.string().optional(),
         discardFirstMin: nonNegative.optional(),
         discardLastMin: nonNegative.optional(),
+        directionalSplitAtStart: directionalSplitSchema.optional(),
+        directionalSplitAtEnd: directionalSplitSchema.optional(),
       }),
     ),
     passengerMass: z
@@ -452,6 +457,21 @@ export const trafficProfilesSchema = z
           code: 'custom',
           path: ['demandTemplates', index, 'discardFirstMin'],
           message: `discarding ${discarded} min of a ${template.durationMin} min run leaves no measurement window`,
+        });
+      }
+      // Both endpoints or neither. One alone would resolve to a template whose mix moves from the
+      // authored end to the profile's own split, which is a mix arc nobody authored and nobody
+      // cited — and it would do it silently, since either field alone is schema-valid.
+      const declared = [
+        template.directionalSplitAtStart !== undefined,
+        template.directionalSplitAtEnd !== undefined,
+      ];
+      if (declared[0] !== declared[1]) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['demandTemplates', index, 'directionalSplitAtStart'],
+          message:
+            'directionalSplitAtStart and directionalSplitAtEnd are declared together or not at all; one alone gives the run a mix arc with an unauthored endpoint',
         });
       }
     });

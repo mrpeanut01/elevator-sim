@@ -845,6 +845,14 @@ export const STUDY_ENTRY_POINTS: Readonly<Record<string, PublishedStudyId | 'no-
     // proof that published a confidence interval would invite a resolution question to be read
     // into a wiring question, which is the one thing it must not do.
     measureEnergyLiveness: 'no-intervals',
+    // Counts in a contingency table: how the three detector inputs' *ratios* move across the run
+    // under the lunch two-way template, against the same table shape DECISIONS.md § D156 measured
+    // the shipped templates flat over. A chi-square and a standardized residual have no standard
+    // error and the claim is categorical — the mix varies, or it does not — so `livenessSuite.ts`
+    // is its driver rather than the pin table. It constructs no `Simulation` and names no
+    // dispatcher: § D162 condition 3 forbids the commit that adds the template from also adding a
+    // selector result.
+    measureLunchTwoWayMix: 'no-intervals',
     // The driver for the five above, and the reason the five are no longer dead. Every entry point
     // mapped to a `PublishedStudyId` had `regeneratePins.ts` as its non-test caller; the
     // `'no-intervals'` half had none at all, which is how `measureEnergyLiveness` shipped as the
