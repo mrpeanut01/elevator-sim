@@ -759,6 +759,92 @@ describe('stage 4, played — a stage that can actually be cleared', () => {
   }, 300_000);
 });
 
+/**
+ * **Stage 6, after `vertical-city` declared an escalator at every one of its two-level lobbies.**
+ *
+ * The building's numbers moved twice: once when it declared the ground-lobby escalator — which took
+ * `long-waits-under` out of this stage's `goals` bucket, because 49/50 tuning against 50/50 holdout
+ * is a classification that does not survive the holdout — and again when it declared the three
+ * sky-lobby ones. The second move was smaller: **one cell**, `answer-the-demand` from 7 of 50 to 6
+ * of 50 on the holdout set, still a variable and still a batch goal. **No goal returned**, and none
+ * was authored to replace the one that left; § D160 selects goals from the measured table and this
+ * lane did not touch that rule.
+ *
+ * So the question *"is stage 6 still playable?"* is answered here the way stage 4's is: by playing
+ * it. Four live goals, three of them counts whose bar is the shipped setting's own count, and the
+ * comparison goal that no stage clears by standing still.
+ */
+describe('stage 6, played — four goals survive the escalators, and the bars still reproduce', () => {
+  let stage: CampaignStage;
+  let unchanged: ReturnType<typeof playStage>;
+
+  beforeAll(() => {
+    stage = stageAt(5);
+    unchanged = playStage(stage, stage.dispatcher.startingProfileId);
+  }, 300_000);
+
+  it('carries four live goals — the three counts and the comparison', () => {
+    expect(stage.goals.map((goal) => goal.kind)).toEqual([
+      'deliver-everyone',
+      'no-divergence',
+      'answer-the-demand',
+      'beat-the-baseline',
+    ]);
+  });
+
+  it('reproduces every published bar on the changed building', () => {
+    /*
+     * The clause that would have caught the goal table going stale against the escalators: the
+     * bars in `data/scenario-goals.json` are re-derived by running the stage, and a bar that no
+     * longer reproduces is refused rather than judged.
+     */
+    let checked = 0;
+    for (const goal of unchanged.verdict.goals) {
+      if (goal.reproduced === null) continue;
+      checked += 1;
+      expect(goal.reproduced, goal.sentence).toBe(true);
+    }
+    expect(checked).toBe(3);
+  });
+
+  it('meets its three count goals at the shipped setting and clears on none of them', () => {
+    // Standing still scores every count goal exactly level against its own bar — so the low
+    // absolute rates (4 of 50 on `deliver-everyone`) are a **bar**, not a difficulty. What is
+    // not cleared is the comparison, which is the whole of what this stage asks a player for.
+    for (const goal of unchanged.verdict.goals) {
+      if (goal.kind === 'beat-the-baseline') continue;
+      expect(goal.met, goal.sentence).toBe(true);
+    }
+    const comparison = unchanged.verdict.goals.find((goal) => goal.kind === 'beat-the-baseline');
+    expect(comparison?.met).toBe(false);
+    expect(unchanged.verdict.cleared).toBe(false);
+  });
+
+  /**
+   * **The answer to "is it playable?", in stage 4's form: a measured clear.**
+   *
+   * `docs/10` § 5.4 and § 11 both said **three** stages clear from the dispatcher dropdown alone —
+   * 3, 4 and 7 — and named stage 6 among the four that do not. That was measured while stage 6
+   * carried five count goals; `long-waits-under` has since left its `goals` bucket, which is one
+   * fewer bar a candidate has to match, and nothing re-measured the claim. It is four.
+   *
+   * Re-measured on the **pre-escalator** configuration it clears there too, so this is not a thing
+   * the sky-lobby escalators did — it is a published claim that went stale with no tool re-deriving
+   * it, which is what this test now is.
+   */
+  it('is clearable from the dropdown — the published count of three stages was four', () => {
+    const played = playStage(stage, 'destination-eta');
+    for (const goal of played.verdict.goals) {
+      expect(goal.met, goal.sentence).toBe(true);
+      if (goal.reproduced !== null) expect(goal.reproduced).toBe(true);
+    }
+    expect(played.verdict.cleared).toBe(true);
+    expect(played.verdict.headline).toContain('all 4 goals reached over 50 runs');
+    /* R2 survives the good news here as it does on stage 4. */
+    expect(played.verdict.headline).toContain('not a ranking of dispatchers');
+  }, 300_000);
+});
+
 describe('the decoder refuses rather than dropping', () => {
   it('throws on a structurally broken stage instead of quietly shipping six', () => {
     /*

@@ -64,24 +64,41 @@ const BASELINE_DIGESTS: Readonly<Record<string, string>> = {
 };
 
 /**
- * The same digests measured **after** `vertical-city` declared its escalator, for the one
- * building that declares one.
+ * The current digests for the one building that declares a transport mode — `vertical-city` with
+ * an escalator at **all four** of its two-level lobbies: `G ↔ 2`, `26 ↔ 27`, `51 ↔ 52`, `76 ↔ 77`.
  *
  * Pinned rather than omitted. The moved figure is the finding, and a guard that simply stopped
  * looking at the building the change was made for would be the fourth entry in this repository's
  * list of tests that cannot fail.
  */
 const MOVED_DIGESTS: Readonly<Record<string, string>> = {
-  'vertical-city|nearest-car': '788a0199c73089092bb78f863a745364cfee8a4f1cdf2f8ced88b12fb94360ac',
-  'vertical-city|eta': '96a55b58dee7fa618242d06cf16dec777a63df3f06fa068c97037dd2535a6c54',
-  'vertical-city|collective': '03fe08156be7ec5da7b7f2969fe514660743f6f4e805adcbcbf9334813ef935f',
+  'vertical-city|nearest-car': '77c37f9b186e2e210e610deb6d68e172428e5beb4bf36639f7943dbacf1a0b12',
+  'vertical-city|eta': '37d5a747c45a3c3a43f33c50e080deca27fa16c47a562361f50c2e7a901cdf59',
+  'vertical-city|collective': 'a91bf06e4b1c708a5b78c6fd78657af71c8bcd69c44fad4dbae546d5923866af',
 };
 
-/** Digests measured on baseline `d7e8571` for the building that has since declared a mode. */
-const VERTICAL_CITY_BEFORE: Readonly<Record<string, string>> = {
-  'vertical-city|nearest-car': 'a8f78f82129dcefc6b36d905b500047906b2a9d10358ffcf033607a98ece08f3',
-  'vertical-city|eta': 'f3587fabdc00d41057fe972bdf15c50f96c194e20c2620f41be497964d2147f6',
-  'vertical-city|collective': 'd7f3f3bf74d36a72ede1288612e1b3ba173eec69b932d907ccfd724510907cd4',
+/**
+ * The two superseded states of the same building, kept so the guard can say *which* change moved
+ * it rather than only *that* it moved.
+ *
+ * `allLift` is baseline `d7e8571`, before `core` had a transport mode at all. `groundOnly` is the
+ * tree that declared the ground-lobby escalator and nothing else — the configuration every
+ * `vertical-city` figure published between those two changes was measured under, and the arm
+ * `sim/transportHop.test.ts` and `config/doubleDeck.test.ts` still run live.
+ */
+const VERTICAL_CITY_BEFORE: Readonly<Record<string, { allLift: string; groundOnly: string }>> = {
+  'vertical-city|nearest-car': {
+    allLift: 'a8f78f82129dcefc6b36d905b500047906b2a9d10358ffcf033607a98ece08f3',
+    groundOnly: '788a0199c73089092bb78f863a745364cfee8a4f1cdf2f8ced88b12fb94360ac',
+  },
+  'vertical-city|eta': {
+    allLift: 'f3587fabdc00d41057fe972bdf15c50f96c194e20c2620f41be497964d2147f6',
+    groundOnly: '96a55b58dee7fa618242d06cf16dec777a63df3f06fa068c97037dd2535a6c54',
+  },
+  'vertical-city|collective': {
+    allLift: 'd7f3f3bf74d36a72ede1288612e1b3ba173eec69b932d907ccfd724510907cd4',
+    groundOnly: '03fe08156be7ec5da7b7f2969fe514660743f6f4e805adcbcbf9334813ef935f',
+  },
 };
 
 const PROFILES = ['nearest-car', 'eta', 'collective'] as const;
@@ -159,11 +176,28 @@ describe('a building that declares no transport mode runs exactly as it did befo
 describe('the building that declares one moved, and moved everywhere', () => {
   for (const profileId of PROFILES) {
     const key = `vertical-city|${profileId}`;
-    it(`${key} reproduces the re-derived digest and is not the baseline one`, () => {
+    it(`${key} reproduces the re-derived digest and is neither superseded one`, () => {
       const { digest, transportHops } = measure('vertical-city', profileId);
       expect(digest).toBe(MOVED_DIGESTS[key]);
-      expect(digest).not.toBe(VERTICAL_CITY_BEFORE[key]);
+      // Distinct from *both* prior states, so a regression that silently reverts either the
+      // sky-lobby escalators or the ground one fails here by name rather than by a moved mean.
+      expect(digest).not.toBe(VERTICAL_CITY_BEFORE[key]?.allLift);
+      expect(digest).not.toBe(VERTICAL_CITY_BEFORE[key]?.groundOnly);
       expect(transportHops).toBeGreaterThan(0);
     });
   }
+
+  /*
+   * The three prior digests are only meaningful if they are three *different* digests. Without
+   * this, a copy-paste that made `allLift` and `groundOnly` the same value would leave the
+   * `not.toBe` pair above asserting one thing twice — the "value with two readers" shape, in the
+   * expectation rather than in the subject.
+   */
+  it('the three pinned states of this building are three distinct runs', () => {
+    for (const profileId of PROFILES) {
+      const key = `vertical-city|${profileId}`;
+      const before = VERTICAL_CITY_BEFORE[key];
+      expect(new Set([before?.allLift, before?.groundOnly, MOVED_DIGESTS[key]]).size, key).toBe(3);
+    }
+  });
 });

@@ -507,7 +507,8 @@ export const DOOR_DEFAULTS = Object.freeze({
    *   every replication and are suppressed rather than quoted.
    *
    * **Ten of those fifty cells were measured on a `vertical-city` that had no escalator, and that
-   * building has since declared one.** Every run of the other four buildings is bit-identical to
+   * building has since declared four** — one at each of its two-level lobbies, in two separate
+   * changes. Every run of the other four buildings is bit-identical to
    * the tree these figures were taken on — `traffic/transportIdentity.test.ts` pins that at full
    * precision — so 40 of the 50 cells cannot have moved, including the `secure-tower` row above.
    * The ten `vertical-city` cells can have, and the `predictive-balanced` row is one of them. It

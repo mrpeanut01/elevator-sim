@@ -377,5 +377,10 @@ describe('the lift-only model is a conservative view of the planner that actuall
     const planner = RoutePlanner.forBuilding(b);
     expect(legsFrom(topologyOf(b), 'G').get('40')).toBe(3);
     expect(planner.legCount('G', '40')).toBe(2);
+    // The widest gap the escalators open, and the one that matters most: a cross-lobby interfloor
+    // journey. The lift-only model rides 105 m down to the ground lobby and back; the planner
+    // crosses at sky lobby A. Pinned so the gap cannot quietly close back up.
+    expect(legsFrom(topologyOf(b), '40').get('34')).toBe(5);
+    expect(planner.legCount('40', '34')).toBe(2);
   });
 });

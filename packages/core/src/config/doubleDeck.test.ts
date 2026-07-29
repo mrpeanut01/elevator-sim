@@ -202,11 +202,11 @@ describe('a double-deck bank with no declared pairing has no geometry, and says 
 });
 
 /**
- * The cross-deck refusal, kept live after the escalator removed its only shipped case.
+ * The cross-deck refusal, kept live after the escalators removed its only shipped case.
  *
  * `#deckAllows` refuses a leg whose origin and destination sit on different decks of the same
  * rigidly coupled car. On `vertical-city` the only legs that ever reached it were the one-floor
- * `G <-> 2` lobby hops — and the building's declared escalator now carries those, so the shipped
+ * `G <-> 2` lobby hops — and the building's declared escalators now carry those, so the shipped
  * configuration reaches the refusal zero times.
  *
  * That is a correct outcome and a dangerous one: the branch would be untested from `data/` and
@@ -224,9 +224,17 @@ describe('the cross-deck refusal still refuses, on the configuration that still 
   it('refuses cross-deck legs when the lobby hop is a lift leg again, and none when it is not', async () => {
     const cfg = await load();
     const shipped = cfg.buildingsById.get('vertical-city') as ResolvedBuilding;
-    expect(shipped.transportModes.length, 'vertical-city no longer declares a transport mode').toBe(
-      1,
+    /*
+     * **One escalator per two-level lobby**, so this count tracks `servesFloorPairs` rather than
+     * a remembered number: the shuttle declares four pairs and each is a lobby with a machine in
+     * it. Written as the derived equality rather than as `toBe(4)`, so a fifth pair without a
+     * fifth escalator fails here and not somewhere downstream.
+     */
+    const pairs = shipped.banks.find((bank) => bank.id === 'shuttle')?.servesFloorPairs ?? [];
+    expect(shipped.transportModes.map((mode) => [...mode.connects])).toEqual(
+      pairs.map((pair) => [...pair]),
     );
+    expect(shipped.transportModes.length, 'vertical-city declares no transport mode').toBe(4);
 
     const run = (building: ResolvedBuilding) =>
       runSimulation({

@@ -65,10 +65,14 @@
  * and still never gated on — the denominators differ for a smaller and more boring reason than
  * they used to.
  *
- * A genuine decomposition difference does survive, but not in this regime: under the building's own
- * *mixed* demand a cross-lobby interfloor journey — 31 → 46 and its kind — still rides down to the
- * ground lobby and back, because this building declares an escalator at `G ↔ 2` and none at its
- * three sky-lobby pairs. Incoming-only up-peak contains no such journey. See § 6.
+ * The decomposition difference that used to survive under the building's own *mixed* demand — a
+ * cross-lobby interfloor journey, 31 → 46 and its kind, riding all the way down to the ground lobby
+ * and back — **is gone too**: `vertical-city` now declares an escalator at each of its three
+ * sky-lobby pairs as well, and 31 → 46 crosses at sky lobby A in two lift legs where it took four.
+ * **That changed nothing here**, and the reason is worth stating rather than assuming: this study's
+ * comparable regime is incoming-only up-peak from `G`, and **not one of the building's 92 populated
+ * destinations changes route** when the sky-lobby escalators are added or removed — on either arm.
+ * Measured over the whole floor set, not inferred. See § 6.
  *
  * The consequence for the statistics is exact and is the reason this study is gated on TTD:
  *
@@ -229,16 +233,23 @@
  *
  * # 6. What this module does not answer
  *
- * **The sky lobbies have no escalator, and the ground lobby does.** `core` now has a non-elevator
- * transport mode and `vertical-city` declares one, at `G ↔ 2`, which is the hop this module's
- * earlier revision named as its largest limit. It declares **none** at `26 ↔ 27`, `51 ↔ 52` or
- * `76 ↔ 77`. So a cross-lobby *interfloor* journey — zone 3 to zone 4, `31 → 46` and its kind —
- * still rides the shuttle down to the ground lobby, crosses on the escalator there, and rides back
- * up. Whether those three pairs should also be joined is a question about the *building*, not
- * about `core`, and it is left to whoever owns `data/buildings/vertical-city.json`. Note that the
- * study's comparable regime is incoming-only up-peak, where no such journey occurs, so it is the
- * shipped *mixed* demand this affects and not the two operating points' own results — § 2 shows
- * the up-peak decompositions coming out identical leg for leg.
+ * **The sky lobbies now have escalators too, and it did not move this study.** The earlier revision
+ * of this section named `26 ↔ 27`, `51 ↔ 52` and `76 ↔ 77` as the remaining limit: a cross-lobby
+ * *interfloor* journey — zone 3 to zone 4, `31 → 46` and its kind — rode the shuttle 105 m down to
+ * the ground lobby, crossed there, and rode back up. `vertical-city` declares all three now, and
+ * that journey takes two lift legs instead of four.
+ *
+ * **This study's figures are unchanged by it, and that is a measurement rather than a hope.** The
+ * comparable regime is incoming-only up-peak from `G`, and the sky-lobby edges are on no route out
+ * of `G`: over all 92 populated destinations, on both the double-deck and the single-deck arm, the
+ * planned floors are identical with and without them. Two of the three edges carry **no hops at
+ * all** even under the shipped mixed demand, because `zone-5-local` and `zone-6-local` each serve
+ * *both* levels of their sky lobby.
+ *
+ * **So the verdict did not widen, and it must not be read as if it had.** `BETTER-EVERYWHERE` still
+ * rests on **two cells at one operating point**, exactly as § 5 records. A change that removed the
+ * limitation this section named without touching the evidence base does not strengthen the result;
+ * the 1.5 % point is still UNQUOTABLE and still dropped out.
  *
  * **The 1.5 % point has been re-censused and its budget has not been re-derived.** The budget of
  * 200 was chosen against a ceiling of 386 measured on the pre-escalator configuration; the ceiling

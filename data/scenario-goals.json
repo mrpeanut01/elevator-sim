@@ -810,13 +810,13 @@
           },
           "holdout": {
             "n": 50,
-            "passes": 7,
-            "fails": 43,
+            "passes": 6,
+            "fails": 44,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 4 of 50 on the tuning seeds and 7 of 50 on the holdout seeds."
+          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 4 of 50 on the tuning seeds and 6 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",

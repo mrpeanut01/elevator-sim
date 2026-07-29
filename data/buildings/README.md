@@ -111,13 +111,26 @@ the next leg starts waiting or as seconds added after the last alighting.
 
 The `traversalTimeS` is reference data and must be cited in the mode's `$comment`; see
 [docs/02 § Non-lift transport](../../docs/02-elevator-reference.md). Declared by
-[`vertical-city.json`](vertical-city.json) and by no other shipped building: before it existed,
+[`vertical-city.json`](vertical-city.json) and by no other shipped building, which declares **four**
+— one per two-level lobby, `G ↔ 2` and the three sky lobbies `26 ↔ 27`, `51 ↔ 52`, `76 ↔ 77`, all at
+21.2 s because every lobby pair rises exactly the 4.5 m deck separation. Before any of them existed,
 **292 of that building's 3,549 lift legs at the standard seed were the `G ↔ 2` lobby hop**, which
-is the single largest modelling limit the repository had recorded
-([`DECISIONS.md` § D147](../../DECISIONS.md) § 6).
+was the single largest modelling limit the repository had recorded
+([`DECISIONS.md` § D147](../../DECISIONS.md) § 6); the four together bring the same 1,956 journeys
+down to **3,245** lift legs.
 
 Three things a mode deliberately cannot express, because nothing would read them: what kind of
 machine it is, a direction (so a one-way escalator is not expressible), and a capacity or headway.
+
+**Declaring a mode is not the same as its being used, and the difference is worth measuring.** Two
+of `vertical-city`'s four — `51 ↔ 52` and `76 ↔ 77` — carry **0 hops**, because the local bank at
+each of those sky lobbies serves *both* of its levels, so the two levels are already the same
+breadth-first depth apart and the escalator never shortens a route any passenger can ask for. That
+is a fact about the building's zoning rather than about the schema, and it is pinned as a per-mode
+census in `traffic/transportRoute.test.ts` rather than left to be rediscovered — a declared field
+that changes no decision is the shape [`DECISIONS.md`](../../DECISIONS.md) found in
+`data/dispatcher-profiles.json`, and `data/buildings/` is not exempt from it. If you add a mode, add
+its measured hop count beside it.
 
 ## Transfer floors and per-floor traffic
 

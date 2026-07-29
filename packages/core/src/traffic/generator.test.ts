@@ -1145,14 +1145,23 @@ describe('failure modes', () => {
   });
 
   it('drops the demand it cannot route, and says so', () => {
-    // Cap the leg budget below what Vertical City's geometry needs and the zone-3/zone-4
-    // interfloor pairs disappear — loudly, with the demand redistributed inside its own share
-    // rather than silently vanishing.
-    const capped = planDemand({ building: building('vertical-city'), profiles, maxLegs: 3 });
+    // Cap the leg budget below what Vertical City's geometry needs and the pairs that need the
+    // extra leg disappear — loudly, with the demand redistributed inside its own share rather
+    // than silently vanishing.
+    //
+    // **The cap moved from 3 to 2 when the sky lobbies got escalators.** It used to be the
+    // zone-3/zone-4 interfloor pairs that vanished, at four lift legs each; those now cross at
+    // sky lobby A in two, and the longest journey left is the three-leg zone-3-to-zone-5 kind.
+    // A cap of 3 refuses nothing, so this guard would have gone quietly vacuous.
+    const capped = planDemand({ building: building('vertical-city'), profiles, maxLegs: 2 });
     const uncapped = planDemand({ building: building('vertical-city'), profiles });
     expect(capped.warnings.some((w) => w.includes('maxLegs'))).toBe(true);
     expect(capped.peakPassengersPerSecond).toBeCloseTo(uncapped.peakPassengersPerSecond, 12);
     expect(uncapped.warnings.some((w) => w.includes('maxLegs'))).toBe(false);
+    // Non-vacuous in the other direction too: the *default* budget really does leave this
+    // building's longest journey intact, so the warning above is the cap talking and not the
+    // building being unroutable.
+    expect(uncapped.warnings).toEqual([]);
   });
 
   it('does not generate an over-long journey once it has been planned away', () => {
@@ -1160,9 +1169,16 @@ describe('failure modes', () => {
       building: building('vertical-city'),
       profiles,
       streams: new StreamSet(51),
-      maxLegs: 3,
+      maxLegs: 2,
     });
-    expect(trace.passengers.every((p) => p.legs.length <= 3)).toBe(true);
+    expect(trace.passengers.every((p) => p.legs.length <= 2)).toBe(true);
+    // And the cap is doing work: uncapped, this building really does plan three-leg journeys.
+    const uncapped = generateTrace({
+      building: building('vertical-city'),
+      profiles,
+      streams: new StreamSet(51),
+    });
+    expect(uncapped.passengers.some((p) => p.legs.length === 3)).toBe(true);
   });
 
   it('warns rather than crashing on a building with no demand at all', () => {
