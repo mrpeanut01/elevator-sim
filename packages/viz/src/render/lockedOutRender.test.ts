@@ -232,10 +232,15 @@ describe('the three barriers stay three marks', () => {
   it('keeps a cell of air between the call marks and the rider glyphs', () => {
     /*
      * The two groups say different things about the same landing — `✗`/`▩` about the **call**,
-     * `●◑○✖` about the **people** — and after the W6/U4 merge they share a row. Run together
-     * they read as one string, and the abandoned band's `✖` is one codepoint from the unanswered
-     * `✗`. Asserted in pixels because it is a pixel decision: the mark occupies one cell, the
-     * advance past it is two, and the separator makes three before the queue may start.
+     * `●◑○◆` about the **people** — and after the W6/U4 merge they share a row. Run together
+     * they read as one string. Asserted in pixels because it is a pixel decision: the mark
+     * occupies one cell, the advance past it is two, and the separator makes three before the
+     * queue may start.
+     *
+     * The gap is not what stops the two groups being *confused*, and this comment used to say it
+     * was: the abandoned band was `✖`, one codepoint and no distance at all from the unanswered
+     * `✗`. That was a shape collision and space does not fix one — the band is now `◆`, and the
+     * rule is in `render/landingMarks.test.ts`. This test is still about the space.
      */
     const ctx = new Recorder();
     drawScene(ctx, {

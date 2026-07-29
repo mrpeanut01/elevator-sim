@@ -1659,14 +1659,23 @@ One state, two views, § 4's hide/never-hide lists.
 >
 > 1. **Order on the row is `▲n ▼n` · `✗` · `▩` · one cell of air · the rider glyphs.** The call
 >    marks go first because a long queue caption would otherwise push them past the metrics panel,
->    and the cell of air is there because `✗`/`▩` are statements about the **call** and `●◑○✖` are
+>    and the cell of air is there because `✗`/`▩` are statements about the **call** and `●◑○◆` are
 >    statements about the **people**: run together they read as one string.
-> 2. **A latent glyph collision, reported not resolved.** W7a's `abandoned` band is `✖` (U+2716)
+> 2. **A latent glyph collision, reported not resolved.** W7a's `abandoned` band was `✖` (U+2716)
 >    and `D10`'s unanswered-call mark is `✗` (U+2717) — different characters, near-identical marks
 >    at 12 px, and they co-occur *systematically*, because a call nobody answers is exactly a call
 >    whose riders pass the abandonment horizon. Not observed on Secure Tower at seed 20 260 729
 >    (nobody there passes the 900 s horizon), so it is latent. Neither glyph belongs to W7b and
 >    changing either is not this lane's call.
+>
+>    > **Closed 2026-07-29 by T74, and it was never latent — the reported run was too short.**
+>    > The `abandoned` band is now **`◆`** (U+25C6). The same building and the *same seed* the
+>    > report calls latent — **Secure Tower, `collective`, seed 20 260 729** — puts both marks on
+>    > floor 25 at `t ≈ 1673–1859 s` as soon as the horizon is 1 800 s rather than 900 s: the
+>    > locked-out rider is still standing at 1 149 s, past the abandonment horizon, at a landing no
+>    > car answers. Driven and screenshotted. The rule that replaces *"four distinct characters"* is
+>    > **no two claims on one landing row may share a shape family**, asserted in
+>    > `packages/viz/src/render/landingMarks.test.ts` with the whole theme collapsed to one colour.
 > 3. **The empty-landing branch gained a third condition.** `queue === undefined` was W7a's; a
 >    landing the caller has *named* as locked out must survive it too, or the picture and the
 >    banner disagree about the same floor.
@@ -1676,6 +1685,17 @@ One state, two views, § 4's hide/never-hide lists.
 > `plot.y - 18 = 58` with `textBaseline: 'bottom'`. They overlap by 10 px on **every building with
 > more than one bank** — Secure Tower, Mixed-Use High-Rise, Vertical City — and the 64 px header
 > has no free row, so the fix is `headerPx`, which is W7a's decision to make.
+>
+> > **Closed 2026-07-29 by T74, and the header held *four* overlapping claims, not two.** The
+> > hidden-shaft notice (`plot.y − 20`) overprinted both the mood line and the bank label, and the
+> > selected landing's caption was drawn at exactly the same `y` and `x` as the hidden-shaft notice,
+> > so those two overprinted each other. The fix is a `HeaderBand` on `Layout`: six named rows —
+> > title, run meta, mood, notices, bank labels, shaft labels — with `headerPx`'s default *derived*
+> > from that stack (**90 px**, from 64) and a smaller value clamped up rather than honoured.
+> > Nothing in `render/` computes a header `y` of its own any more, and
+> > `packages/viz/src/render/headerBand.test.ts` rebuilds every drawn text box from the recorded
+> > `font`/`textAlign`/`textBaseline` and requires the boxes above `plot.y` to be pairwise disjoint
+> > at five viewport sizes.
 
 ### W8 — Access-zoning editor and the dispatcher compatibility warning *(depends on W7b)* — **the warning ✅ DONE 2026-07-29; the editor controls open**
 

@@ -64,11 +64,11 @@ export function drawPreview(ctx: Canvas2DLike, input: PreviewInput): void {
   ctx.textBaseline = 'top';
   ctx.font = FONT_BOLD;
   ctx.fillStyle = theme.text;
-  ctx.fillText(title, 12, 10);
+  ctx.fillText(title, 12, layout.header.titleY);
 
   ctx.font = FONT;
   ctx.fillStyle = theme.textDim;
-  ctx.fillText(input.caption ?? geometry.expansion, 12, 30);
+  ctx.fillText(input.caption ?? geometry.expansion, 12, layout.header.metaY);
 
   if (geometry.floors.length === 0) {
     // The editor's empty state, drawn rather than left as a black rectangle (UX.md § C.3).
@@ -154,9 +154,11 @@ export function drawPreview(ctx: Canvas2DLike, input: PreviewInput): void {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillStyle = theme.textDim;
-    ctx.fillText(column.label, column.centreX, layout.plot.y - 4);
+    // Both rows come from the layout's header band, so the preview and the run viewer cannot
+    // drift apart about where a bank label goes — `render/layout.ts`'s {@link HeaderBand}.
+    ctx.fillText(column.label, column.centreX, layout.header.shaftY);
     ctx.fillStyle = theme.badge;
-    ctx.fillText(column.bankId, column.centreX, layout.plot.y - 18);
+    ctx.fillText(column.bankId, column.centreX, layout.header.bankY);
   }
 
   drawLensLegend(ctx, input, theme);
@@ -169,7 +171,7 @@ export function drawPreview(ctx: Canvas2DLike, input: PreviewInput): void {
     ctx.fillText(
       `showing ${String(layout.columns.length)} of ${String(layout.columns.length + layout.hiddenShaftCount)} shafts`,
       layout.plot.x,
-      layout.plot.y - 32,
+      layout.header.noticeY,
     );
   }
 

@@ -36,6 +36,11 @@
  * survives colour removal by planning a row under a theme whose four band colours are the *same
  * string* and showing the bands are still distinguishable.
  *
+ * **Injective over codepoints is not enough, and shipping proved it**: `✖` and `✗` are two
+ * codepoints and one mark. `render/landingMarks.test.ts` carries the stronger rule — no two
+ * *claims* on one landing row may share a shape *family* — and {@link BAND_GLYPH}'s fourth entry
+ * is what it corrected.
+ *
  * ## Mood is a reading of the bands, not a second measurement
  *
  * {@link riderMoodOf} is a total function from {@link WaitBand}, and that is the whole of the
@@ -53,21 +58,40 @@ import type { FloorQueue, QueueGroup, QueuedRider, WaitBand } from '../frame/ove
  * -------------------------------------------------------------------------- */
 
 /**
- * One shape per band. **Injective, and asserted to be.**
+ * One shape per band. **Injective, and asserted to be — by shape family, not by codepoint.**
  *
- * Chosen so the four are distinguishable at 12 px and in greyscale: an empty ring, a half-filled
- * ring, a solid disc, and a cross that is not a ring at all. The progression reads as *filling up*,
- * which is the direction the wait is going.
+ * Three rings filling up — empty, half, solid — and then a mark that leaves the family, because
+ * the fourth band is not *more full*. It is a rider past the abandonment horizon, and the ring
+ * ladder has no rung above *solid* to put them on.
  *
- * `✖` and not `✗`: `render/canvas.ts` already draws `✗` for *a call no car answers in this run*
- * (`D10`), which is a claim about the dispatcher, and this is a claim about one person's clock.
- * Two different facts do not get one glyph — the same argument that separated `✗` from `⊘`.
+ * ## `◆` and not `✖`, and why the first answer was not enough
+ *
+ * The original reasoning was right and its execution was not. `render/canvas.ts` draws `✗`
+ * (U+2717) for *a call no car answers in this run* (`D10`) — a claim about the dispatcher — so
+ * this band, a claim about one person's clock, took `✖` (U+2716). **Different codepoint, the same
+ * mark.** At 12 px a heavy multiplication X and a ballot X are one shape, and after the W6/W7b
+ * merge they share a landing row.
+ *
+ * They are also not independent, which is what makes it a defect rather than an aesthetic
+ * complaint: *a call nobody answers is exactly a call whose riders pass the abandonment horizon*,
+ * so the two appear **together**, on the same row, precisely when the building is in trouble and
+ * the picture is the whole point.
+ *
+ * `◆` (U+25C6, solid diamond) is the fix, and it is a *shape* fix: it shares no silhouette with
+ * any other mark the landing row can carry — `✗` (cross), `▩` (hatched block), `✓` (tick), `·`
+ * (dot), `○ ◑ ●` (rings). It is heavier than `●`, which is the direction the wait is going, and it
+ * is angular where `●` is round, so the two bands next to each other on the ladder separate by
+ * silhouette and not by weight alone.
+ *
+ * The invariant this replaces *"four distinct characters"* with is asserted in
+ * `render/landingMarks.test.ts`: **no two distinct claims drawn on one landing row may share a
+ * shape family**, checked with every colour in the theme collapsed to one string.
  */
 export const BAND_GLYPH: Readonly<Record<WaitBand, string>> = Object.freeze({
   settling: '○',
   waiting: '◑',
   long: '●',
-  abandoned: '✖',
+  abandoned: '◆',
 });
 
 /** The glyph for a boarding that just happened — the relief transition. */
