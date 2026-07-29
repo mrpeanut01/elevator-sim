@@ -358,6 +358,9 @@ function withArmProfiles(
     dispatcherProfilesById,
     trafficProfiles: resources.trafficProfiles,
     ...(resources.elevatorSpecs === undefined ? {} : { elevatorSpecs: resources.elevatorSpecs }),
+    ...(resources.dispatcherProfiles === undefined
+      ? {}
+      : { dispatcherProfiles: resources.dispatcherProfiles }),
   });
 }
 

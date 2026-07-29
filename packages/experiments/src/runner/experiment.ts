@@ -612,6 +612,12 @@ export function planExperiment(
           dispatcherProfile: profile,
           trafficProfiles: resources.trafficProfiles,
           ...(resources.elevatorSpecs === undefined ? {} : { elevatorSpecs: resources.elevatorSpecs }),
+          // The file, so a profile that opts into `selection.policy` finds its arms. Beside
+          // `dispatcher.options.weightSets`, which still overrides it: a study switching among a
+          // *derived* library hands one in, and everything else derives the shipped one from data.
+          ...(resources.dispatcherProfiles === undefined
+            ? {}
+            : { dispatcherProfiles: resources.dispatcherProfiles }),
           ...(arm.demandTemplate === undefined ? {} : { demandTemplate: arm.demandTemplate }),
           ...(arm.durationS === undefined ? {} : { durationS: arm.durationS }),
           ...(arm.reportWindow === undefined ? {} : { reportWindow: arm.reportWindow }),

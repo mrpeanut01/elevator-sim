@@ -64,9 +64,11 @@ import {
   INITIAL_SELECTOR_STATE,
   resolveWeightSets,
   selectWeightSet,
+  type PatternSwitchingSource,
   type ResolvedSelection,
   type SelectorState,
   type TrafficObservation,
+  type WeightSetSource,
 } from './selector.js';
 import { COST_TERMS, DECLARED_TERM_IDS, isDeclaredTerm, isImplementedTerm } from './terms/index.js';
 import {
@@ -348,6 +350,65 @@ export function resolveWeights(
     pendingWeights.set(id, weight);
   }
   return { weights, pendingWeights };
+}
+
+/**
+ * The shape the weight-set library is derived from: the whole of `data/dispatcher-profiles.json`.
+ *
+ * Declared structurally, as {@link DispatcherProfileSource} is, so this module states exactly what
+ * it needs from that file and a real `DispatcherProfiles` satisfies it without a cast.
+ */
+export interface WeightSetLibrarySource {
+  readonly patternSwitching?: PatternSwitchingSource | undefined;
+  readonly profiles: readonly {
+    readonly id: string;
+    readonly weights: Readonly<Record<string, number>>;
+  }[];
+}
+
+/**
+ * Turn a loaded `data/dispatcher-profiles.json` into the library a selector chooses among.
+ *
+ * **This is the function that makes the selector reachable from a shipped run.** § D141 built the
+ * mechanism and left it reachable only through {@link DispatchPolicyOptions.weightSets}, which is
+ * an *override* — a hand-built object for a fixture or an optimizer. `experiments`' runner carried
+ * one per dispatcher arm, so a study could switch weight sets and `elevator-sim run` could not:
+ * the file-level `patternSwitching` block and the profiles its arms name both live in the data
+ * directory the CLI already loads, and nothing turned the one into the other. `SimulationConfig`
+ * now carries that file the way it already carries `data/elevator-specs.json`, `Simulation` calls
+ * this, and the seam has a non-test caller.
+ *
+ * Total and cheap: `undefined` in, `undefined` out; no `patternSwitching` block, `undefined` out.
+ * A profile that then asks for a selector is refused by {@link resolveWeightSets} with the message
+ * that names the missing library, which is the same refusal a hand-built caller gets. Deriving it
+ * unconditionally is therefore free of behavioural consequence — under `selection.policy: 'off'`,
+ * which is every shipped profile, `resolveWeightSets` returns before it reads a field of it.
+ *
+ * The arms' weights go through {@link resolveWeights}, the same function `resolveDispatchConfig`
+ * uses for the run's own profile, for the reason that function's docstring gives: two answers to
+ * "what is this profile's weight vector" would be two sources of truth about one question.
+ *
+ * **One consequence is stated rather than hidden: this widens the blast radius of one specific
+ * malformed file.** `resolveWeights` throws on a weight whose term id `core`'s registry does not
+ * declare, and every profile is now resolved on every run rather than only the run's own. So a
+ * `data/dispatcher-profiles.json` that adds a term to its own `terms` list without implementing it
+ * in `dispatch/terms/` — a half-finished state, which `dispatcherProfilesSchema` accepts because it
+ * validates weights against the *file's* term list — fails every run instead of only runs of the
+ * profile that weights it. That is loud, names the offending profile and term, and is the correct
+ * reading of a file whose arms cannot all be built; the alternative, skipping a profile whose
+ * weights do not resolve, is a selector silently missing one of its regimes, which
+ * {@link resolveWeightSets} refuses for exactly this reason.
+ */
+export function weightSetSourceFrom(
+  library: WeightSetLibrarySource | undefined,
+): WeightSetSource | undefined {
+  const patternSwitching = library?.patternSwitching;
+  if (library === undefined || patternSwitching === undefined) return undefined;
+  const weightsByProfileId = new Map<string, ReadonlyMap<string, number>>();
+  for (const profile of library.profiles) {
+    weightsByProfileId.set(profile.id, resolveWeights(profile.weights, profile.id).weights);
+  }
+  return Object.freeze({ patternSwitching, weightsByProfileId });
 }
 
 function isHardConstraintId(id: string): id is HardConstraintId {

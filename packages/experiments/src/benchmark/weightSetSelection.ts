@@ -60,8 +60,8 @@
 import {
   WeightedCostDispatchPolicy,
   resolveDispatchConfig,
-  resolveWeights,
   runSimulation,
+  weightSetSourceFrom,
 } from '@elevator-sim/core';
 
 import type {
@@ -198,27 +198,28 @@ export const VERDICT_REPLICATIONS = 200;
 /**
  * The shipped `patternSwitching` block, with every arm's weights resolved.
  *
- * Resolved through `core`'s own `resolveWeights`, the same function `resolveDispatchConfig` uses
- * for the run's own profile, so an arm's weight vector cannot be assembled differently from the
- * profile it names — and a misspelled term id in an arm is refused for the same reason it is
- * refused in a profile.
+ * **This is now core's `weightSetSourceFrom` with a refusal on the front, and the delegation is
+ * the point.** This function used to build the library itself, and while it was the only builder
+ * that was fine; T53 gave `SimulationConfig` the same derivation so `elevator-sim run` could reach
+ * the selector, and two functions answering "what are this file's weight sets" would be two
+ * sources of truth about one question — the failure `runner/metrics.ts`'s docstring names, and the
+ * reason `resolveWeights` was extracted in the first place. So the arithmetic lives in `core`
+ * beside the profile resolution it must agree with, and what stays here is this study's own
+ * contract: a study that *asks* for the library cannot proceed without one, whereas a run that
+ * merely carries the file may legitimately have no `patternSwitching` block.
  *
  * @throws Error when the file authors no `patternSwitching` block at all.
  */
 export function weightSetLibrary(config: {
   readonly dispatcherProfiles: LoadedConfig['dispatcherProfiles'];
 }): WeightSetSource {
-  const patternSwitching = config.dispatcherProfiles.patternSwitching;
-  if (patternSwitching === undefined) {
+  const library = weightSetSourceFrom(config.dispatcherProfiles);
+  if (library === undefined) {
     throw new Error(
       'data/dispatcher-profiles.json authors no patternSwitching block, so there are no weight sets to select between.',
     );
   }
-  const weightsByProfileId = new Map<string, ReadonlyMap<string, number>>();
-  for (const profile of config.dispatcherProfiles.profiles) {
-    weightsByProfileId.set(profile.id, resolveWeights(profile.weights, profile.id).weights);
-  }
-  return Object.freeze({ patternSwitching, weightsByProfileId });
+  return library;
 }
 
 /**
@@ -799,6 +800,7 @@ export function toResources(config: LoadedConfig): ExperimentResources {
     dispatcherProfilesById: config.dispatcherProfilesById,
     trafficProfiles: config.trafficProfiles,
     elevatorSpecs: config.elevatorSpecs,
+    dispatcherProfiles: config.dispatcherProfiles,
   });
 }
 

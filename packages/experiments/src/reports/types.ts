@@ -71,6 +71,7 @@ import type {
   ReportWindow,
   ResolvedDemandTemplate,
   RunRecord,
+  SelectionStageConfig,
   SaturationThresholds,
   SimulationResult,
   TimeoutPolicy,
@@ -137,6 +138,16 @@ export interface StoredDispatcherOptions {
   readonly weights?: Readonly<Record<string, number>> | undefined;
   /** Replaces the profile's hard-constraint set entirely when present. */
   readonly hardConstraints?: readonly string[] | undefined;
+  /**
+   * The weight-set selection stage the run overrode, field by field.
+   *
+   * Six scalars, so it round-trips exactly. The *arms* it selects among do not appear here and
+   * are not stored: for a shipped run they are derived from `data/dispatcher-profiles.json`, which
+   * a replay re-reads the same way it re-reads the profile itself, and for a study that handed in
+   * a derived library `createStoredRun` refuses rather than storing a configuration it cannot
+   * reconstruct.
+   */
+  readonly selection?: SelectionStageConfig | undefined;
 }
 
 /** The runner's own tunables (`SIM_PARAMETERS`), as stored. Omitted fields took their defaults. */

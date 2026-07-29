@@ -118,6 +118,7 @@ import {
   groupContext,
   repositionContextFor,
   resolvePrepositionContext,
+  weightSetSourceFrom,
   withLandingCounts,
   type ArrivalModel,
   type CallContextSource,
@@ -680,7 +681,22 @@ export class Simulation {
     // (CLAUDE.md invariant 7). `config.createPolicy` is the instrumentation and optimizer hook,
     // never how a shipped run chooses.
     const buildPolicy = config.createPolicy ?? createPolicyFor;
-    const policyOptions = config.dispatcherOptions ?? {};
+    // The weight-set library, derived from the data file rather than handed in as an override.
+    //
+    // `DispatchPolicyOptions.weightSets` is the *override* half — a hand-built library for a
+    // fixture or an optimizer — and until this line it was the only way in, which is why a study
+    // could enable the selector and `elevator-sim run` could not (§ D141's own "impact" note).
+    // `config.dispatcherProfiles` is the file `loadConfig` already produced, so the shipped path
+    // supplies the library the same way it supplies `elevatorSpecs`.
+    //
+    // Precedence `override > derived`, the same order every other stage resolves in. When both
+    // are absent the object handed to `buildPolicy` is **the same object** `dispatcherOptions`
+    // was, not a copy of it: a run that opts into nothing must be byte-identical to one built
+    // before this line existed, and identity is a stronger statement of that than equality.
+    const overrides = config.dispatcherOptions ?? {};
+    const weightSets = overrides.weightSets ?? weightSetSourceFrom(config.dispatcherProfiles);
+    const policyOptions =
+      weightSets === overrides.weightSets ? overrides : { ...overrides, weightSets };
     for (const bank of this.#building.banks) {
       this.#policies.set(bank.id, buildPolicy(profile, policyOptions));
       this.#capacityMonitors.set(bank.id, new CapacityReassignmentMonitor());
