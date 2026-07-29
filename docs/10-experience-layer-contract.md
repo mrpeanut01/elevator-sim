@@ -387,18 +387,26 @@ disagreement is stated.
 > same unit-tested `renderRunningMean`, but "driven on a TTY" is not claimed.
 >
 > **There is no third, and that was established rather than assumed.** The honesty search
-> (§ D163 clause 1) reported thirteen `suppressed-mean` violations at `render/describeFrame.ts` and
-> `render/canvas.ts` on saturated runs — which would have been this defect in a third and fourth
-> place. Every one was a false positive in the **check**, and the evidence is in the strings: not
-> one printed a mean, three of them said *"suppressed"* in the very clause that triggered the
-> report, and the numbers were `summary.undelivered` (61, which happened to equal `meanWaitS`
-> rounded), `frame.boardedLegs` (28, ditto) and the rolling window's own length (300 s, beside a
-> `wait95S` of 300.4 and a cue naming a different quantity). The decisive one is
-> `describeFrame(@0s)`: at that instant the frame carries `0 legs waiting, 0 boarded`, so a running
-> mean of 61 s could not exist. Corrected in `honesty/properties.ts` — the claim window is bounded
-> by the numeral's own clause, and a cue must name the quantity whose value it is paired with — and
-> guarded by a fault that injects the header string above verbatim, so the narrowing has something
-> it must still catch. **§ D111's own fix was re-confirmed by that fault, not by rereading it.**
+> (§ D163 clause 1) reported `suppressed-mean` violations at `render/describeFrame.ts`,
+> `render/canvas.ts` and `render/runSummary.ts` on refused runs — thirteen in the always-on tier
+> and more in the deep one — which would have been this defect in several further places. **Every
+> one was a false positive in the check**, and the evidence is in the strings: not one printed a
+> mean, and several said *"suppressed"* or *"not reported"* in the very clause that triggered the
+> report. What the numbers actually were: `summary.undelivered` (61, which happened to equal
+> `meanWaitS` rounded); `frame.boardedLegs` (28, ditto); the rolling window's own length (300 s,
+> beside a `wait95S` of 300.4 and a cue naming a different quantity); the mean quoted **inside
+> `core`'s own refusal**, which the fourth `awtIsValid` ground states on purpose; a constant in a
+> `SearchParameter.description`; and — twice — a single digit matched *inside* a longer number,
+> the `9` of *"95th percentile"* and the `3` of *"the last 300 seconds"*.
+>
+> The decisive one is `describeFrame(@0s)`: at that instant the frame carries `0 legs waiting,
+> 0 boarded`, so a running mean of 61 s could not exist. Corrected in `honesty/properties.ts` in
+> four ways, each strictly more specific than what it replaced — the claim window is bounded by the
+> numeral's own clause; a cue must name the quantity whose value it is paired with; the run's own
+> `awtInvalidReason` is cut out by identity before the scan; and a form is compared against a whole
+> number token rather than a substring. Guarded by a fault that injects the header string above
+> verbatim, so the narrowing has something it must still catch. **§ D111's own fix was re-confirmed
+> by that fault, not by rereading it.**
 
 
 

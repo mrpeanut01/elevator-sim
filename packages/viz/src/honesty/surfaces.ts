@@ -791,10 +791,27 @@ const CONTROLS: SurfaceAdapter = {
      * text the Parameters tab prints, so the *filter* is searched as well as the surface: if it
      * ever returns a string with a probability word in it, that is a hole in the remedy rather
      * than in the surface.
+     *
+     * **The provenance is decided by what the filter did**, which is the whole of the
+     * classification and needs no word list:
+     *
+     * - **passed through** — the return value *is* `control.help`, so the string is `core`'s own
+     *   description and is marked `schema`, exactly as the `.help` seed above. It cannot carry a
+     *   probability word (the filter guarantees that), and its numbers are schema constants that
+     *   have nothing to do with this run. R3 read them anyway and reported a `meanWaitS` of 50 s
+     *   matching a `50` in `answer.reopenOnLateArrival`'s prose — `honesty-9100022`, deep tier;
+     * - **rewritten** — the return value is this package's own refusal sentence, so it stays
+     *   result-bearing and R10 reads it. That is the case the drive exists for.
      */
     for (const control of controls) {
       const safe = playerSafeDescription(control.help);
-      if (safe !== null) seeds.push({ field: `playerSafeDescription(${control.id})`, text: safe, role: 'prose' });
+      if (safe === null) continue;
+      seeds.push({
+        field: `playerSafeDescription(${control.id})`,
+        text: safe,
+        role: 'prose',
+        ...(safe === control.help ? { provenance: 'schema' as const } : {}),
+      });
     }
     return singleRun(this.id, seeds);
   },

@@ -225,10 +225,10 @@ describe('a counterexample shrinks', () => {
  *    `MIN_REPLICATION_BUDGET` the row draws its interval and refuses the ordering, with the
  *    reason where the verdict would have been — `batch/report.ts`'s `under-budget` verdict.
  *
- * ## Two further findings that were **not** product defects, and were corrected in the rule
+ * ## Four further findings that were **not** product defects, and were corrected in the rule
  *
- * Both arrived with the merge, both were R3's textual half, and each is recorded on the rule it
- * corrected in `properties.ts` — § D171's own pattern for a false positive.
+ * All four were R3's textual half, and each is recorded on the rule it corrected in
+ * `properties.ts` — § D171's own pattern for a false positive. Not one string printed a mean.
  *
  * 3. **Eight reports on `describeFrame` and `drawScene`** (`honesty-9021`, `honesty-9045`): a
  *    run-level count — `61` undelivered passengers, `28` boarded legs — in a **different sentence**
@@ -239,10 +239,21 @@ describe('a counterexample shrinks', () => {
  *    *"Rolling mean wait over the last 300 seconds is not reported"* — a window length, beside a
  *    cue naming a **different** quantity, in `describeFrame`'s own refusal. The cues are now keyed
  *    to the quantity whose value is being looked for.
+ * 5. **The run's own refusal, quoted** (`honesty-9100022`, deep tier): `awtIsValid`'s fourth
+ *    ground writes *"a mean of 49.6 s reported beside a wait of 1339.6 s describes a system nobody
+ *    experienced"*, and `describeFrame` embeds that sentence. The string-level `role === 'reason'`
+ *    exemption now composes — the run's own `awtInvalidReason` is cut out **by identity** before
+ *    the scan. Same case, same tier: a `meanWaitS` of 50 matching a `50` in `core`'s description
+ *    of `answer.reopenOnLateArrival`, which is schema prose and is now marked as such.
+ * 6. **A substring of a number is not a number** (`honesty-9100022`, deep tier): `wait95S` rounded
+ *    to `9` and matched inside *"**9**5th percentile"* — the cue itself — and `meanWaitS` rounded
+ *    to `3` and matched inside *"the last **3**00 seconds"*. `String.indexOf` had been doing the
+ *    same quietly all along (`61` inside *"loaded at 0.**61**"*). Forms are now compared against
+ *    whole number tokens.
  *
- * Both narrowings are guarded by a second R3 fault — `suppressedMeanInProse`, which injects
- * § D111's canvas header verbatim — because a correction to a check is a change to what the check
- * can no longer see, and the thing it must still see should be injected rather than argued.
+ * All of them are guarded by a second R3 fault — `suppressedMeanInProse`, which injects § D111's
+ * canvas header verbatim — because a correction to a check is a change to what the check can no
+ * longer see, and the thing it must still see should be injected rather than argued.
  */
 const OUTSTANDING: readonly {
   readonly property: string;

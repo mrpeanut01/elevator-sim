@@ -112,6 +112,24 @@ function renderings(value: number): readonly string[] {
 }
 
 /**
+ * A **whole** number as a reader sees one, so a form is compared against a token and never
+ * against a substring.
+ *
+ * The sixth false positive this rule has corrected, and the cheapest to state: `String.indexOf`
+ * has no idea what a number is. On `honesty-9100022` (deep tier) `wait95S` rounded to **9** and
+ * `meanWaitS` to **3**, and the search duly reported the `9` inside *"**9**5th percentile"* — the
+ * cue itself — and the `3` inside *"the last **3**00 seconds"*. It had been doing the same
+ * quieter thing all along: `61` matched inside *"loaded at 0.**61** of rated load"* on every car
+ * row of every frame.
+ *
+ * Matching a form against a complete token fixes all of it at once and gives up nothing a
+ * renderer does: a surface that publishes a refused mean prints the number, and a printed number
+ * is a token. **Known limit:** a form is generated without a thousands separator, so a surface
+ * that printed `1,061.0 s` would not be matched. No shipped formatter groups a wait in seconds.
+ */
+const NUMBER_TOKEN = /\d[\d,]*(?:\.\d+)?/;
+
+/**
  * How close a cue and a number must be to be one claim. Characters.
  *
  * **Found by running it, and it is the difference between a check and a coincidence.**
@@ -204,31 +222,69 @@ function clauseSpans(text: string): readonly { readonly from: number; readonly t
   return spans;
 }
 
+/**
+ * `text` with the run's **own refusal** cut out of it — the string-level exemption, made to
+ * compose.
+ *
+ * ## Why this is not an allow-word
+ *
+ * `checkSuppressedMean` already skips `role === 'reason'`, because *"the refusal is the one string
+ * entitled to quote the numbers it is refusing"*. `awtIsValid`'s **fourth ground** takes that
+ * literally: when a run is refused for a leg past the 900 s abandonment horizon, `core` writes
+ *
+ * > `… but a mean of 49.6 s reported beside a wait of 1339.6 s describes a system nobody
+ * > experienced, and its confidence interval must be suppressed.`
+ *
+ * — the mean, the cue naming it, and the refusal, all in one clause, by design. `describeFrame`
+ * embeds that sentence in its paragraph (`Mean waiting time is suppressed: …`) and `drawScene`
+ * puts it under the canvas, so both come back `prose` and the string-level exemption misses them.
+ * Found on `honesty-9100022` in the deep tier.
+ *
+ * What is removed is **the run's own `awtInvalidReason`, by identity** — not a word, not a
+ * pattern, not a list. A leak one character outside it is still seen, and a leak inside it is
+ * `core`'s own sentence. The cut is replaced by a newline so the surrounding text still reads as
+ * two clauses rather than being spliced into one.
+ */
+function withoutRefusal(text: string, reason: string | undefined): string {
+  if (reason === undefined || reason === '') return text;
+  return text.includes(reason) ? text.split(reason).join('\n') : text;
+}
+
+/** Every whole number in `text`, with where it starts. One pass, reused for every form. */
+function numberTokens(text: string): readonly { readonly value: string; readonly at: number }[] {
+  const tokens: { value: string; at: number }[] = [];
+  const scan = new RegExp(NUMBER_TOKEN.source, 'g');
+  for (let match = scan.exec(text); match !== null; match = scan.exec(text)) {
+    tokens.push({ value: match[0], at: match.index });
+  }
+  return tokens;
+}
+
 /** Whether `text` states `numeral` as the value `cue` names, rather than nearby by luck. */
 function claimsNear(
   text: string,
   numeral: string,
   spans: readonly { readonly from: number; readonly to: number }[],
+  tokens: readonly { readonly value: string; readonly at: number }[],
   cue: RegExp,
 ): boolean {
-  let from = 0;
-  for (;;) {
-    const at = text.indexOf(numeral, from);
-    if (at < 0) return false;
+  for (const token of tokens) {
+    // A **whole** number, never a substring of one. See NUMBER_TOKEN.
+    if (token.value !== numeral) continue;
+    const at = token.at;
     const end = at + numeral.length;
     const span = spans.find((candidate) => at >= candidate.from && end <= candidate.to);
-    if (span !== undefined) {
-      // Named `clause`, not `window`: `boundaries.test.ts` bans a bare `window` identifier anywhere
-      // outside `dev/`, precisely because a local of that name shadowing the global is how a DOM
-      // reference hides. It caught this one.
-      const clause = text.slice(
-        Math.max(span.from, at - CLAIM_PROXIMITY),
-        Math.min(span.to, end + CLAIM_PROXIMITY),
-      );
-      if (cue.test(clause)) return true;
-    }
-    from = at + 1;
+    if (span === undefined) continue;
+    // Named `clause`, not `window`: `boundaries.test.ts` bans a bare `window` identifier anywhere
+    // outside `dev/`, precisely because a local of that name shadowing the global is how a DOM
+    // reference hides. It caught this one.
+    const clause = text.slice(
+      Math.max(span.from, at - CLAIM_PROXIMITY),
+      Math.min(span.to, end + CLAIM_PROXIMITY),
+    );
+    if (cue.test(clause)) return true;
   }
+  return false;
 }
 
 /**
@@ -243,11 +299,13 @@ function claimsNear(
  *    achieved interval is an estimate `awtIsValid` does not speak for and is legitimately drawn.
  * 2. **Textual.** On the same run, no string other than the refusal itself may carry the printed
  *    value of `meanWaitS`, `wait95S` or `meanTimeToDestinationS` **within a clause of a cue that
- *    names that quantity**. All three halves are required: a bare number is not a claim, a cue
- *    with no number is a label, two in **different sentences** are neither (see
- *    {@link CLAUSE_BREAK}), and a number matching *one* quantity beside a cue for *another* is a
- *    coincidence (see {@link ESTIMATE_CUES}). The last two were both found by running this over
- *    the shipped surfaces, and both were corrected here rather than in the product.
+ *    names that quantity**. Every half is required, and each of the last four was found by
+ *    running this over the shipped surfaces and corrected **here** rather than in the product:
+ *    a bare number is not a claim; a cue with no number is a label; two in **different sentences**
+ *    are neither ({@link CLAUSE_BREAK}); a number matching *one* quantity beside a cue for
+ *    *another* is a coincidence ({@link ESTIMATE_CUES}); a run's **own refusal** may state the
+ *    number it refuses ({@link withoutRefusal}); and a *substring* of a printed number is not a
+ *    printed number ({@link NUMBER_TOKEN}).
  */
 function checkSuppressedMean(
   context: HonestyContext,
@@ -288,9 +346,11 @@ function checkSuppressedMean(
     // The refusal is the one string entitled to quote the numbers it is refusing.
     if (text.role === 'reason') continue;
     if (!ANY_ESTIMATE_CUE.test(text.text)) continue;
-    const spans = clauseSpans(text.text);
+    const scanned = withoutRefusal(text.text, summary.awtInvalidReason);
+    const spans = clauseSpans(scanned);
+    const tokens = numberTokens(scanned);
     for (const { name, cue, forms } of forbidden) {
-      const hit = forms.find((form) => claimsNear(text.text, form, spans, cue));
+      const hit = forms.find((form) => claimsNear(scanned, form, spans, tokens, cue));
       if (hit === undefined) continue;
       found.push(
         violation(
