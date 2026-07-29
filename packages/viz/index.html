@@ -165,6 +165,15 @@
       .mood-provisional { font-style: italic; }
       .mood-caveat { color: var(--dim); margin: 4px 0 0; }
 
+      /* docs/10 § 11 W3 — the replication batch. Same `.figure` vocabulary as the run summary,
+         because a batch row and a run row are the same kind of claim one level up, and because
+         nothing in either surface may key on a metric id. */
+      #panel-compare .editor-form { width: 100%; }
+      .batch-report .figure { max-width: 90em; }
+      .batch-report .figure-value { display: block; margin-top: 2px; }
+      progress { width: 180px; }
+      progress[hidden] { display: none; }
+
       .sr-only {
         position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
         overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -212,6 +221,9 @@
         </button>
         <button role="tab" id="tab-parameters" aria-selected="false" aria-controls="panel-parameters" tabindex="-1">
           Parameters
+        </button>
+        <button role="tab" id="tab-compare" aria-selected="false" aria-controls="panel-compare" tabindex="-1">
+          Compare
         </button>
       </div>
       <span class="dim" id="banner"></span>
@@ -385,6 +397,40 @@
         </div>
         <div class="editor-body">
           <div class="editor-form" id="param-form"></div>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Surface D — the replication batch (docs/10 § 11 W3)                 -->
+      <!--                                                                     -->
+      <!-- The single-run viewer may say "in this run, X happened". It may not -->
+      <!-- say "this dispatcher is better" (R2). This is where the second       -->
+      <!-- sentence becomes available: N paired replications under common      -->
+      <!-- random numbers, and a paired-t interval on the difference.          -->
+      <!-- ------------------------------------------------------------------ -->
+      <section role="tabpanel" id="panel-compare" aria-labelledby="tab-compare" hidden>
+        <div class="bar">
+          <label>building <select id="batch-building"></select></label>
+          <label>baseline <select id="batch-baseline"></select></label>
+          <label>candidate <select id="batch-candidate"></select></label>
+          <label>duration <input id="batch-duration" type="number" min="60" max="7200" step="60" value="900" size="5" /></label>
+          <label>seed <input id="batch-seed" size="18" inputmode="numeric" value="20260729" /></label>
+          <label title="CLAUDE.md budgets 50–200 per configuration">
+            replications
+            <input id="batch-replications" type="number" min="1" max="400" step="1" value="50" size="4" />
+          </label>
+          <label title="blank runs the building's own traffic profile">
+            demand %pop/5&nbsp;min
+            <input id="batch-demand" size="4" inputmode="decimal" placeholder="profile" />
+          </label>
+          <button id="batch-run">Run batch</button>
+          <button id="batch-cancel">Cancel</button>
+          <progress id="batch-progress" value="0" max="1" aria-label="batch progress"></progress>
+          <span id="batch-status" role="status"></span>
+          <span id="batch-error" role="alert" tabindex="-1"></span>
+        </div>
+        <div class="editor-body">
+          <div class="editor-form batch-report" id="batch-output" aria-label="Batch report"></div>
         </div>
       </section>
     </main>

@@ -9514,3 +9514,234 @@ car label on the canvas.
 **Non-test callers.** `render/canvas.ts` `drawLandings`/`drawHeader`, `render/describeFrame.ts`, and
 `dev/main.ts`'s draw loop, which computes `queueAt` and `buildingMood` every animation frame and
 mounts the gauge as DOM.
+
+---
+
+## D158 — the viewer gets a replication batch, and **W3's own acceptance building does not survive its shipped demand**
+
+**Date:** 2026-07-29 · **Owner:** T62 (wave 8) · **Delivers:** `docs/10-experience-layer-contract.md`
+§ 11 **W3** · **Opens:** nothing · **Applies:** [§ D154](#d154) (`null` not `NaN` at the contract
+edge), [§ D121](#d121) (`experiments`' browser barrel), [§ D127](#d127) (`viz` reaches it only
+through `./browser`)
+
+**Context.** The viewer runs **one** replication, and § 1 **R2** says a score is a property of a run
+and never of a dispatcher. The measured reason is **M7**: Secure Tower under `collective`, twenty
+consecutive seeds, 6 of 20 replications return a quotable AWT and 4 of 20 are diagnosed saturated —
+*the same configuration*. W3 is the unit that makes the other sentence available: N paired
+replications under common random numbers, and a paired-t interval on the difference.
+
+**Four decisions, and the first is the one that decides whether the surface is honest.**
+
+### 1. A partly suppressed batch is **complete-case or nothing**, per metric class
+
+A batch of 50 contains replications whose own summary refuses to stand behind a mean, on any of
+`awtIsValid`'s four grounds. Measured here, at seed `20260729`, 900 s, `onTimeout: 'report'`:
+
+| building | arm | quotable | saturated |
+|---|---|---|---|
+| Garden Apartments | `collective` | **47 / 50** | 0 / 50 |
+| Garden Apartments | `eta` | **47 / 50** | 0 / 50 |
+| Secure Tower | `collective` | **7 / 50** | 24 / 50 |
+| Secure Tower | `eta` | **8 / 50** | 22 / 50 |
+| Midtown Office | `collective` | **0 / 50** | 50 / 50 |
+| Midtown Office | `eta` | **0 / 50** | 50 / 50 |
+
+So a partly suppressed batch is the *ordinary* case, not the edge, and how it is handled is the
+whole design.
+
+**Alternatives.** (a) Average the pairs that held and print the reduced `n`. (b) The same, labelled
+*"conditioned on both arms holding"*. (c) Suppress the whole batch, observations included.
+(d) Report the estimate rows only when **every** pair is valid on **both** arms; leave the
+observation rows alone.
+
+**Chosen: (d).** (a) and (b) are **selection on the outcome**: the pairs that survive are the
+passenger traces both arms coped with, the arms lose pairs at *different* rates — Secure Tower loses
+43 under `collective` and 42 under `eta` — and the traces that fall out are the ones the dispatchers
+differ most on. The survivors understate the difference in exactly the regime a player is trying to
+fix, and they do it while displaying an honest `n`, which makes them worse than a blank rather than
+better. Labelling the bias does not remove it. (c) throws away § 1's own finding (**M1**): an
+observation-based comparison is available on all 60 shipped cells and an estimate-based one on 14.
+Refusing everything would leave the batch silent on precisely the Overwhelmed scenarios the campaign
+is built around, about facts — people carried, rides that never boarded, rides over the long-wait
+threshold — that are not in doubt.
+
+R3 is kept literally: the suppressed row carries the count, the reason in the run's own words, and
+the argument above in one sentence. `report.test.ts` asserts the sharp form — the suppressed row's
+text must **not** contain the number a survivor average would have produced, which is computed in
+the test from the same fixture.
+
+### 2. CRN is audited **field for field**, and the shipped hash is deliberately not used
+
+`experiments` ships `traceDigest`, a 64-bit fingerprint of a run's population, and this lane does
+not call it. Two reasons, both checkable:
+
+- **It is unreachable from a browser.** It lives in `runner/replication.ts`, whose own docstring
+  states an import rule that file cannot break — *"runtime imports here are limited to
+  `@elevator-sim/core` and `node:*`"*, because it is loaded unbuilt by a Node worker entry. It
+  therefore imports the **Node** barrel, and lifting it onto `experiments/browser` means either
+  breaking that rule or splitting the module that documents it.
+- **It is not the primary evidence, and says so.** `runner/crn.ts`: *"`crn.test.ts` additionally
+  compares two dispatchers' traces field-for-field, so the hash is a cheap continuous audit rather
+  than the primary evidence."* A hash exists so a stored result can carry its check without carrying
+  a hundred kilobytes per replication. A browser batch has both arms' traces in memory at the same
+  instant and discards them immediately, so it can afford the evidence the hash stands in for — and
+  a comparison has no collisions.
+
+What is **not** re-implemented is the pairing *rule*: the seed is `experiments`' `replicationSeed`
+and the equivalence class is its `traceKeyOf`, both by import, which is § 13 q1's stated requirement
+that duplicating the rule *"is a second source of truth about pairing and should be avoided."*
+
+The audit is **reported, not thrown**. A thrown error loses the replications that did run and says
+nothing about *what* diverged; `batchReport` refuses every interval on an unaligned result in one
+place, and the panel prints the disagreement.
+
+### 3. One guard was **deleted rather than kept as decoration**
+
+The first draft compared `traceKeyOf` across arms and threw on a mismatch. It cannot fire:
+`BatchRequest` puts the building, the demand template, the horizon and every demand option on the
+*request* and only the dispatcher on the *arm*, so every arm's key is the same value by
+construction and the loop compared a value with itself. That is the shape `viz/src/index.ts`
+§ *Deleted rather than kept as decoration* records deleting `isSupportedRecording` for. The key is
+still computed **once**, recorded on the result and printed by the panel, because it is the half of
+the batch's provenance the seed does not carry: seed plus trace key is what reproduces the run
+somewhere else.
+
+### 4. A fourth surface, a worker, and cancellation that is `terminate()`
+
+`Simulation.run()` is one synchronous call; invariant 3 keeps the wall clock out of `core`, so there
+is no tick to yield between and there could not be one. The smallest schedulable unit is one whole
+replication, and at 196 ms (Vertical City) that is twelve dropped frames — so the loop goes in a
+`Worker` and the panel is a fourth tab. Cancellation terminates the worker rather than setting a
+cooperative flag: a flag could only take effect between replications, would still make the reader
+wait, and would add a second way for a batch to end. A terminated batch reports nothing, which is
+correct — it has no result.
+
+### What was found on the way
+
+**W3's acceptance clause names the one shipped building on which its estimate half cannot be
+satisfied.** The clause reads *"a batch of 50 on Midtown Office returns a paired-t interval on a
+difference."* At Midtown's own traffic profile, **0 of 50** replications return a quotable AWT under
+either `collective` or `eta`; all 50 saturate. The clause is met in the form R1 makes available —
+the observation rows return a paired-t interval at n = 50 — and is **not** met on AWT at the shipped
+demand. Rather than weaken the clause, the panel gained a demand control, and the estimate half is
+reachable one operating point down. Measured, 50 replications per arm, seed `20260729`, 900 s,
+`collective` as baseline and `eta` as candidate:
+
+| `arrivalRatePctPop5min` | quotable, `collective` / `eta` | ΔAWT (`eta` − `collective`) | verdict |
+|---|---|---|---|
+| 1.0 % | 50 / 50 | `+0.322 [−0.355, +1.000]` | not resolved |
+| 1.5 % | 50 / 50 | `−0.461 [−1.211, +0.289]` | not resolved |
+| 2.0 % | **49** / 50 | — | **suppressed** |
+| 2.5 % | 50 / 50 | `−1.779 [−3.271, −0.286]` | resolved |
+| 3.0 % | 50 / 50 | `−2.399 [−4.090, −0.707]` | resolved |
+
+**The 2.0 % row is a caution about M20, and it is stated carefully because it is one replication.**
+**M20** measured Midtown over seeds 1000–1019 at n = 20 across all twelve arms and concluded *"over
+a batch, quotability **is** monotone in demand — M8's non-monotonicity is a single-seed effect."*
+The row above is a different seed set, a different `n` and two arms, and in it `collective` loses
+**exactly one** replication at 2.0 % and none at 2.5 % or 3.0 %. One run out of fifty is not
+evidence that M20's conclusion is wrong, and this entry does not claim it is. What it *is* evidence
+for is operational, and it is the reason the row is here: **under the complete-case rule a single
+replication suppresses the whole estimate half of a batch**, so a demand level chosen because *"every
+arm is quotable"* must be verified **at the batch size that will actually be run**, on the seed set
+that will actually be used. A level validated at n = 20 can suppress at n = 50. W5 and T64 inherit
+that, and it makes their choice a batch measurement rather than a sweep — which § 11 W5's own note
+already suspected for a different reason.
+
+**Two of the resolved intervals are below this project's own resolution limit.** `docs/07` § 4 puts
+the smallest detectable effect at **1.9 s between structurally different dispatchers** at n = 100;
+the 2.5 % row's `−1.779 s` is under it. This is not encoded in the code — the limit is a property of
+an apparatus the batch cannot know — and it is stated here so that a caller reading a resolved verdict
+off this surface at a small effect knows what it is worth.
+
+**An observation can be *unmeasured* without being suppressed, and Garden Apartments shows it.**
+`pctOverLongWait` is a percentage of the rides served **in the reporting window**, and on the
+building § 1 R13 measures as quoting an AWT over five legs at one seed and one at another, some
+seeds have none. Those replications report `null`, the row's verdict is `unmeasured` rather than
+`suppressed` or `0 %`, and the remaining pairs are not averaged for the same reason a partly
+suppressed estimate is not.
+
+**Measured cost, through this implementation, `runBatch` with both arms and the CRN audit**, on the
+hardware this lane ran on (single-threaded, one worker):
+
+| building | 50 replications × 2 arms | per arm-replication | M6 / M23 for one run |
+|---|---|---|---|
+| Garden Apartments | **0.16 s** | **1.6 ms** | 2 / 0.7 ms |
+| Secure Tower | **2.53 s** | **25.3 ms** | 24 / 23.5 ms |
+| Midtown Office | **5.18 s** | **51.8 ms** | 60 / 59.1 ms |
+| Vertical City | **22.91 s** | **229.1 ms** | 196 / 227.1 ms |
+
+Each of those 100 arm-replications includes the recording fold **and** the field-for-field trace
+comparison, and every figure sits within **−12 % to +8 %** of **M23**'s bare `runSimulation` time
+for the same building — Midtown is the *fast* one, at 51.8 ms against 59.1. So neither the fold nor
+the audit is a cost worth engineering around, and the spread against M6/M23 is machine noise rather
+than a measured overhead. W3's own budget clause holds either way: 50 replications is **0.16 s to
+23 s**, and 200 would be 0.6 s to 92 s — inside what a worker plus a progress indicator covers.
+
+No test asserts a wall-clock number: [§ D91](#d91) records what happens to a gate whose threshold is
+a property of the machine.
+
+### Two defects found by **driving** the panel, neither of which a test would have shown
+
+1. **The suppressed-arm note rendered fifteen thousand characters.** `BatchArmSummary.reasons` is
+   de-duplicated by string, and every shipped saturation reason embeds *that run's own* queue
+   growth — so 50 refusals are 50 **distinct** strings and the note printed all of them. R3 requires
+   the reason to be shown; it does not require it fifty times, and a wall nobody reads hides a fact
+   more effectively than a blank would. The panel now prints one refusal in full and a count of the
+   rest; the complete list stays on the report for a caller that wants it. Measured after the fix:
+   6 490 characters for the whole Midtown report.
+2. **The magnitude range printed backwards on a positive difference.** *"eta's door-to-door time was
+   higher than collective's, by between **11.62 s and 6.40 s**"* — `|upper|` then `|lower|` reads
+   correctly on a negative interval and descending on a positive one. Both signs are now asserted.
+   The fixture needed a new knob to catch it: its two arms had identical spread, so every paired
+   difference was exactly `delta` and the interval had **zero width**, in which no ordering of the
+   bounds is observable. A zero-width interval cannot fail a test about which bound comes first.
+
+### Liveness, measured — and it found a false negative of its own
+
+Eleven behaviours were frozen one at a time and the suite watched. **Ten went red on the first
+attempt; one came back green, and it is the interesting one.** Four further mutations were added
+after that finding, all red, giving fifteen red on the final tree.
+
+Freezing the *per-passenger* half of the CRN comparison to `return null` left the whole suite
+**green**. The reason is the shape [§ D154](#d154) records for `wait95S` in a different guise: the
+negative control compared two traces **at different seeds**, so they disagree at the `seed` scalar
+and the comparator returns before the passenger loop is ever reached. Every scalar in that list —
+`seed`, `buildingId`, `durationS`, the window bounds, the counts — is shared by a batch's two arms
+**by construction**, so the per-passenger comparison is the only half that can ever fire in
+production, and it was the half nothing could fail on. A test whose two inputs differ in **exactly
+one passenger field**, with every scalar identical, closes it; the frozen comparator is now red, and
+so is dropping `arrivalTimeS`, `massKg`, the credential or the leg list from the line it hashes.
+
+A **no-op** mutation (`+ 0n` on the seed) was run alongside and stayed green, so the sweep is not
+merely failing on any edit.
+
+### Driven, not read
+
+The Compare tab was exercised in a browser on all three interesting cases. **Midtown Office at
+3 %/5 min, 50 replications per arm, `collective` against `eta`**: `−2.40 s [−4.09, −0.71]` on AWT
+(resolved), WT95 `−6.53 [−13.55, +0.49]` (not resolved, and *not ordered*), door-to-door `+9.01
+[+6.40, +11.62]` resolved **the other way** — the same pair of arms wins on one wait metric and
+loses on another, which is the Pareto point R11 makes about energy showing up on two wait metrics.
+**Midtown at its own profile**: every estimate row suppressed with the reason, both observation rows
+reporting at n = 50. **Garden Apartments, `eta` against `eta`**: 3 of 50 pairs suppressed, so the
+estimate rows refuse; the observation row reads *"+0.00 to +0.00 … includes zero, so the two are not
+ordered at n = 50"* and the energy row *"differed by +0.0 kJ to +0.0 kJ"*. **No row named a winner**,
+which is W3's stated liveness evidence, in the shipped UI rather than in a fixture.
+
+**The main thread is observably not blocked.** With a Vertical City batch running, switching to the
+Run viewer tab showed the playhead advancing 7:05 → 7:58, cars moving and the waiting count changing
+100 → 111 across two screenshots. The progress element ticked to 100 throughout, and **Cancel** at
+20/100 re-enabled the form, hid the progress bar and reported nothing — a terminated batch has no
+result.
+
+**In-browser cost, same configuration as the Node figures above**: Vertical City 50 × 2 at the
+building's own profile took **28.8 s** in the browser against **22.9 s** under Node, **+26 %**.
+Garden Apartments took **0.2 s** against 0.16 s. So the worker is the right place for this and the
+budget clause holds in the environment it is actually claimed for.
+
+**Impact.** A new directory, `packages/viz/src/batch/`, added with its line in
+[`docs/01-architecture.md`](docs/01-architecture.md) in the same commit, which is the atomicity rule
+that file's layout note states. `VIZ_SCHEMA_VERSION` is untouched — a batch record is not a
+recording, and nothing about the recording contract moved. **No phase status moves**: Phase 9 has no
+row in any status table, deliberately, and W3 is a work unit rather than a phase.

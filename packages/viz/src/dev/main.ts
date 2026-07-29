@@ -56,6 +56,7 @@ import { runSummaryFigures } from '../render/runSummary.js';
 import { buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { mountEditor } from './editor.js';
 import { mountParameterForm } from './parameterForm.js';
+import { mountBatchPanel, type BatchPanelElements } from './batchPanel.js';
 import { createLoader } from './bootstrap.js';
 import { shouldAutoplay } from './motion.js';
 import { loadBrowserResources, resolveEdited, type BrowserResources } from './data.js';
@@ -86,7 +87,7 @@ const FRAME_S = 1 / 60;
  * `[tab, other, which]` triples that only works for exactly two tabs. Three of anything is where
  * that stops being cheaper than a loop.
  */
-const TABS = ['viewer', 'editor', 'parameters'] as const;
+const TABS = ['viewer', 'editor', 'parameters', 'compare'] as const;
 type TabName = (typeof TABS)[number];
 
 const isTabName = (value: string | null): value is TabName =>
@@ -127,6 +128,8 @@ interface Elements {
   readonly paramForm: HTMLElement;
   readonly paramStatus: HTMLElement;
   readonly paramRefusal: HTMLElement;
+  /** The Compare surface's controls — `docs/10` § 11 **W3**. */
+  readonly batch: BatchPanelElements;
   readonly confirm: HTMLDialogElement;
   readonly confirmMessage: HTMLElement;
   readonly confirmOk: HTMLButtonElement;
@@ -169,16 +172,33 @@ function elements(): Elements {
       viewer: find<HTMLButtonElement>('tab-viewer'),
       editor: find<HTMLButtonElement>('tab-editor'),
       parameters: find<HTMLButtonElement>('tab-parameters'),
+      compare: find<HTMLButtonElement>('tab-compare'),
     },
     panels: {
       viewer: find<HTMLElement>('panel-viewer'),
       editor: find<HTMLElement>('panel-editor'),
       parameters: find<HTMLElement>('panel-parameters'),
+      compare: find<HTMLElement>('panel-compare'),
     },
     paramSource: find<HTMLSelectElement>('param-source'),
     paramForm: find<HTMLElement>('param-form'),
     paramStatus: find<HTMLElement>('param-status'),
     paramRefusal: find<HTMLElement>('param-refusal'),
+    batch: {
+      building: find<HTMLSelectElement>('batch-building'),
+      baseline: find<HTMLSelectElement>('batch-baseline'),
+      candidate: find<HTMLSelectElement>('batch-candidate'),
+      duration: find<HTMLInputElement>('batch-duration'),
+      seed: find<HTMLInputElement>('batch-seed'),
+      replications: find<HTMLInputElement>('batch-replications'),
+      demand: find<HTMLInputElement>('batch-demand'),
+      run: find<HTMLButtonElement>('batch-run'),
+      cancel: find<HTMLButtonElement>('batch-cancel'),
+      progress: find<HTMLProgressElement>('batch-progress'),
+      status: find<HTMLElement>('batch-status'),
+      error: find<HTMLElement>('batch-error'),
+      output: find<HTMLElement>('batch-output'),
+    },
     confirm: find<HTMLDialogElement>('confirm'),
     confirmMessage: find<HTMLElement>('confirm-message'),
     confirmOk: find<HTMLButtonElement>('confirm-ok'),
@@ -729,7 +749,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ) {
       return;
     }
-    if (ui.panels.editor.hidden === false) return;
+    // The transport shortcuts belong to the viewer. Any other surface being on screen disables
+    // them, so `[`/`]` on the Compare tab does not silently re-speed a playhead nobody can see.
+    if (ui.panels.viewer.hidden) return;
     if (playback === undefined) return;
     switch (event.key) {
       case ' ':
@@ -784,6 +806,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       editor.showBuilding(ui.building.value);
       editor.refresh();
     }
+    // `D11` again, one surface further along: a batch opened after several single runs should be
+    // about the building and the seed the reader was just looking at. Once per session, so it
+    // never overwrites a choice they made on this panel.
+    if (which === 'compare') batch.prefill();
     syncUrl();
   }
 
@@ -889,6 +915,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
     picker: ui.paramSource,
     status: ui.paramStatus,
     refusal: ui.paramRefusal,
+  });
+
+  /* ------------------------------------------------------------------ *
+   * The replication batch — docs/10 § 11 W3, and this file is its named non-test caller.
+   *
+   * The chain is `main.ts → dev/batchPanel.ts → dev/batchWorker.ts → batch/runBatch.ts`, with
+   * `batch/report.ts` called back on this thread once the worker returns. Mounted here rather
+   * than lazily for the same reason the parameter form is: a panel that fails to build should
+   * say so on the first paint, not on the first visit.
+   * ------------------------------------------------------------------ */
+
+  const batch = mountBatchPanel({
+    resources,
+    elements: ui.batch,
+    inherit: () => ({
+      buildingId: ui.building.value,
+      seed: ui.seed.value,
+      durationS: ui.duration.value,
+    }),
   });
 
   // `D11`: `?tab=editor` survives a reload, and opens on the building the URL names. After the

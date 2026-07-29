@@ -1329,7 +1329,38 @@ recorded"*, never as zero.
 - **Risk:** this is the unit most likely to acquire a field with no consumer. The rule is one field,
   one renderer, same commit.
 
-### W3 — The replication batch runner in the viewer *(depends on W2)*
+### W3 — The replication batch runner in the viewer *(depends on W2)* — ✅ **DONE 2026-07-29, and its acceptance clause did not survive the building it names**
+
+> **Landed** ([`DECISIONS.md` § D158](../DECISIONS.md)). `packages/viz/src/batch/` holds the runner
+> and the report; `packages/viz/src/dev/batchWorker.ts` runs it off the painting thread and
+> `packages/viz/src/dev/batchPanel.ts` is the Compare tab, mounted by `src/dev/main.ts`. The
+> statistics are `experiments`' — `pairedDifferenceEstimate` and `intervalContainsZero`, through the
+> browser barrel — and nothing statistical is computed in `viz`. § 13 q1 is answered the
+> non-duplicating way: the seed is `replicationSeed` and the equivalence class is `traceKeyOf`, both
+> imported.
+>
+> **The acceptance clause below is met in the form R1 makes available, and not on AWT.** *"A batch
+> of 50 on Midtown Office returns a paired-t interval on a difference"* — at Midtown's own traffic
+> profile, **0 of 50** replications return a quotable AWT under `collective` **or** `eta`; all 50
+> saturate, on both arms. The observation rows do return a paired-t interval at n = 50, which is
+> exactly § 1's **M1** finding reaching a surface. The estimate half is reachable one operating
+> point down and the panel gained a demand control so a reader can get there: at 2.5 % and 3.0 %
+> `%POP`/5 min every replication of both arms is quotable and the interval excludes zero. The clause
+> was **not** weakened.
+>
+> **One row is a caution about M20, and it is one replication wide.** At 2.0 % `collective` loses a
+> single replication of fifty and the estimate rows suppress, between two demand levels at which
+> both arms are quotable 50 of 50. That is **not** a refutation of M20's *"over a batch, quotability
+> is monotone in demand"* — different seeds, different `n`, two arms rather than twelve — and it is
+> not claimed as one. What it does show is operational: **under the complete-case rule one
+> replication suppresses the whole estimate half**, so a demand level chosen because every arm is
+> quotable must be verified at the batch size that will be run, on the seed set that will be used.
+> A level validated at n = 20 can suppress at n = 50. W5 and T64 inherit that (**M27**).
+>
+> **Suppression handling is the design decision, and it is stated rather than defaulted**: an
+> estimate row reports only when every pair is valid on both arms, and the survivors are **not**
+> averaged, because the arms lose pairs at different rates and the traces that fall out are the ones
+> the dispatchers differ most on. § D158 § 1 carries the rejected alternatives.
 
 A worker that runs N replications of a configuration and returns a paired summary, so R2's batch
 goals and § 8.4's honest deltas are possible.
@@ -1344,9 +1375,16 @@ goals and § 8.4's honest deltas are possible.
 - **Liveness evidence:** a comparison whose true difference is zero (a profile against itself)
   reports "not resolved" rather than a winner.
 - **Non-test caller:** the scenario judge (W5) and the dispatcher editor's compare control (W6).
+  **Neither exists yet**, so the shipped caller is the **Compare tab**: `src/dev/main.ts` →
+  `src/dev/batchPanel.ts` → `src/dev/batchWorker.ts` → `src/batch/runBatch.ts`, with
+  `src/batch/report.ts` called back on the main thread. W5 and W6 inherit it rather than create it.
 - **Open:** whether the batch reuses `packages/experiments`'s CRN manager (§ 13 q1) or duplicates a
   minimal seed-pairing rule. Duplicating is a second source of truth about pairing and should be
-  avoided.
+  avoided. **Settled: reused.** `replicationSeed` and `traceKeyOf` are imported. The one thing that
+  is *not* reused is `traceDigest`, which is unreachable from a browser — it lives in
+  `runner/replication.ts`, whose own import rule confines it to the Node barrel — and the batch
+  compares the two arms' `PassengerTrace`s **field for field** instead, which `runner/crn.ts` calls
+  the primary evidence the hash stands in for.
 
 ### W4 — The generated parameter form *(depends on nothing; parallel to W1–W3)* — ✅ **DONE 2026-07-28, with one half blocked on `core`**
 
@@ -1551,6 +1589,19 @@ export) was re-read against `packages/experiments/package.json` and still holds.
 | **M23** | `runSimulation`, `collective`, 900 s, seeds 1000–1019, on this tree: Garden Apartments **0.7** ms/rep, Secure Tower **23.5**, Midtown Office **59.1**, Mixed-Use High-Rise **68.5**, Vertical City **227.1**. M6 reproduces on four of five within noise; **Vertical City is 16 % slower** than M6's 196, and Mixed-Use was never in M6. 50 replications: 0.0 / 1.2 / 3.0 / 3.4 / **11.4** s. § 13 q5. |
 | **M24** | `ActiveWhenCondition` admits exactly two forms — a value list and `{ min?, max? }` — and `activeWhenSatisfied` returns `false` for an unset gate, so *"the absolute override is unset"* is not expressible and cannot be smuggled into the value list. Separately: of the **10** schemas `discoverParameterSchemas()` finds, **two do not collect into a search space** — `TRAFFIC_PARAMETERS` (*"`traffic.arrivalRatePctPop5min` is continuous and its default is null"*) and `SIM_PARAMETERS` (*"`sim.drainGraceS` declares a log scale over a range starting at 0"*). § 13 q6, and W4's own finding. |
 | **M25** | `C34`'s caller count, with the repository's own scanner (`corpus`/`isBarrel`/`auditModules` from `tuning/callers.test-helper.ts`, comments stripped so a `{@link}` is not an import). Non-test, non-barrel importers of `experiments/src/browser.ts`: **0 → 3** (`viz/src/controls/controls.ts`, `viz/src/controls/types.ts`, `viz/src/dev/parameterForm.ts`). Importers of any kind: 1 → 7. `auditModules(['experiments/src/tuning/space'])` uncalled exports: **6 → 3** — `activeParameters`, `parameterOf` and `defaultCandidate` gained real callers, which is what they were written for. § D127. |
+
+### Measured 2026-07-29 by T62, for W3
+
+Seed `20260729` throughout — a **different seed set** from M6/M7/M18/M20, which is why the counts
+below are not directly comparable with theirs and are not read as re-measurements of them.
+`durationS: 900`, `onTimeout: 'report'`, through `runBatch` (both arms, CRN audit on), Node 26.
+
+| id | Measurement |
+|---|---|
+| **M26** | Quotable replications out of **50**, at each building's own traffic profile: Garden Apartments **47/50** (`collective`) and **47/50** (`eta`), 0 saturated; Secure Tower **7/50** and **8/50**, 24 and 22 saturated; Midtown Office **0/50** and **0/50**, **50/50 saturated on both arms**. So W3's acceptance clause — *"a batch of 50 on Midtown Office returns a paired-t interval on a difference"* — is met on the observation rows at n = 50 and cannot be met on AWT at that building's shipped demand. |
+| **M27** | Midtown Office, 50 replications per arm, `collective` baseline against `eta`, `demand: { arrivalRatePctPop5min: r }`. Quotable `collective`/`eta` and the paired ΔAWT: r = 1.0 → 50/50, `+0.322 [−0.355, +1.000]`; r = 1.5 → 50/50, `−0.461 [−1.211, +0.289]`; r = 2.0 → **49**/50, **suppressed**; r = 2.5 → 50/50, `−1.779 [−3.271, −0.286]`; r = 3.0 → 50/50, `−2.399 [−4.090, −0.707]`. The 2.0 % dip is **one replication** and is not read as refuting **M20**; what it shows is that under the complete-case suppression rule a single replication suppresses the estimate half, so a demand level must be validated at the batch size that will be run. Note also that r = 2.5's `1.779 s` is **below** `docs/07` § 4's 1.9 s resolution limit between structurally different dispatchers. |
+| **M28** | Wall-clock through `runBatch`, 50 replications × 2 arms including the recording fold and the field-for-field CRN comparison: Garden Apartments **0.16 s**, Secure Tower **2.53 s**, Midtown Office **5.18 s**, Vertical City **22.91 s** — that is 1.6 / 25.3 / 51.8 / 229.1 ms per arm-replication, every one of which is within **−12 % to +8 %** of **M23**'s bare `runSimulation` figure for the same building, so the fold and the audit are inside the machine noise rather than a measured overhead. Reproduces **M6**/**M23** within the difference those two account for. Not asserted by any test — § D91 records what happens to a gate whose threshold is a property of the machine. |
+| **M29** | Garden Apartments, 50 replications: some replications report **no** `waiting.pctOverLongWait` at all, because it is a percentage of the rides served **in the reporting window** and this is the building **M17** measures as quoting an AWT over five legs at one seed and one at another. Those pairs are `null`, the batch row's verdict is `unmeasured` rather than `suppressed` or `0 %`, and the surviving pairs are not averaged. An observation can be absent without being refused, and the two states are drawn differently. |
 
 ---
 
