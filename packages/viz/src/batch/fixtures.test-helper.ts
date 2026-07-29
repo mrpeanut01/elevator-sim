@@ -22,6 +22,9 @@ export interface FakeReplicationOptions {
   readonly awtIsValid?: boolean;
   readonly awtInvalidReason?: string | null;
   readonly saturated?: boolean;
+  readonly status?: BatchReplication['status'];
+  readonly serviceLevelVerdict?: BatchReplication['serviceLevelVerdict'];
+  readonly offeredPer5Min?: number | null;
   /** Overrides for individual metrics. Everything unnamed takes {@link baseValue}. */
   readonly metrics?: Partial<Record<BatchMetric, number | null>>;
 }
@@ -43,8 +46,15 @@ export function fakeReplication(
     awtInvalidReason:
       options.awtInvalidReason ?? (valid ? null : 'the queues never stopped growing.'),
     saturated: options.saturated ?? !valid,
-    status: 'completed',
-    serviceLevelVerdict: 'served',
+    status: options.status ?? 'completed',
+    serviceLevelVerdict: options.serviceLevelVerdict ?? 'served',
+    /*
+     * `in` rather than `??`: the override a caller most wants here is **`null`** — *"this run
+     * measured no offered demand"* — and `null ?? baseValue` silently discards it. Watched
+     * happening: `goals.test.ts`'s unmeasured case reported `pass` against a fixture that had
+     * quietly kept the default.
+     */
+    offeredPer5Min: 'offeredPer5Min' in options ? (options.offeredPer5Min ?? null) : baseValue,
     metrics: metrics as Record<BatchMetric, number | null>,
   };
 }

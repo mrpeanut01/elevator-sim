@@ -106,6 +106,11 @@
  * | {@link BATCH_METRICS}, {@link BATCH_METRIC_CLASS}, {@link BATCH_METRIC_PRESENTATION} | `src/batch/report.ts` and `src/batch/runBatch.ts`; the class map is also what makes a ninth metric a compile error rather than a silent default |
  * | {@link MIN_REPLICATION_BUDGET}, {@link MAX_REPLICATION_BUDGET} | `batchReport`, in `src/batch/report.ts`. Inside the module only |
  * | {@link BatchError} | thrown by `runBatch`; caught and flattened by `src/dev/batchWorker.ts` |
+ * | {@link goalReport} | `src/dev/batchPanel.ts`, on the batch the Compare tab just ran — `docs/10` § 11 **W9** |
+ * | {@link measureGoalRate}, {@link judgeReplication} | `goalReport`, and `src/scenario/measure.ts`. R12's arithmetic, in one place |
+ * | {@link measureScenario}, {@link publishedScenarioFor} | `src/scenario/regenerate.test-helper.ts`, the driver that writes `data/scenario-goals.json`, and `src/scenario/goalRates.test.ts`, which re-derives it. **The only export here whose shipped caller is a driver rather than a screen**, and it is the shape `experiments/src/benchmark/regeneratePins.ts` already has: a published number needs something that can produce it again |
+ * | {@link validatePublishedGoalRates} | `src/scenario/goalRates.test.ts` — the guard. A goal kind with no measured rate on a scenario is a failure, not an omission |
+ * | {@link CANDIDATE_GOALS}, {@link CANDIDATE_SCENARIOS} | `goalReport`, `regenerate.test-helper.ts` and the guard |
  *
  * `frameSequence` and `serializeFrames` exist because Phase 4's acceptance criterion needs a
  * headless, browser-free way to compare two replays. They would have shipped as "configurable,
@@ -415,3 +420,68 @@ export {
   type BatchReport,
   type BatchVerdict,
 } from './batch/report.js';
+
+/* -------------------------------------------------------------------------- *
+ * scenario/ — R12 made mechanical: what a goal *is* on a configuration
+ *   (docs/10 § 1 R12, § 5.2, § 11 W9)
+ *
+ * A goal that always passes or always fails is not a goal; a goal in between
+ * is judged over a batch. This is the instrument that decides which, the seven
+ * stages it was run on, the published table in `data/scenario-goals.json`, and
+ * the validator that refuses a table with a kind in it unaccounted for.
+ * -------------------------------------------------------------------------- */
+
+export {
+  DISPOSITION_OF,
+  GOAL_BLOCKER,
+  GOAL_JUDGEMENT,
+  GOAL_KINDS,
+  GOAL_READS,
+  GOAL_TAKES_THRESHOLD,
+  goalLabel,
+  isPerReplicationGoal,
+  judgeReplication,
+  measureGoalRate,
+  type GoalDisposition,
+  type GoalJudgement,
+  type GoalKind,
+  type GoalOutcome,
+  type GoalRate,
+  type GoalRateClass,
+  type GoalSpec,
+  type PerReplicationGoalKind,
+} from './scenario/goals.js';
+
+export {
+  CANDIDATE_GOALS,
+  CANDIDATE_SCENARIOS,
+  LONG_WAIT_CEILING_PCT,
+} from './scenario/candidates.js';
+
+export {
+  measureScenario,
+  publishedScenarioFor,
+  type GoalScenario,
+  type MeasureOptions,
+  type MeasuredGoal,
+  type MeasuredScenario,
+  type SeedSet,
+} from './scenario/measure.js';
+
+export {
+  MIN_SEEDS_PER_GOAL,
+  classOfCounts,
+  validatePublishedGoalRates,
+  type PublishedGoalRates,
+  type PublishedGoalRecord,
+  type PublishedRate,
+  type PublishedScenario,
+  type PublishedSeedSet,
+} from './scenario/published.js';
+
+export {
+  goalReport,
+  type GoalReport,
+  type GoalReportRow,
+  type GoalReportWithheld,
+} from './scenario/goalReport.js';

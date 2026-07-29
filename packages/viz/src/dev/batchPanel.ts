@@ -24,6 +24,7 @@
 
 import type { BatchRequest, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
 import { batchReport, type BatchComparisonRow, type BatchReport } from '../batch/report.js';
+import { goalReport, type GoalReport, type GoalReportRow } from '../scenario/goalReport.js';
 import type { BrowserResources } from './data.js';
 
 export interface BatchPanelElements {
@@ -189,7 +190,7 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
       }
       const report = batchReport(message.result);
       ui.status.textContent = `${String(report.replications)} replications per arm in ${(message.result.elapsedMs / 1000).toFixed(1)} s.`;
-      draw(report);
+      draw(report, goalReport(message.result));
       stopWorker();
     });
     next.addEventListener('error', (event: ErrorEvent) => {
@@ -254,7 +255,25 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
     }
   }
 
-  function draw(report: BatchReport): void {
+  /**
+   * A goal row's CSS class from R12's disposition — never from the goal kind.
+   *
+   * A constant is drawn as a *refusal*, in the same class a suppressed statistic uses, because
+   * that is what it is: this configuration cannot judge the player on it, and the surface says so
+   * rather than showing a rate of 50 of 50 that reads like a win.
+   */
+  function dispositionClass(item: GoalReportRow): string {
+    switch (item.disposition) {
+      case 'batch':
+        return 'figure-observation';
+      case 'configuration-fact':
+        return 'figure-suppressed figure-warning';
+      case 'not-shippable':
+        return 'figure-absent';
+    }
+  }
+
+  function draw(report: BatchReport, goals: GoalReport): void {
     ui.output.replaceChildren();
     ui.output.append(
       row(
@@ -310,6 +329,32 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
       for (const item of comparison.rows) {
         ui.output.append(row(item.label, item.sentence, item.note, verdictClass(item)));
       }
+    }
+    drawGoals(goals);
+  }
+
+  /**
+   * R12 on screen: what each candidate goal **is** on this configuration.
+   *
+   * Deliberately after the comparison rows and deliberately without a verdict. Nothing here says
+   * a goal was met — it says how often it passed, out of how many runs, and what that makes it:
+   * a batch goal, a fact about the configuration, or something this batch cannot judge.
+   */
+  function drawGoals(goals: GoalReport): void {
+    ui.output.append(
+      row(
+        'goals',
+        'What each candidate goal is on this configuration — a frequency over the runs above, ' +
+          'never a verdict on one of them.',
+        goals.floorNote ?? undefined,
+        goals.floorNote === null ? 'figure-observation' : 'figure-warning',
+      ),
+    );
+    for (const item of goals.rows) {
+      ui.output.append(row(item.label, item.sentence, undefined, dispositionClass(item)));
+    }
+    for (const item of goals.withheld) {
+      ui.output.append(row(item.label, 'no pass rate from this batch', item.reason, 'figure-absent'));
     }
   }
 

@@ -18,7 +18,7 @@
  */
 
 import { loadConfig, type LoadedConfig, type PassengerTrace } from '@elevator-sim/core';
-import { replicationSeed } from '@elevator-sim/experiments/browser';
+import { metricOf, replicationSeed } from '@elevator-sim/experiments/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { batchReport } from './report.js';
@@ -213,6 +213,37 @@ describe('what a batch records', () => {
           expect(value === null || Number.isFinite(value), `${arm.armId}/${metric}`).toBe(true);
         }
       }
+    }
+  });
+
+  it('records the offered demand off the same projection every other figure comes from', () => {
+    /*
+     * `offeredPer5Min` is a **field** rather than a `BatchMetric` — every arm sees the same
+     * passengers by construction, so a comparison row on it would be a paired difference of a
+     * value with itself. It is here because `answer-the-demand` is `personsPer5Min >=
+     * offeredPer5Min` and the batch carried only the carried half.
+     *
+     * Asserted against `experiments`' shipped `metricOf` rather than against a literal, because
+     * the claim is *"the same projection"*, and asserted as **equal across arms** because that is
+     * the property the field's docstring rests its whole design on.
+     */
+    const result = runBatch(requestFor('midtown-office', 3, ['collective', 'eta']), resourcesFor('midtown-office'));
+    const [baseline, candidate] = result.arms;
+    expect(baseline?.replications.length).toBe(3);
+    for (const [index, replication] of (baseline?.replications ?? []).entries()) {
+      const fresh = recordRun({
+        building: requireBuilding(config, 'midtown-office'),
+        dispatcherProfile: requireDispatcher(config, 'collective'),
+        trafficProfiles: config.trafficProfiles,
+        elevatorSpecs: config.elevatorSpecs,
+        durationS: 900,
+        onTimeout: 'report',
+        seed: BigInt(replication.seed),
+        replication: replication.replication,
+      }).result.summary;
+      expect(replication.offeredPer5Min).toBe(metricOf(fresh, 'offeredPer5Min'));
+      expect(replication.offeredPer5Min).not.toBeNull();
+      expect(candidate?.replications[index]?.offeredPer5Min).toBe(replication.offeredPer5Min);
     }
   });
 
