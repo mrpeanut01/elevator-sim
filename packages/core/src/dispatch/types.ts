@@ -57,10 +57,18 @@ import type {
   ParkingStrategy,
   PassengerAssignmentMode,
   ReassignmentPolicy,
+  SelectionStageConfig,
 } from '../config/types.js';
 import type { SimTime } from '../kernel/types.js';
 import type { CarSnapshot, CostEstimate, CostRequest } from '../model/car/types.js';
 import type { CredentialGroup, Direction } from '../model/types.js';
+
+import type {
+  ResolvedSelection,
+  ResolvedWeightSets,
+  WeightSetPolicy,
+  WeightSetSource,
+} from './selector.js';
 
 /* -------------------------------------------------------------------------- *
  * Errors
@@ -124,7 +132,8 @@ export interface DispatchCall {
    * It is a fact about the call, not a policy switch: `costRequestFor` forwards the credential
    * for an authorized request so `estimateCost` does not ask a second time whether an *unbadged*
    * passenger may reach a zoned floor — the question that, unasked, made `destination-entry`
-   * unserviceable on `secure-tower` (51.7 % unserved against conventional's 33.5 %).
+   * unserviceable on `secure-tower` (**100 % unserved** against conventional's 33.5 % —
+   * `benchmark/accessControl.ts` H-ACCESS-1, seed 20 260 726, n = 30, re-run after § T50-D1).
    */
   readonly panelAuthorized?: boolean | undefined;
   /** Passengers waiting for this call, when somebody counted. */
@@ -506,6 +515,22 @@ export interface DispatchContext {
    * {@link DispatchObservation.demandForecast}; resolve it once per dispatch pass, not per call.
    */
   readonly demandForecast?: ReadonlyMap<string, number> | undefined;
+  /**
+   * Shaft indices of the building's entrance floors, for the traffic-pattern detector.
+   *
+   * The third fact only the group controller holds, and the one this lane added. A car snapshot
+   * carries its shaft's served floors, their heights and their access zones, and **not** whether
+   * a floor is an entrance — so `dispatch/selector.ts` cannot tell a lobby arrival from an
+   * interfloor one without being told. It was told wrongly once, which is why this field exists:
+   * the first implementation used the shaft's lowest served floor as the lobby, and on
+   * `midtown-office` the `main` bank's lowest served floor is `P1` at index −1 while the lobby
+   * `G` is index 0, so a **pure up-peak run reported an interfloor rate four times its lobby
+   * rate**. Both floors are `isEntrance` there; neither is the lowest one alone.
+   *
+   * Absent, the detector falls back to the shaft's lowest served floor — correct on a building
+   * with nothing below the lobby, and stated rather than silent.
+   */
+  readonly entranceFloorIndices?: ReadonlySet<number> | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -678,6 +703,17 @@ export interface ResolvedConstraints {
 }
 
 /**
+ * Stage 3's **weight-set selection**, as a profile may author it.
+ *
+ * Re-exported from `config/types.ts`, not redeclared: it is a section of
+ * `dispatcherProfileSchema` and every schema-validated shape lives there. The whole authored
+ * surface of `dispatch/selector.ts` is six scalars and no map — the arms themselves are the
+ * file-level `patternSwitching` block, in the same file and for the same reason the cost-term
+ * library is, because a library of what exists is not a knob an optimizer samples.
+ */
+export type { SelectionStageConfig } from '../config/types.js';
+
+/**
  * A dispatcher profile with every default applied and every claim checked.
  *
  * The five stage sections are exactly the tunable surface: every field in them is declared in
@@ -710,6 +746,24 @@ export interface ResolvedDispatchConfig {
   readonly eligibility: ResolvedEligibilityStage;
   readonly answer: ResolvedAnswerStage;
   readonly idle: ResolvedIdleStage;
+  /**
+   * Stage 3's weight-set selection. Six scalars, all declared, all defaulted to inert.
+   *
+   * `policy: 'off'` is the default and every shipped profile's state; under it
+   * {@link ResolvedDispatchConfig.weightSets} is absent and the policy hands {@link weights} —
+   * the same frozen Map object — to the scorer on every decision, so a non-selecting run is
+   * byte-identical by construction.
+   */
+  readonly selection: ResolvedSelection;
+  /**
+   * The arms the selector may choose between, absent when it is off.
+   *
+   * **Not** a tunable section: `tunablePathsOf` does not enumerate it and
+   * `DISPATCH_PARAMETERS` declares no row for it, because the arm set is the same kind of thing
+   * as the cost-term library — a statement of what exists, resolved out of
+   * `data/dispatcher-profiles.json`, and not a dimension an optimizer samples.
+   */
+  readonly weightSets?: ResolvedWeightSets | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -918,6 +972,21 @@ export interface DispatchPolicyOptions {
   readonly weights?: Readonly<Record<string, number>> | undefined;
   /** Replaces the profile's hard-constraint set entirely when present. */
   readonly hardConstraints?: readonly string[] | undefined;
+  /** Overrides the profile's `selection` section field by field. */
+  readonly selection?: SelectionStageConfig | undefined;
+  /**
+   * The weight-set library, which is file-level rather than per profile.
+   *
+   * `patternSwitching` and the profiles it names both live in `data/dispatcher-profiles.json`,
+   * so a policy built from one profile cannot resolve its own arms. The runner supplies them —
+   * `experiments/src/runner/experiment.ts` already carries a `DispatchPolicyOptions` per
+   * dispatcher arm end to end, so a study enables the selector without a line of change in
+   * `sim/simulation.ts`.
+   *
+   * Required whenever `selection.policy` is not `'off'`; supplying it while the policy is off
+   * changes nothing.
+   */
+  readonly weightSets?: WeightSetSource | undefined;
 }
 
 /**
@@ -967,4 +1036,6 @@ export interface DispatcherProfileSource {
         readonly repositionEnergyWeight?: number | undefined;
       }
     | undefined;
+  /** Stage 3's weight-set selection. Absent is `policy: 'off'`, which every shipped profile is. */
+  readonly selection?: SelectionStageConfig | undefined;
 }

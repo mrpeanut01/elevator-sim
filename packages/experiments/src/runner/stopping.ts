@@ -1,14 +1,17 @@
 /**
  * The sequential stopping rule, as the runner uses it.
  *
- * docs/03-traffic-and-statistics.md § Part 3 states the rule as four lines:
+ * docs/03-traffic-and-statistics.md § Part 3 states the rule as three lines:
  *
  * ```
  * after each replication n:
- *     halfWidth = t[n-1, conf] * (s / sqrt(n))     # n <= 25, t-distribution
- *     halfWidth = z[conf]      * (s / sqrt(n))     # n >  25, normal approximation
+ *     halfWidth = t[n-1, conf] * (s / sqrt(n))     # every n — no crossover
  *     if halfWidth < acceptableRange: stop and report mean
  * ```
+ *
+ * It was four lines until 2026-07-27, with a `t` (n ≤ 25) / `z` (n > 25) crossover on the second
+ * and third. That family is deleted from the code (DECISIONS.md § D14) *and* from the doc, and
+ * this block quoted the superseded version for long enough to be worth saying so out loud.
  *
  * Two different responsibilities are packed into that. The first three lines are **statistics** —
  * a t/z quantile, a standard error, a half-width — and belong wherever this package keeps its
@@ -22,10 +25,10 @@
  * `n - 1` at every `n`, so the half-width this rule compares against `acceptableRange` is the same
  * number the report will print. A `z` above n = 25 is 2–5 % narrower and would stop *earlier* than
  * the published interval justifies — the direction the last paragraph of {@link HalfWidthEstimate}
- * warns about. § Part 3's four-line rule therefore needs correcting to `t[n-1]` at every `n`; the
- * quantile chooser that implemented it is deleted (DECISIONS.md § D7). What survives here is the
+ * warns about. The quantile chooser that implemented the crossover is deleted (DECISIONS.md § D7),
+ * and § Part 3 was corrected to match, so the doc and the code now agree. What survives here is the
  * *port*: this module still adapts any estimator, and `fixtures.test-helper.ts`'s `docHalfWidth`
- * double deliberately uses the doc's crossover family to prove that.
+ * double deliberately uses the **superseded** crossover family to prove that.
  *
  * **What that costs, measured.** `t[n-1] > z` at every `n`, so the shipped rule can only ever run
  * *more* replications than a normal-approximation one — open item `C4` asked how many more, and
@@ -71,10 +74,38 @@ import type { StoppingRule, StoppingVerdict } from './types.js';
  * What an estimator has to tell the rule.
  *
  * Only {@link halfWidth} is required, and it is in the metric's own units: seconds for AWT,
- * persons per 5 minutes for handling capacity. A non-finite half-width — fewer than two samples,
- * a zero-variance sample the estimator declines to bound — means "not yet precise enough" and
- * never "precise enough", which is the safe direction: an experiment that runs too long wastes
- * CPU, and one that stops too early publishes a number it did not earn.
+ * persons per 5 minutes for handling capacity. A non-finite half-width — **fewer than two
+ * samples** — means "not yet precise enough" and never "precise enough", which is the safe
+ * direction: an experiment that runs too long wastes CPU, and one that stops too early publishes a
+ * number it did not earn.
+ *
+ * ## A zero-variance sample is *not* one of those, and this docstring used to say it was
+ *
+ * It listed "a zero-variance sample the estimator declines to bound" beside the `n < 2` case. The
+ * shipped estimator declines nothing: `estimateMean` returns `halfWidth = t[n-1] · 0 / √n` = **0**,
+ * which is finite, correct, and below every positive target — so {@link halfWidthStoppingRule}
+ * stops at the **first** evaluation point, whatever `acceptableRange` was asked for. Open item
+ * `C4`'s third finding was that disagreement; the docstring is what was wrong, not the code, for
+ * two reasons:
+ *
+ * 1. **Zero is the true half-width of an interval around a constant sample.** An estimator that
+ *    returned `NaN` there would be refusing to report a number it has.
+ * 2. **Phase 3's first acceptance criterion depends on it.** `pairedDifferenceEstimate(v, v)` must
+ *    produce an interval of exactly `[0, 0]` containing zero — a candidate compared against itself
+ *    is *indistinguishable*, not unmeasurable. `estimateMean` is what produces that, and
+ *    "declining to bound" a zero-variance sample would replace a passing criterion with a `NaN`.
+ *    Weakening an acceptance criterion so a comment becomes true is the move CLAUDE.md § Working
+ *    agreements forbids by name.
+ *
+ * **What is genuinely uncomfortable is left standing and stated rather than fixed.** docs/07 § 4:
+ * *"a bit-identical result is a wiring bug until proven otherwise"*. A rule that stops the instant
+ * every replication agrees is declaring convergence on exactly the evidence that most often means
+ * the replications were never independent. It is **unreachable in anything this repository ships**
+ * — no study injects a stopping rule at all (DECISIONS.md § D125), and where one is injected the
+ * runner's first evaluation is at `policy.minReplications` (50 by default,
+ * `replicationRunner.ts`'s first chunk), so the stop lands at the floor rather than at `n = 2`
+ * unless a caller lowers the floor as `validation/sequentialStopping.test.ts` does. Pinned by
+ * `stopping.test.ts` § "a zero-variance sample", so a change of mind is a visible one.
  */
 export interface HalfWidthEstimate {
   readonly halfWidth: number;

@@ -60,6 +60,35 @@ export function floorsInBuildingOrder(
   return [...floors].sort((a, b) => b.index - a.index || b.heightM - a.heightM);
 }
 
+/**
+ * Do the **declaration order** and the **building order** of one floor list agree?
+ *
+ * A statement about two orderings, and deliberately not a statement about legality. `ED-24`'s
+ * declaration-order view shows it so that the ⇧/⇩ buttons have a visible effect *besides* the row
+ * moving: press one on a document where the two agree and this flips to *differ*, which is the
+ * single sentence that tells a reader the array actually changed. The whole defect the view exists
+ * to close was a control whose effect could not be seen ([`docs/07`](../../../../docs/07-handoff.md)
+ * § 8), and a row moving inside a list the reader has just been told is *the array's own order* is
+ * weak evidence on its own — every list looks like it is in its own order.
+ *
+ * **Nothing here decides whether a document is legal.** Two orders differing is ordinary: four of
+ * the five shipped buildings declare their floors bottom-up, so they differ from the moment they
+ * are opened. `parseBuilding`/`resolveBuilding` decide legality and the Validation panel reports
+ * it — § D67 — and this predicate is never consulted about it. It is also not what
+ * `floor-height-order` checks: `parse.ts` runs that check over `expandFloors`' output, which is
+ * already sorted ascending by `index`, so the declaration array's order is not an input to it.
+ *
+ * Lives here rather than in `dev/editor.ts` for the reason `floorsInBuildingOrder` does: that
+ * file's docstring says everything with a decision in it is tested under Node, and *"do these two
+ * orders agree"* is a decision.
+ */
+export function declarationOrderMatchesBuildingOrder(
+  floors: readonly FloorConfig[],
+): boolean {
+  const building = floorsInBuildingOrder(floors);
+  return floors.every((floor, at) => building[at]?.id === floor.id);
+}
+
 export interface PreviewGeometry {
   readonly floors: readonly VizFloor[];
   readonly shafts: readonly ShaftGeometry[];

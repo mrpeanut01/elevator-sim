@@ -602,6 +602,72 @@ export interface StageActivity {
   readonly lateArrivalHoldMaxDwellS: number;
   /** See {@link lateArrivalHoldMaxDwellS}. Passengers, not seconds. */
   readonly lateArrivalHoldMaxCohort: number;
+
+  /* ---- double-deck operation ---- */
+
+  /**
+   * Stops begun by a double-deck car.
+   *
+   * **These seven counters exist because "it looks wired" is not evidence.** Double-deck was
+   * configured, schema-validated, indexed by `Bank` and read by nothing for the whole life of
+   * the project — the eleventh instance of this repository's signature defect. Every one of
+   * them is zero on every building without a double-deck car, which is the other half of the
+   * claim: a mechanism that fires everywhere is not a mechanism, it is a regression.
+   */
+  readonly doubleDeckStops: number;
+  /**
+   * Of {@link doubleDeckStops}, those where the two decks opened onto **two different floors**
+   * at the same instant.
+   *
+   * This is the number the hardware is bought for: each one is a stop a single-deck bank would
+   * have had to make twice. A run where it is zero while `doubleDeckStops` is large has decks
+   * that never met a pair, which is a geometry problem, not a dispatch one.
+   */
+  readonly doubleDeckPairedStops: number;
+  /** Boardings taken, `[lower, upper]`. The deck assignment as it actually happened. */
+  readonly doubleDeckBoardings: readonly [number, number];
+  /** Alightings taken, `[lower, upper]`. */
+  readonly doubleDeckAlightings: readonly [number, number];
+  /**
+   * Boarders each deck's dwell was **sized** for, `[lower, upper]`.
+   *
+   * Paired with {@link doubleDeckBoardings} for the same reason `lateArrivalHoldsProjected` is
+   * paired with `lateArrivalHoldsBoarded`: a projection that does not match what the boarding
+   * loop then took is a stop given the wrong length, and the dwell is the term the round trip is
+   * most sensitive to.
+   */
+  readonly doubleDeckBoardingsProjected: readonly [number, number];
+  /**
+   * Boarding loops stopped by a **deck's** 80 % design load while the car body still had room.
+   *
+   * Non-zero is what makes the per-deck capacity rule falsifiable: it is the count of times the
+   * answer differed from the whole-car rule, and a run where it stays zero has not exercised it.
+   */
+  readonly doubleDeckDeckFullRefusals: number;
+  /**
+   * Distinct legs refused because origin and destination sit on **different decks**, and are
+   * therefore unrideable on a car whose decks are bolted together.
+   *
+   * Expected to be zero and measured at **200** on `vertical-city`, which is why it is a counter
+   * and not an assertion. `traffic/route.ts` never *routes* a cross-deck leg onto the shuttle,
+   * but a leg is not bound to a bank, so the shuttle is offered the `G → 2` and `2 → G` queues
+   * that the two ground-lobby locals serve — journeys of one floor, on floors that are the same
+   * double-deck stop position. See `Simulation.#deckAllows`.
+   */
+  readonly deckMismatchLegs: number;
+  /**
+   * Distinct legs the **bare kiosk** refused: a destination disclosed with no credential beside
+   * it, on a floor an access zone covers.
+   *
+   * Non-zero for exactly one configuration — `dispatch.callType: 'destination-entry'` with no
+   * landing panel, on a building with access zones — and zero for every profile
+   * `data/dispatcher-profiles.json` ships. It is the configuration's own measured cost
+   * (DECISIONS.md § D30's premise) stated as a count of people rather than as a rate, which is
+   * the half an unserved-fraction study cannot see: it says *who* the kiosk turned away, and
+   * therefore lets a reader tell them apart from the passengers who merely stood behind them.
+   * See `Simulation.#kioskAllows` and § T50-D1.
+   */
+  readonly kioskRefusedLegs: number;
 }
 
 /**

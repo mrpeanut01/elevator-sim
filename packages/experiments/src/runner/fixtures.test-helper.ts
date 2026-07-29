@@ -105,14 +105,17 @@ const T_95_ONE_TAIL: readonly number[] = [
 /**
  * The doc's half-width arithmetic, implemented just far enough to exercise the port.
  *
- * `t[n-1, conf]` for `n ≤ 25`, `z[conf]` beyond it, exactly as
- * docs/03-traffic-and-statistics.md § Part 3 writes it, with the doc's own `z = 1.65` at 90 %.
+ * `t[n-1, conf]` for `n ≤ 25`, `z[conf]` beyond it — the textbook crossover
+ * docs/03-traffic-and-statistics.md § Part 3 wrote as the rule **until 2026-07-27**, with that
+ * version's own `z = 1.65` at 90 %. The doc now writes `t[n-1]` at every `n` and names the
+ * crossover as literature; this double keeps the superseded family on purpose, per below.
  * Supports 90 % only and throws otherwise, because this is a **test double**.
  *
  * **It is not what the production rule computes, and that is deliberate.**
  * `validation/harness.ts`'s `productionStoppingRule` injects `reports/statistics`'s
- * `estimateMean`, which is Student-t at every `n` — the doc's crossover is not implemented
- * anywhere in shipped code (DECISIONS.md § D7, `stopping.test.ts` § productionStoppingRule). A
+ * `estimateMean`, which is Student-t at every `n` — the crossover is not implemented anywhere in
+ * shipped code, and is no longer what the doc asks for either (DECISIONS.md § D7, § D14,
+ * `stopping.test.ts` § productionStoppingRule). A
  * double whose quantile family differs from the shipped estimator's is what proves
  * {@link halfWidthStoppingRule} records the estimate verbatim rather than re-deriving it. The
  * runner's tests are about *when* the rule is asked and whether the answer is reproducible, not

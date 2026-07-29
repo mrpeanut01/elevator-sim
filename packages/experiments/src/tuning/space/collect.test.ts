@@ -272,8 +272,18 @@ describe('every parameter core declares is accounted for', () => {
     // `metrics.*` row it is declared and counted here and is correctly not authorable in a
     // dispatcher profile. A dispatcher that could tune the threshold at which its own long waits
     // stop being reported would be tuning away its own evidence.
-    expect(rows).toBe(99);
-    expect(SPACE.parameters.length).toBe(49);
+    //
+    // **99 → 106 and 49 → 56 in wave 6**, and here the two move together, which is the third
+    // possible relationship and the one neither earlier note had. All seven new rows are
+    // `DISPATCH_PARAMETERS`' `selection.*` — stage 3's weight-set selector — and all seven are
+    // authorable in a profile, because a dispatcher choosing *which of the shipped weight vectors
+    // to score with* is a dispatcher dimension in a way `sim.assignedWalkS` and
+    // `metrics.maxWaitHorizonS` are not. Their arrival also found a real defect one file over:
+    // `encode.ts`'s `PROFILE_OBJECT_SECTIONS` is a hand-written list of profile sections, so all
+    // seven were reported unauthorable and silently dropped from the space until `selection` was
+    // added to it. The biconditional above is what caught it.
+    expect(rows).toBe(106);
+    expect(SPACE.parameters.length).toBe(56);
     // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
     // always said `false` would satisfy the biconditional above only by accident.
     expect(authorable).toBeGreaterThan(0);

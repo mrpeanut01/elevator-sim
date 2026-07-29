@@ -14,8 +14,13 @@ partially complete.** Read the two that need care precisely:
 - **Phase 6** — 6a (destination *disclosure*) and 6b (destination *dispatch*) are accepted against a
   **raised** criterion, now measured on the building that criterion names ([§ D100](DECISIONS.md)).
   The gate is **met by the Level-0 arm and not by the Level-1 panel at any measured point** — say
-  both. 6c (learned control) is deferred out of the phase with reasons, not dropped. Double-deck
-  operation is configured, validated, disclaimed on every run — and not simulated.
+  both. 6c (learned control) is **no longer deferred — it is implemented, measured, and NOT
+  ACCEPTED**: ΔTTD `−0.213 [−0.440, +0.014]` against `collective` at n = 200 on a disjoint seed, an
+  interval containing zero, unchanged at 24 and 64 search candidates ([§ D139](DECISIONS.md) is the
+  criterion, dated before the code; [§ D145](DECISIONS.md) is the verdict). Double-deck operation is
+  **simulated** — paired stops, per-deck design load, deck-bound legs ([§ D131](DECISIONS.md)) — and
+  the disclaimer survives only in the narrower case of a double-deck bank declaring no
+  `servesFloorPairs`, which no shipped building raises.
 - **Phase 8** — **both blocking property violations are closed**, and neither was closed by moving a
   bound: `fuzz-1001074` by a fourth `awtIsValid` ground, `fuzz-1000384` by revoking a promise a
   withdrawn car cannot keep. The deep tier is green at 2 000 cases. **All eight tracks have landed**;
@@ -24,12 +29,21 @@ partially complete.** Read the two that need care precisely:
   track lands, and no property violation is outstanding*) is met ([§ D108](DECISIONS.md); § D102 is
   the superseded partial verdict, left standing).
 
-**No phase status has moved since `f895a16`.** What has moved is what the phases are *true of*:
-`destination-eta` now weights `rideTime` at **0.5** and is no longer a destination profile that
-changes no decision ([§ D112](DECISIONS.md)); the viewer and `elevator-sim watch` no longer print a
-mean the same run says is suppressed ([§ D111](DECISIONS.md)); the ninth dead seam and the two holes
-in `core`'s dead-code scanner are closed ([§ D114](DECISIONS.md)). None of that changes a phase
-verdict, and none of it was allowed to round one up.
+**No phase status has moved, and wave 6 is the reason that sentence is worth reading.** That wave
+built double-deck simulation, a mid-run weight-set selector, Phase 7's undelivered fuzzy detector,
+Phase 6c, and Phase 9's W4 — and **not one phase verdict changed**, because 6c did not clear the
+criterion written before it ([§ D139](DECISIONS.md)) and Phase 6 is
+therefore still partial. The fuzzy arm *did* return an interval excluding zero, ΔTTD
+`−0.212 [−0.416, −0.007]`, and is still reported **below the resolution limit** — both arms sit in
+the structural regime whose smallest detectable effect is 1.9 s, and an interval excluding zero is
+not a win when the effect is smaller than the apparatus can resolve.
+
+What has moved is what the phases are *true of*: `destination-eta` weights `rideTime` at **0.5**
+([§ D112](DECISIONS.md)); the viewer and `elevator-sim watch` no longer print a mean the same run
+says is suppressed ([§ D111](DECISIONS.md)); the ninth dead seam and the two holes in `core`'s
+dead-code scanner are closed ([§ D114](DECISIONS.md)); and the eleventh dead seam — the whole deck
+API — is closed by simulating it ([§ D131](DECISIONS.md)). None of that was allowed to round a
+verdict up.
 
 **Energy is an axis, never a score.** The matrix that closed Phase 8 measured `nearest-car` — the
 weakest shipped dispatcher and the viewer's default — **on the Pareto front at six of eight cells**,
@@ -42,13 +56,24 @@ by serving fewer people has not saved anything. See [§ D106](DECISIONS.md).
 in [`docs/05-roadmap.md`](docs/05-roadmap.md), which carries each phase's acceptance verdict and the
 measurements behind it. Read its **Standing requirement — the integration seam has an owner** before
 planning work: a behaviour that is configurable, unit-tested in isolation and never called from a
-shipped path passes every other check this repository runs, and has already shipped **nine** times in
+shipped path passes every other check this repository runs, and has already shipped **ten** times in
 code — plus, once, in `data/`. The instructive one is the sixth: the whole of `tuning/` was reachable
 from nothing outside its own tests, the module said so in its own docstring, and the roadmap asserted
 the phase green anyway. So the rule is not "is it reachable?" but **"name the non-test caller"**. A
 barrel re-export and a `{@link}` tag look exactly like a caller and are not one.
 
-**The ninth, and the one in `data/`, are the two most recent and they are the two worth reading.**
+**The eleventh is the most recent and the most instructive, and it is the one to read first.** The
+whole deck API on `model/bank.ts` — `isDoubleDeck`, `deckAt`, `deckAssignmentFor`, `pairedFloorOf`,
+`servesFloorPair` — had **no non-test caller anywhere in the tree**. Every reference outside its own
+file was `bank.test.ts` or a barrel re-export. It is instructive because nothing about it looked
+neglected: `vertical-city` had authored eight double-deck cars and four floor pairs since the
+building was written, the config layer cross-validated them with four dedicated warning codes, and
+`Bank` indexed the geometry correctly. **The configuration was right, the validation was right, and
+nothing consulted either.** Closed by simulating it ([§ D131](DECISIONS.md)) — which is why the
+count above moved from nine to ten in code, while *"the ninth dead seam"* elsewhere in these
+documents still correctly names § D114's instance and must not be renumbered.
+
+**The ninth, and the one in `data/`, are the next two worth reading.**
 The ninth is `measureEnergyLiveness` — and it was not a one-off: `published.ts` splits `benchmark/`
 into studies that publish an interval and studies classified `'no-intervals'`, the first half has
 `regeneratePins.ts` as its driver, and the second half had **no driver at all**, so **all five** of

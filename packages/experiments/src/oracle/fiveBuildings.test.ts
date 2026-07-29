@@ -58,6 +58,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import {
   CLOSED_FORM_ASSUMPTIONS,
   CLOSED_FORM_COMPARISON_RULE,
+  UP_PEAK_WARNING_CODES,
   loadConfig,
   travelTime,
 } from '@elevator-sim/core';
@@ -147,7 +148,8 @@ const PRINCIPAL_BANKS: readonly PrincipalBank[] = [
     peakWindowS: 900,
     rationale:
       'the lowest bank that starts at the street entrance; the shuttle is double-deck hardware ' +
-      'the runtime does not model and has no measurable bracket either',
+      'the closed form does not model — the simulator does, as of Phase 6 — and has no ' +
+      'measurable bracket either',
   },
 ];
 
@@ -582,14 +584,32 @@ describe('the banks that cannot be reconciled, and the mechanism for each', () =
     const shuttle = vertical.banks.find((bank) => bank.id === 'shuttle');
     if (shuttle === undefined) throw new Error('missing shuttle');
 
-    // **(1) The hardware is not the hardware.** Eight double-deck cars, and double-deck operation
-    // is not simulated: each runs as a single-deck car of the same whole-car capacity, so it makes
-    // up to twice the stops the declared machine would. `loadConfig` raises
-    // `double-deck-not-simulated` and the disclaimer travels in `RunRecord.warnings` — the
-    // mechanism that exists precisely so a figure cannot be published without it.
+    // **(1) The closed form is not the machine — and Phase 6 changed which side is wrong.**
+    // Eight double-deck cars. This blocker used to read *"double-deck operation is not simulated,
+    // so each runs as a single-deck car of the combined capacity"*; the simulator now models the
+    // decks, and `analytical/roundTripTime.ts` still implements the **single-deck** Barney/CIBSE
+    // derivation, which is a different derivation this project does not have. So the blocker did
+    // not go away when the decks were simulated — it changed sides. Before, the two agreed by
+    // sharing one simplification; now the simulator makes one stop where `(S+1)·ts` counts two,
+    // and a residual measured here would be a residual against a model of different hardware.
+    //
+    // **This is one of four blockers and the only one Phase 6 touched.** (2), (3) and (4) below
+    // are untouched, and the bank stays unmeasurable for all four.
     expect(shuttle.cars.every((car) => car.doubleDeck)).toBe(true);
-    const disclaimers = vertical.warnings.map((warning) => warning.code);
-    expect(disclaimers).toContain('double-deck-not-simulated');
+    expect(
+      shuttle.servesFloorPairs ?? [],
+      'the shuttle stopped declaring floor pairs, so its decks are not modelled either',
+    ).not.toEqual([]);
+    // The closed form still disclaims this hardware, and `deriveUpPeakTerms` cannot even be
+    // *called* on this bank to show it — blocker (2) below throws first. So the assertion is on
+    // the vocabulary: `UP_PEAK_WARNING_CODES.doubleDeck` is the analytical layer stating that its
+    // round trip is the single-deck one, and it is deliberately **not** retired alongside the
+    // config-layer disclaimer that Phase 6 made false.
+    expect(UP_PEAK_WARNING_CODES.doubleDeck).toBe('doubleDeck');
+    expect(
+      vertical.warnings.map((warning) => warning.code),
+      'the retired config disclaimer is back on a building whose decks are simulated',
+    ).not.toContain('double-deck-not-simulated');
 
     // **(2) It has no population of its own to drive.** Every one of its eight served floors
     // declares `population: 0` — two ground-lobby levels and six sky lobbies — because the people

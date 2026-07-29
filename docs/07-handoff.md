@@ -11,9 +11,14 @@ the shape of both:
   the criterion [`DECISIONS.md` § D27](../DECISIONS.md) **raised**, and that criterion has now been
   measured on the building it names ([§ D100](../DECISIONS.md)). The gate is **met by the Level-0
   arm and not met by the Level-1 panel at any measured point** — both halves are the result. 6c
-  (learned control) is **deferred out of the phase with reasons**, not dropped. Double-deck
-  operation is configured, validated and disclaimed on every run of `vertical-city`, and still not
-  simulated.
+  (learned control) is **no longer deferred: it is implemented, measured, and NOT ACCEPTED** —
+  ΔTTD `−0.213 [−0.440, +0.014]` against `collective` at n = 200 on a disjoint seed, an interval
+  containing zero, unchanged at 24 and 64 search candidates ([§ D139](../DECISIONS.md) is the
+  criterion, dated before the code; [§ D145](../DECISIONS.md) is the verdict). Double-deck operation
+  is **simulated** ([§ D131](../DECISIONS.md)) and **benchmarked** ([§ D147](../DECISIONS.md)) to a
+  **dispatcher-dependent** verdict; the disclaimer survives only in the narrower case of a
+  double-deck bank declaring no `servesFloorPairs`, which no shipped building raises
+  ([§ D132](../DECISIONS.md)).
 - **Phase 8** — **both blocking property violations are closed**, and neither was closed by moving a
   bound. The eighth track — the full experiment matrix and Pareto front at a real budget, which
   carries Phase 7's acceptance interval at 50–200 replications — **landed in `f895a16`**, so both
@@ -35,6 +40,49 @@ This document exists so work can resume cold without re-deriving anything. Every
 measured by this project, not assumed, and every figure names where it came from. **Where a
 published figure turned out not to hold here, that is recorded too — several did not**, including
 two handed to this task that did not reproduce.
+
+### What wave 6 moved — four standing deferrals measured, and **no verdict rounded up**
+
+Wave 6 (2026-07-28, board at [`WAVE6_PLAN.md`](../WAVE6_PLAN.md)) is the first wave that was allowed
+to move a phase verdict, and **none moved.** That is the result rather than the absence of one: 6c
+was built, measured against a criterion written before it existed, and **refused**, so Phase 6 is
+still ⚠️. Read the four rows that carry verdicts before anything else:
+
+| | |
+|---|---|
+| **Phase 6c — implemented, measured, and NOT ACCEPTED** | Built as **learned weight selection** rather than a 400-parameter RL vector, which dissolves two of § D28's three objections instead of arguing them away; the third — *its criterion was stated in the metrics 6b makes non-comparable* — was answered **first**, in [§ D139](../DECISIONS.md), dated before a line of the policy existed. ΔTTD `−0.213 [−0.440, +0.014]` against `collective`, n = 200, disjoint seed, CRN; the interval **contains zero**, and is unchanged at 24 and at 64 search candidates. [§ D145](../DECISIONS.md) |
+| **Phase 7's one undelivered bullet ships, and is *not* a win either** | The fuzzy traffic-pattern detector with hysteresis now drives per-pattern weight sets and is live on trajectories, not on a mean ([§ D143](../DECISIONS.md)). Its ΔTTD `−0.212 [−0.416, −0.007]` **does** exclude zero — and is **still reported below the resolution limit**, because both arms are structurally different dispatchers for part of the run and § 4 prices that regime's smallest detectable effect at **1.9 s**. [§ D140](../DECISIONS.md) made that a **gate condition** rather than a caveat, and wrote the raise into the study before either arm was run |
+| **The search is not what failed** | The known-answer check passed: pointed at `idle.repositionThresholdS`, the same machinery returned **1.691 s at 64 draws, 1.490 s at 128, 1.874 s at 256** against a shipped 8 s. The 32-draw run returned 4.855 s and is reported rather than discarded — under-sampled, not wrong-surfaced — and **that** is what set `SEARCH_CANDIDATES = 64`, from a dimension whose answer was known and not from 6c's result. [§ D144](../DECISIONS.md) |
+| **Double-deck is simulated, and benchmarked to a `DISPATCHER-DEPENDENT` verdict** | ΔTTD on `vertical-city` up-peak: **WORSE under `eta`** (`+1.950 [+0.975, +2.925]` at 1 %), **BETTER under `collective`** (`−1.408` at 1 %, `−5.291` at 1.5 %), and one cell **permanently unresolvable** — required n ≈ 869 against a ceiling of 386. **There is no verdict of the form *double-deck is better*.** Energy is WORSE in all four cells and did not buy it by serving fewer people: `unservedFraction` is exactly 0 on both arms at every replication. [§ D131](../DECISIONS.md), [§ D147](../DECISIONS.md) |
+
+Closed alongside them, each verified rather than taken on report: **`C33`** (both halves,
+[§ D126](../DECISIONS.md)) · **all three `C4` findings** ([§ D127](../DECISIONS.md)) ·
+**`C34`** (0 → 3 non-test callers) and W4's TypeScript export-condition gap
+([§ D134](../DECISIONS.md)) · the fuzz corpus's third rung, `destination-entry`
+([§ D128](../DECISIONS.md)) · `deepCampaignRequested` as a **recorded exemption** and `withCallType`
+as **never having been a weak seam** ([§ D129](../DECISIONS.md)) · **the eleventh dead seam, the
+whole deck API** ([§ D131](../DECISIONS.md)) and its disclaimers, argued one site at a time
+([§ D132](../DECISIONS.md)) · `moveFloor`'s scope call ([§ D135](../DECISIONS.md)) ·
+`garden-down-peak`'s open question ([§ D136](../DECISIONS.md)) · **`C35`, opened and closed inside
+the wave** ([§ D130](../DECISIONS.md) opened it as a blocking fuzz finding,
+[§ D137](../DECISIONS.md) closed it in `core`) · the citation-guard gap
+([§ D138](../DECISIONS.md)) · the bare-kiosk re-pin ([§ D149](../DECISIONS.md)). **TWIN** — two
+independently driven cars in one shaft — is **designed and not built**, in
+[`docs/11-twin-shaft-contract.md`](11-twin-shaft-contract.md); it is **not** double-deck
+([§ D148](../DECISIONS.md)).
+
+> **Six of the things wave 6 found were wrong were in the register itself, and every one was
+> optimistic.** A register read rather than checked is a register that drifts in one direction.
+> § 8 carries all six with the evidence; the short form is: one `C4` finding was **already closed**;
+> another was **ten places, not one, and six of the ten were false about the code**; that finding's
+> *"only reachable below the 50-replication floor"* was wrong about the phenomenon; **`withCallType`'s
+> row was wrong on both halves and it was never a weak seam**; the dead-seam count was **ten in code
+> plus one in `data/`**, not nine; and `garden-down-peak`'s row **asked a question whose answer is
+> yes**. A seventh is about the guards rather than the register and is in § 3.
+
+**Wave 6 opened items as well as closing them**, which is why § 8 is not shorter — the `G → 2` lobby
+leg, `PROFILE_OBJECT_SECTIONS`, the selector's CLI gap, TWIN's nine gating questions and eight more.
+A register that only ever shrinks is not being read honestly.
 
 ### What has moved since `f895a16`, and what has not
 
@@ -95,17 +143,23 @@ is not being read honestly.
 | 3 — Experiment infra | ✅ Replication runner, CRN, sequential stopping, paired-t |
 | 4 — Visualization | ✅ Viewer, building editor, live metrics overlay, playback from a stored seed; 88-scenario UX ledger |
 | 5 — Smart dispatch | ✅ Twelve cost terms, auction, predictor, benchmark suite |
-| 7 — Automated tuning | ✅ **ACCEPTED** — search space, three searches, held-out validation, and a CLI `tune` that calls them |
+| 7 — Automated tuning | ✅ **ACCEPTED** — search space, three searches, held-out validation, a CLI `tune` that calls them, **and its one undelivered bullet — the fuzzy traffic-pattern detector with hysteresis driving per-pattern weight sets — now ships and drives a run**; measured BETTER on TTD and reported **below the resolution limit** |
 | CLI | ✅ `list`, `run`, `compare`, `tune`, `fuzz`, `watch` |
-| **6 — Destination dispatch & learned control** | ⚠️ 6a and 6b accepted against the raised criterion, measured on the building it names: **met by Level 0, not met by the Level-1 panel**; **6c deferred out of the phase**; double-deck still not simulated |
+| **6 — Destination dispatch & learned control** | ⚠️ 6a and 6b accepted against the raised criterion, measured on the building it names: **met by Level 0, not met by the Level-1 panel**; **6c implemented, measured and NOT ACCEPTED**; double-deck **simulated and benchmarked**, to a **dispatcher-dependent** verdict |
 | **8 — Testing campaign** | ✅ Blocking clause **discharged** — 0 outstanding property violations, deep tier green at 2 000 cases — and all eight tracks landed, the last being the full experiment matrix (8 cells × 12 profiles, Pareto over AWT / energy / WT95) with Phase 7's acceptance interval at n = 150 |
 
-Phase 7's one undelivered scope bullet — the fuzzy traffic-pattern detector — is marked not-done in
-[the roadmap](05-roadmap.md) rather than folded into the ✅. `data/dispatcher-profiles.json` ships a
-schema-validated `patternSwitching` block that no runtime code reads; editing it changes nothing.
-The same treatment is applied to Phase 6c: it is marked not-done in the roadmap with its reasons,
-rather than swept into a neighbouring tick. Phase 8's eighth track was carried the same way until it
-landed; it is now ✅ with the study that discharges it named.
+**Every sub-phase now has a measurement rather than a deferral, and Phase 6 is still ⚠️ because one
+of them was refused.** Phase 7's one undelivered scope bullet — the fuzzy traffic-pattern detector —
+was carried as not-done in [the roadmap](05-roadmap.md) rather than folded into the ✅ for as long as
+`data/dispatcher-profiles.json` shipped a schema-validated `patternSwitching` block that no runtime
+code read. It is read now: `dispatch/selector.ts` is the mechanism, the block is its arm set, and
+`weightSetsByPattern`'s dangling `energy-saver` is repointed to the shipped `energy-aware` with the
+selector **refusing** a dangling name rather than falling back silently
+([§ D141](../DECISIONS.md), [§ D142](../DECISIONS.md)). Phase 6c got the same treatment in the other
+direction: it is `⬜ IMPLEMENTED, MEASURED, AND NOT ACCEPTED` in the roadmap, with its criterion
+([§ D139](../DECISIONS.md)) dated before its code, rather than swept into a neighbouring tick.
+Phase 8's eighth track was carried this way until it landed; it is now ✅ with the study that
+discharges it named.
 
 ### Running it
 
@@ -117,13 +171,39 @@ npm run sim -- compare --building midtown-office --a eta --b nearest-car --reps 
 npm run sim -- tune --building garden-apartments --params idle.repositionThresholdS --seed 42
 npm run sim -- fuzz --cases 8                  # or: --tier deep --cases 2000, the overnight pass
 npm run sim -- watch --building garden-apartments --dispatcher eta --speed 10
-npm test          # full suite: 179 files, 3,353 tests (3,344 pass, 9 skip)
+npm test          # full suite: 190 files, 3,505 tests (3,496 pass, 9 skip)
 ```
 
-Measured on this tree after wave 5's eighth merge, 2026-07-28: `npx tsc -b` clean,
-`npx vitest run --testTimeout=120000` → **179 files / 3 353 tests, 3 344 passed, 9 skipped**,
-exit 0, 466 s. The benchmarks execute real replications, which is where the runtime goes.
+Measured on this tree after wave 6 closed, 2026-07-28, **serially on an idle machine**:
+`npx tsc -b` clean, `npx vitest run --testTimeout=120000` → **190 files / 3 505 tests, 3 496
+passed, 9 skipped**, exit 0, 473 s. The benchmarks execute real replications, which is where the
+runtime goes.
 
+> **This is the *second* serial run, and the first one was red.** It came back
+> **2 failed | 3 494 passed**, and neither failure belonged to any lane — both were guards catching
+> staleness that no lane could see from inside its own scope. `runner/deadCode.test.ts` reported
+> `replicationSeeds — now has a caller`: allowlisted as a plural whose collision check is never armed
+> in a run, which was true until a new study began drawing a whole experiment's seeds at once, so
+> the entry was **deleted rather than annotated**, as that guard's second assertion requires.
+> `benchmark/matrix.test.ts` reported **176 stale pins**, and its message is explicit that you must
+> *"establish WHICH of the two numbers is correct before regenerating"* — so it was established
+> rather than assumed: all 176 sit on `vertical-city-up-peak` and **none anywhere else**,
+> independently reproducing three lanes' separate blast-radius measurements. The old pins described
+> single-deck hardware on a building that has always declared eight double-deck cars. They were
+> stale because the simulator **stopped being wrong** ([§ D150](../DECISIONS.md)).
+>
+> **Report the red run, not only the green one.** A suite that is green on the second attempt is a
+> different fact from a suite that was green, and this document exists so a cold reader gets the
+> first kind of fact.
+
+> **Wave 6's +152 is accounted for by lane**, as wave 5's +129 was: `validation/quantileFamily`
+> (§ D127) and `validation/citations` (§ D138) are new files, as are `fuzz/deadCode` (§ D129),
+> `core/sim/doubleDeckSeam` (§ D131), `core/sim/bareKiosk` (§ D137), `core/dispatch/selector`
+> (§ D141), `benchmark/downPeakDestination` (§ D136), `benchmark/weightSetSelection` (§ D145),
+> `benchmark/doubleDeck` (§ D147), and `viz/src/controls/{controls,render}` (§ D134) — **179 → 190
+> files**. The skip count is **unchanged at 9** through both waves, which is the number worth
+> watching: a wave that quietly skips a test to go green moves it.
+>
 > **Wave 5's +129 is accounted for, test by test**, as § D115's +48 was: `reports` +4 (§ D117);
 > `cli/commands/fuzz.test.ts` +16 and `index.test.ts` +1 (§ D118); `browser.test.ts` +22 (§ D121);
 > `fuzz/generate.test.ts` +10 (§ D122); `runner/stoppingBudget.test.ts` +6 (§ D119);
@@ -135,9 +215,9 @@ exit 0, 466 s. The benchmarks execute real replications, which is where the runt
 
 **Do not treat the wall-clock as a fixture.** The commit that landed the eighth track (`f895a16`)
 measured the suite going from 435 s to **519 s** on its machine; a re-run of the same tree took
-**793 s**; the 3 220-test tree took **578 s**; the 3 349-test tree took **567 s**; this 3 353-test
-tree took **466 s** — *fewer* seconds for *more* tests, twice over, which is the point. All five are
-true and none is a property of the code. If you
+**793 s**; the 3 220-test tree took **578 s**; the 3 349-test tree took **567 s**; the 3 353-test
+tree took **466 s**; and this **3 505**-test tree took **473 s** — *fewer* seconds for *more* tests,
+three times over, which is the point. All six are true and none is a property of the code. If you
 need a runtime regression signal, measure it twice on an idle machine — this is the same class of
 mistake as inheriting a saturation ceiling across studies (§ 4).
 
@@ -180,9 +260,13 @@ silently invalidate results rather than fail loudly.
 
 ### The integration seam must have an owner
 
-**This project shipped nine defects of the form "configurable, unit-tested in isolation,
-dead in the shipped path" — and a tenth in `data/` rather than in code.** Each passes every other
-check the repo runs. The count is the length of this table, not a number carried in prose:
+**This project shipped ten defects of the form "configurable, unit-tested in isolation,
+dead in the shipped path" — plus one in `data/` rather than in code.** Each passes every other
+check the repo runs. The count is the length of this table, not a number carried in prose — **and
+the register carried it as *nine plus one* until wave 6 measured the eleventh** ([§ D131](../DECISIONS.md)),
+in `CLAUDE.md`, here, and in `WAVE6_PLAN.md` § 2. The numbering below is **not** renumbered to fit:
+the `data/` instance keeps the 10 it was given, *"the ninth dead seam"* elsewhere in these documents
+still correctly names § D114's instance, and the deck API is 11.
 
 | # | Defect | How it presented |
 |---|---|---|
@@ -196,6 +280,7 @@ check the repo runs. The count is the length of this table, not a number carried
 | 8 | `StageActivity`'s late-arrival counters, `WARNING_CODES.doubleDeckNotSimulated` | On an object `runSimulation()` discards, and a code no shipped path branched on. Both asserted in both directions by their own tests |
 | **9** | **The whole `'no-intervals'` half of `benchmark/`** — `measureAuctionAggregation`, `measureDestinationLiveness`, `measureEnergyLiveness`, `measureMultiRoundReachability`, `measurePredictorLag` | The interval half has `regeneratePins.ts` as its driver; the categorical half had **none**, so all five were dead. `measureEnergyLiveness` had two barrels, a string key in `published.ts` and its own test, and the repository's own scanner printed `measureEnergyLiveness -> []`. Closed by `benchmark/livenessSuite.ts`, and `index.test.ts`'s guard now iterates the entry-point set **derived from the directory** rather than five hand-written names ([§ D114](../DECISIONS.md)) |
 | **10, in `data/`** | **`destination-eta`** | `dispatch.callType: mobile-credential` and a weight vector identical to `eta`'s. Schema-valid, loaded by the real loader, tested, named after the thing it did not do: **bit-identical to `eta` at 8 of 8 matrix cells**. Invariant 7 makes dispatch strategy *data*; it does not put data outside this requirement. Closed by authoring `weights.rideTime: 0.5` ([§ D112](../DECISIONS.md)) |
+| **11** | **The whole deck API on `model/bank.ts`** — `isDoubleDeck`, `deckAt`, `deckAssignmentFor`, `pairedFloorOf`, `servesFloorPair` | **0 non-test, non-barrel callers anywhere in the tree**, measured with the repository's own binding rule before a line was written. It is the instructive one because **nothing about it looked neglected**: `vertical-city` had authored eight double-deck cars and four `servesFloorPairs` since the building was written, `config/parse.ts` cross-validated the pairing against the floor heights with **four dedicated warning codes**, and `Bank` built a `deckByFloorId` index that was correct. **The configuration was right, the validation was right, and nothing consulted either** — instance 6's shape (`seedSetFromReplications` *"existed **to be** the seam"*) with a whole subsystem behind it. Closed by **simulating** it; `pairedFloorOf` and `servesFloorPair` were **deleted** rather than wired, because the model that made the rest live had no use for them ([§ D131](../DECISIONS.md)) |
 
 **The weaker instance that was recorded here is CLOSED**: `fuzz/`'s only non-test caller used to be
 a test (`campaign.ts` ← `corpus.test.ts`), tracked as **C24**. `cli/src/commands/fuzz.ts` is now the
@@ -203,18 +288,19 @@ named non-test caller of `runCampaign`, `formatStats`, `STANDARD_CORPUS`, `deepS
 `deepCampaignSize` — **verified with the repository's own scanner rather than asserted**
 ([§ D118](../DECISIONS.md)).
 
-**Three weaker instances are open in its place, and are recorded rather than dressed up** — which is
-the same treatment C24 got, and the reason it eventually closed:
+**Three weaker instances stood here after wave 5. Wave 6 resolved all three, and only one of them
+was what this section said it was:**
 
 | | |
 |---|---|
-| `deepCampaignRequested` | Scans to `[]`. Its only importer is `fuzz/deep.test.ts` — **C24's exact shape, in the file that closed C24.** Defensible (it gates a vitest tier) and still the weaker answer |
-| `withCallType` | Its only caller outside `fuzz/generate.ts` is `validation/adversarial.test.ts`, which uses it to build the conventional control arm of a destination comparison. Kept deliberately, and now **checked rather than relied on**: `assertCarriesCallType` runs on every case ([§ D122](../DECISIONS.md)) |
-| `experiments/src/browser.ts` | Has **no** non-test caller and cannot have one until `docs/10`'s W4 exists. Stated in the file rather than dressed up; `browser.test.ts` is its mechanical owner meanwhile. Tracked as **C34** ([§ D121](../DECISIONS.md)) |
+| `deepCampaignRequested` — **a recorded exemption** | Still scans to `[]`, and now **allowlisted with a stated reason and asserted in both directions** in the new `fuzz/deadCode.test.ts`. Wiring it to `cli/src/commands/fuzz.ts` is the caller § D118 **refused** — *"a tier chosen by an ambient variable is a tier a user cannot see in their own shell history"* — so making the count go down would have reversed a recorded decision to satisfy a guard. The allowlist's staleness assertion is what makes the exemption falsifiable: **an importer appearing turns the suite red and forces § D118 to be re-argued** ([§ D129](../DECISIONS.md)) |
+| `withCallType` — **this row was wrong on both halves, and it was never a weak seam** | It said *"its only caller outside `fuzz/generate.ts` is `validation/adversarial.test.ts`"*. Checked with the scanner: **`generate.ts` does not call it at all** — `run.ts:163` does — and that call sits on a live chain whose far end is a shipped CLI command: `cli/commands/fuzz.ts → runCampaign → evaluateCase → fuzzSimulationConfigFor → withCallType`. **Two of the three links are intra-file**, so `nonTestImportersOf` genuinely answers `[]` and the row read as true. `nonTestImportersOf` answers *"who imports it"*; the standing rule asks *"name the non-test caller"* — **when the answer is a chain those are different questions, and the register recorded the answer to the easier one.** The chain is now pinned link by link, each cross-file link as an import binding and each intra-file link as a second occurrence in stripped source, with the `[]` kept beside it in the other direction ([§ D129](../DECISIONS.md)) |
+| `experiments/src/browser.ts` (**C34**) — **CLOSED** | **0 → 3** non-test, non-barrel importers, counted with `auditModules` with comments stripped so a `{@link}` is not an import: `viz/src/controls/controls.ts`, `viz/src/controls/types.ts`, `viz/src/dev/parameterForm.ts`. The reading worth having is one layer down — `activeParameters`, `parameterOf` and `defaultCandidate` were three of `tuning/space`'s six uncalled exports, **and a generic editor is what they were written for** ([§ D134](../DECISIONS.md)) |
 
-The stopping rule is a fourth: nothing outside `validation/` ever injects one, so
-`productionStoppingRule` has no non-test caller at all. Deleting a documented port with a Phase 3
-gate suite behind it needs its own recorded decision, so it is named here and not acted on.
+The stopping rule was a fourth and is now **a recorded exemption too**: nothing outside
+`validation/` ever injects one, the port is admissible only for single-cell precision-targeted
+estimation of which none ships, and one of `runner/deadCode.test.ts`'s assertions **pins the
+exemption itself** — a study that injects a stopping rule turns it red ([§ D125](../DECISIONS.md)).
 
 Add three more of the same shape that were **not** dead code but stale *numbers*: a published
 interval measured before a seam was wired and never regenerated, and two intervals hand-transcribed
@@ -241,8 +327,12 @@ to make a phase pass.
 | `core/src/dispatch/deadCode.test.ts` | An export of `dispatch/policies/` or `dispatch/predictor/` with no real importer. Barrel re-export is explicitly *not* a caller; only `import` / `export … from` bindings count. The `PUBLIC_API_ONLY` allowlist is asserted **in both directions**, so it cannot become where dead code goes to be forgotten. **Its own two blind spots are now closed** — see below | The same four; and, for the two fixes, **C7** |
 | `experiments/src/index.test.ts` § study entry points | A study entry point with no non-test, non-barrel caller. Iterates `Object.keys(STUDY_ENTRY_POINTS)` — **derived** from the `benchmark/` directory, whose totality `published.test.ts` asserts in both directions — so a study added later is not invisible to it. It deliberately does *not* assert barrel re-export: six live entry points are on no barrel, and `measureEnergyLiveness` was on two and dead | Instance 9 above |
 | `experiments/src/tuning/deadCode.test.ts` | The same audit for `tuning/{search,space,report}` | Review finding #1 — the whole of `tuning/`, reachable from nothing outside its own tests, asserted green by the roadmap |
-| `experiments/src/benchmark/published.test.ts` | A published interval that the code no longer produces, or that changes in silence. Every interval-shaped literal in `benchmark/` is either reproduced by a pinned estimate at its own printed precision or declared unpinned with a count | Three figures that did not reproduce — one measured before a seam was wired, two double-rounded |
-| `experiments/src/validation/documentation.test.ts` | Four separate drifts: the phase set disagreeing across `CLAUDE.md` / `README.md` / this file; this file contradicting *itself* between its opening line and its own table; a `docs/*.md` on disk and not in README's table; a roadmap reproduction instruction naming a function nobody exports. **And** the refuted access-control mechanism, three ways — a claim with no refutation within 400 characters, a correction silently deleted, and `estimateCost.ts`'s exclusion asserted in both directions | Review findings #2, #17, #18; and § D60, where seven places asserted a refuted mechanism and *nothing went red* |
+| `experiments/src/runner/deadCode.test.ts` | The **third** copy — 86 `runner/` exports, 7 uncalled, all seven allowlisted with reasons and asserted in both directions. One assertion pins the stopping-rule **exemption itself** | `C4` ([§ D125](../DECISIONS.md)) |
+| `experiments/src/fuzz/deadCode.test.ts` | The **fourth** copy, in the directory that carried `C24`, which none of the other three audited: 63 exports, 8 uncalled — the seven fault injectors (a fault injector *with* a shipped caller would be the defect) and `deepCampaignRequested`. It also pins `withCallType`'s **caller chain**, link by link, because an importer query cannot see an intra-file link | The `withCallType` row above, which was wrong on both halves ([§ D129](../DECISIONS.md)) |
+| `experiments/src/benchmark/published.test.ts` | A published interval that the code no longer produces, or that changes in silence. Every interval-shaped literal in `benchmark/` is either reproduced by a pinned estimate at its own printed precision or declared unpinned with a count. **Now with a second pair of layers for *counts*** — `PINNED_COVERAGE` field-for-field at the same tolerance, and `derivedCoverageForms()` as the vocabulary a table row must be renderable from | Three figures that did not reproduce — one measured before a seam was wired, two double-rounded. **And then a fourth it could not see at all**: see the note below this table |
+| `experiments/src/validation/documentation.test.ts` | Five separate drifts: the phase set disagreeing across `CLAUDE.md` / `README.md` / this file; this file contradicting *itself* between its opening line and its own table; a `docs/*.md` on disk and not in README's table; a roadmap reproduction instruction naming a function nobody exports; and — since [§ D149](../DECISIONS.md) — `docs/05`'s H-ACCESS-1 coverage rows, which must be **renderable from the study's own pins** rather than transcribed, watched failing on a single drifted digit. **And** the refuted access-control mechanism, three ways — a claim with no refutation within 400 characters, a correction silently deleted, and `estimateCost.ts`'s exclusion asserted in both directions | Review findings #2, #17, #18; § D60, where seven places asserted a refuted mechanism and *nothing went red*; and the bare-kiosk figures, which drifted for four days with nothing red |
+| `experiments/src/validation/citations.test.ts` | **A cited path that cannot be followed**, in two forms — every relative markdown link, and every backticked `.md` path resolved against the root *or* the citing file — **plus every `§ Dnnn` naming a real `## Dnnn` heading in `DECISIONS.md`**. Fenced blocks are blanked, not removed, so a reported line number still means something; both halves assert they found something to check | Four lane records — `DECISIONS-T16`, `-T20`, `-T29`, `-T30` — merged into `DECISIONS.md` and deleted, leaving **eight citations to paths that have never existed**, one of them the home of a decision a whole scope call rested on. And a `§ D144` cited by hand for a verdict whose entry was not yet numbered ([§ D138](../DECISIONS.md)) |
+| `experiments/src/validation/quantileFamily.test.ts` | The deleted `n ≤ 25` **t/z crossover** stated anywhere under `packages/*/src` without a supersession marker within **300** characters. The file list is derived from disk; markdown is out of scope on purpose, because `DECISIONS.md`'s job is to carry superseded statements verbatim | `C4`'s stale docstring, recorded as one place, corrected to four by `WAVE6_PLAN.md` § 1, and **measured at ten — six of them false about the code**. The window is tighter than § D60's 4× because 4× was measured too loose: restoring the original one-liner put it **349 characters** from a marker belonging to the *neighbouring* corrected docstring, and a generous window lets a newly-stale sentence **borrow its neighbour's refutation** ([§ D127](../DECISIONS.md)) |
 | `core/src/sim/moduleTree.test.ts` | `docs/01`'s module tree disagreeing with disk, **in both directions** — a phantom directory and an undocumented one both fail. Scoped to workspace members that are installed, with `core`'s presence asserted so the scope cannot degrade into "skip everything" | Review finding #15, and C28 |
 | `viz/src/boundaries.test.ts` | Invariant 6's import direction, plus the no-DOM rule, both with positive controls | Phase 4 |
 | `core/src/browser.test.ts` + the import-graph guard | A `node:` builtin reachable from the browser barrel — `loadConfig` imports `node:fs/promises`, so a browser import used to throw at module evaluation | C2 (§ D31–§ D33) |
@@ -250,14 +340,32 @@ to make a phase pass.
 | `validation/goldenRuns.test.ts`, `fuzz/determinism.test.ts` | A stored run that no longer replays byte-identically | Invariants 4 and 5 |
 | `benchmark/saturationCensus.test.ts` | An operating point excluded by its **ceiling** being reported as if it were excluded by its **answer**. The two are indistinguishable in a results table | § D100's 3 % row |
 
+> **A guard missed a stale published figure at *both* of its layers, by construction, and the shape
+> is worth more than the instance.** The `C35` fix moved the bare-kiosk arm's Secure Tower figures
+> from `27.6` undelivered / `51.7 %` unserved to **`52.2` / `100.0 %`**, and nothing went red for
+> four days. `published.test.ts` is the guard whose entire purpose is catching this.
+> **Layer A** — the pin table — excluded H-ACCESS-1 on the *correct* observation that a categorical
+> has no standard error, and **that was read as a licence to hold nothing**: a categorical does not
+> need an interval pin, it needs a **count** pin. **Layer B** scans `benchmark/` for literals shaped
+> `N [N, N]`, and `51.7 %` is not interval-shaped — *the scan did not fail to match it; it was never
+> asked to.* Meanwhile `accessControl.test.ts` asserts **inequalities**, and every one of them held
+> *more* strongly after the change, because the figure moved in the direction that makes its own
+> sentence more true. **A stale number that still supports its own sentence is the only kind nobody
+> re-checks, and it is worse than one that contradicts it.** Both layers now carry a count form
+> ([§ D149](../DECISIONS.md)) — **for this study.** The class is still open, in § 8.
+
 ### Standing dead-code audit
 
-For every exported symbol in `dispatch/policies/`, `dispatch/predictor/` and
-`experiments/tuning/`, count callers outside its own module and tests. Every zero must be
-classified as dead or as deliberate public API. Do this each phase. **Both halves are mechanised**
-(the first two rows above); when this section was first written the second did not exist and the
-sentence was read as though it did. *A standing requirement stated in prose is not a standing
-requirement.*
+For every exported symbol in `dispatch/policies/`, `dispatch/predictor/`, `experiments/tuning/`,
+`experiments/runner/` and `experiments/fuzz/`, count callers outside its own module and tests. Every
+zero must be classified as dead or as deliberate public API. Do this each phase. **All of it is
+mechanised** — four copies of one audit now, over one scanner (`auditModules` in
+`tuning/callers.test-helper.ts`), not four scanners; when this section was first written the second
+copy did not exist and the sentence was read as though it did. *A standing requirement stated in
+prose is not a standing requirement.* **Each new copy has found something in the directory nobody
+had audited**: `runner/` gave 7 uncalled of 86, `fuzz/` 8 of 63, and both shared blind spot is
+stated in their headers — a symbol used twice inside its own file reads as live regardless of who
+imports it, which is the rule that (correctly) reports `withCallType` live.
 
 **The two holes in the `core` scanner are CLOSED (C7).** They were, for the record:
 
@@ -391,7 +499,19 @@ pre-positioning measures exactly zero — its own deadband vetoes every move. Th
 as-is on purpose: any optimizer that rediscovers ~2 s blind has validated itself.
 **Do not hand-edit it to 2 s.**
 
-**It has been passed once, and that pass is what Phase 7's acceptance rests on.**
+**It has now been passed twice, by two different searches, and the shipped value is still 8 s.**
+The second pass is Phase 6c's own machinery — `runDeadbandKnownAnswer` runs the **same search** that
+fitted the learned policy, on a different building at a different metric, and nothing in the
+procedure knows what a deadband is. It returned **1.691 s at 64 draws, 1.490 s at 128 and 1.874 s at
+256**. The **32-draw run returned 4.855 s and is reported rather than discarded**: it is not the
+failure § D139 names — it did not return 8 s — but it is not the known answer either, and it is
+diagnosable, because only 3 of 32 draws land below the shipped 8 s over the declared `[0, 60]` range
+and the two that do reproduce the sweep's own direction. **The surface was right and the search was
+under-sampled, and that is what set `SEARCH_CANDIDATES = 64`** — calibrated on a dimension whose
+answer was known rather than on 6c's result, which § D139 names as a way to make its own criterion a
+bad one ([§ D144](../DECISIONS.md)).
+
+**The first pass is what Phase 7's acceptance rests on.**
 `elevator-sim tune`, searching this one dimension from the shipped 8 s against the real `data/`
 directory, returned **2.582 s** — with the tuning and holdout seed sets printed `DISJOINT` (trace
 seed 9876618837807159332 against holdout 11367898276632666949) and a holdout verdict of
@@ -409,7 +529,11 @@ on all five, because charging the two simplifications `CLOSED_FORM_ASSUMPTIONS` 
 advance** as `bias: 'under'` closes every gap, with no fitted constant anywhere.
 
 Re-measured on this tree on 2026-07-28 by `oracle/fiveBuildings.test.ts` at n = 64, seeds from
-810 000, each building's principal bank:
+810 000, each building's principal bank. **Double-deck simulation did not move any of it, and this
+table does not need regenerating** — all five residuals reproduce bit-for-bit, Vertical City
+included at **−0.140 %, RECONCILED**. That is not luck and it is not a tolerance: `isolateBank`
+builds its single-bank building from `zone-1-local`, which has **no double-deck car**, so the
+measurement is structurally untouched ([§ D131](../DECISIONS.md)).
 
 | building | bank | raw INT | raw %POP | raw RTT | residual after charging | verdict |
 |---|---|---|---|---|---|---|
@@ -441,7 +565,7 @@ with its mechanism rather than as a failure of the oracle:
 
 | bank | why |
 |---|---|
-| `vertical-city/shuttle` | Blocked **four separate ways**, none of them a tolerance: (1) eight double-deck cars and double-deck operation is not simulated; (2) all eight served floors declare `population: 0`, so `U` is entirely onward traffic (2 872 occupants of zones 3–6) and `%POP` against a zero population is not a small number, it is not a number; (3) a 26-person car holds its doors 41.20 s against a shortest possible round trip of 30.03 s, so no clustering threshold separates a reopen from a return; (4) its eight floors are four *pairs* 4.5 m apart with binding deck assignment, so `N` is not the count the model means |
+| `vertical-city/shuttle` | Blocked **four separate ways**, none of them a tolerance: (1) eight double-deck cars — and this blocker **did not go away, it changed sides**: the simulator now models the decks (§ D131) and the **closed form does not**, `RTT = 2(H·tv + tx) + (S+1)·ts + 2·P·tp` being the single-deck Barney/CIBSE derivation, so the simulator makes one stop where `(S+1)` counts two. `analytical/upPeak.ts`'s warning was **kept and strengthened** rather than retired, which is the over-claim `WAVE6_PLAN.md` § 7 named in advance ([§ D132](../DECISIONS.md)); the double-deck closed form is not implemented and is out of scope by decision; (2) all eight served floors declare `population: 0`, so `U` is entirely onward traffic (2 872 occupants of zones 3–6) and `%POP` against a zero population is not a small number, it is not a number; (3) a 26-person car holds its doors 41.20 s against a shortest possible round trip of 30.03 s, so no clustering threshold separates a reopen from a return; (4) its eight floors are four *pairs* 4.5 m apart with binding deck assignment, so `N` is not the count the model means |
 | `mixed-use-high-rise/residential-local` | 32.8 s of reopen against a 31.3 s round trip — departures cannot be reconstructed from boarding times. That is a limit of the reconstruction, not a defect in the simulator; the fix is a car-position series, which no run record carries |
 | `vertical-city/zone-6-local` | Empty departure bracket, same mechanism |
 
@@ -503,12 +627,47 @@ raised acceptance criterion are in [the roadmap](05-roadmap.md).
 - ✅ **6b — destination dispatch.** Accepted on the Midtown / Secure Tower contrast: per-passenger
   assignment, write-once promises, a `brokenPromises` counter, and the landing panel rendered at
   `VIZ_SCHEMA_VERSION = 4`. **Its acceptance carries a caveat** — see the next block.
-- ⬜ **6c — learned control.** `LearnedDispatcher`, an RL policy. **Deferred out of the phase** — it
-  shares no interface with 6a or 6b, it strains invariant 8 (is a 400-parameter policy vector a
-  declarable tunable?), and its acceptance criterion was stated in the metrics 6b makes
-  non-comparable. It needs its own acceptance question before it needs an implementation.
-- ⬜ **Double-deck and `vertical-city`** — still the most deferrable scope in the project.
-  Configured and validated, **not simulated**, and disclaimed on every run of that building.
+- ⬜ **6c — learned control. IMPLEMENTED, MEASURED, AND NOT ACCEPTED** — which is a different state
+  from deferred and a better one: a deferral is an absence of evidence and this is evidence. § D28's
+  first two objections were dissolved by **choosing a shape rather than arguing**: built as learned
+  **weight selection** over the vectors already in `data/`, it shares the very weight vector 6a and
+  6b price against, and a selection policy is a declarable tunable with type, range, default and
+  `activeWhen`. The third — its criterion was stated in the metrics 6b makes non-comparable — was
+  answered **first**, in [§ D139](../DECISIONS.md), dated before the code, and adopted verbatim
+  except for one **raise**: [§ D140](../DECISIONS.md) makes *below the resolution limit* a **gate
+  condition** instead of a caveat, written into the study before either arm ran.
+  **The verdict**, Midtown Office interfloor-mix 1.5 %, reference arm `collective` chosen from this
+  cell's own 200-replication census *before any selector arm existed*, n = 200, seed 20261537
+  disjoint from the tuning seed, CRN: ΔTTD **`−0.213 [−0.440, +0.014]` — the interval contains
+  zero.** Unchanged at 24 and at 64 candidates. Costs beside it, never folded in: ΔAWT `+0.424`
+  WORSE, ΔWT95 `+0.675` INDISTINGUISHABLE, energy `+4.807 kJ` per served leg WORSE.
+  22 of 200 replications bit-identical, so it is not the wiring bug § D139 warns about, and the
+  holdout sign agrees with the tuning sign — **a generalizing effect that cannot be resolved is
+  still an effect that cannot be resolved.** [§ D145](../DECISIONS.md)
+- **Phase 7's fuzzy arm — measured in the same study, and the row that could have been
+  over-claimed.** Its ΔTTD
+  `−0.212 [−0.416, −0.007]` **does** exclude zero on the better side. Both arms switched weight sets
+  on most replications, so both are structurally different dispatchers for part of the run, and § 4
+  prices that regime at **1.9 s**: −0.212 s is a **tenth** of it. Reported below the resolution
+  limit ([§ D143](../DECISIONS.md), [§ D145](../DECISIONS.md)).
+- ✅ **Double-deck and `vertical-city` — SIMULATED and BENCHMARKED, to a `DISPATCHER-DEPENDENT`
+  verdict.** Paired stops keyed by stop position, dwell charged to the **busier deck rather than the
+  sum**, the 80 % design load applied **per deck**, and a cross-deck leg **refused** because the
+  decks are bolted together (200 legs refused on a real run, conservation balanced, nobody left
+  undelivered by it). Blast radius **48 of 60 shipped cells byte-identical**, the 12 that moved all
+  `vertical-city` — the only building declaring a double-deck car ([§ D131](../DECISIONS.md)).
+  **The gate, ΔTTD paired-t 95 % under CRN, budgets from this cell's own census and none inherited:**
+  WORSE under `eta` (`+1.950 [+0.975, +2.925]` at up-peak 1 %, n = 153), BETTER under `collective`
+  (`−1.408 [−2.400, −0.416]` at 1 %; `−5.291 [−6.350, −4.232]` at 1.5 %, n = 200), and `eta` at
+  1.5 % **permanently unresolvable** — required n ≈ 869 against a ceiling of **386**.
+  **So the sign is a property of the dispatcher held fixed, and no verdict of the form "double-deck
+  is better" is available on this building.** Energy is WORSE in all four cells — more kilojoules,
+  more metres, more starts — and it did **not** buy that by serving fewer people: `unservedFraction`
+  is exactly `0` on both arms at **every** replication of both points. The naive *fewer stops ⇒ less
+  driving* is refuted here; the mechanism is § 8's `G → 2` lobby leg. `nearest-car` is excluded by
+  its **ceiling** and not by its answer, and is published rather than dropped.
+  [§ D147](../DECISIONS.md). **This is not a Phase 6 verdict** — the phase's criterion is about
+  destination dispatch; what moved is what the double-deck bullet is *true of*.
 
 #### The criterion, measured on the building it names
 
@@ -709,7 +868,9 @@ one of the four has since been acted on:
    worst on wait. Re-measured after the `destination-eta` weight landed: **still six**.
 2. `destination-eta` was **bit-identical to `eta` at all eight cells**. **Acted on** — it now
    weights `rideTime` at 0.5 and separates at **seven of eight**; the one that remains is
-   `garden-down-peak`, and it is structural rather than under-weighted (§ 8).
+   `garden-down-peak`, and wave 6 measured *why*: the cell is blind to **`rideTime`** and **not**
+   blind to the destination, and the class it names is only true at that cell's budget and seed
+   (§ 8, [§ D136](../DECISIONS.md)).
 3. `fairness-first` is identical to `eta` at **five** cells and `auction-multi-round` to `auction` at
    both Garden cells — both unchanged. **A third class was found in the re-measurement:**
    `destination-eta ≡ capacity-aware` at `garden-residential`, which no earlier report names.
@@ -722,35 +883,64 @@ after the weight landed rather than carried over.
 
 ## 8. Open debt — stated, not buried
 
+**Four parts, and the order is deliberate**: what wave 6 **opened**, what is **standing**, what is
+**closed and worth reading anyway**, and — last — the short form for someone planning work. **Six
+rows that used to be in this table were checked against the code in wave 6 and six were wrong, every
+one in the optimistic direction.** They are kept, corrected, in § *Where this register was wrong
+about itself*, because deleting them would delete the evidence that a register has to be checked
+against the code rather than read.
+
+### Opened by wave 6
+
 | Item | Notes |
 |---|---|
-| **Phase 6c — learned control** | Deferred out of Phase 6 with reasons (§ D28). Needs its own acceptance question before it needs an implementation |
-| **Phase 9 — the experience layer: designed, not built** | [`docs/10`](10-experience-layer-contract.md) is a complete design — novice/expert modes, a schema-generated dispatcher and traffic editor, access-zone credentials, and the rules that keep a gamified surface honest — and **not one line of it is implemented**. No status table carries a Phase 9 row, deliberately: a design is not a phase in progress. Its § 13 lists the questions that must be settled before implementation starts |
-| **`packages/experiments`' browser export — the prerequisite is CLOSED, `W4` is only *partly* unblocked** | A browser barrel, an export condition and a both-directions graph-walk guard landed ([§ D121](../DECISIONS.md)); `collectSearchSpace()` is importable, callable and provably `node:`-free, and M10 is confirmed corrected and pinned at 49 ids under both conditions. **The `node:` reachability list turned out to be three modules, not the one this row used to name** — `runner/parallel.ts`, `reports/persistence.ts`, and `validation/harness.ts` via `benchmark/verdict.ts`. **Still open:** TypeScript does not apply the `browser` export condition, so a browser-only file importing `@elevator-sim/experiments` typechecks against the **Node** types; the mitigation is the explicit `./browser` subpath and **nothing mechanically forces a `viz` file to pick it**. In `core` that gap was one function; here it is hundreds of names. The rest of `W4` — four control renderers, the `activeWhen` rule at the control, the fictional-schema liveness evidence — is unwritten |
-| **`garden-down-peak` is `destination-eta`'s remaining identity class** | Measured bit-identical to `eta` there at `rideTime` **0.3, 1.0 and 2.0** — so it is a **blind operating point**, not an under-weighted term: every down trip ends at the lobby and the destination carries nothing the direction button did not. `destination-panel` lands in the same class there independently. Whether *any* destination weight can carry information at such a point is an open question rather than a defect, and raising the weight fourfold not moving it is the evidence that separates the two |
-| **The editor's ⇧/⇩ buttons never moved a floor in the building** | `moveFloor` moves a floor within the **declaration array** and deliberately renumbers neither `index` nor `heightM`, for a good reason its own docstring gives: the loader fails a building whose two disagree (`floor-height-order`), and an editor that silently rewrote either would settle a modelling error by fiat. So the buttons reformat the JSON. Under the old array-ordered table that was invisible; under the `index`-ordered table it is visible, and they are **relabelled honestly** rather than repurposed or deleted — deleting them would leave `moveFloor` with no non-test caller, which is this repository's signature defect. **The scope call is handed back**: give the declaration list its own view, or drop `moveFloor` and let `index` be the only ordering control. `packages/viz/DECISIONS-T29.md` § T29-4, [§ D111](../DECISIONS.md) |
+| **The `G → 2` lobby leg is charged as an elevator leg — the largest modelling debt in the wave** | `core` has **no escalator and no stair**, so the ground-level hop a real two-level double-deck lobby serves with an escalator is routed onto a local bank. On `vertical-city` a passenger boarding at `G` — the lower floor of the pair `["G", "2"]` — may only alight on lower-pair floors, and zone 4 is anchored to **27**, so every journey into the 27-side gains a leg: **110 of 593 journeys** are decomposed differently, +10.8 % / +11.6 % legs at the two operating points. It costs the double-deck arm legs, waiting, in-car time and fleet distance the hardware would not really pay. **This is the single largest reason to read § 7's WORSE-under-`eta` row as an upper bound on the cost of double-deck rather than as its true cost.** It is *not* a reason to discount the energy direction, which carries the same sign in all four cells. Named rather than corrected: correcting it means a non-elevator transport mode in `core` ([§ D147](../DECISIONS.md) § 6) |
+| **The 1.5 % double-deck point is seed-marginal; the 1 % point is the robust one** | 1.5 % is the highest rate at which every arm keeps a quotable AWT — `arms.ts`'s rule, not the study's — and its ceiling is **386**. At the *pilot* seed the DD `eta` cell lost its AWT inside 100 replications, which is what a ceiling of 386 looks like from one seed over. Published rather than smoothed. The 1 % point's ceiling is **951** ([§ D147](../DECISIONS.md)) |
+| **`tuning/space/encode.ts`'s `PROFILE_OBJECT_SECTIONS` is a hand-written list** | In the module whose sibling `collect.ts` opens with an argument against hand-written lists. All **seven** declared, round-trip-tested, profile-authorable `selection.*` dimensions were reported unauthorable by `collectSearchSpace()` and **silently dropped**, with nothing anywhere reading as wrong — the exact symptom `collect.ts` predicts. `selection` is added and the space moves 49 → **56**, declared rows 99 → 106. **Deriving the list from `dispatcherProfileSchema`'s own shape is the real fix and is not done**: until it is, a new profile section is invisible to the generic optimizer invariant 8 exists for, and fails silently ([§ D146](../DECISIONS.md)) |
+| **The weight-set library reaches studies and not the shipped runner** | It travels as a `DispatchPolicyOptions` field, which `runner/experiment.ts` already plumbs per dispatcher arm, so a **study** can enable the selector and **`elevator-sim run` / `tune` / `watch` cannot**. Wiring `patternSwitching` through `SimulationConfig` from `LoadedConfig` is the fix; `runner/` and `cli/` belonged to other lanes ([§ D141](../DECISIONS.md)). Relatedly and deliberately: **no shipped profile opts into a selector** — both arms are *derived* in `benchmark/weightSetSelection.ts`, the precedent being `destination-eta-unpriced`, and on § D145's measurement neither has earned a shipped slot |
+| **§ 4's two resolution limits were measured on AWT and were applied to TTD** | 0.20 s near-neighbour, 1.9 s structural, read as absolute seconds against a metric whose scale is different — at § D145's cell TTD is ~54 s against AWT's ~15 s, so 1.9 s is 3.5 % of TTD where § 4 measured 12 % of AWT. **The absolute reading is the more permissive of the two**, so reading it relatively would put both arms *further* below the limit and **no verdict turns on the choice**. But the limits have **not been measured on TTD directly**, and that is unmeasured rather than settled ([§ D145](../DECISIONS.md)) |
+| **Phase 6c's refusal is one operating point** | One building, one traffic pattern, one reference arm. § D139 asked for the operating point's own census and got it; it did **not** ask for a sweep, and a sweep is the obvious follow-up. Nothing in the verdict says a selector cannot help somewhere else — it says it did not help measurably **here** ([§ D145](../DECISIONS.md)) |
+| **`kioskRefusedLegs` has no consumer in `benchmark/`** | It is on `StageActivity` and therefore on `SimulationResult`, so the CLI, `experiments` and the viewer can all read it, and its warning reaches `result.warnings`. **Nothing reports it as a column.** That is the ninth-dead-seam shape one notch down, stated here rather than left to be discovered — and it is the half an unserved-fraction study **cannot** express: the bare-kiosk arm now publishes `100 %` unserved, and *who* was refused at the kiosk is available and unread ([§ D137](../DECISIONS.md) item 2, [§ D149](../DECISIONS.md)) |
+| **`stopCount` has no `activeWhen`, and two shipped profiles sit one authored field away from a measured cost** | `energy-aware` (`stopCount` 0.3) and `predictive-balanced` (`stopCount` 0.2) become destination-sensitive at `garden-down-peak` the moment anybody authors `dispatch.callType` on them — at a cost measured **WORSE on AWT, WT95 and TTD**. `stopCount` is the one destination-reading term with no `activeWhen` declaring its gate, so `docs/06`'s parameter schema does not tell an optimizer that half of it only exists under a destination call type. **A configuration hazard nothing warns about** ([§ D136](../DECISIONS.md)) |
+| **`nearest-car` is unusable on `vertical-city` at any budget in the band — a fifth building** | Its first invalid replication is at 26 (1 %) and at 6 (1.5 %), so no budget in 50–200 fits under it and both double-deck points would be `UNQUOTABLE` with it in the cell. Excluded **by its ceiling and not by its answer**, published rather than dropped, and carried in the study object as `CEILING_EXCLUDED_ARMS`. § 4 already records it as the only profile that saturates; **this is that finding on a fifth building, and it is still the viewer's default in places** — the editor's own picker was moved to `collective` in wave 6 ([§ D147](../DECISIONS.md), [§ D134](../DECISIONS.md)) |
+| **`RunRecord` has no car-move series, and now has two consumers wanting it** | TWIN's **P7** separation property needs one to be more than a tautology, and § 5's `mixed-use-high-rise/residential-local` oracle gap has needed one since it was recorded. **That is the argument for doing it once** rather than twice or never ([§ D148](../DECISIONS.md)) |
+| **`published.test.ts` holds nothing for a categorical study outside H-ACCESS-1** | The **instance** is fixed and the **class** is not, for the two structural reasons § D149 gives: a `PinnedEstimate` would carry three `NaN`s to hold a count, and Layer B's scan is interval-shaped. `DECISIONS.md`'s own copies of these counts are still transcribed ([§ D149](../DECISIONS.md)) |
+| **TWIN — designed, not built, with nine questions gating implementation** | [`docs/11`](11-twin-shaft-contract.md): two independently driven cars in one shaft, **not** double-deck — double-deck adds *geometry* and TWIN adds *a constraint*, and a TWIN refusal is dynamic where a deck refusal is static. The gate is the **equal-car** pairing (2*N* shafts × 1 car vs *N* × 2), whose expected direction is stated in advance as **worse or indistinguishable**, because a constraint removes options; *"TWIN is significantly better on equal cars"* is a bug report. **No shipped building declares two cars in one shaft**, so nothing can be measured until one does. It gets no roadmap status row, deliberately ([§ D148](../DECISIONS.md)) |
+| **Three smaller things W4 left behind** | The **structural-refusal reason is prose** — computed, correct, and keyed on a call id `VizLeg` does not carry, so it cannot be joined to a leg; the **authored W4 candidate is validated and not routed into Run**, so the parameters tab validates and does not yet simulate (W5/W6); and **`viz` now depends on `experiments`**, so `tsc -b packages/viz` builds `experiments` first and a red `experiments` makes `viz` unbuildable — correct, and worth knowing ([§ D134](../DECISIONS.md)) |
+
+### Standing, and not closed by wave 6
+
+| Item | Notes |
+|---|---|
+| **Phase 9 — the experience layer: designed, and now W4-only** | [`docs/10`](10-experience-layer-contract.md) is a complete design — novice/expert modes, a schema-generated dispatcher and traffic editor, access-zone credentials, and the rules that keep a gamified surface honest. **W4 is built** — four control renderers keyed on the declared `type`, one `activeWhen` rule enforced at the control, proved generic against a **fictional** schema the product does not ship, because a generated control that looks live only because the shipped schema happens to fit it is the risk `WAVE6_PLAN.md` § 7 named. Everything else is unwritten, and **§ 13's eight open questions are answered** with the evidence each one named ([§ D133](../DECISIONS.md), [§ D134](../DECISIONS.md)). No status table carries a Phase 9 row, deliberately: adding one for unstarted work is how a design starts reading as work in progress |
+| **`W4`'s U7 half is blocked on a `core` fix** | `docs/10` § 11 says the `TRAFFIC_PARAMETERS` half is *"unblocked either way, because that schema is on the `core/browser` barrel."* **True about reachability, false about collectability**: of the ten schemas `discoverParameterSchemas()` finds, **two do not collect** — `TRAFFIC_PARAMETERS` (`traffic.arrivalRatePctPop5min` declares a `null` default, and a search needs a point to start from) and `SIM_PARAMETERS` (`sim.drainGraceS` declares a **log** scale over a range starting at 0). The form **draws the refusal** rather than hiding the schema, and a test derives both sets from discovery so a `core` fix turns it red instead of leaving a stale sentence ([§ D134](../DECISIONS.md)). The **TypeScript export-condition gap is CLOSED** — `boundaries.test.ts` now requires `viz` to reach `experiments` only through `/browser`, tests **not** exempt, watched failing on a manufactured bare import that `tsc` exits 0 on |
 | **The Level-1 panel does not clear the Phase 6 gate on `mixed-use-high-rise`** | INDISTINGUISHABLE against `eta` and `collective` at every measured rate, and WT95 `+9.083` WORSE at 4 %. A measured result rather than a task, but it is what anyone planning further destination work needs. § 7 |
-| **The four ⚠️ UX rows are CLOSED, and two of them were *false*** | Driven, not read ([§ D120](../DECISIONS.md)). `RV-21`: `main()` ran its data load **above** the `let started = false` that `start()` closes over, so any failed first load left that binding in its temporal dead zone for the life of the page — Retry then threw inside a floating `async` IIFE with no `catch`, the page cleared its own error message and sat at `loading data…` for ever, empty, with nothing in the console. **Retry was permanently dead after any failed load.** `RV-17`: Vite answers `Accept: */*` with `index.html` and a **200**, so `!response.ok` — the only branch that named the missing path — is exactly the branch a missing `data/` file does not take. A fifth row (§ B.3) was false on **both** clauses. The ⚠️ bucket is **0** and all seven ⛔ keyboard rows are green. **Two limitations are recorded in the rows rather than absorbed:** `KB-14`'s CSS clause is unexercised under a real OS preference (the media query cannot be emulated by the available tooling, so it was driven by replacing `window.matchMedia`), and `RV-11`'s *no passengers were generated* sentence exists only in the status line — the canvas, the exported PNG and `describeFrame` leave the reader to infer it |
-| **`ED-12` / `ED-13` — CLOSED, and the schema did not move (`C30`)** | [§ D116](../DECISIONS.md). `ED-12`'s row was the thing that was wrong: a carless bank is an **error**, and relaxing `bankConfigSchema` so the ledger could show a green row would have been the weaken-a-criterion-to-pass failure `CLAUDE.md` forbids. What changed is that `resolveBuilding` — the editor's whole definition of legality under `ED-T8` — was **raised** to agree with the schema it had been silently contradicting, emitting an `empty-bank` code the vocabulary declared and **nothing anywhere in the repository had ever produced**. It matters because the run does not simply have no service there: on a seven-floor tower whose top floor was served only by a carless bank, **ten of twelve seeds published `awtIsValid: true`**, two with passengers never served at all, under the 5 % censoring limit. `ED-13`'s scenario was unrepresentable by design — a per-car `servesFloors` does not exist, because service zoning is a property of the shaft group |
 | **The mixed-use study's replication margin is tight** | n = 200 at up-peak 4 % is **ceiling-bound**, not variance-derived: the requirement for the hardest pair is 666, the measured ceiling is 206, and 200 leaves **six replications of margin**. A change that costs the arms six replications of headroom invalidates the point rather than widening it. The pair needing 666 is reported unresolved rather than quoted |
-| **`C24` — CLOSED by a named non-test caller** | `cli/src/commands/fuzz.ts`, verified with the repository's own scanner ([§ D118](../DECISIONS.md)). Three weaker instances stand in its place and are listed in § 3 — `deepCampaignRequested`, `withCallType`, and `experiments/src/browser.ts` (**C34**) — plus the stopping rule, which has no non-test caller at all |
-| **A phase's status is now bound to *evidence that exists* — and still not to evidence that *supports* it** | § D115 called this the largest un-mechanised risk in the repository. It is **narrowed, not closed** ([§ D123](../DECISIONS.md)). `validation/phaseStatus.test.ts` parses the phase set, every status and every cited artefact out of `docs/05-roadmap.md` — never a hand-written list — and fails if an accepted phase cites a test, directory, study function or pin group that does not exist, if a discipline table carries an undischarged row, if Phase 8's campaign table reports a violation, or if its own parse degrades to asserting nothing. Ten manufactured failures were watched. **What it provably does not catch:** that any measurement is *correct*; that a cited suite actually asserts the criterion it is cited for (citations are checked for existence, not relevance); that the criterion is the right criterion — nothing mechanical distinguishes a raised criterion from a weakened one; and it is **asymmetric by design**, never questioning a `partial` or `deferred` phase, because over-claiming is the failure this repository has shipped. The remaining defence is `CLAUDE.md` § Working agreements and a reader who checks |
-| **`C33` — the `'z'`-label shape survives two files from where it was fixed** | Opened by [§ D117](../DECISIONS.md) rather than folded into C5's closure. `reports/statistics.ts:332` stamps `method: 't' as IntervalMethod` on an interval whose `halfWidth`, `lower` and `upper` are all `NaN` — an assertion that **widens a correct literal to the union for no reason**, and the one remaining place in `reports/` where the family loses its narrow type. Separately, `ConvergenceReport.method` is non-optional in `types.ts`, so a suppressed metric still *names* a family for an interval that does not exist. *"C5 is closed"* and *"the same defect exists two files away"* must not be the same sentence — this repository has twice been burned by a fix that made its own report true and left a sibling copy wrong |
-| **`C34` — the new browser barrel has no non-test caller** | And cannot have one until `docs/10`'s W4 exists. Stated in the file rather than dressed up, with `browser.test.ts` as its mechanical owner meanwhile ([§ D121](../DECISIONS.md)). This is the repository's signature defect shape, entered knowingly and with its owner named |
-| **`destination-entry` is unreached by both fuzz corpora** | Legal for 11 of 12 profiles and drawn by neither the 64-case nor the 2 000-case corpus. Now **stated on `GENERATED_CALL_TYPES` and asserted**, rather than silently absent ([§ D122](../DECISIONS.md)). Widening it is its own task: it moves about half of every corpus and makes the access-zone arm a three-way case — a call carrying a destination but no credential |
-| **Three findings from the `C4` measurement, recorded rather than fixed in passing** | `validation/sequentialStopping.test.ts:163` still projects the budget with a **hard-coded `z90`** and prints the row **C19** corrected in both doc copies — so the repository derives one answer and publishes another, and C19 fixed the docs and missed the code. `runner/types.ts`'s `StoppingVerdict.distribution` still documents the `'t'` ≤ 25 / `'z'` past it family § D14 deleted. And `estimateMean` returns `halfWidth = 0` on a zero-variance sample, which is finite and below any target, so the rule stops immediately — `stopping.ts`'s docstring implies such a sample yields a non-finite half-width. Only reachable below the 50-replication floor ([§ D119](../DECISIONS.md)) |
-| `stats/` consolidation | Statistics live in `reports/statistics.ts` and `runner/stopping.ts`; `docs/01` layout records this as outstanding |
-| Profiles bit-identical to one another | `eta ≡ fairness-first` survives on both up-peak buildings and is *correct* there (`starvation` is zero for every candidate when no car holds a committed hall call). It still means "9 of 9 beat baseline" counts fewer distinct dispatchers than it sounds. **Re-measured through `runMatrix()` on 2026-07-28**, after the `destination-eta` weight: `eta ≡ fairness-first` at **five** cells, `auction ≡ auction-multi-round` at both Garden cells, `destination-eta ≡ eta` at **`garden-down-peak` only** (where the class also contains `destination-panel`), and a class no earlier report names — **`destination-eta ≡ capacity-aware` at `garden-residential`**. This is why the matrix baselines on `collective`, which is in no identity class at any cell — a baseline that is secretly one of its own arms makes that arm's whole row a row of exact zeros |
+| `stats/` consolidation | Statistics live in `reports/statistics.ts` and `runner/stopping.ts`; `docs/01` layout records this as outstanding. Not started, and it has its own row rather than being folded into a lane |
+| Profiles bit-identical to one another | `eta ≡ fairness-first` survives on both up-peak buildings and is *correct* there (`starvation` is zero for every candidate when no car holds a committed hall call). It still means "9 of 9 beat baseline" counts fewer distinct dispatchers than it sounds. **Re-measured through `runMatrix()` on 2026-07-28**, after the `destination-eta` weight: `eta ≡ fairness-first` at **five** cells, `auction ≡ auction-multi-round` at both Garden cells, and **`destination-eta ≡ capacity-aware` at `garden-residential`**, which no earlier report names. This is why the matrix baselines on `collective`, which is in no identity class at any cell — a baseline that is secretly one of its own arms makes that arm's whole row a row of exact zeros. **And an identity class belongs to a `(cell, seed, n)`** — see the correction below |
 | `prepositionPlan` | Zero callers — superseded by `resolvePrepositionContext`. **Classified**, not deleted: one of the 14 entries in `dispatch/deadCode.test.ts`'s `PUBLIC_API_ONLY`, asserted in both directions |
 | Mixed-use achieved **interval** | Reports `unmeasurable` by design: a shuttle holds doors 39.8 s while an office-local car completes a round trip in 31.3 s, so **no** departure-gap threshold is valid there. Constrains the oracle; **does not** constrain a TTD comparison, which § D100 checked rather than assumed |
-| Double-deck operation | Configured and validated on `vertical-city`, **not simulated**; disclaimed on every run of that building, and the disclaimer reaches `RunRecord` and the CLI report |
-| Fuzzy pattern switching | `patternSwitching` is authored in `data/` and schema-validated, and no runtime code reads it. Deferred scope, not a defect to fix in passing — see `DECISIONS.md` § D12 |
-| **`runner/` is now audited** *(`C4` closed, [§ D119](../DECISIONS.md) and [§ D125](../DECISIONS.md))* | The sequential stopping rule turned out not to be one thing. The **port is exempt**: a rule stops *cells*, so a paired comparison's two arms would stop at different `n` and the shorter arm's own realized variance would decide how many pairs survive — so a fixed budget is right for a stronger reason than the studies give, and the rule is admissible only for single-cell precision-targeted estimation, of which none ships. `fixedBudgetStoppingRule` is **dead** and claimed in its docstring to be the shipped default; `runner.acceptableRange` is **inert**, and its report-side twin `targetHalfWidth` has no shipped caller either, so `ConvergenceStatus` is `'not-assessed'` everywhere and CONVERGED / HIT CAP / IN PROGRESS have never been printed. **86 runner exports, 7 uncalled** — all seven now allowlisted with reasons in the new `runner/deadCode.test.ts`, the **third** dead-code guard, asserted in both directions and watched failing three ways. One of the four assertions **pins the exemption itself**: a study that injects a stopping rule turns it red. The scanner is one copy (`auditModules` in `tuning/callers.test-helper.ts`), not a third. What no guard here catches is the other half — `runner.acceptableRange` is *read*, in a branch nothing takes, so it has callers and is invisible to all three |
-| `C5` — a `'z'` label can still print | `reports/compare.ts:607` can print `'z'` as a fallback family label on a convergence report, in the branch where `achievedHalfWidth` is already `NaN`. Cosmetic, and it is the exact mislabelling finding #14 was about |
+| `C5` — a `'z'` label can still print | `reports/compare.ts:607` can print `'z'` as a fallback family label on a convergence report, in the branch where `achievedHalfWidth` is already `NaN`. Cosmetic, and it is the exact mislabelling finding #14 was about. Distinct from `C33`, which is closed |
 | `C27` — Phase 6a/6b studies are off the package barrel | Reachable at their module paths with `regeneratePins.ts` as the non-test caller, but not on `benchmark/index.ts` or `src/index.ts`. Name list in § D62; both files must change in one commit. `runMixedUseHighRiseStudy` is in the same position |
-| `C32` — the fuzz generator picks call types blind to the profile | `fuzz/generate.ts` can name a call type the profile cannot carry a destination for; `run.ts` works around it in `withCallType`. A real corpus extension |
+| `estimateMean` returns `halfWidth = 0` on a zero-variance sample | **Resolved against the docstring rather than the code, and pinned**: zero is the *true* half-width of an interval around a constant sample, and Phase 3's first acceptance criterion depends on it — making the estimator decline to bound such a sample turns **five** assertions red, including the one that pins *"a candidate compared against itself is INDISTINGUISHABLE, not unmeasurable."* What stays uncomfortable is recorded rather than fixed: a rule that stops the moment every replication agrees declares convergence on exactly the evidence that usually means the replications were never independent. Unreachable in anything shipped, because **no study injects a stopping rule at all** ([§ D127](../DECISIONS.md)) |
 | Multi-replication statistics over generated buildings | One replication per case, as everywhere in `fuzz/`. Nothing there says a *mean* under a degraded fleet is right, only that the mechanics under it are sound |
-| A dispatcher or a zone cannot be changed mid-run | A car's availability can (`BuildingConfig.serviceEvents`); the other two have no mechanism |
+| A **zone** cannot be changed mid-run | The dispatcher half of this row is **closed**: `selectWeightSet` changes the weight vector mid-run, off an explicit `SelectorState` threaded through deterministic simulation state, consuming **no** random stream — so a stored run still replays byte-identically and every paired comparison keeps its pairing, re-run rather than reasoned about ([§ D141](../DECISIONS.md)). A car's availability could already change (`BuildingConfig.serviceEvents`). **Zoning still has no mechanism** |
+| **A phase's status is bound to *evidence that exists* — and still not to evidence that *supports* it** | § D115 called this the largest un-mechanised risk in the repository. It is **narrowed, not closed** ([§ D123](../DECISIONS.md)). `validation/phaseStatus.test.ts` parses the phase set, every status and every cited artefact out of `docs/05-roadmap.md` — never a hand-written list — and fails if an accepted phase cites a test, directory, study function or pin group that does not exist, if a discipline table carries an undischarged row, if Phase 8's campaign table reports a violation, or if its own parse degrades to asserting nothing. **What it provably does not catch:** that any measurement is *correct*; that a cited suite actually asserts the criterion it is cited for; that the criterion is the right criterion — nothing mechanical distinguishes a raised criterion from a weakened one; and it is **asymmetric by design**, never questioning a `partial` or `deferred` phase, because over-claiming is the failure this repository has shipped. The remaining defence is `CLAUDE.md` § Working agreements and a reader who checks |
+
+### Closed, and kept because the lesson is the point
+
+| Item | Notes |
+|---|---|
+| **`C35` — opened and closed inside one wave** | Under `destination-entry` beside a **conventional** profile a landing call carries a destination and no credential; if the passenger at the **head** of the queue was bound for a restricted floor, `infeasibilityOf` refused the call for **every car**, and **everybody behind them was stranded** — including passengers whose journey touches no restricted floor at all, **eight of the nine** on the shrunk counterexample, with a one-car fleet idle for 790.9 s. Found by widening the fuzz corpus and proven **pre-existing** at `63186a8`; 32 of 2 000 deep cases failed, and the class isolates perfectly — `destination-entry` 32 of 32, P5 only, nine profiles, four topologies. **A landing call speaks for a queue; a refusal that belongs to one person was being applied to all of them.** Fixed in `core` by asking one new **per-passenger** question at the landing **and** at the doorway — refusing at dispatch only was rejected with a measurement, because `#loadWhileIdle` boards from a car already standing there, so the refusal would have become **a matter of luck**. 60 of 60 shipped cells byte-identical; deep tier back to **0 failures at 2 000 cases** ([§ D130](../DECISIONS.md), [§ D137](../DECISIONS.md)) |
+| **`destination-entry` is now drawn by both fuzz corpora** | The middle rung of the information ladder is in `GENERATED_CALL_TYPES`, and the credential question moved from being a property of the call type to a property of the **`(profile, call type)` pair** — because `destination-entry` beside `eta` is a call with a destination and no credential, and beside `destination-panel` it is a call with **both**. `properties.ts` and the generator now call **one** function: *a property that disagrees with `costRequestFor` about who is servable is not a weaker property, it is a wrong one.* Blast radius **900 of 2 064 cases changed `callType` and nothing else moved in any of them**, because the draw keeps to **one float** in the same stream position ([§ D128](../DECISIONS.md)) |
+| **`C33` — CLOSED at the construction sites, not at the type** | `estimateMean` and `pairedDifferenceEstimate` return a narrow `PublishedMeanEstimate`; `ConvergenceReport.method` is **optional** and `convergenceOf` **omits the key** rather than setting it, so a suppressed metric no longer names a family for an interval that does not exist. Widening a required field to optional reads like a loosening and is the opposite: `'z'` is still a compile error where an interval exists. **The test that catches half of it is a type annotation, not an `expect`** — `tsc -b` is the runner. The stored shape stays wide, because a pre-2026-07 run set carries `'z'` and must still parse ([§ D126](../DECISIONS.md)) |
+| **The editor's ⇧/⇩ buttons — the scope call is taken, and `moveFloor` keeps its caller** | A **Declaration order** fieldset lists `building.floors` in the order the array is written, with **no sort anywhere in the render path**, and ⇧/⇩ live only there. Deleting the buttons was the alternative and was refused: the honest form of *"delete the buttons"* is *"delete the function"*, and **owning a seam is better than removing one**. `index` and `heightM` are still not renumbered, and a test compares the `{id → [index, heightM]}` map across a move. **The count did not move — 1 non-test caller before, 1 after** — what moved is *which* call site ([§ D135](../DECISIONS.md)) |
+| Double-deck operation | Configured, validated, **simulated** ([§ D131](../DECISIONS.md)) and **benchmarked** ([§ D147](../DECISIONS.md)). `WARNING_CODES.doubleDeckNotSimulated` is **deleted** because it became false; the narrower `missingFloorPairs` carries the same sentence for the one case still true — a double-deck bank declaring no `servesFloorPairs` — which **no shipped building raises**, which is the right state for a disclaimer: available, read, and not needed. `planRun` remains its named non-test reader; only which code it reads changed. The `analytical/upPeak.ts` warning was **kept and strengthened**, because retiring it would have been the over-claim ([§ D132](../DECISIONS.md)) |
+| Fuzzy pattern switching | **Shipped.** `patternSwitching` is read by `dispatch/selector.ts` at decision time, with hysteresis and **no random draw**; the fourth declared detector input, `timeOfDay`, was **deleted rather than faked**, because `core` has no wall clock and every shipped operating point is a window from zero — *a declared detector input nothing can supply is the same configured-validated-dead shape this block already was*. Liveness measured on **trajectories**: a permutation of the shipped map is not identical to it, 137 vs 135 moves with the first divergence at move 42, and selector-off is identical to no-options-at-all ([§ D141](../DECISIONS.md), [§ D143](../DECISIONS.md)) |
+| **`runner/` and `fuzz/` are now audited** *(`C4` and `C24` closed)* | The stopping rule turned out not to be one thing: the **port is exempt** — a rule stops *cells*, so a paired comparison's two arms would stop at different `n` — and the exemption is **pinned**, so a study that injects one turns the suite red. `fixedBudgetStoppingRule` is dead and claimed in its docstring to be the shipped default; `runner.acceptableRange` is inert, so `ConvergenceStatus` is `'not-assessed'` everywhere and CONVERGED / HIT CAP / IN PROGRESS have never been printed. **86 runner exports, 7 uncalled; 63 fuzz exports, 8 uncalled** — all allowlisted with reasons, both directions. What no guard catches is the other half: `runner.acceptableRange` is *read*, in a branch nothing takes, so it has callers and is invisible to all four ([§ D125](../DECISIONS.md), [§ D129](../DECISIONS.md)) |
+| **`C32` — CLOSED by wave 5, and the row outlived it** | The fuzz generator drew the call type **against** the profile: **122 of 2 000 deep cases (6.1 %)** were running something other than what they said. Closed at the generator with `assertCarriesCallType` on every case ([§ D122](../DECISIONS.md)). It is listed here because it sat in this table as *open* while the same section's closing paragraph listed it as closed by wave 5 — **a register disagreeing with itself in one screen** |
+| **`ED-12` / `ED-13` — CLOSED, and the schema did not move (`C30`)** | [§ D116](../DECISIONS.md). `ED-12`'s row was the thing that was wrong: a carless bank is an **error**, and relaxing `bankConfigSchema` so the ledger could show a green row would have been the weaken-a-criterion-to-pass failure `CLAUDE.md` forbids. `resolveBuilding` was **raised** to agree with the schema it had been silently contradicting, emitting an `empty-bank` code the vocabulary declared and **nothing anywhere had ever produced**. It matters because on a seven-floor tower whose top floor was served only by a carless bank, **ten of twelve seeds published `awtIsValid: true`**, two with passengers never served at all |
+| **The four ⚠️ UX rows are CLOSED, and two of them were *false*** | Driven, not read ([§ D120](../DECISIONS.md)). `RV-21`: `main()` ran its data load **above** the `let started = false` that `start()` closes over, so any failed first load left that binding in its temporal dead zone for the life of the page — Retry then threw inside a floating `async` IIFE with no `catch`, the page cleared its own error message and sat at `loading data…` for ever, empty, with nothing in the console. **Retry was permanently dead after any failed load.** `RV-17`: Vite answers `Accept: */*` with `index.html` and a **200**, so `!response.ok` — the only branch that named the missing path — is exactly the branch a missing `data/` file does not take. A fifth row (§ B.3) was false on **both** clauses. The ⚠️ bucket is **0** and all seven ⛔ keyboard rows are green. **Two limitations are recorded in the rows rather than absorbed:** `KB-14`'s CSS clause is unexercised under a real OS preference (the media query cannot be emulated by the available tooling, so it was driven by replacing `window.matchMedia`), and `RV-11`'s *no passengers were generated* sentence exists only in the status line — the canvas, the exported PNG and `describeFrame` leave the reader to infer it |
 
 **Closed since this table was last written**, each verified rather than taken on report:
 `fuzz-1000384` (§ 7), `C2`, `C7`, `C10`, `C11`, `C15`, `C16`, `C19`, `C20`, `C21`, `C22`, `C23`,
@@ -761,34 +951,104 @@ and CLI printing a suppressed mean** ([§ D111](../DECISIONS.md)).
 
 **Closed by wave 5**, each verified rather than taken on report: **C4** · **C5** · **C24** ·
 **C27** · **C30** · **C32** · the four ⚠️ UX rows · `packages/experiments`' browser export
-(the *prerequisite*; W4 itself is only partly unblocked) · and *no test asserts any phase's status*,
+(the *prerequisite*; W4 itself was only partly unblocked) · and *no test asserts any phase's status*,
 **narrowed rather than closed**. [§ D116](../DECISIONS.md)–[§ D124](../DECISIONS.md).
 
-**Still open, in one place, because a reader planning work needs the list and not the prose:**
-*Deferred by a recorded argument, not by neglect* — Phase 6c · Phase 9 · double-deck simulation ·
-`patternSwitching` · `garden-down-peak`'s identity class · the `moveFloor` scope call.
+**Closed by wave 6**, each verified rather than taken on report: **C33** ([§ D126](../DECISIONS.md))
+· all three **C4** findings ([§ D127](../DECISIONS.md)) · **C34** and W4's TypeScript-condition gap
+([§ D134](../DECISIONS.md)) · `destination-entry`'s corpus gap ([§ D128](../DECISIONS.md)) ·
+`deepCampaignRequested` and `withCallType` ([§ D129](../DECISIONS.md)) · **C35**, opened and closed
+inside the wave ([§ D130](../DECISIONS.md), [§ D137](../DECISIONS.md)) · the **eleventh** dead seam
+and double-deck simulation ([§ D131](../DECISIONS.md)) with its disclaimers
+([§ D132](../DECISIONS.md)) · `docs/10` § 13's eight questions ([§ D133](../DECISIONS.md)) ·
+`moveFloor`'s scope call ([§ D135](../DECISIONS.md)) · `garden-down-peak`'s open question
+([§ D136](../DECISIONS.md)) · the citation-guard gap ([§ D138](../DECISIONS.md)) · Phase 7's
+fuzzy-detector bullet ([§ D143](../DECISIONS.md)) · the bare-kiosk re-pin
+([§ D149](../DECISIONS.md)). **Phase 6c is neither closed nor open: it is measured and refused**
+([§ D145](../DECISIONS.md)).
 
-*Live debt* — **C33** (the `'z'` shape at `statistics.ts:332`, and `ConvergenceReport.method` being
-non-optional) · **C34** (the browser barrel has no non-test caller) · W4's TypeScript-condition gap ·
-`deepCampaignRequested` and `withCallType`, each with a test as its only caller ·
-`destination-entry` unreached by both fuzz corpora · `estimateMean`'s zero-variance `halfWidth = 0` · the mixed-use study's six-replication margin · `stats/` consolidation ·
-`runDestinationDispatchStudy` off both barrels.
+### Where this register was wrong about itself
+
+**Six rows here were checked against the code in wave 6 and six were wrong — every one in the
+optimistic direction.** This is the most transferable content in the wave, and it is stated rather
+than quietly fixed, because *"the register says X"* and *"the code says Y"* being different
+sentences is the whole reason a register is kept.
+
+1. **One of the three `C4` findings was already closed.** `sequentialStopping.test.ts` reads
+   `t[n−1]` back out of the shipped `estimateMean`; the hard-coded `z90` was gone. This section's own
+   closing blockquote said a concurrent session had done it, and **the row was never updated to
+   match** — a document contradicting itself two screens apart ([§ D127](../DECISIONS.md)).
+2. **`C4`'s stale-docstring finding was ten places, not one — and six of the ten were false about
+   the code**, not merely stale about a sibling document. The instructive one:
+   `tuning/report/holdout.ts` claimed *"the `n <= 25` t/z split `reports/statistics.ts` **applies**"*,
+   which it does not and has not since § D14. The register said one place; `WAVE6_PLAN.md` § 1
+   corrected it to four; it was **ten**, and it is now guarded by `quantileFamily.test.ts`
+   ([§ D127](../DECISIONS.md)).
+3. **That finding's *"only reachable below the 50-replication floor"* was wrong about the
+   phenomenon.** It is right about `n = 2` and wrong about the mechanism: the runner's **first**
+   chunk is `policy.minReplications`, so under an injected rule a zero-variance cell stops **at** the
+   floor — 50 by default — rather than continuing to `maxReplications`. Lowering the floor, which
+   only `validation/sequentialStopping.test.ts` does, is what moves the stop from 50 to 2.
+4. **`withCallType`'s row was wrong on both halves, and it was never a weak seam.** Detail in § 3.
+   The method note is the part to carry: `nonTestImportersOf` answers *"who imports it"* and the
+   standing rule asks *"name the non-test caller"* — **when the answer is a chain those are different
+   questions, and two of this chain's three links are intra-file and invisible to any importer
+   query** ([§ D129](../DECISIONS.md)).
+5. **The dead-seam count was ten in code plus one in `data/`, not nine plus one** — in `CLAUDE.md`,
+   in § 3 here, and in `WAVE6_PLAN.md` § 2 — and wave 6 made it **eleven** in code by finding the
+   deck API. A count carried in prose beside a table is a count that drifts from it
+   ([§ D131](../DECISIONS.md)).
+6. **`garden-down-peak`'s row asked a question whose answer is yes.** It said *"whether **any**
+   destination weight can carry information at such a point is an open question"*. Enumerated over
+   every term `core` declares, at five weights, n = 200, CRN, two seeds:
+   - it is blind to **`rideTime`** — the term **both** shipped destination profiles weight — which
+     separates two candidate cars in **1 of 1 727 contested decisions**. A term with the same value
+     for every car is a constant added to every candidate's cost, and **a constant cannot change an
+     `argmin`**, so no weight rescues it: sixteen times the shipped weight buys the same single flip
+     and no second one;
+   - it is **not** blind to the destination. `stopCount` separates the cars in **139** of the same
+     1 727, and pricing the destination with it is **WORSE on AWT, WT95 and TTD** at n = 200 at both
+     seeds — arithmetic on the shipped normalization says why: one extra stop is 0.5 normalized
+     units, so a candidate needs a **6.7 s** ETA advantage at w = 0.2, **20 s** at w = 0.5, and there
+     is **no finite `t`** at w ≥ 1;
+   - **an identity class belongs to a `(cell, seed, n)`**, exactly as a saturation ceiling does.
+     `destination-eta ≡ eta` at `garden-down-peak` is **true at n = 51 at both seeds and false at
+     n = 200** at one of them. **Four documents quote that class, and each needs its budget and its
+     seed attached** ([§ D136](../DECISIONS.md)).
+
+And a seventh, about the guards rather than the register: **`published.test.ts` missed a stale
+published figure at both of its layers by construction**, and the story is in § 3.
+
+**Still open, in one place, because a reader planning work needs the list and not the prose:**
+
+*Deferred by a recorded argument, not by neglect* — Phase 9 beyond W4 · **TWIN**, designed and not
+built · the double-deck closed-form RTT · a **sweep** behind Phase 6c's one-operating-point refusal.
+
+*Live debt* — the **`G → 2` lobby leg** charged as an elevator leg · the seed-marginal 1.5 %
+double-deck point · `PROFILE_OBJECT_SECTIONS` hand-listed · the selector not reaching
+`run` / `tune` / `watch` · the resolution limits **unmeasured on TTD** · `kioskRefusedLegs` with no
+consumer · **W4's U7 half blocked on a `core` fix** · `stopCount` with no `activeWhen` ·
+`nearest-car` unusable on a **fifth** building and still a default in places · `RunRecord`'s missing
+**car-move series**, now with two consumers · `published.test.ts` holding nothing for the
+categorical **class** · the structural-refusal reason being prose keyed on a call id `VizLeg` does
+not carry · the W4 candidate not routed into Run · `viz` now depending on `experiments` · **C5**
+(`compare.ts:607` can still print `'z'`) · **C27** (`runDestinationDispatchStudy` off both barrels) ·
+the mixed-use study's six-replication margin · `stats/` consolidation · zoning still unchangeable
+mid-run.
 
 *And the one that no longer has a name of its own, because it is now everyone's:* a phase's status is
 bound to evidence that **exists**, not to evidence that **supports** it. The guard cannot tell a
 raised criterion from a weakened one, and it never questions a `partial` or `deferred` phase. **That
-is the largest remaining un-mechanised risk**, and it is smaller than it was, not gone.
+is the largest remaining un-mechanised risk**, and it is smaller than it was, not gone. Wave 6 is the
+first wave that could have exercised it in the dangerous direction — it wrote a gate and then
+measured against it — and the answer was `NOT ACCEPTED`, with the criterion dated before the code and
+**raised** once mid-wave.
 
-> **A concurrent session closed three of those in parallel** — `sequentialStopping.test.ts:163`'s
-> hard-coded `z90` (it now reads `t[n−1]` back out of the shipped `estimateMean`, so the projection
-> cannot drift from the rule it reports on — which is how **C19** happened), `StoppingVerdict`'s
-> stale docstring, and the stopping rule's missing non-test caller, which is now a **recorded
-> exemption** rather than an open question ([§ D125](../DECISIONS.md)).
->
-> **Wave 5 closed nine items and opened seven.** That is the register working. `WAVE5_PLAN.md` § 5
-> made *"the debt table rewritten to what is actually left, including anything this wave opened"* a
-> condition of done, precisely because a register that only ever shrinks is not being read honestly —
-> and because five of the seven were found only by fixing something adjacent to them.
+> **Wave 6 closed fourteen items and opened fifteen.** That is the register working, not failing.
+> `WAVE6_PLAN.md` § 6 made *"the debt register rewritten to what is actually left, including anything
+> this wave opened"* a condition of done, for the reason wave 5 recorded: **five of wave 5's seven
+> new items were found only by fixing something adjacent to them**, and wave 6's largest new item —
+> the lobby leg — was found only by benchmarking a capability that had just been made to work.
 
 
 ### Two figures corrected here, because the handed-back versions did not reproduce

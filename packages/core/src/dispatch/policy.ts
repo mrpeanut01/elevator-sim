@@ -59,6 +59,15 @@ import {
 import { resolveNormalization } from './normalize.js';
 import { DISPATCH_DEFAULTS, DISPATCH_PARAMETERS } from './parameters.js';
 import { rankScores, scoreCar } from './scoringEngine.js';
+import {
+  ArrivalWindow,
+  INITIAL_SELECTOR_STATE,
+  resolveWeightSets,
+  selectWeightSet,
+  type ResolvedSelection,
+  type SelectorState,
+  type TrafficObservation,
+} from './selector.js';
 import { COST_TERMS, DECLARED_TERM_IDS, isDeclaredTerm, isImplementedTerm } from './terms/index.js';
 import {
   DispatchError,
@@ -81,6 +90,7 @@ import {
   type RepositionContext,
   type RepositionDecision,
   type ResolvedDispatchConfig,
+  type SelectionStageConfig,
 } from './types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -129,23 +139,7 @@ export function resolveDispatchConfig(
 
   /* ---- weights ---- */
   const authored: Record<string, number> = { ...source.weights, ...(options.weights ?? {}) };
-  const weights = new Map<string, number>();
-  const pendingWeights = new Map<string, number>();
-  // Registry order first, so two profiles weighting the same terms sum them in the same
-  // sequence and produce bit-identical costs.
-  for (const term of COST_TERMS) {
-    const weight = authored[term.id];
-    if (weight !== undefined) weights.set(term.id, weight);
-  }
-  for (const [id, weight] of Object.entries(authored)) {
-    if (isImplementedTerm(id)) continue;
-    if (!isDeclaredTerm(id)) {
-      throw new DispatchError(
-        `Dispatcher "${source.id}" puts weight ${weight} on "${id}", which the cost-term library does not declare. Known terms: ${DECLARED_TERM_IDS.join(', ')}. A weight nothing reads contributes nothing, so a misspelled term id produces a dispatcher that scores every car identically and decides by car id — a plausible-looking run of a system nobody configured.`,
-      );
-    }
-    pendingWeights.set(id, weight);
-  }
+  const { weights, pendingWeights } = resolveWeights(authored, source.id);
 
   /* ---- hard constraints ---- */
   const declared = options.hardConstraints ?? source.hardConstraints ?? [];
@@ -188,6 +182,48 @@ export function resolveDispatchConfig(
   const eligibility = source.eligibility;
   const answer = source.answer;
   const idle = source.idle;
+  const selectionSource: SelectionStageConfig = {
+    ...(source.selection ?? {}),
+    ...(options.selection ?? {}),
+  };
+  const selection: ResolvedSelection = Object.freeze({
+    policy: selectionSource.policy ?? DISPATCH_DEFAULTS.selectionPolicy,
+    hysteresisS: nonNegative(
+      selectionSource.hysteresisS ?? DISPATCH_DEFAULTS.selectionHysteresisS,
+      'selection.hysteresisS',
+      source.id,
+    ),
+    observationWindowS: positive(
+      selectionSource.observationWindowS ?? DISPATCH_DEFAULTS.selectionObservationWindowS,
+      'selection.observationWindowS',
+      source.id,
+    ),
+    lobbyArrivalRateGain: nonNegative(
+      selectionSource.lobbyArrivalRateGain ?? DISPATCH_DEFAULTS.selectionInputGain,
+      'selection.lobbyArrivalRateGain',
+      source.id,
+    ),
+    interfloorRateGain: nonNegative(
+      selectionSource.interfloorRateGain ?? DISPATCH_DEFAULTS.selectionInputGain,
+      'selection.interfloorRateGain',
+      source.id,
+    ),
+    downPeakRateGain: nonNegative(
+      selectionSource.downPeakRateGain ?? DISPATCH_DEFAULTS.selectionInputGain,
+      'selection.downPeakRateGain',
+      source.id,
+    ),
+    switchMargin: nonNegative(
+      selectionSource.switchMargin ?? DISPATCH_DEFAULTS.selectionSwitchMargin,
+      'selection.switchMargin',
+      source.id,
+    ),
+  });
+  // Resolved here rather than at the first decision, and thrown from here rather than returned:
+  // a dangling weight-set name is a configuration whose dispatcher cannot express one of its own
+  // declared regimes, and finding that out 600 s into a replication is finding it out after the
+  // run it invalidated. Same argument, same place, as the unknown hard constraint above.
+  const weightSets = resolveWeightSets(options.weightSets, selection, source.id);
   const waitTimeReference = options.normalization?.waitTimeS ?? source.normalization?.waitTimeS;
   const distanceReference = options.normalization?.distanceM ?? source.normalization?.distanceM;
 
@@ -272,9 +308,46 @@ export function resolveDispatchConfig(
         source.id,
       ),
     }),
+    selection,
+    ...(weightSets === undefined ? {} : { weightSets }),
   };
 
   return Object.freeze(config);
+}
+
+/**
+ * One authored weight record, in cost-term registry order, with the pending half split off.
+ *
+ * Extracted from {@link resolveDispatchConfig} because the weight-set selector resolves the
+ * *same* thing for every arm it may switch to, and two implementations of "what is this
+ * profile's weight vector" would be two answers to one question — the failure
+ * `runner/metrics.ts`'s docstring names. Registry order first, so two profiles weighting the
+ * same terms sum them in the same sequence and produce bit-identical costs; and a misspelled
+ * term id is rejected here for every arm, not only for the profile that happens to be the run's.
+ */
+export function resolveWeights(
+  authored: Readonly<Record<string, number>>,
+  profileId: string,
+): {
+  readonly weights: ReadonlyMap<string, number>;
+  readonly pendingWeights: ReadonlyMap<string, number>;
+} {
+  const weights = new Map<string, number>();
+  const pendingWeights = new Map<string, number>();
+  for (const term of COST_TERMS) {
+    const weight = authored[term.id];
+    if (weight !== undefined) weights.set(term.id, weight);
+  }
+  for (const [id, weight] of Object.entries(authored)) {
+    if (isImplementedTerm(id)) continue;
+    if (!isDeclaredTerm(id)) {
+      throw new DispatchError(
+        `Dispatcher "${profileId}" puts weight ${weight} on "${id}", which the cost-term library does not declare. Known terms: ${DECLARED_TERM_IDS.join(', ')}. A weight nothing reads contributes nothing, so a misspelled term id produces a dispatcher that scores every car identically and decides by car id — a plausible-looking run of a system nobody configured.`,
+      );
+    }
+    pendingWeights.set(id, weight);
+  }
+  return { weights, pendingWeights };
 }
 
 function isHardConstraintId(id: string): id is HardConstraintId {
@@ -294,6 +367,15 @@ function nonNegativeInteger(value: number, id: string, profileId: string): numbe
   if (!Number.isInteger(value) || value < 0) {
     throw new DispatchError(
       `Dispatcher "${profileId}": ${id} must be a non-negative integer; received ${value}.`,
+    );
+  }
+  return value;
+}
+
+function positive(value: number, id: string, profileId: string): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new DispatchError(
+      `Dispatcher "${profileId}": ${id} must be a finite positive number; received ${value}.`,
     );
   }
   return value;
@@ -331,10 +413,70 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
   /** Open batch key to the call id that owns it, so a second press joins rather than forks. */
   readonly #openBatches = new Map<string, string>();
 
+  /* ---- stage 3's weight-set selection. All three are inert while the selector is off. ---- */
+
+  /**
+   * The trailing arrival window, built only when a selector is configured.
+   *
+   * `undefined` under `selection.policy: 'off'` — every shipped profile — so a non-selecting run
+   * allocates nothing, records nothing and takes no branch a previous run did not.
+   */
+  readonly #arrivals: ArrivalWindow | undefined;
+  /** The selector's memory. Deterministic simulation state; {@link reset} clears it. */
+  #selectorState: SelectorState = INITIAL_SELECTOR_STATE;
+  /**
+   * The weight vector in force.
+   *
+   * Initialised to `config.weights` — **the same frozen Map object**, not a copy — so a policy
+   * with no selector hands the scorer exactly what it handed before this mechanism existed. That
+   * is what makes byte-identity a structural property rather than a tolerance.
+   */
+  #weights: ReadonlyMap<string, number>;
+  /** Weight-set changes this policy has made. For reports and for the liveness study. */
+  #switchCount = 0;
+  /** The pattern currently in force, or `undefined` while the profile's own weights stand. */
+  #activePatternId: string | undefined;
+  /** What the detector last saw. For a report, for calibration, and for the liveness study. */
+  #lastTraffic: TrafficObservation | undefined;
+
   constructor(config: ResolvedDispatchConfig) {
     this.config = config;
     this.id = config.id;
     this.name = config.name;
+    this.#weights = config.weights;
+    this.#arrivals = config.weightSets === undefined ? undefined : new ArrivalWindow();
+  }
+
+  /**
+   * The weight vector this policy is scoring with **now**.
+   *
+   * Equal to `config.weights` for the life of a run on every shipped profile. A study reads it to
+   * assert that a selector actually selected — the mechanism being live is a fact to measure, not
+   * to infer from the configuration being present.
+   */
+  get activeWeights(): ReadonlyMap<string, number> {
+    return this.#weights;
+  }
+
+  /** The pattern in force, or `undefined`. Provenance for a report; never read to decide. */
+  get activePattern(): string | undefined {
+    return this.#activePatternId;
+  }
+
+  /** How many times the weight vector has changed during this run. */
+  get weightSetSwitches(): number {
+    return this.#switchCount;
+  }
+
+  /**
+   * The traffic state the detector read at the last decision, or `undefined` with no selector.
+   *
+   * The membership ramps in `data/dispatcher-profiles.json` are authored in these units, so this
+   * is also how they were calibrated — measured off real runs rather than guessed, which is the
+   * difference between a detector and a decoration.
+   */
+  get observedTraffic(): TrafficObservation | undefined {
+    return this.#lastTraffic;
   }
 
   get calls(): readonly CallLifecycle[] {
@@ -380,6 +522,7 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
         waitingMassKg: observation.waitingMassKg ?? existing.waitingMassKg,
       });
       this.#lifecycles.set(call.id, merged);
+      this.#countArrival(call, at, merged.waitingPassengers - existing.waitingPassengers);
       return merged;
     }
 
@@ -395,13 +538,32 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
             : (open.waitingMassKg ?? 0) + observation.waitingMassKg,
       });
       this.#lifecycles.set(open.callId, merged);
+      this.#countArrival(call, at, merged.waitingPassengers - open.waitingPassengers);
       return merged;
     }
 
     const created = newLifecycle(call, at, this.config, observation);
     this.#lifecycles.set(call.id, created);
     this.#openBatches.set(batchKey, call.id);
+    this.#countArrival(call, at, created.waitingPassengers);
     return created;
+  }
+
+  /**
+   * Feed the traffic detector, if there is one.
+   *
+   * **Deltas, not registrations.** `Simulation.#registerCalls` re-registers every live call on
+   * every dispatch pass with the landing's current count, so a detector that counted calls would
+   * multiply one queue by however often the bank happened to be asked and report an arrival rate
+   * that rose with the dispatcher's own activity. What is recorded is the increase in what is
+   * waiting, which is passengers.
+   *
+   * Nothing happens at all when the selector is off, which is what keeps a shipped run's
+   * allocation profile as well as its numbers unchanged.
+   */
+  #countArrival(call: DispatchCall, at: SimTime, delta: number): void {
+    if (this.#arrivals === undefined || delta <= 0) return;
+    this.#arrivals.record(at, call.floorIndex, call.direction, delta);
   }
 
   /* ---------------------------------------------------------------- *
@@ -464,7 +626,11 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
       scores.push(
         scoreCar(
           { car, call, request: verdict.request, estimate: verdict.estimate, at, observation },
-          this.config.weights,
+          // The one binding this whole mechanism exists to break. It used to read
+          // `this.config.weights` and that single expression was the reason a dispatcher could
+          // not be changed mid-run; `#weights` **is** `config.weights`, the same object, on
+          // every profile that does not ask for a selector.
+          this.#weights,
           this.config.normalization,
         ),
       );
@@ -552,7 +718,47 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
     at: SimTime,
     context?: DispatchContext | undefined,
   ): DispatchDecision {
+    this.#refreshWeightSet(cars, at, context);
     return this.#decide(callId, cars, at, context);
+  }
+
+  /**
+   * **Stage 3, before the scoring.** Consult the weight-set selector, and adopt what it says.
+   *
+   * Called once per decision, from {@link dispatch} and {@link reconsider}, and **not** from
+   * {@link score} or {@link eligible}: those two are the read-only views of the engine and a
+   * caller inspecting a score must see the weights the decision was made with, not advance the
+   * selector past it. `AuctionDispatcher` prices every car through `score`, so a selector that
+   * updated there would step the hysteresis once per bidder.
+   *
+   * Consumes no random stream and reads no clock: `at` is the kernel's, `cars` is the snapshot
+   * list the caller already built, and {@link selectWeightSet} is pure. That is the whole of this
+   * mechanism's cost to common random numbers, and it is zero — asserted by re-running
+   * `validation/goldenRuns.test.ts` and `fuzz/determinism.test.ts`, not by this paragraph.
+   */
+  #refreshWeightSet(
+    cars: readonly CarSnapshot[],
+    at: SimTime,
+    context: DispatchContext | undefined,
+  ): void {
+    const sets = this.config.weightSets;
+    if (sets === undefined || this.#arrivals === undefined) return;
+
+    const traffic = this.#arrivals.observe(
+      at,
+      this.config.selection.observationWindowS,
+      cars,
+      context?.entranceFloorIndices,
+    );
+    this.#lastTraffic = traffic;
+    const result = selectWeightSet(sets, this.config.selection, traffic, this.#selectorState, at);
+    this.#selectorState = result.state;
+    if (result.switched) this.#switchCount += 1;
+    // An abstaining detector leaves the profile's own weights standing, which is why this reads
+    // the arm rather than assuming one: `arm === undefined` is "none of the declared regimes",
+    // and guessing the least-bad one would hide exactly that.
+    this.#weights = result.arm?.weights ?? this.config.weights;
+    this.#activePatternId = result.arm?.patternId;
   }
 
   /* ---------------------------------------------------------------- *
@@ -565,6 +771,7 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
     at: SimTime,
     context?: DispatchContext | undefined,
   ): DispatchDecision {
+    this.#refreshWeightSet(cars, at, context);
     return this.#decide(callId, cars, at, context);
   }
 
@@ -849,6 +1056,16 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
   reset(): void {
     this.#lifecycles.clear();
     this.#openBatches.clear();
+    // The selector's memory goes with the lifecycles, for the same reason and by the same
+    // argument: a replication that inherited the previous one's traffic history would begin
+    // already convinced of a pattern, and Phase 3's paired-t intervals would be measuring a
+    // dispatcher that had seen the other replication's passengers.
+    this.#arrivals?.clear();
+    this.#selectorState = INITIAL_SELECTOR_STATE;
+    this.#weights = this.config.weights;
+    this.#activePatternId = undefined;
+    this.#lastTraffic = undefined;
+    this.#switchCount = 0;
   }
 }
 

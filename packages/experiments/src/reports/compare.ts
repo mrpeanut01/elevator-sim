@@ -39,7 +39,12 @@
  * every estimate either way.
  */
 
-import { estimateMean, pairedDifferenceEstimate, DEFAULT_CONFIDENCE } from './statistics.js';
+import {
+  estimateMean,
+  pairedDifferenceEstimate,
+  DEFAULT_CONFIDENCE,
+  PUBLISHED_INTERVAL_FAMILY,
+} from './statistics.js';
 import {
   ReportsError,
   intervalContainsZero,
@@ -572,17 +577,8 @@ function candidateMetric(
 }
 
 /**
- * The one quantile family a report built here can carry — as a value, so the compiler holds it.
- *
- * `statistics.ts` narrows `publishedIntervalQuantile`'s return type to `'t'`: every published
- * interval in this package is Student-t at `n − 1`, at every `n` (DECISIONS.md § D14, review
- * finding #14). This constant is that guarantee restated where a report is *assembled* rather than
- * where an interval is computed, because the two are different places to get it wrong.
- */
-const PUBLISHED_INTERVAL_FAMILY = 't' as const;
-
-/**
- * A {@link ConvergenceReport} whose family label is pinned to {@link PUBLISHED_INTERVAL_FAMILY}.
+ * A {@link ConvergenceReport} whose family label is pinned to `statistics.ts`'s
+ * {@link PUBLISHED_INTERVAL_FAMILY}, or absent.
  *
  * `ConvergenceReport.method` is typed `IntervalMethod`, the two-member union, because a *stored*
  * run set predating 2026-07 carries `'z'` and must still parse. That width is right for the stored
@@ -590,22 +586,29 @@ const PUBLISHED_INTERVAL_FAMILY = 't' as const;
  * expression of union type, so nothing but a literal in the right place kept `'z'` off a report
  * whose every interval was `t`. Narrowing the construction site — the only one in the repository —
  * makes that assignment a compile error rather than a convention.
+ *
+ * The constant is **imported** rather than restated here. It used to be declared in both files;
+ * two copies of one convention that can drift apart is precisely what § D114 measured the cost of
+ * in the dead-code scanners, and the reason the duplication existed there — a package boundary
+ * `core` may not cross — does not exist inside `reports/`.
  */
 type PublishedConvergenceReport = ConvergenceReport & {
-  readonly method: typeof PUBLISHED_INTERVAL_FAMILY;
+  readonly method?: typeof PUBLISHED_INTERVAL_FAMILY | undefined;
 };
 
 /**
- * The family label a convergence report may carry for `estimate`, or a refusal.
+ * The family label a convergence report may carry for `estimate`, **or nothing**, or a refusal.
  *
- * Three cases, and the third is the one worth stating:
+ * Three cases, and the second and third are the ones worth stating:
  *
  * - An estimate in the published family: its own label, copied.
  * - **No estimate at all** — the headline metric was suppressed, so `achievedHalfWidth` is `NaN`.
- *   There is no interval to read a family off, and `ConvergenceReport.method` is not optional, so
- *   the report names the family it would have used. This is the branch open item C5 was about: it
- *   used to call an n-dependent quantile chooser that returned `'z'` past n = 25, so a suppressed
- *   metric could stamp `'z'` on a report whose every printed interval was `t`.
+ *   This returns `undefined`, and `ConvergenceReport.method` is optional so that it can. C5 fixed
+ *   the *wrong* label here — the branch used to call an n-dependent quantile chooser that returned
+ *   `'z'` past n = 25, so a suppressed metric could stamp `'z'` on a report whose every printed
+ *   interval was `t`. `C33` is the half C5 left behind: naming `'t'` was no longer *wrong*, but it
+ *   was still a family stamped on an interval that does not exist. An absent interval has no
+ *   family, and the report now says so rather than naming the one it would have used.
  * - An estimate from **outside** the published family: refused. Copying `'z'` here would be
  *   truthful about that estimate and untruthful about this package, which has no estimator that
  *   produces one; the estimate came from somewhere else, and a reader cannot re-derive the
@@ -615,8 +618,8 @@ type PublishedConvergenceReport = ConvergenceReport & {
  */
 export function publishedIntervalFamily(
   estimate: MeanEstimate | undefined,
-): typeof PUBLISHED_INTERVAL_FAMILY {
-  if (estimate === undefined) return PUBLISHED_INTERVAL_FAMILY;
+): typeof PUBLISHED_INTERVAL_FAMILY | undefined {
+  if (estimate === undefined) return undefined;
   if (estimate.method !== PUBLISHED_INTERVAL_FAMILY) {
     throw new ReportsError(
       `a convergence report cannot label its half-width "${estimate.method}": every interval this package publishes is Student-t at n − 1, at every n (statistics.ts § "One quantile", DECISIONS.md § D14), so a "${estimate.method}" estimate did not come from an estimator here and the report will not put a family on it.`,
@@ -635,6 +638,7 @@ function convergenceOf(
   const estimate = metrics.find((metric) => metric.metricId === metricId)?.estimate;
   const achievedHalfWidth = estimate?.halfWidth ?? Number.NaN;
   const target = options.targetHalfWidth;
+  const family = publishedIntervalFamily(estimate);
 
   const status: ConvergenceStatus =
     target === undefined
@@ -654,15 +658,18 @@ function convergenceOf(
     achievedHalfWidth,
     confidence,
     /*
-     * `'t'`, always — including when `achievedHalfWidth` is `NaN` because the headline metric was
-     * suppressed and there is no estimate to read a family off. {@link publishedIntervalFamily}
-     * has the three cases and why the third refuses; {@link PublishedConvergenceReport} is what
-     * makes `'z'` unwritable here, rather than this line being careful.
+     * `'t'` when there is an interval, and **absent** when there is not.
+     * {@link publishedIntervalFamily} has the three cases and why the third refuses;
+     * {@link PublishedConvergenceReport} is what makes `'z'` unwritable here, rather than this
+     * line being careful.
      *
      * It used to read `estimate?.method ?? 't'` — an expression of union type assigned to a field
-     * of union type. The literal was right and nothing checked it. Open item C5.
+     * of union type. The literal was right and nothing checked it (open item C5). Then it read
+     * `'t'` unconditionally, which named a family for an interval that does not exist whenever the
+     * headline metric was suppressed (open item `C33`). The key is **omitted** rather than set to
+     * `undefined` so the two are the same in JSON as they are in the type.
      */
-    method: publishedIntervalFamily(estimate),
+    ...(family === undefined ? {} : { method: family }),
   });
 }
 

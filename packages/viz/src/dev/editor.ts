@@ -14,6 +14,19 @@
  * zoning is a paragraph saying where it actually lives. A reader who wants "the zones" is told
  * three times that there is no such thing.
  *
+ * ## The floors are shown twice, on purpose, in two different orders
+ *
+ * The **Floors** table is in *building* order — highest `index` at the top, the direction the
+ * preview draws (`U1`, `ED-01a`). The **Declaration order** list below it is the `floors` array as
+ * the file writes it, and it is the only place `moveFloor` is offered, because it is the only place
+ * that operation has a visible effect. Those two orders are different questions about one document
+ * — *which floor is above which* and *what does the file look like* — and one widget answering both
+ * is what put a control on screen that never did what its arrow implied (`docs/07` § 8).
+ *
+ * Each view says which order it is in and what that order means. A second table that is merely a
+ * different sort, with nothing saying what it is for, would reproduce the defect rather than close
+ * it.
+ *
  * ## Validation is never partial
  *
  * The issue list is rebuilt from `ValidationReport.issues` in full on every edit, and when the
@@ -51,7 +64,11 @@ import {
   upsertAccessZone,
 } from '../editor/editorEdits.js';
 import { EditorHistory } from '../editor/editorHistory.js';
-import { floorsInBuildingOrder, previewGeometry } from '../editor/editorPreview.js';
+import {
+  declarationOrderMatchesBuildingOrder,
+  floorsInBuildingOrder,
+  previewGeometry,
+} from '../editor/editorPreview.js';
 import {
   issuesMayBeIncomplete,
   summariseReport,
@@ -148,6 +165,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
   const issuesNode = el<HTMLUListElement>('ed-issues');
   const warningsNode = el<HTMLUListElement>('ed-warnings');
   const floorsBody = el<HTMLTableSectionElement>('ed-floors').querySelector('tbody');
+  const declaration = mountDeclarationSection(el<HTMLElement>('ed-floors'));
   const rangesNode = el<HTMLElement>('ed-ranges');
   const banksNode = el<HTMLElement>('ed-banks');
   const zonesNode = el<HTMLElement>('ed-zones');
@@ -262,32 +280,85 @@ export function mountEditor(options: EditorOptions): EditorHandle {
       );
       const actions = document.createElement('td');
       /*
-       * `moveFloor` moves a floor within the **declaration list** and deliberately renumbers
-       * neither `index` nor `heightM` — its own docstring says why, and the reason is good: the
-       * loader fails a building whose two disagree (`floor-height-order`), and an editor that
-       * silently rewrote either would settle a modelling error by fiat.
+       * No ⇧/⇩ here, and that is the change `ED-24` records.
        *
-       * Which means these two buttons never moved a floor *in the building*, only in the JSON.
-       * With the table now in building order (`U1`) their effect shows in the Document textarea
-       * rather than in the row above, so the titles say so instead of saying "up the list", which
-       * under the old array-ordered table read as though it moved the floor.
+       * They used to sit in this row. `moveFloor` moves a floor within the **declaration array**
+       * and deliberately renumbers neither `index` nor `heightM` — its own docstring says why, and
+       * the reason is good: the loader fails a building whose two disagree (`floor-height-order`),
+       * and an editor that silently rewrote either would settle a modelling error by fiat. So in a
+       * table sorted by `index` those arrows moved nothing the reader could see: the row they were
+       * attached to stayed exactly where it was, and the only thing that changed was the Document
+       * textarea further down the page. Honest titles made that legible without making it useful.
+       *
+       * The operation is unchanged and is offered in {@link renderDeclaration}, where the list
+       * *is* the array and pressing ⇩ moves the row. The ordering control in **this** table is
+       * `index`, which is the field that decides which floor is above which.
        */
       actions.append(
-        button(
-          '⇧',
-          () => commit(moveFloor(building, floor.id, -1)),
-          `move floor ${floor.id} earlier in the JSON declaration list (does not change its index or height)`,
-        ),
-        button(
-          '⇩',
-          () => commit(moveFloor(building, floor.id, 1)),
-          `move floor ${floor.id} later in the JSON declaration list (does not change its index or height)`,
-        ),
         button('✕', () => commit(removeFloor(building, floor.id)), `remove floor ${floor.id}`),
       );
       row.append(actions);
       floorsBody.append(row);
     }
+  }
+
+  /**
+   * The declaration-order view — `ED-24`, `ED-25`, and `moveFloor`'s only caller.
+   *
+   * The list is `building.floors` **as it stands**, with no sort anywhere: this view's whole claim
+   * is that it shows the array, so deriving its order from anything would make the claim false. The
+   * position numbers come from `<ol>` rather than from arithmetic for the same reason.
+   *
+   * `index` and `heightM` are printed, not editable. They are edited in the table above, and
+   * repeating the inputs here would offer two controls for one field and invite exactly the
+   * renumber-to-match that `moveFloor`'s docstring refuses.
+   *
+   * **Nothing in here decides what is legal.** The disabled ⇧ on the first row and ⇩ on the last
+   * are a no-op guard, not a verdict — `moveFloor` clamps and would return the same document.
+   * Whether the reordered document loads is `parseBuilding`/`resolveBuilding`'s answer, rendered by
+   * {@link renderValidation} from `report.issues`, and this list never offers a second one (§ D67).
+   */
+  function renderDeclaration(building: BuildingConfig): void {
+    const floors = building.floors ?? [];
+    declaration.list.replaceChildren();
+
+    if (floors.length === 0) {
+      declaration.agreement.textContent =
+        (building.floorRanges?.length ?? 0) > 0
+          ? 'This building declares no explicit floors — its floors come from ranges, which the loader expands. A range has no position in the floors array to move.'
+          : 'No floors yet.';
+      return;
+    }
+
+    for (const [at, floor] of floors.entries()) {
+      const item = document.createElement('li');
+      const label = floor.label === undefined ? '' : ` “${floor.label}”`;
+      const up = button(
+        '⇧',
+        () => commit(moveFloor(building, floor.id, -1)),
+        `move floor ${floor.id} one place earlier in the floors array`,
+      );
+      const down = button(
+        '⇩',
+        () => commit(moveFloor(building, floor.id, 1)),
+        `move floor ${floor.id} one place later in the floors array`,
+      );
+      up.disabled = at === 0;
+      down.disabled = at === floors.length - 1;
+      item.append(
+        `${floor.id}${label} — index ${String(floor.index)}, ${String(floor.heightM)} m  `,
+        up,
+        down,
+      );
+      declaration.list.append(item);
+    }
+
+    // Descriptive, and the reason the buttons are legible: press one and this sentence changes.
+    // Two orders differing is ordinary — four of the five shipped buildings differ on open — so it
+    // is stated as a fact about the file and never as a fault with it.
+    declaration.agreement.textContent = declarationOrderMatchesBuildingOrder(floors)
+      ? 'This file happens to declare its floors in the same order the table above shows them — top floor first.'
+      : 'This file declares its floors in a different order from the table above. That is ordinary: most of the shipped buildings are written bottom-up.';
   }
 
   function renderRanges(building: BuildingConfig): void {
@@ -503,6 +574,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
     const building = history.current;
     renderIdentity(building);
     renderFloors(building);
+    renderDeclaration(building);
     renderRanges(building);
     renderBanks(building);
     renderZones(building);
@@ -820,6 +892,66 @@ export function mountEditor(options: EditorOptions): EditorHandle {
 /* -------------------------------------------------------------------------- *
  * Small DOM helpers
  * -------------------------------------------------------------------------- */
+
+/**
+ * What each of the two floor views is, said on the screen rather than in this file — `ED-25`.
+ *
+ * The requirement is not "a second list": it is that a reader can tell the two apart and knows what
+ * each ordering means. A sort with no statement of what it is for is the defect this view exists to
+ * close, wearing a different hat.
+ *
+ * The last sentence is load-bearing and is the reason this paragraph is not shorter. Reordering an
+ * array is the kind of edit a reader expects to be told is safe or unsafe, and this view must not
+ * tell them: § D67 gives every legality opinion in the editor to `parseBuilding`/`resolveBuilding`,
+ * and the Validation panel is where their answer appears. So the text points at it instead of
+ * pre-empting it.
+ */
+const DECLARATION_NOTE =
+  'The table above is in building order — highest index at the top, the direction the preview ' +
+  'draws. This list is the floors array in the order the file writes it, which is what you see in ' +
+  'the Document (JSON) below. ⇧ and ⇩ move a floor within that array and change nothing else: ' +
+  'index and heightM are shown here read-only and are edited in the table above, because the ' +
+  'loader requires the two to agree (floor-height-order) and an editor that renumbered them to ' +
+  'follow a reorder would be settling a modelling error on your behalf. Whether the document is ' +
+  'legal is the loader’s answer, listed under Validation below; this list never says.';
+
+/** The declaration-order view's own nodes. Rebuilt on every edit by `renderDeclaration`. */
+interface DeclarationSection {
+  readonly list: HTMLOListElement;
+  readonly agreement: HTMLElement;
+}
+
+/**
+ * Build the declaration-order fieldset and insert it after the Floors one.
+ *
+ * Built here rather than declared in `index.html` because that file is being edited by another
+ * lane in this same tree and is outside this change's ownership; the nodes it needs are a fieldset,
+ * two paragraphs and an `<ol>`, all of which inherit the stylesheet's element rules, so nothing is
+ * lost by constructing them. If `index.html` later grows the markup, this function is what to
+ * delete.
+ */
+function mountDeclarationSection(floorsTable: HTMLElement): DeclarationSection {
+  const box = document.createElement('fieldset');
+  box.id = 'ed-declaration';
+  const legend = document.createElement('legend');
+  legend.textContent = 'Declaration order — the floors array as the file writes it';
+  const note = document.createElement('p');
+  note.className = 'dim';
+  note.style.margin = '0 0 6px';
+  note.textContent = DECLARATION_NOTE;
+  const agreement = document.createElement('p');
+  agreement.id = 'ed-declaration-agreement';
+  agreement.className = 'dim';
+  agreement.style.margin = '0 0 6px';
+  const list = document.createElement('ol');
+  list.id = 'ed-declaration-list';
+  box.append(legend, note, agreement, list);
+
+  const floorsBox = floorsTable.closest('fieldset');
+  if (floorsBox === null) floorsTable.after(box);
+  else floorsBox.after(box);
+  return { list, agreement };
+}
 
 function cellWithText(text: string): HTMLTableCellElement {
   const cell = document.createElement('td');

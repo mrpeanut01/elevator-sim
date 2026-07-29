@@ -86,6 +86,7 @@ import {
   acceptsHallCalls,
   oppositeDirection,
   type CarCall,
+  type DeckPosition,
   type Direction,
   type HallCall,
   type ServiceMode,
@@ -103,7 +104,11 @@ import {
   type LoadSensorOverrides,
 } from './loadSensor.js';
 import {
+  deckOfFloor,
+  deckSlot,
+  floorIdsServedAt,
   shaftFloor,
+  stopFloorIdOf,
   type CarClock,
   type CarMotion,
   type CarParameterSpec,
@@ -112,6 +117,7 @@ import {
   type CommittedStop,
   type CostEstimate,
   type CostRequest,
+  type DeckStopSplit,
   type RouteStop,
   type ServedFloor,
 } from './types.js';
@@ -285,7 +291,10 @@ export class Car implements CarLike {
   constructor(init: CarInit) {
     if (init.id.length === 0) throw new ModelError('Car id must not be empty.');
 
-    const home = shaftFloor(init.shaft, init.homeFloorId);
+    // Homed at a *stop position*, not at a floor. A double-deck car homed at "27" stands where
+    // its lower deck is at 26 and its upper deck opens onto 27 — the same physical place, named
+    // the way the rest of this class names it. Identity on a single-deck shaft.
+    const home = shaftFloor(init.shaft, stopFloorIdOf(init.shaft, init.homeFloorId));
     if (home === undefined) {
       throw new ModelError(
         `Car "${init.id}" is homed at floor "${init.homeFloorId}", which its shaft does not serve.`,
@@ -381,10 +390,111 @@ export class Car implements CarLike {
   }
 
   /* ---------------------------------------------------------------- *
+   * Decks
+   * ---------------------------------------------------------------- */
+
+  /**
+   * Whether this car carries two rigidly coupled decks. Read off the shaft, which is where the
+   * bank's declared pairing reaches the runtime.
+   *
+   * `spec.doubleDeck` says the *hardware* has two decks; this says the *shaft* knows which
+   * floors they open onto. The two can disagree only for a bank that declares double-deck cars
+   * and no `servesFloorPairs`, which `parse.ts` warns about (`missing-floor-pairs`) and which no
+   * shipped building does. When they disagree the car runs single-deck, because a second deck
+   * with no floor to open onto is not a second deck.
+   */
+  get isDoubleDeck(): boolean {
+    return this.shaft.isDoubleDeck;
+  }
+
+  /**
+   * Where this car stands to open onto `floorId` — the lower floor of its pair.
+   *
+   * **The one normalization in this class**, applied at every boundary where a floor id enters:
+   * home floor, car call, hall-call ordering, alighting, departure. Everything inside the car
+   * is then in stop positions, and everything outside it may go on speaking in floors. Identity
+   * on a single-deck car, which is what makes every other building's run unchanged.
+   */
+  stopFloorFor(floorId: string): string {
+    return stopFloorIdOf(this.shaft, floorId);
+  }
+
+  /** The floors this car's decks open onto when it stops here, lower deck first. */
+  floorIdsServedHere(): readonly string[] {
+    return floorIdsServedAt(this.shaft, this.#floor.id);
+  }
+
+  /**
+   * Which deck opens onto a floor. `'lower'` for every floor of a single-deck car, which makes
+   * every per-deck accumulator in the runner degenerate to the whole-car one.
+   */
+  deckFor(floorId: string): DeckPosition {
+    return deckOfFloor(this.shaft, floorId);
+  }
+
+  /**
+   * Mass currently on one deck, kilograms.
+   *
+   * A passenger occupies the deck their boarding floor maps to. Their destination maps to the
+   * same deck by construction — `traffic/route.ts` will not plan a leg that changes deck
+   * mid-ride, because the decks are bolted together — so the destination is the cheaper and
+   * equally correct key, and it is the one a passenger carries after boarding.
+   *
+   * `0` for the upper deck of a single-deck car, whose whole load is `'lower'`.
+   */
+  deckMassKg(deck: DeckPosition): number {
+    let massKg = 0;
+    for (const passenger of this.#passengers) {
+      if (deckOfFloor(this.shaft, passenger.destinationFloorId) === deck) massKg += passenger.massKg;
+    }
+    return massKg;
+  }
+
+  /**
+   * The 80 % design load **of one deck**, kilograms, or `undefined` for a single-deck car.
+   *
+   * CLAUDE.md's rule that cars fill to 80 % of rated capacity and not 100 % is a rule about a
+   * deck, not about a car body: a 4 000 lb double-deck shuttle is two 2 000 lb decks, and
+   * filling one to 3 200 kg-equivalent because the *other* is empty would put 26 people into a
+   * space that holds 13. The whole-car limit still applies on top through the load cell, and is
+   * implied by this one summed over both decks.
+   *
+   * Derived from `ratedLoadLbPerDeck / ratedLoadLb` rather than by halving, so a car whose two
+   * decks are not equal — the schema permits it, `parse.ts` warns `deck-load-mismatch` — is
+   * modelled as authored rather than as assumed.
+   */
+  get deckDesignLoadKg(): number | undefined {
+    const perDeckLb = this.spec.ratedLoadLbPerDeck;
+    if (!this.isDoubleDeck || perDeckLb === undefined || this.spec.ratedLoadLb <= 0) {
+      return undefined;
+    }
+    return this.loadSensor.designLoadKg * (perDeckLb / this.spec.ratedLoadLb);
+  }
+
+  /** The per-deck overload interlock, kilograms, or `undefined` for a single-deck car. */
+  get deckOverloadKg(): number | undefined {
+    const perDeckLb = this.spec.ratedLoadLbPerDeck;
+    if (!this.isDoubleDeck || perDeckLb === undefined || this.spec.ratedLoadLb <= 0) {
+      return undefined;
+    }
+    return (
+      this.loadSensor.ratedLoadKg *
+      this.loadSensor.overloadThreshold *
+      (perDeckLb / this.spec.ratedLoadLb)
+    );
+  }
+
+  /* ---------------------------------------------------------------- *
    * Position and motion
    * ---------------------------------------------------------------- */
 
-  /** The floor the car is at, or the one it left if a move is in progress. */
+  /**
+   * The floor the car is at, or the one it left if a move is in progress.
+   *
+   * For a double-deck car this is its **stop position**: the floor its *lower* deck opens onto.
+   * The upper deck is at `pairedFloorOf(floorId)` at the same instant, and
+   * {@link floorIdsServedHere} names both.
+   */
   get floorId(): string {
     return this.#floor.id;
   }
@@ -501,7 +611,10 @@ export class Car implements CarLike {
         `Car "${this.id}" is overloaded (load factor ${this.loadSensor.loadFactor.toFixed(3)} >= ${this.loadSensor.overloadThreshold}); the doors are held open and the car will not start.`,
       );
     }
-    const target = shaftFloor(this.shaft, floorId);
+    // A double-deck car drives between *stop positions*, so "go to 27" is "go to 26 and open
+    // the upper deck onto 27". Normalizing here rather than at each caller is what keeps the
+    // travelled distance the real one: 26 to 27 is not a 4.5 m hop, it is the same place.
+    const target = shaftFloor(this.shaft, this.stopFloorFor(floorId));
     if (target === undefined) {
       throw new ModelError(
         `Car "${this.id}" cannot depart for "${floorId}": its shaft does not serve that floor.`,
@@ -755,7 +868,7 @@ export class Car implements CarLike {
 
   /** Whether a destination is registered inside the car. */
   hasCarCall(floorId: string): boolean {
-    return this.#carCalls.has(floorId);
+    return this.#carCalls.has(this.stopFloorFor(floorId));
   }
 
   /**
@@ -775,10 +888,14 @@ export class Car implements CarLike {
         `Car "${this.id}" is in mode "${this.#mode}" and does not honour car calls.`,
       );
     }
-    const existing = this.#carCalls.get(floorId);
+    // A button for floor 27 on a double-deck car commits the car to the *stop* at 26; the two
+    // buttons of a pair are one stop, which is the whole of what the hardware buys. Identity on
+    // a single-deck car.
+    const stopFloorId = this.stopFloorFor(floorId);
+    const existing = this.#carCalls.get(stopFloorId);
     if (existing !== undefined) return existing;
 
-    const floor = shaftFloor(this.shaft, floorId);
+    const floor = shaftFloor(this.shaft, stopFloorId);
     if (floor === undefined) {
       throw new ModelError(
         `Car "${this.id}" has no button for floor "${floorId}": its shaft does not serve it.`,
@@ -800,7 +917,7 @@ export class Car implements CarLike {
 
   /** Extinguish a car-call button. @returns `true` if one was lit. */
   clearCarCall(floorId: string): boolean {
-    return this.#carCalls.delete(floorId);
+    return this.#carCalls.delete(this.stopFloorFor(floorId));
   }
 
   /**
@@ -927,7 +1044,9 @@ export class Car implements CarLike {
     if (index < 0) {
       throw new ModelError(`Passenger "${passenger.id}" is not aboard car "${this.id}".`);
     }
-    if (passenger.destinationFloorId !== this.#floor.id) {
+    // Both decks are open, so "this floor" is either floor of the pair. Identity on a
+    // single-deck car, where `stopFloorFor` returns its argument.
+    if (this.stopFloorFor(passenger.destinationFloorId) !== this.#floor.id) {
       throw new ModelError(
         `Passenger "${passenger.id}" is bound for "${passenger.destinationFloorId}" and cannot alight at "${this.#floor.id}".`,
       );
@@ -982,9 +1101,16 @@ export class Car implements CarLike {
     return this.loadSensor.remove(passenger);
   }
 
-  /** Everyone aboard whose destination is the current floor, in boarding order. */
+  /**
+   * Everyone aboard whose destination is the current floor, in boarding order.
+   *
+   * For a double-deck car that is everyone bound for **either** floor of the pair the car is
+   * standing at: both decks open, and both empty at once.
+   */
   alightingHere(): readonly Passenger[] {
-    return this.#passengers.filter((p) => p.destinationFloorId === this.#floor.id);
+    return this.#passengers.filter(
+      (p) => this.stopFloorFor(p.destinationFloorId) === this.#floor.id,
+    );
   }
 
   /* ---------------------------------------------------------------- *
@@ -1062,16 +1188,25 @@ export class Car implements CarLike {
       alightingCount: number;
       alightingMassKg: number;
       boardingCount: number;
+      /** `[lower, upper]` alighting and boarding. Only read when the shaft is double-deck. */
+      deckAlighting: [number, number];
+      deckBoarding: [number, number];
     }
 
+    const doubleDeck = this.shaft.isDoubleDeck;
     const byFloor = new Map<string, Accumulator>();
+    // **Keyed by stop position, not by floor.** This is the one line that makes a double-deck
+    // stop one stop: two hall calls at 26 and 27 accumulate into a single entry, so the route
+    // has one node where a single-deck car would have two and the projection charges one
+    // approach, one open and one close instead of two of each.
     const ensure = (floorId: string, registeredAt: SimTime): Accumulator | undefined => {
-      const existing = byFloor.get(floorId);
+      const stopFloorId = doubleDeck ? this.stopFloorFor(floorId) : floorId;
+      const existing = byFloor.get(stopFloorId);
       if (existing !== undefined) {
         existing.registeredAt = Math.min(existing.registeredAt, registeredAt);
         return existing;
       }
-      const floor = this.shaft.floorsById.get(floorId);
+      const floor = this.shaft.floorsById.get(stopFloorId);
       /* c8 ignore next -- every entry point validates the floor against this shaft. */
       if (floor === undefined) return undefined;
       const created: Accumulator = {
@@ -1083,8 +1218,10 @@ export class Car implements CarLike {
         alightingCount: 0,
         alightingMassKg: 0,
         boardingCount: 0,
+        deckAlighting: [0, 0],
+        deckBoarding: [0, 0],
       };
-      byFloor.set(floorId, created);
+      byFloor.set(stopFloorId, created);
       return created;
     };
 
@@ -1100,6 +1237,8 @@ export class Car implements CarLike {
         entry.hallCallDirections.push(call.direction);
       }
       entry.boardingCount += this.assumedBoardingPassengers;
+      entry.deckBoarding[deckSlot(deckOfFloor(this.shaft, call.floorId))] +=
+        this.assumedBoardingPassengers;
     }
     for (const passenger of this.#passengers) {
       const entry = ensure(passenger.destinationFloorId, passenger.boardedAt ?? passenger.arrivedAt);
@@ -1107,6 +1246,7 @@ export class Car implements CarLike {
       entry.carCall = true;
       entry.alightingCount += 1;
       entry.alightingMassKg += passenger.massKg;
+      entry.deckAlighting[deckSlot(deckOfFloor(this.shaft, passenger.destinationFloorId))] += 1;
     }
 
     return Object.freeze(
@@ -1127,6 +1267,7 @@ export class Car implements CarLike {
             alightingCount: entry.alightingCount,
             alightingMassKg: entry.alightingMassKg,
             boardingCount: entry.boardingCount,
+            ...(doubleDeck ? { deckSplit: splitOf(entry.deckAlighting, entry.deckBoarding) } : {}),
           }),
         ),
     );
@@ -1337,20 +1478,34 @@ export class Car implements CarLike {
     const floorId = this.#floor.id;
     let hallCall = false;
     let boarding = 0;
+    const deckBoarding: [number, number] = [0, 0];
     for (const call of this.#hallCalls.values()) {
-      if (call.floorId !== floorId) continue;
+      if (this.stopFloorFor(call.floorId) !== floorId) continue;
       hallCall = true;
       boarding += this.assumedBoardingPassengers;
+      deckBoarding[deckSlot(deckOfFloor(this.shaft, call.floorId))] +=
+        this.assumedBoardingPassengers;
     }
     let alighting = 0;
+    const deckAlighting: [number, number] = [0, 0];
     for (const passenger of this.#passengers) {
-      if (passenger.destinationFloorId === floorId) alighting += 1;
+      if (this.stopFloorFor(passenger.destinationFloorId) !== floorId) continue;
+      alighting += 1;
+      deckAlighting[deckSlot(deckOfFloor(this.shaft, passenger.destinationFloorId))] += 1;
     }
+    // **The decks empty in parallel, so the stop takes the busier one, not the sum.** Same rule
+    // the door machine already applies to the two base dwells (`baseDwellSeconds`: alighting and
+    // boarding do not take turns). Degenerate on a single-deck car, where everything is on the
+    // lower deck and the max is the sum.
+    const split = this.isDoubleDeck ? splitOf(deckAlighting, deckBoarding) : undefined;
+    const movers =
+      split === undefined ? alighting + boarding : Math.max(split.movers[0], split.movers[1]);
     return {
       carCall: this.#carCalls.has(floorId) || alighting > 0,
       hallCall,
-      hallQueueLength: boarding,
-      transferSeconds: (alighting + boarding) * this.passengerTransferS,
+      hallQueueLength:
+        split === undefined ? boarding : Math.max(split.boarding[0], split.boarding[1]),
+      transferSeconds: movers * this.passengerTransferS,
     };
   }
 
@@ -1389,6 +1544,20 @@ export class Car implements CarLike {
  * arrival for it would be a spurious failure.
  */
 const ARRIVAL_EPSILON_S = 1e-9;
+
+/** Assemble a {@link DeckStopSplit} from per-deck alighting and boarding tallies. */
+function splitOf(
+  alighting: readonly [number, number],
+  boarding: readonly [number, number],
+): DeckStopSplit {
+  return Object.freeze({
+    movers: Object.freeze([alighting[0] + boarding[0], alighting[1] + boarding[1]]) as readonly [
+      number,
+      number,
+    ],
+    boarding: Object.freeze([boarding[0], boarding[1]]) as readonly [number, number],
+  });
+}
 
 function requireNonNegative(value: number, field: string, carId: string): number {
   if (!Number.isFinite(value) || value < 0) {

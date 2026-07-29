@@ -313,6 +313,8 @@ export interface ProfilePatch {
   readonly answer?: ProfileSection | undefined;
   readonly idle?: ProfileSection | undefined;
   readonly auction?: ProfileSection | undefined;
+  /** Stage 3's weight-set selection. `policy: 'off'` on every shipped profile. */
+  readonly selection?: ProfileSection | undefined;
 }
 
 /**

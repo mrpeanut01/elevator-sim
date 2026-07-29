@@ -68,6 +68,40 @@ describe('halfWidthStoppingRule', () => {
     });
   });
 
+  /**
+   * **A zero-variance sample: what actually happens, pinned because a docstring said otherwise.**
+   *
+   * `HalfWidthEstimate`'s docstring listed "a zero-variance sample the estimator declines to bound"
+   * as a source of a *non-finite* half-width. The shipped estimator declines nothing —
+   * `t[n-1] · 0 / √n` is **0**, finite, and strictly below every positive target — so the rule
+   * stops at the first evaluation point whatever precision was asked for. Open item `C4`'s third
+   * finding was that disagreement, and the docstring is what was wrong: zero is the true half-width
+   * of an interval around a constant sample, and Phase 3's first acceptance criterion needs
+   * `pairedDifferenceEstimate(v, v)` to be exactly `[0, 0]` rather than `NaN`.
+   *
+   * Pinned here so that a later change of mind is a visible change rather than a silent one, and
+   * because the *hazard* is real even though the arithmetic is right: docs/07 § 4 records that a
+   * bit-identical result is a wiring bug until proven otherwise, and this is a rule declaring
+   * convergence on exactly that evidence. It is unreachable in anything this repository ships — no
+   * study injects a stopping rule at all (DECISIONS.md § D125).
+   */
+  it('stops immediately on a zero-variance sample, at the shipped estimator’s own arithmetic', () => {
+    const flat = [7, 7, 7, 7, 7, 7];
+    const estimate = estimateMean(flat, { confidence: 0.9 });
+    expect(estimate.stdDev).toBe(0);
+    expect(estimate.halfWidth).toBe(0);
+    expect(Number.isFinite(estimate.halfWidth)).toBe(true);
+
+    const answer = verdict(productionStoppingRule(input(flat, 1e-9)));
+    expect(answer.halfWidth).toBe(0);
+    /* Below even a target nine orders of magnitude tighter than anything a study asks for. */
+    expect(answer.stop).toBe(true);
+
+    /* Two samples is the rule's own floor, so this is the earliest a stop is expressible at all. */
+    expect(verdict(productionStoppingRule(input([7, 7], 1e-9))).stop).toBe(true);
+    expect(verdict(productionStoppingRule(input([7], 1e-9))).stop).toBe(false);
+  });
+
   it('passes the confidence level through to the estimator', () => {
     const seen: number[] = [];
     const rule = halfWidthStoppingRule((_, { confidence }) => {
@@ -91,10 +125,11 @@ describe('fixedBudgetStoppingRule', () => {
  * `validation/harness.ts`'s `productionStoppingRule` is the repository's only composed stopping
  * rule. **Nothing outside a test injects it, or any rule** — every shipped study fixes its budget,
  * deliberately (DECISIONS.md § D125). What it injects is `reports/statistics`'s `estimateMean` —
- * Student-t at `n - 1`, at every `n`. docs/03-traffic-and-statistics.md § Part 3 writes the rule with a
- * `t` (n ≤ 25) / `z` (n > 25) crossover instead; the quantile chooser that implemented that had no
+ * Student-t at `n - 1`, at every `n`, which is also what docs/03-traffic-and-statistics.md § Part 3
+ * now writes. That section wrote a `t` (n ≤ 25) / `z` (n > 25) crossover until 2026-07-27; the
+ * quantile chooser that implemented it had no
  * non-test caller once review finding #14 took it off the published path, and is deleted rather
- * than kept exported behind a caller list nothing satisfies (DECISIONS.md § D7).
+ * than kept exported behind a caller list nothing satisfies (DECISIONS.md § D7, § D14).
  *
  * The half-width the loop compares against `acceptableRange` is therefore the *same number* the
  * report prints for that cell — which is the property worth pinning, because `ConvergenceReport`
@@ -121,9 +156,9 @@ describe('productionStoppingRule — the estimator loop control would use if inj
     }
   });
 
-  it('is strictly more conservative than the doc’s crossover past n = 25, never less', () => {
+  it('is strictly more conservative than the superseded crossover past n = 25, never less', () => {
     // The direction matters and is the whole reason this is the estimator that ships: a wider
-    // half-width stops later. At 90 % and n = 26 the doc's z = 1.65 against t(25) = 1.7081.
+    // half-width stops later. At 90 % and n = 26 the old rule's z = 1.65 against t(25) = 1.7081.
     const samples = Array.from({ length: 26 }, (_, index) => index * 1.3);
     const input_ = {
       samples,
@@ -139,12 +174,13 @@ describe('productionStoppingRule — the estimator loop control would use if inj
 });
 
 /**
- * The test double is checked against the doc's own worked arithmetic, because the runner's stopping
- * tests are only as meaningful as the estimator behind them.
+ * The test double is checked against that rule's own worked arithmetic, because the runner's
+ * stopping tests are only as meaningful as the estimator behind them.
  *
- * It implements docs/03 § Part 3's crossover, which the **shipped** rule deliberately does not —
- * see the block above. That divergence is useful rather than accidental: it is what proves the
- * port records whatever family the estimator reports instead of re-deriving one.
+ * It implements the crossover docs/03 § Part 3 carried before 2026-07-27, which neither the
+ * **shipped** rule nor the doc does now — see the block above. That divergence is useful rather
+ * than accidental: it is what proves the port records whatever family the estimator reports
+ * instead of re-deriving one.
  */
 describe('docHalfWidth (an estimator that is deliberately not the shipped one)', () => {
   it('uses the t-distribution to n = 25 and the normal approximation past it', () => {

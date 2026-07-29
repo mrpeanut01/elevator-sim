@@ -72,12 +72,16 @@ import { travelTime } from '../../physics/motion/index.js';
 import { acceptsCarCalls, acceptsHallCalls, type Direction } from '../types.js';
 
 import {
+  deckOfFloor,
+  deckSlot,
   isAccessPermitted,
   shaftFloor,
+  stopFloorIdOf,
   type CarSnapshot,
   type CommittedStop,
   type CostEstimate,
   type CostRequest,
+  type DeckStopSplit,
   type InfeasibilityReason,
   type RouteStop,
 } from './types.js';
@@ -160,14 +164,37 @@ export function requestedStop(
   snapshot: CarSnapshot,
   request: CostRequest,
 ): CommittedStop | undefined {
-  const floor = shaftFloor(snapshot.shaft, request.floorId);
+  // **Where the dispatcher learns that a stop serves two floors.** The request names a landing
+  // — floor 27 — and the stop it would add is at the car's *position* for that landing, 26. So
+  // a car already committed to 26 prices 27 as a stop it is making anyway, and `withStop` merges
+  // rather than appends. Without this normalization the estimator prices double-deck hardware as
+  // single-deck: two approaches, two door cycles, twice the marginal delay.
+  //
+  // Identity on a single-deck shaft, so no conventional bank's price moves.
+  const floor = shaftFloor(snapshot.shaft, stopFloorIdOf(snapshot.shaft, request.floorId));
   if (floor === undefined) return undefined;
 
   const isHallCall = (request.kind ?? 'hall') === 'hall';
   // A car call loads nobody: the passenger who pressed it is already aboard. Only a landing
   // call brings mass and transfer time with it.
-  const boardingCount =
-    request.boardingPassengers ?? (isHallCall ? snapshot.assumedBoardingPassengers : 0);
+  const boardingCount = Math.max(
+    0,
+    request.boardingPassengers ?? (isHallCall ? snapshot.assumedBoardingPassengers : 0),
+  );
+
+  const slot = deckSlot(deckOfFloor(snapshot.shaft, request.floorId));
+  const deckSplit: DeckStopSplit | undefined = snapshot.shaft.isDoubleDeck
+    ? Object.freeze({
+        movers: Object.freeze(slot === 0 ? [boardingCount, 0] : [0, boardingCount]) as readonly [
+          number,
+          number,
+        ],
+        boarding: Object.freeze(slot === 0 ? [boardingCount, 0] : [0, boardingCount]) as readonly [
+          number,
+          number,
+        ],
+      })
+    : undefined;
 
   return Object.freeze({
     floorId: floor.id,
@@ -182,7 +209,8 @@ export function requestedStop(
     registeredAt: request.registeredAt ?? snapshot.at,
     alightingCount: 0,
     alightingMassKg: 0,
-    boardingCount: Math.max(0, boardingCount),
+    boardingCount,
+    ...(deckSplit === undefined ? {} : { deckSplit }),
   });
 }
 
@@ -242,11 +270,44 @@ function withStop(
         boardingCount: sameButton
           ? Math.max(stop.boardingCount, extra.boardingCount)
           : stop.boardingCount + extra.boardingCount,
+        // The per-deck split follows the same rule, per deck. A request at 27 folded into a
+        // stop already committed at 26 adds its boarders to the *upper* deck and leaves the
+        // lower one alone — which is exactly why the merged stop's dwell does not grow: the
+        // lower deck was already the busier one.
+        ...(stop.deckSplit === undefined && extra.deckSplit === undefined
+          ? {}
+          : { deckSplit: mergeDeckSplits(stop.deckSplit, extra.deckSplit, sameButton) }),
       }),
     );
   }
   if (!found) merged.push(extra);
   return merged;
+}
+
+const ZERO_SPLIT: DeckStopSplit = Object.freeze({
+  movers: Object.freeze([0, 0]) as readonly [number, number],
+  boarding: Object.freeze([0, 0]) as readonly [number, number],
+});
+
+/** Deck-wise `withStop`: `max` for the same button, `+` for a second group of people. */
+function mergeDeckSplits(
+  a: DeckStopSplit | undefined,
+  b: DeckStopSplit | undefined,
+  sameButton: boolean,
+): DeckStopSplit {
+  const left = a ?? ZERO_SPLIT;
+  const right = b ?? ZERO_SPLIT;
+  const combine = (x: number, y: number): number => (sameButton ? Math.max(x, y) : x + y);
+  return Object.freeze({
+    movers: Object.freeze([
+      combine(left.movers[0], right.movers[0]),
+      combine(left.movers[1], right.movers[1]),
+    ]) as readonly [number, number],
+    boarding: Object.freeze([
+      combine(left.boarding[0], right.boarding[0]),
+      combine(left.boarding[1], right.boarding[1]),
+    ]) as readonly [number, number],
+  });
 }
 
 /**
@@ -310,11 +371,19 @@ function orderStops(
 
 /** The door machine's view of why the car stops here, including the passenger-flow term. */
 function stopReasonFor(snapshot: CarSnapshot, stop: CommittedStop): DoorStopReason {
-  const movers = stop.alightingCount + stop.boardingCount;
+  // Both decks open together and empty in parallel, so a paired stop takes the busier deck's
+  // transfer, not the sum of the two. `deckSplit` is absent on every single-deck stop and the
+  // expression below is then the sum it always was.
+  const split = stop.deckSplit;
+  const movers =
+    split === undefined
+      ? stop.alightingCount + stop.boardingCount
+      : Math.max(split.movers[0], split.movers[1]);
   return {
     carCall: stop.carCall,
     hallCall: stop.hallCall,
-    hallQueueLength: stop.boardingCount,
+    hallQueueLength:
+      split === undefined ? stop.boardingCount : Math.max(split.boarding[0], split.boarding[1]),
     // The `2*P*tp` term of the Barney/CIBSE round-trip-time calculation, localised to one
     // stop. Without it, a lobby stop that loads twelve people is priced as a 5 s dwell and
     // the simulation comes out ~10 s short at every heavy floor.

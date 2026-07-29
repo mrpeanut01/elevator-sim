@@ -71,6 +71,15 @@ export default defineConfig({
   // The reference data is the viewer's static content in dev. Nothing is copied on build,
   // because there is no production build of this package.
   publicDir: DATA_DIR,
-  server: { port: 5174, strictPort: false },
+  // docs/10 § 2.10 **M16** and § 14 item 6: `.claude/launch.json` declared 5173 and this file
+  // declared 5174, so the preview tooling pointed at a port the server does not use. Reconciled
+  // on **5174**, because that is the port the server was actually serving and the one any bookmark
+  // or driven session already had.
+  //
+  // `strictPort` is now `true`, which is the half of the fix that stops the disagreement coming
+  // back: under `false` a busy 5174 silently becomes 5175 and the tooling is wrong again with
+  // nothing said. Failing to start is the honest outcome — it names the conflict instead of
+  // hiding it.
+  server: { port: 5174, strictPort: true },
   plugins: [buildingsManifest()],
 });

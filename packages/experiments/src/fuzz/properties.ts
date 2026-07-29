@@ -39,6 +39,7 @@
 
 import {
   buildJourneys,
+  isDestinationCallType,
   resolveLoadSensor,
   type DispatcherProfile,
   type ElevatorSpecs,
@@ -49,6 +50,7 @@ import {
   type SimulationResult,
 } from '@elevator-sim/core';
 
+import { callCarriesCredential } from './generate.js';
 import type { FuzzCase, PropertyBounds, Violation } from './types.js';
 
 /** Metres, kilograms and seconds are doubles; this absorbs binary-float dust in a comparison. */
@@ -87,20 +89,38 @@ function permittedGroupsByFloor(building: ResolvedBuilding): ReadonlyMap<string,
  * error `CLAUDE.md` warns about:
  *
  * 1. **service zoning** — some bank's shaft reaches both floors;
- * 2. **access zoning at the origin** — the *call* must carry a credential the landing accepts,
- *    and `costRequestFor` forwards one only under `mobile-credential`. Under a bare up/down
- *    button a call from a restricted landing is unassignable and those passengers are locked
- *    out for the whole run. That is a real operating condition, not a defect;
- * 3. **access zoning at the destination** — the *passenger's* credential, which is what
- *    `Simulation.#carCanCarry` checks at boarding time.
+ * 2. **access zoning at the origin** — the *call* must carry a credential the landing accepts.
+ *    `costRequestFor` forwards one under `mobile-credential` **or** when a landing panel has
+ *    already checked it, so whether it does is a property of the `(profile, call type)` pair and
+ *    not of the call type alone; {@link callCarriesCredential} is that question, derived from
+ *    `core`'s own rule rather than restated here. Under a bare up/down button — or under
+ *    `destination-entry` beside a conventional profile — a call from a restricted landing is
+ *    unassignable and those passengers are locked out for the whole run. That is a real operating
+ *    condition, not a defect;
+ * 3. **access zoning at the destination, by two different actors with two different credentials.**
+ *    At *boarding* time `Simulation.#carCanCarry` asks it with the **passenger's** credential. At
+ *    *dispatch* time `infeasibilityOf` step 4 asks it again with the **call's** — but only when the
+ *    call disclosed a destination at all — and answers `destinationAccessDenied` for every car when
+ *    the call has none. So under `destination-entry` beside a conventional profile, a leg to a
+ *    restricted floor is refused by the whole fleet **before** anybody boards, exactly as a call
+ *    *from* a restricted landing is: same mechanism, other end of the journey. Both are checked.
  *
  * A leg that fails any of them is legitimately unservable and is exempt from the starvation
  * and deadlock bounds — but it must still be *named* in `undelivered`, which P1 checks.
+ *
+ * **The third clause was added when the corpus reached the middle rung of the ladder, and it does
+ * not make anything green.** `fuzz-145`'s shrunk counterexample — a credentialed passenger at the
+ * lobby of a single-car building, refused by the only car in it because the kiosk told the group
+ * *where* they were going and not *who they were* — stops being reported as a deadlock, correctly,
+ * because no budget would ever have collected them. The parent case still fails, on two passengers
+ * bound for an **unrestricted** floor who are stranded behind that one in the same landing queue,
+ * which is a `core` liveness finding and is recorded rather than exempted.
  */
 function isServable(
   building: ResolvedBuilding,
   permitted: ReadonlyMap<string, ReadonlySet<string>>,
-  callCarriesCredential: boolean,
+  callHasCredential: boolean,
+  callDisclosesDestination: boolean,
   originFloorId: string,
   destinationFloorId: string,
   credentialGroup: string | undefined,
@@ -113,12 +133,21 @@ function isServable(
 
   const originGroups = permitted.get(originFloorId);
   if (originGroups !== undefined) {
-    const callCredential = callCarriesCredential ? credentialGroup : undefined;
+    const callCredential = callHasCredential ? credentialGroup : undefined;
     if (callCredential === undefined || !originGroups.has(callCredential)) return false;
   }
   const destinationGroups = permitted.get(destinationFloorId);
   if (destinationGroups !== undefined) {
+    // (a) boarding time, the passenger's own credential.
     if (credentialGroup === undefined || !destinationGroups.has(credentialGroup)) return false;
+    // (b) dispatch time, the call's. `costRequestFor` forwards the destination under the two
+    //     destination call types and the credential under `mobile-credential` or a panel, so this
+    //     is `true` for exactly one pair — a disclosed destination with no credential beside it —
+    //     and `infeasibilityOf` then returns `destinationAccessDenied` for every car in the
+    //     building, permanently. Under `up-down-buttons` no destination reaches the request and
+    //     this branch is unreachable, which is why the clause is gated on disclosure rather than
+    //     applied to every call that lacks a credential.
+    if (callDisclosesDestination && !callHasCredential) return false;
   }
   return true;
 }
@@ -765,7 +794,12 @@ export function checkTermination(context: PropertyContext): Violation[] {
     if (leg.alightedAt !== undefined) lastActivityAt = Math.max(lastActivityAt, leg.alightedAt);
   }
   const permitted = permittedGroupsByFloor(building);
-  const callCarriesCredential = context.case.callType === 'mobile-credential';
+  // Derived beside the profile, not off the call type alone: a landing panel authorizes at the
+  // kiosk and `costRequestFor` honours that, so `destination-entry` carries a credential beside a
+  // panel profile and carries none beside a conventional one. Asking one function is what keeps
+  // this property's notion of servable equal to the simulator's.
+  const callHasCredential = callCarriesCredential(context.dispatcherProfile, context.case.callType);
+  const callDisclosesDestination = isDestinationCallType(context.case.callType);
   const credentialByJourney = new Map(
     result.trace.passengers.map((record) => [record.journeyId, record.credentialGroup]),
   );
@@ -796,7 +830,8 @@ export function checkTermination(context: PropertyContext): Violation[] {
     const servable = isServable(
       building,
       permitted,
-      callCarriesCredential,
+      callHasCredential,
+      callDisclosesDestination,
       journey.originFloorId,
       journey.destinationFloorId,
       credentialByJourney.get(journey.journeyId),
@@ -833,7 +868,12 @@ export function checkStarvation(context: PropertyContext): Violation[] {
   if (flagged) return violations;
 
   const permitted = permittedGroupsByFloor(building);
-  const callCarriesCredential = context.case.callType === 'mobile-credential';
+  // Derived beside the profile, not off the call type alone: a landing panel authorizes at the
+  // kiosk and `costRequestFor` honours that, so `destination-entry` carries a credential beside a
+  // panel profile and carries none beside a conventional one. Asking one function is what keeps
+  // this property's notion of servable equal to the simulator's.
+  const callHasCredential = callCarriesCredential(context.dispatcherProfile, context.case.callType);
+  const callDisclosesDestination = isDestinationCallType(context.case.callType);
 
   for (const leg of result.record.passengers) {
     const waitS = (leg.boardedAt ?? result.record.endedAt) - leg.arrivedAt;
@@ -842,7 +882,8 @@ export function checkStarvation(context: PropertyContext): Violation[] {
       !isServable(
         building,
         permitted,
-        callCarriesCredential,
+        callHasCredential,
+        callDisclosesDestination,
         leg.originFloorId,
         leg.destinationFloorId,
         leg.credentialGroup,

@@ -91,6 +91,22 @@
       .checklist { max-height: 140px; overflow: auto; border: 1px solid var(--edge); border-radius: 4px; padding: 4px 6px; }
       .checklist label { display: flex; gap: 6px; color: var(--text); }
       textarea { width: 100%; min-height: 140px; }
+      /* docs/10 § 11 W4 — the generated parameter form. Every rule below is keyed on a class the
+         renderer emits for *every* control, never on a parameter id, because there is no list of
+         parameter ids anywhere in this product's UI and adding one here would be the first. */
+      #panel-parameters .editor-form { width: 100%; }
+      .control { padding: 6px 0; border-bottom: 1px solid var(--edge); }
+      .control-label { display: inline-block; min-width: 16em; }
+      .control-unit { color: var(--dim); margin-right: 6px; }
+      .control-input { display: inline-flex; gap: 6px; align-items: center; }
+      .control-input input[type='range'] { width: 180px; }
+      .control-input input[type='number'] { width: 7em; }
+      .control-help { color: var(--dim); margin: 4px 0 0; max-width: 60em; }
+      /* KB-15: the reason is text. The dimming is a second signal, never the only one. */
+      .control-disabled { opacity: 0.65; }
+      .control-inactive { color: var(--warn); margin: 4px 0 0; }
+      .control-reset { margin-left: 6px; }
+
       .sr-only {
         position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
         overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -135,6 +151,9 @@
         </button>
         <button role="tab" id="tab-editor" aria-selected="false" aria-controls="panel-editor" tabindex="-1">
           Building editor
+        </button>
+        <button role="tab" id="tab-parameters" aria-selected="false" aria-controls="panel-parameters" tabindex="-1">
+          Parameters
         </button>
       </div>
       <span class="dim" id="banner"></span>
@@ -276,6 +295,25 @@
           <div class="editor-preview">
             <canvas id="preview" role="img" aria-label="No building open."></canvas>
           </div>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Surface C — the generated parameter form (docs/10 § 11 W4)          -->
+      <!--                                                                     -->
+      <!-- Nothing below names a parameter, a section or a schema. The picker   -->
+      <!-- is filled from `discoverParameterSchemas()` and the controls are     -->
+      <!-- built from the declarations, which is CLAUDE.md invariant 8 reaching -->
+      <!-- the screen: a knob declared tomorrow appears here with no edit.      -->
+      <!-- ------------------------------------------------------------------ -->
+      <section role="tabpanel" id="panel-parameters" aria-labelledby="tab-parameters" hidden>
+        <div class="bar">
+          <label>schema <select id="param-source"></select></label>
+          <span id="param-status" role="status"></span>
+          <span id="param-refusal" role="alert" tabindex="-1"></span>
+        </div>
+        <div class="editor-body">
+          <div class="editor-form" id="param-form"></div>
         </div>
       </section>
     </main>

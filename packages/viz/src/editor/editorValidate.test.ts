@@ -155,30 +155,57 @@ describe('warnings are separate and never fatal — ED-T7, ED-12, ED-15, ED-16, 
     expect(warning?.message).toContain('9');
   }, 120_000);
 
-  it('double-deck is surfaced as declared-but-not-simulated — ED-17', () => {
+  /**
+   * **ED-17 changed meaning in Phase 6, and it changed because the old claim became false.**
+   *
+   * It used to assert `double-deck-not-simulated` on any bank declaring a double-deck car. That
+   * code is retired: `core` simulates the decks from the bank's `servesFloorPairs`. What survives
+   * — and what the editor still has to surface — is the *one* configuration where the hardware is
+   * declared and the geometry is not, because there the car really does run as a single deck of
+   * the combined capacity. Two arms, so the editor cannot go silent in either direction.
+   *
+   * `packages/viz/UX.md`'s ED-17 row still describes the old behaviour and is left for the lane
+   * that owns that document.
+   */
+  const doubleDeckCar = {
+    id: 'A',
+    spec: 'hydraulic',
+    doubleDeck: true,
+    deckSeparationM: 3,
+    ratedLoadLb: 3200,
+    ratedLoadLbPerDeck: 1600,
+  } as const;
+
+  it('double-deck with a declared pairing is simulated, and is not disclaimed — ED-17', () => {
     const report = check({
       ...garden,
       banks: [
         {
           ...(garden.banks[0] as BuildingConfig['banks'][number]),
           servesFloorPairs: [['G', '2']],
-          cars: [
-            {
-              id: 'A',
-              spec: 'hydraulic',
-              doubleDeck: true,
-              deckSeparationM: 3,
-              ratedLoadLb: 3200,
-              ratedLoadLbPerDeck: 1600,
-            },
-          ],
+          cars: [doubleDeckCar],
         },
       ],
     });
-    const warning = report.warnings.find((w) => w.code === 'double-deck-not-simulated');
-    expect(warning).toBeDefined();
-    expect(warning?.message.toLowerCase()).toContain('not simulate');
+    expect(report.warnings.find((w) => w.code === 'double-deck-not-simulated')).toBeUndefined();
+    expect(report.warnings.find((w) => w.code === 'missing-floor-pairs')).toBeUndefined();
     // A warning, so Run stays enabled — ED-12's rule applied here.
+    expect(report.valid).toBe(true);
+  }, 120_000);
+
+  it('double-deck with no declared pairing is surfaced as not-simulated — ED-17', () => {
+    const report = check({
+      ...garden,
+      banks: [
+        {
+          ...(garden.banks[0] as BuildingConfig['banks'][number]),
+          cars: [doubleDeckCar],
+        },
+      ],
+    });
+    const warning = report.warnings.find((w) => w.code === 'missing-floor-pairs');
+    expect(warning).toBeDefined();
+    expect(warning?.message.toLowerCase()).toContain('cannot be simulated');
     expect(report.valid).toBe(true);
   }, 120_000);
 });

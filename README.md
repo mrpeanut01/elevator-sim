@@ -49,6 +49,7 @@ This project exists to make those comparisons rigorous.
 | [Review findings](docs/08-review-findings.md) | The whole-system review register, with each finding's disposition |
 | [Destination dispatch contract](docs/09-destination-dispatch-contract.md) | Phase 6's locked interface contract, its measured comparison design, and the open questions that gate implementation |
 | [Experience layer contract](docs/10-experience-layer-contract.md) | Phase 9's design: the rules that keep a gamified surface honest, novice/expert modes, a schema-generated dispatcher and traffic editor, and access-zone credentials |
+| [TWIN shaft contract](docs/11-twin-shaft-contract.md) | Two independently driven cars in one shaft, designed and not built: the shaft model, the speed-dependent separation constraint, the deadlock invariant and the property that catches it, and an acceptance criterion written before the implementation |
 
 Machine-readable configuration lives in [`data/`](data/).
 
@@ -56,7 +57,7 @@ Machine-readable configuration lives in [`data/`](data/).
 
 **Phases 0–5, 7 and 8 are landed and accepted. Phase 6 is partially complete** — see the table for
 what that means. Four packages (`core`, `experiments`, `viz`, `cli`), a six-command CLI,
-**179 test files, 3,353 tests** (3,344 passing, 9 skipped), `tsc -b` clean.
+**190 test files, 3,505 tests** (3,496 passing, 9 skipped), `tsc -b` clean.
 
 | Phase | Status |
 |---|---|
@@ -66,9 +67,9 @@ what that means. Four packages (`core`, `experiments`, `viz`, `cli`), a six-comm
 | 3 — Experiment infra | ✅ Replication runner, CRN, sequential stopping, paired-t |
 | 4 — Visualization | ✅ Viewer, building editor, live metrics overlay, playback from a stored seed, 88-scenario UX ledger |
 | 5 — Smart dispatch | ✅ Twelve cost terms, auction, predictor, benchmark suite |
-| 7 — Automated tuning | ✅ Search space, three searches, held-out validation, `elevator-sim tune` |
+| 7 — Automated tuning | ✅ Search space, three searches, held-out validation, `elevator-sim tune` — **and its one undelivered bullet, the fuzzy traffic-pattern detector with hysteresis driving per-pattern weight sets, now ships and drives a run**; measured BETTER on TTD and reported **below the resolution limit**, because the effect is smaller than the apparatus resolves |
 | CLI | ✅ `list`, `run`, `compare`, `tune`, `fuzz`, `watch` |
-| 6 — Destination dispatch & learned control | ⚠️ 6a (disclosure) and 6b (dispatch) accepted against a **raised** criterion, now measured on the Mixed-Use High-Rise the criterion names: **met by the Level-0 arm, not met by the Level-1 panel at any measured point**. 6c (learned control) deferred out of the phase with reasons; double-deck still not simulated |
+| 6 — Destination dispatch & learned control | ⚠️ 6a (disclosure) and 6b (dispatch) accepted against a **raised** criterion, now measured on the Mixed-Use High-Rise the criterion names: **met by the Level-0 arm, not met by the Level-1 panel at any measured point**. 6c (learned control) is **no longer deferred — it is implemented, measured, and NOT ACCEPTED**: ΔTTD `−0.213 [−0.440, +0.014]` against `collective`, an interval containing zero, against a criterion recorded *before* the code. Double-deck operation **is simulated**, and benchmarked to a **dispatcher-dependent** verdict — WORSE under `eta`, BETTER under `collective`, with no verdict of the form *double-deck is better*. Every sub-phase now has a measurement rather than a deferral, and the phase is still partial because one of them was refused |
 | 8 — Testing campaign | ✅ All eight tracks landed — fuzzing, oracle across all five buildings, physics, statistics, determinism, scale, adversarial, and the full experiment matrix (8 cells × 12 profiles, Pareto front over AWT / energy / WT95) — and found four real defects, **all four now fixed**; the deep tier is green at 2 000 cases and **no property violation is outstanding**, so both halves of the criterion are met |
 
 Try it — six commands, all against the real `data/` directory:
@@ -81,7 +82,7 @@ npm run sim -- compare --building midtown-office --a eta --b nearest-car --reps 
 npm run sim -- tune --building garden-apartments --params idle.repositionThresholdS --seed 42
 npm run sim -- fuzz --cases 8                  # or: --tier deep --cases 2000, the overnight pass
 npm run sim -- watch --building garden-apartments --dispatcher nearest-car --speed 10
-npm test        # 179 files, 3,353 tests — the benchmarks execute real replications, so this is minutes, not seconds
+npm test        # 190 files, 3,505 tests — the benchmarks execute real replications, so this is minutes, not seconds
 ```
 
 `compare` prints a paired-t interval on the difference and refuses to rank two arms whose interval
@@ -91,10 +92,13 @@ the nine metrics that stop being comparable. `run`, `compare` **and `watch`** al
 mean the run's own summary suppresses; `watch` printed one on both of its render paths until
 [§ D111](DECISIONS.md).
 
-**What is not done is in the brief, not in this table.** Phase 6c (learned control) is deferred with
-reasons; Phase 9 (the experience layer) is designed in
-[`docs/10`](docs/10-experience-layer-contract.md) and **not built**; double-deck operation is
-configured, disclaimed and not simulated. A phase's *status* is now bound to **evidence that
+**What is not done is in the brief, not in this table.** Phase 6c is **measured and refused**, which
+is a different state from deferred and a better one. Phase 9 is designed in
+[`docs/10`](docs/10-experience-layer-contract.md) and **only W4 is built** — the schema-driven
+control renderers, proved generic against a schema the product does not ship. TWIN operation — two
+independently driven cars in one shaft — is **designed and not built**, in
+[`docs/11`](docs/11-twin-shaft-contract.md); it is not double-deck, and the contract says why. A
+phase's *status* is now bound to **evidence that
 exists** — `validation/phaseStatus.test.ts` parses every status and citation out of the roadmap and
 fails if an accepted phase names a test, study or pin group that does not — but **not to evidence
 that supports it**: a phase could still cite a real suite that does not assert its criterion, and the

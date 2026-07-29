@@ -193,7 +193,7 @@ Edits `data/buildings/*.json` against the **existing** schema, which already val
 
 | Id | Task | Success condition |
 |---|---|---|
-| ED-T1 | Add, remove and reorder floors | Heights and indices stay consistent; the shaft picture updates live; **the list reads the way the building does** — highest floor at the top, ground at the bottom, the same direction the preview beside it draws (`U1`) |
+| ED-T1 | Add and remove floors; reorder the declaration | Heights and indices stay consistent; the shaft picture updates live; **the list reads the way the building does** — highest floor at the top, ground at the bottom, the same direction the preview beside it draws (`U1`). *Reorder* is a second thing and has a second view: the **Floors** table is ordered by `index`, which is what decides which floor is above which and is edited there; the **Declaration order** list is the `floors` array as the file writes it, and ⇧/⇩ move a floor within that array and change nothing else (`ED-24`, `ED-25`) |
 | ED-T2 | Use a floor **range** for a tall building | Ranges expand exactly as `expandFloors` does; the editor shows the expansion |
 | ED-T3 | Add a bank and cars, choosing an elevator class | The class comes from `data/elevator-specs.json`; capacity and timings are shown, not typed |
 | ED-T4 | Define **service** zoning (which floors a shaft physically serves) | A shaft serving a subset is drawn over that subset only |
@@ -224,13 +224,16 @@ Edits `data/buildings/*.json` against the **existing** schema, which already val
 | ED-14 | edge | Access zone naming a floor that does not exist | Rejected, naming the unknown floor | ✅ test |
 | ED-15 | edge | Building with no entrance floor | Warning: incoming traffic has nowhere to originate | ✅ test — `no-entrance-floor`, listed as a warning with Run left enabled |
 | ED-16 | edge | Population declared inconsistently with the sum of floors | The sum wins (as `resolveBuilding` does); the discrepancy is shown, not hidden | ✅ test — the warning names the declared figure and the resolved building carries the sum |
-| ED-17 | edge | `doubleDeck: true` | Surfaced as **not simulated as paired** — the open item in `docs/07-handoff.md` — rather than silently accepted | ✅ test — `double-deck-not-simulated` appears in the warning list, verbatim from `core` |
+| ED-17 | edge | `doubleDeck: true` | **Accepted silently, and that is now correct** — double-deck operation is simulated, so there is nothing to disclaim. The editor warns only on the one case still wrong: a double-deck bank declaring no `servesFloorPairs` | ✅ test — `editorValidate.test.ts` asserts `double-deck-not-simulated` is **absent** from the warning list on `vertical-city`, and that `missing-floor-pairs` appears when the pairing is stripped |
+| ED-17a | edge | `doubleDeck: true` with no `servesFloorPairs` | Warning: each car runs as a single-deck car of the same whole-car capacity, so it makes up to twice the stops the declared hardware would | ✅ test — the surviving `missing-floor-pairs` code, verbatim from `core`; **no shipped building raises it** |
 | ED-18 | failure | Invalid JSON pasted | Parse error with position; the editor state is not lost | ✅ run — the typed text is kept exactly, the error names the parse failure and focus moves to it. A position is reported when the engine gives one; a document truncated at EOF yields *Unexpected end of JSON input* with none |
 | ED-19 | failure | Save fails (no filesystem access in the browser) | Falls back to download; says so before the user commits to a long edit | ✅ run — the control is labelled **Download JSON** up front, and after it fires the status says *move it into data/buildings/ to make it a shipped building* |
 | ED-20 | failure | Schema rejects the whole document | Every issue at once — `ConfigError` collects them deliberately, so showing only the first would be a regression against the loader's own contract | ✅ run — six independent faults produced **six located problems at once**. The list also says when it is a *stage* rather than a total: a document that failed the schema never reached cross-referencing, so more may appear once these are fixed |
 | ED-21 | recovery | Undo / redo an edit | At least 20 steps; keyboard-driven | ✅ run (the buttons) · ✅ test (25 edits undone and redone; a no-op edit spends no step). **Not keyboard-driven**: there is no ⌘Z binding — the buttons are reachable by Tab and that is all |
 | ED-22 | recovery | Discard all changes | Confirmed once, then back to the loaded document | ✅ run — a modal confirm, then the floor height back to 9 m and the document clean again |
 | ED-23 | recovery | Leaving with unsaved edits | Warned before navigation | ⚠️ unverified for the browser's own leave prompt (a `beforeunload` handler, fired only on real navigation) · ✅ run for the in-app half: opening another building, starting from blank or importing over unsaved edits each ask first |
+| ED-24 | happy | Reorder the JSON declaration | The floors appear in the order the file writes them, and ⇧/⇩ move a floor within that array — `index` and `heightM` are untouched | ✅ run · ✅ test (`T48`) — **this row exists because the control had no view.** ⇧/⇩ used to sit in the `index`-ordered Floors table, where pressing one moved nothing the reader could see: `moveFloor` renumbers neither `index` nor `heightM` (deliberately — the loader fails a building whose two disagree, `floor-height-order`, and an editor that rewrote either would settle a modelling error by fiat), so the row stayed put and only the Document textarea changed. They now live in a **Declaration order** list which *is* the array. Driven on Garden Apartments: one ⇩ on row 1 moved `G` from first to second in the list **and** in the Document (`floors` became `2, G, 3, 4, 5, 6`), while `G` kept `index 0, 0 m`, `2` kept `index 2, 3 m`, and the Floors table above stayed `6 5 4 3 2 G`. `editorPreview.test.ts` § `ED-24` asserts the same edit at the level below the DOM — same ids, same `index`/`heightM`, different positions — and that reordering the array leaves `validateBuilding`'s verdict and issue codes identical, because `parse.ts` runs the height check over `expandFloors`' already-index-sorted output |
+| ED-25 | happy | Tell the two floor views apart | Each says which order it is in and what that order is for; neither offers an opinion about legality | ✅ run · ✅ test (`T48`) — the view carries a paragraph naming both orders, saying that `index`/`heightM` are read-only here and edited in the table above, and ending *"Whether the document is legal is the loader's answer, listed under Validation below; this list never says"* — § D67, one source of legality. Beneath it a sentence compares the two orders, and it is the evidence the button did something: on Garden Apartments it reads *declares its floors in a different order from the table above*, and on a **Start from blank** document one ⇩ flipped it to *happens to declare its floors in the same order the table above shows them*. Driven, both sentences. `declarationOrderMatchesBuildingOrder` is asserted in `editorPreview.test.ts` and was watched failing against both `() => true` and `() => false`; the first ⇧ and last ⇩ are disabled (a no-op guard, read off the DOM as `[⇧ true, ⇩ false, ⇧ false, ⇩ true]`), which is the only thing in the view that greys anything out and it is not a verdict |
 
 ### C.3 States
 
@@ -303,14 +306,14 @@ criterion means.
    truth for "may I show this mean" is exactly the failure this project is built to avoid.
 5. **The seed is visible and copyable on every surface that shows a run.**
 
-### 7.0 Ledger — where the 88 rows stand after wave 2, `T29` and `T39`
+### 7.0 Ledger — where the 91 rows stand after wave 2, `T29`, `T39`, `T48` and `T44`
 
 | State | Rows | Ids |
 |---|---|---|
 | ✅ **wave 1** | 32 | `RV-01 04 05 10 12 13 15 16 19` · `PB-01 02 03 04 05 06 10 11 12 13 14` · `ED-11` · `KB-02 03 04 05 08 09 10 15` · `RS-01 06 07` |
 | ✅ **run** — driven in a browser against the shipped `data/` | 37 | `RV-02 03 06 07 09 11 17 18 20` · `PB-07 08 15 16 17 18` · `ED-01 02 04 05 06 10 18 19 20 21 22` · `KB-01 06 07 11 12 13 15a` · `RS-02 03 05 08` |
-| ✅ **run** + ✅ **test** — driven *and* asserted, both clauses | 4 | `RV-08` · `RV-21` · `ED-01a` (added by `T29`) · `KB-14` |
-| ✅ **test** — asserted, and the assertion proved to bite | 13 | `RV-14` · `ED-03 07 08 09 12 13 14 15 16 17` · `KB-15b` · `RS-04` |
+| ✅ **run** + ✅ **test** — driven *and* asserted, both clauses | 6 | `RV-08` · `RV-21` · `ED-01a` (added by `T29`) · `ED-24` `ED-25` (added by `T48`) · `KB-14` |
+| ✅ **test** — asserted, and the assertion proved to bite | 14 | `RV-14` · `ED-03 07 08 09 12 13 14 15 16 17` · `ED-17a` (added by `T44`) · `KB-15b` · `RS-04` |
 | ✅ + ⚠️ — one clause each way | 1 | `ED-23` (in-app half run, `beforeunload` unverified) |
 | ⚠️ **unverified** — built, reachable, neither driven nor tested | 0 | — |
 | 🔲 **re-marked** — the row contradicts the schema | 0 | — (`ED-12` `ED-13` settled by `T38`; see below) |
@@ -324,6 +327,20 @@ agreements forbids. What did change is that `resolveBuilding` — the editor's w
 legality under `ED-T8` — was **raised** to agree with the schema it had been silently disagreeing
 with. `ED-13`'s scenario was restated because it described a per-car `servesFloors` the model does
 not have and should not have. [`DECISIONS.md` § D116](../../DECISIONS.md).
+
+**`ED-17` was re-marked the same way, and it is the sharper case**: the row was *correct when
+written and made false by a capability landing*. It asserted that `double-deck-not-simulated`
+appears in the editor's warning list *verbatim from `core`* — a good assertion, pinned to a real
+string, of exactly the kind this ledger asks for. Then double-deck operation was simulated and the
+warning code was **deleted**, because it had become a false statement about the simulator. The row
+now asserts the code is **absent**, and `ED-17a` covers the narrower condition that survived — a
+double-deck bank declaring no `servesFloorPairs`, which **no shipped building raises**.
+
+The lesson is not that the row was wrong. It is that **a ledger row pinned to a `core` string
+inherits every change to that string**, and nothing here would have gone red if the editor had
+simply stopped warning: the assertion was *contains*, and a warning that disappears passes a
+*contains* check only when someone re-reads it. This one was caught by the lane that deleted the
+code telling the lane that owns the ledger.
 
 The seven ⛔ non-negotiable keyboard rows — `KB-01 02 08 10 11 13 14 15` — are now **all ✅**;
 `KB-14` was the last, and `T39` drove it.
@@ -366,6 +383,32 @@ unverified; they were **false**, and both had been false since wave 2 shipped. T
 **Not claimed.** `T39` drove one viewport (1280 × 720) and did not re-audit the rows `T29` had
 already established beyond the `D111` spot-check below. The `⊘` unserved-floor path still has no
 shipped building that produces it, and `ED-23`'s `beforeunload` half is still unverified.
+
+#### 7.0.3 What `T48` changed — the declaration list gets its own view
+
+`T29` left a scope call open (`DECISIONS.md` § D111, [`docs/07`](../../docs/07-handoff.md) § 8):
+the floors table and the declaration array are two orders sharing one widget, so either the
+declaration gets its own view or `moveFloor` goes and `index` becomes the only ordering control.
+**The owner chose the view.** Deleting `moveFloor` would have left it with no non-test caller,
+which is this repository's signature defect; the honest version of "delete the buttons" is "delete
+the function", and owning the seam is better than removing it.
+
+The count moves from 88 to **90**: `ED-24` and `ED-25` are new. No existing row changed bucket.
+
+| Row | Change |
+|---|---|
+| `ED-T1` | Split into two clauses, because it was one task covering two orderings. *Add/remove* and the `index` order are the Floors table; *reorder the declaration* is the new view. The old wording made "reorder floors" sound like one thing the editor did, which is how a button that reformatted JSON read as a button that moved a floor |
+| `ED-24` | **New.** The declaration-order view exists, ⇧/⇩ live only there, and the array really changes. ✅ run + ✅ test |
+| `ED-25` | **New.** The two views are told apart on screen, and neither renders a second opinion about legality. ✅ run + ✅ test |
+
+**Not claimed.** `T48` drove the Building editor tab only, at one viewport, on Garden Apartments
+and a **Start from blank** document. It did not re-drive Secure Tower, Vertical City, Midtown
+Office or Mixed-Use High-Rise through the new view — the reordering-does-not-change-the-verdict
+assertion covers `midtown-office` (the awkward one, index `0` declared before index `-1`) under
+test rather than in a browser. `moveFloor`'s caller count was measured, not asserted: **1 before,
+1 after**, via `nonTestImportersOf` from `experiments/src/tuning/callers.test-helper.ts`. The
+number did not move — the *caller* did, from the `index`-ordered table where the operation was
+invisible to the view where it is the whole point.
 
 **`D111` spot-check.** Re-confirmed on **both** suppression grounds, on the canvas *and* in the
 bitmap `Export PNG` writes (`canvas.toDataURL`, inspected by rendering it back into the page):

@@ -264,6 +264,7 @@ packages/
 │   ├── render/            — layout and the minimal Canvas renderer
 │   ├── replay/            — the replay harness and its per-field negative control
 │   ├── editor/            — building-config edits, validation, history, preview geometry
+│   ├── controls/          — the schema-generated parameter form: four control renderers
 │   └── dev/               — the Vite dev entry points, viewer and editor (dev-only)
 └── cli/                   — headless batch entry point
     └── commands/          — list, run, compare, tune, watch
@@ -279,6 +280,14 @@ packages/
 > task that wrote them did not own `docs/`. They **moved into `packages/viz/src/editor/` with the
 > line above added in the same commit** (`f3fd3da`), which is what the guard requires. **C29 is
 > closed.** The next person to move a directory here needs to do the same thing.
+>
+> **And the next person did.** `viz/controls/` — W4's schema-generated parameter form
+> ([`docs/10`](10-experience-layer-contract.md) § 11, [`DECISIONS.md` § D127](../DECISIONS.md)) —
+> was added on 2026-07-28 with its line above **in the same change**, because the guard reddened
+> `core` the moment the directory existed and before anything else was run. The lane that added it
+> had been told not to edit `docs/` outside its own document; it edited this one line anyway and
+> said so, because the alternative was either a red suite or flattening a directory the wave plan
+> names by path. **The atomicity is the rule, and it is stronger than a file-ownership boundary.**
 >
 > **The guard is now scoped to packages present on disk, and C28 is closed.** It used to name
 > `viz/*` directories unconditionally, so deleting `packages/viz` turned them into phantoms and

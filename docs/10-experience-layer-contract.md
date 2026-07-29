@@ -481,7 +481,9 @@ which floor, and — the important omission — **no connection to the dispatche
 returns `accessDenied`, and the call is **permanently unassignable**. Measured consequence, already
 published: on Secure Tower, conventional dispatch leaves **33.5 %** unserved with **0 of 30**
 replications quotable, and a destination-entry kiosk *without* the credential is **worse**, at
-**51.7 %** (`docs/05-roadmap.md`, `DECISIONS.md` § D30 area, and `dispatch/types.ts`).
+**100.0 %** — it serves nobody on that building at all (`docs/05-roadmap.md`, `DECISIONS.md`
+§ D56, and `dispatch/types.ts`; re-pinned to `benchmark/accessControl.ts` H-ACCESS-1, seed
+20 260 726, n = 30, after the `C35` fix).
 
 So today a user can author an access zone in the editor and run it against ten of twelve dispatchers
 that structurally cannot serve it, and nothing on either screen says so. § 10.
@@ -864,8 +866,8 @@ keeps the technical form only.
 | Technical | Plain-language form | Notes |
 |---|---|---|
 | `AWT = 24.5 s` | "Riders waited **25 seconds on average**" | Only when `awtIsValid`. Otherwise R3's reason. |
-| `WT95 = 62 s` | "**1 in 20 riders** waited more than a minute" | Natural frequency (§ 3.4). `95` → `1 in 20` is exact. |
-| `WT99` | "**1 in 100 riders** waited more than …" | |
+| `WT95 = 62 s` | "**1 in 20 rides** waited more than a minute" | Natural frequency (§ 3.4). `95` → `1 in 20` is exact. **Corrected: the word was *"riders"*.** `WT95` is computed over **legs**, and a sky-lobby journey boards twice, so "riders" turns a leg statistic into a person statistic — the wave-1 `served` → `boardedLegs` defect reappearing in the plain-language column of the document written to prevent it. § 13 q7 settles the word: **a ride is one boarding, one car, one wait.** |
+| `WT99` | "**1 in 100 rides** waited more than …" | Same correction, same reason. |
 | `maxWaitS` | "The **unluckiest rider** waited …" | Must carry `longestWaitIsCensored`: if that rider never boarded, the figure is a **floor**, and the plain form becomes "…waited at least …". |
 | `TTD = 96 s` | "**Door to door**, a typical trip took a minute and a half" | Journey-level, spanning transfers. On a sky-lobby building this is the number that matters and AWT is not. |
 | `% > 60 s = 8 %` | "**8 in 100** riders waited more than a minute" | Carries the censoring caveat: the denominator is *served* legs, and the unserved are exactly the ones that would have counted. Show `unservedCount` beside it, always. |
@@ -1039,6 +1041,19 @@ Recommendation: **(a)**, scoped to `tuning/space` first (which the editor needs 
 re-implemented: held-out seeds, CRN within a round, and no ranking inside the noise floor come from
 `runHoldoutRound`, not from new UI code.
 
+> **Settled 2026-07-28 — (a), and the recommendation's scoping held.** *"A browser cannot import the
+> tuner today"* is no longer true and is left standing as the record of why the barrel exists.
+> [§ D121](../DECISIONS.md) added `packages/experiments/src/browser.ts` with a `browser` export
+> condition and a both-directions graph-walk guard, carrying `tuning/space` — **and not
+> `tuning/search`**, which is exactly the scoping recommended here, because nothing has yet asked
+> for a UI-driven search. `reports/statistics.ts`, `runner/crn.ts`, `runner/metrics.ts` and
+> `runner/stopping.ts` came with it, each answering a named W3 consumer rather than being whatever
+> happened to be free of `node:`.
+>
+> The residual — TypeScript does not apply the `browser` condition, so a bare specifier typechecks
+> against the Node surface — is closed by a guard in `packages/viz/src/boundaries.test.ts`
+> ([§ D127](../DECISIONS.md)), and W4 is built on the result.
+
 ---
 
 ## 9. U7 — Rider models, definable, assignable, with multipliers
@@ -1175,7 +1190,9 @@ so: it is not a property of the building.
 the twelve shipped dispatchers are in that state. The consequence is not "worse", it is
 **structural**: `docs/01-architecture.md` records **0 of 30** replications quotable and **33.5 %**
 unserved for conventional dispatch on Secure Tower's interfloor traffic; a destination-entry kiosk
-*without* the credential is worse at **51.7 %**.
+*without* the credential is worse at **100.0 %** — with no credential it serves nobody on that
+building at all (`benchmark/accessControl.ts` H-ACCESS-1, seed 20 260 726, n = 30, re-run after the
+`C35` fix).
 
 So the viewer and the editor both gain a check, computed from data both already hold:
 
@@ -1199,6 +1216,21 @@ take** — which is a narrower and more accurate statement than this section ori
 > answered, and `:258` draws `⊘` on a floor no shaft serves. So an unanswerable call is **not**
 > presented as an ordinary long wait today; what the viewer cannot say is **why** it went
 > unanswered. That is the gap, and it is the one worth closing.
+>
+> **Corrected a second time, and the sentence above is still too strong** (**M22**, § 13 q4).
+> `Simulation` diagnoses stuck calls and emits a warning naming the call, the floor, the direction
+> and the reason set — and `VizRecording` **already carries `warnings`**. Measured on Secure Tower
+> at seed 42: `collective` **11** structural refusals, `nearest-car` **18**, `destination-eta`
+> **0**. So the recording *can* say **why**, at run granularity, and the viewer could print it
+> today.
+>
+> What is actually missing is narrower than either earlier statement: the fact is **prose, keyed on
+> a call id `VizLeg` does not carry**, and it is emitted only for calls still stuck when the run
+> stopped — a call freed late by a car passing for another reason is deliberately not reported.
+> So it cannot be joined to a rider glyph, which is what § 6's renderer needs. The remedy is a
+> **structured** counterpart to a warning that already exists, in `core`; § 13 q4 records it as
+> new debt and it is **not** this document's change to make. `VizLeg.credentialGroup` below stays
+> the cheaper half and still lands first.
 
 `RV-08` covers the *service*-zoning case and notes that **no shipped building has an unserved
 floor**, so the `⊘` path does not arise in `data/`. The *access* case does arise, on Secure Tower,
@@ -1287,7 +1319,28 @@ goals and § 8.4's honest deltas are possible.
   minimal seed-pairing rule. Duplicating is a second source of truth about pairing and should be
   avoided.
 
-### W4 — The generated parameter form *(depends on nothing; parallel to W1–W3)*
+### W4 — The generated parameter form *(depends on nothing; parallel to W1–W3)* — ✅ **DONE 2026-07-28, with one half blocked on `core`**
+
+> **Landed** ([`DECISIONS.md` § D127](../DECISIONS.md)). `packages/viz/src/controls/` holds the pure
+> model and the four renderers; `packages/viz/src/dev/parameterForm.ts` mounts them on a third tab.
+> Every acceptance clause below passes, the liveness evidence is derived from a **fictional** schema
+> (an orchard — irrigation, litres per tree, pickers on shift, night harvest, lantern count), and
+> **`C34` is closed with a measured caller count** (**M25**: 0 → 3 non-test, non-barrel importers of
+> `experiments/src/browser.ts`; `tuning/space`'s uncalled exports 6 → 3).
+>
+> **The U7 half is blocked, and this is a finding rather than a deferral.** The paragraph below says
+> *"the `TRAFFIC_PARAMETERS` half of W4 is unblocked either way, because that schema is on the
+> `core/browser` barrel."* That is true about **reachability** and false about **collectability**:
+> of the ten schemas `discoverParameterSchemas()` finds, **two refuse to collect into a search
+> space** — `TRAFFIC_PARAMETERS`, because `traffic.arrivalRatePctPop5min`'s default is `null`, and
+> `SIM_PARAMETERS`, because `sim.drainGraceS` declares a log scale over a range starting at zero
+> (**M24**). The form **draws each refusal** rather than dropping the schema from its picker, and a
+> test derives both sets from discovery so a fix in `core` turns it red. U7's editor needs that fix
+> first.
+>
+> **What W4 does not do**, stated rather than discovered: the authored candidate is validated —
+> through the shipped `SearchSpace.validate`, which is `parseDispatcherProfiles` plus
+> `createPolicyFor` — and is **not yet routed into the Run button**. Wiring it is W5/W6's.
 
 Four control renderers keyed on `type`, one `activeWhen` rule, `description` as help, `unit` as
 suffix, `default` as reset. Pointed at `collectSearchSpace()` for U6 and at `TRAFFIC_PARAMETERS` for
@@ -1427,11 +1480,46 @@ than assumed. **Rows are marked measured-again, not merely believed.**
 `destination-eta` or a dispatcher count, and M10's refutation (`packages/experiments` has no browser
 export) was re-read against `packages/experiments/package.json` and still holds.
 
+> **M10 is now itself out of date, in the good direction.** `packages/experiments` **does** have a
+> browser export ([§ D121](../DECISIONS.md)) and W4 is built against it ([§ D127](../DECISIONS.md)).
+> The row's *finding* — that discovery gives identical results against either `core` barrel and that
+> a browser could not import the tuner **at the time it was written** — stands as a record of what
+> was true then. Both halves of § 13 q1 are closed.
+
+### Measured 2026-07-28 by T47, settling § 13
+
+| id | Measurement |
+|---|---|
+| **M20** | Midtown Office, seeds 1000–1019, `durationS: 900`, `onTimeout: 'report'`, all **12** shipped arms, `demand: { arrivalRatePctPop5min: r }`. Quotable replications out of 20, worst arm across the twelve: r = 1 → **20/20** (all twelve at 20/20); r = 2 → 18/20 (`nearest-car`; eleven others at 20/20); r = 3 → 16/20 (`nearest-car`; `energy-aware` and `auction` at 19, **nine** arms at 20/20); r = 4 → 8/20 (`nearest-car`; **no** arm at 20/20, best 18); r = 5 → 5/20 (best 14). Over a batch, quotability **is** monotone in demand — M8's non-monotonicity is a single-seed effect. § 13 q2. |
+| **M21** | `collective`, seeds 1000–1019, 900 s, on `midtown-office`, `secure-tower` and `mixed-use-high-rise` — 60 runs. A windowed goal (`waiting.pctOverLongWait ≤ 10`) and a whole-run goal (`counts.unserved === 0`) return **opposite verdicts on 35 of 60**. `midtown-office` seed 1000: window `pctOverLongWait` **89.5 %** (fail) against **0** unserved (pass), with the window `300–600 s` of an **1822 s** run. § 13 q3. |
+| **M22** | Secure Tower, seed 42, 900 s. Structural-refusal warnings in `SimulationResult.warnings`, which `VizRecording.warnings` carries: `collective` **11** of 13 warnings, `nearest-car` **18** of 20, `destination-eta` **0** of 2. Text, verbatim: *"call `high#18:down` at floor `18` going down was never collected: every car in bank `high` refused it for a structural reason (accessDenied). Under dispatch.callType `up-down-buttons` a landing call carries no credential, so an access-restricted pickup floor is infeasible for the whole bank."* § 13 q4, and the basis for § 10.4's second correction. |
+| **M23** | `runSimulation`, `collective`, 900 s, seeds 1000–1019, on this tree: Garden Apartments **0.7** ms/rep, Secure Tower **23.5**, Midtown Office **59.1**, Mixed-Use High-Rise **68.5**, Vertical City **227.1**. M6 reproduces on four of five within noise; **Vertical City is 16 % slower** than M6's 196, and Mixed-Use was never in M6. 50 replications: 0.0 / 1.2 / 3.0 / 3.4 / **11.4** s. § 13 q5. |
+| **M24** | `ActiveWhenCondition` admits exactly two forms — a value list and `{ min?, max? }` — and `activeWhenSatisfied` returns `false` for an unset gate, so *"the absolute override is unset"* is not expressible and cannot be smuggled into the value list. Separately: of the **10** schemas `discoverParameterSchemas()` finds, **two do not collect into a search space** — `TRAFFIC_PARAMETERS` (*"`traffic.arrivalRatePctPop5min` is continuous and its default is null"*) and `SIM_PARAMETERS` (*"`sim.drainGraceS` declares a log scale over a range starting at 0"*). § 13 q6, and W4's own finding. |
+| **M25** | `C34`'s caller count, with the repository's own scanner (`corpus`/`isBarrel`/`auditModules` from `tuning/callers.test-helper.ts`, comments stripped so a `{@link}` is not an import). Non-test, non-barrel importers of `experiments/src/browser.ts`: **0 → 3** (`viz/src/controls/controls.ts`, `viz/src/controls/types.ts`, `viz/src/dev/parameterForm.ts`). Importers of any kind: 1 → 7. `auditModules(['experiments/src/tuning/space'])` uncalled exports: **6 → 3** — `activeParameters`, `parameterOf` and `defaultCandidate` gained real callers, which is what they were written for. § D127. |
+
 ---
 
 ## 13. Open questions that must be settled before implementation
 
-1. **Does `@elevator-sim/experiments` gain a browser-safe export? — PREREQUISITE, not optional.**
+> ## Settled 2026-07-28 — **all eight**, and three of them corrected something in this document
+>
+> Each answer below carries its **basis**: *measured*, *decided*, or *already closed by* a named
+> decision. Where a question named a measurement as its settling method, the measurement was run.
+> Full working in `DECISIONS.md` § D126.
+>
+> | q | answer | basis |
+> |---|---|---|
+> | 1 | **Yes, and it is shipped.** The prerequisite closed at § D121; the residual — TypeScript does not apply the `browser` condition — is closed mechanically in `packages/viz/src/boundaries.test.ts` (§ D127) | already closed, § D121 + § D127 |
+> | 2 | **3 %/5 min on Midtown Office**, with the scenario declaring an arm set of nine of the twelve, at which every declared arm is **20/20** quotable. The strict all-twelve reading gives **1 %/5 min** | **measured**, **M20** |
+> | 3 | **Every goal declares its scope, and the scenario schema requires the field.** The two disagree on **35 of 60** measured runs | **measured** (**M21**), then decided |
+> | 4 | **No new event.** `core` already computes the refusal reason and it already reaches `VizRecording.warnings`. What is missing is a *structured* form of it, which is a `core` change | **measured**, **M22** |
+> | 5 | **50 by default, off the main thread, with the resolution stated on screen**; a scenario asking for a resolved difference declares **150** | **measured** (**M23**), then decided |
+> | 6 | **No — § 9.3 option (b) stands.** `activeWhen` provably cannot express *"the absolute override is unset"*, and the null default already breaks something else | **measured**, **M24** |
+> | 7 | **"ride."** One boarding, one car, one wait; a journey with a transfer is **two rides**. § 7.1's `WT95` row is corrected accordingly | **decided**, against `describeFrame`'s wording |
+> | 8 | **Before, and it is done.** The ⚠️ bucket is empty; two of the four rows were **false**, not merely unverified | already closed, [§ D120](../DECISIONS.md) |
+
+1. ✅ **ANSWERED — yes, and both halves are now closed.** **Does `@elevator-sim/experiments` gain a
+   browser-safe export? — PREREQUISITE, not optional.**
    W4 needs the search space and W3 wants the CRN manager, and today the package declares exactly
    two export paths (`"."`, `"./package.json"`) with no browser condition, so a deep import of
    `tuning/space` is **refused by the resolver**, and the one entry that exists pulls
@@ -1443,41 +1531,131 @@ export) was re-read against `packages/experiments/package.json` and still holds.
    *Settled by:* a decision from the owner of `packages/experiments`, plus a graph-walk test in the
    manner of `core/src/browser.test.ts` if the answer is yes.
 
-2. **What demand level makes Midtown Office a teachable scenario?** **M8** shows a single-seed sweep
+   > **Answered: yes.** [§ D121](../DECISIONS.md) added the barrel, the export condition and the
+   > both-directions graph-walk guard, and § D121 itself recorded the half it did **not** close:
+   > *"TypeScript does not apply the `browser` export condition … and nothing mechanically forces a
+   > `viz` file to pick"* the explicit subpath. That half is now closed too, by a guard test in
+   > `packages/viz/src/boundaries.test.ts` that fails on a bare `@elevator-sim/experiments`
+   > specifier anywhere in the package — tests included, because nothing in `viz` has a legitimate
+   > use for that package's Node surface. Manufactured and watched: on the violation, `tsc -p
+   > packages/viz --noEmit` exits **0** and the guard names the offending file. `tsc` exiting zero
+   > is the evidence the guard is necessary rather than tidy. § D127.
+
+2. ✅ **ANSWERED — 3 %/5 min, with the arm set declared.** **What demand level makes Midtown Office a
+   teachable scenario?** **M8** shows a single-seed sweep
    cannot answer this. *Settled by:* running `saturationCensus.test.ts`'s own rule — the highest load
    at which every arm including the baseline returns a valid AWT — over a batch on each candidate
    building, and recording the answer in the scenario file.
 
-3. **Is a scenario's goal judged on the report window or the whole run?** Every figure in
+   > **Measured (M20).** Over a batch, quotability **is** monotone in demand, and steep. Twelve arms
+   > × 20 seeds × five rates: at **1 %** all twelve are 20/20; at **3 %** nine of twelve are 20/20
+   > and the worst (`nearest-car`) is 16/20; between **3 % and 4 %** every arm leaves 20/20 at once.
+   >
+   > **3 %/5 min**, with the scenario declaring the nine arms that are 20/20 there. That is the rule
+   > applied, not bent: its emphasis is that the **baseline may not be excluded**, and `docs/07` § 4
+   > already established `nearest-car` as a poor reference arm — both recommended baselines,
+   > `collective` and `eta`, are 20/20 at 3 %. A scenario that insists on offering `nearest-car`
+   > must drop to 1 %, where no queue forms and there is nothing to teach.
+
+3. ✅ **ANSWERED — every goal declares its scope, and the schema requires it.** **Is a scenario's goal
+   judged on the report window or the whole run?** Every figure in
    `RunSummary` is windowed (peak 5 minutes by default), but "20 people never arrived" is a whole-run
    fact. A scenario that mixes them without saying which is which will produce goals that look
    contradictory. *Settled by:* fixing the convention in the scenario schema — each goal declares its
    scope — and asserting it.
 
-4. **Does a locked-out call need an explicit event, or is credential-plus-zone enough?** § 10.4
+   > **Measured first (M21), because "looks contradictory" understates it.** `collective`, seeds
+   > 1000–1019, 900 s, on three buildings: a windowed goal (`pctOverLongWait ≤ 10`) and a whole-run
+   > goal (`counts.unserved === 0`) return **opposite verdicts on 35 of 60 runs**. On
+   > `midtown-office` seed 1000 the window says 89.5 % of legs waited over a minute — *fail* — while
+   > the whole run says zero unserved — *pass* — and the window is **300–600 s of an 1822 s run**.
+   > Not an edge case: the majority case. So `scope` is a **required** field on every goal, rejected
+   > at load if absent, and printed beside the verdict.
+
+4. ✅ **ANSWERED — no new event; `core` already says it, and § 10.4 was too strong.** **Does a
+   locked-out call need an explicit event, or is credential-plus-zone enough?** § 10.4
    infers it. An inference in the viewer is a second source of truth about a question `core` answers
    (`estimateCost` returns `accessDenied` / `destinationAccessDenied`), and CLAUDE.md has a rule about
    that. *Settled by:* checking whether the refusal reason survives into `RunRecord` today; if it does
    not, deciding whether `core` should carry it, which is a `core` change and not this document's.
 
-5. **How many replications does a Basic-mode player wait for?** W3 measures 0.1–9.8 s for 50. The
+   > **Checked, and it does survive (M22).** `Simulation` diagnoses stuck calls and pushes a warning
+   > naming the call, the floor, the direction and the reason set; the warnings reach
+   > `RunRecord.warnings` and `VizRecording` **already carries `warnings`**. Measured on Secure
+   > Tower, seed 42: `collective` produces **11** structural-refusal warnings, `nearest-car` **18**,
+   > and `destination-eta` **0**. One reads, verbatim: *"call `high#18:down` at floor 18 going down
+   > was never collected: every car in bank `high` refused it for a structural reason
+   > (accessDenied)."*
+   >
+   > So the answer is **no**: the refusal reason is computed, it survives, and no new event is
+   > needed. What is missing is a **structured** counterpart to the sentence — the fact is prose,
+   > keyed on a call id `VizLeg` does not carry, and emitted only for calls still stuck at the end.
+   > That is a `core` change and is **new debt**, not this document's to make. W7b's
+   > `VizLeg.credentialGroup` is still the cheaper half and still lands first.
+
+5. ✅ **ANSWERED — 50 by default, 150 for a resolved difference.** **How many replications does a
+   Basic-mode player wait for?** W3 measures 0.1–9.8 s for 50. The
    budget table says ±0.5 s needs n = 143 and ±0.25 s needs n = 563 — on Vertical City that is 28 s
    and 110 s. *Settled by:* choosing a default per scenario, sized to the building, and stating the
    resolution the chosen budget buys on screen (which is what `tune` already does).
 
-6. **Is `traffic.arrivalRateMultiplier` worth a `core` schema change?** § 9.3 recommends resolving it
+   > **Re-measured (M23)**, because a budget decision that rests on a stale cost is a budget nobody
+   > checked. M6 reproduces on four of five buildings; **Vertical City is 16 % slower** on this tree
+   > (227 ms/rep against M6's 196), and Mixed-Use High-Rise — which M6 never measured — is 68.5.
+   >
+   > **50** is the default: the floor of CLAUDE.md's 50–200 budget, and the largest number that
+   > keeps every building except Vertical City under 4 s. Vertical City needs a worker and a
+   > progress indicator at any budget in the range, which W3 already specifies. A scenario whose
+   > goal is a *resolved difference* declares **150**, from `docs/07` § 4's table. The resolution
+   > the budget buys is stated on screen; an interval containing zero reads *"too small to measure
+   > at 50 runs"* and offers to raise it.
+
+6. ✅ **ANSWERED — no; § 9.3 option (b) stands, and now on measurement.** **Is
+   `traffic.arrivalRateMultiplier` worth a `core` schema change?** § 9.3 recommends resolving it
    at the scenario layer for Phase 9. *Settled by:* whether `activeWhen` can express "the absolute
    override is unset" without a new condition form. If it cannot, (b) stands.
 
-7. **What is the plain-language name for a "leg"?** `boardedLegs` counts leg boardings and a
+   > **It cannot (M24).** `ActiveWhenCondition` has exactly two forms — a value list and a numeric
+   > interval — and `activeWhenSatisfied` returns **`false`** for an unset gate by a rule its own
+   > docstring defends. So an "is unset" condition is not expressible, and it cannot be smuggled
+   > into the value-list form either: an unset gate fails *every* condition, including one that
+   > named it.
+   >
+   > **A second reason arrived with W4.** `TRAFFIC_PARAMETERS` does not collect into a search space
+   > at all: `collectSearchSpace` refuses `traffic.arrivalRatePctPop5min` because its default is
+   > `null` — *"a search needs a point it can start from"*. That null is the *"only honest default"*
+   > § 9.3 quotes approvingly, so the obstacle to (a) and the obstacle to collecting the schema are
+   > the **same fact seen twice**. (b) stands.
+
+7. ✅ **ANSWERED — "ride".** **What is the plain-language name for a "leg"?** `boardedLegs` counts
+   leg boardings and a
    sky-lobby journey boards twice — this was already a wave-1 defect (`served` → `boardedLegs`).
    Basic mode must not reintroduce it by calling legs "people". *Settled by:* a decision on the word,
    applied consistently, with `describeFrame`'s existing wording as the reference.
 
-8. **Should the four `⚠️ unverified` rows in `UX.md` be settled before or during Phase 9?**
+   > **Decided: "ride".** One boarding, one car, one wait; a sky-lobby journey is **two rides**.
+   > `describeFrame` already draws the distinction the word has to preserve — *"N **legs** waiting,
+   > M boarded so far"* against *"N **passengers** undelivered"* — and "ride" is short, is not a
+   > person, and composes: *"12 rides"*, *"the longest ride waited 41 seconds"*.
+   >
+   > **This convicts § 7.1's flagship row**, which renders `WT95` as *"1 in 20 **riders**"* over a
+   > statistic computed on legs — the wave-1 defect reappearing in the plain-language column of the
+   > document written to prevent it. Corrected there.
+
+8. ✅ **ANSWERED — before, and it is done.** **Should the four `⚠️ unverified` rows in `UX.md` be
+   settled before or during Phase 9?**
    `RV-11`, `RV-17`, `RV-21`, `KB-14`. `KB-14` (`prefers-reduced-motion`) matters most here, because
    an animated queue is exactly what that media query is about. *Settled by:* emulating the query in a
    driven session, which costs minutes.
+
+   > **Closed by [§ D120](../DECISIONS.md), and it cost more than minutes because two of the four
+   > were false rather than unverified.** `RV-21` was severe: a temporal-dead-zone `ReferenceError`
+   > left **Retry permanently dead after any failed load**, with the page clearing its own error
+   > message. `RV-17`'s second clause was false because Vite answers a missing `data/` file with
+   > `index.html` and a **200**, so the only branch that named the missing path is the one it does
+   > not take. `KB-14` and `RV-11` hold, with their limits recorded. The ⚠️ bucket is **0**, and
+   > W4 adds no `transition` or `animation` declaration to the stylesheet, so KB-14's guard block
+   > still protects against future motion rather than present motion.
 
 ---
 
@@ -1506,15 +1684,31 @@ export) was re-read against `packages/experiments/package.json` and still holds.
    `docs/05` § *What remains* and [`docs/07`](07-handoff.md) § 8. The second half of this item —
    that `nearest-car` is the viewer's default despite `docs/07` § 4 recommending against it as a
    reference arm — is recorded, and item 4 is the fix.
-4. ⬜ **STILL OPEN.** **`packages/viz/src/dev/main.ts`** — change the viewer's default dispatcher
-   from `nearest-car` to `collective` or `eta`, per `docs/07-handoff.md` § 4. One line, and it
-   removes the worst first impression the product currently makes.
+4. ✅ **DONE 2026-07-28.** **`packages/viz/src/dev/main.ts`** — the viewer's default dispatcher was
+   `nearest-car` only because it is first in `data/dispatcher-profiles.json`; it now opens on
+   **`collective`**, chosen from a stated preference list (`collective`, then `eta`) with a fallback
+   to file order if neither is authored, and the URL's `dispatcher` parameter still wins. Verified
+   in a driven browser: `?tab=parameters` deep-links, and the dispatcher selector reads `collective`
+   on first paint. § D127.
 5. ✅ **DONE.** **`packages/viz/src/dev/main.ts`** — the selected tab is written into the URL
    (**M15**), and with it the editor and the viewer stopped holding separate opinions about which
    building is open ([§ D111](../DECISIONS.md)).
-6. ⬜ **STILL OPEN.** **`.claude/launch.json` or `packages/viz/vite.config.ts`** — reconcile ports
-   5173 / 5174 (**M16**).
+6. ✅ **DONE 2026-07-28.** **`.claude/launch.json` and `packages/viz/vite.config.ts`** — reconciled
+   on **5174** (**M16**), the port the server was actually serving. `strictPort` is now `true`,
+   which is the half of the fix that stops the disagreement returning: under `false` a busy 5174
+   silently becomes 5175 and the tooling is wrong again with nothing said. § D127.
 7. **`AGENT_STATUS.md`** — U2–U8 are not yet tracked there; only U1 is.
+
+9. ⬜ **NEW, opened by W4.** **`packages/core`** — two declared schemas cannot be collected into a
+   search space, so a generated editor cannot be pointed at them (**M24**).
+   `traffic.arrivalRatePctPop5min` declares a `null` default and `sim.drainGraceS` declares a `log`
+   scale over a range starting at zero. The null is the *"only honest default"* § 9.3 quotes
+   approvingly, so the fix is not simply "give it a number" — it needs the same decision § 9.3 q6
+   defers, and **U7's half of W4 waits on it**.
+10. ⬜ **NEW, opened by § 13 q4.** **`packages/core`** — the structural-refusal reason exists, is
+    correct, and is **prose** (**M22**). A structured counterpart — the call's reason set, keyed so
+    a `VizLeg` can be joined to it — is what § 6's queue renderer and § 10's credential lens need,
+    and it is a `core` change.
 8. **`data/dispatcher-profiles.json`** — no change requested. Noted for the record: the profile set is
    sparse (`weights.rideTime` is authored by exactly one profile), which is correct and is why § 8.3
    opens on presets rather than on sliders.

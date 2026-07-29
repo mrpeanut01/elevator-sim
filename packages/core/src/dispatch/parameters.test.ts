@@ -29,6 +29,7 @@ import {
 } from './predictor/parameters.js';
 import type { PredictorIdleSource } from './predictor/types.js';
 import { COST_TERMS, costTerm } from './terms/index.js';
+import type { WeightSetSource } from './selector.js';
 import type {
   DispatchParameterSpec,
   DispatcherProfileSource,
@@ -108,6 +109,41 @@ const PROBE_PROFILE: DispatcherProfileSource = {
     repositionThresholdS: 17,
     repositionEnergyWeight: 1.4,
   },
+  // Stage 3's weight-set selection, at `contextual` so all six rows are live at once: the three
+  // gains and the margin gate on that value and would otherwise be probed in a configuration
+  // where they cannot be read, which is the same hole `dispatch.callType: 'mobile-credential'`
+  // above closes for `weights.rideTime`.
+  selection: {
+    policy: 'contextual',
+    hysteresisS: 45,
+    observationWindowS: 240,
+    lobbyArrivalRateGain: 1.5,
+    interfloorRateGain: 2.5,
+    downPeakRateGain: 0.5,
+    switchMargin: 0.35,
+  },
+};
+
+/**
+ * A one-arm weight-set library, so the probe profile's `selection.policy` resolves.
+ *
+ * `resolveWeightSets` refuses a profile that asks for a selector with no library — a dispatcher
+ * that declares it switches weight sets and has none to switch between does not switch — so the
+ * probe has to supply one. Deliberately minimal: this suite is about the six declared scalars,
+ * and the arms are not among them.
+ */
+const PROBE_WEIGHT_SETS: WeightSetSource = {
+  patternSwitching: {
+    patternDetector: {
+      type: 'fuzzy',
+      inputs: ['lobbyArrivalRate'],
+      patterns: ['busy'],
+      hysteresisS: 30,
+      membership: { busy: { lobbyArrivalRate: [0, 0.01] } },
+    },
+    weightSetsByPattern: { busy: 'probe-arm' },
+  },
+  weightsByProfileId: new Map([['probe-arm', new Map([['waitTime', 1]])]]),
 };
 
 /** The value each probed parameter should come back as. */
@@ -147,10 +183,18 @@ const PROBE_VALUES: ReadonlyMap<string, number | string | boolean> = new Map<
   ['idle.parkingStrategy', 'zone-center'],
   ['idle.repositionThresholdS', 17],
   ['idle.repositionEnergyWeight', 1.4],
+  ['selection.policy', 'contextual'],
+  ['selection.hysteresisS', 45],
+  ['selection.observationWindowS', 240],
+  ['selection.lobbyArrivalRateGain', 1.5],
+  ['selection.interfloorRateGain', 2.5],
+  ['selection.downPeakRateGain', 0.5],
+  ['selection.switchMargin', 0.35],
 ]);
 
 const PROBED: ResolvedDispatchConfig = resolveDispatchConfig(PROBE_PROFILE, {
   normalization: { waitTimeS: 95, distanceM: 44 },
+  weightSets: PROBE_WEIGHT_SETS,
 });
 
 const DEFAULTED: ResolvedDispatchConfig = resolveDispatchConfig({
@@ -510,8 +554,14 @@ function readBack(
       id,
     );
   }
+  // The library goes in for every id, not only the `selection.*` ones: a profile whose
+  // `selection.policy` gate was satisfied from the spec (`profileWith` above) asks for a selector
+  // whatever knob is being probed, and `resolveWeightSets` refuses one with nothing to select
+  // between. Supplying it unconditionally is what keeps the gate satisfaction machine-derived.
   return dispatchParameterValue(
-    resolveDispatchConfig(profile as unknown as DispatcherProfileSource),
+    resolveDispatchConfig(profile as unknown as DispatcherProfileSource, {
+      weightSets: PROBE_WEIGHT_SETS,
+    }),
     id,
   );
 }
@@ -549,7 +599,15 @@ describe('every declared tunable is authorable as a profile, and every authorabl
     // The reverse direction, derived from the schema rather than from a list, so a section that
     // gains a field fails here until something declares it. A field an optimizer can write but
     // never sample is a knob whose value the tuned result silently depends on.
-    const sections = ['normalization', 'dispatch', 'eligibility', 'answer', 'idle', 'auction'];
+    const sections = [
+      'normalization',
+      'dispatch',
+      'eligibility',
+      'answer',
+      'idle',
+      'auction',
+      'selection',
+    ];
     const undeclared: string[] = [];
     for (const section of sections) {
       const field = (dispatcherProfileSchema.shape as Readonly<Record<string, unknown>>)[section];

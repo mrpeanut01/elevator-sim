@@ -103,6 +103,7 @@
  */
 
 import { findPassengerTransferS } from '../config/resolveCar.js';
+import { isDestinationCallType } from '../config/types.js';
 import type {
   DispatcherProfile,
   FloorConfig,
@@ -111,6 +112,7 @@ import type {
 } from '../config/types.js';
 import {
   CapacityReassignmentMonitor,
+  callCarriesCredential,
   createArrivalModel,
   createPolicyFor,
   groupContext,
@@ -139,6 +141,7 @@ import type { CarTimings, ReportWindow, RunRecord, RunSummary } from '../metrics
 import {
   CAR_DEFAULTS,
   Car,
+  deckSlot,
   isAccessPermitted,
   shaftForBank,
   type CarSnapshot,
@@ -431,6 +434,14 @@ export class Simulation {
   readonly #summarizeOptions: SimulationConfig['summarize'];
   readonly #windowSelection: SimulationConfig['reportWindow'];
   readonly #entranceFloorIds: readonly string[];
+  /**
+   * The same entrance floors as shaft indices, for the weight-set selector's traffic detector.
+   *
+   * Resolved once with {@link #entranceFloorIds} rather than per dispatch pass, and by index
+   * rather than by id because a `DispatchCall` carries `floorIndex` and the detector counts
+   * arrivals off calls.
+   */
+  readonly #entranceFloorIndices: ReadonlySet<number>;
   readonly #deadlineS: SimTime;
 
   readonly #policies = new Map<string, DispatchPolicy>();
@@ -496,6 +507,44 @@ export class Simulation {
   #lateArrivalHoldMaxCohort = 0;
   /** How often the drain deadline refused to schedule something. `> 0` means it really bit. */
   #deadlineTruncations = 0;
+
+  /* ---- double-deck operation, counted rather than asserted ---- */
+
+  /** Stops begun by a double-deck car, whether or not both decks had a floor to open onto. */
+  #doubleDeckStops = 0;
+  /** Of those, stops where the two decks opened onto two different floors at the same instant. */
+  #doubleDeckPairedStops = 0;
+  /** Boardings actually taken, `[lower, upper]`. The deck assignment, counted at the doorway. */
+  readonly #doubleDeckBoardings: [number, number] = [0, 0];
+  /** Alightings actually taken, `[lower, upper]`. */
+  readonly #doubleDeckAlightings: [number, number] = [0, 0];
+  /** What the dwell was *sized* for, `[lower, upper]`; compare against the two above. */
+  readonly #doubleDeckBoardingsProjected: [number, number] = [0, 0];
+  /** Boarding loops stopped by a **deck's** 80 % design load while the car body still had room. */
+  #doubleDeckDeckFullRefusals = 0;
+  /** Legs refused because their origin and destination sit on different decks. See `#deckAllows`. */
+  readonly #deckMismatchLegs = new Set<string>();
+
+  /* ---- the bare kiosk, counted rather than asserted (DECISIONS.md § T50-D1) ---- */
+
+  /**
+   * Whether this run's calls disclose a destination and carry **nothing to authorize it with**.
+   *
+   * True for exactly one configuration: `dispatch.callType: 'destination-entry'` with no landing
+   * panel. `costRequestFor` then forwards the destination and drops the credential, so
+   * `infeasibilityOf` step 4 asks *"may an unbadged passenger reach that floor?"* and answers
+   * `destinationAccessDenied` for every car in the building. Derived from the resolved policy
+   * config beside {@link #panelAssigns}, through the same `dispatch/lifecycle.ts` functions
+   * `costRequestFor` itself uses, so the runner and the request can never disagree about it.
+   *
+   * `false` under `up-down-buttons` (no destination reaches the request), under
+   * `mobile-credential` (the device carries the credential) and under any panel (§ D30 authorizes
+   * at the kiosk) — which is every profile `data/dispatcher-profiles.json` ships.
+   */
+  readonly #kioskWithoutCredential: boolean;
+  /** Legs the bare kiosk refused. See {@link #kioskAllows}. */
+  readonly #kioskRefusedLegs = new Set<string>();
+
   #ran = false;
 
   constructor(config: SimulationConfig) {
@@ -556,28 +605,31 @@ export class Simulation {
     }
 
     /*
-     * Double-deck hardware the runtime does not model, said out loud on every run.
+     * **Double-deck operation is simulated, and the disclaimer that said otherwise is gone.**
      *
-     * `loadConfig` raises the same thing as a `double-deck-not-simulated` config warning, but a
-     * config warning is read once by whoever loaded the directory and is not attached to
-     * anything a run produces. `result.warnings` is, and it is what `serializeRunRecord`'s
-     * caller and every report have in front of them — so a stored round-trip time for Vertical
-     * City's eight declared shuttles carries the reason it is a round-trip time for different
-     * hardware, rather than being indistinguishable from a modelled one.
+     * What replaces it is a *narrower* disclaimer, raised only in the one case where the
+     * hardware is declared and the geometry is not: a bank with double-deck cars and no
+     * `servesFloorPairs`. `parse.ts` warns `missing-floor-pairs` for that config, and the
+     * runtime consequence is concrete — `shaftForBank` builds a single-deck shaft, so the car
+     * really does run as one body of the combined capacity and really does make up to twice the
+     * stops. That sentence used to be true of every double-deck bank; it is now true of none
+     * that ships, and this raises it only where it is still true.
      *
      * Detected from the resolved building rather than copied out of `ResolvedBuilding.warnings`,
      * so a building assembled by hand instead of by the loader is covered too.
      */
-    const doubleDeckBanks = resolved.banks.filter((bank) =>
-      bank.cars.some((car) => car.doubleDeck === true),
+    const unpairedDoubleDeckBanks = resolved.banks.filter(
+      (bank) =>
+        bank.cars.some((car) => car.doubleDeck === true) &&
+        (bank.servesFloorPairs === undefined || bank.servesFloorPairs.length === 0),
     );
-    if (doubleDeckBanks.length > 0) {
-      const cars = doubleDeckBanks.reduce(
+    if (unpairedDoubleDeckBanks.length > 0) {
+      const cars = unpairedDoubleDeckBanks.reduce(
         (total, bank) => total + bank.cars.filter((car) => car.doubleDeck === true).length,
         0,
       );
       this.#disclaimers.push(
-        `building "${resolved.id}" declares ${cars} double-deck car(s) in bank(s) ${doubleDeckBanks.map((bank) => `"${bank.id}"`).join(', ')}, and double-deck operation is not simulated: each runs as a single-deck car of the same whole-car capacity, so it makes up to twice the stops the declared hardware would. Every round-trip time, interval and handling-capacity number this run reports for those banks describes single-deck hardware. Double-deck dispatch is Phase 6.`,
+        `building "${resolved.id}" declares ${cars} double-deck car(s) in bank(s) ${unpairedDoubleDeckBanks.map((bank) => `"${bank.id}"`).join(', ')} with no servesFloorPairs, so the runtime has no deck geometry to simulate: each runs as a single-deck car of the same whole-car capacity, and makes up to twice the stops the declared hardware would. Declare the floor pairs to have the decks modelled.`,
       );
     }
 
@@ -647,6 +699,13 @@ export class Simulation {
     this.#passengerModel =
       stage === undefined ? 'conventional' : passengerModelOf(stage);
     this.#panelAssigns = this.#passengerModel === 'destination-dispatch';
+    // The bare kiosk, off the same resolved stage and through the same two functions
+    // `costRequestFor` asks. `stage === undefined` cannot happen for a run with a bank; a
+    // building with none discloses nothing because it opens no calls.
+    this.#kioskWithoutCredential =
+      stage !== undefined &&
+      isDestinationCallType(stage.callType) &&
+      !callCarriesCredential(stage.callType, this.#panelAssigns);
 
     /*
      * The comparability disclaimer, raised at construction beside the double-deck one.
@@ -670,6 +729,9 @@ export class Simulation {
     });
 
     this.#entranceFloorIds = Object.freeze(this.#building.entranceFloors.map((floor) => floor.id));
+    this.#entranceFloorIndices = new Set(
+      this.#building.entranceFloors.map((floor) => floor.index),
+    );
     this.#deadlineS = this.#trace.durationS + this.#options.drainGraceS;
     this.#reportWindow = traceReportWindow(this.#trace);
     this.#windowSelection = config.reportWindow;
@@ -845,6 +907,23 @@ export class Simulation {
       lateArrivalHoldDwellS: this.#lateArrivalHoldDwellS,
       lateArrivalHoldMaxDwellS: this.#lateArrivalHoldMaxDwellS,
       lateArrivalHoldMaxCohort: this.#lateArrivalHoldMaxCohort,
+      doubleDeckStops: this.#doubleDeckStops,
+      doubleDeckPairedStops: this.#doubleDeckPairedStops,
+      doubleDeckBoardings: Object.freeze([
+        this.#doubleDeckBoardings[0],
+        this.#doubleDeckBoardings[1],
+      ]) as readonly [number, number],
+      doubleDeckAlightings: Object.freeze([
+        this.#doubleDeckAlightings[0],
+        this.#doubleDeckAlightings[1],
+      ]) as readonly [number, number],
+      doubleDeckBoardingsProjected: Object.freeze([
+        this.#doubleDeckBoardingsProjected[0],
+        this.#doubleDeckBoardingsProjected[1],
+      ]) as readonly [number, number],
+      doubleDeckDeckFullRefusals: this.#doubleDeckDeckFullRefusals,
+      deckMismatchLegs: this.#deckMismatchLegs.size,
+      kioskRefusedLegs: this.#kioskRefusedLegs.size,
     });
   }
 
@@ -1275,6 +1354,11 @@ export class Simulation {
         // they are legitimately absent from every *other* bank's tally. Their own bank counted
         // them, which is what this check is for.
         if (passenger.isAssigned) continue;
+        // The bare kiosk's refusal is not a routing failure and must not be reported as one: the
+        // building can fly this route, and does under either of the ladder's other two rungs. See
+        // {@link #kioskAllows}. They stay on the landing, are named in `undelivered`, counted in
+        // `stageActivity.kioskRefusedLegs`, and named once in a warning at the end of the run.
+        if (!this.#kioskAllows(passenger)) continue;
         throw new SimulationError(
           `Passenger "${passenger.id}" waits at floor "${floor.id}" for "${passenger.destinationFloorId}", which no bank serving that floor can reach for credential "${String(passenger.credentialGroup)}". The trace planned a route no bank can fly; nobody could ever collect them.`,
         );
@@ -1690,13 +1774,17 @@ export class Simulation {
    * opening anyway — and `Car.registerCarCall` would throw the moment somebody stepped in.
    */
   #loadWhileIdle(car: Car, at: SimTime): boolean {
-    const floor = this.#building.requireFloor(car.floorId);
-    if (
-      this.#waitingFor(car, floor, 'up', at) === 0 &&
-      this.#waitingFor(car, floor, 'down', at) === 0
-    ) {
-      return false;
-    }
+    // Both landings a double-deck car is standing at, not one: an empty shuttle parked at the
+    // pair `[26, 27]` with a queue on 27 and nobody on 26 is standing where the queue is.
+    const waiting = car
+      .floorIdsServedHere()
+      .map((floorId) => this.#building.requireFloor(floorId))
+      .some(
+        (floor) =>
+          this.#waitingFor(car, floor, 'up', at) > 0 ||
+          this.#waitingFor(car, floor, 'down', at) > 0,
+      );
+    if (!waiting) return false;
     return this.#beginStop(car, [], [], at) === 'stopped';
   }
 
@@ -1740,7 +1828,9 @@ export class Simulation {
     let dirty = false;
 
     for (const call of car.assignedHallCalls) {
-      if (call.floorId !== car.floorId) continue;
+      // "At this car's floor" is "at either floor this car's decks open onto". Identity for a
+      // single-deck car, where `stopFloorFor` returns its argument.
+      if (car.stopFloorFor(call.floorId) !== car.floorId) continue;
       const active = this.#activeCalls.get(call.id);
       if (active === undefined) {
         car.releaseHallCall(call.id);
@@ -1844,32 +1934,76 @@ export class Simulation {
       return 'past-deadline';
     }
 
+    // **One stop, one or two landings.** A double-deck car standing at the lower floor of a pair
+    // has both decks open, so the stop loads and unloads two floors at once. `floorIdsServedHere`
+    // is `[car.floorId]` for every single-deck car, and every accumulator below then collapses to
+    // the whole-car one it was.
+    const floorIds = car.floorIdsServedHere();
+    const floors = floorIds.map((floorId) => this.#building.requireFloor(floorId));
+    const directions = this.#boardingDirections(car, floors, served, at);
+
     let alightingMassKg = 0;
-    for (const passenger of alighting) alightingMassKg += passenger.massKg;
-
-    const floor = this.#building.requireFloor(car.floorId);
-    const directions = this.#boardingDirections(car, floor, served, at);
-
-    let boarding = 0;
-    let projectedMassKg = car.loadSensor.massKg - alightingMassKg;
-    for (const direction of directions) {
-      const projected = this.#projectedBoarding(car, floor, direction, projectedMassKg, at);
-      boarding += projected.count;
-      projectedMassKg = projected.massKg;
+    const deckAlighting: [number, number] = [0, 0];
+    const deckAlightingMassKg: [number, number] = [0, 0];
+    for (const passenger of alighting) {
+      const slot = deckSlot(car.deckFor(passenger.destinationFloorId));
+      alightingMassKg += passenger.massKg;
+      deckAlightingMassKg[slot] += passenger.massKg;
+      deckAlighting[slot] += 1;
     }
 
-    if (alighting.length === 0 && boarding === 0 && !car.hasCarCall(car.floorId)) {
+    let boarding = 0;
+    const deckBoarding: [number, number] = [0, 0];
+    let projectedMassKg = car.loadSensor.massKg - alightingMassKg;
+    const deckMassKg: [number, number] = [
+      car.deckMassKg('lower') - deckAlightingMassKg[0],
+      car.deckMassKg('upper') - deckAlightingMassKg[1],
+    ];
+    for (const floor of floors) {
+      const slot = deckSlot(car.deckFor(floor.id));
+      for (const direction of directions) {
+        const projected = this.#projectedBoarding(
+          car,
+          floor,
+          direction,
+          projectedMassKg,
+          deckMassKg[slot],
+          at,
+        );
+        boarding += projected.count;
+        deckBoarding[slot] += projected.count;
+        projectedMassKg = projected.massKg;
+        deckMassKg[slot] = projected.deckMassKg;
+      }
+    }
+
+    const carCallHere = floorIds.some((floorId) => car.hasCarCall(floorId));
+    if (alighting.length === 0 && boarding === 0 && !carCallHere) {
       return 'nobody-would-move';
     }
 
+    // **The dwell is the busier deck, not the sum.** Both decks open on the same interlock and
+    // both queues move through their own doorway in parallel, so a stop that unloads four below
+    // and one above takes `4 x tp`. Charging `5 x tp` would return the door-time saving the
+    // hardware exists to produce — and `2*P*tp` is the term the Barney/CIBSE round trip is most
+    // sensitive to. Degenerate for a single-deck car: everything is on the lower deck.
+    const movers = car.isDoubleDeck
+      ? Math.max(deckAlighting[0] + deckBoarding[0], deckAlighting[1] + deckBoarding[1])
+      : alighting.length + boarding;
     car.openDoors(at, {
-      carCall: alighting.length > 0 || car.hasCarCall(car.floorId),
+      carCall: alighting.length > 0 || carCallHere,
       // A landing stop is a landing stop whether or not this car was the one sent for it: the
       // dwell has to cover somebody noticing the car, walking to it and stepping in either way.
       hallCall: served.length > 0 || boarding > 0,
-      hallQueueLength: boarding,
-      transferSeconds: (alighting.length + boarding) * car.passengerTransferS,
+      hallQueueLength: car.isDoubleDeck ? Math.max(deckBoarding[0], deckBoarding[1]) : boarding,
+      transferSeconds: movers * car.passengerTransferS,
     });
+    if (car.isDoubleDeck) {
+      this.#doubleDeckStops += 1;
+      if (floorIds.length > 1) this.#doubleDeckPairedStops += 1;
+      this.#doubleDeckBoardingsProjected[0] += deckBoarding[0];
+      this.#doubleDeckBoardingsProjected[1] += deckBoarding[1];
+    }
     this.#stops.set(car.id, {
       alighting,
       served,
@@ -1906,7 +2040,7 @@ export class Simulation {
    */
   #boardingDirections(
     car: Car,
-    floor: Floor,
+    floors: readonly Floor[],
     served: readonly ActiveCall[],
     at: SimTime,
   ): readonly Direction[] {
@@ -1918,9 +2052,16 @@ export class Simulation {
       chosen.add(onward);
     } else if (chosen.size === 0) {
       // Idle, doors open. Take the fuller queue; ties go up, so the choice is total and does
-      // not depend on the order two queues happened to be built in.
-      const up = this.#waitingFor(car, floor, 'up', at);
-      const down = this.#waitingFor(car, floor, 'down', at);
+      // not depend on the order two queues happened to be built in. **Summed over the landings
+      // this stop opens onto**, because the decks travel together: one direction is chosen for
+      // the car, not one per deck, and a car that took "up" below and "down" above would have to
+      // come apart to honour both.
+      let up = 0;
+      let down = 0;
+      for (const floor of floors) {
+        up += this.#waitingFor(car, floor, 'up', at);
+        down += this.#waitingFor(car, floor, 'down', at);
+      }
       if (up > 0 || down > 0) chosen.add(up >= down ? 'up' : 'down');
     }
 
@@ -2030,11 +2171,16 @@ export class Simulation {
     const onReopen = stop.alighted;
     stop.transferred = true;
 
-    const floor = this.#building.requireFloor(car.floorId);
+    // Both decks, in the order they are declared — lower first — so the boarding order of a
+    // paired stop is a property of the config and not of a map's iteration.
+    const floors = car
+      .floorIdsServedHere()
+      .map((floorId) => this.#building.requireFloor(floorId));
 
     if (!stop.alighted) {
       stop.alighted = true;
       for (const passenger of stop.alighting) {
+        if (car.isDoubleDeck) this.#doubleDeckAlightings[deckSlot(car.deckFor(passenger.destinationFloorId))] += 1;
         car.alight(passenger, at);
         this.#recorder.recordAlighting(passenger, at);
         if (!passenger.isFinalLeg) this.#scheduleTransfer(passenger, at);
@@ -2042,8 +2188,10 @@ export class Simulation {
     }
 
     let boarded = 0;
-    for (const direction of stop.directions) {
-      boarded += this.#boardFrom(car, floor, direction, at);
+    for (const floor of floors) {
+      for (const direction of stop.directions) {
+        boarded += this.#boardFrom(car, floor, direction, at);
+      }
     }
     if (onReopen) {
       this.#lateArrivalHoldsBoarded += boarded;
@@ -2115,18 +2263,40 @@ export class Simulation {
     if (stop === undefined || !stop.transferred) return;
     if (car.loadSensor.massKg >= car.loadSensor.designLoadKg) return;
 
-    const floor = this.#building.requireFloor(car.floorId);
+    // Both landings, and the per-deck cohorts kept apart, because the reopen's dwell is sized
+    // the same way the stop's was: the busier deck, not the sum.
+    const floors = car
+      .floorIdsServedHere()
+      .map((floorId) => this.#building.requireFloor(floorId));
     let boarding = 0;
+    const deckBoarding: [number, number] = [0, 0];
     let massKg = car.loadSensor.massKg;
-    for (const direction of stop.directions) {
-      // `queueLength` before the projection: the latter copies the queue, this runs at the close
-      // of every stop, and the overwhelming majority of stops leave an empty landing behind them.
-      if (floor.queueLength(direction) === 0) continue;
-      const projected = this.#projectedBoarding(car, floor, direction, massKg, at);
-      boarding += projected.count;
-      massKg = projected.massKg;
+    const deckMassKg: [number, number] = [car.deckMassKg('lower'), car.deckMassKg('upper')];
+    for (const floor of floors) {
+      const slot = deckSlot(car.deckFor(floor.id));
+      for (const direction of stop.directions) {
+        // `queueLength` before the projection: the latter copies the queue, this runs at the
+        // close of every stop, and the overwhelming majority of stops leave an empty landing
+        // behind them.
+        if (floor.queueLength(direction) === 0) continue;
+        const projected = this.#projectedBoarding(
+          car,
+          floor,
+          direction,
+          massKg,
+          deckMassKg[slot],
+          at,
+        );
+        boarding += projected.count;
+        deckBoarding[slot] += projected.count;
+        massKg = projected.massKg;
+        deckMassKg[slot] = projected.deckMassKg;
+      }
     }
     if (boarding === 0) return;
+    const holdCohort = car.isDoubleDeck
+      ? Math.max(deckBoarding[0], deckBoarding[1])
+      : boarding;
 
     this.#lateArrivalHoldsRequested += 1;
     const step = car.requestReopen('lateArrival', at, {
@@ -2135,8 +2305,8 @@ export class Simulation {
       // half of the transfer does not replay and must not be paid for a second time either.
       carCall: false,
       hallCall: true,
-      hallQueueLength: boarding,
-      transferSeconds: boarding * car.passengerTransferS,
+      hallQueueLength: holdCohort,
+      transferSeconds: holdCohort * car.passengerTransferS,
     });
     // Refused — the profile declined the courtesy hold, or the stop's reopen budget is spent.
     // The door carries on closing and the passenger waits for the next car, which is the
@@ -2175,11 +2345,23 @@ export class Simulation {
   #boardFrom(car: Car, floor: Floor, direction: Direction, at: SimTime): number {
     const designLoadKg = car.loadSensor.designLoadKg;
     const overloadKg = car.loadSensor.ratedLoadKg * car.loadSensor.overloadThreshold;
+    // **The 80 % rule applies per deck.** A deck is a room with its own doorway; filling one to
+    // the whole car's design load because the other happens to be empty would put 26 people into
+    // a space that holds 13. `undefined` for every single-deck car, and both clauses below are
+    // then exactly the two the whole-car cell already imposed.
+    const deck = car.deckFor(floor.id);
+    const deckDesignLoadKg = car.deckDesignLoadKg;
+    const deckOverloadKg = car.deckOverloadKg;
     let boarded = 0;
 
     for (;;) {
       if (car.loadSensor.massKg >= designLoadKg) break;
       const massKg = car.loadSensor.massKg;
+      const deckMassKg = deckDesignLoadKg === undefined ? 0 : car.deckMassKg(deck);
+      if (deckDesignLoadKg !== undefined && deckMassKg >= deckDesignLoadKg) {
+        this.#doubleDeckDeckFullRefusals += 1;
+        break;
+      }
       const [passenger] = floor.takeWaiting(
         direction,
         1,
@@ -2189,10 +2371,12 @@ export class Simulation {
         (candidate) =>
           this.#carCanCarry(car, candidate) &&
           this.#promiseAllows(car, candidate, at) &&
-          massKg + candidate.massKg < overloadKg,
+          massKg + candidate.massKg < overloadKg &&
+          (deckOverloadKg === undefined || deckMassKg + candidate.massKg < deckOverloadKg),
       );
       if (passenger === undefined) break;
 
+      if (car.isDoubleDeck) this.#doubleDeckBoardings[deckSlot(deck)] += 1;
       car.board(passenger, at);
       // Counted, not assumed. `#promiseAllows` is the only path into this loop and it refuses
       // the wrong car, so this can only be non-zero if a *second* path into a car appears — which
@@ -2252,21 +2436,28 @@ export class Simulation {
     floor: Floor,
     direction: Direction,
     fromMassKg: number,
+    fromDeckMassKg: number,
     at: SimTime,
-  ): { count: number; massKg: number } {
+  ): { count: number; massKg: number; deckMassKg: number } {
     const designLoadKg = car.loadSensor.designLoadKg;
     const overloadKg = car.loadSensor.ratedLoadKg * car.loadSensor.overloadThreshold;
+    const deckDesignLoadKg = car.deckDesignLoadKg;
+    const deckOverloadKg = car.deckOverloadKg;
     let massKg = fromMassKg;
+    let deckMassKg = fromDeckMassKg;
     let count = 0;
     for (const passenger of floor.waiting(direction)) {
       if (massKg >= designLoadKg) break;
+      if (deckDesignLoadKg !== undefined && deckMassKg >= deckDesignLoadKg) break;
       if (!this.#carCanCarry(car, passenger)) continue;
       if (!this.#promiseAllows(car, passenger, at)) continue;
       if (massKg + passenger.massKg >= overloadKg) continue;
+      if (deckOverloadKg !== undefined && deckMassKg + passenger.massKg >= deckOverloadKg) continue;
       massKg += passenger.massKg;
+      deckMassKg += passenger.massKg;
       count += 1;
     }
-    return { count, massKg };
+    return { count, massKg, deckMassKg };
   }
 
   /**
@@ -2294,26 +2485,36 @@ export class Simulation {
     // Every bank that opens onto this floor, not only this car's. A shared lobby is shared:
     // this car can have emptied a queue another bank still has a car driving towards, and
     // leaving that call lit sends it on a trip to collect nobody.
-    for (const other of this.#building.banksServing(car.floorId)) {
-      for (const active of this.#callsAt(other.id, car.floorId)) {
-        if (this.#eligibleWaiting(other, active).count === 0) {
-          this.#completeCall(active, at);
-          // The car that was driving there has just been freed; its group may have somewhere
-          // better to send it.
-          if (active.carIds.length > 0 || other.id === bank.id) dirty.add(other.id);
-          continue;
+    //
+    // **And every floor this stop opened onto**, not only the car's position: a double-deck
+    // shuttle that emptied floor 27 with its upper deck must extinguish 27's button, or the
+    // landing stays lit for a queue that is no longer there. Exactly one floor for a
+    // single-deck car.
+    const servedFloorIds = car.floorIdsServedHere();
+    for (const floorId of servedFloorIds) {
+      for (const other of this.#building.banksServing(floorId)) {
+        for (const active of this.#callsAt(other.id, floorId)) {
+          if (this.#eligibleWaiting(other, active).count === 0) {
+            this.#completeCall(active, at);
+            // The car that was driving there has just been freed; its group may have somewhere
+            // better to send it.
+            if (active.carIds.length > 0 || other.id === bank.id) dirty.add(other.id);
+            continue;
+          }
+          // Somebody is still standing there. If this car was the one sent for them and could
+          // not take them all, the allocation is discharged and the remainder goes back to the
+          // group — the overflow case, and the reason a full car cannot delete a queue.
+          if (other.id !== bank.id || !active.carIds.includes(car.id)) continue;
+          this.#reofferCall(car, active, at);
+          dirty.add(other.id);
         }
-        // Somebody is still standing there. If this car was the one sent for them and could
-        // not take them all, the allocation is discharged and the remainder goes back to the
-        // group — the overflow case, and the reason a full car cannot delete a queue.
-        if (other.id !== bank.id || !active.carIds.includes(car.id)) continue;
-        this.#reofferCall(car, active, at);
-        dirty.add(other.id);
       }
     }
 
-    this.#syncButton(car.floorId, 'up');
-    this.#syncButton(car.floorId, 'down');
+    for (const floorId of servedFloorIds) {
+      this.#syncButton(floorId, 'up');
+      this.#syncButton(floorId, 'down');
+    }
 
     // Stage 5's load edge. A stop is the only thing in this simulation that changes a car's load,
     // so this is where a crossing can be observed, and it is before `#stepCar` sends the car on:
@@ -2329,10 +2530,15 @@ export class Simulation {
       this.#deadlineTruncations += 1;
       return;
     }
-    if (!car.canStart || car.floorId === floorId) return;
     if (!car.shaft.floorsById.has(floorId)) return;
+    // A double-deck car drives between stop positions, so "go to 27" is "go to 26 and open the
+    // upper deck onto 27" — and a car already at 26 has nowhere to go. Normalizing *before* the
+    // already-there test is what keeps 26→27 from being commanded as a 4.5 m move that the
+    // hardware cannot make. Identity for every single-deck car.
+    const target = car.stopFloorFor(floorId);
+    if (!car.canStart || car.floorId === target) return;
 
-    const motion = car.departFor(floorId, at);
+    const motion = car.departFor(target, at);
     this.#kernel.schedule(
       motion.arrivesAt,
       carArrivedEvent({ carId: car.id }, (payload, context) => {
@@ -2552,7 +2758,9 @@ export class Simulation {
       // kiosk, and forwarding that verdict is what stops `estimateCost` asking a second time
       // whether an **unbadged** passenger may reach a zoned floor. Unasked, that question made a
       // bare `destination-entry` arm unable to serve `secure-tower` at all — worse than
-      // conventional, not better (51.7 % unserved against 33.5 %).
+      // conventional, not better (100 % unserved against 33.5 %: `benchmark/accessControl.ts`
+      // H-ACCESS-1, seed 20 260 726, n = 30, re-run after § T50-D1, which is where "at all"
+      // stopped being a figure of speech).
       //
       // There is deliberately **no rejection branch** here. A passenger the panel would refuse
       // cannot reach this code: `#openCalls` throws for anybody no bank serving the floor can
@@ -2596,7 +2804,15 @@ export class Simulation {
     at: SimTime,
   ): GroupObservationContext {
     const forecast = this.#predictors.get(bankId);
-    return groupContext(snapshots, at, forecast === undefined ? {} : { predictor: forecast });
+    return groupContext(snapshots, at, {
+      ...(forecast === undefined ? {} : { predictor: forecast }),
+      // The third group fact, and the one a car snapshot cannot carry: which floors are
+      // entrances. `dispatch/selector.ts`'s traffic detector separates a lobby arrival from an
+      // interfloor one, and a shaft knows its served floors without knowing which of them people
+      // walk in at — on `midtown-office` the `main` bank's lowest served floor is the garage.
+      // Resolved once for the run in the constructor, so this costs a property read per pass.
+      entranceFloorIndices: this.#entranceFloorIndices,
+    });
   }
 
   /**
@@ -2681,12 +2897,94 @@ export class Simulation {
     return this.#carsById.get(assignedCarId)?.bankId === bank.id;
   }
 
-  /** Service zoning and access zoning, both checked, neither merged into the other. */
+  /**
+   * Service zoning, access zoning and **deck coupling**, all three checked, none merged.
+   *
+   * The deck clause is the bank-level twin of {@link #deckAllows}, and it is not a tidy
+   * duplicate — it is load-bearing, and its absence was a defect. {@link #eligibleWaiting} runs
+   * this predicate to decide whether a landing call is **finished**, and {@link #finishStop}
+   * completes the call only when it answers `0`. Without the clause, a `G → 2` leg left standing
+   * at the lobby keeps the shuttle's call at G alive forever: every car refuses it at
+   * {@link #carCanCarry}, the call is re-offered, and the bank is sent back to a landing it can
+   * never clear. The bank has to know what its cars know.
+   *
+   * **This is `Bank`'s deck index's first non-test caller.** `isDoubleDeck`, `deckAssignmentFor`
+   * and `deckAt` were built, indexed and unit-tested when the bank was written and every
+   * reference to them outside `model/bank.ts` was a test or a barrel re-export — the eleventh
+   * instance of this repository's signature defect (`docs/07` § 3), and one of the two halves
+   * this lane closes. The other half is the shaft's copy, which is what a `Car` reads.
+   */
   #bankCanCarry(bank: Bank<Car>, passenger: Passenger): boolean {
     return (
       bank.servesFloor(passenger.destinationFloorId) &&
-      this.#building.isAccessPermitted(passenger.credentialGroup, passenger.destinationFloorId)
+      this.#building.isAccessPermitted(passenger.credentialGroup, passenger.destinationFloorId) &&
+      this.#bankDecksAllow(bank, passenger) &&
+      this.#kioskAllows(passenger)
     );
+  }
+
+  /**
+   * **The bare kiosk's own refusal, and it is not one of the three zonings.**
+   *
+   * A fourth question, kept fourth: service zoning is the fabric, access zoning is the credential,
+   * deck coupling is the hardware — and this is the **interface**. Under
+   * `dispatch.callType: 'destination-entry'` with no panel the passenger types a destination into
+   * a kiosk that has nothing to identify them with, so the group is asked *"may an unbadged
+   * passenger reach floor 27?"* and answers `destinationAccessDenied` for every car. That refusal
+   * is the configuration's whole measured cost (DECISIONS.md § D30's premise, and
+   * `benchmark/accessControl.ts`'s `BARE_KIOSK_ARM`), and it is preserved here rather than
+   * removed.
+   *
+   * What it stops being is **collateral**. Before § T50-D1 the refusal was expressed only through
+   * the call value: `#callValue` took the head of the landing queue, disclosed their restricted
+   * destination, and the whole call died — so everybody standing behind them died with it,
+   * including passengers whose journey touches no access zone at all. Asking the question per
+   * passenger, here, is what separates the two: the refused passenger is refused, and the queue
+   * behind them is collected.
+   *
+   * **Asked at the landing and at the doorway both**, because the alternative is worse than
+   * either answer. `#bankCanCarry` stops them heading a call; `#carCanCarry` stops them boarding
+   * the car the group sent for somebody else. Refusing at dispatch and admitting at the doorway
+   * would make the refusal a matter of **luck** — you travel if and only if a queue-mate happens
+   * to be bound somewhere unrestricted — which is an artefact of queue composition and not a
+   * system anybody could build. A kiosk that would not send you a car has not authorized your
+   * trip.
+   *
+   * The question is a fact about **the pair (call type, floor)**: no dispatch decision, score or
+   * car state can produce it or change it, which is what keeps it from being a general
+   * re-eligibility mechanism (the ground § T22-D1 argues from). `false` for every shipped
+   * profile — all twelve run at `up-down-buttons` or `mobile-credential` — so no shipped
+   * configuration's eligibility set moves.
+   *
+   * The refused passenger is neither dropped nor carried: they stay on the landing, are named in
+   * {@link SimulationResult.undelivered} as `waiting`, and are counted in
+   * {@link StageActivity.kioskRefusedLegs}. `#openCalls` exempts them from its routing-failure
+   * throw for the same reason — the trace planned a route the building can fly; the interface
+   * refused it.
+   */
+  #kioskAllows(passenger: Passenger): boolean {
+    if (!this.#kioskWithoutCredential) return true;
+    // The question `infeasibilityOf` step 4 will ask, asked with the credential the call will
+    // actually carry — which under this configuration is none.
+    if (this.#building.isAccessPermitted(undefined, passenger.destinationFloorId)) return true;
+    this.#kioskRefusedLegs.add(passenger.id);
+    return false;
+  }
+
+  /**
+   * Whether a bank's coupled decks can carry a leg at all — origin and destination on one deck.
+   *
+   * A floor the bank pairs with nothing (or does not serve) has no deck assignment, and a leg
+   * that touches one is not constrained: `undefined` from {@link Bank.deckAssignmentFor} means
+   * *the car as a whole serves it*, which either deck does. Trivially `true` for every
+   * single-deck bank, so no conventional building's eligibility set moves.
+   */
+  #bankDecksAllow(bank: Bank<Car>, passenger: Passenger): boolean {
+    if (!bank.isDoubleDeck) return true;
+    const origin = bank.deckAssignmentFor(passenger.originFloorId);
+    if (origin === undefined) return true;
+    const destinationDeck = bank.deckAt(passenger.destinationFloorId);
+    return destinationDeck === undefined || destinationDeck === origin.deck;
   }
 
   /**
@@ -2718,8 +3016,45 @@ export class Simulation {
     return (
       car.acceptsHallCalls &&
       car.shaft.floorsById.has(passenger.destinationFloorId) &&
-      isAccessPermitted(car.shaft, passenger.credentialGroup, passenger.destinationFloorId)
+      isAccessPermitted(car.shaft, passenger.credentialGroup, passenger.destinationFloorId) &&
+      this.#deckAllows(car, passenger) &&
+      this.#kioskAllows(passenger)
     );
+  }
+
+  /**
+   * **The deck binds the passenger.** A leg whose origin and destination sit on *different*
+   * decks of the same double-deck bank cannot be ridden: the decks are rigidly coupled, so
+   * somebody who boarded the lower deck at 26 is at 51 when the upper deck is at 52, and there
+   * is no moment in the run at which they could step across.
+   *
+   * The model **refuses the leg rather than teleporting the passenger**, which is the honest of
+   * the two readings — the alternative, letting them alight on the other deck's floor, would
+   * silently make a physically impossible journey and flatter every time-to-destination
+   * statistic on the building. The refusal is a car predicate, so the passenger stays on the
+   * landing for a bank that *can* carry them.
+   *
+   * **This was expected to be unreachable and is not, which is why it is counted rather than
+   * asserted.** `traffic/route.ts`'s `legDestinations` restricts a *shuttle* leg boarded on a
+   * lower-deck floor to lower-deck floors, so no route ever puts a cross-deck leg **on this
+   * bank**. But a leg is not bound to a bank — `route.ts` says so deliberately, because
+   * "recording a bank here would freeze a dispatch decision into the passenger trace" — so the
+   * shuttle is still *offered* every queue at every floor it opens onto. On `vertical-city` that
+   * is 270 `G → 2` legs and 22 `2 → G` legs: one floor apart, planned on `zone-1-local` or
+   * `zone-2-local`, and impossible on a double-deck car because **G and 2 are the same stop
+   * position** — the passenger would have to change decks without the car moving.
+   *
+   * Measured at seed 20 260 726, `eta`: **200 distinct legs refused**, the run's conservation
+   * audit `balanced: true`, and none of the 83 undelivered journeys is on a shuttle floor. So the
+   * refusal costs nobody a ride and removes a move the hardware cannot make.
+   */
+  #deckAllows(car: Car, passenger: Passenger): boolean {
+    if (!car.isDoubleDeck) return true;
+    if (car.deckFor(passenger.originFloorId) === car.deckFor(passenger.destinationFloorId)) {
+      return true;
+    }
+    this.#deckMismatchLegs.add(passenger.id);
+    return false;
   }
 
   /**
@@ -2964,6 +3299,15 @@ export class Simulation {
    * that happened to pass and load it is not a problem, and saying so would be a lie.
    */
   #diagnoseStuckCalls(): void {
+    // The bare kiosk's refusals, said out loud once. A landing that was collected around them
+    // reports nothing else at all — the call completed — so without this line the only trace of
+    // a turned-away passenger is a row in `undelivered` that looks like ordinary overflow.
+    if (this.#kioskRefusedLegs.size > 0) {
+      this.#warnings.push(
+        `${String(this.#kioskRefusedLegs.size)} leg(s) were refused by the destination kiosk: dispatch.callType "destination-entry" discloses a destination and carries no credential, so an access-restricted destination is infeasible for every car in the building and no car is ever sent for it. Those legs are named in undelivered and are the measured cost of a kiosk that does not authorize (DECISIONS.md § D30, § T50-D1); passengers behind them in the same landing queue are collected normally. A credential-aware call type ("mobile-credential") or a landing panel serves them.`,
+      );
+    }
+
     for (const [callId, reasons] of this.#unservable) {
       const active = this.#activeCalls.get(callId);
       if (active === undefined) continue;

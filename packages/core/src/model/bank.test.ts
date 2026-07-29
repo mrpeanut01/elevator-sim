@@ -135,8 +135,10 @@ describe('double-deck pairing', () => {
     expect(shuttle.deckAt('26')).toBe('lower');
     expect(shuttle.deckAt('27')).toBe('upper');
 
-    expect(shuttle.pairedFloorOf('26')).toBe('27');
-    expect(shuttle.pairedFloorOf('27')).toBe('26');
+    // `pairedFloorOf` and `servesFloorPair` were deleted in Phase 6 for having no non-test
+    // caller; `deckAssignmentFor` carries the same two facts and does have one.
+    expect(shuttle.deckAssignmentFor('26')?.pairedFloorId).toBe('27');
+    expect(shuttle.deckAssignmentFor('27')?.pairedFloorId).toBe('26');
 
     const assignment = shuttle.deckAssignmentFor('51');
     expect(assignment?.deck).toBe('lower');
@@ -146,9 +148,15 @@ describe('double-deck pairing', () => {
 
   it('is ordered: a pair is not its own reverse', () => {
     const shuttle = bank('vertical-city', 'shuttle');
-    expect(shuttle.servesFloorPair('26', '27')).toBe(true);
-    expect(shuttle.servesFloorPair('27', '26')).toBe(false);
-    expect(shuttle.servesFloorPair('26', '51')).toBe(false);
+    expect(shuttle.deckAt('26')).toBe('lower');
+    expect(shuttle.deckAt('27')).toBe('upper');
+    expect(shuttle.deckAssignmentFor('26')?.pair).toEqual({
+      lowerFloorId: '26',
+      upperFloorId: '27',
+    });
+    // Reversed, the same two floors are not a pair: the assignment for the *upper* floor names
+    // itself as upper, so a caller asking "is [27, 26] a stop" reads `deck === 'upper'` and stops.
+    expect(shuttle.deckAssignmentFor('27')?.deck).toBe('upper');
   });
 
   it('keeps servesFloors as the flattened union of the pairs', () => {
@@ -165,7 +173,6 @@ describe('double-deck pairing', () => {
     expect(local.isDoubleDeck).toBe(false);
     expect(local.servesFloorPairs).toEqual([]);
     expect(local.deckAt('G')).toBeUndefined();
-    expect(local.pairedFloorOf('G')).toBeUndefined();
     expect(local.deckAssignmentFor('G')).toBeUndefined();
     // It still serves the same ground-lobby levels the shuttle does — that is a shared stop,
     // not a deck pairing.

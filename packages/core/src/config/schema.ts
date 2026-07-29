@@ -25,6 +25,7 @@ import {
   PARKING_STRATEGIES,
   REASSIGNMENT_POLICIES,
   SERVICE_MODES,
+  WEIGHT_SET_POLICIES,
   type AccessZone,
   type BankConfig,
   type BuildingConfig,
@@ -93,24 +94,28 @@ export const WARNING_CODES = {
   floorsExceedClass: 'floors-exceed-class',
   noEntranceFloor: 'no-entrance-floor',
   unknownWeightSetProfile: 'unknown-weight-set-profile',
+  /**
+   * The bank has double-deck cars and no `servesFloorPairs`, so **there is no deck geometry to
+   * simulate** and the runtime runs the car as a single deck of the combined capacity.
+   *
+   * This is the disclaimer `double-deck-not-simulated` used to be, narrowed to the only case
+   * where it is still true. Double-deck operation *is* simulated as of Phase 6: `shaftForBank`
+   * builds a deck-aware shaft from this pairing, one stop opens onto both floors of a pair, the
+   * 80 % design load applies per deck and the dwell is the busier deck. All of that is downstream
+   * of the pairing — a bank that declares none gets a single-deck shaft, really does make up to
+   * twice the stops the declared hardware would, and really does report round-trip times,
+   * intervals and handling capacities for a machine nobody configured.
+   *
+   * So the code kept its meaning and lost its scope, rather than being deleted: `planRun` in
+   * `cli/src/commands/run.ts` still branches on it and is still its named non-test reader
+   * (DECISIONS.md § D23), and `config/doubleDeck.test.ts` still asserts it in both directions.
+   * It is raised on **no shipped building** — `vertical-city`'s shuttle declares its four pairs
+   * — which is the difference between a disclaimer and a defect.
+   */
   missingFloorPairs: 'missing-floor-pairs',
   unusedFloorPairs: 'unused-floor-pairs',
   deckLoadMismatch: 'deck-load-mismatch',
   deckPersonsOutsideClassRange: 'deck-persons-outside-class-range',
-  /**
-   * The building declares double-deck cars and the runtime does not simulate them.
-   *
-   * Not a defect in the config — it is a fact about the simulator, raised where the reader can
-   * act on it. `doubleDeck`, `deckSeparationM`, `ratedLoadLbPerDeck`, `servesFloorPairs` and the
-   * whole `Bank` deck index are parsed, cross-validated by the two warnings above, resolved onto
-   * `ResolvedCar` and unit-tested — and no code in `sim/`, `model/car/` or `dispatch/` reads any
-   * of them. So a shuttle declared as a double-deck car runs as a single-deck car of the same
-   * whole-car capacity, making up to twice the stops the declared hardware would, and every
-   * round-trip time, interval and handling-capacity figure reported for that bank is for
-   * hardware nobody configured. Double-deck *dispatch* is Phase 6 (docs/07-handoff.md); saying
-   * so out loud is not.
-   */
-  doubleDeckNotSimulated: 'double-deck-not-simulated',
 } as const;
 
 /** Render a zod path as `banks[0].cars[1].spec`. */
@@ -559,6 +564,25 @@ const auctionStageSchema = z.strictObject({
   reserveMarginalDelayS: nonNegative.optional(),
 });
 
+/**
+ * Stage 3's weight-set selection, as a profile authors it.
+ *
+ * Six scalars and no map. The arms are the file-level `patternSwitching` block, for the same
+ * reason the cost-term library is file-level: a statement of what exists is not a knob an
+ * optimizer samples. `policy` is the opt-in and its default is `off`, so a profile that says
+ * nothing here holds one weight vector for the run — which is every profile this file ships.
+ */
+const selectionStageSchema = z.strictObject({
+  $comment: comment,
+  policy: z.enum(WEIGHT_SET_POLICIES).optional(),
+  hysteresisS: nonNegative.max(900).optional(),
+  observationWindowS: positive.min(30).max(1800).optional(),
+  lobbyArrivalRateGain: nonNegative.max(4).optional(),
+  interfloorRateGain: nonNegative.max(4).optional(),
+  downPeakRateGain: nonNegative.max(4).optional(),
+  switchMargin: fraction.optional(),
+});
+
 export const dispatcherProfileSchema = z.strictObject({
   $comment: comment,
   id: identifier,
@@ -573,6 +597,7 @@ export const dispatcherProfileSchema = z.strictObject({
   answer: answerStageSchema.optional(),
   idle: idleStageSchema.optional(),
   auction: auctionStageSchema.optional(),
+  selection: selectionStageSchema.optional(),
 });
 
 export const dispatcherProfilesSchema = z
@@ -591,6 +616,15 @@ export const dispatcherProfilesSchema = z
           inputs: z.array(identifier).min(1),
           patterns: z.array(identifier).min(1),
           hysteresisS: nonNegative,
+          // Pattern id to input id to `[zeroAt, oneAt]` — the membership ramp that decides when
+          // the detector is in that pattern. Optional in the schema and **required by
+          // `resolveWeightSets`** for every declared pattern, and the asymmetry is deliberate:
+          // this file may be read by a consumer that only wants the profile library, but a
+          // *selector* built over a pattern with no clause has a constant membership and can
+          // neither enter nor leave that pattern on evidence.
+          membership: z
+            .record(identifier, z.record(identifier, z.tuple([z.number(), z.number()])))
+            .optional(),
         }),
         weightSetsByPattern: z.record(identifier, identifier),
       })

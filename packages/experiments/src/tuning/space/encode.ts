@@ -81,12 +81,52 @@ import { SearchSpaceError, isActive } from './types.js';
 const WEIGHTS_SECTION = 'weights';
 
 /**
+ * A one-arm weight-set library, for the feasibility oracle and for nothing else.
+ *
+ * `selection.policy` is a profile field; the **arms** are not — they are the file-level
+ * `patternSwitching` block, the way the cost-term library is file-level. So a profile carrying
+ * `selection.policy: 'fuzzy'` is buildable or not only *given* a library, exactly as a car is
+ * feasible or not only given a building. This stands in for the real one so that turning the
+ * knob on is not mistaken for an infeasible candidate.
+ *
+ * Synthetic rather than loaded: this module is reachable from the browser barrel and may not read
+ * `data/`. It never reaches a run — `runnerObjective` builds arms from the real resources.
+ */
+const SEARCH_SPACE_WEIGHT_SETS = Object.freeze({
+  patternSwitching: Object.freeze({
+    patternDetector: Object.freeze({
+      type: 'fuzzy',
+      inputs: Object.freeze(['lobbyArrivalRate']),
+      patterns: Object.freeze(['probe']),
+      hysteresisS: 0,
+      membership: Object.freeze({ probe: Object.freeze({ lobbyArrivalRate: [0, 1] }) }),
+    }),
+    weightSetsByPattern: Object.freeze({ probe: 'probe-arm' }),
+  }),
+  weightsByProfileId: new Map<string, ReadonlyMap<string, number>>([
+    ['probe-arm', new Map([['waitTime', 1]])],
+  ]),
+});
+
+/**
  * The `constraints` pseudo-section: the one family of ids whose authored form is not its dotted
  * path. See {@link ProfilePatch.hardConstraints}.
  */
 const CONSTRAINTS_SECTION = 'constraints';
 
-/** Sections written as `profile.<section>.<key>`, which is every other one. */
+/**
+ * Sections written as `profile.<section>.<key>`, which is every other one.
+ *
+ * **A hand-written list, in the module whose sibling's docstring argues against hand-written
+ * lists**, and it is worth saying so rather than quietly appending to it. `collect.ts` derives
+ * the *parameters* from `core`'s `_PARAMETERS` exports precisely so a new schema needs no edit
+ * here; the *sections* are still enumerated, so a new profile section is invisible to the search
+ * until this array names it. `selection` was the seventh, and the symptom was exactly the one
+ * `collect.ts` predicts for a hand-listed space: seven declared, round-trip-tested,
+ * profile-authorable dimensions that `collectSearchSpace()` reported as unauthorable and dropped,
+ * with nothing anywhere reading as wrong. Deriving this list from `dispatcherProfileSchema`'s own
+ * shape is the real fix and is recorded as debt rather than done in passing.
+ */
 export const PROFILE_OBJECT_SECTIONS: readonly string[] = Object.freeze([
   'normalization',
   'dispatch',
@@ -94,6 +134,7 @@ export const PROFILE_OBJECT_SECTIONS: readonly string[] = Object.freeze([
   'answer',
   'idle',
   'auction',
+  'selection',
 ]);
 
 /** Every section a {@link ProfilePatch} can carry, including the two pseudo-sections. */
@@ -437,7 +478,19 @@ export function validateValues(
     // Builds whichever policy `auction.aggregation` names, and runs every build-time check the
     // shipped path runs — including the one constraint the declared box does not express, that a
     // destination-entry dispatcher may not defer.
-    createPolicyFor(profile satisfies AuctionProfileSource);
+    //
+    // The weight-set library is supplied because it is a **run input, not a profile field**, in
+    // the same way the building is: `patternSwitching` lives at the top of
+    // `data/dispatcher-profiles.json` beside the profile list, and `core` refuses a profile that
+    // asks for a selector with nothing to select between. Without a stand-in here the oracle
+    // would answer "infeasible" for every draw that turned `selection.policy` on — which is not a
+    // fact about the candidate, it is a fact about what the oracle was handed. {@link
+    // SEARCH_SPACE_WEIGHT_SETS} is synthetic and minimal on purpose: this file is on the browser
+    // barrel and may not read `data/`, and the question being asked is whether the *dispatcher*
+    // builds, not whether one particular library resolves.
+    createPolicyFor(profile satisfies AuctionProfileSource, {
+      weightSets: SEARCH_SPACE_WEIGHT_SETS,
+    });
   } catch (error) {
     return messageOf(error);
   }
@@ -683,12 +736,24 @@ function valueOf(parameter: SearchParameter, coordinate: number): ParameterValue
     ? reflectInto(coordinate, low, high)
     : coordinateOf(parameter, parameter.default);
   switch (parameter.type) {
-    case 'continuous':
+    case 'continuous': {
+      if (parameter.scale !== 'log') {
+        return Math.min(parameter.max, Math.max(parameter.min, folded));
+      }
       // Clamped after the exponential, not only in box coordinates: `exp(log(1800))` is
       // `1800.0000000000005`, which is outside a declared range the profile schema will enforce.
-      return parameter.scale === 'log'
-        ? Math.min(parameter.max, Math.max(parameter.min, Math.exp(folded)))
-        : Math.min(parameter.max, Math.max(parameter.min, folded));
+      const once = Math.min(parameter.max, Math.max(parameter.min, Math.exp(folded)));
+      // **And normalized to the fixed point of `exp ∘ log`, which is what makes the round trip
+      // idempotent rather than nearly so.** `exp(log(y)) === y` fails by one ulp for some
+      // doubles, so `decode(encode(decode(v)))` could move a log-scaled coordinate a second time
+      // — `normalization.distanceM` at 5.873516484765638 came back 5.873516484765639 — which is
+      // exactly what `sample.test.ts`'s idempotence claim forbids and what `cmaes.ts` relies on
+      // when it updates its distribution from what was evaluated. Latent: it was reached only
+      // when the dimension count changed and moved the draw sequence. One normalization suffices,
+      // checked over three million draws across this dimension's declared range with zero
+      // survivors, and it is a no-op for every value that was already a fixed point.
+      return Math.min(parameter.max, Math.max(parameter.min, Math.exp(Math.log(once))));
+    }
     case 'integer': {
       const natural = parameter.scale === 'log' ? Math.exp(folded) : folded;
       return Math.min(parameter.max, Math.max(parameter.min, Math.round(natural)));

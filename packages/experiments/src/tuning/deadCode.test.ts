@@ -76,15 +76,22 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
   'search/plateauClasses': 'the groups behind the count the round already carries; for a report',
 
   /*
-   * -- Space introspection. Three accessors over a collected `SearchSpace`, for a caller that
-   * wants to *describe* the space rather than draw from it — a `list --parameters` command, a
-   * generated doc. The shipped path draws (`sampleCandidate`) and merges (`candidateFromProfile`),
-   * and needs none of them; `tune --params` validates against `space.byId` directly, which is the
-   * same map `parameterOf` wraps.
+   * -- Space introspection: **three entries deleted, 2026-07-28, because the caller arrived.**
+   *
+   * `activeParameters`, `parameterOf` and `defaultCandidate` sat here with the reason *"for a
+   * caller that wants to describe the space rather than draw from it — a `list --parameters`
+   * command, a generated doc"*. The caller that arrived is neither: it is
+   * `packages/viz/src/controls/controls.ts`, W4's generated parameter form
+   * (docs/10-experience-layer-contract.md § 11, DECISIONS.md § D127). A form is an optimizer with
+   * a human in the loop, and it needs exactly the three questions this block anticipated — which
+   * dimensions are live at this point, what is the row for this id, and where does the space
+   * start.
+   *
+   * They are **deleted rather than annotated**, which is what the third assertion below demands:
+   * *"an allowlist that keeps entries after their reason lapses is where dead code goes to be
+   * forgotten."* That assertion is what found them — it went red on the day `controls.ts` landed,
+   * before anyone thought to look. This block is the record of why it was right to.
    */
-  'space/activeParameters': 'space introspection: which dimensions a point leaves gated on',
-  'space/parameterOf': 'space introspection: one row by id; a one-line wrapper over space.byId',
-  'space/defaultCandidate': 'space introspection: the declared defaults as a point',
 
   /*
    * -- Two draws the shipped searches do not make.
@@ -103,15 +110,15 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
   'space/perturbCandidate': 'a local move; none of the three shipped methods takes one',
 
   /*
-   * -- The named stream, for a caller that draws directly.
+   * -- `space/policyNoiseStream` was here, and its entry is **deleted rather than re-argued**.
    *
-   * CLAUDE.md invariant 2 says every draw comes from a named stream of an injected `StreamSet`,
-   * and this is that stream for `tuning/space`. The shipped path gets the same stream from the
-   * other side — `searchRng`'s `SEARCH_STREAM` is the string `'policyNoise'`, and
-   * `round.test.ts` pins that the two agree — so a search never needs to build one. A study that
-   * samples the space without running a search does.
+   * The reason it carried was *"the named RNG stream for a caller that draws without a search"*,
+   * with the honest note that a study sampling the space without running a search would need it.
+   * Wave 6's `benchmark/weightSetSelection.ts` is that study: it draws the four learned
+   * `selection.*` dimensions straight out of `collectSearchSpace()` to fit Phase 6c's contextual
+   * policy. The allowlist is asserted in both directions precisely so an entry whose reason has
+   * lapsed fails here rather than quietly becoming the place dead code goes to be forgotten.
    */
-  'space/policyNoiseStream': 'the named RNG stream for a caller that draws without a search',
 
   /*
    * -- Deliberately weaker than what the report uses, and kept as the direct question.

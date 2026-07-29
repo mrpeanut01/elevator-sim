@@ -205,11 +205,19 @@ export interface RunPlan {
   /**
    * Load-time disclaimers about this building, carried from the config layer.
    *
-   * **This is the non-test reader `WARNING_CODES.doubleDeckNotSimulated` did not have.**
+   * **This is the non-test reader the double-deck disclaimer code did not have.**
    * `resolveBuilding` raised it, `config/doubleDeck.test.ts` asserted it in both directions, and
    * no shipped path read the code — the CLI printed the `Simulation`-side statement and never
    * looked at `ResolvedBuilding.warnings` at all. A code nothing branches on is a string with a
    * test, which is the shape of defect the standing requirement in `docs/05-roadmap.md` names.
+   *
+   * **The branch survived Phase 6's double-deck work and was re-pointed rather than deleted.**
+   * `double-deck-not-simulated` was retired because double-deck operation *is* simulated now;
+   * `missing-floor-pairs` carries the same disclaimer over the one configuration where it is
+   * still true — a double-deck bank with no declared pairing, which gets a single-deck shaft.
+   * `docs/09` § 6.3 required exactly this: *"Phase 6 must not remove that branch, or the code
+   * becomes the eighth dead seam again."* It is now raised by **no shipped building**, which is
+   * the honest state for a disclaimer: available, read, and not needed.
    *
    * Selected **by code**, so the choice of what counts as a load-time disclaimer is a machine-
    * readable decision rather than a substring match on prose.
@@ -218,7 +226,7 @@ export interface RunPlan {
 }
 
 /** Config-warning codes the CLI repeats before a run, because they qualify its numbers. */
-const DISCLAIMER_CODES: readonly string[] = [WARNING_CODES.doubleDeckNotSimulated];
+const DISCLAIMER_CODES: readonly string[] = [WARNING_CODES.missingFloorPairs];
 
 export function planRun(config: LoadedConfig, parsed: ParsedArgs): RunPlan {
   const buildingId = requiredStringFlag(parsed, 'building');

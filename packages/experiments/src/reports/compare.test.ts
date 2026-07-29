@@ -215,12 +215,16 @@ describe('convergence is reported as what it is', () => {
       .toBe(29);
   });
 
-  it('says t rather than z when there is no estimate to read a family off', () => {
-    // Review follow-up to finding #14, one layer down. When the headline metric is suppressed
-    // there is no `MeanEstimate`, so `method` comes from a fallback — and that fallback used to be
-    // an n-dependent quantile chooser that returned `'z'` past n = 25. `formatConvergence` never
-    // prints `method`, so the wrong family was invisible on the page and fully present in any
-    // serialized `ConvergenceReport`, which is exactly the mislabelling finding #14 was about.
+  it('names no family at all when there is no estimate to read one off', () => {
+    // Review follow-up to finding #14, one layer down, and then open item `C33` on top of it.
+    //
+    // When the headline metric is suppressed there is no `MeanEstimate`, so `method` came from a
+    // fallback — and that fallback used to be an n-dependent quantile chooser that returned `'z'`
+    // past n = 25. `formatConvergence` never prints `method`, so the wrong family was invisible on
+    // the page and fully present in any serialized `ConvergenceReport`. C5 fixed the label to
+    // `'t'`. `C33` is what was left: `'t'` is no longer *wrong*, but it is still a quantile family
+    // named for an interval that does not exist — `achievedHalfWidth` is `NaN` beside it, and the
+    // pair reads as "a t-interval of unknown width" rather than "no interval".
     //
     // 30 saturated replications: past the old crossover, and with nothing to estimate from.
     const saturated = observations(
@@ -229,7 +233,24 @@ describe('convergence is reported as what it is', () => {
     );
     const report = buildCandidateReport('overloaded', saturated, { targetHalfWidth: 1 });
     expect(report.convergence.achievedHalfWidth).toBeNaN();
+    expect(report.convergence.method).toBeUndefined();
+    // Absent, not present-and-undefined: the JSON a consumer receives must not carry the key at
+    // all, or `'method' in report` stays true and the absence is expressible only in TypeScript.
+    expect('method' in report.convergence).toBe(false);
+    const roundTripped = JSON.parse(JSON.stringify(report.convergence)) as Record<string, unknown>;
+    expect('method' in roundTripped).toBe(false);
+  });
+
+  it('still names the family when there is an interval to name it for', () => {
+    // The other side of the same rule, so "optional" cannot decay into "never set". A report with
+    // a live headline estimate carries `'t'`, and it is the estimate's own label rather than a
+    // re-derivation.
+    const report = buildCandidateReport('collective', observations([4.1, 5.0, 5.6, 7.4, 6.2]), {
+      targetHalfWidth: 1,
+    });
+    expect(Number.isFinite(report.convergence.achievedHalfWidth)).toBe(true);
     expect(report.convergence.method).toBe('t');
+    expect('method' in report.convergence).toBe(true);
   });
 });
 
@@ -271,9 +292,11 @@ describe('a convergence report cannot label its half-width with a family it did 
     expect(publishedIntervalFamily(estimateStub)).toBe('t');
   });
 
-  it('states the published family when there is no estimate to read one off', () => {
+  it('states no family when there is no estimate to read one off', () => {
     // The suppressed-metric branch: `achievedHalfWidth` is `NaN` and there is no `MeanEstimate`.
-    expect(publishedIntervalFamily(undefined)).toBe('t');
+    // It returned `'t'` until `C33` — the published family, correctly named, for an interval that
+    // does not exist. An absent interval has no family.
+    expect(publishedIntervalFamily(undefined)).toBeUndefined();
   });
 
   it('refuses a normal-approximation estimate instead of copying its label onto a report', () => {
@@ -287,20 +310,27 @@ describe('a convergence report cannot label its half-width with a family it did 
     expect(() => publishedIntervalFamily(normal)).toThrow(/z/);
   });
 
-  it('says t on every shape of report the public API can build', () => {
+  it('says t or nothing on every shape of report the public API can build, and never z', () => {
     // The reachability argument, executed rather than asserted: `convergenceOf` is the only
     // construction site of a `ConvergenceReport` in the repository, and every estimate it can see
     // comes from `estimateMean`, which is Student-t at every n. These are the branches that reach
     // it — no estimate at all, a suppressed one, one below the old n = 25 crossover, one above it,
     // and a convergence metric id that matches nothing.
-    const shaped: readonly CandidateReport[] = [
-      buildCandidateReport('empty', []),
-      buildCandidateReport('single', observations([4.2])),
+    //
+    // Since `C33` the assertion is two-sided rather than one: a shape with an interval must name
+    // `'t'`, and a shape without one must name nothing. Asserting only "never `'z'`" would pass
+    // trivially if the field went absent everywhere, which is how an optional field decays into a
+    // field nobody sets.
+    const withInterval: readonly CandidateReport[] = [
       buildCandidateReport('small', observations([1, 2, 3])),
       buildCandidateReport(
         'large',
         observations(Array.from({ length: 30 }, (_, index) => 5 + index * 0.01)),
       ),
+    ];
+    const withoutInterval: readonly CandidateReport[] = [
+      buildCandidateReport('empty', []),
+      buildCandidateReport('single', observations([4.2])),
       buildCandidateReport(
         'saturated',
         observations(Array.from({ length: 30 }, (_, index) => 300 + index), {
@@ -314,8 +344,13 @@ describe('a convergence report cannot label its half-width with a family it did 
         targetHalfWidth: 1,
       }),
     ];
-    for (const report of shaped) {
-      expect(report.convergence.method).toBe('t');
+    for (const report of withInterval) {
+      expect(Number.isFinite(report.convergence.achievedHalfWidth), report.candidateId).toBe(true);
+      expect(report.convergence.method, report.candidateId).toBe('t');
+    }
+    for (const report of withoutInterval) {
+      expect(report.convergence.achievedHalfWidth, report.candidateId).toBeNaN();
+      expect(report.convergence.method, report.candidateId).toBeUndefined();
     }
   });
 });

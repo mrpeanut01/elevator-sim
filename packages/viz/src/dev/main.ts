@@ -16,11 +16,17 @@
  * | `dev/bootstrap.ts` | {@link main}, which is the only thing that loads `data/` — `RV-17`/`RV-21` |
  * | `dev/motion.ts` | `adopt`, which asks it whether a new recording may start moving — `KB-14` |
  *
- * ## Two surfaces, one page
+ * ## Three surfaces, one page
  *
- * A tablist rather than two documents, because the editor's whole payoff is `ED-04`: a valid
+ * A tablist rather than three documents, because the editor's whole payoff is `ED-04`: a valid
  * edit goes straight to a run without a reload, keeping the seed and the dispatcher the reader
  * had already chosen.
+ *
+ * The third surface is W4 (`docs/10-experience-layer-contract.md` § 11): the **generated**
+ * parameter form, mounted from `dev/parameterForm.ts`. It is also this file's answer to
+ * `DECISIONS.md` § D121's open item — `packages/experiments`' browser barrel had no non-test
+ * caller, could not have one until W4 existed, and was tracked as `C34`. It has one now, and the
+ * chain is `main.ts → dev/parameterForm.ts → controls/controls.ts → @elevator-sim/experiments/browser`.
  */
 
 import { SimulationError, type BuildingConfig, type SimulationConfig } from '@elevator-sim/core/browser';
@@ -46,6 +52,7 @@ import {
 } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
 import { mountEditor } from './editor.js';
+import { mountParameterForm } from './parameterForm.js';
 import { createLoader } from './bootstrap.js';
 import { shouldAutoplay } from './motion.js';
 import { loadBrowserResources, resolveEdited, type BrowserResources } from './data.js';
@@ -57,6 +64,21 @@ const OVERLAY_WIDTH_PX = 250;
 const OVERLAY_MIN_VIEWPORT_PX = 900;
 /** One display frame at 60 Hz, in simulated seconds at the current speed — `KB-06`, `PB-08`. */
 const FRAME_S = 1 / 60;
+
+/**
+ * The surfaces, in tab order — `D11`, and the `tab` key in the URL.
+ *
+ * A list rather than a pair of fields. It was a pair until W4 (`docs/10` § 11) added a third
+ * surface, and the pair form had the tab machinery written out twice: two `setAttribute` calls,
+ * two `tabIndex` assignments, two `hidden` assignments and a hand-written arrow-key table of
+ * `[tab, other, which]` triples that only works for exactly two tabs. Three of anything is where
+ * that stops being cheaper than a loop.
+ */
+const TABS = ['viewer', 'editor', 'parameters'] as const;
+type TabName = (typeof TABS)[number];
+
+const isTabName = (value: string | null): value is TabName =>
+  value !== null && (TABS as readonly string[]).includes(value);
 
 interface Elements {
   readonly canvas: HTMLCanvasElement;
@@ -82,10 +104,13 @@ interface Elements {
   readonly error: HTMLElement;
   readonly banner: HTMLElement;
   readonly description: HTMLElement;
-  readonly tabViewer: HTMLButtonElement;
-  readonly tabEditor: HTMLButtonElement;
-  readonly panelViewer: HTMLElement;
-  readonly panelEditor: HTMLElement;
+  /** Tab button and its panel, per surface. Keyed by {@link TabName}, so a fourth is one entry. */
+  readonly tabs: Readonly<Record<TabName, HTMLButtonElement>>;
+  readonly panels: Readonly<Record<TabName, HTMLElement>>;
+  readonly paramSource: HTMLSelectElement;
+  readonly paramForm: HTMLElement;
+  readonly paramStatus: HTMLElement;
+  readonly paramRefusal: HTMLElement;
   readonly confirm: HTMLDialogElement;
   readonly confirmMessage: HTMLElement;
   readonly confirmOk: HTMLButtonElement;
@@ -122,10 +147,20 @@ function elements(): Elements {
     error: find<HTMLElement>('error'),
     banner: find<HTMLElement>('banner'),
     description: find<HTMLElement>('frame-description'),
-    tabViewer: find<HTMLButtonElement>('tab-viewer'),
-    tabEditor: find<HTMLButtonElement>('tab-editor'),
-    panelViewer: find<HTMLElement>('panel-viewer'),
-    panelEditor: find<HTMLElement>('panel-editor'),
+    tabs: {
+      viewer: find<HTMLButtonElement>('tab-viewer'),
+      editor: find<HTMLButtonElement>('tab-editor'),
+      parameters: find<HTMLButtonElement>('tab-parameters'),
+    },
+    panels: {
+      viewer: find<HTMLElement>('panel-viewer'),
+      editor: find<HTMLElement>('panel-editor'),
+      parameters: find<HTMLElement>('panel-parameters'),
+    },
+    paramSource: find<HTMLSelectElement>('param-source'),
+    paramForm: find<HTMLElement>('param-form'),
+    paramStatus: find<HTMLElement>('param-status'),
+    paramRefusal: find<HTMLElement>('param-refusal'),
     confirm: find<HTMLDialogElement>('confirm'),
     confirmMessage: find<HTMLElement>('confirm-message'),
     confirmOk: find<HTMLButtonElement>('confirm-ok'),
@@ -191,6 +226,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
   for (const profile of resources.dispatcherProfiles) {
     ui.dispatcher.append(new Option(profile.id, profile.id));
   }
+  /*
+   * The opening dispatcher, chosen rather than inherited from `data/`'s file order.
+   *
+   * `docs/10-experience-layer-contract.md` § 14 item 4, and the reason is measured in
+   * `docs/07-handoff.md` § 4: `nearest-car` is *"the **only** profile that saturates"* at the
+   * benchmark operating points, and that document recommends `collective` or `eta` as the
+   * reference arm instead. It is first in `data/dispatcher-profiles.json`, so before this line
+   * the viewer opened on it by accident of file order and the newcomer's first run was the worst
+   * one available.
+   *
+   * A preference list rather than one id, and a fallback to whatever `data/` lists first, so this
+   * cannot break the viewer if a profile is renamed — the URL's `dispatcher` parameter is applied
+   * after this and still wins.
+   */
+  const PREFERRED_DEFAULT_DISPATCHERS = ['collective', 'eta'] as const;
+  const preferred = PREFERRED_DEFAULT_DISPATCHERS.find((id) =>
+    resources.dispatcherProfiles.some((profile) => profile.id === id),
+  );
+  if (preferred !== undefined) ui.dispatcher.value = preferred;
   for (const speed of SPEEDS) {
     ui.speed.append(new Option(`×${String(speed)}`, String(speed)));
   }
@@ -242,7 +296,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * `aria-selected`, so there is one answer to "which tab" rather than a DOM attribute and a URL
    * that can drift.
    */
-  let currentTab: 'viewer' | 'editor' = params.get('tab') === 'editor' ? 'editor' : 'viewer';
+  let currentTab: TabName = isTabName(params.get('tab')) ? (params.get('tab') as TabName) : 'viewer';
 
   function syncUrl(): void {
     const next = new URLSearchParams({
@@ -653,7 +707,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ) {
       return;
     }
-    if (ui.panelEditor.hidden === false) return;
+    if (ui.panels.editor.hidden === false) return;
     if (playback === undefined) return;
     switch (event.key) {
       case ' ':
@@ -694,17 +748,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * Tabs — KB-01 (roving tabindex, arrow keys)
    * ------------------------------------------------------------------ */
 
-  function selectTab(which: 'viewer' | 'editor'): void {
-    const viewer = which === 'viewer';
+  function selectTab(which: TabName): void {
     currentTab = which;
-    ui.tabViewer.setAttribute('aria-selected', String(viewer));
-    ui.tabEditor.setAttribute('aria-selected', String(!viewer));
-    ui.tabViewer.tabIndex = viewer ? 0 : -1;
-    ui.tabEditor.tabIndex = viewer ? -1 : 0;
-    ui.panelViewer.hidden = !viewer;
-    ui.panelEditor.hidden = viewer;
-    if (!viewer) {
-      // `D11`: one building across both panes. Declines to act on an unsaved edit — see
+    for (const name of TABS) {
+      const selected = name === which;
+      ui.tabs[name].setAttribute('aria-selected', String(selected));
+      ui.tabs[name].tabIndex = selected ? 0 : -1;
+      ui.panels[name].hidden = !selected;
+    }
+    if (which === 'editor') {
+      // `D11`: one building across the panes. Declines to act on an unsaved edit — see
       // `EditorHandle.showBuilding`.
       editor.showBuilding(ui.building.value);
       editor.refresh();
@@ -712,21 +765,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
     syncUrl();
   }
 
-  ui.tabViewer.addEventListener('click', () => {
-    selectTab('viewer');
-  });
-  ui.tabEditor.addEventListener('click', () => {
-    selectTab('editor');
-  });
-  for (const [tab, other, which] of [
-    [ui.tabViewer, ui.tabEditor, 'editor'],
-    [ui.tabEditor, ui.tabViewer, 'viewer'],
-  ] as const) {
-    tab.addEventListener('keydown', (event) => {
-      if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+  for (const [index, name] of TABS.entries()) {
+    ui.tabs[name].addEventListener('click', () => {
+      selectTab(name);
+    });
+    // `KB-01`: arrow keys move along the tablist and wrap, which is the roving-tabindex pattern.
+    // Wrapping arithmetic rather than a hand-written neighbour table, because the table only ever
+    // worked for exactly two tabs and would have had to be rewritten for the third.
+    ui.tabs[name].addEventListener('keydown', (event) => {
+      const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+      if (step === 0) return;
       event.preventDefault();
-      selectTab(which);
-      other.focus();
+      const next = TABS[(index + step + TABS.length) % TABS.length] ?? 'viewer';
+      selectTab(next);
+      ui.tabs[next].focus();
     });
   }
 
@@ -749,7 +801,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     onRun: (building) => {
       adhocBuilding = building;
       selectTab('viewer');
-      ui.tabViewer.focus();
+      ui.tabs.viewer.focus();
       runOnce();
     },
     /**
@@ -802,9 +854,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
       }),
   });
 
+  /* ------------------------------------------------------------------ *
+   * The generated parameter form — docs/10 § 11 W4
+   *
+   * Mounted unconditionally rather than lazily on the tab switch, so that a schema that fails to
+   * collect is reported on the first paint rather than on the first visit. Two of the ten shipped
+   * schemas do fail, for stated reasons, and the form draws the reason.
+   * ------------------------------------------------------------------ */
+
+  mountParameterForm({
+    container: ui.paramForm,
+    picker: ui.paramSource,
+    status: ui.paramStatus,
+    refusal: ui.paramRefusal,
+  });
+
   // `D11`: `?tab=editor` survives a reload, and opens on the building the URL names. After the
   // mount, because `selectTab('editor')` hands the building over to the editor.
-  if (currentTab === 'editor') selectTab('editor');
+  if (currentTab !== 'viewer') selectTab(currentTab);
 
   // ED-23: warned before navigation, and only when there is something to lose.
   window.addEventListener('beforeunload', (event) => {
@@ -846,7 +913,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     }
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
 
-    if (playback !== undefined && recording !== undefined && !ui.panelViewer.hidden) {
+    if (playback !== undefined && recording !== undefined && !ui.panels.viewer.hidden) {
       const frame = playback.frame();
       const bank = ui.bankFilter.value;
       // RV-06: a bank filter, applied to the *layout* rather than to the frame, so the cars that
@@ -917,7 +984,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
   // The live region is updated on a slow cadence of its own, so a screen reader is not read a
   // new sentence every animation frame.
   window.setInterval(() => {
-    if (ui.panelViewer.hidden) return;
+    if (ui.panels.viewer.hidden) return;
     ui.description.textContent = lastDescription;
   }, 2000);
 

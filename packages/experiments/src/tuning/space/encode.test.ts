@@ -264,6 +264,23 @@ describe('a patch merges onto a base without dropping what it did not touch', ()
  * A candidate as a profile the loader accepts
  * -------------------------------------------------------------------------- */
 
+/** The one run input a dispatcher profile cannot carry: the weight sets a selector chooses between. */
+const PROBE_WEIGHT_SETS = {
+  patternSwitching: {
+    patternDetector: {
+      type: 'fuzzy',
+      inputs: ['lobbyArrivalRate'],
+      patterns: ['probe'],
+      hysteresisS: 0,
+      membership: { probe: { lobbyArrivalRate: [0, 1] as readonly [number, number] } },
+    },
+    weightSetsByPattern: { probe: 'probe-arm' },
+  },
+  weightsByProfileId: new Map<string, ReadonlyMap<string, number>>([
+    ['probe-arm', new Map([['waitTime', 1]])],
+  ]),
+};
+
 describe('a decoded candidate is a profile loadConfig accepts and a policy builds from', () => {
   it('parses every random candidate through the real profile parser', () => {
     // `candidateProfile` validates through `parseDispatcherProfiles`, the function `loadConfig`
@@ -275,7 +292,13 @@ describe('a decoded candidate is a profile loadConfig accepts and a policy build
       // And the profile reads back as the candidate it came from, so the trip through the
       // parser changed nothing.
       expect(candidatesEqual(encodeCandidate(SPACE, profile), candidate)).toBe(true);
-      expect(() => createPolicyFor(profile)).not.toThrow();
+      // The weight-set library is handed in for the same reason the building is not: it is a
+      // **run input, not a profile field**. `selection.policy` is authorable and the arms are the
+      // file-level `patternSwitching` block, so `core` refuses a profile that asks for a selector
+      // with nothing to select between — a fact about what this call was handed, not about the
+      // candidate. Built here rather than imported from `encode.ts` so the two oracles share no
+      // code: this file is the independent check on that one.
+      expect(() => createPolicyFor(profile, { weightSets: PROBE_WEIGHT_SETS })).not.toThrow();
     }
   });
 

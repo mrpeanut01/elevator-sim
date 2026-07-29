@@ -101,6 +101,7 @@
 
 export {
   DEFAULT_CONFIDENCE,
+  PUBLISHED_INTERVAL_FAMILY,
   estimateMean,
   meanOf,
   normalQuantile,
@@ -110,7 +111,7 @@ export {
   studentTQuantile,
 } from './reports/statistics.js';
 
-export type { EstimateOptions } from './reports/statistics.js';
+export type { EstimateOptions, PublishedMeanEstimate } from './reports/statistics.js';
 
 /* -------------------------------------------------------------------------- *
  * runner/ — N replications of a (building, dispatcher, traffic) configuration:

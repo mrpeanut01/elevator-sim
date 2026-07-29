@@ -17,8 +17,12 @@ import { BUILDING_IDS, DATA_DIR, breadthConfig } from '../fixtures.test-helper.j
 import { recordRun } from '../record/recordRun.js';
 import { buildLayout } from '../render/layout.js';
 import { describePreview } from '../render/preview.js';
-import { addCar, removeFloor, updateFloor } from './editorEdits.js';
-import { floorsInBuildingOrder, previewGeometry } from './editorPreview.js';
+import { addCar, moveFloor, removeFloor, updateFloor } from './editorEdits.js';
+import {
+  declarationOrderMatchesBuildingOrder,
+  floorsInBuildingOrder,
+  previewGeometry,
+} from './editorPreview.js';
 import { validateBuilding } from './editorValidate.js';
 
 let config: LoadedConfig;
@@ -219,5 +223,77 @@ describe('U1 — the editor\u2019s floor lists run the way the building does', (
     const before = (source.floors ?? []).map((floor) => floor.id);
     floorsInBuildingOrder(source.floors ?? []);
     expect((source.floors ?? []).map((floor) => floor.id)).toEqual(before);
+  }, 120_000);
+});
+
+describe('ED-24 — the declaration view says which order it is in', () => {
+  /*
+   * The sentence beside the ⇧/⇩ buttons is the evidence that they did something, so it has to be
+   * a real comparison of the two orders and not a constant. These assertions were watched failing
+   * against `() => true` and against `() => false`.
+   */
+  it('is false on the shipped buildings, which are written bottom-up', () => {
+    for (const buildingId of BUILDING_IDS) {
+      const floors = sourceOf(buildingId).floors ?? [];
+      if (floors.length < 2) continue;
+      expect(
+        declarationOrderMatchesBuildingOrder(floors),
+        `${buildingId} declares its floors bottom-up, so the two orders differ`,
+      ).toBe(false);
+    }
+  }, 120_000);
+
+  it('is true for an array that already reads top-first', () => {
+    const floors = sourceOf('garden-apartments').floors ?? [];
+    expect(declarationOrderMatchesBuildingOrder(floorsInBuildingOrder(floors))).toBe(true);
+  }, 120_000);
+
+  it('flips when `moveFloor` reorders the array, and only the array', () => {
+    /*
+     * The whole point of the view, asserted end to end at the level below the DOM: a two-floor
+     * document where the orders agree, one ⇩, and they no longer do — while every floor keeps the
+     * `index` and `heightM` it arrived with. `ED-25`.
+     */
+    const source = sourceOf('garden-apartments');
+    const top = { ...source, floors: [...floorsInBuildingOrder(source.floors ?? [])] };
+    expect(declarationOrderMatchesBuildingOrder(top.floors)).toBe(true);
+
+    const moved = moveFloor(top, top.floors[0]?.id ?? '', 1);
+    expect(declarationOrderMatchesBuildingOrder(moved.floors ?? [])).toBe(false);
+
+    // Same floors, same numbers, different positions. `moveFloor` renumbers nothing.
+    const numbersOf = (building: BuildingConfig): Record<string, [number, number]> =>
+      Object.fromEntries(
+        (building.floors ?? []).map((floor) => [floor.id, [floor.index, floor.heightM]]),
+      );
+    expect(numbersOf(moved)).toEqual(numbersOf(top));
+    expect((moved.floors ?? []).map((floor) => floor.id)).not.toEqual(
+      top.floors.map((floor) => floor.id),
+    );
+    expect([...(moved.floors ?? [])].map((floor) => floor.id).sort()).toEqual(
+      top.floors.map((floor) => floor.id).sort(),
+    );
+  }, 120_000);
+
+  it('is unchanged by reordering: the loader sorts before it checks floor-height-order', () => {
+    /*
+     * The claim the view's note makes by *not* making it — this list never says whether a document
+     * is legal, and the reason it can afford not to is that `parse.ts` runs its height check over
+     * `expandFloors`' output, which is already sorted ascending by `index`. Asserted against the
+     * real loader rather than restated: a shipped building and its own floors array shuffled into
+     * the opposite order must produce the same verdict and the same issues.
+     */
+    const source = sourceOf('midtown-office');
+    const shuffled = { ...source, floors: [...floorsInBuildingOrder(source.floors ?? [])] };
+    const options = {
+      file: 'midtown-office.json',
+      trafficProfileIds: new Set(config.trafficProfilesById.keys()),
+    };
+    const before = validateBuilding(source, config.elevatorSpecs, options);
+    const after = validateBuilding(shuffled, config.elevatorSpecs, options);
+    expect(after.valid).toBe(before.valid);
+    expect(after.issues.map((issue) => issue.code)).toEqual(
+      before.issues.map((issue) => issue.code),
+    );
   }, 120_000);
 });

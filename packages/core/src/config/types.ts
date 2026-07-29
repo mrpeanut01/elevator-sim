@@ -326,6 +326,22 @@ export const PARKING_STRATEGIES = ['stay', 'lobby', 'zone-center', 'predicted-de
 export type ParkingStrategy = (typeof PARKING_STRATEGIES)[number];
 
 /**
+ * **Whether the weight vector may change during a run, and by what rule** (lifecycle stage 3).
+ *
+ * `off` is the default and the state of every profile in `data/dispatcher-profiles.json`: one
+ * weight vector for the run, which is what every published number in this repository was
+ * measured under. `fuzzy` is a trapezoidal traffic-pattern detector with hysteresis driving the
+ * per-pattern weight sets `patternSwitching` authors; `contextual` is the same arms under a
+ * small learned reparameterization. `dispatch/selector.ts` implements both and neither is a
+ * class — the rule is a categorical value and the arms are data (CLAUDE.md invariant 7).
+ *
+ * Here rather than in `dispatch/` for the reason {@link SERVICE_MODES} gives: `config/` is a
+ * closed module graph and every declared vocabulary a schema validates lives in it.
+ */
+export const WEIGHT_SET_POLICIES = ['off', 'fuzzy', 'contextual'] as const;
+export type WeightSetPolicy = (typeof WEIGHT_SET_POLICIES)[number];
+
+/**
  * **Who** aggregates the prices the one cost engine produces (lifecycle stage 4).
  *
  * Not *what* a car is worth — that is `engine`, there is one of them, and both values below
@@ -498,6 +514,28 @@ export interface DispatcherProfile extends Commented {
   readonly idle?: IdleStageConfig | undefined;
   /** Stage 4's aggregation. Absent is the centralized argmin. */
   readonly auction?: AuctionStageConfig | undefined;
+  /**
+   * Stage 3's weight-set selection. Absent is `policy: 'off'` — one weight vector for the run,
+   * which is what every profile in `data/dispatcher-profiles.json` ships.
+   */
+  readonly selection?: SelectionStageConfig | undefined;
+}
+
+/**
+ * Stage 3's weight-set selection, as a profile authors it.
+ *
+ * Six scalars and no map: the arms are {@link PatternSwitchingConfig}, file-level, for the same
+ * reason the cost-term library is. `dispatch/parameters.ts` declares every field here with a
+ * type, a range, a default and an `activeWhen` (CLAUDE.md invariant 8).
+ */
+export interface SelectionStageConfig extends Commented {
+  readonly policy?: WeightSetPolicy | undefined;
+  readonly hysteresisS?: number | undefined;
+  readonly observationWindowS?: number | undefined;
+  readonly lobbyArrivalRateGain?: number | undefined;
+  readonly interfloorRateGain?: number | undefined;
+  readonly downPeakRateGain?: number | undefined;
+  readonly switchMargin?: number | undefined;
 }
 
 /** Fuzzy traffic-pattern detector. Hysteresis prevents detector oscillation. */
@@ -506,6 +544,22 @@ export interface PatternDetectorConfig extends Commented {
   readonly inputs: readonly string[];
   readonly patterns: readonly string[];
   readonly hysteresisS: number;
+  /**
+   * Pattern id to input id to the membership ramp `[zeroAt, oneAt]`, in the input's own raw
+   * units — passengers per second per car.
+   *
+   * One form, both directions: `[0.05, 0.20]` rises and `[0.20, 0.05]` falls. A pattern's
+   * membership is the **weakest** of its clauses (fuzzy AND), so two clauses express *"lobby
+   * high and down low"* without a second shape in the schema.
+   *
+   * Optional here and required by `dispatch/selector.ts` for every declared pattern: this file
+   * may legitimately be read for its profile library alone, but a *selector* built over a
+   * pattern with no clause has a constant membership and can neither enter nor leave that
+   * pattern on evidence.
+   */
+  readonly membership?:
+    | Readonly<Record<string, Readonly<Record<string, readonly [number, number]>>>>
+    | undefined;
 }
 
 /** Per-pattern weight sets: the up-peak optimum is not the down-peak optimum. */

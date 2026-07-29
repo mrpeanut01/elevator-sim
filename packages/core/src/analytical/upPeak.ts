@@ -453,10 +453,17 @@ export function deriveUpPeakTerms(
     });
   }
 
+  // **Kept, and for a stronger reason than it had.** `RTT = 2(H·tv + tx) + (S+1)·ts + 2·P·tp` is
+  // the *single-deck* Barney/CIBSE derivation, and simulating the decks did not give the closed
+  // form a double-deck one — that is a separate derivation this project does not implement. Until
+  // Phase 6 the simulator shared the closed form's simplification, so the two agreed by being
+  // wrong together; now the simulator makes one stop where this expression counts two, and they
+  // disagree *on purpose*. A warning that was advisory is therefore load-bearing: a residual
+  // measured against this bank is a residual against a model of different hardware.
   if (cars.some((car) => car.doubleDeck)) {
     warnings.push({
       code: UP_PEAK_WARNING_CODES.doubleDeck,
-      message: `bank "${bank.id}" contains double-deck cars. The single-deck round trip treats them as one car body of the combined capacity, which understates stops and overstates handling capacity; double-deck has its own formulation.`,
+      message: `bank "${bank.id}" contains double-deck cars. This closed form is the single-deck round trip and treats them as one car body of the combined capacity, which understates stops and overstates handling capacity; double-deck has its own formulation, which is not implemented. The simulator does model the decks, so a simulated round trip for this bank is deliberately not comparable with this expression.`,
     });
   }
 

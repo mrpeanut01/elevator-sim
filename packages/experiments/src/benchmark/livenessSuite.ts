@@ -42,11 +42,19 @@ import { measureAuctionAggregation, measureMultiRoundReachability } from './auct
 import { measureDestinationLiveness } from './destinationLiveness.js';
 import { measureEnergyLiveness } from './energyLiveness.js';
 import { measurePredictorLag } from './predictorLag.js';
+import {
+  measureWeightSetSelectionLiveness,
+  runDeadbandKnownAnswer,
+} from './weightSetSelection.js';
 
 import type { AuctionEnsembleResult, MultiRoundReachability } from './auctionAggregation.js';
 import type { DestinationLiveness } from './destinationLiveness.js';
 import type { EnergyLivenessStudy } from './energyLiveness.js';
 import type { PredictorLagStudy } from './predictorLag.js';
+import type {
+  DeadbandKnownAnswer,
+  WeightSetLivenessResult,
+} from './weightSetSelection.js';
 
 /** Everything the categorical half of `benchmark/` measured, in one pass. */
 export interface LivenessSuiteResult {
@@ -55,6 +63,17 @@ export interface LivenessSuiteResult {
   readonly multiRoundReachability: MultiRoundReachability;
   readonly destination: readonly DestinationLiveness[];
   readonly energy: EnergyLivenessStudy;
+  /** Does the weight-set selector change **car trajectories**? Wave 6's addition. */
+  readonly weightSets: WeightSetLivenessResult;
+  /**
+   * The 2 s deadband, rediscovered — or not — by the same search that fitted Phase 6c's policy.
+   *
+   * Categorical for the same reason the rest of this suite is: the answer is a threshold in
+   * seconds against a published one, not an interval. It lives beside the liveness measurements
+   * because it is the check that the *machinery* works, and a liveness proof of a fitted policy is
+   * worth nothing if the fitting procedure cannot find a known optimum.
+   */
+  readonly deadband: DeadbandKnownAnswer;
 }
 
 export interface LivenessSuiteOptions {
@@ -90,12 +109,22 @@ export async function runLivenessSuite(
     options.fastOnly === true ? { ...seedOption, replications: 2 } : seedOption,
   );
 
+  const weightSets = await measureWeightSetSelectionLiveness(seedOption);
+  // `fastOnly` narrows the draw count rather than dropping the run, so `rediscovered` is still a
+  // measured field — and at 32 draws it is measured **false**, which is the honest answer at that
+  // budget and not a skipped study wearing a zero.
+  const deadband = await runDeadbandKnownAnswer(
+    options.fastOnly === true ? { ...seedOption, candidates: 32, replications: 12 } : seedOption,
+  );
+
   return Object.freeze({
     predictorLag,
     auctionAggregation,
     multiRoundReachability,
     destination,
     energy,
+    weightSets,
+    deadband,
   });
 }
 
@@ -179,6 +208,32 @@ export function formatLivenessSuite(result: LivenessSuiteResult): string {
         `starts=${arm.meanStarts.toFixed(1)} unmeasured=${arm.unmeasuredReplications}`,
     );
   }
+
+  lines.push('', 'weight-set selection (weightSetSelection.ts)');
+  const weightSets = result.weightSets;
+  lines.push(
+    `  building=${weightSets.building} profile=${weightSets.profileId} ` +
+      `patterns=${weightSets.patternsVisited.length === 0 ? 'none' : weightSets.patternsVisited.join('>')} ` +
+      `switches=${weightSets.switches}`,
+  );
+  lines.push(
+    `  shippedVsPermutedMap: identical=${String(weightSets.weightSetContrast.identical)} ` +
+      `moves=${weightSets.weightSetContrast.movesA}/${weightSets.weightSetContrast.movesB} ` +
+      `firstDivergence=${weightSets.weightSetContrast.firstDivergence ?? 'none'}`,
+  );
+  lines.push(
+    `  selectorOnVsOff: identical=${String(weightSets.selectorContrast.identical)} ` +
+      `offIsIdenticalToNoOptions=${String(weightSets.offIsIdentical)}`,
+  );
+
+  lines.push('', 'the 2 s deadband, known answer (weightSetSelection.ts)');
+  lines.push(
+    `  shipped=${result.deadband.shippedThresholdS} s knownOptimum=${result.deadband.knownOptimumS} s ` +
+      `candidates=${result.deadband.candidates.length} ` +
+      `winner=${result.deadband.winnerThresholdS.toFixed(3)} s ` +
+      `ΔAWT=${result.deadband.winnerMeanDeltaAwtS.toFixed(4)} s ` +
+      `rediscovered=${String(result.deadband.rediscovered)}`,
+  );
 
   return lines.join('\n');
 }

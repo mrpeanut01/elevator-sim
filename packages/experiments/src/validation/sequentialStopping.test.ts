@@ -23,13 +23,13 @@
  *
  * ## The defect this suite pins
  *
- * `StoppingVerdict.distribution` is documented as recording "which approximation the rule used —
- * 't' for n ≤ 25, 'z' past it", and `StoppingSummary.evaluations` as letting a replication count
+ * `StoppingVerdict.distribution` is documented as recording "whatever the estimator calls its own
+ * quantile family … verbatim", and `StoppingSummary.evaluations` as letting a replication count
  * "be explained afterwards rather than re-derived". Wire the rule up exactly as `stopping.ts`'s own
  * docstring instructs — `halfWidthStoppingRule((samples, { confidence }) => estimateMean(samples,
  * { confidence }))` — and the field is always `undefined`, because `MeanEstimate` calls it `method`
  * and `HalfWidthEstimate` calls it `distribution`. The recorded audit trail is therefore silent
- * about the one thing the doc singles out. See the report; the assertion below documents the
+ * about the quantile family it is documented to carry. See the report; the assertion below documents the
  * current behaviour so a fix is a visible change rather than a silent one.
  */
 

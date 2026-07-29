@@ -17,7 +17,7 @@ import {
   resolveBuilding,
 } from './parse.js';
 import { ConfigError, ISSUE_CODES, WARNING_CODES } from './schema.js';
-import type { ElevatorSpecs, LoadedConfig } from './types.js';
+import type { DispatcherProfiles, ElevatorSpecs, LoadedConfig } from './types.js';
 
 /**
  * The acceptance bar: the data that ships in this repository must validate against the
@@ -316,23 +316,28 @@ describe('loadConfig against the real data/ directory', () => {
     }
   });
 
-  it('reports exactly the three known advisories on the shipped data', () => {
+  it('reports exactly the one known advisory on the shipped data', () => {
     expect(config.warnings.map((warning) => warning.code)).toEqual([
-      // patternSwitching selects an "energy-saver" profile that has not been authored.
-      WARNING_CODES.unknownWeightSetProfile,
       // Midtown's bank spans 76.9 m; geared traction is reference-rated to 76 m.
       WARNING_CODES.riseExceedsClass,
-      // Vertical City's shuttle bank declares eight double-deck cars that the runtime runs as
-      // single-deck cars. The config layer used to validate the deck pairing carefully enough
-      // to look wired and then say nothing at all, so the only signal that the shuttles were
-      // not being modelled was silence.
-      WARNING_CODES.doubleDeckNotSimulated,
+      // **A second advisory is gone, and gone because the data was wrong rather than the rule.**
+      // `patternSwitching.weightSetsByPattern.idle` named `energy-saver`, which was never an
+      // authored profile, and `unknown-weight-set-profile` said pattern switching would "fall
+      // back until it exists". Nothing read the block, so nothing fell back. Now that
+      // `dispatch/selector.ts` does read it, a missing arm is a regime the dispatcher cannot
+      // express, so `resolveWeightSets` throws and the shipped file names `energy-aware`. The
+      // warning itself is unchanged and is driven from a fixture below — a guard whose only
+      // evidence is a defect in shipped data has nowhere to go when the defect is fixed.
+      // **The third advisory is gone, and gone because it became false.** Vertical City's
+      // shuttle bank declares eight double-deck cars, and `double-deck-not-simulated` said the
+      // runtime ran them as single-deck cars of the combined capacity. It does not any more:
+      // the bank declares its four `servesFloorPairs`, `shaftForBank` builds a deck-aware
+      // shaft from them, and `config/doubleDeck.test.ts` counts the paired stops in a real run.
+      // `missing-floor-pairs` carries the disclaimer over the one configuration where it is
+      // still true, and no shipped bank is in that state.
     ]);
-    expect(config.warnings[0]?.message).toContain('energy-saver');
-    expect(config.warnings[1]?.message).toContain('76.9');
-    expect(config.warnings[1]?.file).toContain('midtown-office.json');
-    expect(config.warnings[2]?.message).toContain('double-deck operation is not simulated');
-    expect(config.warnings[2]?.file).toContain('vertical-city.json');
+    expect(config.warnings[0]?.message).toContain('76.9');
+    expect(config.warnings[0]?.file).toContain('midtown-office.json');
   });
 
   it('is deterministic: two loads produce identical results', async () => {
@@ -724,11 +729,32 @@ describe('resolveBuilding', () => {
 });
 
 describe('crossCheckDispatcherProfiles', () => {
+  /**
+   * Driven from a fixture, and it used to be driven from the shipped file.
+   *
+   * `weightSetsByPattern.idle` named `energy-saver`, which was never an authored profile, and
+   * this suite asserted the warning off `data/dispatcher-profiles.json` itself. That was fine
+   * while nothing read the block; once `dispatch/selector.ts` did, the dangling name became a
+   * regime the dispatcher could not express and the shipped file was corrected. A guard whose
+   * only evidence is a defect in shipped data has nowhere to stand the moment the defect is
+   * fixed — so the guard keeps its evidence and the data loses its defect. Both directions are
+   * asserted, because a cross-check that cannot come back clean is not a check.
+   */
+  const authored = async (): Promise<DispatcherProfiles> =>
+    parseDispatcherProfiles(await readReal(DATA_FILES.dispatcherProfiles), 'dispatcher-profiles.json');
+
   it('flags a pattern selecting an unauthored dispatcher profile', async () => {
-    const dispatchers = parseDispatcherProfiles(
-      await readReal(DATA_FILES.dispatcherProfiles),
-      'dispatcher-profiles.json',
-    );
+    const real = await authored();
+    const dispatchers: DispatcherProfiles = {
+      ...real,
+      patternSwitching: {
+        ...real.patternSwitching!,
+        weightSetsByPattern: {
+          ...real.patternSwitching!.weightSetsByPattern,
+          idle: 'energy-saver',
+        },
+      },
+    };
 
     const warnings = crossCheckDispatcherProfiles(dispatchers, 'dispatcher-profiles.json');
 
@@ -737,5 +763,9 @@ describe('crossCheckDispatcherProfiles', () => {
     ]);
     expect(warnings[0]?.path).toBe('patternSwitching.weightSetsByPattern.idle');
     expect(warnings[0]?.message).toContain('energy-saver');
+  });
+
+  it('reports nothing for the shipped file, whose every weight set is authored', async () => {
+    expect(crossCheckDispatcherProfiles(await authored(), 'dispatcher-profiles.json')).toEqual([]);
   });
 });

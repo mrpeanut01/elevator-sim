@@ -20,13 +20,16 @@
 import { runAccessControlStudy } from './accessControl.js';
 import { runCapacityReassignmentStudy } from './capacityReassignment.js';
 import { runDestinationDisclosureStudy } from './destinationDisclosure.js';
+import { runDownPeakDestinationStudy } from './downPeakDestination.js';
 import { runDestinationDispatchStudy } from './destinationDispatchContrast.js';
+import { runDoubleDeckStudy } from './doubleDeck.js';
 import { runMatrix } from './matrix.js';
 import { runMixedUseHighRiseStudy } from './mixedUseHighRise.js';
 import { runPhase7Acceptance } from './phase7Acceptance.js';
 import { auditForecastCausalityInRun } from './predictorLag.js';
 import { runPrepositioningStudy } from './prepositioning.js';
 import { TAIL_CENSUS_LOADS, runTailStudy } from './tailStudy.js';
+import { runWeightSetSelectionStudy } from './weightSetSelection.js';
 import { runBenchmark } from './suite.js';
 import { loadResources, withProfiles } from '../validation/harness.js';
 import {
@@ -37,11 +40,14 @@ import {
   capacityFigures,
   causalityFigures,
   disclosureFigures,
+  doubleDeckFigures,
+  downPeakFigures,
   matrixFigures,
   mixedUseFigures,
   phase7Figures,
   prepositioningFigures,
   tailFigures,
+  weightSetSelectionFigures,
   type PinnedEstimate,
   type PublishedStudyId,
 } from './published.js';
@@ -63,6 +69,9 @@ export async function measureAllPublishedFigures(): Promise<
     'mixed-use-high-rise': mixedUseFigures(await runMixedUseHighRiseStudy({ resources })),
     matrix: matrixFigures(await runMatrix({ resources })),
     'phase7-acceptance': phase7Figures(await runPhase7Acceptance({})),
+    'down-peak-destination': downPeakFigures(await runDownPeakDestinationStudy({})),
+    'weight-set-selection': weightSetSelectionFigures(await runWeightSetSelectionStudy({})),
+    'double-deck': doubleDeckFigures(await runDoubleDeckStudy({ resources })),
   };
 }
 

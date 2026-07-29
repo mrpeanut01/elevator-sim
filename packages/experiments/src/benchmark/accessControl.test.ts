@@ -10,13 +10,22 @@
  *
  * # H-ACCESS-1 — coverage. **CONFIRMED, categorically, with no interval.**
  *
- * On Secure Tower at the interfloor-mix operating point, over 30 replications:
+ * On Secure Tower at the interfloor-mix operating point, over 30 replications — `accessControl.ts`
+ * at its own budget, seed 20 260 726, re-run 2026-07-28 on the tree carrying § T50-D1 and pinned in
+ * {@link PINNED_COVERAGE}:
  *
  * | arm | replications with a quotable AWT | undelivered journeys per run | unserved |
  * |---|---|---|---|
  * | `eta`, `up-down-buttons` — conventional | **0 of 30** | 18.2 | 33.5 % |
- * | `eta`, `destination-entry`, no credential | **0 of 30** | **27.6** | **51.7 %** |
+ * | `eta`, `destination-entry`, no credential | **0 of 30** | **52.2** | **100.0 %** |
  * | `destination-eta`, `mobile-credential` | **30 of 30** | **0.0** | **0.00 %** |
+ *
+ * **The middle row used to read `27.6` and `51.7 %`**, measured before § T50-D1 made a
+ * credential-less kiosk refuse the *passenger* rather than the whole landing call. It moved in the
+ * direction that makes its own claim *more* true — a bare kiosk on Secure Tower now serves **nobody
+ * at all**, which is § D30's qualitative ruling arriving literally — so no verdict moved and every
+ * inequality below held throughout. That is precisely why it had to be re-pinned rather than left:
+ * a number that still supports its sentence is the only kind nobody re-checks.
  *
  * Conventional dispatch does not perform *worse* on this building — **it does not perform.** An
  * access-restricted pickup carries no credential under `up-down-buttons`, so every car in the bank
@@ -32,10 +41,13 @@
  * ## DECISIONS.md § D30's premise, measured rather than cited
  *
  * The middle row is the one that decides what a shipped destination profile may author. A kiosk that
- * takes a destination and *not* a credential makes the building **worse than conventional** — 27.6
- * undelivered journeys against 18.2 — because `costRequestFor` forwards the destination and drops
- * the credential, so `estimateCost` is asked whether an unbadged passenger may reach a zoned floor
- * and answers no for every car. That is why `data/dispatcher-profiles.json` ships
+ * takes a destination and *not* a credential makes the building **worse than conventional** — 52.2
+ * undelivered journeys against 18.2, and **100 % of journeys unserved against 33.5 %** — because
+ * `costRequestFor` forwards the destination and drops the credential, so `estimateCost` is asked
+ * whether an unbadged passenger may reach a zoned floor and answers no for every car. On Secure
+ * Tower that is *every* journey: every up trip's destination is zoned and every down trip's origin
+ * is, so the building is not partly served, it is not served. That is why
+ * `data/dispatcher-profiles.json` ships
  * `mobile-credential` and not `destination-entry`, and why panel-stage authorization is Phase 6b's
  * work rather than a footnote.
  *
@@ -82,6 +94,8 @@
  * `the root DECISIONS.md` § T15-5.
  */
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { intervalExcludesZero } from '../validation/harness.js';
@@ -89,13 +103,19 @@ import { intervalExcludesZero } from '../validation/harness.js';
 import {
   BARE_KIOSK_ARM,
   CREDENTIAL_ARM,
+  PINNED_COVERAGE,
+  coverageKey,
+  coveragePinOf,
+  derivedCoverageForms,
   formatAccessControlStudy,
+  publishedCoverageRow,
   runAccessControlStudy,
   type AccessControlStudy,
   type CoverageRow,
+  type PinnedCoverage,
 } from './accessControl.js';
 import { DISCLOSURE_BASELINE } from './destinationDisclosure.js';
-import { accessControlFigures, checkPinned, describeMismatches } from './published.js';
+import { accessControlFigures, checkPinned, describeMismatches, pinMatches } from './published.js';
 
 const TIMEOUT_MS = 900_000;
 
@@ -244,4 +264,111 @@ describe('the figures this study publishes still come out of it', () => {
       describeMismatches('access-control', mismatches),
     ).toBe('');
   }, TIMEOUT_MS);
+});
+
+/* -------------------------------------------------------------------------- *
+ * The same guard for H-ACCESS-1, which is counts and was therefore unguarded
+ * -------------------------------------------------------------------------- */
+
+/** This file's own source, so the table above is checked rather than trusted. */
+const SOURCE = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+
+/** The module docstring with its comment furniture removed, so a line wrap cannot hide a claim. */
+const PROSE = (SOURCE.split('*/')[0] ?? '').replace(/\n\s*\*\s?/g, ' ');
+
+describe('the counts this study publishes still come out of it', () => {
+  it('reproduces every pinned coverage row, field for field', async () => {
+    // Layer A for a categorical. `checkPinned` cannot hold these — they have no standard error —
+    // and until § T50-D1 moved two of them nothing in the suite re-derived them at all. The
+    // assertions below this file's table are *inequalities*, and every one of them held while the
+    // published figures went stale, which is the whole reason this test exists.
+    const measured = (await study()).coverage.rows;
+    const mismatches: string[] = [];
+    for (const row of measured) {
+      const key = coverageKey(row);
+      const expected = PINNED_COVERAGE[key];
+      if (expected === undefined) {
+        mismatches.push(`${key}: measured, but PINNED_COVERAGE does not hold it`);
+        continue;
+      }
+      const actual = coveragePinOf(row);
+      for (const field of [
+        'replications',
+        'notCompleted',
+        'withoutQuotableAwt',
+        'meanUndelivered',
+        'meanUnservedFraction',
+      ] as const) {
+        if (!pinMatches(expected[field], actual[field])) {
+          mismatches.push(
+            `${key}.${field}: pinned ${String(expected[field])}, measured ${String(actual[field])}`,
+          );
+        }
+      }
+      if (expected.quotable !== actual.quotable) {
+        mismatches.push(
+          `${key}.quotable: pinned ${String(expected.quotable)}, measured ${String(actual.quotable)}`,
+        );
+      }
+    }
+    // Both directions, as `published.test.ts` insists for the intervals: a pin for a row nobody
+    // measures any more is as stale as a row nobody pinned.
+    for (const key of Object.keys(PINNED_COVERAGE)) {
+      if (!measured.some((row) => coverageKey(row) === key)) {
+        mismatches.push(`${key}: pinned, but this study no longer produces the row`);
+      }
+    }
+    expect(mismatches.join('\n'), mismatches.join('\n')).toBe('');
+  }, TIMEOUT_MS);
+
+  it('publishes no coverage row this file cannot re-derive from a pin', () => {
+    // Layer B for a categorical, scoped to the file that prints the table. `published.test.ts`
+    // scans `benchmark/` for interval-shaped literals and `51.7 %` is not interval-shaped, so the
+    // H-ACCESS-1 table sat outside the publication guard entirely — printed, quoted in six other
+    // places, and re-derived by nothing.
+    const derivable = derivedCoverageForms();
+    const rows: string[] = [];
+    for (const line of SOURCE.split('\n')) {
+      const trimmed = line.replace(/^\s*\*\s?/, '');
+      if (!trimmed.startsWith('|') || !/\bof \d+\b/.test(trimmed)) continue;
+      const cells = trimmed
+        .split('|')
+        .map((cell) => cell.replaceAll('*', '').trim())
+        .filter((cell) => cell.length > 0);
+      rows.push(cells.slice(-3).join(' | '));
+    }
+    expect(rows.length, 'the H-ACCESS-1 table is gone, so this guard is checking nothing').toBe(3);
+    for (const row of rows) {
+      expect(
+        derivable.has(row),
+        `this file publishes the coverage row "${row}", which no entry of PINNED_COVERAGE renders. ` +
+          `Legal renderings: ${[...derivable].join(' / ')}`,
+      ).toBe(true);
+    }
+  });
+
+  it('states D30’s premise in prose the pins render', () => {
+    // The table is not the only place a count is published — the paragraph under it quotes two of
+    // them as the measurement that decides what `data/dispatcher-profiles.json` may author. A guard
+    // that checked only the table would let the sentence drift on its own.
+    const bare = PINNED_COVERAGE['secure-tower/destination-entry-bare'] as PinnedCoverage;
+    const conventional = PINNED_COVERAGE['secure-tower/eta'] as PinnedCoverage;
+    const claim =
+      `${bare.meanUndelivered.toFixed(1)} undelivered journeys against ` +
+      `${conventional.meanUndelivered.toFixed(1)}, and **${(bare.meanUnservedFraction * 100).toFixed(0)} % ` +
+      `of journeys unserved against ${(conventional.meanUnservedFraction * 100).toFixed(1)} %**`;
+    expect(PROSE, `the D30-premise sentence no longer states "${claim}"`).toContain(claim);
+    // …and the figures it replaced are named as history rather than silently deleted, so a reader
+    // who finds `51.7 %` in an older document learns which run superseded it.
+    expect(PROSE).toContain('used to read `27.6` and `51.7 %`');
+  });
+
+  it('renders the credential row as the zero it is, at both published precisions', () => {
+    // The null half of H-ACCESS-1, and the one figure in the table that is *supposed* to be a
+    // constant. Pinned so that a regression which started leaving journeys undelivered under the
+    // credential would fail here rather than be read as a rounding change.
+    const credential = PINNED_COVERAGE['secure-tower/destination-eta-unpriced'] as PinnedCoverage;
+    expect(publishedCoverageRow(credential, 1)).toBe('30 of 30 | 0.0 | 0.0 %');
+    expect(publishedCoverageRow(credential, 2)).toBe('30 of 30 | 0.0 | 0.00 %');
+  });
 });

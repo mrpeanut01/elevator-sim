@@ -366,6 +366,19 @@ describe('bit-identical arms are found and named', () => {
  * -------------------------------------------------------------------------- */
 
 describe('every published matrix figure is the one the code still produces', () => {
+  /*
+   * **The 44 `vertical-city-up-peak` pins were regenerated once, deliberately, and § D150 says
+   * why.** They are the only pins in this group measured after § D131 made double-deck operation
+   * simulated rather than merely configured, and `vertical-city` is the only shipped building that
+   * declares double-deck cars. When this check went red it reported **176 field mismatches over 44
+   * keys, every one of them at that cell and none at the other seven** — and `n` moved on none of
+   * them, so a budget was never fitted to a result.
+   *
+   * The discipline `regeneratePins.ts` states applies in full: a re-run that disagrees with the
+   * file is a question. The answer here was that the *file* was stale, because the simulator
+   * stopped being wrong. **A mismatch outside `vertical-city-up-peak` has no such answer waiting
+   * for it** — establish which number is right before touching this table.
+   */
   it('matches the pin table in both directions', async () => {
     const mismatches = checkPinned('matrix', matrixFigures(await matrixOf()));
     expect(describeMismatches('matrix', mismatches), describeMismatches('matrix', mismatches)).toBe(

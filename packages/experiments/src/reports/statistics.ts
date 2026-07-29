@@ -15,7 +15,7 @@
  * docs/03-traffic-and-statistics.md states the interval arithmetic in two places, and until
  * 2026-07 this module implemented both:
  *
- * - **§ Part 4, "Use a paired-t interval"** (doc lines ~349-357) is the *published* interval. It
+ * - **§ Part 4, "Use a paired-t interval"** is the *published* interval. It
  *   states one formula with no `n` in the choice of family:
  *
  *   ```
@@ -25,10 +25,12 @@
  *   That is {@link publishedIntervalQuantile}, and it is the only quantile {@link estimateMean}
  *   and {@link pairedDifferenceEstimate} reach.
  *
- * - **§ Part 3, "Sequential stopping rule"** (doc lines ~177-182) is *loop control*. The doc writes
- *   it with a crossover — `t[n-1, conf]` at `n <= 25`, `z[conf]` above — on the argument that a
+ * - **§ Part 3, "Sequential stopping rule"** is *loop control*. That section **used to** write it
+ *   with a crossover — `t[n-1, conf]` at `n <= 25`, `z[conf]` above — on the argument that a
  *   stopping decision may be approximate because being 5% optimistic about when to stop costs
- *   replications rather than validity.
+ *   replications rather than validity. **It no longer does**: since 2026-07-27 the doc's own
+ *   four-line rule is three lines reading `# every n — no crossover`, and it names the textbook
+ *   split as literature rather than as this repository's rule.
  *
  * **That argument does not survive the two rules sharing a target.** The runner's
  * `acceptableRange` is a half-width target, and the report's `ConvergenceReport` decides
@@ -39,8 +41,10 @@
  * stops exactly when the published interval meets its target, and the crossover — which had **no
  * non-test caller** after review finding #14 was fixed — is deleted rather than left exported
  * with a caller list nothing satisfies (docs/05-roadmap.md § *Standing requirement*, and
- * DECISIONS.md § D7). docs/03 § Part 3's four-line rule is therefore **not** implemented as
- * written and needs correcting to `t[n-1]` at every `n`; that doc is not this module's to edit.
+ * DECISIONS.md § D7). The instruction this paragraph used to carry — *"§ Part 3 needs correcting to
+ * `t[n-1]` at every `n`; that doc is not this module's to edit"* — is **discharged**: the doc was
+ * corrected, and a docstring that still asks for it is a stale claim about a sibling artefact,
+ * which is the shape § D60 measured seven instances of.
  *
  * Review finding #14 measured what the crossover cost when it *was* on the published path: at n=26
  * the published half-width used z=1.95996 where the doc prescribes t(25)=2.06390, so it was 4.83%
@@ -73,7 +77,7 @@
  * (invariant 3), no mutation of any input.
  */
 
-import { ReportsError, type IntervalMethod, type MeanEstimate } from './types.js';
+import { ReportsError, type MeanEstimate } from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * Constants
@@ -87,6 +91,34 @@ import { ReportsError, type IntervalMethod, type MeanEstimate } from './types.js
  * *stopping rule*, not of a published interval, and both are settable.
  */
 export const DEFAULT_CONFIDENCE = 0.95;
+
+/**
+ * The one quantile family this package publishes — as a value, so the compiler holds it.
+ *
+ * Every interval produced here is Student-t at `n - 1`, at every `n` (§ "One quantile" above,
+ * DECISIONS.md § D14). This constant is that guarantee where an interval is *computed*;
+ * `compare.ts` imports the same constant for where a report is *assembled*, which is a different
+ * place to get it wrong. It is deliberately **one** constant rather than one per module: two copies
+ * of a convention that can disagree is the standing hazard § D114 measured the cost of.
+ */
+export const PUBLISHED_INTERVAL_FAMILY = 't' as const;
+
+/**
+ * A {@link MeanEstimate} whose family label is pinned to {@link PUBLISHED_INTERVAL_FAMILY}.
+ *
+ * `MeanEstimate.method` is typed `IntervalMethod`, the two-member union, because a *stored* run set
+ * predating 2026-07 carries `'z'` and must still parse (`types.ts` § IntervalMethod). That width is
+ * right for the **stored** shape and wrong for a freshly computed one, and the distinction is the
+ * whole of open item `C33`: the `n < 2` branch of {@link estimateMean} used to widen a correct
+ * literal back to the union with `'t' as IntervalMethod`, on an interval whose `halfWidth`, `lower`
+ * and `upper` are all `NaN`. Narrowing the **construction sites** — the only ones in this package —
+ * makes that assertion a compile error rather than a convention nothing checks.
+ *
+ * This is the same shape as `compare.ts`'s `PublishedConvergenceReport`, on purpose (§ D117).
+ */
+export type PublishedMeanEstimate = MeanEstimate & {
+  readonly method: typeof PUBLISHED_INTERVAL_FAMILY;
+};
 
 /* -------------------------------------------------------------------------- *
  * Sample moments
@@ -258,10 +290,10 @@ export function studentTCdf(t: number, df: number): number {
 function publishedIntervalQuantile(
   n: number,
   confidence: number,
-): { readonly quantile: number; readonly method: 't' } {
+): { readonly quantile: number; readonly method: typeof PUBLISHED_INTERVAL_FAMILY } {
   assertConfidence(confidence);
   const p = 1 - (1 - confidence) / 2;
-  return { quantile: studentTQuantile(p, n - 1), method: 't' };
+  return { quantile: studentTQuantile(p, n - 1), method: PUBLISHED_INTERVAL_FAMILY };
 }
 
 /* -------------------------------------------------------------------------- *
@@ -296,7 +328,7 @@ export interface EstimateOptions {
 export function estimateMean(
   values: readonly number[],
   options: EstimateOptions = {},
-): MeanEstimate {
+): PublishedMeanEstimate {
   if (values.length === 0) {
     throw new ReportsError('estimateMean: at least one replication is required');
   }
@@ -329,7 +361,14 @@ export function estimateMean(
       stdDev: Number.NaN,
       standardError: Number.NaN,
       confidence,
-      method: 't' as IntervalMethod,
+      /*
+       * The family the interval *would* have had, on an interval that does not exist: `halfWidth`,
+       * `lower` and `upper` are all `NaN` below n = 2. It used to read `'t' as IntervalMethod` —
+       * an assertion widening a correct literal back to the union for no reason, and the last place
+       * in `reports/` where the family lost its narrow type. Open item `C33`; the return type is
+       * now what keeps it narrow, rather than this line being careful.
+       */
+      method: PUBLISHED_INTERVAL_FAMILY,
       degreesOfFreedom: Number.NaN,
       halfWidth: Number.NaN,
       lower: Number.NaN,
@@ -386,7 +425,7 @@ export function pairedDifferenceEstimate(
   candidate: readonly number[],
   baseline: readonly number[],
   options: EstimateOptions = {},
-): MeanEstimate {
+): PublishedMeanEstimate {
   if (candidate.length !== baseline.length) {
     throw new ReportsError(
       `pairedDifferenceEstimate: ${candidate.length} candidate values against ${baseline.length} baseline values. A paired interval requires one pair per replication`,

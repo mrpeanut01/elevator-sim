@@ -207,6 +207,152 @@ export interface CoverageResult {
 }
 
 /* -------------------------------------------------------------------------- *
+ * H-ACCESS-1's publication pin — the guard a categorical still needs
+ * -------------------------------------------------------------------------- */
+
+/**
+ * One published coverage row, at the precision it is computed at rather than printed at.
+ *
+ * `published.ts` § *Why this module exists* pins every **interval** this package prints, and
+ * `accessControlFigures` deliberately leaves H-ACCESS-1 out of it on the ground that a categorical
+ * outcome has no standard error and there is nothing for a five-number pin to hold. **That
+ * reasoning is right about the shape and was wrong about the consequence.**
+ *
+ * DECISIONS.md § T50-D1 changed what a credential-less kiosk does — it now refuses the *passenger*
+ * rather than the whole landing call — and the two figures this table's middle row publishes,
+ * `27.6` undelivered per run and `51.7 %` unserved, stopped reproducing. **Nothing went red**,
+ * because `accessControl.test.ts` asserted *inequalities* and every one of them held **more**
+ * strongly afterwards. An unpinned number that still happens to support its own sentence is exactly
+ * the shape `docs/07` § 3 records three times, and it is the shape a study reported as counts is
+ * *most* exposed to, because the interval guard cannot see a bare number at all.
+ *
+ * So the counts get the same two layers the intervals get: this is Layer A, and
+ * {@link derivedCoverageForms} is the vocabulary Layer B checks a published table against.
+ */
+export interface PinnedCoverage {
+  readonly replications: number;
+  readonly notCompleted: number;
+  readonly withoutQuotableAwt: number;
+  readonly meanUndelivered: number;
+  readonly meanUnservedFraction: number;
+  readonly quotable: boolean;
+}
+
+/**
+ * Every H-ACCESS-1 row this repository publishes, keyed `building/arm`.
+ *
+ * Produced by `runAccessControlStudy({})` on 2026-07-28, on the tree carrying § T50-D1: this
+ * module's own study at its own declared budget — seed {@link BENCHMARK_SEED} (20 260 726),
+ * `coverageReplications = 30`, Secure Tower and Midtown Office at the `arms.ts` interfloor-mix
+ * operating points. No operating point was invented to produce it; it is the published one, re-run.
+ *
+ * The Midtown rows are pinned even though every field is zero, for the same reason `downPeakFigures`
+ * pins its zero `rideTime` rows: **there the zero is the finding.** It is the null half of
+ * H-ACCESS-1 — a building with no access zones does not move under any of the three call types —
+ * and a null nobody pinned is a null that can quietly stop being one.
+ */
+export const PINNED_COVERAGE: Readonly<Record<string, PinnedCoverage>> = Object.freeze({
+  'secure-tower/eta': Object.freeze({
+    replications: 30,
+    notCompleted: 30,
+    withoutQuotableAwt: 30,
+    meanUndelivered: 18.166666666666668,
+    meanUnservedFraction: 0.3353422721842136,
+    quotable: false,
+  }),
+  'secure-tower/destination-entry-bare': Object.freeze({
+    replications: 30,
+    notCompleted: 30,
+    withoutQuotableAwt: 30,
+    meanUndelivered: 52.233333333333334,
+    meanUnservedFraction: 1,
+    quotable: false,
+  }),
+  'secure-tower/destination-eta-unpriced': Object.freeze({
+    replications: 30,
+    notCompleted: 0,
+    withoutQuotableAwt: 0,
+    meanUndelivered: 0,
+    meanUnservedFraction: 0,
+    quotable: true,
+  }),
+  'midtown-office/eta': Object.freeze({
+    replications: 30,
+    notCompleted: 0,
+    withoutQuotableAwt: 0,
+    meanUndelivered: 0,
+    meanUnservedFraction: 0,
+    quotable: true,
+  }),
+  'midtown-office/destination-entry-bare': Object.freeze({
+    replications: 30,
+    notCompleted: 0,
+    withoutQuotableAwt: 0,
+    meanUndelivered: 0,
+    meanUnservedFraction: 0,
+    quotable: true,
+  }),
+  'midtown-office/destination-eta-unpriced': Object.freeze({
+    replications: 30,
+    notCompleted: 0,
+    withoutQuotableAwt: 0,
+    meanUndelivered: 0,
+    meanUnservedFraction: 0,
+    quotable: true,
+  }),
+});
+
+/** A measured row's key into {@link PINNED_COVERAGE}. */
+export const coverageKey = (row: CoverageRow): string => `${row.building}/${row.armId}`;
+
+/** A measured row as a pin, so the comparison is field-for-field rather than by eye. */
+export function coveragePinOf(row: CoverageRow): PinnedCoverage {
+  return Object.freeze({
+    replications: row.replications,
+    notCompleted: row.notCompleted,
+    withoutQuotableAwt: row.withoutQuotableAwt,
+    meanUndelivered: row.meanUndelivered,
+    meanUnservedFraction: row.meanUnservedFraction,
+    quotable: row.quotable,
+  });
+}
+
+/**
+ * A published coverage row exactly as this repository's tables write one, minus the arm label:
+ * *quotable replications*, *undelivered per run*, *unserved*.
+ *
+ * The quotable column is `replications − withoutQuotableAwt` because that is the column the tables
+ * actually print — `0 of 30` for an arm that lost its AWT on every replication. Emphasis and cell
+ * padding are normalized away by the caller; what is compared is the three numbers and their
+ * denominators.
+ */
+export function publishedCoverageRow(pin: PinnedCoverage, places = 1): string {
+  const quotable = pin.replications - pin.withoutQuotableAwt;
+  return (
+    `${String(quotable)} of ${String(pin.replications)} | ` +
+    `${pin.meanUndelivered.toFixed(1)} | ` +
+    `${(pin.meanUnservedFraction * 100).toFixed(places)} %`
+  );
+}
+
+/**
+ * Every rendering of every pinned coverage row, at every precision this repository prints at.
+ *
+ * Both 1 dp and 2 dp for the unserved percentage: `docs/05-roadmap.md` writes `33.5 %` and the same
+ * table's credential row writes `0.00 %`, and a vocabulary that assumed one would reject the other
+ * as undeclared. The undelivered mean is 1 dp everywhere, which is what `formatAccessControlStudy`
+ * prints, so it is not varied — a second precision nobody uses would only widen what passes.
+ */
+export function derivedCoverageForms(): ReadonlySet<string> {
+  const forms = new Set<string>();
+  for (const pin of Object.values(PINNED_COVERAGE)) {
+    forms.add(publishedCoverageRow(pin, 1));
+    forms.add(publishedCoverageRow(pin, 2));
+  }
+  return forms;
+}
+
+/* -------------------------------------------------------------------------- *
  * H-ACCESS-2 — the difference-of-differences
  * -------------------------------------------------------------------------- */
 
