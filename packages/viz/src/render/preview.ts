@@ -8,11 +8,28 @@
  * half of whose branches are unreachable in each of its two uses.
  *
  * What it draws is the four things `UX.md` § 4 says the editor edits: floors, banks, cars (as
- * shafts) and **service** zoning — a shaft covering only the floors its bank serves. Access
- * zoning is a credential fact and is listed in the form, never drawn as geometry; operational
- * zoning is not building geometry at all (see `editorEdits.ts`).
+ * shafts) and **service** zoning — a shaft covering only the floors its bank serves.
+ *
+ * ## The credential lens — `docs/10-experience-layer-contract.md` § 10.1
+ *
+ * The sentence above used to end *"access zoning is a credential fact and is listed in the form,
+ * never drawn as geometry"*, and that was the defect § 10.1 named: prose in a form is the weakest
+ * way to teach that service zoning and access zoning are different things, because a reader skims
+ * it. So the preview gains a **mode**, not a second picture: pick a credential group and every
+ * floor label carries one of three glyphs — reachable, not served, not permitted — with three
+ * legend rows and one sentence each.
+ *
+ * The lens is a mode rather than a permanent overlay because *"not permitted"* is meaningless
+ * without a credential to be un-permitted for, and the building has no default one. With no
+ * credential selected the preview draws exactly what it drew before.
+ *
+ * Operational zoning is still not drawn, and now says so: it is a dispatcher weight vector, not
+ * building geometry, so there is no floor state it could produce (see `access/zoning.ts`'s
+ * `LENS_OPERATIONAL_NOTE` and `editorEdits.ts`).
  */
 
+import type { CredentialLens } from '../access/zoning.js';
+import { LENS_LEGEND, STATE_GLYPHS, STATE_WORDS, describeCredentialLens } from '../access/zoning.js';
 import type { PreviewGeometry } from '../editor/editorPreview.js';
 import type { Canvas2DLike, Theme } from './canvas.js';
 import { DEFAULT_THEME, fitLabel } from './canvas.js';
@@ -28,6 +45,11 @@ export interface PreviewInput {
   readonly theme?: Theme;
   /** Shown under the title. The validity summary, so the picture and the verdict travel together. */
   readonly caption?: string | undefined;
+  /**
+   * The credential lens, when the reader has picked a credential group. Omitted, the preview is
+   * exactly what it was before this mode existed.
+   */
+  readonly lens?: CredentialLens | undefined;
 }
 
 export function drawPreview(ctx: Canvas2DLike, input: PreviewInput): void {
@@ -64,6 +86,7 @@ export function drawPreview(ctx: Canvas2DLike, input: PreviewInput): void {
   }
 
   const unserved = new Set(geometry.unservedFloorIds);
+  const lensByFloor = new Map((input.lens?.rows ?? []).map((row) => [row.floorId, row]));
 
   ctx.font = FONT;
   ctx.textBaseline = 'middle';
@@ -78,13 +101,39 @@ export function drawPreview(ctx: Canvas2DLike, input: PreviewInput): void {
     if (!row.labelled) continue;
     ctx.textAlign = 'right';
     const badge = row.isTransferFloor ? '⇄ ' : row.isEntrance ? '⌂ ' : '';
-    const mark = unserved.has(row.floorId) ? ' ⊘' : '';
-    ctx.fillStyle = mark !== '' ? theme.restricted : badge === '' ? theme.textDim : theme.badge;
+    // With the lens on, the state glyph replaces the bare `⊘` — and it *includes* `⊘`, because
+    // `not-served` is the same fact under the same spelling. Off, nothing changes.
+    const lensRow = lensByFloor.get(row.floorId);
+    const mark =
+      lensRow !== undefined
+        ? ` ${STATE_GLYPHS[lensRow.state]}`
+        : unserved.has(row.floorId)
+          ? ' ⊘'
+          : '';
+    ctx.fillStyle =
+      lensRow !== undefined
+        ? lensRow.state === 'reachable'
+          ? theme.text
+          : lensRow.state === 'not-served'
+            ? theme.restricted
+            : theme.warning
+        : mark !== ''
+          ? theme.restricted
+          : badge === ''
+            ? theme.textDim
+            : theme.badge;
     const budget = layout.plot.x - 8 - (badge.length + mark.length) * 8;
     ctx.fillText(`${badge}${fitLabel(row.label, budget)}${mark}`, layout.plot.x - 8, row.y);
     ctx.textAlign = 'left';
     ctx.fillStyle = theme.textDim;
-    ctx.fillText(`${row.heightM.toFixed(1)} m`, layout.plot.x + layout.plot.width + 10, row.y);
+    // The word beside the height, so the state survives a font with no `▩` in it and a printout
+    // with no colour in it. `D18`'s rule — never one signal — applied to zoning.
+    const word = lensRow === undefined ? '' : `  ${STATE_WORDS[lensRow.state]}`;
+    ctx.fillText(
+      `${row.heightM.toFixed(1)} m${word}`,
+      layout.plot.x + layout.plot.width + 10,
+      row.y,
+    );
   }
 
   const servedById = new Map(
@@ -110,6 +159,8 @@ export function drawPreview(ctx: Canvas2DLike, input: PreviewInput): void {
     ctx.fillText(column.bankId, column.centreX, layout.plot.y - 18);
   }
 
+  drawLensLegend(ctx, input, theme);
+
   if (layout.hiddenShaftCount > 0) {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'bottom';
@@ -126,12 +177,60 @@ export function drawPreview(ctx: Canvas2DLike, input: PreviewInput): void {
 }
 
 /**
+ * § 10.1's *"three states, three glyphs, three legend rows, one sentence each"*, drawn.
+ *
+ * Bottom-left, above the shaft-count note, and only with the lens on. Every row carries its
+ * glyph **and** its word **and** the kind of zoning that produced it, because a legend that
+ * only decoded colours would be the thing the lens exists to replace.
+ */
+function drawLensLegend(ctx: Canvas2DLike, input: PreviewInput, theme: Theme): void {
+  const lens = input.lens;
+  if (lens === undefined) return;
+  const { layout } = input;
+  ctx.font = FONT;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'bottom';
+  let y = layout.height - 8;
+  ctx.fillStyle = theme.textDim;
+  ctx.fillText(
+    'operational zoning is a dispatcher setting, not building geometry — it has no floor state',
+    12,
+    y,
+  );
+  y -= 16;
+  for (const entry of [...LENS_LEGEND].reverse()) {
+    ctx.fillStyle =
+      entry.state === 'reachable'
+        ? theme.text
+        : entry.state === 'not-served'
+          ? theme.restricted
+          : theme.warning;
+    const count = lens.counts[entry.state];
+    ctx.fillText(
+      `${entry.glyph} ${entry.word} (${entry.zoning}) — ${String(count)} floor${count === 1 ? '' : 's'}`,
+      12,
+      y,
+    );
+    y -= 16;
+  }
+  ctx.fillStyle = theme.badge;
+  ctx.fillText(`credential lens: ${lens.credentialGroup}`, 12, y);
+}
+
+/**
  * The preview's text alternative — `KB-13` applied to the editor's canvas.
  *
  * The editor's canvas is as opaque to a screen reader as the viewer's, and the information in it
  * (which shafts reach which floors) is the whole point of the surface.
+ *
+ * With the lens on it carries the lens too, produced by `describeCredentialLens` rather than
+ * reassembled here — the picture and its sentence read one function, exactly as the run canvas
+ * and `describeFrame` do.
  */
-export function describePreview(geometry: PreviewGeometry): string {
+export function describePreview(
+  geometry: PreviewGeometry,
+  lens?: CredentialLens | undefined,
+): string {
   if (geometry.floors.length === 0) return 'No floors declared yet.';
   const parts = [`${geometry.expansion}.`];
   const byBank = new Map<string, string[]>();
@@ -151,5 +250,6 @@ export function describePreview(geometry: PreviewGeometry): string {
   if (geometry.unservedFloorIds.length > 0) {
     parts.push(`Floors no bank serves: ${geometry.unservedFloorIds.join(', ')}.`);
   }
+  if (lens !== undefined) parts.push(describeCredentialLens(lens));
   return parts.join(' ');
 }

@@ -23,6 +23,9 @@
  * the frame sequences matching.
  */
 
+import type { LockedOutLanding } from '../access/lockedOut.js';
+import { describeLockedOut } from '../access/lockedOut.js';
+import { STATE_GLYPHS } from '../access/zoning.js';
 import type { LandingAssignment, OverlayMetrics } from '../frame/overlay.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import type { DoorPhase, Frame, VizRecording } from '../contract/types.js';
@@ -140,6 +143,27 @@ export interface SceneInput {
    * recording-wide scan of its own.
    */
   readonly unansweredCallFloorIds?: readonly string[] | undefined;
+  /**
+   * Landings whose calls **no car may legally answer** — `docs/10` § 10.4, `U8`.
+   *
+   * The third member of a family whose two existing members it must not be confused with, and
+   * the reason all three are separate inputs rather than one *"unavailable"* list:
+   *
+   * | input | the fact | the fix |
+   * |---|---|---|
+   * | {@link SceneInput.unservedFloorIds} | **service** zoning: no shaft reaches this floor | build a bank that serves it |
+   * | {@link SceneInput.unansweredCallFloorIds} | an **outcome**: a car could have taken this call and none did | more cars, a better policy |
+   * | this | **access** zoning: the call carries no credential the cars will accept | a dispatcher that reads credentials, or a credential for the rider |
+   *
+   * `CLAUDE.md` forbids collapsing the three kinds of zoning, and a renderer that drew a floor no
+   * shaft reaches the same way as a floor no credential opens would do exactly that in the one
+   * place a reader actually looks.
+   *
+   * Derived by the caller from `access/lockedOut.ts`, for the reason {@link SceneInput.overlay}
+   * and {@link SceneInput.unansweredCallFloorIds} are: which floors are access-controlled is a
+   * fact about the *building*, and `drawScene` stays a pure function of what it is handed.
+   */
+  readonly lockedOutLandings?: readonly LockedOutLanding[] | undefined;
 }
 
 /**
@@ -245,6 +269,20 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
       `${recording.status.toUpperCase()} — ${String(recording.summary.undelivered)} undelivered`,
     );
   }
+  /*
+   * `docs/10` § 10.4, **second** — before saturation and before the unanswered count, and after
+   * the status for `RV-16`'s reason.
+   *
+   * Order is priority here, because the line is clipped from the right when it does not fit
+   * (below). A structural refusal — these calls could never have been answered by anybody —
+   * outranks both a statistic being suppressed and a count of calls that merely went unanswered,
+   * and it is the one of the four a reader can act on. It does **not** replace the unanswered
+   * clause: the two are different claims about different calls, and a reader needs both counts.
+   *
+   * The `short` form: the floors are already marked `▩` on their own rows, and this is one line.
+   */
+  const lockedOut = describeLockedOut(input.lockedOutLandings ?? [], { short: true });
+  if (lockedOut !== '') banner.push(lockedOut);
   if (recording.summary.saturated) banner.push('SATURATED — AWT suppressed');
   else if (!recording.summary.awtIsValid) banner.push('AWT suppressed');
   // `D10` — a call no car answered is never left to the landing selector alone. See
@@ -259,7 +297,23 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   }
   if (banner.length > 0) {
     ctx.fillStyle = theme.warning;
-    ctx.fillText(banner.join('   ·   '), layout.width - 12, 10);
+    /*
+     * Clipped so it cannot overprint the building name.
+     *
+     * The banner is right-aligned on the **same line** as the title, which is drawn at `x = 12`
+     * in the bold face. Nothing stopped the two meeting in the middle, and on Secure Tower at
+     * 800 px they did — *"⊘Secure Tower"* with the banner's tail written through it, which was
+     * already true of the four-clause banner before § 10.4 added a fifth. Found by driving it.
+     *
+     * The full sentence is never lost: `describeFrame` writes it into the canvas's `aria-label`
+     * unabbreviated, which is the surface with no width limit.
+     */
+    const titlePx = 12 + recording.buildingName.length * BOLD_CHAR_ADVANCE_PX + 16;
+    ctx.fillText(
+      fitLabel(banner.join('   ·   '), layout.width - 12 - titlePx),
+      layout.width - 12,
+      10,
+    );
   }
 }
 
@@ -544,10 +598,27 @@ export function landingOptionLabel(assignment: LandingAssignment): string {
  */
 const UNANSWERED_GLYPH = '✗';
 
+/**
+ * The glyph for a landing whose call no car **may** answer — `docs/10` § 10.4.
+ *
+ * The **same** glyph the credential lens uses for `not-permitted` (`access/zoning.ts`), on
+ * purpose: the editor's lens and the run viewer are two views of one fact, and a reader who
+ * learned `▩` on the preview must not have to learn a second spelling of it here. It is neither
+ * `⊘` (no shaft reaches this floor) nor `✗` (a car could have come and none did), which is the
+ * whole point — three barriers, three glyphs, none of them a recolouring of another.
+ *
+ * Both lockout causes draw it. The glyph names the **barrier**, which is access zoning either
+ * way; the banner and the screen-reader sentence name the **cause**, because *"the dispatcher
+ * cannot read this credential"* and *"this rider has no credential"* have different fixes and a
+ * 12 px mark cannot carry that.
+ */
+const LOCKED_OUT_GLYPH = STATE_GLYPHS['not-permitted'];
+
 function drawLandings(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   const { frame, layout } = input;
   const rowById = new Map(layout.rows.map((row) => [row.floorId, row]));
   const unanswered = new Set(input.unansweredCallFloorIds ?? []);
+  const lockedOut = new Set((input.lockedOutLandings ?? []).map((landing) => landing.floorId));
   const x = layout.plot.x + layout.plot.width + 10;
   ctx.font = FONT;
   ctx.textAlign = 'left';
@@ -576,6 +647,11 @@ function drawLandings(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void 
     if (unanswered.has(landing.floorId)) {
       ctx.fillStyle = theme.warning;
       ctx.fillText(UNANSWERED_GLYPH, cursor, row.y);
+      cursor += 16;
+    }
+    if (lockedOut.has(landing.floorId)) {
+      ctx.fillStyle = theme.restricted;
+      ctx.fillText(LOCKED_OUT_GLYPH, cursor, row.y);
     }
   }
 }
@@ -625,6 +701,16 @@ function drawFooter(
  * characters fit in a gutter.
  */
 const CHAR_ADVANCE_PX = 7.2;
+
+/**
+ * The same measure for the **bold 14 px** face the two headings use.
+ *
+ * Only one caller needs it — `drawHeader`, to reserve the building name's own width before it
+ * right-aligns the warning banner on the same line. Approximate for the same reason
+ * {@link CHAR_ADVANCE_PX} is, and rounded **up** rather than down, because being generous here
+ * clips a warning slightly early and being stingy overprints the title.
+ */
+const BOLD_CHAR_ADVANCE_PX = 8.5;
 
 /**
  * Clip a label to a pixel budget, with an ellipsis — `RV-09` and `RS-04`.

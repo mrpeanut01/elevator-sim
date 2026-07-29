@@ -43,6 +43,13 @@ import {
   type FloorConfig,
 } from '@elevator-sim/core/browser';
 
+import { checkAccessCompatibility } from '../access/dispatcherCredentials.js';
+import {
+  LENS_OPERATIONAL_NOTE,
+  credentialGroupsIn,
+  credentialLensFor,
+  type CredentialLens,
+} from '../access/zoning.js';
 import {
   OPERATIONAL_ZONING_NOTE,
   addBank,
@@ -83,9 +90,29 @@ import type { BrowserResources } from './data.js';
 
 const OVERLAY_NONE = 0;
 
+/**
+ * Right gutter wide enough for `114.6 m  not permitted` — the lens's per-floor word.
+ *
+ * Measured rather than guessed: 22 characters at the 12 px monospace face's ~7.2 px advance is
+ * 158 px. Bigger was tried first and is worse — at 190 px the preview pane on an 800 px window
+ * dropped two of Secure Tower's six shafts to pay for it, which trades a fact the reader asked
+ * for against one they did not.
+ */
+const LENS_GUTTER_RIGHT_PX = 160;
+/** Bottom band the lens's four legend lines occupy, so they never sit over the lowest floors. */
+const LENS_FOOTER_PX = 92;
+
 export interface EditorHandle {
   /** Re-draw at the current size. Called when the tab becomes visible or the window resizes. */
   refresh(): void;
+  /**
+   * The viewer's dispatcher selection moved — `docs/10` § 11 **W8**.
+   *
+   * § 10.3's note is a fact about a *pairing*, and half of the pair lives on the other surface.
+   * Without this, authoring an access zone here and then switching the viewer to a conventional
+   * dispatcher would leave the editor's note naming a profile nobody has selected any more.
+   */
+  dispatcherChanged(): void;
   /** `ED-23` — is there an unsaved edit? */
   isDirty(): boolean;
   /**
@@ -131,6 +158,17 @@ export interface EditorOptions {
    * what the button does. Found by reading the dialog on screen.
    */
   readonly confirm: (message: string, okLabel: string) => Promise<boolean>;
+  /**
+   * Which dispatcher the **viewer** currently has selected — `docs/10` § 11 **W8**.
+   *
+   * A function rather than a value because the answer changes while the editor is mounted, and
+   * the acceptance case is exactly that: *"authoring an access zone on a building and switching
+   * to a conventional dispatcher raises it live."* Read at render time.
+   *
+   * Optional so a test can mount the editor without one, in which case no compatibility note is
+   * shown — the same silence the viewer keeps when it cannot name a profile.
+   */
+  readonly currentDispatcherId?: (() => string) | undefined;
 }
 
 function el<T extends HTMLElement>(id: string): T {
@@ -169,6 +207,9 @@ export function mountEditor(options: EditorOptions): EditorHandle {
   const rangesNode = el<HTMLElement>('ed-ranges');
   const banksNode = el<HTMLElement>('ed-banks');
   const zonesNode = el<HTMLElement>('ed-zones');
+  const lensSelect = el<HTMLSelectElement>('ed-lens');
+  const lensNote = el<HTMLElement>('ed-lens-note');
+  const accessNote = el<HTMLElement>('ed-access-note');
   const jsonNode = el<HTMLTextAreaElement>('ed-json');
   const expansionNode = el<HTMLElement>('ed-expansion');
   const previewCanvas = el<HTMLCanvasElement>('preview');
@@ -211,6 +252,13 @@ export function mountEditor(options: EditorOptions): EditorHandle {
   let report: ValidationReport = validate(history.current);
   /** Text the reader typed that does not parse. Kept so `ED-18` does not lose their work. */
   let pendingJson: string | undefined;
+  /**
+   * The credential the lens is looking through, or `''` for **off** — `docs/10` § 10.1.
+   *
+   * Editor state and not document state: it changes nothing about the building and must not
+   * appear in the JSON, the undo stack or the download. A mode, not a field.
+   */
+  let lensGroup = '';
 
   function validate(building: BuildingConfig): ValidationReport {
     return validateBuilding(building, resources.elevatorSpecs, {
@@ -491,6 +539,51 @@ export function mountEditor(options: EditorOptions): EditorHandle {
       empty.textContent = 'no access zones — every credential group may select every floor';
       zonesNode.append(empty);
     }
+    renderLensPicker(building);
+    renderAccessNote(building);
+  }
+
+  /**
+   * The lens's credential picker — `docs/10` § 10.2's *"autocomplete over groups already used in
+   * this building"*, in its simplest honest form.
+   *
+   * Options come from the document, never from a vocabulary: `core` has none, and inventing one
+   * would be a second source of truth about what a credential group is. A group the reader types
+   * into a zone appears here on the next render; delete it and the lens falls back to **off**
+   * rather than looking through a credential the building no longer mentions.
+   */
+  function renderLensPicker(building: BuildingConfig): void {
+    const groups = credentialGroupsIn(building.accessZones);
+    if (!groups.includes(lensGroup)) lensGroup = '';
+    lensSelect.replaceChildren(new Option('off', ''));
+    for (const group of groups) lensSelect.append(new Option(group, group));
+    lensSelect.value = lensGroup;
+    lensSelect.disabled = groups.length === 0;
+    lensNote.textContent =
+      groups.length === 0
+        ? 'no credential groups in this building yet — add an access zone to use the lens'
+        : LENS_OPERATIONAL_NOTE;
+  }
+
+  /** § 10.3, in the editor, against whatever dispatcher the viewer currently names. */
+  function renderAccessNote(building: BuildingConfig): void {
+    const dispatcherId = options.currentDispatcherId?.();
+    const profile = resources.dispatcherProfiles.find(
+      (candidate) => candidate.id === dispatcherId,
+    );
+    const resolved = report.resolved;
+    if (profile === undefined || resolved === undefined) {
+      accessNote.textContent = '';
+      return;
+    }
+    accessNote.textContent =
+      checkAccessCompatibility({
+        buildingName: building.name,
+        floorIds: resolved.floors.map((floor) => floor.id),
+        accessZones: resolved.accessZones,
+        profile,
+        profiles: resources.dispatcherProfiles,
+      }).warning ?? '';
   }
 
   function renderValidation(): void {
@@ -537,6 +630,17 @@ export function mountEditor(options: EditorOptions): EditorHandle {
     const building = history.current;
     const geometry = previewGeometry(building, report.resolved);
     expansionNode.textContent = ` — ${geometry.expansion}`;
+    // `docs/10` § 10.1's non-test caller. Built from the same geometry the picture is drawn from,
+    // so the lens cannot disagree with the shafts beside it about which floors are served.
+    const lens: CredentialLens | undefined =
+      lensGroup === ''
+        ? undefined
+        : credentialLensFor({
+            floors: geometry.floors,
+            shafts: geometry.shafts,
+            accessZones: building.accessZones,
+            credentialGroup: lensGroup,
+          });
 
     const ctx = previewCanvas.getContext('2d');
     if (ctx === null) {
@@ -560,14 +664,21 @@ export function mountEditor(options: EditorOptions): EditorHandle {
       floors: geometry.floors,
       shafts: geometry.shafts,
       overlayWidthPx: OVERLAY_NONE,
+      // The lens costs two things the default geometry does not have room for, and both were
+      // found by driving it on Secure Tower: the right gutter has to fit `114.6 m  not permitted`
+      // rather than `114.6 m`, and the four legend lines at the bottom sat over the lobby. Asked
+      // for here rather than inside `drawPreview`, because the layout is the caller's to choose
+      // and a renderer that resized its own plot would be deciding twice.
+      ...(lens === undefined ? {} : { gutterRightPx: LENS_GUTTER_RIGHT_PX, footerPx: LENS_FOOTER_PX }),
     });
     drawPreview(ctx as unknown as Canvas2DLike, {
       geometry,
       layout,
       title: `${building.name} — preview (no run)`,
       caption: summariseReport(report),
+      lens,
     });
-    previewCanvas.setAttribute('aria-label', describePreview(geometry));
+    previewCanvas.setAttribute('aria-label', describePreview(geometry, lens));
   }
 
   function render(): void {
@@ -879,10 +990,22 @@ export function mountEditor(options: EditorOptions): EditorHandle {
     render();
   });
 
+  lensSelect.addEventListener('change', () => {
+    lensGroup = lensSelect.value;
+    renderPreview();
+  });
+
   render();
 
   return {
     refresh: renderPreview,
+    // Deliberately **not** folded into `refresh`, which fires on every window resize and on every
+    // tab switch: `render()` rebuilds every form row, and doing that on a resize would move the
+    // reader's focus out of whatever field they were typing in. This is the one line that has to
+    // change, so this is the one line that changes.
+    dispatcherChanged: () => {
+      renderAccessNote(history.current);
+    },
     isDirty: () => history.state.isDirty,
     showBuilding,
     currentBuildingId: () => history.current.id,

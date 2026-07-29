@@ -19,6 +19,8 @@
  * spelled out here in words, which is the strongest form of "colour is never the only signal".
  */
 
+import type { LockedOutLanding } from '../access/lockedOut.js';
+import { describeLockedOut } from '../access/lockedOut.js';
 import type { Frame, VizRecording } from '../contract/types.js';
 import type { OverlayMetrics } from '../frame/overlay.js';
 import { LOAD_ALARM, LOAD_FULL } from './overlay.js';
@@ -37,6 +39,15 @@ export interface DescribeFrameInput {
    * `<select>` that is dropped below 1280 px.
    */
   readonly unansweredCallFloorIds?: readonly string[] | undefined;
+  /**
+   * Landings no car may legally answer — the same list the canvas marks with `▩`.
+   *
+   * Said in words for the reason everything else here is, and with one extra: the glyph cannot
+   * carry *which* credential is going unread, and that is the entire content of `docs/10`
+   * § 10.4's *"why"*. A non-sighted reader gets the credential named; a sighted one gets it from
+   * the banner, which is produced by the same function so the two cannot word it differently.
+   */
+  readonly lockedOutLandings?: readonly LockedOutLanding[] | undefined;
   /** Cap on the number of cars named individually, so a 24-car tower is still a paragraph. */
   readonly maxCars?: number;
 }
@@ -108,6 +119,9 @@ export function describeFrame(input: DescribeFrameInput): string {
         `answers in this run: ${unanswered.join(', ')}.`,
     );
   }
+
+  const lockedOut = describeLockedOut(input.lockedOutLandings ?? []);
+  if (lockedOut !== '') parts.push(`${lockedOut}.`);
 
   const metrics = input.metrics;
   if (metrics !== undefined) {

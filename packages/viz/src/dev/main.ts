@@ -29,8 +29,19 @@
  * chain is `main.ts → dev/parameterForm.ts → controls/controls.ts → @elevator-sim/experiments/browser`.
  */
 
-import { SimulationError, type BuildingConfig, type SimulationConfig } from '@elevator-sim/core/browser';
+import {
+  SimulationError,
+  type AccessZone,
+  type BuildingConfig,
+  type SimulationConfig,
+} from '@elevator-sim/core/browser';
 
+import {
+  checkAccessCompatibility,
+  credentialCapabilityOf,
+} from '../access/dispatcherCredentials.js';
+import { lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
+import { restrictedFloorIds } from '../access/zoning.js';
 import type { VizRecording } from '../contract/types.js';
 import { frameSequence, serializeFrames } from '../frame/sequence.js';
 import {
@@ -107,6 +118,8 @@ interface Elements {
   readonly description: HTMLElement;
   /** Where `render/runSummary.ts`'s figures are drawn — `docs/10` § 11 W2. */
   readonly runSummary: HTMLElement;
+  /** § 10.3's pre-run compatibility note. Empty when there is nothing to say. */
+  readonly accessNote: HTMLElement;
   /** Tab button and its panel, per surface. Keyed by {@link TabName}, so a fourth is one entry. */
   readonly tabs: Readonly<Record<TabName, HTMLButtonElement>>;
   readonly panels: Readonly<Record<TabName, HTMLElement>>;
@@ -151,6 +164,7 @@ function elements(): Elements {
     banner: find<HTMLElement>('banner'),
     description: find<HTMLElement>('frame-description'),
     runSummary: find<HTMLElement>('run-summary'),
+    accessNote: find<HTMLElement>('access-note'),
     tabs: {
       viewer: find<HTMLButtonElement>('tab-viewer'),
       editor: find<HTMLButtonElement>('tab-editor'),
@@ -314,6 +328,103 @@ function boot(ui: Elements, resources: BrowserResources): void {
     window.history.replaceState(null, '', `?${next.toString()}`);
   }
 
+  /* ------------------------------------------------------------------ *
+   * Access zoning — docs/10 § 10.3 and § 10.4
+   * ------------------------------------------------------------------ */
+
+  /**
+   * What the *current* recording needs in order to be asked about lockouts.
+   *
+   * Two facts, both about things outside the recording: which of its floors sit in an access
+   * zone (a property of the **building**), and whether the profile that ran it forwards the
+   * credential (a property of the **dispatcher**). `access/lockedOut.ts` says why they are not
+   * fields on the contract, and what silence means when they are unknown: an empty list, and no
+   * claim. That is the state a recording loaded from a file for a building this build does not
+   * ship arrives in.
+   */
+  let access: { restrictedFloorIds: readonly string[]; carriesCredential: boolean } = {
+    restrictedFloorIds: [],
+    carriesCredential: false,
+  };
+
+  /** The building on screen: the edited document if there is one, otherwise the shipped entry. */
+  function currentBuilding(): { name: string; floorIds: readonly string[]; accessZones: readonly AccessZone[] } | undefined {
+    if (adhocBuilding !== undefined) {
+      try {
+        const edited = resolveEdited(resources, adhocBuilding);
+        return {
+          name: edited.name,
+          floorIds: edited.floors.map((floor) => floor.id),
+          accessZones: edited.accessZones,
+        };
+      } catch {
+        // An invalid edit has no access zoning to report on. The editor's own validation panel is
+        // where that is said; repeating it here would be a second opinion about legality.
+        return undefined;
+      }
+    }
+    const shipped = resources.buildings.find((candidate) => candidate.id === ui.building.value);
+    return shipped === undefined
+      ? undefined
+      : {
+          name: shipped.name,
+          floorIds: shipped.floors.map((floor) => floor.id),
+          accessZones: shipped.accessZones,
+        };
+  }
+
+  /**
+   * The same two facts, for a recording that arrived from a **file** rather than from a run.
+   *
+   * By id, because that is all a loaded recording carries. Unknown either way is the honest
+   * empty answer — see {@link access}.
+   */
+  function accessForIds(
+    buildingId: string,
+    dispatcherProfileId: string,
+  ): { restrictedFloorIds: readonly string[]; carriesCredential: boolean } {
+    const shipped = resources.buildings.find((candidate) => candidate.id === buildingId);
+    const profile = resources.dispatcherProfiles.find(
+      (candidate) => candidate.id === dispatcherProfileId,
+    );
+    if (shipped === undefined || profile === undefined) {
+      return { restrictedFloorIds: [], carriesCredential: false };
+    }
+    return {
+      restrictedFloorIds: restrictedFloorIds(
+        shipped.floors.map((floor) => floor.id),
+        shipped.accessZones,
+      ),
+      carriesCredential: credentialCapabilityOf(profile).carriesCredential,
+    };
+  }
+
+  /**
+   * § 10.3, before **Run** — the highest-value item in U8.
+   *
+   * Recomputed on every change to either selector, so a reader who switches from
+   * `destination-eta` to `nearest-car` on Secure Tower sees the note appear without pressing
+   * anything. It is a `role="status"`, not an alert, and it never disables **Run**.
+   */
+  function renderAccessNote(): void {
+    const building = currentBuilding();
+    const profile = resources.dispatcherProfiles.find(
+      (candidate) => candidate.id === ui.dispatcher.value,
+    );
+    if (building === undefined || profile === undefined) {
+      ui.accessNote.textContent = '';
+      return;
+    }
+    ui.accessNote.textContent =
+      checkAccessCompatibility({
+        buildingName: building.name,
+        floorIds: building.floorIds,
+        accessZones: building.accessZones,
+        profile,
+        profiles: resources.dispatcherProfiles,
+      }).warning ?? '';
+  }
+
   function fail(text: string): void {
     // KB-11: focus moves to the message so it is announced, and so the reader is at the control
     // that needs changing rather than wherever they pressed.
@@ -406,6 +517,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
     ui.status.textContent = `simulating ${resolved.name} for ${String(durationS)} s — this blocks the page for about a second…`;
     lastConfig = config;
+    // Captured from the run's *own* inputs rather than looked up afterwards by id: an edited
+    // building has no entry in `resources` to look up, and this is the one path that holds both
+    // the resolved building and the profile that ran it.
+    access = {
+      restrictedFloorIds: restrictedFloorIds(
+        resolved.floors.map((floor) => floor.id),
+        resolved.accessZones,
+      ),
+      carriesCredential: credentialCapabilityOf(dispatcherProfile).carriesCredential,
+    };
     clearError();
     try {
       recording = recordRun(config).recording;
@@ -591,6 +712,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       }
       clearError();
       lastConfig = undefined; // a loaded recording cannot be re-simulated without its config
+      // The loaded recording names a building and a dispatcher by id. If this build ships both,
+      // the lockout question can be asked; if it does not, `access` goes empty and the viewer
+      // makes no claim rather than an inferred one.
+      access = accessForIds(result.recording.buildingId, result.recording.dispatcherProfileId);
       adopt(result.recording);
       ui.status.textContent = `loaded ${file.name} — ${statusLine(result.recording)}`;
     });
@@ -692,8 +817,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
   ui.building.addEventListener('change', () => {
     adhocBuilding = undefined;
     syncUrl();
+    renderAccessNote();
   });
-  ui.dispatcher.addEventListener('change', syncUrl);
+  ui.dispatcher.addEventListener('change', () => {
+    syncUrl();
+    renderAccessNote();
+    // Both surfaces, because § 10.3's note is a fact about the *pairing* and the two halves of it
+    // are chosen on different screens.
+    editor.dispatcherChanged();
+  });
   ui.landingSelect.addEventListener('change', () => {
     selection = undefined;
     selectionKey = undefined;
@@ -799,15 +931,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // `D11`: the editor opens on the building the URL and the viewer already name, not on
     // whatever `data/` happens to list first.
     initialBuildingId: ui.building.value,
+    // § 10.3's other half. Read at render time, not captured, so the editor always asks about the
+    // profile the viewer names *now*.
+    currentDispatcherId: () => ui.dispatcher.value,
     onOpen: (buildingId) => {
       applyParam(ui.building, buildingId);
       // A shipped building was chosen, so the ad-hoc document the editor may have handed over
       // earlier is no longer what Run means.
       adhocBuilding = undefined;
       syncUrl();
+      renderAccessNote();
     },
     onRun: (building) => {
       adhocBuilding = building;
+      // Before `runOnce`, so a reader who authors an access zone in the editor and presses
+      // **Run this building** with a conventional dispatcher selected reads the note on arrival
+      // rather than after the run has already failed — `docs/10` § 11 W8's third acceptance case.
+      renderAccessNote();
       selectTab('viewer');
       ui.tabs.viewer.focus();
       runOnce();
@@ -956,6 +1096,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
       const metrics = overlayAt(recording, frame.simTimeS);
       const unanswered = unansweredCallFloors(recording, assignments);
+      // `docs/10` § 10.4's non-test caller. Recomputed per frame like the assignments are,
+      // because *"who is standing at a locked-out landing right now"* is a property of the
+      // instant, and it costs one pass over `legs` — the same scan `overlayAt` already makes.
+      const lockedOut: readonly LockedOutLanding[] = lockedOutLandingsAt({
+        recording,
+        at: frame.simTimeS,
+        restrictedFloorIds: access.restrictedFloorIds,
+        carriesCredential: access.carriesCredential,
+      });
       drawScene(surface, {
         recording,
         frame,
@@ -964,6 +1113,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
         selection,
         unservedFloorIds: unservedFloors(recording),
         unansweredCallFloorIds: unanswered,
+        lockedOutLandings: lockedOut,
       });
 
       // KB-13: the canvas is not a hole in the page. Updated at most twice a second, because a
@@ -973,6 +1123,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
         frame,
         metrics,
         unansweredCallFloorIds: unanswered,
+        lockedOutLandings: lockedOut,
       });
       if (description !== lastDescription) {
         lastDescription = description;
@@ -1000,6 +1151,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
   // honest from here, so there is no second opinion about when these are live.
   syncTransport();
 
+  // Before the first run, not after it: § 10.3's whole point is that the note is *stated* rather
+  // than diagnosed, so it must be on screen while the opening building and dispatcher are still
+  // only a selection.
+  renderAccessNote();
   ui.status.textContent = 'ready — press Run, or open the building editor';
   runOnce();
 }

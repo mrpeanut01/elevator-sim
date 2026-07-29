@@ -371,12 +371,13 @@ function loadSeries(result: SimulationResult): ReadonlyMap<string, CarLoadSeries
 /**
  * The per-leg projection the fold cannot give back.
  *
- * Nine fields of `PassengerRecord`, not fifteen: see {@link VizLeg} for what is left out and
+ * Ten fields of `PassengerRecord`, not fifteen: see {@link VizLeg} for what is left out and
  * why. Sorted by `(arrivedAt, passengerId)` so the array's order is total and reproducible —
  * `result.record.passengers` is in generation order, which is deterministic but is not an order
  * anything downstream may binary-search or compare against.
  *
- * `boardedAt`, `carId`, `bankId` and `assignedCarId` are written as *absent* rather than as
+ * `boardedAt`, `carId`, `bankId`, `assignedCarId` and `credentialGroup` are written as *absent*
+ * rather than as
  * `undefined` values when the record has none, because a recording round-trips through JSON in
  * the replay harness and `JSON.stringify` drops `undefined` — a recording that carried explicit
  * `undefined`s would not equal itself after the trip. `recordRun.test.ts` § *survives a JSON
@@ -397,6 +398,7 @@ function describeLegs(passengers: readonly PassengerRecord[]): readonly VizLeg[]
     if (passenger.carId !== undefined) leg.carId = passenger.carId;
     if (passenger.bankId !== undefined) leg.bankId = passenger.bankId;
     if (passenger.assignedCarId !== undefined) leg.assignedCarId = passenger.assignedCarId;
+    if (passenger.credentialGroup !== undefined) leg.credentialGroup = passenger.credentialGroup;
     return leg;
   });
   legs.sort((a, b) => a.arrivedAt - b.arrivedAt || a.passengerId.localeCompare(b.passengerId));

@@ -71,6 +71,7 @@ import type {
  * | 3 | {@link VizRecording.legs} added — the per-leg array `UX.md` § 7.2 and `DECISIONS.md` D15 reserved for the wave that acquires a consumer. Wave 2 is that wave: `src/frame/overlay.ts` reads it for the windowed figures the live metrics overlay shows, and `landingAssignmentsAt` reads its `carId`/`bankId` for `RV-T3`. See `the root DECISIONS.md`. |
  * | 4 | {@link VizRecording.passengerModel}, {@link VizLeg.destinationFloorId} and {@link VizLeg.assignedCarId} added, so a **Level-1** (destination-dispatch) run can be drawn as the thing it is. `docs/09-destination-dispatch-contract.md` § 3.1 required either this bump or a refusal in `recordRun`; § T18-D1 of `the root DECISIONS.md` records which was chosen and what was measured. |
  * | 5 | {@link VizSummary} widened to what `docs/10-experience-layer-contract.md` § 11 **W2** names: the reporting {@link VizSummary.window}, the long-wait triple, **the count every estimate was computed from** (R13), {@link VizHandlingCapacity}, {@link VizAchievedInterval}, {@link VizServiceLevel} and {@link VizEnergy}. Every field lands with the figure that draws it — `src/render/runSummary.ts`, mounted by `src/dev/main.ts` — because a field with no consumer is this repository's signature defect and W2 is the unit the design says is most likely to acquire one. |
+ * | 6 | {@link VizLeg.credentialGroup} added — `docs/10` § 10.4's *"one genuine contract widening U8 needs"*, so the recording can tell **nobody came** from **nobody may come**. Its consumers land in the same change: `src/access/lockedOut.ts` classifies a locked-out landing by it, `src/render/canvas.ts` marks the landing and banners it, and `src/render/describeFrame.ts` says which credential went unread. § 10.4 asked for version 5 and W2 took that number first; this is the same field at the next one. |
  *
  * ## What version 4 fixed, measured rather than predicted
  *
@@ -103,7 +104,7 @@ import type {
  * a recording arrives from somewhere other than this build and the versions genuinely can
  * disagree (`UX.md` `PB-07`/`PB-15`).
  */
-export const VIZ_SCHEMA_VERSION = 5;
+export const VIZ_SCHEMA_VERSION = 6;
 
 /* -------------------------------------------------------------------------- *
  * Geometry
@@ -240,15 +241,19 @@ export interface VizProgress {
  *
  * ## What is deliberately not here
  *
- * `massKg`, `journeyId`, `legIndex`, `credentialGroup` and `alightedAt` are all on
- * `PassengerRecord` and none of them is copied. Nothing in this package reads them, and copying
- * them "while we are here" is how a contract acquires six fields and one consumer.
+ * `massKg`, `journeyId`, `legIndex` and `alightedAt` are all on `PassengerRecord` and none of
+ * them is copied. Nothing in this package reads them, and copying them "while we are here" is
+ * how a contract acquires six fields and one consumer.
  *
  * {@link destinationFloorId} and {@link assignedCarId} *were* on that list until version 4, and
  * they come off it for the same reason `legs` came on in version 3: they acquire a consumer in
  * the same change. `landingAssignmentsAt` keys a Level-1 landing on the destination and reports
  * the promise, `describeSelection` says the promise out loud, and `describeFrame` puts it in the
  * sentence a screen reader hears. See {@link VizRecording.passengerModel}.
+ *
+ * {@link credentialGroup} comes off the list at version 6, on the same terms and for the same
+ * stated reason — `src/access/lockedOut.ts`, the canvas banner and `describeFrame` all read it in
+ * the change that adds it.
  *
  * ## Ordering
  *
@@ -291,6 +296,26 @@ export interface VizLeg {
    * ends `timed-out` with **25** promised-but-never-boarded legs.
    */
   readonly assignedCarId?: string | undefined;
+  /**
+   * The credential this rider holds, or **absent** when their route needs none.
+   *
+   * Copied from `PassengerRecord.credentialGroup`, which `traffic/generator.ts` sets to the first
+   * group — in declared zone order — that covers every restricted floor on the route, and leaves
+   * `undefined` when nothing on the route is restricted. So absence carries two facts that a
+   * renderer must not confuse: *this journey crosses no access zone* (the common case), or *this
+   * trace was generated with `credentialAssignment: 'none'` and this rider is unbadged on a
+   * restricted floor*. The second is what makes `src/access/lockedOut.ts`'s
+   * `rider-has-no-credential` cause visible; the origin floor is what tells them apart.
+   *
+   * Absent rather than `undefined` when there is none — `JSON.stringify` drops `undefined`, and a
+   * recording that carried explicit ones would not equal itself after the replay harness's round
+   * trip. The same rule the four fields above already keep.
+   *
+   * **Cost.** A short string on a fraction of legs. `docs/10` § 2.4 measures legs at 5–8 % of a
+   * recording; on Secure Tower at 900 s, `garden-apartments`-style buildings carry none at all
+   * because they declare no access zone.
+   */
+  readonly credentialGroup?: string | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
