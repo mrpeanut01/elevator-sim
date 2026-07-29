@@ -8584,3 +8584,219 @@ needs no change — `garden-down-peak` remains its single member, asserted in bo
 2. **The `eta ≡ fairness-first` widening has no mechanism.** It is a measured class with an
    unmeasured explanation, which is the state `CLAUDE.md` § *A stated mechanism goes stale the same
    way* says must be declared rather than filled in.
+
+---
+
+## D151 — the Phase 6c **sweep**, pre-registered in full before any ΔTTD exists
+
+**Date:** 2026-07-28 · **Owner:** orchestrator, wave 7 · **Extends:** [§ D139](#d139) as raised by
+[§ D140](#d140) · **Answers:** [§ D145](#d145)'s *"Phase 6c's refusal is one operating point"* ·
+**Consumes:** T50's feasibility census · **Status:** the gate T52 measures against
+
+**Context.** [§ D145](#d145) measured Phase 6c at exactly one operating point — `midtown-office`
+interfloor-mix 1.5 %, reference arm `collective`, n = 200 — and returned ΔTTD
+`−0.213 [−0.440, +0.014]`, an interval containing zero, so **NOT ACCEPTED**.
+[`docs/07`](docs/07-handoff.md) § 8 opened the follow-up in its own words: *"One building, one
+traffic pattern, one reference arm. § D139 asked for the operating point's own census and got it;
+it did not ask for a sweep, and a sweep is the obvious follow-up."*
+
+**This entry is dated before any sweep ΔTTD exists, for the reason [§ D139](#d139) gives about
+itself:** a criterion written after a result is indistinguishable from a criterion fitted to it.
+[`CLAUDE.md`](CLAUDE.md) § Working agreements forbids weakening a criterion to make a phase pass,
+and this repository has done it once already by accident inside [§ D27](#d27).
+
+### 0. The failure mode this entry exists to prevent
+
+§ D139 named four things that would make its criterion a bad one. The fourth is *"widening the
+budget until the interval excludes zero."* **A sweep is that fourth clause wearing a disguise.**
+Eight cells judged at α = 0.05 each carry a family-wise error rate of `1 − 0.95⁸ ≈ 34 %`, so a
+sweep that reports its best cell finds a "winner" roughly one time in three when nothing is real.
+That is precisely the *confident nonsense* [`CLAUDE.md`](CLAUDE.md) § Statistical discipline exists
+to prevent, and it is the reason every clause below is fixed **now** rather than chosen later.
+
+### 1. The cell set — fixed here, and fixed by a census forbidden to measure ΔTTD
+
+T50 censused eighteen candidate cells at n = 200 across all twelve shipped profiles at **two**
+seeds (20260726, 20260728), measuring **only** single-arm marginals and shipped-versus-shipped
+paired sds. It constructed no `SelectionStageConfig`, no `weightSets` library and no learned
+candidate. Its apparatus was validated by reproducing three published ceilings exactly
+(`nearest-car` on midtown up-peak 1 % → 174; `secure-tower` up-peak 2 % → 126; `vertical-city`
+up-peak 1 % → 109, each matching `matrix.ts`).
+
+**PRIMARY cells — five, and the sweep runs all five whatever any of them shows.**
+
+| # | cell | reference arm (seed-stable) | ceiling | n |
+|---|---|---|---|---|
+| 1 | `midtown-office` / interfloor-mix **1.0 %** / 1800 s | `collective` | ≥ 200 | 200 |
+| 2 | `midtown-office` / interfloor-mix **2.0 %** / 1800 s | `auction-multi-round` | ≥ 200 | 200 |
+| 3 | `garden-apartments` / **residential** 2 % / 3600 s | `zoned-uppeak` | ≥ 200 | 200 |
+| 4 | `garden-apartments` / **down-peak** 2 % / 3600 s | `zoned-uppeak` | ≥ 200 | 200 |
+| 5 | `midtown-office` @ `trafficProfile: hotel` / 1.5 % / 1800 s | `collective` | ≥ 200 | 200 |
+
+Cell 5 is a **derived building** — data, not code. The traffic-pattern axis is not free:
+`SimulationDemandOptions` carries no traffic-profile id, so a profile can only be swept by deriving
+a building. Declaring it here is what makes it a pre-registered cell rather than a later
+convenience. It also moves `batchSize` (2.0 vs 1.4), not only the split.
+
+**SECONDARY cells — three, admitted only with [§ D147](#d147)'s `CEILING_EXCLUDED_ARMS` device,
+and reported in a separate family (§ 3).**
+
+| # | cell | reference arm | excluded by ceiling | n |
+|---|---|---|---|---|
+| 6 | `secure-tower` / up-peak 2 % | `auction-multi-round` | `nearest-car` (190 / 126) | **126** |
+| 7 | `midtown-office` / down-peak 1 % | `zoned-uppeak` | `nearest-car` (87 / 12) | 200 |
+| 8 | `vertical-city` / up-peak 1 % | `collective` | `destination-panel` (10), `predictive-balanced` (35), `nearest-car` (164 / 109) | 200 |
+
+**EXCLUDED, each with its measured mechanism and never a tolerance.** `mixed-use-high-rise`
+up-peak 4 % — all-arm ceiling **24** at one seed, *and* the reference arm **flips between seeds**
+(`predictive-balanced` → `auction-multi-round`), so § D139's *"the best shipped profile at the
+operating point"* rule returns a different answer per seed and cannot be pre-registered here.
+`garden-apartments` interfloor-mix 1.5 % — **no quotable arm at either seed**; all twelve fail on
+the same replications with *"No passenger was served within the reporting window"*.
+`secure-tower` interfloor-mix and down-peak, `mixed-use-high-rise` interfloor-mix — **2 of 12**
+arms quotable, the ten conventional arms invalid on 199–200 of 200, which is
+[§ D100](#d100) part 1's mechanism (an access-restricted pickup carries no credential under
+up-down buttons); **secure down-peak is a new instance of it on a pattern never censused before**.
+`vertical-city` interfloor-mix — **1 of 12**. `garden-apartments` @ `hotel` — 0 of 12.
+`constant-iso` — excluded on `data/traffic-profiles.json`'s own statement that it is incompatible
+with confidence intervals across replications.
+
+**`office-prestige` ≡ `office-standard` once the rate is overridden** — all twelve arms'
+TTD means, sds and CoVs byte-identical at both seeds. A twelfth identity class, and the reason only
+`hotel` enters the sweep. It belongs in `docs/07`'s identity-class row.
+
+### 2. Which ceiling — declared, because it changes three cells
+
+A ceiling is an **arm-set** property, not only a `(building, traffic, seed)` property: the all-arm
+ceiling and the reference arm's own ceiling diverge sharply (vertical-city up-peak **10 vs ≥ 200**;
+midtown down-peak **12 vs ≥ 200**). **This sweep uses the all-arm ceiling over its declared arm
+set** — the reference arm, the learned arm, and nothing else — because the excluded arms are not in
+the comparison. The census's conservative min-over-twelve is reported beside it and is not the
+budget.
+
+**A defect in the shipped machinery is recorded rather than worked around.**
+`censusSelectionPoint`'s `firstInvalidOf` reads `record.summary.saturation.saturated`, but
+`awtIsValid` has **four** grounds. It therefore under-reports ceilings of the empty-window kind:
+at `garden` interfloor-mix the strict ceiling is 32/22 and the shipped function returns **none**,
+at a cell where no arm is quotable at all. T52 must not reuse it unfixed. Opened as its own item.
+
+### 3. The gate, and the multiplicity correction
+
+Per cell, unchanged from § D139 as raised by § D140: **paired-t interval on ΔTTD excluding zero on
+the better side under CRN**, costs published beside and never folded in, tuned on one seed set and
+validated on a **disjoint** one.
+
+**Raised — per-cell α is Holm–Bonferroni corrected across the five PRIMARY cells.** Holm rather
+than plain Bonferroni because it is uniformly more powerful at the same family-wise error rate, so
+the correction costs no sensitivity it does not have to. The SECONDARY family is corrected
+**separately** and may never be pooled with the primary family to enlarge either — an arm admitted
+only by excluding other arms is weaker evidence, and merging the families would launder that.
+
+**Raised — the resolution limit is measured on TTD at the cell, not inherited.**
+[`docs/07`](docs/07-handoff.md) § 8 already carries the row: *"§ 4's two resolution limits were
+measured on AWT and were applied to TTD… the limits have not been measured on TTD directly, and
+that is unmeasured rather than settled."* TTD scale varies **2.5×** across these cells (41.9 s at
+garden down-peak to 106 s at vertical-city), so one absolute figure cannot mean the same thing at
+each. T52 measures the smallest detectable effect on **TTD at each cell** and gates on that.
+§ D140's raise stands: an interval that excludes zero but whose effect is below the cell's own
+limit is **NOT ACCEPTED**, not accepted-with-a-caveat.
+
+### 4. Plateau expectation, stated before the numbers appear
+
+§ D139: *"a bit-identical run is a wiring bug until proven otherwise."* T50 measured bit-identical
+paired-replication counts between shipped profiles and each cell's reference arm at n = 200, **and
+they are cell-specific**: interfloor cells 0–6 of 200, garden 0–3, but **midtown up-peak 1 % runs
+47–84** and **secure up-peak 2 % runs 86–134**. So at cells 6 and 7's neighbourhood a high
+identical count is **the cell's own plateau, not a bug**, and that is recorded here rather than
+discovered later and argued about. At the five primary cells the prior is unchanged: a high
+identical count is a wiring bug until proven otherwise.
+
+### 5. The regime screen — a declared moderator, and the objection to it, answered
+
+**The mechanism this sweep is actually testing.** A selector choosing among shipped weight vectors
+can only pay for itself where **there is something to switch on**. `dispatch/selector.ts` reads
+three signals — `lobbyArrivalRate`, `interfloorRate`, `downPeakRate` — and *which pattern am I in*
+lives in their **ratios**, not their level. But `traffic/types.ts`'s `DemandPhase` carries exactly
+`startIntensity` and `endIntensity`: a **scalar** multiplier. **The directional split is fixed for
+the whole run.** So under `rise-and-fall` all three signals swell and shrink together and their
+ratios do not move, and the selector may have nothing to switch on **by construction** at every
+shipped operating point.
+
+**If that is so, a sweep over shipped profiles refuses everywhere for a reason that is not about
+selection at all** — it is about the traffic model. That is a materially different finding from
+*learned control does not help*, and conflating the two would be the stale-mechanism failure
+[`CLAUDE.md`](CLAUDE.md) warns about: *"If you write a sentence about why something performs
+better, either measure it or say it is unmeasured."*
+
+**The screen.** T52 measures, at each pre-registered cell and **before any ΔTTD**, whether the
+three detector inputs' ratios move enough within the window to cross the selector's own switching
+margin — the *regime count* of the cell. It is reported for every cell.
+
+**T50's objection, recorded because it is a good one.** T50 declined to measure these rates,
+holding that *"a cell with only one live regime predicts a selector that never switches, which is
+outcome information wearing a feasibility label,"* and asked that any such screen be separately and
+explicitly declared before the arms are built. **That is exactly right, and this section is that
+declaration.** What makes the screen legitimate is not that it is outcome-blind — it is not — but
+that its use is fixed in advance:
+
+- **The sweep runs all five primary cells regardless of what the screen returns.** No cell is added,
+  dropped, reweighted or reordered on the strength of it.
+- The screen is a **moderator for interpretation**, not a filter for inclusion.
+- **A significant effect at a one-regime cell is a bug report, not a result** — the generalization of
+  § D139's bit-identical clause, and the same move [§ D148](#d148) made for TWIN by stating the
+  expected direction in advance so that a surprise would read as a defect.
+
+### 6. What "accepted" would mean — stated before the result
+
+**Phase 6c is ACCEPTED if and only if** the learned selector clears the gate — paired-t interval
+excluding zero on the better side under CRN, at the Holm-corrected level, with an effect at or above
+that cell's **own TTD-measured** resolution limit, generalizing to the disjoint seed set — at **at
+least one PRIMARY cell**.
+
+**And the phase's stated status must then name the cells where it did and did not.** There is no
+aggregate claim of the form *learned control works*. [§ D147](#d147) is the precedent and the model:
+*WORSE under `eta`, BETTER under `collective`, one cell permanently unresolvable — there is no
+verdict of the form "double-deck is better."*
+
+A SECONDARY cell alone does **not** accept the phase. It is reported, with its exclusions named.
+
+### 7. The conditional follow-on, and the honesty constraint on it
+
+**If the screen returns one regime at every cell**, the shipped traffic model cannot express the
+condition under which selection could help, and the fair test does not exist yet. The work that
+creates it is a demand template whose **directional split varies by phase** — a real building does
+go from up-peak to two-way to down-peak — which is a `core` change: `DemandPhase` carries an
+intensity multiplier and would need to carry a split.
+
+**Three constraints on it, fixed here so they cannot be relaxed later:**
+
+1. It must be **opt-in and byte-identical when unused**. Every existing published number must
+   reproduce exactly; a traffic-model change that moves a shipped figure invalidates far more than
+   this phase.
+2. The comparison stays *learned selector vs the best shipped **single** profile on the same
+   traffic*. Changing the traffic does not change the reference rule.
+3. **A win there is stated as what it is.** *"Selection helps when the directional mix changes
+   mid-run"* — never *"selection helps"*, and never as a Phase 6c acceptance at a shipped operating
+   point, because the template that produced it is authored, by construction, to contain the thing
+   selection exists to exploit. Whether such a cell may accept Phase 6c at all is deliberately left
+   **open** here and must be decided in its own entry, dated before that measurement.
+
+### 8. What would make this a bad criterion, stated so a reviewer can check
+
+Mirroring § D139's own self-check. Adding a cell after seeing a result. Dropping a primary cell that
+refused. Pooling the primary and secondary families to enlarge either. Reporting an uncorrected
+per-cell interval as the verdict. Using the § 5 screen to filter cells rather than to interpret
+them. Reading § 4's AWT-measured resolution limits as TTD limits after § 3 said they would be
+measured. Quoting a secondary cell as the acceptance. Letting the § 7 template's result be stated
+as a shipped-operating-point acceptance.
+
+### 9. The outcome this decision explicitly permits
+
+**A second refusal, across the whole grid.** It would turn § D145's *"nothing in the verdict says a
+selector cannot help somewhere else"* from an open question into a measured answer over eight named
+operating points, which is strictly more than this repository knows today. Phase 6 would remain
+⚠️ **partial**, and every document that states its status would say so.
+
+**Impact.** Phase 6c's verdict and Phase 6's status. `docs/05-roadmap.md` § Phase 6c,
+`docs/07-handoff.md` § 8. Nothing in § D139 or § D140 is weakened; §§ 3 and 5 raise two clauses and
+§ 1 broadens coverage from one cell to eight.
