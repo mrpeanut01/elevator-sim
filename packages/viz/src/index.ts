@@ -91,6 +91,12 @@
  * | {@link renderSlider}, {@link renderStepper}, {@link renderSelect}, {@link renderCheckbox} | `renderControl`, in `src/controls/render.ts`. **Inside the module only** — the dispatch is the entry point and the four are its branches |
  * | {@link sliderPositionOf} | `renderSlider`, in `src/controls/render.ts`. Inside the module only |
  * | {@link inputIdOf}, {@link helpIdOf}, {@link SLIDER_STEPS} | `src/controls/render.ts`, in every renderer. Exported because a caller wiring events needs the same id derivation the renderer used, and two derivations of one id is how a label stops pointing at its input |
+ * | {@link runBatch} | `src/dev/batchWorker.ts`, the worker the Compare tab starts — `docs/10` § 11 **W3** |
+ * | {@link firstTraceDisagreement} | `runBatch`, once per arm per replication. **Inside the module only** — it is the CRN audit, and nothing outside has a second trace to compare |
+ * | {@link batchReport} | `src/dev/batchPanel.ts`, on the main thread, when the worker returns |
+ * | {@link BATCH_METRICS}, {@link BATCH_METRIC_CLASS}, {@link BATCH_METRIC_PRESENTATION} | `src/batch/report.ts` and `src/batch/runBatch.ts`; the class map is also what makes a ninth metric a compile error rather than a silent default |
+ * | {@link MIN_REPLICATION_BUDGET}, {@link MAX_REPLICATION_BUDGET} | `batchReport`, in `src/batch/report.ts`. Inside the module only |
+ * | {@link BatchError} | thrown by `runBatch`; caught and flattened by `src/dev/batchWorker.ts` |
  *
  * `frameSequence` and `serializeFrames` exist because Phase 4's acceptance criterion needs a
  * headless, browser-free way to compare two replays. They would have shipped as "configurable,
@@ -309,3 +315,51 @@ export {
 } from './controls/render.js';
 
 export type { ControlNode } from './controls/render.js';
+
+/* -------------------------------------------------------------------------- *
+ * batch/ — N paired replications, and the paired-t report on them (docs/10 § 11 W3)
+ *
+ * The single-run surface may say "in this run, X happened" and may not say
+ * "this dispatcher is better" (R2). This is the other sentence. The statistics
+ * are `@elevator-sim/experiments`' — `pairedDifferenceEstimate` and
+ * `intervalContainsZero`, imported through the browser barrel — and nothing
+ * statistical is computed in this package.
+ * -------------------------------------------------------------------------- */
+
+export {
+  BATCH_METRICS,
+  BATCH_METRIC_CLASS,
+  BATCH_METRIC_PRESENTATION,
+  type BatchArmRequest,
+  type BatchArmResult,
+  type BatchCrnAudit,
+  type BatchCrnMismatch,
+  type BatchMetric,
+  type BatchMetricClass,
+  type BatchMetricPresentation,
+  type BatchProgress,
+  type BatchReplication,
+  type BatchRequest,
+  type BatchResources,
+  type BatchResult,
+  type BatchWorkerMessage,
+  type BatchWorkerRequest,
+} from './batch/types.js';
+
+export {
+  BatchError,
+  firstTraceDisagreement,
+  runBatch,
+  type RunBatchOptions,
+} from './batch/runBatch.js';
+
+export {
+  MAX_REPLICATION_BUDGET,
+  MIN_REPLICATION_BUDGET,
+  batchReport,
+  type BatchArmSummary,
+  type BatchComparison,
+  type BatchComparisonRow,
+  type BatchReport,
+  type BatchVerdict,
+} from './batch/report.js';
