@@ -1524,15 +1524,23 @@ goals and § 8.4's honest deltas are possible.
 > **`C34` is closed with a measured caller count** (**M25**: 0 → 3 non-test, non-barrel importers of
 > `experiments/src/browser.ts`; `tuning/space`'s uncalled exports 6 → 3).
 >
-> **The U7 half is blocked, and this is a finding rather than a deferral.** The paragraph below says
-> *"the `TRAFFIC_PARAMETERS` half of W4 is unblocked either way, because that schema is on the
-> `core/browser` barrel."* That is true about **reachability** and false about **collectability**:
-> of the ten schemas `discoverParameterSchemas()` finds, **two refuse to collect into a search
-> space** — `TRAFFIC_PARAMETERS`, because `traffic.arrivalRatePctPop5min`'s default is `null`, and
+> **The U7 half was blocked, and T75 unblocked it — the superseded finding is kept below because
+> the correction is the instructive part.** § D134 recorded: *"of the ten schemas
+> `discoverParameterSchemas()` finds, two refuse to collect into a search space —
+> `TRAFFIC_PARAMETERS`, because `traffic.arrivalRatePctPop5min`'s default is `null`, and
 > `SIM_PARAMETERS`, because `sim.drainGraceS` declares a log scale over a range starting at zero
-> (**M24**). The form **draws each refusal** rather than dropping the schema from its picker, and a
-> test derives both sets from discovery so a fix in `core` turns it red. U7's editor needs that fix
-> first.
+> (**M24**)"*, with the sets derived from discovery *"so a fix in `core` turns it red."* It did.
+>
+> **All ten collect now, and the two refusals turned out to be different kinds of thing.**
+> `SIM_PARAMETERS` was a defect in **two** rows (`sim.drainGraceS` and `sim.queueSampleCount`, the
+> second invisible because the collector throws on the first) and the fix was the **scale**, because
+> zero is a named mode in both ranges rather than a slack bound. `TRAFFIC_PARAMETERS` was not a
+> defect at all, in **four** rows: `default: null` there is the *"only honest default"* § 9.3 quotes
+> approvingly, and it is *also* not a point a search can start from — both at once. The collector
+> now says both, through `CollectOptions.nullDefault: 'exclude'`: thirteen rows collect and four are
+> named in `SearchSpace.unsearchable`, drawn beside the controls in the collector's own words. The
+> register is § D134's — what cannot be searched is **said**, never dropped; what changed is the
+> granularity, since one bad row used to take sixteen good ones off the screen with it.
 >
 > **What W4 does not do**, stated rather than discovered: the authored candidate is validated —
 > through the shipped `SearchSpace.validate`, which is `parseDispatcherProfiles` plus
@@ -1902,7 +1910,7 @@ export) was re-read against `packages/experiments/package.json` and still holds.
 | **M21** | `collective`, seeds 1000–1019, 900 s, on `midtown-office`, `secure-tower` and `mixed-use-high-rise` — 60 runs. A windowed goal (`waiting.pctOverLongWait ≤ 10`) and a whole-run goal (`counts.unserved === 0`) return **opposite verdicts on 35 of 60**. `midtown-office` seed 1000: window `pctOverLongWait` **89.5 %** (fail) against **0** unserved (pass), with the window `300–600 s` of an **1822 s** run. § 13 q3. |
 | **M22** | Secure Tower, seed 42, 900 s. Structural-refusal warnings in `SimulationResult.warnings`, which `VizRecording.warnings` carries: `collective` **11** of 13 warnings, `nearest-car` **18** of 20, `destination-eta` **0** of 2. Text, verbatim: *"call `high#18:down` at floor `18` going down was never collected: every car in bank `high` refused it for a structural reason (accessDenied). Under dispatch.callType `up-down-buttons` a landing call carries no credential, so an access-restricted pickup floor is infeasible for the whole bank."* § 13 q4, and the basis for § 10.4's second correction. |
 | **M23** | `runSimulation`, `collective`, 900 s, seeds 1000–1019, on this tree: Garden Apartments **0.7** ms/rep, Secure Tower **23.5**, Midtown Office **59.1**, Mixed-Use High-Rise **68.5**, Vertical City **227.1**. M6 reproduces on four of five within noise; **Vertical City is 16 % slower** than M6's 196, and Mixed-Use was never in M6. 50 replications: 0.0 / 1.2 / 3.0 / 3.4 / **11.4** s. § 13 q5. |
-| **M24** | `ActiveWhenCondition` admits exactly two forms — a value list and `{ min?, max? }` — and `activeWhenSatisfied` returns `false` for an unset gate, so *"the absolute override is unset"* is not expressible and cannot be smuggled into the value list. Separately: of the **10** schemas `discoverParameterSchemas()` finds, **two do not collect into a search space** — `TRAFFIC_PARAMETERS` (*"`traffic.arrivalRatePctPop5min` is continuous and its default is null"*) and `SIM_PARAMETERS` (*"`sim.drainGraceS` declares a log scale over a range starting at 0"*). § 13 q6, and W4's own finding. |
+| **M24** | `ActiveWhenCondition` admits exactly two forms — a value list and `{ min?, max? }` — and `activeWhenSatisfied` returns `false` for an unset gate, so *"the absolute override is unset"* is not expressible and cannot be smuggled into the value list. Separately, and **superseded by T75**: of the **10** schemas `discoverParameterSchemas()` finds, two used to refuse to collect. All **10** collect now — `SIM_PARAMETERS`' two log-over-zero scales were a defect and are fixed in `core`; `TRAFFIC_PARAMETERS`' **four** `default: null` rows were not, and are reported per row in `SearchSpace.unsearchable` rather than taking the schema down. Declared rows **106 → 106**, dimensions **56 → 56**. § 13 q6, and W4's own finding as corrected. |
 | **M25** | `C34`'s caller count, with the repository's own scanner (`corpus`/`isBarrel`/`auditModules` from `tuning/callers.test-helper.ts`, comments stripped so a `{@link}` is not an import). Non-test, non-barrel importers of `experiments/src/browser.ts`: **0 → 3** (`viz/src/controls/controls.ts`, `viz/src/controls/types.ts`, `viz/src/dev/parameterForm.ts`). Importers of any kind: 1 → 7. `auditModules(['experiments/src/tuning/space'])` uncalled exports: **6 → 3** — `activeParameters`, `parameterOf` and `defaultCandidate` gained real callers, which is what they were written for. § D127. |
 
 ### Measured 2026-07-29 by T62, for W3
@@ -2064,11 +2072,14 @@ on every stage, the first blocked on W7 and the second because it compares two a
    > into the value-list form either: an unset gate fails *every* condition, including one that
    > named it.
    >
-   > **A second reason arrived with W4.** `TRAFFIC_PARAMETERS` does not collect into a search space
-   > at all: `collectSearchSpace` refuses `traffic.arrivalRatePctPop5min` because its default is
-   > `null` — *"a search needs a point it can start from"*. That null is the *"only honest default"*
-   > § 9.3 quotes approvingly, so the obstacle to (a) and the obstacle to collecting the schema are
-   > the **same fact seen twice**. (b) stands.
+   > **A second reason arrived with W4, and T75 narrowed it without removing it.**
+   > `collectSearchSpace` refuses `traffic.arrivalRatePctPop5min` because its default is `null` —
+   > *"a search needs a point it can start from"*. That null is the *"only honest default"* § 9.3
+   > quotes approvingly, so the obstacle to (a) and the obstacle to **searching that row** are the
+   > **same fact seen twice**. What T75 changed is that the fact no longer takes the whole schema
+   > with it: the row is named in `SearchSpace.unsearchable` and its thirteen siblings collect.
+   > **No number was invented for it, and none should be** — a search cannot start from "unset", and
+   > any number declared there is imposed on every profile in every building. (b) stands.
 
 7. ✅ **ANSWERED — "ride".** **What is the plain-language name for a "leg"?** `boardedLegs` counts
    leg boardings and a
@@ -2142,12 +2153,14 @@ on every stage, the first blocked on W7 and the second because it compares two a
    silently becomes 5175 and the tooling is wrong again with nothing said. § D127.
 7. **`AGENT_STATUS.md`** — U2–U8 are not yet tracked there; only U1 is.
 
-9. ⬜ **NEW, opened by W4.** **`packages/core`** — two declared schemas cannot be collected into a
-   search space, so a generated editor cannot be pointed at them (**M24**).
-   `traffic.arrivalRatePctPop5min` declares a `null` default and `sim.drainGraceS` declares a `log`
-   scale over a range starting at zero. The null is the *"only honest default"* § 9.3 quotes
-   approvingly, so the fix is not simply "give it a number" — it needs the same decision § 9.3 q6
-   defers, and **U7's half of W4 waits on it**.
+9. ✅ **CLOSED by T75** (opened by W4). **`packages/core`** — both schemas collect and the editor
+   can be pointed at all ten (**M24**, corrected). `SIM_PARAMETERS` was a defect in two rows and the
+   **scale** was wrong, not the bound: zero is a named mode in both `sim.drainGraceS` and
+   `sim.queueSampleCount`. `TRAFFIC_PARAMETERS` was **not** a defect, in four rows, and the fix was
+   emphatically **not** "give it a number" — the null is the *"only honest default"* § 9.3 quotes
+   approvingly, and giving `traffic.arrivalRatePctPop5min` a default would impose an office rate on
+   every residential building. The four are named per row in `SearchSpace.unsearchable` instead.
+   § 9.3 q6 is unchanged and still open on its own terms.
 10. ⬜ **NEW, opened by § 13 q4.** **`packages/core`** — the structural-refusal reason exists, is
     correct, and is **prose** (**M22**). A structured counterpart — the call's reason set, keyed so
     a `VizLeg` can be joined to it — is what § 6's queue renderer and § 10's credential lens need,

@@ -64,9 +64,7 @@ function batchResourcesFor(loaded: BrowserResources, buildingId: string): BatchR
   }
   return {
     building,
-    dispatcherProfilesById: new Map(
-      loaded.dispatcherProfiles.map((profile) => [profile.id, profile]),
-    ),
+    dispatcherProfiles: loaded.dispatcherProfiles,
     trafficProfiles: loaded.trafficProfiles,
     elevatorSpecs: loaded.elevatorSpecs,
   };

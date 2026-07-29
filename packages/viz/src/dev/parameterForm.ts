@@ -27,13 +27,25 @@
  * both U6 (`collectSearchSpace()`) and U7 (`TRAFFIC_PARAMETERS`); discovering the list gives all
  * ten and the day an eleventh is declared it appears here with no edit.
  *
- * **Two of the ten do not collect, and the form says so rather than hiding them.** Measured on
- * this tree: `SIM_PARAMETERS` declares a `log` scale over a range starting at zero, and
- * `TRAFFIC_PARAMETERS` declares `traffic.arrivalRatePctPop5min` with a `null` default — which is
- * the *"only honest default"* docs/10 § 9.3 quotes approvingly, and which a search space cannot
- * start from. Both refusals come from `collectSearchSpace` with its own message, and both are
- * drawn. Dropping them silently would be this repository's signature defect pointed at a schema:
- * a surface that looks complete because the incomplete parts are invisible.
+ * **All ten collect, and four rows inside one of them still cannot be searched.** § D134 measured
+ * two schemas refusing outright and drew the refusal rather than hiding the schema; T75 fixed what
+ * each refusal was about, and they turned out to be different kinds of thing:
+ *
+ * - `SIM_PARAMETERS` was a **defect** — `sim.drainGraceS` and `sim.queueSampleCount` declared a
+ *   `log` scale over a range starting at zero, which no sampler can draw from. Zero is a named
+ *   mode in both, so the scale was wrong and the bound was right. Fixed in `core`; the schema
+ *   collects whole.
+ * - `TRAFFIC_PARAMETERS` was **not** a defect. `traffic.arrivalRatePctPop5min` and the three
+ *   `traffic.directionalSplit.*` shares declare `default: null` on purpose — the *"only honest
+ *   default"* docs/10 § 9.3 quotes approvingly, because any number named there is imposed on every
+ *   profile in every building. Honest and unsearchable at the same time. So the form asks for
+ *   `nullDefault: 'exclude'`: the other thirteen rows draw controls, and the four are drawn as
+ *   named refusals beside them, in `collectSearchSpace`'s own words.
+ *
+ * The register is unchanged from § D134's: what cannot be searched is **said**, never dropped.
+ * A surface that looks complete because the incomplete parts are invisible is this repository's
+ * signature defect pointed at a schema. What moved is the granularity — one bad row used to take
+ * sixteen good ones off the screen with it.
  */
 
 import {
@@ -49,7 +61,7 @@ import {
   defaultValues,
   resetControl,
 } from '../controls/controls.js';
-import { renderControls, valueAtSliderPosition } from '../controls/render.js';
+import { renderControls, renderUnsearchable, valueAtSliderPosition } from '../controls/render.js';
 import type { ControlNode } from '../controls/render.js';
 import type { Control, ControlEdit, ControlValues } from '../controls/types.js';
 
@@ -75,17 +87,72 @@ export interface ParameterFormHandle {
 }
 
 /** A schema that collected, or the reason it did not. Never a silently missing entry. */
-type Source = { readonly ok: true; readonly space: SearchSpace } | { readonly ok: false; readonly reason: string };
+export type Source =
+  | { readonly ok: true; readonly space: SearchSpace }
+  | { readonly ok: false; readonly reason: string };
 
-function collect(name: string): Source {
+/**
+ * Point the form at one discovered schema, or at the dispatcher space.
+ *
+ * **Exported so the acceptance test calls the function the form calls.** `DECISIONS.md` § D159
+ * names *a fixture routing the test past its subject* as one of five ways a test can fail to be
+ * able to fail, and a test that rebuilt these options itself would be exactly that: it would go on
+ * passing while the mount asked `collectSearchSpace` for something else entirely.
+ */
+export function collectFormSource(name: string): Source {
   try {
+    // The dispatcher space keeps the shipped rule — `nullDefault` defaults to `'refuse'` — because
+    // a *dispatcher* dimension with no origin is a defect and must not shrink the space quietly.
     if (name === SEARCH_SPACE_SOURCE) return { ok: true, space: collectSearchSpace() };
     const rows = discoverParameterSchemas().get(name);
     if (rows === undefined) return { ok: false, reason: `${name} is no longer declared.` };
-    return { ok: true, space: collectSearchSpace({ source: { [name]: rows }, include: () => true }) };
+    return {
+      ok: true,
+      space: collectSearchSpace({
+        source: { [name]: rows },
+        include: () => true,
+        nullDefault: 'exclude',
+      }),
+    };
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : String(error) };
   }
+}
+
+/**
+ * The one line under the picker: how many dimensions, how many live, how many cannot be searched,
+ * and the authorability verdict.
+ *
+ * **Pure, and exported, because `space.unsearchable` has two readers** — this sentence and
+ * `renderUnsearchable`'s list — and [`DECISIONS.md`](../../../../DECISIONS.md) § D154 records the
+ * mutation that came back green for exactly that reason: *"that value has two independent readers
+ * … and freezing one leaves the other live."* A count drawn in one place and not the other is a
+ * form that says thirteen dimensions and lists four refusals, or the reverse, and nothing red.
+ */
+export function formStatusLine(
+  space: SearchSpace,
+  controls: readonly Control[],
+  values: ControlValues,
+): string {
+  const live = controls.filter((control) => control.enabled).length;
+  let verdict: string;
+  try {
+    const why = space.validate(candidateOf(space, values));
+    verdict =
+      why === undefined
+        ? 'authorable as a dispatcher profile, and it has no dead gate'
+        : `not authorable: ${why}`;
+  } catch (error) {
+    // `validate` decodes into a dispatcher profile, which is only a meaningful question for a
+    // space whose ids are profile paths. For the other nine schemas the answer is legitimately
+    // "no", and saying so is better than not asking.
+    verdict = `not authorable: ${error instanceof Error ? error.message : String(error)}`;
+  }
+  const withheld =
+    space.unsearchable.size === 0
+      ? ''
+      : `, ${String(space.unsearchable.size)} declared but not searchable`;
+  return `${String(controls.length)} dimensions, ${String(live)} live${withheld} — ${verdict}. Authorability is a schema check: docs/10 § 8.2 says a profile that passes it is authorable and has no dead gate, not that it is sound.`;
 }
 
 /** One {@link ControlNode} tree, instantiated. The only DOM construction in W4. */
@@ -129,7 +196,7 @@ export function mountParameterForm(options: ParameterFormOptions): ParameterForm
   }
 
   let sourceName = picker.value;
-  let source = collect(sourceName);
+  let source = collectFormSource(sourceName);
   let values: ControlValues = source.ok ? defaultValues(source.space) : new Map();
 
   function say(reason: string): void {
@@ -150,22 +217,10 @@ export function mountParameterForm(options: ParameterFormOptions): ParameterForm
     const space = source.space;
     const controls = controlsFor(space, values);
     container.append(instantiate(doc, renderControls(controls)));
+    const unsearchable = renderUnsearchable(space.unsearchable);
+    if (unsearchable !== undefined) container.append(instantiate(doc, unsearchable));
 
-    const live = controls.filter((control) => control.enabled).length;
-    let verdict: string;
-    try {
-      const why = space.validate(candidateOf(space, values));
-      verdict =
-        why === undefined
-          ? 'authorable as a dispatcher profile, and it has no dead gate'
-          : `not authorable: ${why}`;
-    } catch (error) {
-      // `validate` decodes into a dispatcher profile, which is only a meaningful question for a
-      // space whose ids are profile paths. For the other nine schemas the answer is legitimately
-      // "no", and saying so is better than not asking.
-      verdict = `not authorable: ${error instanceof Error ? error.message : String(error)}`;
-    }
-    status.textContent = `${String(controls.length)} dimensions, ${String(live)} live — ${verdict}. Authorability is a schema check: docs/10 § 8.2 says a profile that passes it is authorable and has no dead gate, not that it is sound.`;
+    status.textContent = formStatusLine(space, controls, values);
   }
 
   function apply(edit: ControlEdit): void {
@@ -182,7 +237,7 @@ export function mountParameterForm(options: ParameterFormOptions): ParameterForm
 
   picker.addEventListener('change', () => {
     sourceName = picker.value;
-    source = collect(sourceName);
+    source = collectFormSource(sourceName);
     values = source.ok ? defaultValues(source.space) : new Map();
     say('');
     draw();

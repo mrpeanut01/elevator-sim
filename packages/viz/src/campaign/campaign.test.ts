@@ -110,7 +110,7 @@ function publishedFor(stage: CampaignStage): PublishedScenario {
 function resourcesFor(stage: CampaignStage): BatchResources {
   return {
     building: requireBuilding(config, stage.building),
-    dispatcherProfilesById: config.dispatcherProfilesById,
+    dispatcherProfiles: config.dispatcherProfiles,
     trafficProfiles: config.trafficProfiles,
     elevatorSpecs: config.elevatorSpecs,
   };
@@ -229,6 +229,7 @@ describe('what running a stage is, on every stage', () => {
         dispatcherProfile: requireProfile(stage.dispatcher.startingProfileId),
         trafficProfiles: config_().trafficProfiles,
         elevatorSpecs: config_().elevatorSpecs,
+        dispatcherProfiles: config_().dispatcherProfiles,
       });
       expect(config.seed).toBe(stageReplicationSeed(stage, 0));
       expect(config.durationS).toBe(stage.durationS);
@@ -892,6 +893,7 @@ function failStatesFor(stage: CampaignStage, result: BatchResult, candidateProfi
       dispatcherProfile: profile,
       trafficProfiles: config.trafficProfiles,
       elevatorSpecs: config.elevatorSpecs,
+      dispatcherProfiles: config.dispatcherProfiles,
     }),
   );
   return failStateReports({

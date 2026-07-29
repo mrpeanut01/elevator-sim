@@ -568,7 +568,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
   /** § 10.3, in the editor, against whatever dispatcher the viewer currently names. */
   function renderAccessNote(building: BuildingConfig): void {
     const dispatcherId = options.currentDispatcherId?.();
-    const profile = resources.dispatcherProfiles.find(
+    const profile = resources.dispatcherProfiles.profiles.find(
       (candidate) => candidate.id === dispatcherId,
     );
     const resolved = report.resolved;
@@ -582,7 +582,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
         floorIds: resolved.floors.map((floor) => floor.id),
         accessZones: resolved.accessZones,
         profile,
-        profiles: resources.dispatcherProfiles,
+        profiles: resources.dispatcherProfiles.profiles,
       }).warning ?? '';
   }
 

@@ -213,7 +213,19 @@ export const SIM_PARAMETERS: readonly SimParameterSpec[] = Object.freeze([
     id: 'sim.drainGraceS',
     type: 'continuous',
     range: [0, 86_400],
-    scale: 'log',
+    /**
+     * **Linear, because the range genuinely starts at zero.**
+     *
+     * A log-uniform draw is undefined at or below zero, so a `log` scale over `[0, …]` is a
+     * declaration no generic sampler can draw from — CLAUDE.md invariant 8's whole point — and
+     * this row declared one until T75. Two ways to fix it, and the code picks which: raise the
+     * minimum above zero, or drop the scale to linear. `resolveOptions` admits this value through
+     * `nonNegative`, and zero has a meaning there rather than being a degenerate bound — the
+     * deadline becomes the demand horizon itself, so the run may not spend a second past the end
+     * of demand. That is a legitimate configuration (an ISO constant-demand run discards its tail
+     * anyway), so **the range is right and the scale was wrong.**
+     */
+    scale: 'linear',
     default: SIM_DEFAULTS.drainGraceS,
     unit: 's',
     description:
@@ -234,7 +246,14 @@ export const SIM_PARAMETERS: readonly SimParameterSpec[] = Object.freeze([
     id: 'sim.queueSampleCount',
     type: 'integer',
     range: [0, 10_000],
-    scale: 'log',
+    /**
+     * **Linear, for {@link SIM_PARAMETERS}' `sim.drainGraceS` reason, and here the code is
+     * explicit about it.** `Simulation` guards its sampler with `queueSampleCount > 0` and
+     * `simulation.test.ts` runs the zero case on purpose: it is the documented fallback to the
+     * series `metrics` reconstructs from arrival and boarding times, not an empty bound. A range
+     * whose minimum is a named mode cannot be raised to make a log scale legal.
+     */
+    scale: 'linear',
     default: SIM_DEFAULTS.queueSampleCount,
     description:
       'Evenly spaced building-wide queue samples over the demand horizon. The direct input to saturation detection; zero falls back to the series metrics reconstructs from arrival and boarding times.',

@@ -1469,6 +1469,32 @@ describe('configuration', () => {
     }
   });
 
+  it('declares no log scale over a range a log-uniform draw is undefined on', () => {
+    /*
+     * The rule `experiments`' `tuning/space/collect.ts` enforces from the other side, restated
+     * here so `core` fails on its own declaration rather than only when something tries to
+     * collect it. Two rows broke it until T75 — `sim.drainGraceS` and `sim.queueSampleCount`,
+     * both `log` over a range starting at 0 — and the whole of `SIM_PARAMETERS` was therefore
+     * uncollectable, which is what blocked the viewer's generated form (DECISIONS.md § D134).
+     *
+     * Zero is a *named mode* in both ranges, not a slack bound: `queueSampleCount: 0` is the
+     * documented fallback to the reconstructed series and `drainGraceS: 0` is a deadline at the
+     * demand horizon. So the fix was the scale and the bound stayed, and this guard is written
+     * to red either way round — raise a log row's minimum to 0 and it fails.
+     */
+    const logRows = SIM_PARAMETERS.filter((parameter) => parameter.scale === 'log');
+    // Not vacuous: `sim.dispatchRetryS` is a live log dimension over [0.5, 60].
+    expect(logRows.length).toBeGreaterThan(0);
+    for (const parameter of logRows) {
+      expect(parameter.range?.[0] ?? 0, `${parameter.id} declares a log scale`).toBeGreaterThan(0);
+    }
+    // …and every bounded row declares one of the two scales a sampler implements.
+    for (const parameter of SIM_PARAMETERS) {
+      if (parameter.range === undefined) continue;
+      expect(['linear', 'log'], parameter.id).toContain(parameter.scale);
+    }
+  });
+
   it('samples the queue, so saturation detection has something to fit', () => {
     const result = runSimulation(
       baseConfig('garden-apartments', 'nearest-car', { queueSampleCount: 30 }),

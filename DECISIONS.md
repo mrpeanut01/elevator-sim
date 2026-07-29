@@ -10143,3 +10143,33 @@ Measured live at 1440×900 on Secure Tower: panel stack **396 → 271 px**, canv
 **Two real false negatives were found and closed**, both the two-readers shape one level deeper than expected: `BAND_GLYPH` has **three** readers in the bar branch — glyph loop, full caption, shortened caption — and only the glyph loop was exercised. The first fix then used only the default gutter and so took the *short* caption branch, **two readers again, one level down**. Closed by asserting the mark per band at two gutter widths.
 
 **Impact.** `docs/07` § 8's three viewer rows close. **Known limits:** the shape-family table is a hand-written judgement — it cannot go stale silently, but it can be *wrong*, and `▲` against `◆` is the closest remaining pair. Text metrics are approximate (no `measureText` on the canvas port by design), right for a defect measured in tens of pixels and unable to catch a 1–2 px overlap. **Defect 3 has no automated guard** — it is CSS and this repository has no DOM-layout harness — so it is measured and published rather than pinned.
+
+---
+
+## D166 — the viewer can enable a selector, and **both "blocked on a `core` fix" refusals understated themselves** — one in count, one in kind
+
+**Date:** 2026-07-29 · **Owner:** T75 (wave 9) · **Closes:** [§ D153](#d153)'s viewer gap and [§ D134](#d134)'s U7 half · **Applies:** [§ D155](#d155)'s rule · **Moves no published figure**
+
+### Item 1 — the selector reaches the viewer
+
+`BrowserResources.dispatcherProfiles` was the profile **array**; it is now the whole file, named for it exactly as `trafficProfiles` and `elevatorSpecs` already were — the array was the odd one out, which is [§ D153](#d153) decision 1's own argument arriving one package over. **All three** viewer run paths carry it — Run, Compare and Campaign — because *a profile that runs under Run and is refused by name under Compare is worse than one uniformly refused.*
+
+`BatchResources` stopped carrying `dispatcherProfilesById`: every construction site built that map **from this very object**, so the map was a projection carried in place of the thing. `runBatch` derives it where it needs it. Rejected: carrying the file *beside* the map — two answers to *"what are this build's dispatchers"*.
+
+### Item 2 — and the two refusals were not the same kind of thing
+
+[§ D134](#d134) recorded two of ten discovered schemas as not collecting, and built a test that would **redden on a `core` fix**. It did. What it was pinning understated itself **in both directions**.
+
+**`SIM_PARAMETERS` was a defect, and in two rows rather than the one named.** `sim.drainGraceS` **and** `sim.queueSampleCount` both declared a **log** scale over a range starting at 0; the second was invisible because the collector throws on the first offender it meets. Established from the code rather than from convenience: zero is a **named mode** in both ranges — the resolver admits it, `Simulation` guards its sampler on it, and a test already ran the zero case deliberately as the documented fallback. So **the bound is right and the scale was wrong.** → `linear`. *Rejected: raising the minimum above 0*, which would delete a documented mode to make a check pass.
+
+**`TRAFFIC_PARAMETERS` was not a defect at all, and in four rows rather than one.** `traffic.arrivalRatePctPop5min` plus all three `traffic.directionalSplit.*` shares. **There is no honest numeric default for any of them and none was invented** — the module's own test defends the nulls with a measurement. And a gate is not available either: `arrivalRatePctPop5min` is set at ~250 call sites including the published benchmarks, so an `activeWhen` claiming it inert outside a companion knob would be **false** — which is [§ D155](#d155)'s refused shape exactly, arriving in a second place. *A gate is a claim, and the wrong claim costs more than no claim.*
+
+So the fix is on the **consumer**: `CollectOptions.nullDefault: 'exclude'` separates *"not a member of this space"* — silence, correctly — from *"a member that cannot be drawn from"*, which must be **said**. It is an option defaulting to `'refuse'` and not a behaviour change, because universal exclusion would let a **dispatcher** row with a null default vanish from the 56-dimension space silently. Asserted both ways.
+
+### Blast radius, measured before landing
+
+Declared rows **106 → 106**; dimensions **56 → 56**; `traffic.*` / `sim.*` in the shipped space **0 → 0**. **No dimension became searchable**, so no published figure can move — those rows are not profile-authorable and never were in the dispatcher space. What changed is that the form can be pointed at **10 of 10** schemas instead of 8, and the four rows that cannot be searched are **drawn as refusals with their reason** rather than hidden.
+
+**A value with two readers, found and closed:** `SearchSpace.unsearchable` is read by the drawn list *and* by the status-line count, and only the list was exercised. The status line was extracted pure and both are now asserted together — [§ D154](#d154)'s `wait95S` shape, in a third place.
+
+**Impact.** Both `docs/07` § 8 rows close. **Known limits:** the four `traffic.*` rows remain unsearchable, and that is the **honest state rather than a deferral** — closing it needs the decision `docs/10` § 9.3 q6 already defers. `SearchSpace.unsearchable` has one caller and one instance shape, so its generality is asserted by derivation and not by a second case — the same caveat § D155 records for `partiallyActiveWhen`. And `log → linear` is a **worse search parametrization** for two wide ranges; nothing samples them today, and if anything ever does, the right fix is a sampler that understands *"zero plus a log range"*, not a bound moved after the fact.

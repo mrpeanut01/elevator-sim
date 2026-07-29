@@ -246,6 +246,32 @@ export interface CollectOptions {
    * A predicate rather than a list, for the reason this whole file exists.
    */
   readonly include?: ((spec: DispatchParameterSpec) => boolean) | undefined;
+  /**
+   * What to do with an included row that declares `default: null` — *"there is no default; unset
+   * is meaningful"*.
+   *
+   * **`'refuse'` (the default) is the shipped rule and it does not move.** A dispatcher dimension
+   * with no origin is a defect: `defaultCandidate` is the point every tuned result is compared
+   * against, and a space that quietly dropped a dimension would be a search over a system nobody
+   * configured. No row `isProfileAuthorable` admits declares `null` today, and if one ever does,
+   * `collectSearchSpace()` must still throw rather than shrink by one.
+   *
+   * **`'exclude'` is for a caller collecting a schema it does not own**, one schema at a time,
+   * with `include: () => true` — which is what `viz`' generated parameter form does. `core`'s
+   * `TRAFFIC_PARAMETERS` declares four such rows deliberately: `traffic.arrivalRatePctPop5min`
+   * and the three `traffic.directionalSplit.*` shares, whose effective value comes from a floor's
+   * traffic profile and for which *"any number declared here would be imposed on every profile in
+   * every building"*. That is the **only honest default**, and it is still not a point a search
+   * can start from — both halves are true at once, and `'refuse'` can only express the second.
+   * Under `'exclude'` the other thirteen rows collect and the four are named in
+   * {@link SearchSpace.unsearchable} with the same message `'refuse'` would have thrown, so the
+   * caller can draw the refusal rather than the schema vanishing.
+   *
+   * It is scoped to an explicit `null` and nothing else. A default that is `undefined`, `NaN`, of
+   * the wrong type, or outside its own declared range is malformed rather than absent, and stays
+   * fatal under both settings.
+   */
+  readonly nullDefault?: 'refuse' | 'exclude' | undefined;
 }
 
 /**
@@ -283,8 +309,16 @@ export function collectSearchSpace(options: CollectOptions = {}): SearchSpace {
   /* ---- narrow to what a profile can hold, then validate the shape ---- */
   const collected: SearchParameter[] = [];
   const defaults = new Map<string, ParameterValue>();
+  const unsearchable = new Map<string, string>();
   for (const { spec, declaredBy } of specs.values()) {
     if (!include(spec)) continue;
+    if (options.nullDefault === 'exclude' && (spec.default as unknown) === null) {
+      // Not silence: the row is a member of this space and cannot be drawn from, and the two
+      // facts are reported together. The message is the one `toSearchParameter` would have
+      // thrown, so a reader sees one sentence about this row whichever setting produced it.
+      unsearchable.set(spec.id, undeclaredDefault(spec));
+      continue;
+    }
     const parameter = toSearchParameter(spec, declaredBy);
     collected.push(parameter);
     defaults.set(parameter.id, parameter.default);
@@ -300,7 +334,18 @@ export function collectSearchSpace(options: CollectOptions = {}): SearchSpace {
     allById: byId,
     defaults,
     validate: (values: Candidate) => validateValues(byId, values),
+    unsearchable: Object.freeze(unsearchable),
   });
+}
+
+/**
+ * The one sentence about a row that declares no default, wherever it is reported.
+ *
+ * Shared by the throw and by {@link SearchSpace.unsearchable} so the two cannot drift into two
+ * accounts of the same fact — the drift `runner/metrics.ts`'s docstring names.
+ */
+function undeclaredDefault(spec: DispatchParameterSpec): string {
+  return `"${spec.id}" is ${spec.type} and its default is ${describe(spec.default)}. A search needs a point it can start from.`;
 }
 
 let cached: SearchSpace | undefined;
@@ -365,6 +410,9 @@ export function subspace(
     allById: space.allById,
     defaults: space.defaults,
     validate: (values: Candidate) => validateValues(space.allById, values),
+    // Kept whole through narrowing, exactly as `defaults` and `allById` are: what the *full*
+    // collection could not draw from is a fact about the schema, not about this selection.
+    unsearchable: space.unsearchable,
   });
 }
 
@@ -447,9 +495,7 @@ function toSearchParameter(
       const scale = scaleOf(spec, min);
       const value = spec.default;
       if (typeof value !== 'number' || !Number.isFinite(value)) {
-        throw new SearchSpaceError(
-          `"${spec.id}" is ${spec.type} and its default is ${describe(value)}. A search needs a point it can start from.`,
-        );
+        throw new SearchSpaceError(undeclaredDefault(spec));
       }
       if (value < min || value > max) {
         throw new SearchSpaceError(

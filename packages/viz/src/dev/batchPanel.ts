@@ -74,7 +74,7 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
     ui.building.append(new Option(`${building.name} (${building.id})`, building.id));
   }
   for (const select of [ui.baseline, ui.candidate]) {
-    for (const profile of resources.dispatcherProfiles) {
+    for (const profile of resources.dispatcherProfiles.profiles) {
       select.append(new Option(profile.id, profile.id));
     }
   }
@@ -85,7 +85,7 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
   applyPreference(ui.candidate, PREFERRED_BATCH_CANDIDATE);
 
   function applyPreference(select: HTMLSelectElement, preferred: readonly string[]): void {
-    const found = preferredDispatcherId(preferred, resources.dispatcherProfiles);
+    const found = preferredDispatcherId(preferred, resources.dispatcherProfiles.profiles);
     if (found !== undefined) select.value = found;
   }
 

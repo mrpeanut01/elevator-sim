@@ -96,7 +96,7 @@
  * | {@link DEFAULT_THEME}, {@link formatClock} | `drawScene`, in `src/render/canvas.ts` |
  * | {@link ManualClock} | tests only, by construction — it is the test double |
  * | {@link controlsFor}, {@link applyControlEdit}, {@link resetControl}, {@link defaultValues}, {@link candidateOf}, {@link describeCondition} | `src/dev/parameterForm.ts` — W4's mount, `docs/10` § 11 |
- * | {@link renderControl}, {@link renderControls}, {@link valueAtSliderPosition} | `src/dev/parameterForm.ts`; and `renderControl` from `renderControls`, in `src/controls/render.ts` |
+ * | {@link renderControl}, {@link renderControls}, {@link renderUnsearchable}, {@link valueAtSliderPosition} | `src/dev/parameterForm.ts`; and `renderControl` from `renderControls`, in `src/controls/render.ts` |
  * | {@link renderSlider}, {@link renderStepper}, {@link renderSelect}, {@link renderCheckbox} | `renderControl`, in `src/controls/render.ts`. **Inside the module only** — the dispatch is the entry point and the four are its branches |
  * | {@link sliderPositionOf} | `renderSlider`, in `src/controls/render.ts`. Inside the module only |
  * | {@link inputIdOf}, {@link helpIdOf}, {@link SLIDER_STEPS} | `src/controls/render.ts`, in every renderer. Exported because a caller wiring events needs the same id derivation the renderer used, and two derivations of one id is how a label stops pointing at its input |
@@ -375,6 +375,7 @@ export {
   renderSelect,
   renderSlider,
   renderStepper,
+  renderUnsearchable,
   sliderPositionOf,
   valueAtSliderPosition,
 } from './controls/render.js';

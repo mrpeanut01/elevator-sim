@@ -21,7 +21,7 @@ import {
   parseTrafficProfiles,
   resolveBuilding,
   type BuildingConfig,
-  type DispatcherProfile,
+  type DispatcherProfiles,
   type ElevatorSpecs,
   type ResolvedBuilding,
   type TrafficProfiles,
@@ -51,7 +51,22 @@ export interface BuildingEntry {
 export interface BrowserResources {
   readonly elevatorSpecs: ElevatorSpecs;
   readonly trafficProfiles: TrafficProfiles;
-  readonly dispatcherProfiles: readonly DispatcherProfile[];
+  /**
+   * The whole of `data/dispatcher-profiles.json`, **not** its `profiles` array.
+   *
+   * It was the array until T75, and the difference is the file-level `patternSwitching` block:
+   * `SimulationConfig.dispatcherProfiles` is what `Simulation` turns into a weight-set library
+   * through `weightSetSourceFrom`, and an array cannot satisfy it. So a profile could author
+   * `"selection": {"policy": "fuzzy"}`, `parseDispatcherProfiles` would accept it here, and
+   * pressing **Run** would refuse it **by name** — the safe failure, and still the thirteenth
+   * instance of a behaviour that is configurable, validated and unreachable from the surface that
+   * needs it (`DECISIONS.md` § D153's own known-limitations paragraph).
+   *
+   * Named for its file, as {@link BrowserResources.trafficProfiles} and
+   * {@link BrowserResources.elevatorSpecs} already are; § D153 decision 1 argues the naming, and
+   * the array was the odd one out. Readers that want the list say `.profiles`.
+   */
+  readonly dispatcherProfiles: DispatcherProfiles;
   readonly buildings: readonly ResolvedBuilding[];
   /** The same buildings, with the document each was parsed from. */
   readonly entries: readonly BuildingEntry[];
@@ -136,7 +151,7 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
   return {
     elevatorSpecs,
     trafficProfiles,
-    dispatcherProfiles: dispatchers.profiles,
+    dispatcherProfiles: dispatchers,
     buildings,
     entries,
     trafficProfileIds,
@@ -184,7 +199,7 @@ export async function loadCampaign(resources: BrowserResources): Promise<LoadedC
     published,
     // The one statement anywhere about what a dimension may be, and it is derived here.
     dimensionIds: space.ids,
-    profileIds: new Set(resources.dispatcherProfiles.map((profile) => profile.id)),
+    profileIds: new Set(resources.dispatcherProfiles.profiles.map((profile) => profile.id)),
     restrictedFloorIdsByBuilding: new Map(
       resources.buildings.map((building) => [
         building.id,
