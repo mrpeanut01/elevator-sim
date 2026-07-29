@@ -409,6 +409,33 @@ export interface CostTermDefinition {
    * here is also what stops `parameters.ts` naming a term, which invariant 7 forbids.
    */
   readonly activeWhen?: Readonly<Record<string, readonly string[]>> | undefined;
+  /**
+   * The stage settings under which this term prices **more** than it otherwise does — and, unlike
+   * {@link activeWhen}, **not a gate**.
+   *
+   * The two are mutually exclusive on the same key and say opposite things about the region
+   * outside the condition. `activeWhen` says *"the weight is a dead dimension there, skip it"*.
+   * `partiallyActiveWhen` says *"the weight is live there too — search it — but the term is
+   * pricing a different quantity on the two sides, so a weight tuned on one does not transfer to
+   * the other."*
+   *
+   * `stopCount` is the case, and the reason this field exists rather than a second `activeWhen`.
+   * It counts the pickup stop under every call type and adds the destination stop only when the
+   * destination is disclosed, so half of its raw value is conditional and its **weight** is not.
+   * Gating it was tried and refused by measurement — `searchSpaceLiveness.test.ts` found
+   * `weights.stopCount` still moving a run at `dispatch.callType: up-down-buttons`, outside the
+   * proposed gate, which is the one error `activeWhen` exists to make impossible.
+   *
+   * Carried onto the derived `weights.<id>` row's `description` by `parameters.ts`, so it reaches
+   * every schema consumer that exists — the search space, the experience layer's help text —
+   * without adding a `DispatchParameterSpec` field nothing outside a test would read.
+   *
+   * Its proof obligation is the mirror image of the gate's, and
+   * `terms/destinationDisclosure.test.ts` executes both: inside the condition the term must price
+   * differently, and **outside it the term must still separate two candidate cars**. A
+   * declaration that fails the second is a gate wearing the wrong name.
+   */
+  readonly partiallyActiveWhen?: Readonly<Record<string, readonly string[]>> | undefined;
   /** Pure. Non-negative. Never `NaN`. */
   readonly evaluate: (context: TermContext) => number;
 }

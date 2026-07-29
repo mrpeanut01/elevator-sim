@@ -60,6 +60,7 @@ import { COST_TERMS } from './terms/index.js';
 import type {
   ActiveWhenCondition,
   ActiveWhenRange,
+  CostTermDefinition,
   DispatchParameterSpec,
   ResolvedDispatchConfig,
 } from './types.js';
@@ -165,6 +166,36 @@ export const DISPATCH_DEFAULTS = Object.freeze({
  * The schema
  * -------------------------------------------------------------------------- */
 
+/** `{ 'a.b': ['x', 'y'] }` as `a.b ∈ {x, y}`, in the notation the rest of the schema's prose uses. */
+function conditionsAsProse(conditions: Readonly<Record<string, readonly string[]>>): string {
+  return Object.entries(conditions)
+    .map(([id, values]) => `${id} ∈ {${values.join(', ')}}`)
+    .join(' and ');
+}
+
+/**
+ * The sentence a partly-conditional term adds to its own weight's description.
+ *
+ * `partiallyActiveWhen` reaches a schema consumer **here**, folded into `description`, rather than
+ * as a `DispatchParameterSpec` field of its own — because it does not change what an optimizer
+ * *does*. The dimension is live on both sides of the condition and must be searched on both, so a
+ * new structural field would have no reader outside a test, which is the defect
+ * docs/05 § *Standing requirement* is about. `description` already has three real readers: the
+ * collected search space carries it verbatim, the experience layer renders it as help text, and
+ * docs/06 quotes it.
+ */
+function partialActivitySentence(term: CostTermDefinition): string {
+  if (term.partiallyActiveWhen === undefined) return '';
+  return (
+    ` Part of this term's raw value exists only when ${conditionsAsProse(term.partiallyActiveWhen)}` +
+    ', and the rest of it is priced under every setting. This is not a gate: the weight is a live' +
+    ' dimension on both sides and must be searched on both. What it changes is transferability —' +
+    ' the term prices a different quantity either side of that condition, so a weight tuned under' +
+    ' one does not carry over to the other, for the same reason a weight tuned on up-peak does not' +
+    ' carry over to down-peak.'
+  );
+}
+
 /**
  * One `weights.<termId>` row per implemented term, in registry order.
  *
@@ -172,6 +203,12 @@ export const DISPATCH_DEFAULTS = Object.freeze({
  * knows what it needs to be able to change a decision, and a condition written in this file
  * would have to name terms, which invariant 7 forbids. `rideTime` is the term that has one —
  * it can only be priced when the call carries a destination.
+ *
+ * `partiallyActiveWhen` is carried through the same way and to a different place, the row's
+ * `description`, because it is the **opposite** of a gate — see {@link partialActivitySentence}.
+ * `stopCount` is the term that has one: it counts the pickup under every call type and the
+ * destination only when one is disclosed, so gating its weight would hide a live region, which
+ * `sim/searchSpaceLiveness.test.ts` measured and refused.
  */
 const WEIGHT_PARAMETERS: readonly DispatchParameterSpec[] = COST_TERMS.map((term) => ({
   id: `weights.${term.id}`,
@@ -179,7 +216,7 @@ const WEIGHT_PARAMETERS: readonly DispatchParameterSpec[] = COST_TERMS.map((term
   range: [0, 5] as const,
   scale: 'linear' as const,
   default: 0,
-  description: `Weight on the normalized ${term.id} term — ${term.measures.toLowerCase()}${term.unit === '' ? '' : `, raw unit ${term.unit}`}. Zero removes the term from the sum entirely.`,
+  description: `Weight on the normalized ${term.id} term — ${term.measures.toLowerCase()}${term.unit === '' ? '' : `, raw unit ${term.unit}`}. Zero removes the term from the sum entirely.${partialActivitySentence(term)}`,
   ...(term.activeWhen === undefined ? {} : { activeWhen: term.activeWhen }),
 }));
 

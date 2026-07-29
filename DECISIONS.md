@@ -9107,3 +9107,88 @@ words rather than printing a zero. It is a fact about those buildings, not a def
 **Impact.** `VIZ_SCHEMA_VERSION` 4 → 5. `record/document.ts` is the reader: it refuses a version-4
 recording on load with *"re-record it from its seed"*, which is the behaviour it already had for a
 version-3 one and the reason the constant exists.
+
+---
+
+## D155 — `stopCount` gets a **declaration and not a gate**: the `activeWhen` § D136 deferred was written, measured, and **refused**
+
+**Date:** 2026-07-29 · **Owner:** T55 (wave 7) · **Continues:** [§ D136](#d136) ·
+**Applies:** [§ D21](#d21)'s rule and `RISKS.md` R17 · **Moves no phase verdict**
+
+**Context.** [`docs/07`](docs/07-handoff.md) § 8 carried this as live debt: *"`stopCount` has no
+`activeWhen`, and two shipped profiles sit one authored field away from a measured cost."* The
+remedy the row named was an `activeWhen` on `stopCountTerm` gating it to the destination call types.
+The lane was instructed to **measure the blast radius before writing the edit**, because an
+`activeWhen` changes what a generic optimizer searches.
+
+**The remedy was written, measured, and is wrong.** It is recorded here rather than quietly dropped,
+because the register asked for it in writing and the next reader will otherwise ask again.
+
+### What the measurement said
+
+With `activeWhen: { 'dispatch.callType': ['destination-entry', 'mobile-credential'] }` on
+`stopCountTerm`, **three independent existing guards went red, and each was right**:
+
+- `searchSpaceLiveness.test.ts` — *"`weights.stopCount` is gated on `dispatch.callType`
+  […] and at `dispatch.callType=up-down-buttons` — **outside that gate** — it still moves a run
+  (0 vs 5 on `midtown-office`)."*
+- `policies.test.ts` — `energy-aware` and `predictive-balanced` both weight `stopCount` while
+  declaring `up-down-buttons`, so both shipped profiles become **invalid**.
+- `parameters.test.ts` — the gated-dimension set grows by one.
+
+The gate would have hidden a **live** dimension from every draw at `up-down-buttons` — the schema's
+own default, and the call type of **10 of 12** shipped profiles. That is exactly [§ D21](#d21)'s
+shape and `RISKS.md` R17: *a gate is a machine-readable claim, and this one is false.* § D136
+deferred the `activeWhen` once, and the measurement says it was right to.
+
+### Which half is conditional, established from the code and confirmed by measurement
+
+`addedStopCount` is two summands. The **pickup** increment is priced under every call type; the
+**destination** increment is reached only when `request.destinationFloorId` is set, which
+`costRequestFor` does only for a destination call type. Compare `rideTime`, where the same
+`undefined` check returns `0` — the **whole** value. So `rideTime`'s gate is sound and
+`stopCount`'s is not, and the difference is not a matter of degree.
+
+Measured across 4 320 (car, call) pairs on `midtown-office` under all three declared call types:
+**exactly two of twelve terms price differently when the destination is disclosed, and they need
+opposite declarations.** With the destination withheld, `rideTime`'s spread between candidate cars
+is **0** — nothing to search — and `stopCount`'s is **1**.
+
+### What was landed instead
+
+`partiallyActiveWhen` on `CostTermDefinition` — the **mirror image** of `activeWhen`, carrying the
+mirror-image proof obligation: outside the condition the dimension must be **live**, not flat. It
+does not gate, and it changes nothing an optimizer draws: declared rows **106 → 106**, dimensions
+**56 → 56**, conditional dimensions **19 → 19**. No published figure moved.
+
+**Rejected alternatives.** (1) The `activeWhen` itself — refused above. (2) A new
+`DispatchParameterSpec.partiallyActiveWhen` **field**: an optimizer's behaviour is unchanged either
+way, so the field would have had **no non-test reader** — the dead-seam pattern
+[`docs/05`](docs/05-roadmap.md)'s standing requirement exists to stop. Folded into `description`
+instead, which has **three** real readers. (3) A narrower gate — no bound is correct, because the
+term is live outside *all* of the call types at which it prices differently, the same reason § D21
+ungated `idle.predictorHorizonS`. (4) A `parse.ts` warning on a `stopCount`-weighting profile that
+declares a destination call type — that configuration is **legitimate**, and it would put a *result*
+into the *validator*. (5) Leaving it open with the measurement, which the brief explicitly
+permitted — rejected only because the non-gating declaration closes the stated hazard **without
+narrowing anything**, which is strictly better and was available.
+
+### The transferable rule
+
+**A gate is a claim, and the wrong claim costs more than no claim.** An absent `activeWhen` leaves an
+optimizer searching a dimension it did not need to search — wasted budget. A false `activeWhen`
+removes a dimension that matters — a wrong answer, silently. The two failures are not symmetric, and
+invariant 8's *"`activeWhen` for conditional parameters"* should be read as *for parameters whose
+**dimension** is conditional*, not *whose **value** is*. Written up in
+[`docs/06`](docs/06-parameterization-and-tuning.md) § *A gate is a claim…*
+
+**Known limitation, stated rather than absorbed.** The classification is measured on **one
+building**, `midtown-office`. Breadth (12 terms × 8 640 comparisons) substitutes for buildings, and
+both positives are structural — an `undefined` check — rather than traffic-dependent. And
+`partiallyActiveWhen` has exactly **one instance**; its generality is asserted by derivation, not by
+a second case, and [§ D134](#d134)'s fictional-schema technique was **not** applied to it.
+
+**Impact.** `docs/07` § 8's row is closed with the refused remedy recorded. `docs/09`'s two places
+telling a future term author to use *"the same `activeWhen`"* are corrected. The hazard § D136
+measured is **documented, not prevented** — authoring `dispatch.callType` onto `energy-aware` is
+still legal and still costs `+1.320 s` at `garden-down-peak`, deliberately.
