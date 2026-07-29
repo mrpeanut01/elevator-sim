@@ -216,6 +216,39 @@ export interface TraceLeg {
 }
 
 /**
+ * One hop of a journey made on something that is not a lift — the building's declared escalator
+ * or stair.
+ *
+ * **Not a {@link TraceLeg}, and that is the point.** A leg is a unit of elevator service: it
+ * lights a landing button, joins a queue, occupies a car and contributes to every per-leg metric
+ * this project publishes. A hop does none of those. Charging the ground-level hop of a two-level
+ * lobby as a leg is exactly the defect `DECISIONS.md` § D147 § 6 named as the largest modelling
+ * limit in the repository, so hops are counted, timed and reported separately.
+ *
+ * The time is still *charged*: {@link traversalTimeS} lands on the journey's time-to-destination
+ * either as a delay before the next leg starts waiting or, on a hop that ends the journey, as
+ * seconds added after the last alighting. Removing a leg and giving its seconds away for free
+ * would flatter every arm that uses the escalator.
+ */
+export interface TraceTransportHop {
+  /** `TransportModeConfig.id` of the edge ridden. */
+  readonly modeId: string;
+  readonly originFloorId: string;
+  readonly originFloorIndex: number;
+  readonly destinationFloorId: string;
+  readonly destinationFloorIndex: number;
+  /**
+   * The elevator leg this hop comes immediately before: `0` when the hop starts the journey,
+   * and `legs.length` when it ends it. At most one hop per index — two consecutive transport
+   * edges would mean the router had chained escalators, which it can only do through a floor
+   * flagged `isTransferFloor`, and which no shipped building declares.
+   */
+  readonly beforeLegIndex: number;
+  /** Landing-to-landing seconds, deterministic, from the building's declaration. */
+  readonly traversalTimeS: number;
+}
+
+/**
  * One journey, fully determined before the simulation starts.
  *
  * The `journeyId` is what makes time-to-destination span a sky-lobby transfer: every leg
@@ -237,6 +270,15 @@ export interface GeneratedPassenger {
   readonly finalDestinationFloorIndex: number;
   /** At least one. More than one exactly when the journey crosses a transfer floor. */
   readonly legs: readonly TraceLeg[];
+  /**
+   * Hops on a declared non-lift connection, ascending by `beforeLegIndex`.
+   *
+   * **Absent — not `[]` — on a journey that uses none**, which is every journey in every building
+   * that declares no `transportModes`. The field is omitted rather than emptied so that a trace
+   * from such a building is the same object it was before this existed, and
+   * `traffic/transportIdentity.test.ts` can hold the whole run to a bit-identical result.
+   */
+  readonly transportHops?: readonly TraceTransportHop[] | undefined;
   /** Body mass, kilograms, drawn from the `passengerMass` stream. */
   readonly massKg: number;
   /** Access credential, or `undefined` for an unbadged visitor. */

@@ -120,7 +120,9 @@ export interface NamedLanding {
  *
  * 15 s is **M5**'s own cadence, so the deepest queue this reports is comparable with the 175 and
  * 379 that measurement published. `queueAt` is linear in the leg count, so a 900 s run of Vertical
- * City is roughly 125 × 3 222 leg visits — well inside a click.
+ * City is roughly 125 × 3 222 leg visits — well inside a click. (3 222 predates `vertical-city`'s
+ * ground-lobby escalator, which removed about 8 % of that building's lift legs; the bound is an
+ * over-estimate now, which is the direction a headroom claim may safely be wrong in.)
  */
 export const DIAGNOSIS_SAMPLE_EVERY_S = 15;
 

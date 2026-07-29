@@ -91,8 +91,21 @@ function assertConserved(result: SimulationResult): void {
     const last = legs[legs.length - 1];
     if (last === undefined) continue;
     if (last.alightedAt !== undefined && last.isFinalLeg) {
-      // Delivered — and delivered to the floor the trace asked for, never another one.
-      expect(last.destinationFloorId).toBe(record.finalDestinationFloorId);
+      // Delivered — and delivered to the floor the trace asked the *lifts* for, never another
+      // one. That is the journey's declared destination except where the route finishes on a
+      // declared escalator, in which case the lift terminus is one hop short of it and
+      // `egressTransitSeconds` carries the rest onto time-to-destination.
+      const terminus = record.legs[record.legs.length - 1]?.destinationFloorId;
+      expect(last.destinationFloorId).toBe(terminus);
+      const closingHop = (record.transportHops ?? []).find(
+        (hop) => hop.beforeLegIndex === record.legs.length,
+      );
+      if (closingHop === undefined) {
+        expect(terminus).toBe(record.finalDestinationFloorId);
+      } else {
+        expect(closingHop.destinationFloorId).toBe(record.finalDestinationFloorId);
+        expect(last.egressTransitSeconds).toBe(closingHop.traversalTimeS);
+      }
       delivered += 1;
     }
   }

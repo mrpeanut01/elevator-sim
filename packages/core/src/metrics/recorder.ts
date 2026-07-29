@@ -81,6 +81,12 @@ export interface RecordablePassenger {
   readonly arrivedAt: SimTime;
   readonly journeyStartedAt: SimTime;
   readonly credentialGroup?: CredentialGroup | undefined;
+  /**
+   * Seconds of declared non-lift travel owed after this leg alights. Optional so that a test
+   * literal and every pre-transport-mode caller satisfy the shape unchanged; `0` when absent,
+   * which is every leg of every building that declares no transport mode.
+   */
+  readonly egressTransitS?: number | undefined;
 }
 
 /** Anything carrying the master seed. `StreamSet` satisfies it. */
@@ -173,6 +179,7 @@ interface LegState {
     readonly credentialGroup: CredentialGroup | undefined;
     readonly arrivedAt: SimTime;
     readonly journeyStartedAt: SimTime;
+    readonly egressTransitSeconds: number;
     boardedAt: SimTime | undefined;
     alightedAt: SimTime | undefined;
     carId: string | undefined;
@@ -341,6 +348,7 @@ export class MetricsRecorder {
         credentialGroup: passenger.credentialGroup,
         arrivedAt: passenger.arrivedAt,
         journeyStartedAt: passenger.journeyStartedAt,
+        egressTransitSeconds: passenger.egressTransitS ?? 0,
         boardedAt: undefined,
         alightedAt: undefined,
         carId: undefined,
@@ -723,6 +731,11 @@ function freezeLeg(leg: LegState): PassengerRecord {
     ...(source.credentialGroup === undefined ? {} : { credentialGroup: source.credentialGroup }),
     arrivedAt: source.arrivedAt,
     journeyStartedAt: source.journeyStartedAt,
+    // Omitted at zero so a record from a building with no transport mode is byte-identical to
+    // one written before the field existed — the same rule `assignedCarId` follows below.
+    ...(source.egressTransitSeconds === 0
+      ? {}
+      : { egressTransitSeconds: source.egressTransitSeconds }),
     ...(source.boardedAt === undefined ? {} : { boardedAt: source.boardedAt }),
     ...(source.alightedAt === undefined ? {} : { alightedAt: source.alightedAt }),
     ...(source.carId === undefined ? {} : { carId: source.carId }),

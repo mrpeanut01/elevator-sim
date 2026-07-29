@@ -302,7 +302,6 @@
         { "kind": "deliver-everyone", "threshold": null },
         { "kind": "no-divergence", "threshold": null },
         { "kind": "answer-the-demand", "threshold": null },
-        { "kind": "long-waits-under", "threshold": 10 },
         { "kind": "beat-the-baseline", "threshold": null }
       ],
       "levers": {

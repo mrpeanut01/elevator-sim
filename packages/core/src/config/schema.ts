@@ -41,6 +41,7 @@ import {
   type ServiceEventConfig,
   type TrafficProfile,
   type TrafficProfiles,
+  type TransportModeConfig,
 } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -827,6 +828,28 @@ export const serviceEventSchema = z.strictObject({
   mode: z.enum(SERVICE_MODES),
 });
 
+/**
+ * One non-lift connection between two floors. See {@link TransportModeConfig}.
+ *
+ * `connects` is a fixed-length tuple rather than an array so "an escalator between three floors"
+ * cannot be authored at all: a machine with three landings is two machines. The two ids are
+ * required to differ here, where the message can name the field, rather than in `resolveBuilding`
+ * where it would be a cross-reference failure.
+ */
+export const transportModeSchema = z
+  .strictObject({
+    $comment: comment,
+    id: identifier,
+    name: z.string().min(1).optional(),
+    connects: z.tuple([identifier, identifier]),
+    traversalTimeS: positive,
+  })
+  .refine((mode) => mode.connects[0] !== mode.connects[1], {
+    message:
+      'connects must name two different floors; a transport mode that starts and ends on the same floor moves nobody',
+    path: ['connects'],
+  });
+
 export const accessZoneSchema = z.strictObject({
   $comment: comment,
   id: identifier,
@@ -845,6 +868,7 @@ export const buildingConfigSchema = z
     floorRanges: z.array(floorRangeSchema).optional(),
     totalPopulation: nonNegative.optional(),
     banks: z.array(bankConfigSchema).min(1, 'a building must have at least one bank'),
+    transportModes: z.array(transportModeSchema).optional(),
     accessZones: z.array(accessZoneSchema).optional(),
     serviceEvents: z.array(serviceEventSchema).optional(),
     notes: z.array(z.string().min(1)).optional(),
@@ -861,6 +885,9 @@ export const buildingConfigSchema = z
     }
     checkUniqueIds(building.banks, 'banks', ctx);
     if (building.accessZones !== undefined) checkUniqueIds(building.accessZones, 'accessZones', ctx);
+    if (building.transportModes !== undefined) {
+      checkUniqueIds(building.transportModes, 'transportModes', ctx);
+    }
     building.banks.forEach((bank, bankIndex) => {
       const seen = new Map<string, number>();
       bank.cars.forEach((car, carIndex) => {
@@ -903,5 +930,6 @@ type _FloorRangeConforms = Conforms<FloorRange, z.infer<typeof floorRangeSchema>
 type _CarConfigConforms = Conforms<CarConfig, z.infer<typeof carConfigSchema>>;
 type _BankConfigConforms = Conforms<BankConfig, z.infer<typeof bankConfigSchema>>;
 type _AccessZoneConforms = Conforms<AccessZone, z.infer<typeof accessZoneSchema>>;
+type _TransportModeConforms = Conforms<TransportModeConfig, z.infer<typeof transportModeSchema>>;
 type _ServiceEventConforms = Conforms<ServiceEventConfig, z.infer<typeof serviceEventSchema>>;
 type _BuildingConfigConforms = Conforms<BuildingConfig, z.infer<typeof buildingConfigSchema>>;

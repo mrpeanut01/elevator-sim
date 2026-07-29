@@ -160,8 +160,19 @@ import {
 } from '../model/index.js';
 import { travelTime } from '../physics/motion/index.js';
 import { StreamSet } from '../random/index.js';
-import { generateTrace, toPassengerInit } from '../traffic/generator.js';
-import type { GeneratedPassenger, PassengerTrace, TrafficConfig } from '../traffic/types.js';
+import {
+  egressTransitSecondsOf,
+  generateTrace,
+  leadingTransitSecondsOf,
+  toPassengerInit,
+  transportHopBefore,
+} from '../traffic/generator.js';
+import type {
+  GeneratedPassenger,
+  PassengerTrace,
+  TraceTransportHop,
+  TrafficConfig,
+} from '../traffic/types.js';
 
 import {
   batchArrivalEvent,
@@ -171,6 +182,7 @@ import {
   queueSampleEvent,
   serviceChangeEvent,
   transferArrivalEvent,
+  transportArrivalEvent,
 } from './events.js';
 import {
   SIM_DEFAULTS,
@@ -461,6 +473,8 @@ export class Simulation {
   readonly #legs = new Map<string, Passenger>();
   readonly #legsByJourney = new Map<string, Passenger[]>();
   readonly #recordsByJourney = new Map<string, GeneratedPassenger>();
+  /** Trace-record id to its index in `trace.passengers`, for the transport-arrival payload. */
+  readonly #recordIndexById = new Map<string, number>();
   readonly #stops = new Map<string, StopInProgress>();
   /** Bank id to the future tick times already on the queue, so a tick is never doubled. */
   readonly #pendingTicks = new Map<string, Set<number>>();
@@ -487,6 +501,8 @@ export class Simulation {
   readonly #disclaimers: string[] = [];
   readonly #warnings: string[] = [];
   #transfers = 0;
+  /** Hops taken on a declared non-lift connection. See {@link ConservationAudit.transportHops}. */
+  #transportHops = 0;
   /** Promises a landing panel made. See {@link ConservationAudit.legsAssigned}. */
   #legsAssigned = 0;
   /** Boardings onto a car other than the promised one. Asserted `0`; see `#reconcile`. */
@@ -556,8 +572,9 @@ export class Simulation {
 
     /* ---- the trace, before anything moves (common random numbers) ---- */
     this.#trace = generateTrace(traceConfigFor(config, this.#streams));
-    for (const record of this.#trace.passengers) {
+    for (const [index, record] of this.#trace.passengers.entries()) {
       this.#recordsByJourney.set(record.journeyId, record);
+      this.#recordIndexById.set(record.id, index);
     }
     this.#warnings.push(...this.#trace.warnings);
 
@@ -1228,6 +1245,14 @@ export class Simulation {
     }
 
     for (const record of batch.passengers) {
+      // A journey that opens on the building's escalator is not standing at a lift landing yet.
+      // Its leg 0 is admitted when the hop finishes; until then it is neither waiting nor
+      // visible to a dispatcher, which is the whole difference between a hop and a leg.
+      const openingHopS = leadingTransitSecondsOf(record);
+      if (openingHopS > 0) {
+        this.#scheduleOpeningTransport(record, at, openingHopS);
+        continue;
+      }
       // Built from the trace's own `PassengerInit`, not through `PassengerFactory.arrive`,
       // which would draw a fresh mass. The trace already carries one, drawn at generation time
       // in trace order — using it is what keeps the passenger population a pure function of
@@ -1236,6 +1261,50 @@ export class Simulation {
     }
 
     const floor = this.#building.requireFloor(batch.originFloorId);
+    for (const bankId of this.#openCalls(floor, at)) this.#dispatchBank(bankId, at);
+  }
+
+  /**
+   * Hold a journey on its opening escalator, then admit its first lift leg at the far landing.
+   *
+   * Truncated by the same drain deadline a sky-lobby walk is, and counted the same way: a hop
+   * the run had no time to finish is work the deadline cut, not a passenger who vanished.
+   */
+  #scheduleOpeningTransport(record: GeneratedPassenger, at: SimTime, traversalS: number): void {
+    const arrivedAt = at + traversalS;
+    if (arrivedAt > this.#deadlineS) {
+      this.#deadlineTruncations += 1;
+      return;
+    }
+    const passengerIndex = this.#recordIndexById.get(record.id);
+    /* c8 ignore next 6 -- every trace record was indexed in the constructor. */
+    if (passengerIndex === undefined) {
+      throw new SimulationError(
+        `Trace record "${record.id}" is not in this run's passenger index; the trace and the run disagree.`,
+      );
+    }
+    this.#kernel.schedule(
+      arrivedAt,
+      transportArrivalEvent({ passengerIndex }, (payload, context) => {
+        this.#onOpeningTransport(payload.passengerIndex, context.time);
+      }),
+    );
+  }
+
+  /** The far end of an opening hop: the journey's first lift leg starts waiting here, now. */
+  #onOpeningTransport(passengerIndex: number, at: SimTime): void {
+    const record = this.#trace.passengers[passengerIndex];
+    /* c8 ignore next 6 -- the index came from the same array in the constructor. */
+    if (record === undefined) {
+      throw new SimulationError(
+        `Trace passenger ${passengerIndex} does not exist; the schedule and the trace disagree.`,
+      );
+    }
+    const passenger = new Passenger(toPassengerInit(record));
+    this.#transportHops += 1;
+    this.#admit(passenger);
+
+    const floor = this.#building.requireFloor(passenger.originFloorId);
     for (const bankId of this.#openCalls(floor, at)) this.#dispatchBank(bankId, at);
   }
 
@@ -2199,7 +2268,15 @@ export class Simulation {
         if (car.isDoubleDeck) this.#doubleDeckAlightings[deckSlot(car.deckFor(passenger.destinationFloorId))] += 1;
         car.alight(passenger, at);
         this.#recorder.recordAlighting(passenger, at);
-        if (!passenger.isFinalLeg) this.#scheduleTransfer(passenger, at);
+        if (passenger.isFinalLeg) {
+          // A journey that finishes on the building's escalator is still moving after it steps
+          // off the lift. The seconds are already on the leg (`egressTransitS`, added to
+          // time-to-destination); this is the hop being *counted*, so the audit's hop total is
+          // every hop taken and not only the ones that needed an event.
+          if (passenger.egressTransitS > 0) this.#transportHops += 1;
+        } else {
+          this.#scheduleTransfer(passenger, at);
+        }
       }
     }
 
@@ -2635,7 +2712,11 @@ export class Simulation {
    * ---------------------------------------------------------------- */
 
   #scheduleTransfer(passenger: Passenger, at: SimTime): void {
-    const arrivedAt = at + this.#options.transferWalkS;
+    // A change of lift made on the building's escalator costs the escalator's declared
+    // landing-to-landing time **instead of** the sky-lobby walk, not on top of it: both numbers
+    // are door-to-door times for the same movement, and charging both would double it.
+    const hop = this.#transportHopAfter(passenger);
+    const arrivedAt = at + (hop?.traversalTimeS ?? this.#options.transferWalkS);
     if (arrivedAt > this.#deadlineS) {
       this.#deadlineTruncations += 1;
       return;
@@ -2678,21 +2759,49 @@ export class Simulation {
         `Leg "${fromLegId}" is leg ${previous.legIndex} of a ${record.legs.length}-leg journey and has no successor, but it alighted short of "${record.finalDestinationFloorId}".`,
       );
     }
-    if (planned.originFloorId !== previous.destinationFloorId) {
+    // Without a hop the next leg boards where this one alighted. With one, it boards at the far
+    // end of the declared connection — and the hop itself must start where the passenger is.
+    const hop = this.#transportHopAfter(previous);
+    if (hop !== undefined && hop.originFloorId !== previous.destinationFloorId) {
+      throw new SimulationError(
+        `Journey "${previous.journeyId}" alighted at "${previous.destinationFloorId}" but its next transport hop "${hop.modeId}" starts at "${hop.originFloorId}".`,
+      );
+    }
+    const boardsAt = hop?.destinationFloorId ?? previous.destinationFloorId;
+    if (planned.originFloorId !== boardsAt) {
       throw new SimulationError(
         `Journey "${previous.journeyId}" alighted at "${previous.destinationFloorId}" but its next planned leg starts at "${planned.originFloorId}".`,
       );
     }
 
+    // The egress hop belongs to whichever leg is last, and that is this one exactly when the
+    // leg being created is the highest-indexed planned leg.
+    const egressTransitS =
+      previous.legIndex + 2 === record.legs.length ? egressTransitSecondsOf(record) : 0;
     const next = this.#factory.transfer(previous, {
       destinationFloorId: planned.destinationFloorId,
       arrivedAt: at,
+      ...(hop === undefined ? {} : { originFloorId: hop.destinationFloorId }),
+      ...(egressTransitS === 0 ? {} : { egressTransitS }),
     });
     this.#transfers += 1;
+    if (hop !== undefined) this.#transportHops += 1;
     this.#admit(next);
 
     const floor = this.#building.requireFloor(next.originFloorId);
     for (const bankId of this.#openCalls(floor, at)) this.#dispatchBank(bankId, at);
+  }
+
+  /**
+   * The declared non-lift hop, if any, between the leg `passenger` is on and the next one.
+   *
+   * `undefined` for every leg of every building that declares no `transportModes` — the trace
+   * omits the field entirely there — so this returns without touching a map on the shipped path.
+   */
+  #transportHopAfter(passenger: Passenger): TraceTransportHop | undefined {
+    const record = this.#recordsByJourney.get(passenger.journeyId);
+    if (record?.transportHops === undefined) return undefined;
+    return transportHopBefore(record, passenger.legIndex + 1);
   }
 
   /* ---------------------------------------------------------------- *
@@ -3050,19 +3159,25 @@ export class Simulation {
    * statistic on the building. The refusal is a car predicate, so the passenger stays on the
    * landing for a bank that *can* carry them.
    *
-   * **This was expected to be unreachable and is not, which is why it is counted rather than
-   * asserted.** `traffic/route.ts`'s `legDestinations` restricts a *shuttle* leg boarded on a
-   * lower-deck floor to lower-deck floors, so no route ever puts a cross-deck leg **on this
-   * bank**. But a leg is not bound to a bank — `route.ts` says so deliberately, because
-   * "recording a bank here would freeze a dispatch decision into the passenger trace" — so the
-   * shuttle is still *offered* every queue at every floor it opens onto. On `vertical-city` that
-   * is 270 `G → 2` legs and 22 `2 → G` legs: one floor apart, planned on `zone-1-local` or
-   * `zone-2-local`, and impossible on a double-deck car because **G and 2 are the same stop
-   * position** — the passenger would have to change decks without the car moving.
+   * **It was expected to be unreachable, turned out not to be, and is now unreachable again from
+   * shipped data — for a reason worth stating rather than deleting.** `traffic/route.ts`'s
+   * `legDestinations` restricts a *shuttle* leg boarded on a lower-deck floor to lower-deck
+   * floors, so no route ever puts a cross-deck leg **on this bank**. But a leg is not bound to a
+   * bank — `route.ts` says so deliberately, because "recording a bank here would freeze a dispatch
+   * decision into the passenger trace" — so the shuttle is still *offered* every queue at every
+   * floor it opens onto. On `vertical-city` that used to be 270 `G → 2` legs and 22 `2 → G` legs:
+   * one floor apart, planned on `zone-1-local` or `zone-2-local`, and impossible on a double-deck
+   * car because **G and 2 are the same stop position** — the passenger would have to change decks
+   * without the car moving. Measured at seed 20 260 726, `eta`: **200 distinct legs refused**,
+   * conservation `balanced: true`, and none of the 83 undelivered journeys on a shuttle floor.
    *
-   * Measured at seed 20 260 726, `eta`: **200 distinct legs refused**, the run's conservation
-   * audit `balanced: true`, and none of the 83 undelivered journeys is on a shuttle floor. So the
-   * refusal costs nobody a ride and removes a move the hardware cannot make.
+   * `vertical-city` now declares an escalator between `G` and `2`, so **those legs no longer
+   * exist and this refusal fires 0 times on every shipped building** at that same seed and
+   * profile. The guard is kept, because it is the difference between refusing an impossible move
+   * and teleporting a passenger, and `config/doubleDeck.test.ts` exercises it against the same
+   * building with its `transportModes` stripped — the configuration every `vertical-city` figure
+   * published before that declaration was measured under. A branch nothing shipped can reach is
+   * only safe while something still reaches it on purpose.
    */
   #deckAllows(car: Car, passenger: Passenger): boolean {
     if (!car.isDoubleDeck) return true;
@@ -3418,9 +3533,14 @@ export class Simulation {
       if (last === undefined) continue;
 
       if (last.hasAlighted && last.isFinalLeg) {
-        if (last.destinationFloorId !== record.finalDestinationFloorId) {
+        // The floor the *lifts* were asked to reach. Identical to the journey's declared
+        // destination unless the route finishes on a declared escalator or stair, in which case
+        // the lifts' job ended one hop short and `egressTransitS` carries the rest.
+        const liftTerminus =
+          record.legs[record.legs.length - 1]?.destinationFloorId ?? record.finalDestinationFloorId;
+        if (last.destinationFloorId !== liftTerminus) {
           problems.push(
-            `journey "${record.journeyId}" was delivered to "${last.destinationFloorId}" but asked for "${record.finalDestinationFloorId}"`,
+            `journey "${record.journeyId}" was delivered to "${last.destinationFloorId}" but its last planned lift leg ends at "${liftTerminus}" (final destination "${record.finalDestinationFloorId}")`,
           );
         } else {
           delivered += 1;
@@ -3535,6 +3655,7 @@ export class Simulation {
       legsBoarded: this.#recorder.boardedCount,
       legsAlighted: this.#recorder.alightedCount,
       transfers: this.#transfers,
+      transportHops: this.#transportHops,
       legsAssigned: this.#legsAssigned,
       wrongCarBoardings: this.#wrongCarBoardings,
       brokenPromises: this.#brokenPromises,

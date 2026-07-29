@@ -125,15 +125,23 @@ describe('double-deck operation is simulated, and counted on the building that d
       ).toBeGreaterThan(0);
       expect(activity.doubleDeckAlightings[0]).toBeGreaterThan(0);
       expect(activity.doubleDeckAlightings[1]).toBeGreaterThan(0);
-      // A leg whose origin and destination sit on different decks cannot be ridden. This was
-      // *expected* to be zero — `traffic/route.ts` never routes one onto the shuttle — and is
-      // not, because a leg is not bound to a bank and the shuttle is offered the one-floor
-      // `G <-> 2` queues the ground-lobby locals serve. Asserted live rather than absent, since
-      // a zero here would mean the guard had stopped being consulted.
+      // A leg whose origin and destination sit on different decks cannot be ridden. It used to
+      // be non-zero here — 200 distinct legs at this seed — and the reason was the one-floor
+      // `G <-> 2` lobby leg: planned on a ground-lobby local, offered to the shuttle because a
+      // leg is not bound to a bank, and impossible on a double-deck car because G and 2 are the
+      // same stop position.
+      //
+      // **`vertical-city` now declares an escalator between those two floors, so that leg no
+      // longer exists and the guard is no longer reached from shipped data.** Asserted at zero
+      // here, and asserted *live* in the suite below against the same building with its
+      // `transportModes` stripped — which is exactly the configuration every figure published
+      // before that declaration was measured under. A guard with no live case anywhere would be
+      // this repository's signature defect; a guard with a live case that is no longer shipped
+      // is a fact worth stating in both places.
       expect(
         activity.deckMismatchLegs,
-        `${id}: the cross-deck guard is never consulted, so it cannot be protecting anything`,
-      ).toBeGreaterThan(0);
+        `${id}: a cross-deck leg was refused, but no shipped route produces one any more`,
+      ).toBe(0);
       // Per-deck capacity, exercised rather than merely present: each of these is a boarding
       // loop stopped by a *deck* filling while the car body still had room, which is the count
       // of times the per-deck 80 % rule gave a different answer from the whole-car one.
@@ -190,5 +198,56 @@ describe('a double-deck bank with no declared pairing has no geometry, and says 
         expect(result.stageActivity.doubleDeckStops).toBe(0);
       }
     }
+  }, 180_000);
+});
+
+/**
+ * The cross-deck refusal, kept live after the escalator removed its only shipped case.
+ *
+ * `#deckAllows` refuses a leg whose origin and destination sit on different decks of the same
+ * rigidly coupled car. On `vertical-city` the only legs that ever reached it were the one-floor
+ * `G <-> 2` lobby hops — and the building's declared escalator now carries those, so the shipped
+ * configuration reaches the refusal zero times.
+ *
+ * That is a correct outcome and a dangerous one: the branch would be untested from `data/` and
+ * nothing would say so. So it is exercised against `vertical-city` **minus its transport modes**,
+ * which is not a fixture invented for the test — it is the building exactly as it was shipped
+ * before this change, and the configuration every `vertical-city` figure published before it was
+ * measured under.
+ */
+describe('the cross-deck refusal still refuses, on the configuration that still produces one', () => {
+  /** The building as it was before it declared an escalator. */
+  function withoutTransportModes(building: ResolvedBuilding): ResolvedBuilding {
+    return { ...building, transportModes: [] };
+  }
+
+  it('refuses cross-deck legs when the lobby hop is a lift leg again, and none when it is not', async () => {
+    const cfg = await load();
+    const shipped = cfg.buildingsById.get('vertical-city') as ResolvedBuilding;
+    expect(shipped.transportModes.length, 'vertical-city no longer declares a transport mode').toBe(
+      1,
+    );
+
+    const run = (building: ResolvedBuilding) =>
+      runSimulation({
+        building,
+        dispatcherProfile: cfg.dispatcherProfilesById.get('eta')!,
+        trafficProfiles: cfg.trafficProfiles,
+        elevatorSpecs: cfg.elevatorSpecs,
+        seed: SEED,
+        onTimeout: 'report',
+      });
+
+    const before = run(withoutTransportModes(shipped));
+    const after = run(shipped);
+
+    expect(
+      before.stageActivity.deckMismatchLegs,
+      'the pre-escalator configuration no longer reaches the cross-deck guard either, so nothing exercises it',
+    ).toBeGreaterThan(0);
+    expect(after.stageActivity.deckMismatchLegs).toBe(0);
+    // The refusal costs nobody a ride: the run still balances on both sides.
+    expect(before.conservation.balanced).toBe(true);
+    expect(after.conservation.balanced).toBe(true);
   }, 180_000);
 });

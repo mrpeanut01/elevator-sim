@@ -782,20 +782,20 @@
           "disposition": "batch",
           "tuning": {
             "n": 50,
-            "passes": 38,
-            "fails": 12,
+            "passes": 41,
+            "fails": 9,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdout": {
             "n": 50,
-            "passes": 42,
-            "fails": 8,
+            "passes": 43,
+            "fails": 7,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "no-divergence: a batch goal, judged over the scenario's replications — 38 of 50 on the tuning seeds and 42 of 50 on the holdout seeds."
+          "reason": "no-divergence: a batch goal, judged over the scenario's replications — 41 of 50 on the tuning seeds and 43 of 50 on the holdout seeds."
         },
         {
           "kind": "answer-the-demand",
@@ -810,34 +810,13 @@
           },
           "holdout": {
             "n": 50,
-            "passes": 5,
-            "fails": 45,
+            "passes": 7,
+            "fails": 43,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 4 of 50 on the tuning seeds and 5 of 50 on the holdout seeds."
-        },
-        {
-          "kind": "long-waits-under",
-          "threshold": 10,
-          "disposition": "batch",
-          "tuning": {
-            "n": 50,
-            "passes": 49,
-            "fails": 1,
-            "unmeasured": 0,
-            "rateClass": "variable"
-          },
-          "holdout": {
-            "n": 50,
-            "passes": 49,
-            "fails": 1,
-            "unmeasured": 0,
-            "rateClass": "variable"
-          },
-          "holdoutAgrees": true,
-          "reason": "long-waits-under (≤ 10 %): a batch goal, judged over the scenario's replications — 49 of 50 on the tuning seeds and 49 of 50 on the holdout seeds."
+          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 4 of 50 on the tuning seeds and 7 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
@@ -873,6 +852,27 @@
         }
       ],
       "withheld": [
+        {
+          "kind": "long-waits-under",
+          "threshold": 10,
+          "disposition": "not-shippable",
+          "tuning": {
+            "n": 50,
+            "passes": 49,
+            "fails": 1,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
+          "holdout": {
+            "n": 50,
+            "passes": 50,
+            "fails": 0,
+            "unmeasured": 0,
+            "rateClass": "constant-pass"
+          },
+          "holdoutAgrees": false,
+          "reason": "long-waits-under (≤ 10 %): withheld. It passed 49 of 50 on the tuning seeds and 50 of 50 on the holdout seeds, which are two different kinds of answer (variable against constant-pass). A classification that does not survive a disjoint seed set is not one to ship a level on."
+        },
         {
           "kind": "everyone-can-get-there",
           "threshold": null,

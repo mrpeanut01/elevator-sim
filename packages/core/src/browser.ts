@@ -180,6 +180,7 @@ export {
   serviceEventSchema,
   trafficProfileSchema,
   trafficProfilesSchema,
+  transportModeSchema,
 } from './config/index.js';
 
 export type {
@@ -240,6 +241,7 @@ export type {
   ServiceEventConfig,
   TrafficProfile,
   TrafficProfiles,
+  TransportModeConfig,
   TypicalMax,
   ValueRange,
 } from './config/index.js';
@@ -501,6 +503,8 @@ export type {
   PassengerTrace,
   ResolvedDemandTemplate,
   RiseAndFallOptions,
+  RoutePlan,
+  RouteSegment,
   RouteTopology,
   TraceLeg,
   TrafficConfig,

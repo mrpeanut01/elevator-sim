@@ -1100,8 +1100,9 @@ selection exists to exploit**, and that is a different finding from *learned con
 
 ### Also still not built in this phase's original scope
 
-- **Double-deck operation and Vertical City. SIMULATED, and benchmarked to a dispatcher-dependent
-  verdict.** Paired stops serving both landings, per-deck design load at 80 %, deck-bound legs, and
+- **Double-deck operation and Vertical City. SIMULATED, and benchmarked — to a dispatcher-dependent
+  verdict, and then, once the lobby hop stopped being a lift leg, to BETTER-EVERYWHERE on a
+  narrower base.** Paired stops serving both landings, per-deck design load at 80 %, deck-bound legs, and
   dwell charged to the **busier deck rather than the sum**. It closed the **eleventh** instance of
   this repository's signature defect: the whole deck API on `model/bank.ts` — `isDoubleDeck`,
   `deckAt`, `deckAssignmentFor`, `pairedFloorOf`, `servesFloorPair` — had **no non-test caller
@@ -1116,15 +1117,28 @@ selection exists to exploit**, and that is a different finding from *learned con
   form *is* the single-deck derivation, so retiring it would have been the over-claim
   ([§ D11, § D22, § D23](../DECISIONS.md), [review finding #11](08-review-findings.md)).
 
-  **The verdict, on `vertical-city` up-peak, ΔTTD paired-t 95 % under CRN:** WORSE under `eta`
+  **The verdict, on `vertical-city` up-peak, ΔTTD paired-t 95 % under CRN — and it has moved
+  once, for a stated cause.** It was `DISPATCHER-DEPENDENT`: WORSE under `eta`
   (`+1.950 [+0.975, +2.925]` at 1 %), BETTER under `collective` (`−1.408 [−2.400, −0.416]` at 1 %
-  and `−5.291 [−6.350, −4.232]` at 1.5 %), and one cell **permanently unresolvable** — required
-  n ≈ 869 against a ceiling of 386. **There is no verdict of the form *double-deck is better*.**
-  Energy is WORSE in all four cells, and **not** because it served fewer people: `unservedFraction`
-  is exactly 0 on both arms at every replication. The intuitive *fewer stops ⇒ less driving* is
-  refuted here; the mechanism is that **110 of 593 journeys gain a leg**, because a car boarding at
-  `G` can only alight on lower-pair floors and `core` has no escalator or stair to carry the
-  resulting `G → 2` lobby hop.
+  and `−5.291 [−6.350, −4.232]` at 1.5 %), with one cell permanently unresolvable. That was
+  measured on a building with **no escalator**, where a car boarding at `G` can only alight on
+  lower-pair floors and the resulting `G → 2` lobby hop had nowhere to go but a local lift —
+  **110 of 593 journeys gained a leg**, and the WORSE row was published as an *upper bound on the
+  cost of double-deck rather than its true cost*.
+
+  `core` now has a non-elevator transport mode and `vertical-city` declares one at `G ↔ 2`. Re-run
+  at the same seed and the same pre-registered budgets, the excess-leg gap falls from
+  **+10.80 % / +11.56 %** to **+1.32 % / +1.70 %** — and what is left is *report-window
+  membership* rather than a decomposition difference, because at these points the two arms now
+  plan identical leg counts journey for journey — `eta` at 1 % becomes
+  `−2.729 [−3.550, −1.907]` **BETTER**, `collective` at 1 % `−6.262 [−7.210, −5.315]` **BETTER**,
+  and the gate reads **`BETTER-EVERYWHERE`**. **Read it with its cost:** the 1.5 % point dropped
+  out entirely — both double-deck cells lose their AWT inside n = 200 — so the new word rests on
+  **two cells at one operating point** where the old one rested on four at two, and ΔAWT moved the
+  *other* way (`eta` @ 1 %: −0.355 BETTER → +0.785 WORSE) because the legs removed were the cheap
+  one-floor ones. Energy is still WORSE in every quotable cell and still **not** because it served
+  fewer people: `unservedFraction` is exactly 0 on both arms at every replication. The intuitive
+  *fewer stops ⇒ less driving* is refuted here in both revisions.
 
 ---
 

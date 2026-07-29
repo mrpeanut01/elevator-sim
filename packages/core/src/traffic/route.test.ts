@@ -102,12 +102,19 @@ describe('vertical-city: double-deck routing', () => {
     expect(planner.legCount('G', '20')).toBe(1);
   });
 
-  it('needs five legs to cross between a lower-anchored and an upper-anchored zone', () => {
+  it('needs four lift legs and one escalator hop between a lower- and an upper-anchored zone', () => {
     // Zone 3 hangs off sky lobby level 26 (lower deck) and zone 4 off level 27 (upper deck),
     // so an occupant of 40 reaching 34 goes all the way down and back up. This is geometry,
     // not a bug, and it is why the generator's default maxLegs is 6 rather than 3.
+    //
+    // It was **five lift legs** until `vertical-city` declared its lobby escalator: the
+    // `2 → G` step in the middle is now a hop, so the lifts are charged four
+    // (`DECISIONS.md` § D147 § 6, and `transportRoute.test.ts`).
     const planner = RoutePlanner.forBuilding(building('vertical-city'));
-    expect(planner.legCount('40', '34')).toBe(5);
+    expect(planner.legCount('40', '34')).toBe(4);
+    const plan = planner.plan('40', '34');
+    expect(plan?.transportHopCount).toBe(1);
+    expect(plan?.floors).toHaveLength(6);
   });
 });
 
@@ -154,10 +161,13 @@ describe('planner contract', () => {
     expect(() => planner.requireRoute('40', '34', 4)).toThrow(TrafficError);
   });
 
-  it('rejects a route longer than the leg budget', () => {
+  it('rejects a route longer than the leg budget, counting lift legs and not hops', () => {
     const planner = RoutePlanner.forBuilding(building('vertical-city'));
-    expect(() => planner.requireRoute('40', '34', 4)).toThrow(/needs 5 elevator legs/);
-    expect(planner.requireRoute('40', '34', 6)).toHaveLength(6);
+    // Four lift legs and one escalator hop: the budget bounds the lift legs, which is what the
+    // message has always said. Three is over, four is not, and the six-floor route is the same
+    // route either way.
+    expect(() => planner.requireRoute('40', '34', 3)).toThrow(/needs 4 elevator legs/);
+    expect(planner.requireRoute('40', '34', 4)).toHaveLength(6);
   });
 
   it('is stable: the same query returns the same route every time', () => {

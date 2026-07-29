@@ -558,6 +558,23 @@ export function resolveBuilding(
     });
   });
 
+  /*
+   * A transport mode is an *edge of the routing graph*, so a mode naming a floor this building
+   * does not declare is the same class of failure as a bank serving one: it silently removes a
+   * connection somebody authored, and the only symptom would be a journey that quietly grew a
+   * lift leg back. Fatal, located, and named after the field.
+   */
+  (building.transportModes ?? []).forEach((mode, modeIndex) => {
+    mode.connects.forEach((floorId, endIndex) => {
+      if (floorsById.has(floorId) || floors.length === 0) return;
+      addIssue(
+        `transportModes[${modeIndex}].connects[${endIndex}]`,
+        `transport mode "${mode.id}" connects floor "${floorId}", which this building does not declare. Known floor ids: ${formatKnown(knownFloorIds)}.`,
+        ISSUE_CODES.unknownFloor,
+      );
+    });
+  });
+
   if (issues.length > 0) {
     throw new ConfigError(issues, {
       summary: `Invalid building "${building.id}": ${issues.length} problem${issues.length === 1 ? '' : 's'}`,
@@ -578,6 +595,7 @@ export function resolveBuilding(
     entranceFloors,
     transferFloors,
     banks,
+    transportModes: building.transportModes ?? [],
     accessZones: building.accessZones ?? [],
     serviceEvents,
     totalPopulation,
