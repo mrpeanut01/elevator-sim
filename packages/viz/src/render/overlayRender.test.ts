@@ -17,7 +17,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { FIXTURE_DOOR_CONFIG } from '../fixtures.test-helper.js';
+import { FIXTURE_DOOR_CONFIG, fixtureSummary } from '../fixtures.test-helper.js';
 import { constantSeries } from '../contract/series.js';
 import {
   VIZ_SCHEMA_VERSION,
@@ -155,16 +155,7 @@ const RECORDING: VizRecording = {
     boardedLegs: constantSeries(0),
     meanWaitS: constantSeries(0),
   },
-  summary: {
-    saturated: false,
-    awtIsValid: true,
-    meanWaitS: 12,
-    wait95S: 30,
-    meanTimeToDestinationS: 40,
-    generated: 5,
-    delivered: 4,
-    undelivered: 1,
-  },
+  summary: fixtureSummary({ generated: 5, delivered: 4, undelivered: 1 }),
   warnings: [],
 };
 

@@ -246,18 +246,83 @@ function describeFloor(floor: ResolvedBuilding['floors'][number]): VizFloor {
   };
 }
 
+/**
+ * `NaN` in, `null` out — the one place the contract's absence convention is applied.
+ *
+ * `core` says *"not measured"* with `NaN` so an absent measurement cannot arrive disguised as a
+ * zero. A recording says it with `null` so the same fact survives `JSON.stringify`, which turns
+ * `NaN` into `null` anyway and would otherwise leave a **loaded** recording holding a `null` that
+ * the type says is a `number`. See the {@link VizSummary} block comment in `contract/types.ts`.
+ *
+ * `Infinity` is caught by the same guard for the same reason — `JSON.stringify(Infinity)` is also
+ * `null` — rather than left to arrive as a number no `toFixed` should be called on.
+ */
+function finiteOrNull(value: number): number | null {
+  return Number.isFinite(value) ? value : null;
+}
+
 function describeSummary(result: SimulationResult): VizSummary {
   const { summary, conservation } = result;
+  const { waiting, handlingCapacity, achievedInterval, serviceLevel, energy } = summary;
   return {
     saturated: summary.saturation.saturated,
     awtIsValid: summary.awtIsValid,
     awtInvalidReason: summary.awtInvalidReason,
-    meanWaitS: summary.waiting.meanS,
-    wait95S: summary.waiting.p95S,
+    meanWaitS: waiting.meanS,
+    wait95S: waiting.p95S,
     meanTimeToDestinationS: summary.timeToDestination.meanS,
     generated: conservation.generated,
     delivered: conservation.delivered,
     undelivered: conservation.undelivered,
+
+    // Version 5. Every field here is copied from the summary `core` already produced — never
+    // recomputed from the recording's own arrays, which would be a second source of truth about
+    // a question the metrics module has answered, on a different window.
+    reportWindow: {
+      id: summary.window.id,
+      startS: summary.window.startS,
+      endS: summary.window.endS,
+    },
+    windowSeconds: summary.windowSeconds,
+    waitCount: waiting.count,
+    timeToDestinationCount: summary.timeToDestination.count,
+    pctOverLongWait: finiteOrNull(waiting.pctOverLongWait),
+    longWaitThresholdS: waiting.longWaitThresholdS,
+    unservedCount: waiting.unservedCount,
+    handlingCapacity: {
+      personsPer5Min: handlingCapacity.personsPer5Min,
+      offeredPer5Min: handlingCapacity.offeredPer5Min,
+      // Absent, not zero: a building whose record carries no population has no `%POP`, and a
+      // `0 %` there would read as "nobody moved".
+      pctPopulationPer5Min:
+        handlingCapacity.pctPopulationPer5Min === undefined
+          ? null
+          : finiteOrNull(handlingCapacity.pctPopulationPer5Min),
+    },
+    achievedInterval: {
+      meanS: finiteOrNull(achievedInterval.meanS),
+      coefficientOfVariation: finiteOrNull(achievedInterval.coefficientOfVariation),
+      count: achievedInterval.count,
+    },
+    serviceLevel: {
+      verdict: serviceLevel.verdict,
+      longestWaitS: finiteOrNull(serviceLevel.longestWaitS),
+      longestWaitIsCensored: serviceLevel.longestWaitIsCensored,
+      overHorizonCount: serviceLevel.overHorizonCount,
+      arrivalCount: serviceLevel.arrivalCount,
+      horizonS: serviceLevel.horizonS,
+    },
+    energy: {
+      measured: energy.measured,
+      workKJ: finiteOrNull(energy.workKJ),
+      workPerServedLegKJ: finiteOrNull(energy.workPerServedLegKJ),
+      // The denominator of `workPerServedLegKJ`, which `EnergyStatistics` divides by and does not
+      // publish. `summarize.ts` passes `counts.alighted` as its `servedLegCount`, so this is that
+      // same number rather than a second reading of it.
+      deliveredLegCount: summary.counts.alighted,
+      distanceM: finiteOrNull(energy.distanceM),
+      starts: finiteOrNull(energy.starts),
+    },
   };
 }
 

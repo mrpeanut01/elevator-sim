@@ -50,6 +50,7 @@ import type {
   DoorConfig,
   DoorMachineState,
   PassengerModel,
+  ServiceLevelVerdict,
   SimTime,
   SimulationStatus,
 } from '@elevator-sim/core/browser';
@@ -69,6 +70,7 @@ import type {
  * | 2 | `VizProgress.served` / `Frame.served` renamed {@link VizProgress.boardedLegs}, because the counter counts **leg boardings** and the header called them people. See `the root DECISIONS.md`. |
  * | 3 | {@link VizRecording.legs} added — the per-leg array `UX.md` § 7.2 and `DECISIONS.md` D15 reserved for the wave that acquires a consumer. Wave 2 is that wave: `src/frame/overlay.ts` reads it for the windowed figures the live metrics overlay shows, and `landingAssignmentsAt` reads its `carId`/`bankId` for `RV-T3`. See `the root DECISIONS.md`. |
  * | 4 | {@link VizRecording.passengerModel}, {@link VizLeg.destinationFloorId} and {@link VizLeg.assignedCarId} added, so a **Level-1** (destination-dispatch) run can be drawn as the thing it is. `docs/09-destination-dispatch-contract.md` § 3.1 required either this bump or a refusal in `recordRun`; § T18-D1 of `the root DECISIONS.md` records which was chosen and what was measured. |
+ * | 5 | {@link VizSummary} widened to what `docs/10-experience-layer-contract.md` § 11 **W2** names: the reporting {@link VizSummary.window}, the long-wait triple, **the count every estimate was computed from** (R13), {@link VizHandlingCapacity}, {@link VizAchievedInterval}, {@link VizServiceLevel} and {@link VizEnergy}. Every field lands with the figure that draws it — `src/render/runSummary.ts`, mounted by `src/dev/main.ts` — because a field with no consumer is this repository's signature defect and W2 is the unit the design says is most likely to acquire one. |
  *
  * ## What version 4 fixed, measured rather than predicted
  *
@@ -101,7 +103,7 @@ import type {
  * a recording arrives from somewhere other than this build and the versions genuinely can
  * disagree (`UX.md` `PB-07`/`PB-15`).
  */
-export const VIZ_SCHEMA_VERSION = 4;
+export const VIZ_SCHEMA_VERSION = 5;
 
 /* -------------------------------------------------------------------------- *
  * Geometry
@@ -295,12 +297,184 @@ export interface VizLeg {
  * The recording
  * -------------------------------------------------------------------------- */
 
+/* -------------------------------------------------------------------------- *
+ * The summary, and the four sub-shapes version 5 adds
+ *
+ * ## `null` where `RunSummary` has `NaN`, and why the difference is not cosmetic
+ *
+ * `core` uses `NaN` for *"this quantity was not measured"* — deliberately, so that an absent
+ * measurement cannot arrive downstream disguised as a zero (`metrics/types.ts`, and
+ * `docs/10-experience-layer-contract.md` § 7.3 clause 5 restates it for the energy axis:
+ * *"`NaN`-not-zero when the run recorded no travel"*).
+ *
+ * A recording is not a `RunSummary`. It is **serialised**: the replay harness round-trips one
+ * through `JSON.parse(JSON.stringify(x))`, **Save recording** writes one to a file and
+ * `readRecordingDocument` reads one back. `JSON.stringify(NaN)` is `null`, and `JSON.parse` gives
+ * `null` back — so a `number`-typed field carrying `NaN` becomes a `null` that the type system
+ * says is a `number`, and the first renderer to call `.toFixed(1)` on it throws or prints
+ * something invented. The failure appears only on the *loaded* copy, which is the half of the
+ * viewer that no unit test builds by hand.
+ *
+ * So the contract spells the same fact the way JSON can carry it: **`null` means the run did not
+ * measure this**, and the value is never `NaN` and never `0`. `describeSummary` in
+ * `src/record/recordRun.ts` is the one place the conversion happens, and
+ * `src/render/runSummary.ts` is the one place `null` is turned into words — *"not recorded"*,
+ * never a dash and never a zero (R3, R11).
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The reporting window every cohort figure in a {@link VizSummary} was computed over.
+ *
+ * `UX.md` RV-T4 requires the window on screen and `docs/10` § 7.4 says why it is a prerequisite
+ * for the whole of U5 rather than a label: *"riders waited 25 seconds on average"* is false
+ * without *"during the busiest 5 minutes"*, and the shipped rise-and-fall template reports a
+ * 300 s peak out of a 900 s run. Copied from `RunSummary.window`, which is a `ReportWindow`.
+ */
+export interface VizWindow {
+  /** `full-run`, `peak-5min`, … — the window's own name, never re-derived here. */
+  readonly id: string;
+  /** Inclusive lower bound, simulated seconds. */
+  readonly startS: SimTime;
+  /** Exclusive upper bound, simulated seconds. */
+  readonly endS: SimTime;
+}
+
+/**
+ * Offered demand beside answered demand, in one unit — `docs/10` § 3.5.
+ *
+ * The design calls the paired bar built from these *"the highest-value single addition in the
+ * whole of Phase 9"*, and the reason is that both numbers are **observations**: how many people
+ * arrived and how many the lifts carried, per five minutes. Neither is suppressed on a saturated
+ * run, and together they explain the saturation before the queue visibly diverges — the Factorio
+ * belt backing up in front of the slow machine, in the units this project already reports demand
+ * in.
+ *
+ * **People, not legs.** `HandlingCapacity` reports both and these two are the person-denominated
+ * pair, because `%POP` and the demand targets in `docs/03` are quoted in people and four of the
+ * five shipped buildings have a transfer floor that would inflate a leg count.
+ */
+export interface VizHandlingCapacity {
+  /** `HC5`: people the lifts carried, per 5 minutes of the window. */
+  readonly personsPer5Min: number;
+  /** People who arrived, per 5 minutes of the same window. The demand the bar pairs it against. */
+  readonly offeredPer5Min: number;
+  /** `%POP`. `null` when the record carries no population to divide by — not `0`. */
+  readonly pctPopulationPer5Min: number | null;
+}
+
+/**
+ * Achieved **INT**: the spacing of car departures from the terminal.
+ *
+ * {@link count} is R13's clause one applied to this row — it is the number of *gaps* the mean was
+ * fitted over, and a mean interval over two gaps is a different claim from one over sixty.
+ *
+ * {@link coefficientOfVariation} is carried and is **never translated**. `docs/10` § 7.2 is
+ * explicit: mapping a dispersion statistic onto *"they arrived in clumps"* versus *"evenly"* is
+ * the operation R10 bans, one type down, and it needs a threshold nothing in `core` supplies. The
+ * renderer prints the number with its definition or nothing.
+ */
+export interface VizAchievedInterval {
+  /** Mean gap between departures, seconds. `null` when no interval could be reconstructed. */
+  readonly meanS: number | null;
+  /** `stdDev / mean` — the bunching measure. `null` when there are too few gaps to say. */
+  readonly coefficientOfVariation: number | null;
+  /** Gaps the mean was computed from. R13: an estimate without its `n` may not be drawn. */
+  readonly count: number;
+}
+
+/**
+ * How long the worst-served passenger in the window waited — `RunSummary.serviceLevel`.
+ *
+ * `docs/10` R4 lists **Abandoned** (`verdict === 'starved'`) as Phase 9's second-preferred fail
+ * state and notes that three of its four fail states were already in {@link VizSummary} and *"the
+ * second is not"*. This is that second one.
+ *
+ * {@link longestWaitIsCensored} is the field that keeps the figure honest: a leg that never
+ * boarded has no waiting time, only a waiting time *so far*, so the number is then a **lower
+ * bound** and the plain-language form has to say *"waited at least …"* (§ 7.1). Drawing the
+ * censored and uncensored cases identically would put the understatement precisely where the
+ * service is worst.
+ */
+export interface VizServiceLevel {
+  readonly verdict: ServiceLevelVerdict;
+  /** The longest wait known in the window, seconds. `null` when the window held no arrivals. */
+  readonly longestWaitS: number | null;
+  /** Whether {@link longestWaitS} belongs to a leg that never boarded, and is therefore a floor. */
+  readonly longestWaitIsCensored: boolean;
+  /** Arrivals whose wait is known to exceed {@link horizonS}. */
+  readonly overHorizonCount: number;
+  /** Arrivals in the window, served or not — {@link overHorizonCount}'s denominator. R13. */
+  readonly arrivalCount: number;
+  /** The abandonment horizon applied, seconds. Copied, never assumed: the renderer names it. */
+  readonly horizonS: number;
+}
+
+/**
+ * What the fleet spent moving — **an axis, never a score** (`docs/10` R11, CLAUDE.md § Energy).
+ *
+ * Five numbers rather than one, and the plurality is the rule rather than generosity:
+ *
+ * - {@link workKJ} is the axis, and it is drawn **only beside** AWT and WT95. Measured across the
+ *   full experiment matrix, `nearest-car` — the viewer's default and the arm `docs/07` § 4 calls
+ *   a poor reference — is on the Pareto front at **six of eight cells**, because it is best on
+ *   energy and worst on wait. A standalone eco score ranks the worst dispatcher first.
+ * - {@link workPerServedLegKJ} goes beside it, always. *A configuration that spends less by
+ *   serving fewer people has not saved anything*, and the total alone cannot tell the two apart.
+ * - {@link deliveredLegCount} is that ratio's denominator — R13, and the reason a per-leg figure
+ *   over four legs is not the same claim as one over four hundred.
+ * - {@link distanceM} and {@link starts} are the two things that can move the work term, and a
+ *   single scalar cannot say which did.
+ *
+ * {@link measured} distinguishes *"the cars did not move"* from *"nobody wrote down how far the
+ * cars moved"*. When it is `false` every figure here is `null` and the renderer prints **"not
+ * recorded"** — never `0 kJ`, which would make every arm tie on energy and quietly restore a
+ * two-axis front under a three-axis name.
+ *
+ * **Units, on screen.** Kilojoules of *out-of-balance mechanical work*, not kWh: it omits
+ * acceleration losses, drive and gearing efficiency, door motors and standby power. See
+ * `docs/02-elevator-reference.md` § Energy and the counterweight.
+ */
+export interface VizEnergy {
+  /** Whether the run recorded any travel at all. `false` ⇒ every figure below is `null`. */
+  readonly measured: boolean;
+  /** Out-of-balance mechanical work over the window, kilojoules. */
+  readonly workKJ: number | null;
+  /** {@link workKJ} per leg that alighted in the window. `null` when none did. */
+  readonly workPerServedLegKJ: number | null;
+  /** Legs that alighted in the window — {@link workPerServedLegKJ}'s denominator. */
+  readonly deliveredLegCount: number;
+  /** Metres the fleet travelled in the window. */
+  readonly distanceM: number | null;
+  /** Moves commanded in the window. Each is one motor start. */
+  readonly starts: number | null;
+}
+
 /**
  * Statistics a viewer may show, and the one flag that decides whether it may show them.
  *
  * {@link awtIsValid} is copied from `RunSummary` rather than recomputed. A viewer that renders
  * `meanS` while this is `false` is reporting a mean for a system whose queues grow without
  * bound; the UX inventory makes suppressing it a required state, not a nicety.
+ *
+ * ## What the gate covers, stated once
+ *
+ * `meansAreSuppressed` in `src/frame/overlay.ts` is the **single** gate for *"may I show this"*
+ * (`docs/10` R9), and it speaks for exactly the three figures `RunSummary.awtIsValid` speaks for:
+ * {@link meanWaitS}, {@link wait95S} and {@link meanTimeToDestinationS}. Everything version 5
+ * adds is either an observation — a count, a rate, a longest wait — or an estimate with its own
+ * `n` and its own caveat, and none of them is routed through that flag. Widening the gate to
+ * cover them would be a *second* claim wearing the first one's authority, which is the failure
+ * R9 exists to prevent in the other direction.
+ *
+ * ## R13, in the type
+ *
+ * Every estimate here is adjacent to the count it was computed from: {@link waitCount} for the
+ * two wait figures and for {@link pctOverLongWait}, {@link timeToDestinationCount} for TTD,
+ * {@link VizAchievedInterval.count} for the interval, {@link VizServiceLevel.arrivalCount} for
+ * the over-horizon count and {@link VizEnergy.deliveredLegCount} for the per-leg work. Measured
+ * on Garden Apartments at `collective`, seed 42: the run's AWT is `11.319 s` with
+ * `awtIsValid: true`, computed over **five** legs. It is a legitimately quotable mean by this
+ * project's own rule and it is not a mean anybody should read without knowing the `n`.
  */
 export interface VizSummary {
   readonly saturated: boolean;
@@ -312,6 +486,34 @@ export interface VizSummary {
   readonly generated: number;
   readonly delivered: number;
   readonly undelivered: number;
+
+  /* ---- version 5 — `docs/10` § 11 W2 ---- */
+
+  /** The window every cohort figure above and below was computed over. `docs/10` § 7.4. */
+  readonly reportWindow: VizWindow;
+  /** `reportWindow.endS - reportWindow.startS`. Carried, not subtracted, so the two cannot drift. */
+  readonly windowSeconds: number;
+  /** Legs the wait figures were computed over — R13's `n` for AWT, WT95 and % > long wait. */
+  readonly waitCount: number;
+  /** Journeys {@link meanTimeToDestinationS} was computed over — R13's `n` for TTD. */
+  readonly timeToDestinationCount: number;
+  /**
+   * Served legs whose wait exceeded {@link longWaitThresholdS}, as a percentage, `0`–`100`.
+   *
+   * An **observation** — a count over served legs — so it is not suppressed. Its denominator is
+   * *served* legs, and {@link unservedCount} is the size of the hole that leaves: the legs that
+   * never boarded are precisely the ones that would have counted as long waits, so the renderer
+   * shows the two together, always (§ 7.1). `null` when nothing was served.
+   */
+  readonly pctOverLongWait: number | null;
+  /** The long-wait threshold applied, seconds. 60 s by default, and never assumed by a renderer. */
+  readonly longWaitThresholdS: number;
+  /** Legs that arrived in the window and had not boarded when the run ended. */
+  readonly unservedCount: number;
+  readonly handlingCapacity: VizHandlingCapacity;
+  readonly achievedInterval: VizAchievedInterval;
+  readonly serviceLevel: VizServiceLevel;
+  readonly energy: VizEnergy;
 }
 
 /**

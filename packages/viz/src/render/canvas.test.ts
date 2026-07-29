@@ -15,12 +15,13 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { FIXTURE_DOOR_CONFIG } from '../fixtures.test-helper.js';
+import { FIXTURE_DOOR_CONFIG, fixtureSummary } from '../fixtures.test-helper.js';
 import { constantSeries } from '../contract/series.js';
 import { VIZ_SCHEMA_VERSION, type Frame, type VizRecording } from '../contract/types.js';
 import { buildLayout } from './layout.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import { DEFAULT_THEME, drawScene, formatClock, type Canvas2DLike } from './canvas.js';
+import { windowClause } from './runSummary.js';
 
 /* -------------------------------------------------------------------------- *
  * A recording context
@@ -124,16 +125,7 @@ const RECORDING: VizRecording = {
     boardedLegs: constantSeries(0),
     meanWaitS: constantSeries(0),
   },
-  summary: {
-    saturated: false,
-    awtIsValid: true,
-    meanWaitS: 12,
-    wait95S: 30,
-    meanTimeToDestinationS: 40,
-    generated: 50,
-    delivered: 50,
-    undelivered: 0,
-  },
+  summary: fixtureSummary(),
   warnings: [],
 };
 
@@ -202,6 +194,40 @@ describe('drawScene', () => {
     expect(ctx.calls.length).toBeGreaterThan(20);
     expect(ctx.calls.some((call) => call.op === 'fillRect')).toBe(true);
     expect(ctx.calls.some((call) => call.op === 'fillText')).toBe(true);
+  });
+
+  /*
+   * `docs/10-experience-layer-contract.md` § 7.4 / `UX.md` RV-T4 — every figure carries its
+   * window, on the surface that leaves the building.
+   *
+   * The header quotes a running mean and the panel quotes windowed figures; a bitmap that says
+   * neither which window nor how long it was is a bitmap whose numbers will be read as covering
+   * the whole run. **Export PNG** writes this canvas to a file, so the footer is where it has to
+   * be — not in the DOM panel, which the export does not capture.
+   *
+   * Recomputed from the recording rather than written down: replacing the clause with a constant
+   * makes the second assertion fail, and dropping it makes the first fail.
+   */
+  it('names the reporting window in the footer, so the exported PNG says what it covers', () => {
+    const text = draw(frame())
+      .calls.filter((call) => call.op === 'fillText')
+      .map((call) => String(call.args[0]));
+    expect(text.some((line) => line.includes(windowClause(RECORDING.summary)))).toBe(true);
+
+    const moved: VizRecording = {
+      ...RECORDING,
+      summary: {
+        ...RECORDING.summary,
+        reportWindow: { ...RECORDING.summary.reportWindow, id: 'full-run', startS: 0, endS: 600 },
+      },
+    };
+    const after = new RecordingContext();
+    drawScene(after, { recording: moved, frame: frame(), layout, theme: DEFAULT_THEME });
+    expect(
+      after.calls
+        .filter((call) => call.op === 'fillText')
+        .some((call) => String(call.args[0]).includes('full-run 0–600 s')),
+    ).toBe(true);
   });
 
   it('is a pure function of its inputs: equal frames draw equal call sequences', () => {

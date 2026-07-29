@@ -1276,7 +1276,36 @@ Remove the unconditional running mean from `render/canvas.ts`'s header, or gate 
 - **Note:** `UX.md` § A.3's **Saturated** row is already correct and the code is wrong. No
   criterion is weakened.
 
-### W2 — Widen `VizSummary` to what U5 and U3 need *(depends on W1 for the honesty rule)*
+### W2 — Widen `VizSummary` to what U5 and U3 need *(depends on W1 for the honesty rule)* — ✅ **DONE 2026-07-29**
+
+> **Landed** ([`DECISIONS.md` § D152](../DECISIONS.md)). `VIZ_SCHEMA_VERSION` is **5**, every field
+> below is drawn by `packages/viz/src/render/runSummary.ts` and mounted by `drawRunSummary` in
+> `packages/viz/src/dev/main.ts`, and the liveness evidence was produced **twice per field** —
+> 30 renderer mutations and 25 recorder mutations, **55 of 55 red**.
+>
+> **Three deviations, each stated rather than absorbed:**
+>
+> 1. **The field is `reportWindow`, not `window`.** `packages/viz/src/boundaries.test.ts` forbids a
+>    browser-free module to name `window`, and its own docstring argues against loosening that
+>    rule. The field list above was written without knowing it. `windowSeconds` is unchanged.
+> 2. **The contract carries `null` where `RunSummary` carries `NaN`.** A recording is serialised and
+>    `JSON.stringify(NaN)` is `null`, so a `number`-typed `NaN` becomes a `null` the type system
+>    calls a number — on the *loaded* copy, which no unit test builds by hand. Same fact, in the
+>    encoding JSON has. § 7.3 clause 5's *"`NaN`-not-zero"* is honoured in its reason.
+> 3. **The figures are DOM, not canvas** — R3 needs prose, R7 needs copyable, and the figures are
+>    properties of the run rather than the frame. The one clause that must be on the bitmap is:
+>    `drawFooter` names the window, because **Export PNG** is what leaves the building.
+>
+> **The acceptance clause about Basic mode is not met and cannot be**: Basic/Advanced is W6. The
+> offered-versus-carried bar is on screen in the only mode that exists.
+>
+> **Found on the way — a twelfth dead seam, inside the type this unit widens.**
+> `VizSummary.meanTimeToDestinationS` has existed since version 1 with **no non-test caller**;
+> every reference outside the contract was one of three test files. It is drawn now, as
+> *door to door*, with its `n`. And **three shipped buildings reconstruct no departure interval at
+> all** (`garden-apartments`, `mixed-use-high-rise`, `vertical-city`) — a fact about those
+> buildings, said in words rather than printed as a zero.
+
 
 Add to `VizSummary`, each with a renderer in the same change: `window`, `windowSeconds`,
 `pctOverLongWait` + `longWaitThresholdS` + `unservedCount`, **the count each estimate was computed

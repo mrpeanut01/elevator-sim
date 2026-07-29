@@ -28,6 +28,7 @@ import { meansAreSuppressed } from '../frame/overlay.js';
 import type { DoorPhase, Frame, VizRecording } from '../contract/types.js';
 import type { Layout } from './layout.js';
 import { LOAD_ALARM, drawOverlay, loadColour } from './overlay.js';
+import { windowClause } from './runSummary.js';
 
 /** The subset of a 2D canvas context this renderer uses. */
 export interface Canvas2DLike {
@@ -603,7 +604,16 @@ function drawFooter(
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = theme.textDim;
-  ctx.fillText(`${recording.status} · ${String(recording.summary.generated)} generated`, 12, y - 10);
+  // `docs/10` § 7.4 and `UX.md` RV-T4: every figure carries its window, and this is the surface
+  // that leaves the building. **Export PNG** writes the canvas to a file, so a bitmap whose
+  // header quotes a mean without saying which 300 seconds it covers will be read as covering the
+  // whole run. The clause is produced by `render/runSummary.ts` rather than formatted here, so
+  // the panel and the picture cannot word the same window differently.
+  ctx.fillText(
+    `${recording.status} · ${String(recording.summary.generated)} generated · ${windowClause(recording.summary)}`,
+    12,
+    y - 10,
+  );
 }
 
 /**

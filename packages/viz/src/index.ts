@@ -62,6 +62,8 @@
  * | {@link drawOverlay} | `drawScene`, in `src/render/canvas.ts` |
  * | {@link loadColour}, {@link loadTrackMax}, {@link doorGlyph}, {@link describeSelection} | `src/render/canvas.ts` and `src/render/overlay.ts` |
  * | {@link describeFrame} | `src/dev/main.ts`, as the canvas's `aria-label` and its live region — `KB-13` |
+ * | {@link runSummaryFigures} | `drawRunSummary` in `src/dev/main.ts`, called from `adopt` on every recording — `docs/10` § 11 **W2** |
+ * | {@link windowClause} | `drawFooter`, in `src/render/canvas.ts` — § 7.4 on the surface `Export PNG` writes to a file |
  * | {@link landingOptionLabel} | `src/dev/main.ts`'s `populateLandings`, one option per landing call |
  * | {@link readRecordingDocument} | `src/dev/main.ts`'s **Load recording** control — the version check's first real caller |
  * | {@link verifyReplay}, {@link recordingFingerprint} | `src/dev/main.ts`'s **Verify replay** control |
@@ -195,6 +197,19 @@ export {
   type OverlayInput,
 } from './render/overlay.js';
 export { describeFrame, type DescribeFrameInput } from './render/describeFrame.js';
+/*
+ * The figure ids and `FIGURE_ORDER` are deliberately **not** re-exported. They have no caller
+ * outside their own module and its test — `runSummaryFigures` orders its own output by them — and
+ * a barrel row whose honest entry reads *none* is what the note above this table is about.
+ */
+export {
+  runSummaryFigures,
+  windowClause,
+  type SummaryBar,
+  type SummaryFigure,
+  type SummaryFigureKind,
+  type SummarySeverity,
+} from './render/runSummary.js';
 export { describePreview, drawPreview, type PreviewInput } from './render/preview.js';
 
 export {
