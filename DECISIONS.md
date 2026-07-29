@@ -10362,3 +10362,35 @@ Playable and measurably clearable: at the shipped setting all three count goals 
 `docs/10` § 11's goal table **disagreed with the shipped JSON in three of stage 6's five cells** and still printed `long-waits-under` in **bold** — the table's own mark for a shipping goal — after the measurement had withheld it. And *"three stages clear from the dispatcher dropdown"* is **four**: re-measured on the **pre-escalator** configuration it clears there too, so the claim went stale at § D167 with nothing re-deriving it. Both corrected, and the table is now **parsed and compared cell by cell against the JSON**, bold marks and footnotes included, with a counter asserting all 35 comparisons ran.
 
 **Impact.** 961 published pins: **not one moved** — `regeneratePins.js` diffs to zero lines. **Known limits:** the route through sky lobby A is decided by expansion order on an exact tie, so reordering `transportModes` in the JSON would silently re-route 20 journeys — guarded. And **`matrix` is the one study id of fifteen whose pins no test re-derives**, covered only by the manual tool; that is the harness-coverage shape and it is recorded rather than closed here.
+
+---
+
+## D171 — the honesty property under search **found two real violations**, and both are contract judgements rather than code defects
+
+**Date:** 2026-07-29 · **Owner:** T78 (wave 9) · **Satisfies:** [§ D163](#d163) clause 1 · **Resolves:** both findings, by the owner's decision · **Opens:** nothing
+
+**Context.** [§ D163](#d163) clause 1 was the load-bearing half of Phase 9's gate: *the honesty property holds under **search**, not on examples.* Its justification was history — every R1–R13 rule was enforced by hand-written tests over hand-chosen cases, Phase 8 found two blocking property violations by searching where nobody had looked, and wave 8 found six tests that could not fail, one of them the instrument that checks for tests that cannot fail.
+
+**The search found two violations. That is the clause working, and it is the most valuable outcome it could have produced.**
+
+### The two findings
+
+**1. A probability word reaching the Parameters tab.** `core`'s `idle.predictorHorizonS` declares a description containing *"likely to appear soon"*; the control layer copies it verbatim and the form writes it to the page. The shipped remedy `playerSafeDescription` **exists, is driven by this search on the same text, and correctly rewrites it** — the Parameters tab is the one surface that does not call it. And `words.ts` records that exemption **deliberately** (*"the Parameters tab is a schema surface and may show it"*) while § D163 clause 1 says *"no probability word **anywhere**"*. **Two shipped sentences disagreeing is not a harness author's call**, and it was escalated rather than resolved in the lane.
+
+**Resolved: the rule is narrowed, not the product.** R10 exists to stop **a confidence interval being translated into a probability word**. A parameter description saying a demand predictor forecasts floors where traffic is *likely* is technical prose about **what a dial does**, not a claim about a result — and rewriting `core`'s own description of its own parameter would cost precision to satisfy a rule aimed at something else. The property is scoped to result-bearing surfaces; the exemption stands **with this entry as its reason** rather than as an unexplained special case.
+
+**2. The Compare panel names a winner at n ≥ 2.** `compareMetric` emits a resolved verdict — *"the X arm is the one that came out ahead on this row"* — as soon as the paired interval excludes zero, which needs two replications and nothing else, while the panel refuses only `replications < 1`. Measured at **n = 7** and **n = 8** on observation-class rows, which survive at small n precisely because the estimate-class rows suppress first. R2 requires *a paired-t interval excluding zero over 50–200 replications*. **The counter-argument was recorded rather than ignored:** a budget note *is* emitted below 50 and drawn — in a **different row** from the verdict.
+
+**Resolved: show the interval, withhold the verdict.** Below the minimum budget the panel draws the measured interval and **refuses to name a winner**, with the reason in the verdict's place. That is what the rest of this product already does with insufficient evidence — publish the observation, refuse the claim — and it fixes the deeper half too: a qualification in a different row from the claim it qualifies is R13 clause one's defect one level up, and can be quoted apart from it.
+
+### Why the search is believable
+
+**Seven injected faults, one per property clause, all found and all shrunk** — injected into real cases over shipped data, so a property that merely echoed the statistics would have sailed past every one. The fault suite compares against the **clean** run rather than against zero, so the outstanding R10 finding cannot make an assertion pass for the wrong reason.
+
+**The surface set is derived, not listed** — 107 text producers across 40 modules, partitioned exhaustively into *driven* and *excluded-with-a-reason*, with three anti-rot guards: an adapter may not claim a declaration the derivation cannot find, an exclusion for a vanished declaration must be deleted, and nothing may be both. **A new surface is red, not skipped.**
+
+**And the harness proves itself alive** rather than asserting it: every adapter must produce at least one string; the corpus must land on **both** halves of the space (28 of 48 cases suppressed, or R3 has nothing to be true of while reading green); a zero-seed campaign is asserted **not** a pass; the derivation must find more than 60 producers before its partition is trusted. **The shrinker's own defect was caught this way** — its first building reducer offered *any* other building, so it cycled Garden→Midtown→Garden for forty "accepted" steps.
+
+**Three false positives are recorded on the rules they corrected**, because they were the harness being wrong rather than the product: a bare `energy` match flagged the *dispatcher's name*; a bare `than` flagged four of `core`'s own parameter descriptions; and a cue-and-number-anywhere match flagged an eight-sentence paragraph whose number was a queue count in a different sentence.
+
+**Impact.** Both findings resolved as above. Always-on tier: 48 pinned seeds, **80 501 strings**, 550 simulations, 74 s. Deep tier behind a flag, clean at 24 cases. **The mode dimension plugs in at one line** — a tuple in `types.ts` — and the corpus assertion tightens automatically. **Known limits:** the three DOM panels are statically swept for probability words rather than driven, which is weaker and is stated as a limitation rather than presented as coverage; and the always-on tier reaches no batch at n ≥ 50, so R2's budget clause is only satisfiable in the deep tier.
