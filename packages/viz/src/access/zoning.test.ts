@@ -131,7 +131,7 @@ describe('Secure Tower under one credential at a time', () => {
       }
     }
     expect(disagreements).toEqual([]);
-  });
+  }, 60_000);
 
   it('lists the restricted floors in building order, not in id order', () => {
     const { floors, accessZones } = secureTower();

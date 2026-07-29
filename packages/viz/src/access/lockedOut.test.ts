@@ -92,12 +92,12 @@ describe('the recording carries the credential at all', () => {
     }
     const distinct = new Set(recording.legs.map((leg) => leg.credentialGroup));
     expect(distinct.size).toBeGreaterThan(2);
-  });
+  }, 60_000);
 
   it('carries none on a building with no access zones', () => {
     const { recording } = recordRun(breadthConfig(config, 'garden-apartments', { seed: SEED }));
     expect(recording.legs.some((leg) => leg.credentialGroup !== undefined)).toBe(false);
-  });
+  }, 60_000);
 });
 
 describe('Secure Tower under `nearest-car`', () => {

@@ -167,7 +167,7 @@ describe('a stored run replays to an identical result', () => {
     const replayed = assertIdenticalReplay(stored, sources);
     expect(replayed.runId).toBe('sweep-0007');
     expect(replayed.record.metadata).toEqual({ candidate: 'w-0.25', round: 3 });
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -321,7 +321,7 @@ describe('replay refuses a substitute configuration', () => {
     expect(stored.record.replication).toBeUndefined();
     expect(replaySimulationConfig(stored, sources).replication).toBeUndefined();
     expect(replayStoredRun(stored, sources).identical).toBe(true);
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *

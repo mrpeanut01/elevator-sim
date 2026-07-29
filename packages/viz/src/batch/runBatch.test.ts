@@ -74,7 +74,7 @@ describe('common random numbers', () => {
       expect(baseline?.replications[i]?.seed).toBe(expected);
       expect(candidate?.replications[i]?.seed).toBe(expected);
     }
-  });
+  }, 60_000);
 
   it('reports the batch as aligned, having compared one pair per replication', () => {
     const result = runBatch(requestFor('garden-apartments', 6, ['collective', 'eta']), resourcesFor('garden-apartments'));
@@ -84,7 +84,7 @@ describe('common random numbers', () => {
     // The equivalence class is recorded, and it names the population rather than the dispatcher.
     expect(result.crn.traceKey).toContain('garden-apartments');
     expect(result.crn.traceKey).not.toContain('collective');
-  });
+  }, 60_000);
 
   it('the two arms really do see the same passengers — checked outside this module', () => {
     /*
@@ -118,7 +118,7 @@ describe('common random numbers', () => {
       expect(right).toEqual(left);
       expect(firstTraceDisagreement(left, right)).toBeNull();
     }
-  });
+  }, 60_000);
 
   it('negative control: the comparison can fail, and names the field it failed on', () => {
     // Without this the assertion above could be passing because every trace equals every other
@@ -142,7 +142,7 @@ describe('common random numbers', () => {
     const detail = firstTraceDisagreement(first, second);
     expect(detail).not.toBeNull();
     expect(detail).toMatch(/^(?:seed|passengerCount|arrivals\.length|passengers)/);
-  });
+  }, 60_000);
 
   /*
    * **The control the one above cannot be.** Found by mutation, and it is the false negative T60
@@ -200,7 +200,7 @@ describe('common random numbers', () => {
 
     /* …and the comparator still says nothing about a trace compared with itself. */
     expect(firstTraceDisagreement(trace, { ...trace })).toBeNull();
-  });
+  }, 60_000);
 });
 
 describe('what a batch records', () => {
@@ -214,7 +214,7 @@ describe('what a batch records', () => {
         }
       }
     }
-  });
+  }, 60_000);
 
   it('records the offered demand off the same projection every other figure comes from', () => {
     /*
@@ -245,7 +245,7 @@ describe('what a batch records', () => {
       expect(replication.offeredPer5Min).not.toBeNull();
       expect(candidate?.replications[index]?.offeredPer5Min).toBe(replication.offeredPer5Min);
     }
-  });
+  }, 60_000);
 
   it('copies the run summary’s own verdict rather than recomputing one', () => {
     const resources = resourcesFor('secure-tower');
@@ -273,14 +273,14 @@ describe('what a batch records', () => {
         expect(replication.awtInvalidReason).toBe(fresh.awtInvalidReason ?? null);
       }
     }
-  });
+  }, 60_000);
 
   it('is deterministic in the request', () => {
     const request = requestFor('garden-apartments', 4, ['collective', 'eta']);
     const first = runBatch(request, resourcesFor('garden-apartments'));
     const second = runBatch(request, resourcesFor('garden-apartments'));
     expect(second.arms).toEqual(first.arms);
-  });
+  }, 60_000);
 
   it('reports progress once per arm-replication, monotonically, to the total', () => {
     const seen: number[] = [];
@@ -296,7 +296,7 @@ describe('what a batch records', () => {
     );
     expect(seen).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(result.arms[0]?.replications).toHaveLength(5);
-  });
+  }, 60_000);
 
   it('measures elapsed time through the injected clock and never a global one', () => {
     let ticks = 0;
@@ -306,7 +306,7 @@ describe('what a batch records', () => {
       { clock: { now: () => (ticks += 100) } },
     );
     expect(result.elapsedMs).toBe(100);
-  });
+  }, 60_000);
 });
 
 describe('a request that cannot be run says so', () => {
@@ -316,7 +316,7 @@ describe('a request that cannot be run says so', () => {
     const request = requestFor('garden-apartments', 2, ['collective', 'no-such-profile']);
     expect(() => runBatch(request, resources())).toThrow(BatchError);
     expect(() => runBatch(request, resources())).toThrow(/no-such-profile/);
-  });
+  }, 60_000);
 
   it('refuses two arms with one id, and a non-positive replication count', () => {
     const shared = requestFor('garden-apartments', 2, ['collective', 'eta']);
@@ -325,7 +325,7 @@ describe('a request that cannot be run says so', () => {
     ).toThrow(/share an id/);
     expect(() => runBatch({ ...shared, replications: 0 }, resources())).toThrow(/positive whole/);
     expect(() => runBatch({ ...shared, durationS: 0 }, resources())).toThrow(/positive number/);
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *

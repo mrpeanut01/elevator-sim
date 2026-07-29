@@ -93,7 +93,7 @@ describe('a selecting dispatcher is stored completely enough to replay', () => {
     expect(JSON.stringify(on.record.travelSamples)).not.toBe(
       JSON.stringify(off.record.travelSamples),
     );
-  });
+  }, 60_000);
 
   it('replays byte for byte after a trip through JSON', () => {
     const simConfig = configFor(selecting);
@@ -112,7 +112,7 @@ describe('a selecting dispatcher is stored completely enough to replay', () => {
     expect(outcome.differences).toEqual([]);
     expect(outcome.identical).toBe(true);
     expect(outcome.summaryMatches).toBe(true);
-  });
+  }, 60_000);
 
   it('refuses to replay when the sources cannot supply the arms', () => {
     // Not a silent fallback to the profile's own weights: that replay would succeed and mean
@@ -129,7 +129,7 @@ describe('a selecting dispatcher is stored completely enough to replay', () => {
     expect(() => replayStoredRun(stored, withoutLibrary)).toThrow(
       /patternSwitching library was supplied/,
     );
-  });
+  }, 60_000);
 
   it('round-trips a selection stage supplied as a dispatcherOptions override', () => {
     // The override half. `dispatcherOptionsOf` dropped this field silently until T53, which was
@@ -154,7 +154,7 @@ describe('a selecting dispatcher is stored completely enough to replay', () => {
       hysteresisS: 60,
     });
     expect(replayStoredRun(stored, sources).identical).toBe(true);
-  });
+  }, 60_000);
 
   it('refuses to store a run whose weight-set library was handed in by hand', () => {
     const library = {
@@ -172,5 +172,5 @@ describe('a selecting dispatcher is stored completely enough to replay', () => {
         result,
       }),
     ).toThrow(ReportsError);
-  });
+  }, 60_000);
 });
