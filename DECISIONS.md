@@ -8584,3 +8584,109 @@ needs no change — `garden-down-peak` remains its single member, asserted in bo
 2. **The `eta ≡ fairness-first` widening has no mechanism.** It is a measured class with an
    unmeasured explanation, which is the state `CLAUDE.md` § *A stated mechanism goes stale the same
    way* says must be declared rather than filled in.
+
+---
+
+## D151 — the profile's section list is **derived from the schema**, and the derivation is proved against a schema the product does not ship
+
+**Date:** 2026-07-28 · **Owner:** T54 · **Closes:** [§ D146](#d146) item 1's stated debt —
+*"deriving the list from `dispatcherProfileSchema`'s own shape is the real fix and is left as
+debt"* · **Opens:** nothing new; **names** one thing that was already open
+
+### What was wrong
+
+`tuning/space/encode.ts` decided which keys of a dispatcher profile are written as
+`profile.<section>.<key>` by carrying `PROFILE_OBJECT_SECTIONS`, a hand-written array — in the
+module whose sibling `collect.ts` opens with an argument against hand-written lists. § D146
+recorded what that cost the first time: `selection` landed in `config/schema.ts` with seven
+declared, round-trip-tested rows, the array did not gain it, `collectSearchSpace()` reported all
+seven **unauthorable**, and the search space was 49 where it should have been 56 — with nothing
+anywhere reading as wrong. Adding `selection` to the array fixed that instance and left the
+mechanism intact.
+
+### The fix, and where it lives
+
+`config/schema.ts` gains `objectSectionsOf(schema)` — the keys of an object schema whose values,
+after peeling every wrapper that exposes an `innerType`, are themselves object schemas — and
+`DISPATCHER_PROFILE_OBJECT_SECTIONS`, that function applied to `dispatcherProfileSchema`.
+`encode.ts`'s constant **is** that value, by identity.
+
+It lives in `core` rather than in `experiments` for a reason that is not convenience:
+`experiments` does not depend on `zod` and must not start, and the fact being read is a fact about
+`core`'s schema. Nobody outside `schema.ts` re-derives it.
+
+### The counts did not move, and that is the claim
+
+| | before | after |
+|---|---|---|
+| search-space dimensions | **56** | **56** |
+| declared rows | **106** | **106** |
+| profile object sections | 7, written down | 7, derived |
+| order | `normalization, dispatch, eligibility, answer, idle, auction, selection` | identical |
+
+Declaration order rather than sorted, so the order is unchanged and a decoded patch's JSON keys
+come out where they did. An object literal's key order is fixed by the language, unlike a module
+namespace's — which is why `collect.ts` sorts its discovery and this does not.
+
+**A derivation that moved a count would be a second defect wearing the fix's clothes**, so the two
+numbers `collect.test.ts` already pins are the regression evidence, and `encode.test.ts` now pins
+the section count they are a function of.
+
+### Measured: an eighth section reaches the optimizer with no edit in `experiments`
+
+A fictional `plaza` section plus one declared `plaza.fountainDwellS` row, added to `core` alone:
+
+| | space | `plaza.fountainDwellS` in the space | decoded patch |
+|---|---|---|---|
+| hand-written list | **56** | **absent** — silently dropped as unauthorable | — |
+| derived list | **57** | **present** | `{"plaza":{"fountainDwellS":9}}` |
+
+That is § D146's failure mode reproduced on demand and then not happening.
+
+### Why the proof is against a fictional schema
+
+`config/schema.test.ts` exercises the deriver against a profile schema **the product does not
+ship**, carrying four fictional sections in four wrapper shapes — `.optional()`, bare,
+`.default({})`, `.optional().readonly()` — and three fictional non-sections. § D134's reason,
+verbatim in shape: *a generated control that looks live only because the shipped schema happens to
+fit it is the risk*. A test that only checked the seven shipped names passes for a hand-written
+list too, which is the entire history of this defect — and it was watched failing: replacing the
+deriver's body with the old array reds the two fictional-schema assertions and **leaves every
+shipped-schema assertion green**, which is exactly the discrimination being bought.
+
+The verdict is also cross-checked against an **independent oracle** that shares no code with the
+deriver: a key is a section iff `parseDispatcherProfiles` — the function `loadConfig` calls —
+accepts `{}` at it. The two agree key for key, with `weights` the one documented difference, for
+the same reason it is the blind spot below.
+
+### The blind spot, named rather than hidden
+
+A section authored as a **record**, a **union**, an **intersection**, a **lazy** or a **pipe** is
+**not** found, and would fail the same silent way `selection` did. This is asserted, not merely
+stated: the fictional schema carries a `z.record` section and a union/intersection/lazy triple, and
+the test requires them absent. `weights` is the shipped instance and is why the rule is drawn here
+— an open map has no fixed keys, so there is nothing for a search to declare, and `encode.ts`
+handles it as a pseudo-section with its own translation.
+
+### The second instance of § D146's defect, found and **not** closed
+
+`core`'s own `sim/searchSpaceLiveness.test.ts` carries the same hand-written array, and it was
+**stale in the same way**: six sections against the schema's seven, so all seven `selection.*` rows
+were classified unauthorable and dropped from the liveness sweep too.
+
+**Deriving it there turns the sweep red, and the red is truthful.** Measured: `finds no flat
+dimension without a declared reason` fails with exactly the seven `selection.*` ids and no others,
+under the message *"no pair of values for these dimensions could be materialised and run at all"*.
+The cause is not this sweep — `sim/simulation.ts` contains no reference to `weightSets` at all, so
+a profile carrying a non-`off` `selection.policy` cannot be **run** through `runSimulation`, which
+is the separately-tracked *selector not reaching the runner* gap. The sweep's own instruction for
+an inadmissible dimension is *"do not allowlist them"*, and weakening it to make a derivation land
+is the thing `CLAUDE.md` § *Working agreements* forbids.
+
+So the array stands **and the omission is now stated**: `SECTIONS_THIS_SWEEP_CANNOT_RUN` names
+`selection` with its reason, and a new assertion requires the difference between the schema's
+sections and the sweep's to be **exactly** that set. An eighth section fails it — watched, with a
+fictional `plaza`: *"a section the schema declares is neither probed by this sweep nor excused with
+a reason: expected `['plaza', 'selection']` to strictly equal `['selection']`"* — and `selection`
+becoming runnable fails it too. That is the difference between an exclusion and the silent
+staleness the list had before.

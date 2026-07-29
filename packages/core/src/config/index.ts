@@ -24,6 +24,7 @@
 
 export {
   ConfigError,
+  DISPATCHER_PROFILE_OBJECT_SECTIONS,
   ISSUE_CODES,
   WARNING_CODES,
   accessZoneSchema,
