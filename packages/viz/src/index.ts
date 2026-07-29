@@ -111,6 +111,14 @@
  * | {@link measureScenario}, {@link publishedScenarioFor} | `src/scenario/regenerate.test-helper.ts`, the driver that writes `data/scenario-goals.json`, and `src/scenario/goalRates.test.ts`, which re-derives it. **The only export here whose shipped caller is a driver rather than a screen**, and it is the shape `experiments/src/benchmark/regeneratePins.ts` already has: a published number needs something that can produce it again |
  * | {@link validatePublishedGoalRates} | `src/scenario/goalRates.test.ts` — the guard. A goal kind with no measured rate on a scenario is a failure, not an omission |
  * | {@link CANDIDATE_GOALS}, {@link CANDIDATE_SCENARIOS} | `goalReport`, `regenerate.test-helper.ts` and the guard |
+ * | {@link parseCampaign}, {@link validateCampaign} | `loadCampaign` in `src/dev/data.ts`, called once by `src/dev/main.ts` before the Campaign tab is mounted — `docs/10` § 5.2 |
+ * | {@link editableIdsOf} | `src/dev/campaignPanel.ts`, `src/campaign/brief.ts` and `parse.ts`'s lever check. One answer to *"may I move this?"* |
+ * | {@link briefingFor} | `src/dev/campaignPanel.ts`'s left column, redrawn on every stage change |
+ * | {@link admitProfile}, {@link movedDimensions} | `src/dev/campaignPanel.ts` — a profile outside the stage's editable set is refused with the dimension named, before the batch |
+ * | {@link judgeStage} | `src/dev/campaignPanel.ts`, on the batch the Campaign tab just ran |
+ * | {@link batchRequestForStage}, {@link demonstrationConfigFor}, {@link stageReplicationSeed} | `src/dev/campaignPanel.ts`, and `campaign.test.ts` calls the same two rather than assembling a second request — the shape § D159 calls *a fixture routing the test to the wrong code path*, one level up |
+ * | {@link failStateCounts}, {@link evidenceFrom}, {@link failStateReports} | `src/dev/campaignPanel.ts` — § 5.3's four states, counted over the batch and diagnosed on one replayed replication |
+ * | {@link PROBABILITY_WORDS}, {@link probabilityWordIn} | `src/campaign/parse.ts`, which refuses an authored brief that trips it — R10 at load time rather than in review |
  *
  * `frameSequence` and `serializeFrames` exist because Phase 4's acceptance criterion needs a
  * headless, browser-free way to compare two replays. They would have shipped as "configurable,
@@ -485,3 +493,73 @@ export {
   type GoalReportRow,
   type GoalReportWithheld,
 } from './scenario/goalReport.js';
+
+
+/* -------------------------------------------------------------------------- *
+ * The campaign — `docs/10-experience-layer-contract.md` § 5, W5
+ *
+ * Seven stages, as data validated by a schema. A goal is selected from
+ * `data/scenario-goals.json`'s measured `goals` bucket and never authored; the
+ * bar it is judged against is the count that table published for the shipped
+ * setting on the same seeds; and every verdict comes from a batch, because R2
+ * says one replication cannot support the sentence.
+ * -------------------------------------------------------------------------- */
+
+export {
+  FAIL_STATES,
+  type Campaign,
+  type CampaignStage,
+  type EditableDimensions,
+  type FailState,
+  type StageDispatcher,
+  type StageTraffic,
+} from './campaign/types.js';
+
+export {
+  CampaignError,
+  editableIdsOf,
+  parseCampaign,
+  playerFacingStrings,
+  validateCampaign,
+  type CampaignContext,
+} from './campaign/parse.js';
+
+export { PROBABILITY_WORDS, probabilityWordIn } from './campaign/words.js';
+
+export {
+  admitProfile,
+  movedDimensions,
+  valueText,
+  type MovedDimension,
+  type ProfileAdmission,
+} from './campaign/dimensions.js';
+
+export { briefingFor, type BriefedDimension, type BriefingInput, type StageBriefing } from './campaign/brief.js';
+
+export {
+  judgeStage,
+  type JudgeStageInput,
+  type StageGoalVerdict,
+  type StageReport,
+} from './campaign/judge.js';
+
+export {
+  BASELINE_ARM_ID,
+  CANDIDATE_ARM_ID,
+  batchRequestForStage,
+  demonstrationConfigFor,
+  stageReplicationSeed,
+  type DemonstrationInput,
+} from './campaign/stageRun.js';
+
+export {
+  evidenceFrom,
+  failStateCounts,
+  failStateReports,
+  type DemonstrationEvidence,
+  type EvidenceInput,
+  type FailStateCount,
+  type FailStateReport,
+  type FailStateReportInput,
+  type NamedLanding,
+} from './campaign/failStates.js';

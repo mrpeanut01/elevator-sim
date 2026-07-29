@@ -9842,3 +9842,48 @@ Its first draft filed **every** kind with no per-run predicate as unshippable �
 **On the false-negative shape this wave hit four times:** `disposition` and `rateClass` are both *stored* and *derived*, so a mutation that moves a constant into `goals` **and** rewrites its disposition to match would satisfy a naive check. It still fires, because `expected` is derived from the published **counts**, never from the stored value. All ten permanent data controls are applied to the **real loaded table**, deep-cloned — never a hand-built fixture. A genuine fixture false negative was also found and fixed on first run: `fakeReplication`'s `?? baseValue` silently discarded the `null` override the unmeasured test depended on.
 
 **Impact.** `data/scenario-goals.json` is the published table and T65 must take its goals only from its `goals` buckets. **Known limits:** `everyone-can-get-there` is published as **withheld**, blocked on W7 — the guard keeps it there until someone writes the predicate and re-measures, which is the intended behaviour. The `long-waits-under` threshold (10 %, M18's) is a free parameter and the rate is a function of it; it is published beside every rate it produced, and a different threshold is a different measurement.
+
+---
+
+## D161 — the campaign ships, and it is **honest about how much of it the dropdown already clears**
+
+**Date:** 2026-07-29 · **Owner:** T65 (wave 8) · **Implements:** [`docs/10`](docs/10-experience-layer-contract.md) § 5 (U3) as W5 · **Consumes:** [§ D158](#d158), [§ D160](#d160) · **Corrects:** `docs/10` § 5.4
+
+**Context.** [§ D160](#d160) established that R12, applied honestly, leaves **no single-run goals** — a campaign is batch goals and briefing facts. This lane is the campaign built on that table: § 5.2's scenario schema, § 5.4's seven stages, § 5.3's four fail states, and a progression UI whose every verdict comes from W3's batch runner and W9's estimator. **No second runner, no second estimator.** Every goal is *selected* from `data/scenario-goals.json`'s `goals` bucket and never authored — pinned by a test in **both** directions, so a goal invented by hand and a measured goal quietly dropped are each a guard failure.
+
+### The answer to the question the lane was asked, in both halves
+
+**Yes — the measured table supports a playable seven-stage progression.** All seven stages carry at least one live goal.
+
+**And, measured over every admissible shipped profile: three of the seven clear from the dispatcher dropdown alone** — stage 3 by `fairness-first`, stage 4 by `destination-eta`/`destination-panel`, stage 7 by `destination-panel`. Four do not, because `beat-the-baseline` requires a paired interval excluding zero **with nothing resolving the other way**.
+
+**§ 5.4's claim that stage 1 is *"winnable trivially"* is measurably false** under that bar, and is corrected in place rather than left as flavour text. Publishing which stages are already solved by a dropdown is less flattering than not measuring it, and it is the only version a player cannot be misled by.
+
+### The bar is not a number somebody chose
+
+Each stage runs **two arms**: its own starting profile, and the player's. The count goals' bar is the shipped setting's published count *on the same seeds* — and the baseline arm **is** that setting on those seeds. So `judge.ts` **re-derives the bar every run and refuses to judge at all when it does not reproduce.** A campaign threshold that cannot be re-derived from the run that is supposed to produce it is exactly the stale-published-number failure `CLAUDE.md` names; here it is structurally impossible rather than merely watched. And because `beat-the-baseline` needs an interval excluding zero in the candidate's favour, **standing still clears nothing.**
+
+### R11 reaching the player, which is the test of whether any of this worked
+
+Stage 5, played: `destination-eta` cleared every lockout, took `answer-the-demand` from **3/50 to 12/50**, and **cost** long waits — **16/50 against 32/50**. The game says so in those words: *"ahead on people carried … and behind on rides over the long-wait threshold. That is a move along the front rather than a win."*
+
+A gamified surface that reported a single score would have called that a win. This one reports a Pareto move, because R11 is enforced as a test — `favours` is `null` on every `axis` row however its interval fell — and not as a paragraph.
+
+### The false-negative hunt, and the harness that lied
+
+Four variants were named going in and **all four were found**:
+
+1. **Two readers** — `favours` and `reproduced` are both stored and derivable. Before the control existed, `reproduced` could never have been `false`; closed by a test that runs a stage against the *wrong seed set*.
+2. **A fixture routing past the code path** — there are no fixtures, and the suite nonetheless assembled its **own `BatchRequest`**, a reimplementation of the call site. Extracted to `campaign/stageRun.ts` and called by both panel and suite. The demand-override branch fires on four stages and **had no test at all** until then.
+3. **A control returning early** — every mutation targets the production clause on an otherwise-valid campaign, and `parseCampaign` composes decode+validate so a structurally broken stage throws rather than being silently dropped.
+4. **An eroded guard whose assertions stay true** — the *"no dimension id is written into `campaign/`"* grep listed six files **by hand** (a new module escaped it) and matched only `'single-quoted'` literals. The file list is now read off the directory and the id matched bare.
+
+**And a fifth, one level up: the mutation harness itself was lying.** `--reporter=basic` no longer exists in vitest 4, so **every mutation reported "no failures"** — a sweep that would have certified a dead test suite as fully live. It now aborts if vitest emits no `Tests` line. *The instrument that checks the tests needs its own check*, which is this wave's lesson arriving one level above where it started.
+
+**Final battery: 15 mutations, 15 red, no-op control green.**
+
+### Driving it found what tests did not
+
+A fail state printed `0 of 50` **while suggesting a dial to try** — a sentence that is technically true and useless. The definitions were reworded out of the indicative and the hint attached only where the state actually arose, asserted both ways.
+
+**Impact.** `data/campaign.json` is pinned field-for-field to `data/scenario-goals.json`, so regenerating the goal table without regenerating the campaign turns the suite red — intended. **Known limits:** the player's move is a **shipped profile**, not a live weight editor — wiring W4's form into the arm is W6's — so four stages need an authored weight vector to clear. `everyone-can-get-there` reaches the briefing as **withheld**, blocked on W7. `PROBABILITY_WORDS` is now a third copy of that pattern and the divergence is pinned by a superset assertion rather than left to drift.

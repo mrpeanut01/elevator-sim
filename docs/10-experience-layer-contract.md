@@ -838,6 +838,20 @@ adding exactly one concept and each stage using a shipped building:
 Stage 3 is the load-bearing one. **A game that cannot be lost teaches nothing, and this simulator's
 losing condition is real.**
 
+> **Measured 2026-07-29, and one word of the list above is now false.** Stage 1 is described as
+> *"winnable trivially"*. Under the bar W5 actually ships — the count goals judged against the
+> shipped setting's own published count on the same seeds, plus `beat-the-baseline`, which every
+> stage carries and which needs a paired interval excluding zero with nothing resolving the other
+> way — **no shipped dispatcher profile clears stage 1**, because on Garden Apartments no measure
+> separates any admissible arm from `collective` at n = 50. Three stages *are* clearable from the
+> dispatcher dropdown alone: **3** (`fairness-first`), **4** (`destination-eta`,
+> `destination-panel`) and **7** (`destination-panel`). Stage 5 is the instructive one and it is
+> instructive in both directions: `destination-eta` clears every locked-out landing and takes
+> `answer-the-demand` from 3 of 50 to 12 of 50, and **costs** long waits — 16 of 50 against 32 —
+> so it comes out *ahead on people carried and behind on long waits*, which is a move along the
+> front rather than a win. That is § 5.3's Pareto sentence arriving as a measured outcome instead
+> of a caution.
+
 ### 5.5 What must never be built
 
 - A score displayed on a suppressed run (R1, R5).
@@ -1508,7 +1522,61 @@ U7.
   and which is a second source of truth about what the search space is. The `TRAFFIC_PARAMETERS`
   half of W4 is unblocked either way, because that schema is on the `core/browser` barrel.
 
-### W5 — Scenarios as data, and the judge *(depends on W2, W3)*
+### W5 — Scenarios as data, and the judge *(depends on W2, W3)* — ✅ **DONE 2026-07-29, and the goal table supports all seven stages**
+
+> **Landed.** `packages/viz/src/campaign/` holds the schema (`types.ts`, `parse.ts`), the briefing
+> (`brief.ts`), the editable-dimension check (`dimensions.ts`), the judge (`judge.ts`) and § 5.3's
+> four fail states (`failStates.ts`); `data/campaign.json` is the seven stages as data;
+> `packages/viz/src/dev/campaignPanel.ts` is the Campaign tab, mounted by `src/dev/main.ts`.
+> **No second runner and no second estimator**: every verdict comes from W3's `runBatch` and
+> `batchReport`, and every goal rate from W9's `measureGoalRate`.
+>
+> **A goal is selected, never authored.** Each stage's goal list is checked **equal** to its
+> `goals` bucket in `data/scenario-goals.json` — subset because § D160 forbids inventing one,
+> superset because a measured goal quietly dropped is indistinguishable on screen from a goal
+> nobody measured. The building, dispatcher, horizon, demand level, both seed sets and the
+> replication count are each checked field-for-field against that table's entry for the same stage
+> id, because a pass rate is a property of **one** configuration.
+>
+> **The bar is the shipped setting's own published count, and it is re-derived every time.** Each
+> stage runs two arms — the stage's starting profile and the player's — so the baseline arm *is*
+> the configuration the table measured, on the same seeds. `judge.ts` compares what that arm scored
+> with what the table says it scored and **refuses to judge the player at all** when the two
+> disagree. Nothing invents a threshold; § 5.2's own warning about `long-waits-under` is what that
+> avoids.
+>
+> **The measured table does support a playable seven-stage progression, and the honest form of that
+> sentence has two halves.** All seven stages carry at least one live goal (14 count goals plus
+> `beat-the-baseline` on every stage). Measured over every admissible shipped profile, **three
+> stages can be cleared from the dispatcher dropdown alone** — stage 3 by `fairness-first`, stage 4
+> by `destination-eta` and `destination-panel`, stage 7 by `destination-panel` — and four cannot,
+> because `beat-the-baseline` needs a paired interval excluding zero with nothing resolving the
+> other way, and no shipped profile achieves that there. **§ 5.4's *"winnable trivially"* is false
+> of stage 1 under this bar**, and is corrected in place below. Clearing those four needs an
+> authored weight vector, which is invariant 7's own model of what a dispatcher is.
+>
+> **Two findings, both from driving rather than from a test.**
+>
+> 1. **A saturated run can end with an empty building.** Stage 3 replication 0 — Midtown Office at
+>    its shipped demand — is `saturated: true` with `undelivered: 0` and **ends at 1 883 s with
+>    nobody standing**: the queues grew inside the 900 s demand horizon and drained afterwards. A
+>    diagnosis sampled at `endedAt` said *"nobody was still standing at the end"* about it. That is
+>    CLAUDE.md's *"neither sees a queue that grew enormously and drained just in time"* reaching a
+>    screen; the diagnosis now samples every 15 s (**M5**'s cadence) and reports the worst moment,
+>    which on that run is **119 people on `G` at 795 s**.
+> 2. **R10 has a hole wherever text is *derived* rather than authored.** `idle.predictorHorizonS`'s
+>    schema `description` contains the word *"likely"* — correct prose for a parameter schema, and a
+>    probability word arriving on a player-facing surface through `SearchParameter.description` on
+>    the stage that opens every declared dimension. `core`'s text is not this lane's to rewrite and
+>    the Parameters tab may still show it, so `campaign/words.ts` **replaces** it there with the
+>    reason (R3's shape applied to R10). The refusal does not quote the offending word, because a
+>    refusal that named it tripped the blanket assertion it exists to keep.
+>
+> **Known limits.** `building` is an id and never an inline `BuildingConfig` (§ 5.2 allows either):
+> an inline building could carry no measured goal, so it is a form in which nothing could legally be
+> declared. `traffic` is the one field `BatchRequest` reads. The player's move is a **shipped
+> profile**, not a live weight editor — W6/W4's wiring — and an off-spec profile is refused with the
+> out-of-scope dimensions named rather than silently judged.
 
 The scenario schema, a shipped scenario library covering § 5.4's seven stages, and a judge that
 evaluates goals from finished recordings and batches.

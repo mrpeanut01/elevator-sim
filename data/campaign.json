@@ -1,0 +1,346 @@
+{
+  "generatedBy": "Authored. Validated at load by packages/viz/src/campaign/parse.ts against data/scenario-goals.json, against collectSearchSpace() and against data/buildings/. packages/viz/src/campaign/campaign.test.ts runs that validator over this file.",
+  "contract": "docs/10-experience-layer-contract.md § 5.2 (the scenario shape), § 5.3 (the four fail states), § 5.4 (the seven-stage progression). Goals are SELECTED, never authored: every kind below appears in this stage's `goals` bucket in data/scenario-goals.json, and the bar each is judged against is the count that table published for the shipped setting on these same seeds. DECISIONS.md § D160 — a rate of 0 or 1 is a fact for the brief, anything between is a batch goal, and there is no single-run goal left for a stage to carry.",
+  "stages": [
+    {
+      "id": "stage-1-first-call",
+      "name": "One shaft, low demand",
+      "teaches": "a call, a car, a wait",
+      "brief": [
+        "Garden Apartments is a small building with a gentle trickle of demand.",
+        "Watch a call appear at a landing, a car answer it, and the wait end — those three things are what every dispatcher in this simulator is made of.",
+        "Nothing here is hard. The stage exists so that the next six have something to be different from."
+      ],
+      "building": "garden-apartments",
+      "traffic": { "arrivalRatePctPop5min": null },
+      "durationS": 900,
+      "dispatcher": {
+        "startingProfileId": "collective",
+        "editable": {
+          "mode": "listed",
+          "ids": [
+            "weights.waitTime",
+            "weights.distanceTravelled",
+            "constraints.noDirectionReversal"
+          ]
+        }
+      },
+      "seeds": { "name": "tuning-20260730", "seed": "20260730", "replications": 50 },
+      "holdoutSeeds": { "name": "holdout-20260731", "seed": "20260731", "replications": 50 },
+      "replications": 50,
+      "goals": [
+        { "kind": "answer-the-demand", "threshold": null },
+        { "kind": "beat-the-baseline", "threshold": null }
+      ],
+      "levers": {
+        "overwhelmed": "weights.waitTime",
+        "abandoned": "weights.waitTime",
+        "stranded": "constraints.noDirectionReversal",
+        "locked-out": null
+      }
+    },
+    {
+      "id": "stage-2-morning-rush",
+      "name": "The morning rush",
+      "teaches": "rise and fall, and the gap between demand offered and demand carried",
+      "brief": [
+        "Midtown Office at two and a half percent of its population arriving every five minutes: busy, and still under the level at which it stops coping.",
+        "Two counts matter here — how many people arrived, and how many were carried — and the gap between them is the thing a dispatcher can move.",
+        "This is the first stage where a number changes when you change a dial."
+      ],
+      "building": "midtown-office",
+      "traffic": { "arrivalRatePctPop5min": 2.5 },
+      "durationS": 900,
+      "dispatcher": {
+        "startingProfileId": "collective",
+        "editable": {
+          "mode": "listed",
+          "ids": [
+            "weights.waitTime",
+            "weights.distanceTravelled",
+            "weights.loadFactor",
+            "weights.crowding",
+            "weights.stopCount",
+            "weights.starvation",
+            "constraints.noDirectionReversal",
+            "dispatch.assignmentMode",
+            "dispatch.splitThresholdPassengers",
+            "dispatch.reassignmentPolicy",
+            "dispatch.commitmentPoint",
+            "dispatch.reassignmentHysteresisS",
+            "dispatch.maxReassignmentsPerCall",
+            "answer.allowBypassIfSoleEligibleCar",
+            "answer.bypassLoadThreshold",
+            "eligibility.maxLoadFactorForAssignment"
+          ]
+        }
+      },
+      "seeds": { "name": "tuning-20260730", "seed": "20260730", "replications": 50 },
+      "holdoutSeeds": { "name": "holdout-20260731", "seed": "20260731", "replications": 50 },
+      "replications": 50,
+      "goals": [
+        { "kind": "answer-the-demand", "threshold": null },
+        { "kind": "long-waits-under", "threshold": 10 },
+        { "kind": "beat-the-baseline", "threshold": null }
+      ],
+      "levers": {
+        "overwhelmed": "dispatch.assignmentMode",
+        "abandoned": "weights.starvation",
+        "stranded": "answer.allowBypassIfSoleEligibleCar",
+        "locked-out": null
+      }
+    },
+    {
+      "id": "stage-3-overwhelmed",
+      "name": "Overwhelmed",
+      "teaches": "saturation, and why a diverging queue has no average",
+      "brief": [
+        "The same building at the demand it actually ships with.",
+        "It cannot be won as configured, and that is the point: the queues grow faster than the cars empty them, so the tool refuses to average a wait that never settles.",
+        "Your job here is to read the refusal and say where the building broke, not to beat it."
+      ],
+      "building": "midtown-office",
+      "traffic": { "arrivalRatePctPop5min": null },
+      "durationS": 900,
+      "dispatcher": {
+        "startingProfileId": "collective",
+        "editable": {
+          "mode": "listed",
+          "ids": [
+            "weights.waitTime",
+            "weights.distanceTravelled",
+            "weights.loadFactor",
+            "weights.crowding",
+            "weights.stopCount",
+            "weights.starvation",
+            "constraints.noDirectionReversal",
+            "dispatch.assignmentMode",
+            "dispatch.splitThresholdPassengers",
+            "dispatch.reassignmentPolicy",
+            "dispatch.commitmentPoint",
+            "dispatch.reassignmentHysteresisS",
+            "dispatch.maxReassignmentsPerCall",
+            "answer.allowBypassIfSoleEligibleCar",
+            "answer.bypassLoadThreshold",
+            "eligibility.maxLoadFactorForAssignment"
+          ]
+        }
+      },
+      "seeds": { "name": "tuning-20260730", "seed": "20260730", "replications": 50 },
+      "holdoutSeeds": { "name": "holdout-20260731", "seed": "20260731", "replications": 50 },
+      "replications": 50,
+      "goals": [
+        { "kind": "nobody-abandoned", "threshold": null },
+        { "kind": "beat-the-baseline", "threshold": null }
+      ],
+      "levers": {
+        "overwhelmed": "dispatch.assignmentMode",
+        "abandoned": "weights.starvation",
+        "stranded": "answer.allowBypassIfSoleEligibleCar",
+        "locked-out": null
+      }
+    },
+    {
+      "id": "stage-4-two-banks",
+      "name": "Two banks",
+      "teaches": "service zoning, and a journey with two waits",
+      "brief": [
+        "Mixed-Use High-Rise has two banks that reach different parts of the building, so a single journey can involve two waits and a transfer.",
+        "Service zoning is which floors a shaft physically reaches — not who is allowed in, and not how the dispatcher thinks; the three are different concepts with different fixes.",
+        "Keep the queues from running away while you learn to tell them apart."
+      ],
+      "building": "mixed-use-high-rise",
+      "traffic": { "arrivalRatePctPop5min": 1.5 },
+      "durationS": 900,
+      "dispatcher": {
+        "startingProfileId": "collective",
+        "editable": {
+          "mode": "listed",
+          "ids": [
+            "weights.waitTime",
+            "weights.distanceTravelled",
+            "weights.loadFactor",
+            "weights.crowding",
+            "weights.stopCount",
+            "weights.starvation",
+            "weights.zoneAffinity",
+            "weights.rideTime",
+            "constraints.noDirectionReversal",
+            "dispatch.callType",
+            "dispatch.passengerAssignment",
+            "dispatch.assignmentMode",
+            "dispatch.splitThresholdPassengers",
+            "dispatch.reassignmentPolicy",
+            "dispatch.commitmentPoint",
+            "dispatch.reassignmentHysteresisS",
+            "dispatch.maxReassignmentsPerCall",
+            "answer.allowBypassIfSoleEligibleCar",
+            "answer.bypassLoadThreshold",
+            "eligibility.maxLoadFactorForAssignment",
+            "idle.parkingStrategy",
+            "idle.repositionThresholdS",
+            "idle.repositionEnergyWeight"
+          ]
+        }
+      },
+      "seeds": { "name": "tuning-20260730", "seed": "20260730", "replications": 50 },
+      "holdoutSeeds": { "name": "holdout-20260731", "seed": "20260731", "replications": 50 },
+      "replications": 50,
+      "goals": [
+        { "kind": "no-divergence", "threshold": null },
+        { "kind": "long-waits-under", "threshold": 10 },
+        { "kind": "beat-the-baseline", "threshold": null }
+      ],
+      "levers": {
+        "overwhelmed": "dispatch.assignmentMode",
+        "abandoned": "weights.starvation",
+        "stranded": "weights.zoneAffinity",
+        "locked-out": "dispatch.callType"
+      }
+    },
+    {
+      "id": "stage-5-credentials",
+      "name": "Credentials",
+      "teaches": "access zoning, by failing at it first",
+      "brief": [
+        "Secure Tower puts a credential on most of its floors, and the dispatcher you start on cannot read one.",
+        "Ten of the twelve shipped dispatchers are in the same position, so a call from a restricted floor is not slow — it is unanswerable, and no amount of tuning the waiting weight reaches it.",
+        "Change what the call carries, and watch the locked-out landings clear."
+      ],
+      "building": "secure-tower",
+      "traffic": { "arrivalRatePctPop5min": null },
+      "durationS": 900,
+      "dispatcher": {
+        "startingProfileId": "collective",
+        "editable": {
+          "mode": "listed",
+          "ids": [
+            "weights.waitTime",
+            "weights.distanceTravelled",
+            "weights.rideTime",
+            "constraints.noDirectionReversal",
+            "dispatch.callType",
+            "dispatch.passengerAssignment"
+          ]
+        }
+      },
+      "seeds": { "name": "tuning-20260730", "seed": "20260730", "replications": 50 },
+      "holdoutSeeds": { "name": "holdout-20260731", "seed": "20260731", "replications": 50 },
+      "replications": 50,
+      "goals": [
+        { "kind": "no-divergence", "threshold": null },
+        { "kind": "answer-the-demand", "threshold": null },
+        { "kind": "long-waits-under", "threshold": 10 },
+        { "kind": "beat-the-baseline", "threshold": null }
+      ],
+      "levers": {
+        "overwhelmed": "weights.waitTime",
+        "abandoned": "weights.waitTime",
+        "stranded": "dispatch.callType",
+        "locked-out": "dispatch.callType"
+      }
+    },
+    {
+      "id": "stage-6-the-tall-one",
+      "name": "The tall one",
+      "teaches": "that at a hundred floors the geometry decides more than the weights do",
+      "brief": [
+        "Vertical City is a hundred floors served by banks that each reach a slice of it, with sky lobbies where journeys change hands.",
+        "At this scale the shape of the building sets the outcome more than the weight vector does, and this stage is where that stops being an assertion.",
+        "Everything the other stages opened is open here. See how far the dials get you."
+      ],
+      "building": "vertical-city",
+      "traffic": { "arrivalRatePctPop5min": 0.5 },
+      "durationS": 900,
+      "dispatcher": {
+        "startingProfileId": "collective",
+        "editable": {
+          "mode": "listed",
+          "ids": [
+            "weights.waitTime",
+            "weights.distanceTravelled",
+            "weights.loadFactor",
+            "weights.crowding",
+            "weights.stopCount",
+            "weights.starvation",
+            "weights.zoneAffinity",
+            "weights.rideTime",
+            "weights.detourPenalty",
+            "weights.existingCallDelay",
+            "weights.directionReversal",
+            "weights.predictedDemand",
+            "constraints.noDirectionReversal",
+            "dispatch.callType",
+            "dispatch.passengerAssignment",
+            "dispatch.assignmentTiming",
+            "dispatch.deferWindowS",
+            "dispatch.assignmentMode",
+            "dispatch.splitThresholdPassengers",
+            "dispatch.reassignmentPolicy",
+            "dispatch.commitmentPoint",
+            "dispatch.reassignmentHysteresisS",
+            "dispatch.maxReassignmentsPerCall",
+            "answer.allowBypassIfSoleEligibleCar",
+            "answer.bypassLoadThreshold",
+            "answer.dwellPolicy",
+            "answer.dwellAdaptationGain",
+            "answer.maxDwellS",
+            "eligibility.maxLoadFactorForAssignment",
+            "idle.parkingStrategy",
+            "idle.repositionThresholdS",
+            "idle.repositionEnergyWeight",
+            "auction.aggregation",
+            "auction.rounds",
+            "auction.reserveMarginalDelayS"
+          ]
+        }
+      },
+      "seeds": { "name": "tuning-20260730", "seed": "20260730", "replications": 50 },
+      "holdoutSeeds": { "name": "holdout-20260731", "seed": "20260731", "replications": 50 },
+      "replications": 50,
+      "goals": [
+        { "kind": "deliver-everyone", "threshold": null },
+        { "kind": "no-divergence", "threshold": null },
+        { "kind": "answer-the-demand", "threshold": null },
+        { "kind": "long-waits-under", "threshold": 10 },
+        { "kind": "beat-the-baseline", "threshold": null }
+      ],
+      "levers": {
+        "overwhelmed": "idle.parkingStrategy",
+        "abandoned": "weights.starvation",
+        "stranded": "dispatch.assignmentMode",
+        "locked-out": "dispatch.callType"
+      }
+    },
+    {
+      "id": "stage-7-prove-it",
+      "name": "Tune it",
+      "teaches": "that an improvement you cannot measure is not one",
+      "brief": [
+        "Back to Midtown Office, at a level where both settings still stand behind their own numbers.",
+        "Every dimension the search space declares is yours to move, and the bar is no longer whether something looked better: it is a paired interval over fifty runs, on the difference itself, that does not contain zero.",
+        "Tune on the seeds you are given. The holdout set exists so that a gain living only in these passenger traces has somewhere to fail."
+      ],
+      "building": "midtown-office",
+      "traffic": { "arrivalRatePctPop5min": 1.5 },
+      "durationS": 900,
+      "dispatcher": {
+        "startingProfileId": "collective",
+        "editable": { "mode": "every-declared-dimension" }
+      },
+      "seeds": { "name": "tuning-20260730", "seed": "20260730", "replications": 50 },
+      "holdoutSeeds": { "name": "holdout-20260731", "seed": "20260731", "replications": 50 },
+      "replications": 50,
+      "goals": [
+        { "kind": "answer-the-demand", "threshold": null },
+        { "kind": "beat-the-baseline", "threshold": null }
+      ],
+      "levers": {
+        "overwhelmed": "dispatch.assignmentMode",
+        "abandoned": "weights.starvation",
+        "stranded": "answer.allowBypassIfSoleEligibleCar",
+        "locked-out": null
+      }
+    }
+  ]
+}
