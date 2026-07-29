@@ -10259,7 +10259,7 @@ On Secure Tower at seed 20260729 that is **thirteen warnings now appearing in bo
 
 ### The class this clause cannot be satisfied for — reported, not weakened
 
-**Basic cannot *shorten* a suppression reason.** `core` returns one of four sentences as a bare `string` with **no ground code**, so a per-ground rewording would have to re-decide which ground fired — [R9](../docs/10-experience-layer-contract.md)'s forbidden operation, and wrong precisely on the fourth ground. Basic therefore leads with a ground-free sentence and carries `core`'s own words underneath.
+**Basic cannot *shorten* a suppression reason.** `core` returns one of four sentences as a bare `string` with **no ground code**, so a per-ground rewording would have to re-decide which ground fired — [R9](docs/10-experience-layer-contract.md)'s forbidden operation, and wrong precisely on the fourth ground. Basic therefore leads with a ground-free sentence and carries `core`'s own words underneath.
 
 § D163 says a clause may not be satisfied by a hand-written exemption list, and this is not one: it is a stated structural limit with a named fix — **`core` must carry the ground beside the prose.** Recorded as debt rather than absorbed.
 
