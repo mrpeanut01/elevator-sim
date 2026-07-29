@@ -29,30 +29,47 @@ const TRAVERSAL_S = 21.2;
 
 let config: LoadedConfig;
 let result: SimulationResult;
+/**
+ * The same run on `vertical-city` **with only its ground-lobby escalator** — the building exactly
+ * as it shipped between `d7e8571` and the sky-lobby escalators. It is here for one reason: it is
+ * the only configuration in `data/` that still produces a **closing** hop, and a code path with no
+ * live case anywhere is this repository's signature defect.
+ */
+let beforeSkyLobbies: SimulationResult;
 
 beforeAll(async () => {
   config = await load();
   const building = config.buildingsById.get('vertical-city');
   const dispatcherProfile = config.dispatcherProfilesById.get('collective');
   if (building === undefined || dispatcherProfile === undefined) throw new Error('missing fixture');
-  result = runSimulation({
-    building,
+  const common = {
     dispatcherProfile,
     trafficProfiles: config.trafficProfiles,
     elevatorSpecs: config.elevatorSpecs,
     seed: 20260726,
-    onTimeout: 'report',
+    onTimeout: 'report' as const,
+  };
+  result = runSimulation({ ...common, building });
+  beforeSkyLobbies = runSimulation({
+    ...common,
+    building: {
+      ...building,
+      transportModes: building.transportModes.filter((mode) => mode.id === 'lobby-escalator'),
+    },
   });
-}, 120_000);
+}, 240_000);
 
-const legsOf = (journeyId: string): PassengerRecord[] =>
-  result.record.passengers
+const legsOf = (of: SimulationResult, journeyId: string): PassengerRecord[] =>
+  of.record.passengers
     .filter((record) => record.journeyId === journeyId)
     .sort((a, b) => a.legIndex - b.legIndex);
 
 /** Trace records whose hop sits at `position`, in trace order. */
-function withHopAt(position: 'opening' | 'middle' | 'closing'): readonly GeneratedPassenger[] {
-  return result.trace.passengers.filter((record) => {
+function withHopAt(
+  position: 'opening' | 'middle' | 'closing',
+  of: SimulationResult = result,
+): readonly GeneratedPassenger[] {
+  return of.trace.passengers.filter((record) => {
     const hops = record.transportHops ?? [];
     if (hops.length !== 1) return false;
     const [hop] = hops;
@@ -63,21 +80,53 @@ function withHopAt(position: 'opening' | 'middle' | 'closing'): readonly Generat
   });
 }
 
-describe('all three hop positions occur, so all three paths are exercised', () => {
-  it('the shipped demand produces every one of them', () => {
+describe('two of the three hop positions occur on shipped data, and the third is kept live', () => {
+  /**
+   * **The closing hop lost its only shipped case when the sky lobbies got escalators**, and this
+   * is where that is said rather than discovered.
+   *
+   * A journey out of zone 4 used to end on the ground escalator — `40 → 27` (zone-4 local),
+   * `27 → 2` (shuttle upper deck), `2 → G` (escalator) — which is a **closing** hop. Sky lobby A's
+   * escalator gives the same journey a route of the same length that crosses one floor pair
+   * earlier: `40 → 27`, `27 ⇢ 26` (escalator), `26 → G` (shuttle lower deck). Same two legs, same
+   * one hop, **middle** instead of closing. 20 journeys at this seed changed that way, and no
+   * shipped journey ends on a hop any more, because floors `2`, `27`, `52` and `77` carry no
+   * population and are not entrances — so no journey can *finish* on the far side of an escalator.
+   *
+   * That is the shape this repository has shipped eleven times: a behaviour whose cause was fixed
+   * and which then goes untested from `data/` with nothing saying so. It is asserted at zero here,
+   * and exercised **live** in the suite below against `vertical-city` with only its ground-lobby
+   * escalator — the building exactly as it shipped between `d7e8571` and this change, and the
+   * configuration every `vertical-city` figure published in that window was measured under.
+   */
+  it('opening and middle occur; closing does not, and both facts are asserted', () => {
     expect(withHopAt('opening').length).toBeGreaterThan(0);
     expect(withHopAt('middle').length).toBeGreaterThan(0);
-    expect(withHopAt('closing').length).toBeGreaterThan(0);
+    expect(withHopAt('closing').length).toBe(0);
   });
 
-  it('every hop is the declared escalator at its declared cost', () => {
+  it('every hop is a declared escalator of this building at its declared cost', () => {
+    const declared = new Map(
+      (config.buildingsById.get('vertical-city')?.transportModes ?? []).map((mode) => [
+        mode.id,
+        mode,
+      ]),
+    );
+    const used = new Set<string>();
     for (const record of result.trace.passengers) {
       for (const hop of record.transportHops ?? []) {
-        expect(hop.modeId).toBe('lobby-escalator');
+        const mode = declared.get(hop.modeId);
+        expect(mode, `hop on undeclared mode "${hop.modeId}"`).toBeDefined();
         expect(hop.traversalTimeS).toBeCloseTo(TRAVERSAL_S, 9);
-        expect(new Set([hop.originFloorId, hop.destinationFloorId])).toEqual(new Set(['G', '2']));
+        expect(new Set([hop.originFloorId, hop.destinationFloorId])).toEqual(
+          new Set(mode?.connects ?? []),
+        );
+        used.add(hop.modeId);
       }
     }
+    // The two the traffic can reach, and only those — `traffic/transportRoute.test.ts` carries
+    // the per-mode census and the reason the other two carry nobody.
+    expect([...used].sort()).toEqual(['lobby-escalator', 'sky-lobby-a-escalator']);
   });
 });
 
@@ -85,7 +134,7 @@ describe('an opening hop delays the wait without shortening the journey', () => 
   it('leg 0 starts waiting 21.2 s after the batch, and the journey started at the batch', () => {
     let checked = 0;
     for (const record of withHopAt('opening').slice(0, 40)) {
-      const legs = legsOf(record.journeyId);
+      const legs = legsOf(result, record.journeyId);
       const first = legs[0];
       if (first === undefined) continue;
       checked += 1;
@@ -105,7 +154,7 @@ describe('a middle hop replaces the sky-lobby walk and moves the boarding floor'
     for (const record of withHopAt('middle').slice(0, 40)) {
       const hop = (record.transportHops ?? [])[0];
       if (hop === undefined) continue;
-      const legs = legsOf(record.journeyId);
+      const legs = legsOf(result, record.journeyId);
       const before = legs[hop.beforeLegIndex - 1];
       const after = legs[hop.beforeLegIndex];
       if (before?.alightedAt === undefined || after === undefined) continue;
@@ -119,13 +168,21 @@ describe('a middle hop replaces the sky-lobby walk and moves the boarding floor'
 });
 
 describe('a closing hop is charged to time-to-destination and to nothing else', () => {
+  /**
+   * Run against `beforeSkyLobbies`, not against the shipped configuration — see the note on that
+   * binding. The arm is one field's difference from what `data/` ships, and it is the exact
+   * configuration this building had when the closing-hop path was written and measured.
+   */
   it('the last leg carries the seconds, and the journey record includes them', () => {
     const journeys = new Map(
-      buildJourneys(result.record.passengers).map((journey) => [journey.journeyId, journey]),
+      buildJourneys(beforeSkyLobbies.record.passengers).map((journey) => [
+        journey.journeyId,
+        journey,
+      ]),
     );
     let checked = 0;
-    for (const record of withHopAt('closing').slice(0, 40)) {
-      const legs = legsOf(record.journeyId);
+    for (const record of withHopAt('closing', beforeSkyLobbies).slice(0, 40)) {
+      const legs = legsOf(beforeSkyLobbies, record.journeyId);
       const last = legs[legs.length - 1];
       const journey = journeys.get(record.journeyId);
       if (last?.alightedAt === undefined || journey === undefined || !journey.isComplete) continue;
@@ -164,10 +221,31 @@ describe('the run accounts for every hop it took', () => {
     expect(result.conservation.transportHops).toBe(planned);
   });
 
-  it('no leg of any journey is the G <-> 2 lobby hop', () => {
+  it('no leg of any journey is a lobby-pair hop, at any of the four two-level lobbies', () => {
+    const declared = (config.buildingsById.get('vertical-city')?.transportModes ?? []).map(
+      (mode) => new Set(mode.connects),
+    );
+    // Non-vacuous: there are four pairs to violate, not one.
+    expect(declared).toHaveLength(4);
     for (const record of result.record.passengers) {
-      const pair = new Set([record.originFloorId, record.destinationFloorId]);
-      expect(pair.has('G') && pair.has('2')).toBe(false);
+      for (const pair of declared) {
+        expect(
+          pair.has(record.originFloorId) && pair.has(record.destinationFloorId),
+          `${record.originFloorId} -> ${record.destinationFloorId} was charged to the lifts`,
+        ).toBe(false);
+      }
     }
+  });
+
+  /**
+   * The control the closing-hop suite needs to mean anything: the arm it runs against really does
+   * produce closing hops, and the shipped configuration really does not. Without this, both halves
+   * of that claim could be true because `withHopAt` had stopped matching anything.
+   */
+  it('the ground-escalator-only arm is the one that still ends journeys on a hop', () => {
+    expect(withHopAt('closing', beforeSkyLobbies).length).toBeGreaterThan(0);
+    expect(withHopAt('closing', result).length).toBe(0);
+    // Same journeys either way — this is a decomposition difference, not a demand difference.
+    expect(result.trace.passengers.length).toBe(beforeSkyLobbies.trace.passengers.length);
   });
 });

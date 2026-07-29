@@ -45,6 +45,17 @@
  * and because the point of the fix is to stop the *lifts* being charged, not to minimize the
  * passenger's clock. Among transport edges, and among banks, declared order breaks the tie — so
  * the route is a stable property of the config rather than of iteration order.
+ *
+ * **What that rule costs, measured rather than assumed.** When a building declares an escalator at
+ * *every* level of a stack — `vertical-city` has one at each of its four two-level lobbies — some
+ * journeys have two routes of equal length, and expansion order silently picks one. `40 → G` there
+ * is two lift legs and one hop either way: it used to be shuttle-then-escalator (a **closing** hop
+ * at the ground lobby) and is now escalator-then-shuttle (a **middle** hop at sky lobby A), because
+ * floor 26 enters the frontier ahead of floor 2. Twenty journeys at the pinned seed moved that way
+ * and saved nothing, and the shipped demand stopped producing a closing hop at all — which took the
+ * only live case away from a `sim/` code path. Preferring the transport edge is still right; the
+ * point is that it decides *ties* as well as *wins*, and a tie it decides can retire a behaviour.
+ * `sim/transportHop.test.ts` holds that path live against the configuration that still reaches it.
  */
 
 import type { ResolvedBuilding } from '../config/types.js';

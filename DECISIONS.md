@@ -10322,3 +10322,43 @@ A second guard failed for a real reason on first run: `resolveDemandTemplate` pa
 Digests generated in a **detached worktree at the base commit**, against that tree's own build and data. All five buildings × both shipped templates reproduce the serialized trace bit for bit, **with no field excluded** — the three new fields are omitted rather than emptied. And `mixAmplitude: 0` takes the **pre-existing static code path deliberately**, because rescaling by a multiplier of one sums in a different order and moved every arrival time by one unit in the last place.
 
 **Impact.** `midtown-office` gains a lunch two-way operating point — chosen because it is the project's primary office building and Phase 2 validation case, it shipped no lunch point, and `docs/03` has named two-way a governing peak since it was written. The new point copies the interfloor point exactly, so **the only difference is where the mix comes from** and the rate is not a free choice made here. **Known limits, and the first is the uncomfortable one:** the arc's amplitude is the **widest consistent with the citation**, and a real building's departures and returns overlap — *a wider arc is the one a selector finds easiest to exploit*, so it is stated first in three places rather than last. The point has **no saturation census**; whoever measures must derive their budget from their own. And no selector arm was constructed, run or measured — **the commit ordering is the evidence.**
+
+---
+
+## D170 — sky-lobby escalators, and **the brief's premise about them was false against the building's own data**
+
+**Date:** 2026-07-29 · **Owner:** T79 (wave 9) · **Closes:** [§ D167](#d167)'s sky-lobby limitation · **Moves no published pin** · **Authorised by the owner**
+
+**Context.** [§ D167](#d167) gave `core` a non-elevator transport mode and used it for `vertical-city`'s ground pair, recording as a known limit that the building still declared none at `26↔27`, `51↔52`, `76↔77` — so a cross-lobby interfloor journey still rode to the ground lobby and back.
+
+### The orchestrator's premise was wrong, and the reason is structural
+
+The brief instructed the lane that *"the rise between sky-lobby pairs is not the same as the ground pair's — use the building's actual floor heights."* **False.** Every two-level lobby here is one a double-deck shuttle serves, and `resolveBuilding` **refuses any `servesFloorPairs` entry not exactly `deckSeparationM` apart**. All eight shuttles declare 4.5 m, so **all four lobbies rise 4.5 m by construction** and all four traverse in **21.2 s** on § D167's EN 115-1 basis. The rises and the mode-to-pair correspondence are now **asserted**, so a moved floor height fails the derivation rather than silently invalidating it.
+
+### What it bought, and what it did not
+
+Cross-lobby journeys routed through the ground lobby: **6 → 0**. `30 → 45` went from four legs to **two legs and one hop**. Lift legs 3 257 → 3 245 across the same 1 956 journeys.
+
+**And two of the three new escalators carry nobody.** `zone-5-local` serves both 51 and 52 and `zone-6-local` both 76 and 77, so the search reaches both levels at the same depth. Not graph-inert — removing them moves 58 of 9 900 ordered pairs — but **every one of those 58 starts at a floor with zero population that is not an entrance.** Declared anyway, because the machines exist in the building being modelled, and **measured and pinned in both directions rather than left to be found**: this is [§ D112](#d112)'s inert-`destination-eta` shape arriving in `data/buildings/`.
+
+**The third broke a tie, not a race.** `40 → G` is two legs and one hop either way; 20 journeys swapped deck and machine and **saved nothing**. Its real consequence is that shipped demand **no longer produces a closing transport hop at all** — asserted at zero and exercised live against the building minus its sky-lobby modes, [§ D167](#d167)'s `#deckAllows` pattern reused.
+
+### The prediction was half right, and the half that was wrong is the useful half
+
+§ D167 found that removing a lift leg made the queue behind it burstier, and the brief predicted the same mechanism at a sky lobby. **The double-deck hardware's own stop saving did narrow** — 12 shuttle legs left the bank, and under `eta` at the pinned seed the paired arm went 221 < 256 to **245 = 245**.
+
+**But widening to a census showed the strict inequality was never universal:** `collective` made *more* paired moves at 3 of 4 seeds **before this change too**. The single-cell control had been asserting something false in general and passing for the wrong reason. The honest statement is that **the escalator does deck-changing work the double-deck car was doing, and takes it off the hardware being measured** — which is a fact about what the study can see, not a regression.
+
+**The double-deck verdict did not move and its base did not widen:** `BETTER-EVERYWHERE` before and after, still two cells at one operating point, 1.5 % still unquotable, **all 40 double-deck pins byte-identical**. Measured rather than assumed: 0 of the building's 92 populated destinations changes route on either arm.
+
+### Stage 6 — playable, and no goal authored
+
+**Four live goals before and after.** The escalators moved exactly one cell — `answer-the-demand` 7/50 → 6/50 on holdout, still a variable and still a batch goal — and **did not move `long-waits-under` by a single seed**; it stays withheld. **No goal returned and none was authored**, which is [§ D160](#d160)'s rule holding under the pressure of a stage that lost one.
+
+Playable and measurably clearable: at the shipped setting all three count goals sit exactly level and the comparison is not ordered; two destination dispatchers clear all four. Both pinned.
+
+### Two stale published claims, and one had gone stale before this lane touched anything
+
+`docs/10` § 11's goal table **disagreed with the shipped JSON in three of stage 6's five cells** and still printed `long-waits-under` in **bold** — the table's own mark for a shipping goal — after the measurement had withheld it. And *"three stages clear from the dispatcher dropdown"* is **four**: re-measured on the **pre-escalator** configuration it clears there too, so the claim went stale at § D167 with nothing re-deriving it. Both corrected, and the table is now **parsed and compared cell by cell against the JSON**, bold marks and footnotes included, with a counter asserting all 35 comparisons ran.
+
+**Impact.** 961 published pins: **not one moved** — `regeneratePins.js` diffs to zero lines. **Known limits:** the route through sky lobby A is decided by expansion order on an exact tie, so reordering `transportModes` in the JSON would silently re-route 20 journeys — guarded. And **`matrix` is the one study id of fifteen whose pins no test re-derives**, covered only by the manual tool; that is the harness-coverage shape and it is recorded rather than closed here.

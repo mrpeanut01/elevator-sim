@@ -1140,6 +1140,13 @@ selection exists to exploit**, and that is a different finding from *learned con
   fewer people: `unservedFraction` is exactly 0 on both arms at every replication. The intuitive
   *fewer stops ⇒ less driving* is refuted here in both revisions.
 
+  **`vertical-city` has since declared an escalator at all three sky lobbies as well, and not one
+  figure above moved.** The reason is measured rather than assumed: this study's only comparable
+  regime is incoming-only up-peak from `G`, and none of the building's 92 populated destinations
+  changes route when those three edges exist — on either arm. **The base did not widen**, so the
+  word `BETTER-EVERYWHERE` is exactly as strong as it was: two cells at one operating point, with
+  the 1.5 % point still UNQUOTABLE.
+
 ---
 
 ## Phase 7 — Automated tuning

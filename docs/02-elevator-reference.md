@@ -219,11 +219,45 @@ a lift, and a journey was charged an entire elevator leg the real building never
 | time on the flat steps | `2 × 2 × 0.40 / 0.5 = 3.2 s` | |
 | **landing to landing** | **21.2 s** | |
 
+### The three sky lobbies, and why their derivation is the same arithmetic
+
+`vertical-city` declares an escalator at **all four** of its two-level lobbies, and the other three
+come out at 21.2 s as well. That is not a shortcut — it is a constraint of the building:
+
+| pair | lower floor | upper floor | rise | incline `rise / sin 30°` | incline time | flat steps | **total** |
+|---|---|---|---|---|---|---|---|
+| `G ↔ 2` | 0.0 m | 4.5 m | **4.5 m** | 9.00 m | 18.0 s | 3.2 s | **21.2 s** |
+| `26 ↔ 27` | 105.6 m | 110.1 m | **4.5 m** | 9.00 m | 18.0 s | 3.2 s | **21.2 s** |
+| `51 ↔ 52` | 211.2 m | 215.7 m | **4.5 m** | 9.00 m | 18.0 s | 3.2 s | **21.2 s** |
+| `76 ↔ 77` | 303.0 m | 307.5 m | **4.5 m** | 9.00 m | 18.0 s | 3.2 s | **21.2 s** |
+
+**The rise is not a free parameter here, and that is the point.** A two-level lobby in this tower is
+a lobby a double-deck car serves, and `resolveBuilding` refuses any `servesFloorPairs` entry whose
+two floors are not *exactly* `deckSeparationM` apart (`ISSUE_CODES.deckSeparationMismatch`). Every
+shuttle in `vertical-city` declares `deckSeparationM: 4.5`, so every lobby pair is 4.5 m by
+construction and the EN 115-1 derivation lands on the same number four times. Both halves are
+asserted in `traffic/transportRoute.test.ts` — the rises against the floor heights, and the
+transport modes against the shuttle's own pairs — so a floor height that moves fails the derivation
+rather than silently invalidating it. Each is 4.5 m ≤ 6 m, so 30° is permitted and two flat steps
+per landing is the requirement; nothing in the table changes with height.
+
 **What could not be cited, stated plainly:** no CIBSE Guide D page giving a *lumped* escalator
-door-to-door traversal time was available while this was written, so the figure above is
+door-to-door traversal time was available while this was written, so the figures above are
 constructed from EN 115-1's geometry and speed limits rather than quoted from a table. If a Guide D
 figure is later found and disagrees, the number moves and every `vertical-city` pin moves with it —
 which is the normal treatment of a moved published figure, not an exception.
+
+**Two of the four carry nobody, and it is published rather than left to be found.** `51 ↔ 52` and
+`76 ↔ 77` are on 0 hops of the shipped trace, because `zone-5-local` serves *both* 51 and 52 and
+`zone-6-local` serves *both* 76 and 77 — so breadth-first search reaches the two levels of those
+lobbies at the same depth and the escalator never shortens anything a passenger can ask for. They
+are declared because the hardware is really there and removing them would make the building's own
+notes false; they are **measured** because a declared field that changes no decision is the shape
+`DECISIONS.md` § D112 found in `data/dispatcher-profiles.json`. The census is pinned in both
+directions in `traffic/transportRoute.test.ts`. Sky lobby A is the one that matters:
+`zone-3-local` is anchored to 26 and `zone-4-local` to 27, so its two levels are not
+interchangeable, and joining them took a cross-lobby interfloor journey from **four lift legs to
+two**.
 
 **Three things the model deliberately does not have**, each because nothing would read them:
 a `kind` enum (nothing branches on escalator-versus-stair), a direction (a one-way escalator is a

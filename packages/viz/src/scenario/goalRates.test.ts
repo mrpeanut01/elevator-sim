@@ -32,6 +32,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 
 import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { replicationSeed } from '@elevator-sim/experiments/browser';
@@ -127,6 +128,89 @@ describe('the published goal pass-rate table', () => {
         expect(forbidden.has(metric)).toBe(false);
       }
     }
+  });
+});
+
+/**
+ * **The prose copy of the table, held to the JSON copy of it.**
+ *
+ * `docs/10` § M30 reprints this table for a reader. That copy **had gone stale** — three of stage
+ * 6's five cells disagreed with `data/scenario-goals.json` after `vertical-city` declared its
+ * ground-lobby escalator, including a goal still printed in bold after the measurement had made it
+ * *withheld*. Nothing noticed, because the regeneration path writes the JSON and no test read the
+ * markdown.
+ *
+ * So this parses the table out of the document and compares every cell, in **both** directions:
+ * a cell that moves in the JSON without moving in the prose fails, and so does a cell edited in the
+ * prose to something the JSON does not say. The bold marking is compared too, because bold *means*
+ * "shipping batch goal" in that table's own key, and a rate that stops shipping while staying
+ * bold is the failure that actually happened.
+ */
+const DOCS_10_PATH = fileURLToPath(
+  new URL('../../../../docs/10-experience-layer-contract.md', import.meta.url),
+);
+
+/** The five goal kinds § M30's table has a column for, in its column order. */
+const M30_COLUMNS = [
+  'deliver-everyone',
+  'no-divergence',
+  'nobody-abandoned',
+  'answer-the-demand',
+  'long-waits-under',
+] as const;
+
+/** `"**4/50, 9/50**"` → `{ text: '4/50, 9/50', bold: true }`; footnote marks are dropped. */
+function readCell(raw: string): { readonly text: string; readonly bold: boolean } {
+  const trimmed = raw.trim().replace(/[†‡]/gu, '').trim();
+  const bold = trimmed.startsWith('**') && trimmed.endsWith('**');
+  return { text: (bold ? trimmed.slice(2, -2) : trimmed).trim(), bold };
+}
+
+describe('the table printed in docs/10 § M30 is the table in data/scenario-goals.json', () => {
+  it('reproduces every cell and every bold mark, in both directions', async () => {
+    const markdown = await readFile(DOCS_10_PATH, 'utf8');
+    const rows = markdown
+      .split('\n')
+      .filter((line) => /^\| \*\*[1-7] /u.test(line))
+      .map((line) => line.split('|').slice(1, -1));
+    // Non-vacuous: a table that stopped matching the row pattern would otherwise pass silently.
+    expect(rows).toHaveLength(table.scenarios.length);
+
+    let compared = 0;
+    rows.forEach((cells, index) => {
+      const scenario = table.scenarios[index];
+      expect(scenario, `no scenario for documented row ${index}`).toBeDefined();
+      if (scenario === undefined) return;
+      const shipped = new Map(
+        [...scenario.goals, ...scenario.configurationFacts, ...scenario.withheld].map((record) => [
+          record.kind,
+          record,
+        ]),
+      );
+      const shipsAsGoal = new Set(scenario.goals.map((record) => record.kind));
+
+      M30_COLUMNS.forEach((kind, column) => {
+        const documented = readCell(cells[column + 2] ?? '');
+        const record = shipped.get(kind);
+        expect(record, `${scenario.id}: ${kind} is in no bucket`).toBeDefined();
+        if (record?.tuning == null || record.holdout == null) return;
+        const expected =
+          `${String(record.tuning.passes)}/${String(record.tuning.n)}, ` +
+          `${String(record.holdout.passes)}/${String(record.holdout.n)}`;
+        compared += 1;
+        expect(documented.text, `${scenario.id} / ${kind}`).toBe(expected);
+        // Bold is the table's own key for "shipping batch goal", so it is data, not decoration.
+        expect(documented.bold, `${scenario.id} / ${kind}: bold mark`).toBe(shipsAsGoal.has(kind));
+      });
+    });
+
+    /*
+     * **The early-return guard**, which is the third false-negative shape in this repository's
+     * list: every clause above sits behind a `return` that a missing record or a null rate would
+     * take, so a table whose cells all fell through would report no failure at all. Seven stages
+     * times five columns, and no cell in this table is unmeasured.
+     */
+    expect(compared).toBe(table.scenarios.length * M30_COLUMNS.length);
   });
 });
 

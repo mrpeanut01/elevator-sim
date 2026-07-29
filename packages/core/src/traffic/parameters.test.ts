@@ -341,7 +341,14 @@ const PROBES: readonly Probe[] = [
   {
     ids: ['traffic.maxLegs'],
     buildingId: 'vertical-city',
-    probe: { maxLegs: 3 },
+    // **3 until the sky lobbies got escalators, and 2 since.** The probe has to bind, and the cap
+    // that binds is a fact about the building's geometry: `vertical-city`'s longest planned
+    // journey is now three lift legs (zone 3 → zone 5 and its kind), where it used to be four
+    // (zone 3 → zone 4, which crossed decks at the *ground* lobby and now crosses at sky lobby A).
+    // A cap of 3 refuses nothing today and this probe would assert nothing — the shape
+    // `parameters.test.ts`'s own `expect(observe(base)).not.toEqual(expected)` line exists to
+    // catch, and did.
+    probe: { maxLegs: 2 },
     observe: (config) => planDemand(config).warnings.some((w) => w.includes('maxLegs')),
     expected: true,
   },
