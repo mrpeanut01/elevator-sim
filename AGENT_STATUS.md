@@ -451,3 +451,58 @@ three findings from the `C4` measurement. Current list: [`docs/07`](docs/07-hand
 not the defect. That is the argument for *determine whether this is true, do not make it true*, and
 it is written up in [§ D124](DECISIONS.md) along with three process findings, including the one this
 wave paid for: **parallelise the work, serialise the measurement.**
+
+---
+
+# Waves 7 and 8 — live, 2026-07-29
+
+**Wave 7** closes the debt underneath Phase 6/7 and measures the Phase 6c sweep.
+**Wave 8** is Phase 9, the experience layer. They run concurrently because wave 7 is
+`core`/`experiments` and wave 8 is `viz`; the one shared surface is `boundaries.test.ts`.
+
+**Baseline:** `da411ea` — 190 files, 3496 passed, 9 skipped, `tsc -b` clean.
+**Now:** `4b8682d` — **194 files, 3585 passed, 9 skipped**, `tsc -b` clean.
+
+| ID | Task | Branch | Status | Verdict |
+|---|---|---|---|---|
+| T50 | Feasibility census for the 6c sweep | *(main tree, read-only)* | **CLOSED** | 18 cells censused, **no ΔTTD measured anywhere** — the constraint that keeps the cell set honest |
+| T51 | Pre-register the sweep as § D151 | `integration` | **CLOSED** | committed `26715f1`, before any comparison existed |
+| T52 | Run the pre-registered sweep | `feat/t52-sweep` | **IN FLIGHT** | the long pole |
+| T53 | Selector reaches the shipped runner | `feat/t53-selector-runner` | **MERGED** `e75a1c6` | § D153 — the **twelfth** signature defect, caught before shipping |
+| T54 | Derive `PROFILE_OBJECT_SECTIONS` | `feat/t54-schema-sections` | **MERGED** `94973fe` | § D152 — counts unmoved (56/106), which *is* the claim |
+| T55 | `stopCount`'s `activeWhen` | `feat/t55-stopcount` | **IN FLIGHT** | blast radius **before** the edit, by instruction |
+| T56 | `kioskRefusedLegs` + C27 | `feat/t56-seams` | **MERGED** `aa2c0ed` | C27 was **not open** — a register row wrong in the *pessimistic* direction |
+| T60 | Widen `VizSummary` (W2) | `feat/t60-vizsummary` | **MERGED** `4b8682d` | § D154 — 55/55 liveness mutations red; twelfth dead seam found *inside* the widened type |
+| T61 | Rider queues + mood (W6/U4) | `feat/t61-queues-mood` | **IN FLIGHT** | — |
+| T62 | Batch runner in a worker (W3) | `feat/t62-batch-runner` | **IN FLIGHT** | — |
+
+## What these waves have found so far, and none of it moved a phase verdict
+
+1. **A guard keyed on an outcome does not catch a change to the *reason* that outcome holds.**
+   T54 excused `selection` from the liveness sweep and built a guard to fail the day it became
+   runnable. T53 *is* that day, and the guard stayed green — correctly. The claim survived and the
+   reason died. Corrected in place with the superseded wording kept beside it ([§ D153](DECISIONS.md)).
+2. **A register row wrong in the pessimistic direction.** Six were found wrong in one wave before
+   and *every one was optimistic*. C27 is the first that claimed open what was already closed. But
+   something real was missing anyway: the two barrel guards compare the barrels **against each
+   other**, so deleting all 34 names from both left them green.
+3. **A false negative in mutation testing.** Freezing `wait95S` came back green because the value
+   has **two readers** and killing one left the other live. Not a dead field — a dead *mutation*.
+4. **`docs/10` was wrong about the code twice** — its W2 field list names a `window` field this
+   package's own boundary rule forbids. The binding contract is not exempt from being checked.
+5. **A test-suite fault that says nothing about the code.** `packages/core`'s whole-simulation tests
+   ran under vitest's 5 000 ms default; under a loaded parallel runner **eight** of them timed out.
+   71 explicit timeouts added (`5d161e8`), and the two heaviest tests in the same run had *passed*
+   all along because they already carried one.
+
+## Process notes for whoever runs the next wave
+
+- **Concurrent lanes all appending to `DECISIONS.md` collide on the entry number.** Three collisions
+  so far (D151/D152/D154), each cheap to fix at merge, none caught by any test. If a wave runs more
+  than two lanes that record decisions, allocate the numbers up front.
+- **Do not let a lane merge on its own report.** Every merge here was re-verified by the full suite
+  in the integration tree, and the reports were accurate — but that is a finding, not an assumption.
+- **The feasibility/outcome boundary has to be enforced, not requested.** T50 was told not to
+  measure ΔTTD and independently refused a *second* measurement — the operating point's detector-input
+  rates — on the grounds that it "predicts a selector that never switches, which is outcome
+  information wearing a feasibility label." That objection is why § D151 § 5 exists.
