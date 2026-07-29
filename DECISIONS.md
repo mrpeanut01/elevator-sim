@@ -9982,3 +9982,95 @@ it open a third time.
 
 **Impact.** Gates T77. Constrains T70's template authoring. Nothing in § D139, § D140, § D151 or
 § D156 is weakened; condition 5 is new and is a **raise**.
+
+---
+
+## D163 — Phase 9's acceptance criterion, written **after seven of nine units**, and therefore load-bearing only where it currently **fails**
+
+**Date:** 2026-07-29 · **Owner:** orchestrator, wave 9 · **Gates:** Phase 9 · **Status:** the gate
+T76 and T78 measure against
+
+**Context.** Phase 9 has shipped seven units — W2, W3, W4, W5, W7a, W7b, W9 — with **no stated
+acceptance criterion for the phase**, deliberately: [`docs/07`](docs/07-handoff.md) § 8 records that
+no status table carries a Phase 9 row, because *adding one for unstarted work is how a design starts
+reading as work in progress*. That was right while the phase was unstarted. It is no longer, and
+*"done"* for Phase 9 is currently **undefined**.
+
+### The problem with this entry, stated before its contents
+
+**A criterion written after most of the work is, by default, a criterion fitted to the work.**
+[§ D139](#d139) says exactly this about itself and dated itself before its implementation to avoid
+it. This entry cannot do that — seven units already exist. So the defence has to be structural
+rather than chronological:
+
+> **The clauses that decide this phase must be ones the shipped product does not currently
+> satisfy.** A criterion whose every clause is already met is a description, not a gate.
+
+Clauses 1 and 2 below **both fail today**, and they are the load-bearing ones. Clauses 3–5 are
+already met and are recorded as **standing requirements rather than as the gate** — they can turn
+the phase red by regressing, and they cannot turn it green by having already been true.
+
+### The criterion
+
+**1. The honesty property holds under *search*, not on examples. — CURRENTLY FAILS (not built).**
+
+Across a generated sweep over (building × shipped dispatcher × seed × mode), **no player-facing
+string may assert something the run's own statistics refuse**. Concretely, and each already has a
+rule it derives from: no mean where `awtIsValid` is false (R3); no comparative claim sourced from a
+single replication (R2); no probability word anywhere (R10); no estimate without its `n` (R13); no
+figure combining energy with a wait metric (R11); no goal reported without its measured pass rate
+(R12/[§ D160](#d160)).
+
+This is the clause that matters, and the reason is the one the repository already paid for: **every
+one of these rules is currently enforced by hand-written tests over hand-chosen cases.** `fuzz/`
+exists because that is not the same as holding. Phase 8 found two blocking property violations by
+searching where nobody had looked, and this wave found **six tests that could not fail** — five
+distinct mechanisms, one of them the instrument that checks for tests that cannot fail. A per-unit
+assertion that a string is honest on the case its author picked is exactly the evidence that
+history says is insufficient.
+
+**2. Mode parity. — CURRENTLY FAILS (only one mode exists).**
+
+`docs/10` § 4's rule is *Basic mode may hide complexity; it may never hide a failure.* Acceptance
+requires both modes to exist and the parity to be **derived, not listed**: the set of failure
+states, suppression reasons and fail-state diagnoses visible in Advanced must be computed from the
+code and asserted visible in Basic. A hand-written parity list is the hand-written-list defect
+[§ D152](#d152) closed one layer down, and it would fail the same way — silently, when a ninth
+failure state is added.
+
+**3–5. Standing requirements, which can redden the phase and cannot green it.**
+Every shipped goal carries its measured across-seed pass rate ([§ D160](#d160)). Every unit names
+its **non-test caller** — the standing requirement, not a Phase 9 invention. The viewer is
+**driven** for every acceptance claim, never read: this repository has recorded twice that a UI row
+asserted green by reading was false when driven, and once that a Retry button was permanently dead
+after any failed load.
+
+### What is explicitly *not* in the criterion
+
+**Feature completeness.** U6, U7's rider models, the § 10.2 floor multi-select and the coverage
+matrix are designed and unbuilt, and a phase gate that requires every designed feature is a gate
+that measures ambition rather than quality. **Anything unbuilt at acceptance is named in the
+verdict**, the way Phase 6's status names 6c.
+
+**Playability or fun.** Not measurable here, and a criterion that pretends otherwise would be the
+worst kind: unfalsifiable, and satisfiable by assertion. [§ D161](#d161) already publishes the
+uncomfortable measured fact in its place — **three of seven stages clear from the dispatcher
+dropdown alone** — and that number is more use than any claim about enjoyment.
+
+### What would make this a bad criterion, so a reviewer can check
+
+Adding a clause the product already satisfies and calling it load-bearing. Satisfying clause 1 with
+a fixed case list rather than a search. Satisfying clause 2 with a hand-written parity list.
+Declaring the phase accepted with clause 1 or 2 unmet. Reading *"the viewer is driven"* as satisfied
+by a test that renders to a canvas mock and never opens a browser.
+
+### The outcome this decision explicitly permits
+
+**Phase 9 accepted with named gaps**, in the shape Phase 6's status already uses — or **not
+accepted**, if the honesty property fails under search. A property violation found by clause 1
+would be the single most valuable result this phase could produce, because it would be a case where
+the experience layer says something the measurement layer would refuse, which is the exact failure
+the whole of `docs/10` § 1 exists to prevent.
+
+**Impact.** Phase 9 gains a criterion and still gains **no status row until it is measured against
+it** — the row and the verdict land together or neither does.
