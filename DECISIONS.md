@@ -11018,12 +11018,17 @@ nine units is now built. Whether the phase is *accepted* is [§ D163](#d163)'s q
 separately; a unit landing is not a verdict.
 
 > **A note on this commit, because the record should not be tidier than the history.** `ae6750b`'s
-> message describes W8 alone, and the commit also contains the whole of [§ D183](#d183) below. The
-> orchestrator ran `git add -A` in a worktree two lanes were writing to concurrently. The wave's own
-> policy is one worktree per concurrent lane, and it was not followed — the lanes owned disjoint
-> *files*, which is necessary and was not sufficient, because staging is repository-wide. Nothing was
-> lost and no change is unreviewed, but **review the files, not the commit**, and the commit is not
-> evidence of what landed together.
+> message describes W8 alone, and the commit also contains the whole of [§ D183](#d183) **and part of
+> [§ D184](#d184)** — `matrixFront.test.ts` among them. The orchestrator ran `git add -A` in a worktree
+> **three** lanes were writing to concurrently. The wave's own policy is one worktree per concurrent
+> lane, and it was not followed — the lanes owned disjoint *files*, which is necessary and was not
+> sufficient, because **staging is repository-wide**. Nothing was lost and no change is unreviewed, but
+> **review the files, not the commit**, and the commit is not evidence of what landed together.
+>
+> The first version of this note said *two* lanes. That was wrong in the optimistic direction, which is
+> the direction this repository's registers have drifted before ([`docs/07`](docs/07-handoff.md) § 8:
+> *"six of the things wave 6 found were wrong were in the register itself, and every one was
+> optimistic"*). Corrected rather than reworded.
 
 ---
 
@@ -11096,3 +11101,105 @@ lands **with its consumer**. The consumer is now here and waiting. Carried in
 [`GAPS.md`](GAPS.md) § 3, narrowed rather than deleted.
 
 **Impact on phase status: none.**
+
+---
+
+## D184 — the `matrix` pin gap was a grep artifact; the real gap was its **Pareto front**, and it had already drifted
+
+**Date:** 2026-07-30 · **Owner:** wave 11 · **Corrects** [`GAPS.md`](GAPS.md) § 2 · **Corrects**
+[`docs/05`](docs/05-roadmap.md) § *What the matrix found* · **Landed partly inside `ae6750b`** — see
+the note under § D182
+
+### The recorded gap was false, and its cause had already been documented one commit earlier
+
+`GAPS.md` § 2 recorded *"the `matrix` study's pins are re-derived by no test."* **That was false when
+written.** `matrix.test.ts` has called `checkPinned('matrix', …)` against a **full-budget**
+`runMatrix()` — all eight cells, all declared `n`, nothing sampled — on every always-on run since
+`f895a16`, and `published.test.ts`'s scan, which reads sources with `readFileSync`, has enforced that
+call's existence for all fifteen study ids. **The claimed state would have made an existing test red**,
+so it was incompatible with a green suite.
+
+The finding came from a `grep` for `checkPinned`. `matrix.test.ts` carried a raw NUL byte; `grep` in
+this environment wraps `ugrep -I`; the file was **silently skipped** — no output, exit 1,
+indistinguishable from a genuine miss. `f78dc42` documents that exact artifact producing a false
+`#rail-access-note` finding and removed the bytes. The `GAPS.md` entry predates the removal.
+
+**Second victim of one tooling defect, and the worse of the two** — the first was caught within the
+hour by driving the page; this one sat in the register where a lane would plan against it. Recorded
+struck-through rather than deleted, because a false gap costs a lane a day and the mechanism now has
+two attestations rather than one.
+
+### What was genuinely open is the matrix's **categorical** output — § D149's shape, one study over
+
+`matrixFigures`' docstring says the front's *"assertions are memberships in `matrix.test.ts`"*. **The
+memberships were not there.** `matrix.test.ts` asserted the front's *structure* — three active axes,
+nothing double-bucketed, every exclusion named — and correctly declined to assert which arm wins where.
+
+No interval pin can cover the difference, and the reason is structural rather than an oversight: the
+front is decided **arm-against-arm** by `tuning/report/pareto.ts` over raw per-replication
+`summary.energy.workKJ`, while **all 352 pins are arm-against-baseline** paired estimates. A change to
+the dominance rule, to `pareto.ts`'s invalid-fraction tolerance, to the energy proxy's wiring or to
+`verdict.ts`'s resolution limit moves the published table with every pin green.
+
+### It had already happened, and it went unnoticed for the § D149 reason
+
+`7fac568` gave `core` a non-elevator transport mode ([§ D167](#d167)) — `vertical-city`'s two-level
+lobby is served by an **escalator**, and every edge of `route.ts`'s reachability graph had been a lift
+bank. It correctly regenerated that cell's interval pins, **108 references in `published.ts`**,
+including `vertical-city-up-peak/eta/awtS` from mean `+0.811` to `+1.066 [+0.700, +1.432]`. The front
+moved with them, from `{collective, nearest-car, energy-aware}` to
+`{collective, nearest-car, eta, energy-aware, fairness-first, destination-eta}`.
+
+`docs/05` did not follow. For four days the published front read **three arms where the tree computes
+six**, and the note beside it still said *"`eta` **leaves** the front"* when `eta` is on it.
+
+**`nearest-car` is on the front at exactly six of eight, and that count never moved.** § D106,
+`docs/10` § 5.5's refusal of an aggregated eco score, and *energy is an axis, never a score* all rest
+on **the count** — so every sentence the table supports stayed true while the table went wrong. That is
+[§ D149](#d149) verbatim: *a stale number that still supports its own sentence is the only kind nobody
+re-checks, and it is worse than one that contradicts it.* **Nothing was careless. There was no
+mechanism.**
+
+### The guard, and the assertion that emptied its own register
+
+Two layers, **~0.3 s total**, and no new flag — the honest re-derivation costs **74.8 s** and the
+always-on suite **already pays it**. The gap was never cost; it was that the run was there and nothing
+read the categorical half of it.
+
+- **Layer A** — `matrix.ts`'s `PINNED_FRONTS`: front, dominated, indeterminate, unquotable,
+  model-excluded, identity classes and verdict census per cell, compared field-for-field in **both**
+  directions against the run `matrixOf()` already holds.
+- **Layer B** — `matrixFront.test.ts`: scans every document and package source for the per-cell row,
+  the membership-count claim in all seven wordings this repository actually uses, and the enumeration
+  of the exceptions, and requires each to be renderable from the pin. A count claim must be **found**,
+  so a pattern that quietly stopped matching fails rather than passing by looking at nothing.
+
+Mutation-tested rather than asserted: removing one arm from one pinned front reddens **three** tests
+and names twenty-odd places the claim becomes false; perturbing a verdict count no document quotes
+reddens Layer A **only**, so the layers discriminate.
+
+The drift was declared in a `PUBLISHED_FRONT_DRIFT` register — `UNPINNED_INTERVALS`-shaped, asserted
+exact in both directions — because the finding lane did not own `docs/`. **The document was then
+corrected, and the assertion forced the entry out by name**: *"PUBLISHED_FRONT_DRIFT declares
+`vertical-city-up-peak` stale, and it no longer is. Delete the entry — the gap has closed."* The
+register is now empty, which is its correct steady state and is not a licence: the partition assertion
+fails on any scanned row that is neither derivable nor declared.
+
+**A pin is not a criterion.** Nothing here asserts that any arm *ought* to be on any front. It asserts
+that a move is a **question** — which of the two is right — rather than a silence.
+
+### Also corrected, and left open
+
+`matrix.ts` said `fairness-first` is identical to `eta` at **five** cells, twice. It is **six**;
+`docs/05` has said six since § D131; the count is now measured and pinned.
+
+**Left open, stated rather than half-built:** `docs/05`'s four-column identity-class table is pinned by
+Layer A but has no Layer B parser, so its cell lists could still go stale silently. And the door-hold
+figure remains annotated rather than re-derived — feasible at **~100–160 s** behind `ELEVATOR_SIM_DEEP`,
+with `reopenOnLateArrival` injectable as a schema-valid derived profile needing no `core` change, but
+it belongs in a lane that also owns `physics/doors/types.ts`, whose docstring justifies the
+`reopenOnLateArrival: false` default and would move in the same commit. Both carried in
+[`GAPS.md`](GAPS.md).
+
+**Impact on phase status: none.** Phase 8's matrix verdict is unchanged; what changed is that the
+published table is now re-derived rather than transcribed.

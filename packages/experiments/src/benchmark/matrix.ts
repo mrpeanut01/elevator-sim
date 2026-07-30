@@ -802,6 +802,24 @@ const canonicalMembers = (members: readonly string[]): readonly string[] =>
   Object.freeze([...members].sort());
 
 /**
+ * Two member lists, compared element by element and then by length.
+ *
+ * Element-wise rather than by a joined string, and the reason is a real trap rather than taste: any
+ * separator character orders `['a', 'b']` against `['ab', 'x']` according to whether the separator
+ * sorts before or after `b`, so the class order — and therefore the pin — would depend on which
+ * delimiter happened to be chosen. No shipped profile id collides that way today, which is exactly
+ * how such a thing survives to bite the commit that adds the id that does.
+ */
+const compareMembers = (a: readonly string[], b: readonly string[]): number => {
+  for (let index = 0; index < Math.min(a.length, b.length); index += 1) {
+    const left = a[index] ?? '';
+    const right = b[index] ?? '';
+    if (left !== right) return left < right ? -1 : 1;
+  }
+  return a.length - b.length;
+};
+
+/**
  * A measured cell as a pin.
  *
  * Every membership is **sorted**, deliberately: the order `pareto.ts` returns is an artefact of the
@@ -817,7 +835,7 @@ export function frontPinOf(result: MatrixCellResult): PinnedFront {
   }
   const classes = result.identityClasses
     .map((members) => canonicalMembers(members))
-    .sort((a, b) => (a.join('|') < b.join('|') ? -1 : 1));
+    .sort(compareMembers);
   return Object.freeze({
     replications: result.cell.replications,
     front: canonicalMembers(result.front.front),

@@ -130,29 +130,27 @@ interface PublishedFrontDrift {
  * named**, never a tolerance: the document is wrong, the code is right, and the entry says which
  * commit made it so.
  *
- * The one entry below is the finding that motivated this whole file, and it is worth reading as
- * evidence rather than as bookkeeping. Every mechanical guard this repository owns was green while
- * it was true.
+ * **The register is empty, and it was emptied by its own assertion.** It shipped carrying one entry —
+ * `docs/05-roadmap.md`'s `vertical-city-up-peak` front, three arms published against six derived,
+ * moved by `7fac568` ("give `core` a non-elevator transport mode, and stop charging the lobby hop to
+ * the lifts") four days earlier. That commit correctly regenerated the cell's interval pins;
+ * `git show 7fac568 -- benchmark/published.ts` shows `vertical-city-up-peak/eta/awtS` going from mean
+ * `+0.811` to `+1.066`, and the front moved with them, because a front is arm-against-arm through
+ * `pareto.ts` while every one of the 352 pins is arm-against-baseline. Nothing was hidden: **there was
+ * no mechanism.**
  *
- * `docs/` is outside the lane that found it and was not edited. The register is the honest
- * alternative to editing nothing and saying nothing.
+ * The lane that found it did not own `docs/`, so it declared the drift instead of editing nothing and
+ * saying nothing. The document was then corrected — and **this assertion is what forced the entry
+ * out**, by name: *"PUBLISHED_FRONT_DRIFT declares "vertical-city-up-peak" stale, and it no longer is.
+ * Delete the entry — the gap has closed."* That is the both-directions rule doing the work it exists
+ * for, in the direction nobody designs for.
+ *
+ * An entry here is a **defect that is named**, never a tolerance: the document is wrong, the code is
+ * right, and the entry says which commit made it so. An empty register is the correct steady state and
+ * accepts nothing — the partition assertion below fails on a scanned row that is neither derivable nor
+ * declared, so emptiness is not a licence.
  */
-const PUBLISHED_FRONT_DRIFT: readonly PublishedFrontDrift[] = Object.freeze([
-  Object.freeze({
-    file: 'docs/05-roadmap.md',
-    cellId: 'vertical-city-up-peak',
-    published: 'collective, nearest-car, energy-aware',
-    derived: 'collective, nearest-car, eta, energy-aware, fairness-first, destination-eta',
-    movedBy:
-      'commit 7fac568 ("give `core` a non-elevator transport mode, and stop charging the lobby hop ' +
-      'to the lifts"). That commit correctly regenerated this cell\'s 44 interval pins — `git show ' +
-      '7fac568 -- benchmark/published.ts` shows `vertical-city-up-peak/eta/awtS` moving off the mean ' +
-      'the roadmap\'s own note beside this table still quotes — and the front moved with them, ' +
-      'because the front is arm-against-arm through `pareto.ts` while every pin is arm-against-' +
-      'baseline. Nothing was hidden: there was no mechanism. The row and the note under it both ' +
-      'predate the move; the count claim they support did NOT change and is asserted below.',
-  }),
-]);
+const PUBLISHED_FRONT_DRIFT: readonly PublishedFrontDrift[] = Object.freeze([]);
 
 /* -------------------------------------------------------------------------- *
  * Scanning

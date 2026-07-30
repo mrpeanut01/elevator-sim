@@ -1569,7 +1569,7 @@ is worse at serving people*. Measured front membership, one row per cell:
 | `garden-down-peak` | 51 | collective, **nearest-car**, eta, energy-aware, fairness-first, capacity-aware, auction, auction-multi-round, zoned-uppeak, `destination-eta` |
 | `secure-up-peak` | 119 | **nearest-car**, energy-aware |
 | `mixed-use-up-peak` | 50 | energy-aware |
-| `vertical-city-up-peak` | 50 | collective, **nearest-car**, energy-aware |
+| `vertical-city-up-peak` | 50 | collective, **nearest-car**, eta, energy-aware, fairness-first, `destination-eta` |
 
 `nearest-car` is the arm this document elsewhere calls too weak a baseline to separate anything, and
 it was the viewer's default until [§ D134](../DECISIONS.md). It reaches the front by being **best on energy and worst on wait**: a
@@ -1583,6 +1583,10 @@ score — one would rank the worst dispatcher first. **Energy is an axis, never 
 > `nearest-car` is still on the front at exactly six. The two departures are the interesting ones:
 > at those cells `destination-eta` was on the front only by being bit-identical to an arm already on
 > it, so it left the front by *becoming a distinct dispatcher* rather than by getting worse.
+>
+> > **⚠️ The `vertical-city-up-peak` half of that sentence is SUPERSEDED** by `7fac568`, two notes
+> > below. `destination-eta` is on that cell's front in this tree. The `midtown-interfloor` half
+> > stands.
 
 > **One row moved again when double-deck operation was simulated, and the `nearest-car` count did
 > not.** At `vertical-city-up-peak` (n = 50, seed 20 260 728) `eta` **leaves** the front and the
@@ -1594,6 +1598,40 @@ score — one would rank the worst dispatcher first. **Energy is an axis, never 
 > interval excluding zero on the *worse* side), so `eta` stops dominating `collective` and
 > `collective` becomes non-dominated. **`eta` did not get better or worse than it was measured to
 > be — it was previously measured on hardware the building does not have.**
+>
+> > **⚠️ The paragraph above is SUPERSEDED, and the row in the table has been corrected.** It is left
+> > standing because the correction is only legible as a correction beside it — and because the way it
+> > went stale is the point.
+> >
+> > **`7fac568` moved this cell again, and nothing followed it here.** That commit gave `core` a
+> > non-elevator transport mode ([§ D167](../DECISIONS.md)): `traffic/route.ts` plans a journey as
+> > reachability over service zoning, every edge of that graph had been a lift bank, and so the ground
+> > hop of `vertical-city`'s two-level lobby — which the real building serves with an **escalator** —
+> > had been routed onto `zone-1-local`. It correctly regenerated all of this cell's interval pins,
+> > **108 references in `published.ts`**, including `eta`'s AWT against the baseline from
+> > `+0.811` to **`+1.066 [+0.700, +1.432]`**. The Pareto front is computed from the same run, so it
+> > moved with them.
+> >
+> > The front at `vertical-city-up-peak` is now the **six** arms in the table:
+> > `collective`, `nearest-car`, `eta`, `energy-aware`, `fairness-first`, `destination-eta` — so
+> > `eta` is back on it, and the identity class there is `eta ≡ fairness-first`. The
+> > *"`eta` **leaves** the front"* sentence above, and the earlier note's claim that `destination-eta`
+> > *"**leaves** it at … `vertical-city-up-peak`"*, are both false about this tree.
+> >
+> > **`nearest-car` is still on the front at exactly six of eight, and that is why nobody noticed.**
+> > § D106, `docs/10` § 5.5's refusal of an aggregated eco score, and *energy is an axis, never a
+> > score* all rest on **the count** — and the count was right the whole time the table under it was
+> > wrong. This is [§ D149](../DECISIONS.md)'s shape exactly: *a stale number that still supports its
+> > own sentence is the only kind nobody re-checks, and it is worse than one that contradicts it.*
+> >
+> > **Nothing was careless. There was no mechanism.** Every one of the 352 interval pins is an
+> > arm-against-baseline paired estimate; front membership is decided **arm-against-arm** by
+> > `tuning/report/pareto.ts` over raw per-replication energy. No interval pin can see a front move, so
+> > a change to the dominance rule, to `pareto.ts`'s invalid-fraction tolerance, to the energy proxy's
+> > wiring or to `verdict.ts`'s resolution limit moves this table with every pin green. There is a
+> > mechanism now — `matrix.ts`'s `PINNED_FRONTS` and `matrixFront.test.ts`, which re-derive every
+> > cell's front, identity classes and verdict census from the run the suite **already pays for**, and
+> > scan this document for the row ([§ D184](../DECISIONS.md)). Cost: ~0.3 s.
 
 **2. `destination-eta` used to be bit-identical to `eta` at all eight cells, and is now identical at
 one.** It authored `dispatch.callType: mobile-credential` and a weight vector identical to `eta`'s,
