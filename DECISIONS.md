@@ -11276,3 +11276,92 @@ mode.
   docstring is incomplete. Carried in [`GAPS.md`](GAPS.md).
 
 **Impact on phase status: none.**
+
+---
+
+## D186 — the deep tier's two findings were **opposite kinds**, and one of them was a check accepting a branch for the wrong reason
+
+**Date:** 2026-07-30 · **Owner:** wave 11 · **Resolves** [§ D163](#d163) clause 1's two deep-tier
+findings · **Builds on** [§ D172](#d172) and [§ D179](#d179)
+
+Phase 9's acceptance pass ran the deep honesty tier — 60 cases, **271 985 strings**, 4 650
+simulations, 43 of 60 runs suppressed, 23 surfaces, ~380 s. **It found two violations**, which § D163
+calls *"the single most valuable result this phase could produce."* They turned out to be opposite
+kinds, and the second is the more instructive.
+
+**This also corrects the record.** [§ D172](#d172) asserted the deep tier clean, and said so on *"the
+refinement relation, not a run"* — its baseline control run was blocked at the time. Running it says
+otherwise. A claim resting on an argument rather than a run is exactly what this repository asks to be
+labelled, and § D172 did label it; the correction is what the label was for.
+
+### Finding 1 — `suppressed-mean` at `dispatcherBlurbOf(destination-eta)`: **real, and not where it was reported**
+
+On a Vertical City run refused because 28 of 446 arrivals (6.3 %) were censored above the 5.0 % limit,
+the dispatcher card printed `no quotable AWT on 30 of 30`. An estimate cue and the run's own refused
+`meanWaitS` in one clause. The `30` was a **replication count from a different study on a different
+building**.
+
+**Why this is not § D172's false positive, stated as the distinction it is.** Every one of § D172's
+five narrowings was a *proof that a numeral could not be the quantity* — a run-level count at an
+instant with zero legs waiting, a substring of `95th`, a cue naming a different quantity, the run's own
+refusal cut by identity. **No such proof exists for free-form authored text.** Measured on this one
+field: **25 distinct numerals in `destination-eta`'s `$comment` sit in a clause with an estimate cue.**
+Any run whose refused `meanWaitS`, `wait95S` or `meanTimeToDestinationS` rounds to one of the
+twenty-five fires the property, and nothing distinguishes those twenty-five from a real leak. A
+narrowing here would be an **exclusion wearing a narrowing's clothes.**
+
+**And the collision was the smaller half.** The card carried `AWT +0.295 [+0.154, +0.437]` — n = 150,
+another building, another seed — on the card of the dispatcher the reader had just run, with nothing
+saying so. `docs/12` § 1.4 **R2** specifies *a list of selectable cards*; § 2.2 records that every
+handoff label is *"a sentence a building manager would say."* Measured in a browser, the longest
+rendered card was **5 133 characters** of maintainer documentation.
+
+**Fixed at the cause.** `dispatcherBlurbOf` derives from the weight vector for **every** profile, and
+`$comment` reaches no card by any route. Not truncated — a truncated essay is still an essay and its
+first clause carries numerals too. Two declared facts a weight vector cannot carry are printed as the
+file declares them: `hardConstraints`, which is the whole difference between `collective` and `eta`,
+and the auction stage's `aggregation` and `rounds`, which is the whole difference between the two
+auctions. Cards are now **75–164 characters**, all twelve distinct, **none carrying an estimate cue** —
+driven and measured, not asserted. `rightRail.test.ts` pins all four properties, including that no two
+shipped profiles share a blurb, which is what makes the derivation safe to widen rather than a taste.
+
+### Finding 2 — `goal-without-rate` at `judge.headline`: **a false positive, and the check was accepting the *other* branch for the wrong reason**
+
+Reported against the **cleared** branch — *"all 3 goals reached over 50 runs"* — the only branch with
+no `N of M` in it. The seed tested `\d+ of \d+` for `rateShown`, and on the uncleared branch that
+matched `${met} of ${total}`: **a count of goals against goals, with no seed in it anywhere.**
+
+**The evidence is arithmetical rather than stylistic.** Drive a stage on a batch with **no replications
+at all** and the headline reads `0 of 2 goals reached over 0 runs`. The pattern is satisfied and there
+is no run for a rate to be over. So the property was not reporting the cleared branch because a rate
+was missing — it was **accepting the uncleared branch for the wrong reason**, which is wave 8's *tests
+that could not fail* arriving **inside the instrument § D163 built to find them**. That is the second
+time this repository has found that shape in its own guard, and the first was also found by porting a
+fix from a sibling copy rather than by reading.
+
+There is no rate a headline could carry: R12's rate is per goal, four goals have four different ones,
+and each states its own in a separately-seeded sentence. `beat-the-baseline` is `batch-only`, which
+§ D160 records R12 as never having reached. What R13 asks of a headline — the `n` — it carries on both
+branches.
+
+**The headline was not rewritten to satisfy the regex.** Making it read `3 of 3` would be satisfying a
+check with a number that is not the quantity, which is worse than widening an exclusion. It is seeded
+`role: 'observation'` with the replication count declared, so R13 still sees it.
+
+**What the narrowing gives up, bounded rather than implied:** the search can no longer catch a headline
+*rewritten* to assert a per-goal outcome without a rate. `campaign/judge.test.ts` is the control — the
+produced headline names no goal kind and no goal label, on both branches, with the cleared one driven
+through a real 50-replication batch.
+
+### Left open, named rather than absorbed
+
+- **The better copy exists and has nowhere to live.** The handoff writes a short player-facing sentence
+  per dispatcher; `data/dispatcher-profiles.json` has no field for it, and `$comment` must not be made
+  to serve. The derived blurb is honest and bounded and reads as configuration.
+- **`patternOptionsOf`'s `help` still reads a *traffic* profile's `$comment`** onto a driven surface —
+  the identical route, benign at 64 characters of player-safe copy today, and bounded by nothing.
+
+Both in [`GAPS.md`](GAPS.md).
+
+**Impact on phase status:** [§ D163](#d163) clause 1 is the gate, and it is the reason this entry
+exists rather than a status row.

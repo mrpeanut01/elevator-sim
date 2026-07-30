@@ -112,27 +112,88 @@ export function dispatcherFamilyOf(profile: DispatcherProfile): string {
 }
 
 /**
- * The blurb under a profile's name in the list.
+ * The blurb under a profile's name in the list — **derived, for every profile, with no path by
+ * which authored prose can reach a card.**
  *
- * The profile's own `$comment` when it has one — `data/dispatcher-profiles.json` writes a good
- * paragraph on the five that need explaining, and paraphrasing it here would be a second
- * description of the same strategy. When it has none, an honest one-liner **generated from the
- * weight vector**, because the alternative the handoff takes — an authored blurb per dispatcher —
- * is a string that goes stale the first time somebody re-weights a term.
+ * ## Why `$comment` is not this string, and is not a shorter version of it either
+ *
+ * It used to be: the profile's own `$comment` when it had one, this derivation when it did not.
+ * That is the defect § D163 clause 1's search found, and the report it produced was a *symptom*
+ * rather than the fault. On a Vertical City run whose own summary refuses its mean, the
+ * `destination-eta` card printed `no quotable AWT on 30 of 30` — an estimate cue and the run's
+ * own refused `meanWaitS`, in one clause — so R3 fired. The `30` was a **replication count from
+ * a different study on a different building**, and the collision was luck.
+ *
+ * The luck is the point. `$comment` is maintainer documentation: `destination-eta`'s is **5 082
+ * characters** of seeds, `DECISIONS.md` ids, replication budgets and confidence intervals, and
+ * **25 distinct numerals in it sit in a clause with an estimate cue**. Any run whose refused
+ * `meanWaitS`, `wait95S` or `meanTimeToDestinationS` rounds to one of those twenty-five fires the
+ * property, and no narrowing of the property can tell that numeral from a real leak — the text is
+ * free-form, so there is nothing to narrow *against*. § D172 narrowed R3 five times, and every
+ * one of those narrowings was a proof that a numeral **could not** be the quantity. None is
+ * available here.
+ *
+ * And the collision is the smaller half. `AWT +0.295 [+0.154, +0.437]` on the card of the
+ * dispatcher the reader has just run is a published interval from another building, another seed
+ * and n = 150, printed with nothing to say so. Truncating it would not help: a truncated essay is
+ * still an essay, and its first clause carries numerals too.
+ *
+ * ## So what a card says instead
+ *
+ * The weight vector, in the file's own vocabulary — the honest one-liner the three profiles with
+ * no `$comment` already shipped, now the only mechanism. It cannot go stale, because it *is* the
+ * configuration; it carries no estimate cue, so R3's textual half has nothing to match; and it is
+ * bounded by the size of the term library rather than by an author's patience.
+ *
+ * Two shipped facts are not weights and still separate two profiles the vector cannot: the
+ * `hardConstraints` list and the auction stage. Both are printed as the file declares them, the
+ * way the term ids already are, rather than translated — a taxonomy maintained in a renderer is
+ * the thing {@link dispatcherFamilyOf} refuses for the same reason. `rightRail.test.ts` asserts
+ * **no two shipped profiles share a blurb**, so a future pair that collides is red rather than a
+ * picker with two identical cards in it.
+ *
+ * A short authored player-facing blurb would be better copy than any of this, and the handoff
+ * already writes one per dispatcher. That needs a new field in `data/dispatcher-profiles.json`;
+ * `$comment` is not it and must not be made to be it.
  */
 export function dispatcherBlurbOf(profile: DispatcherProfile): string {
-  const comment = profile.$comment;
-  if (comment !== undefined && comment.trim() !== '') return comment;
   const weighted = weightedTermsOf(profile.weights);
-  if (weighted.length === 0) return 'no term weighted — every car prices the same.';
-  const heaviest = weighted
-    .slice(0, 3)
-    .map(([id, weight]) => `${id} ${weight.toFixed(2)}`)
-    .join(', ');
-  return (
-    `${String(weighted.length)} of ${String(DECLARED_TERM_IDS.length)} terms weighted; ` +
-    `heaviest ${heaviest}.`
-  );
+  const head =
+    weighted.length === 0
+      ? 'no term weighted — every car prices the same'
+      : `${String(weighted.length)} of ${String(DECLARED_TERM_IDS.length)} terms weighted; ` +
+        `heaviest ${weighted
+          .slice(0, 3)
+          .map(([id, weight]) => `${id} ${weight.toFixed(2)}`)
+          .join(', ')}`;
+  const clauses = [head, ...mechanismClausesOf(profile)];
+  return `${clauses.join('; ')}.`;
+}
+
+/**
+ * The declared behaviour a weight vector cannot carry, in the file's own words.
+ *
+ * Only fields `DispatcherProfile` types and `data/dispatcher-profiles.json` actually authors:
+ * ids out of `hardConstraints`, and the auction stage's `aggregation` and `rounds`. Nothing here
+ * invents a description, so nothing here can be wrong about the code — and a value this renderer
+ * has never heard of prints as itself rather than as a default sentence about it.
+ */
+function mechanismClausesOf(profile: DispatcherProfile): readonly string[] {
+  const clauses: string[] = [];
+  const constraints = profile.hardConstraints ?? [];
+  if (constraints.length > 0) {
+    clauses.push(
+      `hard constraint${constraints.length === 1 ? '' : 's'} ${[...constraints].sort((a, b) => a.localeCompare(b)).join(', ')}`,
+    );
+  }
+  const auction = profile.auction;
+  if (auction !== undefined) {
+    const rounds = auction.rounds ?? 1;
+    clauses.push(
+      `${auction.aggregation ?? 'central-argmin'} over ${String(rounds)} bidding round${rounds === 1 ? '' : 's'}`,
+    );
+  }
+  return clauses;
 }
 
 /** `n of m · family` — the eyebrow note, design `:924`. */

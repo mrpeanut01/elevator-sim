@@ -1499,7 +1499,37 @@ const CAMPAIGN: SurfaceAdapter = {
     }
 
     const verdict = judgeStage({ stage, published, result: context.batch, report: context.report });
-    seeds.push({ field: 'judge.headline', text: verdict.headline, role: 'goal', goal: { rateShown: /\b\d+\s*(?:of|\/)\s*\d+\b/.test(verdict.headline), seeds: context.batch.arms[0]?.replications.length ?? 0 } });
+    /*
+     * The headline is an **observation**, not a goal claim — narrowed from `role: 'goal'` after the
+     * deep tier reported `goal-without-rate` against it (§ D186).
+     *
+     * The old seed tested `\d+ of \d+` for `rateShown`, and on the uncleared branch that matched
+     * `${met} of ${total}` — **a count of goals against goals, with no seed in it anywhere**. Drive a
+     * stage on a batch with no replications and the headline reads `0 of 2 goals reached over 0 runs`:
+     * the pattern is satisfied and there is no run for a rate to be over. So the check was not
+     * reporting the cleared branch because a rate was missing; it was **accepting the uncleared branch
+     * for the wrong reason**, which is wave 8's *tests that could not fail* arriving inside the
+     * instrument § D163 built to find them.
+     *
+     * There is no rate a headline could carry: R12's rate is per goal, four goals have four different
+     * ones, and each already states its own (`passed 45 of 50 runs`) in a separately-seeded sentence
+     * below. `beat-the-baseline` is `batch-only`, which § D160 records R12 as never having reached.
+     * What R13 asks of a headline — the `n` — it does carry, on **both** branches, so that is what is
+     * declared here.
+     *
+     * **What this gives up:** the search can no longer catch a headline *rewritten* to assert a
+     * per-goal outcome without a rate. That is bounded rather than left implicit — `judge.test.ts`
+     * asserts the produced headline names no goal kind and no goal label, on both branches, with the
+     * cleared one driven through a real 50-replication batch.
+     */
+    const headlineSeeds = context.batch.arms[0]?.replications.length ?? 0;
+    seeds.push({
+      field: 'judge.headline',
+      text: verdict.headline,
+      role: 'observation',
+      declaredCount: headlineSeeds,
+      countShown: verdict.headline.includes(String(headlineSeeds)),
+    });
     for (const goal of verdict.goals) {
       const replications = context.batch.arms[0]?.replications.length ?? 0;
       seeds.push({

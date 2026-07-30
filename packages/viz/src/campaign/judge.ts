@@ -379,6 +379,39 @@ function suppressionClause(
  * There is not one. **R2**: the sentence is about the runs — how many of this stage's goals were
  * reached over how many replications — and never about which dispatcher is better in general. No
  * grade, no points, no letter.
+ *
+ * ## This line is a tally of verdicts, and it is deliberately not a goal claim
+ *
+ * § D163 clause 1's deep tier reported it as one — `goal-without-rate` at
+ * `campaign/judge.ts#judgeStage · judge.headline`, on
+ * *"The morning rush: all 3 goals reached over 50 runs."* — and the report is a **false positive**
+ * of § D172's exact shape: a numeral matched by something that is not the quantity being looked
+ * for.
+ *
+ * The evidence is arithmetical rather than stylistic. `honesty/surfaces.ts` seeds this string
+ * `role: 'goal'` with `rateShown` set by testing it for `\d+ of \d+`, and on the **uncleared**
+ * branch that pattern matches `${met} of ${total}` — a count of **goals against goals**, with no
+ * seed anywhere in it. Drive a stage on a batch with no replications at all and the headline reads
+ * *"0 of 2 goals reached over 0 runs"*: the pattern is satisfied, and there is no run for a pass
+ * rate to be over. `judge.test.ts` pins exactly that. So the check does not report this string
+ * because a rate is missing on one branch — it accepts the other branch **for the wrong reason**,
+ * which is the class § D163 was written against.
+ *
+ * The rate R12 asks for is per goal, and every goal has one: {@link judgeCountGoal} writes
+ * *"passed 45 of 50 runs"* into each goal's own sentence, seeded separately, and
+ * `beat-the-baseline` — the only other kind any shipped stage carries — is `batch-only` and R12
+ * never reached it (§ D160). There is no rate this line could carry: four goals have four
+ * different ones, and folding them into a headline would invent a fifth number nothing measured.
+ * What R13 asks of it — the `n` — it does carry, in *"over 50 runs"*, on both branches.
+ *
+ * **The narrowing this needs, and what the narrowing gives up.** `judge.headline` should be seeded
+ * `role: 'observation'` with `declaredCount` and `countShown` set from the replication count, so
+ * R13 still sees it and R12 stops being asked a question the string does not answer. That is a
+ * change to `honesty/surfaces.ts`. What it can no longer catch: a headline **rewritten** to assert
+ * a per-goal outcome — *"nobody-abandoned was met"* — with no rate beside it. That risk is bounded
+ * here rather than left implicit: this function's inputs are a stage name, four integers and two
+ * fixed clauses, and `judge.test.ts` asserts the produced headline names **no goal kind and no
+ * goal label**, on both branches, over the shipped campaign.
  */
 function headlineFor(
   stage: CampaignStage,

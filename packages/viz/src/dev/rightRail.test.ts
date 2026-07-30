@@ -146,19 +146,74 @@ describe('dispatcherPlateOf', () => {
   });
 });
 
+/**
+ * The blurb is derived for **every** profile, and these are the guards that keep it that way.
+ *
+ * The card used to print `profile.$comment` verbatim where there was one. § D163 clause 1's
+ * search reported it as an R3 violation — `destination-eta`'s comment says *"no quotable AWT on
+ * 30 of 30"*, and on a Vertical City run whose refused `meanWaitS` rounds to `30` that is an
+ * estimate cue and the withheld number in one clause. The collision was luck; the defect was that
+ * a player-facing card rendered 5 082 characters of maintainer prose at all.
+ *
+ * So the cases below are about the **mechanism** and not about that one string: a comment may not
+ * reach a blurb by any route, a blurb may not carry an estimate cue at all, and no two shipped
+ * profiles may share one. The last is what makes the derivation safe to widen — it is the reason
+ * the hard-constraint and auction clauses exist, rather than a preference.
+ */
 describe('the dispatcher list’s words', () => {
-  it('quotes the profile’s own `$comment` where there is one', () => {
-    const energy = profile('energy-aware');
-    expect(energy.$comment).toBeDefined();
-    expect(dispatcherBlurbOf(energy)).toBe(energy.$comment);
+  it('never renders a profile’s `$comment`, whole or in part', () => {
+    const commented = config.dispatcherProfiles.profiles.filter(
+      (entry) => (entry.$comment ?? '').trim() !== '',
+    );
+    // Both ways: a file that stopped carrying comments would make the loop below vacuous.
+    expect(commented.length).toBeGreaterThan(5);
+    for (const entry of commented) {
+      const blurb = dispatcherBlurbOf(entry);
+      expect(blurb).not.toBe(entry.$comment);
+      // Not a prefix either: truncating an essay leaves an essay, and its numerals with it.
+      const opening = (entry.$comment ?? '').slice(0, 24);
+      expect(blurb.includes(opening)).toBe(false);
+    }
   });
 
-  it('generates an honest one-liner from the weight vector where there is not', () => {
+  it('carries no estimate cue, so R3’s textual half has nothing to match', () => {
+    // `honesty/properties.ts`'s ESTIMATE_CUES, restated because they are module-private there.
+    const cues = /\b(?:average|mean|awt|typical|95th|wt95|percentile|one in twenty|1 in 20|time to destination|ttd)\b/i;
+    for (const entry of config.dispatcherProfiles.profiles) {
+      const blurb = dispatcherBlurbOf(entry);
+      expect(cues.test(blurb), `${entry.id}: ${blurb}`).toBe(false);
+      expect(blurb.length, `${entry.id} is ${String(blurb.length)} characters`).toBeLessThanOrEqual(
+        160,
+      );
+    }
+    // The regression itself: the numeral and the cue that fired are both gone.
+    expect(dispatcherBlurbOf(profile('destination-eta'))).not.toContain('30 of 30');
+  });
+
+  it('tells every shipped profile apart', () => {
+    const blurbs = config.dispatcherProfiles.profiles.map((entry) => dispatcherBlurbOf(entry));
+    expect(new Set(blurbs).size).toBe(blurbs.length);
+  });
+
+  it('generates an honest one-liner from the weight vector', () => {
     const collective = profile('collective');
     expect(collective.$comment).toBeUndefined();
     const blurb = dispatcherBlurbOf(collective);
     expect(blurb).toContain('1 of 12 terms weighted');
     expect(blurb).toContain('waitTime 1.00');
+  });
+
+  it('prints the two declared facts a weight vector cannot carry, as the file declares them', () => {
+    // `collective` and `eta` weight the same single term; only the hard constraint separates them.
+    expect(dispatcherBlurbOf(profile('collective'))).toContain(
+      'hard constraint noDirectionReversal',
+    );
+    expect(dispatcherBlurbOf(profile('eta'))).not.toContain('hard constraint');
+    // The two auctions are weight-identical; only the round count separates them.
+    expect(dispatcherBlurbOf(profile('auction'))).toContain('contract-net over 1 bidding round');
+    expect(dispatcherBlurbOf(profile('auction-multi-round'))).toContain(
+      'contract-net over 3 bidding rounds',
+    );
   });
 
   it('names the engine rather than inventing a family for a profile with no role', () => {
