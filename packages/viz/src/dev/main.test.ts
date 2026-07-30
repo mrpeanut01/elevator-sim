@@ -34,7 +34,7 @@ import { describe, expect, it } from 'vitest';
 
 import { WAIT_BANDS } from '../live/bands.js';
 
-import { waitLegendEntries } from './main.js';
+import { seekActionForKey, waitLegendEntries } from './main.js';
 
 async function indexHtml(): Promise<string> {
   return readFile(fileURLToPath(new URL('../../index.html', import.meta.url)), 'utf8');
@@ -104,6 +104,32 @@ describe('index.html holds no second copy of the legend', () => {
     // needs a handle to keep it, and `elementMap.ts` is where a handle is declared.
     const markup = await legendMarkup();
     expect(markup).toContain('id="legend-title"');
+  });
+});
+
+describe('keyboard seeking — KX-10', () => {
+  it('maps the arrows to ∓5 s, and to ∓60 s with Shift', () => {
+    expect(seekActionForKey('ArrowLeft', false)).toStrictEqual({ kind: 'by', deltaS: -5 });
+    expect(seekActionForKey('ArrowRight', false)).toStrictEqual({ kind: 'by', deltaS: 5 });
+    expect(seekActionForKey('ArrowLeft', true)).toStrictEqual({ kind: 'by', deltaS: -60 });
+    expect(seekActionForKey('ArrowRight', true)).toStrictEqual({ kind: 'by', deltaS: 60 });
+  });
+
+  it('sends Home and End to the run’s own ends', () => {
+    expect(seekActionForKey('Home', false)).toStrictEqual({ kind: 'toStart' });
+    expect(seekActionForKey('End', false)).toStrictEqual({ kind: 'toEnd' });
+    // Shift changes the arrows' distance and nothing about the ends — there is only one start.
+    expect(seekActionForKey('Home', true)).toStrictEqual({ kind: 'toStart' });
+    expect(seekActionForKey('End', true)).toStrictEqual({ kind: 'toEnd' });
+  });
+
+  it('answers nothing for every key it does not own', () => {
+    // The transport's other keys keep their own handlers; a seek answered for Space or Escape
+    // would swallow play/pause and the drawer's dismissal.
+    for (const key of [' ', ',', '.', '[', ']', 'Enter', 'Escape', 'ArrowUp', 'ArrowDown', 'a']) {
+      expect(seekActionForKey(key, false)).toBeUndefined();
+      expect(seekActionForKey(key, true)).toBeUndefined();
+    }
   });
 });
 

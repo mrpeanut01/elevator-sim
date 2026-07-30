@@ -131,6 +131,7 @@ import {
   applyRailState,
   applySurfaceState,
   drawerStateFor,
+  escapeClosesDrawer,
   railStateFor,
   segmentAfterKey,
   surfaceStateFor,
@@ -1257,6 +1258,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const target = event.target;
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
       if (target instanceof HTMLSelectElement) return;
+      /*
+       * A key a focused control already answered is not this handler's to answer again. The tab
+       * strip, the rail segments and the timeline all `preventDefault` on the arrows and on
+       * Home/End when they handle one, and they run first — target before window — so without
+       * this guard an arrow pressed on the timeline would both frame-step (`KX-09`, the
+       * timeline's own handler) and seek (`KX-10`, below), two moves for one key.
+       */
+      if (event.defaultPrevented) return;
+      const seek = seekActionForKey(event.key, event.shiftKey);
+      if (seek !== undefined && playback !== undefined) {
+        event.preventDefault();
+        playback.pause();
+        if (seek.kind === 'by') playback.seekBy(seek.deltaS);
+        else playback.seekToProgress(seek.kind === 'toEnd' ? 1 : 0);
+        renderLive();
+        drawTransportChrome(viewAt());
+        return;
+      }
       switch (event.key) {
         case ' ':
           event.preventDefault();
@@ -1279,6 +1298,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
         }
         case 'Enter':
           if (event.metaKey || event.ctrlKey) closeShift();
+          break;
+        case 'Escape':
+          // SH-12 / KX-11: Escape dismisses the drawer, and only the drawer — in column mode the
+          // key is inert and focus stays wherever it was. Focus returns to the toggle because the
+          // toggle is what re-opens what Escape just closed.
+          if (escapeClosesDrawer(window.innerWidth, state.drawerOpen)) {
+            context.update({ drawerOpen: false });
+            ui.rail.drawerToggle.focus();
+          }
           break;
         default:
           break;
@@ -1317,6 +1345,40 @@ function boot(ui: Elements, resources: BrowserResources): void {
 }
 
 const MODE_KEY = 'elevator-sim.viewMode';
+
+/* ========================================================================== *
+ * Keyboard seeking — KX-10
+ * ========================================================================== */
+
+/** What a transport key asks of the playhead. `by` is simulated seconds, sign and all. */
+export type SeekAction =
+  | { readonly kind: 'by'; readonly deltaS: number }
+  | { readonly kind: 'toStart' }
+  | { readonly kind: 'toEnd' };
+
+/**
+ * The seek a key asks for, if any — `KX-10`, the retired `KB-04`/`KB-05`'s successor.
+ *
+ * Fixed **simulated** seconds, not display frames: <kbd>←</kbd>/<kbd>→</kbd> move 5 s,
+ * <kbd>Shift</kbd> makes it 60 s, and <kbd>Home</kbd>/<kbd>End</kbd> are the run's own ends. The
+ * timeline's focused arrows remain `KX-09`'s frame step — a *speed-relative* move — and the two
+ * never fire together because a key the timeline answered is `defaultPrevented` before the global
+ * handler sees it. Pure, so the mapping is testable without a window.
+ */
+export function seekActionForKey(key: string, shiftKey: boolean): SeekAction | undefined {
+  switch (key) {
+    case 'ArrowLeft':
+      return { kind: 'by', deltaS: shiftKey ? -60 : -5 };
+    case 'ArrowRight':
+      return { kind: 'by', deltaS: shiftKey ? 60 : 5 };
+    case 'Home':
+      return { kind: 'toStart' };
+    case 'End':
+      return { kind: 'toEnd' };
+    default:
+      return undefined;
+  }
+}
 
 /**
  * Deep links, so a finding can be sent to somebody.
