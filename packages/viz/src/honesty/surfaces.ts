@@ -29,6 +29,13 @@
  * looked at.
  */
 
+import type {
+  DispatcherProfiles,
+  ElevatorSpecs,
+  ResolvedBuilding,
+  TrafficProfiles,
+} from '@elevator-sim/core/browser';
+
 import { restrictedFloorIds } from '../access/zoning.js';
 import { credentialLensFor, describeCredentialLens, LENS_LEGEND, LENS_OPERATIONAL_NOTE, STATE_WORDS } from '../access/zoning.js';
 import { checkAccessCompatibility, credentialCapabilityOf } from '../access/dispatcherCredentials.js';
@@ -55,6 +62,10 @@ import { previewGeometry } from '../editor/editorPreview.js';
 import { summariseReport, validateBuilding, type ValidationReport } from '../editor/editorValidate.js';
 import { frameAt } from '../frame/frameAt.js';
 import { landingAssignmentsAt, meansAreSuppressed, overlayAt, queueAt, type FloorQueue, type LandingAssignment } from '../frame/overlay.js';
+import { WAIT_BANDS, moodAt, waitBandsAt } from '../live/bands.js';
+import { decisionRowsAt } from '../live/decisions.js';
+import { honestyAt } from '../live/honesty.js';
+import { phaseAt, timelineOf } from '../live/timeline.js';
 import { verifyReplay } from '../record/document.js';
 import { DEFAULT_THEME, drawScene, describeSelection, landingOptionLabel, type Canvas2DLike, type SceneSelection } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
@@ -67,6 +78,126 @@ import { AWT_ID, ENERGY_ID, TTD_ID, WT95_ID, runSummaryFigures, windowClause } f
 import { goalReport } from '../scenario/goalReport.js';
 import { goalLabel, GOAL_BLOCKER } from '../scenario/goals.js';
 import type { PublishedScenario } from '../scenario/published.js';
+
+/* ---- the design refactor's surfaces: the shift layer, the four editors, the panels ---- */
+import {
+  BLANK_SPEC,
+  buildingAdvice,
+  buildingFromSpec,
+  buildingSummary,
+  occupancyLine,
+  SPEC_ROWS,
+  specFromBuilding,
+  validateSpec,
+  type BuildingSpec,
+} from '../authoring/buildingSpec.js';
+import {
+  adviceFor,
+  blankSpec,
+  costFunctionLine,
+  DEFAULT_LEVERS,
+  DWELL_CHOICES,
+  DWELL_HINTS,
+  inertTerms,
+  profileFromSpec,
+  specFromProfile,
+  type DispatcherSpec,
+} from '../authoring/dispatcherSpec.js';
+import {
+  classesFromSpecs,
+  classFromSpec,
+  MACHINE_ROWS,
+  machineSummary,
+  plainDescription,
+  specFromClass,
+  type MachineClass,
+} from '../authoring/machineSpec.js';
+import {
+  DEFAULT_PATTERN,
+  PATTERN_ROWS,
+  patternSummary,
+  PEAK_ORDERS,
+  PEAK_ORDER_INFO,
+  rowsFor,
+  specFromTrafficProfile,
+} from '../authoring/patternSpec.js';
+import {
+  checkBuilding,
+  elevationCarsOf,
+  elevationNoteOf,
+  elevationRowsOf,
+  specRowsOf,
+  speedChipsOf,
+} from '../dev/buildingEditor.js';
+import type { BrowserResources } from '../dev/data.js';
+import {
+  dwellHintOf,
+  flagLineOf,
+  flagRowsOf,
+  leverRowsOf,
+  termRowsOf,
+} from '../dev/dispatcherEditor.js';
+import {
+  goalRowsOf,
+  historyBarsOf,
+  idleDecisionRow,
+  idleHonestyCard,
+  idleMoodView,
+  idleStatRowsOf,
+  mathsDisclosureOf,
+  moodDriverRowsOf,
+  moodViewOf,
+  runFiguresOf,
+  servedCaptionFor,
+  servedTitleFor,
+  statRowsOf,
+  streakLineOf,
+} from '../dev/leftRail.js';
+import { machineRowsOf, ratedSpeedChipsOf, speedLadderOf } from '../dev/machinesEditor.js';
+import {
+  diagnosisRowsOf,
+  emptyReportView,
+  figureViewOf,
+  goalRowViewOf,
+  reportViewOf,
+} from '../dev/reportPanel.js';
+import {
+  buildingPlateOf,
+  dispatcherBlurbOf,
+  dispatcherFamilyOf,
+  dispatcherNoteOf,
+  dispatcherPlateOf,
+  machineWarningOf,
+  nameplateOf,
+  patternOptionsOf,
+  trafficPlateOf,
+} from '../dev/rightRail.js';
+import { scenarioCardsOf } from '../dev/scenariosPanel.js';
+import {
+  patternRowsOf,
+  previewSegmentsOf,
+  previewTemplateOf,
+} from '../dev/trafficEditor.js';
+import { moodOf } from '../live/bands.js';
+import { observationsAt } from '../live/observations.js';
+import { CONTRACTS, contractById, contractForBuilding, nextContract, statLineOf } from '../shift/contracts.js';
+import { baseDemandOf, eventFor, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
+import { bestLineFor, goalsForDay, readGoal, readGoals } from '../shift/goals.js';
+import { shiftObservationsOf } from '../shift/observations.js';
+import { averageWaitFigure, clockRange, dayReportOf, NOT_RECORDED } from '../shift/report.js';
+import {
+  DAY_START_S,
+  type DayReport,
+  type GoalReading,
+  type Observations,
+  type ReportFigure,
+  type ScenarioContract,
+  type ShiftEvent,
+  type ShiftGoal,
+  type WeekState,
+} from '../shift/types.js';
+import { closeDay, openWeek, outcomeOf } from '../shift/week.js';
+
 import type { HonestyCase, RenderedText, TextProvenance, TextRole } from './types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -106,6 +237,33 @@ export interface HonestyContext {
   readonly accessZones: Parameters<typeof restrictedFloorIds>[1];
   readonly floorIds: readonly string[];
   readonly buildingName: string;
+  /**
+   * The case's own resolved building.
+   *
+   * Added for the authoring and shift surfaces, which take a building rather than a recording:
+   * `statLineOf` derives a scenario card's spec line from it (`docs/12` § 4.4 — *"generated from
+   * the building JSON, not authored"*), `specFromBuilding` reads it back into the editor's shape,
+   * and `shiftRunPatch` needs its banks to decide which car an event holds. It is the **same**
+   * object `run.ts` already resolved for the recording, not a second lookup.
+   */
+  readonly building: ResolvedBuilding;
+  /**
+   * Every shipped building, as the page loads them.
+   *
+   * The scenarios grid draws all five cards at once, so a search that handed it one building would
+   * render four *"no building is loaded"* refusals and call the surface driven.
+   */
+  readonly buildings: readonly ResolvedBuilding[];
+  /** For the pattern editor, which opens on the building's own demand rather than on a default. */
+  readonly trafficProfiles: TrafficProfiles;
+  /**
+   * The whole of `data/dispatcher-profiles.json`, not its `profiles` array.
+   *
+   * The dispatcher editor draws one row per **cost term** and puts the term's own `measures`
+   * sentence in the tooltip, and the term library is a file-level block. `dev/data.ts` carries the
+   * whole file for the same reason and says so.
+   */
+  readonly dispatcherProfiles: DispatcherProfiles;
   /**
    * One instant's frame, metrics, queues, assignments, lock-outs and mood — **memoised**.
    *
@@ -163,8 +321,15 @@ export function textCapturingContext(): Canvas2DLike & { readonly texts: readonl
     fillRect() {},
     strokeRect() {},
     beginPath() {},
+    closePath() {},
     moveTo() {},
     lineTo() {},
+    // The four path and shape members `Canvas2DLike` gained with the design handoff's stage. They
+    // are no-ops here for the same reason every other geometry member is: this context exists to
+    // answer *what did the surface say*, and a rounded car says nothing.
+    quadraticCurveTo() {},
+    arc() {},
+    fill() {},
     stroke() {},
     fillText(text: string) {
       if (text.trim() !== '') texts.push(text);
@@ -468,6 +633,19 @@ const CANVAS: SurfaceAdapter = {
     'render/canvas.ts#landingOptionLabel',
     'render/canvas.ts#fitLabel',
     'render/overlay.ts#drawOverlay',
+    /*
+     * The stage's crowd, reached only through `drawScene` — the `renderSlider`/`renderControls`
+     * case this interface's `covers` docstring names.
+     *
+     * This is a **coverage claim, not an exclusion**: the adapter below passes `bundle.queues`, so
+     * a landing deep enough to overflow its lane really does draw its `+N` into the corpus at
+     * every sampled instant, and a landing past the alarm depth really does execute the rule.
+     * They are listed because the derivation finds them (a font string and an `rgba()` builder
+     * read as prose to the two-adjacent-words scanner) and an unclassified producer is red — not
+     * because anything about them is exempt.
+     */
+    'render/riderFigures.ts#drawRiderLane',
+    'render/riderFigures.ts#drawAlarmRule',
   ],
   render(context) {
     const { recording } = context;
@@ -551,6 +729,107 @@ const MOOD: SurfaceAdapter = {
           text: `${driver.label}: ${driver.text}`,
           role: 'observation',
         });
+      }
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The design handoff's left rail and transport — `src/live/`.
+ *
+ * Every string these produce is a sentence a player reads on the primary screen, so they are
+ * **driven** rather than excluded: the mood headline, the four band labels, the timeline's chips
+ * and titles, the decision log's heads and reasons, and the honesty card in both disclosure
+ * modes. Driving both modes matters more here than anywhere else in the file — the card's whole
+ * job is to say whether an estimate may be quoted, and a search that only ever rendered the
+ * casual half would never see the sentence that quotes the refusal.
+ *
+ * The roles are the surfaces' own classification, not a judgement made here. The honesty card's
+ * `maths` is `reason` when the run's means are suppressed, because that is exactly what it is —
+ * `core`'s refusal, quoted — and `observation` otherwise, because every figure in that branch is
+ * a count, a threshold or a longest wait. Nothing in `live/` is ever an `estimate`: the directory
+ * does not name a suppressible figure, which `live/noMeans.test.ts` asserts by grep.
+ */
+const LIVE_RAIL: SurfaceAdapter = {
+  id: 'live/bands.ts#moodAt',
+  covers: [
+    'live/bands.ts#WAIT_BANDS',
+    'live/bands.ts#BAND_COLORS',
+    'live/bands.ts#bandById',
+    'live/bands.ts#bandIndexOf',
+    'live/bands.ts#bandOf',
+    'live/bands.ts#moodAt',
+    'live/bands.ts#moodOf',
+    'live/bands.ts#waitBandsAt',
+    'live/decisions.ts#decisionRowsAt',
+    'live/decisions.ts#TERM_PHRASES',
+    'live/honesty.ts#honestyAt',
+    'live/timeline.ts#timelineOf',
+    'live/timeline.ts#phaseAt',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const { recording } = context;
+
+    for (const band of WAIT_BANDS) {
+      seeds.push({ field: `waitBand(${band.id}).label`, text: band.label, role: 'label' });
+      seeds.push({ field: `waitBand(${band.id}).legend`, text: band.legendLabel, role: 'label' });
+    }
+    for (const segment of timelineOf(recording)) {
+      seeds.push({ field: `timeline(${segment.id}).label`, text: segment.label, role: 'label' });
+      seeds.push({ field: `timeline(${segment.id}).title`, text: segment.title, role: 'observation' });
+    }
+
+    for (const at of sampleTimes(recording)) {
+      const stamp = at.toFixed(0);
+      const mood = moodAt(recording, at);
+      seeds.push({ field: `mood(@${stamp}s).headline`, text: mood.headline, role: 'observation' });
+      seeds.push({ field: `mood(@${stamp}s).sub`, text: mood.sub, role: 'observation' });
+
+      const bands = waitBandsAt(recording, at);
+      for (const entry of bands.counts) {
+        seeds.push({
+          field: `bands(@${stamp}s).${entry.band.id}`,
+          text: `${entry.band.label} ${String(entry.count)}`,
+          role: 'observation',
+          declaredCount: bands.total,
+          countShown: true,
+        });
+      }
+
+      const segment = phaseAt(recording, at);
+      if (segment !== undefined) {
+        seeds.push({ field: `phaseAt(@${stamp}s)`, text: segment.title, role: 'observation' });
+      }
+
+      for (const [index, row] of decisionRowsAt(recording, at).entries()) {
+        seeds.push({
+          field: `decision(@${stamp}s)[${String(index)}].head`,
+          text: row.head,
+          role: 'label',
+        });
+        seeds.push({
+          field: `decision(@${stamp}s)[${String(index)}].why`,
+          text: row.why,
+          role: 'observation',
+        });
+      }
+
+      for (const mode of ['casual', 'engineer'] as const) {
+        const card = honestyAt(recording, at, mode);
+        seeds.push({ field: `honesty(${mode}, @${stamp}s).title`, text: card.title, role: 'prose' });
+        seeds.push({ field: `honesty(${mode}, @${stamp}s).plain`, text: card.plain, role: 'prose' });
+        if (card.maths !== undefined) {
+          seeds.push({
+            field: `honesty(${mode}, @${stamp}s).maths`,
+            text: card.maths,
+            // The refusal's own words when there is one; counts and thresholds otherwise.
+            role: card.suppressed ? 'reason' : 'observation',
+            declaredCount: recording.summary.waitCount,
+            countShown: true,
+          });
+        }
       }
     }
     return singleRun(this.id, seeds);
@@ -1250,6 +1529,1409 @@ const CAMPAIGN: SurfaceAdapter = {
   },
 };
 
+/* -------------------------------------------------------------------------- *
+ * The design refactor's surfaces — the shift layer, the four editors, the panels
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The one fold, taken once per case, and the two days every shift surface is driven over.
+ *
+ * ## Why the fold is `live/`'s and not a second one
+ *
+ * `shift/observations.ts` says it in as many words: *"`live/` folds and this projects"*, and
+ * *"that is how a repository ends up with two answers to how many people has this building
+ * carried"* — § D111's defect, one layer up. So the recording is folded exactly once, by
+ * `observationsAt(recording, recording.endedAt)`, and projected by `shiftObservationsOf`. There is
+ * exactly one such call in the shipped product (`dev/main.ts#closeShift`) and this is the same one,
+ * at the same instant, for the same stated reason: *"a day's account is the day's, and a reader
+ * who paused at 09:00 has not made the afternoon not happen."*
+ *
+ * ## Why two days rather than one
+ *
+ * `goalsForDay` alternates its third bar on `day % 2` — even days ask a reader to hold a landing's
+ * depth, odd days ask that nobody crosses the abandonment horizon — so a single day would leave
+ * one of the two goal sentences unrendered on every case of every campaign. Day 1 and day 4 also
+ * split the two branches of `contractLineFor` and `taughtFor`: day 1 runs the building's **own**
+ * scenario, day 4 runs it as *a building the reader drew*, which is the branch that prints
+ * *"nothing is being banked"*.
+ *
+ * ## Why each day is closed twice
+ *
+ * `closeDay` only produces a {@link ClearedAward} when the banked count reaches the contract's
+ * `needClean`, and whether the generated run cleared its goals is not something an adapter may
+ * arrange. So each day is also closed on a week that has **already** banked `needClean` shifts —
+ * a state a reader reaches by playing — and that is what renders `awardFor`'s sentence. Day 4
+ * closes on `c5`, the last contract, so `nextContract` returns `undefined` and the other branch —
+ * *"any scenario you like — they are all open"* — is rendered too.
+ */
+interface ShiftDay {
+  readonly day: number;
+  readonly dayIdx: number;
+  readonly contract: ScenarioContract | undefined;
+  readonly event: ShiftEvent;
+  readonly goals: readonly ShiftGoal[];
+  readonly readings: readonly GoalReading[];
+  /** The week the run actually produced. */
+  readonly week: WeekState;
+  /** The same day closed on a week already at `needClean`, so the award banner renders. */
+  readonly banked: WeekState;
+  readonly report: DayReport;
+}
+
+interface ShiftBundle {
+  readonly observations: Observations;
+  readonly dispatcherName: string;
+  readonly days: readonly ShiftDay[];
+}
+
+/**
+ * Memoised per context, because five adapters want the same day and the fold is a pass over every
+ * leg plus a sort of `2n` queue events. Keyed on the context object, which `run.ts` builds fresh
+ * per case, so nothing survives a case.
+ */
+const SHIFT_BUNDLES = new WeakMap<HonestyContext, ShiftBundle>();
+
+function shiftBundleOf(context: HonestyContext): ShiftBundle {
+  const hit = SHIFT_BUNDLES.get(context);
+  if (hit !== undefined) return hit;
+
+  const { recording } = context;
+  const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+  const dispatcherName =
+    context.profiles.find((profile) => profile.id === recording.dispatcherProfileId)?.name ??
+    recording.dispatcherProfileId;
+
+  const plan: readonly { readonly day: number; readonly contractId: string; readonly own: boolean }[] = [
+    // The building's own scenario, on the odd-day goal set.
+    { day: 1, contractId: contractForBuilding(context.case.buildingId)?.id ?? 'c1', own: false },
+    // A building the reader drew, on the even-day goal set, banked against the last contract.
+    { day: 4, contractId: 'c5', own: true },
+  ];
+
+  const days = plan.map(({ day, contractId, own }): ShiftDay => {
+    const dayIdx = (day - 1) % 7;
+    const contract = own ? undefined : contractById(contractId);
+    const goals = goalsForDay(day);
+    const readings = readGoals(goals, observations);
+    const event = eventFor(day, dayIdx);
+    const outcome = outcomeOf({
+      day,
+      dayIdx,
+      eventId: event.id,
+      arrived: observations.arrived,
+      carried: observations.carried,
+      minutePct: observations.minutePct,
+      readings,
+    });
+    const opened: WeekState = { ...openWeek(contractId), day, dayIdx };
+    const week = closeDay(opened, outcome);
+    const banked = closeDay(
+      { ...opened, cleanRun: contractById(contractId)?.needClean ?? 1 },
+      outcome,
+    );
+    const report = dayReportOf({
+      recording,
+      observations,
+      goals,
+      // The banked week, so the sheet renders its cleared banner as well as its streak line.
+      week: banked,
+      contract,
+      event,
+      dispatcherName,
+      dayStartS: DAY_START_S,
+    });
+    return { day, dayIdx, contract, event, goals, readings, week, banked, report };
+  });
+
+  const bundle: ShiftBundle = { observations, dispatcherName, days };
+  SHIFT_BUNDLES.set(context, bundle);
+  return bundle;
+}
+
+/**
+ * The one figure on the Day sheet that `awtIsValid` speaks for, by its shipped id.
+ *
+ * The same discipline `RUN_SUMMARY` applies with `AWT_ID`/`WT95_ID`/`TTD_ID`: the classification
+ * comes from the surface's own id, never from a word in the value. `shift/report.ts`'s module
+ * docstring states the rule this reads — *"`AVERAGE WAIT` is the only figure on this sheet that a
+ * saturated run may not publish"* — and `worst-wait` is deliberately **not** here, because a
+ * longest wait is an observation R4 says is drawn on a saturated run on purpose.
+ */
+const REPORT_AVERAGE_WAIT_ID = 'average-wait';
+
+/** What R3, R11 and R13 need about a report cell, from the cell's own `tone`, `id` and `axisOnly`. */
+function reportFigureShape(figure: ReportFigure): {
+  readonly role: TextRole;
+  readonly gated: boolean;
+  readonly energyAxis: boolean;
+} {
+  const gated = figure.id === REPORT_AVERAGE_WAIT_ID;
+  if (figure.tone === 'withheld') return { role: 'suppressed', gated, energyAxis: figure.axisOnly };
+  if (figure.axisOnly) return { role: 'observation', gated: false, energyAxis: true };
+  return { role: gated ? 'estimate' : 'observation', gated, energyAxis: false };
+}
+
+/**
+ * The Day report — the sheet that prints `withheld`, and the most safety-critical string here.
+ *
+ * ## Why this is driven rather than excluded
+ *
+ * `shift/report.ts` publishes a mean. That is the whole of the argument: it is the only surface the
+ * design refactor added that can print `summary.meanWaitS`, it gates that one figure on
+ * `awtIsValid && !saturated`, and R3 plus the suppression rule are exactly the checks that claim
+ * needs. A search that excluded it would be excluding the figure it exists to watch.
+ *
+ * Every seed's role is the **sheet's own** classification, read through {@link reportFigureShape}
+ * from `ReportFigure.tone`, `ReportFigure.id` and `ReportFigure.axisOnly`. Nothing here decides
+ * that a mean is legitimate: `averageWaitFigure` already asked the summary, and a cell that came
+ * back `plain` on a suppressed run would be the sheet disagreeing with `core` — which the property
+ * reports rather than this file second-guessing.
+ *
+ * ## The small print is a `reason`, and that is a structural fact rather than a kindness
+ *
+ * `DayReport.smallPrint` exists for one purpose: to refuse a comparative reading of one day.
+ * *"This is one replication of one day on one seed. It cannot tell you that X is better than
+ * anything — that needs 50 or more paired runs …"* It **names** the ordering claim it is refusing,
+ * in R2's own words, which is precisely what `TextRole` `reason` is for and precisely why
+ * `properties.ts` exempts that role: the refusal is the one string entitled to quote what it
+ * refuses. See `checkSingleRunComparative`'s own note on the third narrowing.
+ */
+const SHIFT_REPORT: SurfaceAdapter = {
+  id: 'shift/report.ts#dayReportOf',
+  covers: [
+    'shift/report.ts#dayReportOf',
+    'shift/report.ts#averageWaitFigure',
+    'shift/report.ts#clockRange',
+    'shift/report.ts#NOT_RECORDED',
+    'shift/goals.ts#goalsForDay',
+    'shift/goals.ts#readGoal',
+    'shift/goals.ts#readGoals',
+    'shift/goals.ts#bestLineFor',
+    'shift/events.ts#SHIFT_EVENTS',
+    'shift/events.ts#eventFor',
+    'shift/events.ts#shiftRunPatch',
+    'shift/week.ts#closeDay',
+    'shift/contracts.ts#CONTRACTS',
+    'shift/contracts.ts#contractById',
+    'shift/contracts.ts#contractForBuilding',
+    'shift/contracts.ts#nextContract',
+    'shift/contracts.ts#statLineOf',
+  ],
+  render(context) {
+    const { recording } = context;
+    const { summary } = recording;
+    const bundle = shiftBundleOf(context);
+    const seeds: TextSeed[] = [];
+
+    /* ---- the sheet itself, on both days ---- */
+    for (const entry of bundle.days) {
+      const at = `day${String(entry.day)}`;
+      const { report } = entry;
+      seeds.push({ field: `${at}.title`, text: report.title, role: 'label' });
+      for (const [index, line] of report.metaLines.entries()) {
+        seeds.push({ field: `${at}.metaLines[${String(index)}]`, text: line, role: 'label' });
+      }
+      seeds.push({ field: `${at}.lede`, text: report.lede, role: 'observation' });
+
+      for (const figure of report.figures) {
+        const shape = reportFigureShape(figure);
+        const countInNote = /(\d[\d,]*)/.test(figure.note);
+        seeds.push({
+          field: `${at}.figures(${figure.id}).value`,
+          text: `${figure.label}: ${figure.value}`,
+          role: shape.role,
+          declaredCount: shape.gated ? summary.waitCount : undefined,
+          // The sheet carries a figure's `n` in its **note**, which sits under the value in the
+          // same cell. `countShown` is R13's *"in the same visual unit"*, so it is read off the
+          // note the cell actually printed rather than off whether a count exists.
+          countShown: shape.gated ? countInNote : undefined,
+          energyAxis: shape.energyAxis,
+          gated: shape.gated,
+        });
+        seeds.push({
+          field: `${at}.figures(${figure.id}).note`,
+          text: figure.note,
+          // A withheld cell's note **is** `core`'s refusal, quoted whole.
+          role: shape.role === 'suppressed' ? 'reason' : 'observation',
+          declaredCount: shape.gated ? summary.waitCount : undefined,
+          countShown: shape.gated ? countInNote : undefined,
+          energyAxis: shape.energyAxis,
+          gated: shape.gated,
+        });
+      }
+
+      seeds.push({ field: `${at}.verdictLine`, text: report.verdictLine, role: 'observation' });
+      seeds.push({ field: `${at}.streakLine`, text: report.streakLine, role: 'prose' });
+      seeds.push({ field: `${at}.contractLine`, text: report.contractLine, role: 'label' });
+      if (report.cleared !== null) {
+        seeds.push({
+          field: `${at}.cleared.reward`,
+          text: report.cleared.reward,
+          role: 'label',
+        });
+        seeds.push({
+          field: `${at}.cleared.nextTitle`,
+          text: report.cleared.nextTitle,
+          role: 'label',
+        });
+      }
+      for (const reading of report.goals) {
+        seeds.push({
+          field: `${at}.goals(${reading.goal.id}).label`,
+          text: reading.goal.label,
+          role: 'label',
+        });
+        /*
+         * **Deliberately `observation`, not `goal`, and the distinction is the shift layer's own.**
+         *
+         * `TextRole` `goal` is R12's object — a goal whose across-seed pass rate must be published
+         * beside it — and § D160 found that R12 *abolishes* the single-run goal category for the
+         * campaign. `shift/goals.ts` states at length why a shift reading is a different thing:
+         * it is a comparison of one day's **count** against a stated bar, never a claim that a
+         * dispatcher is better, and the sheet's own small print says so on every single day. There
+         * is no batch behind it and no rate to publish, so classifying it `goal` would report every
+         * shipped day as an R12 violation of a rule aimed at the campaign.
+         *
+         * Nothing is hidden by the choice: R3, R10, R11 and R13's frequency clause all still read
+         * these strings, and the value a reading prints is `GoalReading.display`, which is `—`
+         * whenever the goal is `pending` — so a number cannot appear on an ungraded row.
+         */
+        seeds.push({
+          field: `${at}.goals(${reading.goal.id}).display`,
+          text: `${reading.goal.label} — ${reading.display}`,
+          role: 'observation',
+          declaredCount: bundle.observations.arrived,
+          countShown: false,
+        });
+      }
+      for (const row of report.diagnosis) {
+        seeds.push({ field: `${at}.diagnosis(${row.id}).when`, text: row.when, role: 'label' });
+        seeds.push({ field: `${at}.diagnosis(${row.id}).what`, text: row.what, role: 'observation' });
+        seeds.push({ field: `${at}.diagnosis(${row.id}).why`, text: row.why, role: 'prose' });
+      }
+      for (const lever of report.levers) {
+        seeds.push({ field: `${at}.levers(${lever.id}).title`, text: lever.title, role: 'label' });
+        seeds.push({ field: `${at}.levers(${lever.id}).body`, text: lever.body, role: 'prose' });
+      }
+      seeds.push({ field: `${at}.forecast.name`, text: report.forecast.name, role: 'label' });
+      seeds.push({ field: `${at}.forecast.note`, text: report.forecast.note, role: 'prose' });
+      seeds.push({
+        field: `${at}.forecast.demand`,
+        text: report.forecast.demand,
+        role: 'observation',
+      });
+      seeds.push({ field: `${at}.taught`, text: report.taught, role: 'prose' });
+      // The refusal. See the adapter's docstring.
+      seeds.push({ field: `${at}.smallPrint`, text: report.smallPrint, role: 'reason' });
+      seeds.push({ field: `${at}.nextDayName`, text: report.nextDayName, role: 'label' });
+
+      /* ---- the day's own inputs, driven where the sheet reaches them through a helper ---- */
+      seeds.push({
+        field: `${at}.bestLineFor`,
+        text: bestLineFor(bundle.observations, entry.banked.bestMinutePct),
+        role: 'observation',
+      });
+      const firstGoal = entry.goals[0];
+      if (firstGoal !== undefined) {
+        const reading = readGoal(firstGoal, bundle.observations);
+        seeds.push({
+          field: `${at}.readGoal(${firstGoal.id})`,
+          text: `${firstGoal.label} — ${reading.display}`,
+          role: 'observation',
+        });
+      }
+      seeds.push({ field: `${at}.eventFor.name`, text: entry.event.name, role: 'label' });
+      seeds.push({ field: `${at}.eventFor.note`, text: entry.event.note, role: 'prose' });
+    }
+
+    /* ---- the figure the whole sheet is careful about, driven on its own ---- */
+    const wait = averageWaitFigure(summary);
+    const waitShape = reportFigureShape(wait);
+    seeds.push({
+      field: 'averageWaitFigure.value',
+      text: `${wait.label}: ${wait.value}`,
+      role: waitShape.role,
+      declaredCount: summary.waitCount,
+      countShown: /(\d[\d,]*)/.test(wait.note),
+      gated: true,
+    });
+    seeds.push({
+      field: 'averageWaitFigure.note',
+      text: wait.note,
+      role: waitShape.role === 'suppressed' ? 'reason' : 'observation',
+      declaredCount: summary.waitCount,
+      countShown: /(\d[\d,]*)/.test(wait.note),
+      gated: true,
+    });
+    seeds.push({ field: 'NOT_RECORDED', text: NOT_RECORDED, role: 'label' });
+    seeds.push({
+      field: 'clockRange',
+      text: clockRange(recording.startedAt, recording.endedAt, DAY_START_S),
+      role: 'label',
+    });
+
+    /* ---- the five events, and what each writes into a run ---- */
+    const trafficProfile =
+      context.trafficProfiles.profiles.find(
+        (candidate) => candidate.id === context.building.trafficProfile,
+      ) ?? context.trafficProfiles.profiles[0];
+    for (const event of Object.values(SHIFT_EVENTS)) {
+      seeds.push({ field: `SHIFT_EVENTS.${event.id}.name`, text: event.name, role: 'label' });
+      seeds.push({ field: `SHIFT_EVENTS.${event.id}.note`, text: event.note, role: 'prose' });
+      if (trafficProfile === undefined) continue;
+      /*
+       * Both values of `templateVariesMix`, because the refusal only exists under the second: a
+       * `lunch-two-way` run has its directional mix set by the template, `core` refuses both at
+       * once, and `shiftRunPatch` says so rather than producing a config that throws. The viewer
+       * runs both templates, so both are configurations a reader reaches.
+       */
+      for (const varies of [false, true]) {
+        const patch = shiftRunPatch({
+          event,
+          building: context.building,
+          base: baseDemandOf(trafficProfile),
+          templateVariesMix: varies,
+        });
+        for (const [index, withheld] of patch.withheld.entries()) {
+          seeds.push({
+            field: `shiftRunPatch(${event.id}, variesMix=${String(varies)}).withheld[${String(index)}]`,
+            text: withheld,
+            role: 'reason',
+          });
+        }
+      }
+    }
+
+    /* ---- the five contracts, and the stat line derived from the building rather than authored ---- */
+    for (const contract of CONTRACTS) {
+      seeds.push({ field: `CONTRACTS.${contract.id}.label`, text: contract.label, role: 'label' });
+      seeds.push({ field: `CONTRACTS.${contract.id}.title`, text: contract.title, role: 'label' });
+      seeds.push({ field: `CONTRACTS.${contract.id}.teaches`, text: contract.teaches, role: 'prose' });
+      seeds.push({ field: `CONTRACTS.${contract.id}.brief`, text: contract.brief, role: 'prose' });
+      seeds.push({ field: `CONTRACTS.${contract.id}.reward`, text: contract.reward, role: 'label' });
+      const after = nextContract(contract.id);
+      if (after !== undefined) {
+        seeds.push({
+          field: `nextContract(${contract.id})`,
+          text: `${after.label} — ${after.title}`,
+          role: 'label',
+        });
+      }
+    }
+    seeds.push({
+      field: 'statLineOf',
+      text: statLineOf(context.building),
+      role: 'observation',
+    });
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The four editors' copy — slider labels, tooltips, summary lines and advice.
+ *
+ * ## Why this is one adapter over four modules
+ *
+ * They are one surface to a reader: `docs/12` § 1.3 M8–M11 is a single editing column that swaps
+ * its rows as the reader moves between the dispatcher, the pattern, the machine and the building.
+ * The `field` on every seed names the module and the export, so a violation still points at one
+ * function.
+ *
+ * ## What is driven, and what a row's `help` is
+ *
+ * Every `SpecRow`, `MachineRow` and `PatternRow` carries a `label` and a `help`, and the `help` is
+ * the tooltip a reader opens — prose this package authored, about what the control does to the
+ * simulation. It is **not** {@link TextProvenance} `schema`: `core` did not write it, no
+ * `SearchParameter.description` is being re-printed, and § D171's narrowing of R10 is scoped to
+ * text `core` wrote about its own dial. So it is `single-run`, exactly as the existing `EDITOR`
+ * adapter classifies `validateBuilding`'s messages, and every property reads it.
+ *
+ * The specs driven are the reader's real starting points: the case's own building read back with
+ * `specFromBuilding`, the case's own dispatcher with `specFromProfile`, the building's own traffic
+ * profile with `specFromTrafficProfile`, and the blank forms a reader starting from nothing gets.
+ * The one constructed spec is the `rideTime`-under-`up-down-buttons` vector, which is § D112's
+ * shipped defect and the thing `inertTerms` exists to refuse — a vector a reader produces by
+ * dragging one slider.
+ */
+const AUTHORING: SurfaceAdapter = {
+  id: 'authoring/buildingSpec.ts#buildingSummary',
+  covers: [
+    'authoring/buildingSpec.ts#buildingSummary',
+    'authoring/buildingSpec.ts#buildingAdvice',
+    'authoring/buildingSpec.ts#occupancyLine',
+    'authoring/buildingSpec.ts#validateSpec',
+    'authoring/buildingSpec.ts#SPEC_ROWS',
+    'authoring/buildingSpec.ts#BLANK_SPEC',
+    'authoring/buildingSpec.ts#specFromBuilding',
+    'authoring/buildingSpec.ts#buildingFromSpec',
+    'authoring/dispatcherSpec.ts#adviceFor',
+    'authoring/dispatcherSpec.ts#costFunctionLine',
+    'authoring/dispatcherSpec.ts#inertTerms',
+    'authoring/dispatcherSpec.ts#DWELL_HINTS',
+    'authoring/dispatcherSpec.ts#specFromProfile',
+    'authoring/dispatcherSpec.ts#profileFromSpec',
+    'authoring/dispatcherSpec.ts#blankSpec',
+    'authoring/machineSpec.ts#MACHINE_ROWS',
+    'authoring/machineSpec.ts#machineSummary',
+    'authoring/machineSpec.ts#plainDescription',
+    'authoring/machineSpec.ts#specFromClass',
+    'authoring/machineSpec.ts#classFromSpec',
+    'authoring/patternSpec.ts#PATTERN_ROWS',
+    'authoring/patternSpec.ts#patternSummary',
+    'authoring/patternSpec.ts#PEAK_ORDER_INFO',
+    'authoring/patternSpec.ts#PEAK_ORDERS',
+    'authoring/patternSpec.ts#rowsFor',
+    'authoring/patternSpec.ts#DEFAULT_PATTERN',
+    'authoring/patternSpec.ts#specFromTrafficProfile',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+
+    /* ---- M11, the building ---- */
+    for (const row of SPEC_ROWS) {
+      seeds.push({ field: `SPEC_ROWS.${row.key}.label`, text: `${row.group} · ${row.label}`, role: 'label' });
+      seeds.push({ field: `SPEC_ROWS.${row.key}.help`, text: row.help, role: 'prose' });
+    }
+    const authored = specFromBuilding(context.building.config, context.building.id);
+    const specs: readonly { readonly label: string; readonly spec: BuildingSpec }[] = [
+      { label: 'from-building', spec: authored },
+      { label: 'blank', spec: BLANK_SPEC },
+      /*
+       * A drag that has orphaned a floor, and a rise past the class envelope. Both are states a
+       * reader reaches by dragging a shaft's band, and both are the sentences `validateSpec`
+       * exists to draw — the second of which is worded so it does **not** claim the loader
+       * refuses, because `config/parse.ts` raises it as an advisory and builds the bank.
+       */
+      {
+        label: 'orphaned-band',
+        spec: { ...BLANK_SPEC, floors: 20, cars: 1, bandByCar: { 0: [0, 4] as readonly [number, number] } },
+      },
+    ];
+    for (const { label, spec } of specs) {
+      seeds.push({ field: `buildingSummary(${label})`, text: buildingSummary(spec), role: 'observation' });
+      seeds.push({ field: `occupancyLine(${label})`, text: occupancyLine(spec), role: 'observation' });
+      seeds.push({ field: `buildingAdvice(${label})`, text: buildingAdvice(spec), role: 'prose' });
+      const built = buildingFromSpec(spec, { specs: context.elevatorSpecs });
+      seeds.push({ field: `buildingFromSpec(${label}).name`, text: built.name, role: 'label' });
+      for (const bank of built.banks) {
+        seeds.push({
+          field: `buildingFromSpec(${label}).banks(${bank.id}).name`,
+          text: bank.name ?? bank.id,
+          role: 'label',
+        });
+      }
+    }
+
+    /* ---- M10, the machine class ---- */
+    for (const row of MACHINE_ROWS) {
+      seeds.push({ field: `MACHINE_ROWS.${row.key}.label`, text: `${row.group} · ${row.label}`, role: 'label' });
+      seeds.push({ field: `MACHINE_ROWS.${row.key}.help`, text: row.help, role: 'prose' });
+    }
+    const classes = classesFromSpecs(context.elevatorSpecs);
+    for (const machineClass of classes) {
+      seeds.push({
+        field: `plainDescription(${machineClass.id})`,
+        text: plainDescription(machineClass),
+        role: 'observation',
+      });
+      const machineSpec = specFromClass(machineClass);
+      seeds.push({
+        field: `specFromClass(${machineClass.id}).name`,
+        text: machineSpec.name,
+        role: 'label',
+      });
+      seeds.push({
+        field: `machineSummary(${machineClass.id})`,
+        text: machineSummary(machineSpec),
+        role: 'observation',
+      });
+      const saved: MachineClass = classFromSpec(machineSpec, `${machineClass.id}-yours`);
+      seeds.push({ field: `classFromSpec(${machineClass.id}).name`, text: saved.name, role: 'label' });
+      seeds.push({
+        field: `classFromSpec(${machineClass.id}).application`,
+        text: saved.application,
+        role: 'label',
+      });
+    }
+    // The building editor draws its class limits beside the elevation. `classes[2]` is the row the
+    // viewer opens on (`dev/state.ts`), and the orphaned-band spec above is 20 floors of 3.6 m.
+    const limitClass = classes[2] ?? classes[0];
+    for (const { label, spec } of specs) {
+      for (const [index, problem] of validateSpec(spec, limitClass).entries()) {
+        seeds.push({
+          field: `validateSpec(${label})[${String(index)}]`,
+          text: problem,
+          role: 'reason',
+        });
+      }
+    }
+
+    /* ---- M9, the arrival pattern ---- */
+    for (const row of PATTERN_ROWS) {
+      seeds.push({ field: `PATTERN_ROWS.${row.key}.label`, text: `${row.group} · ${row.label}`, role: 'label' });
+      seeds.push({ field: `PATTERN_ROWS.${row.key}.help`, text: row.help, role: 'prose' });
+    }
+    for (const order of PEAK_ORDERS) {
+      const info = PEAK_ORDER_INFO[order];
+      seeds.push({ field: `PEAK_ORDER_INFO.${order}.label`, text: info.label, role: 'label' });
+      seeds.push({ field: `PEAK_ORDER_INFO.${order}.note`, text: info.note, role: 'prose' });
+      const patternSpec = { ...DEFAULT_PATTERN, order };
+      seeds.push({
+        field: `patternSummary(${order})`,
+        text: patternSummary(patternSpec),
+        role: 'observation',
+      });
+      for (const row of rowsFor(patternSpec)) {
+        seeds.push({ field: `rowsFor(${order}).${row.key}`, text: row.label, role: 'label' });
+      }
+    }
+    const buildingPattern = specFromTrafficProfile(
+      context.trafficProfiles,
+      context.building.trafficProfile,
+    );
+    seeds.push({ field: 'specFromTrafficProfile.name', text: buildingPattern.name, role: 'label' });
+    seeds.push({
+      field: 'specFromTrafficProfile.summary',
+      text: patternSummary(buildingPattern),
+      role: 'observation',
+    });
+    seeds.push({ field: 'DEFAULT_PATTERN.name', text: DEFAULT_PATTERN.name, role: 'label' });
+
+    /* ---- M8, the dispatcher ---- */
+    for (const [choice, hint] of Object.entries(DWELL_HINTS)) {
+      seeds.push({ field: `DWELL_HINTS.${choice}`, text: hint, role: 'prose' });
+    }
+    const termIds = Object.keys(
+      context.profiles.find((profile) => profile.id === context.case.baselineProfileId)?.weights ?? {},
+    );
+    const dispatcherSpecs: readonly { readonly label: string; readonly spec: DispatcherSpec }[] = [
+      ...context.profiles.map((profile) => ({
+        label: profile.id,
+        spec: specFromProfile(profile),
+      })),
+      { label: 'blank', spec: blankSpec(termIds) },
+      /* § D112's vector: a weighted `rideTime` the engine will not read. */
+      {
+        label: 'inert-ridetime',
+        spec: {
+          name: 'My dispatcher',
+          weights: { rideTime: 50, waitTime: 100 },
+          flags: { pool: false, zone: false, bypass: true },
+        },
+      },
+    ];
+    for (const { label, spec } of dispatcherSpecs) {
+      seeds.push({ field: `specFromProfile(${label}).name`, text: spec.name, role: 'label' });
+      seeds.push({
+        field: `costFunctionLine(${label})`,
+        text: costFunctionLine(spec, (termId) => termId),
+        role: 'observation',
+      });
+      seeds.push({ field: `adviceFor(${label})`, text: adviceFor(spec), role: 'prose' });
+      for (const inert of inertTerms(spec)) {
+        seeds.push({
+          field: `inertTerms(${label}).${inert.termId}`,
+          text: inert.why,
+          role: 'reason',
+        });
+      }
+      seeds.push({
+        field: `profileFromSpec(${label}).name`,
+        text: profileFromSpec(spec, { id: `${label}-edited` }).name,
+        role: 'label',
+      });
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The left rail's view models — § 1.2 L1–L7.
+ *
+ * `dev/leftRail.ts` is in `dev/` because it also mounts, and everything driven here is the pure
+ * half: the mood card, the four stat rows, *YOUR RUN*, *TODAY'S SHIFT*, the maths disclosure and
+ * the decision log's row shape. `mountLeftRail` is the DOM half and is excluded with the rest of
+ * the mounts; the split is `controls/render.ts`'s and this file's own — *"the decision is a pure
+ * function returning a descriptor, and the DOM is the dumb instantiator"*.
+ *
+ * The four **idle** views are driven too, and they are not filler: they are the state a reader
+ * meets before the first shift, they are the one place the rail must claim nothing at all, and
+ * `idleStatRowsOf` deliberately does not print the caption `served under 60 s` because no run has
+ * measured a threshold. A surface that says nothing is exactly where an invented figure hides.
+ */
+const RAIL_VIEW: SurfaceAdapter = {
+  id: 'dev/leftRail.ts#moodViewOf',
+  covers: [
+    'dev/leftRail.ts#moodViewOf',
+    'dev/leftRail.ts#idleMoodView',
+    'dev/leftRail.ts#statRowsOf',
+    'dev/leftRail.ts#idleStatRowsOf',
+    'dev/leftRail.ts#servedCaptionFor',
+    'dev/leftRail.ts#servedTitleFor',
+    'dev/leftRail.ts#streakLineOf',
+    'dev/leftRail.ts#runFiguresOf',
+    'dev/leftRail.ts#historyBarsOf',
+    'dev/leftRail.ts#goalRowsOf',
+    'dev/leftRail.ts#mathsDisclosureOf',
+    'dev/leftRail.ts#idleHonestyCard',
+    'dev/leftRail.ts#idleDecisionRow',
+    'dev/leftRail.ts#moodDriverRowsOf',
+  ],
+  render(context) {
+    const { recording } = context;
+    const seeds: TextSeed[] = [];
+    const bundle = shiftBundleOf(context);
+
+    for (const at of sampleTimes(recording)) {
+      const stamp = at.toFixed(0);
+      const bands = waitBandsAt(recording, at);
+      const view = moodViewOf(bands, moodOf(bands));
+      seeds.push({ field: `moodViewOf(@${stamp}s).headline`, text: view.headline, role: 'observation' });
+      seeds.push({ field: `moodViewOf(@${stamp}s).sub`, text: view.sub, role: 'observation' });
+      seeds.push({
+        field: `moodViewOf(@${stamp}s).barLabel`,
+        text: view.barLabel,
+        role: 'observation',
+        declaredCount: bands.total,
+        countShown: true,
+      });
+      for (const entry of view.legend) {
+        seeds.push({
+          field: `moodViewOf(@${stamp}s).legend(${entry.bandId})`,
+          text: `${entry.label} ${String(entry.count)}`,
+          role: 'observation',
+          declaredCount: bands.total,
+          countShown: true,
+        });
+      }
+
+      const live = observationsAt(recording, at);
+      for (const row of statRowsOf(live)) {
+        seeds.push({
+          field: `statRowsOf(@${stamp}s).${row.label}.value`,
+          text: `${row.label}: ${row.value}`,
+          role: 'observation',
+        });
+        seeds.push({
+          field: `statRowsOf(@${stamp}s).${row.label}.title`,
+          text: row.title,
+          role: 'prose',
+        });
+      }
+      seeds.push({
+        field: `servedCaptionFor(@${stamp}s)`,
+        text: servedCaptionFor(live.longWaitThresholdS),
+        role: 'label',
+      });
+      seeds.push({
+        field: `servedTitleFor(@${stamp}s)`,
+        text: servedTitleFor(live.longWaitThresholdS, live.servedCount),
+        role: 'prose',
+        declaredCount: live.servedCount,
+        countShown: true,
+      });
+
+      for (const driver of moodDriverRowsOf(context.bundleAt(at).mood)) {
+        seeds.push({
+          field: `moodDriverRowsOf(@${stamp}s).${driver.label}`,
+          text: `${driver.label}: ${driver.glyph} ${driver.text}`,
+          role: 'observation',
+        });
+      }
+
+      for (const mode of ['casual', 'engineer'] as const) {
+        for (const showMaths of [false, true]) {
+          const disclosure = mathsDisclosureOf(honestyAt(recording, at, mode), showMaths, mode);
+          seeds.push({
+            field: `mathsDisclosureOf(${mode}, showMaths=${String(showMaths)}, @${stamp}s).toggleLabel`,
+            text: disclosure.toggleLabel,
+            role: 'label',
+          });
+          if (disclosure.mathsHidden || disclosure.maths === '') continue;
+          seeds.push({
+            field: `mathsDisclosureOf(${mode}, showMaths=${String(showMaths)}, @${stamp}s).maths`,
+            text: disclosure.maths,
+            // `honestyAt` already asked `meansAreSuppressed`; a suppressed card's maths is the
+            // refusal's own arithmetic, and everything else in that slot is a count or a threshold.
+            role: context.suppressed ? 'reason' : 'observation',
+            declaredCount: recording.summary.waitCount,
+            countShown: true,
+          });
+        }
+      }
+    }
+
+    /* ---- the week, on the two days the shift bundle closed ---- */
+    for (const entry of bundle.days) {
+      const at = `day${String(entry.day)}`;
+      const streak = streakLineOf(entry.banked);
+      seeds.push({ field: `${at}.streakLineOf`, text: streak.text, role: 'observation' });
+      for (const figure of runFiguresOf(entry.banked)) {
+        seeds.push({
+          field: `${at}.runFiguresOf(${figure.label})`,
+          text: `${figure.value} ${figure.label}`,
+          role: 'observation',
+        });
+      }
+      for (const bar of historyBarsOf(
+        entry.banked.history,
+        bundle.observations.minutePct,
+        entry.dayIdx,
+      )) {
+        seeds.push({ field: `${at}.historyBarsOf(${bar.short}).title`, text: bar.title, role: 'observation' });
+      }
+      // The pre-history branch: a day still running, and a week with nothing banked at all.
+      for (const bar of historyBarsOf([], undefined, entry.dayIdx)) {
+        seeds.push({ field: `${at}.historyBarsOf(empty).title`, text: bar.title, role: 'observation' });
+      }
+      for (const row of goalRowsOf(entry.readings)) {
+        seeds.push({
+          field: `${at}.goalRowsOf(${row.label}).value`,
+          // The glyph is never the only signal — KB-15 — so the row is driven as a reader sees it.
+          text: `${row.glyph} ${row.label} — ${row.value}`,
+          role: 'observation',
+        });
+      }
+    }
+
+    /* ---- the state before the first shift ---- */
+    const idleMood = idleMoodView();
+    seeds.push({ field: 'idleMoodView.headline', text: idleMood.headline, role: 'label' });
+    seeds.push({ field: 'idleMoodView.sub', text: idleMood.sub, role: 'label' });
+    seeds.push({ field: 'idleMoodView.barLabel', text: idleMood.barLabel, role: 'label' });
+    for (const row of idleStatRowsOf()) {
+      seeds.push({ field: `idleStatRowsOf(${row.label}).value`, text: `${row.label}: ${row.value}`, role: 'label' });
+      seeds.push({ field: `idleStatRowsOf(${row.label}).title`, text: row.title, role: 'prose' });
+    }
+    const idleCard = idleHonestyCard();
+    seeds.push({ field: 'idleHonestyCard.title', text: idleCard.title, role: 'label' });
+    seeds.push({ field: 'idleHonestyCard.plain', text: idleCard.plain, role: 'prose' });
+    const idleRow = idleDecisionRow();
+    seeds.push({ field: 'idleDecisionRow.head', text: idleRow.head, role: 'label' });
+    seeds.push({ field: 'idleDecisionRow.why', text: idleRow.why, role: 'prose' });
+    seeds.push({ field: 'idleDecisionRow.title', text: idleRow.title, role: 'prose' });
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The observation sheet as the panel draws it — § 4.2's figure grid, goal rows and diagnosis.
+ *
+ * A second rendering of the same `DayReport`, and it is worth searching separately for one reason:
+ * `figureViewOf` is where `axisOnly` is **enforced**, ahead of the tone, so an energy cell that
+ * arrived carrying a ranking tone still draws with no colour. What the panel adds to the sheet's
+ * own strings is the `title` on a goal row (the state in words, KB-15) and the cleared banner's
+ * sentence, and both are read.
+ *
+ * The roles come from the **report's** cells rather than from the view's, because the view drops
+ * `id` and `tone` on the way through. The two lists are the same list in the same order —
+ * `reportViewOf` is `report.figures.map(figureViewOf)` — so they are zipped by index.
+ */
+const REPORT_PANEL: SurfaceAdapter = {
+  id: 'dev/reportPanel.ts#reportViewOf',
+  covers: [
+    'dev/reportPanel.ts#reportViewOf',
+    'dev/reportPanel.ts#figureViewOf',
+    'dev/reportPanel.ts#goalRowViewOf',
+    'dev/reportPanel.ts#diagnosisRowsOf',
+    'dev/reportPanel.ts#emptyReportView',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const bundle = shiftBundleOf(context);
+
+    for (const entry of bundle.days) {
+      const at = `day${String(entry.day)}`;
+      const view = reportViewOf(entry.report);
+      seeds.push({ field: `${at}.title`, text: view.title, role: 'label' });
+      seeds.push({ field: `${at}.lede`, text: view.lede, role: 'observation' });
+      for (const [index, cell] of view.figures.entries()) {
+        const source = entry.report.figures[index];
+        const shape = source === undefined
+          ? { role: 'observation' as TextRole, gated: false, energyAxis: false }
+          : reportFigureShape(source);
+        seeds.push({
+          field: `${at}.figures[${String(index)}](${cell.label}).value`,
+          text: `${cell.label}: ${cell.value}`,
+          role: shape.role,
+          declaredCount: shape.gated ? context.recording.summary.waitCount : undefined,
+          countShown: shape.gated ? /(\d[\d,]*)/.test(cell.note) : undefined,
+          energyAxis: shape.energyAxis,
+          gated: shape.gated,
+        });
+        seeds.push({
+          field: `${at}.figures[${String(index)}](${cell.label}).note`,
+          text: cell.note,
+          role: shape.role === 'suppressed' ? 'reason' : 'observation',
+          energyAxis: shape.energyAxis,
+        });
+      }
+      for (const row of view.goals) {
+        seeds.push({
+          field: `${at}.goals(${row.label}).display`,
+          text: `${row.glyph} ${row.label} — ${row.display}`,
+          role: 'observation',
+        });
+        // The state in words. The glyph is the shorthand; this is the message.
+        seeds.push({ field: `${at}.goals(${row.label}).help`, text: row.help, role: 'label' });
+      }
+      for (const [index, row] of view.diagnosis.entries()) {
+        seeds.push({
+          field: `${at}.diagnosis[${String(index)}]`,
+          text: `${row.when} — ${row.what}`,
+          role: 'observation',
+        });
+        seeds.push({ field: `${at}.diagnosis[${String(index)}].why`, text: row.why, role: 'prose' });
+      }
+      for (const lever of view.levers) {
+        seeds.push({ field: `${at}.levers(${lever.title})`, text: lever.body, role: 'prose' });
+      }
+      seeds.push({ field: `${at}.verdictLine`, text: view.verdictLine, role: 'observation' });
+      seeds.push({ field: `${at}.streakLine`, text: view.streakLine, role: 'prose' });
+      seeds.push({ field: `${at}.contractLine`, text: view.contractLine, role: 'label' });
+      if (view.cleared !== null) {
+        seeds.push({ field: `${at}.cleared.note`, text: view.cleared.note, role: 'label' });
+      }
+      seeds.push({ field: `${at}.taught`, text: view.taught, role: 'prose' });
+      seeds.push({ field: `${at}.smallPrint`, text: view.smallPrint, role: 'reason' });
+      seeds.push({ field: `${at}.nextDayLabel`, text: view.nextDayLabel, role: 'label' });
+
+      /* The two row builders, driven on their own so the coverage claim names what it calls. */
+      const firstReading = entry.readings[0];
+      if (firstReading !== undefined) {
+        const row = goalRowViewOf(firstReading);
+        seeds.push({ field: `${at}.goalRowViewOf.help`, text: row.help, role: 'label' });
+      }
+      const firstFigure = entry.report.figures[0];
+      if (firstFigure !== undefined) {
+        const cell = figureViewOf(firstFigure);
+        seeds.push({
+          field: `${at}.figureViewOf(${cell.label})`,
+          text: `${cell.label}: ${cell.value}`,
+          role: reportFigureShape(firstFigure).role,
+        });
+      }
+      for (const [index, row] of diagnosisRowsOf(entry.report.diagnosis).entries()) {
+        seeds.push({
+          field: `${at}.diagnosisRowsOf[${String(index)}].what`,
+          text: row.what,
+          role: 'observation',
+        });
+      }
+    }
+
+    /* The empty sheet, which is drawn rather than hidden — § 2.2. */
+    const empty = emptyReportView();
+    seeds.push({ field: 'emptyReportView.title', text: empty.title, role: 'label' });
+    seeds.push({ field: 'emptyReportView.lede', text: empty.lede, role: 'prose' });
+    seeds.push({ field: 'emptyReportView.nextDayLabel', text: empty.nextDayLabel, role: 'label' });
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The scenarios grid — five cards, and the stat line § 4.4 forbids authoring.
+ *
+ * Driven over **every** shipped building rather than the case's one, because the grid draws all
+ * five at once and `statLineOf` is the claim under search: *"6 floors · 2 cars · 0.63 m/s · 120
+ * people"*, derived from `data/buildings/` and never transcribed beside it. The unresolved card is
+ * driven too — a reader who deleted a building file gets a card that says so rather than a card
+ * that invents a spec for it, and that sentence is a refusal worth checking.
+ */
+const SCENARIOS: SurfaceAdapter = {
+  id: 'dev/scenariosPanel.ts#scenarioCardsOf',
+  covers: ['dev/scenariosPanel.ts#scenarioCardsOf'],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const week = shiftBundleOf(context).days[0]?.banked ?? openWeek();
+
+    for (const [label, buildings] of [
+      ['loaded', context.buildings],
+      ['none-loaded', [] as readonly ResolvedBuilding[]],
+    ] as const) {
+      for (const card of scenarioCardsOf(CONTRACTS, week, buildings)) {
+        seeds.push({
+          field: `${label}.${card.contractId}.title`,
+          text: `${card.label} — ${card.title}`,
+          role: 'label',
+        });
+        seeds.push({ field: `${label}.${card.contractId}.name`, text: card.name, role: 'label' });
+        seeds.push({ field: `${label}.${card.contractId}.brief`, text: card.brief, role: 'prose' });
+        seeds.push({
+          field: `${label}.${card.contractId}.statLine`,
+          text: card.statLine,
+          role: card.resolved ? 'observation' : 'reason',
+        });
+        seeds.push({
+          field: `${label}.${card.contractId}.objective`,
+          text: card.objective,
+          role: 'observation',
+        });
+        seeds.push({ field: `${label}.${card.contractId}.reward`, text: card.reward, role: 'label' });
+        seeds.push({ field: `${label}.${card.contractId}.teaches`, text: card.teaches, role: 'prose' });
+        seeds.push({ field: `${label}.${card.contractId}.help`, text: card.help, role: 'label' });
+      }
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The right rail's four plates — § 1.4 R1–R3, *what is running*.
+ *
+ * The most claim-dense surface the refactor added, and the one whose module docstring states the
+ * rule this adapter exists to hold to account: *"a plate never computes a round trip. It reads one
+ * off the run, or it says there is no run."* So `buildingPlateOf` is driven **both** with the
+ * case's recording and with `undefined`, because the second is where the plate must say *no run
+ * yet* instead of filling the space with arithmetic the simulator did not do.
+ *
+ * `achieved interval` is the one row here that is a mean, and § 1.5 B8 is unconditional about it.
+ * The row is therefore rendered with the run's own suppression state: `withheld` on a refused run
+ * with `core`'s reason in its help, and a mean with its gap count otherwise. Nothing on this plate
+ * reaches for `meanWaitS`, so nothing here is `gated` — the plate's own docstring says so and the
+ * property is what checks it.
+ */
+const RIGHT_RAIL: SurfaceAdapter = {
+  id: 'dev/rightRail.ts#buildingPlateOf',
+  covers: [
+    'dev/rightRail.ts#buildingPlateOf',
+    'dev/rightRail.ts#dispatcherPlateOf',
+    'dev/rightRail.ts#dispatcherBlurbOf',
+    'dev/rightRail.ts#dispatcherFamilyOf',
+    'dev/rightRail.ts#dispatcherNoteOf',
+    'dev/rightRail.ts#trafficPlateOf',
+    'dev/rightRail.ts#nameplateOf',
+    'dev/rightRail.ts#machineWarningOf',
+    'dev/rightRail.ts#patternOptionsOf',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const specs = context.elevatorSpecs as ElevatorSpecs;
+
+    /* R2 — the dispatcher list, every shipped profile. */
+    for (const profile of context.profiles) {
+      seeds.push({
+        field: `dispatcherFamilyOf(${profile.id})`,
+        text: dispatcherFamilyOf(profile),
+        role: 'label',
+      });
+      seeds.push({
+        field: `dispatcherBlurbOf(${profile.id})`,
+        text: dispatcherBlurbOf(profile),
+        role: 'prose',
+      });
+      seeds.push({
+        field: `dispatcherNoteOf(${profile.id})`,
+        text: dispatcherNoteOf(context.profiles, profile.id),
+        role: 'label',
+      });
+      for (const row of dispatcherPlateOf(profile)) {
+        seeds.push({
+          field: `dispatcherPlateOf(${profile.id}).${row.k}`,
+          text: `${row.k}: ${row.v}`,
+          role: 'label',
+        });
+        if (row.help !== undefined) {
+          seeds.push({
+            field: `dispatcherPlateOf(${profile.id}).${row.k}.help`,
+            text: row.help,
+            role: 'prose',
+          });
+        }
+      }
+    }
+
+    /* R3 — the building plate, with a run and without one. */
+    for (const [label, recording] of [
+      ['with-run', context.recording],
+      ['no-run', undefined],
+    ] as const) {
+      for (const row of buildingPlateOf(context.building, recording)) {
+        seeds.push({
+          field: `buildingPlateOf(${label}).${row.k}`,
+          text: `${row.k}: ${row.v}`,
+          /*
+           * `achieved interval` is the plate's one mean, and the plate has already asked
+           * `meansAreSuppressed`. A row that came back with a number on a refused run is the
+           * surface disagreeing with the summary, which is what the property reports.
+           */
+          role:
+            row.k === 'achieved interval'
+              ? row.v === 'withheld'
+                ? 'suppressed'
+                : 'observation'
+              : 'observation',
+        });
+        if (row.help !== undefined) {
+          seeds.push({
+            field: `buildingPlateOf(${label}).${row.k}.help`,
+            text: row.help,
+            // A withheld row's help quotes `core`'s own refusal.
+            role: row.k === 'achieved interval' && row.v === 'withheld' ? 'reason' : 'prose',
+          });
+        }
+      }
+    }
+
+    /* R3 — the traffic plate, on the building's own pattern. */
+    const patternSpec = specFromTrafficProfile(
+      context.trafficProfiles,
+      context.building.trafficProfile,
+    );
+    for (const row of trafficPlateOf(patternSpec, context.building.totalPopulation)) {
+      seeds.push({
+        field: `trafficPlateOf.${row.k}`,
+        text: `${row.k}: ${row.v}`,
+        role: 'observation',
+      });
+      if (row.help !== undefined) {
+        seeds.push({ field: `trafficPlateOf.${row.k}.help`, text: row.help, role: 'prose' });
+      }
+    }
+    // `population` reads *no building resolved* rather than `0` before a building resolves.
+    for (const row of trafficPlateOf(patternSpec, undefined)) {
+      if (row.k !== 'population') continue;
+      seeds.push({ field: 'trafficPlateOf(no-building).population', text: row.v, role: 'reason' });
+    }
+
+    /* R3 — the nameplate, and the class advisory, over every shipped class. */
+    for (const machineClass of classesFromSpecs(specs)) {
+      for (const row of nameplateOf(machineClass, specs)) {
+        seeds.push({
+          field: `nameplateOf(${machineClass.id}).${row.k}`,
+          text: `${row.k}: ${row.v}`,
+          role: 'observation',
+        });
+        if (row.help !== undefined) {
+          seeds.push({
+            field: `nameplateOf(${machineClass.id}).${row.k}.help`,
+            text: row.help,
+            role: 'prose',
+          });
+        }
+      }
+      for (const [label, building] of [
+        ['with-building', context.building],
+        ['no-building', undefined],
+      ] as const) {
+        seeds.push({
+          field: `machineWarningOf(${machineClass.id}, ${label})`,
+          text: machineWarningOf(machineClass, building),
+          role: 'prose',
+        });
+      }
+    }
+
+    /* R2 — the arrival-pattern list. */
+    for (const option of patternOptionsOf(browserResourcesOf(context), [], context.building)) {
+      seeds.push({
+        field: `patternOptionsOf(${option.id}).label`,
+        text: `${option.label} · ${option.tag}`,
+        role: 'label',
+      });
+      seeds.push({ field: `patternOptionsOf(${option.id}).sub`, text: option.sub, role: 'observation' });
+      seeds.push({ field: `patternOptionsOf(${option.id}).help`, text: option.help, role: 'prose' });
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * `BrowserResources` as the page assembles it, from what the case already loaded.
+ *
+ * Two rail and editor surfaces take the whole record rather than the two fields they read, and
+ * reconstructing it here is the alternative to widening their signatures for a test's convenience.
+ * Every field is the shipped one: the same `data/` documents, the same resolved buildings.
+ */
+function browserResourcesOf(context: HonestyContext): BrowserResources {
+  return {
+    elevatorSpecs: context.elevatorSpecs as ElevatorSpecs,
+    trafficProfiles: context.trafficProfiles,
+    dispatcherProfiles: context.dispatcherProfiles,
+    buildings: context.buildings,
+    entries: context.buildings.map((building) => ({
+      file: `${building.id}.json`,
+      config: building.config,
+      resolved: building,
+    })),
+    trafficProfileIds: new Set(context.trafficProfiles.profiles.map((profile) => profile.id)),
+    warnings: [],
+  };
+}
+
+/**
+ * The four editors as the panels draw them — sliders, chips, the elevation and the preview strip.
+ *
+ * `authoring/` is the model and these are its views, so the split is the same one `RAIL_VIEW`
+ * names: the row-building is pure and driven, the mount is DOM and excluded. What the views add to
+ * the model's own strings is the part that changes with what the reader has dragged — the value
+ * beside each slider, the field the row writes, the over-capacity sentence, the elevation's
+ * per-floor tooltips, and the two **refusals**: `inertPatternRows`, which says a control writes
+ * nothing the run reads, and `checkBuilding`, which runs the spec through the real loader on every
+ * edit and reports what it said.
+ *
+ * The specs driven are the same three `AUTHORING` uses — the case's own building read back, the
+ * blank form, and the orphaned-band drag — so a violation on a row can be traced to a spec a
+ * reader can reproduce.
+ */
+const EDITOR_PANELS: SurfaceAdapter = {
+  id: 'dev/buildingEditor.ts#specRowsOf',
+  covers: [
+    'dev/buildingEditor.ts#specRowsOf',
+    'dev/buildingEditor.ts#specFieldOf',
+    'dev/buildingEditor.ts#formatSpecValue',
+    'dev/buildingEditor.ts#overCapacityNote',
+    'dev/buildingEditor.ts#speedChipsOf',
+    'dev/buildingEditor.ts#elevationRowsOf',
+    'dev/buildingEditor.ts#elevationCarsOf',
+    'dev/buildingEditor.ts#elevationNoteOf',
+    'dev/buildingEditor.ts#checkBuilding',
+    'dev/dispatcherEditor.ts#termRowsOf',
+    'dev/dispatcherEditor.ts#flagRowsOf',
+    'dev/dispatcherEditor.ts#flagLineOf',
+    'dev/dispatcherEditor.ts#leverRowsOf',
+    'dev/dispatcherEditor.ts#dwellHintOf',
+    'dev/machinesEditor.ts#machineRowsOf',
+    'dev/machinesEditor.ts#machineFieldOf',
+    'dev/machinesEditor.ts#formatMachineValue',
+    'dev/machinesEditor.ts#ratedSpeedChipsOf',
+    'dev/trafficEditor.ts#patternRowsOf',
+    'dev/trafficEditor.ts#formatPatternValue',
+    'dev/trafficEditor.ts#inertPatternRows',
+    'dev/trafficEditor.ts#previewSegmentsOf',
+    'dev/trafficEditor.ts#previewKindOf',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const specs = context.elevatorSpecs as ElevatorSpecs;
+    const classes = classesFromSpecs(specs);
+    const limitClass = classes[2] ?? classes[0];
+    const trafficProfileIds = new Set(context.trafficProfiles.profiles.map((profile) => profile.id));
+
+    /* ---- M11, the building editor ---- */
+    const buildingSpecs: readonly { readonly label: string; readonly spec: BuildingSpec }[] = [
+      { label: 'from-building', spec: specFromBuilding(context.building.config, context.building.id) },
+      { label: 'blank', spec: BLANK_SPEC },
+      // Let past design capacity, which is the one row that swaps its sub-line for a sentence.
+      { label: 'over-capacity', spec: { ...BLANK_SPEC, occupancyPct: 115 } },
+    ];
+    for (const { label, spec } of buildingSpecs) {
+      for (const view of specRowsOf(spec)) {
+        seeds.push({
+          field: `specRowsOf(${label}).${view.row.key}.value`,
+          text: `${view.row.label}: ${view.value}`,
+          role: 'label',
+        });
+        seeds.push({
+          field: `specRowsOf(${label}).${view.row.key}.sub`,
+          text: view.sub,
+          // The over-capacity sub-line is a claim about what this building costs; the ordinary one
+          // names the document field the slider writes.
+          role: view.overCapacity ? 'observation' : 'label',
+        });
+      }
+      seeds.push({
+        field: `elevationNoteOf(${label})`,
+        text: elevationNoteOf(spec),
+        role: 'prose',
+      });
+      for (const row of elevationRowsOf(spec)) {
+        seeds.push({
+          field: `elevationRowsOf(${label}).floor${String(row.floor)}.label`,
+          text: `${row.label} — ${row.peopleText}`,
+          role: 'observation',
+        });
+        seeds.push({
+          field: `elevationRowsOf(${label}).floor${String(row.floor)}.labelTitle`,
+          text: row.labelTitle,
+          role: 'prose',
+        });
+        seeds.push({
+          field: `elevationRowsOf(${label}).floor${String(row.floor)}.skyTitle`,
+          text: row.skyTitle,
+          role: 'prose',
+        });
+        seeds.push({
+          field: `elevationRowsOf(${label}).floor${String(row.floor)}.occTitle`,
+          text: row.occTitle,
+          role: 'observation',
+        });
+      }
+      for (const car of elevationCarsOf(spec)) {
+        seeds.push({
+          field: `elevationCarsOf(${label}).${car.id}.legend`,
+          text: car.legend,
+          role: 'label',
+        });
+      }
+      for (const chip of speedChipsOf(spec, limitClass, speedLadderOf(specs))) {
+        seeds.push({
+          field: `speedChipsOf(${label}).${chip.label}`,
+          text: chip.label,
+          role: 'label',
+        });
+      }
+      const check = checkBuilding(spec, specs, trafficProfileIds);
+      if (check.error !== '') {
+        seeds.push({ field: `checkBuilding(${label}).error`, text: check.error, role: 'reason' });
+      }
+      for (const [index, warning] of check.warnings.entries()) {
+        seeds.push({
+          field: `checkBuilding(${label}).warnings[${String(index)}]`,
+          text: warning,
+          role: 'reason',
+        });
+      }
+    }
+
+    /* ---- M10, the machine editor ---- */
+    for (const machineClass of classes) {
+      const machineSpec = specFromClass(machineClass);
+      for (const view of machineRowsOf(machineSpec)) {
+        seeds.push({
+          field: `machineRowsOf(${machineClass.id}).${view.row.key}.value`,
+          text: `${view.row.label}: ${view.value}`,
+          role: 'label',
+        });
+        seeds.push({
+          field: `machineRowsOf(${machineClass.id}).${view.row.key}.field`,
+          text: view.field,
+          role: 'label',
+        });
+      }
+      for (const chip of ratedSpeedChipsOf(machineSpec, speedLadderOf(specs))) {
+        seeds.push({
+          field: `ratedSpeedChipsOf(${machineClass.id}).${chip.label}`,
+          text: chip.label,
+          role: 'label',
+        });
+      }
+    }
+
+    /* ---- M9, the traffic editor ---- */
+    for (const order of PEAK_ORDERS) {
+      const patternSpec = { ...DEFAULT_PATTERN, order };
+      for (const view of patternRowsOf(patternSpec)) {
+        seeds.push({
+          field: `patternRowsOf(${order}).${view.row.key}.value`,
+          text: `${view.row.label}: ${view.value}`,
+          role: 'label',
+        });
+        if (view.refusal !== undefined) {
+          seeds.push({
+            field: `patternRowsOf(${order}).${view.row.key}.refusal`,
+            text: view.refusal,
+            role: 'reason',
+          });
+        }
+      }
+      const resolution = previewTemplateOf(
+        patternSpec,
+        context.trafficProfiles.demandTemplates,
+        context.recording.endedAt - context.recording.startedAt,
+      );
+      if (!resolution.ok) {
+        seeds.push({
+          field: `previewTemplateOf(${order}).reason`,
+          text: resolution.reason,
+          role: 'reason',
+        });
+        continue;
+      }
+      for (const segment of previewSegmentsOf(resolution.template, patternSpec)) {
+        seeds.push({
+          field: `previewSegmentsOf(${order}).${segment.id}.short`,
+          text: segment.short,
+          role: 'label',
+        });
+        seeds.push({
+          field: `previewSegmentsOf(${order}).${segment.id}.title`,
+          text: segment.title,
+          role: 'observation',
+        });
+      }
+    }
+
+    /* ---- M8, the dispatcher editor ---- */
+    const terms = context.dispatcherProfiles.terms;
+    for (const profile of context.profiles) {
+      const spec = specFromProfile(profile);
+      for (const view of termRowsOf(terms, spec, inertTerms(spec))) {
+        seeds.push({
+          field: `termRowsOf(${profile.id}).${view.termId}.label`,
+          text: `${view.label} ${String(view.value)}`,
+          role: 'label',
+        });
+        seeds.push({
+          field: `termRowsOf(${profile.id}).${view.termId}.help`,
+          text: view.help,
+          role: 'prose',
+        });
+        seeds.push({
+          field: `termRowsOf(${profile.id}).${view.termId}.serves`,
+          text: view.serves,
+          role: 'label',
+        });
+        if (view.inertWhy !== undefined) {
+          seeds.push({
+            field: `termRowsOf(${profile.id}).${view.termId}.inertWhy`,
+            text: view.inertWhy,
+            role: 'reason',
+          });
+        }
+      }
+      seeds.push({
+        field: `flagLineOf(${profile.id})`,
+        text: flagLineOf(profile),
+        role: 'label',
+      });
+      for (const row of flagRowsOf(spec)) {
+        seeds.push({
+          field: `flagRowsOf(${profile.id}).${row.key}.label`,
+          text: `${row.label} — ${row.on ? 'on' : 'off'}`,
+          role: 'label',
+        });
+        seeds.push({ field: `flagRowsOf(${profile.id}).${row.key}.hint`, text: row.hint, role: 'prose' });
+        seeds.push({ field: `flagRowsOf(${profile.id}).${row.key}.help`, text: row.help, role: 'prose' });
+      }
+      /*
+       * All four dwell states, including *inherit* — which is the one the page opens on and the
+       * one `authoring/dispatcherSpec.ts` records as the defect it caught: a *normal* chip pressed
+       * by nobody had been rewriting every profile that authored a dwell.
+       */
+      for (const dwell of [undefined, ...DWELL_CHOICES] as const) {
+        seeds.push({
+          field: `dwellHintOf(${profile.id}, ${dwell ?? 'inherit'})`,
+          text: dwellHintOf({ ...DEFAULT_LEVERS, dwell }, profile),
+          role: 'prose',
+        });
+      }
+    }
+    for (const levers of [
+      DEFAULT_LEVERS,
+      { ...DEFAULT_LEVERS, parking: true },
+      { ...DEFAULT_LEVERS, express: true },
+    ]) {
+      for (const row of leverRowsOf(levers)) {
+        seeds.push({
+          field: `leverRowsOf(${row.key}, on=${String(row.on)}).label`,
+          text: `${row.label} — ${row.on ? 'on' : 'off'}`,
+          role: 'label',
+        });
+        seeds.push({ field: `leverRowsOf(${row.key}).hint`, text: row.hint, role: 'prose' });
+        seeds.push({ field: `leverRowsOf(${row.key}).help`, text: row.help, role: 'prose' });
+      }
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
 /**
  * Every surface the search drives.
  *
@@ -1262,6 +2944,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   OVERLAY,
   CANVAS,
   MOOD,
+  LIVE_RAIL,
   RIDER_QUEUE,
   ACCESS,
   MODE,
@@ -1272,6 +2955,19 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   BATCH_REPORT,
   GOAL_REPORT,
   CAMPAIGN,
+  /*
+   * The design refactor's surfaces, appended rather than interleaved: `faults.ts` corrupts the
+   * **first** string matching a shape, so inserting an adapter ahead of `RUN_SUMMARY` would move
+   * every fault onto a different surface and quietly change what `honesty.test.ts`'s shrink
+   * assertions are about.
+   */
+  SHIFT_REPORT,
+  AUTHORING,
+  RAIL_VIEW,
+  RIGHT_RAIL,
+  REPORT_PANEL,
+  SCENARIOS,
+  EDITOR_PANELS,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

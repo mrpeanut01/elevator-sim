@@ -3,98 +3,674 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>elevator-sim — run viewer and building editor (dev)</title>
+    <title>Elevator Sim — shift mode</title>
+    <!--
+      ============================================================================
+      The page is the integration contract, and it is checked in both directions.
+
+      `src/dev/elementMap.ts` holds the manifest of every id this markup promises;
+      `src/dev/elementMap.test.ts` asserts the manifest against this file *and*
+      freezes the list of ids the viewer never resolves. Renaming anything here
+      without moving the manifest in the same commit reddens the suite, which is
+      the intended behaviour.
+
+      The structure below is `docs/12-design-handoff.md` § 1, which is in turn the
+      Claude Design handoff vendored at `docs/design/elevator-sim-reimagined.dc.html`.
+      Where a section deviates from the handoff there is a comment saying so and
+      naming the § 4 row that records why.
+      ============================================================================
+    -->
     <style>
+      /* ======================================================================
+         Tokens — one palette, declared once.
+
+         Before this file was rewritten there were three copies of the colour set:
+         `:root` here, `DEFAULT_THEME` in `src/render/canvas.ts`, and the handoff.
+         Three copies of a palette is this repository's signature defect wearing a
+         different hat. The canvas now derives its theme from `render/tokens.ts`,
+         and the values below are the same numbers. If you change one, change both
+         — `render/tokens.test.ts` is what notices if you do not.
+
+         Values are the handoff's, § 1.1 S6 / S7.
+         ====================================================================== */
       :root {
         color-scheme: dark;
-        --bg: #0f1319;
-        --panel: #171d26;
-        --panel2: #141a23;
-        --edge: #2b3542;
-        --text: #e6edf3;
-        --dim: #7d8896;
-        --warn: #e0b040;
-        --bad: #e0473a;
-        --ok: #3fb27f;
-        --focus: #4f9ee8;
+
+        /* Surfaces, darkest first. */
+        --bg: #0b0e14;
+        --rail: #0e131b;
+        --panel: #10151e;
+        --card: #131924;
+        --raised: #16212f;
+        --edge: #212a36;
+        --edge-strong: #2f3a49;
+        --hairline: #1a212c;
+
+        /* Ink. */
+        --text: #e8edf4;
+        --dim: #8b98a9;
+        --dimmer: #6d7b8d;
+        --faint: #4d5a6b;
+        --fainter: #3d4956;
+
+        /* Accent. */
+        --accent: #4f9ee8;
+        --accent-soft: #7fb6f0;
+        --accent-ink: #08131f;
+
+        /* The wait-age bands. Used by every claim about how long somebody has
+           stood, on every surface, so that the rail, the canvas and the report
+           cannot disagree about what amber means. § 1.1 S7. */
+        --band-0: #3fb27f;
+        --band-1: #e0b040;
+        --band-2: #e0773a;
+        --band-3: #e0473a;
+
+        /* Aliases kept because the vocabulary below reads better with them, and
+           because `ok`/`warn`/`bad` is what the disclosure layer already calls
+           these three ideas. */
+        --ok: var(--band-0);
+        --warn: var(--band-1);
+        --bad: var(--band-3);
+        --over: #e0563a;
+        --transfer: #c69ad8;
+        --entrance: #6f8fd6;
+        --secure: #c9a56a;
+        --measured: #9fc48a;
+
+        /* Type. Two families: prose and figures. § 1.1 S8. */
+        --sans: 'Helvetica Neue', Helvetica, system-ui, -apple-system, sans-serif;
+        --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+        /* Geometry. */
+        --r-card: 12px;
+        --r-panel: 11px;
+        --r-control: 7px;
+        --r-chip: 6px;
+        --rail-left: 296px;
+        --rail-right: 364px;
       }
+
       * { box-sizing: border-box; }
       html, body { height: 100%; margin: 0; }
       body {
         background: var(--bg);
         color: var(--text);
-        font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
-        display: flex;
-        flex-direction: column;
+        font: 400 13px/1.45 var(--sans);
+        -webkit-font-smoothing: antialiased;
+        overflow: hidden;
+      }
+      a { color: var(--accent-soft); }
+      a:hover { color: var(--text); }
+      select, button, input, textarea { font-family: inherit; }
+
+      ::-webkit-scrollbar { width: 9px; height: 9px; }
+      ::-webkit-scrollbar-thumb { background: var(--edge); border-radius: 9px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+
+      @keyframes pulseAlarm { 0%, 100% { opacity: 1 } 50% { opacity: 0.45 } }
+      @keyframes riseIn { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: none } }
+
+      /* KB-14: nothing animates that is not the simulation itself. */
+      @media (prefers-reduced-motion: reduce) {
+        * { transition: none !important; animation: none !important; }
       }
 
       /* KB-01: the first tab stop is a way past the toolbars to the thing being looked at. */
       .skip {
-        position: absolute; left: -9999px; top: 0; z-index: 10;
-        background: var(--panel); color: var(--text); padding: 8px 12px;
-        border: 1px solid var(--focus);
+        position: absolute; left: -9999px; top: 0; z-index: 40;
+        background: var(--card); color: var(--text); padding: 8px 12px;
+        border: 1px solid var(--accent); border-radius: var(--r-control);
       }
       .skip:focus { left: 8px; top: 8px; }
 
-      .bar {
-        display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-        padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--edge);
-      }
-      footer.bar { border-bottom: 0; border-top: 1px solid var(--edge); }
-      h1 { font-size: 13px; margin: 0 12px 0 0; font-weight: bold; letter-spacing: 0.04em; }
+      /* KB-02: focus is never removed, only replaced with something more visible. */
+      :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-      select, input, button, textarea {
-        font: inherit; color: var(--text); background: var(--bg);
-        border: 1px solid var(--edge); border-radius: 4px; padding: 4px 8px;
+      .sr-only {
+        position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+        overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
       }
-      button { cursor: pointer; }
+
+      /* ======================================================================
+         Shared vocabulary
+
+         Every rule below is keyed on a class a mount emits for *every* instance
+         of a kind — never on a figure id, a parameter id, a goal kind, a term id
+         or a driver id. There is no list of metric names anywhere in this
+         product's UI and a stylesheet that started one would be the first.
+         ====================================================================== */
+
+      /* An eyebrow: the small tracked uppercase label above every section. § 1.1 S8. */
+      .eyebrow {
+        font: 600 10px/1.2 var(--mono);
+        letter-spacing: 0.12em;
+        color: var(--dimmer);
+        text-transform: uppercase;
+      }
+      .eyebrow-row {
+        display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+        margin: 18px 0 9px;
+      }
+      .eyebrow-row:first-child { margin-top: 0; }
+      .eyebrow-note { font: 500 10px var(--mono); color: var(--faint); white-space: nowrap; }
+
+      /* A figure: a monospace number with a label. The run summary, the batch
+         report and the campaign result all speak this vocabulary, because a batch
+         row and a run row are the same kind of claim one level up. */
+      .figure { padding: 4px 0; border-bottom: 1px solid var(--edge); }
+      .figure-label { color: var(--dimmer); font: 500 10.5px var(--mono); letter-spacing: 0.05em; }
+      .figure-value { font: 600 15px var(--mono); color: var(--text); }
+      .figure-count { color: var(--dimmer); margin-left: 6px; font: 500 11px var(--mono); }
+      .figure-note { color: var(--dim); margin: 3px 0 0; font-size: 11.5px; line-height: 1.4; }
+      /* KB-15: the colour is a second signal. The words in `figure-note` are the first. */
+      .figure-warning .figure-value,
+      .figure-absent .figure-value,
+      .figure-suppressed .figure-value { color: var(--warn); }
+      .figure-origin-run-identity .figure-value { color: var(--text); }
+      .figure-bar { display: flex; gap: 6px; align-items: center; margin-top: 3px; }
+      .figure-bar-label { color: var(--dimmer); min-width: 5em; font: 500 10px var(--mono); }
+      .figure-bar-track { flex: 1; min-width: 40px; height: 6px; border-radius: 3px; background: var(--bg); overflow: hidden; }
+      .figure-bar-fill { height: 100%; background: var(--accent); }
+      .figure-bar-text { color: var(--text); min-width: 4em; text-align: right; font: 500 10px var(--mono); }
+
+      /* A card: the handoff's basic container. § 1.1 S6. */
+      .card {
+        border: 1px solid var(--edge); border-radius: var(--r-card);
+        background: var(--panel); overflow: hidden;
+      }
+      .card-raised { background: linear-gradient(#131924, #10151e); }
+
+      /* A hairline stack: rows separated by the grid gap showing through. */
+      .stack { display: grid; gap: 1px; background: var(--edge); border: 1px solid var(--edge); border-radius: var(--r-card); overflow: hidden; }
+      .stack > * { background: var(--panel); }
+
+      /* A chip: the handoff's small selectable pill. */
+      .chip {
+        border: 1px solid var(--edge-strong); background: transparent; color: var(--dim);
+        border-radius: var(--r-chip); padding: 5px 9px;
+        font: 600 11px var(--mono); cursor: pointer; white-space: nowrap;
+      }
+      .chip[aria-pressed='true'], .chip.is-on {
+        background: var(--raised); border-color: var(--accent); color: var(--text);
+      }
+      .chip-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+      /* A selectable card in a rail list. */
+      .pick {
+        display: block; width: 100%; text-align: left; cursor: pointer; color: var(--text);
+        border: 1px solid var(--edge); background: var(--panel);
+        border-radius: 10px; padding: 9px 12px;
+      }
+      .pick[aria-pressed='true'] { background: var(--raised); border-color: var(--accent); }
+      .pick-title { font-size: 12.5px; font-weight: 600; }
+      .pick-sub { font: 500 10px var(--mono); color: var(--dimmer); line-height: 1.45; margin-top: 3px; }
+      .pick-list { display: grid; gap: 6px; }
+
+      /* A schedule plate: the monospace key/value table in every rail segment. § 1.4 R3. */
+      .plate {
+        border: 1px solid var(--edge); border-radius: 10px; background: var(--panel);
+        overflow: hidden; font: 500 11px var(--mono); margin-bottom: 12px;
+      }
+      .plate-row {
+        display: flex; justify-content: space-between; gap: 10px;
+        padding: 6px 12px; border-bottom: 1px solid var(--hairline);
+      }
+      .plate-row:last-child { border-bottom: 0; }
+      .plate-key { color: var(--dimmer); }
+      .plate-value { color: #c6d0dc; text-align: right; }
+
+      /* The ghost button every rail segment ends with. */
+      .ghost {
+        background: none; border: 1px solid var(--edge-strong); color: var(--accent-soft);
+        border-radius: var(--r-control); padding: 5px 10px;
+        font-size: 11.5px; font-weight: 600; cursor: pointer;
+      }
+      .primary {
+        border: 0; border-radius: 9px; padding: 9px 15px;
+        font-size: 13px; font-weight: 600; cursor: pointer;
+        background: var(--accent); color: var(--accent-ink); white-space: nowrap;
+      }
+      .secondary {
+        border: 1px solid var(--edge-strong); background: none; color: #c6d0dc;
+        border-radius: 9px; padding: 9px 15px; font-size: 13px; font-weight: 600;
+        cursor: pointer; white-space: nowrap;
+      }
       button[disabled], select[disabled], input[disabled] { opacity: 0.45; cursor: not-allowed; }
-      /* KB-02: never removed, only replaced with something more visible. */
-      :focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
-      label { color: var(--dim); display: inline-flex; gap: 6px; align-items: center; }
-      fieldset { border: 1px solid var(--edge); border-radius: 4px; margin: 0 0 10px; padding: 8px 10px; }
-      legend { color: var(--dim); padding: 0 4px; }
 
-      [role='tablist'] { display: flex; gap: 4px; }
-      [role='tab'] { background: var(--bg); border-bottom-color: transparent; }
-      [role='tab'][aria-selected='true'] { background: var(--panel2); border-color: var(--focus); color: var(--text); }
+      /* A term with a tooltip. The dotted underline is the affordance; `title` is
+         the text. Never colour alone (KB-15). */
+      .helpful { cursor: help; border-bottom: 1px dotted var(--edge-strong); }
 
-      main { flex: 1; min-height: 0; display: flex; }
-      [role='tabpanel'] { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-      [role='tabpanel'][hidden] { display: none; }
-
-      .stage-wrap { flex: 1; min-height: 0; padding: 8px 12px; }
-      canvas { width: 100%; height: 100%; display: block; }
-
-      .editor-body { flex: 1; min-height: 0; display: flex; gap: 12px; padding: 8px 12px; overflow: hidden; }
-      .editor-form { width: 46%; min-width: 320px; overflow: auto; }
-      .editor-preview { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-      .editor-preview canvas { flex: 1; min-height: 0; }
-
-      table { border-collapse: collapse; width: 100%; }
-      th, td { text-align: left; padding: 2px 4px; border-bottom: 1px solid var(--edge); }
-      th { color: var(--dim); font-weight: normal; }
-      td input[type='number'], td input[type='text'] { width: 6.5em; }
-
+      /* Errors and refusals. `ConfigError` renders every issue on its own line
+         (RV-18 / ED-20); collapsing the newlines would run six located problems
+         together into one unreadable sentence. */
+      [role='alert'] { color: var(--bad); white-space: pre-wrap; }
       .issues { margin: 0; padding-left: 18px; }
       .issues li { margin: 2px 0; }
       .issues code { color: var(--warn); }
-      .bad { color: var(--bad); }
-      .warn { color: var(--warn); }
-      .ok { color: var(--ok); }
       .dim { color: var(--dim); }
-      #status, #editor-status { color: var(--dim); }
-      /* `ConfigError` renders every issue on its own line (RV-18 / ED-20). Collapsing the
-         newlines would run six located problems together into one unreadable sentence. */
-      [role='alert'] { color: var(--bad); white-space: pre-wrap; }
-      #scrub { flex: 1; min-width: 160px; }
+      .warn { color: var(--warn); }
+      .bad { color: var(--bad); }
+      .ok { color: var(--ok); }
+
+      /* ======================================================================
+         Shell — § 1.1 S1, S2
+         ====================================================================== */
+      .shell {
+        height: 100vh; width: 100%;
+        display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr);
+        background: var(--bg); overflow: hidden;
+      }
+
+      /* --- Header, § 1.1 S3 --- */
+      .topbar {
+        display: flex; align-items: center; gap: 14px;
+        min-width: 0; width: 100%; overflow: hidden;
+        padding: 10px 16px;
+        background: linear-gradient(#141a24, #10151e);
+        border-bottom: 1px solid var(--edge);
+      }
+      .brand { display: flex; align-items: center; gap: 9px; flex: none; }
+      .brand-mark {
+        width: 22px; height: 26px; border-radius: 3px;
+        background: var(--bg); border: 1.5px solid var(--accent);
+        display: flex; align-items: center; justify-content: center;
+      }
+      .brand-mark span { width: 2px; height: 14px; background: var(--accent); opacity: 0.5; }
+      .brand-text { line-height: 1.1; }
+      .brand-name { font-weight: 700; letter-spacing: -0.01em; }
+      .brand-mode { font: 500 10px/1.2 var(--mono); color: var(--dimmer); letter-spacing: 0.08em; }
+
+      .topbar-building {
+        display: flex; align-items: baseline; gap: 10px;
+        padding-left: 14px; border-left: 1px solid var(--edge);
+        flex: 1 1 180px; min-width: 120px; overflow: hidden;
+      }
+      .topbar-building h1 {
+        font: 600 13px var(--sans); margin: 0;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto;
+      }
+      .topbar-right {
+        display: flex; align-items: center; gap: 12px;
+        margin-left: auto; flex: 0 1 auto; min-width: 0;
+      }
+      .clock { font: 600 22px/1 var(--mono); letter-spacing: -0.02em; }
+      .phase-pill {
+        font: 500 11px var(--mono); color: var(--dim);
+        padding: 3px 7px; border: 1px solid var(--edge); border-radius: 20px; white-space: nowrap;
+      }
+      .topbar-day { text-align: right; line-height: 1.3; flex: none; white-space: nowrap; }
+      .topbar-day-name { font-weight: 600; font-size: 13px; }
+      .topbar-day-sub { font: 500 10px var(--mono); color: var(--dimmer); }
+
+      /* § 1.1 S5 — below 1180 px the building's name outranks its spec line. */
+      @media (max-width: 1179px) { [data-hide-narrow] { display: none !important; } }
+
+      /* --- Body, § 1.1 S2 --- */
+      .body {
+        display: grid;
+        grid-template-columns: var(--rail-left) minmax(0, 1fr) var(--rail-right);
+        min-height: 0; min-width: 0; width: 100%; overflow: hidden; position: relative;
+      }
+      .rail { background: var(--rail); overflow: auto; padding: 14px; }
+      .rail-l { border-right: 1px solid var(--edge); }
+      .rail-r { border-left: 1px solid var(--edge); }
+
+      /* § 1.1 S5 — below 1340 px the right rail becomes an overlay drawer rather
+         than disappearing, because it is the only way to change who is driving. */
+      @media (max-width: 1339px) {
+        .body { grid-template-columns: 270px minmax(0, 1fr); }
+        .rail-r {
+          position: absolute; top: 0; bottom: 0; right: 0;
+          width: min(var(--rail-right), 90vw); z-index: 20;
+          box-shadow: -18px 0 40px rgb(0 0 0 / 0.5);
+        }
+        .rail-r[hidden] { display: none; }
+        #drawer-toggle { display: inline-flex !important; }
+      }
+      @media (max-width: 899px) { .body { grid-template-columns: 236px minmax(0, 1fr); } }
+
+      /* --- Main column, § 1.3 --- */
+      .stagecol {
+        display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden;
+        background: radial-gradient(120% 90% at 50% 0%, #111823, #0b0e14);
+      }
+      .tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 9px 14px 0; align-items: flex-end; }
+      [role='tab'] {
+        border: 0; background: transparent; color: var(--dimmer);
+        font-size: 12.5px; font-weight: 600; padding: 7px 13px;
+        border-radius: 8px 8px 0 0; cursor: pointer; white-space: nowrap;
+      }
+      [role='tab'][aria-selected='true'] { background: #151d29; color: var(--text); }
+      [role='tab'][hidden] { display: none; }
+      .tab-secondary { font-size: 11.5px; padding: 6px 10px; color: var(--faint); }
+      .tabs-right { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+      #drawer-toggle {
+        display: none; align-items: center; align-self: center;
+        background: var(--raised); border: 1px solid var(--accent); color: var(--text);
+        border-radius: var(--r-control); padding: 4px 10px; margin-right: 4px;
+        font-size: 11.5px; font-weight: 600; cursor: pointer; white-space: nowrap;
+      }
+
+      [role='tabpanel'] { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+      [role='tabpanel'][hidden] { display: none; }
+      .sheet {
+        flex: 1; min-height: 0; overflow: auto;
+        margin: 0 14px 8px; border: 1px solid var(--edge); border-radius: var(--r-card);
+        background: #0f141d; padding: 22px 24px;
+      }
+
+      /* The coach ribbon, § 1.3 M2. */
+      .coach {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+        margin: 8px 14px; padding: 9px 13px;
+        border: 1px solid var(--edge); border-left: 2px solid var(--accent);
+        border-radius: 10px; background: linear-gradient(90deg, #16202c, #10151e);
+      }
+      .coach-rule { width: 1px; align-self: stretch; background: var(--edge); flex: none; }
+      .coach-title { font-size: 13.5px; font-weight: 600; margin-top: 2px; white-space: nowrap; }
+      .coach-hint { font-size: 12.5px; color: #c6d0dc; line-height: 1.4; }
+      .coach-progress { font: 500 10.5px var(--mono); color: var(--dim); margin-top: 3px; }
+      .coach-controls { flex: 0 1 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto; }
+      .coach select {
+        background: var(--bg); border: 1px solid var(--edge-strong); color: #c6d0dc;
+        border-radius: var(--r-control); padding: 5px 8px;
+        font-size: 11.5px; font-weight: 600; cursor: pointer; max-width: 190px;
+      }
+
+      /* The stage, § 1.3 M3. */
+      .stage-wrap {
+        flex: 1; min-height: 0; position: relative; margin: 0 14px 8px;
+        border: 1px solid var(--edge); border-radius: var(--r-card);
+        overflow: hidden; background: var(--bg);
+      }
+      #stage { width: 100%; height: 100%; display: block; }
+      .alarm {
+        position: absolute; left: 14px; top: 14px;
+        display: flex; align-items: center; gap: 9px;
+        padding: 8px 13px; border-radius: 10px;
+        background: rgb(224 71 58 / 0.14); border: 1px solid rgb(224 71 58 / 0.5);
+        backdrop-filter: blur(6px);
+      }
+      .alarm[hidden] { display: none; }
+      .alarm-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--band-3); animation: pulseAlarm 1.1s infinite; }
+      .alarm-text { font-size: 12.5px; font-weight: 600; }
+      .alarm-sub { font: 500 11px var(--mono); color: #c9a29d; }
+
+      /* The wait-age legend, § 1.3 M4. */
+      .legend {
+        display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+        margin: 0 14px 8px; padding: 0 2px;
+        font: 500 10.5px var(--mono); color: var(--dim);
+      }
+      .legend-title { color: var(--faint); letter-spacing: 0.1em; }
+
+      /* The transport, § 1.3 M5. */
+      .transport {
+        margin: 0 14px 12px; border: 1px solid var(--edge);
+        border-radius: var(--r-card); background: var(--panel); padding: 10px 13px;
+      }
+      .transport-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      #play-pause {
+        width: 34px; height: 34px; flex: none; border-radius: 9px; border: 0; cursor: pointer;
+        background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 700;
+      }
+      .transport-mid { flex: 1 1 240px; min-width: 150px; }
+      #timeline {
+        position: relative; height: 26px; border-radius: var(--r-control);
+        overflow: hidden; background: var(--bg); cursor: pointer; display: flex;
+        border: 0; padding: 0; width: 100%;
+      }
+      .phase-seg {
+        display: flex; align-items: center; justify-content: center;
+        overflow: hidden; border-right: 1px solid var(--bg); min-width: 0;
+      }
+      .phase-seg span { font: 600 9.5px var(--mono); white-space: nowrap; letter-spacing: 0.04em; }
+      #playhead {
+        position: absolute; top: 0; bottom: 0; width: 2px; background: #fff;
+        box-shadow: 0 0 8px rgb(255 255 255 / 0.7); pointer-events: none;
+      }
+      .ticks {
+        display: flex; justify-content: space-between;
+        font: 500 9.5px var(--mono); color: var(--faint); margin-top: 3px;
+      }
+      .transport-tail { display: flex; gap: 4px; flex: none; align-items: center; flex-wrap: wrap; }
+      .transport-tail .chip { padding: 6px 9px; }
+      #status { color: var(--dim); font: 500 11px var(--mono); }
+
+      /* --- Left rail, § 1.2 --- */
+      .mood-head { display: flex; align-items: center; gap: 12px; }
+      .mood-face {
+        width: 46px; height: 46px; border-radius: 50%; flex: none;
+        display: flex; align-items: center; justify-content: center; font-size: 24px;
+        border: 1.5px solid var(--edge);
+      }
+      .mood-headline { font-weight: 600; font-size: 15px; line-height: 1.25; }
+      .mood-sub { font: 500 11px var(--mono); color: var(--dimmer); margin-top: 2px; }
+      .mood-bar { display: flex; height: 9px; border-radius: 5px; overflow: hidden; margin-top: 14px; background: var(--bg); gap: 1px; }
+      .mood-legend {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; margin-top: 10px;
+        font: 500 11px var(--mono);
+      }
+      .mood-legend > div { display: flex; justify-content: space-between; }
+
+      .stat-row {
+        display: flex; justify-content: space-between; align-items: baseline;
+        padding: 10px 13px;
+      }
+      .stat-label { font-size: 12px; color: var(--dim); white-space: nowrap; }
+      .stat-value { font: 600 15px var(--mono); }
+
+      .run-figures { display: flex; gap: 1px; background: var(--edge); }
+      .run-figure { flex: 1; padding: 11px 13px; background: var(--panel); }
+      .run-figure-value { font: 600 22px/1 var(--mono); }
+      .run-figure-label { font: 500 10px var(--mono); color: var(--dimmer); margin-top: 4px; }
+      .history { display: flex; align-items: flex-end; gap: 5px; height: 64px; }
+      .history-day { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; height: 100%; }
+      .history-bar { width: 100%; border-radius: 3px 3px 0 0; }
+      .history-label { font: 500 9px var(--mono); color: var(--dimmer); }
+
+      .shift-head { padding: 11px 13px; background: linear-gradient(#16202c, #121924); border-bottom: 1px solid var(--edge); }
+      .shift-event { font-size: 13px; font-weight: 600; line-height: 1.3; }
+      .shift-note { font-size: 11.5px; color: var(--dim); line-height: 1.45; margin-top: 3px; }
+      .goal { }
+      .goal-line { display: flex; gap: 7px; align-items: baseline; }
+      .goal-glyph { font-size: 11px; flex: none; }
+      .goal-label { font-size: 12px; line-height: 1.35; flex: 1; }
+      .goal-got { font: 600 11px var(--mono); flex: none; }
+      .goal-track { display: block; height: 4px; border-radius: 2px; background: var(--bg); margin-top: 5px; overflow: hidden; }
+      .goal-fill { display: block; height: 100%; }
+
+      .honesty { margin-top: 14px; border: 1px solid var(--edge); border-radius: var(--r-card); padding: 12px 13px; }
+      .honesty-body { display: flex; gap: 8px; align-items: flex-start; }
+      .honesty-title { font-size: 13px; font-weight: 600; line-height: 1.35; }
+      .honesty-plain { font-size: 12px; color: #a6b2c1; line-height: 1.45; margin: 3px 0 0; }
+      #honesty-toggle {
+        margin-top: 8px; background: none; border: 1px solid var(--edge-strong); color: var(--dim);
+        border-radius: 20px; padding: 3px 10px; font: 500 11px var(--mono); cursor: pointer;
+      }
+      #honesty-maths {
+        font: 500 11px/1.5 var(--mono); color: var(--dim);
+        margin: 9px 0 0; padding-top: 9px; border-top: 1px dashed var(--edge-strong);
+      }
+      #honesty-maths[hidden], #honesty-toggle[hidden] { display: none; }
+
+      .decision {
+        padding: 8px 12px; border-bottom: 1px solid var(--hairline);
+        animation: riseIn 0.25s ease-out;
+      }
+      .decision:last-child { border-bottom: 0; }
+      .decision-head { display: flex; gap: 8px; align-items: baseline; }
+      .decision-time { font: 600 10px var(--mono); color: var(--faint); flex: none; }
+      .decision-title { font: 600 11.5px var(--mono); }
+      .decision-why { font-size: 11.5px; color: var(--dim); line-height: 1.4; margin-top: 2px; }
+
+      /* --- Right rail, § 1.4 --- */
+      .segmented {
+        display: flex; gap: 3px; padding: 3px;
+        border: 1px solid var(--edge); border-radius: 9px; background: var(--bg); margin-bottom: 13px;
+      }
+      .segmented button {
+        flex: 1; border: 0; border-radius: var(--r-chip); padding: 6px 8px;
+        font-size: 11.5px; font-weight: 600; cursor: pointer;
+        background: transparent; color: var(--dimmer);
+      }
+      .segmented button[aria-selected='true'] { background: var(--raised); color: var(--text); }
+      .rail-panel[hidden] { display: none; }
+      .rail-prose { font-size: 11.5px; color: var(--dimmer); line-height: 1.5; margin: 0 0 10px; }
+
+      /* --- The report sheet, § 1.3 M6 --- */
+      .report { max-width: 760px; }
+      .report-head {
+        display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;
+        border-bottom: 1.5px solid #26303d; padding-bottom: 12px;
+      }
+      .report h2 { margin: 6px 0 0; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+      .report h3 {
+        font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: var(--dim);
+        margin: 26px 0 8px; text-transform: uppercase;
+      }
+      .report-meta { text-align: right; font: 500 11px/1.6 var(--mono); color: var(--dim); }
+      .report-lede { font-size: 15px; line-height: 1.6; color: #c6d0dc; margin: 18px 0 0; }
+      .report-figures {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1px; background: var(--edge); border: 1px solid var(--edge);
+        border-radius: 10px; overflow: hidden; margin: 20px 0 0;
+      }
+      .report-figures .figure { background: var(--card); padding: 12px 14px; border-bottom: 0; }
+      .report-figures .figure-value { display: block; font-size: 20px; margin-top: 4px; }
+      .report-goal {
+        display: flex; align-items: baseline; gap: 10px;
+        padding: 10px 13px; border-radius: 9px;
+      }
+      .report-diagnosis {
+        display: flex; gap: 12px; padding: 12px 14px; border-radius: 10px;
+        background: var(--card); border-left: 2px solid var(--edge);
+      }
+      .report-when { font: 600 12px var(--mono); flex: none; width: 64px; }
+      .report-lever { padding: 12px 14px; border: 1px solid var(--edge); border-radius: 10px; background: var(--card); }
+      .report-cleared {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+        margin: 0 0 12px; padding: 14px 16px;
+        border: 1px solid rgb(63 178 127 / 0.45); border-radius: 11px; background: rgb(63 178 127 / 0.08);
+      }
+      .report-cleared[hidden] { display: none; }
+      .small-print { margin: 16px 0 0; padding: 14px 16px; border: 1px dashed var(--edge-strong); border-radius: 10px; }
+
+      /* --- Scenario cards, § 1.3 M7 --- */
+      .scenario {
+        display: flex; gap: 0; text-align: left; cursor: pointer; width: 100%;
+        border: 1px solid var(--edge); background: var(--card);
+        border-radius: var(--r-card); padding: 0; overflow: hidden; color: var(--text);
+      }
+      .scenario[aria-current='true'] { background: var(--raised); border-color: var(--accent); }
+      .scenario-art { width: 96px; flex: none; border-right: 1px solid var(--edge); }
+      .scenario-body { padding: 13px 16px; flex: 1; min-width: 0; }
+      .scenario-line { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
+      .scenario-brief { font-size: 12.5px; color: #a6b2c1; line-height: 1.5; margin: 7px 0 0; max-width: 660px; }
+      .scenario-stats { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 9px; font: 500 11px var(--mono); }
+      .scenario-own { border-style: dashed; border-color: var(--edge-strong); background: var(--panel); }
+
+      /* --- Editors, § 1.3 M8–M11 --- */
+      .editor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 20px; max-width: 1340px; }
+      .editor-panel { border: 1px solid var(--edge); border-radius: var(--r-panel); background: var(--card); padding: 15px 16px; }
+      .field { display: block; font-size: 11.5px; color: var(--dim); }
+      .field input, .field textarea, .field select {
+        display: block; width: 100%; margin-top: 4px;
+        background: var(--bg); border: 1px solid var(--edge-strong); border-radius: var(--r-control);
+        color: var(--text); padding: 6px 9px; font-size: 12.5px;
+      }
+      .slider { }
+      .slider-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; margin-bottom: 3px; }
+      .slider-value { font: 600 11px var(--mono); color: var(--dim); flex: none; }
+      .slider-sub { font: 500 10px var(--mono); color: var(--faint); margin-top: 2px; }
+      .slider-group { font: 600 10px var(--mono); letter-spacing: 0.1em; color: var(--dimmer); margin: 6px 0 4px; }
+      input[type='range'] {
+        -webkit-appearance: none; appearance: none; width: 100%; margin: 0;
+        height: 4px; border-radius: 2px; background: var(--edge); outline: none; accent-color: var(--accent);
+      }
+      input[type='range']::-webkit-slider-thumb {
+        -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+        background: var(--text); border: 2px solid var(--bg); cursor: grab;
+      }
+      .toggle {
+        display: block; width: 100%; text-align: left; cursor: pointer; color: var(--text);
+        border: 1px solid var(--edge); background: var(--panel); border-radius: 9px; padding: 9px 11px;
+      }
+      .toggle[aria-pressed='true'] { background: rgb(63 178 127 / 0.09); }
+      .toggle-line { display: flex; gap: 8px; align-items: baseline; }
+      .toggle-label { font-size: 12.5px; font-weight: 600; flex: 1; }
+      .toggle-state { font: 600 10px var(--mono); flex: none; }
+      .toggle-hint { font-size: 11.5px; color: var(--dim); line-height: 1.4; margin-top: 2px; }
+      .editor-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+      .dirty { font: 500 10.5px var(--mono); color: var(--warn); }
+      .dirty[hidden] { display: none; }
+      .summary-line { font: 500 11px var(--mono); color: var(--accent-soft); margin-top: 13px; line-height: 1.6; }
+      .advice { font-size: 12px; color: #a6b2c1; line-height: 1.45; margin: 6px 0 0; }
+
+      /* The elevation, § 1.3 M11. */
+      .elevation { border: 1px solid var(--edge); border-radius: var(--r-panel); background: #0d1219; padding: 12px 12px 10px; }
+      .elevation-head {
+        display: flex; align-items: baseline; gap: 8px; padding: 0 8px 7px;
+        font: 600 9px var(--mono); letter-spacing: 0.09em; color: var(--faint);
+        border-bottom: 1px solid var(--hairline); min-width: 400px;
+      }
+      .elevation-body { position: relative; overflow: auto; border-radius: 8px; margin-top: 6px; }
+      .elev-row { flex: none; display: flex; align-items: center; gap: 8px; padding: 0 8px; box-sizing: border-box; }
+      .elev-floor { width: 40px; flex: none; font: 600 10px var(--mono); background: none; border: 0; text-align: left; padding: 0; }
+      .elev-sky { width: 26px; flex: none; display: flex; align-items: center; justify-content: center; background: none; border: 0; padding: 0; }
+      .elev-sky span {
+        width: 13px; height: 13px; border-radius: 4px; display: flex; align-items: center; justify-content: center;
+        border: 1px solid var(--edge); font: 600 8px var(--mono);
+      }
+      .elev-occ { width: 104px; flex: none; height: 100%; display: flex; align-items: center; touch-action: none; background: none; border: 0; padding: 0; }
+      .elev-occ-track { position: relative; width: 100%; height: 6px; border-radius: 3px; background: var(--bg); display: block; overflow: hidden; }
+      .elev-people { width: 74px; flex: none; text-align: right; font: 500 10px var(--mono); white-space: nowrap; }
+      .elev-shafts { position: absolute; top: 0; bottom: 0; right: 8px; display: flex; gap: 6px; }
+      .elev-shaft { flex: 1; min-width: 0; position: relative; background: rgb(255 255 255 / 0.04); border-radius: 5px; }
+      .elev-band {
+        position: absolute; left: 0; right: 0; border: 1px solid var(--accent); border-radius: 5px;
+        background: rgb(79 158 232 / 0.07);
+        display: flex; flex-direction: column; justify-content: space-between; align-items: stretch; overflow: hidden;
+      }
+      .elev-grip { height: 10px; flex: none; cursor: ns-resize; opacity: 0.5; border: 0; padding: 0; }
+      .elev-legend-row { display: flex; align-items: center; gap: 10px; font: 500 10.5px var(--mono); color: var(--dim); padding: 3px 2px; }
+
+      /* The retained instrument surfaces, § 2.3. Same `.figure` vocabulary. */
+      .instrument-bar {
+        display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+        padding: 8px 14px; border-bottom: 1px solid var(--edge); background: var(--panel);
+      }
+      .instrument-bar label { color: var(--dim); display: inline-flex; gap: 6px; align-items: center; }
+      .instrument-bar select, .instrument-bar input {
+        color: var(--text); background: var(--bg); border: 1px solid var(--edge-strong);
+        border-radius: var(--r-chip); padding: 4px 8px; font-size: 12px;
+      }
+      .instrument-bar button {
+        color: var(--text); background: var(--bg); border: 1px solid var(--edge-strong);
+        border-radius: var(--r-chip); padding: 4px 10px; font-size: 12px; cursor: pointer;
+      }
+      .instrument-body { flex: 1; min-height: 0; display: flex; gap: 12px; padding: 10px 14px; overflow: hidden; }
+      .instrument-form { flex: 1; min-width: 0; overflow: auto; }
+      .instrument-form fieldset { border: 1px solid var(--edge); border-radius: 8px; margin: 0 0 10px; padding: 8px 10px; }
+      .instrument-form legend { color: var(--dim); padding: 0 4px; }
+      .instrument-form table { border-collapse: collapse; width: 100%; }
+      .instrument-form th, .instrument-form td { text-align: left; padding: 2px 4px; border-bottom: 1px solid var(--edge); }
+      .instrument-form th { color: var(--dim); font-weight: normal; }
+      .instrument-form td input[type='number'], .instrument-form td input[type='text'] { width: 6.5em; }
+      .instrument-form textarea { width: 100%; min-height: 140px; }
+      .instrument-preview { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+      .instrument-preview canvas { flex: 1; min-height: 0; width: 100%; }
       .checklist { max-height: 140px; overflow: auto; border: 1px solid var(--edge); border-radius: 4px; padding: 4px 6px; }
       .checklist label { display: flex; gap: 6px; color: var(--text); }
-      textarea { width: 100%; min-height: 140px; }
-      /* docs/10 § 11 W4 — the generated parameter form. Every rule below is keyed on a class the
-         renderer emits for *every* control, never on a parameter id, because there is no list of
-         parameter ids anywhere in this product's UI and adding one here would be the first. */
-      #panel-parameters .editor-form { width: 100%; }
+      .batch-report .figure { max-width: 90em; }
+      .batch-report .figure-value { display: block; margin-top: 2px; }
+      progress { width: 180px; }
+      progress[hidden] { display: none; }
+
+      /* docs/10 § 11 W4 — the generated parameter form. Keyed on a class the renderer
+         emits for *every* control, never on a parameter id. */
       .control { padding: 6px 0; border-bottom: 1px solid var(--edge); }
       .control-label { display: inline-block; min-width: 16em; }
       .control-unit { color: var(--dim); margin-right: 6px; }
@@ -107,451 +683,835 @@
       .control-inactive { color: var(--warn); margin: 4px 0 0; }
       .control-reset { margin-left: 6px; }
 
-      /* The panel strip — the answer to *three panels compete for one column and the canvas
-         loses*.
-
-         The run summary and the mood gauge used to **stack** below the stage, so the column paid
-         `max(summary) + max(mood)` and the canvas paid it. Measured at 1440×900: the summary sat
-         at its 30vh cap of 270 px and the gauge at its 14vh cap of 126 px, so the two of them took
-         396 px of a 900 px window and the `#stage` canvas was left with **168 px**. They are now
-         laid side by side in one grid row, so the column pays `max(summary, mood)` — 271 px — and
-         the canvas gets **293 px**. The next panel added here joins the row rather than pushing
-         the picture down again.
-
-         Nothing is hidden and nothing is capped tighter: both children keep their own scroll and
-         the mood gauge's ceiling goes **up**, from 14vh to 30vh, because in a row its height is
-         free until it exceeds its neighbour's. Below ~720 px of viewport `auto-fit` puts them back
-         one above the other, which is the arrangement that was right there anyway. */
-      .panel-strip {
-        display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-        align-items: start;
-        border-top: 1px solid var(--edge); background: var(--panel2);
-      }
-      /* `min-width: 0` or a grid child refuses to shrink below its widest unbreakable row, and the
-         summary's figure notes are long sentences. Without it the strip forces a horizontal
-         scrollbar on the whole page instead of wrapping. */
-      .panel-strip > * { min-width: 0; }
-
-      /* docs/10 § 11 W2 — the run summary. Keyed on the classes the mount emits for *every*
-         figure, never on a figure id: `render/runSummary.ts` decides what a figure is, and a
-         stylesheet that knew the difference between `awt` and `energy` would be a second place
-         that had to be edited when a twelfth figure arrives. */
-      .run-summary {
-        display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 2px 18px; padding: 6px 12px; max-height: 30vh; overflow: auto;
-      }
-      .figure { padding: 4px 0; border-bottom: 1px solid var(--edge); }
-      .figure-label { color: var(--dim); }
-      .figure-value { color: var(--text); }
-      /* KB-15: the warning colour is a second signal. The words in `figure-note` are the first. */
-      .figure-warning .figure-value { color: var(--warn); }
-      .figure-absent .figure-value, .figure-suppressed .figure-value { color: var(--warn); }
-      /* docs/10 § 4 — the mode layer's own row kinds. They are the *origins* of § 4's
-         non-negotiable list, not figure ids: a run's identity, the people it left behind, a
-         warning it raised, the passenger model, a locked-out call and the fail states. The
-         classes come from `mode/disclosure.ts`'s `rowClassesOf`, so this block is styling a
-         taxonomy the code derives rather than a list a stylesheet maintains. */
-      .figure-origin-run-identity .figure-value { color: var(--text); }
-      .figure-warning .figure-note { color: var(--dim); }
-      .figure-count { color: var(--dim); margin-left: 6px; }
-      .figure-note { color: var(--dim); margin: 2px 0 0; }
-      /* § 3.5's paired bar. The number is printed beside every bar, so length is never the only
-         carrier of a value — a bar clipped by a narrow column must still be readable. */
-      .figure-bar { display: flex; gap: 6px; align-items: center; margin-top: 2px; }
-      .figure-bar-label { color: var(--dim); min-width: 5em; }
-      .figure-bar-track { flex: 1; min-width: 40px; height: 8px; background: var(--bg); border: 1px solid var(--edge); }
-      .figure-bar-fill { height: 100%; background: var(--focus); }
-      .figure-bar-text { color: var(--text); min-width: 4em; text-align: right; }
-
-      /* docs/10 § 6 / D4 — the building mood gauge. Keyed on `level` and `provisional` only,
-         never on a driver id, for the reason above: `render/mood.ts` decides what the drivers
-         are, and a sixth one must appear here with no edit.
-
-         Deliberately **not** a dial. R11's argument against an eco score applies to a needle for
-         the same reason — a single pointer invites the reader to optimise it, and the thing they
-         would be optimising is one replication of one seed. The shape is carried by the glyph the
-         mount emits as text (KB-15), so the colours below are the second signal and never the
-         first. */
-      .building-mood {
-        padding: 6px 12px;
-        /* It still scrolls, and the cap is now the strip's rather than its own.
-           The old cap was 14vh with this reasoning: *"a taller panel squeezed 21 floors into
-           110 px and put every landing below the pitch at which a queue can be drawn as anything
-           but a bar"*. That reasoning was about a gauge **stacked above the stage**, where every
-           pixel it took came out of the picture. Beside the run summary it costs the column
-           nothing until it is the taller of the two, so the cap goes up rather than down and the
-           trade it was protecting against no longer exists. */
-        max-height: 30vh; overflow: auto;
-      }
-      .mood-head { margin: 0 0 4px; font-weight: 600; }
-      .mood-glyph { font-size: 1.1em; }
-      .mood-driver { margin: 1px 0; }
-      /* `padding-right` and not only the trailing space the mount emits: an inline-block collapses
-         the space at its edge, so the label ran into the sentence — `standing right now196
-         standing at 2 floors`. The same defect W2 found on `figure-count`, one panel over. */
+      /* docs/10 § 6 / D4 — the mood gauge's own row kinds, still drawn by
+         `render/mood.ts` inside the left rail's card. */
+      .mood-driver { margin: 1px 0; font: 500 11px var(--mono); }
       .mood-label { color: var(--dim); min-width: 9em; padding-right: 8px; display: inline-block; }
       .mood-calm { color: var(--text); }
       .mood-frustrated { color: var(--warn); }
-      .mood-distressed { color: var(--bad, var(--warn)); }
-      /* R6 — an outcome read before the playhead reaches the end of the run is a preview, and the
-         word "So far" in the headline says so. The rule stays because a reader who has learned to
-         ignore the word still sees the panel is unfinished. */
+      .mood-distressed { color: var(--bad); }
+      /* R6 — an outcome read before the playhead reaches the end is a preview. */
       .mood-provisional { font-style: italic; }
-      .mood-caveat { color: var(--dim); margin: 4px 0 0; }
+      .mood-caveat { color: var(--dim); margin: 4px 0 0; font-size: 11.5px; }
 
-      /* docs/10 § 11 W3 — the replication batch. Same `.figure` vocabulary as the run summary,
-         because a batch row and a run row are the same kind of claim one level up, and because
-         nothing in either surface may key on a metric id. */
-      #panel-compare .editor-form { width: 100%; }
-      /* docs/10 § 5 — the campaign. Two columns of the same `.figure` rows: the briefing on the
-         left, the stage's result on the right. Nothing below keys on a goal kind or a fail state,
-         because `campaign/` decides what those are and a stylesheet that named one would be the
-         first list of goal names in this product's UI. */
-      #panel-campaign .editor-form { width: 50%; overflow: auto; }
-      .batch-report .figure { max-width: 90em; }
-      .batch-report .figure-value { display: block; margin-top: 2px; }
-      progress { width: 180px; }
-      progress[hidden] { display: none; }
-
-      .sr-only {
-        position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-        overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+      /* --- Footer, § 1.1 S4 --- */
+      .footbar {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+        padding: 7px 16px; background: var(--rail); border-top: 1px solid var(--edge);
+        font: 500 11px var(--mono); color: var(--dimmer); width: 100%; min-width: 0;
       }
-
-      /* RS-02 / RS-03: the per-car status list goes first, the canvas keeps its height. */
-      @media (max-width: 1279px) { .wide-only { display: none; } }
-      @media (max-width: 767px) {
-        .editor-body { flex-direction: column; overflow: auto; }
-        .editor-form { width: 100%; }
-        .stage-wrap { padding: 4px 6px; min-height: 60vh; }
-        .bar { padding: 6px 8px; }
+      #copy-run {
+        background: none; border: 1px solid var(--edge); color: var(--dim);
+        border-radius: var(--r-chip); padding: 3px 9px; font: inherit; cursor: pointer; white-space: nowrap;
       }
+      #footer-right { margin-left: auto; min-width: 0; }
 
       /* The confirm dialog: themed like the rest, so a modal does not look like another app. */
       dialog {
-        background: var(--panel);
-        color: var(--text);
-        border: 1px solid var(--edge);
-        border-radius: 6px;
-        padding: 16px 18px;
-        max-width: 34em;
+        background: var(--card); color: var(--text); border: 1px solid var(--edge);
+        border-radius: 10px; padding: 16px 18px; max-width: 34em;
       }
       dialog::backdrop { background: rgb(0 0 0 / 0.55); }
       dialog p { margin: 0 0 12px; }
       dialog form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
-      /* KB-14: nothing animates that is not the simulation itself. */
-      @media (prefers-reduced-motion: reduce) {
-        * { transition: none !important; animation: none !important; }
+      @media (max-width: 767px) {
+        .instrument-body { flex-direction: column; overflow: auto; }
+        .sheet { padding: 16px 14px; }
+        .editor-grid { grid-template-columns: minmax(0, 1fr); }
       }
     </style>
   </head>
   <body>
     <a class="skip" href="#stage">Skip to the building</a>
 
-    <header class="bar">
-      <h1>elevator-sim</h1>
-      <div role="tablist" aria-label="Surfaces">
-        <button role="tab" id="tab-viewer" aria-selected="true" aria-controls="panel-viewer">
-          Run viewer
-        </button>
-        <button role="tab" id="tab-editor" aria-selected="false" aria-controls="panel-editor" tabindex="-1">
-          Building editor
-        </button>
-        <button role="tab" id="tab-parameters" aria-selected="false" aria-controls="panel-parameters" tabindex="-1">
-          Parameters
-        </button>
-        <button role="tab" id="tab-compare" aria-selected="false" aria-controls="panel-compare" tabindex="-1">
-          Compare
-        </button>
-        <button role="tab" id="tab-campaign" aria-selected="false" aria-controls="panel-campaign" tabindex="-1">
-          Campaign
-        </button>
-      </div>
-      <!-- docs/10 § 4 / U2 — Basic is the default, Advanced is one control away and is
-           remembered. It sits in the header rather than in a panel because it governs every
-           surface, and `mode/parity.ts` is what stops it from ever hiding a failure. -->
-      <label class="dim">view
-        <select id="view-mode">
-          <option value="basic" selected>Basic</option>
-          <option value="advanced">Advanced</option>
-        </select>
-      </label>
-      <span id="mode-parity" role="alert" class="dim"></span>
-      <span class="dim" id="banner"></span>
-    </header>
-
-    <main>
-      <!-- ------------------------------------------------------------------ -->
-      <!-- Surface A + B — run viewer and playback                              -->
-      <!-- ------------------------------------------------------------------ -->
-      <section role="tabpanel" id="panel-viewer" aria-labelledby="tab-viewer">
-        <div class="bar">
-          <label>building <select id="building"></select></label>
-          <label>dispatcher <select id="dispatcher"></select></label>
-          <label>duration <input id="duration" type="number" min="60" max="7200" step="60" value="900" size="5" /></label>
-          <label>seed <input id="seed" size="20" inputmode="numeric" placeholder="random" /></label>
-          <button id="run">Run</button>
-          <button id="verify" title="re-simulate from this seed and compare the frame sequences">
-            Verify replay
-          </button>
-          <button id="copy-provenance" title="copy building, dispatcher, seed and duration in the form the CLI accepts">
-            Copy provenance
-          </button>
-          <button id="save-recording">Save recording</button>
-          <label>load <input id="load-recording" type="file" accept="application/json,.json" /></label>
-          <label class="wide-only">bank <select id="bank-filter"><option value="">all</option></select></label>
-          <label class="wide-only">landing <select id="landing-select"><option value="">none</option></select></label>
-          <button id="export-png" class="wide-only">Export PNG</button>
+    <div class="shell">
+      <!-- ================================================================= -->
+      <!-- Header — § 1.1 S3                                                  -->
+      <!-- ================================================================= -->
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"><span></span></div>
+          <div class="brand-text">
+            <div class="brand-name">Elevator Sim</div>
+            <div class="brand-mode">SHIFT MODE</div>
+          </div>
         </div>
 
-        <!-- docs/10 § 10.3 — the dispatcher compatibility note, stated BEFORE Run rather than
-             diagnosed after it. `role="status"` and not `role="alert"`: it is a fact about the
-             pairing on screen, not an error, and Run stays enabled (ED-15). Written by
-             `access/dispatcherCredentials.ts` through `dev/main.ts`; empty when there is nothing
-             to say, which is every building that declares no access zone. -->
-        <p id="access-note" class="warn" role="status" style="margin: 4px 0"></p>
+        <div class="topbar-building">
+          <h1 id="building-name">—</h1>
+          <span data-hide-narrow id="building-sub" class="phase-pill" style="border: 0; padding: 0"></span>
+        </div>
 
-        <div class="stage-wrap">
-          <canvas id="stage" role="img" aria-label="No run yet.">
-            <p id="stage-fallback">
-              This view draws a building on a canvas. Your browser has not rendered it; the
-              description of the current frame is in this element's label.
+        <div class="topbar-right" id="topbar-right">
+          <div style="display: flex; align-items: baseline; gap: 8px">
+            <span class="clock" id="clock">06:00</span>
+            <span data-hide-narrow class="phase-pill" id="phase-label"></span>
+          </div>
+          <div class="topbar-day">
+            <div class="topbar-day-name" id="day-label">Day 1</div>
+            <div class="topbar-day-sub" id="tenants-line"></div>
+          </div>
+          <!-- docs/10 § 4 / U2 — the disclosure mode. `mode/` calls the two levels
+               `basic` and `advanced`; the handoff calls them Casual and Engineer
+               (§ 1.5 B1). The *values* are the model's and the *labels* are the
+               handoff's, so `mode/parity.ts` keeps working unchanged. -->
+          <label class="dim" data-hide-narrow style="font: 500 10px var(--mono)">
+            view
+            <select id="view-mode">
+              <option value="basic" selected>Casual</option>
+              <option value="advanced">Engineer</option>
+            </select>
+          </label>
+          <span id="mode-parity" role="alert" class="dim"></span>
+          <span class="dim" id="banner" data-hide-narrow></span>
+        </div>
+      </header>
+
+      <!-- ================================================================= -->
+      <!-- Body — § 1.1 S2                                                    -->
+      <!-- ================================================================= -->
+      <div class="body" id="body-grid">
+        <!-- ------------------------------------------------------------- -->
+        <!-- Left rail — § 1.2                                              -->
+        <!-- ------------------------------------------------------------- -->
+        <aside class="rail rail-l" aria-label="How the building feels">
+          <div class="eyebrow-row"><span class="eyebrow">How the building feels</span></div>
+
+          <!-- L1 / L2 — the mood card. Drawn from observations alone (R1): nothing
+               in it is routed through `awtIsValid`, because `live/bands.ts`'s input
+               type does not carry a suppressible field. -->
+          <div class="card card-raised" style="padding: 14px">
+            <div class="mood-head">
+              <div class="mood-face" id="mood-face" aria-hidden="true"></div>
+              <div style="min-width: 0">
+                <div class="mood-headline" id="mood-headline"></div>
+                <div class="mood-sub" id="mood-sub"></div>
+              </div>
+            </div>
+            <div class="mood-bar" id="mood-bar" role="img" aria-label="Waiting passengers by how long they have stood"></div>
+            <div class="mood-legend" id="mood-legend"></div>
+          </div>
+
+          <!-- L3 — the four stat rows. -->
+          <div class="stack" style="margin-top: 14px" id="live-stats"></div>
+
+          <!-- docs/10 § 6 / D4 — the driver list the existing gauge produces. An addition to the
+               handoff, so it goes **after** L3 rather than inside L1's card: it is four sentences,
+               and above the stats it pushed the rail's four headline figures off a 900 px screen.
+               Nothing is hidden by the move and `mode/parity.ts` is untouched — the drivers are
+               observations either way, and a deeper read belongs under the headline it explains. -->
+          <div id="mood-drivers" style="margin-top: 12px"></div>
+
+          <!-- L4 — YOUR RUN. -->
+          <div class="eyebrow-row">
+            <span class="eyebrow">Your run</span>
+            <span class="eyebrow-note" id="streak-line"></span>
+          </div>
+          <div class="card" style="margin-bottom: 14px">
+            <div class="run-figures" id="run-figures"></div>
+            <div style="padding: 12px 13px; border-top: 1px solid var(--edge)">
+              <div class="history" id="history"></div>
+              <p style="margin: 10px 0 0; font-size: 11.5px; color: var(--dim); line-height: 1.45">
+                Share of riders away within a minute. No losing — just a line you are trying to bend upward.
+              </p>
+            </div>
+          </div>
+
+          <!-- L5 — TODAY'S SHIFT. -->
+          <div class="eyebrow-row"><span class="eyebrow">Today's shift</span></div>
+          <div class="card" style="margin-bottom: 16px">
+            <div class="shift-head">
+              <div class="shift-event" id="shift-event"></div>
+              <div class="shift-note" id="shift-note"></div>
+            </div>
+            <div style="display: grid; gap: 9px; padding: 11px 13px" id="shift-goals"></div>
+            <div style="padding: 8px 13px; border-top: 1px solid var(--edge); font: 500 10.5px var(--mono); color: var(--dimmer)" id="shift-best"></div>
+          </div>
+
+          <!-- L6 — the honesty card. -->
+          <div class="honesty" id="honesty">
+            <div class="honesty-body">
+              <span id="honesty-glyph" style="font-size: 14px; line-height: 1.3"></span>
+              <div style="min-width: 0">
+                <div class="honesty-title" id="honesty-title"></div>
+                <div class="honesty-plain" id="honesty-plain"></div>
+                <button type="button" id="honesty-toggle" hidden></button>
+                <p id="honesty-maths" hidden></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- L7 — WHY IT DID THAT. -->
+          <div class="eyebrow-row">
+            <span class="eyebrow">Why it did that</span>
+            <span class="eyebrow-note">live</span>
+          </div>
+          <div class="card" style="border-radius: 10px" id="decision-log" aria-live="off"></div>
+        </aside>
+
+        <!-- ------------------------------------------------------------- -->
+        <!-- Main column — § 1.3                                            -->
+        <!-- ------------------------------------------------------------- -->
+        <main class="stagecol">
+          <!-- M1 — the tab strip. The three primary surfaces are the handoff's.
+               The four editor tabs are *contextual*: hidden until the rail opens
+               one, which is the handoff's only entry point to them (§ 1.4 R2).
+               The three instrument surfaces on the right are retained from the
+               shipped viewer — see `docs/12-design-handoff.md` § 2.3 for why they
+               are not deleted, and `DECISIONS.md` § D174. -->
+          <div class="tabs" role="tablist" aria-label="Surfaces">
+            <button role="tab" id="tab-run" aria-selected="true" aria-controls="panel-run">Simulation</button>
+            <button role="tab" id="tab-report" aria-selected="false" aria-controls="panel-report" tabindex="-1">Day report</button>
+            <button role="tab" id="tab-scenarios" aria-selected="false" aria-controls="panel-scenarios" tabindex="-1">Scenarios</button>
+            <button role="tab" id="tab-dispatcher" aria-selected="false" aria-controls="panel-dispatcher" tabindex="-1" hidden>Dispatcher</button>
+            <button role="tab" id="tab-traffic" aria-selected="false" aria-controls="panel-traffic" tabindex="-1" hidden>Traffic</button>
+            <button role="tab" id="tab-machines" aria-selected="false" aria-controls="panel-machines" tabindex="-1" hidden>Machines</button>
+            <button role="tab" id="tab-building" aria-selected="false" aria-controls="panel-building" tabindex="-1" hidden>Building</button>
+            <div class="tabs-right">
+              <button type="button" id="drawer-toggle" aria-expanded="false" aria-controls="rail-right">Controls ▸</button>
+              <button role="tab" class="tab-secondary" id="tab-compare" aria-selected="false" aria-controls="panel-compare" tabindex="-1">Compare</button>
+              <button role="tab" class="tab-secondary" id="tab-campaign" aria-selected="false" aria-controls="panel-campaign" tabindex="-1">Campaign</button>
+              <button role="tab" class="tab-secondary" id="tab-parameters" aria-selected="false" aria-controls="panel-parameters" tabindex="-1">Parameters</button>
+            </div>
+          </div>
+
+          <!-- =========================== Simulation =========================== -->
+          <section role="tabpanel" id="panel-run" aria-labelledby="tab-run">
+            <!-- M2 — the coach ribbon. -->
+            <div class="coach">
+              <div style="flex: none">
+                <div class="eyebrow" id="coach-label"></div>
+                <div class="coach-title" id="coach-title"></div>
+              </div>
+              <div class="coach-rule"></div>
+              <div style="min-width: 200px; flex: 1 1 220px">
+                <div class="coach-hint" id="coach-hint"></div>
+                <div class="coach-progress" id="coach-progress"></div>
+              </div>
+              <div class="coach-controls">
+                <label class="sr-only" for="pick-building">building</label>
+                <select id="pick-building" title="the building this shift runs in"></select>
+                <label class="sr-only" for="pick-pattern">arrival pattern</label>
+                <select id="pick-pattern" title="the arrival pattern this shift runs"></select>
+                <!-- § 4.1 — the third select the handoff does not have. A shift is a
+                     run and a run has a length; the handoff assumed a fixed
+                     sixteen-hour day this simulator cannot produce honestly. -->
+                <label class="sr-only" for="pick-shift">shift length</label>
+                <select id="pick-shift" title="how much simulated demand this shift covers"></select>
+                <button type="button" class="ghost" id="open-scenarios">All scenarios</button>
+              </div>
+            </div>
+
+            <!-- M3 — the stage. -->
+            <div class="stage-wrap">
+              <canvas id="stage" role="img" aria-label="No run yet.">
+                <p id="stage-fallback">
+                  This view draws a building on a canvas. Your browser has not rendered it; the
+                  description of the current frame is in this element's label.
+                </p>
+              </canvas>
+              <div class="alarm" id="alarm" role="status" hidden>
+                <span class="alarm-dot" aria-hidden="true"></span>
+                <span class="alarm-text" id="alarm-text"></span>
+                <span class="alarm-sub" id="alarm-sub"></span>
+              </div>
+            </div>
+
+            <p id="frame-description" class="sr-only" aria-live="polite"></p>
+
+            <!-- M4 — the wait-age legend. -->
+            <div class="legend" id="legend">
+              <span class="legend-title">How long they have stood</span>
+            </div>
+
+            <!-- M5 — the transport. -->
+            <div class="transport">
+              <div class="transport-row">
+                <button type="button" id="play-pause" aria-label="Play">▶</button>
+                <div class="transport-mid">
+                  <div id="timeline" role="slider" tabindex="0"
+                       aria-label="playhead" aria-valuemin="0" aria-valuemax="1000" aria-valuenow="0">
+                    <div id="playhead" style="left: 0%"></div>
+                  </div>
+                  <div class="ticks" id="timeline-ticks"></div>
+                </div>
+                <div class="transport-tail">
+                  <button type="button" class="chip" id="step-back" title="one display frame back (,)">◀|</button>
+                  <button type="button" class="chip" id="step-forward" title="one display frame forward (.)">|▶</button>
+                  <span id="speed-chips" class="chip-row" role="group" aria-label="playback speed"></span>
+                  <label class="dim" style="font: 500 10.5px var(--mono)">
+                    loop <input type="checkbox" id="loop" />
+                  </label>
+                </div>
+              </div>
+              <div class="transport-row" style="margin-top: 8px">
+                <span id="status" role="status">booting…</span>
+                <span id="error" role="alert" tabindex="-1"></span>
+                <span style="margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap">
+                  <button type="button" class="chip" id="run">Run this shift</button>
+                  <button type="button" class="chip" id="verify" title="re-simulate from this seed and compare the frame sequences">Verify replay</button>
+                  <button type="button" class="chip" id="copy-provenance" title="copy building, dispatcher, seed and duration in the form the CLI accepts">Copy provenance</button>
+                  <button type="button" class="chip" id="save-recording">Save recording</button>
+                  <label class="dim" style="font: 500 10.5px var(--mono)">
+                    load <input id="load-recording" type="file" accept="application/json,.json" />
+                  </label>
+                  <button type="button" class="chip" id="export-png">Export PNG</button>
+                  <label class="dim" style="font: 500 10.5px var(--mono)">
+                    seed <input id="seed" size="12" inputmode="numeric" placeholder="random" />
+                  </label>
+                  <label class="dim" style="font: 500 10.5px var(--mono)">
+                    bank <select id="bank-filter"><option value="">all</option></select>
+                  </label>
+                  <label class="dim" style="font: 500 10.5px var(--mono)">
+                    landing <select id="landing-select"><option value="">none</option></select>
+                  </label>
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <!-- =========================== Day report =========================== -->
+          <section role="tabpanel" id="panel-report" aria-labelledby="tab-report" hidden>
+            <div class="sheet">
+              <div class="report">
+                <div class="report-head">
+                  <div>
+                    <div class="eyebrow">Vertical transportation — daily observation sheet</div>
+                    <h2 id="report-title">Nothing filed yet</h2>
+                  </div>
+                  <div class="report-meta" id="report-meta"></div>
+                </div>
+                <p class="report-lede" id="report-lede"></p>
+                <div class="report-figures" id="report-figures"></div>
+
+                <div style="display: flex; align-items: baseline; gap: 10px; margin: 26px 0 8px; flex-wrap: wrap">
+                  <h3 style="margin: 0">The shift asked for</h3>
+                  <span style="font: 600 11px var(--mono)" id="report-verdict"></span>
+                  <span style="font-size: 12px; color: var(--dim)" id="report-streak"></span>
+                  <span style="margin-left: auto; font: 500 11px var(--mono); color: var(--accent-soft)" id="report-contract"></span>
+                </div>
+                <div class="report-cleared" id="report-cleared" hidden>
+                  <span style="font-size: 20px" aria-hidden="true">✓</span>
+                  <div style="min-width: 0; flex: 1">
+                    <div style="font-size: 15px; font-weight: 600">Scenario cleared</div>
+                    <div style="font-size: 12.5px; color: #a6b2c1; line-height: 1.5; margin-top: 2px" id="report-cleared-note"></div>
+                  </div>
+                  <button type="button" class="primary" id="report-take-next" style="background: var(--ok); color: #062017">
+                    Take the next assignment
+                  </button>
+                </div>
+                <div style="display: grid; gap: 6px" id="report-goals"></div>
+
+                <h3>Where it went wrong</h3>
+                <div style="display: grid; gap: 9px" id="report-diagnosis"></div>
+
+                <h3>Levers you actually have</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 9px" id="report-levers"></div>
+
+                <div style="display: flex; flex-wrap: wrap; gap: 9px; margin: 26px 0 0">
+                  <div style="flex: 1; min-width: 240px; padding: 13px 15px; border: 1px solid var(--edge); border-radius: 10px; background: linear-gradient(#16202c, #121924)">
+                    <div class="eyebrow">Tomorrow</div>
+                    <div style="font-size: 14px; font-weight: 600; margin-top: 5px" id="report-forecast-name"></div>
+                    <div style="font-size: 12.5px; color: #a6b2c1; line-height: 1.5; margin-top: 3px" id="report-forecast-note"></div>
+                    <div style="font: 500 11px var(--mono); color: var(--warn); margin-top: 7px" id="report-forecast-demand"></div>
+                  </div>
+                  <div style="flex: 1; min-width: 200px; padding: 13px 15px; border: 1px solid var(--edge); border-radius: 10px; background: var(--card)">
+                    <div class="eyebrow">What this taught</div>
+                    <div style="font-size: 12.5px; color: #a6b2c1; line-height: 1.5; margin-top: 5px" id="report-taught"></div>
+                  </div>
+                </div>
+
+                <div class="small-print">
+                  <div class="eyebrow" style="letter-spacing: 0.08em; color: var(--dim)">
+                    The small print, which is actually the point
+                  </div>
+                  <p style="font-size: 12.5px; line-height: 1.55; color: #a6b2c1; margin: 7px 0 0" id="report-small-print"></p>
+                </div>
+
+                <div style="display: flex; gap: 9px; margin: 22px 0 0; flex-wrap: wrap">
+                  <button type="button" class="primary" id="report-next-day">Open the doors on tomorrow</button>
+                  <button type="button" class="secondary" id="report-back">Back to the building</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- =========================== Scenarios ============================ -->
+          <section role="tabpanel" id="panel-scenarios" aria-labelledby="tab-scenarios" hidden>
+            <div class="sheet">
+              <div style="max-width: 1040px">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px">
+                  <div>
+                    <div class="eyebrow">Scenarios — five buildings, any order</div>
+                    <p style="font-size: 13px; color: #a6b2c1; line-height: 1.5; margin: 6px 0 0; max-width: 640px">
+                      Every scenario is open from the start. Bank the clean shifts one asks for, or just run
+                      it and watch what breaks — each building teaches something the other four cannot.
+                    </p>
+                  </div>
+                </div>
+                <div style="display: grid; gap: 10px" id="scenario-list"></div>
+                <p style="font-size: 12px; color: var(--dimmer); margin: 16px 0 0; max-width: 660px; line-height: 1.55">
+                  All five ship with the simulator in <code style="font-family: var(--mono)">data/buildings/</code> —
+                  same floor heights, same car specs, same populations. Taking an assignment restarts the week
+                  on that building.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <!-- ====================== Dispatcher editor ========================= -->
+          <section role="tabpanel" id="panel-dispatcher" aria-labelledby="tab-dispatcher" hidden>
+            <div class="sheet">
+              <div class="editor-grid" style="max-width: 1000px">
+                <div>
+                  <div class="eyebrow-row"><span class="eyebrow">The group controllers</span></div>
+                  <div class="pick-list" id="dispatcher-list"></div>
+                </div>
+                <div>
+                  <div class="eyebrow-row">
+                    <span class="eyebrow" id="dispatcher-editing"></span>
+                    <span class="eyebrow-note" id="dispatcher-yours-count"></span>
+                  </div>
+                  <div class="editor-panel">
+                    <label class="field">name <input id="dispatcher-name" /></label>
+                    <div class="eyebrow-row" style="margin: 14px 0 10px">
+                      <span class="eyebrow" id="dispatcher-terms-used"></span>
+                      <button type="button" class="chip" id="dispatcher-copy-current">start from the current one</button>
+                    </div>
+                    <div style="display: grid; gap: 9px" id="dispatcher-terms"></div>
+                    <div style="display: grid; gap: 6px; margin-top: 14px" id="dispatcher-flags"></div>
+                    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #1c2532">
+                      <div class="eyebrow" style="margin-bottom: 9px">Group levers — apply to whoever is driving</div>
+                      <div style="border: 1px solid var(--edge); border-radius: var(--r-card); overflow: hidden">
+                        <div id="group-levers"></div>
+                        <div style="padding: 10px 12px; background: var(--panel)">
+                          <div class="helpful" title="How long the doors stand open after the last person crosses the beam. Snappy dwell buys round trips and irritates everyone; patient dwell is kinder and costs capacity at the peak."
+                               style="font-size: 12.5px; font-weight: 600; display: inline-block">Door dwell</div>
+                          <div class="chip-row" style="margin-top: 6px" id="dwell-chips"></div>
+                          <div style="font-size: 11.5px; color: var(--dim); line-height: 1.4; margin-top: 4px" id="dwell-hint"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="summary-line" id="dispatcher-summary"></div>
+                    <p class="advice" id="dispatcher-advice"></p>
+                    <div class="editor-actions">
+                      <button type="button" class="secondary" id="dispatcher-close">Close</button>
+                      <button type="button" class="primary" id="dispatcher-save">Save as a new dispatcher</button>
+                      <span class="dirty" id="dispatcher-dirty" hidden>edited — not saved</span>
+                      <span role="alert" id="dispatcher-error"></span>
+                    </div>
+                  </div>
+                  <div class="eyebrow-row"><span class="eyebrow">Your dispatchers</span></div>
+                  <div style="display: grid; gap: 7px" id="dispatcher-yours"></div>
+                  <p style="font-size: 12px; color: var(--dimmer); line-height: 1.55; margin: 12px 0 0">
+                    One run cannot tell you yours is better than ETA — that needs fifty paired runs against the
+                    same passengers, which is what <strong>Compare</strong> is for. It can tell you what it did
+                    today, which is where the queue was.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ======================== Traffic editor ========================== -->
+          <section role="tabpanel" id="panel-traffic" aria-labelledby="tab-traffic" hidden>
+            <div class="sheet">
+              <div style="max-width: 760px">
+                <div class="eyebrow-row">
+                  <span class="eyebrow" id="traffic-editing"></span>
+                  <span class="eyebrow-note" id="traffic-summary"></span>
+                </div>
+                <div class="editor-panel">
+                  <label class="field">name <input id="traffic-name" /></label>
+                  <div class="slider-group" style="margin: 14px 0 6px">Which peak comes first</div>
+                  <div class="chip-row" id="traffic-order-chips"></div>
+                  <p style="font-size: 12px; color: var(--dim); line-height: 1.45; margin: 6px 0 0" id="traffic-order-note"></p>
+                  <div style="display: grid; gap: 10px; margin-top: 14px" id="traffic-rows"></div>
+                  <div class="slider-group" style="margin: 16px 0 6px">The day this makes</div>
+                  <div style="display: flex; height: 24px; border-radius: var(--r-control); overflow: hidden; background: var(--bg)" id="traffic-preview"></div>
+                  <div class="ticks" id="traffic-preview-ticks"></div>
+                  <div class="editor-actions">
+                    <button type="button" class="secondary" id="traffic-close">Close</button>
+                    <button type="button" class="primary" id="traffic-save">Save as a new pattern</button>
+                    <span class="dirty" id="traffic-dirty" hidden>edited — not saved</span>
+                    <span role="alert" id="traffic-error"></span>
+                  </div>
+                </div>
+                <p style="font-size: 12px; color: var(--dimmer); margin: 12px 0 0; line-height: 1.55" id="traffic-footnote"></p>
+              </div>
+            </div>
+          </section>
+
+          <!-- ======================= Machines editor ========================== -->
+          <section role="tabpanel" id="panel-machines" aria-labelledby="tab-machines" hidden>
+            <div class="sheet">
+              <div style="max-width: 760px">
+                <div class="eyebrow-row"><span class="eyebrow" id="machines-editing"></span></div>
+                <div class="editor-panel">
+                  <label class="field">name <input id="machines-name" /></label>
+                  <div style="display: grid; gap: 10px; margin-top: 10px" id="machines-rows"></div>
+                  <div class="chip-row" style="margin-top: 12px; padding-top: 11px; border-top: 1px solid #1c2532">
+                    <span class="helpful" style="font-size: 11.5px; color: var(--dim); margin-right: 2px"
+                          title="Contract speed in metres per second — the fastest a car of this class is allowed to run. It must sit inside the class's own speed band.">rated speed in service</span>
+                    <span id="machines-speed-chips" class="chip-row"></span>
+                  </div>
+                  <div style="font: 500 11px var(--mono); color: var(--measured); line-height: 1.6; margin-top: 10px" id="machines-summary"></div>
+                  <div class="editor-actions">
+                    <button type="button" class="secondary" id="machines-close">Close</button>
+                    <button type="button" class="primary" id="machines-save">Save as a new class</button>
+                    <span class="dirty" id="machines-dirty" hidden>edited — not saved</span>
+                    <span role="alert" id="machines-error"></span>
+                  </div>
+                </div>
+                <p style="font-size: 12px; color: var(--dim); line-height: 1.5; margin: 12px 0 0">
+                  Editing a shipped class never overwrites it — save the changes as a class of your own and it
+                  joins the list, ready to fit to a building.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <!-- ======================= Building editor ========================== -->
+          <section role="tabpanel" id="panel-building" aria-labelledby="tab-building" hidden>
+            <div class="sheet">
+              <div class="editor-grid">
+                <div>
+                  <div class="eyebrow-row">
+                    <span class="eyebrow" id="building-editing"></span>
+                    <button type="button" class="chip" id="building-blank">blank tower</button>
+                  </div>
+                  <div class="editor-panel">
+                    <label class="field">name <input id="building-spec-name" /></label>
+                    <div style="display: grid; gap: 10px; margin-top: 10px" id="building-rows"></div>
+                    <div class="helpful" style="font: 500 11px var(--mono); color: var(--measured); margin-top: 10px; line-height: 1.6"
+                         id="building-occupancy"
+                         title="Capacity is what the building was designed to hold; occupancy is how much of it is let today. Population — the number the lifts must move — is the product of the two."></div>
+                    <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #1c2532">
+                      <div class="eyebrow helpful"
+                           title="The machine class from data/elevator-specs.json. It sets the speed band, the rise the class can serve and the loads it is built in — choosing one is choosing the physics, not a label.">
+                        Machine class
+                      </div>
+                      <button type="button" id="building-open-machines"
+                              style="background: none; border: 0; padding: 0; margin-top: 3px; color: var(--accent-soft); font: 500 10.5px var(--mono); cursor: pointer">
+                        edit the classes themselves on the Machines tab →
+                      </button>
+                      <div class="chip-row" style="margin-top: 7px" id="building-class-chips"></div>
+                      <div style="font-size: 11.5px; color: var(--dim); line-height: 1.55; margin-top: 8px" id="building-class-plain"></div>
+                      <div style="font: 500 10.5px var(--mono); color: #5c6a7c; line-height: 1.6; margin-top: 4px" id="building-class-limits"></div>
+                      <div style="font: 500 11px var(--mono); line-height: 1.55; margin-top: 6px" id="building-class-warning"></div>
+                    </div>
+                    <div class="chip-row" style="margin-top: 12px">
+                      <span class="helpful" style="font-size: 11.5px; color: var(--dim); margin-right: 4px"
+                            title="Rated load in pounds, at 150 lb per person — the capacities table in data/elevator-specs.json. Each class is only built in part of the range.">rated load</span>
+                      <span class="chip-row" id="building-load-chips"></span>
+                    </div>
+                    <div class="chip-row" style="margin-top: 8px">
+                      <span class="helpful" style="font-size: 11.5px; color: var(--dim); margin-right: 4px"
+                            title="Contract speed in metres per second — the fastest the car is allowed to run. On short rises it is never reached, so door and stop time dominate.">rated speed</span>
+                      <span class="chip-row" id="building-speed-chips"></span>
+                    </div>
+                    <div class="chip-row" style="margin-top: 8px">
+                      <span class="helpful" style="font-size: 11.5px; color: var(--dim); margin-right: 4px"
+                            title="A transfer floor every N storeys, where riders change from a shuttle to a local group. It is how very tall buildings avoid spending their whole floor plate on shafts.">sky lobby</span>
+                      <span class="chip-row" id="building-sky-chips"></span>
+                    </div>
+                    <div class="summary-line" id="building-summary"></div>
+                    <p class="advice" id="building-advice"></p>
+                    <div class="editor-actions">
+                      <button type="button" class="secondary" id="building-close">Close</button>
+                      <button type="button" class="primary" id="building-save">Save as a new building</button>
+                      <span class="dirty" id="building-dirty" hidden>edited — not saved</span>
+                      <span role="alert" id="building-spec-error"></span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="eyebrow-row"><span class="eyebrow">Elevation — floors, occupancy and shafts</span></div>
+                  <div style="font: 500 10px var(--mono); color: var(--faint); margin: 0 0 9px; line-height: 1.5">
+                    click a floor's sky dot to make it a transfer level · drag a floor's bar to let that floor
+                    alone, 0–120% of design capacity · drag a shaft's top or bottom edge to restrict it to a band
+                    of floors
+                  </div>
+                  <div class="elevation">
+                    <div class="elevation-head">
+                      <span style="width: 40px; flex: none">FLOOR</span>
+                      <span style="width: 26px; flex: none; text-align: center"
+                            title="Click a floor's dot to make it a sky lobby — a transfer level where riders change between an express shaft and the locals above.">SKY</span>
+                      <span style="width: 104px; flex: none">OCCUPIED</span>
+                      <span style="width: 74px; flex: none; text-align: right">PEOPLE</span>
+                      <span style="flex: 1; text-align: center">SHAFTS</span>
+                    </div>
+                    <div class="elevation-body" id="elevation-body"></div>
+                    <div style="display: flex; padding: 7px 8px 0; gap: 10px">
+                      <span id="elevation-occ-note" class="eyebrow-note"></span>
+                      <span style="flex: 1; min-width: 0; display: flex; justify-content: flex-end; gap: 6px">
+                        <button type="button" class="chip" id="elevation-level-occ" hidden>level all</button>
+                        <button type="button" class="chip" id="elevation-clear-ranges" hidden>release every shaft</button>
+                      </span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 10px; border-top: 1px solid var(--hairline); padding-top: 8px"
+                         id="elevation-legend"></div>
+                    <div style="font: 500 10.5px var(--mono); color: var(--accent-soft); margin-top: 8px; line-height: 1.5" id="elevation-note"></div>
+                    <div style="font: 500 10.5px var(--mono); color: var(--over); margin-top: 4px; line-height: 1.5" id="elevation-warning"></div>
+                    <div style="margin-top: 12px; padding-top: 11px; border-top: 1px solid #1c2532" class="chip-row">
+                      <button type="button" class="secondary" id="elevation-add-shaft">+ Add a shaft</button>
+                      <button type="button" class="secondary" id="elevation-remove-shaft">− Remove a shaft</button>
+                    </div>
+                    <p style="font-size: 12px; color: var(--dim); line-height: 1.5; margin: 9px 0 0">
+                      Everything here shapes the building on paper — the day already running keeps its old plan
+                      until you save the building or run a fresh day from it. A smarter dispatcher is free; a
+                      fifth shaft is not.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- § 4.5 — the document editor, kept whole beneath the elevation.
+                   The sliders above design a building; this is the one surface that
+                   can express access zoning, per-floor ids and a floor range, and
+                   it carries docs/10 § 11 W8's open half. Its ids are unchanged, so
+                   `dev/editor.ts` mounts into it exactly as before. -->
+              <details style="margin: 18px 0 0" id="building-document">
+                <summary style="cursor: pointer; color: var(--accent-soft); font: 600 11px var(--mono); letter-spacing: 0.08em">
+                  THE DOCUMENT — floors, banks, access zoning and validation
+                </summary>
+                <div class="instrument-bar" style="margin-top: 10px; border-radius: 8px 8px 0 0">
+                  <label>open <select id="editor-open"></select></label>
+                  <button id="editor-blank">Start from blank</button>
+                  <label>import <input id="editor-import" type="file" accept="application/json,.json" /></label>
+                  <button id="editor-undo">Undo</button>
+                  <button id="editor-redo">Redo</button>
+                  <button id="editor-discard">Discard changes</button>
+                  <button id="editor-download">Download JSON</button>
+                  <button id="editor-run">Run this building</button>
+                  <span id="editor-status" role="status"></span>
+                  <span id="editor-error" role="alert" tabindex="-1"></span>
+                </div>
+                <div class="instrument-body" style="max-height: 70vh">
+                  <div class="instrument-form">
+                    <fieldset>
+                      <legend>Identity</legend>
+                      <div class="chip-row">
+                        <label>id <input id="ed-id" size="18" /></label>
+                        <label>name <input id="ed-name" size="18" /></label>
+                        <label>type <select id="ed-type"></select></label>
+                        <label>traffic profile <select id="ed-traffic"></select></label>
+                      </div>
+                    </fieldset>
+                    <fieldset>
+                      <legend>Floors <span class="dim" id="ed-expansion"></span></legend>
+                      <table id="ed-floors">
+                        <thead>
+                          <tr><th>id</th><th>index</th><th>height m</th><th>pop</th><th>entrance</th><th>sky lobby</th><th></th></tr>
+                        </thead>
+                        <tbody></tbody>
+                      </table>
+                      <div class="chip-row" style="padding: 4px 0">
+                        <button id="ed-add-floor">Add floor</button>
+                        <button id="ed-add-range">Add floor range</button>
+                      </div>
+                      <div id="ed-ranges"></div>
+                    </fieldset>
+                    <fieldset>
+                      <legend>Banks, cars and <em>service</em> zoning</legend>
+                      <p class="dim" style="margin: 0 0 6px">
+                        Service zoning is which floors a shaft physically reaches. It is not access zoning
+                        and not operational zoning.
+                      </p>
+                      <div id="ed-banks"></div>
+                      <button id="ed-add-bank">Add bank</button>
+                    </fieldset>
+                    <fieldset>
+                      <legend><em>Access</em> zoning — credentials</legend>
+                      <p class="dim" style="margin: 0 0 6px">
+                        Which credential groups may select which floors. A separate concept from service
+                        zoning above: the two are routinely different sets on the same building.
+                      </p>
+                      <div id="ed-zones"></div>
+                      <button id="ed-add-zone">Add access zone</button>
+                      <p style="margin: 8px 0 0">
+                        <label>credential lens
+                          <select id="ed-lens"><option value="">off</option></select>
+                        </label>
+                        <span class="dim" id="ed-lens-note"></span>
+                      </p>
+                      <p class="warn" id="ed-access-note" role="status" style="margin: 8px 0 0"></p>
+                    </fieldset>
+                    <fieldset>
+                      <legend><em>Operational</em> zoning</legend>
+                      <p class="dim" id="ed-operational" style="margin: 0"></p>
+                    </fieldset>
+                    <fieldset>
+                      <legend>Document</legend>
+                      <label for="ed-json" class="dim">JSON — edit here or above; both write the same document.</label>
+                      <textarea id="ed-json" spellcheck="false" aria-describedby="ed-json-help"></textarea>
+                      <p id="ed-json-help" class="dim" style="margin: 4px 0 0">
+                        Applied on blur. A parse error is reported with its position and your text is kept.
+                      </p>
+                    </fieldset>
+                    <fieldset>
+                      <legend>Validation</legend>
+                      <p id="ed-verdict" style="margin: 0 0 6px"></p>
+                      <ul class="issues" id="ed-issues"></ul>
+                      <ul class="issues" id="ed-warnings"></ul>
+                    </fieldset>
+                  </div>
+                  <div class="instrument-preview">
+                    <canvas id="preview" role="img" aria-label="No building open."></canvas>
+                  </div>
+                </div>
+              </details>
+            </div>
+          </section>
+
+          <!-- ==================== Retained: Compare (§ 2.3) ==================== -->
+          <section role="tabpanel" id="panel-compare" aria-labelledby="tab-compare" hidden>
+            <div class="instrument-bar">
+              <label>building <select id="batch-building"></select></label>
+              <label>baseline <select id="batch-baseline"></select></label>
+              <label>candidate <select id="batch-candidate"></select></label>
+              <label>duration <input id="batch-duration" type="number" min="60" max="7200" step="60" value="900" size="5" /></label>
+              <label>seed <input id="batch-seed" size="18" inputmode="numeric" value="20260729" /></label>
+              <label title="CLAUDE.md budgets 50–200 per configuration">
+                replications <input id="batch-replications" type="number" min="1" max="400" step="1" value="50" size="4" />
+              </label>
+              <label title="blank runs the building's own traffic profile">
+                demand %pop/5&nbsp;min <input id="batch-demand" size="4" inputmode="decimal" placeholder="profile" />
+              </label>
+              <button id="batch-run">Run batch</button>
+              <button id="batch-cancel">Cancel</button>
+              <progress id="batch-progress" value="0" max="1" aria-label="batch progress"></progress>
+              <span id="batch-status" role="status"></span>
+              <span id="batch-error" role="alert" tabindex="-1"></span>
+            </div>
+            <div class="instrument-body">
+              <div class="instrument-form batch-report" id="batch-output" aria-label="Batch report"></div>
+            </div>
+          </section>
+
+          <!-- =================== Retained: Campaign (§ 2.3) ==================== -->
+          <section role="tabpanel" id="panel-campaign" aria-labelledby="tab-campaign" hidden>
+            <div class="instrument-bar">
+              <label>stage <select id="campaign-stage"></select></label>
+              <label>your setting <select id="campaign-profile"></select></label>
+              <label><input type="checkbox" id="campaign-edit" /> edit the weights</label>
+              <button id="campaign-run">Run this stage</button>
+              <button id="campaign-cancel">Cancel</button>
+              <progress id="campaign-progress" value="0" max="1" aria-label="stage progress"></progress>
+              <span id="campaign-status" role="status"></span>
+              <span id="campaign-error" role="alert" tabindex="-1"></span>
+            </div>
+            <div class="instrument-bar" id="campaign-weights-bar" hidden>
+              <span id="campaign-weights-status" role="status"></span>
+              <span id="campaign-weights-refusal" role="alert" tabindex="-1"></span>
+            </div>
+            <div class="instrument-form" id="campaign-weights" hidden aria-label="Your weight vector"></div>
+            <div class="instrument-body">
+              <div class="instrument-form batch-report" id="campaign-brief" aria-label="Stage briefing"></div>
+              <div class="instrument-form batch-report" id="campaign-output" aria-label="Stage result"></div>
+            </div>
+          </section>
+
+          <!-- ================== Retained: Parameters (§ 2.3) =================== -->
+          <section role="tabpanel" id="panel-parameters" aria-labelledby="tab-parameters" hidden>
+            <div class="instrument-bar">
+              <label>schema <select id="param-source"></select></label>
+              <span id="param-status" role="status"></span>
+              <span id="param-refusal" role="alert" tabindex="-1"></span>
+            </div>
+            <div class="instrument-body">
+              <div class="instrument-form" id="param-form"></div>
+            </div>
+          </section>
+        </main>
+
+        <!-- ------------------------------------------------------------- -->
+        <!-- Right rail — § 1.4                                             -->
+        <!-- ------------------------------------------------------------- -->
+        <aside class="rail rail-r" id="rail-right" aria-label="Controls">
+          <div class="segmented" role="tablist" aria-label="Control surfaces">
+            <button role="tab" id="seg-dispatcher" aria-selected="true" aria-controls="rail-panel-dispatcher">Dispatcher</button>
+            <button role="tab" id="seg-traffic" aria-selected="false" aria-controls="rail-panel-traffic" tabindex="-1">Traffic</button>
+            <button role="tab" id="seg-building" aria-selected="false" aria-controls="rail-panel-building" tabindex="-1">Building</button>
+            <button role="tab" id="seg-machines" aria-selected="false" aria-controls="rail-panel-machines" tabindex="-1">Machines</button>
+          </div>
+
+          <div role="tabpanel" class="rail-panel" id="rail-panel-dispatcher" aria-labelledby="seg-dispatcher">
+            <div class="eyebrow-row">
+              <span class="eyebrow">Who is driving</span>
+              <span class="eyebrow-note" id="rail-dispatcher-note"></span>
+            </div>
+            <div class="pick-list" id="rail-dispatcher-list"></div>
+            <div class="eyebrow-row"><span class="eyebrow">Schedule</span></div>
+            <div class="plate" id="rail-dispatcher-plate"></div>
+            <!-- docs/10 § 10.3 — the dispatcher compatibility note, stated BEFORE Run rather than
+                 diagnosed after it. `role="status"` and not `role="alert"`: it is a fact about the
+                 pairing on screen, not an error, and Run stays enabled (ED-15). Empty when there is
+                 nothing to say, which is every building that declares no access zone. -->
+            <p class="rail-prose warn" id="rail-access-note" role="status"></p>
+            <button type="button" class="ghost" id="rail-open-dispatcher">Open dispatcher editor →</button>
+          </div>
+
+          <div role="tabpanel" class="rail-panel" id="rail-panel-traffic" aria-labelledby="seg-traffic" hidden>
+            <div class="eyebrow-row">
+              <span class="eyebrow">Arrival pattern</span>
+              <span class="eyebrow-note" id="rail-traffic-note"></span>
+            </div>
+            <div class="pick-list" id="rail-traffic-list"></div>
+            <div class="eyebrow-row"><span class="eyebrow">Schedule</span></div>
+            <div class="plate" id="rail-traffic-plate"></div>
+            <button type="button" class="ghost" id="rail-open-traffic">Open traffic editor →</button>
+          </div>
+
+          <div role="tabpanel" class="rail-panel" id="rail-panel-building" aria-labelledby="seg-building" hidden>
+            <div class="eyebrow-row">
+              <span class="eyebrow">The building</span>
+              <span class="eyebrow-note" id="rail-building-note"></span>
+            </div>
+            <div class="pick-list" id="rail-building-list"></div>
+            <div class="eyebrow-row"><span class="eyebrow">Schedule</span></div>
+            <div class="plate" id="rail-building-plate"></div>
+            <p class="rail-prose">
+              Shafts, floors, occupancy and machine class all live in the building editor — a car can be taken
+              out of service from the badge under its shaft in the picture.
             </p>
-          </canvas>
-        </div>
-
-        <p id="frame-description" class="sr-only" aria-live="polite"></p>
-
-        <!-- The panel strip: one row, not a stack. See `.panel-strip` above for the measurement
-             that put them side by side. A panel added to this column belongs *inside* this
-             element — outside it, the canvas pays for it again. -->
-        <div class="panel-strip">
-          <!-- docs/10 § 11 W2 — the run summary. Every field VizSummary gained at schema 5 is
-               drawn here, by `render/runSummary.ts` through `dev/main.ts`. Rows are emitted from
-               the figure list; nothing below keys on a figure id, because a stylesheet that named
-               one would be the first list of metric names in this product's UI. -->
-          <section id="run-summary" class="run-summary" aria-label="Run summary"></section>
-
-          <!-- docs/10 § 6 / D4 — the building mood gauge, from observations alone (R1). It is
-               drawn on every run, including the ~46 of 60 shipped configurations whose mean wait
-               is legitimately refused, which is the single most valuable property of the feature:
-               nothing here is routed through `awtIsValid`, and `render/mood.ts` cannot reach a
-               suppressible field because its input type does not carry one. -->
-          <section id="building-mood" class="building-mood" aria-label="Building mood"></section>
-        </div>
-
-        <footer class="bar">
-          <button id="play-pause">Play</button>
-          <button id="step-back" title="one display frame back (,)">◀|</button>
-          <button id="step-forward" title="one display frame forward (.)">|▶</button>
-          <label>speed <select id="speed"></select></label>
-          <label>loop <input id="loop" type="checkbox" /></label>
-          <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="playhead" />
-          <span id="status" role="status">booting…</span>
-          <span id="error" role="alert" tabindex="-1"></span>
-        </footer>
-      </section>
-
-      <!-- ------------------------------------------------------------------ -->
-      <!-- Surface C — building editor                                          -->
-      <!-- ------------------------------------------------------------------ -->
-      <section role="tabpanel" id="panel-editor" aria-labelledby="tab-editor" hidden>
-        <div class="bar">
-          <label>open <select id="editor-open"></select></label>
-          <button id="editor-blank">Start from blank</button>
-          <label>import <input id="editor-import" type="file" accept="application/json,.json" /></label>
-          <button id="editor-undo">Undo</button>
-          <button id="editor-redo">Redo</button>
-          <button id="editor-discard">Discard changes</button>
-          <button id="editor-download">Download JSON</button>
-          <button id="editor-run">Run this building</button>
-          <span id="editor-status" role="status"></span>
-          <span id="editor-error" role="alert" tabindex="-1"></span>
-        </div>
-
-        <div class="editor-body">
-          <div class="editor-form">
-            <fieldset>
-              <legend>Identity</legend>
-              <div class="bar" style="background: none; border: 0; padding: 0">
-                <label>id <input id="ed-id" size="18" /></label>
-                <label>name <input id="ed-name" size="18" /></label>
-                <label>type <select id="ed-type"></select></label>
-                <label>traffic profile <select id="ed-traffic"></select></label>
-              </div>
-            </fieldset>
-
-            <fieldset>
-              <legend>Floors <span class="dim" id="ed-expansion"></span></legend>
-              <table id="ed-floors">
-                <thead>
-                  <tr><th>id</th><th>index</th><th>height m</th><th>pop</th><th>entrance</th><th>sky lobby</th><th></th></tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-              <div class="bar" style="background: none; border: 0; padding: 4px 0">
-                <button id="ed-add-floor">Add floor</button>
-                <button id="ed-add-range">Add floor range</button>
-              </div>
-              <div id="ed-ranges"></div>
-            </fieldset>
-
-            <fieldset>
-              <legend>Banks, cars and <em>service</em> zoning</legend>
-              <p class="dim" style="margin: 0 0 6px">
-                Service zoning is which floors a shaft physically reaches. It is not access
-                zoning and not operational zoning.
-              </p>
-              <div id="ed-banks"></div>
-              <button id="ed-add-bank">Add bank</button>
-            </fieldset>
-
-            <fieldset>
-              <legend><em>Access</em> zoning — credentials</legend>
-              <p class="dim" style="margin: 0 0 6px">
-                Which credential groups may select which floors. A separate concept from service
-                zoning above: the two are routinely different sets on the same building.
-              </p>
-              <div id="ed-zones"></div>
-              <button id="ed-add-zone">Add access zone</button>
-              <!-- docs/10 § 10.1 — the credential lens. A *mode* over the preview to the right:
-                   pick a credential and every floor is drawn reachable, not served, or not
-                   permitted. The two failure states are different concepts with different fixes,
-                   so they get different glyphs and different sentences and are never merged. -->
-              <p style="margin: 8px 0 0">
-                <label
-                  >credential lens
-                  <select id="ed-lens">
-                    <option value="">off</option>
-                  </select></label
-                >
-                <span class="dim" id="ed-lens-note"></span>
-              </p>
-              <!-- docs/10 § 10.3 — the same pre-run compatibility fact the viewer states, against
-                   the dispatcher the viewer currently has selected. A fact, not a verdict: Run
-                   stays enabled (ED-15), and this list is separate from the validation issues
-                   below because it is not a defect in the document. -->
-              <p class="warn" id="ed-access-note" role="status" style="margin: 8px 0 0"></p>
-            </fieldset>
-
-            <fieldset>
-              <legend><em>Operational</em> zoning</legend>
-              <p class="dim" id="ed-operational" style="margin: 0"></p>
-            </fieldset>
-
-            <fieldset>
-              <legend>Document</legend>
-              <label for="ed-json" class="dim">JSON — edit here or above; both write the same document.</label>
-              <textarea id="ed-json" spellcheck="false" aria-describedby="ed-json-help"></textarea>
-              <p id="ed-json-help" class="dim" style="margin: 4px 0 0">
-                Applied on blur. A parse error is reported with its position and your text is kept.
-              </p>
-            </fieldset>
-
-            <fieldset>
-              <legend>Validation</legend>
-              <p id="ed-verdict" style="margin: 0 0 6px"></p>
-              <ul class="issues" id="ed-issues"></ul>
-              <ul class="issues" id="ed-warnings"></ul>
-            </fieldset>
+            <button type="button" class="ghost" id="rail-open-building">Open building editor →</button>
           </div>
 
-          <div class="editor-preview">
-            <canvas id="preview" role="img" aria-label="No building open."></canvas>
+          <div role="tabpanel" class="rail-panel" id="rail-panel-machines" aria-labelledby="seg-machines" hidden>
+            <div class="eyebrow-row">
+              <span class="eyebrow">Machine class</span>
+              <span class="eyebrow-note" id="rail-machines-note"></span>
+            </div>
+            <div class="pick-list" id="rail-machines-list"></div>
+            <!-- § 1.4 R3 — the nameplate is engineer-only. -->
+            <div id="rail-nameplate-block" hidden>
+              <div class="eyebrow-row"><span class="eyebrow">Nameplate</span></div>
+              <div class="plate" id="rail-machines-plate"></div>
+              <p class="rail-prose">
+                Figures follow CIBSE Guide D and ISO 8100-32, as the simulator's own reference does. Cars fill
+                to 80% of rated load, never the nameplate — using the nameplate is how a study ends up
+                flattering.
+              </p>
+            </div>
+            <p class="rail-prose" id="rail-machines-warning"></p>
+            <button type="button" class="ghost" id="rail-open-machines">Open machine editor →</button>
           </div>
-        </div>
-      </section>
+        </aside>
+      </div>
 
-      <!-- ------------------------------------------------------------------ -->
-      <!-- Surface C — the generated parameter form (docs/10 § 11 W4)          -->
-      <!--                                                                     -->
-      <!-- Nothing below names a parameter, a section or a schema. The picker   -->
-      <!-- is filled from `discoverParameterSchemas()` and the controls are     -->
-      <!-- built from the declarations, which is CLAUDE.md invariant 8 reaching -->
-      <!-- the screen: a knob declared tomorrow appears here with no edit.      -->
-      <!-- ------------------------------------------------------------------ -->
-      <section role="tabpanel" id="panel-parameters" aria-labelledby="tab-parameters" hidden>
-        <div class="bar">
-          <label>schema <select id="param-source"></select></label>
-          <span id="param-status" role="status"></span>
-          <span id="param-refusal" role="alert" tabindex="-1"></span>
-        </div>
-        <div class="editor-body">
-          <div class="editor-form" id="param-form"></div>
-        </div>
-      </section>
-
-      <!-- ------------------------------------------------------------------ -->
-      <!-- Surface D — the replication batch (docs/10 § 11 W3)                 -->
-      <!--                                                                     -->
-      <!-- The single-run viewer may say "in this run, X happened". It may not -->
-      <!-- say "this dispatcher is better" (R2). This is where the second       -->
-      <!-- sentence becomes available: N paired replications under common      -->
-      <!-- random numbers, and a paired-t interval on the difference.          -->
-      <!-- ------------------------------------------------------------------ -->
-      <section role="tabpanel" id="panel-compare" aria-labelledby="tab-compare" hidden>
-        <div class="bar">
-          <label>building <select id="batch-building"></select></label>
-          <label>baseline <select id="batch-baseline"></select></label>
-          <label>candidate <select id="batch-candidate"></select></label>
-          <label>duration <input id="batch-duration" type="number" min="60" max="7200" step="60" value="900" size="5" /></label>
-          <label>seed <input id="batch-seed" size="18" inputmode="numeric" value="20260729" /></label>
-          <label title="CLAUDE.md budgets 50–200 per configuration">
-            replications
-            <input id="batch-replications" type="number" min="1" max="400" step="1" value="50" size="4" />
-          </label>
-          <label title="blank runs the building's own traffic profile">
-            demand %pop/5&nbsp;min
-            <input id="batch-demand" size="4" inputmode="decimal" placeholder="profile" />
-          </label>
-          <button id="batch-run">Run batch</button>
-          <button id="batch-cancel">Cancel</button>
-          <progress id="batch-progress" value="0" max="1" aria-label="batch progress"></progress>
-          <span id="batch-status" role="status"></span>
-          <span id="batch-error" role="alert" tabindex="-1"></span>
-        </div>
-        <div class="editor-body">
-          <div class="editor-form batch-report" id="batch-output" aria-label="Batch report"></div>
-        </div>
-      </section>
-
-      <!-- ------------------------------------------------------------------ -->
-      <!-- Surface E — the campaign (docs/10 § 5, W5)                          -->
-      <!--                                                                     -->
-      <!-- Seven stages, each a fully-specified configuration plus a goal set  -->
-      <!-- plus a replication budget. Every verdict on this surface comes from -->
-      <!-- a batch (R2), every goal comes from data/scenario-goals.json's      -->
-      <!-- measured `goals` bucket (R12), and nothing here is a score.         -->
-      <!-- ------------------------------------------------------------------ -->
-      <section role="tabpanel" id="panel-campaign" aria-labelledby="tab-campaign" hidden>
-        <div class="bar">
-          <label>stage <select id="campaign-stage"></select></label>
-          <label>your setting <select id="campaign-profile"></select></label>
-          <!-- docs/10 § 11 W6 — the live weight editor. § D161's known limitation was that "the
-               player's move is a shipped profile, not a live weight editor", which is why four of
-               the seven stages needed an authored weight vector to clear. Ticking this turns the
-               candidate arm into an *edited* vector: the same W4 controls, restricted to the
-               dimensions the stage declares editable, refused at the control by
-               `controls/editedProfile.ts` before a replication runs. -->
-          <label><input type="checkbox" id="campaign-edit" /> edit the weights</label>
-          <button id="campaign-run">Run this stage</button>
-          <button id="campaign-cancel">Cancel</button>
-          <progress id="campaign-progress" value="0" max="1" aria-label="stage progress"></progress>
-          <span id="campaign-status" role="status"></span>
-          <span id="campaign-error" role="alert" tabindex="-1"></span>
-        </div>
-        <div class="bar" id="campaign-weights-bar" hidden>
-          <span id="campaign-weights-status" role="status"></span>
-          <span id="campaign-weights-refusal" role="alert" tabindex="-1"></span>
-        </div>
-        <div class="editor-form" id="campaign-weights" hidden aria-label="Your weight vector"></div>
-        <div class="editor-body">
-          <div class="editor-form batch-report" id="campaign-brief" aria-label="Stage briefing"></div>
-          <div class="editor-form batch-report" id="campaign-output" aria-label="Stage result"></div>
-        </div>
-      </section>
-    </main>
+      <!-- ================================================================= -->
+      <!-- Footer — § 1.1 S4                                                  -->
+      <!-- ================================================================= -->
+      <footer class="footbar">
+        <span id="status-line"></span>
+        <span style="color: var(--dim); white-space: nowrap" id="seed-line"></span>
+        <button type="button" id="copy-run">copy run</button>
+        <span id="footer-right">observations only — nothing on this screen is averaged over a queue that never settled</span>
+      </footer>
+    </div>
 
     <!-- ED-22 / ED-23: a confirm dialog that traps focus and restores it (KB-12). -->
     <dialog id="confirm">

@@ -216,14 +216,29 @@ discover — including the ones that are inconvenient.
 | [Destination dispatch contract](docs/09-destination-dispatch-contract.md) | Phase 6's locked interface contract, its measured comparison design, and the open questions that gate implementation |
 | [Experience layer contract](docs/10-experience-layer-contract.md) | Phase 9's design: the rules that keep a gamified surface honest, novice/expert modes, a schema-generated dispatcher and traffic editor, and access-zone credentials |
 | [TWIN shaft contract](docs/11-twin-shaft-contract.md) | Two independently driven cars in one shaft, designed and not built: the shaft model, the speed-dependent separation constraint, the deadlock invariant and the property that catches it, and an acceptance criterion written before the implementation |
+| [Design handoff](docs/12-design-handoff.md) | The Claude Design handoff the viewer is built to, the requirements checklist extracted from it, the gap analysis against the shipped viewer, the backend changes the front end required, and every deviation with the constraint that forced it |
 
-Machine-readable configuration lives in [`data/`](data/).
+Machine-readable configuration lives in [`data/`](data/), and the design the viewer is built to is
+vendored in [`docs/design/`](docs/design/).
+
+### Running the viewer
+
+```bash
+npm install && npm run build
+npm run dev -w @elevator-sim/viz     # → http://localhost:5174
+```
 
 ## Status
 
 **Phases 0–5, 7 and 8 are landed and accepted. Phase 6 is partially complete** — see the table for
-what that means. Four packages (`core`, `experiments`, `viz`, `cli`), a six-command CLI,
-**226 test files, 4,148 tests** (4,138 passing, 10 skipped), `tsc -b` clean.
+what that means. Four packages (`core`, `experiments`, `viz`, `cli`), a six-command CLI, and a
+viewer built to a [design handoff](docs/12-design-handoff.md). **253 test files, 4,700 tests**
+(4,690 passing, 10 skipped), `tsc -b` clean, 550 s serially on an idle machine.
+
+Wave 10 rebuilt the viewer against that handoff and **moved no phase verdict**: no published number
+was recomputed and no acceptance criterion was touched — the report sheet reads `VizSummary`, which
+reads `RunSummary`, which is the object the CLI and the experiment matrix already read. See
+[`WAVE10_PLAN.md`](WAVE10_PLAN.md).
 
 | Phase | Status |
 |---|---|

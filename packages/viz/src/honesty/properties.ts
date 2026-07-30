@@ -404,6 +404,36 @@ const ORDERING_CLAIM =
  * budget, draws the interval and names no arm, so no shipped row can reach this clause. The
  * clause stays because the *product* is what changed: a future caller that constructs a row
  * itself, or a regression in `compareMetric`, is exactly what a property is for.
+ *
+ * ## The third narrowing: a refusal may name the ordering it refuses
+ *
+ * The **third** false positive this rule has corrected in itself, and it arrived with the design
+ * refactor's Day report. `DayReport.smallPrint` exists to refuse a comparative reading of one day,
+ * and it does it in R2's own words:
+ *
+ * > `This is one replication of one day on one seed. It cannot tell you that conventional`
+ * > `collective is better than anything — that needs 50 or more paired runs against the same`
+ * > `passengers, and a confidence interval that excludes zero.`
+ *
+ * Measured on the always-on corpus, that was reported twelve times across four cases and two
+ * surfaces. `ORDERING_CLAIM` matched *"is better than"*, `named` matched because `collective`'s
+ * display name is *Conventional collective*, and the sentence's verb is **cannot**. Not one of the
+ * twelve strings ordered anything; every one of them was the product saying so.
+ *
+ * The correction is the line `checkSuppressedMean` has always had, for the reason it gives in as
+ * many words — *"the refusal is the one string entitled to quote the numbers it is refusing"* —
+ * applied to the claim rather than to the number. It is **not** an allow-word: nothing here looks
+ * for *"cannot"* or *"not"*, and a rule that did would pass *"X is not worse than Y"*. What is
+ * skipped is a string the **surface itself** classified `reason`, which is a structural fact set
+ * by the adapter from the field it came out of, and the same classification R3 has trusted since
+ * this directory was written.
+ *
+ * **What it costs, stated rather than glossed:** a surface that ordered two dispatchers in a
+ * string it had classified as a refusal would now be missed. That is the same trade `role ===
+ * 'reason'` already buys R3, it is falsifiable — `faults.ts#comparativeOnOneRun` injects the claim
+ * into a string classified `observation`, so the clause still has something it must catch — and
+ * the batch clauses below are untouched, because they read `RenderedText.comparison` rather than
+ * the words.
  */
 function checkSingleRunComparative(
   context: HonestyContext,
@@ -419,6 +449,9 @@ function checkSingleRunComparative(
   const named = [context.case.baselineProfileId, context.case.candidateProfileId];
   for (const text of texts) {
     if (text.provenance === 'single-run') {
+      // The refusal is the one string entitled to name the ordering it is refusing. See the third
+      // narrowing in this function's docstring.
+      if (text.role === 'reason') continue;
       if (ORDERING_CLAIM.test(text.text) && named.some((id) => text.text.includes(id))) {
         found.push(
           violation(

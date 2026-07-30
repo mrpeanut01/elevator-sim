@@ -132,6 +132,23 @@ export function describeFrame(input: DescribeFrameInput): string {
     `${String(frame.totalWaiting)} legs waiting, ${String(frame.boardedLegs)} boarded so far.`,
   );
 
+  /*
+   * Cars held out of service — `docs/12` § 1.5 B7, and `KB-13`.
+   *
+   * The stage says this three ways to a sighted reader: a dimmed shaft, a red pill, and the word
+   * `OOS` on it. A reader on the text alternative had none of them, and it is not a cosmetic
+   * fact — every other number in this sentence is a number a smaller group of cars produced.
+   * Named individually rather than counted, because *which* car is the thing a reader would act
+   * on and there are never many.
+   */
+  const outOfService = recording.outOfServiceCarIds;
+  if (outOfService.length > 0) {
+    parts.push(
+      `${String(outOfService.length)} car${outOfService.length === 1 ? '' : 's'} held out of ` +
+        `service: ${outOfService.join(', ')}.`,
+    );
+  }
+
   const unanswered = input.unansweredCallFloorIds ?? [];
   if (unanswered.length > 0) {
     parts.push(

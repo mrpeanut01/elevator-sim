@@ -49,8 +49,12 @@ class Recorder implements Canvas2DLike {
   fillRect(): void {}
   strokeRect(): void {}
   beginPath(): void {}
+  closePath(): void {}
   moveTo(): void {}
   lineTo(): void {}
+  quadraticCurveTo(): void {}
+  arc(): void {}
+  fill(): void {}
   stroke(): void {}
   fillText(text: string, x: number, y: number): void {
     this.texts.push({ text, x, y, fill: this.fillStyle });
@@ -119,6 +123,12 @@ const RECORDING: VizRecording = {
     meanWaitS: constantSeries(0),
   },
   summary: fixtureSummary(),
+  // Version 7. Empty is the legal value for a fixture that exercises none of the three:
+  // the timeline draws one unlabelled band, the decision log draws its empty state, and
+  // no shaft is dark. See `contract/types.ts`.
+  demandPhases: [],
+  decisions: [],
+  outOfServiceCarIds: [],
   warnings: [],
 };
 

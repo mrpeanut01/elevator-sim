@@ -76,6 +76,20 @@ class RecordingContext implements Canvas2DLike {
   strokeRect(x: number, y: number, w: number, h: number): void {
     this.#push('strokeRect', x, y, w, h, this.strokeStyle);
   }
+  // The four `Canvas2DLike` gained with the design handoff's stage. Recorded rather than
+  // swallowed, so a mark this panel draws with a path is as visible to a test as a `fillRect`.
+  closePath(): void {
+    this.#push('closePath');
+  }
+  quadraticCurveTo(cpx: number, cpy: number, x: number, y: number): void {
+    this.#push('quadraticCurveTo', cpx, cpy, x, y);
+  }
+  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number): void {
+    this.#push('arc', x, y, radius, startAngle, endAngle, this.fillStyle);
+  }
+  fill(): void {
+    this.#push('fill', this.fillStyle);
+  }
   beginPath(): void {
     this.#push('beginPath');
   }
@@ -156,6 +170,12 @@ const RECORDING: VizRecording = {
     meanWaitS: constantSeries(0),
   },
   summary: fixtureSummary({ generated: 5, delivered: 4, undelivered: 1 }),
+  // Version 7. Empty is the legal value for a fixture that exercises none of the three:
+  // the timeline draws one unlabelled band, the decision log draws its empty state, and
+  // no shaft is dark. See `contract/types.ts`.
+  demandPhases: [],
+  decisions: [],
+  outOfServiceCarIds: [],
   warnings: [],
 };
 

@@ -164,6 +164,22 @@ discharges it named.
 
 ### Running it
 
+**The viewer**, which is what wave 10 rebuilt and what most readers want first:
+
+```bash
+npm install && npm run build
+npm run dev -w @elevator-sim/viz     # → http://localhost:5174
+```
+
+It opens on a **shift**: a building, a day, a dispatcher and a transport. The three primary
+surfaces are Simulation, Day report and Scenarios; the four editors are reached from the right
+rail; and Compare, Campaign and Parameters are the three instrument surfaces retained from the
+five-tab viewer this replaced ([§ D174](../DECISIONS.md)). What it is built to, and every place it
+deviates from that with the constraint that forced the deviation, is
+[`docs/12-design-handoff.md`](12-design-handoff.md).
+
+**The CLI**, which is where every published number in this repository came from:
+
 ```bash
 npm install && npm run build
 npm run sim -- list
@@ -172,12 +188,12 @@ npm run sim -- compare --building midtown-office --a eta --b nearest-car --reps 
 npm run sim -- tune --building garden-apartments --params idle.repositionThresholdS --seed 42
 npm run sim -- fuzz --cases 8                  # or: --tier deep --cases 2000, the overnight pass
 npm run sim -- watch --building garden-apartments --dispatcher eta --speed 10
-npm test          # full suite: 190 files, 3,505 tests (3,496 pass, 9 skip)
+npm test          # full suite: 253 files, 4,700 tests (4,690 pass, 10 skip)
 ```
 
-Measured on this tree after wave 6 closed, 2026-07-28, **serially on an idle machine**:
-`npx tsc -b` clean, `npx vitest run --testTimeout=120000` → **190 files / 3 505 tests, 3 496
-passed, 9 skipped**, exit 0, 473 s. The benchmarks execute real replications, which is where the
+Measured on this tree after wave 10 closed, 2026-07-30, **serially on an idle machine**:
+`npx tsc -b` clean, `npx vitest run` → **253 files / 4 700 tests, 4 690 passed, 10 skipped**,
+exit 0, 550 s. The benchmarks execute real replications, which is where the
 runtime goes.
 
 > **This is the *second* serial run, and the first one was red.** It came back

@@ -269,7 +269,35 @@ const OUTSTANDING: readonly {
    */
   readonly fieldContains?: string;
   readonly finding: string;
-}[] = Object.freeze([]);
+}[] = Object.freeze([
+  /*
+   * ## The finding the design refactor's Day sheet produced — **closed**, and left here as the
+   * record of what the search is for
+   *
+   * `shift/report.ts#diagnosisFor` builds a *Where it went wrong* row about the reporting window,
+   * and its `why` opened with an illustrative counter-example:
+   *
+   * > `“Riders waited 25 seconds on average” is false without “during the busiest five minutes”.`
+   *
+   * The sentence is quoted in order to be **called false**, and it is the best line on the row. It
+   * was also, verbatim, a numeral beside an estimate cue naming the quantity — and on
+   * `honesty-9032`'s shrunk case (Midtown Office, censored above the unserved limit) the run's own
+   * refused `meanWaitS` rounds to **25**. So the sheet printed, three rows under a cell reading
+   * `AVERAGE WAIT: withheld`, the number that cell was withholding, in the same voice as its real
+   * figures. R3's textual half was right to see it: a reader cannot tell a quoted counter-example
+   * from a figure, which is the whole reason that half exists.
+   *
+   * **The two obvious corrections were both wrong.** Narrowing the rule to ignore numerals inside
+   * typographic quotation marks would be an allow-word with a hiding place in it — `“average wait
+   * 61.0 s”` would pass. Dropping the row from the corpus would be excluding a player-facing
+   * string. What closed it is one word in `shift/report.ts`: the illustrative figure is spelled
+   * **twenty-five**. The sentence keeps its force and the sheet stops carrying an invented figure
+   * in the voice it reports real ones in.
+   *
+   * The register is empty, and it is asserted empty in both directions — an entry that no longer
+   * reproduces is as much a defect as a finding that is not recorded.
+   */
+]);
 
 function matchesOutstanding(found: {
   property: string;

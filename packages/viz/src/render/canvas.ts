@@ -29,7 +29,7 @@ import { STATE_GLYPHS } from '../access/zoning.js';
 import type { FloorQueue, LandingAssignment, OverlayMetrics, WaitBand } from '../frame/overlay.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import type { DoorPhase, Frame, VizRecording } from '../contract/types.js';
-import type { Layout } from './layout.js';
+import type { Layout, ShaftColumn } from './layout.js';
 import { LOAD_ALARM, drawOverlay, loadColour } from './overlay.js';
 import { windowClause } from './runSummary.js';
 import type { BuildingMood } from './mood.js';
@@ -39,8 +39,27 @@ import {
   planQueueRow,
   type QueueRowPlan,
 } from './riderQueue.js';
+import { DAY_START_S, DEFAULT_SKY, drawSky, isNight, type SkyBand, type SkyRamp } from './sky.js';
+import { drawAlarmRule, drawRiderLane, figureClearancePx } from './riderFigures.js';
+import { fillRoundedRect } from './shapes.js';
+import * as tokens from './tokens.js';
 
-/** The subset of a 2D canvas context this renderer uses. */
+/**
+ * The subset of a 2D canvas context this renderer uses.
+ *
+ * ## What may be added to it, and what may not
+ *
+ * Every member here is one a recording stub can implement in a line and a test can read back.
+ * The four added for the design handoff's stage — `quadraticCurveTo`, `closePath`, `fill` and
+ * `arc` — pass that test: each records its own numbers, so a rounded car and a rider's head are
+ * as legible in a transcript as a `fillRect` ever was.
+ *
+ * What is deliberately **absent** is anything that hands back an opaque handle. `measureText`
+ * would oblige every stub to implement font metrics (see {@link CHAR_ADVANCE_PX});
+ * `createLinearGradient` would make the sky a `[object Object]` in every transcript, which is
+ * why `render/sky.ts` paints a ramp as strips instead. Both refusals are the same rule: **a call
+ * this interface admits must say what it drew.**
+ */
 export interface Canvas2DLike {
   fillStyle: string;
   strokeStyle: string;
@@ -55,14 +74,37 @@ export interface Canvas2DLike {
   fillRect(x: number, y: number, w: number, h: number): void;
   strokeRect(x: number, y: number, w: number, h: number): void;
   beginPath(): void;
+  closePath(): void;
   moveTo(x: number, y: number): void;
   lineTo(x: number, y: number): void;
+  quadraticCurveTo(cpx: number, cpy: number, x: number, y: number): void;
+  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number): void;
+  fill(): void;
   stroke(): void;
   fillText(text: string, x: number, y: number): void;
 }
 
+/**
+ * Every colour the stage can draw, in one place — and **derived from `render/tokens.ts`, never
+ * spelled here.**
+ *
+ * `docs/12` § 2.2 counted three hand-maintained copies of this project's palette and named the
+ * defect class: *"one source, derived everywhere."* Two of the three are now the same file; the
+ * stylesheet lane imports the same names. A hex literal appearing below is a regression.
+ *
+ * ## The rule this type has kept since wave 2
+ *
+ * **Two different claims never share a colour**, because the tests in this directory identify a
+ * mark by its fill and a shared string silently merges two counts into one. Where the design's
+ * own palette would merge two, the narrower claim moves and the wait-age band does not — the
+ * divergences are named at `render/tokens.ts`'s `WAITING_UP` and `FLOOR_LABEL`.
+ *
+ * That rule is not a substitute for KB-15. Colour separates two claims *for a test*; a **glyph**
+ * or a **word** separates them for a reader, and every claim on this canvas has one.
+ */
 export interface Theme {
   readonly background: string;
+  /** A progress or load-bar track. Not the shaft recess — see {@link Theme.shaftRecess}. */
   readonly shaft: string;
   readonly shaftEdge: string;
   readonly floorLine: string;
@@ -100,43 +142,120 @@ export interface Theme {
   readonly queueBands: Readonly<Record<WaitBand, string>>;
   /** A boarding that just happened — the relief transition. */
   readonly queueRelief: string;
+
+  /* ---------------- the stage, `docs/12` § 1.3 M3 ---------------- */
+
+  /** The four sky ramps. See `render/sky.ts` for which hour picks which. */
+  readonly sky: Readonly<Record<SkyBand, SkyRamp>>;
+  /** The translucent mass of the building, behind the plot. */
+  readonly mass: string;
+  /** One floor's slab. A wash 2–6 px deep, which is the floor line the stage draws instead. */
+  readonly floorSlab: string;
+  /** The dark recess a shaft is cut into. */
+  readonly shaftRecess: string;
+  /** The hairline around that recess. Lighter than {@link Theme.shaftEdge}, which is a border. */
+  readonly shaftHairline: string;
+  /** The travelling cable above a car. */
+  readonly cable: string;
+  /** A window with somebody behind it, after dark. */
+  readonly windowNight: string;
+  /** The same in daylight. */
+  readonly windowDay: string;
+  /** A floor with nothing special about it. Not {@link Theme.textDim} — see `render/tokens.ts`. */
+  readonly floorLabel: string;
+  /** A transfer floor's label and its `⇄`. The entrance's is {@link Theme.badge}. */
+  readonly badgeTransfer: string;
+  /** The line the entrance floor stands on. */
+  readonly ground: string;
+  /** Text printed inside a car. Dark, because the car it sits on is not. */
+  readonly carLabel: string;
+  /** A car held out of service — the filled pill under its shaft. */
+  readonly outOfServiceOn: string;
+  /** Text on that pill. */
+  readonly outOfServiceOnText: string;
+  /** A car in service — the unfilled pill. */
+  readonly outOfServiceOff: string;
+  /** Text on that pill. */
+  readonly outOfServiceOffText: string;
+  /**
+   * A landing that has stacked past the alarm depth, and the `+N` on a truncated crowd.
+   *
+   * Shares its value with `queueBands.abandoned` and `carOverload`, which is the design's own
+   * intent — one red, meaning *this is the thing that is wrong* — and is safe because all three
+   * are separated from each other by shape and by the row they are drawn on.
+   */
+  readonly alarm: string;
 }
 
-/** Readable on a projector and in a screenshot, which is the whole specification. */
+/**
+ * Readable on a projector and in a screenshot, which is the whole specification — now in the
+ * handoff's palette.
+ *
+ * Every value comes from `render/tokens.ts`. Where a name here and a name there differ, the
+ * token is the design's word for the colour and this is the renderer's word for the claim; the
+ * indirection is the point, because a claim can be re-pointed at a different token without the
+ * design's vocabulary moving.
+ */
 export const DEFAULT_THEME: Theme = Object.freeze({
-  background: '#0f1319',
-  shaft: '#171d26',
-  shaftEdge: '#2b3542',
-  floorLine: '#232c37',
-  text: '#e6edf3',
-  textDim: '#7d8896',
-  car: '#4f9ee8',
-  carLight: '#3fb27f',
-  carHeavy: '#e0a03a',
-  carOverload: '#e0473a',
-  // Distinct from `background` on purpose. They would look the same on screen, but a test that
-  // identifies the door seam by its fill would then also match the background wash, and it did.
-  doorSeam: '#0b0e13',
-  waitingUp: '#3fb27f',
-  waitingDown: '#c07ad8',
-  warning: '#e0b040',
-  panel: '#141a23',
-  highlight: '#f2f6fa',
-  badge: '#6f7dd6',
-  restricted: '#8a6f4a',
+  background: tokens.PAGE,
+  shaft: tokens.RAIL,
+  shaftEdge: tokens.EDGE,
+  floorLine: tokens.PREVIEW_FLOOR_LINE,
+  text: tokens.TEXT,
+  textDim: tokens.TEXT_DIM,
+  car: tokens.CAR_MID,
+  carLight: tokens.CAR_LIGHT,
+  carHeavy: tokens.CAR_HEAVY,
+  carOverload: tokens.CAR_OVERLOAD,
+  // Distinct from `background` on purpose, and the reason is unchanged by the repalette: they
+  // would look the same on screen, but a test that identifies the door seam by its fill would
+  // then also match the background wash, and it did. The design's own door gap
+  // (`rgba(5,8,13,.92)`) happens to keep the two apart, which is luck rather than design, so the
+  // property is asserted in `stageRender.test.ts` rather than left to it.
+  doorSeam: tokens.DOOR_GAP,
+  // The design paints *up* and *the freshest wait band* the same green. They are two claims on
+  // one row and `canvas.test.ts` counts one of them by its fill, so the direction pair moves and
+  // the band palette keeps § S7's value. See `render/tokens.ts`'s `WAITING_UP`.
+  waitingUp: tokens.WAITING_UP,
+  waitingDown: tokens.WAITING_DOWN,
+  warning: tokens.WARNING,
+  panel: tokens.CARD,
+  highlight: tokens.HIGHLIGHT,
+  badge: tokens.FLOOR_LABEL_ENTRANCE,
+  restricted: tokens.FLOOR_LABEL_RESTRICTED,
   queueBands: Object.freeze({
-    // Not `textDim`, which is the same grey: a test identifying a settling rider by its fill also
-    // matched every floor label and every dimmed caption. The third time this file has needed the
-    // rule that two different claims never share a colour.
-    settling: '#8fa0b3',
-    waiting: '#e0b040',
-    long: '#e0773a',
-    abandoned: '#e0473a',
+    // § S7's four, verbatim. The note this comment replaced said `settling` had to avoid
+    // `textDim`'s grey because a test identifying a settling rider by its fill also matched every
+    // floor label; that collision is closed from the other side now — the floor label has its own
+    // token (`FLOOR_LABEL`) and the band is the design's green. The *rule* has not changed, only
+    // which of the two claims moved to satisfy it.
+    settling: tokens.BAND_SETTLING,
+    waiting: tokens.BAND_WAITING,
+    long: tokens.BAND_LONG,
+    abandoned: tokens.BAND_ABANDONED,
   }),
-  // Distinct from `waitingUp` and `carLight`, which are the same green. They would read the same
-  // on screen, and a test that identified the relief mark by its fill would then also match every
-  // up-call badge and every lightly-loaded car — which it did.
-  queueRelief: '#7fd6b0',
+  // Distinct from `waitingUp` and `carLight`, which are the other two greens. They would read the
+  // same on screen, and a test that identified the relief mark by its fill would then also match
+  // every up-call badge and every lightly-loaded car — which it did.
+  queueRelief: tokens.RELIEF,
+
+  sky: DEFAULT_SKY,
+  mass: tokens.STAGE_MASS,
+  floorSlab: tokens.STAGE_SLAB,
+  shaftRecess: tokens.STAGE_SHAFT_RECESS,
+  shaftHairline: tokens.STAGE_SHAFT_HAIRLINE,
+  cable: tokens.STAGE_CABLE,
+  windowNight: tokens.STAGE_WINDOW_NIGHT,
+  windowDay: tokens.STAGE_WINDOW_DAY,
+  floorLabel: tokens.FLOOR_LABEL,
+  badgeTransfer: tokens.FLOOR_LABEL_TRANSFER,
+  ground: tokens.STAGE_GROUND,
+  carLabel: tokens.CAR_OCCUPANT_TEXT,
+  outOfServiceOn: tokens.OOS_ON,
+  outOfServiceOnText: tokens.OOS_ON_TEXT,
+  outOfServiceOff: tokens.OOS_OFF,
+  outOfServiceOffText: tokens.OOS_OFF_TEXT,
+  alarm: tokens.ALARM,
 });
 
 export interface SceneInput {
@@ -219,6 +338,78 @@ export interface SceneInput {
    * reasons stay in the DOM, where they can be read and copied.
    */
   readonly mood?: BuildingMood | undefined;
+  /**
+   * Simulated seconds from midnight to `simTimeS === 0` — `docs/12` § 4.1.
+   *
+   * The stage's sky and its lit windows are keyed on the hour, and the hour is
+   * `dayStartS + frame.simTimeS`. Defaults to `06:00`, which is where the handoff's day begins.
+   *
+   * **To be re-sourced.** `packages/viz/src/live/timeline.ts` is being written in a parallel lane
+   * and will own `DAY_START_S` and the `hh:mm` formatter for the whole viewer; `render/` may not
+   * import from `src/live/` in this wave, so the default lives in `render/sky.ts` and this option
+   * lets the caller override it in the meantime. When that module lands, this default should come
+   * from it and `render/sky.ts`'s copy should be deleted rather than kept in step by hand.
+   */
+  readonly dayStartS?: number | undefined;
+}
+
+/** A rectangle the caller can hit-test a pointer against. Canvas coordinates, CSS pixels. */
+export interface SceneHitRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * One shaft's service badge, and where it was drawn — `docs/12` § 1.5 B7.
+ *
+ * The renderer draws the badge and reports its rectangle; **it does not handle the click.** A
+ * pointer belongs to the DOM and `boundaries.test.ts` rule 3 keeps the DOM in `src/dev/`, so the
+ * seam is a rectangle and a car id. `src/dev/` turns one into a `recordRun` re-run with the car
+ * in {@link VizRecording.outOfServiceCarIds}; nothing here knows that happens.
+ *
+ * Reported rather than recomputed by the caller for the reason the whole of this directory
+ * exists: a hit box computed in `dev/main.ts` from the same arithmetic is a second copy of the
+ * layout, and the two would drift the first time a badge moved.
+ */
+export interface CarBadgeHit {
+  readonly carId: string;
+  /** The short label drawn above the shaft, so a caller can name the car in a tooltip. */
+  readonly label: string;
+  /** What the badge currently says. `true` draws `OOS`, `false` draws `⏻`. */
+  readonly outOfService: boolean;
+  /**
+   * The hit rectangle, **larger than the drawn pill** — the artefact's own three pixels of slop
+   * on each side (`:2110`). A 26 × 15 target is below every pointer guideline there is; the slop
+   * does not fix that and it does make the badge forgiving at the corners.
+   */
+  readonly rect: SceneHitRect;
+}
+
+/** The landing the stage's alarm chip should name — `docs/12` § 1.3 M3. */
+export interface StageAlarm {
+  readonly floorId: string;
+  readonly label: string;
+  readonly waiting: number;
+}
+
+/**
+ * What the draw produced that a caller outside the canvas needs.
+ *
+ * `drawScene` returned `void` until the stage acquired a control. It now returns the two things
+ * that cannot be recovered from the inputs without re-deriving the layout: where the badges
+ * landed, and which landing raised the alarm. Both are *reports of what was drawn*, so the chip
+ * above the stage and the rule across the floor can never disagree about which floor is in
+ * trouble — which is the same argument `SceneInput.overlay` makes in the other direction.
+ */
+export interface SceneHits {
+  readonly carBadges: readonly CarBadgeHit[];
+  /**
+   * The deepest landing past the alarm depth, or `undefined`. One rather than a list, because the
+   * chip is one chip; the *rules* are drawn on every landing that crossed.
+   */
+  readonly alarm: StageAlarm | undefined;
 }
 
 /**
@@ -243,7 +434,17 @@ export interface SceneSelection {
 const FONT = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
 const FONT_BOLD = 'bold 14px ui-monospace, SFMono-Regular, Menlo, monospace';
 
-export function drawScene(ctx: Canvas2DLike, input: SceneInput): void {
+/**
+ * One frame, onto one context — the whole stage, back to front.
+ *
+ * The order is the design's (`:1998–2162`) and it is load-bearing rather than incidental: the sky
+ * is behind the mass, the mass is behind the slabs, the slabs are behind the shafts, the people
+ * stand in front of all of it, and the ground line is drawn last so it is not washed out by the
+ * mass. The four things that are **not** the design's — the header band, the landing gutter, the
+ * notices row and the metrics panel — are drawn where they always were, because each of them is a
+ * claim the handoff's prototype had no way to make and this viewer is not allowed to stop making.
+ */
+export function drawScene(ctx: Canvas2DLike, input: SceneInput): SceneHits {
   const { recording, frame, layout } = input;
   const theme = input.theme ?? DEFAULT_THEME;
 
@@ -251,10 +452,30 @@ export function drawScene(ctx: Canvas2DLike, input: SceneInput): void {
   ctx.fillStyle = theme.background;
   ctx.fillRect(0, 0, layout.width, layout.height);
 
+  /*
+   * The sky, and the hour it was painted for.
+   *
+   * The hour is returned rather than recomputed by the two other functions that need it —
+   * the lit windows and nothing else, today — so a scene can never be lit for a different time of
+   * day than the one it is painted under. `render/sky.ts` for why the hour cannot come from a
+   * clock and why the ramp is strips rather than a `CanvasGradient`.
+   */
+  const hour = drawSky(ctx, {
+    width: layout.width,
+    height: layout.height,
+    simTimeS: frame.simTimeS,
+    dayStartS: input.dayStartS ?? DAY_START_S,
+    palette: theme.sky,
+  });
+
+  drawBuildingMass(ctx, layout, theme);
   drawHeader(ctx, input, theme);
-  drawFloors(ctx, input, theme);
+  drawFloors(ctx, input, theme, hour);
   drawShafts(ctx, input, theme);
   drawCars(ctx, input, theme);
+  const carBadges = drawServiceBadges(ctx, input, theme);
+  const alarm = drawRiderLanes(ctx, input, theme);
+  drawGroundLine(ctx, input, theme);
   drawLandings(ctx, input, theme);
   drawSelection(ctx, input, theme);
   drawNotices(ctx, input, theme);
@@ -263,6 +484,52 @@ export function drawScene(ctx: Canvas2DLike, input: SceneInput): void {
     drawOverlay(ctx, { recording, frame, layout, theme, metrics: input.overlay });
   }
   ctx.restore();
+  return { carBadges, alarm };
+}
+
+/**
+ * The mass of the building, behind everything the plot holds — design `:2018–2020`.
+ *
+ * Eight pixels of bleed above and below, so the top and bottom slabs sit *inside* the mass rather
+ * than on its edge. Without it the building has no roof and no basement and the shafts appear to
+ * float on the sky.
+ */
+function drawBuildingMass(ctx: Canvas2DLike, layout: Layout, theme: Theme): void {
+  ctx.fillStyle = theme.mass;
+  ctx.fillRect(layout.plot.x, layout.plot.y - 8, layout.plot.width, layout.plot.height + 16);
+}
+
+/**
+ * The line the entrance floor stands on — design `:2159–2162`.
+ *
+ * Drawn last, and it starts ten pixels into the label gutter so it reads as the ground the whole
+ * building is on rather than as one more floor slab. A building with no entrance floor — which
+ * the schema permits and no shipped building is — simply gets no ground line, rather than one
+ * drawn at an arbitrary floor.
+ */
+function drawGroundLine(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
+  const { layout } = input;
+  const entrance = layout.rows.find((row) => row.isEntrance);
+  if (entrance === undefined) return;
+  ctx.strokeStyle = theme.ground;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(layout.plot.x - 10, entrance.y + slabHeightPx(layout) + 0.5);
+  ctx.lineTo(layout.plot.x + layout.plot.width, entrance.y + slabHeightPx(layout) + 0.5);
+  ctx.stroke();
+}
+
+/**
+ * A floor slab's depth — design `:2016`, `max(2, min(6, pitch × 0.18))`.
+ *
+ * The stage draws a slab where the viewer used to draw a hairline. It is the same claim — *there
+ * is a floor here* — at a weight that reads as structure, and it is clamped at both ends so a
+ * 101-storey building gets 2 px rather than a smear and a four-storey one gets 6 px rather than a
+ * plinth. One function because three callers need the same number: the slab itself, the ground
+ * line that sits under one, and the alarm rule that sits under another.
+ */
+function slabHeightPx(layout: Layout): number {
+  return Math.max(2, Math.min(6, layout.pitchPx * 0.18));
 }
 
 /**
@@ -441,21 +708,85 @@ function meanClause(recording: VizRecording, frame: Frame): string {
   return `mean wait so far ${mean === undefined ? '—' : `${mean.toFixed(1)} s`}`;
 }
 
-function drawFloors(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
+/**
+ * Slabs, lit windows and labels — design `:2023–2045`.
+ *
+ * ## The three floor badges, and the one that was not adopted
+ *
+ * The artefact draws four states in the label gutter: `⌂` entrance, `⇄` transfer, `⚿` secure, and
+ * plain. Three of those are taken; **`⚿` is not**, and refusing it is the point rather than an
+ * omission.
+ *
+ * A `VizFloor` has no *secure* flag, and giving it one would be the third kind of zoning
+ * collapsed into the first — `CLAUDE.md` forbids exactly that, because service zoning (no shaft
+ * reaches this floor), access zoning (no credential opens this call) and operational zoning (the
+ * dispatcher's own strategy) are different facts with different fixes. Access control in this
+ * simulator is a property of a **call's credential**, not of a storey: the same floor is open to
+ * one rider and shut to the next. It already has a mark — `▩`, on the landing row, drawn by
+ * `drawLandings` and named in the banner — and `access/zoning.ts`'s docstring is explicit that a
+ * reader who learned `▩` must not have to learn a second spelling of it.
+ *
+ * So the gutter's third badge stays `⊘`, which is the fact the gutter actually knows: **no shaft
+ * in this building reaches this floor**. It keeps the design's `#c9a56a`, because that is the
+ * slot the artefact painted that colour.
+ *
+ * ## The label stride is the layout's, not a second one
+ *
+ * The artefact recomputes a stride in `draw()` (`:2038`). `FloorRow.labelled` already is that
+ * decision, made once, with two rules this renderer would otherwise have to reinvent: reference
+ * floors are never thinned, and a strided label yields to a reference one. A second stride here
+ * would disagree with it on `vertical-city` and nowhere else, which is the worst place to find
+ * out.
+ */
+function drawFloors(ctx: Canvas2DLike, input: SceneInput, theme: Theme, hour: number): void {
   const { layout } = input;
   const unserved = new Set(input.unservedFloorIds ?? []);
-  ctx.font = FONT;
-  ctx.textBaseline = 'middle';
-  for (const row of layout.rows) {
-    // Every floor gets a line, on every building, at every pitch. Only the *label* thins.
-    ctx.strokeStyle = theme.floorLine;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(layout.plot.x, row.y);
-    ctx.lineTo(layout.plot.x + layout.plot.width, row.y);
-    ctx.stroke();
+  const populationById = new Map(
+    input.recording.floors.map((floor) => [floor.id, floor.population]),
+  );
+  const slab = slabHeightPx(layout);
+  const windows = windowBand(layout);
+  const night = isNight(hour);
+  // How much of the band is lit: most of it after dark, a little more than half in office hours,
+  // and almost nothing in the hour either side. The artefact's own three rungs (`:2029`).
+  const litFraction = night ? 0.42 : hour > 8 && hour < 18 ? 0.5 : 0.22;
+
+  for (const [rowIndex, row] of layout.rows.entries()) {
+    // Every floor gets a slab, on every building, at every pitch. Only the *label* thins.
+    ctx.fillStyle = theme.floorSlab;
+    ctx.fillRect(layout.plot.x, row.y, layout.plot.width, slab);
+
+    /*
+     * The window band, lit by who is home.
+     *
+     * Deterministic and not random: `(index × 7 + cell × 13) mod 11` is a fixed pattern per
+     * (floor, cell) pair, so the same building lights the same windows every time it is drawn. A
+     * `Math.random()` here — which is what the artefact does — would be a global RNG draw inside
+     * the renderer (`CLAUDE.md` invariant 2) *and* would make the picture depend on how many
+     * times it had been painted, which is the property `replay/replay.test.ts` rests on.
+     *
+     * A floor with nobody living on it is dimmed rather than dark: a lobby at midnight has its
+     * lights on and nobody in it, which is true of every building this project ships.
+     */
+    if (windows !== undefined) {
+      const population = populationById.get(row.floorId) ?? 0;
+      ctx.fillStyle = night ? theme.windowNight : theme.windowDay;
+      for (let cell = 0; cell < windows.cells; cell += 1) {
+        const on =
+          ((rowIndex * 7 + cell * 13) % 11) / 11 < litFraction * (population > 0 ? 1 : 0.3);
+        if (!on) continue;
+        ctx.fillRect(
+          windows.rightX - cell * WINDOW_PITCH_PX,
+          row.y - Math.min(8, layout.pitchPx * 0.44),
+          WINDOW_WIDTH_PX,
+          Math.min(6, layout.pitchPx * 0.3),
+        );
+      }
+    }
 
     if (!row.labelled) continue;
+    ctx.font = FLOOR_LABEL_FONT;
+    ctx.textBaseline = 'middle';
     ctx.textAlign = 'right';
     // Entrance and sky-lobby floors get a glyph as well as a colour: `⌂` for the entrance and
     // `⇄` for a transfer floor (RV-07). A reader must be able to find the sky lobby in a
@@ -465,9 +796,11 @@ function drawFloors(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
     ctx.fillStyle =
       restricted !== ''
         ? theme.restricted
-        : badge === ''
-          ? theme.textDim
-          : theme.badge;
+        : row.isTransferFloor
+          ? theme.badgeTransfer
+          : row.isEntrance
+            ? theme.badge
+            : theme.floorLabel;
     // The gutter is everything left of the plot, less the 8 px the text is inset by. A label
     // longer than that is clipped here rather than drawn off the left edge of the canvas.
     const budget = layout.plot.x - 8 - (badge.length + restricted.length) * 8;
@@ -477,7 +810,39 @@ function drawFloors(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
       row.y,
     );
   }
+  ctx.font = FONT;
 }
+
+/** Cell pitch and width of the window band — design `:2030`, `c * 14` and a 6 px pane. */
+const WINDOW_PITCH_PX = 14;
+const WINDOW_WIDTH_PX = 6;
+/** The most panes a floor gets. Six is the artefact's; past that the band reads as a barcode. */
+const MAX_WINDOW_CELLS = 6;
+
+/**
+ * Where the windows go, if anywhere.
+ *
+ * The right-hand end of the plot, clear of the shaft bank and of the rider lane — a lit window
+ * behind a queue of people is a window nobody can see, and one behind a shaft is a hole in the
+ * building. `undefined` when there is no such strip, which is a real case on a sixteen-car
+ * building at a narrow viewport and which costs nothing: the windows are scenery and every fact
+ * on the canvas survives their absence.
+ */
+function windowBand(layout: Layout): { readonly rightX: number; readonly cells: number } | undefined {
+  const occupiedTo =
+    layout.riderLane !== undefined
+      ? layout.riderLane.x + layout.riderLane.width
+      : layout.columns.reduce((right, column) => Math.max(right, column.x + column.width), layout.plot.x);
+  const rightX = layout.plot.x + layout.plot.width - 16;
+  const cells = Math.min(
+    MAX_WINDOW_CELLS,
+    Math.floor((rightX - (occupiedTo + 8)) / WINDOW_PITCH_PX),
+  );
+  return cells > 0 ? { rightX, cells } : undefined;
+}
+
+/** The label gutter's face — design `:2039`. Smaller and heavier than the body face. */
+const FLOOR_LABEL_FONT = '600 10.5px ui-monospace, SFMono-Regular, Menlo, monospace';
 
 function drawShafts(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   const { recording, layout } = input;
@@ -490,11 +855,15 @@ function drawShafts(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
     const rows = layout.rows.filter((row) => served === undefined || served.has(row.floorId));
     const top = rows.reduce((min, row) => Math.min(min, row.y), layout.plot.y + layout.plot.height);
     const bottom = rows.reduce((max, row) => Math.max(max, row.y), layout.plot.y);
-    ctx.fillStyle = theme.shaft;
+    // A recess rather than a panel: the shaft is a hole cut into the mass, which is what makes
+    // the mass read as a building rather than as a backdrop. Design `:2054–2057`.
+    ctx.fillStyle = theme.shaftRecess;
     ctx.fillRect(column.x, top, column.width, Math.max(1, bottom - top));
-    ctx.strokeStyle = theme.shaftEdge;
+    ctx.strokeStyle = theme.shaftHairline;
     ctx.lineWidth = 1;
-    ctx.strokeRect(column.x, top, column.width, Math.max(1, bottom - top));
+    // Half-pixel inset so the hairline lands on a pixel rather than across two of them, which is
+    // the difference between a 1 px line and a 2 px grey smudge on a real context.
+    ctx.strokeRect(column.x + 0.5, top + 0.5, Math.max(1, column.width - 1), Math.max(1, bottom - top - 1));
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
@@ -515,9 +884,22 @@ function drawShafts(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   }
 }
 
+/**
+ * The cars, their cables and their doors — design `:2058–2093`.
+ *
+ * ## Why the body is a path and not a `fillRect`
+ *
+ * The design's car has rounded corners, and at the 11–28 px this renderer draws them at, 5 px of
+ * radius is the difference between a lift car and a progress bar. The path also records more than
+ * the rectangle did: `canvas.test.ts` locates the car by the `moveTo` that opens it, which
+ * carries the top edge *and* the radius, and asserts the top edge against `layout.yForHeight`.
+ * That single assertion is what stops a renderer quietly drawing the nearest floor and throwing
+ * away the S-curve the frame producer evaluated.
+ */
 function drawCars(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   const { frame, layout } = input;
   const byCar = new Map(frame.cars.map((car) => [car.carId, car]));
+  const outOfService = new Set(input.recording.outOfServiceCarIds);
   for (const column of layout.columns) {
     const car = byCar.get(column.carId);
     if (car === undefined) continue;
@@ -527,22 +909,45 @@ function drawCars(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
     const x = column.x + 2;
     const w = column.width - 4;
 
+    /*
+     * A car that is not in service is dimmed, and the dimming is **never** the only signal —
+     * the badge at the foot of its shaft says `OOS` in three letters (`drawServiceBadges`).
+     * `globalAlpha` is invisible to a recording stub, which is exactly why it may not carry a
+     * claim on its own; KB-15 and `honesty/` would both be satisfied by a badge alone, and the
+     * alpha is here so the shaft looks as dark as the badge says it is.
+     */
+    ctx.globalAlpha = outOfService.has(column.carId) ? 0.32 : 1;
+
+    // The travelling cable, from the shaft head down to the car's roof. Scenery, and the one
+    // piece of it that moves with the machine rather than with the clock.
+    ctx.strokeStyle = theme.cable;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(column.centreX, layout.plot.y);
+    ctx.lineTo(column.centreX, y);
+    ctx.stroke();
+
     // Four bands, not three: the 80 % fill rule and the 1.1 overload alarm are different facts
     // about a car and used to share one colour that changed at 0.8 (D18, RV-14).
     ctx.fillStyle = loadColour(car.loadFactor, theme);
-    ctx.fillRect(x, y, w, h);
+    fillRoundedRect(ctx, { x, y, width: w, height: h, radius: Math.min(5, h / 3) });
 
     // Doors: a shut car shows the seam at the centre, an open one shows it split to the sides.
     // Drawing the *gap* rather than the leaves means `doorFraction` reads directly as a width.
-    const gap = w * 0.9 * car.doorFraction;
+    // Inset by 1.5 px top and bottom so the gap sits *inside* the rounded body rather than
+    // squaring off its corners — design `:2079`.
+    const gap = w * DOOR_GAP_FRACTION * car.doorFraction;
     ctx.fillStyle = theme.doorSeam;
-    ctx.fillRect(x + w / 2 - gap / 2, y, Math.max(1, gap), h);
+    ctx.fillRect(x + w / 2 - gap / 2, y + 1.5, Math.max(1, gap), Math.max(1, h - 3));
 
     if (h >= 12) {
-      ctx.font = FONT;
+      ctx.font = OCCUPANT_FONT;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = theme.text;
+      // Dark on the tint, not light: the four load colours are all mid-lightness, and 12 px of
+      // `#e8edf4` on `#3fb27f` is the one pairing on this canvas that fails a contrast check in
+      // both directions. Design `:2082`.
+      ctx.fillStyle = theme.carLabel;
       ctx.fillText(String(car.occupants), column.centreX, centreY);
     }
 
@@ -569,7 +974,162 @@ function drawCars(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
       ctx.fillStyle = theme.textDim;
       ctx.fillText(doorGlyph(car.doorPhase), column.centreX, y + h + 8);
     }
+    ctx.globalAlpha = 1;
   }
+}
+
+/** How much of a car's width the doors open to — design `:2078`, `cw * 0.86`. */
+const DOOR_GAP_FRACTION = 0.86;
+/** The occupant count's face — design `:2083`. */
+const OCCUPANT_FONT = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
+/** The service badge's face — design `:2108`. */
+const SERVICE_BADGE_FONT = '600 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+/** Slop around the drawn pill, each side, so the corners are hittable — design `:2110`. */
+const SERVICE_BADGE_SLOP_PX = 3;
+/** The widest a pill gets. Narrower on a narrow shaft, so it never overhangs its neighbour. */
+const SERVICE_BADGE_MAX_WIDTH_PX = 26;
+
+/**
+ * The out-of-service badge at the foot of every shaft — `docs/12` § 1.5 B7, design `:2094–2111`.
+ *
+ * ## Why it says a word and not only a colour
+ *
+ * `⏻` on a faint pill for *in service*, `OOS` on a red one for *not*. Two glyphs and one of them
+ * is three letters, so the state survives greyscale, a screenshot and **Export PNG** — KB-15,
+ * and the same rule that put `!` beside an overloaded car and `⇄` beside a sky lobby. The
+ * shaft's dimmed alpha is a *second* carrier of the same fact and never the first.
+ *
+ * ## Why the click is not handled here
+ *
+ * `boundaries.test.ts` rule 3: `render/` has no DOM and therefore no pointer. The badge's
+ * rectangle is returned to the caller, `src/dev/` hit-tests it, and turning a hit into a car held
+ * out of service is `recordRun`'s `outOfServiceCarIds` (§ 3.1 BE5) — a real re-run through
+ * `Car.setMode`, not a display state. The renderer's whole part in B7 is *here is the target and
+ * here is what it currently says*.
+ *
+ * The row it is drawn on is `layout.foot.badgeY`, which the layout owns for the reason the header
+ * band owns its six: hung off the plot's bottom edge by hand it lands on the run-status caption
+ * at every viewport size.
+ */
+function drawServiceBadges(
+  ctx: Canvas2DLike,
+  input: SceneInput,
+  theme: Theme,
+): readonly CarBadgeHit[] {
+  const { layout } = input;
+  const outOfService = new Set(input.recording.outOfServiceCarIds);
+  const hits: CarBadgeHit[] = [];
+  const height = layout.foot.badgeHeightPx;
+  const y = layout.foot.badgeY;
+  for (const column of layout.columns) {
+    const off = outOfService.has(column.carId);
+    const width = Math.min(column.width, SERVICE_BADGE_MAX_WIDTH_PX);
+    const x = column.x + (column.width - width) / 2;
+
+    ctx.fillStyle = off ? theme.outOfServiceOn : theme.outOfServiceOff;
+    fillRoundedRect(ctx, { x, y, width, height, radius: 4 });
+
+    ctx.font = SERVICE_BADGE_FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = off ? theme.outOfServiceOnText : theme.outOfServiceOffText;
+    ctx.fillText(off ? SERVICE_OFF_GLYPH : SERVICE_ON_GLYPH, x + width / 2, y + height / 2 + 0.5);
+
+    hits.push({
+      carId: column.carId,
+      label: column.label,
+      outOfService: off,
+      rect: {
+        x: x - SERVICE_BADGE_SLOP_PX,
+        y: y - SERVICE_BADGE_SLOP_PX,
+        width: width + 2 * SERVICE_BADGE_SLOP_PX,
+        height: height + 2 * SERVICE_BADGE_SLOP_PX,
+      },
+    });
+  }
+  ctx.font = FONT;
+  return hits;
+}
+
+/**
+ * The two things a service badge can say — design `:2109`.
+ *
+ * Exported because they are marks, and every mark in this renderer that a reader has to tell
+ * apart from another mark is read from the shipped value by a guard rather than transcribed into
+ * one. They are drawn *below* the plot rather than on a landing row, so
+ * `render/landingMarks.test.ts`'s family rule does not reach them — but they are the only two
+ * marks in the foot band and they must stay distinguishable from each other, which
+ * `stageRender.test.ts` asserts.
+ */
+export const SERVICE_ON_GLYPH = '⏻';
+export const SERVICE_OFF_GLYPH = 'OOS';
+
+/**
+ * The people, on the floors they are standing on — `docs/12` § 1.3 M3, design `:2114–2157`.
+ *
+ * Returns the deepest landing past the alarm depth, for the chip above the stage.
+ *
+ * ## Three things this function is careful about
+ *
+ * **It draws nothing without a lane.** `Layout.riderLane` is `undefined` when the shafts fill the
+ * plot, and the landing row in the right gutter carries the whole claim then. See
+ * `render/riderFigures.ts` for why the figures are an addition to that row and never a
+ * replacement for it.
+ *
+ * **The crowd is clamped into the plot.** A queue on the top floor would otherwise be drawn a
+ * figure-height *above* `plot.y`, straight through the shaft labels and the bank labels — the
+ * header band's own defect, arriving from underneath. `render/headerBand.test.ts` would catch it
+ * only on a scene that supplied queues, and its scene does not, so the clamp is here rather than
+ * left to a guard that cannot see it.
+ *
+ * **The alarm is reported, not just drawn.** One landing, the deepest, so the chip names the
+ * floor a reader should walk to; the *rules* are drawn on every landing that crossed, because
+ * more than one floor can be in trouble and a chip can only name one.
+ */
+function drawRiderLanes(
+  ctx: Canvas2DLike,
+  input: SceneInput,
+  theme: Theme,
+): StageAlarm | undefined {
+  const { layout, frame } = input;
+  const lane = layout.riderLane;
+  const queues = input.queues ?? [];
+  if (lane === undefined || queues.length === 0) return undefined;
+
+  const rowById = new Map(layout.rows.map((row) => [row.floorId, row]));
+  const slab = slabHeightPx(layout);
+  // Body, head and the highest the bob can lift it — `figureClearancePx`, not a local sum, so the
+  // clamp and the guard that checks it cannot disagree about how tall a person is.
+  const clearance = figureClearancePx(layout.pitchPx);
+  let alarm: StageAlarm | undefined;
+
+  for (const queue of queues) {
+    const row = rowById.get(queue.floorId);
+    if (row === undefined) continue;
+    // Clamped, so the top floor's crowd stands inside the building rather than in the header.
+    const feetY = Math.max(row.y, layout.plot.y + clearance);
+    const result = drawRiderLane(ctx, theme, {
+      riders: queue.riders,
+      total: queue.total,
+      x: lane.x,
+      widthPx: lane.width,
+      feetY,
+      pitchPx: layout.pitchPx,
+      simTimeS: frame.simTimeS,
+    });
+    if (!result.alarm) continue;
+    drawAlarmRule(ctx, theme, {
+      x: layout.plot.x,
+      y: row.y + slab + 1.5,
+      widthPx: layout.plot.width,
+      simTimeS: frame.simTimeS,
+    });
+    if (alarm === undefined || queue.total > alarm.waiting) {
+      alarm = { floorId: row.floorId, label: row.label, waiting: queue.total };
+    }
+  }
+  ctx.font = FONT;
+  return alarm;
 }
 
 /**
@@ -994,16 +1554,23 @@ function drawFooter(
 ): void {
   // The bar sits on the very bottom edge and the caption above it: overlapping the two put the
   // run status underneath the playhead, which is unreadable at exactly the moment it matters.
-  const y = layout.height - 8;
+  // Both rows come from `Layout.foot` rather than from arithmetic here, for the reason the header
+  // rows come from `Layout.header`: the badge row arrived between them and nothing owned the gap.
+  const y = layout.foot.progressY;
   const barX = layout.plot.x;
   const barW = layout.plot.width;
   ctx.fillStyle = theme.shaft;
-  ctx.fillRect(barX, y, barW, 6);
+  ctx.fillRect(barX, y, barW, layout.foot.progressHeightPx);
 
   const span = recording.endedAt - recording.startedAt;
   const fraction = span <= 0 ? 0 : (frame.simTimeS - recording.startedAt) / span;
   ctx.fillStyle = theme.car;
-  ctx.fillRect(barX, y, barW * Math.max(0, Math.min(1, fraction)), 6);
+  ctx.fillRect(
+    barX,
+    y,
+    barW * Math.max(0, Math.min(1, fraction)),
+    layout.foot.progressHeightPx,
+  );
 
   ctx.font = FONT;
   ctx.textAlign = 'left';
@@ -1017,7 +1584,7 @@ function drawFooter(
   ctx.fillText(
     `${recording.status} · ${String(recording.summary.generated)} generated · ${windowClause(recording.summary)}`,
     12,
-    y - 10,
+    layout.foot.statusY,
   );
 }
 

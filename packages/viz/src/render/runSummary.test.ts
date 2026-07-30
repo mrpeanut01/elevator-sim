@@ -93,6 +93,12 @@ function recordingWith(summary: VizSummary, overrides: Partial<VizRecording> = {
       meanWaitS: constantSeries(0),
     },
     summary,
+    // Version 7. Empty is the legal value for a fixture that exercises none of the three:
+    // the timeline draws one unlabelled band, the decision log draws its empty state, and
+    // no shaft is dark. See `contract/types.ts`.
+    demandPhases: [],
+    decisions: [],
+    outOfServiceCarIds: [],
     warnings: [],
     ...overrides,
   };

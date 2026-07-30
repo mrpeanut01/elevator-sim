@@ -166,8 +166,12 @@ class Recorder implements Canvas2DLike {
   fillRect(): void {}
   strokeRect(): void {}
   beginPath(): void {}
+  closePath(): void {}
   moveTo(): void {}
   lineTo(): void {}
+  quadraticCurveTo(): void {}
+  arc(): void {}
+  fill(): void {}
   stroke(): void {}
   fillText(text: string, x: number, y: number): void {
     this.texts.push({ text, x, y, fill: this.fillStyle });
@@ -214,6 +218,12 @@ const RECORDING: VizRecording = {
     meanWaitS: constantSeries(0),
   },
   summary: fixtureSummary(),
+  // Version 7. Empty is the legal value for a fixture that exercises none of the three:
+  // the timeline draws one unlabelled band, the decision log draws its empty state, and
+  // no shaft is dark. See `contract/types.ts`.
+  demandPhases: [],
+  decisions: [],
+  outOfServiceCarIds: [],
   warnings: [],
 };
 
@@ -288,32 +298,38 @@ const layout = buildLayout({
  * Stronger than the existing colour-removal test, which collapses the four band colours and leaves
  * the rest of the palette standing. Here nothing anywhere on the canvas differs by fill, so a mark
  * that is only distinguishable by colour is not distinguishable.
+ *
+ * ## Derived from the theme's own keys, not listed
+ *
+ * It was a list of twenty-one field names, and the list was the weakness. The design handoff added
+ * fourteen fields to `Theme` in one change — the sky ramps, the mass, the slab, the two window
+ * tints, the floor-label greys, the ground, the two service-badge pairs — and **every one of them
+ * would have survived a hand-written collapse**, which means a mark drawn in `theme.badgeTransfer`
+ * would have stayed distinguishable in the test that exists to prove colour is not needed. Green,
+ * and measuring less than it claimed: exactly the erosion `render/headerBand.test.ts`'s own
+ * anti-erosion test was written for.
+ *
+ * So the collapse walks `DEFAULT_THEME`'s keys. A string becomes `one`; a nested record of strings
+ * (the four bands) has each value collapsed; the sky's four two-stop ramps become four ramps of
+ * `one`. A field of any other shape throws by name rather than being skipped, so a future theme
+ * field cannot slip through the way these fourteen would have.
  */
 const MONOCHROME: Theme = (() => {
   const one = '#ffffff';
-  return {
-    ...DEFAULT_THEME,
-    background: one,
-    shaft: one,
-    shaftEdge: one,
-    floorLine: one,
-    text: one,
-    textDim: one,
-    car: one,
-    carLight: one,
-    carHeavy: one,
-    carOverload: one,
-    doorSeam: one,
-    waitingUp: one,
-    waitingDown: one,
-    warning: one,
-    panel: one,
-    highlight: one,
-    badge: one,
-    restricted: one,
-    queueBands: { settling: one, waiting: one, long: one, abandoned: one },
-    queueRelief: one,
+  const collapse = (value: unknown, path: string): unknown => {
+    if (typeof value === 'string') return one;
+    if (Array.isArray(value)) return value.map((entry, index) => collapse(entry, `${path}[${String(index)}]`));
+    if (typeof value === 'object' && value !== null) {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, entry]) => [key, collapse(entry, `${path}.${key}`)]),
+      );
+    }
+    throw new Error(
+      `Theme.${path} is neither a colour nor a record of colours, so this test cannot take its ` +
+        'colour away. Collapse it here deliberately, or the guard silently stops covering it.',
+    );
   };
+  return collapse(DEFAULT_THEME, '') as Theme;
 })();
 
 function drawEverything(theme: Theme = MONOCHROME): Recorder {

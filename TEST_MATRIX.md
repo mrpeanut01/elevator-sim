@@ -1,5 +1,19 @@
 # Test matrix
 
+> ## ↩️ Wave 10 — the design handoff. This matrix stays retired in place; wave 10's coverage is in [`WAVE10_PLAN.md`](WAVE10_PLAN.md) § 5.
+>
+> Wave 10's own standing rule is this file's, one level down. This file says *a component test does
+> not close a row, because this project's dominant defect class passes every component test it has*.
+> Wave 10 applies that to the four editors the handoff adds: **every control has a test that moves it
+> and requires the resulting run to differ**, compared on the legs — who was carried by which car and
+> when — and never on a window statistic, because a summary over the peak five minutes can
+> legitimately be equal for two visibly different runs.
+>
+> It found three defects that way ([§ D177](DECISIONS.md)): a dwell control writing a field that does
+> nothing under the default door policy, a default lever silently rewriting a shipped dispatcher, and
+> a *load sensor off* value the model layer rejects. None of the three would have failed a component
+> test of the control.
+
 > ## ↩️ The delivery reopened 2026-07-28 as **wave 5**, and this matrix stays retired in place.
 >
 > Two of the three items it left carried forward are wave-5 scope and are being worked now: the

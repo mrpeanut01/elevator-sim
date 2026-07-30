@@ -248,6 +248,10 @@ export function contextFor(honestyCase: HonestyCase, resources: HonestyResources
     accessZones,
     floorIds,
     buildingName: building.name,
+    building,
+    buildings: [...resources.buildingsById.values()],
+    trafficProfiles: resources.trafficProfiles,
+    dispatcherProfiles: resources.dispatcherProfiles,
     bundleAt: memoisedBundles(recording, access),
   };
 }

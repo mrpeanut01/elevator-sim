@@ -131,6 +131,36 @@ export interface HeaderBand {
   readonly titleLinePx: number;
 }
 
+/**
+ * The rows stacked **below** the plot — the same arithmetic ownership {@link HeaderBand} has.
+ *
+ * ## Why the footer needed one too
+ *
+ * The header band exists because six literals in two files collided over three rows of space and
+ * nobody owned any of them. The footer had two tenants and 28 px, which was exactly enough and
+ * therefore never went wrong. The design handoff adds a third — an out-of-service badge at the
+ * foot of every shaft (`docs/12` § 1.5 B7, design `:2094`) — and a badge 15 px tall hung off the
+ * plot's bottom edge lands on top of the run-status caption at every viewport size. Measured
+ * before it was written, from the two functions' own arithmetic: the badge occupied
+ * `[h − 35, h − 20]` and the caption `[h − 24, h − 12]`.
+ *
+ * So the same answer, for the same reason, before rather than after: the rows are computed here
+ * once, and {@link MIN_FOOTER_PX} is *derived* from the stack rather than being a number somebody
+ * picked. `render/stageRender.test.ts` asserts the three are pairwise disjoint at five viewports,
+ * which is `render/headerBand.test.ts`'s rule applied to the other end of the canvas.
+ */
+export interface FootBand {
+  /** Top y of the out-of-service badge row — one badge per shaft column. */
+  readonly badgeY: number;
+  /** Height of one badge. Carried so a test can rebuild the rectangle rather than transcribe it. */
+  readonly badgeHeightPx: number;
+  /** Baseline y of the run-status caption. Drawn with `textBaseline: 'middle'`. */
+  readonly statusY: number;
+  /** Top y of the playback progress bar. */
+  readonly progressY: number;
+  readonly progressHeightPx: number;
+}
+
 export interface Layout {
   readonly width: number;
   readonly height: number;
@@ -143,6 +173,8 @@ export interface Layout {
    * may compute a header y of its own; that is the defect this field closes.
    */
   readonly header: HeaderBand;
+  /** Where each row below the plot goes — see {@link FootBand}. Same rule, same reason. */
+  readonly foot: FootBand;
   readonly columns: readonly ShaftColumn[];
   readonly rows: readonly FloorRow[];
   /**
@@ -167,6 +199,19 @@ export interface Layout {
   readonly pitchPx: number;
   /** The metrics panel's rectangle, when one was asked for. Never overlaps {@link plot}. */
   readonly overlay: Rect | undefined;
+  /**
+   * The strip inside the plot where waiting people are drawn — `docs/12` § 1.3 M3.
+   *
+   * `undefined` when the shafts leave no room for one, which is a real case rather than a
+   * theoretical one: Mixed-Use High-Rise's sixteen cars fill the plot on any window narrow enough
+   * to be worth the phrase. The stage then draws no figures, and the landing row in the right
+   * gutter carries the whole claim — the same *aggregate, never remove* degradation `docs/10`
+   * § 6.2 uses for the queue itself.
+   *
+   * Its existence is what decides whether the shaft bank is left-aligned or centred; see
+   * {@link BANK_INSET_PX}.
+   */
+  readonly riderLane: Rect | undefined;
   /** Pixel y for a height above datum, in metres. Continuous, and clamped to the plot. */
   yForHeight(heightM: number): number;
   /** Height above datum for a pixel y. Inverse of {@link yForHeight}, for click-to-seek. */
@@ -253,17 +298,94 @@ export function minHeaderPx(paddingPx: number = DEFAULT_PADDING_PX): number {
  */
 export const MIN_HEADER_PX = minHeaderPx(DEFAULT_PADDING_PX);
 
+/* -------------------------------------------------------------------------- *
+ * The foot band's row stack — see {@link FootBand}
+ * -------------------------------------------------------------------------- */
+
+/** Air above the badge row, and again between it and the caption. */
+const FOOT_GAP_PX = 5;
+/** One out-of-service badge — design `:2095`, `bh = 15`. */
+const OOS_BADGE_HEIGHT_PX = 15;
+/** Line box of the caption, at the same 12 px face the header rows use. */
+const FOOT_LINE_PX = 14;
+/** Air between the caption and the progress bar. */
+const FOOT_BAR_GAP_PX = 4;
+const PROGRESS_HEIGHT_PX = 6;
+/** Air under the progress bar, so it is not flush with the canvas edge. */
+const FOOT_BOTTOM_PX = 2;
+
+/**
+ * The smallest footer that holds its own rows — computed, not chosen, exactly as
+ * {@link minHeaderPx} is.
+ *
+ * **This is 51 px against the 28 px it was**, and the 23 px comes out of the plot. That is the
+ * price of the out-of-service badge being a *control* rather than a decoration: it has to be big
+ * enough to hit with a mouse and it has to sit somewhere nothing else is drawn.
+ */
+export const MIN_FOOTER_PX =
+  FOOT_GAP_PX +
+  OOS_BADGE_HEIGHT_PX +
+  FOOT_GAP_PX +
+  FOOT_LINE_PX +
+  FOOT_BAR_GAP_PX +
+  PROGRESS_HEIGHT_PX +
+  FOOT_BOTTOM_PX;
+
 const DEFAULTS = {
   gutterLeftPx: 72,
   gutterRightPx: 76,
-  footerPx: 28,
+  footerPx: MIN_FOOTER_PX,
   paddingPx: DEFAULT_PADDING_PX,
 } as const;
+
+/**
+ * The default footer, exported so a test that needs to hit an exact floor pitch can subtract the
+ * real one rather than a transcription of it.
+ *
+ * `canvas.test.ts` builds a viewport whose pitch has to land in a two-pixel window between the
+ * glyph threshold and the label threshold. It did that with the literal `28`, which stopped being
+ * the footer height the moment the badge row was added — the test would have gone on passing
+ * while measuring a pitch two pixels away from the one it names.
+ */
+export const DEFAULT_FOOTER_PX = DEFAULTS.footerPx;
 
 /** Largest shaft width that still looks like a shaft, and the smallest that is still legible. */
 const MAX_SHAFT_WIDTH_PX = 96;
 const MIN_SHAFT_WIDTH_PX = 18;
 const SHAFT_GAP_PX = 10;
+
+/* -------------------------------------------------------------------------- *
+ * The rider lane — see {@link Layout.riderLane}
+ * -------------------------------------------------------------------------- */
+
+/**
+ * How far the shaft bank is inset from the plot's left edge **when there is a rider lane**.
+ *
+ * The artefact's `bankX = plot.x + 18` (`:2011`). Without a lane the bank stays centred, which is
+ * what it has always done and what looks right when the shafts are the only thing in the plot.
+ * With a lane, centring would leave a strip of people on each side of the bank and a bank in the
+ * middle of a crowd; the design's reading is *building on the left, lobby on the right*.
+ */
+const BANK_INSET_PX = 18;
+
+/** Air between the last shaft and the first person — the artefact's `+ 30` (`:2015`). */
+const RIDER_LANE_GAP_PX = 30;
+
+/**
+ * The narrowest lane worth having: four figures at 11 px plus the 70 px the `+N` is held back.
+ *
+ * Below this the lane would hold fewer people than the landing row's glyph budget already draws,
+ * so it would cost the plot 114 px to say less than the gutter already says. Kept in step with
+ * `render/riderFigures.ts`'s own minimum by `stageRender.test.ts`, which asserts the lane the
+ * layout hands over always has capacity for at least that many.
+ */
+const MIN_RIDER_LANE_PX = 4 * 11 + 70;
+
+/**
+ * The widest. A lane of 220 px holds thirteen figures, and past that the crowd is being drawn at
+ * the expense of the shafts, which are the subject.
+ */
+const MAX_RIDER_LANE_PX = 220;
 
 /**
  * Smallest row pitch at which a 12 px monospace floor id is readable rather than a smear.
@@ -302,6 +424,20 @@ export function buildLayout(options: LayoutOptions): Layout {
     shaftY,
     linePx: HEADER_LINE_PX,
     titleLinePx: HEADER_TITLE_LINE_PX,
+  };
+
+  // The foot band, anchored from the canvas's bottom edge upward for the progress bar and the
+  // caption — which is where those two have always been drawn — and from the plot's bottom edge
+  // downward for the badge row, which has to touch the shafts it belongs to. `footer` is not
+  // clamped the way `header` is: a caller who asks for a short footer gets a badge row that hangs
+  // into the caption's space, and `footerPx` has one caller. See {@link FootBand}.
+  const progressY = options.height - FOOT_BOTTOM_PX - PROGRESS_HEIGHT_PX;
+  const foot: FootBand = {
+    badgeY: plot.y + plot.height + FOOT_GAP_PX,
+    badgeHeightPx: OOS_BADGE_HEIGHT_PX,
+    statusY: progressY - FOOT_BAR_GAP_PX - FOOT_LINE_PX / 2,
+    progressY,
+    progressHeightPx: PROGRESS_HEIGHT_PX,
   };
 
   const overlay: Rect | undefined =
@@ -348,7 +484,29 @@ export function buildLayout(options: LayoutOptions): Layout {
   const rawWidth = count === 0 ? 0 : (available - SHAFT_GAP_PX * (count - 1)) / count;
   const shaftWidth = Math.max(MIN_SHAFT_WIDTH_PX, Math.min(MAX_SHAFT_WIDTH_PX, rawWidth));
   const totalWidth = count * shaftWidth + Math.max(0, count - 1) * SHAFT_GAP_PX;
-  const originX = plot.x + Math.max(0, (available - totalWidth) / 2);
+
+  /*
+   * Where the bank sits, and whether there is a lobby beside it.
+   *
+   * One decision rather than two, because they are one decision: the lane is whatever is left
+   * after the bank has been pushed to the left, so asking for a lane and asking where the bank
+   * goes are the same question. When the answer is *no lane*, the bank goes back to being centred
+   * and the whole of this is inert — which is the case every existing test in this package runs
+   * through, and why none of their column coordinates move.
+   */
+  const slack = available - totalWidth - BANK_INSET_PX - RIDER_LANE_GAP_PX;
+  const laneWidth = slack >= MIN_RIDER_LANE_PX ? Math.min(MAX_RIDER_LANE_PX, slack) : 0;
+  const originX =
+    laneWidth > 0 ? plot.x + BANK_INSET_PX : plot.x + Math.max(0, (available - totalWidth) / 2);
+  const riderLane: Rect | undefined =
+    laneWidth > 0
+      ? {
+          x: originX + totalWidth + RIDER_LANE_GAP_PX,
+          y: plot.y,
+          width: laneWidth,
+          height: plot.height,
+        }
+      : undefined;
 
   const columns: ShaftColumn[] = shown.map((shaft, index) => {
     const x = originX + index * (shaftWidth + SHAFT_GAP_PX);
@@ -428,12 +586,14 @@ export function buildLayout(options: LayoutOptions): Layout {
     height: options.height,
     plot,
     header: headerBand,
+    foot,
     columns,
     rows,
     hiddenShaftCount: total - count,
     carHeightPx,
     pitchPx,
     overlay,
+    riderLane,
     yForHeight,
     heightForY,
     rowNearestY,

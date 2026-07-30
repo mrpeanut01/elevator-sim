@@ -41,8 +41,12 @@ class Recorder implements Canvas2DLike {
   fillRect(): void {}
   strokeRect(): void {}
   beginPath(): void {}
+  closePath(): void {}
   moveTo(): void {}
   lineTo(): void {}
+  quadraticCurveTo(): void {}
+  arc(): void {}
+  fill(): void {}
   stroke(): void {}
   fillText(text: string, x: number, y: number): void {
     this.texts.push({ text, x, y, fill: this.fillStyle });

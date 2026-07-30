@@ -60,6 +60,21 @@ So the energy proxy may be shown **beside** AWT and WT95 and never aggregated in
 `EnergyStatistics.workPerServedLegKJ` goes beside the raw figure: a configuration that spends less
 by serving fewer people has not saved anything. See [§ D106](DECISIONS.md).
 
+**The viewer is now built to a design handoff, and the handoff is canonical for the interface.**
+*Elevator Sim Reimagined* is vendored at [`docs/design/`](docs/design/); the requirements extracted
+from it, the audit of the old viewer against it, and every deviation with the constraint that forced
+it are [`docs/12-design-handoff.md`](docs/12-design-handoff.md) ([§ D174](DECISIONS.md)–[§ D179](DECISIONS.md)).
+Two halves, both load-bearing: **the handoff wins every disagreement about what the screen looks
+like, and the simulator wins every disagreement about what a number means.** The handoff is a
+prototype with its own toy simulator — its report sheet computes *average wait* as
+`28 + (100 − pct) × 0.9` — so its layout, copy and interaction are the deliverable and its numbers
+are not.
+
+The rule that carried that work is the standing requirement below, pointed at a slider:
+**move the control and require the run to change**, compared on the legs rather than on a window
+statistic. It found three inert or wrong controls and one false claim about a mechanism before a
+single editor was mounted ([§ D177](DECISIONS.md)). If you add a control, add that test.
+
 [`docs/07-handoff.md`](docs/07-handoff.md) is the resume brief. Work proceeds by the phases
 in [`docs/05-roadmap.md`](docs/05-roadmap.md), which carries each phase's acceptance verdict and the
 measurements behind it. Read its **Standing requirement — the integration seam has an owner** before

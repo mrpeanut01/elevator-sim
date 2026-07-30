@@ -57,6 +57,130 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/motion.ts#REDUCED_MOTION_QUERY',
         'dev/motion.ts#prefersReducedMotion',
         'dev/motion.ts#shouldAutoplay',
+        /*
+         * The design refactor's three mounts. Each is the DOM half of a split whose **pure** half
+         * is driven: `RAIL_VIEW` renders everything `mountLeftRail` writes, `REPORT_PANEL`
+         * everything `mountReport` writes, `SCENARIOS` every card `mountScenarios` instantiates.
+         * `mountScenarios` is the one that authors a sentence of its own — the dashed sixth card's
+         * *"Build your own scenario"* copy, which is inline and therefore reaches only the static
+         * sweep below. That is a stated limitation, not coverage.
+         */
+        'dev/leftRail.ts#mountLeftRail',
+        'dev/reportPanel.ts#mountReport',
+        'dev/scenariosPanel.ts#mountScenarios',
+        'dev/rightRail.ts#mountRightRail',
+        'dev/buildingEditor.ts#mountBuildingEditor',
+        'dev/dispatcherEditor.ts#mountDispatcherEditor',
+        'dev/machinesEditor.ts#mountMachinesEditor',
+        'dev/trafficEditor.ts#mountTrafficEditor',
+        /*
+         * Reads a mounted row back out of the document to update it in place. There is no string
+         * in it at all — its literals are the class selectors it queries by — and it cannot run
+         * without a document.
+         */
+        'dev/dispatcherEditor.ts#sliderHandlesOf',
+      ],
+    },
+    {
+      reason:
+        'A component factory. `dev/dom.ts` produces no sentence of its own — every string it puts ' +
+        'on the page is one it was handed by a caller, and every one of those callers is either ' +
+        'driven here or excluded above. Its own literals are class names, ARIA attribute values ' +
+        'and the two-letter `on`/`off` state word, which is KB-15\'s second signal for a toggle ' +
+        'rather than a claim about a run. The module says so itself: *"every helper below is ' +
+        'deliberately decision-free … there is nothing in it a test would want to assert"*, and ' +
+        'the honest consequence is that driving it would put the caller\'s string into the corpus ' +
+        'twice under the factory\'s name.',
+      ids: [
+        'dev/dom.ts#chip',
+        'dev/dom.ts#chipRow',
+        'dev/dom.ts#eyebrow',
+        'dev/dom.ts#figure',
+        'dev/dom.ts#fillPlate',
+        'dev/dom.ts#pick',
+        'dev/dom.ts#plateRow',
+        'dev/dom.ts#slider',
+        'dev/dom.ts#toggle',
+      ],
+    },
+    {
+      reason:
+        'Navigation state and page plumbing, not a claim about a run. `dev/surfaces.ts` decides ' +
+        'which tab is present, which is focusable and whether the right rail is a column or a ' +
+        'drawer; its one authored string is the drawer toggle — `Controls ▸` / `Close controls` — ' +
+        'which names a control rather than a result, and `surfaces.test.ts` asserts it directly ' +
+        'alongside the breakpoint it must agree with. `dev/state.ts` is configuration: it answers ' +
+        '*what is the simulator being asked for*, and its one string table, `SHIFT_LENGTHS`, ' +
+        'names a duration (*Standard shift — 30 min*) rather than anything the run produced. Both ' +
+        'are derived only because the two-adjacent-words scanner reads hyphenated ids ' +
+        '(`garden-apartments`, `lunch-two-way`) as prose.',
+      ids: [
+        'dev/surfaces.ts#applyDrawerState',
+        'dev/surfaces.ts#applyRailState',
+        'dev/surfaces.ts#applySurfaceState',
+        'dev/surfaces.ts#drawerStateFor',
+        'dev/state.ts#initialState',
+        'dev/state.ts#SHIFT_LENGTHS',
+        'dev/state.ts#shiftRunConfigOf',
+      ],
+    },
+    {
+      reason:
+        'A vocabulary or a schema, not prose. `GOAL_OBSERVATION_IDS` and `SHIFT_EVENT_IDS` are the ' +
+        'id tuples the two shift unions are derived from — the same id-table case as ' +
+        '`campaign/types.ts#FAIL_STATES` above — and every event a reader sees is its ' +
+        '`ShiftEvent.name` and `note`, both of which `SHIFT_REPORT` drives. ' +
+        '`contract/types.ts#VIZ_SCHEMA_VERSION` is the integer 7; it is derived only because the ' +
+        'declaration scanner gives a `const` the span up to the next `const`, which in a file of ' +
+        'interfaces swallows the string-literal unions of the types below it. A version number ' +
+        'reaches a reader only through `record/document.ts#verifyReplay`, which is driven.',
+      ids: [
+        'shift/types.ts#GOAL_OBSERVATION_IDS',
+        'shift/types.ts#SHIFT_EVENT_IDS',
+        'contract/types.ts#VIZ_SCHEMA_VERSION',
+      ],
+    },
+    {
+      reason:
+        'A stylesheet value. `SCENARIO_ART` and `FALLBACK_ART` are CSS gradients, derived because ' +
+        '`linear-gradient` reads as two adjacent words. This is `mode/disclosure.ts#rowClassesOf`\'s ' +
+        'case exactly: a gradient asserts nothing to a reader, and driving it would put ' +
+        '`linear-gradient(180deg,#1a2430,#10151e 70%)` into the corpus as though a surface had ' +
+        'said it. The card that carries the swatch is driven — `scenarioCardsOf` — and the ' +
+        'scenariosPanel module states in its own docstring that the art *"makes no claim about"* ' +
+        'the building it decorates.',
+      ids: [
+        'dev/scenariosPanel.ts#SCENARIO_ART',
+        'dev/scenariosPanel.ts#FALLBACK_ART',
+        /*
+         * The 3 px track under the occupancy slider — a `linear-gradient` whose stops are the
+         * value and the over-capacity threshold. The *sentence* that goes with it is
+         * `overCapacityNote`, which `EDITOR_PANELS` drives; the gradient is the second signal, and
+         * KB-15's point is that it is never the only one.
+         */
+        'dev/buildingEditor.ts#specTrackOf',
+        /*
+         * The transport timeline's segment palette, exported so the traffic editor's preview strip
+         * can draw the same bands rather than keep a second copy of the five hex pairs — the
+         * duplication `dev/tokens.test.ts` exists to stop. Four `{bg, fg}` pairs assert nothing; the
+         * segment's own `label` and `title` are prose and `LIVE_RAIL` drives both.
+         */
+        'live/timeline.ts#PHASE_PALETTE',
+      ],
+    },
+    {
+      reason:
+        'Returns a boolean, or a config block with no sentence in it. `specIsDirty` and ' +
+        '`machineIsDirty` answer *has the reader changed anything* and are derived only through ' +
+        'the transitive clause — they call `specFromProfile` / `specFromClass`, whose `Copy of …` ' +
+        'name is the prose, and that name **is** driven by the `AUTHORING` adapter. ' +
+        '`demandFromSpec` returns the `SimulationDemandOptions` fragment the runner consumes; the ' +
+        'reader sees that choice as `patternSummary` and as `PEAK_ORDER_INFO`\'s label and note, ' +
+        'both driven. Same group as `batch/runBatch.ts#runBatch` above, for the same reason.',
+      ids: [
+        'authoring/dispatcherSpec.ts#specIsDirty',
+        'authoring/machineSpec.ts#machineIsDirty',
+        'authoring/patternSpec.ts#demandFromSpec',
       ],
     },
     {

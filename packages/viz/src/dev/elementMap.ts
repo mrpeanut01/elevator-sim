@@ -19,6 +19,12 @@
  * So the ids are data now, the resolution is one pass that collects everything it could not find,
  * and the list is a document a UI author can read.
  *
+ * **That claim was tested by the design refactor and it held.** The page below is not the page the
+ * manifest was extracted from: `docs/12-design-handoff.md` replaced the five-tab instrument panel
+ * with the handoff's three-column shift surface, and the whole markup was rewritten. The manifest
+ * moved in the same commit, `elementMap.test.ts` named every id that had gone, and nothing had to
+ * be found by reloading.
+ *
  * ## Why the manifest is typed as {@link IdsFor}<{@link Elements}> rather than a plain object
  *
  * Because a manifest that can drift from the interface is the thing this repository has shipped
@@ -33,11 +39,11 @@
  *
  * ## What this module does not do
  *
- * **It does not make any element optional.** Every id below is required, because `main.ts`
- * dereferences every one of them unconditionally — a `requirement: 'optional'` field here would be
+ * **It does not make any element optional.** Every id below is required, because the mounts
+ * dereference every one of them unconditionally — a `requirement: 'optional'` field here would be
  * a promise the page does not keep, which is exactly the failure mode described above wearing the
  * opposite mask. Making a surface genuinely optional means guarding its wiring, one surface at a
- * time, and is a change to `main.ts` rather than to this list.
+ * time, and is a change to a mount rather than to this list.
  *
  * What it does do is turn *"the page died"* into *"the page is missing these four things"*, which
  * is the difference between a crash and a diagnosis.
@@ -56,50 +62,328 @@ import type { CampaignPanelElements } from './campaignPanel.js';
  * that stops being cheaper than a loop.
  *
  * It lives here rather than in `main.ts` because {@link Elements} keys two of its records by it, so
- * the tab list and the ids for those tabs are one fact. Adding a sixth surface is then a compile
- * error until both its button and its panel have an id.
+ * the tab list and the ids for those tabs are one fact. Adding an eleventh surface is then a
+ * compile error until both its button and its panel have an id.
+ *
+ * **The first three are the handoff's** (`docs/12-design-handoff.md` § 1.3 M1) and are the only
+ * ones visible at rest. The four editors are *contextual*: their buttons carry `hidden` in the
+ * markup and are revealed when the rail opens one, which is the handoff's only route to them.
+ * The last three are the instrument surfaces retained from the shipped viewer — § 2.3 of the
+ * handoff doc argues why deleting them to match a design that had not heard of them would delete
+ * the only surface on which *"this dispatcher is better"* can ever be said (R2).
  */
-export const TABS = ['viewer', 'editor', 'parameters', 'compare', 'campaign'] as const;
+export const TABS = [
+  'run',
+  'report',
+  'scenarios',
+  'dispatcher',
+  'traffic',
+  'machines',
+  'building',
+  'compare',
+  'campaign',
+  'parameters',
+] as const;
 export type TabName = (typeof TABS)[number];
+
+/** The four the handoff reaches only from the right rail, never from the strip at rest. */
+export const CONTEXTUAL_TABS: readonly TabName[] = Object.freeze([
+  'dispatcher',
+  'traffic',
+  'machines',
+  'building',
+]);
 
 export const isTabName = (value: string | null): value is TabName =>
   value !== null && (TABS as readonly string[]).includes(value);
 
-/** Everything `main.ts` holds a reference to, in the shape it holds it. */
-export interface Elements {
-  readonly canvas: HTMLCanvasElement;
+/** The right rail's four segments — `docs/12` § 1.4 R1. */
+export const RAIL_SEGMENTS = ['dispatcher', 'traffic', 'building', 'machines'] as const;
+export type RailSegment = (typeof RAIL_SEGMENTS)[number];
+
+export const isRailSegment = (value: string | null): value is RailSegment =>
+  value !== null && (RAIL_SEGMENTS as readonly string[]).includes(value);
+
+/* -------------------------------------------------------------------------- *
+ * The surfaces, one interface each.
+ *
+ * Grouped rather than flat, for the reason `batch` and `campaign` were already
+ * grouped: a mount takes its own sub-record and cannot reach a sibling's
+ * elements, so "which surface owns this element" is answered by the type rather
+ * than by grep.
+ * -------------------------------------------------------------------------- */
+
+/** § 1.1 S3 — the header. */
+export interface HeaderElements {
+  readonly buildingName: HTMLElement;
+  readonly buildingSub: HTMLElement;
+  readonly clock: HTMLElement;
+  readonly phaseLabel: HTMLElement;
+  readonly dayLabel: HTMLElement;
+  readonly tenantsLine: HTMLElement;
+  /** § 4's mode toggle, and the place `mode/parity.ts` puts a refusal it finds. */
+  readonly viewMode: HTMLSelectElement;
+  readonly modeParity: HTMLElement;
+  readonly banner: HTMLElement;
+  /** The container the narrow-viewport rule steps aside — § 1.1 S5. */
+  readonly right: HTMLElement;
+}
+
+/** § 1.2 L1–L3 — the mood card and the four live stats. */
+export interface MoodElements {
+  readonly face: HTMLElement;
+  readonly headline: HTMLElement;
+  readonly sub: HTMLElement;
+  readonly bar: HTMLElement;
+  readonly legend: HTMLElement;
+  /** Where `render/mood.ts`'s driver rows go — `docs/10` § 6 / D4, W6's U4. */
+  readonly drivers: HTMLElement;
+  readonly stats: HTMLElement;
+}
+
+/** § 1.2 L4, L5 — YOUR RUN and TODAY'S SHIFT. */
+export interface ShiftElements {
+  readonly streakLine: HTMLElement;
+  readonly runFigures: HTMLElement;
+  readonly history: HTMLElement;
+  readonly event: HTMLElement;
+  readonly note: HTMLElement;
+  readonly goals: HTMLElement;
+  readonly best: HTMLElement;
+}
+
+/** § 1.2 L6 — the honesty card. */
+export interface HonestyElements {
+  readonly card: HTMLElement;
+  readonly glyph: HTMLElement;
+  readonly title: HTMLElement;
+  readonly plain: HTMLElement;
+  readonly toggle: HTMLButtonElement;
+  readonly maths: HTMLElement;
+}
+
+/** § 1.3 M2 — the coach ribbon. */
+export interface CoachElements {
+  readonly label: HTMLElement;
+  readonly title: HTMLElement;
+  readonly hint: HTMLElement;
+  readonly progress: HTMLElement;
   readonly building: HTMLSelectElement;
-  readonly dispatcher: HTMLSelectElement;
-  readonly duration: HTMLInputElement;
-  readonly speed: HTMLSelectElement;
-  readonly seed: HTMLInputElement;
+  readonly pattern: HTMLSelectElement;
+  /** § 4.1 — the select the handoff does not have, because a shift is a run and a run has a length. */
+  readonly shiftLength: HTMLSelectElement;
+  readonly allScenarios: HTMLButtonElement;
+}
+
+/** § 1.3 M3, M4 — the stage, its alarm and its legend. */
+export interface StageElements {
+  readonly canvas: HTMLCanvasElement;
+  readonly alarm: HTMLElement;
+  readonly alarmText: HTMLElement;
+  readonly alarmSub: HTMLElement;
+  readonly description: HTMLElement;
+  readonly legend: HTMLElement;
+}
+
+/** § 1.3 M5 — the transport, plus the run controls that live on its second row. */
+export interface TransportElements {
+  readonly playPause: HTMLButtonElement;
+  readonly timeline: HTMLElement;
+  readonly playhead: HTMLElement;
+  readonly ticks: HTMLElement;
+  readonly speedChips: HTMLElement;
+  readonly stepBack: HTMLButtonElement;
+  readonly stepForward: HTMLButtonElement;
+  readonly loop: HTMLInputElement;
+  readonly status: HTMLElement;
+  readonly error: HTMLElement;
   readonly run: HTMLButtonElement;
   readonly verify: HTMLButtonElement;
   readonly copyProvenance: HTMLButtonElement;
   readonly saveRecording: HTMLButtonElement;
   readonly loadRecording: HTMLInputElement;
+  readonly exportPng: HTMLButtonElement;
+  readonly seed: HTMLInputElement;
   readonly bankFilter: HTMLSelectElement;
   readonly landingSelect: HTMLSelectElement;
-  readonly exportPng: HTMLButtonElement;
-  readonly playPause: HTMLButtonElement;
-  readonly stepBack: HTMLButtonElement;
-  readonly stepForward: HTMLButtonElement;
-  readonly loop: HTMLInputElement;
-  readonly scrub: HTMLInputElement;
-  readonly status: HTMLElement;
+}
+
+/** § 1.3 M6 — the daily observation sheet. */
+export interface ReportElements {
+  readonly title: HTMLElement;
+  readonly meta: HTMLElement;
+  readonly lede: HTMLElement;
+  readonly figures: HTMLElement;
+  readonly verdict: HTMLElement;
+  readonly streak: HTMLElement;
+  readonly contract: HTMLElement;
+  readonly cleared: HTMLElement;
+  readonly clearedNote: HTMLElement;
+  readonly takeNext: HTMLButtonElement;
+  readonly goals: HTMLElement;
+  readonly diagnosis: HTMLElement;
+  readonly levers: HTMLElement;
+  readonly forecastName: HTMLElement;
+  readonly forecastNote: HTMLElement;
+  readonly forecastDemand: HTMLElement;
+  readonly taught: HTMLElement;
+  readonly smallPrint: HTMLElement;
+  readonly nextDay: HTMLButtonElement;
+  readonly back: HTMLButtonElement;
+}
+
+/** § 1.3 M8 — the dispatcher editor. */
+export interface DispatcherEditorElements {
+  readonly list: HTMLElement;
+  readonly editing: HTMLElement;
+  readonly yoursCount: HTMLElement;
+  readonly name: HTMLInputElement;
+  readonly termsUsed: HTMLElement;
+  readonly copyCurrent: HTMLButtonElement;
+  readonly terms: HTMLElement;
+  readonly flags: HTMLElement;
+  readonly levers: HTMLElement;
+  readonly dwellChips: HTMLElement;
+  readonly dwellHint: HTMLElement;
+  readonly summary: HTMLElement;
+  readonly advice: HTMLElement;
+  readonly close: HTMLButtonElement;
+  readonly save: HTMLButtonElement;
+  readonly dirty: HTMLElement;
   readonly error: HTMLElement;
-  readonly banner: HTMLElement;
-  readonly description: HTMLElement;
-  /** Where `render/runSummary.ts`'s figures are drawn — `docs/10` § 11 W2. */
-  readonly runSummary: HTMLElement;
-  /** § 4's mode toggle, and the place `mode/parity.ts` puts a refusal it finds. */
-  readonly viewMode: HTMLSelectElement;
-  readonly modeParity: HTMLElement;
-  /** § 10.3's pre-run compatibility note. Empty when there is nothing to say. */
+  readonly yours: HTMLElement;
+}
+
+/** § 1.3 M9 — the traffic editor. */
+export interface TrafficEditorElements {
+  readonly editing: HTMLElement;
+  readonly summary: HTMLElement;
+  readonly name: HTMLInputElement;
+  readonly orderChips: HTMLElement;
+  readonly orderNote: HTMLElement;
+  readonly rows: HTMLElement;
+  readonly preview: HTMLElement;
+  readonly previewTicks: HTMLElement;
+  readonly close: HTMLButtonElement;
+  readonly save: HTMLButtonElement;
+  readonly dirty: HTMLElement;
+  readonly error: HTMLElement;
+  readonly footnote: HTMLElement;
+}
+
+/** § 1.3 M10 — the machine-class editor. */
+export interface MachinesEditorElements {
+  readonly editing: HTMLElement;
+  readonly name: HTMLInputElement;
+  readonly rows: HTMLElement;
+  readonly speedChips: HTMLElement;
+  readonly summary: HTMLElement;
+  readonly close: HTMLButtonElement;
+  readonly save: HTMLButtonElement;
+  readonly dirty: HTMLElement;
+  readonly error: HTMLElement;
+}
+
+/** § 1.3 M11 — the building editor's spec column and its elevation. */
+export interface BuildingEditorElements {
+  readonly editing: HTMLElement;
+  readonly blank: HTMLButtonElement;
+  readonly name: HTMLInputElement;
+  readonly rows: HTMLElement;
+  readonly occupancy: HTMLElement;
+  readonly openMachines: HTMLButtonElement;
+  readonly classChips: HTMLElement;
+  readonly classPlain: HTMLElement;
+  readonly classLimits: HTMLElement;
+  readonly classWarning: HTMLElement;
+  readonly loadChips: HTMLElement;
+  readonly speedChips: HTMLElement;
+  readonly skyChips: HTMLElement;
+  readonly summary: HTMLElement;
+  readonly advice: HTMLElement;
+  readonly close: HTMLButtonElement;
+  readonly save: HTMLButtonElement;
+  readonly dirty: HTMLElement;
+  readonly error: HTMLElement;
+  readonly elevationBody: HTMLElement;
+  readonly elevationOccNote: HTMLElement;
+  readonly elevationLevelOcc: HTMLButtonElement;
+  readonly elevationClearRanges: HTMLButtonElement;
+  readonly elevationLegend: HTMLElement;
+  readonly elevationNote: HTMLElement;
+  readonly elevationWarning: HTMLElement;
+  readonly addShaft: HTMLButtonElement;
+  readonly removeShaft: HTMLButtonElement;
+  /** § 4.5 — the document editor kept whole beneath the elevation. */
+  readonly document: HTMLDetailsElement;
+}
+
+/** § 1.4 — the right rail. Four segments, each a list, a plate and a link. */
+export interface RailElements {
+  readonly root: HTMLElement;
+  readonly drawerToggle: HTMLButtonElement;
+  readonly segments: Readonly<Record<RailSegment, HTMLButtonElement>>;
+  readonly panels: Readonly<Record<RailSegment, HTMLElement>>;
+  readonly dispatcherNote: HTMLElement;
+  readonly dispatcherList: HTMLElement;
+  readonly dispatcherPlate: HTMLElement;
+  /**
+   * `docs/10` § 10.3's pre-run compatibility note.
+   *
+   * It lived above the canvas on the old page. It lives beside the dispatcher list here because
+   * that is where the pairing it is about is chosen — the note says *this dispatcher cannot read
+   * the credential this building issues*, and a reader who is about to pick a different one should
+   * not have to look somewhere else to find out. Empty when there is nothing to say.
+   */
   readonly accessNote: HTMLElement;
-  /** Where `render/mood.ts`'s gauge is drawn — `docs/10` § 6 / D4, W6's U4. */
-  readonly mood: HTMLElement;
-  /** Tab button and its panel, per surface. Keyed by {@link TabName}, so a sixth is one entry. */
+  readonly openDispatcher: HTMLButtonElement;
+  readonly trafficNote: HTMLElement;
+  readonly trafficList: HTMLElement;
+  readonly trafficPlate: HTMLElement;
+  readonly openTraffic: HTMLButtonElement;
+  readonly buildingNote: HTMLElement;
+  readonly buildingList: HTMLElement;
+  readonly buildingPlate: HTMLElement;
+  readonly openBuilding: HTMLButtonElement;
+  readonly machinesNote: HTMLElement;
+  readonly machinesList: HTMLElement;
+  /** Engineer-only — § 1.4 R3. */
+  readonly nameplateBlock: HTMLElement;
+  readonly machinesPlate: HTMLElement;
+  readonly machinesWarning: HTMLElement;
+  readonly openMachines: HTMLButtonElement;
+}
+
+/** § 1.1 S4 — the footer. */
+export interface FooterElements {
+  readonly statusLine: HTMLElement;
+  readonly seedLine: HTMLElement;
+  readonly copyRun: HTMLButtonElement;
+  readonly right: HTMLElement;
+}
+
+/** Everything the mounts hold a reference to, in the shape they hold it. */
+export interface Elements {
+  readonly bodyGrid: HTMLElement;
+  readonly header: HeaderElements;
+  readonly mood: MoodElements;
+  readonly shift: ShiftElements;
+  readonly honesty: HonestyElements;
+  /** § 1.2 L7 — the decision log's container. */
+  readonly decisionLog: HTMLElement;
+  readonly coach: CoachElements;
+  readonly stage: StageElements;
+  readonly transport: TransportElements;
+  readonly report: ReportElements;
+  /** § 1.3 M7 — where the five scenario cards go. */
+  readonly scenarioList: HTMLElement;
+  readonly dispatcherEditor: DispatcherEditorElements;
+  readonly trafficEditor: TrafficEditorElements;
+  readonly machinesEditor: MachinesEditorElements;
+  readonly buildingEditor: BuildingEditorElements;
+  readonly rail: RailElements;
+  readonly footer: FooterElements;
+  /** Tab button and its panel, per surface. Keyed by {@link TabName}. */
   readonly tabs: Readonly<Record<TabName, HTMLButtonElement>>;
   readonly panels: Readonly<Record<TabName, HTMLElement>>;
   readonly paramSource: HTMLSelectElement;
@@ -129,52 +413,252 @@ export type IdsFor<T> = {
 /**
  * Every id the viewer needs, keyed exactly as {@link Elements}.
  *
- * The ids are the ones `index.html` already used — this manifest was extracted from the resolution
- * calls rather than authored beside them, so no id changed when it landed and
- * `elementMap.test.ts` pins that against the page.
+ * Checked against `index.html` in both directions by `elementMap.test.ts`.
  */
 export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
-  canvas: 'stage',
-  viewMode: 'view-mode',
-  modeParity: 'mode-parity',
-  building: 'building',
-  dispatcher: 'dispatcher',
-  duration: 'duration',
-  speed: 'speed',
-  seed: 'seed',
-  run: 'run',
-  verify: 'verify',
-  copyProvenance: 'copy-provenance',
-  saveRecording: 'save-recording',
-  loadRecording: 'load-recording',
-  bankFilter: 'bank-filter',
-  landingSelect: 'landing-select',
-  exportPng: 'export-png',
-  playPause: 'play-pause',
-  stepBack: 'step-back',
-  stepForward: 'step-forward',
-  loop: 'loop',
-  scrub: 'scrub',
-  status: 'status',
-  error: 'error',
-  banner: 'banner',
-  description: 'frame-description',
-  runSummary: 'run-summary',
-  accessNote: 'access-note',
-  mood: 'building-mood',
+  bodyGrid: 'body-grid',
+  header: Object.freeze({
+    buildingName: 'building-name',
+    buildingSub: 'building-sub',
+    clock: 'clock',
+    phaseLabel: 'phase-label',
+    dayLabel: 'day-label',
+    tenantsLine: 'tenants-line',
+    viewMode: 'view-mode',
+    modeParity: 'mode-parity',
+    banner: 'banner',
+    right: 'topbar-right',
+  }),
+  mood: Object.freeze({
+    face: 'mood-face',
+    headline: 'mood-headline',
+    sub: 'mood-sub',
+    bar: 'mood-bar',
+    legend: 'mood-legend',
+    drivers: 'mood-drivers',
+    stats: 'live-stats',
+  }),
+  shift: Object.freeze({
+    streakLine: 'streak-line',
+    runFigures: 'run-figures',
+    history: 'history',
+    event: 'shift-event',
+    note: 'shift-note',
+    goals: 'shift-goals',
+    best: 'shift-best',
+  }),
+  honesty: Object.freeze({
+    card: 'honesty',
+    glyph: 'honesty-glyph',
+    title: 'honesty-title',
+    plain: 'honesty-plain',
+    toggle: 'honesty-toggle',
+    maths: 'honesty-maths',
+  }),
+  decisionLog: 'decision-log',
+  coach: Object.freeze({
+    label: 'coach-label',
+    title: 'coach-title',
+    hint: 'coach-hint',
+    progress: 'coach-progress',
+    building: 'pick-building',
+    pattern: 'pick-pattern',
+    shiftLength: 'pick-shift',
+    allScenarios: 'open-scenarios',
+  }),
+  stage: Object.freeze({
+    canvas: 'stage',
+    alarm: 'alarm',
+    alarmText: 'alarm-text',
+    alarmSub: 'alarm-sub',
+    description: 'frame-description',
+    legend: 'legend',
+  }),
+  transport: Object.freeze({
+    playPause: 'play-pause',
+    timeline: 'timeline',
+    playhead: 'playhead',
+    ticks: 'timeline-ticks',
+    speedChips: 'speed-chips',
+    stepBack: 'step-back',
+    stepForward: 'step-forward',
+    loop: 'loop',
+    status: 'status',
+    error: 'error',
+    run: 'run',
+    verify: 'verify',
+    copyProvenance: 'copy-provenance',
+    saveRecording: 'save-recording',
+    loadRecording: 'load-recording',
+    exportPng: 'export-png',
+    seed: 'seed',
+    bankFilter: 'bank-filter',
+    landingSelect: 'landing-select',
+  }),
+  report: Object.freeze({
+    title: 'report-title',
+    meta: 'report-meta',
+    lede: 'report-lede',
+    figures: 'report-figures',
+    verdict: 'report-verdict',
+    streak: 'report-streak',
+    contract: 'report-contract',
+    cleared: 'report-cleared',
+    clearedNote: 'report-cleared-note',
+    takeNext: 'report-take-next',
+    goals: 'report-goals',
+    diagnosis: 'report-diagnosis',
+    levers: 'report-levers',
+    forecastName: 'report-forecast-name',
+    forecastNote: 'report-forecast-note',
+    forecastDemand: 'report-forecast-demand',
+    taught: 'report-taught',
+    smallPrint: 'report-small-print',
+    nextDay: 'report-next-day',
+    back: 'report-back',
+  }),
+  scenarioList: 'scenario-list',
+  dispatcherEditor: Object.freeze({
+    list: 'dispatcher-list',
+    editing: 'dispatcher-editing',
+    yoursCount: 'dispatcher-yours-count',
+    name: 'dispatcher-name',
+    termsUsed: 'dispatcher-terms-used',
+    copyCurrent: 'dispatcher-copy-current',
+    terms: 'dispatcher-terms',
+    flags: 'dispatcher-flags',
+    levers: 'group-levers',
+    dwellChips: 'dwell-chips',
+    dwellHint: 'dwell-hint',
+    summary: 'dispatcher-summary',
+    advice: 'dispatcher-advice',
+    close: 'dispatcher-close',
+    save: 'dispatcher-save',
+    dirty: 'dispatcher-dirty',
+    error: 'dispatcher-error',
+    yours: 'dispatcher-yours',
+  }),
+  trafficEditor: Object.freeze({
+    editing: 'traffic-editing',
+    summary: 'traffic-summary',
+    name: 'traffic-name',
+    orderChips: 'traffic-order-chips',
+    orderNote: 'traffic-order-note',
+    rows: 'traffic-rows',
+    preview: 'traffic-preview',
+    previewTicks: 'traffic-preview-ticks',
+    close: 'traffic-close',
+    save: 'traffic-save',
+    dirty: 'traffic-dirty',
+    error: 'traffic-error',
+    footnote: 'traffic-footnote',
+  }),
+  machinesEditor: Object.freeze({
+    editing: 'machines-editing',
+    name: 'machines-name',
+    rows: 'machines-rows',
+    speedChips: 'machines-speed-chips',
+    summary: 'machines-summary',
+    close: 'machines-close',
+    save: 'machines-save',
+    dirty: 'machines-dirty',
+    error: 'machines-error',
+  }),
+  buildingEditor: Object.freeze({
+    editing: 'building-editing',
+    blank: 'building-blank',
+    name: 'building-spec-name',
+    rows: 'building-rows',
+    occupancy: 'building-occupancy',
+    openMachines: 'building-open-machines',
+    classChips: 'building-class-chips',
+    classPlain: 'building-class-plain',
+    classLimits: 'building-class-limits',
+    classWarning: 'building-class-warning',
+    loadChips: 'building-load-chips',
+    speedChips: 'building-speed-chips',
+    skyChips: 'building-sky-chips',
+    summary: 'building-summary',
+    advice: 'building-advice',
+    close: 'building-close',
+    save: 'building-save',
+    dirty: 'building-dirty',
+    error: 'building-spec-error',
+    elevationBody: 'elevation-body',
+    elevationOccNote: 'elevation-occ-note',
+    elevationLevelOcc: 'elevation-level-occ',
+    elevationClearRanges: 'elevation-clear-ranges',
+    elevationLegend: 'elevation-legend',
+    elevationNote: 'elevation-note',
+    elevationWarning: 'elevation-warning',
+    addShaft: 'elevation-add-shaft',
+    removeShaft: 'elevation-remove-shaft',
+    document: 'building-document',
+  }),
+  rail: Object.freeze({
+    root: 'rail-right',
+    drawerToggle: 'drawer-toggle',
+    segments: Object.freeze({
+      dispatcher: 'seg-dispatcher',
+      traffic: 'seg-traffic',
+      building: 'seg-building',
+      machines: 'seg-machines',
+    }),
+    panels: Object.freeze({
+      dispatcher: 'rail-panel-dispatcher',
+      traffic: 'rail-panel-traffic',
+      building: 'rail-panel-building',
+      machines: 'rail-panel-machines',
+    }),
+    dispatcherNote: 'rail-dispatcher-note',
+    dispatcherList: 'rail-dispatcher-list',
+    dispatcherPlate: 'rail-dispatcher-plate',
+    accessNote: 'rail-access-note',
+    openDispatcher: 'rail-open-dispatcher',
+    trafficNote: 'rail-traffic-note',
+    trafficList: 'rail-traffic-list',
+    trafficPlate: 'rail-traffic-plate',
+    openTraffic: 'rail-open-traffic',
+    buildingNote: 'rail-building-note',
+    buildingList: 'rail-building-list',
+    buildingPlate: 'rail-building-plate',
+    openBuilding: 'rail-open-building',
+    machinesNote: 'rail-machines-note',
+    machinesList: 'rail-machines-list',
+    nameplateBlock: 'rail-nameplate-block',
+    machinesPlate: 'rail-machines-plate',
+    machinesWarning: 'rail-machines-warning',
+    openMachines: 'rail-open-machines',
+  }),
+  footer: Object.freeze({
+    statusLine: 'status-line',
+    seedLine: 'seed-line',
+    copyRun: 'copy-run',
+    right: 'footer-right',
+  }),
   tabs: Object.freeze({
-    viewer: 'tab-viewer',
-    editor: 'tab-editor',
-    parameters: 'tab-parameters',
+    run: 'tab-run',
+    report: 'tab-report',
+    scenarios: 'tab-scenarios',
+    dispatcher: 'tab-dispatcher',
+    traffic: 'tab-traffic',
+    machines: 'tab-machines',
+    building: 'tab-building',
     compare: 'tab-compare',
     campaign: 'tab-campaign',
+    parameters: 'tab-parameters',
   }),
   panels: Object.freeze({
-    viewer: 'panel-viewer',
-    editor: 'panel-editor',
-    parameters: 'panel-parameters',
+    run: 'panel-run',
+    report: 'panel-report',
+    scenarios: 'panel-scenarios',
+    dispatcher: 'panel-dispatcher',
+    traffic: 'panel-traffic',
+    machines: 'panel-machines',
+    building: 'panel-building',
     compare: 'panel-compare',
     campaign: 'panel-campaign',
+    parameters: 'panel-parameters',
   }),
   paramSource: 'param-source',
   paramForm: 'param-form',

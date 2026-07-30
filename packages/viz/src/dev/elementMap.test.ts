@@ -103,7 +103,7 @@ describe('the resolver reports every missing element, not the first', () => {
     if (!resolved.ok) return;
     // Nested groups come back as objects, not as the ids that named them — the shape the 1 600-line
     // caller depends on, and the part a hand-written walk gets wrong.
-    expect((resolved.elements.canvas as unknown as { id: string }).id).toBe('stage');
+    expect((resolved.elements.stage.canvas as unknown as { id: string }).id).toBe('stage');
     expect((resolved.elements.tabs.compare as unknown as { id: string }).id).toBe('tab-compare');
     expect((resolved.elements.batch.replications as unknown as { id: string }).id).toBe(
       'batch-replications',

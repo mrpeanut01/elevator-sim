@@ -10529,3 +10529,226 @@ a diagnosis.
 
 **Impact on phase status: none, and that is the point.** No verdict moved, no criterion was touched,
 and no number was republished. Both changes are about what a *future caller* can do wrong.
+
+---
+
+## D174 — the Claude Design handoff is **canonical for the interface and not for the numbers**, and three surfaces it had never heard of were kept
+
+**Context.** A Claude Design project, *Elevator Sim Reimagined*, was handed over as the design for
+the viewer, with the instruction that it be treated as the source of truth for the user interface.
+It is vendored at [`docs/design/elevator-sim-reimagined.dc.html`](docs/design/elevator-sim-reimagined.dc.html)
+and the requirements extracted from it are
+[`docs/12-design-handoff.md`](docs/12-design-handoff.md) § 1.
+
+**What it is, because that changes how it must be read.** It is a working prototype with its own
+toy simulator: `Math.random()` arrivals, an S-curve-ish motion model, a twelve-term cost function
+and a report sheet whose *average wait* is computed as `28 + (100 − pct) × 0.9`. Its layout,
+hierarchy, copy, interaction and state model are the deliverable. **Its numbers are not.**
+
+**Decision.** The handoff wins every disagreement about what the screen looks like. The simulator
+wins every disagreement about what a number means, the binding is re-sourced, and the difference is
+written down rather than smoothed over. Both halves are load-bearing: without the first this is a
+refactor that "loosely approximates" a design, and without the second it is a viewer that prints
+`28 + (100 − pct) × 0.9` beside a run that computed something else.
+
+**The one place that authority was overruled, and why.** The handoff's tab strip has three
+surfaces. The shipped viewer has five, and three of them — **Parameters** (`docs/10` § 11 W4, the
+schema-generated form, which is CLAUDE.md invariant 8 reaching a screen), **Compare** (N paired
+replications under common random numbers with a paired-t interval) and **Campaign** (§ D161's seven
+stages) — do not appear in it, because its author did not know they existed.
+
+Deleting them to match would delete **the only surface on which R2 can ever be discharged**: a
+single-run viewer may say *in this run, X happened* and may not say *this dispatcher is better*, and
+Compare is where the second sentence becomes available. That is not a feature; it is the thing this
+repository exists to protect. They are kept as three chips in the right-hand group of the handoff's
+own tab strip, which is an open horizontal list and takes them without inventing a pattern.
+
+**Impact on phase status: none.** No verdict moved and no criterion was touched. Phase 4 is
+complete against a criterion about the run viewer's honesty, and every guard that criterion rests
+on is still green — including the ones this refactor had to make *stronger* to keep passing (§ D177).
+
+---
+
+## D175 — the handoff's **sixteen-hour day does not exist in this simulator**, and the timeline says what is actually there
+
+**The handoff draws** a day from 06:00 to 22:00 with seven named phases — `TRICKLE`, `AM PEAK`,
+`STEADY`, `LUNCH`, `STEADY`, `PM PEAK`, `QUIET` — under a scrubbing playhead, with five fixed
+o'clock ticks beneath it.
+
+**The constraint is not performance, though performance is also real.** `core/` has no clock
+(invariant 3): `Simulation.run()` returns a whole result and `frameAt(recording, t)` samples it,
+which is what makes scrubbing backwards free and replay bit-identical. A sixteen-hour day of Midtown
+Office at its shipped demand is roughly **39 000 passengers**, and Vertical City is four times that;
+recording one synchronously in a browser tab is tens of seconds and hundreds of megabytes.
+
+The disqualifying reason is the other one. **The shipped demand templates do not describe a
+sixteen-hour day.** `rise-and-fall` is thirty minutes, `constant-iso` is two hours, `lunch-two-way`
+is thirty. Drawing `AM PEAK` and `LUNCH` over a thirty-minute rise-and-fall run would be a caption
+that does not describe the demand underneath it — which is the failure mode the honesty card three
+inches to its left exists to prevent.
+
+**Decision.** The timeline's segments are the **resolved demand template's own phases**, carried on
+the recording as `VizRecording.demandPhases` and rendered with their real `%pop/5 min`; the clock is
+`06:00 + simTimeS`, so the ticks under it are the run's *actual* simulated times rather than a fixed
+ruler. Shift length becomes a control in the coach ribbon beside the building and pattern selects —
+the handoff's own component, one more instance of it — offering 15 min, 30 min, 1 h and 2 h, and
+defaulting to **30 minutes** because that is the horizon every published figure in
+[`docs/05-roadmap.md`](docs/05-roadmap.md) was measured over.
+
+Layout, hierarchy, segment colouring, playhead, tick row, click-to-scrub and the speed chips are all
+as drawn. What changed is that the labels are true.
+
+**A consequence worth stating.** Four of the five shipped buildings run *past* their demand schedule
+— Midtown Office ends at 1 938 s against a 900 s horizon — so the timeline grows a `DRAIN` band. It
+deliberately does not say *nobody is arriving*: Mixed-Use High-Rise registers its last leg at
+1 322 s, because a sky-lobby journey registers its second leg when the first one lands.
+
+---
+
+## D176 — the recording gained **the three things the run knew and threw away**, at schema 7
+
+Three of the handoff's panels could not be drawn from a version-6 recording, and in each case the
+fact existed during the run and was discarded before it returned.
+
+| Field | The panel | Why it could not be derived |
+|---|---|---|
+| `VizLeg.alightedAt` | *carried today*, and the report's `CARRIED` | Boarding is not delivery. The recording could only offer `boardedLegs`, and a rail that called that "carried" would over-report by everyone in transit — largest at exactly the moment a reader is watching, the peak. A projection of a field `core` already recorded; nothing in `core` changed. |
+| `VizRecording.decisions` | **WHY IT DID THAT** | A cost is a function of the world at the instant of the decision. By the time `run()` returns that world is gone, and re-scoring against the final state would produce a fluent explanation of a decision that was never made. This repository's standing defect is a plausible number nobody checked; a plausible *reason* nobody checked is the same defect with better prose. |
+| `VizRecording.demandPhases` | the transport timeline, the header's phase pill | § D175. The schedule lives on the resolved template, not on the result. |
+
+Plus `VizRecording.outOfServiceCarIds`, so the picture can draw the dark shaft a reader produced by
+clicking the badge under it — a viewer that inferred *out of service* from *never moved* would mark
+an idle car on a quiet morning.
+
+**How the decisions are captured, and why that is safe.** By wrapping the policy `Simulation` would
+have built anyway, through the `SimulationConfig.createPolicy` hook whose own docstring names
+*"instrumenting a real run — wrapping the policy to count what each cost term actually evaluated
+to"* as one of its two reasons to exist. The wrapper delegates and returns the delegate's value
+unchanged, draws no random number, reads no clock and alters no input — the same four properties
+`record/instrument.ts` argues for the car wrappers, and **asserted the same way**:
+`decisionLog.test.ts` runs the same configuration with and without instrumentation and requires the
+two `RunRecord`s equal by `JSON.stringify`, not by a digest.
+
+What is kept per decision is the winner's three largest term contributions, its cost, and the
+runner-up's cost. Not every losing car's full breakdown: a busy Vertical City run makes tens of
+thousands of decisions against thirty-five cars, and storing every bid would make the bids the
+largest array in the recording by an order of magnitude, to feed a panel that draws six rows.
+
+**Out of service is real, not a badge.** `recordRun` sets the mode through `Car.setMode` before the
+run, so `estimateCost` refuses the car with `infeasibleReason: 'serviceMode'` and the group
+dispatches around it with no new branch anywhere. An id that names no car is an error rather than a
+no-op — a typo that silently ran the full group would report its figures as the reduced group's.
+
+---
+
+## D177 — the four editors are models, not forms — and requiring **the run to change** found three defects a form would have shipped
+
+The handoff has four editors: a dispatcher (twelve cost terms), an arrival pattern, a machine class
+and a building with a draggable elevation. Each is a panel of sliders over a nested, optional,
+resolver-defaulted configuration object, which is the shape in which a control quietly stops writing
+anything.
+
+**Decision.** Each editor edits a flat, total *spec* in `packages/viz/src/authoring/`, and that
+module owns the conversion to and from the real configuration object. The panel is decision-free.
+And every control has a test that **moves it and requires the resulting run to differ** — compared
+on the legs, *who was carried by which car and when*, not on a window statistic.
+
+That last rule is the entire value of the lane, and it earned its keep three times before the
+editors were mounted:
+
+1. **The dwell chips were decoration.** They wrote `answer.maxDwellS`, which under the default
+   `dwellPolicy: 'fixed'` only bounds the transfer — the hold itself is `dwellCarCallS` /
+   `dwellHallCallS`, which come from the **car**. Three chips, three byte-identical runs. They now
+   write the car's own dwell (the `doors.dwellHallCallS` band's `{min, typical, max}`) and switch
+   `patient` to `adaptive`, so the door extends with the queue, which is the half of *"everybody gets
+   on"* a longer fixed hold cannot express.
+2. **The default lever silently rewrote a shipped dispatcher.** `GroupLevers.dwell` defaulted to
+   `'normal'`, and a lever whose default value is itself an override replaced `energy-aware`'s
+   authored `adaptive / 0.2 / 10 s` the moment the page loaded. The dwell lever now has a fourth
+   state — `undefined`, *the dispatcher's own* — no chip is lit until a reader chooses, and
+   `dwellChoiceOf` lights one when the running profile happens to match. Caught by a test that opens
+   each shipped profile in the editor, saves it untouched, and requires a **bit-identical
+   `RunRecord`**.
+3. ***Blind to the load sensor* was configured out of range.** `bypassLoadThreshold` was set to
+   `1.11`, just past the overload alarm, on the reasoning that a threshold above overload can never
+   fire. `resolveLoadSensor` rejects it: the threshold is a fraction of rated load in `(0, 1]`. *Off*
+   is now `1` — a car stops taking hall calls only when it is completely full, and what the flag
+   removes is the 80 % courtesy bypass, which is exactly the handoff's own blurb.
+
+**And one false claim about a mechanism.** Three docstrings and a UI string said the loader
+*refuses* a bank whose rise exceeds its class's `maxRiseM`. `config/parse.ts` raises it as an
+**advisory** — *"the reference envelope is application guidance, not a hard limit"* — and builds the
+bank. All four are corrected to say the run happens and its round-trip times describe a machine
+outside its class. A false claim about a mechanism is the defect
+`experiments/src/validation/documentation.test.ts` exists to catch one level up; this is the same
+defect one level down, and the test that found it is the one that asserted the loader would throw.
+
+**§ 4.3 is the deviation this creates.** The handoff's ten traffic sliders (`amStart`, `pmMult`,
+`lunchMult`, …) describe § D175's day. They are replaced by rows bound to
+`SimulationDemandOptions`'s real parameters, grouped `INTENSITY` / `DIRECTION` /
+`THE SHAPE OF THE PERIOD`, each tooltip naming the field it writes. The peak-order chips survive
+because they mean something real — the directional split — and *two-way both ends* is the
+`lunch-two-way` template, whose whole purpose is a mix that swings across one period.
+
+---
+
+## D178 — every figure on the report is **re-sourced from the recording**, and energy stays an axis
+
+The handoff's observation sheet is the best-argued surface in it — *"this is one replication of one
+day on one seed; it cannot tell you that X is better than anything"* is this project's own thesis in
+the prototype's own words. Its figures are placeholders.
+
+| Handoff figure | Implemented source |
+|---|---|
+| `CARRIED` | `count(legs where alightedAt ≤ t)` (§ D176) |
+| `AWAY INSIDE A MINUTE` | an observation over served legs, never suppressed — as the handoff's own note says |
+| `AVERAGE WAIT` | `summary.meanWaitS`, **or the literal `withheld` plus `summary.awtInvalidReason`** when `awtIsValid` is false or the run saturated. The handoff reserved `withheld` for the saturated case; the implementation widens it to all four grounds |
+| `WORST WAIT` | `summary.serviceLevel.longestWaitS`, saying *at least* and *lower bound* when `longestWaitIsCensored` |
+| `DEEPEST QUEUE` | the maximum over `t` of any one floor's queue, with the floor and the clock time it happened at |
+| `TOOK THE STAIRS` | legs whose wait passed `serviceLevel.horizonS` |
+| *Where it went wrong* | derived from the run's own peak instant and reporting window. The prototype hard-codes `08:30` and `17:20`; a test asserts both strings appear nowhere, and that no clock time outside `[startedAt, endedAt]` is ever printed |
+
+**One figure is added that the handoff does not have.** Energy, as `workKJ` with
+`workPerServedLegKJ` beside it. [§ D106](#) requires energy be shown beside AWT and WT95 and never
+aggregated into a grade; the shipped viewer shows it, and dropping it to match a design that had not
+heard the argument would be a regression. It is rendered in the handoff's own figure cell, carries
+`tone: 'unranked'`, gets **no colour ranking**, and is never summed with anything. The pair is a
+biconditional in the test: both present or both absent, and no other figure on the sheet carries
+`kJ`.
+
+**Impact on phase status: none.** Every published number is unchanged, because none of them was
+recomputed — the sheet reads `VizSummary`, which reads `RunSummary`, which is the same object the
+CLI and the experiment matrix read.
+
+---
+
+## D179 — implementing a prototype **finds things in it**, and four of them were defects
+
+`docs/12-design-handoff.md` § 4.6 is the list; this is the argument for why it is a list rather than
+four quiet corrections.
+
+A design handoff that is a *working prototype* is worth far more than a set of mockups — it has
+states, interactions and copy, and every one of those is a decision somebody made and can be read
+back. It also has bugs, and its bugs look exactly like requirements. Four of them survived into the
+implementation long enough to be found by something other than reading:
+
+| Found by | The defect |
+|---|---|
+| A test asserting a control changes what is on screen | **The *show me the maths* toggle was inert.** `hasMaths = engineer` and `showMaths = st.showMaths ‖ engineer` together make the button visible exactly when the paragraph is already open |
+| A test asserting no clock time outside the run's span | **Three authored strings named hours no shift contains** — `08:30`, `14:00`, `11:30`. One of the three, *"one car is effectively half a car until 11:30"*, also promised a return to service that never happens |
+| The honesty property search, § D163 clause 1 | **The report-window row quoted `25` beside an estimate cue**, on a run whose own refused mean rounds to 25 — printing the withheld number three rows under the cell withholding it |
+| Driving the page at 900 px | **The mood card's driver rows pushed the four headline stats off screen** |
+
+**The rule this establishes.** Where the handoff and the simulator disagree about a *number*, the
+simulator wins (§ D174). Where the handoff disagrees with **itself** — a control that does nothing,
+a caption that names something not there — the implementation fixes it and records the fix. The
+alternative is reproducing a defect faithfully and calling it fidelity, which is what "match the
+design as closely as reasonably possible" does not mean.
+
+Three of the four were found by a *mechanism* rather than by review, and that is the part worth
+keeping: the toggle by a test that asserts two states differ, the clock times by a test that had
+been written to pin them as exceptions and was then tightened to forbid them, and the quoted numeral
+by a property search that has now driven 194 206 strings per campaign across 22 surfaces. The fourth
+was found by opening the page.
+
+**Impact on phase status: none.**

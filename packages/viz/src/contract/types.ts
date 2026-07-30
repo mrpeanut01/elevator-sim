@@ -72,6 +72,7 @@ import type {
  * | 4 | {@link VizRecording.passengerModel}, {@link VizLeg.destinationFloorId} and {@link VizLeg.assignedCarId} added, so a **Level-1** (destination-dispatch) run can be drawn as the thing it is. `docs/09-destination-dispatch-contract.md` § 3.1 required either this bump or a refusal in `recordRun`; § T18-D1 of `the root DECISIONS.md` records which was chosen and what was measured. |
  * | 5 | {@link VizSummary} widened to what `docs/10-experience-layer-contract.md` § 11 **W2** names: the reporting {@link VizSummary.window}, the long-wait triple, **the count every estimate was computed from** (R13), {@link VizHandlingCapacity}, {@link VizAchievedInterval}, {@link VizServiceLevel} and {@link VizEnergy}. Every field lands with the figure that draws it — `src/render/runSummary.ts`, mounted by `src/dev/main.ts` — because a field with no consumer is this repository's signature defect and W2 is the unit the design says is most likely to acquire one. |
  * | 6 | {@link VizLeg.credentialGroup} added — `docs/10` § 10.4's *"one genuine contract widening U8 needs"*, so the recording can tell **nobody came** from **nobody may come**. Its consumers land in the same change: `src/access/lockedOut.ts` classifies a locked-out landing by it, `src/render/canvas.ts` marks the landing and banners it, and `src/render/describeFrame.ts` says which credential went unread. § 10.4 asked for version 5 and W2 took that number first; this is the same field at the next one. |
+ * | 7 | {@link VizLeg.alightedAt}, {@link VizRecording.decisions} and {@link VizRecording.demandPhases} added, for `docs/12-design-handoff.md` § 3.1 BE1, BE2 and BE4. Each lands with the surface that reads it: *carried today* and the report's carried figure read `alightedAt`, the left rail's **WHY IT DID THAT** log reads `decisions`, and the transport timeline reads `demandPhases`. None of the three is derivable from version 6 — `boardedAt` is not delivery, a decision's losing bids are discarded by the time the run returns, and the phase schedule lives on the resolved template rather than on the result. |
  *
  * ## What version 4 fixed, measured rather than predicted
  *
@@ -104,7 +105,7 @@ import type {
  * a recording arrives from somewhere other than this build and the versions genuinely can
  * disagree (`UX.md` `PB-07`/`PB-15`).
  */
-export const VIZ_SCHEMA_VERSION = 6;
+export const VIZ_SCHEMA_VERSION = 7;
 
 /* -------------------------------------------------------------------------- *
  * Geometry
@@ -280,6 +281,21 @@ export interface VizLeg {
   readonly arrivedAt: SimTime;
   /** When the wait ended. `undefined` for a leg nobody ever served. */
   readonly boardedAt?: SimTime | undefined;
+  /**
+   * When this leg **left the car**. `undefined` for a leg that never boarded, and for one still
+   * riding when the horizon closed.
+   *
+   * Boarding is not delivery, and the difference is a whole car-load. The left rail's *carried
+   * today* and the report's `CARRIED` figure are both counts of people who **got where they were
+   * going**; before this field the recording could only offer `boardedLegs`, and a surface that
+   * called that "carried" would over-report by everyone currently in transit — largest at exactly
+   * the moment a reader is watching, the peak. `docs/12-design-handoff.md` § 4.2.
+   *
+   * A projection of `PassengerRecord.alightedAt`, which `core` has always recorded; nothing in
+   * `core` changed to add it here. Absent rather than `undefined` when there is none, by the same
+   * JSON-round-trip rule the four fields below keep.
+   */
+  readonly alightedAt?: SimTime | undefined;
   /** The car that served this leg. `undefined` while unserved. */
   readonly carId?: string | undefined;
   /** The bank that served this leg. `undefined` while unserved. */
@@ -316,6 +332,121 @@ export interface VizLeg {
    * because they declare no access zone.
    */
   readonly credentialGroup?: string | undefined;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Version 7 — the two things the run knew and the recording threw away
+ * -------------------------------------------------------------------------- */
+
+/**
+ * One segment of the demand template this run was driven by.
+ *
+ * **Why the recording carries the schedule rather than the viewer inventing one.** The design
+ * handoff draws a phase-segmented timeline under the stage — `AM PEAK`, `LUNCH`, `PM PEAK` — from
+ * an authored sixteen-hour office day. This simulator has no such day: demand comes from a
+ * {@link https://example.invalid | resolved demand template}, `rise-and-fall` over thirty minutes
+ * or `constant-iso` over two hours, and the template's phases are the only true answer to *what
+ * is the building being asked for right now*. A timeline labelled from anything else is a caption
+ * that does not describe the picture under it, which is the failure mode the honesty card exists
+ * to prevent. See `docs/12-design-handoff.md` § 4.1.
+ *
+ * Resolved at record time from `SimulationConfig.demandTemplate` through `core`'s own
+ * `resolveDemandTemplate`, so the segments the viewer draws are the segments the generator drew
+ * from — not a second reading of the same JSON.
+ */
+export interface VizPhase {
+  /** Stable within a recording, for a key. `${index}-${kind}`. */
+  readonly id: string;
+  /** `ramp-up`, `hold`, `ramp-down` or `flat`, derived from the intensity at the two ends. */
+  readonly kind: 'ramp-up' | 'hold' | 'ramp-down' | 'flat';
+  /** A phrase for the timeline chip. Short enough to survive a 44 px segment. */
+  readonly label: string;
+  readonly startS: SimTime;
+  readonly endS: SimTime;
+  /** Intensity multiplier at each end, `0..1`, straight off the template. */
+  readonly startIntensity: number;
+  readonly endIntensity: number;
+  /**
+   * The demand rate at the phase's midpoint, in percent of population per five minutes — the
+   * unit `docs/03-traffic-and-statistics.md` states demand in and the unit a traffic study is
+   * written in.
+   *
+   * `null` when the run's record carries no population, for the same reason
+   * {@link VizHandlingCapacity.pctPopulationPer5Min} is: a `0 %` there would read as *nobody is
+   * coming*.
+   */
+  readonly ratePctPop5min: number | null;
+  /** Whether this segment lies inside the reporting window. The window is the only quotable part. */
+  readonly inReportWindow: boolean;
+}
+
+/**
+ * One dispatch decision, as the left rail's **WHY IT DID THAT** log needs it.
+ *
+ * ## Why this is recorded and not reconstructed
+ *
+ * A viewer can already see *what* happened — a car came, a queue cleared. It has never been able
+ * to say *why that car*, and the handoff makes the answer a first-class rail section. The answer
+ * exists for exactly the duration of one `DispatchDecision`: every eligible car's weighted cost,
+ * broken down per term, best first. `Simulation` uses the winner and discards the rest, and by the
+ * time `run()` returns there is nothing left to reconstruct from. Reconstructing it afterwards
+ * would mean re-scoring against a world that has moved, which is a plausible sentence about a
+ * decision that was never made — the exact defect class this repository keeps finding.
+ *
+ * ## Why it costs nothing it should not
+ *
+ * Captured by wrapping the policy `Simulation` would have built anyway, through the
+ * `SimulationConfig.createPolicy` hook whose own docstring names *"instrumenting a real run"* as
+ * one of its two reasons to exist. The wrapper delegates and returns the delegate's value
+ * unchanged, draws no random number, reads no clock and alters no input — the same four
+ * properties `record/instrument.ts` argues for the car wrappers, and asserted the same way:
+ * `decisionLog.test.ts` compares an instrumented run's `RunRecord` against an uninstrumented
+ * one's and requires them equal.
+ *
+ * ## What it deliberately does not carry
+ *
+ * The losing cars' full breakdowns. A busy Vertical City run makes tens of thousands of decisions
+ * against 35 cars; storing every bid would be the largest array in the recording by an order of
+ * magnitude, to feed a panel that shows six rows. What is kept is the winner's own decomposition
+ * and the runner-up's cost, which is everything the sentence *"A, 12 s away — it was 3.1 s
+ * cheaper than B"* needs.
+ */
+export interface VizDecision {
+  readonly at: SimTime;
+  readonly callId: string;
+  /** `assigned`, `reassigned` or `unassigned` — the three outcomes a reader can see happen. */
+  readonly outcome: 'assigned' | 'reassigned' | 'unassigned';
+  readonly floorId: string;
+  readonly direction: Direction;
+  /** The car that took it, or `undefined` when nobody could. */
+  readonly carId?: string | undefined;
+  /** Short label of {@link carId}, as the canvas draws it. */
+  readonly carLabel?: string | undefined;
+  /** Weighted cost of the winner. `undefined` when nothing was assigned. */
+  readonly cost?: number | undefined;
+  /** Weighted cost of the next-best eligible car, for *how close was it*. */
+  readonly runnerUpCost?: number | undefined;
+  /** How many cars were eligible at all. `0` names a locked-out or fully-filtered landing. */
+  readonly eligibleCars: number;
+  /**
+   * The winner's cost decomposition, largest contribution first, truncated to the three that
+   * carry the sentence. Empty for an `unassigned` decision.
+   */
+  readonly terms: readonly VizDecisionTerm[];
+  /** `core`'s own `DecisionReason` when it gave one — `no-eligible-car` and friends. */
+  readonly reason?: string | undefined;
+  /** People standing at that landing when the decision was made, when the caller counted them. */
+  readonly waitingPassengers?: number | undefined;
+}
+
+/** One weighted term's share of a decision. A projection of `core`'s `ScoreBreakdown`. */
+export interface VizDecisionTerm {
+  readonly termId: string;
+  readonly weight: number;
+  /** The term's own unit — seconds, metres, stops. */
+  readonly raw: number;
+  /** `weight × normalized`. What this term actually contributed to the total. */
+  readonly contribution: number;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -584,6 +715,32 @@ export interface VizRecording {
   readonly legs: readonly VizLeg[];
   readonly progress: VizProgress;
   readonly summary: VizSummary;
+  /**
+   * The demand template's segments, ascending and contiguous over `[0, demandEndedAt]`.
+   *
+   * Version 7. **Empty is a legal value and means the template could not be resolved**, which is
+   * the case for a recording loaded from a file written before version 7. The transport draws a
+   * single unlabelled band then, rather than inventing a schedule — see {@link VizPhase}.
+   */
+  readonly demandPhases: readonly VizPhase[];
+  /**
+   * Every dispatch decision, ascending by `(at, callId)`.
+   *
+   * Version 7, and **empty is a legal value**: a run recorded without the decision instrumentation
+   * carries none, and the rail draws its *standing by* empty state rather than a blank box. See
+   * {@link VizDecision} for why it is captured rather than reconstructed, and
+   * {@link RecordRunOptions.recordDecisions} for how to turn it off.
+   */
+  readonly decisions: readonly VizDecision[];
+  /**
+   * Cars this run was configured to hold out of service, by runtime car id.
+   *
+   * Version 7. `recordRun` sets the mode through `Car.setMode` before the run, so the dispatcher
+   * refuses them with `infeasibleReason: 'serviceMode'` and nothing else in the group changes.
+   * Recorded because the picture must be able to draw the dark shaft it produced, and a viewer
+   * that inferred *out of service* from *never moved* would mark an idle car on a quiet morning.
+   */
+  readonly outOfServiceCarIds: readonly string[];
   /** Non-fatal diagnostics from the run, for the viewer's warning strip. */
   readonly warnings: readonly string[];
 }

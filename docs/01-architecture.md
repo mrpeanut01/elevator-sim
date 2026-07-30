@@ -259,8 +259,11 @@ packages/
 ├── viz/                   — web visualization, consumes core                    (Phase 4 complete)
 │   ├── access/            — access zoning made visible: the credential lens, the locked-out landing, the dispatcher compatibility check
 │   ├── contract/          — the recording schema and its folded series
-│   ├── record/            — instrumenting a run into a VizRecording
+│   ├── record/            — instrumenting a run into a VizRecording, and the dispatch decisions behind it
 │   ├── frame/             — the deterministic frame producer
+│   ├── live/              — what the rails read at the playhead: wait bands, observations, the phase timeline, the decision rows, the honesty card
+│   ├── shift/             — the shift layer: the five scenarios, the day's event, its goals, tenant growth, the week, the day report
+│   ├── authoring/         — the four editors' models: a slider-shaped spec, and the real configuration object it becomes
 │   ├── playback/          — the playback clock and its mapping
 │   ├── render/            — layout and the minimal Canvas renderer
 │   ├── replay/            — the replay harness and its per-field negative control
