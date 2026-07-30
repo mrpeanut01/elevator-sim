@@ -9857,6 +9857,9 @@ Its first draft filed **every** kind with no per-run predicate as unshippable �
 
 **And, measured over every admissible shipped profile: three of the seven clear from the dispatcher dropdown alone** — stage 3 by `fairness-first`, stage 4 by `destination-eta`/`destination-panel`, stage 7 by `destination-panel`. Four do not, because `beat-the-baseline` requires a paired interval excluding zero **with nothing resolving the other way**.
 
+> **Superseded on the count (2026-07-30, wave 12):** the number is **four**, re-derived and pinned
+> by a test; `GAPS.md` § 5 carries the correction. The sentence above stands as this entry's record.
+
 **§ 5.4's claim that stage 1 is *"winnable trivially"* is measurably false** under that bar, and is corrected in place rather than left as flavour text. Publishing which stages are already solved by a dropdown is less flattering than not measuring it, and it is the only version a player cannot be misled by.
 
 ### The bar is not a number somebody chose
@@ -10844,6 +10847,12 @@ describing a control the markup dropped goes red. `elementMap.test.ts`'s both-di
 check is unchanged and the frozen 34-id never-resolved list did not move — `#copy-provenance` left
 the manifest and the page together.
 
+> **Corrected (2026-07-30, wave 12):** this entry restyled `#bank-filter` and treated it as
+> load-bearing under `RS-05` while the control was **inert** — the lane audited what the control was
+> for and never asked whether it works. The filter is wired now, and the contradiction is recorded
+> where it was fixed: [§ D187](#d187). `RV-T7`'s payload defect, carried above as *not fixed here*,
+> is closed by [§ D190](#d190).
+
 **Impact on phase status: none.**
 
 ---
@@ -11365,3 +11374,206 @@ Both in [`GAPS.md`](GAPS.md).
 
 **Impact on phase status:** [§ D163](#d163) clause 1 is the gate, and it is the reason this entry
 exists rather than a status row.
+
+## D187 — the bank filter filters, and § D180 had recorded the inert control as load-bearing
+
+**Date: 2026-07-30 · Wave 12, lane V (T93).**
+
+Wave 11 restyled `#bank-filter` and [§ D180](#d180) recorded it as load-bearing, citing `RS-05` —
+which permits horizontal scroll *or* a bank filter and forbids silent truncation. `GAPS.md` then
+measured the control inert by driving it: the `change` handler wrote a binding `drawStage` never
+read, canvas bitmap hash byte-identical across `(all)`, `shuttle`, `zone-6-local` on `vertical-city`.
+**§ D180's citation was false of the shipped viewer when it was written, and this entry is the
+correction it is owed**: the wave-11 lane audited what the control was *for* and never asked whether
+it *works* — "name the non-test caller" has the sibling question nothing asked, *name the reader of
+the value*.
+
+**Decision: wire, not retire.** `RS-05`'s either/or is only satisfiable here by the filter — the
+stage already reserves the bank-label band for exactly this, and `render/layout.ts`'s `HeaderBand`
+docstring sentence *"`dev/main.ts` filters the shafts by bank"* was written ahead of the fact. It is
+now true. Mechanism: a pure `shaftsForBank(shafts, bankId)` threaded through `drawStage` →
+`buildLayout`, so the chosen bank gets the whole plot width; floor-keyed facts (queues, landings,
+locked-out floors, alarms) stay whole-building; `''` means *all* **by identity** (the same array
+through); a filter naming a bank the recording lacks falls back to unfiltered with no caption. The
+no-silent-truncation clause is a visible caption — *"bank X — showing N of M shafts"* — drawn first
+on the existing notices row, counting `columns + hiddenShaftCount` of `recording.shafts.length` so
+it composes with the capacity-overflow warning.
+
+**The § D177 test exists**: moving the filter changes `buildLayout`'s column set, `''` is asserted
+unchanged by identity, and the unknown-bank fallback is pinned. An exported PNG of a filtered stage
+carries the caption, deliberately.
+
+## D188 — `Escape` closes the drawer it can see, and the arrows seek fixed seconds
+
+**Date: 2026-07-30 · Wave 12, lane V (T94).**
+
+The right rail below 1340 px is an overlay at `z-index: 20` whose own toggle was the only way to
+close it — keyboard-trap-shaped, found by driving under § D163 clause 5 and named inside Phase 9's
+verdict. Fix: a pure `escapeClosesDrawer(viewportPx, openedByReader)` in `dev/surfaces.ts`, wired
+into `wireKeyboard`, with focus returned to `#drawer-toggle`. **Deliberately inert in column mode**:
+at ≥ 1340 px the rail is a remembered layout choice, not a modal, and `Escape` dismissing it would
+destroy state the reader set on purpose.
+
+`KX-10` landed in the same commit: `←`/`→` seek ∓5 s, `Shift+←`/`→` ∓60 s, `Home`/`End` jump to the
+run's ends, via a pure `seekActionForKey(key, shiftKey)`. The fixed-seconds seek is **distinct from
+`KX-09`'s speed-relative frame step on purpose** — two idioms, two rows — and an
+`event.defaultPrevented` guard keeps the timeline's own arrows, the tab strip and the rail segments
+from double-firing with the global handler.
+
+## D189 — the URL is a description of state, not a journal
+
+**Date: 2026-07-30 · Wave 12, lane V (T95).**
+
+`applyDeepLink` read seven params and nothing anywhere in `packages/viz` wrote one back — the
+retired rows `RV-03`/`RV-T2` had claimed otherwise and were false of this viewer (`SH-09`). Fix at
+the `renderAll` chokepoint: `history.replaceState`, never `pushState` — every state change flows
+through one path, and `pushState` would make Back unwind fifty tweaks before leaving the page.
+
+Param policy, recorded because each clause is load-bearing: **deterministic defaults are omitted**
+(derived from `initialState`, not restated, so a fresh page keeps a clean address bar); **the seed
+is always written** — it has no default, and a link without it is a different run (invariant 5
+arriving at an address bar); **nothing writes before boot completes**. The round trip is asserted
+directly — `deepLinkStateOf(deepLinkSearchOf(state))` reproduces the linked fields — and
+`applyDeepLink` has its first tests, via the pure `deepLinkStateOf` it was refactored around.
+
+## D190 — `copy run` names the traffic or refuses, and the equivalence was driven rather than assumed
+
+**Date: 2026-07-30 · Wave 12, lane V (T96).**
+
+The emitted CLI line named `--building/--dispatcher/--seed/--duration` and no traffic, so whenever
+pattern or day was non-default it reproduced a *different* run — a provenance defect carried as
+`RV-T7` then `TP-13` since the retired board. The fix was not assumable from `--traffic` existing:
+the viewer routes a pattern through `specFromTrafficProfile → demandFromSpec`, the CLI through
+`withTrafficProfile` — different mechanisms that merely ought to agree. **So the equivalence was
+driven**: 10 of 10 cells (2 buildings × the building's own demand + 4 shipped profiles, seed 123,
+900 s, sha256 over `legs`/`boardedLegs`/`waiting`) bit-identical — and the two-way cells **diverge
+without `--template lunch-two-way`**, which is why the line emits `--template` whenever the
+pattern's template is not the CLI default. One cell is re-pinned leg-for-leg in a committed test as
+the tripwire on the two pipelines staying equivalent.
+
+What no flag can express — a saved pattern, any day but the first, held cars, moved group levers,
+saved buildings or dispatchers — now **refuses with named reasons** on `#status` and copies
+nothing. A control that cannot tell the truth must say so rather than approximate; the pre-existing
+line also lied on all five of those, beyond `TP-13`'s named scope, and each is a refusal now.
+
+## D191 — the machines editor's test drives the fit, because the naive path would have called a live control dead
+
+**Date: 2026-07-30 · Wave 12, lane T (T97, T98).**
+
+`ME-07`: the machines editor was the one editor § D177's rule did not cover — four tests, all
+spec-object claims, none calling `recordRun`. The suite that closes it drives the whole shipped
+chain, and the reason is a wiring fact worth more than the suite: **`resolveCar` prefers the car's
+own `ratedSpeedMps`/`ratedLoadLb`, so a class's rated speed and capacity reach a run only through
+the building editor's *fit*** (the class-chip `onPick` snaps speed to the class typical and clamps
+load into the class range); only acceleration and jerk reach `resolveCar` directly. A test of
+`specsWithClass → resolveBuilding` alone would have produced a false *inert* finding about a
+control that works — the exact shape § D177 exists to catch, inverted.
+
+Also recorded: the speed arm must run on **Garden Apartments**, whose 3.0 m pitch makes
+0.63 → 1.00 m/s a measured 11 % round-trip change; Midtown Office is this repository's named speed
+negative control (2.5 m/s never reached on a 3.8 m pitch), and running the arm there would test the
+building, not the slider. Every arm asserts non-empty legs — a fingerprint of zero legs equals
+anything — and the unchanged-spec arm asserts bit-identity as the negative control. `CO-02`'s
+positive half landed beside it: a shipped non-default arrival pattern changes both the handed
+config and the legs.
+
+## D192 — the fifth audit, and the prose table it replaces had two rows whose docstrings named callers that do not call
+
+**Date: 2026-07-30 · Wave 12, lane A (T100).**
+
+Phase 9's clause 4 — *every unit names its non-test caller* — was satisfied by a hand table in
+`viz/src/index.ts` and re-derived by nothing; the verdict named it the clause to distrust first.
+**It is mechanised now**: `packages/viz/src/deadCode.test.ts`, the fifth copy of the audit, with
+`AUDITED_MODULES` derived from `readdirSync` and asserted in both directions so a twentieth
+directory turns the suite red. 1 017 exports, 992 live, 25 zero-caller exports classified — 8
+`DEAD_CANDIDATES`, 17 `PUBLIC_API_ONLY` — both lists asserted in both directions plus disjointness.
+
+The scanner is **inlined**, `core`'s precedent, on three verified grounds: the helper is not on
+`experiments`' barrels and cannot be (it reads `node:fs`); `boundaries.test.ts` makes the bare
+specifier an offence in every viz file; and a cross-package relative import violates `rootDir`
+under project references. Two divergences are themselves decisions: a **namespace-import rule**
+(`render/canvas.ts`'s `import * as tokens` is invisible to name-binding extraction; the rule
+carried 38 live tokens, positive-controlled both ways), and **`readSource` throws on NUL bytes and
+invalid UTF-8** rather than substituting — R24's class, the one that produced two false findings in
+wave 11, refused at the reader.
+
+**The mechanisation immediately out-performed the prose it replaces.** Two exports carry docstrings
+naming callers that do not call them: `dev/viewerRunConfig`, whose test asserts the § D153 selector
+seam **against a function no shipped path calls** (§ D159's fixture-routes-the-test shape, one file
+up); and `dev/PREFERRED_VIEWER_DISPATCHERS`, whose § D134 obligation is actually enforced by a
+duplicated literal in `state.ts`. Six more candidates are ranked in the audit. Disposition — wire
+or delete, each with its own verification — is follow-up work, deliberately not this entry's.
+
+## D193 — authored player copy is a schema field, and `$comment` is never player-facing on any file
+
+**Date: 2026-07-30 · Wave 12, lane P (T101).**
+
+[§ D186](#d186) closed the `$comment`-onto-a-driven-surface route for dispatcher cards and left two
+things open, one of which was the same route on the traffic file: `patternOptionsOf`'s `help` read
+`profile.$comment` — benign at 64 characters of player-safe copy, bounded by nothing, one authored
+paragraph from being § D186's defect again. Traffic copy cannot be derived the way a dispatcher
+blurb derives from weights (a demand vector yields numbers, and numbers beside an estimate-shaped
+card are the defect), so this is the authored-field half: **`TrafficProfile.blurb`, required, 1–160
+characters, schema-validated in `core`** — a profile with nothing to say still has to say it on
+purpose — and the card reads it and nothing else.
+
+The refusal is enforced by **adversarial injection**, not by shipped data alone: a § D186-shaped
+essay (estimate cue, colliding numerals, essay length) planted on *every* profile must reach none
+of a card's rendered strings, because a guard over today's data is only as strong as today's data.
+The guard was mutation-checked red — re-pointing `help` at `$comment ?? blurb` fails three tests —
+before landing. The dispatcher half of § D186's "left open" (an authored field in
+`data/dispatcher-profiles.json`) remains open; `blurb` is named so that field can share it.
+
+## D194 — the mode axis's second value changed nothing, and for a prose-free producer coverage is a seed, not a `covers` claim
+
+**Date: 2026-07-30 · Wave 12, lane H (T99).**
+
+`'basic'` joined `HONESTY_MODES` and the always-on corpus produced **zero new strings** — the
+measured fact, not the hoped one. No shipped adapter branches on `context.case.mode`: the
+disclosure adapter renders both `VIEW_MODES` on every case because parity compares two projections
+of one datum. The old docstring claimed the corpus would double and was wrong; it now records the
+axis as generative headroom that becomes load-bearing the day a renderer branches on case mode.
+The axis assertion tightened itself (`modes` keys now `advanced`+`basic`, 28/20 across 48 seeds).
+
+The two named string groups are driven: the elevation express toggle's `expressLabel`/`expressTitle`
+(both throws included, one via a legend no shipped spec can produce) and the access block. **The
+register's prescribed fix for the access block was half wrong**: `accessMatrixOf`/`zoneChoicesOf`
+are deliberately prose-free — facts and ids only — so `deriveTextProducers` does not list them and
+a `covers` entry naming them fails derive's own no-stale-coverage guard. For a prose-free producer,
+coverage is **seeds composing the strings exactly as the mount does**, with liveness held by the
+adapter-liveness assertion rather than by `covers`. Always-on corpus: 48 cases, 200 248 → **201 832
+strings** (+1 584, itemised per case), 22 of 23 surfaces live, **0 violations**. The deep-tier
+figures (60 / 271 985 / 23) are the acceptance run's record and are not restated by this entry; the
+next deep run renders the new seeds on every case. Six mount-private copy sentences in
+`dev/buildingEditor.ts` remain static-only; the named fix is exporting them.
+
+## D195 — the wave-12 orchestration record: a polluted measurement stopped rather than reported, and the register wrong in the pessimistic direction
+
+**Date: 2026-07-30 · Wave 12, orchestrator.**
+
+Six lanes, six worktrees, six branches — **R25's remedy held**: no commit contains another lane's
+work, `ae6750b`'s class did not recur. The rest of this entry is what went wrong anyway, because a
+wave that only records its lanes' findings is reading itself optimistically:
+
+- **The orchestrator invalidated its own baseline.** A full serial suite was started in the main
+  worktree to verify the inherited tree's green claim — and lanes were then merged into that same
+  tree while vitest read it. The result was a measurement of no tree at all (R7's class, wave 5's
+  lesson re-learned one level up: *parallelise the work, serialise the measurement* applies to the
+  orchestrator's own tree, not only to lanes). Stopped and discarded rather than quoted; the
+  integration-close serial run is the only suite figure this wave reports.
+- **The board cited § D187 before any decision carried the number.** `citations.test.ts` — installed
+  after § D138's hand-cited § D144 — went red on exactly its target class, in six worktree copies at
+  once. The number is now assigned, by this entry's neighbour.
+- **Six stale entries in `docs/07` § 8's short list, all pessimistic** — closed items still listed
+  as live debt, one item counted twice, one paragraph citing the superseded single-cell § D145
+  where § D156's sweep stands. Wave 6's six register errors were optimistic. **A register drifts in
+  whichever direction is not being read**, and the short list three screens below its own tables is
+  the least-read text in the file.
+- **Lane V edited a file outside its set** — `honesty/derive.test.ts` — because the harness's
+  designed tripwire fired on the lane's own three new exports. Judged correct at review: the
+  alternative was landing red, and the hunks were classification, not behavior. The boundary policy
+  gains the corollary: a tripwire that names the offender may be answered by the offender.
+- **Lane H stalled silently twice** waiting on a monitor that never fired, with correct work
+  sitting uncommitted both times; resumed both times by direct message. Wait on a signal you own,
+  and a lane that goes quiet holding an uncommitted edit is a lane the orchestrator pings, not
+  waits out.
