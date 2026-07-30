@@ -14,6 +14,7 @@ import { CONTEXTUAL_TABS, RAIL_SEGMENTS, TABS, type TabName } from './elementMap
 import {
   DRAWER_BREAKPOINT_PX,
   drawerStateFor,
+  escapeClosesDrawer,
   railStateFor,
   segmentAfterKey,
   surfaceStateFor,
@@ -130,6 +131,30 @@ describe('the drawer', () => {
   it('labels the toggle by what pressing it will do', () => {
     expect(drawerStateFor(1000, false).toggleLabel).toBe('Controls ▸');
     expect(drawerStateFor(1000, true).toggleLabel).toBe('Close controls');
+  });
+});
+
+describe('Escape and the drawer — SH-12 / KX-11', () => {
+  it('dismisses an open drawer below the breakpoint', () => {
+    expect(escapeClosesDrawer(DRAWER_BREAKPOINT_PX - 1, true)).toBe(true);
+  });
+
+  it('does nothing when the drawer is already closed', () => {
+    // The caller moves focus to the toggle only on a real close; a false here is what keeps
+    // Escape from stealing focus for a key that changed nothing.
+    expect(escapeClosesDrawer(DRAWER_BREAKPOINT_PX - 1, false)).toBe(false);
+  });
+
+  it('is inert in column mode, whatever the reader last chose', () => {
+    /*
+     * In column mode the rail is always shown and `drawerOpen` is a *remembered* choice, not an
+     * applied one. Escape writing it to false here would silently close the drawer the reader had
+     * open the next time the window narrows — a change to state the key visibly did nothing to.
+     */
+    for (const opened of [true, false]) {
+      expect(escapeClosesDrawer(DRAWER_BREAKPOINT_PX, opened)).toBe(false);
+      expect(escapeClosesDrawer(DRAWER_BREAKPOINT_PX + 400, opened)).toBe(false);
+    }
   });
 });
 
