@@ -354,11 +354,12 @@ function carConfigOf(car: ResolvedCar): CarConfig {
  * behind that references dropped floors would fail validation for a reason unrelated to the
  * comparison.
  *
- * **Caller obligation on double-deck hardware.** `loadConfig` raises `double-deck-not-simulated`
- * on Vertical City's shuttle and that disclaimer travels in `RunRecord.warnings`. An isolated
- * single-bank building is authored fresh, so *it* carries no such history. Do not publish a figure
- * for a double-deck bank from this function without restating the disclaimer;
- * `fiveBuildings.test.ts` refuses to reconcile that bank at all, for this reason among two others.
+ * **Caller obligation on double-deck hardware.** The simulator models the decks as of Phase 6 and
+ * the closed form does not — `analytical/roundTripTime.ts` is the single-deck Barney/CIBSE
+ * derivation, and `UP_PEAK_WARNING_CODES.doubleDeck` says so on every bank that declares one. The
+ * two therefore describe different machines *on purpose*. Do not publish a closed-form figure for a
+ * double-deck bank from this function without restating that warning; `fiveBuildings.test.ts`
+ * refuses to reconcile Vertical City's shuttle at all, for this reason among three others.
  */
 export function isolateBank(
   building: ResolvedBuilding,

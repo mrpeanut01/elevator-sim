@@ -57,6 +57,12 @@
  * checked.** Measured at 72.7 s of simulation. Nothing is capped, sampled or shortened for the
  * always-on run, and there is no reduced-budget variant of this table anywhere.
  *
+ * *"Every front"* became true rather than aspirational when {@link PINNED_FRONTS} landed: until then
+ * the always-on tier checked the front's **structure** — three active axes, nothing in two buckets,
+ * every exclusion named — and not a single one of its **memberships**, which is the half a reader
+ * quotes. See § *The categorical publication pin* at the foot of this file for the instance that
+ * says why the distinction is not pedantry.
+ *
  * What is **opt-in** (`ELEVATOR_SIM_DEEP=1`) is the thing that cannot be afforded every run and is
  * not the deliverable: the **200-replication saturation census** that re-derives each cell's
  * ceiling and each arm's paired spread — i.e. re-derives the budgets in this file rather than
@@ -91,7 +97,7 @@ import { armOf, runBenchmarkCase, type CaseResult } from './suite.js';
  *
  * `collective` rather than `eta` among the two docs/07 § 4 permits, for a reason that is measured
  * rather than aesthetic: `eta` is bit-identical to at least one other shipped profile at most cells
- * — to `fairness-first` at five, and, when this matrix was first run, to `destination-eta` at
+ * — to `fairness-first` at six, and, when this matrix was first run, to `destination-eta` at
  * **all eight** (see {@link MatrixCellResult.identityClasses}) — and a baseline that is secretly the
  * same run as one of its own arms makes that arm's whole row a row of exact zeros with nothing to
  * say. It would also have hidden the matrix's largest structural finding behind a row of zeros in
@@ -102,7 +108,15 @@ import { armOf, runBenchmarkCase, type CaseResult } from './suite.js';
  * weights `rideTime` at 0.5. It separates from `eta` at seven of the eight cells; the one where it
  * does not is named, with the measurement that shows the cell blind at every weight up to 2.0, in
  * `matrix.test.ts`. The choice of baseline is
- * unaffected — `fairness-first` is still identical to `eta` at five cells — and is left alone.
+ * unaffected — `fairness-first` is still identical to `eta` at six cells — and is left alone.
+ *
+ * **Both counts read *five* until 2026-07-30, and the correction is measured rather than editorial.**
+ * `PINNED_FRONTS` holds the class at `midtown-up-peak`, `garden-residential`, `garden-down-peak`,
+ * `secure-up-peak`, `mixed-use-up-peak` **and** `vertical-city-up-peak`; `docs/05-roadmap.md`
+ * § *What the matrix found* has said six since § D131 made the decks simulated, and named that cell
+ * as the sixth. This file was the copy that did not move. It is the same shape as the front row the
+ * same event moved and nothing re-derived — `matrixFront.test.ts` § *the drift register* — one level
+ * down, in a source docstring instead of a document.
  */
 export const MATRIX_BASELINE = 'collective';
 
@@ -705,4 +719,320 @@ export function cellResult(
     );
   }
   return found;
+}
+
+/* -------------------------------------------------------------------------- *
+ * The categorical publication pin — what the interval pins structurally cannot see
+ * -------------------------------------------------------------------------- */
+
+/**
+ * One cell's whole categorical result, keyed as a set rather than as a number.
+ *
+ * ## Why this exists, and why `PINNED_ESTIMATES` was never going to catch it
+ *
+ * `published.ts` pins every **interval** this matrix produces — 352 of them, five fields each, and
+ * `matrix.test.ts` compares all of them against a fresh full-budget run on every always-on suite.
+ * That guard is real and it is green. It is also **blind to the Pareto front by construction**, and
+ * the blindness is not a matter of degree:
+ *
+ * - A pinned figure is an arm's paired difference against {@link MATRIX_BASELINE}. The front is
+ *   decided by comparing arms **against each other**, over three axes, by
+ *   `tuning/report/pareto.ts`'s dominance rule.
+ * - The front's energy axis is the *raw* per-replication `summary.energy.workKJ` read through
+ *   `seedSetFromReplications`, not the `energyKJ` paired estimate the pin holds.
+ * - So a change in the dominance rule, in `pareto.ts`'s `maxInvalidFraction`, in the energy proxy's
+ *   wiring, or in `MODEL_SENSITIVE_METRIC_IDS` moves the published front **with every one of
+ *   the 352 pins unchanged**, and nothing turns red.
+ *
+ * **That is not hypothetical — it has already happened, in the other direction.** `7fac568` gave
+ * `core` a non-elevator transport mode and stopped charging `vertical-city`'s lobby hop to the
+ * lifts. It correctly regenerated that cell's 44 interval pins (`eta`'s AWT against the baseline
+ * moved from `+0.811 s` to `+1.066 s`, an interval that no longer spans zero on the same side), and
+ * the front at `vertical-city-up-peak` moved with them — `eta`, `fairness-first` and
+ * `destination-eta` are on it now and were not before. `docs/05-roadmap.md` § *What the matrix
+ * found* still prints the pre-`7fac568` row. Nothing was hidden and nothing was careless: **there
+ * was simply no mechanism.** `matrixFront.test.ts` § *the drift register* is that mechanism, and
+ * carries the row.
+ *
+ * This is § D149's shape one study over — a categorical figure with no standard error, guarded
+ * field-for-field through a pin table and rendered into the vocabulary a published table row must
+ * come from — with `accessControl.ts`'s `PinnedCoverage` as the precedent.
+ *
+ * ## What a pin is and is not
+ *
+ * A pin is **not** a criterion. `matrix.test.ts` § *what is asserted* is explicit that which arm
+ * wins where is the output of this study rather than its precondition, and that stands: nothing here
+ * asserts that `nearest-car` *ought* to be on any front. What is asserted is that the front the code
+ * produces today is the front this repository publishes, so that a move is a **question** — which of
+ * the two is right — rather than a silence.
+ */
+export interface PinnedFront {
+  /** The cell's budget, so a front can never be read against the wrong `n` (finding #4's shape). */
+  readonly replications: number;
+  /** Ids nothing significantly beats on every active axis. */
+  readonly front: readonly string[];
+  readonly dominated: readonly string[];
+  readonly indeterminate: readonly string[];
+  /** Arms whose own AWT was invalid at this budget — held out of the front by the table's rule. */
+  readonly unquotable: readonly string[];
+  /** Arms held out because their passenger model makes two of the three axes incomparable. */
+  readonly modelExcluded: readonly string[];
+  /**
+   * Bit-identity classes, as equivalence classes of size > 1.
+   *
+   * Pinned because they are published — `docs/05` § *What the matrix found* prints all four with
+   * their cells — and because an identity class is the one finding this project has twice had to
+   * treat as a wiring bug. `matrix.test.ts` asserts the `eta`/`destination-eta` pair specifically
+   * and asserts *structural* properties of the rest; the classes themselves were unpinned.
+   */
+  readonly identityClasses: readonly (readonly string[])[];
+  /**
+   * How many (arm, metric) cells landed on each verdict.
+   *
+   * Layer A only — no published rendering quotes it. It is here because `verdict.ts` decides a
+   * verdict from an interval **and a resolution limit**, so a change to the second moves every
+   * verdict in the table while every pinned interval stays put. The counts are the cheapest thing
+   * that sees it.
+   */
+  readonly verdicts: Readonly<Record<string, number>>;
+}
+
+/** Members in a canonical order, so a pin compares as the set it is. */
+const canonicalMembers = (members: readonly string[]): readonly string[] =>
+  Object.freeze([...members].sort());
+
+/**
+ * Two member lists, compared element by element and then by length.
+ *
+ * Element-wise rather than by a joined string, and the reason is a real trap rather than taste: any
+ * separator character orders `['a', 'b']` against `['ab', 'x']` according to whether the separator
+ * sorts before or after `b`, so the class order — and therefore the pin — would depend on which
+ * delimiter happened to be chosen. No shipped profile id collides that way today, which is exactly
+ * how such a thing survives to bite the commit that adds the id that does.
+ */
+const compareMembers = (a: readonly string[], b: readonly string[]): number => {
+  for (let index = 0; index < Math.min(a.length, b.length); index += 1) {
+    const left = a[index] ?? '';
+    const right = b[index] ?? '';
+    if (left !== right) return left < right ? -1 : 1;
+  }
+  return a.length - b.length;
+};
+
+/**
+ * A measured cell as a pin.
+ *
+ * Every membership is **sorted**, deliberately: the order `pareto.ts` returns is an artefact of the
+ * order candidates were built in, which is `[MATRIX_BASELINE, ...MATRIX_ARM_PROFILES]` and is
+ * already asserted in `matrix.test.ts`. Comparing unsorted would make a reordering of that list —
+ * a change with no effect on any result — read as eight simultaneous front changes.
+ * {@link publishedFrontRow} puts the publication order back when it renders.
+ */
+export function frontPinOf(result: MatrixCellResult): PinnedFront {
+  const verdicts: Record<string, number> = {};
+  for (const arm of result.caseResult.arms) {
+    for (const cell of arm.cells) verdicts[cell.verdict] = (verdicts[cell.verdict] ?? 0) + 1;
+  }
+  const classes = result.identityClasses
+    .map((members) => canonicalMembers(members))
+    .sort(compareMembers);
+  return Object.freeze({
+    replications: result.cell.replications,
+    front: canonicalMembers(result.front.front),
+    dominated: canonicalMembers(result.front.dominated),
+    indeterminate: canonicalMembers(result.front.indeterminate),
+    unquotable: canonicalMembers(result.unquotableArms),
+    modelExcluded: canonicalMembers(result.modelExcludedArms),
+    identityClasses: Object.freeze(classes),
+    verdicts: Object.freeze({ ...verdicts }),
+  });
+}
+
+/**
+ * Every cell's categorical result, keyed by cell id.
+ *
+ * Produced by `runMatrix()` on 2026-07-30 at the shipped defaults — no reduced budget, no sampled
+ * subset, seed {@link MATRIX_SEED} and each cell's own declared `n`. Regenerate with
+ * `matrixFront.test.ts`'s printed block, and only after answering the question a moved membership
+ * asks, which is *which* of the two is right. A front regenerated to make a suite green has
+ * destroyed the only thing this table is for.
+ */
+export const PINNED_FRONTS: Readonly<Record<string, PinnedFront>> = Object.freeze({
+  "midtown-up-peak": Object.freeze({
+    replications: 81,
+    front: Object.freeze(["capacity-aware", "destination-eta", "energy-aware", "nearest-car"]),
+    dominated: Object.freeze(["auction", "auction-multi-round", "collective", "eta", "fairness-first", "predictive-balanced", "zoned-uppeak"]),
+    indeterminate: Object.freeze([]),
+    unquotable: Object.freeze([]),
+    modelExcluded: Object.freeze(["destination-panel"]),
+    identityClasses: Object.freeze([Object.freeze(["eta", "fairness-first"])]),
+    verdicts: Object.freeze({ "BETTER": 6, "INDISTINGUISHABLE": 23, "WORSE": 15 }),
+  }),
+  "midtown-down-peak": Object.freeze({
+    replications: 78,
+    front: Object.freeze(["destination-eta", "energy-aware", "eta", "fairness-first", "zoned-uppeak"]),
+    dominated: Object.freeze(["auction", "auction-multi-round", "capacity-aware", "collective", "predictive-balanced"]),
+    indeterminate: Object.freeze([]),
+    unquotable: Object.freeze(["nearest-car"]),
+    modelExcluded: Object.freeze(["destination-panel"]),
+    identityClasses: Object.freeze([]),
+    verdicts: Object.freeze({ "BETTER": 18, "INDISTINGUISHABLE": 9, "UNQUOTABLE": 4, "WORSE": 13 }),
+  }),
+  "midtown-interfloor": Object.freeze({
+    replications: 200,
+    front: Object.freeze(["energy-aware", "eta", "nearest-car"]),
+    dominated: Object.freeze(["auction", "auction-multi-round", "capacity-aware", "collective", "destination-eta", "fairness-first", "predictive-balanced", "zoned-uppeak"]),
+    indeterminate: Object.freeze([]),
+    unquotable: Object.freeze([]),
+    modelExcluded: Object.freeze(["destination-panel"]),
+    identityClasses: Object.freeze([]),
+    verdicts: Object.freeze({ "BETTER": 23, "INDISTINGUISHABLE": 3, "WORSE": 18 }),
+  }),
+  "garden-residential": Object.freeze({
+    replications: 65,
+    front: Object.freeze(["collective", "energy-aware", "nearest-car", "zoned-uppeak"]),
+    dominated: Object.freeze(["auction", "auction-multi-round", "capacity-aware", "destination-eta", "eta", "fairness-first", "predictive-balanced"]),
+    indeterminate: Object.freeze([]),
+    unquotable: Object.freeze([]),
+    modelExcluded: Object.freeze(["destination-panel"]),
+    identityClasses: Object.freeze([Object.freeze(["auction", "auction-multi-round"]), Object.freeze(["capacity-aware", "destination-eta"]), Object.freeze(["eta", "fairness-first"])]),
+    verdicts: Object.freeze({ "BETTER": 4, "INDISTINGUISHABLE": 25, "WORSE": 15 }),
+  }),
+  "garden-down-peak": Object.freeze({
+    replications: 51,
+    front: Object.freeze(["auction", "auction-multi-round", "capacity-aware", "collective", "destination-eta", "energy-aware", "eta", "fairness-first", "nearest-car", "zoned-uppeak"]),
+    dominated: Object.freeze(["predictive-balanced"]),
+    indeterminate: Object.freeze([]),
+    unquotable: Object.freeze([]),
+    modelExcluded: Object.freeze(["destination-panel"]),
+    identityClasses: Object.freeze([Object.freeze(["auction", "auction-multi-round"]), Object.freeze(["destination-eta", "destination-panel", "eta", "fairness-first"])]),
+    verdicts: Object.freeze({ "BETTER": 4, "INDISTINGUISHABLE": 32, "WORSE": 8 }),
+  }),
+  "secure-up-peak": Object.freeze({
+    replications: 119,
+    front: Object.freeze(["energy-aware", "nearest-car"]),
+    dominated: Object.freeze(["auction", "auction-multi-round", "capacity-aware", "collective", "destination-eta", "eta", "fairness-first", "predictive-balanced", "zoned-uppeak"]),
+    indeterminate: Object.freeze([]),
+    unquotable: Object.freeze([]),
+    modelExcluded: Object.freeze(["destination-panel"]),
+    identityClasses: Object.freeze([Object.freeze(["eta", "fairness-first"])]),
+    verdicts: Object.freeze({ "BETTER": 4, "INDISTINGUISHABLE": 20, "WORSE": 20 }),
+  }),
+  "mixed-use-up-peak": Object.freeze({
+    replications: 50,
+    front: Object.freeze(["energy-aware"]),
+    dominated: Object.freeze(["auction", "auction-multi-round", "capacity-aware", "collective", "destination-eta", "eta", "fairness-first", "predictive-balanced", "zoned-uppeak"]),
+    indeterminate: Object.freeze([]),
+    unquotable: Object.freeze(["destination-panel", "nearest-car"]),
+    modelExcluded: Object.freeze(["destination-panel"]),
+    identityClasses: Object.freeze([Object.freeze(["eta", "fairness-first"])]),
+    verdicts: Object.freeze({ "BETTER": 6, "INDISTINGUISHABLE": 17, "UNQUOTABLE": 8, "WORSE": 13 }),
+  }),
+  "vertical-city-up-peak": Object.freeze({
+    replications: 50,
+    front: Object.freeze(["collective", "destination-eta", "energy-aware", "eta", "fairness-first", "nearest-car"]),
+    dominated: Object.freeze(["auction", "auction-multi-round", "capacity-aware", "predictive-balanced", "zoned-uppeak"]),
+    indeterminate: Object.freeze([]),
+    unquotable: Object.freeze([]),
+    modelExcluded: Object.freeze(["destination-panel"]),
+    identityClasses: Object.freeze([Object.freeze(["eta", "fairness-first"])]),
+    verdicts: Object.freeze({ "BETTER": 9, "INDISTINGUISHABLE": 1, "WORSE": 34 }),
+  }),
+});
+
+/**
+ * Compare a freshly-run matrix against {@link PINNED_FRONTS}, in both directions.
+ *
+ * Returns one human-readable line per disagreement, empty when there is none. Both directions for
+ * `checkPinned`'s stated reason: a cell the pin table has and the matrix no longer produces is as
+ * much a change as a membership that moved, and it is the one a "check every pin" loop tolerates.
+ */
+export function checkFrontPins(results: readonly MatrixCellResult[]): readonly string[] {
+  const failures: string[] = [];
+  const measured = new Map(results.map((result) => [result.cell.id, frontPinOf(result)]));
+
+  const sets = ['front', 'dominated', 'indeterminate', 'unquotable', 'modelExcluded'] as const;
+  for (const [cellId, pin] of Object.entries(PINNED_FRONTS)) {
+    const found = measured.get(cellId);
+    if (found === undefined) {
+      failures.push(`${cellId}: pinned, but the matrix no longer produces this cell`);
+      continue;
+    }
+    if (found.replications !== pin.replications) {
+      failures.push(
+        `${cellId}.replications: pinned ${String(pin.replications)}, measured ${String(found.replications)}`,
+      );
+    }
+    for (const field of sets) {
+      const a = pin[field].join(', ');
+      const b = found[field].join(', ');
+      if (a !== b) failures.push(`${cellId}.${field}: pinned [${a}], measured [${b}]`);
+    }
+    const pinnedClasses = pin.identityClasses.map((members) => members.join('+')).join(' | ');
+    const foundClasses = found.identityClasses.map((members) => members.join('+')).join(' | ');
+    if (pinnedClasses !== foundClasses) {
+      failures.push(
+        `${cellId}.identityClasses: pinned {${pinnedClasses}}, measured {${foundClasses}}`,
+      );
+    }
+    const verdictKeys = [...new Set([...Object.keys(pin.verdicts), ...Object.keys(found.verdicts)])].sort();
+    for (const verdict of verdictKeys) {
+      if ((pin.verdicts[verdict] ?? 0) !== (found.verdicts[verdict] ?? 0)) {
+        failures.push(
+          `${cellId}.verdicts.${verdict}: pinned ${String(pin.verdicts[verdict] ?? 0)}, measured ${String(found.verdicts[verdict] ?? 0)}`,
+        );
+      }
+    }
+  }
+  for (const cellId of measured.keys()) {
+    if (!(cellId in PINNED_FRONTS)) {
+      failures.push(`${cellId}: produced by the matrix but not pinned`);
+    }
+  }
+  return Object.freeze(failures);
+}
+
+/**
+ * A cell's front exactly as `docs/05-roadmap.md` § *What the matrix found* prints one: the member
+ * ids, comma-separated, in `[MATRIX_BASELINE, ...MATRIX_ARM_PROFILES]` order.
+ *
+ * The pin stores the front as a **set** and this restores the publication's **order**, which is the
+ * arm order the table is read in. Doing it here rather than in the pin is what keeps a reordering
+ * of `MATRIX_ARM_PROFILES` from reading as a result change: it would move every rendered row and no
+ * pinned membership.
+ */
+export function publishedFrontRow(pin: PinnedFront): string {
+  const members = new Set(pin.front);
+  return [MATRIX_BASELINE, ...MATRIX_ARM_PROFILES].filter((armId) => members.has(armId)).join(', ');
+}
+
+/**
+ * The vocabulary a published per-cell front row must be renderable from, keyed by cell id.
+ *
+ * `accessControl.ts`'s `derivedCoverageForms` for a different categorical. One rendering per
+ * cell and no second precision: unlike a coverage percentage there is nothing here to round, so a
+ * row either is the derived membership or it is a claim about a run this tree does not produce.
+ */
+export function derivedFrontRows(): ReadonlyMap<string, string> {
+  const rows = new Map<string, string>();
+  for (const [cellId, pin] of Object.entries(PINNED_FRONTS)) {
+    rows.set(cellId, publishedFrontRow(pin));
+  }
+  return rows;
+}
+
+/**
+ * The cells where `armId` is on the front, in {@link MATRIX_CELLS} order.
+ *
+ * This is what the sentence *"`nearest-car` is on the Pareto front at six of eight cells"* — which
+ * this repository states as fact in more than twenty places, and which `DECISIONS.md` § D106 makes
+ * the entire reason energy may be an axis and never a score — is a claim about. Derived from the
+ * pin table so the count and the two exceptions are both re-derived rather than transcribed.
+ */
+export function frontMembershipCells(armId: string): readonly string[] {
+  return Object.freeze(
+    MATRIX_CELLS.filter((cell) => PINNED_FRONTS[cell.id]?.front.includes(armId) === true).map(
+      (cell) => cell.id,
+    ),
+  );
 }

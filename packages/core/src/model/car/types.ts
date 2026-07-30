@@ -33,7 +33,14 @@ import type { SimTime } from '../../kernel/types.js';
 import type { DoorConfig, DoorMachineState } from '../../physics/doors/index.js';
 import type { MotionConstraints, MotionProfile } from '../../physics/motion/index.js';
 import type { AccessZone, ResolvedBuilding } from '../../config/types.js';
-import { ModelError, type CredentialGroup, type Direction, type ServiceMode } from '../types.js';
+import {
+  DECK_POSITIONS,
+  ModelError,
+  type CredentialGroup,
+  type DeckPosition,
+  type Direction,
+  type ServiceMode,
+} from '../types.js';
 
 /* -------------------------------------------------------------------------- *
  * Clock
@@ -101,6 +108,81 @@ export interface CarShaft {
   /** Lowest served floor index. `undefined` for an empty shaft, which cannot occur. */
   readonly lowestIndex: number;
   readonly highestIndex: number;
+
+  /* ---- double-deck geometry; inert and empty on a single-deck shaft ---- */
+
+  /**
+   * True when this shaft's car carries two rigidly coupled decks, so **one stop opens onto
+   * two floors at once**.
+   *
+   * Every helper below short-circuits on this flag, and every collection below is empty when
+   * it is `false`. That is what makes a single-deck building's run bit-identical to the run it
+   * produced before decks were modelled: not an assertion, a structural property.
+   */
+  readonly isDoubleDeck: boolean;
+  /**
+   * The floors a car may physically **stand at** — the lower floor of every declared pair,
+   * plus every served floor in no pair. Equal to {@link floors} on a single-deck shaft, and
+   * empty on one (read {@link stopFloorsOf} rather than this field).
+   *
+   * A double-deck car has one position per pair, not one per floor: with the lower deck at
+   * 26 the upper deck is at 27, and "the car at 27" is not a second place it can be. Travel,
+   * route order and the whole cost projection are therefore in **stop positions**, which is
+   * why this list and not {@link floors} is the shaft's set of route nodes.
+   */
+  readonly stopFloors: readonly ServedFloor[];
+  /** Served floor id to the stop position a car stands at to open onto it. */
+  readonly stopFloorIdByFloorId: ReadonlyMap<string, string>;
+  /** Stop position id to the floors it opens onto, **lower deck first**. */
+  readonly floorIdsByStopFloorId: ReadonlyMap<string, readonly string[]>;
+  /** Served floor id to the deck that opens on it. */
+  readonly deckByFloorId: ReadonlyMap<string, DeckPosition>;
+}
+
+/** Declared double-deck pairing for a shaft: `[lowerFloorId, upperFloorId]`, in any order. */
+export interface ShaftOptions {
+  readonly floorPairs?: readonly (readonly [string, string])[] | undefined;
+}
+
+/**
+ * The stop position a car stands at to open onto `floorId`.
+ *
+ * Identity on a single-deck shaft, and identity for a floor of a double-deck shaft that is
+ * in no declared pair. This is the normalization every deck-aware call site goes through:
+ * a hall call at 27 is answered by a car standing at 26.
+ *
+ * Pure.
+ */
+export function stopFloorIdOf(shaft: CarShaft, floorId: string): string {
+  if (!shaft.isDoubleDeck) return floorId;
+  return shaft.stopFloorIdByFloorId.get(floorId) ?? floorId;
+}
+
+/**
+ * The floors one stop opens onto, lower deck first — one id on a single-deck shaft, two at a
+ * paired stop of a double-deck one.
+ *
+ * Pure.
+ */
+export function floorIdsServedAt(shaft: CarShaft, stopFloorId: string): readonly string[] {
+  if (!shaft.isDoubleDeck) return [stopFloorId];
+  return shaft.floorIdsByStopFloorId.get(stopFloorId) ?? [stopFloorId];
+}
+
+/**
+ * Which deck opens on a floor. `'lower'` everywhere on a single-deck shaft, which is the
+ * reading that makes every per-deck accumulator below degenerate to the whole-car one.
+ *
+ * Pure.
+ */
+export function deckOfFloor(shaft: CarShaft, floorId: string): DeckPosition {
+  if (!shaft.isDoubleDeck) return 'lower';
+  return shaft.deckByFloorId.get(floorId) ?? 'lower';
+}
+
+/** The route nodes of a shaft: {@link CarShaft.stopFloors} for a double deck, else its floors. */
+export function stopFloorsOf(shaft: CarShaft): readonly ServedFloor[] {
+  return shaft.isDoubleDeck ? shaft.stopFloors : shaft.floors;
 }
 
 /**
@@ -109,9 +191,11 @@ export interface CarShaft {
  * @throws ModelError if the list is empty, if two floors share an id or an index, or if
  *   `heightM` does not increase strictly with `index` — a shaft whose geometry disagrees
  *   with its ordering would make "up" mean two different things and silently corrupt every
- *   direction-dependent cost term.
+ *   direction-dependent cost term. Also if a declared floor pair names a floor the shaft does
+ *   not serve, orders its two floors the wrong way round, or reuses a floor in two pairs: a
+ *   deck assignment that is not a partition would let one floor be served from two positions.
  */
-export function createShaft(floors: readonly ServedFloorInit[]): CarShaft {
+export function createShaft(floors: readonly ServedFloorInit[], options?: ShaftOptions): CarShaft {
   if (floors.length === 0) {
     throw new ModelError('A car shaft must serve at least one floor.');
   }
@@ -169,14 +253,85 @@ export function createShaft(floors: readonly ServedFloorInit[]): CarShaft {
     throw new ModelError('A car shaft must serve at least one floor.');
   }
 
+  const pairs = options?.floorPairs ?? [];
+  if (pairs.length === 0) {
+    return Object.freeze({
+      floors: Object.freeze(served),
+      floorsById: byId,
+      floorsByIndex: byIndex,
+      lowestIndex: first.index,
+      highestIndex: last.index,
+      isDoubleDeck: false,
+      stopFloors: EMPTY_FLOORS,
+      stopFloorIdByFloorId: EMPTY_STOP_FLOORS,
+      floorIdsByStopFloorId: EMPTY_DECK_FLOORS,
+      deckByFloorId: EMPTY_DECKS,
+    });
+  }
+
+  const stopFloorIdByFloorId = new Map<string, string>();
+  const floorIdsByStopFloorId = new Map<string, readonly string[]>();
+  const deckByFloorId = new Map<string, DeckPosition>();
+
+  for (const [lowerFloorId, upperFloorId] of pairs) {
+    const lower = byId.get(lowerFloorId);
+    const upper = byId.get(upperFloorId);
+    if (lower === undefined || upper === undefined) {
+      throw new ModelError(
+        `Shaft declares the deck pair ["${lowerFloorId}", "${upperFloorId}"] but does not serve ${lower === undefined ? `"${lowerFloorId}"` : `"${upperFloorId}"`}. A deck cannot open onto a floor the shaft does not reach.`,
+      );
+    }
+    if (upper.heightM <= lower.heightM) {
+      throw new ModelError(
+        `Shaft deck pair ["${lowerFloorId}", "${upperFloorId}"] is declared lower-first, but "${upperFloorId}" is at ${upper.heightM} m and "${lowerFloorId}" at ${lower.heightM} m. The upper deck must be above the lower one.`,
+      );
+    }
+    for (const floorId of [lowerFloorId, upperFloorId]) {
+      if (stopFloorIdByFloorId.has(floorId)) {
+        throw new ModelError(
+          `Shaft floor "${floorId}" appears in two deck pairs. Deck assignment must partition the paired floors, or a floor would be reachable from two car positions.`,
+        );
+      }
+    }
+    stopFloorIdByFloorId.set(lowerFloorId, lowerFloorId);
+    stopFloorIdByFloorId.set(upperFloorId, lowerFloorId);
+    floorIdsByStopFloorId.set(lowerFloorId, Object.freeze([lowerFloorId, upperFloorId]));
+    deckByFloorId.set(lowerFloorId, 'lower');
+    deckByFloorId.set(upperFloorId, 'upper');
+  }
+
+  // Everything not in a pair is served by the car as a whole and is its own stop position.
+  const stopFloors: ServedFloor[] = [];
+  for (const floor of served) {
+    if (!stopFloorIdByFloorId.has(floor.id)) {
+      stopFloorIdByFloorId.set(floor.id, floor.id);
+      floorIdsByStopFloorId.set(floor.id, Object.freeze([floor.id]));
+      deckByFloorId.set(floor.id, 'lower');
+    }
+    if (stopFloorIdByFloorId.get(floor.id) === floor.id) stopFloors.push(floor);
+  }
+
   return Object.freeze({
     floors: Object.freeze(served),
     floorsById: byId,
     floorsByIndex: byIndex,
     lowestIndex: first.index,
     highestIndex: last.index,
+    isDoubleDeck: true,
+    stopFloors: Object.freeze(stopFloors),
+    stopFloorIdByFloorId,
+    floorIdsByStopFloorId,
+    deckByFloorId,
   });
 }
+
+const EMPTY_FLOORS: readonly ServedFloor[] = Object.freeze([]);
+const EMPTY_STOP_FLOORS: ReadonlyMap<string, string> = new Map<string, string>();
+const EMPTY_DECK_FLOORS: ReadonlyMap<string, readonly string[]> = new Map<
+  string,
+  readonly string[]
+>();
+const EMPTY_DECKS: ReadonlyMap<string, DeckPosition> = new Map<string, DeckPosition>();
 
 /**
  * Build the shaft for one bank of a resolved building, folding in the building's access
@@ -210,6 +365,15 @@ export function shaftForBank(building: ResolvedBuilding, bankId: string): CarSha
 
   const permitted = credentialsByFloorId(building.accessZones);
 
+  // **The deck pairing reaches the runtime here, and only here.** The bank declares the pairs
+  // and `resolveCar` resolves the hardware, but a pairing without a double-deck car in the bank
+  // is inert config (`parse.ts` warns `unused-floor-pairs` for exactly that case), so both
+  // conditions are required before a shaft becomes deck-aware.
+  const floorPairs =
+    bank.cars.some((car) => car.doubleDeck) && bank.servesFloorPairs !== undefined
+      ? bank.servesFloorPairs
+      : undefined;
+
   return createShaft(
     bank.servesFloors.map((floorId) => {
       const floor = building.floorsById.get(floorId);
@@ -226,6 +390,7 @@ export function shaftForBank(building: ResolvedBuilding, bankId: string): CarSha
         ...(groups === undefined ? {} : { permittedCredentialGroups: groups }),
       };
     }),
+    floorPairs === undefined ? undefined : { floorPairs },
   );
 }
 
@@ -347,6 +512,40 @@ export interface CommittedStop {
   readonly alightingMassKg: number;
   /** Passengers assumed to board here. See `CAR_DEFAULTS.assumedBoardingPassengers`. */
   readonly boardingCount: number;
+  /**
+   * **Double-deck only.** How the movers at this stop divide between the two decks, so the
+   * dwell can be the *busier deck* rather than the sum.
+   *
+   * Absent on every single-deck stop, and every consumer falls back to the whole-stop counts
+   * when it is — which is why a building with no double-deck car prices exactly as it did
+   * before decks existed.
+   *
+   * The distinction is not cosmetic. Both decks open together and both empty in parallel, so a
+   * stop where four alight below and one boards above takes `4 x tp`, not `5 x tp`. Charging
+   * the sum would hand back the whole saving the hardware exists to produce: `2*P*tp` is the
+   * term the Barney/CIBSE round trip is most sensitive to, and double-deck's advantage *is* a
+   * door-time advantage.
+   */
+  readonly deckSplit?: DeckStopSplit | undefined;
+}
+
+/** Movers and boarders at one stop, split by deck. `[lower, upper]` in both fields. */
+export interface DeckStopSplit {
+  /** Alighting + boarding on each deck. The dwell is the larger of the two. */
+  readonly movers: readonly [number, number];
+  /** Boarding on each deck. The adaptive hall-dwell extension sees the larger of the two. */
+  readonly boarding: readonly [number, number];
+}
+
+/**
+ * Index of a deck within a {@link DeckStopSplit} tuple.
+ *
+ * Derived from `DECK_POSITIONS` rather than written as a ternary, so the tuple order and the
+ * categorical's declared domain cannot drift apart — and so the domain constant has a caller
+ * instead of being a list nothing reads.
+ */
+export function deckSlot(deck: DeckPosition): 0 | 1 {
+  return DECK_POSITIONS.indexOf(deck) === 1 ? 1 : 0;
 }
 
 /**

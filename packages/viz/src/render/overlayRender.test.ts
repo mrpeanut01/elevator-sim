@@ -17,7 +17,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { FIXTURE_DOOR_CONFIG } from '../fixtures.test-helper.js';
+import { FIXTURE_DOOR_CONFIG, fixtureSummary } from '../fixtures.test-helper.js';
 import { constantSeries } from '../contract/series.js';
 import {
   VIZ_SCHEMA_VERSION,
@@ -36,7 +36,7 @@ import {
   fitLabel,
   type Canvas2DLike,
 } from './canvas.js';
-import { buildLayout } from './layout.js';
+import { MIN_HEADER_PX, buildLayout } from './layout.js';
 import { LOAD_ALARM, LOAD_FULL, loadColour, loadTrackMax } from './overlay.js';
 
 /* -------------------------------------------------------------------------- *
@@ -75,6 +75,20 @@ class RecordingContext implements Canvas2DLike {
   }
   strokeRect(x: number, y: number, w: number, h: number): void {
     this.#push('strokeRect', x, y, w, h, this.strokeStyle);
+  }
+  // The four `Canvas2DLike` gained with the design handoff's stage. Recorded rather than
+  // swallowed, so a mark this panel draws with a path is as visible to a test as a `fillRect`.
+  closePath(): void {
+    this.#push('closePath');
+  }
+  quadraticCurveTo(cpx: number, cpy: number, x: number, y: number): void {
+    this.#push('quadraticCurveTo', cpx, cpy, x, y);
+  }
+  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number): void {
+    this.#push('arc', x, y, radius, startAngle, endAngle, this.fillStyle);
+  }
+  fill(): void {
+    this.#push('fill', this.fillStyle);
   }
   beginPath(): void {
     this.#push('beginPath');
@@ -155,16 +169,13 @@ const RECORDING: VizRecording = {
     boardedLegs: constantSeries(0),
     meanWaitS: constantSeries(0),
   },
-  summary: {
-    saturated: false,
-    awtIsValid: true,
-    meanWaitS: 12,
-    wait95S: 30,
-    meanTimeToDestinationS: 40,
-    generated: 5,
-    delivered: 4,
-    undelivered: 1,
-  },
+  summary: fixtureSummary({ generated: 5, delivered: 4, undelivered: 1 }),
+  // Version 7. Empty is the legal value for a fixture that exercises none of the three:
+  // the timeline draws one unlabelled band, the decision log draws its empty state, and
+  // no shaft is dark. See `contract/types.ts`.
+  demandPhases: [],
+  decisions: [],
+  outOfServiceCarIds: [],
   warnings: [],
 };
 
@@ -325,10 +336,13 @@ describe('the live metrics panel draws the metrics it was given', () => {
         bankId: `bank-${String(index % 12)}`,
       })),
     };
-    // A short viewport as well as a long list, so both sections are genuinely over budget.
+    // A short viewport as well as a long list, so both sections are genuinely over budget. The
+    // height is written as *what it leaves the panel* — 224 px — rather than as a total, because
+    // the total is not the quantity this test cares about and it moved when the header band grew
+    // a row (`render/layout.ts`'s `MIN_HEADER_PX`). Stated this way it cannot move again.
     const layout = buildLayout({
       width: 1200,
-      height: 340,
+      height: 224 + 24 + MIN_HEADER_PX + 28,
       floors: manyBanks.floors,
       shafts: manyBanks.shafts,
       overlayWidthPx: 250,

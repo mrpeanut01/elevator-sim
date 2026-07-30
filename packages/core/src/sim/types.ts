@@ -37,6 +37,7 @@
 import type {
   DirectionalSplit,
   DispatcherProfile,
+  DispatcherProfiles,
   ElevatorSpecs,
   ResolvedBank,
   ResolvedBuilding,
@@ -212,7 +213,19 @@ export const SIM_PARAMETERS: readonly SimParameterSpec[] = Object.freeze([
     id: 'sim.drainGraceS',
     type: 'continuous',
     range: [0, 86_400],
-    scale: 'log',
+    /**
+     * **Linear, because the range genuinely starts at zero.**
+     *
+     * A log-uniform draw is undefined at or below zero, so a `log` scale over `[0, …]` is a
+     * declaration no generic sampler can draw from — CLAUDE.md invariant 8's whole point — and
+     * this row declared one until T75. Two ways to fix it, and the code picks which: raise the
+     * minimum above zero, or drop the scale to linear. `resolveOptions` admits this value through
+     * `nonNegative`, and zero has a meaning there rather than being a degenerate bound — the
+     * deadline becomes the demand horizon itself, so the run may not spend a second past the end
+     * of demand. That is a legitimate configuration (an ISO constant-demand run discards its tail
+     * anyway), so **the range is right and the scale was wrong.**
+     */
+    scale: 'linear',
     default: SIM_DEFAULTS.drainGraceS,
     unit: 's',
     description:
@@ -233,7 +246,14 @@ export const SIM_PARAMETERS: readonly SimParameterSpec[] = Object.freeze([
     id: 'sim.queueSampleCount',
     type: 'integer',
     range: [0, 10_000],
-    scale: 'log',
+    /**
+     * **Linear, for {@link SIM_PARAMETERS}' `sim.drainGraceS` reason, and here the code is
+     * explicit about it.** `Simulation` guards its sampler with `queueSampleCount > 0` and
+     * `simulation.test.ts` runs the zero case on purpose: it is the documented fallback to the
+     * series `metrics` reconstructs from arrival and boarding times, not an empty bound. A range
+     * whose minimum is a named mode cannot be raised to make a log scale legal.
+     */
+    scale: 'linear',
     default: SIM_DEFAULTS.queueSampleCount,
     description:
       'Evenly spaced building-wide queue samples over the demand horizon. The direct input to saturation detection; zero falls back to the series metrics reconstructs from arrival and boarding times.',
@@ -276,6 +296,14 @@ export interface SimulationDemandOptions {
   readonly peakWindowS?: number | undefined;
   /** Intensity at both ends as a fraction of peak. `rise-and-fall` only. */
   readonly baselineFraction?: number | undefined;
+  /**
+   * How much of the authored directional-mix arc to keep, `[0, 1]`. `lunch-two-way` only.
+   *
+   * 1 is the arc as authored; **0 holds the mix flat at the period's own mean with the total
+   * demand unchanged**, which is the negative control `DECISIONS.md` § D162 condition 5 requires
+   * beside any result measured under a varying mix.
+   */
+  readonly mixAmplitude?: number | undefined;
 }
 
 /** What to do when the drain deadline fires with passengers still in the system. */
@@ -304,6 +332,28 @@ export interface SimulationConfig {
    * pair; supply it so the run and the reference data cannot drift apart.
    */
   readonly elevatorSpecs?: ElevatorSpecs | undefined;
+  /**
+   * The whole of `data/dispatcher-profiles.json`, for its file-level `patternSwitching` block.
+   *
+   * **The plural is not a typo and it is not {@link SimulationConfig.dispatcherProfile}.** That
+   * field is the one profile this run dispatches with; this one is the file it came from, supplied
+   * for the same reason {@link SimulationConfig.elevatorSpecs} is — so the run and the reference
+   * data cannot drift apart. It is named after its file, as `trafficProfiles` and `elevatorSpecs`
+   * are, because inventing a third name for `LoadedConfig['dispatcherProfiles']` would be the
+   * drift.
+   *
+   * A weight-set selector chooses among *other profiles'* weight vectors, so a policy built from
+   * one profile cannot resolve its own arms; `patternSwitching` and the profiles it names are both
+   * file-level. Supply this and `Simulation` derives the library through `weightSetSourceFrom`,
+   * which is what lets a profile opt into `selection.policy` **as data** and have
+   * `elevator-sim run` honour it (CLAUDE.md invariant 7).
+   *
+   * Omit it and a profile that asks for a selector is refused by name rather than run without one.
+   * Every shipped profile leaves `selection.policy` at `off`, under which the derived library is
+   * never read and supplying it changes nothing — byte-identical, by the same construction
+   * `dispatch/selector.ts` describes.
+   */
+  readonly dispatcherProfiles?: DispatcherProfiles | undefined;
   /** Master seed. Persisted with the record, and the whole of invariant 5. */
   readonly seed: number | bigint;
   /** `rise-and-fall` (default), `constant-iso`, or an already-resolved template. */
@@ -448,6 +498,16 @@ export interface ConservationAudit {
   readonly legsAlighted: number;
   /** Sky-lobby transfers performed. */
   readonly transfers: number;
+  /**
+   * Hops taken on a declared non-lift connection — an escalator, a stair.
+   *
+   * `0` on every building that declares no `transportModes`, which is every building
+   * except `vertical-city`. Counted separately from {@link transfers} because it is the
+   * number that says how many lift legs this run did **not** charge: before transport
+   * modes existed each of these was a hall call, a wait, a ride and the fleet distance to
+   * answer it (`DECISIONS.md` § D147 § 6).
+   */
+  readonly transportHops: number;
 
   /* ---- destination dispatch; all three are 0 under the conventional passenger model ---- */
 
@@ -602,6 +662,72 @@ export interface StageActivity {
   readonly lateArrivalHoldMaxDwellS: number;
   /** See {@link lateArrivalHoldMaxDwellS}. Passengers, not seconds. */
   readonly lateArrivalHoldMaxCohort: number;
+
+  /* ---- double-deck operation ---- */
+
+  /**
+   * Stops begun by a double-deck car.
+   *
+   * **These seven counters exist because "it looks wired" is not evidence.** Double-deck was
+   * configured, schema-validated, indexed by `Bank` and read by nothing for the whole life of
+   * the project — the eleventh instance of this repository's signature defect. Every one of
+   * them is zero on every building without a double-deck car, which is the other half of the
+   * claim: a mechanism that fires everywhere is not a mechanism, it is a regression.
+   */
+  readonly doubleDeckStops: number;
+  /**
+   * Of {@link doubleDeckStops}, those where the two decks opened onto **two different floors**
+   * at the same instant.
+   *
+   * This is the number the hardware is bought for: each one is a stop a single-deck bank would
+   * have had to make twice. A run where it is zero while `doubleDeckStops` is large has decks
+   * that never met a pair, which is a geometry problem, not a dispatch one.
+   */
+  readonly doubleDeckPairedStops: number;
+  /** Boardings taken, `[lower, upper]`. The deck assignment as it actually happened. */
+  readonly doubleDeckBoardings: readonly [number, number];
+  /** Alightings taken, `[lower, upper]`. */
+  readonly doubleDeckAlightings: readonly [number, number];
+  /**
+   * Boarders each deck's dwell was **sized** for, `[lower, upper]`.
+   *
+   * Paired with {@link doubleDeckBoardings} for the same reason `lateArrivalHoldsProjected` is
+   * paired with `lateArrivalHoldsBoarded`: a projection that does not match what the boarding
+   * loop then took is a stop given the wrong length, and the dwell is the term the round trip is
+   * most sensitive to.
+   */
+  readonly doubleDeckBoardingsProjected: readonly [number, number];
+  /**
+   * Boarding loops stopped by a **deck's** 80 % design load while the car body still had room.
+   *
+   * Non-zero is what makes the per-deck capacity rule falsifiable: it is the count of times the
+   * answer differed from the whole-car rule, and a run where it stays zero has not exercised it.
+   */
+  readonly doubleDeckDeckFullRefusals: number;
+  /**
+   * Distinct legs refused because origin and destination sit on **different decks**, and are
+   * therefore unrideable on a car whose decks are bolted together.
+   *
+   * Expected to be zero and measured at **200** on `vertical-city`, which is why it is a counter
+   * and not an assertion. `traffic/route.ts` never *routes* a cross-deck leg onto the shuttle,
+   * but a leg is not bound to a bank, so the shuttle is offered the `G → 2` and `2 → G` queues
+   * that the two ground-lobby locals serve — journeys of one floor, on floors that are the same
+   * double-deck stop position. See `Simulation.#deckAllows`.
+   */
+  readonly deckMismatchLegs: number;
+  /**
+   * Distinct legs the **bare kiosk** refused: a destination disclosed with no credential beside
+   * it, on a floor an access zone covers.
+   *
+   * Non-zero for exactly one configuration — `dispatch.callType: 'destination-entry'` with no
+   * landing panel, on a building with access zones — and zero for every profile
+   * `data/dispatcher-profiles.json` ships. It is the configuration's own measured cost
+   * (DECISIONS.md § D30's premise) stated as a count of people rather than as a rate, which is
+   * the half an unserved-fraction study cannot see: it says *who* the kiosk turned away, and
+   * therefore lets a reader tell them apart from the passengers who merely stood behind them.
+   * See `Simulation.#kioskAllows` and § T50-D1.
+   */
+  readonly kioskRefusedLegs: number;
 }
 
 /**

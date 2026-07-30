@@ -120,6 +120,7 @@ import {
   expectedPassengers as expectedPassengersOver,
   intensityAt,
   resolveDemandTemplate,
+  splitAt,
 } from './demandTemplate.js';
 import {
   batchesPerSecond,
@@ -142,6 +143,7 @@ import {
   type PassengerTrace,
   type ResolvedDemandTemplate,
   type TraceLeg,
+  type TraceTransportHop,
   type TrafficConfig,
 } from './types.js';
 
@@ -277,6 +279,19 @@ function rateText(passengersPerSecondValue: number): string {
   return `${passengersPerSecondValue.toPrecision(3)} passengers/second (${(passengersPerSecondValue * 300).toPrecision(3)} per 5 min)`;
 }
 
+/**
+ * Spread `categoryRates` onto a source, or **omit the key** when there is nothing to say.
+ *
+ * Omitted rather than zero-filled for the reason `GeneratedPassenger.transportHops` is: a trace
+ * from a run that does not vary its mix must be the object it was before mixes could vary, so that
+ * `traffic/mixIdentity.test.ts` can hold a whole run to a digest rather than to a field list.
+ */
+function withCategoryRates(
+  rates: Readonly<Record<DirectionCategory, number>> | undefined,
+): { categoryRates?: Readonly<Record<DirectionCategory, number>> } {
+  return rates === undefined ? {} : { categoryRates: rates };
+}
+
 interface ResolvedOptions {
   readonly demandLevel: DemandLevel;
   readonly interfloorWeighting: InterfloorWeighting;
@@ -388,8 +403,28 @@ export function planDemand(config: DemandConfig): DemandPlan {
 
   const rateOf = (profile: TrafficProfile): number =>
     config.arrivalRatePctPop5min ?? profile.arrivalRatePctPop5min[options.demandLevel];
+
+  // A template that varies the mix states the mix, so it takes precedence over every floor's
+  // profile — the same relationship `config.directionalSplit` already has, one level up. Combining
+  // the two is refused rather than resolved: one of them would have to win silently, and a caller
+  // who set an explicit split and got the template's instead would have no way to notice.
+  const templateSplit = template.meanDirectionalSplit;
+  if (templateSplit !== undefined && options.directionalSplit !== undefined) {
+    throw new TrafficError(
+      `Demand template "${template.id}" varies the directional mix within the run, and directionalSplit fixes it for the whole run. Set one or the other. To hold this template's mix flat at its own period mean, use templateOverrides.mixAmplitude = 0, which is the negative control rather than a different mean.`,
+    );
+  }
   const splitOf = (profile: TrafficProfile): DirectionalSplit =>
-    options.directionalSplit ?? profile.directionalSplit;
+    templateSplit ?? options.directionalSplit ?? profile.directionalSplit;
+  /** Per-category passengers/second, attached only under a mix-varying template. */
+  const categoryRatesOf = (
+    destinations: readonly DestinationWeight[],
+  ): Readonly<Record<DirectionCategory, number>> | undefined => {
+    if (templateSplit === undefined) return undefined;
+    const rates: Record<DirectionCategory, number> = { incoming: 0, outgoing: 0, interfloor: 0 };
+    for (const destination of destinations) rates[destination.category] += destination.weight;
+    return Object.freeze(rates);
+  };
 
   const entranceFloors = building.entranceFloors;
   const populatedFloors = building.floors.filter((floor) => floor.population > 0);
@@ -524,6 +559,7 @@ export function planDemand(config: DemandConfig): DemandPlan {
       peakBatchesPerSecond: batchesPerSecond(incomingRate, meanBatchSize),
       meanBatchSize,
       destinations: incomingDestinations,
+      ...withCategoryRates(categoryRatesOf(incomingDestinations)),
     });
   }
 
@@ -628,7 +664,23 @@ export function planDemand(config: DemandConfig): DemandPlan {
       peakBatchesPerSecond: batchesPerSecond(rate, profile.batchSize.mean),
       meanBatchSize: profile.batchSize.mean,
       destinations,
+      ...withCategoryRates(categoryRatesOf(destinations)),
     });
+  }
+
+  // A mix arc rescales each source's rate by `split_c(t) / meanSplit_c`, which conserves the
+  // building's total demand *exactly* only while every floor's three shares survive the
+  // feasibility filter: a share that was redistributed at the period's mean mix stays redistributed
+  // in that proportion at every other instant, rather than following the arc. No shipped building
+  // that runs this template raises it — Midtown Office declares no access zones and every floor is
+  // reachable from every entrance — so this says so rather than being silently approximate.
+  if (
+    templateSplit !== undefined &&
+    (warnings.length > 0 || strandedIncoming.length > 0 || rejections.size > 0)
+  ) {
+    warnings.push(
+      `Building "${building.id}" runs demand template "${template.id}", whose directional mix varies within the run, and some of its demand was redistributed or dropped by the feasibility filter (see the warnings beside this one). The redistribution is computed once, at the template's period-mean mix; it does not follow the arc. The building's total arrival rate is therefore conserved exactly at the mean mix and only approximately away from it.`,
+    );
   }
 
   if (strandedIncoming.length > 0) {
@@ -725,15 +777,33 @@ function credentialForRoute(
 }
 
 /** Why an origin-destination pair was rejected, or `ok`. */
-type TripFeasibility = 'ok' | 'unreachable' | 'too-many-legs' | 'no-credential';
+type TripFeasibility = 'ok' | 'unreachable' | 'too-many-legs' | 'no-credential' | 'no-lift-leg';
 
 const REJECTION_REASONS: Readonly<Record<TripFeasibility, string>> = {
   ok: 'they are fine',
   unreachable: 'no chain of banks connects them',
   'too-many-legs': 'the shortest route exceeds the maxLegs limit',
   'no-credential': 'no single credential group is permitted on every restricted floor of the route',
+  'no-lift-leg':
+    'the whole route is served by a declared escalator or stair, so it is not lift demand',
 };
 
+/**
+ * `maxLegs` bounds **elevator** legs, which is what its error message has always said. A
+ * transport hop does not count against it: the limit exists to catch a building whose zoning
+ * makes somebody change lifts five times, and an escalator is the opposite of that problem.
+ *
+ * A route with no elevator leg at all is refused rather than generated. It is a real journey and
+ * the building really serves it, but it is not *lift* demand: it would enter no queue, board no
+ * car and produce no observation, and a passenger record with zero legs cannot become a
+ * `Passenger` at all. Refusing it here puts it in the rejection census beside the other four
+ * reasons rather than crashing trace materialization later.
+ *
+ * `vertical-city` *has* such a pair — `G → 2` is its escalator and nothing else — and never
+ * generates it: floor 2 carries no population and is not an entrance, so it is neither an origin
+ * nor a destination of any demand source. `transportRoute.test.ts` asserts both halves, because a
+ * refusal no configuration can reach and a refusal nothing ever trips look the same from here.
+ */
 function classifyTrip(
   planner: RoutePlanner,
   permitted: ReadonlyMap<string, readonly CredentialGroup[]>,
@@ -742,16 +812,113 @@ function classifyTrip(
   originFloorId: string,
   destinationFloorId: string,
 ): TripFeasibility {
-  const route = planner.route(originFloorId, destinationFloorId);
-  if (route === undefined) return 'unreachable';
-  if (route.length - 1 > maxLegs) return 'too-many-legs';
-  if (enforceAccess && credentialForRoute(route, permitted) === null) return 'no-credential';
+  const plan = planner.plan(originFloorId, destinationFloorId);
+  if (plan === undefined) return 'unreachable';
+  if (plan.elevatorLegCount > maxLegs) return 'too-many-legs';
+  if (plan.elevatorLegCount === 0) return 'no-lift-leg';
+  if (enforceAccess && credentialForRoute(plan.floors, permitted) === null) return 'no-credential';
   return 'ok';
 }
 
 /* -------------------------------------------------------------------------- *
  * Trace generation
  * -------------------------------------------------------------------------- */
+
+/* -------------------------------------------------------------------------- *
+ * The mix arc, as one source sees it
+ * -------------------------------------------------------------------------- */
+
+/**
+ * How a mix-varying template rescales one demand source over time.
+ *
+ * Two numbers come out of the same multiplier, and keeping them together is what stops them
+ * drifting apart:
+ *
+ * - {@link multiplier} reweights the source's **destination table**, so a batch at time `t` picks
+ *   its floor in the proportions the mix has at `t`.
+ * - {@link thinning} reweights the source's **rate**, because a source that carries only outgoing
+ *   trips genuinely has fewer of them when the outgoing share is small. It is normalized by
+ *   {@link peakScale} so the thinning intensity stays inside `[0, 1]` — the condition
+ *   `sampleBatchArrivalTimes` requires for the acceptance test to be exact rather than
+ *   silently lossy.
+ *
+ * The plan's own base mix cancels out of the destination weights: `weight_d ∝ λ · mean_c` and the
+ * multiplier is `split_c(t) / mean_c`, so the product is `λ · split_c(t)` whatever the base was.
+ * That is why `planDemand` may plan at the period mean for numerical safety without that choice
+ * being a modelling claim.
+ *
+ * `undefined` for every source under a template that declares no mix, which is the byte-identity
+ * path: the caller then uses the single static table and the unscaled rate it always used.
+ */
+interface MixSchedule {
+  /** Largest value {@link thinning} would take before normalization. */
+  readonly peakScale: number;
+  /** `split_c(t) / meanSplit_c`, the destination-weight multiplier for category `c`. */
+  multiplier(timeS: number, category: DirectionCategory): number;
+  /** The source's rate at `t` as a fraction of its peak, in `[0, 1]`. */
+  thinning(timeS: number): number;
+}
+
+/** Exact equality of three shares. Exact, not tolerant: an ulp of mix is an ulp of arrival time. */
+function isSameSplit(split: DirectionalSplit | undefined, other: DirectionalSplit): boolean {
+  return (
+    split !== undefined &&
+    split.incoming === other.incoming &&
+    split.outgoing === other.outgoing &&
+    split.interfloor === other.interfloor
+  );
+}
+
+function mixScheduleFor(
+  template: ResolvedDemandTemplate,
+  source: DemandSource,
+): MixSchedule | undefined {
+  const mean = template.meanDirectionalSplit;
+  const rates = source.categoryRates;
+  if (mean === undefined || rates === undefined || source.peakPassengersPerSecond <= 0) {
+    return undefined;
+  }
+  // A template that *states* a mix but never moves it — `mixAmplitude: 0`, the negative control —
+  // takes the static path, and that is a correctness requirement rather than an optimization.
+  // Rescaling by a multiplier that is 1 is not free in floating point: the rate would be summed in
+  // a different order from the one `planDemand` used, and the last ulp would move every arrival
+  // time. The control must be the *same run* as an ordinary fixed-split one, so it takes the same
+  // code path. `traffic/mixIdentity.test.ts` asserts the resulting equality.
+  if (template.phases.every((phase) => isSameSplit(phase.startSplit, mean) && isSameSplit(phase.endSplit, mean))) {
+    return undefined;
+  }
+
+  const multiplier = (timeS: number, category: DirectionCategory): number => {
+    const split = splitAt(template, timeS) ?? mean;
+    const base = mean[category];
+    // A mean share of zero can only arise from two zero endpoints, so the arc is zero there too and
+    // the source carries no rate in that category. Returning 0 rather than dividing is the same
+    // answer without the NaN.
+    return base <= 0 ? 0 : split[category] / base;
+  };
+  /** The source's rate at `t`, in passengers per second, before the template's intensity. */
+  const rateAt = (timeS: number): number =>
+    rates.incoming * multiplier(timeS, 'incoming') +
+    rates.outgoing * multiplier(timeS, 'outgoing') +
+    rates.interfloor * multiplier(timeS, 'interfloor');
+
+  // `rateAt` is piecewise-linear over exactly the phase knots — each `split_c` is — so its maximum
+  // is attained at a knot and this enumeration is exact rather than a sampled approximation.
+  let peakRate = 0;
+  for (const phase of template.phases) {
+    peakRate = Math.max(peakRate, rateAt(phase.startS), rateAt(phase.endS));
+  }
+  if (!(peakRate > 0)) return undefined;
+  const peakScale = peakRate / source.peakPassengersPerSecond;
+
+  return {
+    peakScale,
+    multiplier,
+    // Clamped at 1 against floating-point overshoot at the knot that attains the maximum. The
+    // clamp can only bind by an ulp: anything larger would mean `peakRate` was not the maximum.
+    thinning: (timeS: number): number => Math.min(1, rateAt(timeS) / peakRate),
+  };
+}
 
 /** A batch before it has been sorted into trace order and given its ids. */
 interface RawBatch {
@@ -811,17 +978,21 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
   for (const source of plan.sources) {
     if (source.peakBatchesPerSecond <= 0 || source.destinations.length === 0) continue;
 
-    const destinationTable = new WeightedTable(
-      source.destinations,
-      source.destinations.map((destination) => destination.weight),
-    );
+    const mix = mixScheduleFor(template, source);
+    const staticTable =
+      mix === undefined
+        ? new WeightedTable(
+            source.destinations,
+            source.destinations.map((destination) => destination.weight),
+          )
+        : undefined;
 
     // Pass A: every arrival time for this source, drawn from `arrivals` alone.
     const times = sampleBatchArrivalTimes({
       rng: streams.arrivals,
-      peakBatchesPerSecond: source.peakBatchesPerSecond,
+      peakBatchesPerSecond: source.peakBatchesPerSecond * (mix?.peakScale ?? 1),
       durationS: template.durationS,
-      intensityAt: intensity,
+      intensityAt: mix === undefined ? intensity : (timeS) => intensity(timeS) * mix.thinning(timeS),
     });
 
     // A resident source's origin is fixed and needs no draw; an entrance source's is drawn
@@ -833,6 +1004,24 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
     for (const timeS of times) {
       const originFloor = fixedOrigin ?? entranceTable.pick(streams.origins);
       const size = drawBatchSize(streams.arrivals, profileFor(originFloor).batchSize);
+      // Under a mix arc the table is the batch's own: the same destinations, reweighted by the
+      // directional mix at the instant the batch appears. Rebuilt rather than mutated so that
+      // `pick` stays one uniform draw whatever the weights are — a rejection scheme here would
+      // make the draw count depend on the mix and desynchronize common random numbers between two
+      // configurations that differ only in it.
+      const destinationTable =
+        staticTable ??
+        new WeightedTable(
+          source.destinations,
+          source.destinations.map(
+            (destination) => destination.weight * (mix?.multiplier(timeS, destination.category) ?? 1),
+          ),
+        );
+      if (destinationTable.size === 0) {
+        throw new TrafficError(
+          `Demand source "${source.id}" has no destination with positive weight at t=${timeS} under template "${template.id}". The thinning intensity should have refused this batch; that it did not is a mismatch between the rate schedule and the destination weights.`,
+        );
+      }
 
       const picks: DestinationWeight[] = [];
       if (options.batchSharesDestination) {
@@ -877,24 +1066,41 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
           `Generated a trip from floor "${pick.floorId}" to itself. A trip that goes nowhere has no direction and no waiting time; it must not reach the model layer.`,
         );
       }
-      const route = planner.requireRoute(batch.originFloor.id, pick.floorId, options.maxLegs);
+      const plan = planner.requirePlan(batch.originFloor.id, pick.floorId, options.maxLegs);
+      const route = plan.floors;
 
       const legs: TraceLeg[] = [];
-      for (let index = 0; index + 1 < route.length; index += 1) {
-        const fromId = route[index];
-        const toId = route[index + 1];
-        if (fromId === undefined || toId === undefined) {
-          throw new TrafficError(`Route ${route.join(' -> ')} has a hole at leg ${index}.`);
+      const hops: TraceTransportHop[] = [];
+      for (const segment of plan.segments) {
+        const from = requireFloor(segment.fromFloorId);
+        const to = requireFloor(segment.toFloorId);
+        if (segment.kind === 'transport') {
+          hops.push({
+            modeId: segment.modeId,
+            originFloorId: from.id,
+            originFloorIndex: from.index,
+            destinationFloorId: to.id,
+            destinationFloorIndex: to.index,
+            // The hop sits immediately before whatever leg comes next, which is the number of
+            // legs already emitted — and equals `legs.length` at the end, meaning "after the
+            // last one".
+            beforeLegIndex: legs.length,
+            traversalTimeS: segment.traversalTimeS,
+          });
+          continue;
         }
-        const from = requireFloor(fromId);
-        const to = requireFloor(toId);
         legs.push({
-          legIndex: index,
+          legIndex: legs.length,
           originFloorId: from.id,
           originFloorIndex: from.index,
           destinationFloorId: to.id,
           destinationFloorIndex: to.index,
         });
+      }
+      if (legs.length === 0) {
+        throw new TrafficError(
+          `Route ${route.join(' -> ')} has no elevator leg; planDemand should have refused this pair.`,
+        );
       }
 
       passengerCount += 1;
@@ -913,6 +1119,9 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
         finalDestinationFloorId: pick.floorId,
         finalDestinationFloorIndex: pick.floorIndex,
         legs: Object.freeze(legs),
+        // Omitted, not emptied, when the route used no transport edge: a record from a building
+        // that declares none must be the object it was before this field existed.
+        ...(hops.length === 0 ? {} : { transportHops: Object.freeze(hops) }),
         // Mass is drawn here, in final trace order, so the mass column is a function of the
         // sorted trace rather than of the order the sources happened to be sampled in.
         massKg: drawMass(streams.passengerMass, config.profiles),
@@ -982,11 +1191,53 @@ function drawMass(rng: Rng, profiles: TrafficProfiles): number {
  * Consuming a trace
  * -------------------------------------------------------------------------- */
 
-/** The floors a journey visits, in order: `[origin, ...transfer floors, destination]`. */
+/**
+ * The floors a journey visits, in order: `[origin, ...transfer floors, destination]`.
+ *
+ * Transport hops are part of the journey, so they are part of this: a `G → 2` escalator hop
+ * followed by a `2 → 27` shuttle leg reads `["G", "2", "27"]`, not `["2", "27"]`.
+ */
 export function routeOf(record: GeneratedPassenger): readonly string[] {
   const first = record.legs[0];
   if (first === undefined) return [record.originFloorId];
-  return [first.originFloorId, ...record.legs.map((leg) => leg.destinationFloorId)];
+  const hops = record.transportHops ?? [];
+  const floors: string[] = [];
+  for (const [index, leg] of record.legs.entries()) {
+    const before = hops.find((hop) => hop.beforeLegIndex === index);
+    if (before !== undefined) floors.push(before.originFloorId);
+    floors.push(leg.originFloorId);
+    floors.push(leg.destinationFloorId);
+  }
+  const after = hops.find((hop) => hop.beforeLegIndex === record.legs.length);
+  if (after !== undefined) floors.push(after.destinationFloorId);
+  // Consecutive duplicates arise where a hop's far end is the next leg's origin, which is
+  // always. Collapse them rather than special-casing the join.
+  return floors.filter((floorId, index) => index === 0 || floors[index - 1] !== floorId);
+}
+
+/**
+ * The transport hop immediately before elevator leg `legIndex`, or `undefined`.
+ *
+ * `legIndex === record.legs.length` asks for the hop that *ends* the journey — the escalator a
+ * passenger rides after their last lift ride. See {@link TraceTransportHop.beforeLegIndex}.
+ */
+export function transportHopBefore(
+  record: GeneratedPassenger,
+  legIndex: number,
+): TraceTransportHop | undefined {
+  return (record.transportHops ?? []).find((hop) => hop.beforeLegIndex === legIndex);
+}
+
+/**
+ * Seconds of non-lift travel a journey still owes after its **last** elevator leg alights.
+ *
+ * `0` for every journey that ends on a lift, which is every journey in every building that
+ * declares no transport mode. Charged onto time-to-destination rather than thrown away: the
+ * whole point of removing the spurious leg is to stop charging the *lifts* for it, not to hand
+ * the passenger free seconds.
+ */
+export function egressTransitSecondsOf(record: GeneratedPassenger): number {
+  return transportHopBefore(record, record.legs.length)?.traversalTimeS ?? 0;
 }
 
 /** The transfer floors a journey passes through. Empty for a single-leg journey. */
@@ -1006,12 +1257,35 @@ export function transferFloorsOf(record: GeneratedPassenger): readonly string[] 
  * fresh mass from the `passengerMass` stream, but the trace already carries one drawn at
  * generation time. Using the trace's value is what keeps the passenger population a pure
  * function of `(seed, config)` and independent of the order the run happens to create people.
+ *
+ * ## Two fields the transport modes moved, and neither moves on a building without one
+ *
+ * `arrivedAt` is the batch's instant **plus** any escalator hop that comes before the first lift
+ * ride: a passenger walking onto the escalator at `G` is not standing at the `2` landing yet, and
+ * a leg whose `arrivedAt` said otherwise would report their escalator ride as *waiting*.
+ * `journeyStartedAt` stays the batch instant, so time-to-destination still spans the hop.
+ * {@link leadingTransitSecondsOf} is what the runner schedules the delayed admission on.
+ *
+ * That moves *window membership* for such a leg by the traversal time, because
+ * `PassengerRecord.arrivedAt` is the window key. It stays the property that key exists for — a
+ * **dispatcher-independent** instant, identical under every configuration being compared, because
+ * the traversal time is a constant of the building. A journey arriving inside the window whose
+ * first lift leg begins outside it is a journey whose lift service genuinely happened outside it.
+ *
+ * `finalDestinationFloorId` is the **last elevator leg's** destination rather than the journey's
+ * declared one. On every journey that ends on a lift those are the same floor and this is a
+ * no-op; on one that ends on an escalator they differ, and it is this field that
+ * `Passenger.isFinalLeg` is derived from — so making it the lift terminus is what keeps "the
+ * highest-indexed planned leg is the final leg" true, which `fuzz/properties.ts` asserts
+ * directly. The seconds to the real destination travel separately, as `egressTransitS`.
  */
 export function toPassengerInit(record: GeneratedPassenger): PassengerInit {
   const first = record.legs[0];
-  if (first === undefined) {
+  const last = record.legs[record.legs.length - 1];
+  if (first === undefined || last === undefined) {
     throw new TrafficError(`Trace record "${record.id}" has no legs; it cannot become a passenger.`);
   }
+  const egressTransitS = egressTransitSecondsOf(record);
   return {
     id: record.id,
     journeyId: record.journeyId,
@@ -1020,11 +1294,24 @@ export function toPassengerInit(record: GeneratedPassenger): PassengerInit {
     originFloorIndex: first.originFloorIndex,
     destinationFloorId: first.destinationFloorId,
     destinationFloorIndex: first.destinationFloorIndex,
-    finalDestinationFloorId: record.finalDestinationFloorId,
+    finalDestinationFloorId: last.destinationFloorId,
     journeyOriginFloorId: record.originFloorId,
     journeyStartedAt: record.arrivalTimeS,
     massKg: record.massKg,
-    arrivedAt: record.arrivalTimeS,
+    arrivedAt: record.arrivalTimeS + leadingTransitSecondsOf(record),
+    // Only when leg 0 is also the last leg does the egress hop belong to it.
+    ...(record.legs.length === 1 && egressTransitS > 0 ? { egressTransitS } : {}),
     ...(record.credentialGroup === undefined ? {} : { credentialGroup: record.credentialGroup }),
   };
+}
+
+/**
+ * Seconds between a journey's arrival instant and the landing where its first lift ride begins.
+ *
+ * `0` unless the route opens with a transport hop. The runner delays the passenger's admission
+ * by this, which is why it is a separate export rather than folded into `toPassengerInit`: the
+ * init states *when* the leg begins waiting, and the runner has to know *how long from now*.
+ */
+export function leadingTransitSecondsOf(record: GeneratedPassenger): number {
+  return transportHopBefore(record, 0)?.traversalTimeS ?? 0;
 }

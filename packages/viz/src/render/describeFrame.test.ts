@@ -15,7 +15,9 @@ import {
   breadthConfig,
 } from '../fixtures.test-helper.js';
 import { frameAt } from '../frame/frameAt.js';
-import { overlayAt } from '../frame/overlay.js';
+import { overlayAt, queueAt } from '../frame/overlay.js';
+import { describeQueue } from './riderQueue.js';
+import { buildingMood, moodObservationsOf } from './mood.js';
 import { recordRun } from '../record/recordRun.js';
 import { describeFrame } from './describeFrame.js';
 import { LOAD_ALARM } from './overlay.js';
@@ -167,5 +169,76 @@ describe('the description says which passenger model produced the run — versio
     expect(at(panel)).toContain('one call per destination');
     // The discriminating half: a constant sentence would appear on both.
     expect(at(conventional)).not.toContain('Destination dispatch');
+  }, 300_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * § 6.3 — the per-floor clause, which lands with the renderer rather than after it
+ * -------------------------------------------------------------------------- */
+
+describe('the queue reaches a reader who cannot see the glyphs', () => {
+  it('says a floor’s count, its longest wait and its band — on a real building', () => {
+    /*
+     * § 6.3: *"`describeFrame` gains, per floor with anybody on it, one clause… This is not
+     * optional; it is how the individual-glyph information reaches a reader who cannot see it."*
+     *
+     * Every clause is recomputed from `queueAt` rather than compared with a literal, so a
+     * description that stopped reading the queue would fail rather than keep saying something
+     * plausible.
+     */
+    const { recording } = recordRun(breadthConfig(config, 'midtown-office'));
+    const t = recording.startedAt + (recording.endedAt - recording.startedAt) * 0.5;
+    const queues = queueAt(recording, t);
+    const busiest = [...queues].sort((a, b) => b.total - a.total);
+    expect(busiest[0]?.total ?? 0).toBeGreaterThan(0);
+
+    const text = describeFrame({ recording, frame: frameAt(recording, t), queues });
+    for (const queue of busiest.slice(0, 6)) {
+      expect(text, `floor ${queue.floorId}`).toContain(describeQueue(queue));
+      expect(text).toContain(`Floor ${queue.floorId}: ${String(queue.total)}`);
+    }
+    // The tail is summarised rather than dropped, so the paragraph never understates the queue.
+    const rest = busiest.slice(6);
+    if (rest.length > 0) {
+      const people = rest.reduce((sum, queue) => sum + queue.total, 0);
+      expect(text).toContain(
+        `${String(rest.length)} further floors with ${String(people)} people between them`,
+      );
+    }
+  }, 300_000);
+
+  it('describes the busiest floors, not the first six in building order', () => {
+    // A reader is being told where the trouble is. Walking the building bottom to top and
+    // stopping at six would describe the quiet floors of a tower and omit the queue.
+    const { recording } = recordRun(breadthConfig(config, 'vertical-city'));
+    const t = recording.startedAt + (recording.endedAt - recording.startedAt) * 0.6;
+    const queues = queueAt(recording, t);
+    const deepest = [...queues].sort((a, b) => b.total - a.total)[0];
+    expect(deepest).toBeDefined();
+    const text = describeFrame({ recording, frame: frameAt(recording, t), queues });
+    expect(text).toContain(`Floor ${String(deepest?.floorId)}:`);
+  }, 300_000);
+
+  it('says nothing about queues when none are supplied', () => {
+    const { recording } = recordRun(breadthConfig(config, 'garden-apartments'));
+    const frame = frameAt(recording, recording.endedAt / 2);
+    expect(describeFrame({ recording, frame })).not.toContain('waiting, the longest for');
+  }, 300_000);
+});
+
+describe('the mood is spoken, on the run whose statistics are refused', () => {
+  it('says the headline, every driver and the caveat', () => {
+    const { recording } = recordRun(breadthConfig(config, 'midtown-office'));
+    expect(recording.summary.awtIsValid).toBe(false);
+    const t = recording.endedAt / 2;
+    const queues = queueAt(recording, t);
+    const mood = buildingMood(moodObservationsOf(recording, queues, t));
+    const text = describeFrame({ recording, frame: frameAt(recording, t), queues, mood });
+
+    expect(text).toContain(mood.headline);
+    for (const driver of mood.drivers) expect(text, driver.id).toContain(driver.text);
+    expect(text).toContain(mood.caveat);
+    // R6, in the sentence a screen reader hears: mid-run is a preview and says so.
+    expect(text).toContain('So far');
   }, 300_000);
 });

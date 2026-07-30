@@ -14,7 +14,7 @@ revisited before Phase 0 starts.
 
 **Read this before planning any phase.** The most expensive defect this project has produced is
 not a wrong number. It is a behaviour that is *configurable, unit-tested in isolation, and dead in
-the shipped path* — and it has now happened **nine times in code, plus once in `data/`**. Four were
+the shipped path* — and it has now happened **ten times in code, plus once in `data/`**. Four were
 in Phase 5, all four
 simultaneously: `prepositionPlan`, `CapacityReassignmentMonitor`, `createAuctionPolicy` and the
 whole arrival-model predictor were built correctly, exported, weighted by a shipped profile, and
@@ -836,10 +836,14 @@ with `weights.rideTime: 1` against `eta`, all four figures from the same runs. R
 > `@elevator-sim/experiments` barrel, because `index.test.ts` requires the two to move together and
 > the barrel was another task's file ([§ D62](../DECISIONS.md)). Wave 5 put all 34 names plus
 > `runMixedUseHighRiseStudy` on both in one commit ([§ D118](../DECISIONS.md)) — **but a barrel
-> re-export is *reachability*, not liveness**, which is the exact property all ten dead behaviours
+> re-export is *reachability*, not liveness**, which is the exact property all ten dead behaviours **in code**
 > already had, and `measureEnergyLiveness` was on two barrels and was dead. Their non-test caller is `benchmark/regeneratePins.ts`, exactly as
-> `runTailStudy`'s is, and they are reachable at their module paths. Putting them on the package
-> surface is tracked as **C27**; the name list is in § D62.
+> `runTailStudy`'s is, and they are reachable at their module paths. **This paragraph used to end
+> *"putting them on the package surface is tracked as C27"*, in the present tense, two sentences
+> after saying wave 5 had done it** — a live contradiction inside one blockquote, and the same rot
+> that left `docs/07` § 8 carrying C27 as standing debt for two waves. The list is now guarded:
+> `src/index.test.ts` parses § D62's own fence and requires every name on **both** barrels, bound
+> identically, which is the check that did not exist while the row was wrong.
 
 | metric | difference | verdict |
 |---|---|---|
@@ -881,13 +885,26 @@ optimization and true as a claim about the credential.** The prior was stated in
 replication run was an attempt to make the refutation fail.
 
 **H-ACCESS-1 — coverage. CONFIRMED, categorically, with no interval.** Secure Tower at
-interfloor-mix, 30 replications:
+interfloor-mix, 30 replications — `benchmark/accessControl.ts`'s own coverage budget, seed
+20 260 726, re-run 2026-07-28 on the tree carrying the `C35` fix and pinned in that module's
+`PINNED_COVERAGE`:
 
 | arm | replications with a quotable AWT | undelivered journeys per run | unserved |
 |---|---|---|---|
 | `eta`, `up-down-buttons` — conventional | **0 of 30** | 18.2 | 33.5 % |
-| `eta`, `destination-entry`, no credential | **0 of 30** | 27.6 | 51.7 % |
+| `eta`, `destination-entry`, no credential | **0 of 30** | 52.2 | 100.0 % |
 | `destination-eta`, `mobile-credential` | **30 of 30** | 0.0 | **0.00 %** |
+
+> **The middle row read 27.6 and 51.7 % until the `C35` fix** made a credential-less kiosk refuse the
+> *passenger* rather than the whole landing call. It moved in the direction that makes its own claim
+> **more** true — the bare kiosk now serves **nobody at all** on Secure Tower, which is
+> [§ D30](../DECISIONS.md)'s qualitative ruling arriving literally — so no verdict moved, and **that
+> is exactly why nothing went red**: `accessControl.test.ts` asserted inequalities, and every one of
+> them held more strongly afterwards. `benchmark/published.test.ts`, whose whole job is to catch a
+> published figure the code no longer produces, could not see it either: its interval layer scans for
+> literals shaped `N [N, N]` and `51.7 %` is not one, and its study layer had excluded H-ACCESS-1 on
+> the correct observation that a categorical has no standard error — read as a licence to hold
+> nothing. Both halves now carry a pin.
 
 Conventional dispatch does not perform *worse* on this building — **it does not perform.** An
 access-restricted pickup carries no credential under `up-down-buttons`, so every car answers
@@ -999,26 +1016,136 @@ gating its headline verdict on **AWT** across two passenger models — the first
 already printing it. `compare` now moves the headline to TTD when the arms' models differ, and says
 so in a block naming `core`'s own list.
 
-### Phase 6c — learned control. ⬜ **DEFERRED OUT OF THE PHASE, not dropped.**
+### Phase 6c — learned control. ⬜ **IMPLEMENTED, MEASURED, AND NOT ACCEPTED.**
 
-`LearnedDispatcher` — an RL policy, accepting component-level nondeterminism while keeping the
-environment deterministic so variance is attributable to the policy and not to the world — is **not
-started**. It was moved out of Phase 6 by [§ D28](../DECISIONS.md) for three stated reasons:
+**It is no longer deferred, and it is not accepted either.** The distinction matters: a deferral is
+an absence of evidence, and this is evidence.
 
-1. It shares no interface with 6a or 6b.
-2. It strains invariant 8 — a 400-parameter policy vector is not obviously a *declarable* tunable,
-   and the invariant exists so a generic optimizer can search without elevator-specific knowledge.
-3. Decisively, its acceptance criterion was stated in the metrics 6b makes non-comparable.
+§ D28 moved it out of Phase 6 for three stated reasons, and the first two were answered by choosing
+a shape rather than by argument:
 
-It needs its own acceptance question before it needs an implementation.
+1. *It shares no interface with 6a or 6b.* **Dissolved.** Built as **learned weight selection** — a
+   contextual policy choosing among the cost-term weight vectors already shipped in
+   `data/dispatcher-profiles.json` — it shares the very weight vector 6a and 6b price against. What
+   changes is *which* vector, and when.
+2. *It strains invariant 8 — a 400-parameter policy vector is not obviously a declarable tunable.*
+   **Dissolved by not building that.** A selection policy is a declarable tunable with type, range,
+   default and `activeWhen`, searchable by the generic optimizer invariant 8 exists for.
+3. *Decisively, its acceptance criterion was stated in the metrics 6b makes non-comparable.*
+   **Answered first, in writing, before any code existed** — the criterion is
+   [§ D139](../DECISIONS.md), gating on **TTD** because `comparabilityOf` lists AWT and WT95 among
+   nine metrics that stop being comparable across the two passenger models.
+
+**The measurement.** Midtown Office interfloor-mix, reference arm `collective` (not `nearest-car`,
+which § 4 of the handoff records as a poor reference arm), n = 200 on a **disjoint** seed under CRN:
+
+| arm | ΔTTD (the gate) | verdict |
+|---|---|---|
+| learned selection (6c) | **−0.213 [−0.440, +0.014]** | **INDISTINGUISHABLE — the interval contains zero** |
+| fuzzy detector (Phase 7's bullet) | −0.212 [−0.416, −0.007] | excludes zero, and **still below the resolution limit** |
+
+Unchanged at 24 and at 64 search candidates. Costs published beside the gate and never folded into
+it: ΔAWT +0.424 WORSE, ΔWT95 +0.675 INDISTINGUISHABLE, energy +4.807 kJ per served leg WORSE.
+
+**Both arms are in the structural regime**, whose smallest detectable effect is **1.9 s** (§ 4). An
+interval excluding zero is **not** a win when the effect is smaller than the apparatus can resolve,
+which is why the fuzzy arm is reported below the resolution limit rather than banked.
+
+**The search is not what failed.** Pointed at `idle.repositionThresholdS` — the known-answer test
+whose interior optimum is 2 s while 8 s ships — the same machinery returned **1.691 s at 64
+candidates, 1.490 s at 128, 1.874 s at 256**. It rediscovers ~2 s blind. The candidate count was
+calibrated on *that* dimension, whose answer was known, and not on the 6c result.
+
+#### The sweep — eight operating points, and the refusal holds ([§ D151](../DECISIONS.md), [§ D156](../DECISIONS.md))
+
+**The one-operating-point objection is closed by measurement, and the verdict did not move.** § D151
+pre-registered the cell set, the arms, the metric, the correction and what "accepted" would mean
+**before any sweep ΔTTD existed**; § D156 is the result. Five PRIMARY cells across three buildings
+and four traffic patterns, Holm–Bonferroni corrected across the family, n = 200, CRN, validated on a
+disjoint seed:
+
+| cell | ΔTTD | Holm | below this cell's own TTD limit? | verdict |
+|---|---|---|---|---|
+| Midtown interfloor-mix 1.0 % | **−0.265 [−0.429, −0.101]** | REJECT H0 at α = 0.010 | **yes**, 0.509 s | NOT ACCEPTED |
+| Midtown interfloor-mix 2.0 % | −0.114 [−0.553, +0.324] | retain | yes, 0.615 s | NOT ACCEPTED |
+| Garden residential 2 % | −0.111 [−0.248, +0.027] | retain | yes, 0.917 s | NOT ACCEPTED |
+| Garden down-peak 2 % | **−0.191 [−0.314, −0.069]** | REJECT H0 at α = 0.0125 | **yes**, 0.786 s | NOT ACCEPTED |
+| Midtown @ `hotel` profile 1.5 % | −0.085 [−0.262, +0.092] | retain | yes, 0.758 s | NOT ACCEPTED |
+
+**Two of the five clear the correction and are still refused**, and [§ D140](../DECISIONS.md)'s
+raise is the whole reason: both are a third to a half of their own cell's smallest detectable
+effect. **The limits are now measured on TTD at each cell** rather than inherited from § 4's
+AWT-measured 1.9 s — and every measured structural limit is **smaller** (0.509–0.991 s), which is
+the *permissive* direction, so the refusal is robust to the choice rather than propped up by it.
+
+**One SECONDARY cell clears every gate and does not accept the phase.** Midtown **down-peak 1 %**:
+ΔTTD **−2.130 [−2.730, −1.529]**, Holm-rejected, above its own 0.991 s limit, generalizing. It is
+reported and not banked, for the two reasons § D151 fixed in advance — a secondary cell is admitted
+only by excluding an arm on its ceiling and cannot accept the phase, and a significant effect at a
+cell the regime screen calls **one-regime** is a bug report until investigated. It was investigated:
+it is **not** a constant weight override (pinning the dominant weight set for the whole run is
+**+1.157 [+0.719, +1.595] WORSE**), and the learned arm really does alternate — `fairness-first`
+79.7 % of decisions, `energy-aware` 20.3 %, five changes a run. **What it learned is a busy/idle
+schedule, not a traffic-pattern selection.**
+
+**The regime screen is the finding to carry forward.** Measured before any ΔTTD: the directional
+split **does not vary within a run** at any cell — Pearson homogeneity over the time-bin ×
+direction-category table is inside its own noise everywhere, largest standardized deviation **+1.83 σ**
+— because `DemandPhase` carries a scalar intensity and `generator.ts` applies one `intensity(t)` to
+every demand source. What *does* move is the **level**, and exactly one of the five authored patterns
+(`idle`) is level-triggered. **So the shipped demand template cannot express the condition weight-set
+selection exists to exploit**, and that is a different finding from *learned control does not help*.
+
+**No status moves. Phase 6 stays ⚠️ partial.**
 
 ### Also still not built in this phase's original scope
 
-- **Double-deck operation and Vertical City.** Configured and validated on `vertical-city`,
-  **not simulated**, and disclaimed on every run of that building through
-  `WARNING_CODES.doubleDeckNotSimulated` — which reaches `SimulationResult.warnings`, `RunRecord`
-  and the CLI report ([§ D11, § D22, § D23](../DECISIONS.md), [review finding #11](08-review-findings.md)).
-  The disclaimer is the record; the capability is deferred.
+- **Double-deck operation and Vertical City. SIMULATED, and benchmarked — to a dispatcher-dependent
+  verdict, and then, once the lobby hop stopped being a lift leg, to BETTER-EVERYWHERE on a
+  narrower base.** Paired stops serving both landings, per-deck design load at 80 %, deck-bound legs, and
+  dwell charged to the **busier deck rather than the sum**. It closed the **eleventh** instance of
+  this repository's signature defect: the whole deck API on `model/bank.ts` — `isDoubleDeck`,
+  `deckAt`, `deckAssignmentFor`, `pairedFloorOf`, `servesFloorPair` — had **no non-test caller
+  anywhere**, while `vertical-city` had authored eight double-deck cars and four floor pairs since
+  the building was written and the config layer cross-validated them with four dedicated warning
+  codes. The configuration was right, the validation was right, and nothing consulted either.
+
+  **`WARNING_CODES.doubleDeckNotSimulated` is deleted**, because it became false. What survives is
+  the narrower `WARNING_CODES.missingFloorPairs`, carrying the same sentence for the one case still
+  true — a double-deck bank that declares no `servesFloorPairs` — which **no shipped building
+  raises**. The `analytical/upPeak.ts` warning was **kept and strengthened**: the Barney/CIBSE closed
+  form *is* the single-deck derivation, so retiring it would have been the over-claim
+  ([§ D11, § D22, § D23](../DECISIONS.md), [review finding #11](08-review-findings.md)).
+
+  **The verdict, on `vertical-city` up-peak, ΔTTD paired-t 95 % under CRN — and it has moved
+  once, for a stated cause.** It was `DISPATCHER-DEPENDENT`: WORSE under `eta`
+  (`+1.950 [+0.975, +2.925]` at 1 %), BETTER under `collective` (`−1.408 [−2.400, −0.416]` at 1 %
+  and `−5.291 [−6.350, −4.232]` at 1.5 %), with one cell permanently unresolvable. That was
+  measured on a building with **no escalator**, where a car boarding at `G` can only alight on
+  lower-pair floors and the resulting `G → 2` lobby hop had nowhere to go but a local lift —
+  **110 of 593 journeys gained a leg**, and the WORSE row was published as an *upper bound on the
+  cost of double-deck rather than its true cost*.
+
+  `core` now has a non-elevator transport mode and `vertical-city` declares one at `G ↔ 2`. Re-run
+  at the same seed and the same pre-registered budgets, the excess-leg gap falls from
+  **+10.80 % / +11.56 %** to **+1.32 % / +1.70 %** — and what is left is *report-window
+  membership* rather than a decomposition difference, because at these points the two arms now
+  plan identical leg counts journey for journey — `eta` at 1 % becomes
+  `−2.729 [−3.550, −1.907]` **BETTER**, `collective` at 1 % `−6.262 [−7.210, −5.315]` **BETTER**,
+  and the gate reads **`BETTER-EVERYWHERE`**. **Read it with its cost:** the 1.5 % point dropped
+  out entirely — both double-deck cells lose their AWT inside n = 200 — so the new word rests on
+  **two cells at one operating point** where the old one rested on four at two, and ΔAWT moved the
+  *other* way (`eta` @ 1 %: −0.355 BETTER → +0.785 WORSE) because the legs removed were the cheap
+  one-floor ones. Energy is still WORSE in every quotable cell and still **not** because it served
+  fewer people: `unservedFraction` is exactly 0 on both arms at every replication. The intuitive
+  *fewer stops ⇒ less driving* is refuted here in both revisions.
+
+  **`vertical-city` has since declared an escalator at all three sky lobbies as well, and not one
+  figure above moved.** The reason is measured rather than assumed: this study's only comparable
+  regime is incoming-only up-peak from `G`, and none of the building's 92 populated destinations
+  changes route when those three edges exist — on either arm. **The base did not widen**, so the
+  word `BETTER-EVERYWHERE` is exactly as strong as it was: two cells at one operating point, with
+  the 1.5 % point still UNQUOTABLE.
 
 ---
 
@@ -1035,13 +1162,30 @@ Search the parameter space instead of hand-guessing weights. Full design in
 - Random search baseline, Bayesian optimization, CMA-ES; OCBA for final selection
 - Held-out traffic seeds for validation
 - Pareto front reporting over (AWT, energy, WT95)
-- ⬜ **NOT DONE — Fuzzy traffic-pattern detector with hysteresis, driving per-pattern weight sets.**
-  This bullet was listed as delivered and no detector exists.
-  `data/dispatcher-profiles.json` authors a complete `patternSwitching` block — `type: "fuzzy"`,
-  four inputs, five patterns, `hysteresisS: 120`, a `weightSetsByPattern` map — which is
-  schema-validated, typed on the public `core` barrel, and cross-checked for dangling profile names,
-  and **nothing reads it**. A user editing `weightSetsByPattern` sees a clean `loadConfig` and zero
-  behavioural change: the defect one level up from code, into data.
+- ✅ **DONE — Fuzzy traffic-pattern detector with hysteresis, driving per-pattern weight sets**
+  ([§ D143](../DECISIONS.md)). **This bullet was `⬜ NOT DONE` for two waves and the reason is worth
+  keeping**: `data/dispatcher-profiles.json` authored a complete `patternSwitching` block —
+  `type: "fuzzy"`, four inputs, five patterns, `hysteresisS: 120`, a `weightSetsByPattern` map —
+  schema-validated, typed on the public `core` barrel, cross-checked for dangling profile names, and
+  **read by nothing**. A user editing `weightSetsByPattern` saw a clean `loadConfig` and zero
+  behavioural change: the defect one level up from code, into data
+  ([review finding #5](08-review-findings.md), [§ D12](../DECISIONS.md)).
+
+  It is live now, and its liveness was **measured on trajectories rather than read**: two
+  configurations differing only in `weightSetsByPattern` produce different car paths on one seed —
+  137 moves against 135, first divergence at move 42 — which is the assertion finding #5 prescribed.
+  The detector entered `idle → interfloor → two-way → up-peak → interfloor → two-way → interfloor →
+  two-way` over one run, 8 switches. `timeOfDay` was **dropped** from its declared inputs: a wall
+  clock in `core` violates invariant 3, and it would have been a constant near zero wearing a
+  feature's name. `weightSetsByPattern.idle` named `energy-saver`, which **no profile authors**; it
+  is repointed to `energy-aware` and `resolveWeightSets` now **throws** on a dangling name rather
+  than silently missing a regime ([§ D142](../DECISIONS.md)).
+
+  **Measured, and reported below the resolution limit**: ΔTTD `−0.212 [−0.416, −0.007]` against
+  `collective` at n = 200 — an interval that **excludes zero** and is still not a win, because the
+  effect is smaller than the ~1.9 s this structural regime can resolve
+  ([§ 4](07-handoff.md), [§ D140](../DECISIONS.md)). Reporting it as a win would have been the
+  wave's easiest over-claim.
   [Review finding #5](08-review-findings.md), confirmed by measurement and recorded as deliberately
   unimplemented scope in [`DECISIONS.md` § D12](../DECISIONS.md). It is deferred rather than dropped
   because it is a genuinely new *behaviour* — a controller that switches the whole weight vector
@@ -1396,9 +1540,22 @@ non-default `CarConfig.mode`.
 
 **Re-measured on 2026-07-28 by running `runMatrix()` on this tree** (8 cells, 12 arms, CRN within
 each cell, budgets as derived in `matrix.ts`, `MATRIX_SEED = 20 260 728`) — **after** § D112 authored
-`destination-eta`'s `rideTime` weight, which moves two rows of the table below. Not transcribed from
-the commit that produced it, and not carried over from the version of this section that predated the
-weight.
+`destination-eta`'s `rideTime` weight, and **after [§ D131](../DECISIONS.md) made double-deck
+operation simulated rather than merely configured.** Not transcribed from the commit that produced
+it, and not carried over from any earlier version of this section.
+
+> **The `vertical-city-up-peak` row is measured on different hardware from every version of this
+> table before [§ D150](../DECISIONS.md).** `vertical-city` is the only shipped building that
+> declares double-deck cars, so it is the only cell the eleventh dead seam's closure could move —
+> and it moved all 44 of its pins and none of the other 308. Every other row below is byte-identical
+> to the version § D112 produced. Read the `vertical-city-up-peak` row as *what eight double-deck
+> shuttles do*; the rows above it are unchanged single-deck measurements.
+
+**Every identity claim below carries the `(cell, seed, n)` it was measured at**, because
+[§ D136](../DECISIONS.md) established that an identity class belongs to an operating point and a
+budget rather than to a cell: `destination-eta ≡ eta` at `garden-down-peak` is true at n = 51 at both
+seeds and **false at n = 200** at one of them. Unless stated otherwise every figure here is at
+`MATRIX_SEED = 20 260 728` and at that cell's own derived `n`, given in the table.
 
 **1. `nearest-car` is on the Pareto front at six of the eight cells** — and it is there *because it
 is worse at serving people*. Measured front membership, one row per cell:
@@ -1412,10 +1569,10 @@ is worse at serving people*. Measured front membership, one row per cell:
 | `garden-down-peak` | 51 | collective, **nearest-car**, eta, energy-aware, fairness-first, capacity-aware, auction, auction-multi-round, zoned-uppeak, `destination-eta` |
 | `secure-up-peak` | 119 | **nearest-car**, energy-aware |
 | `mixed-use-up-peak` | 50 | energy-aware |
-| `vertical-city-up-peak` | 50 | **nearest-car**, eta, energy-aware |
+| `vertical-city-up-peak` | 50 | collective, **nearest-car**, eta, energy-aware, fairness-first, `destination-eta` |
 
 `nearest-car` is the arm this document elsewhere calls too weak a baseline to separate anything, and
-it is the viewer's default. It reaches the front by being **best on energy and worst on wait**: a
+it was the viewer's default until [§ D134](../DECISIONS.md). It reaches the front by being **best on energy and worst on wait**: a
 dispatcher that drives less carries fewer people, and a front is non-domination, not merit. This is
 the whole reason [`docs/10`](10-experience-layer-contract.md) § 5.5 forbids an aggregated "eco"
 score — one would rank the worst dispatcher first. **Energy is an axis, never a score.**
@@ -1426,26 +1583,91 @@ score — one would rank the worst dispatcher first. **Energy is an axis, never 
 > `nearest-car` is still on the front at exactly six. The two departures are the interesting ones:
 > at those cells `destination-eta` was on the front only by being bit-identical to an arm already on
 > it, so it left the front by *becoming a distinct dispatcher* rather than by getting worse.
+>
+> > **⚠️ The `vertical-city-up-peak` half of that sentence is SUPERSEDED** by `7fac568`, two notes
+> > below. `destination-eta` is on that cell's front in this tree. The `midtown-interfloor` half
+> > stands.
+
+> **One row moved again when double-deck operation was simulated, and the `nearest-car` count did
+> not.** At `vertical-city-up-peak` (n = 50, seed 20 260 728) `eta` **leaves** the front and the
+> baseline `collective` **joins** it; `nearest-car` and `energy-aware` stay. No other cell's
+> membership changed, so **`nearest-car` is still on the front at exactly six of eight** — the same
+> six: `midtown-up-peak`, `midtown-interfloor`, `garden-residential`, `garden-down-peak`,
+> `secure-up-peak`, `vertical-city-up-peak`. The mechanism is visible in the pins: `eta`'s AWT
+> against the baseline moves from **+0.101 s** (an interval spanning zero) to **+0.811 s** (an
+> interval excluding zero on the *worse* side), so `eta` stops dominating `collective` and
+> `collective` becomes non-dominated. **`eta` did not get better or worse than it was measured to
+> be — it was previously measured on hardware the building does not have.**
+>
+> > **⚠️ The paragraph above is SUPERSEDED, and the row in the table has been corrected.** It is left
+> > standing because the correction is only legible as a correction beside it — and because the way it
+> > went stale is the point.
+> >
+> > **`7fac568` moved this cell again, and nothing followed it here.** That commit gave `core` a
+> > non-elevator transport mode ([§ D167](../DECISIONS.md)): `traffic/route.ts` plans a journey as
+> > reachability over service zoning, every edge of that graph had been a lift bank, and so the ground
+> > hop of `vertical-city`'s two-level lobby — which the real building serves with an **escalator** —
+> > had been routed onto `zone-1-local`. It correctly regenerated all of this cell's interval pins,
+> > **108 references in `published.ts`**, including `eta`'s AWT against the baseline from
+> > `+0.811` to **`+1.066 [+0.700, +1.432]`**. The Pareto front is computed from the same run, so it
+> > moved with them.
+> >
+> > The front at `vertical-city-up-peak` is now the **six** arms in the table:
+> > `collective`, `nearest-car`, `eta`, `energy-aware`, `fairness-first`, `destination-eta` — so
+> > `eta` is back on it, and the identity class there is `eta ≡ fairness-first`. The
+> > *"`eta` **leaves** the front"* sentence above, and the earlier note's claim that `destination-eta`
+> > *"**leaves** it at … `vertical-city-up-peak`"*, are both false about this tree.
+> >
+> > **`nearest-car` is still on the front at exactly six of eight, and that is why nobody noticed.**
+> > § D106, `docs/10` § 5.5's refusal of an aggregated eco score, and *energy is an axis, never a
+> > score* all rest on **the count** — and the count was right the whole time the table under it was
+> > wrong. This is [§ D149](../DECISIONS.md)'s shape exactly: *a stale number that still supports its
+> > own sentence is the only kind nobody re-checks, and it is worse than one that contradicts it.*
+> >
+> > **Nothing was careless. There was no mechanism.** Every one of the 352 interval pins is an
+> > arm-against-baseline paired estimate; front membership is decided **arm-against-arm** by
+> > `tuning/report/pareto.ts` over raw per-replication energy. No interval pin can see a front move, so
+> > a change to the dominance rule, to `pareto.ts`'s invalid-fraction tolerance, to the energy proxy's
+> > wiring or to `verdict.ts`'s resolution limit moves this table with every pin green. There is a
+> > mechanism now — `matrix.ts`'s `PINNED_FRONTS` and `matrixFront.test.ts`, which re-derive every
+> > cell's front, identity classes and verdict census from the run the suite **already pays for**, and
+> > scan this document for the row ([§ D184](../DECISIONS.md)). Cost: ~0.3 s.
 
 **2. `destination-eta` used to be bit-identical to `eta` at all eight cells, and is now identical at
 one.** It authored `dispatch.callType: mobile-credential` and a weight vector identical to `eta`'s,
 so the destination reached `estimateCost` and changed no decision — a shipped, schema-valid,
 separately-tested profile with no effect on any shipped path. Closed by
 [§ D112](../DECISIONS.md): `weights.rideTime: 0.5`, chosen against two criteria stated *before* the
-sweep. **The one cell where it is still identical is `garden-down-peak`, and that is structural, not
-a weight being too small** — measured bit-identical there at `rideTime` 0.3, 1.0 **and** 2.0, because
-every down trip ends at the lobby and the destination carries nothing the direction button did not.
-Raising the weight fourfold not moving it is how a *blind operating point* is told from a *dead
-seam*.
+sweep. **The one cell where it is still identical is `garden-down-peak` at n = 51, and that is
+structural, not a weight being too small** — measured bit-identical there at `rideTime` 0.3, 1.0
+**and** 2.0, because every down trip ends at the lobby and the destination carries nothing the
+direction button did not. Raising the weight fourfold not moving it is how a *blind operating point*
+is told from a *dead seam*. **The budget is load-bearing and is not decoration:**
+[§ D136](../DECISIONS.md) re-measured this same cell at **n = 200** and the class does *not* hold
+there, at one of the two seeds. Simulating double-deck did not touch this cell — `garden-apartments`
+declares no double-deck car — and all 44 of its pins are byte-identical.
 
-**3. Three more identity classes, two of them unchanged and one new.** `fairness-first` is
-bit-identical to `eta` at five cells (`midtown-up-peak`, `garden-residential`, `garden-down-peak`,
-`secure-up-peak`, `mixed-use-up-peak`) and `auction-multi-round` to `auction` at both Garden cells —
-both unchanged by the weight. **New:** `destination-eta ≡ capacity-aware` at `garden-residential`,
-which no prior report names; and `garden-down-peak`'s class is
-`{eta, fairness-first, destination-eta, destination-panel}`, i.e. the Level-1 panel is in it too.
-Reported rather than filtered: an arm that is secretly another arm is a result about that arm — and
-an arm that stops being one arm and becomes another is not a fix, it is a new fact.
+**3. Three more identity classes — one of them wider than it was, and the widening is double-deck's
+doing.** With every claim at `MATRIX_SEED = 20 260 728` and its cell's own `n`:
+
+| class | cells | n at each | moved by double-deck? |
+|---|---|---|---|
+| `eta ≡ fairness-first` | `midtown-up-peak`, `garden-residential`, `garden-down-peak`, `secure-up-peak`, `mixed-use-up-peak`, **`vertical-city-up-peak`** | 81, 65, 51, 119, 50, **50** | **yes — six cells, not five** |
+| `auction ≡ auction-multi-round` | `garden-residential`, `garden-down-peak` | 65, 51 | no |
+| `destination-eta ≡ capacity-aware` | `garden-residential` | 65 | no |
+| `destination-eta ≡ eta` | `garden-down-peak` only | 51 | no |
+
+**`eta ≡ fairness-first` gained a sixth cell, `vertical-city-up-peak`, and it gained it by the decks
+being simulated.** Before, the two arms were distinct there (`eta` +0.101 s on AWT, `fairness-first`
++0.218 s); now both read **+0.811 s** and every one of their four metrics agrees bit-for-bit. The
+reading is that a double-deck shuttle bank leaves `fairness-first`'s starvation term nothing to
+break the tie on — but **that reading is unmeasured**: nothing here isolates the term, and the
+mechanism has not been tested by removing it. Recorded as a claim to check, not as a finding.
+
+`garden-down-peak`'s class remains `{eta, fairness-first, destination-eta, destination-panel}` at
+n = 51 — the Level-1 panel is in it too — and § D136 shows that class narrowing at n = 200. Reported
+rather than filtered: an arm that is secretly another arm is a result about that arm, and an arm
+that becomes another arm when the hardware changes is a new fact rather than a regression.
 
 **4. Saturation ceilings are a property of (building, traffic, seed), not of a building.** Midtown
 up-peak's `nearest-car` ceiling is **287** in `arms.ts` at seed 20 260 726 and **174** in `matrix.ts`
@@ -1482,6 +1704,123 @@ at its own seed and operating point. Neither is wrong; inheriting either across 
 
 ---
 
+## Phase 9 — Experience layer
+
+The layer that lets somebody who is not a lift engineer drive this simulator without being lied to.
+Designed in [`docs/10`](10-experience-layer-contract.md); built, since wave 10, to the interface
+handoff vendored at [`docs/design/`](design/), whose extracted requirements, audit and deviations
+are [`docs/12`](12-design-handoff.md) ([§ D174](../DECISIONS.md)–[§ D179](../DECISIONS.md)). Nine
+units, W1–W9, and **all nine are built** — the last open half, § 10.2's floor multi-select and
+coverage matrix, landed with the access-zoning building editor ([§ D182](../DECISIONS.md)).
+
+- W1 — close the honesty leak: no running mean on the header of a run the same run suppresses
+- W2 — `VizSummary` widened to what the report sheet needs, now at `VIZ_SCHEMA_VERSION` 8
+- W3 — a real replication batch in a worker, with the interval and no winner when it contains zero
+- W4 — schema-generated dispatcher and traffic controls, proved against a schema this repo does not ship
+- W5 — scenarios as data, and a seven-stage campaign judged on the shipped configuration's own scores
+- W6 — the Casual/Engineer split, the live weight editor, and a **derived** mode-parity check
+- W7a/W7b — per-floor rider queues, a building-mood gauge, and the access-credential lens
+- W8 — access zoning in the building editor, and the dispatcher-compatibility warning
+- W9 — every shipped goal carrying its measured across-seed pass rate
+
+**Acceptance:** [§ D163](../DECISIONS.md), five clauses. Two are load-bearing because the product
+**failed** them on the day the criterion was written — **(1)** the honesty property holds under
+*search* rather than on hand-chosen examples, and **(2)** mode parity is *derived from the code*
+rather than listed by hand. Three are standing requirements that *"can turn the phase red by
+regressing, and cannot turn it green by having already been true"* — **(3)** every shipped goal
+carries its measured pass rate, **(4)** every unit names its **non-test caller**, **(5)** the viewer
+is **driven** for every acceptance claim, never read. § D163 also binds the shape of this section:
+the row and the verdict **land together or neither does**, and **anything unbuilt at acceptance is
+named in the verdict**.
+
+> **This criterion was written after seven of the nine units existed, and that is its known
+> weakness.** § D163 says so about itself and defends itself structurally rather than
+> chronologically: a clause the product already satisfied would be a description, not a gate. A
+> reader checking whether the gate was fitted to the work should check clauses 1 and 2 first — those
+> are the two that were red when it was written — and should treat clause 4 as the one this verdict
+> is weakest on. Its own list of what would make it a bad criterion is worth reading beside the
+> table below.
+
+**Status: ✅ ACCEPTED WITH NAMED GAPS (2026-07-30) — the two load-bearing clauses are met by a run
+rather than by an argument, and the gaps below are part of the verdict rather than a footnote to
+it.** The gate suites are `packages/viz/src/honesty/honesty.test.ts`,
+`packages/viz/src/mode/parity.test.ts`, `packages/viz/src/scenario/goalRates.test.ts` and
+`packages/viz/src/campaign/judge.test.ts`.
+
+| clause | finding |
+|---|---|
+| **1 — the honesty property under *search*** | **MET, and met by a run.** The deep tier is green: **60 cases, 271 985 strings, 4 650 simulations, 43 of 60 runs suppressed, 23 surfaces, 398.7 s, 0 violations** (`ELEVATOR_SIM_HONESTY=deep`, `packages/viz/src/honesty/campaign.ts`). It **found two violations first** ([§ D186](../DECISIONS.md)) — one real, fixed at the cause, and one a false positive whose check was *accepting the other branch for the wrong reason*. **[§ D172](../DECISIONS.md) had asserted this tier clean on "the refinement relation, not a run"; running it said otherwise**, which is what the label on that claim was for |
+| **2 — mode parity, derived** | **MET.** `packages/viz/src/mode/parity.ts` computes the failure/suppression set from the code — a discriminated union with an exhaustive switch, so a tenth failure state is a compile error rather than a silent omission — and is proved against a fail state the product deliberately does **not** ship (`packages/viz/src/mode/fictionalFailState.test-helper.ts`). `parityRefusal` runs in the shipped path, not only in the suite (`packages/viz/src/dev/main.ts`, `packages/viz/src/dev/campaignPanel.ts`). **Driven this session:** toggling Casual↔Engineer changes the rail's content and raises no refusal |
+| **3 — every goal carries its measured pass rate** | **MET.** `packages/viz/src/scenario/goalRates.test.ts` re-derives the published counts from **both** disjoint seed sets in the always-on tier, and `docs/10` § M30's table is compared cell-by-cell **in both directions**, against `data/scenario-goals.json`. The surface half — the `goal-without-rate` property on the campaign judge — is deep-tier only, and is now green |
+| **4 — every unit names its non-test caller** | **SATISFIED IN PROSE, MECHANISED BY NOTHING.** See below. This is the clause a future reader should distrust first |
+| **5 — the viewer is driven, never read** | **MET, by driving.** There is **no browser automation in this repository** — no Playwright, no Puppeteer, no jsdom, and all four `vitest.config.ts` projects are `environment: 'node'` — and § D163 explicitly refuses *"a test that renders to a canvas mock and never opens a browser"* as a substitute. Discharged by driving the shipped page; one gap found by doing so, below |
+
+**Clause 4 is the honest weak point, and the fix is a fifth copy of an audit this repository already
+has four of.** All **19** directories under `packages/viz/src` sit outside every `AUDITED_MODULES`:
+the four dead-code audits — `packages/core/src/dispatch/deadCode.test.ts`,
+`packages/experiments/src/runner/deadCode.test.ts`,
+`packages/experiments/src/tuning/deadCode.test.ts` and
+`packages/experiments/src/fuzz/deadCode.test.ts` — cover **7 of 49** `packages/*/src` directories
+(`dispatch/policies`, `dispatch/predictor`, `runner`, `fuzz`, `tuning/search`, `tuning/space`,
+`tuning/report`), and **none of Phase 9's**.
+The whole evidence for clause 4 is a hand-written table in `packages/viz/src/index.ts` plus
+one prose `**Non-test caller:**` line per unit in `docs/10` § 11, **re-derived by nothing**. That
+table is honest about itself — it lists the two rows whose entry reads *none* — but a hand-written
+table is the defect [§ D152](../DECISIONS.md) closed one layer down and the standing requirement
+above warns about in the same words: *a barrel re-export and a `{@link}` tag look exactly like a
+caller and are not one*. Under § D163 this clause is a **standing requirement**, so it cannot green
+the phase and it has not; the acceptance rests on clauses 1 and 2. It could still be false today
+without anything going red, and the fix is a `deadCode.test.ts` under `packages/viz/src`.
+
+**What driving found, since clause 5 is the clause that is discharged by doing rather than
+asserting.** At 1280–1440 px, on the shipped page: the tab arrow ring **skips all four hidden
+contextual tabs and crosses into the nested `.tabs-right` div**, moving both selection and panel; a
+deep link to a contextual tab works on a **cold** load, with exactly one focusable tab per tablist;
+the mode toggle works in the shipped path rather than only in `packages/viz/src/mode/`; the drawer
+opens on **one** press after crossing the 1340 px breakpoint **in both directions**, so the recorded
+two-press bug does not reproduce; and [§ D159](../DECISIONS.md)'s access-compatibility warning is
+live and correct on the right rail and **clears** when the dispatcher reads credentials. **One gap:
+`Escape` does not dismiss the drawer**, which below 1340 px sits at `z-index: 20` over the stage and
+can be closed only by its own toggle. It is in [`GAPS.md`](../GAPS.md) rather than in this verdict's
+favour.
+
+**Named limits on clause 1, in the same breath as the verdict.** The sweep's `mode` axis has **one
+value** — it plugs in at a tuple in `packages/viz/src/honesty/types.ts`, and the corpus assertion
+tightens automatically when it does. The three DOM panels are **statically swept rather than
+driven**, so a sentence assembled at runtime there is invisible to the search. The access block's
+labels, tooltips and legend, and the elevation express toggle's two strings, are **not seeded** into
+`packages/viz/src/honesty/surfaces.ts` and are therefore outside R1–R13. Two rows with one cause:
+`surfaces.ts` is a chokepoint every editor lane hits and no editor lane owns. All four are in
+[`GAPS.md`](../GAPS.md).
+
+**Named limits on clause 2.** Two of [§ D168](../DECISIONS.md)'s four are **closed** — Basic can now
+shorten a suppression reason, because `core` carries the ground beside the prose
+([§ D183](../DECISIONS.md)) and `VizSummary` transports it at schema 8
+([§ D185](../DECISIONS.md)) — and two stand: the **structural-refusal reason is prose keyed on an id
+the leg record does not carry**, so it cannot be joined to a leg, and thirteen warning rows on
+Secure Tower is a wall that is deliberately **not** grouped, because parity requires each warning's
+text in Basic and a summarising group is the first place one could go missing.
+
+**Unbuilt at acceptance, which § D163 requires this verdict to name rather than absorb:** **U6**;
+**U7's rider models**; and **Basic's curated three-dimension subset**, whose place is taken by the
+campaign editor restricted to each stage's declared editable set, which is data. § 10.2's floor
+multi-select and coverage matrix *were* on this list and are not any more — they landed this wave
+([§ D182](../DECISIONS.md)), so **W8 and all nine units are built**, which is why this section says
+*all nine* where the register said *eight and a half*. **Feature completeness was never the gate**,
+and § D163 says why: a phase gate that requires every designed feature measures ambition rather than
+quality. These three are named because the verdict is required to name them, not because they were
+weighed against it.
+
+**What this verdict does not say.** It does not say the experience layer is *good*: § D163 excludes
+playability from the criterion as unfalsifiable, and puts [§ D161](../DECISIONS.md)'s uncomfortable
+measured fact in its place — **four of seven campaign stages clear from the dispatcher dropdown
+alone**. It does not say the honesty property holds; it says it held over 271 985 generated strings
+on 23 seeded surfaces with one mode value, which is a bounded claim and is the strongest one this
+apparatus can make. And it does not say clause 4 is true — only that nothing has shown it false,
+which is exactly the distinction the standing requirement above exists to keep visible.
+
+---
+
 ## Sequencing notes
 
 - **Phases 0–3 are strictly sequential.** Phase 3 must land before any dispatcher
@@ -1497,18 +1836,26 @@ at its own seed and operating point. Neither is wrong; inheriting either across 
   against one 2,765-line file is the Phase 5 configuration with a larger blast radius
   ([§ D28](../DECISIONS.md)). 6c needs its own acceptance question before it needs an implementation.
 
-## What remains, as of 2026-07-28
+## What remains, as of 2026-07-30
+
+> **Five rows of this table were stale when it was re-dated, and they are corrected below rather
+> than deleted.** The table said Phase 6c was *deferred*, Phase 9 was *not built*,
+> `packages/experiments` had *no browser export*, double-deck was *disclaimed on every run*, and
+> fuzzy pattern switching was *read by nothing*. All five had been resolved by waves 6–9 and the
+> table had not moved with them. It is dated, which is a partial defence and not a sufficient one: a
+> dated register that contradicts the current tree is the same failure as an undated one, just
+> harder to blame. The stale wording is quoted here so the correction is legible as a correction.
 
 | Item | Where it is recorded |
 |---|---|
-| **Phase 6c — learned control** | § Phase 6c above; deferred with reasons, not dropped |
-| **Phase 9 — the experience layer** | Designed in [`docs/10`](10-experience-layer-contract.md) and **not built**. No phase row exists for it in any status table, deliberately: a design is not a phase in progress |
-| **`packages/experiments` has no browser export**, which blocks `docs/10`'s generated editor | [`docs/10`](10-experience-layer-contract.md) § 13 q1 — a **prerequisite**, not an optimization. The package declares `"."` and `"./package.json"` only, so a deep import of `tuning/space` is refused by the resolver, and the one entry it does declare pulls `node:worker_threads` through `runner/parallel.ts` |
-| **Double-deck simulation and Vertical City** | § Phase 6 above; disclaimed on every run of that building |
-| **Fuzzy traffic-pattern switching** | § Phase 7 above; authored in `data/`, read by nothing |
+| **The viewer is now built to a design handoff** | Not an open item — a change of source. *Elevator Sim Reimagined* is canonical for the interface ([§ D174](../DECISIONS.md)); the requirements, the gap analysis and the five deviations are [`docs/12`](12-design-handoff.md). **No phase verdict moved and no published number was recomputed**, which is the point rather than an aside: the sheet reads `VizSummary`, which reads `RunSummary`, which is the same object the CLI and the experiment matrix read. Board: [`WAVE10_PLAN.md`](../WAVE10_PLAN.md) |
+| **Phase 6c — learned control** | § Phase 6c above. **No longer deferred: implemented, measured and NOT ACCEPTED**, and the refusal was then broadened from one operating point to eight pre-registered cells and held ([§ D151](../DECISIONS.md) is the protocol, dated before any sweep figure; [§ D156](../DECISIONS.md) is the result). What remains is one re-measurement, on the mix-varying demand template built after the sweep named the shipped template's flat directional split as the mechanism — protocol pre-registered at [§ D162](../DECISIONS.md), **not run**. A third refusal is an explicitly permitted outcome |
+| **Phase 9 — the experience layer** | **No longer open: measured against [§ D163](../DECISIONS.md) and ACCEPTED WITH NAMED GAPS on 2026-07-30** — § Phase 9 above carries the verdict and the gaps, and the row and the verdict landed together as § D163 required. All nine units are built. What remains is not the phase: it is **U6**, **U7's rider models**, **Basic's curated three-dimension subset**, and clause 4 — *name the non-test caller* — which is **satisfied in prose and mechanised by nothing**, because no dead-code audit reaches `packages/viz` |
+| ~~**Access-zoning editor controls**~~ **CLOSED** | [`docs/10`](10-experience-layer-contract.md) § 11 W8's open half — § 10.2's floor multi-select and coverage matrix — landed with the building editor's zoning round trip ([§ D182](../DECISIONS.md)). The dispatcher-compatibility warning had shipped ahead of it ([§ D159](../DECISIONS.md)) |
+| **A zone cannot be changed mid-run** | Operational zoning is a shipped concept with no mechanism over time. Deliberately deferred: nothing measures it and no published result depends on it |
 | **The Level-1 panel does not clear the Phase 6 gate on `mixed-use-high-rise`** | § *Phase 6 on the building the criterion names* above. A measured result, not a task — but it is what a reader planning 6c needs |
-| **`garden-down-peak` is `destination-eta`'s remaining identity class** | § *What the matrix found* above. Structural — bit-identical at `rideTime` 0.3, 1.0 and 2.0 — so it is a **blind operating point**, not an under-weighted term. Whether a destination can carry information at a down-peak whose every trip ends at the lobby is an open question, not a defect |
-| **The editor's ⇧/⇩ buttons reorder the JSON declaration and not the building** | `packages/viz/DECISIONS-T29.md` § T29-4, and [§ D111](../DECISIONS.md). Relabelled honestly rather than repurposed; the scope call — give the declaration its own view, or drop `moveFloor` and let `index` be the only ordering control — is **handed back to the owner** |
+| **`garden-down-peak` is `destination-eta`'s remaining identity class at n = 51** | § *What the matrix found* above. It is blind to **`rideTime`**, not to the destination — and the distinction is measured, not argued ([§ D136](../DECISIONS.md)). `rideTime` separates the candidate cars in **1 of 1 727 contested decisions**, so a constant cannot move an argmin and no weight rescues it: 0.5, 1, 2 and 8 form one identity class, and sixteen times the shipped weight buys the same single flip. **The destination itself is not blind there**: `stopCount` separates the cars in **139** of those decisions — and pricing it is **WORSE** on AWT `+1.320 [+0.988, +1.653]`, WT95 `+4.060 [+2.899, +5.220]` and TTD `+1.419 [+1.067, +1.770]` at n = 200 at two seeds. So the open question is **answered, in the negative-for-the-operator direction**, and what remains open is the mechanism — *which* car the increment prefers and why it is worse placed — which is **unmeasured and not asserted**. The class is stated at n = 51 deliberately: it does not hold at n = 200 |
+| **The editor's ⇧/⇩ buttons reorder the JSON declaration and not the building** | the retired T29 lane record § T29-4, and [§ D111](../DECISIONS.md). Relabelled honestly rather than repurposed; the scope call — give the declaration its own view, or drop `moveFloor` and let `index` be the only ordering control — is **handed back to the owner** |
 | **No test asserts any phase's *status*** | [`docs/07` § 8](07-handoff.md). The guards assert the four documents **agree**, not that they are **true** |
 | Open items C4, C5, C24, C27, C30, C32 | **All six closed** ([§ D116](../DECISIONS.md)–[§ D122](../DECISIONS.md), plus [§ D125](../DECISIONS.md)); **C33** and **C34** opened in their place, and five smaller findings besides. `C4` took **two** decisions — § D119 on the budget, § D125 on the port's disposition — and § D125 also added the **third dead-code guard**, over `runner/`, which neither `core`'s scanner nor `tuning/`'s could reach. Current list: [`docs/07`](07-handoff.md) § 8 § *Still open, in one place*. **C7 is closed** — see below |
 

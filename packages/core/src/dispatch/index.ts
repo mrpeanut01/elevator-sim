@@ -89,13 +89,48 @@ export {
   WeightedCostDispatchPolicy,
   createDispatchPolicy,
   resolveDispatchConfig,
+  resolveWeights,
+  weightSetSourceFrom,
 } from './policy.js';
+
+export type { WeightSetLibrarySource } from './policy.js';
 
 /* -------------------------------------------------------------------------- *
  * The scoring engine (stage 3)
  * -------------------------------------------------------------------------- */
 
 export { bestScore, compareScores, rankScores, scoreCar } from './scoringEngine.js';
+
+/* -------------------------------------------------------------------------- *
+ * The weight-set selector (stage 3) — one mechanism, two policies
+ * -------------------------------------------------------------------------- */
+
+export {
+  ArrivalWindow,
+  IDLE_TRAFFIC,
+  INITIAL_SELECTOR_STATE,
+  SELECTOR_INPUTS,
+  WEIGHT_SET_POLICIES,
+  armMembership,
+  isSelectorInput,
+  rampMembership,
+  resolveWeightSets,
+  selectWeightSet,
+} from './selector.js';
+
+export type {
+  MembershipRamp,
+  PatternSwitchingSource,
+  ResolvedSelection,
+  ResolvedWeightSets,
+  SelectorInput,
+  SelectorState,
+  TrafficObservation,
+  WeightSetArm,
+  WeightSetPolicy,
+  WeightSetSelectionResult,
+  WeightSetSource,
+} from './selector.js';
 
 /* -------------------------------------------------------------------------- *
  * Normalization — required, not optional (CLAUDE.md § modeling rules)
@@ -175,6 +210,7 @@ export {
   answerDecisionFor,
   assignmentWidth,
   batchKeyOf,
+  callCarriesCredential,
   clearsHysteresis,
   costRequestFor,
   expectedResponseSeconds,
@@ -255,6 +291,7 @@ export type {
   ResolvedDispatchStage,
   ResolvedEligibilityStage,
   ResolvedIdleStage,
+  SelectionStageConfig,
   ResolvedNormalization,
   SaturatingNormalization,
   ScoreBreakdown,

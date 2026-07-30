@@ -71,6 +71,7 @@ import type {
   ReportWindow,
   ResolvedDemandTemplate,
   RunRecord,
+  SelectionStageConfig,
   SaturationThresholds,
   SimulationResult,
   TimeoutPolicy,
@@ -137,6 +138,16 @@ export interface StoredDispatcherOptions {
   readonly weights?: Readonly<Record<string, number>> | undefined;
   /** Replaces the profile's hard-constraint set entirely when present. */
   readonly hardConstraints?: readonly string[] | undefined;
+  /**
+   * The weight-set selection stage the run overrode, field by field.
+   *
+   * Six scalars, so it round-trips exactly. The *arms* it selects among do not appear here and
+   * are not stored: for a shipped run they are derived from `data/dispatcher-profiles.json`, which
+   * a replay re-reads the same way it re-reads the profile itself, and for a study that handed in
+   * a derived library `createStoredRun` refuses rather than storing a configuration it cannot
+   * reconstruct.
+   */
+  readonly selection?: SelectionStageConfig | undefined;
 }
 
 /** The runner's own tunables (`SIM_PARAMETERS`), as stored. Omitted fields took their defaults. */
@@ -432,8 +443,9 @@ export type IntervalMethod = 't' | 'z';
  * docs/03-traffic-and-statistics.md § Part 4, "Use a paired-t interval", prescribes the method:
  * Student-t at `n - 1` degrees of freedom, with no `n` in the choice of family. Both are recorded
  * on the estimate ({@link method}, {@link degreesOfFreedom}) so a half-width can be re-derived by
- * hand. § Part 3's `n > 25` normal approximation is **not** what any estimator in this package
- * uses; conflating the two was review finding #14.
+ * hand. The `n > 25` normal approximation § Part 3 **used to** prescribe for loop control is not
+ * what any estimator in this package uses, and since 2026-07-27 is not what that section says
+ * either; conflating the two was review finding #14.
  *
  * Also from that section, and the reason AWT is treated as normal at all: Peters & Abbi rejected
  * Cox's lognormal interval because at 1000 runs it put a 5 s mean between 0.7 s and 36.1 s. The
@@ -522,7 +534,22 @@ export interface ConvergenceReport {
   /** The half-width actually achieved. `NaN` when fewer than two replications. */
   readonly achievedHalfWidth: number;
   readonly confidence: number;
-  readonly method: IntervalMethod;
+  /**
+   * Which quantile family produced {@link achievedHalfWidth} — **absent when there is none.**
+   *
+   * Optional, and that is the point. This field was required, so a report whose headline metric
+   * was suppressed still *named* a family for an interval that does not exist: `achievedHalfWidth`
+   * `NaN` beside `method: 't'` reads as "a t-interval, of unknown width" rather than "no interval".
+   * C5 fixed the case where that label was *wrong*; open item `C33` is the case where it was merely
+   * unearned. An absent interval has no family and now says so.
+   *
+   * Widening a required field to optional is not a weakened claim here — it is a stricter one. The
+   * only construction site, `compare.ts`'s `convergenceOf`, is narrowed to the published family in
+   * the *presence* case by `PublishedConvergenceReport`, so `'z'` remains unwritable; what changed
+   * is that the absence case can no longer borrow a label. `ConvergenceReport` is not persisted —
+   * `persistence.ts` stores `StoredRunRecord`s, never reports — so no stored shape moves.
+   */
+  readonly method?: IntervalMethod | undefined;
 }
 
 /* -------------------------------------------------------------------------- *

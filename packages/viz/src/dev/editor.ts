@@ -14,6 +14,19 @@
  * zoning is a paragraph saying where it actually lives. A reader who wants "the zones" is told
  * three times that there is no such thing.
  *
+ * ## The floors are shown twice, on purpose, in two different orders
+ *
+ * The **Floors** table is in *building* order — highest `index` at the top, the direction the
+ * preview draws (`U1`, `ED-01a`). The **Declaration order** list below it is the `floors` array as
+ * the file writes it, and it is the only place `moveFloor` is offered, because it is the only place
+ * that operation has a visible effect. Those two orders are different questions about one document
+ * — *which floor is above which* and *what does the file look like* — and one widget answering both
+ * is what put a control on screen that never did what its arrow implied (`docs/07` § 8).
+ *
+ * Each view says which order it is in and what that order means. A second table that is merely a
+ * different sort, with nothing saying what it is for, would reproduce the defect rather than close
+ * it.
+ *
  * ## Validation is never partial
  *
  * The issue list is rebuilt from `ValidationReport.issues` in full on every edit, and when the
@@ -30,6 +43,13 @@ import {
   type FloorConfig,
 } from '@elevator-sim/core/browser';
 
+import { checkAccessCompatibility } from '../access/dispatcherCredentials.js';
+import {
+  LENS_OPERATIONAL_NOTE,
+  credentialGroupsIn,
+  credentialLensFor,
+  type CredentialLens,
+} from '../access/zoning.js';
 import {
   OPERATIONAL_ZONING_NOTE,
   addBank,
@@ -51,7 +71,11 @@ import {
   upsertAccessZone,
 } from '../editor/editorEdits.js';
 import { EditorHistory } from '../editor/editorHistory.js';
-import { floorsInBuildingOrder, previewGeometry } from '../editor/editorPreview.js';
+import {
+  declarationOrderMatchesBuildingOrder,
+  floorsInBuildingOrder,
+  previewGeometry,
+} from '../editor/editorPreview.js';
 import {
   issuesMayBeIncomplete,
   summariseReport,
@@ -66,9 +90,29 @@ import type { BrowserResources } from './data.js';
 
 const OVERLAY_NONE = 0;
 
+/**
+ * Right gutter wide enough for `114.6 m  not permitted` — the lens's per-floor word.
+ *
+ * Measured rather than guessed: 22 characters at the 12 px monospace face's ~7.2 px advance is
+ * 158 px. Bigger was tried first and is worse — at 190 px the preview pane on an 800 px window
+ * dropped two of Secure Tower's six shafts to pay for it, which trades a fact the reader asked
+ * for against one they did not.
+ */
+const LENS_GUTTER_RIGHT_PX = 160;
+/** Bottom band the lens's four legend lines occupy, so they never sit over the lowest floors. */
+const LENS_FOOTER_PX = 92;
+
 export interface EditorHandle {
   /** Re-draw at the current size. Called when the tab becomes visible or the window resizes. */
   refresh(): void;
+  /**
+   * The viewer's dispatcher selection moved — `docs/10` § 11 **W8**.
+   *
+   * § 10.3's note is a fact about a *pairing*, and half of the pair lives on the other surface.
+   * Without this, authoring an access zone here and then switching the viewer to a conventional
+   * dispatcher would leave the editor's note naming a profile nobody has selected any more.
+   */
+  dispatcherChanged(): void;
   /** `ED-23` — is there an unsaved edit? */
   isDirty(): boolean;
   /**
@@ -114,6 +158,26 @@ export interface EditorOptions {
    * what the button does. Found by reading the dialog on screen.
    */
   readonly confirm: (message: string, okLabel: string) => Promise<boolean>;
+  /**
+   * Which dispatcher the **viewer** currently has selected — `docs/10` § 11 **W8**.
+   *
+   * A function rather than a value because the answer changes while the editor is mounted, and
+   * the acceptance case is exactly that: *"authoring an access zone on a building and switching
+   * to a conventional dispatcher raises it live."* Read at render time.
+   *
+   * **Required, and it was optional until this cost the feature.** Wave 10 rebuilt the shell and
+   * dropped this option from the only call site; `renderAccessNote` then took its
+   * `profile === undefined` early return on every render and blanked itself, so § D159's warning
+   * was dead on this surface from `22a1021` until it was driven. Nothing went red, because
+   * `checkAccessCompatibility` kept its own unit tests and the honesty search kept driving it
+   * directly — the seam was what broke, not the function.
+   *
+   * The optionality was there so a test could mount without one. No such test exists, and no test
+   * can: this mount is DOM-bound and the suite has no jsdom, which is why `honesty/derive.test.ts`
+   * excludes it. So the exemption protected nothing and hid a live regression. Required means the
+   * compiler is the guard, which is the only guard this seam can have.
+   */
+  readonly currentDispatcherId: () => string;
 }
 
 function el<T extends HTMLElement>(id: string): T {
@@ -148,9 +212,13 @@ export function mountEditor(options: EditorOptions): EditorHandle {
   const issuesNode = el<HTMLUListElement>('ed-issues');
   const warningsNode = el<HTMLUListElement>('ed-warnings');
   const floorsBody = el<HTMLTableSectionElement>('ed-floors').querySelector('tbody');
+  const declaration = mountDeclarationSection(el<HTMLElement>('ed-floors'));
   const rangesNode = el<HTMLElement>('ed-ranges');
   const banksNode = el<HTMLElement>('ed-banks');
   const zonesNode = el<HTMLElement>('ed-zones');
+  const lensSelect = el<HTMLSelectElement>('ed-lens');
+  const lensNote = el<HTMLElement>('ed-lens-note');
+  const accessNote = el<HTMLElement>('ed-access-note');
   const jsonNode = el<HTMLTextAreaElement>('ed-json');
   const expansionNode = el<HTMLElement>('ed-expansion');
   const previewCanvas = el<HTMLCanvasElement>('preview');
@@ -193,6 +261,13 @@ export function mountEditor(options: EditorOptions): EditorHandle {
   let report: ValidationReport = validate(history.current);
   /** Text the reader typed that does not parse. Kept so `ED-18` does not lose their work. */
   let pendingJson: string | undefined;
+  /**
+   * The credential the lens is looking through, or `''` for **off** — `docs/10` § 10.1.
+   *
+   * Editor state and not document state: it changes nothing about the building and must not
+   * appear in the JSON, the undo stack or the download. A mode, not a field.
+   */
+  let lensGroup = '';
 
   function validate(building: BuildingConfig): ValidationReport {
     return validateBuilding(building, resources.elevatorSpecs, {
@@ -262,32 +337,85 @@ export function mountEditor(options: EditorOptions): EditorHandle {
       );
       const actions = document.createElement('td');
       /*
-       * `moveFloor` moves a floor within the **declaration list** and deliberately renumbers
-       * neither `index` nor `heightM` — its own docstring says why, and the reason is good: the
-       * loader fails a building whose two disagree (`floor-height-order`), and an editor that
-       * silently rewrote either would settle a modelling error by fiat.
+       * No ⇧/⇩ here, and that is the change `ED-24` records.
        *
-       * Which means these two buttons never moved a floor *in the building*, only in the JSON.
-       * With the table now in building order (`U1`) their effect shows in the Document textarea
-       * rather than in the row above, so the titles say so instead of saying "up the list", which
-       * under the old array-ordered table read as though it moved the floor.
+       * They used to sit in this row. `moveFloor` moves a floor within the **declaration array**
+       * and deliberately renumbers neither `index` nor `heightM` — its own docstring says why, and
+       * the reason is good: the loader fails a building whose two disagree (`floor-height-order`),
+       * and an editor that silently rewrote either would settle a modelling error by fiat. So in a
+       * table sorted by `index` those arrows moved nothing the reader could see: the row they were
+       * attached to stayed exactly where it was, and the only thing that changed was the Document
+       * textarea further down the page. Honest titles made that legible without making it useful.
+       *
+       * The operation is unchanged and is offered in {@link renderDeclaration}, where the list
+       * *is* the array and pressing ⇩ moves the row. The ordering control in **this** table is
+       * `index`, which is the field that decides which floor is above which.
        */
       actions.append(
-        button(
-          '⇧',
-          () => commit(moveFloor(building, floor.id, -1)),
-          `move floor ${floor.id} earlier in the JSON declaration list (does not change its index or height)`,
-        ),
-        button(
-          '⇩',
-          () => commit(moveFloor(building, floor.id, 1)),
-          `move floor ${floor.id} later in the JSON declaration list (does not change its index or height)`,
-        ),
         button('✕', () => commit(removeFloor(building, floor.id)), `remove floor ${floor.id}`),
       );
       row.append(actions);
       floorsBody.append(row);
     }
+  }
+
+  /**
+   * The declaration-order view — `ED-24`, `ED-25`, and `moveFloor`'s only caller.
+   *
+   * The list is `building.floors` **as it stands**, with no sort anywhere: this view's whole claim
+   * is that it shows the array, so deriving its order from anything would make the claim false. The
+   * position numbers come from `<ol>` rather than from arithmetic for the same reason.
+   *
+   * `index` and `heightM` are printed, not editable. They are edited in the table above, and
+   * repeating the inputs here would offer two controls for one field and invite exactly the
+   * renumber-to-match that `moveFloor`'s docstring refuses.
+   *
+   * **Nothing in here decides what is legal.** The disabled ⇧ on the first row and ⇩ on the last
+   * are a no-op guard, not a verdict — `moveFloor` clamps and would return the same document.
+   * Whether the reordered document loads is `parseBuilding`/`resolveBuilding`'s answer, rendered by
+   * {@link renderValidation} from `report.issues`, and this list never offers a second one (§ D67).
+   */
+  function renderDeclaration(building: BuildingConfig): void {
+    const floors = building.floors ?? [];
+    declaration.list.replaceChildren();
+
+    if (floors.length === 0) {
+      declaration.agreement.textContent =
+        (building.floorRanges?.length ?? 0) > 0
+          ? 'This building declares no explicit floors — its floors come from ranges, which the loader expands. A range has no position in the floors array to move.'
+          : 'No floors yet.';
+      return;
+    }
+
+    for (const [at, floor] of floors.entries()) {
+      const item = document.createElement('li');
+      const label = floor.label === undefined ? '' : ` “${floor.label}”`;
+      const up = button(
+        '⇧',
+        () => commit(moveFloor(building, floor.id, -1)),
+        `move floor ${floor.id} one place earlier in the floors array`,
+      );
+      const down = button(
+        '⇩',
+        () => commit(moveFloor(building, floor.id, 1)),
+        `move floor ${floor.id} one place later in the floors array`,
+      );
+      up.disabled = at === 0;
+      down.disabled = at === floors.length - 1;
+      item.append(
+        `${floor.id}${label} — index ${String(floor.index)}, ${String(floor.heightM)} m  `,
+        up,
+        down,
+      );
+      declaration.list.append(item);
+    }
+
+    // Descriptive, and the reason the buttons are legible: press one and this sentence changes.
+    // Two orders differing is ordinary — four of the five shipped buildings differ on open — so it
+    // is stated as a fact about the file and never as a fault with it.
+    declaration.agreement.textContent = declarationOrderMatchesBuildingOrder(floors)
+      ? 'This file happens to declare its floors in the same order the table above shows them — top floor first.'
+      : 'This file declares its floors in a different order from the table above. That is ordinary: most of the shipped buildings are written bottom-up.';
   }
 
   function renderRanges(building: BuildingConfig): void {
@@ -420,6 +548,51 @@ export function mountEditor(options: EditorOptions): EditorHandle {
       empty.textContent = 'no access zones — every credential group may select every floor';
       zonesNode.append(empty);
     }
+    renderLensPicker(building);
+    renderAccessNote(building);
+  }
+
+  /**
+   * The lens's credential picker — `docs/10` § 10.2's *"autocomplete over groups already used in
+   * this building"*, in its simplest honest form.
+   *
+   * Options come from the document, never from a vocabulary: `core` has none, and inventing one
+   * would be a second source of truth about what a credential group is. A group the reader types
+   * into a zone appears here on the next render; delete it and the lens falls back to **off**
+   * rather than looking through a credential the building no longer mentions.
+   */
+  function renderLensPicker(building: BuildingConfig): void {
+    const groups = credentialGroupsIn(building.accessZones);
+    if (!groups.includes(lensGroup)) lensGroup = '';
+    lensSelect.replaceChildren(new Option('off', ''));
+    for (const group of groups) lensSelect.append(new Option(group, group));
+    lensSelect.value = lensGroup;
+    lensSelect.disabled = groups.length === 0;
+    lensNote.textContent =
+      groups.length === 0
+        ? 'no credential groups in this building yet — add an access zone to use the lens'
+        : LENS_OPERATIONAL_NOTE;
+  }
+
+  /** § 10.3, in the editor, against whatever dispatcher the viewer currently names. */
+  function renderAccessNote(building: BuildingConfig): void {
+    const dispatcherId = options.currentDispatcherId?.();
+    const profile = resources.dispatcherProfiles.profiles.find(
+      (candidate) => candidate.id === dispatcherId,
+    );
+    const resolved = report.resolved;
+    if (profile === undefined || resolved === undefined) {
+      accessNote.textContent = '';
+      return;
+    }
+    accessNote.textContent =
+      checkAccessCompatibility({
+        buildingName: building.name,
+        floorIds: resolved.floors.map((floor) => floor.id),
+        accessZones: resolved.accessZones,
+        profile,
+        profiles: resources.dispatcherProfiles.profiles,
+      }).warning ?? '';
   }
 
   function renderValidation(): void {
@@ -466,6 +639,17 @@ export function mountEditor(options: EditorOptions): EditorHandle {
     const building = history.current;
     const geometry = previewGeometry(building, report.resolved);
     expansionNode.textContent = ` — ${geometry.expansion}`;
+    // `docs/10` § 10.1's non-test caller. Built from the same geometry the picture is drawn from,
+    // so the lens cannot disagree with the shafts beside it about which floors are served.
+    const lens: CredentialLens | undefined =
+      lensGroup === ''
+        ? undefined
+        : credentialLensFor({
+            floors: geometry.floors,
+            shafts: geometry.shafts,
+            accessZones: building.accessZones,
+            credentialGroup: lensGroup,
+          });
 
     const ctx = previewCanvas.getContext('2d');
     if (ctx === null) {
@@ -489,20 +673,28 @@ export function mountEditor(options: EditorOptions): EditorHandle {
       floors: geometry.floors,
       shafts: geometry.shafts,
       overlayWidthPx: OVERLAY_NONE,
+      // The lens costs two things the default geometry does not have room for, and both were
+      // found by driving it on Secure Tower: the right gutter has to fit `114.6 m  not permitted`
+      // rather than `114.6 m`, and the four legend lines at the bottom sat over the lobby. Asked
+      // for here rather than inside `drawPreview`, because the layout is the caller's to choose
+      // and a renderer that resized its own plot would be deciding twice.
+      ...(lens === undefined ? {} : { gutterRightPx: LENS_GUTTER_RIGHT_PX, footerPx: LENS_FOOTER_PX }),
     });
     drawPreview(ctx as unknown as Canvas2DLike, {
       geometry,
       layout,
       title: `${building.name} — preview (no run)`,
       caption: summariseReport(report),
+      lens,
     });
-    previewCanvas.setAttribute('aria-label', describePreview(geometry));
+    previewCanvas.setAttribute('aria-label', describePreview(geometry, lens));
   }
 
   function render(): void {
     const building = history.current;
     renderIdentity(building);
     renderFloors(building);
+    renderDeclaration(building);
     renderRanges(building);
     renderBanks(building);
     renderZones(building);
@@ -807,10 +999,22 @@ export function mountEditor(options: EditorOptions): EditorHandle {
     render();
   });
 
+  lensSelect.addEventListener('change', () => {
+    lensGroup = lensSelect.value;
+    renderPreview();
+  });
+
   render();
 
   return {
     refresh: renderPreview,
+    // Deliberately **not** folded into `refresh`, which fires on every window resize and on every
+    // tab switch: `render()` rebuilds every form row, and doing that on a resize would move the
+    // reader's focus out of whatever field they were typing in. This is the one line that has to
+    // change, so this is the one line that changes.
+    dispatcherChanged: () => {
+      renderAccessNote(history.current);
+    },
     isDirty: () => history.state.isDirty,
     showBuilding,
     currentBuildingId: () => history.current.id,
@@ -820,6 +1024,66 @@ export function mountEditor(options: EditorOptions): EditorHandle {
 /* -------------------------------------------------------------------------- *
  * Small DOM helpers
  * -------------------------------------------------------------------------- */
+
+/**
+ * What each of the two floor views is, said on the screen rather than in this file — `ED-25`.
+ *
+ * The requirement is not "a second list": it is that a reader can tell the two apart and knows what
+ * each ordering means. A sort with no statement of what it is for is the defect this view exists to
+ * close, wearing a different hat.
+ *
+ * The last sentence is load-bearing and is the reason this paragraph is not shorter. Reordering an
+ * array is the kind of edit a reader expects to be told is safe or unsafe, and this view must not
+ * tell them: § D67 gives every legality opinion in the editor to `parseBuilding`/`resolveBuilding`,
+ * and the Validation panel is where their answer appears. So the text points at it instead of
+ * pre-empting it.
+ */
+const DECLARATION_NOTE =
+  'The table above is in building order — highest index at the top, the direction the preview ' +
+  'draws. This list is the floors array in the order the file writes it, which is what you see in ' +
+  'the Document (JSON) below. ⇧ and ⇩ move a floor within that array and change nothing else: ' +
+  'index and heightM are shown here read-only and are edited in the table above, because the ' +
+  'loader requires the two to agree (floor-height-order) and an editor that renumbered them to ' +
+  'follow a reorder would be settling a modelling error on your behalf. Whether the document is ' +
+  'legal is the loader’s answer, listed under Validation below; this list never says.';
+
+/** The declaration-order view's own nodes. Rebuilt on every edit by `renderDeclaration`. */
+interface DeclarationSection {
+  readonly list: HTMLOListElement;
+  readonly agreement: HTMLElement;
+}
+
+/**
+ * Build the declaration-order fieldset and insert it after the Floors one.
+ *
+ * Built here rather than declared in `index.html` because that file is being edited by another
+ * lane in this same tree and is outside this change's ownership; the nodes it needs are a fieldset,
+ * two paragraphs and an `<ol>`, all of which inherit the stylesheet's element rules, so nothing is
+ * lost by constructing them. If `index.html` later grows the markup, this function is what to
+ * delete.
+ */
+function mountDeclarationSection(floorsTable: HTMLElement): DeclarationSection {
+  const box = document.createElement('fieldset');
+  box.id = 'ed-declaration';
+  const legend = document.createElement('legend');
+  legend.textContent = 'Declaration order — the floors array as the file writes it';
+  const note = document.createElement('p');
+  note.className = 'dim';
+  note.style.margin = '0 0 6px';
+  note.textContent = DECLARATION_NOTE;
+  const agreement = document.createElement('p');
+  agreement.id = 'ed-declaration-agreement';
+  agreement.className = 'dim';
+  agreement.style.margin = '0 0 6px';
+  const list = document.createElement('ol');
+  list.id = 'ed-declaration-list';
+  box.append(legend, note, agreement, list);
+
+  const floorsBox = floorsTable.closest('fieldset');
+  if (floorsBox === null) floorsTable.after(box);
+  else floorsBox.after(box);
+  return { list, agreement };
+}
 
 function cellWithText(text: string): HTMLTableCellElement {
   const cell = document.createElement('td');

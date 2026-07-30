@@ -72,6 +72,15 @@ export interface GroupObservationContext extends DispatchContext {
   readonly zoneFloorIdsByCarId?: ReadonlyMap<string, readonly string[]> | undefined;
   /** Floor id to expected arrivals over the predictor's horizon. For `predictedDemand`. */
   readonly demandForecast?: ReadonlyMap<string, number> | undefined;
+  /**
+   * Shaft indices of the building's entrance floors. For the weight-set selector's detector.
+   *
+   * The third fact only the group controller holds. A car snapshot carries the shaft's served
+   * floors and not whether any of them is an entrance, so a detector that must tell a lobby
+   * arrival from an interfloor one has to be told — see `DispatchContext.entranceFloorIndices`
+   * for the measurement that made that non-obvious.
+   */
+  readonly entranceFloorIndices?: ReadonlySet<number> | undefined;
 }
 
 /** What the caller knows, and what it holds, when it asks for a decision. */
@@ -89,6 +98,8 @@ export interface GroupContextOptions {
    * own `idle.predictorHorizonS`, which `PREDICTOR_PARAMETERS` declares.
    */
   readonly horizonS?: number | undefined;
+  /** Shaft indices of the building's entrance floors. Omit and the detector falls back. */
+  readonly entranceFloorIndices?: ReadonlySet<number> | undefined;
 }
 
 /**
@@ -127,6 +138,9 @@ export function groupContext(
     ...(resolved.demandForecast === undefined
       ? {}
       : { demandForecast: resolved.demandForecast }),
+    ...(options.entranceFloorIndices === undefined
+      ? {}
+      : { entranceFloorIndices: options.entranceFloorIndices }),
   });
 }
 

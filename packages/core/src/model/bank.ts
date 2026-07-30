@@ -193,21 +193,20 @@ export class Bank<TCar extends CarLike = ResolvedCar> {
     return this.#deckByFloorId.get(floorId)?.deck;
   }
 
-  /**
-   * The floor the other deck reaches when this one is served — floor 27 for floor 26 in
-   * Vertical City's shuttle. `undefined` when the floor is not part of a pair.
-   */
-  pairedFloorOf(floorId: string): string | undefined {
-    return this.#deckByFloorId.get(floorId)?.pairedFloorId;
-  }
-
-  /** Whether the two floors are one simultaneous double-deck stop, in that order. */
-  servesFloorPair(lowerFloorId: string, upperFloorId: string): boolean {
-    const assignment = this.#deckByFloorId.get(lowerFloorId);
-    return (
-      assignment !== undefined &&
-      assignment.deck === 'lower' &&
-      assignment.pairedFloorId === upperFloorId
-    );
-  }
 }
+
+/*
+ * **`pairedFloorOf` and `servesFloorPair` were deleted here, and deleting them was the point.**
+ *
+ * They shipped with this class, were unit-tested in both directions, and had no non-test caller
+ * for their whole life — the eleventh instance of the defect `docs/07-handoff.md` § 3 tracks.
+ * Phase 6 gave `isDoubleDeck`, `deckAt` and `deckAssignmentFor` a real one (`sim/simulation.ts`'s
+ * bank-level deck-coupling filter) and could name none for these two. The rule is *"name the
+ * non-test caller"*, not *"is it reachable"*, so the honest answer for a symbol with no caller and
+ * no argument for keeping it is to remove it rather than to add it to an allowlist.
+ *
+ * `pairedFloorOf`'s job is done by `deckAssignmentFor(floorId)?.pairedFloorId`, which is one field
+ * access on a live method; `servesFloorPair` is a two-line predicate over the same value. Nothing
+ * is lost that a caller cannot restate in one line — and the day one appears, restating it is the
+ * cheap half of the work.
+ */

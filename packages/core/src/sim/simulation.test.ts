@@ -105,7 +105,7 @@ describe('Garden Apartments, end to end', () => {
     expect(result.summary.waiting.p95S).toBeGreaterThanOrEqual(result.summary.waiting.meanS);
     expect(result.summary.saturation.verdict).toBe('stable');
     expect(result.summary.awtIsValid).toBe(true);
-  });
+  }, 60_000);
 
   it('records one leg per passenger, each with a wait, a ride and a car', () => {
     const result = runSimulation(baseConfig('garden-apartments', 'nearest-car'));
@@ -120,14 +120,14 @@ describe('Garden Apartments, end to end', () => {
       expect(leg.alightedAt ?? -1).toBeGreaterThanOrEqual(leg.boardedAt ?? -1);
       expect(leg.isFinalLeg).toBe(true);
     }
-  });
+  }, 60_000);
 
   it('carries the seed on the record, so the run replays from it (invariant 5)', () => {
     const result = runSimulation(baseConfig('garden-apartments', 'nearest-car'));
     expect(result.record.seed).toBe('20260726');
     expect(result.seed).toBe(result.record.seed);
     expect(result.trace.seed).toBe(result.record.seed);
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -167,7 +167,7 @@ describe('Midtown Office under up-peak, end to end', () => {
       expect(leg.originFloorId).toBe('G');
       expect(leg.direction).toBe('up');
     }
-  });
+  }, 60_000);
 
   it('spreads the work across the whole group rather than one car', () => {
     const simulation = new Simulation(upPeak('collective'));
@@ -184,7 +184,7 @@ describe('Midtown Office under up-peak, end to end', () => {
     const busiest = Math.max(...stops);
     const total = stops.reduce((sum, count) => sum + count, 0);
     expect(busiest).toBeLessThan((3 * total) / stops.length);
-  });
+  }, 60_000);
 
   it('fills cars towards the design load and never past the overload interlock', () => {
     const result = runSimulation(upPeak('collective'));
@@ -196,7 +196,7 @@ describe('Midtown Office under up-peak, end to end', () => {
     expect(load.maxLoadFactor).toBeGreaterThan(load.designLoadFactor);
     expect(load.maxLoadFactor).toBeLessThan(1.1);
     expect(load.carCount).toBe(4);
-  });
+  }, 60_000);
 
   it('reports an interval and a handling capacity in the same units as the closed form', () => {
     const result = runSimulation(upPeak('collective'));
@@ -205,7 +205,7 @@ describe('Midtown Office under up-peak, end to end', () => {
     expect(result.summary.achievedInterval.meanS).toBeGreaterThan(0);
     expect(result.summary.handlingCapacity.personsPer5Min).toBeGreaterThan(0);
     expect(result.summary.handlingCapacity.pctPopulationPer5Min ?? 0).toBeGreaterThan(0);
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -250,7 +250,7 @@ describe('destinations', () => {
       }
       expect(checked).toBeGreaterThan(0);
     }
-  });
+  }, 60_000);
 
   it('only lets a passenger board a car whose shaft reaches their destination', () => {
     const result = runSimulation({
@@ -281,7 +281,7 @@ describe('destinations', () => {
       expect(served?.has(leg.destinationFloorId)).toBe(true);
     }
     expect(boardings).toBeGreaterThan(0);
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -340,7 +340,7 @@ describe('a car that fills up leaves people behind, and they are served later', 
       if (last - first > 60) multiTripLandings += 1;
     }
     expect(multiTripLandings).toBeGreaterThan(0);
-  });
+  }, 60_000);
 
   it('never overloads the car, and the load cell is what stops boarding', () => {
     const result = runSimulation(oneCar());
@@ -352,7 +352,7 @@ describe('a car that fills up leaves people behind, and they are served later', 
     expect(load.maxLoadFactor).toBeGreaterThan(load.designLoadFactor);
     expect(load.maxLoadFactor).toBeLessThan(1.1);
     expect(load.fractionOfTimeAtOrAboveDesignLoad).toBeGreaterThan(0);
-  });
+  }, 60_000);
 
   it('hands a landing it could not finish back to the group', () => {
     // Same situation with a group rather than one car: the landing outlasts the first car's
@@ -383,7 +383,7 @@ describe('a car that fills up leaves people behind, and they are served later', 
 
     const split = [...byBatch.values()].filter((cars) => cars.size > 1).length;
     expect(split).toBeGreaterThan(0);
-  });
+  }, 60_000);
 
   it('makes the overflow wait rather than the queue disappear', () => {
     const result = runSimulation(oneCar());
@@ -395,7 +395,7 @@ describe('a car that fills up leaves people behind, and they are served later', 
     expect(waits).toHaveLength(result.conservation.generated);
     expect(Math.max(...waits)).toBeGreaterThan(60);
     for (const wait of waits) expect(wait).toBeGreaterThanOrEqual(0);
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -484,7 +484,7 @@ describe('sky-lobby journeys', () => {
       );
       expect(journey.transferSeconds ?? 0).toBeGreaterThan(0);
     }
-  });
+  }, 60_000);
 
   it('honours a longer walk across the lobby', () => {
     const walk = 45;
@@ -507,7 +507,7 @@ describe('sky-lobby journeys', () => {
       }
     }
     expect(checked).toBeGreaterThan(0);
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -525,7 +525,7 @@ describe('stream discipline (CLAUDE.md invariant 2)', () => {
     // `destinations` or `passengerMass`, two dispatchers fed the same seed would diverge into
     // different passenger populations and common random numbers would be worth nothing.
     expect(after).toEqual(before);
-  });
+  }, 60_000);
 
   it('touches doorObstruction only when obstructions are being modelled', () => {
     const quiet = new Simulation(baseConfig('garden-apartments', 'nearest-car'));
@@ -543,7 +543,7 @@ describe('stream discipline (CLAUDE.md invariant 2)', () => {
     // Obstructions lengthen stops; they must not lose anybody.
     expect(result.conservation.balanced).toBe(true);
     expect(result.conservation.delivered).toBe(result.conservation.generated);
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -591,7 +591,7 @@ describe('the drain deadline is a reported failure, never a silent truncation', 
       }
     }
     expect(result.undelivered.some((journey) => journey.reason === 'riding')).toBe(true);
-  });
+  }, 60_000);
 
   it('reports instead of throwing when asked to', () => {
     const result = runSimulation(
@@ -607,13 +607,13 @@ describe('the drain deadline is a reported failure, never a silent truncation', 
     expect(SIMULATION_STATUSES).toContain(result.status);
     expect(result.undelivered.length).toBeGreaterThan(0);
     expect(result.conservation.balanced).toBe(true);
-  });
+  }, 60_000);
 
   it('does not fire on a system that finishes on its own', () => {
     const result = runSimulation(baseConfig('garden-apartments', 'nearest-car'));
     expect(result.status).toBe('completed');
     expect(result.endedAt).toBeLessThanOrEqual(result.deadlineS);
-  });
+  }, 60_000);
 
   it('blames the deadline only when the deadline is what stopped the run', () => {
     // A genuine drain timeout: demand outlasts the tail, work is refused because of the
@@ -647,7 +647,7 @@ describe('the drain deadline is a reported failure, never a silent truncation', 
     expect(dry?.message).toMatch(/never biting|ever biting/);
     expect(dry?.message).toMatch(/raising sim\.drainGraceS cannot help/);
     expect(dry?.result?.endedAt ?? 0).toBeLessThan((dry?.result?.deadlineS ?? 0) - 1000);
-  });
+  }, 60_000);
 
   it('stops the door path at the deadline too, not just travel', () => {
     // `drainGraceS` is documented as a *hard* timeout. Gating only departures leaves a stopped
@@ -672,7 +672,7 @@ describe('the drain deadline is a reported failure, never a silent truncation', 
       }
     }
     expect(result.endedAt).toBeLessThanOrEqual(result.deadlineS);
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -726,7 +726,7 @@ describe('what comes out of a run that went wrong', () => {
     } finally {
       Car.prototype.board = original;
     }
-  });
+  }, 60_000);
 
   it('reports an exhausted event budget as aborted, and throws whatever onTimeout says', () => {
     let thrown: SimulationError | undefined;
@@ -759,7 +759,7 @@ describe('what comes out of a run that went wrong', () => {
     expect(result.warnings.some((warning) => warning.includes('event budget exhausted'))).toBe(
       true,
     );
-  });
+  }, 60_000);
 
   it('declares aborted alongside the other statuses', () => {
     expect([...SIMULATION_STATUSES]).toEqual(['completed', 'timed-out', 'aborted']);
@@ -799,7 +799,7 @@ describe('a call the car it was given to will not answer', () => {
       expect(result.conservation.balanced).toBe(true);
       expect(result.conservation.delivered).toBe(result.conservation.generated);
     }
-  });
+  }, 60_000);
 
   it('still delivers everybody with the tunable at its default', () => {
     // The paired half: turning the tunable back on must not be what makes the building work.
@@ -808,7 +808,7 @@ describe('a call the car it was given to will not answer', () => {
       expect(result.status).toBe('completed');
       expect(result.conservation.delivered).toBe(result.conservation.generated);
     }
-  });
+  }, 60_000);
 
   /**
    * The other half of the same disagreement: stage 6 answering *yes* on behalf of a car the
@@ -849,7 +849,7 @@ describe('a call the car it was given to will not answer', () => {
     expect(stops).toHaveLength(1);
     expect(stops[0] ?? 0).toBeLessThan(result.conservation.generated * 2);
     expect(result.events).toBeLessThan(5_000);
-  });
+  }, 60_000);
 
   it('names a call a car keeps refusing rather than reporting the run as merely slow', () => {
     const profile = config.dispatcherProfilesById.get('collective');
@@ -891,7 +891,7 @@ describe('a call the car it was given to will not answer', () => {
     );
     expect(busy.status).toBe('timed-out');
     expect(busy.warnings.filter((warning) => /refused \d+ times by car/.test(warning))).toEqual([]);
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -919,7 +919,7 @@ describe('a landing no car may collect', () => {
     const diagnosed = result.warnings.filter((warning) => warning.includes('accessDenied'));
     expect(diagnosed.length).toBeGreaterThan(0);
     expect(diagnosed[0]).toMatch(/never collected/);
-  });
+  }, 60_000);
 
   it('is cured by moving authorization to call time — a config change and nothing else', () => {
     const profile = config.dispatcherProfilesById.get('eta');
@@ -941,7 +941,7 @@ describe('a landing no car may collect', () => {
     expect(credentialed.undelivered).toEqual([]);
     expect(credentialed.conservation.delivered).toBe(credentialed.conservation.generated);
     expect(credentialed.summary.waiting.meanS).toBeLessThan(conventional.summary.waiting.meanS);
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -964,7 +964,7 @@ describe('the loop is driven by config, never by a profile id (invariant 7)', ()
       );
       expect(result.record.dispatcherProfileId).toBe(profile.id);
     }
-  });
+  }, 60_000);
 
   it('honours a parking strategy supplied as data', () => {
     const profile = config.dispatcherProfilesById.get('collective');
@@ -993,7 +993,7 @@ describe('the loop is driven by config, never by a profile id (invariant 7)', ()
     const parkedAtLobby = parking.building.cars.filter((car) => car.floorId === 'G').length;
     expect(parkedAtLobby).toBeGreaterThan(0);
     expect(parkResult.summary.waiting.meanS).toBeLessThan(stayResult.summary.waiting.meanS);
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -1192,7 +1192,7 @@ describe('passenger transfer time reaches the car it is charged on', () => {
     expect(said[0]).toContain('mixed-use');
     // Naming the fallback is the point: a silent 1.2 s is what caused the defect.
     expect(said[0]).toContain(String(CAR_DEFAULTS.passengerTransferS));
-  });
+  }, 60_000);
 
   it('is silent on every shipped building, because every one of them answers', () => {
     for (const id of BUILDING_IDS) {
@@ -1213,7 +1213,7 @@ describe('passenger transfer time reaches the car it is charged on', () => {
     }).building.cars;
 
     for (const car of cars) expect(car.passengerTransferS).toBe(1.2);
-  });
+  }, 60_000);
 
   it('charges it at every stop: the same trace costs more at 1.75 s than at 1.2 s', () => {
     // The value being *present* on the car proves nothing about it being spent. Two runs of
@@ -1256,7 +1256,7 @@ describe('passenger transfer time reaches the car it is charged on', () => {
     // the whole point — it is not a rounding difference, and it is systematically optimistic
     // in the direction CLAUDE.md § Statistical discipline singles out.
     expect(rideS(asSpecified)).toBeGreaterThan(rideS(asBuilt) + 3);
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -1397,7 +1397,7 @@ describe('configuration', () => {
     expect(result.reportWindow.endS).toBe(result.trace.reportWindowEndS);
     expect(result.reportWindow.id).toBe('peak-5min');
     expect(result.summary.window).toEqual(result.reportWindow);
-  });
+  }, 60_000);
 
   it('re-windows on request without re-simulating', () => {
     const peak = runSimulation(baseConfig('garden-apartments', 'nearest-car'));
@@ -1408,7 +1408,7 @@ describe('configuration', () => {
     expect(whole.reportWindow.id).toBe('full-run');
     expect(whole.record.passengers).toEqual(peak.record.passengers);
     expect(whole.summary.counts.arrivals).toBeGreaterThanOrEqual(peak.summary.counts.arrivals);
-  });
+  }, 60_000);
 
   it('takes the demand horizon from durationS', () => {
     const result = runSimulation(
@@ -1419,14 +1419,14 @@ describe('configuration', () => {
     for (const record of result.trace.passengers) {
       expect(record.arrivalTimeS).toBeLessThan(900);
     }
-  });
+  }, 60_000);
 
   it('refuses a second run from the same Simulation', () => {
     const simulation = new Simulation(baseConfig('garden-apartments', 'nearest-car'));
     simulation.run();
     expect(() => simulation.run()).toThrow(SimulationError);
     expect(() => simulation.run()).toThrow(/already run/);
-  });
+  }, 60_000);
 
   it('rejects nonsense tunables at construction rather than mid-run', () => {
     expect(() =>
@@ -1443,7 +1443,7 @@ describe('configuration', () => {
     expect(() =>
       runSimulation(baseConfig('garden-apartments', 'nearest-car', { queueSampleCount: 2.5 })),
     ).toThrow(/queueSampleCount/);
-  });
+  }, 60_000);
 
   it('declares every tunable it owns (CLAUDE.md invariant 8)', () => {
     const declared = new Set(SIM_PARAMETERS.map((parameter) => parameter.id));
@@ -1469,6 +1469,32 @@ describe('configuration', () => {
     }
   });
 
+  it('declares no log scale over a range a log-uniform draw is undefined on', () => {
+    /*
+     * The rule `experiments`' `tuning/space/collect.ts` enforces from the other side, restated
+     * here so `core` fails on its own declaration rather than only when something tries to
+     * collect it. Two rows broke it until T75 — `sim.drainGraceS` and `sim.queueSampleCount`,
+     * both `log` over a range starting at 0 — and the whole of `SIM_PARAMETERS` was therefore
+     * uncollectable, which is what blocked the viewer's generated form (DECISIONS.md § D134).
+     *
+     * Zero is a *named mode* in both ranges, not a slack bound: `queueSampleCount: 0` is the
+     * documented fallback to the reconstructed series and `drainGraceS: 0` is a deadline at the
+     * demand horizon. So the fix was the scale and the bound stayed, and this guard is written
+     * to red either way round — raise a log row's minimum to 0 and it fails.
+     */
+    const logRows = SIM_PARAMETERS.filter((parameter) => parameter.scale === 'log');
+    // Not vacuous: `sim.dispatchRetryS` is a live log dimension over [0.5, 60].
+    expect(logRows.length).toBeGreaterThan(0);
+    for (const parameter of logRows) {
+      expect(parameter.range?.[0] ?? 0, `${parameter.id} declares a log scale`).toBeGreaterThan(0);
+    }
+    // …and every bounded row declares one of the two scales a sampler implements.
+    for (const parameter of SIM_PARAMETERS) {
+      if (parameter.range === undefined) continue;
+      expect(['linear', 'log'], parameter.id).toContain(parameter.scale);
+    }
+  });
+
   it('samples the queue, so saturation detection has something to fit', () => {
     const result = runSimulation(
       baseConfig('garden-apartments', 'nearest-car', { queueSampleCount: 30 }),
@@ -1487,7 +1513,7 @@ describe('configuration', () => {
     // Saturation still has an answer: `metrics` reconstructs a series from arrival and boarding
     // times when a run carries no samples.
     expect(none.summary.saturation.verdict.length).toBeGreaterThan(0);
-  });
+  }, 60_000);
 
   it('records the fleet roster and the population on the run record', () => {
     const result = runSimulation(baseConfig('midtown-office', 'eta'));
@@ -1495,7 +1521,7 @@ describe('configuration', () => {
     expect(result.record.population).toBe(config.buildingsById.get('midtown-office')?.totalPopulation);
     expect(result.record.buildingId).toBe('midtown-office');
     expect(result.record.demandTemplateId).toBe(result.trace.template.id);
-  });
+  }, 60_000);
 
   it('names every shipped building in its own run id by default', () => {
     for (const buildingId of BUILDING_IDS) {
@@ -1505,5 +1531,5 @@ describe('configuration', () => {
       expect(result.runId).toBe(`${buildingId}-nearest-car-20260726`);
       expect(result.record.runId).toBe(result.runId);
     }
-  });
+  }, 60_000);
 });

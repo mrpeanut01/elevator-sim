@@ -108,11 +108,25 @@
  *   package, so the mitigation matters more: **browser-only code should import
  *   `@elevator-sim/experiments/browser`**, whose types are `dist/browser.d.ts` and therefore match
  *   what the bundler will actually give it.
- * - **This barrel has no non-test caller today**, and that is said plainly rather than dressed up.
- *   It cannot have one: the consumer it exists for is W4, which docs/10 records as unable to start
- *   without it. That is a weaker answer to docs/05-roadmap.md's standing requirement than `tune`
- *   gives `tuning/`, and it is the same shape of answer `fuzz/index.ts` gives for its own surface.
- *   `browser.test.ts` is the mechanical owner in the meantime, and it fails if this file drifts.
+ *
+ *   **Closed mechanically 2026-07-28** (DECISIONS.md § D127). "Should" is now "must":
+ *   `packages/viz/src/boundaries.test.ts` fails on a bare `@elevator-sim/experiments` specifier
+ *   anywhere in that package — **tests included**, because nothing in a renderer has a legitimate
+ *   use for this package's Node surface. Manufactured and watched: on the violation
+ *   `tsc -p packages/viz --noEmit` exits **0** and the guard names the offending file. `tsc`
+ *   exiting zero is the point — the compiler cannot see this, so something else has to.
+ * - **This barrel had no non-test caller**, and that was said plainly rather than dressed up. It
+ *   could not have one: the consumer it exists for is W4, which docs/10 recorded as unable to start
+ *   without it. Tracked as `C34`.
+ *
+ *   **`C34` is closed** (DECISIONS.md § D127, docs/10 **M25**). W4 landed as
+ *   `packages/viz/src/controls/`, mounted by `packages/viz/src/dev/parameterForm.ts`, and the count
+ *   is **measured with this repository's own scanner** rather than asserted — `corpus`, `isBarrel`
+ *   and `auditModules` from `tuning/callers.test-helper.ts`, comments stripped so a `{@link}` tag
+ *   is not an import: **0 → 3** non-test, non-barrel importers, and `tuning/space`'s uncalled
+ *   exports **6 → 3**, because `activeParameters`, `parameterOf` and `defaultCandidate` were
+ *   written for a generic editor and now have one. `browser.test.ts` remains the mechanical owner
+ *   of this file's *contents*; `boundaries.test.ts` is the mechanical owner of how it is reached.
  *
  * **Do not add an export here whose module reaches a Node builtin**, and do not add one whose
  * module reaches `loadConfig` — under the `browser` condition `@elevator-sim/core` resolves to
@@ -215,6 +229,7 @@ export type {
 
 export {
   DEFAULT_CONFIDENCE,
+  PUBLISHED_INTERVAL_FAMILY,
   estimateMean,
   meanOf,
   normalQuantile,
@@ -224,7 +239,7 @@ export {
   studentTQuantile,
 } from './reports/statistics.js';
 
-export type { EstimateOptions } from './reports/statistics.js';
+export type { EstimateOptions, PublishedMeanEstimate } from './reports/statistics.js';
 
 export { ReportsError, intervalContainsZero } from './reports/types.js';
 

@@ -23,13 +23,43 @@
  * the frame sequences matching.
  */
 
-import type { LandingAssignment, OverlayMetrics } from '../frame/overlay.js';
+import type { LockedOutLanding } from '../access/lockedOut.js';
+import { describeLockedOut } from '../access/lockedOut.js';
+import { STATE_GLYPHS } from '../access/zoning.js';
+import type { FloorQueue, LandingAssignment, OverlayMetrics, WaitBand } from '../frame/overlay.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import type { DoorPhase, Frame, VizRecording } from '../contract/types.js';
-import type { Layout } from './layout.js';
+import type { Layout, ShaftColumn } from './layout.js';
 import { LOAD_ALARM, drawOverlay, loadColour } from './overlay.js';
+import { windowClause } from './runSummary.js';
+import type { BuildingMood } from './mood.js';
+import {
+  BAND_GLYPH,
+  MAX_INDIVIDUAL_GLYPHS,
+  planQueueRow,
+  type QueueRowPlan,
+} from './riderQueue.js';
+import { DAY_START_S, DEFAULT_SKY, drawSky, isNight, type SkyBand, type SkyRamp } from './sky.js';
+import { drawAlarmRule, drawRiderLane, figureClearancePx } from './riderFigures.js';
+import { fillRoundedRect } from './shapes.js';
+import * as tokens from './tokens.js';
 
-/** The subset of a 2D canvas context this renderer uses. */
+/**
+ * The subset of a 2D canvas context this renderer uses.
+ *
+ * ## What may be added to it, and what may not
+ *
+ * Every member here is one a recording stub can implement in a line and a test can read back.
+ * The four added for the design handoff's stage — `quadraticCurveTo`, `closePath`, `fill` and
+ * `arc` — pass that test: each records its own numbers, so a rounded car and a rider's head are
+ * as legible in a transcript as a `fillRect` ever was.
+ *
+ * What is deliberately **absent** is anything that hands back an opaque handle. `measureText`
+ * would oblige every stub to implement font metrics (see {@link CHAR_ADVANCE_PX});
+ * `createLinearGradient` would make the sky a `[object Object]` in every transcript, which is
+ * why `render/sky.ts` paints a ramp as strips instead. Both refusals are the same rule: **a call
+ * this interface admits must say what it drew.**
+ */
 export interface Canvas2DLike {
   fillStyle: string;
   strokeStyle: string;
@@ -44,14 +74,37 @@ export interface Canvas2DLike {
   fillRect(x: number, y: number, w: number, h: number): void;
   strokeRect(x: number, y: number, w: number, h: number): void;
   beginPath(): void;
+  closePath(): void;
   moveTo(x: number, y: number): void;
   lineTo(x: number, y: number): void;
+  quadraticCurveTo(cpx: number, cpy: number, x: number, y: number): void;
+  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number): void;
+  fill(): void;
   stroke(): void;
   fillText(text: string, x: number, y: number): void;
 }
 
+/**
+ * Every colour the stage can draw, in one place — and **derived from `render/tokens.ts`, never
+ * spelled here.**
+ *
+ * `docs/12` § 2.2 counted three hand-maintained copies of this project's palette and named the
+ * defect class: *"one source, derived everywhere."* Two of the three are now the same file; the
+ * stylesheet lane imports the same names. A hex literal appearing below is a regression.
+ *
+ * ## The rule this type has kept since wave 2
+ *
+ * **Two different claims never share a colour**, because the tests in this directory identify a
+ * mark by its fill and a shared string silently merges two counts into one. Where the design's
+ * own palette would merge two, the narrower claim moves and the wait-age band does not — the
+ * divergences are named at `render/tokens.ts`'s `WAITING_UP` and `FLOOR_LABEL`.
+ *
+ * That rule is not a substitute for KB-15. Colour separates two claims *for a test*; a **glyph**
+ * or a **word** separates them for a reader, and every claim on this canvas has one.
+ */
 export interface Theme {
   readonly background: string;
+  /** A progress or load-bar track. Not the shaft recess — see {@link Theme.shaftRecess}. */
   readonly shaft: string;
   readonly shaftEdge: string;
   readonly floorLine: string;
@@ -75,30 +128,134 @@ export interface Theme {
   readonly badge: string;
   /** A landing no car may serve — `RV-08`. */
   readonly restricted: string;
+  /**
+   * One colour per wait-age band — `docs/10` § 6.2, and **never the only signal**.
+   *
+   * Every band also has a distinct *shape* (`render/riderQueue.ts`'s `BAND_GLYPH`), because
+   * `UX.md` KB-15 forbids colour as the sole carrier and § 3.1 restates it for this feature: Mini
+   * Metro's players report losing to a station they never saw fill, and legibility of the fail
+   * state is a separate problem from the fail state being good. These four exist so a sighted
+   * reader gets the band *twice*; deleting them would cost nothing but contrast, which is what
+   * `riderQueue.test.ts`'s colour-removal test asserts by planning a row under a theme whose four
+   * are the same string.
+   */
+  readonly queueBands: Readonly<Record<WaitBand, string>>;
+  /** A boarding that just happened — the relief transition. */
+  readonly queueRelief: string;
+
+  /* ---------------- the stage, `docs/12` § 1.3 M3 ---------------- */
+
+  /** The four sky ramps. See `render/sky.ts` for which hour picks which. */
+  readonly sky: Readonly<Record<SkyBand, SkyRamp>>;
+  /** The translucent mass of the building, behind the plot. */
+  readonly mass: string;
+  /** One floor's slab. A wash 2–6 px deep, which is the floor line the stage draws instead. */
+  readonly floorSlab: string;
+  /** The dark recess a shaft is cut into. */
+  readonly shaftRecess: string;
+  /** The hairline around that recess. Lighter than {@link Theme.shaftEdge}, which is a border. */
+  readonly shaftHairline: string;
+  /** The travelling cable above a car. */
+  readonly cable: string;
+  /** A window with somebody behind it, after dark. */
+  readonly windowNight: string;
+  /** The same in daylight. */
+  readonly windowDay: string;
+  /** A floor with nothing special about it. Not {@link Theme.textDim} — see `render/tokens.ts`. */
+  readonly floorLabel: string;
+  /** A transfer floor's label and its `⇄`. The entrance's is {@link Theme.badge}. */
+  readonly badgeTransfer: string;
+  /** The line the entrance floor stands on. */
+  readonly ground: string;
+  /** Text printed inside a car. Dark, because the car it sits on is not. */
+  readonly carLabel: string;
+  /** A car held out of service — the filled pill under its shaft. */
+  readonly outOfServiceOn: string;
+  /** Text on that pill. */
+  readonly outOfServiceOnText: string;
+  /** A car in service — the unfilled pill. */
+  readonly outOfServiceOff: string;
+  /** Text on that pill. */
+  readonly outOfServiceOffText: string;
+  /**
+   * A landing that has stacked past the alarm depth, and the `+N` on a truncated crowd.
+   *
+   * Shares its value with `queueBands.abandoned` and `carOverload`, which is the design's own
+   * intent — one red, meaning *this is the thing that is wrong* — and is safe because all three
+   * are separated from each other by shape and by the row they are drawn on.
+   */
+  readonly alarm: string;
 }
 
-/** Readable on a projector and in a screenshot, which is the whole specification. */
+/**
+ * Readable on a projector and in a screenshot, which is the whole specification — now in the
+ * handoff's palette.
+ *
+ * Every value comes from `render/tokens.ts`. Where a name here and a name there differ, the
+ * token is the design's word for the colour and this is the renderer's word for the claim; the
+ * indirection is the point, because a claim can be re-pointed at a different token without the
+ * design's vocabulary moving.
+ */
 export const DEFAULT_THEME: Theme = Object.freeze({
-  background: '#0f1319',
-  shaft: '#171d26',
-  shaftEdge: '#2b3542',
-  floorLine: '#232c37',
-  text: '#e6edf3',
-  textDim: '#7d8896',
-  car: '#4f9ee8',
-  carLight: '#3fb27f',
-  carHeavy: '#e0a03a',
-  carOverload: '#e0473a',
-  // Distinct from `background` on purpose. They would look the same on screen, but a test that
-  // identifies the door seam by its fill would then also match the background wash, and it did.
-  doorSeam: '#0b0e13',
-  waitingUp: '#3fb27f',
-  waitingDown: '#c07ad8',
-  warning: '#e0b040',
-  panel: '#141a23',
-  highlight: '#f2f6fa',
-  badge: '#6f7dd6',
-  restricted: '#8a6f4a',
+  background: tokens.PAGE,
+  shaft: tokens.RAIL,
+  shaftEdge: tokens.EDGE,
+  floorLine: tokens.PREVIEW_FLOOR_LINE,
+  text: tokens.TEXT,
+  textDim: tokens.TEXT_DIM,
+  car: tokens.CAR_MID,
+  carLight: tokens.CAR_LIGHT,
+  carHeavy: tokens.CAR_HEAVY,
+  carOverload: tokens.CAR_OVERLOAD,
+  // Distinct from `background` on purpose, and the reason is unchanged by the repalette: they
+  // would look the same on screen, but a test that identifies the door seam by its fill would
+  // then also match the background wash, and it did. The design's own door gap
+  // (`rgba(5,8,13,.92)`) happens to keep the two apart, which is luck rather than design, so the
+  // property is asserted in `stageRender.test.ts` rather than left to it.
+  doorSeam: tokens.DOOR_GAP,
+  // The design paints *up* and *the freshest wait band* the same green. They are two claims on
+  // one row and `canvas.test.ts` counts one of them by its fill, so the direction pair moves and
+  // the band palette keeps § S7's value. See `render/tokens.ts`'s `WAITING_UP`.
+  waitingUp: tokens.WAITING_UP,
+  waitingDown: tokens.WAITING_DOWN,
+  warning: tokens.WARNING,
+  panel: tokens.CARD,
+  highlight: tokens.HIGHLIGHT,
+  badge: tokens.FLOOR_LABEL_ENTRANCE,
+  restricted: tokens.FLOOR_LABEL_RESTRICTED,
+  queueBands: Object.freeze({
+    // § S7's four, verbatim. The note this comment replaced said `settling` had to avoid
+    // `textDim`'s grey because a test identifying a settling rider by its fill also matched every
+    // floor label; that collision is closed from the other side now — the floor label has its own
+    // token (`FLOOR_LABEL`) and the band is the design's green. The *rule* has not changed, only
+    // which of the two claims moved to satisfy it.
+    settling: tokens.BAND_SETTLING,
+    waiting: tokens.BAND_WAITING,
+    long: tokens.BAND_LONG,
+    abandoned: tokens.BAND_ABANDONED,
+  }),
+  // Distinct from `waitingUp` and `carLight`, which are the other two greens. They would read the
+  // same on screen, and a test that identified the relief mark by its fill would then also match
+  // every up-call badge and every lightly-loaded car — which it did.
+  queueRelief: tokens.RELIEF,
+
+  sky: DEFAULT_SKY,
+  mass: tokens.STAGE_MASS,
+  floorSlab: tokens.STAGE_SLAB,
+  shaftRecess: tokens.STAGE_SHAFT_RECESS,
+  shaftHairline: tokens.STAGE_SHAFT_HAIRLINE,
+  cable: tokens.STAGE_CABLE,
+  windowNight: tokens.STAGE_WINDOW_NIGHT,
+  windowDay: tokens.STAGE_WINDOW_DAY,
+  floorLabel: tokens.FLOOR_LABEL,
+  badgeTransfer: tokens.FLOOR_LABEL_TRANSFER,
+  ground: tokens.STAGE_GROUND,
+  carLabel: tokens.CAR_OCCUPANT_TEXT,
+  outOfServiceOn: tokens.OOS_ON,
+  outOfServiceOnText: tokens.OOS_ON_TEXT,
+  outOfServiceOff: tokens.OOS_OFF,
+  outOfServiceOffText: tokens.OOS_OFF_TEXT,
+  alarm: tokens.ALARM,
 });
 
 export interface SceneInput {
@@ -139,6 +296,120 @@ export interface SceneInput {
    * recording-wide scan of its own.
    */
   readonly unansweredCallFloorIds?: readonly string[] | undefined;
+  /**
+   * Landings whose calls **no car may legally answer** — `docs/10` § 10.4, `U8`.
+   *
+   * The third member of a family whose two existing members it must not be confused with, and
+   * the reason all three are separate inputs rather than one *"unavailable"* list:
+   *
+   * | input | the fact | the fix |
+   * |---|---|---|
+   * | {@link SceneInput.unservedFloorIds} | **service** zoning: no shaft reaches this floor | build a bank that serves it |
+   * | {@link SceneInput.unansweredCallFloorIds} | an **outcome**: a car could have taken this call and none did | more cars, a better policy |
+   * | this | **access** zoning: the call carries no credential the cars will accept | a dispatcher that reads credentials, or a credential for the rider |
+   *
+   * `CLAUDE.md` forbids collapsing the three kinds of zoning, and a renderer that drew a floor no
+   * shaft reaches the same way as a floor no credential opens would do exactly that in the one
+   * place a reader actually looks.
+   *
+   * Derived by the caller from `access/lockedOut.ts`, for the reason {@link SceneInput.overlay}
+   * and {@link SceneInput.unansweredCallFloorIds} are: which floors are access-controlled is a
+   * fact about the *building*, and `drawScene` stays a pure function of what it is handed.
+   */
+  readonly lockedOutLandings?: readonly LockedOutLanding[] | undefined;
+  /**
+   * Per-floor rider queues at this instant — `docs/10` § 6, U4.
+   *
+   * Omitted, the landings draw exactly what they drew before: the `▲n ▼n` direction counts. Given,
+   * the counts stay *and* every waiting person is drawn — individually while there are few enough
+   * of them, then with a `+N`, then as a log-scaled bar (§ 6.2). The counts are not replaced,
+   * because they are the only thing on the row that says which way people want to go.
+   *
+   * Passed in rather than computed here for the reason {@link SceneInput.overlay} is: `drawScene`
+   * stays a pure function of its inputs, so `canvas.test.ts` can assert what was drawn without
+   * running a simulation.
+   */
+  readonly queues?: readonly FloorQueue[] | undefined;
+  /**
+   * The building's mood, from observations alone — D4, and R1's payoff.
+   *
+   * On the canvas because the canvas is what **Export PNG** writes to a file: a mood that lived
+   * only in the DOM would be absent from the one artefact that leaves the building. The gauge's
+   * reasons stay in the DOM, where they can be read and copied.
+   */
+  readonly mood?: BuildingMood | undefined;
+  /**
+   * Simulated seconds from midnight to `simTimeS === 0` — `docs/12` § 4.1.
+   *
+   * The stage's sky and its lit windows are keyed on the hour, and the hour is
+   * `dayStartS + frame.simTimeS`. Defaults to `06:00`, which is where the handoff's day begins.
+   *
+   * **To be re-sourced.** `packages/viz/src/live/timeline.ts` is being written in a parallel lane
+   * and will own `DAY_START_S` and the `hh:mm` formatter for the whole viewer; `render/` may not
+   * import from `src/live/` in this wave, so the default lives in `render/sky.ts` and this option
+   * lets the caller override it in the meantime. When that module lands, this default should come
+   * from it and `render/sky.ts`'s copy should be deleted rather than kept in step by hand.
+   */
+  readonly dayStartS?: number | undefined;
+}
+
+/** A rectangle the caller can hit-test a pointer against. Canvas coordinates, CSS pixels. */
+export interface SceneHitRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * One shaft's service badge, and where it was drawn — `docs/12` § 1.5 B7.
+ *
+ * The renderer draws the badge and reports its rectangle; **it does not handle the click.** A
+ * pointer belongs to the DOM and `boundaries.test.ts` rule 3 keeps the DOM in `src/dev/`, so the
+ * seam is a rectangle and a car id. `src/dev/` turns one into a `recordRun` re-run with the car
+ * in {@link VizRecording.outOfServiceCarIds}; nothing here knows that happens.
+ *
+ * Reported rather than recomputed by the caller for the reason the whole of this directory
+ * exists: a hit box computed in `dev/main.ts` from the same arithmetic is a second copy of the
+ * layout, and the two would drift the first time a badge moved.
+ */
+export interface CarBadgeHit {
+  readonly carId: string;
+  /** The short label drawn above the shaft, so a caller can name the car in a tooltip. */
+  readonly label: string;
+  /** What the badge currently says. `true` draws `OOS`, `false` draws `⏻`. */
+  readonly outOfService: boolean;
+  /**
+   * The hit rectangle, **larger than the drawn pill** — the artefact's own three pixels of slop
+   * on each side (`:2110`). A 26 × 15 target is below every pointer guideline there is; the slop
+   * does not fix that and it does make the badge forgiving at the corners.
+   */
+  readonly rect: SceneHitRect;
+}
+
+/** The landing the stage's alarm chip should name — `docs/12` § 1.3 M3. */
+export interface StageAlarm {
+  readonly floorId: string;
+  readonly label: string;
+  readonly waiting: number;
+}
+
+/**
+ * What the draw produced that a caller outside the canvas needs.
+ *
+ * `drawScene` returned `void` until the stage acquired a control. It now returns the two things
+ * that cannot be recovered from the inputs without re-deriving the layout: where the badges
+ * landed, and which landing raised the alarm. Both are *reports of what was drawn*, so the chip
+ * above the stage and the rule across the floor can never disagree about which floor is in
+ * trouble — which is the same argument `SceneInput.overlay` makes in the other direction.
+ */
+export interface SceneHits {
+  readonly carBadges: readonly CarBadgeHit[];
+  /**
+   * The deepest landing past the alarm depth, or `undefined`. One rather than a list, because the
+   * chip is one chip; the *rules* are drawn on every landing that crossed.
+   */
+  readonly alarm: StageAlarm | undefined;
 }
 
 /**
@@ -163,7 +434,17 @@ export interface SceneSelection {
 const FONT = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
 const FONT_BOLD = 'bold 14px ui-monospace, SFMono-Regular, Menlo, monospace';
 
-export function drawScene(ctx: Canvas2DLike, input: SceneInput): void {
+/**
+ * One frame, onto one context — the whole stage, back to front.
+ *
+ * The order is the design's (`:1998–2162`) and it is load-bearing rather than incidental: the sky
+ * is behind the mass, the mass is behind the slabs, the slabs are behind the shafts, the people
+ * stand in front of all of it, and the ground line is drawn last so it is not washed out by the
+ * mass. The four things that are **not** the design's — the header band, the landing gutter, the
+ * notices row and the metrics panel — are drawn where they always were, because each of them is a
+ * claim the handoff's prototype had no way to make and this viewer is not allowed to stop making.
+ */
+export function drawScene(ctx: Canvas2DLike, input: SceneInput): SceneHits {
   const { recording, frame, layout } = input;
   const theme = input.theme ?? DEFAULT_THEME;
 
@@ -171,17 +452,84 @@ export function drawScene(ctx: Canvas2DLike, input: SceneInput): void {
   ctx.fillStyle = theme.background;
   ctx.fillRect(0, 0, layout.width, layout.height);
 
+  /*
+   * The sky, and the hour it was painted for.
+   *
+   * The hour is returned rather than recomputed by the two other functions that need it —
+   * the lit windows and nothing else, today — so a scene can never be lit for a different time of
+   * day than the one it is painted under. `render/sky.ts` for why the hour cannot come from a
+   * clock and why the ramp is strips rather than a `CanvasGradient`.
+   */
+  const hour = drawSky(ctx, {
+    width: layout.width,
+    height: layout.height,
+    simTimeS: frame.simTimeS,
+    dayStartS: input.dayStartS ?? DAY_START_S,
+    palette: theme.sky,
+  });
+
+  drawBuildingMass(ctx, layout, theme);
   drawHeader(ctx, input, theme);
-  drawFloors(ctx, input, theme);
+  drawFloors(ctx, input, theme, hour);
   drawShafts(ctx, input, theme);
   drawCars(ctx, input, theme);
+  const carBadges = drawServiceBadges(ctx, input, theme);
+  const alarm = drawRiderLanes(ctx, input, theme);
+  drawGroundLine(ctx, input, theme);
   drawLandings(ctx, input, theme);
   drawSelection(ctx, input, theme);
+  drawNotices(ctx, input, theme);
   drawFooter(ctx, recording, frame, layout, theme);
   if (input.overlay !== undefined) {
     drawOverlay(ctx, { recording, frame, layout, theme, metrics: input.overlay });
   }
   ctx.restore();
+  return { carBadges, alarm };
+}
+
+/**
+ * The mass of the building, behind everything the plot holds — design `:2018–2020`.
+ *
+ * Eight pixels of bleed above and below, so the top and bottom slabs sit *inside* the mass rather
+ * than on its edge. Without it the building has no roof and no basement and the shafts appear to
+ * float on the sky.
+ */
+function drawBuildingMass(ctx: Canvas2DLike, layout: Layout, theme: Theme): void {
+  ctx.fillStyle = theme.mass;
+  ctx.fillRect(layout.plot.x, layout.plot.y - 8, layout.plot.width, layout.plot.height + 16);
+}
+
+/**
+ * The line the entrance floor stands on — design `:2159–2162`.
+ *
+ * Drawn last, and it starts ten pixels into the label gutter so it reads as the ground the whole
+ * building is on rather than as one more floor slab. A building with no entrance floor — which
+ * the schema permits and no shipped building is — simply gets no ground line, rather than one
+ * drawn at an arbitrary floor.
+ */
+function drawGroundLine(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
+  const { layout } = input;
+  const entrance = layout.rows.find((row) => row.isEntrance);
+  if (entrance === undefined) return;
+  ctx.strokeStyle = theme.ground;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(layout.plot.x - 10, entrance.y + slabHeightPx(layout) + 0.5);
+  ctx.lineTo(layout.plot.x + layout.plot.width, entrance.y + slabHeightPx(layout) + 0.5);
+  ctx.stroke();
+}
+
+/**
+ * A floor slab's depth — design `:2016`, `max(2, min(6, pitch × 0.18))`.
+ *
+ * The stage draws a slab where the viewer used to draw a hairline. It is the same claim — *there
+ * is a floor here* — at a weight that reads as structure, and it is clamped at both ends so a
+ * 101-storey building gets 2 px rather than a smear and a four-storey one gets 6 px rather than a
+ * plinth. One function because three callers need the same number: the slab itself, the ground
+ * line that sits under one, and the alarm rule that sits under another.
+ */
+function slabHeightPx(layout: Layout): number {
+  return Math.max(2, Math.min(6, layout.pitchPx * 0.18));
 }
 
 /**
@@ -212,25 +560,34 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   ctx.textBaseline = 'top';
   ctx.font = FONT_BOLD;
   ctx.fillStyle = theme.text;
-  ctx.fillText(recording.buildingName, 12, 10);
+  ctx.fillText(recording.buildingName, 12, layout.header.titleY);
 
   ctx.font = FONT;
   ctx.fillStyle = theme.textDim;
-  ctx.fillText(
-    `${recording.dispatcherProfileId} · seed ${recording.seed} · ${formatClock(frame.simTimeS)} / ${formatClock(recording.endedAt)}`,
-    12,
-    30,
-  );
+  const meta = `${recording.dispatcherProfileId} · seed ${recording.seed} · ${formatClock(frame.simTimeS)} / ${formatClock(recording.endedAt)}`;
+  ctx.fillText(meta, 12, layout.header.metaY);
 
   ctx.textAlign = 'right';
   ctx.fillStyle = theme.text;
+  /*
+   * Clipped against the meta line, for the reason the banner is clipped against the title.
+   *
+   * The two share a row and nothing stopped them meeting: on a narrow canvas the counters were
+   * drawn straight through the seed, and `R7` makes the seed the one thing on that line that may
+   * never be lost. So the counters yield — they are also the line that repeats what the run
+   * summary panel says at length, and the seed is not.
+   */
+  const metaPx = 12 + meta.length * CHAR_ADVANCE_PX + 16;
   ctx.fillText(
-    `waiting ${String(frame.totalWaiting)}   boarded ${String(frame.boardedLegs)} legs   ${meanClause(
-      recording,
-      frame,
-    )}`,
+    fitLabel(
+      `waiting ${String(frame.totalWaiting)}   boarded ${String(frame.boardedLegs)} legs   ${meanClause(
+        recording,
+        frame,
+      )}`,
+      layout.width - 12 - metaPx,
+    ),
     layout.width - 12,
-    30,
+    layout.header.metaY,
   );
 
   // The one statistic a viewer must never quietly average. `awtIsValid` is copied from the
@@ -244,6 +601,20 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
       `${recording.status.toUpperCase()} — ${String(recording.summary.undelivered)} undelivered`,
     );
   }
+  /*
+   * `docs/10` § 10.4, **second** — before saturation and before the unanswered count, and after
+   * the status for `RV-16`'s reason.
+   *
+   * Order is priority here, because the line is clipped from the right when it does not fit
+   * (below). A structural refusal — these calls could never have been answered by anybody —
+   * outranks both a statistic being suppressed and a count of calls that merely went unanswered,
+   * and it is the one of the four a reader can act on. It does **not** replace the unanswered
+   * clause: the two are different claims about different calls, and a reader needs both counts.
+   *
+   * The `short` form: the floors are already marked `▩` on their own rows, and this is one line.
+   */
+  const lockedOut = describeLockedOut(input.lockedOutLandings ?? [], { short: true });
+  if (lockedOut !== '') banner.push(lockedOut);
   if (recording.summary.saturated) banner.push('SATURATED — AWT suppressed');
   else if (!recording.summary.awtIsValid) banner.push('AWT suppressed');
   // `D10` — a call no car answered is never left to the landing selector alone. See
@@ -258,7 +629,49 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   }
   if (banner.length > 0) {
     ctx.fillStyle = theme.warning;
-    ctx.fillText(banner.join('   ·   '), layout.width - 12, 10);
+    /*
+     * Clipped so it cannot overprint the building name.
+     *
+     * The banner is right-aligned on the **same line** as the title, which is drawn at `x = 12`
+     * in the bold face. Nothing stopped the two meeting in the middle, and on Secure Tower at
+     * 800 px they did — *"⊘Secure Tower"* with the banner's tail written through it, which was
+     * already true of the four-clause banner before § 10.4 added a fifth. Found by driving it.
+     *
+     * The full sentence is never lost: `describeFrame` writes it into the canvas's `aria-label`
+     * unabbreviated, which is the surface with no width limit.
+     */
+    const titlePx = 12 + recording.buildingName.length * BOLD_CHAR_ADVANCE_PX + 16;
+    ctx.fillText(
+      fitLabel(banner.join('   ·   '), layout.width - 12 - titlePx),
+      layout.width - 12,
+      layout.header.titleY,
+    );
+  }
+
+  /*
+   * The mood, on the bitmap — D4.
+   *
+   * The **glyph first**, then the word, then (when it is one) the provisional marker. All three are
+   * text, so a greyscale export carries the whole claim: KB-15's rule is not satisfied by drawing
+   * the same fact in two colours.
+   *
+   * Nothing here is suppressible, which is the point of R1 — this line is drawn on the 46 of 60
+   * shipped configurations (**M1**) where the header two lines up says `mean wait suppressed`.
+   *
+   * `layout.header.moodY` and not `48`: the literal `48` put this line straight through the bank
+   * labels on every multi-bank building, because `drawShafts` writes those at `plot.y − 18` and the
+   * 64 px header left the two rows ten pixels apart. Both numbers were locally correct and neither
+   * owned the row. See {@link HeaderBand}.
+   */
+  const mood = input.mood;
+  if (mood !== undefined) {
+    ctx.textAlign = 'left';
+    ctx.fillStyle = mood.level === 'calm' ? theme.textDim : theme.warning;
+    ctx.fillText(
+      fitLabel(`${mood.glyph} ${mood.headline}`, layout.width - 24),
+      12,
+      layout.header.moodY,
+    );
   }
 }
 
@@ -295,21 +708,85 @@ function meanClause(recording: VizRecording, frame: Frame): string {
   return `mean wait so far ${mean === undefined ? '—' : `${mean.toFixed(1)} s`}`;
 }
 
-function drawFloors(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
+/**
+ * Slabs, lit windows and labels — design `:2023–2045`.
+ *
+ * ## The three floor badges, and the one that was not adopted
+ *
+ * The artefact draws four states in the label gutter: `⌂` entrance, `⇄` transfer, `⚿` secure, and
+ * plain. Three of those are taken; **`⚿` is not**, and refusing it is the point rather than an
+ * omission.
+ *
+ * A `VizFloor` has no *secure* flag, and giving it one would be the third kind of zoning
+ * collapsed into the first — `CLAUDE.md` forbids exactly that, because service zoning (no shaft
+ * reaches this floor), access zoning (no credential opens this call) and operational zoning (the
+ * dispatcher's own strategy) are different facts with different fixes. Access control in this
+ * simulator is a property of a **call's credential**, not of a storey: the same floor is open to
+ * one rider and shut to the next. It already has a mark — `▩`, on the landing row, drawn by
+ * `drawLandings` and named in the banner — and `access/zoning.ts`'s docstring is explicit that a
+ * reader who learned `▩` must not have to learn a second spelling of it.
+ *
+ * So the gutter's third badge stays `⊘`, which is the fact the gutter actually knows: **no shaft
+ * in this building reaches this floor**. It keeps the design's `#c9a56a`, because that is the
+ * slot the artefact painted that colour.
+ *
+ * ## The label stride is the layout's, not a second one
+ *
+ * The artefact recomputes a stride in `draw()` (`:2038`). `FloorRow.labelled` already is that
+ * decision, made once, with two rules this renderer would otherwise have to reinvent: reference
+ * floors are never thinned, and a strided label yields to a reference one. A second stride here
+ * would disagree with it on `vertical-city` and nowhere else, which is the worst place to find
+ * out.
+ */
+function drawFloors(ctx: Canvas2DLike, input: SceneInput, theme: Theme, hour: number): void {
   const { layout } = input;
   const unserved = new Set(input.unservedFloorIds ?? []);
-  ctx.font = FONT;
-  ctx.textBaseline = 'middle';
-  for (const row of layout.rows) {
-    // Every floor gets a line, on every building, at every pitch. Only the *label* thins.
-    ctx.strokeStyle = theme.floorLine;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(layout.plot.x, row.y);
-    ctx.lineTo(layout.plot.x + layout.plot.width, row.y);
-    ctx.stroke();
+  const populationById = new Map(
+    input.recording.floors.map((floor) => [floor.id, floor.population]),
+  );
+  const slab = slabHeightPx(layout);
+  const windows = windowBand(layout);
+  const night = isNight(hour);
+  // How much of the band is lit: most of it after dark, a little more than half in office hours,
+  // and almost nothing in the hour either side. The artefact's own three rungs (`:2029`).
+  const litFraction = night ? 0.42 : hour > 8 && hour < 18 ? 0.5 : 0.22;
+
+  for (const [rowIndex, row] of layout.rows.entries()) {
+    // Every floor gets a slab, on every building, at every pitch. Only the *label* thins.
+    ctx.fillStyle = theme.floorSlab;
+    ctx.fillRect(layout.plot.x, row.y, layout.plot.width, slab);
+
+    /*
+     * The window band, lit by who is home.
+     *
+     * Deterministic and not random: `(index × 7 + cell × 13) mod 11` is a fixed pattern per
+     * (floor, cell) pair, so the same building lights the same windows every time it is drawn. A
+     * `Math.random()` here — which is what the artefact does — would be a global RNG draw inside
+     * the renderer (`CLAUDE.md` invariant 2) *and* would make the picture depend on how many
+     * times it had been painted, which is the property `replay/replay.test.ts` rests on.
+     *
+     * A floor with nobody living on it is dimmed rather than dark: a lobby at midnight has its
+     * lights on and nobody in it, which is true of every building this project ships.
+     */
+    if (windows !== undefined) {
+      const population = populationById.get(row.floorId) ?? 0;
+      ctx.fillStyle = night ? theme.windowNight : theme.windowDay;
+      for (let cell = 0; cell < windows.cells; cell += 1) {
+        const on =
+          ((rowIndex * 7 + cell * 13) % 11) / 11 < litFraction * (population > 0 ? 1 : 0.3);
+        if (!on) continue;
+        ctx.fillRect(
+          windows.rightX - cell * WINDOW_PITCH_PX,
+          row.y - Math.min(8, layout.pitchPx * 0.44),
+          WINDOW_WIDTH_PX,
+          Math.min(6, layout.pitchPx * 0.3),
+        );
+      }
+    }
 
     if (!row.labelled) continue;
+    ctx.font = FLOOR_LABEL_FONT;
+    ctx.textBaseline = 'middle';
     ctx.textAlign = 'right';
     // Entrance and sky-lobby floors get a glyph as well as a colour: `⌂` for the entrance and
     // `⇄` for a transfer floor (RV-07). A reader must be able to find the sky lobby in a
@@ -319,9 +796,11 @@ function drawFloors(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
     ctx.fillStyle =
       restricted !== ''
         ? theme.restricted
-        : badge === ''
-          ? theme.textDim
-          : theme.badge;
+        : row.isTransferFloor
+          ? theme.badgeTransfer
+          : row.isEntrance
+            ? theme.badge
+            : theme.floorLabel;
     // The gutter is everything left of the plot, less the 8 px the text is inset by. A label
     // longer than that is clipped here rather than drawn off the left edge of the canvas.
     const budget = layout.plot.x - 8 - (badge.length + restricted.length) * 8;
@@ -331,7 +810,39 @@ function drawFloors(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
       row.y,
     );
   }
+  ctx.font = FONT;
 }
+
+/** Cell pitch and width of the window band — design `:2030`, `c * 14` and a 6 px pane. */
+const WINDOW_PITCH_PX = 14;
+const WINDOW_WIDTH_PX = 6;
+/** The most panes a floor gets. Six is the artefact's; past that the band reads as a barcode. */
+const MAX_WINDOW_CELLS = 6;
+
+/**
+ * Where the windows go, if anywhere.
+ *
+ * The right-hand end of the plot, clear of the shaft bank and of the rider lane — a lit window
+ * behind a queue of people is a window nobody can see, and one behind a shaft is a hole in the
+ * building. `undefined` when there is no such strip, which is a real case on a sixteen-car
+ * building at a narrow viewport and which costs nothing: the windows are scenery and every fact
+ * on the canvas survives their absence.
+ */
+function windowBand(layout: Layout): { readonly rightX: number; readonly cells: number } | undefined {
+  const occupiedTo =
+    layout.riderLane !== undefined
+      ? layout.riderLane.x + layout.riderLane.width
+      : layout.columns.reduce((right, column) => Math.max(right, column.x + column.width), layout.plot.x);
+  const rightX = layout.plot.x + layout.plot.width - 16;
+  const cells = Math.min(
+    MAX_WINDOW_CELLS,
+    Math.floor((rightX - (occupiedTo + 8)) / WINDOW_PITCH_PX),
+  );
+  return cells > 0 ? { rightX, cells } : undefined;
+}
+
+/** The label gutter's face — design `:2039`. Smaller and heavier than the body face. */
+const FLOOR_LABEL_FONT = '600 10.5px ui-monospace, SFMono-Regular, Menlo, monospace';
 
 function drawShafts(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   const { recording, layout } = input;
@@ -344,11 +855,15 @@ function drawShafts(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
     const rows = layout.rows.filter((row) => served === undefined || served.has(row.floorId));
     const top = rows.reduce((min, row) => Math.min(min, row.y), layout.plot.y + layout.plot.height);
     const bottom = rows.reduce((max, row) => Math.max(max, row.y), layout.plot.y);
-    ctx.fillStyle = theme.shaft;
+    // A recess rather than a panel: the shaft is a hole cut into the mass, which is what makes
+    // the mass read as a building rather than as a backdrop. Design `:2054–2057`.
+    ctx.fillStyle = theme.shaftRecess;
     ctx.fillRect(column.x, top, column.width, Math.max(1, bottom - top));
-    ctx.strokeStyle = theme.shaftEdge;
+    ctx.strokeStyle = theme.shaftHairline;
     ctx.lineWidth = 1;
-    ctx.strokeRect(column.x, top, column.width, Math.max(1, bottom - top));
+    // Half-pixel inset so the hairline lands on a pixel rather than across two of them, which is
+    // the difference between a 1 px line and a 2 px grey smudge on a real context.
+    ctx.strokeRect(column.x + 0.5, top + 0.5, Math.max(1, column.width - 1), Math.max(1, bottom - top - 1));
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
@@ -357,20 +872,34 @@ function drawShafts(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
     // Clipped to the column, like the floor labels: a 16-shaft building gives each column about
     // 30 px, and `shuttle`/`office-low` run into their neighbours long before that. Found by
     // running the viewer on Mixed-Use High-Rise.
-    ctx.fillText(fitLabel(column.label, column.width), column.centreX, layout.plot.y - 4);
+    ctx.fillText(fitLabel(column.label, column.width), column.centreX, layout.header.shaftY);
     // RV-06: banks are grouped and *labelled*. Only when there is more than one — repeating
     // "main" over every column of a single-bank building is noise, and the shipped buildings
-    // that have several banks are exactly the ones where the grouping is the point.
+    // that have several banks are exactly the ones where the grouping is the point. The *row* is
+    // reserved either way, so a bank filter does not move the picture — see {@link HeaderBand}.
     if (bankCount > 1) {
       ctx.fillStyle = theme.badge;
-      ctx.fillText(fitLabel(column.bankId, column.width), column.centreX, layout.plot.y - 18);
+      ctx.fillText(fitLabel(column.bankId, column.width), column.centreX, layout.header.bankY);
     }
   }
 }
 
+/**
+ * The cars, their cables and their doors — design `:2058–2093`.
+ *
+ * ## Why the body is a path and not a `fillRect`
+ *
+ * The design's car has rounded corners, and at the 11–28 px this renderer draws them at, 5 px of
+ * radius is the difference between a lift car and a progress bar. The path also records more than
+ * the rectangle did: `canvas.test.ts` locates the car by the `moveTo` that opens it, which
+ * carries the top edge *and* the radius, and asserts the top edge against `layout.yForHeight`.
+ * That single assertion is what stops a renderer quietly drawing the nearest floor and throwing
+ * away the S-curve the frame producer evaluated.
+ */
 function drawCars(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   const { frame, layout } = input;
   const byCar = new Map(frame.cars.map((car) => [car.carId, car]));
+  const outOfService = new Set(input.recording.outOfServiceCarIds);
   for (const column of layout.columns) {
     const car = byCar.get(column.carId);
     if (car === undefined) continue;
@@ -380,22 +909,45 @@ function drawCars(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
     const x = column.x + 2;
     const w = column.width - 4;
 
+    /*
+     * A car that is not in service is dimmed, and the dimming is **never** the only signal —
+     * the badge at the foot of its shaft says `OOS` in three letters (`drawServiceBadges`).
+     * `globalAlpha` is invisible to a recording stub, which is exactly why it may not carry a
+     * claim on its own; KB-15 and `honesty/` would both be satisfied by a badge alone, and the
+     * alpha is here so the shaft looks as dark as the badge says it is.
+     */
+    ctx.globalAlpha = outOfService.has(column.carId) ? 0.32 : 1;
+
+    // The travelling cable, from the shaft head down to the car's roof. Scenery, and the one
+    // piece of it that moves with the machine rather than with the clock.
+    ctx.strokeStyle = theme.cable;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(column.centreX, layout.plot.y);
+    ctx.lineTo(column.centreX, y);
+    ctx.stroke();
+
     // Four bands, not three: the 80 % fill rule and the 1.1 overload alarm are different facts
     // about a car and used to share one colour that changed at 0.8 (D18, RV-14).
     ctx.fillStyle = loadColour(car.loadFactor, theme);
-    ctx.fillRect(x, y, w, h);
+    fillRoundedRect(ctx, { x, y, width: w, height: h, radius: Math.min(5, h / 3) });
 
     // Doors: a shut car shows the seam at the centre, an open one shows it split to the sides.
     // Drawing the *gap* rather than the leaves means `doorFraction` reads directly as a width.
-    const gap = w * 0.9 * car.doorFraction;
+    // Inset by 1.5 px top and bottom so the gap sits *inside* the rounded body rather than
+    // squaring off its corners — design `:2079`.
+    const gap = w * DOOR_GAP_FRACTION * car.doorFraction;
     ctx.fillStyle = theme.doorSeam;
-    ctx.fillRect(x + w / 2 - gap / 2, y, Math.max(1, gap), h);
+    ctx.fillRect(x + w / 2 - gap / 2, y + 1.5, Math.max(1, gap), Math.max(1, h - 3));
 
     if (h >= 12) {
-      ctx.font = FONT;
+      ctx.font = OCCUPANT_FONT;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = theme.text;
+      // Dark on the tint, not light: the four load colours are all mid-lightness, and 12 px of
+      // `#e8edf4` on `#3fb27f` is the one pairing on this canvas that fails a contrast check in
+      // both directions. Design `:2082`.
+      ctx.fillStyle = theme.carLabel;
       ctx.fillText(String(car.occupants), column.centreX, centreY);
     }
 
@@ -422,18 +974,204 @@ function drawCars(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
       ctx.fillStyle = theme.textDim;
       ctx.fillText(doorGlyph(car.doorPhase), column.centreX, y + h + 8);
     }
+    ctx.globalAlpha = 1;
   }
+}
+
+/** How much of a car's width the doors open to — design `:2078`, `cw * 0.86`. */
+const DOOR_GAP_FRACTION = 0.86;
+/** The occupant count's face — design `:2083`. */
+const OCCUPANT_FONT = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
+/** The service badge's face — design `:2108`. */
+const SERVICE_BADGE_FONT = '600 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+/** Slop around the drawn pill, each side, so the corners are hittable — design `:2110`. */
+const SERVICE_BADGE_SLOP_PX = 3;
+/** The widest a pill gets. Narrower on a narrow shaft, so it never overhangs its neighbour. */
+const SERVICE_BADGE_MAX_WIDTH_PX = 26;
+
+/**
+ * The out-of-service badge at the foot of every shaft — `docs/12` § 1.5 B7, design `:2094–2111`.
+ *
+ * ## Why it says a word and not only a colour
+ *
+ * `⏻` on a faint pill for *in service*, `OOS` on a red one for *not*. Two glyphs and one of them
+ * is three letters, so the state survives greyscale, a screenshot and **Export PNG** — KB-15,
+ * and the same rule that put `!` beside an overloaded car and `⇄` beside a sky lobby. The
+ * shaft's dimmed alpha is a *second* carrier of the same fact and never the first.
+ *
+ * ## Why the click is not handled here
+ *
+ * `boundaries.test.ts` rule 3: `render/` has no DOM and therefore no pointer. The badge's
+ * rectangle is returned to the caller, `src/dev/` hit-tests it, and turning a hit into a car held
+ * out of service is `recordRun`'s `outOfServiceCarIds` (§ 3.1 BE5) — a real re-run through
+ * `Car.setMode`, not a display state. The renderer's whole part in B7 is *here is the target and
+ * here is what it currently says*.
+ *
+ * The row it is drawn on is `layout.foot.badgeY`, which the layout owns for the reason the header
+ * band owns its six: hung off the plot's bottom edge by hand it lands on the run-status caption
+ * at every viewport size.
+ */
+function drawServiceBadges(
+  ctx: Canvas2DLike,
+  input: SceneInput,
+  theme: Theme,
+): readonly CarBadgeHit[] {
+  const { layout } = input;
+  const outOfService = new Set(input.recording.outOfServiceCarIds);
+  const hits: CarBadgeHit[] = [];
+  const height = layout.foot.badgeHeightPx;
+  const y = layout.foot.badgeY;
+  for (const column of layout.columns) {
+    const off = outOfService.has(column.carId);
+    const width = Math.min(column.width, SERVICE_BADGE_MAX_WIDTH_PX);
+    const x = column.x + (column.width - width) / 2;
+
+    ctx.fillStyle = off ? theme.outOfServiceOn : theme.outOfServiceOff;
+    fillRoundedRect(ctx, { x, y, width, height, radius: 4 });
+
+    ctx.font = SERVICE_BADGE_FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = off ? theme.outOfServiceOnText : theme.outOfServiceOffText;
+    ctx.fillText(off ? SERVICE_OFF_GLYPH : SERVICE_ON_GLYPH, x + width / 2, y + height / 2 + 0.5);
+
+    hits.push({
+      carId: column.carId,
+      label: column.label,
+      outOfService: off,
+      rect: {
+        x: x - SERVICE_BADGE_SLOP_PX,
+        y: y - SERVICE_BADGE_SLOP_PX,
+        width: width + 2 * SERVICE_BADGE_SLOP_PX,
+        height: height + 2 * SERVICE_BADGE_SLOP_PX,
+      },
+    });
+  }
+  ctx.font = FONT;
+  return hits;
+}
+
+/**
+ * The two things a service badge can say — design `:2109`.
+ *
+ * Exported because they are marks, and every mark in this renderer that a reader has to tell
+ * apart from another mark is read from the shipped value by a guard rather than transcribed into
+ * one. They are drawn *below* the plot rather than on a landing row, so
+ * `render/landingMarks.test.ts`'s family rule does not reach them — but they are the only two
+ * marks in the foot band and they must stay distinguishable from each other, which
+ * `stageRender.test.ts` asserts.
+ */
+export const SERVICE_ON_GLYPH = '⏻';
+export const SERVICE_OFF_GLYPH = 'OOS';
+
+/**
+ * The people, on the floors they are standing on — `docs/12` § 1.3 M3, design `:2114–2157`.
+ *
+ * Returns the deepest landing past the alarm depth, for the chip above the stage.
+ *
+ * ## Three things this function is careful about
+ *
+ * **It draws nothing without a lane.** `Layout.riderLane` is `undefined` when the shafts fill the
+ * plot, and the landing row in the right gutter carries the whole claim then. See
+ * `render/riderFigures.ts` for why the figures are an addition to that row and never a
+ * replacement for it.
+ *
+ * **The crowd is clamped into the plot.** A queue on the top floor would otherwise be drawn a
+ * figure-height *above* `plot.y`, straight through the shaft labels and the bank labels — the
+ * header band's own defect, arriving from underneath. `render/headerBand.test.ts` would catch it
+ * only on a scene that supplied queues, and its scene does not, so the clamp is here rather than
+ * left to a guard that cannot see it.
+ *
+ * **The alarm is reported, not just drawn.** One landing, the deepest, so the chip names the
+ * floor a reader should walk to; the *rules* are drawn on every landing that crossed, because
+ * more than one floor can be in trouble and a chip can only name one.
+ */
+function drawRiderLanes(
+  ctx: Canvas2DLike,
+  input: SceneInput,
+  theme: Theme,
+): StageAlarm | undefined {
+  const { layout, frame } = input;
+  const lane = layout.riderLane;
+  const queues = input.queues ?? [];
+  if (lane === undefined || queues.length === 0) return undefined;
+
+  const rowById = new Map(layout.rows.map((row) => [row.floorId, row]));
+  const slab = slabHeightPx(layout);
+  // Body, head and the highest the bob can lift it — `figureClearancePx`, not a local sum, so the
+  // clamp and the guard that checks it cannot disagree about how tall a person is.
+  const clearance = figureClearancePx(layout.pitchPx);
+  let alarm: StageAlarm | undefined;
+
+  for (const queue of queues) {
+    const row = rowById.get(queue.floorId);
+    if (row === undefined) continue;
+    // Clamped, so the top floor's crowd stands inside the building rather than in the header.
+    const feetY = Math.max(row.y, layout.plot.y + clearance);
+    const result = drawRiderLane(ctx, theme, {
+      riders: queue.riders,
+      total: queue.total,
+      x: lane.x,
+      widthPx: lane.width,
+      feetY,
+      pitchPx: layout.pitchPx,
+      simTimeS: frame.simTimeS,
+    });
+    if (!result.alarm) continue;
+    drawAlarmRule(ctx, theme, {
+      x: layout.plot.x,
+      y: row.y + slab + 1.5,
+      widthPx: layout.plot.width,
+      simTimeS: frame.simTimeS,
+    });
+    if (alarm === undefined || queue.total > alarm.waiting) {
+      alarm = { floorId: row.floorId, label: row.label, waiting: queue.total };
+    }
+  }
+  ctx.font = FONT;
+  return alarm;
+}
+
+/**
+ * The notices row: the shaft-count warning and the selected landing's caption, on **one** row.
+ *
+ * They were drawn by two different functions at the same `y` (`plot.y − 20`), left-aligned at the
+ * same `x`, so a reader who selected a landing on a window too narrow for every shaft got the two
+ * sentences written through each other. They are drawn here in one place, in order, with the
+ * cursor carried between them — which is the only way two left-aligned strings share a row.
+ *
+ * Both keep their own colour: `RS-05`'s warning is a warning and `RV-T3`'s caption is a selection.
+ */
+function drawNotices(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
+  const { layout, selection } = input;
+  const selected =
+    selection === undefined
+      ? undefined
+      : layout.rows.find((candidate) => candidate.floorId === selection.floorId);
+
+  ctx.font = FONT;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'bottom';
+  let cursor = layout.plot.x;
+  const rightEdge = layout.plot.x + layout.plot.width;
 
   if (layout.hiddenShaftCount > 0) {
     // RS-05: never silently truncated. The CLI's `watch` says "showing N of M" and so does this.
-    ctx.font = FONT;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'bottom';
     ctx.fillStyle = theme.warning;
-    ctx.fillText(
+    const text = fitLabel(
       `showing ${String(layout.columns.length)} of ${String(layout.columns.length + layout.hiddenShaftCount)} shafts — widen the window`,
-      layout.plot.x,
-      layout.plot.y - 20,
+      rightEdge - cursor,
+    );
+    ctx.fillText(text, cursor, layout.header.noticeY);
+    cursor += CHAR_ADVANCE_PX * (text.length + 2);
+  }
+
+  if (selection !== undefined && selected !== undefined) {
+    ctx.fillStyle = theme.highlight;
+    ctx.fillText(
+      fitLabel(describeSelection(selection), rightEdge - cursor),
+      cursor,
+      layout.header.noticeY,
     );
   }
 }
@@ -466,12 +1204,7 @@ function drawSelection(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void
     ctx.lineWidth = 2;
     ctx.strokeRect(column.x, layout.plot.y, column.width, layout.plot.height);
   }
-
-  ctx.font = FONT;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'bottom';
-  ctx.fillStyle = theme.highlight;
-  ctx.fillText(describeSelection(selection), layout.plot.x, layout.plot.y - 20);
+  // The caption is drawn by `drawNotices`, which owns the row it shares with `RS-05`'s warning.
 }
 
 /** The caption for a selected landing. Exported so a text alternative can reuse the wording. */
@@ -540,43 +1273,276 @@ export function landingOptionLabel(assignment: LandingAssignment): string {
  * `✗` and not `⊘`: `⊘` already means *this floor is served by no shaft* on the label gutter, and
  * the two are different claims — one about the building's geometry, one about what the dispatcher
  * did with a call it could legally have taken. Colour is not the only signal either way.
+ *
+ * Exported so the shape guard in `render/landingMarks.test.ts` reads the shipped value rather than
+ * a transcription of it. It kept its spelling through that guard's first red run; the band glyph
+ * it collided with is the one that moved (`render/riderQueue.ts`), because `D10` had `✗` first and
+ * because `✗` is named in `UX.md` RV-08, `access/lockedOut.ts` and `docs/10` § 10.4, while the
+ * band's spelling has exactly one definition and every reader goes through it.
  */
-const UNANSWERED_GLYPH = '✗';
+export const UNANSWERED_GLYPH = '✗';
+
+/**
+ * The glyph for a landing whose call no car **may** answer — `docs/10` § 10.4.
+ *
+ * The **same** glyph the credential lens uses for `not-permitted` (`access/zoning.ts`), on
+ * purpose: the editor's lens and the run viewer are two views of one fact, and a reader who
+ * learned `▩` on the preview must not have to learn a second spelling of it here. It is neither
+ * `⊘` (no shaft reaches this floor) nor `✗` (a car could have come and none did), which is the
+ * whole point — three barriers, three glyphs, none of them a recolouring of another.
+ *
+ * Both lockout causes draw it. The glyph names the **barrier**, which is access zoning either
+ * way; the banner and the screen-reader sentence name the **cause**, because *"the dispatcher
+ * cannot read this credential"* and *"this rider has no credential"* have different fixes and a
+ * 12 px mark cannot carry that.
+ */
+const LOCKED_OUT_GLYPH = STATE_GLYPHS['not-permitted'];
+
+/**
+ * The direction a landing call was registered in, and the mark for a landing with nobody at it.
+ *
+ * Named rather than inlined for one reason: they are marks on the **same row** as `✗`, `▩`, the
+ * relief `✓` and the four wait bands, and `render/landingMarks.test.ts` checks that no two claims
+ * on that row share a silhouette. A guard that read a transcribed copy of these three would keep
+ * passing after somebody edited the renderer, which is the false negative that family of guards
+ * exists to avoid.
+ */
+export const WAITING_UP_GLYPH = '▲';
+export const WAITING_DOWN_GLYPH = '▼';
+export const EMPTY_LANDING_GLYPH = '·';
+
+/**
+ * Smallest floor pitch at which a rider glyph is a glyph rather than a smear — § 6.2's second bar
+ * trigger, *"or the floor pitch is below the glyph height"*.
+ *
+ * 12 px is the font size this renderer draws at, so a row shorter than that cannot hold one
+ * without touching its neighbours. Vertical City's 100 floors at 700 px are under 8 px, which is
+ * exactly the case the bar exists for.
+ */
+const MIN_GLYPH_PITCH_PX = 12;
+
+/** Height of the bar a degraded row draws, pixels. Shorter than the pitch, always. */
+const QUEUE_BAR_HEIGHT_PX = 5;
+/** Shortest track a bar is scaled against, so a narrow gutter shortens it rather than erasing it. */
+const MIN_BAR_TRACK_PX = 24;
+/** Longest, so the count and the oldest wait always have room after it. Driven, not guessed. */
+const MAX_BAR_TRACK_PX = 56;
 
 function drawLandings(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   const { frame, layout } = input;
   const rowById = new Map(layout.rows.map((row) => [row.floorId, row]));
   const unanswered = new Set(input.unansweredCallFloorIds ?? []);
+  const lockedOut = new Set((input.lockedOutLandings ?? []).map((landing) => landing.floorId));
+  const queueByFloor = new Map((input.queues ?? []).map((queue) => [queue.floorId, queue]));
+  // The deepest queue anywhere at this instant, for the bar's log scale. Taken from the frame
+  // rather than pinned, because the measured extremes differ by a factor of two between buildings
+  // (M5: 175 on Midtown Office, 379 on Vertical City) and either pin makes the other unreadable.
+  const scaleTotal = (input.queues ?? []).reduce((max, queue) => Math.max(max, queue.total), 0);
   const x = layout.plot.x + layout.plot.width + 10;
+  // Everything right of the landings, up to the metrics panel if there is one. This is the *"row
+  // width"* § 6.2 degrades against, and it is a property of the viewport rather than of the
+  // building — which is why the same building degrades differently on a narrow window.
+  const rightEdge = (layout.overlay?.x ?? layout.width) - 12;
   ctx.font = FONT;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   for (const landing of frame.landings) {
     const row = rowById.get(landing.floorId);
     if (row === undefined) continue;
-    if (landing.waitingUp === 0 && landing.waitingDown === 0) {
+    const queue = queueByFloor.get(landing.floorId);
+    // The empty-landing dot, and the two reasons a landing is not empty even when the direction
+    // counts are zero: somebody is in the queue (U4), or the caller has told us this landing is
+    // locked out (U8). A row the caller named must draw its mark — a guard that dropped it would
+    // be the picture disagreeing with the banner about the same landing.
+    if (
+      landing.waitingUp === 0 &&
+      landing.waitingDown === 0 &&
+      queue === undefined &&
+      !lockedOut.has(landing.floorId)
+    ) {
       ctx.fillStyle = theme.textDim;
-      ctx.fillText('·', x, row.y);
+      ctx.fillText(EMPTY_LANDING_GLYPH, x, row.y);
       continue;
     }
     let cursor = x;
     if (landing.waitingUp > 0) {
       ctx.fillStyle = theme.waitingUp;
-      const text = `▲${String(landing.waitingUp)}`;
+      const text = `${WAITING_UP_GLYPH}${String(landing.waitingUp)}`;
       ctx.fillText(text, cursor, row.y);
       cursor += 8 * (text.length + 1);
     }
     if (landing.waitingDown > 0) {
       ctx.fillStyle = theme.waitingDown;
-      const text = `▼${String(landing.waitingDown)}`;
+      const text = `${WAITING_DOWN_GLYPH}${String(landing.waitingDown)}`;
       ctx.fillText(text, cursor, row.y);
       cursor += 8 * (text.length + 1);
     }
+    let marked = false;
     if (unanswered.has(landing.floorId)) {
       ctx.fillStyle = theme.warning;
       ctx.fillText(UNANSWERED_GLYPH, cursor, row.y);
+      cursor += 8 * 2;
+      marked = true;
+    }
+    if (lockedOut.has(landing.floorId)) {
+      ctx.fillStyle = theme.restricted;
+      ctx.fillText(LOCKED_OUT_GLYPH, cursor, row.y);
+      cursor += 8 * 2;
+      marked = true;
+    }
+    /*
+     * A cell of air between the **call** marks and the **rider** glyphs — added at the merge of
+     * W6/U4 and W7b/U8, because that is where the two first shared a row.
+     *
+     * They are different subjects: `✗`/`▩` say something about the *call* at this landing, and
+     * `●◑○◆` say something about the *people* standing at it. Run together they read as one
+     * string, and the gap stops the two groups being read as one word.
+     *
+     * The gap was all this row had when the abandoned band was `✖` (U+2716), one codepoint and no
+     * distance at all from the unanswered `✗` (U+2717). That is a *shape* problem and a cell of
+     * air does not touch it, so the band moved to `◆` — see `render/riderQueue.ts`'s `BAND_GLYPH`
+     * and the family rule in `render/landingMarks.test.ts`. The gap stays, because separating the
+     * two groups and separating the two marks are two different jobs.
+     */
+    if (marked) cursor += 8;
+    if (queue === undefined) continue;
+    cursor = drawQueueRow(ctx, theme, queue, {
+      x: cursor,
+      y: row.y,
+      widthPx: rightEdge - cursor,
+      pitchPx: layout.pitchPx,
+      scaleTotal,
+      // The layout has already decided which rows are far enough apart to carry 12 px of text —
+      // `FloorRow.labelled`, at `MIN_LABEL_PITCH_PX`. Reused rather than re-derived, because a
+      // queue caption drawn on a row whose own floor label was thinned away is text nothing
+      // identifies, on top of its neighbour. Driven on Midtown Office at 21 floors in a short
+      // canvas, where two adjacent captions overlapped and neither was readable.
+      labelled: row.labelled,
+    });
+  }
+}
+
+interface QueueRowBox {
+  readonly x: number;
+  readonly y: number;
+  readonly widthPx: number;
+  readonly pitchPx: number;
+  readonly scaleTotal: number;
+  /**
+   * Whether this row can carry text — `FloorRow.labelled`.
+   *
+   * **This is a stated limitation, not a silent one.** On a building whose rows are too close to
+   * label — Vertical City's 100 floors, and Midtown Office in a short window — a queue is drawn as
+   * a bar with **no count beside it**, which is the one place this feature does not keep the rule
+   * that a bar never carries its value alone. The count is still reachable: `describeFrame` names
+   * the busiest floors with their numbers, the landing selector lists them, and the header states
+   * the building total. Drawing it anyway was tried and produced two captions on top of each other
+   * at 7 px pitch, which carries less than nothing.
+   */
+  readonly labelled: boolean;
+}
+
+/**
+ * One landing's queue, drawn — § 6.2's three modes, and D4's mood painted on the same glyphs.
+ *
+ * The plan is made by `render/riderQueue.ts` and this function only puts it on the context, which
+ * is the split the whole of `render/` uses: what to draw is arithmetic and testable under Node,
+ * where to draw it is pixels. Returns the cursor, so a caller could put something after the row.
+ */
+function drawQueueRow(
+  ctx: Canvas2DLike,
+  theme: Theme,
+  queue: FloorQueue,
+  box: QueueRowBox,
+): number {
+  /*
+   * Cells the row must keep back for the text that follows the glyphs.
+   *
+   * Without this the glyphs fill the row to its last pixel and the `+N` is drawn under the metrics
+   * panel — seen on Midtown Office at 5:05, seed 42, where the Garage row read `18 waiti` with the
+   * rest behind the panel. A count that is clipped is worse than a count that was never promised,
+   * because the reader cannot tell which digits are missing.
+   *
+   * Constants rather than a measurement, because the text's length depends on the mode and the
+   * mode depends on the capacity: `+999` and `999 waiting` both fit in twelve cells, and the
+   * relief mark is `✓` plus at most three digits.
+   */
+  const reserved =
+    (queue.total > MAX_INDIVIDUAL_GLYPHS ? 12 : 0) + (queue.recentlyBoarded > 0 ? 5 : 0);
+  const plan: QueueRowPlan = planQueueRow({
+    queue,
+    capacityCells: Math.floor(box.widthPx / CHAR_ADVANCE_PX) - reserved,
+    // A row that cannot carry its own floor label cannot carry twelve glyphs and a `+N` either, so
+    // it aggregates all the way to a bar. One rule, in the direction § 6.2 already goes.
+    pitchFits: box.labelled && box.pitchPx >= MIN_GLYPH_PITCH_PX,
+    scaleTotal: box.scaleTotal,
+  });
+  let cursor = box.x;
+
+  if (plan.mode === 'bar') {
+    // The bar carries the *shape* of its worst band too, as the colour of the track's own outline
+    // would not survive greyscale: the glyph is drawn beside the bar, at every depth.
+    ctx.fillStyle = theme.queueBands[plan.worstBand];
+    // The track is a fraction of the row rather than *the row less the caption*, so that a narrow
+    // gutter shortens the bar instead of collapsing it to nothing — which is what the first
+    // version did, and a bar of one pixel says the same thing about 175 and 379. It is also
+    // **capped**: at 45 % of the gutter and no ceiling, the caption ran off the end and Midtown
+    // Office's Lobby read `● 55 waiting ·` with the wait behind the metrics panel. The count is
+    // the thing that must survive, so the bar yields to it.
+    const width = Math.max(
+      1,
+      plan.barFraction * Math.min(MAX_BAR_TRACK_PX, Math.max(MIN_BAR_TRACK_PX, box.widthPx * 0.45)),
+    );
+    ctx.fillRect(cursor, box.y - QUEUE_BAR_HEIGHT_PX / 2, width, QUEUE_BAR_HEIGHT_PX);
+    cursor += width + 6;
+    if (!box.labelled) return cursor;
+    /*
+     * The caption, shortened rather than clipped.
+     *
+     * Driven on Midtown Office at 5:45, seed 42: the Lobby's bar read
+     * `● 50 waiting · longest 9` with the rest behind the metrics panel. A number cut off mid-digit
+     * is worse than one that was never offered, because the reader cannot tell how much is missing.
+     * So the row drops the *secondary* fact — the oldest wait — and keeps the count, which is the
+     * one a bar must never carry alone. Both remain in `describeFrame`.
+     */
+    const room = Math.floor((box.x + box.widthPx - cursor) / CHAR_ADVANCE_PX);
+    const full = `${BAND_GLYPH[plan.worstBand]} ${plan.text}`;
+    const caption =
+      full.length <= room ? full : `${BAND_GLYPH[plan.worstBand]} ${String(plan.total)} waiting`;
+    ctx.fillStyle = theme.text;
+    ctx.fillText(caption, cursor, box.y);
+    cursor += CHAR_ADVANCE_PX * (caption.length + 1);
+    if (plan.reliefText !== undefined) {
+      ctx.fillStyle = theme.queueRelief;
+      ctx.fillText(plan.reliefText, cursor, box.y);
+      cursor += CHAR_ADVANCE_PX * (plan.reliefText.length + 1);
+    }
+    return cursor;
+  }
+
+  for (const segment of plan.segments) {
+    if (segment.label !== undefined) {
+      ctx.fillStyle = theme.badge;
+      ctx.fillText(`${segment.label} `, cursor, box.y);
+      cursor += CHAR_ADVANCE_PX * (segment.label.length + 1);
+    }
+    for (const glyph of segment.glyphs) {
+      ctx.fillStyle = theme.queueBands[glyph.band];
+      ctx.fillText(glyph.glyph, cursor, box.y);
+      cursor += CHAR_ADVANCE_PX;
     }
   }
+  if (plan.text !== '') {
+    ctx.fillStyle = theme.text;
+    ctx.fillText(plan.text, cursor, box.y);
+    cursor += CHAR_ADVANCE_PX * (plan.text.length + 1);
+  }
+  if (plan.reliefText !== undefined) {
+    ctx.fillStyle = theme.queueRelief;
+    ctx.fillText(plan.reliefText, cursor, box.y);
+    cursor += CHAR_ADVANCE_PX * (plan.reliefText.length + 1);
+  }
+  return cursor;
 }
 
 function drawFooter(
@@ -588,22 +1554,38 @@ function drawFooter(
 ): void {
   // The bar sits on the very bottom edge and the caption above it: overlapping the two put the
   // run status underneath the playhead, which is unreadable at exactly the moment it matters.
-  const y = layout.height - 8;
+  // Both rows come from `Layout.foot` rather than from arithmetic here, for the reason the header
+  // rows come from `Layout.header`: the badge row arrived between them and nothing owned the gap.
+  const y = layout.foot.progressY;
   const barX = layout.plot.x;
   const barW = layout.plot.width;
   ctx.fillStyle = theme.shaft;
-  ctx.fillRect(barX, y, barW, 6);
+  ctx.fillRect(barX, y, barW, layout.foot.progressHeightPx);
 
   const span = recording.endedAt - recording.startedAt;
   const fraction = span <= 0 ? 0 : (frame.simTimeS - recording.startedAt) / span;
   ctx.fillStyle = theme.car;
-  ctx.fillRect(barX, y, barW * Math.max(0, Math.min(1, fraction)), 6);
+  ctx.fillRect(
+    barX,
+    y,
+    barW * Math.max(0, Math.min(1, fraction)),
+    layout.foot.progressHeightPx,
+  );
 
   ctx.font = FONT;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = theme.textDim;
-  ctx.fillText(`${recording.status} · ${String(recording.summary.generated)} generated`, 12, y - 10);
+  // `docs/10` § 7.4 and `UX.md` RV-T4: every figure carries its window, and this is the surface
+  // that leaves the building. **Export PNG** writes the canvas to a file, so a bitmap whose
+  // header quotes a mean without saying which 300 seconds it covers will be read as covering the
+  // whole run. The clause is produced by `render/runSummary.ts` rather than formatted here, so
+  // the panel and the picture cannot word the same window differently.
+  ctx.fillText(
+    `${recording.status} · ${String(recording.summary.generated)} generated · ${windowClause(recording.summary)}`,
+    12,
+    layout.foot.statusY,
+  );
 }
 
 /**
@@ -615,6 +1597,16 @@ function drawFooter(
  * characters fit in a gutter.
  */
 const CHAR_ADVANCE_PX = 7.2;
+
+/**
+ * The same measure for the **bold 14 px** face the two headings use.
+ *
+ * Only one caller needs it — `drawHeader`, to reserve the building name's own width before it
+ * right-aligns the warning banner on the same line. Approximate for the same reason
+ * {@link CHAR_ADVANCE_PX} is, and rounded **up** rather than down, because being generous here
+ * clips a warning slightly early and being stingy overprints the title.
+ */
+const BOLD_CHAR_ADVANCE_PX = 8.5;
 
 /**
  * Clip a label to a pixel budget, with an ellipsis — `RV-09` and `RS-04`.

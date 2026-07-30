@@ -360,7 +360,7 @@ none of these are dispatched yet; they batch into one UI task once it lands.
 | U5 | **Human-understandable metrics** alongside AWT / WT95 / TTD. | new | Plain language is not the same as less true. "1 in 20 riders waited over a minute" is both more legible *and* exactly as correct as "WT95 = 62 s". The observation/estimate split and the suppression rule must survive translation. |
 | U6 | **Build new dispatcher models in the UI.** | new | Strong architectural fit: invariant 7 makes dispatchers *data* (weight vectors + stage settings), and invariant 8 makes every tunable self-describing — `discoverParameterSchemas()` / `collectSearchSpace()` already enumerate ~49 dimensions with type, range, default and `activeWhen`. A generic editor is generatable from that rather than hand-built. |
 | U7 | **Rider models definable and assignable to scenarios**, with traffic/occupancy multipliers for worst-case scenarios. | new | `data/traffic-profiles.json` is the current home. Multipliers drive straight into saturation, so the worst-case scenarios this asks for are exactly the runs whose statistics must be suppressed — that has to be designed in, not discovered. |
-| U8 | **Build out Access Zoning (credentials).** | new | `CLAUDE.md` forbids collapsing the three kinds of zoning (service / access / operational) into one field, so the editor must keep them distinct. Credentials have measured consequences: a destination kiosk without one breaks `secure-tower` outright (51.7% unserved vs 33.5%). |
+| U8 | **Build out Access Zoning (credentials).** | new | `CLAUDE.md` forbids collapsing the three kinds of zoning (service / access / operational) into one field, so the editor must keep them distinct. Credentials have measured consequences: a destination kiosk without one breaks `secure-tower` outright (100 % unserved vs 33.5 %). |
 
 **Scope call:** U2–U8 are a coherent body of work, not a punch list — a *product* phase on top of a
 simulator whose engine is now sound. Recorded as **Phase 9** rather than bolted onto Phase 4, whose
@@ -451,3 +451,222 @@ three findings from the `C4` measurement. Current list: [`docs/07`](docs/07-hand
 not the defect. That is the argument for *determine whether this is true, do not make it true*, and
 it is written up in [§ D124](DECISIONS.md) along with three process findings, including the one this
 wave paid for: **parallelise the work, serialise the measurement.**
+
+---
+
+# Waves 7 and 8 — live, 2026-07-29
+
+**Wave 7** closes the debt underneath Phase 6/7 and measures the Phase 6c sweep.
+**Wave 8** is Phase 9, the experience layer. They run concurrently because wave 7 is
+`core`/`experiments` and wave 8 is `viz`; the one shared surface is `boundaries.test.ts`.
+
+**Baseline:** `da411ea` — 190 files, 3496 passed, 9 skipped, `tsc -b` clean.
+**Now:** `4b8682d` — **194 files, 3585 passed, 9 skipped**, `tsc -b` clean.
+
+| ID | Task | Branch | Status | Verdict |
+|---|---|---|---|---|
+| T50 | Feasibility census for the 6c sweep | *(main tree, read-only)* | **CLOSED** | 18 cells censused, **no ΔTTD measured anywhere** — the constraint that keeps the cell set honest |
+| T51 | Pre-register the sweep as § D151 | `integration` | **CLOSED** | committed `26715f1`, before any comparison existed |
+| T52 | Run the pre-registered sweep | `feat/t52-sweep` | **IN FLIGHT** | the long pole |
+| T53 | Selector reaches the shipped runner | `feat/t53-selector-runner` | **MERGED** `e75a1c6` | § D153 — the **twelfth** signature defect, caught before shipping |
+| T54 | Derive `PROFILE_OBJECT_SECTIONS` | `feat/t54-schema-sections` | **MERGED** `94973fe` | § D152 — counts unmoved (56/106), which *is* the claim |
+| T55 | `stopCount`'s `activeWhen` | `feat/t55-stopcount` | **IN FLIGHT** | blast radius **before** the edit, by instruction |
+| T56 | `kioskRefusedLegs` + C27 | `feat/t56-seams` | **MERGED** `aa2c0ed` | C27 was **not open** — a register row wrong in the *pessimistic* direction |
+| T60 | Widen `VizSummary` (W2) | `feat/t60-vizsummary` | **MERGED** `4b8682d` | § D154 — 55/55 liveness mutations red; twelfth dead seam found *inside* the widened type |
+| T61 | Rider queues + mood (W6/U4) | `feat/t61-queues-mood` | **IN FLIGHT** | — |
+| T62 | Batch runner in a worker (W3) | `feat/t62-batch-runner` | **IN FLIGHT** | — |
+
+## What these waves have found so far, and none of it moved a phase verdict
+
+1. **A guard keyed on an outcome does not catch a change to the *reason* that outcome holds.**
+   T54 excused `selection` from the liveness sweep and built a guard to fail the day it became
+   runnable. T53 *is* that day, and the guard stayed green — correctly. The claim survived and the
+   reason died. Corrected in place with the superseded wording kept beside it ([§ D153](DECISIONS.md)).
+2. **A register row wrong in the pessimistic direction.** Six were found wrong in one wave before
+   and *every one was optimistic*. C27 is the first that claimed open what was already closed. But
+   something real was missing anyway: the two barrel guards compare the barrels **against each
+   other**, so deleting all 34 names from both left them green.
+3. **A false negative in mutation testing.** Freezing `wait95S` came back green because the value
+   has **two readers** and killing one left the other live. Not a dead field — a dead *mutation*.
+4. **`docs/10` was wrong about the code twice** — its W2 field list names a `window` field this
+   package's own boundary rule forbids. The binding contract is not exempt from being checked.
+5. **A test-suite fault that says nothing about the code.** `packages/core`'s whole-simulation tests
+   ran under vitest's 5 000 ms default; under a loaded parallel runner **eight** of them timed out.
+   71 explicit timeouts added (`5d161e8`), and the two heaviest tests in the same run had *passed*
+   all along because they already carried one.
+
+## Process notes for whoever runs the next wave
+
+- **Concurrent lanes all appending to `DECISIONS.md` collide on the entry number.** Three collisions
+  so far (D151/D152/D154), each cheap to fix at merge, none caught by any test. If a wave runs more
+  than two lanes that record decisions, allocate the numbers up front.
+- **Do not let a lane merge on its own report.** Every merge here was re-verified by the full suite
+  in the integration tree, and the reports were accurate — but that is a finding, not an assumption.
+- **The feasibility/outcome boundary has to be enforced, not requested.** T50 was told not to
+  measure ΔTTD and independently refused a *second* measurement — the operating point's detector-input
+  rates — on the grounds that it "predicts a selector that never switches, which is outcome
+  information wearing a feasibility label." That objection is why § D151 § 5 exists.
+
+## Waves 7 and 8 — CLOSED 2026-07-29
+
+**Final:** `0342868` — **209 test files, 3903 passed, 9 skipped**, `tsc -b` clean, 30 commits.
+Baseline was `da411ea` — 190 files, 3496 passed. All worktrees removed, all lane branches deleted.
+
+| ID | Unit | Verdict |
+|---|---|---|
+| T50 | Sweep feasibility census | 18 cells, **no ΔTTD measured anywhere** |
+| T51 | § D151 — the sweep, pre-registered | committed before any comparison existed |
+| T52 | The sweep | **Phase 6c NOT ACCEPTED at all five PRIMARY cells** |
+| T53 | Selector → shipped runner | § D153 — twelfth signature defect, caught pre-ship |
+| T54 | Search space derived from schema | § D152 — counts unmoved, which *is* the claim |
+| T55 | `stopCount`'s `activeWhen` | § D155 — **written, measured, refused** |
+| T56 | `kioskRefusedLegs` + C27 | C27 was **not open** — first pessimistic register row |
+| T60–T65 | Phase 9, W2/W3/W5/W6/W7/W9 | §§ D154, D157–D161 |
+
+### Phase status — unchanged, and that is the result
+
+**Phases 1–5 and 7 accepted. Phase 6 ⚠️ partial. Phase 8 accepted.** No verdict moved. Phase 6c
+was swept over eight pre-registered operating points under a protocol dated before any ΔTTD, and
+refused. The mechanism is now named rather than guessed: **the shipped demand template varies the
+*level* and never the *directional split*, so the condition learned selection exists to exploit does
+not occur at any shipped operating point.**
+
+### The one finding that outranks the rest
+
+**Six lanes, six tests that could not fail — and the sixth was the instrument that checks for tests
+that cannot fail.** Five distinct mechanisms, none catchable by reading:
+
+1. **Two readers** — freezing one leaves the other live (T60, `wait95S`).
+2. **A fixture routing past the subject** — the default gutter left zero cells, so every "glyph"
+   test silently exercised the **bar** path (T61). Three mutations green.
+3. **A control returning before the live half** — the CRN negative control compared traces at
+   different *seeds*, returning at the `seed` scalar before the per-passenger loop, which is the
+   only half that can fire in production (T62).
+4. **A guard whose *meaning* eroded while every assertion stayed true** — `marks()` filtered
+   `y > 40` to mean "landing rows"; another lane drew at `y = 48`. Nothing went red, because the
+   test is the thing that moved (T63).
+5. **The mutation harness itself** — `--reporter=basic` no longer exists in vitest 4, so **every
+   mutation reported "no failures."** A sweep that would have certified a dead suite as fully
+   live (T65).
+
+**A test that cannot fail is invisible to every other check this repository runs**, including the
+one built to find it. Hunting all five is now a standing item in a lane brief, not a lucky catch.
+
+### Process notes for the next wave
+
+- **Allocate `DECISIONS.md` entry numbers up front.** Seven collisions. The danger is not the
+  collision: a wrong cross-reference points at a **real, unrelated entry**, so nothing reads as
+  broken to anyone who does not follow the link. `CLAUDE.md` spent one commit pointing readers at
+  the schema-derivation entry while describing the sweep. No test catches this.
+- **Hand a conflicted merge back to the lane that wrote it.** T61 and T63 collided on 11 hunks
+  across three rendering files. Resolving them centrally would have shipped both an eroded guard
+  and an unasserted spacing change; the lane found both.
+- **Serialise the measurement, parallelise the work** — still true, and wave 7 paid it again: the
+  full suite ran ~8.5 min alone and ~13 min under load, and a loaded runner produced **eight**
+  spurious timeout failures that said nothing about the code.
+- **Every unit found its governing document wrong about the code at least once**, and `docs/10`
+  three times. Being *binding* does not make a document *right*.
+
+---
+
+# Wave 9 — CLOSED 2026-07-29
+
+**Scope, by explicit instruction:** drive the debt affecting gameplay or simulation toward zero,
+in parallel where possible. Six items were out of scope by that filter (internal hygiene that
+cannot produce a wrong number or a wrong screen) and stayed listed rather than closed quietly.
+
+**Final:** `55f04f8`, pushed to `origin/integration`. **225 test files, 4 122 tests passed, 10
+skipped**, `tsc -b` clean. Baseline at wave open: `3fec814` — 209 files, 3 903 passed. All wave 9
+worktrees and branches removed.
+
+| ID | Unit | Verdict |
+|---|---|---|
+| T71 | Non-elevator transport mode in `core` | § D167 — largest modelling debt closed; double-deck verdict **flipped while its evidence base narrowed** |
+| T73 | `nearest-car` defaults | § D164 — the viewer's default was already fixed and **undefended**; live site was the CLI's example list |
+| T74 | Three viewer defects | § D165 — two of three reports were wrong about their own cause |
+| T75 | Viewer selector + two `core` schema rows | § D166 — both "blocked on a `core` fix" refusals understated themselves, in opposite directions |
+| T76 | Phase 9 U2 mode split + live weight editor | § D168 — mode parity satisfies § D163 clause 2; found a never-hide item **no mode had ever drawn** |
+| T78 | Honesty property under search | § D171 — satisfies § D163 clause 1; found **two real contract violations**, both owner-resolved |
+| T79 | Sky-lobby escalators + campaign stage 6 | § D170 — corrected the orchestrator's own false premise about the building's geometry |
+| T70 | Phase-varying directional split | § D169 — built the condition Phase 6c's refusal named; **ran no selector arm**, by design |
+| T80 | Two merge-exposed honesty findings | § D172 — suppressed-mean report was a **false positive**; narrowing it surfaced five more of the same class |
+
+## Where Phases 1–7 and 9 stand at close
+
+**Phase 6 is still ⚠️ partial.** The condition its refusal named — no shipped template varying
+directional mix within a run — no longer exists, but **no selector arm has been measured on the
+new template**. That measurement is explicitly the next piece of work, not done here. See
+[`GAPS.md`](GAPS.md) § 1.
+
+**Phase 9 has a criterion for the first time** ([§ D163](DECISIONS.md)), and both of its
+load-bearing clauses now measure as satisfied. It still carries no status row — a formal
+acceptance pass is a distinct piece of work this wave did not do, deliberately, per § D163's own
+rule that the row and the verdict land together.
+
+## The two results worth carrying past this wave
+
+**A negative result, stated as cleanly as the positive ones.** The honesty search found two real
+contract violations — a probability word reaching a schema surface, and a comparison panel naming
+a winner at n = 2 against a stated floor of 50. Both were owner judgement calls, not code defects,
+and both are resolved with the reasoning on the record rather than silently patched.
+
+**A false positive, and the discipline of narrowing a property instead of widening an exclusion.**
+The suppressed-mean report looked exactly like a third instance of a leak this repository has
+closed twice before. It was arithmetically impossible instead — a run-level count matched by an
+over-eager cue window — and narrowing the check correctly surfaced **five more of the same class**
+before it stabilised. The closed leak from two waves ago is now reconfirmed by an injected fault
+rather than by rereading the code that fixed it.
+
+## Full gap register
+
+[`GAPS.md`](GAPS.md) — every known limitation in one place, ordered by whether it can produce a
+wrong number, a wrong screen, or neither. Written so the next reader does not have to reconstruct
+it from thirty commit messages.
+
+---
+
+# Wave 11 — 2026-07-30
+
+**Scope:** take the wave-10 viewer from *implemented* to *implemented per spec*, measured against
+[`docs/12`](docs/12-design-handoff.md) § 5's eleven-point definition of done and § 1's thirty-seven
+requirement rows; close the named gaps in [`GAPS.md`](GAPS.md); hand Phase 6c on rather than run it.
+Board: [`WAVE11_PLAN.md`](WAVE11_PLAN.md).
+
+**Wave 10 was uncommitted when this wave opened** — the entire design-handoff rebuild sat in the
+working tree, closed against its own claim and verified by nobody. It reproduced exactly (253 files /
+4 700 tests) and landed as `22a1021`.
+
+| ID | Unit | Verdict |
+|---|---|---|
+| T81 | Verify and land wave 10 | Claim reproduced exactly; pushed |
+| T83 | Phase 6c handover | [`docs/13`](docs/13-phase-6c-handover.md) — written to be executed cold; the lane corrected five line references in the index it was given |
+| T89 | Conformance audit | 37 rows audited against the vendored prototype; drove every lane below |
+| T90 | Transport block | § D180 — thirteen controls in **no** requirement row and no deviation; recorded and restyled |
+| T91 | Elevation express toggle | § D181 — built; found a band closed with no transfer level silently losing 93 % of demand |
+| T86 | Access-zoning controls | § D182 — W8 closed; found the editor **deleting** access zones on save, and Vertical City reading back as three floors |
+| T88 | Suppression ground | § D183 — the ground beside the prose, with the parity derivation intact |
+| T87 | Matrix pins | § D184 — the recorded gap was **false**; the real gap was the Pareto front, already drifted four days |
+| T92 | Schema 8 transport | § D185 — the ground reaches the screen; the fixtures could not tell *wired* from *working* |
+
+## The two results worth carrying past this wave
+
+**A tooling defect produced two false findings, and one of them was in the register.** Five source
+files carried raw NUL bytes; `grep` here wraps `ugrep -I`, which **silently skips** such files —
+no output, exit 1, indistinguishable from a genuine miss. It produced a false *"nothing writes
+`#rail-access-note`"*, caught within the hour by driving the page; and a false `GAPS.md` entry saying
+the matrix pins were re-derived by no test, which sat where a lane would plan a day's work against it.
+Closed in `f78dc42`. **A register entry is evidence about the tree and inherits the reliability of
+whatever produced it.**
+
+**Three defects were found by building against a thing rather than reading it**, which is the wave's
+own rule pointed at four different subjects: the legend labels that reached no DOM (M4), the editor
+that deleted the zoning it was being taught to edit, the band that could strand a building's traffic,
+and the disclosure suite that was green for a whole commit while the screen it described rendered
+something else.
+
+## Where the phases stand at close
+
+**No phase verdict moved, and none was in scope.** Phase 6 is still ⚠️ partial with 6c handed on.
+**All nine of Phase 9's units are now built** — W8 was the last open half — and Phase 9 still carries
+**no status row**, because [§ D163](DECISIONS.md)'s rule is that the row and the verdict land together
+and the acceptance pass is a distinct piece of work. A unit landing is not a verdict.

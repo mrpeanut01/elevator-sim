@@ -68,6 +68,7 @@ import { describe, expect, it } from 'vitest';
 
 import * as barrel from '../index.js';
 import { parseDispatcherProfiles } from '../config/parse.js';
+import { DISPATCHER_PROFILE_OBJECT_SECTIONS } from '../config/schema.js';
 import type { DispatcherProfile, LoadedConfig, ResolvedBuilding } from '../config/types.js';
 import { COST_TERMS } from '../dispatch/index.js';
 import { activeWhenSatisfied, isActiveWhenRange } from '../dispatch/parameters.js';
@@ -108,7 +109,26 @@ type Value = number | string | boolean;
 
 const PARAMETER_SCHEMA_SUFFIX = '_PARAMETERS';
 
-/** `weights` and `constraints` are written specially; these are plain profile objects. */
+/**
+ * `weights` and `constraints` are written specially; these are plain profile objects.
+ *
+ * **A hand-written list, and it is deliberately not the derived one — which is a claim, asserted
+ * below rather than left to be discovered.** `config/schema.ts` now derives the true list from
+ * `dispatcherProfileSchema`'s own shape (`objectSectionsOf`), and this file could import it. It
+ * does not, because the sweep runs its probes through {@link runSimulation}, and `sim/` builds no
+ * weight-set selector: a profile carrying `selection.policy` other than `off` cannot be *run* here
+ * at all, so all seven `selection.*` rows come back **inadmissible** — the sweep's word for *"no
+ * pair of values could be materialised and run"* — rather than live or flat. Measured: deriving
+ * this list turns `finds no flat dimension without a declared reason` red with exactly those seven
+ * ids and no others.
+ *
+ * That is the separately-tracked selector gap (`docs/07-handoff.md`, *the selector not reaching the
+ * runner*), not a defect in this sweep, and the sweep's own instruction for an inadmissible
+ * dimension is *"do not allowlist them"*. So the omission stands and is **stated**: the assertion
+ * beside {@link SECTIONS_THIS_SWEEP_CANNOT_RUN} fails the day an eighth section lands, and fails
+ * again the day `selection` becomes runnable — which is the difference between an exclusion and
+ * the silent staleness this list had before, when it named six and the schema had seven.
+ */
 const PROFILE_OBJECT_SECTIONS = [
   'dispatch',
   'eligibility',
@@ -117,6 +137,25 @@ const PROFILE_OBJECT_SECTIONS = [
   'idle',
   'auction',
 ] as const;
+
+/**
+ * The sections the schema declares that this sweep cannot probe, each with the reason.
+ *
+ * A claim with a proof obligation, in the same spirit as `DECLARED_INERT`: the entry names why the
+ * section is absent, and the test below re-derives the difference against the schema so the entry
+ * cannot outlive its reason.
+ */
+const SECTIONS_THIS_SWEEP_CANNOT_RUN: Readonly<Record<string, string>> = Object.freeze({
+  // Corrected when T53 landed. The *claim* survived that change and the *reason* did not:
+  // `runSimulation` now does build a weight-set selector — `weightSetSourceFrom(config
+  // .dispatcherProfiles)` — so the old wording ("builds no weight-set selector") became false
+  // while this entry still read as true. What actually keeps `selection` unprobeable here is one
+  // level down: this sweep hands `runSimulation` no `dispatcherProfiles`, and the field is
+  // optional, so no library reaches the policy and `resolveWeightSets` returns before reading one.
+  // Supplying the file here is what would make the section runnable, and is the real gate.
+  selection:
+    'this sweep passes no `dispatcherProfiles`, so no weight-set library reaches the policy and a non-`off` policy cannot be run',
+});
 
 function isParameterSpec(value: unknown): value is DispatchParameterSpec {
   if (typeof value !== 'object' || value === null) return false;
@@ -603,6 +642,30 @@ describe('every searchable dimension can change a run, or declares why it cannot
       expect(ids, `${id} became authorable into a dispatcher profile`).not.toContain(id);
     }
   }, 60_000);
+
+  it('accounts for every section the schema declares, including the one it cannot run', () => {
+    // The list above is hand-written and the schema's is derived, so the two can drift — and did:
+    // this file named six sections while `dispatcherProfileSchema` declared seven, and the seventh
+    // simply vanished from the sweep with nothing reading as wrong. That is § D146's defect in a
+    // second file, and this assertion is what makes it impossible to repeat silently.
+    //
+    // Not a subset check. The **difference** must be exactly the sections named, with reasons, in
+    // SECTIONS_THIS_SWEEP_CANNOT_RUN — so an eighth section landing in the schema fails here (it
+    // is neither probed nor excused), and `selection` becoming runnable fails here too (the excuse
+    // outlived its reason). An exclusion nobody can let rot, which is what this file already asks
+    // of DECLARED_INERT.
+    const declared = new Set(DISPATCHER_PROFILE_OBJECT_SECTIONS);
+    const probed = new Set<string>(PROFILE_OBJECT_SECTIONS);
+    for (const section of probed) {
+      expect(declared, `this sweep probes "${section}", which no dispatcher profile has`).toContain(
+        section,
+      );
+    }
+    expect(
+      [...declared].filter((section) => !probed.has(section)).sort(),
+      'a section the schema declares is neither probed by this sweep nor excused with a reason',
+    ).toStrictEqual(Object.keys(SECTIONS_THIS_SWEEP_CANNOT_RUN).sort());
+  });
 
   it('finds no flat dimension without a declared reason', async () => {
     const { harness, dimensions, byId } = await harnessFor();

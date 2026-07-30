@@ -56,6 +56,7 @@
 
 import type { SimTime } from '../kernel/types.js';
 
+import { diagnoseAwtValidity } from './awtValidity.js';
 import {
   linearTrend,
   mean as meanOf,
@@ -250,8 +251,16 @@ export function buildJourneys(records: readonly PassengerRecord[]): readonly Jou
       totalRideSeconds += rideSecondsOf(leg) ?? 0;
     }
 
-    const isComplete = last.isFinalLeg && last.alightedAt !== undefined;
-    const completedAt = isComplete ? last.alightedAt : undefined;
+    // A journey whose last segment is the building's escalator is complete when the passenger
+    // reaches the far landing, not when they step off the lift. The seconds are a constant on
+    // the leg rather than an event, because nothing a dispatcher does can change them — but
+    // dropping them would make removing a spurious lift leg look like free time saved.
+    const alightedAt = last.alightedAt;
+    const isComplete = last.isFinalLeg && alightedAt !== undefined;
+    const completedAt =
+      isComplete && alightedAt !== undefined
+        ? alightedAt + (last.egressTransitSeconds ?? 0)
+        : undefined;
     const timeToDestinationSeconds = completedAt === undefined ? undefined : completedAt - startedAt;
     const transferSeconds =
       timeToDestinationSeconds === undefined
@@ -1660,24 +1669,21 @@ export function summarizeRun(record: RunRecord, options: SummarizeOptions = {}):
     ...(options.maxWaitHorizonS === undefined ? {} : { horizonS: options.maxWaitHorizonS }),
   });
 
-  const awtInvalidReason = saturation.saturated
-    ? `Queue length rose by ${saturation.projectedGrowthPersons.toFixed(1)} persons (${saturation.slopePersonsPerMinute.toFixed(2)}/min, ${saturation.growthToNoiseRatio.toFixed(1)}x the queue's own scatter) over the ${windowDurationS(window).toFixed(0)} s reporting window, against thresholds ${saturation.thresholds.minProjectedGrowthPersons} persons and ${saturation.thresholds.minSlopePersonsPerMinute}/min; the system is saturated, AWT is not approximately normal and its confidence interval must be suppressed.`
-    : waiting.count === 0
-      ? 'No passenger was served within the reporting window, so there is no waiting time to average.'
-      : // Censoring is checked independently of the trend. AWT is computed over the legs that
-        // boarded, and the legs that did not are systematically the ones that would have
-        // waited longest — so a heavily censored window reports the mean of its fastest
-        // survivors, and does so without the queue trend necessarily firing at all.
-        unservedFraction > maxUnservedFraction
-        ? `${waiting.unservedCount} of ${waiting.arrivalCount} arrivals in the reporting window (${(unservedFraction * 100).toFixed(1)}%) were never served, above the ${(maxUnservedFraction * 100).toFixed(1)}% censoring limit. AWT is the mean over the legs that boarded, which are systematically the passengers who waited least, so the reported mean is biased low by an unknown amount and its confidence interval must be suppressed.`
-          : // The tail is checked independently of both. The trend gate sees a queue that is
-            // still growing at the horizon and the censoring gate sees one that has not cleared
-            // by it; neither sees a queue that grew enormously and then drained just in time,
-            // which reports `completed`, nought unserved, a diluted trend — and a mean beside a
-            // passenger who stood on a landing for a quarter of an hour.
-            serviceLevel.starved
-            ? `Leg "${String(serviceLevel.longestWaitLegId)}" (${String(serviceLevel.longestWaitOriginFloorId)} to ${String(serviceLevel.longestWaitDestinationFloorId)}) waited ${serviceLevel.longestWaitS.toFixed(1)} s${serviceLevel.longestWaitIsCensored ? ' and had still not boarded when the run ended, so that is a lower bound' : ''}, past the ${serviceLevel.horizonS.toFixed(0)} s abandonment horizon; ${serviceLevel.overHorizonCount} of ${serviceLevel.arrivalCount} arrivals in the reporting window are past it. The queue did not diverge and the window is not censored, so neither of those gates fires — but a mean of ${waiting.meanS.toFixed(1)} s reported beside a wait of ${serviceLevel.longestWaitS.toFixed(1)} s describes a system nobody experienced, and its confidence interval must be suppressed.`
-            : undefined;
+  /*
+   * One call, and every branch of it lives in `awtValidity.ts`. The four grounds used to be a
+   * nested conditional here that produced prose and nothing else, so a consumer wanting to word a
+   * refusal per ground had to re-decide which one fired from this summary's other fields — a
+   * second answer to a question this line has already answered. The ground now travels beside the
+   * sentence, and both come from the same table entry.
+   */
+  const awtInvalidity = diagnoseAwtValidity({
+    waiting,
+    saturation,
+    serviceLevel,
+    windowSeconds: windowDurationS(window),
+    maxUnservedFraction,
+    unservedFraction,
+  });
 
   return Object.freeze({
     runId: record.runId,
@@ -1699,8 +1705,14 @@ export function summarizeRun(record: RunRecord, options: SummarizeOptions = {}):
     achievedInterval,
     saturation,
     serviceLevel,
-    awtIsValid: awtInvalidReason === undefined,
-    ...(awtInvalidReason === undefined ? {} : { awtInvalidReason }),
+    awtIsValid: awtInvalidity === undefined,
+    /*
+     * Both keys or neither. A summary carrying a code with no sentence would be a refusal a reader
+     * cannot act on, and one carrying a sentence with no code is what this change removed.
+     */
+    ...(awtInvalidity === undefined
+      ? {}
+      : { awtInvalidReason: awtInvalidity.reason, awtInvalidGround: awtInvalidity.ground }),
   });
 }
 

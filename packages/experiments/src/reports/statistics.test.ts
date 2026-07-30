@@ -11,6 +11,7 @@
 import { Pcg32 } from '@elevator-sim/core';
 import { describe, expect, it } from 'vitest';
 
+import { publishedIntervalFamily } from './compare.js';
 import * as statistics from './statistics.js';
 import {
   DEFAULT_CONFIDENCE,
@@ -300,6 +301,48 @@ describe('pairedDifferenceEstimate', () => {
       expect(estimate.method, `n = ${n}`).toBe('t');
       expect(estimate.degreesOfFreedom, `n = ${n}`).toBe(n - 1);
     }
+  });
+
+  /**
+   * **Open item `C33`, first half — and the assertion that bites is the type annotation, not the
+   * `expect`.**
+   *
+   * The `n < 2` branch read `method: 't' as IntervalMethod`, on an interval whose `halfWidth`,
+   * `lower` and `upper` are all `NaN`. The *value* was right, so no runtime assertion anywhere
+   * could have failed; what was wrong was that the compiler had been told to forget it. That is
+   * review finding #14's shape one layer down, and it is exactly what § D117 fixed at
+   * `compare.ts`'s assembly site and left standing here.
+   *
+   * `family` below is annotated with the literal type. Before the fix
+   * `estimateMean(...).method` was `IntervalMethod`, so this declaration is a **compile** error and
+   * `npx tsc -b` is what reports it — `include: ["src/**\/*.ts"]` puts this file in the build.
+   */
+  it('gives the n < 2 branch the narrow family type, not the stored-shape union', () => {
+    const single = estimateMean([5]);
+    const family: typeof statistics.PUBLISHED_INTERVAL_FAMILY = single.method;
+    expect(family).toBe('t');
+    /* The interval it labels does not exist, which is the whole reason the label had to be exact. */
+    expect(single.halfWidth).toBeNaN();
+    expect(single.lower).toBeNaN();
+    expect(single.upper).toBeNaN();
+    expect(single.degreesOfFreedom).toBeNaN();
+    /* And the same at the other construction site, so the two cannot diverge. */
+    const paired: typeof statistics.PUBLISHED_INTERVAL_FAMILY = pairedDifferenceEstimate(
+      [1, 2],
+      [0, 0],
+    ).method;
+    expect(paired).toBe('t');
+  });
+
+  it('has exactly one published-family constant, shared with the report assembly site', () => {
+    // `compare.ts` used to declare its own `PUBLISHED_INTERVAL_FAMILY`. Two copies of one
+    // convention that can drift apart is what § D114 measured the cost of in the dead-code
+    // scanners, and nothing forces the duplication inside `reports/`. This pins that they are the
+    // same binding rather than two literals that happen to agree today.
+    expect(statistics.PUBLISHED_INTERVAL_FAMILY).toBe('t');
+    expect(publishedIntervalFamily(estimateMean([1, 2, 3]))).toBe(
+      statistics.PUBLISHED_INTERVAL_FAMILY,
+    );
   });
 });
 

@@ -148,6 +148,123 @@ weakest shipped dispatcher — is on the Pareto front at six of eight cells, bec
 energy and worst on wait. Any aggregate "efficiency" number ranks it first. Report energy beside
 AWT and WT95, never instead of them.
 
+## Traffic mix by period, and the one period whose mix moves inside it
+
+The three directional shares are not a constant of a building — they are a constant of a *period*.
+An office's morning up-peak, its lunch period and its evening down-peak have different mixes, and
+`data/traffic-profiles.json`'s per-building-type `directionalSplit` describes the **governing** one.
+
+| period | incoming / outgoing / interfloor | source |
+|---|---|---|
+| morning up-peak, standard office | 85 / 5 / 10 | the shipped `office-standard` profile |
+| **lunch two-way** | **45 / 45 / 10** | CIBSE Guide D (2010, carried into 2020); BCO *Guide to Specification 2014* pairs it with a 13 %/5 min lunchtime two-way demand |
+| lunch two-way, alternatives | 40 / 40 / 20 (Barney 2003a); 42 / 42 / 16 (BCO 2009) | recorded because they differ, not to be averaged with the above |
+
+The lunch peak is worth designing for on its own: measured office lunch-hour demand runs **12–16 %
+of population per 5 minutes**, and the period's intensity can exceed the up-peak handling capacity
+by **20–30 %**, so a system tuned only for the morning can disappoint at midday.
+
+### What could not be cited, stated plainly
+
+The three rows above give the lunch period's mix as **one triple for the whole period**. No CIBSE
+Guide D or BCO page giving that mix *as a function of time within the period* was available while
+this was written, and the shipped `lunch-two-way` template needs one — so it is **derived from the
+mechanism the same sources describe**, not quoted, exactly as the escalator traversal time below is
+derived from EN 115-1 geometry rather than quoted from a table.
+
+The mechanism: occupants ride down to the terminal to leave the building and ride back up on their
+return, so the same period is outgoing-dominant early and incoming-dominant late. Three stated
+assumptions close the arithmetic:
+
+| step | value | source |
+|---|---|---|
+| interfloor share, held constant through the period | 10 % | the cited period mix |
+| incoming share at the instant the period opens | 0 % | nobody has returned yet — the mechanism, not a table |
+| the arc between the ends | linear in time, symmetric about the midpoint | assumption |
+| ⇒ mix at the start | **0 / 90 / 10** | derived |
+| ⇒ mix at the end | **90 / 0 / 10** | the mirror |
+| ⇒ time-average of the arc | `(0+90)/2 / (90+0)/2 / (10+10)/2` = **45 / 45 / 10** | **reproduces the cited figure** |
+
+The last row is the check: the endpoints are pinned by the mechanism *and* by having to integrate
+to the published period mean, rather than being a plausible-looking pair set beside it.
+
+**The limitation cuts the wrong way and is therefore stated first, not last.** An endpoint of
+exactly zero incoming is the **widest** arc consistent with the cited mean; a measured building's
+departures and returns overlap, so a real arc is smoother at its ends. A wider arc is the one a
+traffic-pattern-sensitive dispatcher would find easiest to exploit, so this is **not** a
+conservative choice and must not be reported as one. `traffic.lunchTwoWay.mixAmplitude` narrows it,
+and 0 collapses it to a flat 45/45/10 at identical total demand.
+
+**The period's *length* is not cited either.** The template inherits the CIBSE rise-and-fall run's
+own 30-minute horizon, its 5-minute hold and its zero baseline, so it introduces no duration that
+no source supports. The cited part of `lunch-two-way` is its mix, not its clock.
+
+## Non-lift transport
+
+A building may declare **transport modes** — escalators, stairs — as edges of the routing graph
+(`BuildingConfig.transportModes`). One edge, two floors, one landing-to-landing traversal time.
+They exist for one reason: before them, the ground hop of a two-level lobby had nowhere to go but
+a lift, and a journey was charged an entire elevator leg the real building never pays.
+
+**The traversal time is a reference value, so it is derived and cited rather than chosen.** For
+`vertical-city`'s `G ↔ 2` pair, rise 4.5 m:
+
+| step | value | source |
+|---|---|---|
+| inclination | 30° | BS EN 115-1 — the only permitted angle above a 6 m rise, and the usual commercial compromise below it |
+| nominal speed | 0.5 m/s | the common commercial nominal speed; EN 115-1 permits up to **0.75 m/s** at ≤ 30° and caps 30–35° at **0.50 m/s** |
+| incline length | `4.5 / sin 30° = 9.00 m` | geometry |
+| time on the incline | `9.00 / 0.5 = 18.0 s` | |
+| flat steps | 2 at each landing (rise ≤ 6 m; 3 above it), step depth **0.40 m** | BS EN 115-1 |
+| time on the flat steps | `2 × 2 × 0.40 / 0.5 = 3.2 s` | |
+| **landing to landing** | **21.2 s** | |
+
+### The three sky lobbies, and why their derivation is the same arithmetic
+
+`vertical-city` declares an escalator at **all four** of its two-level lobbies, and the other three
+come out at 21.2 s as well. That is not a shortcut — it is a constraint of the building:
+
+| pair | lower floor | upper floor | rise | incline `rise / sin 30°` | incline time | flat steps | **total** |
+|---|---|---|---|---|---|---|---|
+| `G ↔ 2` | 0.0 m | 4.5 m | **4.5 m** | 9.00 m | 18.0 s | 3.2 s | **21.2 s** |
+| `26 ↔ 27` | 105.6 m | 110.1 m | **4.5 m** | 9.00 m | 18.0 s | 3.2 s | **21.2 s** |
+| `51 ↔ 52` | 211.2 m | 215.7 m | **4.5 m** | 9.00 m | 18.0 s | 3.2 s | **21.2 s** |
+| `76 ↔ 77` | 303.0 m | 307.5 m | **4.5 m** | 9.00 m | 18.0 s | 3.2 s | **21.2 s** |
+
+**The rise is not a free parameter here, and that is the point.** A two-level lobby in this tower is
+a lobby a double-deck car serves, and `resolveBuilding` refuses any `servesFloorPairs` entry whose
+two floors are not *exactly* `deckSeparationM` apart (`ISSUE_CODES.deckSeparationMismatch`). Every
+shuttle in `vertical-city` declares `deckSeparationM: 4.5`, so every lobby pair is 4.5 m by
+construction and the EN 115-1 derivation lands on the same number four times. Both halves are
+asserted in `traffic/transportRoute.test.ts` — the rises against the floor heights, and the
+transport modes against the shuttle's own pairs — so a floor height that moves fails the derivation
+rather than silently invalidating it. Each is 4.5 m ≤ 6 m, so 30° is permitted and two flat steps
+per landing is the requirement; nothing in the table changes with height.
+
+**What could not be cited, stated plainly:** no CIBSE Guide D page giving a *lumped* escalator
+door-to-door traversal time was available while this was written, so the figures above are
+constructed from EN 115-1's geometry and speed limits rather than quoted from a table. If a Guide D
+figure is later found and disagrees, the number moves and every `vertical-city` pin moves with it —
+which is the normal treatment of a moved published figure, not an exception.
+
+**Two of the four carry nobody, and it is published rather than left to be found.** `51 ↔ 52` and
+`76 ↔ 77` are on 0 hops of the shipped trace, because `zone-5-local` serves *both* 51 and 52 and
+`zone-6-local` serves *both* 76 and 77 — so breadth-first search reaches the two levels of those
+lobbies at the same depth and the escalator never shortens anything a passenger can ask for. They
+are declared because the hardware is really there and removing them would make the building's own
+notes false; they are **measured** because a declared field that changes no decision is the shape
+`DECISIONS.md` § D112 found in `data/dispatcher-profiles.json`. The census is pinned in both
+directions in `traffic/transportRoute.test.ts`. Sky lobby A is the one that matters:
+`zone-3-local` is anchored to 26 and `zone-4-local` to 27, so its two levels are not
+interchangeable, and joining them took a cross-lobby interfloor journey from **four lift legs to
+two**.
+
+**Three things the model deliberately does not have**, each because nothing would read them:
+a `kind` enum (nothing branches on escalator-versus-stair), a direction (a one-way escalator is a
+real configuration and is not expressible), and a capacity or headway (an escalator's handling
+capacity dwarfs a lift's, and modelling it would put a queue on the one edge that exists to remove
+one). See `packages/core/src/config/types.ts`.
+
 ## Sources
 
 - [Elevator Types — Archtoolbox](https://www.archtoolbox.com/elevator-types/)
@@ -159,6 +276,11 @@ AWT and WT95, never instead of them.
 - [CIBSE Guide D: Transportation Systems in Buildings (2020)](https://www.cibse.org/knowledge-research/knowledge-portal/guide-d-transportation-systems-in-buildings-2020/) — § 13 covers lift power and energy, and is the basis for the counterweight balance ratio above
 - [ISO 25745-2:2015 — Energy performance of lifts, escalators and moving walks, Part 2: Energy calculation and classification for lifts](https://www.iso.org/standard/61551.html) — the reference cycle measured at empty / half / full load, the non-regenerative measurement convention, and the standby term this project's proxy deliberately omits
 - Barney, G. and Al-Sharif, L., *Elevator Traffic Handbook: Theory and Practice* (2nd ed., Routledge 2016) — drive sizing, counterbalancing, and the round-trip-time derivation this project's oracle implements
+- [BS EN 115-1:2017 — Safety of escalators and moving walks, Part 1: Construction and installation](https://standards.iteh.ai/catalog/standards/cen/89597718-b77e-4b2d-b8da-287ce6d9b9b3/en-115-1-2017) — inclination limits (30°, and 35° only for rises ≤ 6 m), the nominal-speed caps (0.75 m/s at ≤ 30°, 0.50 m/s at 30–35°), and the flat-step requirement (2 for a rise ≤ 6 m, 3 above it) behind the `G ↔ 2` traversal time above
+- [KONE Planning guide — Escalators, ramps and autowalks](https://distributors.kone.com/en/Images/KONE-Escalator-Planning-Guide_tcm90-100695.pdf) — 30° as the commercial/infrastructure compromise angle, 0.5 m/s as the common commercial nominal speed, and the 0.40 m standard step depth
+- [Fundamentals of Traffic Analysis — Elevator World](https://elevatorworld.com/article/fundamentals-of-traffic-analysis/) — the four office traffic types (up-peak, down-peak, lunch mixed-peak, random interfloor), the lunch period's leave-and-return mechanism, and the 12–16 %/5 min lunch demand band behind the traffic-mix table above
+- [Lift Passenger Demand in Office Buildings — Elevator World](https://elevatorworld.com/article/lift-passenger-demand-in-office-buildings/) — the 45 % / 45 % / 10 % lunch mix attributed to CIBSE (2010), the 40/40/20 (Barney 2003a) and 42/42/16 (BCO 2009) alternatives, and the BCO *Guide to Specification 2014* lunchtime two-way demand of 13 %/5 min
+- [Traffic planning methodology — Siikonen, KONE (CTBUH)](https://global.ctbuh.org/resources/papers/download/1049-traffic-planning-methodology.pdf) — lunch mixed-peak as a distinct design condition rather than a variant of up-peak
 - [World's Fastest Elevators — e-architect](https://www.e-architect.com/worlds-fastest-elevators)
 - [KONE Destination Control brochure](https://www.kone.us/Images/kone-destination-brochure_tcm25-18769.pdf)
 - [Elevator Access Control Systems — Genea](https://www.getgenea.com/blog/elevator-access-control-systems-everything-you-need-to-know/)

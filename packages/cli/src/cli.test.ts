@@ -7,7 +7,11 @@
  * them. The statistics themselves are tested where they live.
  */
 
-import { describe, expect, it } from 'vitest';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { main } from './index.js';
 import { createBufferedOutput, type BufferedOutput } from './output.js';
@@ -344,6 +348,116 @@ describe('elevator-sim run', () => {
     expect(ttd).toContain('—');
     expect(ttd).not.toContain('SUPPRESSED');
   });
+});
+
+/*
+ * `StageActivity.kioskRefusedLegs` reaching a human.
+ *
+ * **This is the CLI half of the two non-test callers that counter did not have** (DECISIONS.md
+ * § D137 item 2, § D149 item 2); the other is `benchmark/accessControl.ts`'s coverage column.
+ *
+ * It has to be driven through a **derived data directory**, and that is a fact about the fix
+ * rather than a weakness of the test: every profile `data/dispatcher-profiles.json` ships runs at
+ * `up-down-buttons` or `mobile-credential`, deliberately (§ D30), so no shipped invocation can
+ * make this line print. The reader it exists for is the one who authors
+ * `dispatch.callType: "destination-entry"` — invariant 7 makes that a data edit, not a code
+ * change — and discovers that the building goes unserved with nothing in the table saying which
+ * of the two mechanisms did it. So the test authors exactly that profile and runs it.
+ */
+describe('a bare destination kiosk reports who it turned away', () => {
+  let dataDir = '';
+
+  beforeAll(() => {
+    dataDir = mkdtempSync(join(tmpdir(), 'elevator-sim-kiosk-'));
+    cpSync(DEFAULT_DATA_DIR, dataDir, { recursive: true });
+    const profilesPath = join(dataDir, 'dispatcher-profiles.json');
+    const profiles = JSON.parse(readFileSync(profilesPath, 'utf8')) as {
+      profiles: Record<string, unknown>[];
+    };
+    /* The one authored field that turns the kiosk bare, and nothing else: `eta`'s weights beside
+       `destination-entry`. Invariant 7 — this is a data edit, which is exactly the point. */
+    profiles.profiles.push({
+      id: 'kiosk-bare',
+      name: 'Destination entry with no credential',
+      role: 'destination',
+      weights: { waitTime: 1 },
+      dispatch: { callType: 'destination-entry' },
+    });
+    writeFileSync(profilesPath, JSON.stringify(profiles, undefined, 2));
+  });
+
+  afterAll(() => {
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  const REFUSAL_ROW = 'refused at the kiosk';
+
+  it('prints the refused-leg count in the Passengers block, not only in a warning', async () => {
+    const { code, text } = await cli([
+      'run',
+      '--data',
+      dataDir,
+      '--building',
+      'secure-tower',
+      '--dispatcher',
+      'kiosk-bare',
+      '--seed',
+      '42',
+      ...SHORT,
+    ]);
+    expect(code).toBe(0);
+
+    const line = text.split('\n').find((row) => row.includes(REFUSAL_ROW));
+    expect(
+      line,
+      'the Passengers block does not name the kiosk refusals. StageActivity.kioskRefusedLegs is ' +
+        'back to having no reader in packages/cli — DECISIONS.md § D137 item 2',
+    ).toBeDefined();
+    // A count, and a real one: this run refuses a three-figure number of legs.
+    expect(line).toMatch(/refused at the kiosk\s+\d+ leg\(s\)/u);
+    const refused = Number(/refused at the kiosk\s+(\d+) leg/u.exec(line as string)?.[1]);
+    expect(refused).toBeGreaterThan(0);
+
+    /* It must sit in the Passengers block, because the figure it qualifies is `undelivered` and a
+       reader who has to scroll to a warning list to attribute that figure has not been told. */
+    const lines = text.split('\n');
+    const passengers = lines.findIndex((row) => row.trim() === 'Passengers');
+    const warnings = lines.findIndex((row) => row.trim() === 'Warnings');
+    const refusalRow = lines.findIndex((row) => row.includes(REFUSAL_ROW));
+    expect(passengers).toBeGreaterThanOrEqual(0);
+    expect(warnings).toBeGreaterThan(passengers);
+    expect(refusalRow).toBeGreaterThan(passengers);
+    expect(refusalRow).toBeLessThan(warnings);
+
+    /* And the count is not larger than the undelivered journeys it explains — a refused leg is
+       one of them, so a row claiming more refusals than there are undelivered journeys would be
+       reporting a different quantity than the one it sits under. */
+    const whole = lines.find((row) => row.includes('whole run')) as string;
+    const undelivered = Number(/(\d+) undelivered/u.exec(whole)?.[1]);
+    expect(undelivered).toBeGreaterThan(0);
+    expect(refused).toBeLessThanOrEqual(undelivered);
+  }, 120_000);
+
+  it('says nothing about a kiosk on a shipped profile — the negative control', async () => {
+    // A row that appeared on every run would be indistinguishable from a report that never looked.
+    // `mobile-credential` on the same building at the same seed carries the credential, so nothing
+    // is refused at the interface and the row must be absent rather than zero.
+    const { code, text } = await cli([
+      'run',
+      '--data',
+      dataDir,
+      '--building',
+      'secure-tower',
+      '--dispatcher',
+      'destination-eta',
+      '--seed',
+      '42',
+      ...SHORT,
+    ]);
+    expect(code).toBe(0);
+    expect(text).not.toContain(REFUSAL_ROW);
+    expect(text).toContain('Passengers');
+  }, 120_000);
 });
 
 describe('elevator-sim compare', () => {

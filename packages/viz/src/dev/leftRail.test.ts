@@ -1,0 +1,604 @@
+/**
+ * The left rail's decisions, driven directly.
+ *
+ * There is no jsdom in this repository (`vitest.config.ts` is `environment: 'node'` for every
+ * project), so the mount is deliberately decision-free and everything worth asserting is a pure
+ * function. What is asserted here is what a reviewer would otherwise have to take on trust:
+ *
+ * 1. **The served caption is generated from the run's own threshold**, not from the sixty seconds
+ *    every shipped building happens to report. Driven at 45 s, where a hard-coded caption would
+ *    label one building with another's rule.
+ * 2. **A `pending` goal never renders a number.** An empty morning is not a pass, and a `100%`
+ *    over three riders is arithmetic rather than competence.
+ * 3. **The share is a dash and never `100%` on an empty denominator** — R13, one type down.
+ * 4. **The bar is a partition**: four widths that sum to exactly 100 whenever anybody is standing.
+ * 5. **No string this rail can produce contains a figure `meansAreSuppressed` refuses.** Driven on
+ *    a real, genuinely saturated Vertical City run, the same way `live/noMeans.test.ts` does it,
+ *    because a renderer is the last place a suppressed mean could re-enter.
+ */
+
+import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
+import { beforeAll, describe, expect, it } from 'vitest';
+
+import type { VizRecording } from '../contract/types.js';
+import { DATA_DIR, breadthConfig } from '../fixtures.test-helper.js';
+import { meansAreSuppressed } from '../frame/overlay.js';
+import { WAIT_BANDS, moodOf, waitBandsAt } from '../live/bands.js';
+import { decisionRowsAt } from '../live/decisions.js';
+import { honestyAt } from '../live/honesty.js';
+import { observationsAt } from '../live/observations.js';
+import type { DecisionRow, LiveObservations, WaitBandCount, WaitBands } from '../live/types.js';
+import { recordRun } from '../record/recordRun.js';
+import { PENDING_DISPLAY, goalsForDay, readGoals } from '../shift/goals.js';
+import { shiftObservationsOf } from '../shift/observations.js';
+import type { DayOutcome, GoalObservations, WeekState } from '../shift/types.js';
+import { openWeek } from '../shift/week.js';
+
+import {
+  decisionRowViewOf,
+  goalRowsOf,
+  historyBarsOf,
+  idleHonestyCard,
+  idleStatRowsOf,
+  mathsDisclosureOf,
+  moodViewOf,
+  runFiguresOf,
+  servedCaptionFor,
+  servedTitleFor,
+  statRowsOf,
+  streakLineOf,
+} from './leftRail.js';
+
+/* -------------------------------------------------------------------------- *
+ * Fixtures
+ * -------------------------------------------------------------------------- */
+
+function observations(overrides: Partial<LiveObservations> = {}): LiveObservations {
+  return {
+    atS: 300,
+    waitingNow: 7,
+    longestCurrentWaitS: 42,
+    arrived: 120,
+    boarded: 100,
+    carried: 88,
+    servedUnderThresholdCount: 80,
+    servedCount: 100,
+    servedUnderThresholdPct: 80,
+    longWaitThresholdS: 60,
+    peakQueue: { count: 9, floorId: '12', atS: 210 },
+    deepestQueueNow: 4,
+    deepestQueueFloorId: '12',
+    abandoned: 0,
+    horizonS: 900,
+    ...overrides,
+  };
+}
+
+/** A synthetic banding, so apportionment can be driven at counts a real run rarely produces. */
+function bandsOf(counts: readonly number[]): WaitBands {
+  const total = counts.reduce((sum, value) => sum + value, 0);
+  const entries: WaitBandCount[] = WAIT_BANDS.map((band, index) => {
+    const count = counts[index] ?? 0;
+    return { band, count, pct: total === 0 ? 0 : Math.round((count / total) * 100) };
+  });
+  let worstIndex = 0;
+  for (let index = WAIT_BANDS.length - 1; index >= 0; index -= 1) {
+    if ((counts[index] ?? 0) > 0) {
+      worstIndex = index;
+      break;
+    }
+  }
+  return {
+    atS: 300,
+    total,
+    counts: entries,
+    worst: WAIT_BANDS[worstIndex] as (typeof WAIT_BANDS)[number],
+    worstIndex,
+    longestCurrentWaitS: total === 0 ? undefined : 130,
+  };
+}
+
+function goalObservations(overrides: Partial<GoalObservations> = {}): GoalObservations {
+  return { arrived: 400, carryPct: 90, minutePct: 80, peakQueue: 6, abandoned: 0, ...overrides };
+}
+
+function decisionRow(overrides: Partial<DecisionRow> = {}): DecisionRow {
+  return {
+    key: '120-c1',
+    t: '06:02',
+    head: 'A → Level 12',
+    why: 'waitTime 12.4 s carried it · 0.42 clear of the next car',
+    title: 'waitTime — estimated wait for the new passenger (serves AWT): 12.4 s.',
+    color: '#3fb27f',
+    outcome: 'assigned',
+    ...overrides,
+  };
+}
+
+/* -------------------------------------------------------------------------- *
+ * L3 — the four stat rows
+ * -------------------------------------------------------------------------- */
+
+describe('statRowsOf — the four rows the design draws', () => {
+  it('draws them in the design’s order, with its tooltips verbatim', () => {
+    const rows = statRowsOf(observations());
+    expect(rows.map((row) => row.label)).toEqual([
+      'standing right now',
+      'longest wait',
+      'carried today',
+      'served under 60 s',
+    ]);
+    expect(rows[0]?.title).toBe(
+      'People at a landing with their call registered and no car yet. Instantaneous, not an average.',
+    );
+    expect(rows[1]?.title).toBe(
+      'The worst wait currently on the board. This is the number tenants complain about — averages hide it.',
+    );
+    expect(rows[2]?.title).toBe('Passengers delivered to their destination floor since 06:00.');
+  });
+
+  it('reads its values off the observations and nowhere else', () => {
+    const rows = statRowsOf(observations({ waitingNow: 13, carried: 501 }));
+    expect(rows[0]?.value).toBe('13');
+    expect(rows[2]?.value).toBe('501');
+  });
+
+  /* --- the caption is generated. This is the assertion the row exists for. --- */
+
+  it('generates the served caption from the run’s own long-wait threshold', () => {
+    expect(servedCaptionFor(60)).toBe('served under 60 s');
+    expect(servedCaptionFor(45)).toBe('served under 45 s');
+
+    const odd = statRowsOf(observations({ longWaitThresholdS: 45 }));
+    expect(odd[3]?.label).toBe('served under 45 s');
+    // A hard-coded caption would still say sixty about a building that counts a long wait at 45.
+    expect(odd[3]?.label).not.toContain('60');
+  });
+
+  it('keeps the handoff’s tooltip at 60 s and replaces it when the threshold is not 60', () => {
+    expect(servedTitleFor(60, 100)).toContain('under a minute');
+    expect(servedTitleFor(45, 100)).not.toContain('under a minute');
+    expect(servedTitleFor(45, 100)).toContain('45 s');
+  });
+
+  it('carries the denominator into the tooltip — R13’s `n` for the share', () => {
+    expect(servedTitleFor(60, 137)).toContain('Over 137 served legs.');
+  });
+
+  /* --- the empty denominator --- */
+
+  it('shows a dash and never 100% when nothing has been served', () => {
+    const rows = statRowsOf(
+      observations({
+        servedUnderThresholdPct: undefined,
+        servedCount: 0,
+        servedUnderThresholdCount: 0,
+        boarded: 0,
+      }),
+    );
+    expect(rows[3]?.value).toBe(PENDING_DISPLAY);
+    expect(rows[3]?.value).not.toBe('100%');
+    expect(rows[3]?.tone).toBe('unknown');
+  });
+
+  it('says nobody is waiting rather than printing a zero-second longest wait', () => {
+    const rows = statRowsOf(observations({ longestCurrentWaitS: undefined, waitingNow: 0 }));
+    expect(rows[1]?.value).toBe('nobody waiting');
+    expect(rows[1]?.tone).toBe('plain');
+  });
+
+  /* --- the two colour ladders, keyed on the band boundaries --- */
+
+  it('colours the longest wait at the wait bands’ own boundaries, not at literals', () => {
+    const amberFrom = WAIT_BANDS[2]?.fromS ?? 60;
+    const redFrom = WAIT_BANDS[3]?.fromS ?? 120;
+    const toneAt = (waited: number): string =>
+      statRowsOf(observations({ longestCurrentWaitS: waited }))[1]?.tone ?? '';
+    expect(toneAt(amberFrom - 1)).toBe('plain');
+    expect(toneAt(amberFrom)).toBe('caution');
+    expect(toneAt(redFrom - 1)).toBe('caution');
+    expect(toneAt(redFrom)).toBe('hot');
+  });
+
+  it('colours the served share on the design’s 75/50 ladder', () => {
+    const toneAt = (pct: number): string =>
+      statRowsOf(observations({ servedUnderThresholdPct: pct }))[3]?.tone ?? '';
+    expect(toneAt(75)).toBe('good');
+    expect(toneAt(74)).toBe('caution');
+    expect(toneAt(50)).toBe('caution');
+    expect(toneAt(49)).toBe('hot');
+  });
+
+  it('KB-15: every coloured row states its value as text too', () => {
+    for (const row of statRowsOf(observations())) {
+      expect(row.value.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('idleStatRowsOf — before the first run', () => {
+  it('claims nothing, and names no threshold it has not measured', () => {
+    const rows = idleStatRowsOf();
+    expect(rows).toHaveLength(4);
+    expect(rows.every((row) => row.value === PENDING_DISPLAY)).toBe(true);
+    // The one place a hard-coded `60` would be provably wrong: there is no run to have measured it.
+    expect(rows[3]?.label).toBe('served promptly');
+    expect(rows[3]?.label).not.toMatch(/\d/);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * L1 / L2 — the mood card
+ * -------------------------------------------------------------------------- */
+
+describe('moodViewOf — the face, the bar and the legend', () => {
+  it('takes the face, headline and sub-line from the mood, unchanged', () => {
+    const bands = bandsOf([3, 0, 0, 0]);
+    const mood = moodOf(bands);
+    const view = moodViewOf(bands, mood);
+    expect(view.face).toBe(mood.face);
+    expect(view.headline).toBe(mood.headline);
+    expect(view.sub).toBe(mood.sub);
+    expect(view.faceEdge).toBe(mood.edge);
+    expect(view.faceBg).toBe(mood.bg);
+  });
+
+  it('draws a partition: the four widths sum to exactly 100 whenever anybody is waiting', () => {
+    const awkward: readonly (readonly number[])[] = [
+      [1, 1, 1, 0], // 33.33 each — the case plain rounding sums to 99
+      [1, 1, 1, 1],
+      [1, 0, 0, 0],
+      [7, 3, 0, 1],
+      [1, 2, 3, 0],
+      [17, 5, 3, 2],
+      [0, 0, 0, 5],
+    ];
+    for (const counts of awkward) {
+      const view = moodViewOf(bandsOf(counts), moodOf(bandsOf(counts)));
+      const total = view.segments.reduce((sum, segment) => sum + segment.widthPct, 0);
+      expect(total, `counts ${counts.join(',')}`).toBe(100);
+      expect(view.anybodyWaiting).toBe(true);
+    }
+  });
+
+  it('draws four zeroes on an empty lobby rather than a full green bar', () => {
+    const bands = bandsOf([0, 0, 0, 0]);
+    const view = moodViewOf(bands, moodOf(bands));
+    expect(view.segments.map((segment) => segment.widthPct)).toEqual([0, 0, 0, 0]);
+    expect(view.anybodyWaiting).toBe(false);
+  });
+
+  it('legends the four bands by the design’s names, with the raw head count beside each', () => {
+    const view = moodViewOf(bandsOf([5, 4, 3, 2]), moodOf(bandsOf([5, 4, 3, 2])));
+    expect(view.legend.map((entry) => entry.label)).toEqual([
+      'breezy',
+      'tapping foot',
+      'checking watch',
+      'taking the stairs',
+    ]);
+    expect(view.legend.map((entry) => entry.count)).toEqual([5, 4, 3, 2]);
+    expect(view.legend.map((entry) => entry.color)).toEqual(WAIT_BANDS.map((band) => band.color));
+  });
+
+  it('KB-15: the bar carries the same partition in words', () => {
+    const view = moodViewOf(bandsOf([5, 4, 3, 2]), moodOf(bandsOf([5, 4, 3, 2])));
+    expect(view.barLabel).toContain('14 waiting');
+    for (const band of WAIT_BANDS) expect(view.barLabel).toContain(band.label);
+  });
+
+  it('rounds the calm way: a fractional unit never widens the worst band past its share', () => {
+    // 1/1/1/0: exact shares are 33.33 each, so one unit is spare. It goes to the calmest.
+    const view = moodViewOf(bandsOf([1, 1, 1, 0]), moodOf(bandsOf([1, 1, 1, 0])));
+    expect(view.segments.map((segment) => segment.widthPct)).toEqual([34, 33, 33, 0]);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * L5 — the goal rows
+ * -------------------------------------------------------------------------- */
+
+describe('goalRowsOf — met, missed and pending', () => {
+  it('never renders a number for a pending goal', () => {
+    const rows = goalRowsOf(readGoals(goalsForDay(1), goalObservations({ arrived: 3 })));
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.state).toBe('pending');
+      expect(row.value).toBe(PENDING_DISPLAY);
+      expect(row.value).not.toMatch(/\d/);
+      expect(row.barPct).toBe(0);
+      expect(row.glyph).toBe('·');
+    }
+    // A flat grey track, not an amber sliver: nothing has been graded.
+    expect(new Set(rows.map((row) => row.fill)).size).toBe(1);
+  });
+
+  it('marks a met goal with the tick and the band green', () => {
+    const rows = goalRowsOf(
+      readGoals(goalsForDay(1), goalObservations({ carryPct: 99, minutePct: 99, abandoned: 0 })),
+    );
+    for (const row of rows) {
+      expect(row.state).toBe('met');
+      expect(row.glyph).toBe('✓');
+      expect(row.fill).toBe(WAIT_BANDS[0]?.color);
+      expect(row.value).toMatch(/\d/);
+    }
+  });
+
+  it('gives a missed goal the empty track when nothing has been observed on it', () => {
+    const readings = readGoals(goalsForDay(1), goalObservations({ carryPct: 0, minutePct: 0 }));
+    const rows = goalRowsOf(readings);
+    const zeroObserved = rows.filter((row) => row.state === 'missed' && row.value.startsWith('0'));
+    expect(zeroObserved.length).toBeGreaterThan(0);
+    for (const row of zeroObserved) expect(row.fill).not.toBe(WAIT_BANDS[1]?.color);
+  });
+
+  it('gives a missed goal with progress the band amber', () => {
+    const rows = goalRowsOf(readGoals(goalsForDay(1), goalObservations({ minutePct: 40 })));
+    const minute = rows.find((row) => row.label.includes('inside a minute'));
+    expect(minute?.state).toBe('missed');
+    expect(minute?.fill).toBe(WAIT_BANDS[1]?.color);
+    expect(minute?.glyph).toBe('○');
+  });
+
+  it('passes the goal’s own sentence through rather than composing a second one', () => {
+    const readings = readGoals(goalsForDay(4), goalObservations());
+    expect(goalRowsOf(readings).map((row) => row.label)).toEqual(
+      readings.map((reading) => reading.goal.label),
+    );
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * L4 — YOUR RUN
+ * -------------------------------------------------------------------------- */
+
+describe('runFiguresOf and the sparkline', () => {
+  const week = (overrides: Partial<WeekState> = {}): WeekState => ({
+    ...openWeek('c1'),
+    ...overrides,
+  });
+
+  it('draws the three figures the design draws, in its order', () => {
+    expect(runFiguresOf(week()).map((figure) => figure.label)).toEqual([
+      'clean days running',
+      'best day so far',
+      'banked this scenario',
+    ]);
+  });
+
+  it('banks against the contract’s own needClean', () => {
+    const figures = runFiguresOf(week({ cleanRun: 1 }));
+    expect(figures[2]?.value).toBe('1/1');
+  });
+
+  it('shows a dash rather than a denominator it does not have', () => {
+    // A building the reader built has no scenario behind it, so there is nothing to bank against.
+    const figures = runFiguresOf(week({ contractId: 'not-a-contract' }));
+    expect(figures[2]?.value).toBe(PENDING_DISPLAY);
+  });
+
+  it('reports the streak in words as well as in a colour', () => {
+    expect(streakLineOf(week({ streak: 0 })).text).toBe('no streak yet');
+    expect(streakLineOf(week({ streak: 3 })).text).toBe('on a roll');
+    expect(streakLineOf(week({ streak: 3 })).color).not.toBe(streakLineOf(week()).color);
+  });
+
+  it('draws one bar per closed day, each with its own tooltip', () => {
+    const days: readonly DayOutcome[] = [
+      {
+        day: 1,
+        dayIdx: 0,
+        weekday: 'Monday',
+        eventId: 'ordinary',
+        arrived: 300,
+        carried: 290,
+        minutePct: 82,
+        readings: [],
+        allMet: true,
+      },
+      {
+        day: 2,
+        dayIdx: 1,
+        weekday: 'Tuesday',
+        eventId: 'move-in',
+        arrived: 340,
+        carried: 200,
+        minutePct: 41,
+        readings: [],
+        allMet: false,
+      },
+    ];
+    const bars = historyBarsOf(days, undefined, 2);
+    expect(bars.map((bar) => bar.short)).toEqual(['Mo', 'Tu']);
+    expect(bars[0]?.title).toContain('82% away inside a minute');
+    expect(bars[0]?.title).toContain('290 carried');
+    expect(bars[1]?.title).toContain('Tuesday');
+    expect(bars[0]?.color).not.toBe(bars[1]?.color);
+  });
+
+  it('draws one provisional bar for a day still running, and a flat one before any run', () => {
+    const running = historyBarsOf([], 66, 0);
+    expect(running).toHaveLength(1);
+    expect(running[0]?.title).toContain('so far');
+
+    const idle = historyBarsOf([], undefined, 0);
+    expect(idle).toHaveLength(1);
+    expect(idle[0]?.title).toContain('nothing banked yet');
+    // Floored, so an empty sparkline is still a sparkline rather than a blank strip.
+    expect(idle[0]?.heightPct).toBeGreaterThan(0);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * L6 — the honesty disclosure
+ * -------------------------------------------------------------------------- */
+
+describe('mathsDisclosureOf', () => {
+  it('hides the toggle and the maths in casual mode — a lever, not a lecture', () => {
+    const card = { ...idleHonestyCard(), hasMaths: false };
+    const disclosure = mathsDisclosureOf(card, true, 'casual');
+    expect(disclosure.toggleHidden).toBe(true);
+    expect(disclosure.mathsHidden).toBe(true);
+    expect(disclosure.maths).toBe('');
+  });
+
+  it('is a toggle that toggles — the prototype’s own rule made it inert', () => {
+    /*
+     * The design computes `hasMaths = engineer` and `showMaths = st.showMaths || engineer`, and
+     * those two together make the button do nothing: it is visible exactly when the paragraph is
+     * already open. A control that changes nothing is the defect this wave has a rule about, so the
+     * rule is `hasMaths && showMaths` and `ViewerState.showMaths` starts `true` — the mockup's own
+     * rendered state. See `mathsDisclosureOf` and `docs/12` § 4.
+     */
+    const card = { ...idleHonestyCard(), hasMaths: true, maths: 'the rule' };
+
+    const open = mathsDisclosureOf(card, true, 'engineer');
+    expect(open.toggleHidden).toBe(false);
+    expect(open.mathsHidden).toBe(false);
+    expect(open.toggleLabel).toBe('hide the maths');
+    expect(open.maths).toBe('the rule');
+
+    const shut = mathsDisclosureOf(card, false, 'engineer');
+    expect(shut.toggleHidden).toBe(false);
+    expect(shut.mathsHidden).toBe(true);
+    expect(shut.toggleLabel).toBe('show me the maths');
+
+    // The two states differ in what is on screen. That is the whole assertion.
+    expect(open.mathsHidden).not.toBe(shut.mathsHidden);
+  });
+
+  it('draws neither the toggle nor the paragraph in casual mode, whatever the reader last chose', () => {
+    const card = { ...idleHonestyCard(), hasMaths: false, maths: 'the rule' };
+    for (const showMaths of [true, false]) {
+      const disclosure = mathsDisclosureOf(card, showMaths, 'casual');
+      expect(disclosure.toggleHidden).toBe(true);
+      expect(disclosure.mathsHidden).toBe(true);
+    }
+  });
+
+  it('before the first run says nothing has been measured, and does not tick', () => {
+    const card = idleHonestyCard();
+    expect(card.glyph).not.toBe('✓');
+    expect(card.suppressed).toBe(false);
+    expect(card.hasMaths).toBe(false);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * L7 — the decision log
+ * -------------------------------------------------------------------------- */
+
+describe('decisionRowViewOf', () => {
+  it('passes the recorded sentence through without composing a second one', () => {
+    const row = decisionRow();
+    const view = decisionRowViewOf(row);
+    expect(view.why).toBe(row.why);
+    expect(view.head).toBe(row.head);
+    expect(view.title).toBe(row.title);
+    expect(view.time).toBe(row.t);
+    expect(view.empty).toBe(false);
+  });
+
+  it('draws the standing-by row as a state, with no clock time it did not have', () => {
+    const view = decisionRowViewOf(
+      decisionRow({ outcome: 'empty', head: 'standing by', key: 'standing-by' }),
+    );
+    expect(view.empty).toBe(true);
+    expect(view.time).toBe('—');
+  });
+
+  it('KB-15: the three outcomes read differently in words, not only in colour', () => {
+    const heads = new Set(
+      [
+        decisionRow({ outcome: 'assigned', head: 'A → Level 12' }),
+        decisionRow({ outcome: 'reassigned', head: 'A ⇄ Level 12' }),
+        decisionRow({ outcome: 'unassigned', head: 'no car for Level 12' }),
+      ].map((row) => decisionRowViewOf(row).head),
+    );
+    expect(heads.size).toBe(3);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The rule that outranks the design
+ * -------------------------------------------------------------------------- */
+
+describe('a suppressed run yields no mean anywhere in the left rail', () => {
+  /** The one that saturates hardest at the shipped rates — `live/noMeans.test.ts`'s choice. */
+  const SUPPRESSED_ID = 'vertical-city';
+  let config: LoadedConfig;
+  let recording: VizRecording;
+
+  beforeAll(async () => {
+    config = await loadConfig(DATA_DIR);
+    recording = recordRun(breadthConfig(config, SUPPRESSED_ID)).recording;
+  }, 600_000);
+
+  it('really is suppressed, or the rest of this proves nothing', () => {
+    expect(meansAreSuppressed(recording)).toBe(true);
+    expect(Number.isFinite(recording.summary.meanWaitS)).toBe(true);
+  });
+
+  it('never prints the withheld figure, as a number or inside a sentence', () => {
+    const withheld = [
+      recording.summary.meanWaitS,
+      recording.summary.wait95S,
+      recording.summary.meanTimeToDestinationS,
+    ].filter((value) => Number.isFinite(value) && value !== 0);
+    expect(withheld.length).toBeGreaterThan(0);
+
+    const span = recording.endedAt - recording.startedAt;
+    const outputs: unknown[] = [];
+    for (let step = 0; step <= 6; step += 1) {
+      const t = recording.startedAt + (span * step) / 6;
+      const bands = waitBandsAt(recording, t);
+      const live = observationsAt(recording, t);
+      outputs.push(
+        statRowsOf(live),
+        moodViewOf(bands, moodOf(bands)),
+        goalRowsOf(readGoals(goalsForDay(3), shiftObservationsOf(live))),
+        decisionRowsAt(recording, t, 6).map(decisionRowViewOf),
+        mathsDisclosureOf(honestyAt(recording, t, 'engineer'), true, 'engineer'),
+        mathsDisclosureOf(honestyAt(recording, t, 'casual'), true, 'casual'),
+      );
+    }
+
+    const found: string[] = [];
+    const walk = (value: unknown, path: string): void => {
+      if (typeof value === 'number') {
+        for (const target of withheld) {
+          if (Math.abs(value - target) < 1e-6) found.push(`${path} = ${String(value)}`);
+        }
+        return;
+      }
+      if (typeof value === 'string') {
+        for (const target of withheld) {
+          for (const digits of [1, 2]) {
+            if (value.includes(target.toFixed(digits))) {
+              found.push(`${path} ⊃ "${target.toFixed(digits)}"`);
+            }
+          }
+        }
+        return;
+      }
+      if (Array.isArray(value)) {
+        for (const [index, item] of value.entries()) walk(item, `${path}[${String(index)}]`);
+        return;
+      }
+      if (value !== null && typeof value === 'object') {
+        for (const [key, item] of Object.entries(value)) walk(item, `${path}.${key}`);
+      }
+    };
+    for (const [index, output] of outputs.entries()) walk(output, `#${String(index)}`);
+    expect(found).toEqual([]);
+  }, 600_000);
+
+  it('still fills every row on the run whose mean is refused — the reason the rail is counts', () => {
+    const live = observationsAt(recording, recording.endedAt);
+    const rows = statRowsOf(live);
+    expect(rows).toHaveLength(4);
+    // Not one of the four is blank: every figure on this card is a head count.
+    for (const row of rows) expect(row.value).not.toBe('');
+    expect(rows[3]?.label).toBe(servedCaptionFor(live.longWaitThresholdS));
+  });
+});

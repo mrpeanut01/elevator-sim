@@ -1,0 +1,177 @@
+/**
+ * The week, as a pure state machine: streak, best day, banked shifts, and the seven-day history.
+ *
+ * ## Pure, and what that buys
+ *
+ * Every function here takes a {@link WeekState} and returns a new one. Nothing is mutated, nothing
+ * is stored at module scope, no clock is read and no date exists — `dayIdx` is an index into
+ * {@link WEEKDAYS} and nothing else. `week.test.ts` deep-freezes the input before every transition
+ * and compares a structural snapshot afterwards, so *"pure"* is a property the suite checks rather
+ * than a claim the docstring makes.
+ *
+ * The reason it matters beyond tidiness: the whole week is one serialisable value, so restoring a
+ * session is assigning it, undoing a day is keeping the previous one, and a report is a function of
+ * the state rather than a side effect of producing it. That is the same argument
+ * `contract/types.ts` makes for a recording being a value rather than a live `Simulation`.
+ *
+ * ## Two rules copied deliberately from the design, including one that looks like a bug
+ *
+ * 1. **The streak resets on a missed day; the banked count does not.** `design.html` :1955 and
+ *    :1957: `streak = allMet ? streak + 1 : 0`, but `cleanRun = allMet ? cleanRun + 1 : cleanRun`.
+ *    A missed day costs the streak and keeps the progress. That is not an oversight in the
+ *    prototype — it is what makes the design's own framing true (*"No losing — just a line you are
+ *    trying to bend upward"*, *"nothing here is a game over"*): the streak is the thing you can
+ *    lose, and the assignment is the thing you cannot. Ported verbatim, and named here so nobody
+ *    "fixes" it.
+ * 2. **Taking an assignment restarts the week and keeps what was cleared.** `design.html` :1643
+ *    resets the streak and the banked count, restarts the week at day 1, and leaves `completed`
+ *    alone. The scenarios card says the same thing in words: *"Taking an assignment restarts the
+ *    week on that building."*
+ *
+ * ## Unjudged is not passed
+ *
+ * {@link DayOutcome.allMet} is computed by {@link outcomeOf} as *every reading is `met`*, so a day
+ * with a `pending` goal is not a clean day. `campaign/judge.ts` takes the same line at batch scale
+ * — *"`false` whenever any goal is `null`, because unjudged is not passed"* — and the reason is the
+ * same: a morning that never woke up has not demonstrated anything, and banking it would let a
+ * reader clear a scenario by closing five empty days.
+ */
+
+import { contractById, FIRST_CONTRACT_ID, nextContract } from './contracts.js';
+import {
+  weekdayOf,
+  type ClearedAward,
+  type DayOutcome,
+  type GoalReading,
+  type ShiftEventId,
+  type WeekState,
+} from './types.js';
+
+/** How many days the sparkline holds (`design.html` :1973). Oldest falls off the left. */
+export const HISTORY_DAYS = 7;
+
+/** A fresh week on a scenario, at day 1. Nothing banked, nothing cleared, no history. */
+export function openWeek(contractId: string = FIRST_CONTRACT_ID): WeekState {
+  return {
+    contractId,
+    day: 1,
+    dayIdx: 0,
+    streak: 0,
+    bestMinutePct: 0,
+    cleanRun: 0,
+    completed: [],
+    history: [],
+    cleared: null,
+  };
+}
+
+/** What {@link outcomeOf} needs beyond the readings themselves. */
+export interface DayOutcomeInput {
+  readonly day: number;
+  readonly dayIdx: number;
+  readonly eventId: ShiftEventId;
+  readonly arrived: number;
+  readonly carried: number;
+  /** The observation the sparkline and the *best day so far* figure both read. */
+  readonly minutePct: number;
+  readonly readings: readonly GoalReading[];
+}
+
+/**
+ * Assemble the day that just ended.
+ *
+ * Split out from {@link closeDay} so the *"was this a clean day"* rule lives in one place and can
+ * be asserted on its own. A day with no goals is **not** clean: `every` over an empty array is
+ * `true`, which would make a shift with nothing to prove indistinguishable from one that proved
+ * everything.
+ */
+export function outcomeOf(input: DayOutcomeInput): DayOutcome {
+  return {
+    day: input.day,
+    dayIdx: input.dayIdx,
+    weekday: weekdayOf(input.dayIdx),
+    eventId: input.eventId,
+    arrived: input.arrived,
+    carried: input.carried,
+    minutePct: input.minutePct,
+    readings: input.readings,
+    allMet:
+      input.readings.length > 0 && input.readings.every((reading) => reading.state === 'met'),
+  };
+}
+
+/**
+ * Close the day and hand back the week it produced.
+ *
+ * Total, and does not throw: a `contractId` that names no contract (restored state from an older
+ * build, a scenario since renamed) banks the day and clears nothing, rather than losing the day to
+ * an exception. The banner is simply absent, which is the honest rendering of *"we do not know what
+ * this was an assignment for"*.
+ */
+export function closeDay(week: WeekState, outcome: DayOutcome): WeekState {
+  const streak = outcome.allMet ? week.streak + 1 : 0;
+  // The banked count survives a missed day. See the module docstring, rule 1.
+  const cleanRun = outcome.allMet ? week.cleanRun + 1 : week.cleanRun;
+  const contract = contractById(week.contractId);
+
+  const clears =
+    contract !== undefined &&
+    cleanRun >= contract.needClean &&
+    !week.completed.includes(contract.id);
+
+  const cleared: ClearedAward | null =
+    clears && contract !== undefined ? awardFor(contract.id, contract.reward) : null;
+
+  return {
+    contractId: week.contractId,
+    day: week.day,
+    dayIdx: week.dayIdx,
+    streak,
+    bestMinutePct: Math.max(week.bestMinutePct, outcome.minutePct),
+    cleanRun,
+    completed: clears && contract !== undefined ? [...week.completed, contract.id] : week.completed,
+    history: [...week.history, outcome].slice(-HISTORY_DAYS),
+    cleared,
+  };
+}
+
+/**
+ * Open the doors on tomorrow.
+ *
+ * Clears {@link WeekState.cleared}: the banner belongs to the report of the day that earned it, not
+ * to the week. A banner that persisted would congratulate a reader on Wednesday for something they
+ * did on Monday.
+ */
+export function nextDay(week: WeekState): WeekState {
+  return {
+    ...week,
+    day: week.day + 1,
+    dayIdx: (week.dayIdx + 1) % 7,
+    cleared: null,
+  };
+}
+
+/**
+ * Take an assignment: restart the week on that scenario, keeping what has been cleared.
+ *
+ * `design.html` :1643, and the scenarios card's own sentence. The history goes with the week — a
+ * sparkline that mixed Garden Apartments' quiet mornings with Vertical City's would be seven bars
+ * of two different buildings.
+ */
+export function takeContract(week: WeekState, contractId: string): WeekState {
+  return { ...openWeek(contractId), completed: week.completed };
+}
+
+/** The award payload the report's green banner reads. */
+function awardFor(contractId: string, reward: string): ClearedAward {
+  const next = nextContract(contractId);
+  return {
+    contractId,
+    reward,
+    nextContractId: next?.id ?? null,
+    nextTitle:
+      next === undefined
+        ? 'any scenario you like — they are all open'
+        : `${next.label} — ${next.title}`,
+  };
+}

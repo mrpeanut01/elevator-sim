@@ -258,13 +258,42 @@ export function drawOverlay(ctx: Canvas2DLike, input: OverlayInput): void {
   }
 }
 
-/** Colour for a load factor. Never the *only* signal — see `KB-15b` and the `!` glyph above. */
+/**
+ * Colour for a load factor. Never the *only* signal — see `KB-15b` and the `!` glyph above.
+ *
+ * ## The four boundaries, and the one the design handoff did not get
+ *
+ * `docs/12` § 1.3 M3 asks for the artefact's four steps: `≥ 0.95` red, `≥ 0.8` amber, `> 0.25`
+ * blue, else green. Three of the four are taken. **Red stays at {@link LOAD_ALARM} and not at
+ * 0.95**, and that refusal is the same rule the rest of this file keeps.
+ *
+ * `UX.md` RV-14 and `D18` make the overload alarm a *distinct fact* from the 80 % fill rule, and
+ * `KB-15b` requires the alarm colour to be accompanied by the `!` glyph at every pitch on every
+ * building — `render/canvas.ts` draws it at `loadFactor >= LOAD_ALARM`. Moving the red band down
+ * to 0.95 without moving the glyph would put a red car on screen with nothing beside it, which is
+ * a colour-only signal for the most serious state a car can be in. Moving the *glyph* down to
+ * 0.95 instead would be worse: it would raise a safety alarm on a car that is not overloaded, and
+ * `LOAD_ALARM` is 1.1 because a car is not in trouble at rated load.
+ *
+ * The design's 0.95 is a *prototype's* way of saying "full", and this model already has one: the
+ * 80 % fill rule (`CLAUDE.md` § Modeling rules), which is where the amber starts. The step that
+ * genuinely was missing — the design's `> 0.25` rather than this function's old `>= 0.5` — is
+ * taken, and it is the one that changes what a reader sees most often: a car with three people in
+ * it now reads as *working* rather than as *empty*.
+ */
 export function loadColour(loadFactor: number, theme: Theme): string {
   if (loadFactor >= LOAD_ALARM) return theme.carOverload;
   if (loadFactor >= LOAD_FULL) return theme.carHeavy;
-  if (loadFactor >= 0.5) return theme.car;
+  if (loadFactor > LOAD_OCCUPIED) return theme.car;
   return theme.carLight;
 }
+
+/**
+ * The load at which a car stops reading as empty — `docs/12` § 1.3 M3, the artefact's `> 0.25`.
+ *
+ * Exported so `stageRender.test.ts` reads the shipped boundary rather than a transcription of it.
+ */
+export const LOAD_OCCUPIED = 0.25;
 
 function formatSpan(fromS: number, toS: number): string {
   return `${fromS.toFixed(0)}–${toS.toFixed(0)} s`;

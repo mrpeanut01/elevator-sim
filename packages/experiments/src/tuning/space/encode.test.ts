@@ -5,7 +5,14 @@ import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { createPolicyFor, loadConfig, resolveDoorConfig, runSimulation } from '@elevator-sim/core';
+import {
+  DISPATCHER_PROFILE_OBJECT_SECTIONS,
+  createPolicyFor,
+  dispatcherProfileSchema,
+  loadConfig,
+  resolveDoorConfig,
+  runSimulation,
+} from '@elevator-sim/core';
 import type { DispatcherProfile, LoadedConfig } from '@elevator-sim/core';
 
 import { candidateFromProfile, defaultCandidate, searchSpace, subspace } from './collect.js';
@@ -109,6 +116,35 @@ describe('a candidate survives the trip to a profile and back, exactly', () => {
     const silent = decodeCandidate(SPACE, new Map([['weights.waitTime', 1]]));
     expect(Object.hasOwn(silent, 'hardConstraints')).toBe(false);
     expect(encodeCandidate(SPACE, silent).has('constraints.noDirectionReversal')).toBe(false);
+  });
+
+  it('takes its section list from the schema, not from a list of its own', () => {
+    // The guard § D146 asked for. `PROFILE_OBJECT_SECTIONS` must be the **same value** `core`
+    // derives from `dispatcherProfileSchema` — identity, not equality, because an equal copy is
+    // exactly what a hand-written list that happens to be in step looks like, and being in step is
+    // a property that lasts until the next section lands.
+    expect(
+      PROFILE_OBJECT_SECTIONS,
+      'PROFILE_OBJECT_SECTIONS must BE core\'s DISPATCHER_PROFILE_OBJECT_SECTIONS, not a list equal to it. An equal copy is what the hand-written list looked like on the day before `selection` landed.',
+    ).toBe(DISPATCHER_PROFILE_OBJECT_SECTIONS);
+
+    // And every one of them is a real key of the real profile schema, so the derivation cannot
+    // drift into naming a section a profile does not have. `config/schema.test.ts` proves the
+    // other direction — that a section the schema gains is picked up — against a fictional schema.
+    for (const section of PROFILE_OBJECT_SECTIONS) {
+      expect(Object.hasOwn(dispatcherProfileSchema.shape, section)).toBe(true);
+    }
+
+    // Seven today, and the count is pinned beside the space's own. § D146 is the reason: when
+    // `selection` was missing from the hand-written list the space was 49 instead of 56 and no
+    // test anywhere said so. `collect.test.ts` pins 56 and the 106 declared rows behind it; this
+    // pins the section count those two are a function of, so a section that silently vanishes
+    // fails here first and with a message that names the cause.
+    expect(PROFILE_OBJECT_SECTIONS.length).toBe(7);
+    expect(SPACE.parameters.length).toBe(56);
+    expect(new Set(SPACE.parameters.map((parameter) => parameter.section))).toStrictEqual(
+      new Set(['weights', 'constraints', ...PROFILE_OBJECT_SECTIONS]),
+    );
   });
 
   it('emits only the sections a profile has, and refuses one it does not', () => {
@@ -264,6 +300,23 @@ describe('a patch merges onto a base without dropping what it did not touch', ()
  * A candidate as a profile the loader accepts
  * -------------------------------------------------------------------------- */
 
+/** The one run input a dispatcher profile cannot carry: the weight sets a selector chooses between. */
+const PROBE_WEIGHT_SETS = {
+  patternSwitching: {
+    patternDetector: {
+      type: 'fuzzy',
+      inputs: ['lobbyArrivalRate'],
+      patterns: ['probe'],
+      hysteresisS: 0,
+      membership: { probe: { lobbyArrivalRate: [0, 1] as readonly [number, number] } },
+    },
+    weightSetsByPattern: { probe: 'probe-arm' },
+  },
+  weightsByProfileId: new Map<string, ReadonlyMap<string, number>>([
+    ['probe-arm', new Map([['waitTime', 1]])],
+  ]),
+};
+
 describe('a decoded candidate is a profile loadConfig accepts and a policy builds from', () => {
   it('parses every random candidate through the real profile parser', () => {
     // `candidateProfile` validates through `parseDispatcherProfiles`, the function `loadConfig`
@@ -275,7 +328,13 @@ describe('a decoded candidate is a profile loadConfig accepts and a policy build
       // And the profile reads back as the candidate it came from, so the trip through the
       // parser changed nothing.
       expect(candidatesEqual(encodeCandidate(SPACE, profile), candidate)).toBe(true);
-      expect(() => createPolicyFor(profile)).not.toThrow();
+      // The weight-set library is handed in for the same reason the building is not: it is a
+      // **run input, not a profile field**. `selection.policy` is authorable and the arms are the
+      // file-level `patternSwitching` block, so `core` refuses a profile that asks for a selector
+      // with nothing to select between — a fact about what this call was handed, not about the
+      // candidate. Built here rather than imported from `encode.ts` so the two oracles share no
+      // code: this file is the independent check on that one.
+      expect(() => createPolicyFor(profile, { weightSets: PROBE_WEIGHT_SETS })).not.toThrow();
     }
   });
 

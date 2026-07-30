@@ -16,5 +16,10 @@
     "types": ["node"]
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../core" }]
+  // `experiments` is here for `src/controls/` only, and only through its `./browser` subpath —
+  // the environment-free barrel (DECISIONS.md § D121). `src/boundaries.test.ts` fails on a bare
+  // `@elevator-sim/experiments` specifier anywhere in this package, because TypeScript does not
+  // apply the `browser` export condition and a bare import would typecheck against the Node
+  // surface while the bundle received the browser one.
+  "references": [{ "path": "../core" }, { "path": "../experiments" }]
 }

@@ -55,10 +55,12 @@ import {
 } from '../config/types.js';
 
 import { NORMALIZATION_DEFAULTS } from './normalize.js';
+import { WEIGHT_SET_POLICIES } from './selector.js';
 import { COST_TERMS } from './terms/index.js';
 import type {
   ActiveWhenCondition,
   ActiveWhenRange,
+  CostTermDefinition,
   DispatchParameterSpec,
   ResolvedDispatchConfig,
 } from './types.js';
@@ -130,11 +132,69 @@ export const DISPATCH_DEFAULTS = Object.freeze({
    * travel, the travel being amortised over `PARK_CALL_HORIZON` calls.
    */
   repositionEnergyWeight: 0.2,
+
+  /* ---- stage 3: weight-set selection ---- */
+  /**
+   * **Off.** One weight vector for the run, which is what every profile in
+   * `data/dispatcher-profiles.json` ships and what every published number in this repository
+   * was measured under. A selector is opted into, never inherited.
+   */
+  selectionPolicy: 'off',
+  /**
+   * Seconds a chosen weight set is held before another may take it.
+   *
+   * 120, quoted from the `patternSwitching.patternDetector.hysteresisS` the data file has
+   * carried since Phase 2 — the authored number, not a new one invented in code.
+   */
+  selectionHysteresisS: 120,
+  /**
+   * Trailing window the three traffic rates are counted over, seconds.
+   *
+   * 300 — the five minutes every traffic profile in `data/traffic-profiles.json` states its
+   * demand in (`% of population per 5 minutes`), and the window `peak-5min` reports over. A
+   * detector averaging over a different span than the demand is specified in would be measuring
+   * a quantity nothing else in the project names.
+   */
+  selectionObservationWindowS: 300,
+  /** Identity. At 1 the contextual policy is arithmetically the fuzzy one. */
+  selectionInputGain: 1,
+  /** Inert. At 0 a challenger needs only to be preferred and to have outwaited the dwell. */
+  selectionSwitchMargin: 0,
 } as const);
 
 /* -------------------------------------------------------------------------- *
  * The schema
  * -------------------------------------------------------------------------- */
+
+/** `{ 'a.b': ['x', 'y'] }` as `a.b ∈ {x, y}`, in the notation the rest of the schema's prose uses. */
+function conditionsAsProse(conditions: Readonly<Record<string, readonly string[]>>): string {
+  return Object.entries(conditions)
+    .map(([id, values]) => `${id} ∈ {${values.join(', ')}}`)
+    .join(' and ');
+}
+
+/**
+ * The sentence a partly-conditional term adds to its own weight's description.
+ *
+ * `partiallyActiveWhen` reaches a schema consumer **here**, folded into `description`, rather than
+ * as a `DispatchParameterSpec` field of its own — because it does not change what an optimizer
+ * *does*. The dimension is live on both sides of the condition and must be searched on both, so a
+ * new structural field would have no reader outside a test, which is the defect
+ * docs/05 § *Standing requirement* is about. `description` already has three real readers: the
+ * collected search space carries it verbatim, the experience layer renders it as help text, and
+ * docs/06 quotes it.
+ */
+function partialActivitySentence(term: CostTermDefinition): string {
+  if (term.partiallyActiveWhen === undefined) return '';
+  return (
+    ` Part of this term's raw value exists only when ${conditionsAsProse(term.partiallyActiveWhen)}` +
+    ', and the rest of it is priced under every setting. This is not a gate: the weight is a live' +
+    ' dimension on both sides and must be searched on both. What it changes is transferability —' +
+    ' the term prices a different quantity either side of that condition, so a weight tuned under' +
+    ' one does not carry over to the other, for the same reason a weight tuned on up-peak does not' +
+    ' carry over to down-peak.'
+  );
+}
 
 /**
  * One `weights.<termId>` row per implemented term, in registry order.
@@ -143,6 +203,12 @@ export const DISPATCH_DEFAULTS = Object.freeze({
  * knows what it needs to be able to change a decision, and a condition written in this file
  * would have to name terms, which invariant 7 forbids. `rideTime` is the term that has one —
  * it can only be priced when the call carries a destination.
+ *
+ * `partiallyActiveWhen` is carried through the same way and to a different place, the row's
+ * `description`, because it is the **opposite** of a gate — see {@link partialActivitySentence}.
+ * `stopCount` is the term that has one: it counts the pickup under every call type and the
+ * destination only when one is disclosed, so gating its weight would hide a live region, which
+ * `sim/searchSpaceLiveness.test.ts` measured and refused.
  */
 const WEIGHT_PARAMETERS: readonly DispatchParameterSpec[] = COST_TERMS.map((term) => ({
   id: `weights.${term.id}`,
@@ -150,7 +216,7 @@ const WEIGHT_PARAMETERS: readonly DispatchParameterSpec[] = COST_TERMS.map((term
   range: [0, 5] as const,
   scale: 'linear' as const,
   default: 0,
-  description: `Weight on the normalized ${term.id} term — ${term.measures.toLowerCase()}${term.unit === '' ? '' : `, raw unit ${term.unit}`}. Zero removes the term from the sum entirely.`,
+  description: `Weight on the normalized ${term.id} term — ${term.measures.toLowerCase()}${term.unit === '' ? '' : `, raw unit ${term.unit}`}. Zero removes the term from the sum entirely.${partialActivitySentence(term)}`,
   ...(term.activeWhen === undefined ? {} : { activeWhen: term.activeWhen }),
 }));
 
@@ -362,6 +428,78 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
       'Exchange rate between anticipated waiting time and energy spent moving an empty car: the per-call net gain is the expected saving minus this times the seconds of travel, amortised over the calls the park is expected to answer. Both sides in seconds per call, so the subtraction is dimensionally honest. 0 ignores energy entirely; 2 makes a park whose saving equals its travel time exactly break even, which is the whole meaningful range.',
     activeWhen: { 'idle.parkingStrategy': ['lobby', 'zone-center', 'predicted-demand'] },
   },
+
+  /* ---- stage 3: weight-set selection ---- */
+  {
+    id: 'selection.policy',
+    type: 'categorical',
+    values: [...WEIGHT_SET_POLICIES],
+    default: DISPATCH_DEFAULTS.selectionPolicy,
+    description:
+      'Whether the weight vector may change during the run, and by what rule. off: one vector for the run, which is what every shipped profile does and what every published number in this repository was measured under. fuzzy: a trapezoidal membership per pattern over the observed traffic rates, fuzzy AND across an arm’s clauses, max-membership defuzzification, and a dwell hysteresis. contextual: the same arms and signatures with three learned input gains and a learned switch margin in front of them, which at their defaults is arithmetically the fuzzy rule. Both read their arms from the file-level patternSwitching block; a profile that names a rule with no library supplied is rejected rather than run.',
+  },
+  {
+    id: 'selection.hysteresisS',
+    type: 'continuous',
+    range: [0, 900],
+    scale: 'linear',
+    default: DISPATCH_DEFAULTS.selectionHysteresisS,
+    unit: 's',
+    description:
+      'Seconds a chosen weight set must be held before another may take it. The detector oscillating between two near-equal patterns would re-rank every car twice a minute for no change in the traffic, and a dispatcher that changes its mind faster than the building changes its behaviour is measuring its own noise. Distinct from dispatch.reassignmentHysteresisS, which is about one call moving between cars.',
+    activeWhen: { 'selection.policy': ['fuzzy', 'contextual'] },
+  },
+  {
+    id: 'selection.observationWindowS',
+    type: 'continuous',
+    range: [30, 1800],
+    scale: 'log',
+    default: DISPATCH_DEFAULTS.selectionObservationWindowS,
+    unit: 's',
+    description:
+      'Trailing window the three traffic rates are counted over. Short enough and the detector tracks batches rather than patterns — passengers arrive in batches, so a 30 s window sees a five-person batch as a burst; long enough and it cannot see a peak begin. The divisor is the whole window and not the elapsed time, so a run starts with every rate at zero and climbs into its regime.',
+    activeWhen: { 'selection.policy': ['fuzzy', 'contextual'] },
+  },
+  {
+    id: 'selection.lobbyArrivalRateGain',
+    type: 'continuous',
+    range: [0, 4],
+    scale: 'linear',
+    default: DISPATCH_DEFAULTS.selectionInputGain,
+    description:
+      'Learned gain on the lobby arrival rate before its memberships are evaluated: a gain above 1 makes the detector treat a given rate as busier than it is, which shifts every ramp on that input toward zero. One of the four learned parameters of the contextual policy, and inert at 1 — where the contextual rule is arithmetically the fuzzy one, so what the learning bought is a difference against the fuzzy arm rather than against an unrelated configuration.',
+    activeWhen: { 'selection.policy': ['contextual'] },
+  },
+  {
+    id: 'selection.interfloorRateGain',
+    type: 'continuous',
+    range: [0, 4],
+    scale: 'linear',
+    default: DISPATCH_DEFAULTS.selectionInputGain,
+    description:
+      'Learned gain on the interfloor arrival rate, applied before its memberships are evaluated. Inert at 1.',
+    activeWhen: { 'selection.policy': ['contextual'] },
+  },
+  {
+    id: 'selection.downPeakRateGain',
+    type: 'continuous',
+    range: [0, 4],
+    scale: 'linear',
+    default: DISPATCH_DEFAULTS.selectionInputGain,
+    description:
+      'Learned gain on the down-travelling arrival rate, applied before its memberships are evaluated. Inert at 1.',
+    activeWhen: { 'selection.policy': ['contextual'] },
+  },
+  {
+    id: 'selection.switchMargin',
+    type: 'continuous',
+    range: [0, 1],
+    scale: 'linear',
+    default: DISPATCH_DEFAULTS.selectionSwitchMargin,
+    description:
+      'Membership a challenging pattern must exceed the incumbent’s by before it may take the run, on top of the dwell hysteresis. A dwell asks a challenger to be later; this asks it to be better, which is the gate that bites when two memberships are both near 1 and the dwell has already expired. Inert at 0. Memberships are in [0, 1], so 1 admits only a switch from a completely unrecognized regime to a fully recognized one.',
+    activeWhen: { 'selection.policy': ['contextual'] },
+  },
 ];
 
 /** Every declared id, for a quick membership test. */
@@ -471,6 +609,8 @@ export function dispatchParameterValue(
       return readField(config.answer, key);
     case 'idle':
       return readField(config.idle, key);
+    case 'selection':
+      return readField(config.selection, key);
     default:
       return undefined;
   }
@@ -501,5 +641,6 @@ export function tunablePathsOf(config: ResolvedDispatchConfig): readonly string[
   for (const key of Object.keys(config.eligibility)) paths.push(`eligibility.${key}`);
   for (const key of Object.keys(config.answer)) paths.push(`answer.${key}`);
   for (const key of Object.keys(config.idle)) paths.push(`idle.${key}`);
+  for (const key of Object.keys(config.selection)) paths.push(`selection.${key}`);
   return Object.freeze(paths);
 }

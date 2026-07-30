@@ -45,6 +45,7 @@
 
 import {
   COST_TERMS,
+  DISPATCHER_PROFILE_OBJECT_SECTIONS,
   createPolicyFor,
   parseDispatcherProfiles,
   resolveDoorConfig,
@@ -81,20 +82,60 @@ import { SearchSpaceError, isActive } from './types.js';
 const WEIGHTS_SECTION = 'weights';
 
 /**
+ * A one-arm weight-set library, for the feasibility oracle and for nothing else.
+ *
+ * `selection.policy` is a profile field; the **arms** are not — they are the file-level
+ * `patternSwitching` block, the way the cost-term library is file-level. So a profile carrying
+ * `selection.policy: 'fuzzy'` is buildable or not only *given* a library, exactly as a car is
+ * feasible or not only given a building. This stands in for the real one so that turning the
+ * knob on is not mistaken for an infeasible candidate.
+ *
+ * Synthetic rather than loaded: this module is reachable from the browser barrel and may not read
+ * `data/`. It never reaches a run — `runnerObjective` builds arms from the real resources.
+ */
+const SEARCH_SPACE_WEIGHT_SETS = Object.freeze({
+  patternSwitching: Object.freeze({
+    patternDetector: Object.freeze({
+      type: 'fuzzy',
+      inputs: Object.freeze(['lobbyArrivalRate']),
+      patterns: Object.freeze(['probe']),
+      hysteresisS: 0,
+      membership: Object.freeze({ probe: Object.freeze({ lobbyArrivalRate: [0, 1] }) }),
+    }),
+    weightSetsByPattern: Object.freeze({ probe: 'probe-arm' }),
+  }),
+  weightsByProfileId: new Map<string, ReadonlyMap<string, number>>([
+    ['probe-arm', new Map([['waitTime', 1]])],
+  ]),
+});
+
+/**
  * The `constraints` pseudo-section: the one family of ids whose authored form is not its dotted
  * path. See {@link ProfilePatch.hardConstraints}.
  */
 const CONSTRAINTS_SECTION = 'constraints';
 
-/** Sections written as `profile.<section>.<key>`, which is every other one. */
-export const PROFILE_OBJECT_SECTIONS: readonly string[] = Object.freeze([
-  'normalization',
-  'dispatch',
-  'eligibility',
-  'answer',
-  'idle',
-  'auction',
-]);
+/**
+ * Sections written as `profile.<section>.<key>`, which is every other one.
+ *
+ * **Derived from `dispatcherProfileSchema`'s own shape, not written down**, which is the whole of
+ * the argument this module's sibling opens with applied to the one place `collect.ts` did not
+ * reach. `collect.ts` derives the *parameters* from `core`'s `_PARAMETERS` exports so a new schema
+ * needs no edit here; the *sections* were still enumerated, and the failure was exactly the one it
+ * predicts. `selection` landed in `config/schema.ts` with seven declared, round-trip-tested rows,
+ * this array did not gain it, and all seven were reported **unauthorable** by
+ * `collectSearchSpace()` and silently dropped — nothing anywhere read as wrong
+ * ([DECISIONS.md § D146](../../../../../DECISIONS.md)). Adding `selection` to the list fixed
+ * that instance and left the mechanism; this closes the mechanism.
+ *
+ * The derivation lives in `core` — {@link DISPATCHER_PROFILE_OBJECT_SECTIONS} — because that is
+ * where the schema is and because `experiments` does not depend on `zod`. An **eighth** section
+ * added to `dispatcherProfileSchema` reaches the search space with no edit to this file, and
+ * `config/schema.test.ts` proves it against a fictional schema the product does not ship, for the
+ * reason § D134 gives about W4's control renderers: a list that looks derived only because the
+ * shipped schema happens to fit it is not derived.
+ */
+export const PROFILE_OBJECT_SECTIONS: readonly string[] = DISPATCHER_PROFILE_OBJECT_SECTIONS;
 
 /** Every section a {@link ProfilePatch} can carry, including the two pseudo-sections. */
 export const PROFILE_SECTIONS: readonly string[] = Object.freeze([
@@ -437,7 +478,19 @@ export function validateValues(
     // Builds whichever policy `auction.aggregation` names, and runs every build-time check the
     // shipped path runs — including the one constraint the declared box does not express, that a
     // destination-entry dispatcher may not defer.
-    createPolicyFor(profile satisfies AuctionProfileSource);
+    //
+    // The weight-set library is supplied because it is a **run input, not a profile field**, in
+    // the same way the building is: `patternSwitching` lives at the top of
+    // `data/dispatcher-profiles.json` beside the profile list, and `core` refuses a profile that
+    // asks for a selector with nothing to select between. Without a stand-in here the oracle
+    // would answer "infeasible" for every draw that turned `selection.policy` on — which is not a
+    // fact about the candidate, it is a fact about what the oracle was handed. {@link
+    // SEARCH_SPACE_WEIGHT_SETS} is synthetic and minimal on purpose: this file is on the browser
+    // barrel and may not read `data/`, and the question being asked is whether the *dispatcher*
+    // builds, not whether one particular library resolves.
+    createPolicyFor(profile satisfies AuctionProfileSource, {
+      weightSets: SEARCH_SPACE_WEIGHT_SETS,
+    });
   } catch (error) {
     return messageOf(error);
   }
@@ -683,12 +736,24 @@ function valueOf(parameter: SearchParameter, coordinate: number): ParameterValue
     ? reflectInto(coordinate, low, high)
     : coordinateOf(parameter, parameter.default);
   switch (parameter.type) {
-    case 'continuous':
+    case 'continuous': {
+      if (parameter.scale !== 'log') {
+        return Math.min(parameter.max, Math.max(parameter.min, folded));
+      }
       // Clamped after the exponential, not only in box coordinates: `exp(log(1800))` is
       // `1800.0000000000005`, which is outside a declared range the profile schema will enforce.
-      return parameter.scale === 'log'
-        ? Math.min(parameter.max, Math.max(parameter.min, Math.exp(folded)))
-        : Math.min(parameter.max, Math.max(parameter.min, folded));
+      const once = Math.min(parameter.max, Math.max(parameter.min, Math.exp(folded)));
+      // **And normalized to the fixed point of `exp ∘ log`, which is what makes the round trip
+      // idempotent rather than nearly so.** `exp(log(y)) === y` fails by one ulp for some
+      // doubles, so `decode(encode(decode(v)))` could move a log-scaled coordinate a second time
+      // — `normalization.distanceM` at 5.873516484765638 came back 5.873516484765639 — which is
+      // exactly what `sample.test.ts`'s idempotence claim forbids and what `cmaes.ts` relies on
+      // when it updates its distribution from what was evaluated. Latent: it was reached only
+      // when the dimension count changed and moved the draw sequence. One normalization suffices,
+      // checked over three million draws across this dimension's declared range with zero
+      // survivors, and it is a no-op for every value that was already a fixed point.
+      return Math.min(parameter.max, Math.max(parameter.min, Math.exp(Math.log(once))));
+    }
     case 'integer': {
       const natural = parameter.scale === 'log' ? Math.exp(folded) : folded;
       return Math.min(parameter.max, Math.max(parameter.min, Math.round(natural)));

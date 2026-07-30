@@ -506,6 +506,18 @@ export const DOOR_DEFAULTS = Object.freeze({
    * - The other 32 show no significant difference. The remaining 16 cells saturate in almost
    *   every replication and are suppressed rather than quoted.
    *
+   * **Ten of those fifty cells were measured on a `vertical-city` that had no escalator, and that
+   * building has since declared four** — one at each of its two-level lobbies, in two separate
+   * changes. Every run of the other four buildings is bit-identical to
+   * the tree these figures were taken on — `traffic/transportIdentity.test.ts` pins that at full
+   * precision — so 40 of the 50 cells cannot have moved, including the `secure-tower` row above.
+   * The ten `vertical-city` cells can have, and the `predictive-balanced` row is one of them. It
+   * was **not** re-derived, and the reason is worth stating rather than hiding: this 50-cell study
+   * has **no shipped entry point**. It lives in the commit that measured it, so there is nothing
+   * to re-run — the same gap `experiments/benchmark/published.ts` catalogues inside `benchmark/`,
+   * one directory outside it. Treat the `vertical-city` row as *measured on the pre-escalator
+   * configuration* until somebody ships the study as a function and re-derives it.
+   *
    * So the honest statement is that there is **no measured AWT cost**, which is not the same as
    * "it is free": it is a real modelling change and it moves **41 of the 50** passenger-record
    * trajectories at seed 20260726, on every building whose landings ever hold somebody the car

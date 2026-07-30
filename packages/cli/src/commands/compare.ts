@@ -269,6 +269,9 @@ export async function runCompare(
       dispatcherProfilesById: config.dispatcherProfilesById,
       trafficProfiles: config.trafficProfiles,
       elevatorSpecs: config.elevatorSpecs,
+      // The file beside the profile index, so an arm whose profile opts into `selection.policy`
+      // finds the weight sets it names. Inert while no shipped profile opts in.
+      dispatcherProfiles: config.dispatcherProfiles,
     },
     {
       // The summaries and their scalar projections are all this command reads; keeping every

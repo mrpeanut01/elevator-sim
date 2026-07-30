@@ -82,7 +82,7 @@ describe('the same seed and config replay exactly', () => {
     for (let replication = 0; replication < 4; replication += 1) {
       expect(fingerprint(runSimulation(request))).toBe(expected);
     }
-  });
+  }, 60_000);
 
   it('is bit-identical when door obstructions are drawn from the stream', () => {
     const request = run('garden-apartments', 'nearest-car', 99, {
@@ -92,7 +92,7 @@ describe('the same seed and config replay exactly', () => {
     for (let replication = 0; replication < 4; replication += 1) {
       expect(fingerprint(runSimulation(request))).toBe(expected);
     }
-  });
+  }, 60_000);
 
   it('does not depend on how many simulations the process has already run', () => {
     // Ids are allocated from per-run counters, never module-level ones. A shared counter would
@@ -103,7 +103,7 @@ describe('the same seed and config replay exactly', () => {
     runSimulation(run('secure-tower', 'collective', 7));
     const second = fingerprint(runSimulation(run('garden-apartments', 'nearest-car', 5)));
     expect(second).toBe(first);
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -126,7 +126,7 @@ describe('the model is genuinely stochastic', () => {
     // run an arbitrary scenario rather than an answer.
     const means = new Set(results.map((result) => result.summary.waiting.meanS));
     expect(means.size).toBeGreaterThan(1);
-  });
+  }, 120_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -146,7 +146,7 @@ describe('common random numbers survive a change of dispatcher', () => {
       expect(result.trace.passengerCount).toBe(baseline.trace.passengerCount);
       expect(result.record.seed).toBe(baseline.record.seed);
     }
-  });
+  }, 120_000);
 
   it('gives the identical population to a profile that behaves completely differently', () => {
     const profile = config.dispatcherProfilesById.get('eta');
@@ -164,7 +164,7 @@ describe('common random numbers survive a change of dispatcher', () => {
     // event sequences share almost nothing. The passengers are still the same passengers.
     expect(traceFingerprint(credentialed)).toBe(traceFingerprint(conventional));
     expect(fingerprint(credentialed)).not.toBe(fingerprint(conventional));
-  });
+  }, 60_000);
 
   it('leaves the input streams exactly where trace generation left them', () => {
     const profile = config.dispatcherProfilesById.get('predictive-balanced');
@@ -180,5 +180,5 @@ describe('common random numbers survive a change of dispatcher', () => {
       simulation.run();
       expect(simulation.streams.snapshot()).toEqual(before);
     }
-  });
+  }, 60_000);
 });

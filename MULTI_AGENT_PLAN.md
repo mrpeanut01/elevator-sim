@@ -1,5 +1,22 @@
 # Multi-agent execution plan
 
+> ## ↩️ REOPENED 2026-07-30 as **wave 10** — the design handoff.
+>
+> A Claude Design handoff, *Elevator Sim Reimagined*, is now the canonical source for the user
+> interface ([§ D174](DECISIONS.md)). Wave 10 implements it against the real simulator across eight
+> lanes, and **moves no phase verdict**: no published number is recomputed, no acceptance criterion
+> is touched, and every deviation from the handoff carries the constraint that forced it.
+>
+> Board: **[`WAVE10_PLAN.md`](WAVE10_PLAN.md)** · requirements and gap analysis:
+> [`docs/12-design-handoff.md`](docs/12-design-handoff.md) · decisions:
+> [§ D174](DECISIONS.md)–[§ D179](DECISIONS.md) · the handoff, vendored: [`docs/design/`](docs/design/).
+>
+> Its standing rule is the roadmap's, pointed at a slider: **move the control and require the run to
+> change.** That rule found three inert or wrong controls and one false claim about a mechanism
+> before a single editor was mounted — see [§ D177](DECISIONS.md).
+>
+> Everything below this line is the closed record of waves 1–9 and is not updated.
+
 > ## ↩️ THE DELIVERY REOPENED 2026-07-28 after `918897d`, as **wave 5** — and wave 5 has now CLOSED.
 >
 > **Wave 5's outcome:** all eight lanes merged, **no phase verdict moved**, and the suite went

@@ -42,9 +42,11 @@
  * A **Welch** interval rather than a pooled one, because the two sets routinely differ in size and
  * in spread (the tuning set is usually larger, and the tuned candidate is usually *less* variable on
  * the traces it was tuned to). Welch's `t` with the Satterthwaite degrees of freedom is the standard
- * answer and does not require the variances to match. The `n <= 25` t/z split
- * `reports/statistics.ts` applies is a rule for a **one-sample stopping rule** and does not transfer:
- * a Welch interval is a `t` interval at every `n`, converging to the normal as the df grow.
+ * answer and does not require the variances to match. This sentence used to say that
+ * `reports/statistics.ts` applies an `n <= 25` t/z split; **it does not, and has not since
+ * `89bbf37`** — every interval that module produces is Student-t at `n − 1` at every `n`
+ * (DECISIONS.md § D14). A Welch interval is likewise a `t` interval at every `n`, converging to the
+ * normal as the df grow, so the two agree on family and differ only in the degrees of freedom.
  *
  * ## What this file will not do
  *

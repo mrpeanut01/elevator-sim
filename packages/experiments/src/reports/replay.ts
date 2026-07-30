@@ -34,6 +34,7 @@ import {
   runSimulation,
   summarizeRun,
   type DispatcherProfile,
+  type DispatcherProfiles,
   type ElevatorSpecs,
   type LoadedConfig,
   type ResolvedBuilding,
@@ -69,6 +70,17 @@ export interface ReplaySources {
    * divergence the day the reference data changes.
    */
   readonly elevatorSpecs?: ElevatorSpecs | undefined;
+  /**
+   * The whole of `data/dispatcher-profiles.json`, for its file-level `patternSwitching` block.
+   *
+   * Required to replay a run whose profile opted into `selection.policy`: the weight-set library
+   * is **derived from data** rather than stored, exactly as the profile itself is, so a replay
+   * that omits this reconstructs a dispatcher with no arms and `resolveWeightSets` refuses it by
+   * name. That refusal is the design — a replay that quietly ran the profile's own weights instead
+   * would succeed and mean nothing, which is the argument {@link ReplaySources.elevatorSpecs}
+   * makes about `LOAD_SENSOR_DEFAULTS`.
+   */
+  readonly dispatcherProfiles?: DispatcherProfiles | undefined;
 }
 
 /** Adapt a `LoadedConfig` from `loadConfig()` into {@link ReplaySources}. */
@@ -78,6 +90,7 @@ export function replaySourcesFrom(config: LoadedConfig): ReplaySources {
     dispatcherProfilesById: config.dispatcherProfilesById,
     trafficProfiles: config.trafficProfiles,
     elevatorSpecs: config.elevatorSpecs,
+    dispatcherProfiles: config.dispatcherProfiles,
   });
 }
 
@@ -140,6 +153,12 @@ export function replaySimulationConfig(
     ...(config.usesElevatorSpecs === true && sources.elevatorSpecs !== undefined
       ? { elevatorSpecs: sources.elevatorSpecs }
       : {}),
+    // Unconditional, and not gated on a stored flag, because the library is *derived* from this
+    // file rather than stored beside the run: passing it reconstructs what the original run
+    // derived, and under `selection.policy: 'off'` — every shipped profile — nothing reads it.
+    ...(sources.dispatcherProfiles === undefined
+      ? {}
+      : { dispatcherProfiles: sources.dispatcherProfiles }),
     seed: BigInt(config.seed),
     demandTemplate: config.demandTemplate,
     ...(config.durationS === undefined ? {} : { durationS: config.durationS }),

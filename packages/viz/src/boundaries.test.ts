@@ -17,6 +17,13 @@
  *    under Node, which is why the whole package is testable without a browser.
  * 4. **No `node:` import outside the dev entry point and the test helpers.** The contract, the
  *    frame producer, playback and the renderer must all be loadable in a browser bundle.
+ * 5. **A workspace package with a `browser` export condition is reached through its `./browser`
+ *    subpath, never by its bare name.** TypeScript's `NodeNext` resolution does not apply the
+ *    `browser` condition, so a bare specifier typechecks against the *Node* surface while the
+ *    bundler hands the browser one — the types and the bundle disagree, and the disagreement is
+ *    silent until something calls a name that is not there. `core` has had this rule since its
+ *    split; `experiments` gained the condition in DECISIONS.md § D121, which recorded *"nothing
+ *    mechanically forces a `viz` file to pick it"* as the open item. This file is that mechanism.
  */
 
 import { readFile, readdir } from 'node:fs/promises';
@@ -190,6 +197,36 @@ async function vizSources(): Promise<readonly SourceFile[]> {
 /** The DOM globals a browser-free module must not name. */
 const DOM_PATTERN = /\b(?:document|window|requestAnimationFrame|HTMLCanvasElement)\b/;
 
+/**
+ * Member names removed, so the rule is about **globals** rather than about spelling.
+ *
+ * The third narrowing this file has needed, and the same argument as {@link stripComments} and
+ * {@link stripStringLiterals}: a rule about code must not fire on something that is provably not
+ * code of the kind it forbids. `foo.window` is a property of `foo`. It cannot be the DOM's
+ * `window` under any binding, because the global is reached by a *bare* reference — so matching it
+ * is a false positive by construction, not a judgement call about how likely a collision is.
+ *
+ * It bit on a real field. `core`'s `RunSummary.window` is the {@link ReportWindow} every cohort
+ * statistic is computed over, and `docs/10-experience-layer-contract.md` § 7.4 makes carrying it
+ * into the recording a prerequisite for the whole of U5 — *"riders waited 25 seconds on average"*
+ * is false without *"during the busiest 5 minutes"*. `record/recordRun.ts` has to read
+ * `summary.window` to copy it, and no rename in this package can change what `core` calls its own
+ * field.
+ *
+ * **What is deliberately still caught**, and why the narrowing does not hollow the rule out:
+ *
+ * - `document.getElementById(…)` — the receiver is a bare reference, not a member.
+ * - `const x = document;` and `foo(document)` — the finding this rule actually produced was a
+ *   parameter named `document` shadowing the global, passed as a value. Bare, so still caught.
+ * - `window.matchMedia(…)`, `requestAnimationFrame(…)` — bare.
+ *
+ * Only `x.window`, `x.document` and friends are exempted, and the positive control below is what
+ * proves the narrowing did not silence the two files that genuinely touch the DOM.
+ */
+function stripMemberNames(text: string): string {
+  return text.replace(/\.\s*[A-Za-z_$][\w$]*/g, '.');
+}
+
 /** Files whose job is to touch the outside world. */
 const isTest = (id: string): boolean => id.endsWith('.test.ts') || id.endsWith('.test-helper.ts');
 const isDev = (id: string): boolean => id.startsWith('dev/');
@@ -237,9 +274,26 @@ describe('the DOM is confined to the dev entry point', () => {
   it('is not touched by the contract, the frame producer, playback, the renderer or the editor', async () => {
     const offenders = (await vizSources())
       .filter((file) => !isDev(file.id) && !isTest(file.id))
-      .filter((file) => DOM_PATTERN.test(file.identifiers))
+      .filter((file) => DOM_PATTERN.test(stripMemberNames(file.identifiers)))
       .map((file) => file.id);
     expect(offenders).toEqual([]);
+  });
+
+  it('negative control: a bare global is caught, and a property of that name is not', () => {
+    // The narrowing, stated as a test rather than as a comment. The first four are the shapes
+    // `dev/main.ts` uses; the last two are the shapes `record/recordRun.ts` and
+    // `contract/types.ts` need in order to carry `RunSummary.window` into the recording.
+    for (const caught of [
+      'document.getElementById(id)',
+      'const node = document;',
+      'window.matchMedia(query)',
+      'requestAnimationFrame(tick)',
+    ]) {
+      expect(DOM_PATTERN.test(stripMemberNames(caught)), caught).toBe(true);
+    }
+    for (const allowed of ['summary.window.startS', 'result.summary.window', 'a.document.b']) {
+      expect(DOM_PATTERN.test(stripMemberNames(allowed)), allowed).toBe(false);
+    }
   });
 
   it('positive control: the rule still catches the entry point that does touch the DOM', async () => {
@@ -250,9 +304,12 @@ describe('the DOM is confined to the dev entry point', () => {
     for (const id of ['dev/main.ts', 'dev/editor.ts']) {
       const file = sources.find((candidate) => candidate.id === id);
       expect(file, `${id} is missing`).toBeDefined();
-      expect(DOM_PATTERN.test(file?.identifiers ?? ''), `${id} should trip the DOM rule`).toBe(
-        true,
-      );
+      // Through the *same* narrowing the rule above applies. Testing the un-narrowed form here
+      // would leave the positive control passing for a reason the real rule no longer uses.
+      expect(
+        DOM_PATTERN.test(stripMemberNames(file?.identifiers ?? '')),
+        `${id} should trip the DOM rule`,
+      ).toBe(true);
     }
   });
 
@@ -303,12 +360,67 @@ describe('the browser-facing modules import no node builtins', () => {
     expect(/from\s+['"]@elevator-sim\/core['"]/.test(subpath)).toBe(false);
   });
 
-  it('does not reach into another workspace package’s source', async () => {
-    // `viz` depends on `core` and on nothing else in the repository. A deep import of `cli` or
-    // `experiments` would make the browser bundle drag in `node:fs`.
+  it('does not reach into `cli` at all', async () => {
+    // `viz` depends on `core` and on `experiments`' browser barrel, and on nothing else in the
+    // repository. `cli` is an executable: importing it from a renderer would drag `node:fs`,
+    // `node:process` and an argument parser into the browser bundle.
     const offenders = (await vizSources())
-      .filter((file) => /@elevator-sim\/(?:cli|experiments)/.test(file.code))
+      .filter((file) => /@elevator-sim\/cli/.test(file.code))
       .map((file) => file.id);
     expect(offenders).toEqual([]);
+  });
+
+  it('reaches experiments only through the browser subpath — never the bare specifier', async () => {
+    // **The rule that closes DECISIONS.md § D121's stated open item**, and it is the same rule two
+    // tests above, pointed at the second package that grew a `browser` export condition.
+    //
+    // § D121: *"TypeScript does not apply the `browser` export condition, so a browser-only file
+    // importing `@elevator-sim/experiments` typechecks against the **Node** types. The mitigation
+    // is the explicit `./browser` subpath, and nothing mechanically forces a `viz` file to pick
+    // it. In `core` that gap was one function; here it is hundreds of names."* This is the thing
+    // that forces it.
+    //
+    // Two differences from the `core` rule above, both deliberate:
+    //
+    // 1. **Tests are not exempt.** `core`'s rule exempts them because `viz`'s tests and its dev
+    //    data loader legitimately call `loadConfig`, which is exactly what the Node barrel is
+    //    for. Nothing in this package has a legitimate use for `experiments`' Node surface — the
+    //    runner's worker pool, NDJSON persistence and the acceptance harness are not viewer
+    //    concerns — so a bare import is an offence in every file, and a test that reached for one
+    //    would be the first place the gap re-opened.
+    // 2. **The offence is the specifier, not the package.** `@elevator-sim/experiments/browser`
+    //    is required and correct; `@elevator-sim/experiments` is not. A rule that banned the
+    //    package outright (which is what this test said before W4) cannot express that.
+    const offenders = (await vizSources())
+      .filter((file) => /from\s+['"]@elevator-sim\/experiments['"]/.test(file.code))
+      .map((file) => file.id);
+    expect(offenders).toEqual([]);
+  });
+
+  it('positive control: the experiments rule catches a bare specifier and passes the subpath', () => {
+    // Without this, the rule above could pass because its pattern matched nothing — the silent
+    // mode § D121 watched a resolver degrade into.
+    //
+    // The two specifiers are **assembled** rather than written out, and that is not style: the
+    // rule above reads comment-stripped source and does *not* strip string contents, and it does
+    // not exempt tests, so spelling either specifier as a literal here would make this file its
+    // own first offender. Watched happening, on the first run of this rule.
+    const bare = `import { collectSearchSpace } from '@elevator-sim/${'experiments'}';`;
+    const subpath = `import { collectSearchSpace } from '@elevator-sim/${'experiments'}/browser';`;
+    const pattern = /from\s+['"]@elevator-sim\/experiments['"]/;
+    expect(pattern.test(bare)).toBe(true);
+    expect(pattern.test(subpath)).toBe(false);
+  });
+
+  it('positive control: something in this package really does import the browser subpath', async () => {
+    // The rule above is satisfied vacuously by a package that imports `experiments` nowhere, and
+    // that was this package's state until W4. Asserting a real import keeps the rule attached to
+    // a real consumer: if `src/controls/` ever stops importing the barrel, this goes red and the
+    // claim in DECISIONS.md that W4 is `browser.ts`'s non-test caller stops being true silently.
+    const users = (await vizSources())
+      .filter((file) => /from\s+['"]@elevator-sim\/experiments\/browser['"]/.test(file.code))
+      .filter((file) => !isTest(file.id))
+      .map((file) => file.id);
+    expect(users.length).toBeGreaterThan(0);
   });
 });

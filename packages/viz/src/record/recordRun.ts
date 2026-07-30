@@ -31,12 +31,14 @@
 
 import {
   Simulation,
+  resolveDemandTemplate,
   type Car,
   type CarMotion,
   type Direction,
   type PassengerRecord,
   type ResolvedBuilding,
   type ResolvedCar,
+  type ResolvedDemandTemplate,
   type SimTime,
   type SimulationConfig,
   type SimulationResult,
@@ -49,11 +51,14 @@ import {
   type VizFloor,
   type VizLanding,
   type VizLeg,
+  type VizDecision,
+  type VizPhase,
   type VizProgress,
   type VizRecording,
   type VizShaft,
   type VizSummary,
 } from '../contract/types.js';
+import { DecisionCollector, recordingPolicyFactory } from './decisionLog.js';
 import { instrumentCar, shortCarLabel, type CarTrack } from './instrument.js';
 
 /** A recording plus the result it came from, for a caller that wants both. */
@@ -79,14 +84,57 @@ interface CarStart {
 }
 
 /**
+ * What the caller may ask of a recording beyond the run itself.
+ *
+ * Both fields describe the *recording*, not the simulation — except {@link outOfServiceCarIds},
+ * which describes both, and says so.
+ */
+export interface RecordRunOptions {
+  /**
+   * Capture the dispatch decisions. Default `true`.
+   *
+   * Turned off by the replication batch, where fifty runs' worth of decisions would be carried
+   * to a report that shows none of them. It is a recording-size switch and nothing else: an
+   * instrumented run and an uninstrumented one produce equal `RunRecord`s, which
+   * `decisionLog.test.ts` asserts rather than assumes.
+   *
+   * Ignored — and a `config.createPolicy` the caller supplied is left alone — when the caller has
+   * already claimed the hook. Two wrappers on one policy is a silently different run.
+   */
+  readonly recordDecisions?: boolean | undefined;
+  /**
+   * Runtime car ids to hold **out of service** for the whole run.
+   *
+   * Set through `Car.setMode` before `run()`, so `estimateCost` refuses the car with
+   * `infeasibleReason: 'serviceMode'` and the group dispatches around it with no new branch
+   * anywhere. This is the handoff's *click the badge under a shaft* (§ 1.5 B7) reaching the
+   * simulator: a car a reader takes out of service is genuinely out of service, and the day's
+   * figures are the figures of a group one car short.
+   *
+   * An id that matches no car is an error rather than a no-op — a typo that silently ran the full
+   * group would be reported as the reduced one.
+   */
+  readonly outOfServiceCarIds?: readonly string[] | undefined;
+}
+
+/**
  * Simulate `config` and describe the result for a screen.
  *
  * Throws whatever `Simulation.run()` throws — a `SimulationError` for a run whose conservation
  * audit failed or whose drain deadline fired. A viewer must surface that as a failure state
  * rather than draw a partial building; see `UX.md`, run viewer, error states.
  */
-export function recordRun(config: SimulationConfig): RecordedRun {
-  const simulation = new Simulation(config);
+export function recordRun(config: SimulationConfig, options: RecordRunOptions = {}): RecordedRun {
+  const wanted = options.recordDecisions ?? true;
+  const collector = new DecisionCollector();
+  // Only when the caller has not already claimed the hook. See {@link RecordRunOptions}.
+  const instrumented = wanted && config.createPolicy === undefined;
+  const effective: SimulationConfig = instrumented
+    ? { ...config, createPolicy: recordingPolicyFactory(collector) }
+    : config;
+
+  const simulation = new Simulation(effective);
+  const outOfService = applyOutOfService(simulation, options.outOfServiceCarIds ?? []);
   const tracks = new Map<string, CarTrack>();
   const starts = new Map<string, CarStart>();
   for (const car of simulation.building.cars) {
@@ -96,14 +144,166 @@ export function recordRun(config: SimulationConfig): RecordedRun {
   }
   const result = simulation.run();
   return {
-    recording: describeRun(config.building, simulation.building.cars, tracks, starts, result),
+    recording: describeRun(config.building, simulation.building.cars, tracks, starts, result, {
+      decisions: instrumented ? collector.build() : [],
+      phases: describePhases(config, result),
+      outOfServiceCarIds: outOfService,
+    }),
     result,
   };
+}
+
+/**
+ * Put the named cars out of service, before the run.
+ *
+ * Returns the ids actually set, sorted, so the recording carries what happened rather than what
+ * was asked for. Throws on an id that names no car: see {@link RecordRunOptions}.
+ */
+function applyOutOfService(simulation: Simulation, ids: readonly string[]): readonly string[] {
+  if (ids.length === 0) return [];
+  const byId = new Map(simulation.building.cars.map((car) => [car.id, car]));
+  const applied: string[] = [];
+  for (const id of ids) {
+    const car = byId.get(id);
+    if (car === undefined) {
+      throw new Error(
+        `recordRun: "${id}" was asked to be out of service, but this building has no such car. ` +
+          `Known cars: ${[...byId.keys()].join(', ')}. A run that quietly ignored the request ` +
+          'would report the full group’s figures as the reduced group’s.',
+      );
+    }
+    car.setMode('out-of-service');
+    applied.push(id);
+  }
+  applied.sort((a, b) => a.localeCompare(b));
+  return applied;
+}
+
+/**
+ * The run's demand schedule, as the transport timeline needs it.
+ *
+ * Resolved through `core`'s own `resolveDemandTemplate` from the same `demandTemplate` field the
+ * run was configured with, so these are the segments the generator drew from. A template that
+ * cannot be resolved yields an **empty** list rather than an invented one — the timeline draws a
+ * single unlabelled band and says nothing it cannot support. See {@link VizPhase}.
+ */
+function describePhases(config: SimulationConfig, result: SimulationResult): readonly VizPhase[] {
+  let template: ResolvedDemandTemplate;
+  try {
+    template = resolveDemandTemplate(
+      config.demandTemplate ?? 'rise-and-fall',
+      config.trafficProfiles.demandTemplates,
+    );
+  } catch {
+    return [];
+  }
+  const scale = scaleOf(config.durationS, template.durationS);
+  const population = result.record.population;
+  const nominal = nominalRateOf(config, result);
+  return template.phases.map((phase, index): VizPhase => {
+    const startS = phase.startS * scale;
+    const endS = phase.endS * scale;
+    const mid = (phase.startIntensity + phase.endIntensity) / 2;
+    const kind = kindOf(phase.startIntensity, phase.endIntensity);
+    return {
+      id: `${String(index)}-${kind}`,
+      kind,
+      label: labelOfPhase(kind, phase.startIntensity, phase.endIntensity),
+      startS,
+      endS,
+      startIntensity: phase.startIntensity,
+      endIntensity: phase.endIntensity,
+      // Absent, not zero, when the run's record carries no population: see {@link VizPhase}.
+      ratePctPop5min: nominal === null || population === undefined ? null : nominal * mid,
+      inReportWindow:
+        endS > result.reportWindow.startS && startS < result.reportWindow.endS,
+    };
+  });
+}
+
+/**
+ * A template resolved at its own duration, stretched onto the run's.
+ *
+ * `SimulationConfig.durationS` overrides the template's own horizon, and the generator scales the
+ * phase knots with it. Doing the same here rather than drawing the template's unscaled seconds is
+ * what stops a 1 800 s run from being labelled with a 1 800 s timeline whose peak sits at the
+ * 30-minute template's 600 s mark.
+ */
+function scaleOf(durationS: number | undefined, templateDurationS: number): number {
+  if (durationS === undefined || templateDurationS <= 0) return 1;
+  return durationS / templateDurationS;
+}
+
+/**
+ * Peak demand in percent of population per five minutes, or `null` when the run cannot say.
+ *
+ * Read off the *offered* demand the run actually recorded rather than off the profile, so a
+ * `demand.arrivalRatePctPop5min` override — which is how the compare surface sweeps to saturation
+ * — is reflected instead of contradicted.
+ */
+function nominalRateOf(config: SimulationConfig, result: SimulationResult): number | null {
+  const override = config.demand?.arrivalRatePctPop5min;
+  if (override !== undefined && Number.isFinite(override)) return override;
+  const offered = result.summary.handlingCapacity.offeredPer5Min;
+  const population = result.record.population;
+  if (population === undefined || population <= 0 || !Number.isFinite(offered)) return null;
+  // `offeredPer5Min` is averaged over the whole run, so dividing by the template's mean intensity
+  // recovers the peak rate the phases are fractions of.
+  const meanIntensity = meanIntensityOf(config, result);
+  if (meanIntensity <= 0) return null;
+  return ((offered / population) * 100) / meanIntensity;
+}
+
+function meanIntensityOf(config: SimulationConfig, result: SimulationResult): number {
+  try {
+    const template = resolveDemandTemplate(
+      config.demandTemplate ?? 'rise-and-fall',
+      config.trafficProfiles.demandTemplates,
+    );
+    if (template.durationS <= 0) return 1;
+    return template.intensityIntegralS / template.durationS;
+  } catch {
+    void result;
+    return 1;
+  }
+}
+
+function kindOf(start: number, end: number): VizPhase['kind'] {
+  if (end > start) return 'ramp-up';
+  if (end < start) return 'ramp-down';
+  return start >= 1 ? 'hold' : 'flat';
+}
+
+/**
+ * A phrase short enough to survive a narrow segment, and true at both ends.
+ *
+ * `PEAK` is reserved for a segment that actually holds the template's peak intensity — a
+ * `constant-iso` run holds at 1.0 for two hours and is `STEADY`, not a two-hour peak, because
+ * calling it one would tell a reader the building is under a rush it is not under.
+ */
+function labelOfPhase(kind: VizPhase['kind'], start: number, end: number): string {
+  switch (kind) {
+    case 'ramp-up':
+      return 'FILLING';
+    case 'ramp-down':
+      return 'EASING';
+    case 'hold':
+      return 'PEAK';
+    default:
+      return start === 0 && end === 0 ? 'QUIET' : 'STEADY';
+  }
 }
 
 /* -------------------------------------------------------------------------- *
  * The fold
  * -------------------------------------------------------------------------- */
+
+/** The version-7 facts the fold cannot derive, gathered by {@link recordRun} around the run. */
+interface RecordedExtras {
+  readonly decisions: readonly VizDecision[];
+  readonly phases: readonly VizPhase[];
+  readonly outOfServiceCarIds: readonly string[];
+}
 
 function describeRun(
   building: ResolvedBuilding,
@@ -111,6 +311,7 @@ function describeRun(
   tracks: ReadonlyMap<string, CarTrack>,
   starts: ReadonlyMap<string, CarStart>,
   result: SimulationResult,
+  extras: RecordedExtras,
 ): VizRecording {
   const specs = resolveSpecs(building);
   const loads = loadSeries(result);
@@ -165,6 +366,9 @@ function describeRun(
     legs,
     progress,
     summary: describeSummary(result),
+    demandPhases: extras.phases,
+    decisions: extras.decisions,
+    outOfServiceCarIds: extras.outOfServiceCarIds,
     warnings: result.warnings,
   };
 }
@@ -246,18 +450,92 @@ function describeFloor(floor: ResolvedBuilding['floors'][number]): VizFloor {
   };
 }
 
+/**
+ * `NaN` in, `null` out — the one place the contract's absence convention is applied.
+ *
+ * `core` says *"not measured"* with `NaN` so an absent measurement cannot arrive disguised as a
+ * zero. A recording says it with `null` so the same fact survives `JSON.stringify`, which turns
+ * `NaN` into `null` anyway and would otherwise leave a **loaded** recording holding a `null` that
+ * the type says is a `number`. See the {@link VizSummary} block comment in `contract/types.ts`.
+ *
+ * `Infinity` is caught by the same guard for the same reason — `JSON.stringify(Infinity)` is also
+ * `null` — rather than left to arrive as a number no `toFixed` should be called on.
+ */
+function finiteOrNull(value: number): number | null {
+  return Number.isFinite(value) ? value : null;
+}
+
 function describeSummary(result: SimulationResult): VizSummary {
   const { summary, conservation } = result;
+  const { waiting, handlingCapacity, achievedInterval, serviceLevel, energy } = summary;
   return {
     saturated: summary.saturation.saturated,
     awtIsValid: summary.awtIsValid,
     awtInvalidReason: summary.awtInvalidReason,
-    meanWaitS: summary.waiting.meanS,
-    wait95S: summary.waiting.p95S,
+    /*
+     * Version 8, and copied on the line under the prose it belongs to rather than filed with the
+     * version-5 block below, because the two halves of one refusal are one datum. `core` emits both
+     * or neither — `metrics/summarize.ts` spreads the pair out of a single `AwtInvalidity` — so
+     * copying them adjacently and unconditionally is what keeps *"present exactly when the reason
+     * is"* true here without this file re-deciding anything. It is never re-derived from
+     * `saturated`/`waitCount`/`unservedCount`, which is the whole reason `core` publishes it.
+     */
+    awtInvalidGround: summary.awtInvalidGround,
+    meanWaitS: waiting.meanS,
+    wait95S: waiting.p95S,
     meanTimeToDestinationS: summary.timeToDestination.meanS,
     generated: conservation.generated,
     delivered: conservation.delivered,
     undelivered: conservation.undelivered,
+
+    // Version 5. Every field here is copied from the summary `core` already produced — never
+    // recomputed from the recording's own arrays, which would be a second source of truth about
+    // a question the metrics module has answered, on a different window.
+    reportWindow: {
+      id: summary.window.id,
+      startS: summary.window.startS,
+      endS: summary.window.endS,
+    },
+    windowSeconds: summary.windowSeconds,
+    waitCount: waiting.count,
+    timeToDestinationCount: summary.timeToDestination.count,
+    pctOverLongWait: finiteOrNull(waiting.pctOverLongWait),
+    longWaitThresholdS: waiting.longWaitThresholdS,
+    unservedCount: waiting.unservedCount,
+    handlingCapacity: {
+      personsPer5Min: handlingCapacity.personsPer5Min,
+      offeredPer5Min: handlingCapacity.offeredPer5Min,
+      // Absent, not zero: a building whose record carries no population has no `%POP`, and a
+      // `0 %` there would read as "nobody moved".
+      pctPopulationPer5Min:
+        handlingCapacity.pctPopulationPer5Min === undefined
+          ? null
+          : finiteOrNull(handlingCapacity.pctPopulationPer5Min),
+    },
+    achievedInterval: {
+      meanS: finiteOrNull(achievedInterval.meanS),
+      coefficientOfVariation: finiteOrNull(achievedInterval.coefficientOfVariation),
+      count: achievedInterval.count,
+    },
+    serviceLevel: {
+      verdict: serviceLevel.verdict,
+      longestWaitS: finiteOrNull(serviceLevel.longestWaitS),
+      longestWaitIsCensored: serviceLevel.longestWaitIsCensored,
+      overHorizonCount: serviceLevel.overHorizonCount,
+      arrivalCount: serviceLevel.arrivalCount,
+      horizonS: serviceLevel.horizonS,
+    },
+    energy: {
+      measured: energy.measured,
+      workKJ: finiteOrNull(energy.workKJ),
+      workPerServedLegKJ: finiteOrNull(energy.workPerServedLegKJ),
+      // The denominator of `workPerServedLegKJ`, which `EnergyStatistics` divides by and does not
+      // publish. `summarize.ts` passes `counts.alighted` as its `servedLegCount`, so this is that
+      // same number rather than a second reading of it.
+      deliveredLegCount: summary.counts.alighted,
+      distanceM: finiteOrNull(energy.distanceM),
+      starts: finiteOrNull(energy.starts),
+    },
   };
 }
 
@@ -306,12 +584,13 @@ function loadSeries(result: SimulationResult): ReadonlyMap<string, CarLoadSeries
 /**
  * The per-leg projection the fold cannot give back.
  *
- * Nine fields of `PassengerRecord`, not fifteen: see {@link VizLeg} for what is left out and
+ * Ten fields of `PassengerRecord`, not fifteen: see {@link VizLeg} for what is left out and
  * why. Sorted by `(arrivedAt, passengerId)` so the array's order is total and reproducible —
  * `result.record.passengers` is in generation order, which is deterministic but is not an order
  * anything downstream may binary-search or compare against.
  *
- * `boardedAt`, `carId`, `bankId` and `assignedCarId` are written as *absent* rather than as
+ * `boardedAt`, `carId`, `bankId`, `assignedCarId` and `credentialGroup` are written as *absent*
+ * rather than as
  * `undefined` values when the record has none, because a recording round-trips through JSON in
  * the replay harness and `JSON.stringify` drops `undefined` — a recording that carried explicit
  * `undefined`s would not equal itself after the trip. `recordRun.test.ts` § *survives a JSON
@@ -329,9 +608,11 @@ function describeLegs(passengers: readonly PassengerRecord[]): readonly VizLeg[]
       arrivedAt: passenger.arrivedAt,
     };
     if (passenger.boardedAt !== undefined) leg.boardedAt = passenger.boardedAt;
+    if (passenger.alightedAt !== undefined) leg.alightedAt = passenger.alightedAt;
     if (passenger.carId !== undefined) leg.carId = passenger.carId;
     if (passenger.bankId !== undefined) leg.bankId = passenger.bankId;
     if (passenger.assignedCarId !== undefined) leg.assignedCarId = passenger.assignedCarId;
+    if (passenger.credentialGroup !== undefined) leg.credentialGroup = passenger.credentialGroup;
     return leg;
   });
   legs.sort((a, b) => a.arrivedAt - b.arrivedAt || a.passengerId.localeCompare(b.passengerId));
@@ -403,7 +684,7 @@ function foldPassengers(passengers: readonly PassengerRecord[]): FoldedPassenger
   let waitSum = 0;
 
   for (const event of events) {
-    const key = `${event.floorId} ${event.direction}`;
+    const key = `${event.floorId}\u0000${event.direction}`;
     let builder = landingBuilders.get(key);
     if (builder === undefined) {
       builder = new StepSeriesBuilder(0);

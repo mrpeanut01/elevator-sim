@@ -101,6 +101,7 @@
 
 export {
   DEFAULT_CONFIDENCE,
+  PUBLISHED_INTERVAL_FAMILY,
   estimateMean,
   meanOf,
   normalQuantile,
@@ -110,7 +111,7 @@ export {
   studentTQuantile,
 } from './reports/statistics.js';
 
-export type { EstimateOptions } from './reports/statistics.js';
+export type { EstimateOptions, PublishedMeanEstimate } from './reports/statistics.js';
 
 /* -------------------------------------------------------------------------- *
  * runner/ — N replications of a (building, dispatcher, traffic) configuration:
@@ -451,7 +452,13 @@ export {
   LIVENESS_SEED,
   LIVENESS_STRATEGIES,
   atStrategy,
+  DETECTOR_INPUTS,
+  LUNCH_TWO_WAY_BUILDING,
+  LUNCH_TWO_WAY_SEED,
+  MIX_TIME_BINS,
+  formatLunchTwoWayMix,
   measureEnergyLiveness,
+  measureLunchTwoWayMix,
   strategyArmId,
   formatLivenessSuite,
   runLivenessSuite,
@@ -476,6 +483,8 @@ export {
   GARDEN_RESIDENTIAL_2PCT,
   MIDTOWN_DOWN_PEAK_1PCT,
   MIDTOWN_INTERFLOOR_MIX,
+  MIDTOWN_LUNCH_FLAT_CONTROL,
+  MIDTOWN_LUNCH_TWO_WAY,
   MIDTOWN_UP_PEAK_1PCT,
   NEGATIVE_CONTROLS,
   RIDE_TIME_WEIGHTS,
@@ -518,6 +527,10 @@ export type {
   EnergyArmMeasurement,
   EnergyLivenessOptions,
   EnergyLivenessStudy,
+  DetectorInput,
+  LunchTwoWayMixOptions,
+  LunchTwoWayMixStudy,
+  MixHomogeneity,
   LivenessSuiteOptions,
   LivenessSuiteResult,
   ExcludedCell,

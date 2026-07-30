@@ -1,5 +1,42 @@
 # Test matrix
 
+> ## ↩️ Wave 11 — coverage added, and the two shapes it found that a matrix row cannot express
+>
+> Wave 11's coverage is in [`WAVE11_PLAN.md`](WAVE11_PLAN.md) § 4 lane by lane. Two findings belong
+> *here* rather than there, because both are about what a coverage table can and cannot claim.
+>
+> **1. A fixture-only row is not a covered row.** Every assertion in `mode/disclosure.test.ts` handed a
+> suppression ground in directly, so the whole block was green for a commit while the shipped screen
+> rendered something else ([§ D185](DECISIONS.md)). A row reading *"Basic shortens a suppression
+> reason — ✅ tested"* would have been **true about the test and false about the product**. This file's
+> own opening rule — *a component test does not close a row* — has a second half it did not state:
+> **a row is closed by a case that originates in a real run**, because a fixture proves the mechanism
+> is correct and cannot prove it is reached.
+>
+> **2. A row can go stale while every sentence it supports stays true.** `docs/05`'s Pareto-front
+> table published three arms where the tree computes six, for four days, and nothing caught it —
+> because `nearest-car`'s 6-of-8 count, which is what § D106 and the refusal of an eco score actually
+> rest on, never moved ([§ D184](DECISIONS.md)). That is [§ D149](DECISIONS.md)'s rule arriving at a
+> table instead of a figure: **a stale number that still supports its own sentence is the only kind
+> nobody re-checks.** The fix was not a row; it was a guard that re-derives the table from the run the
+> suite already pays for.
+>
+> Wave 10's rule below is unchanged and carried every wave-11 control that shipped.
+
+> ## ↩️ Wave 10 — the design handoff. This matrix stays retired in place; wave 10's coverage is in [`WAVE10_PLAN.md`](WAVE10_PLAN.md) § 5.
+>
+> Wave 10's own standing rule is this file's, one level down. This file says *a component test does
+> not close a row, because this project's dominant defect class passes every component test it has*.
+> Wave 10 applies that to the four editors the handoff adds: **every control has a test that moves it
+> and requires the resulting run to differ**, compared on the legs — who was carried by which car and
+> when — and never on a window statistic, because a summary over the peak five minutes can
+> legitimately be equal for two visibly different runs.
+>
+> It found three defects that way ([§ D177](DECISIONS.md)): a dwell control writing a field that does
+> nothing under the default door policy, a default lever silently rewriting a shipped dispatcher, and
+> a *load sensor off* value the model layer rejects. None of the three would have failed a component
+> test of the control.
+
 > ## ↩️ The delivery reopened 2026-07-28 as **wave 5**, and this matrix stays retired in place.
 >
 > Two of the three items it left carried forward are wave-5 scope and are being worked now: the
@@ -108,28 +145,80 @@ Legend: ⬜ not started · 🟡 in progress · ✅ passing · ❌ failing · ⚪
 | `experiments/src/validation/documentation.test.ts` | phase-set agreement across three documents, `docs/07` against itself, README's doc table, the roadmap's entry points, **and the refuted mechanism at all seven sites** | ✅ |
 | `experiments/src/benchmark/saturationCensus.test.ts` | an operating point excluded by its **ceiling** reported as if excluded by its **answer** | ✅ |
 
-## 3. Phase 4 — UI scenarios
+## 3. UI scenarios — the live ledger is the shift viewer's, and it is not green
 
-The inventory is `packages/viz/UX.md`; its per-scenario ledger is § 7.0 there. **87 rows**, with
-differentiated states rather than a blanket tick:
+> **The Phase 4 board that stood here is retired, not deleted.** It counted 87 rows against the
+> **five-tab instrument panel** — Run viewer, Building editor, Parameters, Compare, Campaign — that
+> wave 10 replaced with the three-column shift surface. Those rows and their marks are kept
+> verbatim at `packages/viz/UX.md` §§ 1–7, at their original section numbers, because seventy-odd
+> source files and a dozen documents cite them; the old board is reproduced at the bottom of this
+> section for the record. **Nothing below claims a mark that ledger does not carry.**
 
-| State | Rows | Ids |
+**The inventory is [`packages/viz/UX.md`](packages/viz/UX.md); its live per-surface ledger is
+§§ 9–24 there and its count is § 25.** Sixteen surfaces, **219 rows**, ids `SH- LR- CO- SG- TP-
+DR- SC- RR- DE- TE- ME- BE- IS- MD- KX- RX-`.
+
+| State | Rows | Where they are |
 |---|---|---|
-| ✅ **wave 1** | 32 | `RV-01 04 05 10 12 13 15 16 19` · `PB-01 02 03 04 05 06 10 11 12 13 14` · `ED-11` · `KB-02 03 04 05 08 09 10 15` · `RS-01 06 07` |
-| ✅ **run** — driven in a browser against the shipped `data/` | 34 | `RV-02 03 06 07 09 20` · `PB-07 08 15 16 17 18` · `ED-01 02 04 05 06 10 18 19 20 21 22` · `KB-01 06 07 11 12 13 15a` · `RS-02 03 05 08` |
-| ✅ **test** — asserted, and the assertion proved to bite | 12 | `RV-08 14` · `ED-03 07 08 09 14 15 16 17` · `KB-15b` · `RS-04` |
-| ✅ + ⚠️ — one clause each way | 2 | `RV-18` (editor half run, viewer half unverified) · `ED-23` (in-app half run, `beforeunload` unverified) |
-| ⚠️ **unverified** — built and reachable, neither driven nor tested | 4 | `RV-11` `RV-17` `RV-21` `KB-14` |
-| 🔲 **re-marked** — the row contradicts the schema, stated rather than papered over (**C30**) | 2 | `ED-12` `ED-13` |
-| 🔲 **not built** | 1 | `PB-09` (window selection then loop) |
+| ✅ **run** — driven in a browser | **0** | — the pass that wrote the ledger held no browser, and it carried no `✅ run` across from the retired board |
+| ✅ **test** — the whole row asserted, and the assertion located and read | **117** | `BE` 21 · `LR` 20 · `SG` 10 · `DR` 10 · `DE` 9 · `TE` 7 · `SC` 6 · `RR` 6 · `IS` 6 · `MD` 6 · `ME` 5 · `SH` 4 · `KX` 3 · `TP` 2 · `RX` 2 · `CO` 0 |
+| ✅ **test** + ⚠️ — one clause each way | **40** | `SH` 11 · `TP` 8 · `SG` 5 · `CO` 3 · `RR` 3 · `RX` 3 · `DR` 2 · `SC` 2 · `KX` 2 · `LR` 1 |
+| ⚠️ **unverified** — built and reachable, neither driven nor covered | **55** | `KX` 10 · `TP` 7 · `CO` 5 · `RX` 5 · `DR` 4 · `MD` 4 · `SH` 3 · `BE` 3 · `IS` 3 · `SG` 2 · `RR` 2 · `DE` 2 · `ME` 2 · `LR` 1 · `SC` 1 · `TE` 1 |
+| 🔲 **not built, inert, or failing its own condition** | **7** | `SH-09` · `SH-12` · `KX-11` · `SG-15` · `TP-13` · `KX-10` · `RX-03` |
 
-The seven ⛔ non-negotiable keyboard rows — `KB-01 02 08 10 11 13 14 15` — are all ✅ except
-`KB-14`, which is built and unverified.
+These five counts are **derived from `UX.md`'s own tables**, not tallied by hand, on the rule *a row
+carrying `🔲` is not built; a row carrying both `✅ test` and `⚠️` is half; a row carrying one is
+that one.* Editing a row's marks makes this table wrong until it is re-derived.
 
-The scenario classes this matrix originally demanded of every UI feature — happy path, alternate
-valid path, invalid input, empty state, loading state, failure and recovery, keyboard and focus,
-responsive behaviour — are what those ids enumerate. Four rows are **unverified rather than
-untested**, and that distinction is the point of publishing the ledger instead of a count.
+**The 40 half rows are the two rules at the top of this file arriving at the same place.** Rule
+one: *a component test does not close a row.* Rule two, from wave 11: *a row is closed by a case
+that originates in a real run, because a fixture proves the mechanism is correct and cannot prove
+it is reached.* Every one of those 40 is a surface whose **decision** is asserted and whose **DOM
+writing or event listener** is not — and that is not an oversight anybody could tidy away:
+`packages/viz/src/honesty/derive.test.ts` excludes the DOM half of **all eight** mounts by name,
+with the reason stated as *"weaker than driving them … a limitation rather than coverage."* A plain
+`✅ test` on those rows would claim exactly what that exclusion refuses to claim.
+
+**Why the ⚠️ column is 59 rows.** `packages/viz/src/dev/main.ts` is 1 394 lines and holds every
+event listener in the viewer. `main.test.ts` exists — it did not when wave 10 landed — but its
+three blocks are entirely about the wait-age legend. Forty-odd `addEventListener` calls,
+`drawHeader`, `drawFooter`, `drawCoach`, `drawStage`, `drawTransportChrome`, `runShift`, `adopt`,
+`closeShift`, `applyDeepLink` and `randomSeed` have no test at all.
+
+**Three of the seven 🔲 rows were found by reading and have not yet been driven** —
+`SG-15` (the bank filter writes a binding the renderer never reads), `SH-09` (no
+`pushState`/`replaceState` survives, so nothing writes the URL back) and `RX-03` (the left rail
+never yields; there is no stacked layout below 768 px). They are stated as findings-from-reading.
+`UX.md` § 26 is the ordered list of what to drive, highest risk first, and those three lead it.
+
+The scenario classes this matrix demands of every UI feature — happy path, alternate valid path,
+invalid input, empty state, loading state, failure and recovery, keyboard and focus, responsive
+behaviour — are what the sixteen surfaces enumerate, one cycle each.
+
+> ### 🏁 Retired — the Phase 4 board, as it stood at wave 9
+>
+> Against `packages/viz/UX.md` §§ 1–7, which are unchanged. **87 rows** on this board; the ledger
+> there reached 90 after `T48`. Kept because the ids are cited from source and because § 4's
+> `ED-01`…`ED-25` describe the **document editor**, which wave 10 kept whole and moved beneath the
+> building editor's elevation — those rows still describe a live surface, and it is the *route* and
+> the `✅ run` marks that are stale (`UX.md` `BE-23`, and § 26 item 20 is the pass that would
+> re-establish them).
+>
+> | State | Rows | Ids |
+> |---|---|---|
+> | ✅ **wave 1** | 32 | `RV-01 04 05 10 12 13 15 16 19` · `PB-01 02 03 04 05 06 10 11 12 13 14` · `ED-11` · `KB-02 03 04 05 08 09 10 15` · `RS-01 06 07` |
+> | ✅ **run** — driven in a browser against the shipped `data/` | 34 | `RV-02 03 06 07 09 20` · `PB-07 08 15 16 17 18` · `ED-01 02 04 05 06 10 18 19 20 21 22` · `KB-01 06 07 11 12 13 15a` · `RS-02 03 05 08` |
+> | ✅ **test** — asserted, and the assertion proved to bite | 12 | `RV-08 14` · `ED-03 07 08 09 14 15 16 17` · `KB-15b` · `RS-04` |
+> | ✅ + ⚠️ — one clause each way | 2 | `RV-18` (editor half run, viewer half unverified) · `ED-23` (in-app half run, `beforeunload` unverified) |
+> | ⚠️ **unverified** — built and reachable, neither driven nor tested | 4 | `RV-11` `RV-17` `RV-21` `KB-14` |
+> | 🔲 **re-marked** — the row contradicts the schema, stated rather than papered over (**C30**) | 2 | `ED-12` `ED-13` |
+> | 🔲 **not built** | 1 | `PB-09` (window selection then loop) |
+>
+> The four ⚠️ rows were closed by `T39` and the seven ⛔ keyboard rows all reached ✅ — against
+> *that* viewer. **Four of this board's rows are now known false of the shipped one**, and each has
+> a successor that says so rather than quietly re-marking the old row: `RV-03`/`RV-T2` → `SH-09`;
+> `RS-05` → `SG-15`; `RS-03` → `RX-03`; `KB-04`/`KB-05` → `KX-10`. `RV-T7` is unchanged and still
+> unmet, carried forward verbatim as `TP-13` and in [`GAPS.md`](GAPS.md).
 
 ## 4. Phase 8 — testing campaign
 

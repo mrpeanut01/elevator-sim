@@ -1,177 +1,221 @@
 /**
- * The viewer: the shipped, non-test caller of everything this package exports.
+ * The shell: the shipped, non-test caller of everything this package exports.
  *
- * The roadmap's standing requirement is that a behaviour must name a caller which is not one of
- * its own tests. This file is that caller for the run viewer and the playback transport, and it
- * mounts `dev/editor.ts`, which is that caller for the building editor. Every module added in
- * wave 2 is reached from here:
+ * The roadmap's standing requirement is that a behaviour must name a caller which is not one of its
+ * own tests. This file is that caller. Every directory added by the design refactor is reached from
+ * here, and the table below is the answer to *"name the non-test caller"* for each of them:
  *
  * | Module | Reached from |
  * |---|---|
- * | `frame/overlay.ts` | {@link tick}, every animation frame, and the landing selector |
- * | `render/overlay.ts` | `drawScene`, via `SceneInput.overlay` |
- * | `render/describeFrame.ts` | the canvas's `aria-label` and the live region |
- * | `record/document.ts` | **Load recording** (`readRecordingDocument`) and **Verify replay** (`verifyReplay`) |
- * | `editor*.ts` | `dev/editor.ts`, mounted below |
- * | `dev/bootstrap.ts` | {@link main}, which is the only thing that loads `data/` — `RV-17`/`RV-21` |
- * | `dev/motion.ts` | `adopt`, which asks it whether a new recording may start moving — `KB-14` |
+ * | `live/bands.ts`, `observations.ts`, `honesty.ts`, `decisions.ts` | `dev/leftRail.ts`, mounted below — and, for `WAIT_BANDS`' four `legendLabel`s, {@link waitLegendEntries} |
+ * | `live/timeline.ts` | {@link drawTransport} and the header clock |
+ * | `shift/contracts.ts`, `week.ts`, `goals.ts`, `events.ts`, `growth.ts` | `dev/state.ts`'s `shiftRunConfigOf`, called by {@link runShift} |
+ * | `shift/report.ts` | {@link closeShift}, and `dev/reportPanel.ts` |
+ * | `authoring/*` | the four editor mounts, and `shiftRunConfigOf` |
+ * | `record/decisionLog.ts` | `recordRun`, called by {@link runShift} |
+ * | `dev/surfaces.ts` | {@link applyNavigation} |
+ * | `frame/overlay.ts` | {@link drawStage} and the landing selector |
+ * | `record/document.ts` | **Load recording** and **Verify replay** |
+ * | `dev/bootstrap.ts` | {@link main}, the only thing that loads `data/` — `RV-17`/`RV-21` |
+ * | `dev/motion.ts` | {@link adopt}, which asks whether a new recording may start moving — `KB-14` |
  *
- * ## Two surfaces, one page
+ * ## Two render paths, and why there are two
  *
- * A tablist rather than two documents, because the editor's whole payoff is `ED-04`: a valid
- * edit goes straight to a run without a reload, keeping the seed and the dispatcher the reader
- * had already chosen.
+ * `renderAll` redraws every panel and runs when the **state** changes — a click, an edit, a new
+ * recording. `renderLive` redraws only what the **playhead** moves: the stage, the transport, the
+ * header clock and the left rail. Sixty times a second.
+ *
+ * One path would be simpler and wrong in one of two ways. Redrawing everything at 60 Hz rebuilds
+ * eleven panels' DOM per frame and churns the accessibility tree; redrawing only on state change
+ * leaves the rail frozen while the building fills up, which is the one thing the rail exists to
+ * show. The split is the cheap correct answer, and `dom.ts`'s writes are all guarded on *changed*,
+ * so a live redraw that finds nothing moved touches nothing.
+ *
+ * ## What this file does not decide
+ *
+ * What a run is. That is `dev/state.ts`'s `shiftRunConfigOf`, for the reason `dev/runConfig.ts`
+ * existed before it: a decision made inside a click handler needs a document, a canvas and a click
+ * to reach, so it cannot be tested and it drifts.
  */
 
-import { SimulationError, type BuildingConfig, type SimulationConfig } from '@elevator-sim/core/browser';
+import { SimulationError, type BuildingConfig } from '@elevator-sim/core/browser';
 
+import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
+import { lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
+import { restrictedFloorIds } from '../access/zoning.js';
 import type { VizRecording } from '../contract/types.js';
 import { frameSequence, serializeFrames } from '../frame/sequence.js';
 import {
   landingAssignmentsAt,
   meansAreSuppressed,
   overlayAt,
+  queueAt,
   type LandingAssignment,
 } from '../frame/overlay.js';
-import { recordRun } from '../record/recordRun.js';
-import { readRecordingDocument, verifyReplay } from '../record/document.js';
-import { Playback } from '../playback/playback.js';
+import { WAIT_BANDS } from '../live/bands.js';
+import { observationsAt } from '../live/observations.js';
+import {
+  clockAt,
+  DAY_START_S,
+  phaseAt,
+  playheadPctOf,
+  tickLabelsOf,
+  timelineOf,
+} from '../live/timeline.js';
 import { systemClock } from '../playback/clock.js';
-import { buildLayout } from '../render/layout.js';
+import { Playback } from '../playback/playback.js';
+import { readRecordingDocument, verifyReplay } from '../record/document.js';
+import { recordRun } from '../record/recordRun.js';
 import {
   drawScene,
-  landingOptionLabel,
   type Canvas2DLike,
+  type CarBadgeHit,
   type SceneSelection,
 } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
-import { mountEditor } from './editor.js';
-import { createLoader } from './bootstrap.js';
-import { shouldAutoplay } from './motion.js';
-import { loadBrowserResources, resolveEdited, type BrowserResources } from './data.js';
+import { buildLayout } from '../render/layout.js';
+import { disclosureItems } from '../mode/disclosure.js';
+import { parityRefusal } from '../mode/parity.js';
+import { isViewMode, itemsIn, type DisclosureItem } from '../mode/types.js';
+import { contractById, statLineOf } from '../shift/contracts.js';
+import { eventFor } from '../shift/events.js';
+import { shiftObservationsOf } from '../shift/observations.js';
+import { goalsForDay, readGoals } from '../shift/goals.js';
+import { dayReportOf } from '../shift/report.js';
+import { closeDay, nextDay, outcomeOf } from '../shift/week.js';
+import { weekdayOf } from '../shift/types.js';
 
-/** `PB-T1`: ×1 … ×120, and `[`/`]` step this ladder — `KB-07`. */
-const SPEEDS = [1, 2, 5, 10, 30, 60, 120] as const;
+import { mountBatchPanel } from './batchPanel.js';
+import { mountCampaignPanel, type CampaignPanelHandle } from './campaignPanel.js';
+import { createLoader } from './bootstrap.js';
+import { loadBrowserResources, loadCampaign, type BrowserResources } from './data.js';
+import { chip, el, fill, fillSelect, keyedFill, setHidden, setText } from './dom.js';
+import {
+  ELEMENT_IDS,
+  MissingElementsError,
+  isRailSegment,
+  isTabName,
+  resolveElements,
+  type Elements,
+  type RailSegment,
+  type TabName,
+} from './elementMap.js';
+import { mountEditor } from './editor.js';
+import { mountBuildingEditor } from './buildingEditor.js';
+import { mountDispatcherEditor } from './dispatcherEditor.js';
+import { mountLeftRail } from './leftRail.js';
+import { mountMachinesEditor } from './machinesEditor.js';
+import { mountParameterForm } from './parameterForm.js';
+import { mountReport } from './reportPanel.js';
+import { mountRightRail } from './rightRail.js';
+import { mountScenarios } from './scenariosPanel.js';
+import { mountTrafficEditor } from './trafficEditor.js';
+import { shouldAutoplay } from './motion.js';
+import type { MountContext, Panel, ViewAt } from './mountTypes.js';
+import {
+  DEFAULT_SHIFT_LENGTH_S,
+  SHIFT_LENGTHS,
+  allBuildingIds,
+  buildingConfigOf,
+  buildingNameOf,
+  disclosureOf,
+  initialState,
+  profileById,
+  shiftRunConfigOf,
+  withBuilding,
+  type ViewerState,
+} from './state.js';
+import {
+  DRAWER_BREAKPOINT_PX,
+  applyDrawerState,
+  applyRailState,
+  applySurfaceState,
+  drawerStateFor,
+  railStateFor,
+  segmentAfterKey,
+  surfaceStateFor,
+  tabAfterKey,
+} from './surfaces.js';
+
+/**
+ * The playback ladder — `PB-T1`, `KB-07`.
+ *
+ * It reaches ×900 now and did not before, and the reason is the shift: a 1 800 s shift at ×60 is
+ * thirty seconds of watching, which is right for studying a peak and wrong for getting to the end
+ * of a day. The handoff's own chips are ×1 / ×10 / ×60 / ×240 / ×900 and those are the five.
+ */
+const SPEEDS = [1, 10, 60, 240, 900] as const;
+
+/** Width of the right gutter, where the landing counts and the rider queues are drawn. */
+const QUEUE_GUTTER_PX = 280;
 /** Width reserved for the live metrics panel. Dropped below this viewport width — `RS-03`. */
 const OVERLAY_WIDTH_PX = 250;
 const OVERLAY_MIN_VIEWPORT_PX = 900;
 /** One display frame at 60 Hz, in simulated seconds at the current speed — `KB-06`, `PB-08`. */
 const FRAME_S = 1 / 60;
+/** How often the live region is re-announced. Every frame would be unusable. */
+const ANNOUNCE_MS = 2000;
 
-interface Elements {
-  readonly canvas: HTMLCanvasElement;
-  readonly building: HTMLSelectElement;
-  readonly dispatcher: HTMLSelectElement;
-  readonly duration: HTMLInputElement;
-  readonly speed: HTMLSelectElement;
-  readonly seed: HTMLInputElement;
-  readonly run: HTMLButtonElement;
-  readonly verify: HTMLButtonElement;
-  readonly copyProvenance: HTMLButtonElement;
-  readonly saveRecording: HTMLButtonElement;
-  readonly loadRecording: HTMLInputElement;
-  readonly bankFilter: HTMLSelectElement;
-  readonly landingSelect: HTMLSelectElement;
-  readonly exportPng: HTMLButtonElement;
-  readonly playPause: HTMLButtonElement;
-  readonly stepBack: HTMLButtonElement;
-  readonly stepForward: HTMLButtonElement;
-  readonly loop: HTMLInputElement;
-  readonly scrub: HTMLInputElement;
-  readonly status: HTMLElement;
-  readonly error: HTMLElement;
-  readonly banner: HTMLElement;
-  readonly description: HTMLElement;
-  readonly tabViewer: HTMLButtonElement;
-  readonly tabEditor: HTMLButtonElement;
-  readonly panelViewer: HTMLElement;
-  readonly panelEditor: HTMLElement;
-  readonly confirm: HTMLDialogElement;
-  readonly confirmMessage: HTMLElement;
-  readonly confirmOk: HTMLButtonElement;
-  readonly confirmCancel: HTMLButtonElement;
-}
+/* ========================================================================== *
+ * The wait-age legend — § 1.3 M4
+ * ========================================================================== */
 
-function elements(): Elements {
-  const find = <T extends HTMLElement>(id: string): T => {
-    const node = document.getElementById(id);
-    if (node === null) throw new Error(`missing #${id} in index.html`);
-    return node as T;
-  };
-  return {
-    canvas: find<HTMLCanvasElement>('stage'),
-    building: find<HTMLSelectElement>('building'),
-    dispatcher: find<HTMLSelectElement>('dispatcher'),
-    duration: find<HTMLInputElement>('duration'),
-    speed: find<HTMLSelectElement>('speed'),
-    seed: find<HTMLInputElement>('seed'),
-    run: find<HTMLButtonElement>('run'),
-    verify: find<HTMLButtonElement>('verify'),
-    copyProvenance: find<HTMLButtonElement>('copy-provenance'),
-    saveRecording: find<HTMLButtonElement>('save-recording'),
-    loadRecording: find<HTMLInputElement>('load-recording'),
-    bankFilter: find<HTMLSelectElement>('bank-filter'),
-    landingSelect: find<HTMLSelectElement>('landing-select'),
-    exportPng: find<HTMLButtonElement>('export-png'),
-    playPause: find<HTMLButtonElement>('play-pause'),
-    stepBack: find<HTMLButtonElement>('step-back'),
-    stepForward: find<HTMLButtonElement>('step-forward'),
-    loop: find<HTMLInputElement>('loop'),
-    scrub: find<HTMLInputElement>('scrub'),
-    status: find<HTMLElement>('status'),
-    error: find<HTMLElement>('error'),
-    banner: find<HTMLElement>('banner'),
-    description: find<HTMLElement>('frame-description'),
-    tabViewer: find<HTMLButtonElement>('tab-viewer'),
-    tabEditor: find<HTMLButtonElement>('tab-editor'),
-    panelViewer: find<HTMLElement>('panel-viewer'),
-    panelEditor: find<HTMLElement>('panel-editor'),
-    confirm: find<HTMLDialogElement>('confirm'),
-    confirmMessage: find<HTMLElement>('confirm-message'),
-    confirmOk: find<HTMLButtonElement>('confirm-ok'),
-    confirmCancel: find<HTMLButtonElement>('confirm-cancel'),
-  };
-}
-
-/** The controls that need something on screen before they mean anything — UX.md § B.3. */
-function transportControls(ui: Elements): readonly (HTMLButtonElement | HTMLInputElement)[] {
-  return [ui.playPause, ui.stepBack, ui.stepForward, ui.scrub, ui.exportPng];
+/** One key of the wait-age legend: a colour to draw a disc in, and the words beside it. */
+export interface WaitLegendEntry {
+  readonly label: string;
+  readonly color: string;
 }
 
 /**
- * `RV-17` — say what failed, and offer a Retry that refetches without a page reload (`RV-21`).
+ * The legend's four entries, in ascending severity — the handoff `:230–233`.
  *
- * The message is `data.ts`'s, which names the path in every failure mode. This function is only
- * responsible for putting it where the reader is, moving focus to it (`KB-11`), and making the
- * second failure as visible as the first.
+ * **Derived, never written.** Both halves of every entry already exist on `live/bands.ts`'s
+ * `WAIT_BANDS`: `legendLabel` is *under 30 s* / *a minute* / *two minutes* / *gave up*, and `color`
+ * is the same band palette the mood bar, the canvas and the report all read. Until this function
+ * existed, `legendLabel` reached **no DOM anywhere** — four authored strings with no non-test
+ * caller, which is the dead-seam shape this repository has closed eleven times — and the page drew
+ * a legend title with nothing under it.
+ *
+ * Writing the four labels into the markup instead would have been the other failure: a fifth copy
+ * of a palette whose whole point is that the rail, the stage and the report cannot disagree about
+ * what amber means. So the *decision* is here and pure, and {@link legendEntryNode} is the
+ * decision-free half that puts it on the page — the pattern `dom.ts` documents, and the only one
+ * that is testable in a suite with no jsdom.
  */
-function showLoadFailure(ui: Elements, error: unknown, retry: () => Promise<boolean>): void {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.textContent = 'Retry';
-  button.addEventListener('click', () => {
-    ui.error.textContent = '';
-    ui.status.textContent = 'loading data…';
-    retry().catch((failure: unknown) => {
-      // Only reachable if `boot` itself throws. It used to reach nothing at all: the retry ran
-      // inside a floating `async` IIFE, so the page cleared its own error message and then died
-      // in silence. See `bootstrap.ts`.
-      ui.error.textContent = `the viewer failed to start after loading data/: ${message(failure)}`;
-      ui.error.focus();
-    });
-  });
-  ui.error.replaceChildren(`could not load data/: ${message(error)} `, button);
-  ui.error.focus();
+export function waitLegendEntries(): readonly WaitLegendEntry[] {
+  return WAIT_BANDS.map((band) => ({ label: band.legendLabel, color: band.color }));
 }
+
+/** One entry as a node: the handoff's `●` in the band's colour, then the band's words. */
+function legendEntryNode(doc: Document, entry: WaitLegendEntry): HTMLElement {
+  return el(doc, 'span', {
+    className: 'legend-entry',
+    children: [
+      el(doc, 'span', {
+        text: '●',
+        style: { color: entry.color },
+        // The disc is the colour key; the words beside it are the claim. KB-15 — a reader who
+        // cannot separate amber from orange still reads *a minute* and *two minutes*.
+        attrs: { 'aria-hidden': 'true' },
+      }),
+      el(doc, 'span', { text: entry.label }),
+    ],
+  });
+}
+
+function elements(): Elements {
+  const resolved = resolveElements<Elements>(document, ELEMENT_IDS);
+  if (!resolved.ok) throw new MissingElementsError(resolved.missing, resolved.total);
+  return resolved.elements;
+}
+
+/* ========================================================================== *
+ * Boot
+ * ========================================================================== */
 
 async function main(): Promise<void> {
   const ui = elements();
-  ui.status.textContent = 'loading data…';
-  // Nothing is playable until `data/` has loaded — UX.md § B.3's empty state. `boot` re-enables
-  // them once there is a recording; a failed load must not leave five live-looking controls
-  // wired to nothing, which is what `RV-17` shipped with.
-  for (const control of transportControls(ui)) control.disabled = true;
-
+  disableTransport(ui, true);
   const loader = createLoader<BrowserResources>({
     load: loadBrowserResources,
     start: (resources) => {
@@ -184,834 +228,1167 @@ async function main(): Promise<void> {
   await loader.attempt();
 }
 
+function disableTransport(ui: Elements, disabled: boolean): void {
+  for (const control of [
+    ui.transport.playPause,
+    ui.transport.stepBack,
+    ui.transport.stepForward,
+    ui.transport.exportPng,
+    ui.transport.saveRecording,
+    ui.transport.verify,
+  ]) {
+    control.disabled = disabled;
+  }
+}
+
+function showLoadFailure(ui: Elements, error: unknown, retry: () => Promise<boolean>): void {
+  const message = error instanceof Error ? error.message : String(error);
+  setText(ui.transport.error, `${message}\n`);
+  setText(ui.transport.status, 'could not load data/');
+  const again = el(document, 'button', { className: 'chip', text: 'Retry', attrs: { type: 'button' } });
+  again.addEventListener('click', () => {
+    setText(ui.transport.error, '');
+    setText(ui.transport.status, 'loading data…');
+    void retry();
+  });
+  ui.transport.error.append(again);
+  ui.transport.error.focus();
+}
+
 function boot(ui: Elements, resources: BrowserResources): void {
-  for (const building of resources.buildings) {
-    ui.building.append(new Option(`${building.name} (${building.id})`, building.id));
-  }
-  for (const profile of resources.dispatcherProfiles) {
-    ui.dispatcher.append(new Option(profile.id, profile.id));
-  }
-  for (const speed of SPEEDS) {
-    ui.speed.append(new Option(`×${String(speed)}`, String(speed)));
-  }
-  ui.speed.value = '10';
-
+  /* ---------------------------------------------------------------------- *
+   * State
+   * ---------------------------------------------------------------------- */
+  let state: ViewerState = applyDeepLink(initialState(resources, randomSeed()), resources);
+  // A deep link names the building before anything can have been edited, so the editor's working
+  // copy follows it unconditionally here — `withBuilding`'s pristine test is trivially true.
+  state = withBuilding(state, resources, state.buildingId);
   let playback: Playback | undefined;
-  let recording: VizRecording | undefined;
-  let lastConfig: SimulationConfig | undefined;
-  /** A building the editor handed over, outside `data/`. */
-  let adhocBuilding: BuildingConfig | undefined;
-  let selection: SceneSelection | undefined;
+  let building = resources.entries[0]?.resolved;
+  let lastAnnouncedMs = 0;
+  let selectedLandingId = '';
+  /** The run whose day has already been filed. See {@link tick}. */
+  let filedRunId: string | undefined;
   /**
-   * {@link LandingAssignment.key} of the selected call, or `undefined`.
+   * Where the service badges were last drawn, for the click handler.
    *
-   * Not `selection.floorId`: under a landing panel one floor carries one row per
-   * (destination, promised car), so a floor id no longer identifies what the reader picked.
+   * Declared **here**, with the other boot-scope bindings, and not beside the function that reads
+   * it. It was declared next to `badgeAt` and `drawStage` runs before that statement is reached, so
+   * the very first draw threw `Cannot access 'carBadgeHits' before initialization` — a temporal
+   * dead zone inside a closure, which is precisely the failure `dev/bootstrap.ts` was extracted to
+   * stop happening on the load path. It surfaced as *the shift did not run* over a stage that had
+   * in fact drawn, because the throw landed after the picture and before the assignment.
    */
-  let selectionKey: string | undefined;
-  let assignments: readonly LandingAssignment[] = [];
-  let lastDescription = '';
+  let carBadgeHits: readonly CarBadgeHit[] = [];
+  let bankFilter = '';
   /**
-   * Identity of the option set currently in the landing selector, so it is not rebuilt blindly.
+   * Whether the transport restarts at the end.
    *
-   * The sentinel is not the empty string: an empty assignment list *also* keys to the empty
-   * string, so starting there made the very first repopulate look like a no-op and left
-   * `index.html`'s placeholder option in place for the whole run. Found by driving the viewer,
-   * where the landing selector offered exactly one choice and `RV-T3` was unreachable through
-   * the UI it shipped with.
+   * A boot-scope boolean rather than `#loop.checked`, because `#loop` is a `.chip[aria-pressed]`
+   * now (`docs/12` § 4.7) and a button has no checked state. The element carries the same fact in
+   * `aria-pressed`, written by {@link setLooping} and read by nothing — one source, one writer.
    */
-  const NO_OPTIONS_YET = 'not-populated-yet';
-  let landingOptionsKey = NO_OPTIONS_YET;
+  let looping = false;
 
-  /* ------------------------------------------------------------------ *
-   * Deep link — RV-03, and RV-02's "previous run's seed preserved"
-   * ------------------------------------------------------------------ */
-
-  const params = new URLSearchParams(window.location.search);
-  applyParam(ui.building, params.get('building'));
-  applyParam(ui.dispatcher, params.get('dispatcher'));
-  if (params.get('seed') !== null) ui.seed.value = params.get('seed') ?? '';
-  if (params.get('duration') !== null) ui.duration.value = params.get('duration') ?? '900';
-  if (params.get('speed') !== null) applyParam(ui.speed, params.get('speed'));
+  const clock = systemClock();
   /**
-   * Which surface is on screen — `D11`, and the sixth key in the URL.
+   * The legend's fill, keyed on the bands themselves.
    *
-   * `syncUrl` wrote five keys and not this one, so `selectTab` never recorded where the reader
-   * was: a deep link could name a building and a seed and still always open on the viewer, and a
-   * reload from the editor came back to the viewer. Held here rather than read back off
-   * `aria-selected`, so there is one answer to "which tab" rather than a DOM attribute and a URL
-   * that can drift.
+   * `WAIT_BANDS` is frozen, so the key never changes and the row is built exactly once however many
+   * times `renderAll` runs — the same guard `leftRail.ts` uses, for the same reason: a `fill` on
+   * every state change drops hover, and hover is how the reader reads a `title`.
    */
-  let currentTab: 'viewer' | 'editor' = params.get('tab') === 'editor' ? 'editor' : 'viewer';
+  const fillLegend = keyedFill(ui.stage.legend);
 
-  function syncUrl(): void {
-    const next = new URLSearchParams({
-      building: ui.building.value,
-      dispatcher: ui.dispatcher.value,
-      seed: ui.seed.value,
-      duration: ui.duration.value,
-      speed: ui.speed.value,
-      tab: currentTab,
+  /* ---------------------------------------------------------------------- *
+   * The mount context — the only thing a panel may do to the world
+   * ---------------------------------------------------------------------- */
+  const context: MountContext = {
+    update(patch) {
+      state = { ...state, ...patch };
+      renderAll();
+    },
+    runShift() {
+      runShift();
+    },
+    openTab(tab) {
+      const revealed = new Set(state.revealedTabs);
+      revealed.add(tab);
+      state = { ...state, tab, revealedTabs: revealed };
+      if (tab === 'report') closeShift();
+      renderAll();
+      ui.tabs[tab].focus();
+    },
+    fail(message) {
+      setText(ui.transport.error, message);
+    },
+  };
+
+  /* ---------------------------------------------------------------------- *
+   * Panels
+   * ---------------------------------------------------------------------- */
+  const leftRail = mountLeftRail(
+    { mood: ui.mood, shift: ui.shift, honesty: ui.honesty, decisionLog: ui.decisionLog },
+    context,
+  );
+  const rightRail = mountRightRail(ui.rail, context);
+  const reportPanel = mountReport(ui.report, context);
+  const scenariosPanel = mountScenarios(ui.scenarioList, context);
+  const dispatcherEditor = mountDispatcherEditor(ui.dispatcherEditor, context);
+  const trafficEditor = mountTrafficEditor(ui.trafficEditor, context);
+  const machinesEditor = mountMachinesEditor(ui.machinesEditor, context);
+  const buildingEditor = mountBuildingEditor(ui.buildingEditor, context);
+  const statePanels: readonly Panel[] = [
+    rightRail,
+    reportPanel,
+    scenariosPanel,
+    dispatcherEditor,
+    trafficEditor,
+    machinesEditor,
+    buildingEditor,
+  ];
+
+  /*
+   * The document editor, kept whole beneath the elevation — `docs/12` § 4.5. It is the only
+   * surface that can express access zoning, per-floor ids and a floor range, and it carries
+   * docs/10 § 11 W8's open half. Its ids never moved, so it mounts exactly as it did before.
+   */
+  const editor = mountEditor({
+    resources,
+    onRun: (config: BuildingConfig) => {
+      adoptEditedBuilding(config);
+    },
+    confirm: confirmDiscard,
+    /*
+     * § D159's access/dispatcher compatibility warning is keyed on whoever is currently driving.
+     * Without this the editor's `renderAccessNote` takes its early return and blanks itself, so
+     * the warning is dead on this surface — which is exactly what happened between `aa7d943`,
+     * where the old shell passed `() => ui.dispatcher.value`, and here. The five-tab viewer had a
+     * `<select>` to read; the shift viewer keeps the same fact in `state.dispatcherId`.
+     */
+    currentDispatcherId: () => state.dispatcherId,
+  });
+
+  mountParameterForm({
+    container: ui.paramForm,
+    picker: ui.paramSource,
+    status: ui.paramStatus,
+    refusal: ui.paramRefusal,
+  });
+
+  mountBatchPanel({
+    elements: ui.batch,
+    resources,
+    inherit: () => ({
+      buildingId: state.buildingId,
+      seed: state.seed.toString(),
+      durationS: String(state.shiftLengthS),
+    }),
+  });
+
+  /*
+   * The campaign needs its own data file, which is fetched separately. A page that could not load
+   * it must still be a page — the campaign is one of ten surfaces — so the failure is reported in
+   * that surface's own alert slot and the other nine come up.
+   */
+  let campaign: CampaignPanelHandle | undefined;
+  void loadCampaign(resources)
+    .then((loaded) => {
+      campaign = mountCampaignPanel({
+        elements: ui.campaign,
+        resources,
+        loaded,
+        mode: () => state.mode,
+      });
+    })
+    .catch((error: unknown) => {
+      setText(ui.campaign.error, error instanceof Error ? error.message : String(error));
     });
-    window.history.replaceState(null, '', `?${next.toString()}`);
+
+  /* ---------------------------------------------------------------------- *
+   * The shell's own controls
+   * ---------------------------------------------------------------------- */
+  wireNavigation();
+  wireCoach();
+  wireTransport();
+  wireHeaderAndFooter();
+  wireKeyboard();
+  wireStageClicks();
+
+  window.addEventListener('resize', () => {
+    applyNavigation();
+    renderLive();
+  });
+  /*
+   * A `matchMedia` listener as well as `resize`, on the same breakpoint the stylesheet uses.
+   *
+   * `resize` alone left the drawer stale: crossing 1340 px, the rail stayed a visible overlay lying
+   * on top of the stage until the reader pressed the toggle **twice** — once to register a close it
+   * had not had, once to open it. `matchMedia` fires exactly on the crossing rather than on every
+   * intermediate pixel, so the state changes at the same instant the layout does.
+   */
+  window
+    .matchMedia(`(max-width: ${String(DRAWER_BREAKPOINT_PX - 1)}px)`)
+    .addEventListener('change', () => {
+      applyNavigation();
+    });
+
+  renderAll();
+  runShift();
+  requestAnimationFrame(tick);
+
+  /* ====================================================================== *
+   * Rendering
+   * ====================================================================== */
+
+
+  /**
+   * Landings whose calls no car **may** answer, at `t` — `docs/10` § 10.4, `U8`.
+   *
+   * The restricted set and the credential flag are the caller's to supply, because `lockedOut.ts`
+   * is deliberately unable to guess either: an empty restricted set means *this caller does not
+   * know*, which is a different claim from *this building restricts nothing*, and only the shell
+   * has the building document to tell them apart.
+   */
+  function lockedOutAt(recording: VizRecording, at: number): readonly LockedOutLanding[] {
+    const config = buildingConfigOf(resources, state.savedBuildings, recording.buildingId);
+    const profile = profileById(resources, state.savedDispatchers, state.dispatcherId);
+    return lockedOutLandingsAt({
+      recording,
+      at,
+      restrictedFloorIds: restrictedFloorIds(
+        recording.floors.map((floor) => floor.id),
+        config?.accessZones,
+      ),
+      carriesCredential: credentialCapabilityOf(profile).carriesCredential,
+    });
   }
 
-  function fail(text: string): void {
-    // KB-11: focus moves to the message so it is announced, and so the reader is at the control
-    // that needs changing rather than wherever they pressed.
-    ui.error.textContent = text;
-    ui.error.focus();
+  function viewAt(): ViewAt {
+    const recording = state.recording;
+    const simTimeS = playback?.simTimeS ?? recording?.startedAt ?? 0;
+    return {
+      state,
+      resources,
+      recording,
+      simTimeS,
+      building,
+      playing: playback?.state === 'playing',
+    };
   }
 
-  function clearError(): void {
-    ui.error.textContent = '';
+  /** Everything. Runs when the state changed. */
+  function renderAll(): void {
+    applyNavigation();
+    const view = viewAt();
+    for (const panel of statePanels) panel.render(view);
+    leftRail.render(view);
+    drawHeader(view);
+    drawCoach(view);
+    drawFooter(view);
+    drawTransportChrome(view);
+    drawParity();
+    drawLegend();
+    drawStage();
   }
 
-  /* ------------------------------------------------------------------ *
-   * Running
-   * ------------------------------------------------------------------ */
+  /** § 1.3 M4 — the four wait-age keys, from `WAIT_BANDS` and from nowhere else. */
+  function drawLegend(): void {
+    const entries = waitLegendEntries();
+    fillLegend(entries.map((entry) => `${entry.label}·${entry.color}`).join('|'), () => [
+      ui.stage.legendTitle,
+      ...entries.map((entry) => legendEntryNode(document, entry)),
+    ]);
+  }
 
-  function runOnce(): void {
-    const resolvedBuilding = resources.buildings.find(
-      (candidate) => candidate.id === ui.building.value,
-    );
-    const dispatcherProfile = resources.dispatcherProfiles.find(
-      (candidate) => candidate.id === ui.dispatcher.value,
-    );
-    if (dispatcherProfile === undefined) {
-      fail('pick a dispatcher first.');
-      return;
-    }
-    const building = adhocBuilding === undefined ? resolvedBuilding : undefined;
-    const adhoc = adhocBuilding;
-    if (building === undefined && adhoc === undefined) {
-      fail('pick a building first.');
-      return;
-    }
+  /** Only what the playhead moves. Runs at 60 Hz. */
+  function renderLive(): void {
+    const view = viewAt();
+    leftRail.render(view);
+    drawHeader(view);
+    drawFooter(view);
+    drawPlayhead(view);
+    drawStage();
+  }
 
-    const seedText = ui.seed.value.trim();
-    let seed: bigint;
-    try {
-      seed = seedText === '' ? randomSeed() : BigInt(seedText);
-    } catch {
-      fail(`"${seedText}" is not a whole number; a seed must be one.`);
-      return;
-    }
-    // RV-02: the seed is written back before the run, so pressing Run again after changing the
-    // dispatcher compares like with like rather than drawing a fresh seed.
-    ui.seed.value = seed.toString();
-
-    const durationS = Number(ui.duration.value);
-    if (!Number.isFinite(durationS) || durationS <= 0) {
-      fail('duration must be a positive number of simulated seconds.');
-      return;
-    }
-
-    let resolved = building;
-    if (adhoc !== undefined) {
-      try {
-        resolved = resolveEdited(resources, adhoc);
-      } catch (error) {
-        fail(`the edited building could not be resolved: ${message(error)}`);
-        return;
+  function tick(now: number): void {
+    if (playback !== undefined && state.tab === 'run') {
+      renderLive();
+      if (now - lastAnnouncedMs > ANNOUNCE_MS) {
+        lastAnnouncedMs = now;
+        announce();
+      }
+      /*
+       * The day closes when the day ends — the handoff's own behaviour (`closeDay` fires at
+       * `tod >= DAY_END` and opens the sheet). Guarded on `filedRunId` rather than on a boolean, so
+       * loading a different recording arms it again and a loop does not file the same day twice.
+       */
+      if (playback.state === 'ended' && filedRunId !== state.recording?.runId) {
+        closeShift();
       }
     }
-    if (resolved === undefined) {
-      fail('pick a building first.');
-      return;
-    }
-
-    const config: SimulationConfig = {
-      building: resolved,
-      dispatcherProfile,
-      trafficProfiles: resources.trafficProfiles,
-      elevatorSpecs: resources.elevatorSpecs,
-      seed,
-      durationS,
-      /**
-       * `report`, not the kernel's default `throw`.
-       *
-       * At the shipped traffic rates, Mixed-Use High-Rise, Secure Tower and Vertical City
-       * routinely end a 900 s run with people still in the system, and `Simulation` treats that
-       * as a failed run — correctly, because a mean over a system that never cleared is the
-       * confident nonsense this project exists to avoid. But under `throw` there is no recording
-       * at all, so pressing **Run** on three of the five shipped buildings produced an error
-       * message and an empty canvas rather than the playback UX.md RV-01 promises.
-       *
-       * `report` gives the viewer the recording it has to be able to draw, and the run's
-       * `timed-out` status and undelivered count now lead the canvas banner as well as the
-       * status line — UX.md RV-16. Nothing about the statistics moves: `awtIsValid` still comes
-       * from the summary and still suppresses every mean, in the header and in the overlay.
-       */
-      onTimeout: 'report',
-    };
-
-    ui.status.textContent = `simulating ${resolved.name} for ${String(durationS)} s — this blocks the page for about a second…`;
-    lastConfig = config;
-    clearError();
-    try {
-      recording = recordRun(config).recording;
-    } catch (error) {
-      recording = undefined;
-      playback = undefined;
-      fail(
-        error instanceof SimulationError
-          ? `the simulation refused to report this run (seed ${seed.toString()}): ${error.message}`
-          : `run failed (seed ${seed.toString()}): ${message(error)}`,
-      );
-      ui.status.textContent = 'no run on screen.';
-      syncTransport();
-      return;
-    }
-    adopt(recording);
-    syncUrl();
+    requestAnimationFrame(tick);
   }
 
-  /** Put a recording on screen, from a run or from a file. */
-  function adopt(next: VizRecording): void {
-    recording = next;
-    selection = undefined;
-    selectionKey = undefined;
-    playback = new Playback(next, systemClock(), {
-      speed: Number(ui.speed.value),
-      // KB-14: a reader who has asked for reduced motion gets the first frame and a Play button,
-      // not a building that starts moving on its own. The decision is `motion.ts`'s, so it can be
-      // asserted without an operating system that has the preference switched on.
-      autoplay: shouldAutoplay((query) => window.matchMedia(query)),
-      loop: ui.loop.checked,
+  /* ---------------------------------------------------------------------- *
+   * Navigation — § 1.1 S5, § 1.3 M1, § 1.4 R1
+   * ---------------------------------------------------------------------- */
+
+  function applyNavigation(): void {
+    applySurfaceState(ui, surfaceStateFor(state.tab, state.revealedTabs));
+    applyRailState(ui, railStateFor(state.railSegment));
+    applyDrawerState(ui, drawerStateFor(window.innerWidth, state.drawerOpen));
+  }
+
+  function wireNavigation(): void {
+    for (const tab of Object.keys(ui.tabs) as TabName[]) {
+      ui.tabs[tab].addEventListener('click', () => {
+        context.openTab(tab);
+      });
+    }
+    /*
+     * One listener on the strip rather than ten on the buttons: the ring is decided by
+     * `surfaces.ts` and a per-button handler would have to know its own index, which is the thing
+     * that goes wrong when a tab becomes contextual.
+     */
+    ui.tabs.run.parentElement?.addEventListener('keydown', (event) => {
+      const next = tabAfterKey(surfaceStateFor(state.tab, state.revealedTabs), state.tab, event.key);
+      if (next === undefined) return;
+      event.preventDefault();
+      context.openTab(next);
     });
-    ui.playPause.textContent = playback.state === 'playing' ? 'Pause' : 'Play';
-    ui.status.textContent = statusLine(next);
-    ui.banner.textContent = `${next.buildingName} · ${next.dispatcherProfileId} · seed ${next.seed}`;
-    populateBankFilter(next);
-    landingOptionsKey = NO_OPTIONS_YET;
-    populateLandings(next, next.startedAt);
-    syncTransport();
+
+    for (const segment of Object.keys(ui.rail.segments) as RailSegment[]) {
+      ui.rail.segments[segment].addEventListener('click', () => {
+        context.update({ railSegment: segment });
+      });
+    }
+    ui.rail.segments.dispatcher.parentElement?.addEventListener('keydown', (event) => {
+      const next = segmentAfterKey(state.railSegment, event.key);
+      if (next === undefined) return;
+      event.preventDefault();
+      context.update({ railSegment: next });
+      ui.rail.segments[next].focus();
+    });
+
+    ui.rail.drawerToggle.addEventListener('click', () => {
+      context.update({ drawerOpen: !state.drawerOpen });
+    });
+
+    ui.rail.openDispatcher.addEventListener('click', () => {
+      context.openTab('dispatcher');
+    });
+    ui.rail.openTraffic.addEventListener('click', () => {
+      context.openTab('traffic');
+    });
+    ui.rail.openBuilding.addEventListener('click', () => {
+      context.openTab('building');
+    });
+    ui.rail.openMachines.addEventListener('click', () => {
+      context.openTab('machines');
+    });
+    ui.coach.allScenarios.addEventListener('click', () => {
+      context.update({ tab: 'scenarios' });
+    });
+    ui.buildingEditor.openMachines.addEventListener('click', () => {
+      context.openTab('machines');
+    });
+  }
+
+  /* ---------------------------------------------------------------------- *
+   * Header and footer — § 1.1 S3, S4
+   * ---------------------------------------------------------------------- */
+
+  function wireHeaderAndFooter(): void {
+    ui.header.viewMode.addEventListener('change', () => {
+      const value = ui.header.viewMode.value;
+      if (!isViewMode(value)) return;
+      window.localStorage.setItem(MODE_KEY, value);
+      context.update({ mode: value });
+    });
+    /*
+     * The remembered mode, **unless the link named one**. A deep link is somebody sending a
+     * finding to somebody else; a remembered preference that overrode it would show the recipient
+     * a different page from the one that was sent, and neither of them would know.
+     */
+    const linked = new URLSearchParams(window.location.search).get('mode');
+    const remembered = window.localStorage.getItem(MODE_KEY);
+    if (!isViewMode(linked) && isViewMode(remembered)) state = { ...state, mode: remembered };
+
+    /*
+     * One copy control, not two. `#copy-provenance` on the transport called this same function
+     * with the same arguments and produced the same line as the footer's `#copy-run` — and
+     * `#copy-run` is the handoff's own S4 requirement, so the duplicate was the one to go
+     * (`docs/12` § 4.7). RV-T7 asks for *one* control that copies the run's provenance, and it now
+     * has exactly one.
+     */
+    ui.footer.copyRun.addEventListener('click', () => {
+      void copyProvenance('copy run', ui.footer.copyRun);
+    });
+  }
+
+  function drawHeader(view: ViewAt): void {
+    /*
+     * The select follows the state rather than the other way round. It was set only on the
+     * remembered-mode path, so a `?mode=advanced` link put the page in engineer mode with the
+     * control reading *Casual* — the panels and their own switch disagreeing about which mode
+     * the reader was in.
+     */
+    if (ui.header.viewMode.value !== state.mode) ui.header.viewMode.value = state.mode;
+    setText(ui.header.buildingName, buildingNameOf(resources, state.savedBuildings, state.buildingId));
+    setText(
+      ui.header.buildingSub,
+      building === undefined ? '' : statLineOf(building),
+    );
+    setText(ui.header.clock, view.recording === undefined ? '06:00' : clockAt(view.simTimeS));
+    const phase = view.recording === undefined ? undefined : phaseAt(view.recording, view.simTimeS);
+    setText(ui.header.phaseLabel, phase?.label ?? 'no run yet');
+    setText(
+      ui.header.dayLabel,
+      `Day ${String(state.week.day)} · ${weekdayOf(state.week.dayIdx)}`,
+    );
+    const population = building?.floors.reduce((total, floor) => total + floor.population, 0) ?? 0;
+    setText(ui.header.tenantsLine, `${population.toLocaleString('en-GB')} tenants`);
+  }
+
+  function drawFooter(view: ViewAt): void {
+    const profile = profileById(resources, state.savedDispatchers, state.dispatcherId);
+    const observations =
+      view.recording === undefined ? undefined : observationsAt(view.recording, view.simTimeS);
+    setText(
+      ui.footer.statusLine,
+      observations === undefined
+        ? 'no shift run yet'
+        : `${view.playing ? 'running' : 'paused'} · ${String(observations.arrived)} arrived, ` +
+          `${String(observations.carried)} carried · ${profile.name.toLowerCase()}`,
+    );
+    setText(
+      ui.footer.seedLine,
+      `seed ${state.seed.toString()} · day ${String(state.week.day)}`,
+    );
+  }
+
+  async function copyProvenance(label: string, button: HTMLButtonElement): Promise<void> {
+    const line =
+      `--building ${state.buildingId} --dispatcher ${state.dispatcherId} ` +
+      `--seed ${state.seed.toString()} --duration ${String(state.shiftLengthS)}`;
+    try {
+      await navigator.clipboard.writeText(line);
+      setText(button, 'copied');
+    } catch {
+      // A clipboard a browser refuses is not an error the reader caused. Show the line instead.
+      setText(ui.transport.status, line);
+    }
+    window.setTimeout(() => {
+      setText(button, label);
+    }, 1400);
+  }
+
+  function drawParity(): void {
+    /*
+     * Parity is a property of **what was mounted**, not of the mode toggle: § 4's rule is that
+     * Basic may never hide a failure Advanced would show, and that is a claim about this run's
+     * items. So the items are derived from the recording and checked whole — a check over an empty
+     * list would pass every time and say nothing.
+     */
+    const recording = state.recording;
+    if (recording === undefined) {
+      setText(ui.header.modeParity, '');
+      return;
+    }
+    const items: readonly DisclosureItem[] = disclosureItems({
+      recording,
+      dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
+      lockedOut: lockedOutAt(recording, recording.endedAt),
+    });
+    setText(ui.header.modeParity, parityRefusal(items) ?? '');
+    void itemsIn;
+  }
+
+  /* ---------------------------------------------------------------------- *
+   * The coach ribbon — § 1.3 M2
+   * ---------------------------------------------------------------------- */
+
+  function wireCoach(): void {
+    ui.coach.building.addEventListener('change', () => {
+      state = withBuilding(state, resources, ui.coach.building.value);
+      renderAll();
+      runShift();
+    });
+    ui.coach.pattern.addEventListener('change', () => {
+      context.update({ pattern: ui.coach.pattern.value });
+      runShift();
+    });
+    ui.coach.shiftLength.addEventListener('change', () => {
+      context.update({ shiftLengthS: Number(ui.coach.shiftLength.value) });
+      runShift();
+    });
+  }
+
+  function drawCoach(view: ViewAt): void {
+    fillSelect(
+      ui.coach.building,
+      allBuildingIds(resources, state.savedBuildings).map((id) => ({
+        value: id,
+        label: buildingNameOf(resources, state.savedBuildings, id),
+      })),
+      state.buildingId,
+    );
+    fillSelect(
+      ui.coach.pattern,
+      [
+        { value: 'building', label: 'The building’s own demand' },
+        ...resources.trafficProfiles.profiles.map((profile) => ({
+          value: profile.id,
+          label: profile.name,
+        })),
+        ...state.savedPatterns.map((saved) => ({
+          value: saved.id,
+          label: `${saved.spec.name} (yours)`,
+        })),
+      ],
+      state.pattern,
+    );
+    fillSelect(
+      ui.coach.shiftLength,
+      SHIFT_LENGTHS.map((entry) => ({ value: String(entry.seconds), label: entry.label })),
+      String(state.shiftLengthS),
+    );
+
+    const contract = state.week.contractId;
+    setText(ui.coach.label, contract === undefined ? 'Sandbox' : `Scenario · day ${String(state.week.day)}`);
+    setText(ui.coach.title, buildingNameOf(resources, state.savedBuildings, state.buildingId));
+    setText(ui.coach.progress, coachProgress());
+    setText(ui.coach.hint, coachHint(view));
+  }
+
+  function coachProgress(): string {
+    if (state.week.contractId === undefined) {
+      return `${String(Math.round(state.shiftLengthS / 60))} min of demand · free play`;
+    }
+    return `${String(state.week.cleanRun)} clean shift${state.week.cleanRun === 1 ? '' : 's'} banked`;
+  }
+
+  function coachHint(view: ViewAt): string {
+    if (state.withheld.length > 0) return state.withheld.join(' ');
+    if (view.recording === undefined) {
+      return 'Press play and watch a call appear, a car answer it, and the wait end. That is the whole simulator in one move.';
+    }
+    const observations = observationsAt(view.recording, view.simTimeS);
+    if (observations.arrived < 20) {
+      return 'Nothing is graded before the building wakes up — the goals stay blank until twenty people have called.';
+    }
+    if (observations.waitingNow > 25) {
+      return 'This is the crunch. Watch which floor stacks up, then try a different dispatcher in the rail — a smarter one is free, a fifth car is not.';
+    }
+    return 'Keep an eye on the goals in the left rail. The building only gets busier tomorrow.';
+  }
+
+  /* ---------------------------------------------------------------------- *
+   * The run
+   * ---------------------------------------------------------------------- */
+
+  function runShift(): void {
+    setText(ui.transport.error, '');
+    try {
+      const plan = shiftRunConfigOf(resources, state);
+      building = plan.building;
+      const recorded = recordRun(plan.config, {
+        outOfServiceCarIds: plan.outOfServiceCarIds,
+      });
+      state = { ...state, recording: recorded.recording, report: undefined, withheld: plan.withheld };
+      adopt(recorded.recording);
+      renderAll();
+    } catch (error) {
+      failRun(error);
+    }
+  }
+
+  function adoptEditedBuilding(config: BuildingConfig): void {
+    const id = config.id;
+    const saved = [
+      ...state.savedBuildings.filter((entry) => entry.id !== id),
+      { id, config },
+    ];
+    state = { ...state, savedBuildings: saved, buildingId: id, tab: 'run' };
+    runShift();
+  }
+
+  function failRun(error: unknown): void {
+    const message =
+      error instanceof SimulationError || error instanceof Error ? error.message : String(error);
+    setText(ui.transport.error, message);
+    setText(ui.transport.status, 'the shift did not run');
+    ui.transport.error.focus();
+  }
+
+  function adopt(recording: VizRecording): void {
+    playback = new Playback(recording, clock, {
+      speed: playback?.speed ?? 60,
+      loop: looping,
+      // KB-14: a reader who asked for less motion gets a paused first frame.
+      autoplay: shouldAutoplay(window.matchMedia.bind(window)),
+    });
+    disableTransport(ui, false);
+    filedRunId = undefined;
+    selectedLandingId = '';
+    fillLandingSelect(recording);
+    fillBankSelect(recording);
+    setText(
+      ui.transport.status,
+      meansAreSuppressed(recording)
+        ? `AWT suppressed — ${recording.summary.awtInvalidReason ?? 'the queues never settled'}`
+        : `AWT ${recording.summary.meanWaitS.toFixed(1)} s · WT95 ${recording.summary.wait95S.toFixed(1)} s`,
+    );
   }
 
   /**
-   * The transport follows the recording — UX.md § B.3's empty state.
+   * Close the shift and file the sheet.
    *
-   * A function declaration, and called from {@link adopt} rather than hung off the **Run**
-   * button's click, because the click was not the only way a recording arrives. `ED-04` hands one
-   * over from the editor without any click on **Run**, so after a failed run — which disables
-   * these five — *"Run this building"* put a run on screen that could not be paused, stepped,
-   * scrubbed or exported. Found while verifying `RV-11`, which is reached through exactly that
-   * door.
+   * The report is built from the **whole** recording rather than from the playhead: a day's account
+   * is the day's, and a reader who paused at 09:00 has not made the afternoon not happen.
    */
-  function syncTransport(): void {
-    for (const control of transportControls(ui)) control.disabled = recording === undefined;
+  function closeShift(): void {
+    const recording = state.recording;
+    if (recording === undefined || filedRunId === recording.runId) return;
+    filedRunId = recording.runId;
+    const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+    const goals = goalsForDay(state.week.day);
+    const readings = readGoals(goals, observations);
+    const event = eventFor(state.week.day, state.week.dayIdx);
+    const outcome = outcomeOf({
+      day: state.week.day,
+      dayIdx: state.week.dayIdx,
+      eventId: event.id,
+      readings,
+      minutePct: observations.minutePct,
+      carried: observations.carried,
+      arrived: observations.arrived,
+    });
+    const week = closeDay(state.week, outcome);
+    const report = dayReportOf({
+      recording,
+      observations,
+      goals,
+      week,
+      // The scenario this shift belongs to, not `undefined`. Passing nothing made the sheet say
+      // *your own building — nothing is being banked* on the same day the banner cleared a
+      // scenario and the rail counted the shift as banked: three panels, two answers.
+      contract: contractById(state.week.contractId),
+      event,
+      dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
+      dayStartS: DAY_START_S,
+    });
+    /*
+     * The tab is **not** forced here. `closeShift` is reached two ways — the playhead reaching the
+     * end, and the reader opening the sheet — and the second one has already set the tab. Setting
+     * it again inside a handler that `openTab` called would be the same write twice, which is how a
+     * navigation ends up fighting itself.
+     */
+    state = { ...state, week, report };
+    if (state.tab !== 'report') state = { ...state, tab: 'report' };
+    renderAll();
   }
 
-  function populateBankFilter(next: VizRecording): void {
-    const banks = [...new Set(next.shafts.map((shaft) => shaft.bankId))].sort((a, b) =>
+  /* ---------------------------------------------------------------------- *
+   * The stage — § 1.3 M3
+   * ---------------------------------------------------------------------- */
+
+  function drawStage(): void {
+    const recording = state.recording;
+    const canvas = ui.stage.canvas;
+    const context2d = canvas.getContext('2d');
+    if (recording === undefined || playback === undefined || context2d === null) return;
+
+    const box = canvas.parentElement?.getBoundingClientRect();
+    const width = Math.max(360, Math.floor(box?.width ?? 800));
+    const height = Math.max(260, Math.floor(box?.height ?? 500));
+    const ratio = Math.min(2, window.devicePixelRatio || 1);
+    if (canvas.width !== Math.floor(width * ratio) || canvas.height !== Math.floor(height * ratio)) {
+      canvas.width = Math.floor(width * ratio);
+      canvas.height = Math.floor(height * ratio);
+    }
+    context2d.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+    const frame = playback.frame();
+    const wantsOverlay = width >= OVERLAY_MIN_VIEWPORT_PX;
+    const layout = buildLayout({
+      width,
+      height,
+      floors: recording.floors,
+      shafts: recording.shafts,
+      gutterRightPx: QUEUE_GUTTER_PX,
+      overlayWidthPx: wantsOverlay ? OVERLAY_WIDTH_PX : 0,
+    });
+    const overlay = overlayAt(recording, frame.simTimeS);
+    const assignments: readonly LandingAssignment[] = landingAssignmentsAt(recording, frame.simTimeS);
+    const lockedOut: readonly LockedOutLanding[] = lockedOutAt(recording, frame.simTimeS);
+    const hits = drawScene(context2d as unknown as Canvas2DLike, {
+      recording,
+      frame,
+      layout,
+      overlay: wantsOverlay ? overlay : undefined,
+      selection: selectionFor(assignments),
+      unservedFloorIds: unservedFloorsOf(recording),
+      unansweredCallFloorIds: assignments
+        .filter((entry) => entry.answeredByCarId === undefined && entry.waiting > 0)
+        .map((entry) => entry.floorId),
+      lockedOutLandings: lockedOut,
+      queues: queueAt(recording, frame.simTimeS),
+      dayStartS: DAY_START_S,
+    });
+    carBadgeHits = hits.carBadges;
+
+    const alarm = hits.alarm;
+    setHidden(ui.stage.alarm, alarm === undefined);
+    if (alarm !== undefined) {
+      setText(ui.stage.alarmText, `${String(alarm.waiting)} people stacked up at ${alarm.label}`);
+      setText(ui.stage.alarmSub, 'a car is on its way — or add one under Building');
+    }
+    canvas.setAttribute('aria-label', describeFrame({ recording, frame }));
+  }
+
+  function selectionFor(assignments: readonly LandingAssignment[]): SceneSelection | undefined {
+    if (selectedLandingId === '') return undefined;
+    const found = assignments.find((entry) => entry.floorId === selectedLandingId);
+    if (found === undefined) return { floorId: selectedLandingId };
+    return {
+      floorId: found.floorId,
+      answeredByCarId: found.answeredByCarId,
+      answeredInS: found.answeredInS,
+      waiting: found.waiting,
+    };
+  }
+
+  function unservedFloorsOf(recording: VizRecording): readonly string[] {
+    const served = new Set(recording.shafts.flatMap((shaft) => shaft.servedFloorIds));
+    return recording.floors.filter((floor) => !served.has(floor.id)).map((floor) => floor.id);
+  }
+
+  /**
+   * Clicking the badge under a shaft takes that car out of service — § 1.5 B7.
+   *
+   * The hit rectangles come back from `drawScene`, so the click target is wherever the badge was
+   * actually drawn rather than wherever this file thinks it should be. A second copy of the layout
+   * arithmetic here is how a control ends up one pixel out on one building.
+   */
+  function wireStageClicks(): void {
+    ui.stage.canvas.addEventListener('click', (event) => {
+      const hit = badgeAt(event);
+      if (hit === undefined) return;
+      const held = new Set(state.outOfServiceCarIds);
+      if (held.has(hit.carId)) held.delete(hit.carId);
+      else held.add(hit.carId);
+      state = { ...state, outOfServiceCarIds: [...held].sort((a, b) => a.localeCompare(b)) };
+      runShift();
+    });
+    ui.stage.canvas.addEventListener('mousemove', (event) => {
+      ui.stage.canvas.style.cursor = badgeAt(event) === undefined ? 'default' : 'pointer';
+    });
+  }
+
+  function badgeAt(event: MouseEvent): CarBadgeHit | undefined {
+    const rect = ui.stage.canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    return carBadgeHits.find(
+      (hit) =>
+        x >= hit.rect.x &&
+        x <= hit.rect.x + hit.rect.width &&
+        y >= hit.rect.y &&
+        y <= hit.rect.y + hit.rect.height,
+    );
+  }
+
+  function announce(): void {
+    const recording = state.recording;
+    if (recording === undefined || playback === undefined) return;
+    setText(ui.stage.description, describeFrame({ recording, frame: playback.frame() }));
+  }
+
+  /* ---------------------------------------------------------------------- *
+   * The transport — § 1.3 M5
+   * ---------------------------------------------------------------------- */
+
+  function wireTransport(): void {
+    ui.transport.playPause.addEventListener('click', () => {
+      playback?.toggle();
+      drawTransportChrome(viewAt());
+    });
+    ui.transport.stepBack.addEventListener('click', () => {
+      step(-1);
+    });
+    ui.transport.stepForward.addEventListener('click', () => {
+      step(1);
+    });
+    ui.transport.loop.addEventListener('click', () => {
+      setLooping(!looping);
+      // `Playback` takes `loop` at construction, so the change reaches a run already on screen only
+      // by re-adopting it. That was true of the checkbox too; only the event name moved.
+      if (state.recording !== undefined) adopt(state.recording);
+    });
+    ui.transport.timeline.addEventListener('click', (event) => {
+      scrubTo(event.clientX);
+    });
+    ui.transport.timeline.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      event.preventDefault();
+      step(event.key === 'ArrowRight' ? 60 : -60);
+    });
+    // § 4.7 — Run moved into the coach ribbon, beside the three selects that decide what it runs.
+    ui.coach.run.addEventListener('click', () => {
+      runShift();
+    });
+    ui.transport.verify.addEventListener('click', () => {
+      verifyCurrent();
+    });
+    ui.transport.saveRecording.addEventListener('click', () => {
+      saveRecording();
+    });
+    ui.transport.loadRecording.addEventListener('change', () => {
+      void loadRecordingFile();
+    });
+    ui.transport.exportPng.addEventListener('click', () => {
+      exportPng();
+    });
+    ui.transport.seed.addEventListener('change', () => {
+      const raw = ui.transport.seed.value.trim();
+      const seed = raw === '' ? randomSeed() : BigInt(raw.replace(/\D/g, '') || '0');
+      context.update({ seed });
+      runShift();
+    });
+    ui.transport.bankFilter.addEventListener('change', () => {
+      bankFilter = ui.transport.bankFilter.value;
+      drawStage();
+    });
+    ui.transport.landingSelect.addEventListener('change', () => {
+      selectedLandingId = ui.transport.landingSelect.value;
+      drawStage();
+    });
+  }
+
+  /**
+   * The one writer of the loop toggle's two representations.
+   *
+   * `aria-pressed` is not decoration here: `.chip[aria-pressed='true']` is the *only* thing that
+   * makes the chip look on, so a state that reached `looping` without reaching the attribute would
+   * be a transport that loops with its own control drawn off (KB-15 — the state is announced in
+   * words as well as drawn).
+   */
+  function setLooping(on: boolean): void {
+    looping = on;
+    ui.transport.loop.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+
+  function step(frames: number): void {
+    if (playback === undefined) return;
+    playback.pause();
+    playback.seekBy(frames * FRAME_S * playback.speed);
+    renderLive();
+    drawTransportChrome(viewAt());
+  }
+
+  function scrubTo(clientX: number): void {
+    const recording = state.recording;
+    if (recording === undefined || playback === undefined) return;
+    const rect = ui.transport.timeline.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    playback.seekToProgress(fraction);
+    renderLive();
+  }
+
+  /** The parts of the transport that change only when the run or the speed does. */
+  function drawTransportChrome(view: ViewAt): void {
+    const playing = view.playing;
+    setText(ui.transport.playPause, playing ? '❚❚' : '▶');
+    ui.transport.playPause.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+
+    fill(
+      ui.transport.speedChips,
+      ...SPEEDS.map((speed) =>
+        chip(document, {
+          label: `×${String(speed)}`,
+          selected: playback?.speed === speed,
+          title: `${String(speed)} simulated seconds per real second`,
+          onPick: () => {
+            playback?.setSpeed(speed);
+            drawTransportChrome(viewAt());
+          },
+        }),
+      ),
+    );
+
+    const recording = view.recording;
+    if (recording === undefined) {
+      fill(ui.transport.ticks);
+      return;
+    }
+    const segments = timelineOf(recording);
+    /*
+     * The playhead is a child of the timeline and must survive the segments being replaced, so it
+     * is re-appended rather than recreated: recreating it would drop the element `#playhead` names
+     * and `elementMap.test.ts` would be describing a page that no longer exists.
+     */
+    fill(
+      ui.transport.timeline,
+      ...segments.map((segment) =>
+        el(document, 'div', {
+          className: 'phase-seg',
+          title: segment.title,
+          style: {
+            flex: String(segment.span),
+            background: segment.bg,
+          },
+          children: [el(document, 'span', { text: segment.label, style: { color: segment.fg } })],
+        }),
+      ),
+      ui.transport.playhead,
+    );
+    fill(
+      ui.transport.ticks,
+      ...tickLabelsOf(recording, 5).map((label) =>
+        el(document, 'span', { text: label.label }),
+      ),
+    );
+    drawPlayhead(view);
+  }
+
+  function drawPlayhead(view: ViewAt): void {
+    const recording = view.recording;
+    if (recording === undefined) return;
+    const pct = playheadPctOf(recording, view.simTimeS);
+    ui.transport.playhead.style.left = `${pct.toFixed(2)}%`;
+    ui.transport.timeline.setAttribute('aria-valuenow', String(Math.round(pct * 10)));
+    ui.transport.timeline.setAttribute('aria-valuetext', clockAt(view.simTimeS));
+  }
+
+  function fillLandingSelect(recording: VizRecording): void {
+    fillSelect(
+      ui.transport.landingSelect,
+      [
+        { value: '', label: 'none' },
+        ...recording.floors.map((floor) => ({
+          value: floor.id,
+          label: floor.label ?? floor.id,
+        })),
+      ],
+      '',
+    );
+  }
+
+  function fillBankSelect(recording: VizRecording): void {
+    const banks = [...new Set(recording.shafts.map((shaft) => shaft.bankId))].sort((a, b) =>
       a.localeCompare(b),
     );
-    ui.bankFilter.replaceChildren(new Option('all banks', ''));
-    for (const bank of banks) ui.bankFilter.append(new Option(bank, bank));
-    ui.bankFilter.disabled = banks.length < 2;
-  }
-
-  /**
-   * Rebuild the landing selector from the assignments now in force.
-   *
-   * Rebuilt as playback advances rather than once at load, because "which landings have somebody
-   * standing at them" is a property of the *instant*. The first version of this populated the
-   * list at `startedAt`, where nobody is waiting yet, so the control offered exactly one option —
-   * "none" — for the whole run and `RV-T3` was unreachable through the UI it shipped with.
-   *
-   * Skipped when the option set is unchanged, so the reader's open dropdown is not rebuilt under
-   * their cursor sixty times a second.
-   */
-  function populateLandings(next: VizRecording, at: number): void {
-    assignments = landingAssignmentsAt(next, at);
-    const wanted = assignments
-      .map((assignment) => `${assignment.key} ${String(assignment.waiting)}`)
-      .join('|');
-    if (wanted === landingOptionsKey) return;
-    landingOptionsKey = wanted;
-    const chosen = ui.landingSelect.value;
-    ui.landingSelect.replaceChildren(new Option('no landing selected', ''));
-    for (const assignment of assignments) {
-      ui.landingSelect.append(new Option(landingOptionLabel(assignment), assignment.key));
-    }
-    if (assignments.some((assignment) => assignment.key === chosen)) {
-      ui.landingSelect.value = chosen;
-    }
-    ui.landingSelect.disabled = assignments.length === 0;
-  }
-
-  /**
-   * The whole of a call, handed to the renderer.
-   *
-   * Every field is copied rather than a subset chosen per model: the renderer decides what a
-   * `destination-dispatch` selection reads like, and a caller that filtered here would be a
-   * second opinion about the same question.
-   */
-  function selectionOf(assignment: LandingAssignment): SceneSelection {
-    return {
-      floorId: assignment.floorId,
-      answeredByCarId: assignment.answeredByCarId,
-      answeredInS: assignment.answeredInS,
-      waiting: assignment.waiting,
-      oldestWaitS: assignment.oldestWaitS,
-      destinationFloorId: assignment.destinationFloorId,
-      promisedCarId: assignment.promisedCarId,
-    };
-  }
-
-  /* ------------------------------------------------------------------ *
-   * Verify, save, load — PB-05, PB-07, PB-15, PB-16, PB-17
-   * ------------------------------------------------------------------ */
-
-  function verifyReplayControl(): void {
-    if (recording === undefined || lastConfig === undefined) {
-      fail('run something first, then verify it replays.');
-      return;
-    }
-    const options = { fps: 30, speed: 10 } as const;
-    const stored = JSON.parse(JSON.stringify(recording)) as VizRecording;
-    const original = serializeFrames(frameSequence(stored, options));
-    let fresh: VizRecording;
-    try {
-      fresh = recordRun(lastConfig).recording;
-    } catch (error) {
-      fail(`replay failed: ${message(error)}`);
-      return;
-    }
-    const verdict = verifyReplay(stored, fresh);
-    const framesMatch = serializeFrames(frameSequence(fresh, options)) === original;
-    const frames = frameSequence(stored, options).length;
-    if (verdict.matches && framesMatch) {
-      clearError();
-      ui.status.textContent = `replay verified — ${String(frames)} frames identical from seed ${stored.seed} (fingerprint ${verdict.storedFingerprint})`;
-      return;
-    }
-    // PB-16: named fingerprints, and the stored recording stays on screen.
-    fail(
-      framesMatch
-        ? `${verdict.message} (the frame sequences matched but the recordings did not)`
-        : verdict.message,
+    fillSelect(
+      ui.transport.bankFilter,
+      [{ value: '', label: 'all' }, ...banks.map((id) => ({ value: id, label: id }))],
+      bankFilter,
     );
+  }
+
+  /* ---------------------------------------------------------------------- *
+   * Recording in and out
+   * ---------------------------------------------------------------------- */
+
+  function verifyCurrent(): void {
+    const recording = state.recording;
+    if (recording === undefined) return;
+    try {
+      const plan = shiftRunConfigOf(resources, state);
+      const again = recordRun(plan.config, { outOfServiceCarIds: plan.outOfServiceCarIds });
+      const verdict = verifyReplay(recording, again.recording);
+      // The stored recording stays on screen either way — `PB-16`'s second half. A mismatch is
+      // evidence about the build, not a reason to quietly swap in whatever came out.
+      setText(ui.transport.status, verdict.message);
+    } catch (error) {
+      failRun(error);
+    }
   }
 
   function saveRecording(): void {
-    if (recording === undefined) {
-      fail('run something first, then save it.');
-      return;
-    }
-    const blob = new Blob([JSON.stringify(recording)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${recording.buildingId}-${recording.seed}.viz.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    ui.status.textContent = `saved ${anchor.download} (schema ${String(recording.schemaVersion)})`;
+    const recording = state.recording;
+    if (recording === undefined) return;
+    const blob = new Blob([JSON.stringify({ recording, frames: serializeFrames(frameSequence(recording)) })], {
+      type: 'application/json',
+    });
+    downloadBlob(blob, `${recording.buildingId}-${recording.seed}.json`);
   }
 
-  ui.loadRecording.addEventListener('change', (event) => {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
+  async function loadRecordingFile(): Promise<void> {
+    const file = ui.transport.loadRecording.files?.[0];
     if (file === undefined) return;
-    void file.text().then((text) => {
-      const result = readRecordingDocument(text);
-      if (!result.ok) {
-        // PB-15/17/18: the previous run stays on screen and another file can be chosen without
-        // a page reload — the input is not disabled and nothing was torn down.
-        const failure = result.failure;
-        fail(
-          failure.kind === 'parse'
-            ? `${file.name} is not valid JSON: ${failure.message}${failure.position === undefined ? '' : ` (byte ${String(failure.position)})`}`
-            : `${file.name}: ${failure.message}`,
-        );
+    try {
+      const loaded = readRecordingDocument(await file.text());
+      if (!loaded.ok) {
+        setText(ui.transport.error, loaded.failure.message);
+        ui.transport.error.focus();
         return;
       }
-      clearError();
-      lastConfig = undefined; // a loaded recording cannot be re-simulated without its config
-      adopt(result.recording);
-      ui.status.textContent = `loaded ${file.name} — ${statusLine(result.recording)}`;
-    });
-  });
-
-  function copyProvenance(): void {
-    if (recording === undefined) {
-      fail('run something first, then copy its provenance.');
-      return;
+      state = { ...state, recording: loaded.recording, report: undefined };
+      adopt(loaded.recording);
+      renderAll();
+    } catch (error) {
+      failRun(error);
     }
-    // RV-T7: the form the CLI accepts, so a reviewer can paste it into a shell.
-    const line =
-      `npm run sim -- run --building ${recording.buildingId} --dispatcher ${recording.dispatcherProfileId}` +
-      ` --seed ${recording.seed} --duration ${String(Math.round(recording.endedAt - recording.startedAt))}`;
-    void navigator.clipboard
-      .writeText(line)
-      .then(() => {
-        ui.status.textContent = `copied: ${line}`;
-      })
-      .catch(() => {
-        // Clipboard permission is not guaranteed; showing the line is the fallback that works.
-        ui.status.textContent = `could not use the clipboard. Copy this: ${line}`;
-      });
   }
 
   function exportPng(): void {
-    if (recording === undefined) {
-      fail('run something first, then export it.');
-      return;
-    }
-    // RS-08: the seed and the clock are already burned into the header the canvas drew, so the
-    // exported bitmap carries its own provenance.
-    const url = ui.canvas.toDataURL('image/png');
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${recording.buildingId}-${recording.seed}-${Math.round(playback?.simTimeS ?? 0)}s.png`;
-    anchor.click();
-    ui.status.textContent = `exported ${anchor.download}`;
-  }
-
-  /* ------------------------------------------------------------------ *
-   * Transport
-   * ------------------------------------------------------------------ */
-
-  function togglePlay(): void {
-    playback?.toggle();
-    ui.playPause.textContent = playback?.state === 'playing' ? 'Pause' : 'Play';
-  }
-
-  /** One display frame at the current speed — `PB-08`, `KB-06`. Pauses first, as the row says. */
-  function stepFrame(direction: 1 | -1): void {
-    if (playback === undefined) return;
-    playback.pause();
-    ui.playPause.textContent = 'Play';
-    playback.seekBy(direction * FRAME_S * playback.speed);
-  }
-
-  function stepSpeed(direction: 1 | -1): void {
-    const index = SPEEDS.indexOf(Number(ui.speed.value) as (typeof SPEEDS)[number]);
-    const next = SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, index + direction))];
-    if (next === undefined) return;
-    ui.speed.value = String(next);
-    playback?.setSpeed(next);
-    syncUrl();
-  }
-
-  ui.run.addEventListener('click', runOnce);
-  ui.verify.addEventListener('click', verifyReplayControl);
-  ui.copyProvenance.addEventListener('click', copyProvenance);
-  ui.saveRecording.addEventListener('click', saveRecording);
-  ui.exportPng.addEventListener('click', exportPng);
-  ui.playPause.addEventListener('click', togglePlay);
-  ui.stepForward.addEventListener('click', () => {
-    stepFrame(1);
-  });
-  ui.stepBack.addEventListener('click', () => {
-    stepFrame(-1);
-  });
-  ui.speed.addEventListener('change', () => {
-    playback?.setSpeed(Number(ui.speed.value));
-    syncUrl();
-  });
-  ui.loop.addEventListener('change', () => {
-    // `Playback` takes `loop` at construction, so the setting is applied by re-anchoring a new
-    // transport at the current instant rather than by adding a mutable flag to the transport.
-    if (recording === undefined || playback === undefined) return;
-    const at = playback.simTimeS;
-    const wasPlaying = playback.state === 'playing';
-    playback = new Playback(recording, systemClock(), {
-      speed: playback.speed,
-      startAtS: at,
-      autoplay: wasPlaying,
-      loop: ui.loop.checked,
-    });
-  });
-  ui.scrub.addEventListener('input', () => {
-    playback?.seekToProgress(Number(ui.scrub.value) / 1000);
-  });
-  ui.building.addEventListener('change', () => {
-    adhocBuilding = undefined;
-    syncUrl();
-  });
-  ui.dispatcher.addEventListener('change', syncUrl);
-  ui.landingSelect.addEventListener('change', () => {
-    selection = undefined;
-    selectionKey = undefined;
-    const key = ui.landingSelect.value;
-    if (key === '') return;
-    const assignment = assignments.find((candidate) => candidate.key === key);
-    if (assignment === undefined) return;
-    selectionKey = assignment.key;
-    selection = selectionOf(assignment);
-  });
-
-  // KB-03/04/05/06/07 — and KB-08: never while a field has focus.
-  window.addEventListener('keydown', (event) => {
-    const target = event.target;
-    if (
-      target instanceof HTMLInputElement ||
-      target instanceof HTMLSelectElement ||
-      target instanceof HTMLTextAreaElement
-    ) {
-      return;
-    }
-    if (ui.panelEditor.hidden === false) return;
-    if (playback === undefined) return;
-    switch (event.key) {
-      case ' ':
-        event.preventDefault();
-        togglePlay();
-        break;
-      case 'ArrowRight':
-        playback.seekBy(event.shiftKey ? 60 : 5);
-        break;
-      case 'ArrowLeft':
-        playback.seekBy(event.shiftKey ? -60 : -5);
-        break;
-      case 'Home':
-        playback.reset();
-        ui.playPause.textContent = 'Play';
-        break;
-      case 'End':
-        playback.seekTo(playback.recording.endedAt);
-        break;
-      case ',':
-        stepFrame(-1);
-        break;
-      case '.':
-        stepFrame(1);
-        break;
-      case '[':
-        stepSpeed(-1);
-        break;
-      case ']':
-        stepSpeed(1);
-        break;
-      default:
-        break;
-    }
-  });
-
-  /* ------------------------------------------------------------------ *
-   * Tabs — KB-01 (roving tabindex, arrow keys)
-   * ------------------------------------------------------------------ */
-
-  function selectTab(which: 'viewer' | 'editor'): void {
-    const viewer = which === 'viewer';
-    currentTab = which;
-    ui.tabViewer.setAttribute('aria-selected', String(viewer));
-    ui.tabEditor.setAttribute('aria-selected', String(!viewer));
-    ui.tabViewer.tabIndex = viewer ? 0 : -1;
-    ui.tabEditor.tabIndex = viewer ? -1 : 0;
-    ui.panelViewer.hidden = !viewer;
-    ui.panelEditor.hidden = viewer;
-    if (!viewer) {
-      // `D11`: one building across both panes. Declines to act on an unsaved edit — see
-      // `EditorHandle.showBuilding`.
-      editor.showBuilding(ui.building.value);
-      editor.refresh();
-    }
-    syncUrl();
-  }
-
-  ui.tabViewer.addEventListener('click', () => {
-    selectTab('viewer');
-  });
-  ui.tabEditor.addEventListener('click', () => {
-    selectTab('editor');
-  });
-  for (const [tab, other, which] of [
-    [ui.tabViewer, ui.tabEditor, 'editor'],
-    [ui.tabEditor, ui.tabViewer, 'viewer'],
-  ] as const) {
-    tab.addEventListener('keydown', (event) => {
-      if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
-      event.preventDefault();
-      selectTab(which);
-      other.focus();
+    ui.stage.canvas.toBlob((blob) => {
+      if (blob === null) return;
+      downloadBlob(blob, `${state.buildingId}-${state.seed.toString()}.png`);
     });
   }
 
-  /* ------------------------------------------------------------------ *
-   * The editor — ED-04 hands a building back to the viewer
-   * ------------------------------------------------------------------ */
-
-  const editor = mountEditor({
-    resources,
-    // `D11`: the editor opens on the building the URL and the viewer already name, not on
-    // whatever `data/` happens to list first.
-    initialBuildingId: ui.building.value,
-    onOpen: (buildingId) => {
-      applyParam(ui.building, buildingId);
-      // A shipped building was chosen, so the ad-hoc document the editor may have handed over
-      // earlier is no longer what Run means.
-      adhocBuilding = undefined;
-      syncUrl();
-    },
-    onRun: (building) => {
-      adhocBuilding = building;
-      selectTab('viewer');
-      ui.tabViewer.focus();
-      runOnce();
-    },
-    /**
-     * A modal question. Resolves `true` to proceed — `KB-12`.
-     *
-     * `<dialog>.showModal()` gives the focus trap and the focus restore for nothing, which is why
-     * it is used rather than a hand-built overlay. What it does **not** give reliably is the
-     * `close` event: in the automation context this was driven through, a form submit closed the
-     * dialog and set `returnValue` without firing `close` at all, so a promise waiting only on
-     * that event never settled and every confirm flow hung silently — the worst possible failure
-     * for a dialog, because the page looks fine and one code path simply stops.
-     *
-     * So the outcome is taken from whichever of four signals arrives first, and a latch makes the
-     * promise settle exactly once. That is not defensive padding; it is the difference between a
-     * dialog that works in one browser and one that works.
-     */
-    confirm: (text, okLabel) =>
-      new Promise<boolean>((resolve) => {
-        ui.confirmMessage.textContent = text;
-        // The affirmative button says what it does. It said "Discard" for every question, which
-        // on "Open it anyway?" was simply the wrong verb.
-        ui.confirmOk.textContent = okLabel;
-
-        let settled = false;
-        const finish = (value: boolean): void => {
-          if (settled) return;
-          settled = true;
-          ui.confirm.removeEventListener('close', onClose);
-          ui.confirm.removeEventListener('cancel', onCancel);
-          ui.confirmOk.removeEventListener('click', onOk);
-          ui.confirmCancel.removeEventListener('click', onCancel);
-          if (ui.confirm.open) ui.confirm.close();
-          resolve(value);
-        };
-        const onClose = (): void => {
-          finish(ui.confirm.returnValue === 'ok');
-        };
-        const onCancel = (): void => {
-          finish(false);
-        };
-        const onOk = (): void => {
-          finish(true);
-        };
-
-        ui.confirm.addEventListener('close', onClose);
-        ui.confirm.addEventListener('cancel', onCancel); // Escape
-        ui.confirmOk.addEventListener('click', onOk);
-        ui.confirmCancel.addEventListener('click', onCancel);
-        ui.confirm.showModal();
-      }),
-  });
-
-  // `D11`: `?tab=editor` survives a reload, and opens on the building the URL names. After the
-  // mount, because `selectTab('editor')` hands the building over to the editor.
-  if (currentTab === 'editor') selectTab('editor');
-
-  // ED-23: warned before navigation, and only when there is something to lose.
-  window.addEventListener('beforeunload', (event) => {
-    if (!editor.isDirty()) return;
-    event.preventDefault();
-  });
-
-  /* ------------------------------------------------------------------ *
-   * The draw loop
-   * ------------------------------------------------------------------ */
-
-  const ctx = ui.canvas.getContext('2d');
-  if (ctx === null) {
-    // RV-19: explained in text, not thrown into the console.
-    ui.status.textContent =
-      'this browser has no 2D canvas context, so the building cannot be drawn. The run still works and the frame description below is produced.';
-    return;
+  function downloadBlob(blob: Blob, name: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = el(document, 'a', { attrs: { href: url, download: name } });
+    link.click();
+    URL.revokeObjectURL(url);
   }
-  // `CanvasRenderingContext2D.fillStyle` is `string | CanvasGradient | CanvasPattern`, which is
-  // wider than `Canvas2DLike`'s `string`. The narrowing is sound in the direction it is used —
-  // the renderer only ever *writes* strings, never reads a style back — and it is what keeps
-  // `render/canvas.ts` free of DOM types and therefore testable under Node.
-  const surface = ctx as unknown as Canvas2DLike;
 
-  let landingRefreshAt = -Infinity;
+  /* ---------------------------------------------------------------------- *
+   * Keyboard — KB-06, KB-07
+   * ---------------------------------------------------------------------- */
 
-  const tick = (): void => {
-    const ratio = window.devicePixelRatio || 1;
-    const cssWidth = ui.canvas.clientWidth;
-    const cssHeight = ui.canvas.clientHeight;
-    // Both dimensions are checked. Testing width alone leaves a stale backing store when only
-    // the height changes — which it does the moment the status line wraps to a second row, and
-    // the symptom is the previous frame surviving below the new one.
-    const backingWidth = Math.round(cssWidth * ratio);
-    const backingHeight = Math.round(cssHeight * ratio);
-    if (ui.canvas.width !== backingWidth || ui.canvas.height !== backingHeight) {
-      ui.canvas.width = backingWidth;
-      ui.canvas.height = backingHeight;
-    }
-    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-
-    if (playback !== undefined && recording !== undefined && !ui.panelViewer.hidden) {
-      const frame = playback.frame();
-      const bank = ui.bankFilter.value;
-      // RV-06: a bank filter, applied to the *layout* rather than to the frame, so the cars that
-      // are hidden are hidden from the picture and not from the metrics.
-      const shafts =
-        bank === '' ? recording.shafts : recording.shafts.filter((shaft) => shaft.bankId === bank);
-      const wantsOverlay = cssWidth >= OVERLAY_MIN_VIEWPORT_PX;
-      const layout = buildLayout({
-        width: cssWidth,
-        height: cssHeight,
-        floors: recording.floors,
-        shafts,
-        overlayWidthPx: wantsOverlay ? OVERLAY_WIDTH_PX : 0,
-      });
-      // The assignments are refreshed *before* the draw, not after it, because `D10` makes them
-      // an input to the picture rather than only to the landing `<select>`. Drawing first left
-      // the first frame after a run marked from the assignment list of `startedAt`.
-      if (frame.simTimeS - landingRefreshAt > 1 || frame.simTimeS < landingRefreshAt) {
-        landingRefreshAt = frame.simTimeS;
-        // Only while the reader is not holding the control open, for KB-10's reason.
-        if (document.activeElement === ui.landingSelect) {
-          assignments = landingAssignmentsAt(recording, frame.simTimeS);
-        } else {
-          populateLandings(recording, frame.simTimeS);
+  function wireKeyboard(): void {
+    window.addEventListener('keydown', (event) => {
+      const target = event.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+      if (target instanceof HTMLSelectElement) return;
+      switch (event.key) {
+        case ' ':
+          event.preventDefault();
+          playback?.toggle();
+          drawTransportChrome(viewAt());
+          break;
+        case ',':
+          step(-1);
+          break;
+        case '.':
+          step(1);
+          break;
+        case '[':
+        case ']': {
+          const index = SPEEDS.indexOf((playback?.speed ?? 60) as (typeof SPEEDS)[number]);
+          const next = SPEEDS[Math.min(SPEEDS.length - 1, Math.max(0, index + (event.key === ']' ? 1 : -1)))];
+          if (next !== undefined) playback?.setSpeed(next);
+          drawTransportChrome(viewAt());
+          break;
         }
-        if (selection !== undefined) {
-          const fresh = assignments.find((candidate) => candidate.key === selectionKey);
-          selection =
-            fresh === undefined ? { floorId: selection.floorId, waiting: 0 } : selectionOf(fresh);
-        }
+        case 'Enter':
+          if (event.metaKey || event.ctrlKey) closeShift();
+          break;
+        default:
+          break;
       }
+    });
+    ui.report.nextDay.addEventListener('click', () => {
+      state = { ...state, week: nextDay(state.week), report: undefined, tab: 'run' };
+      runShift();
+    });
+    ui.report.back.addEventListener('click', () => {
+      context.update({ tab: 'run' });
+    });
+  }
 
-      const metrics = overlayAt(recording, frame.simTimeS);
-      const unanswered = unansweredCallFloors(recording, assignments);
-      drawScene(surface, {
-        recording,
-        frame,
-        layout,
-        overlay: wantsOverlay ? metrics : undefined,
-        selection,
-        unservedFloorIds: unservedFloors(recording),
-        unansweredCallFloorIds: unanswered,
-      });
+  /* ---------------------------------------------------------------------- *
+   * The confirm dialog — ED-22 / ED-23, KB-12
+   * ---------------------------------------------------------------------- */
 
-      // KB-13: the canvas is not a hole in the page. Updated at most twice a second, because a
-      // live region that changes 60 times a second is unusable rather than accessible.
-      const description = describeFrame({
-        recording,
-        frame,
-        metrics,
-        unansweredCallFloorIds: unanswered,
-      });
-      if (description !== lastDescription) {
-        lastDescription = description;
-        ui.canvas.setAttribute('aria-label', description);
-      }
+  function confirmDiscard(message: string): Promise<boolean> {
+    setText(ui.confirmMessage, message);
+    const previous = document.activeElement;
+    ui.confirm.showModal();
+    return new Promise((resolve) => {
+      ui.confirm.addEventListener(
+        'close',
+        () => {
+          if (previous instanceof HTMLElement) previous.focus();
+          resolve(ui.confirm.returnValue === 'ok');
+        },
+        { once: true },
+      );
+    });
+  }
 
-      // KB-10: the scrub position is written only while the reader is not holding it.
-      if (document.activeElement !== ui.scrub) {
-        ui.scrub.value = String(Math.round(playback.progress * 1000));
-      }
-      if (playback.state === 'ended') ui.playPause.textContent = 'Play';
-    }
-    requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
-
-  // The live region is updated on a slow cadence of its own, so a screen reader is not read a
-  // new sentence every animation frame.
-  window.setInterval(() => {
-    if (ui.panelViewer.hidden) return;
-    ui.description.textContent = lastDescription;
-  }, 2000);
-
-  // Nothing to play until the first run lands. `adopt` and `runOnce`'s failure path keep it
-  // honest from here, so there is no second opinion about when these are live.
-  syncTransport();
-
-  ui.status.textContent = 'ready — press Run, or open the building editor';
-  runOnce();
+  void editor;
 }
 
+const MODE_KEY = 'elevator-sim.viewMode';
+
 /**
- * Floors standing a call that no car answers in this run — `D10`.
+ * Deep links, so a finding can be sent to somebody.
  *
- * `landingAssignmentsAt` only returns calls with somebody waiting at the instant asked for, and
- * `answeredByCarId` is taken off the record rather than guessed, so this is *"nobody ever comes"*
- * and not *"nobody has come yet"*. `promisedCarId` excludes the destination-dispatch case where a
- * panel has already named a car: a promised passenger still standing at the horizon is not an
- * unanswered call, which is the distinction `frame/overlay.ts` § version 4 exists to preserve.
- *
- * Ordered by the building's own floor order, not by id. Sorting the ids as strings read
- * `11, 12, 16, 20, 24, 25, 26, 3, 4, 6, 8, 9` in the spoken description — every digit correct and
- * the sentence useless.
+ * `?building&dispatcher&seed&duration&tab&mode` — the same keys the old viewer accepted, plus
+ * nothing: a link that named a surface this page had renamed would be a broken promise, and
+ * `isTabName` is what refuses one rather than silently opening the first tab.
  */
-function unansweredCallFloors(
-  recording: VizRecording,
-  assignments: readonly LandingAssignment[],
-): readonly string[] {
-  const ids = new Set<string>();
-  for (const assignment of assignments) {
-    if (assignment.waiting === 0) continue;
-    if (assignment.promisedCarId !== undefined) continue;
-    if (assignment.answeredByCarId !== undefined) continue;
-    ids.add(assignment.floorId);
+function applyDeepLink(state: ViewerState, resources: BrowserResources): ViewerState {
+  const params = new URLSearchParams(window.location.search);
+  const patch: { -readonly [K in keyof ViewerState]?: ViewerState[K] } = {};
+  const buildingId = params.get('building');
+  if (buildingId !== null && buildingConfigOf(resources, [], buildingId) !== undefined) {
+    patch.buildingId = buildingId;
   }
-  return recording.floors.map((floor) => floor.id).filter((id) => ids.has(id));
-}
-
-/** Floor ids no shaft in this recording serves — `RV-08`'s unassignable landings. */
-function unservedFloors(recording: VizRecording): readonly string[] {
-  const served = new Set(recording.shafts.flatMap((shaft) => shaft.servedFloorIds));
-  return recording.floors.map((floor) => floor.id).filter((id) => !served.has(id));
-}
-
-function applyParam(select: HTMLSelectElement, value: string | null): void {
-  if (value === null) return;
-  if ([...select.options].some((option) => option.value === value)) select.value = value;
-}
-
-function statusLine(recording: VizRecording): string {
-  const { summary } = recording;
-  // One gate, three surfaces — the status line, the canvas header and the metrics panel.
-  const suppressed = meansAreSuppressed(recording);
-  const parts = [
-    `${recording.buildingName} · ${recording.dispatcherProfileId} · seed ${recording.seed}`,
-  ];
-  // A run that did not deliver everybody is never presented as a completed one (UX.md RV-16).
-  // It leads the line, because it is the fact that decides how much of the rest means anything.
-  if (recording.status !== 'completed') {
-    parts.push(`${recording.status.toUpperCase()} — ${String(summary.undelivered)} undelivered`);
+  const dispatcherId = params.get('dispatcher');
+  if (
+    dispatcherId !== null &&
+    resources.dispatcherProfiles.profiles.some((profile) => profile.id === dispatcherId)
+  ) {
+    patch.dispatcherId = dispatcherId;
   }
-  parts.push(`${String(summary.generated)} generated, ${String(summary.delivered)} delivered`);
-  if (summary.generated === 0) {
-    // RV-11: an explanation, not an empty chart.
-    parts.push('no passengers were generated in this window — nothing to watch');
+  const seed = params.get('seed');
+  if (seed !== null && /^\d+$/.test(seed)) patch.seed = BigInt(seed);
+  const duration = params.get('duration');
+  if (duration !== null && /^\d+$/.test(duration)) {
+    patch.shiftLengthS = Math.max(60, Math.min(7200, Number(duration)));
   }
-  parts.push(
-    suppressed
-      ? `AWT suppressed${summary.awtInvalidReason === undefined ? '' : ` — ${summary.awtInvalidReason}`}`
-      : `AWT ${summary.meanWaitS.toFixed(1)} s · WT95 ${summary.wait95S.toFixed(1)} s`,
-  );
-  return parts.join('   ·   ');
+  const tab = params.get('tab');
+  if (isTabName(tab)) patch.tab = tab;
+  const segment = params.get('rail');
+  if (isRailSegment(segment)) patch.railSegment = segment;
+  const mode = params.get('mode');
+  if (isViewMode(mode)) patch.mode = mode;
+  return { ...state, ...patch, shiftLengthS: patch.shiftLengthS ?? DEFAULT_SHIFT_LENGTH_S };
 }
 
 /**
- * A seed drawn from the browser's CSPRNG, printed so the run can be reproduced.
+ * A seed nobody chose, so the first shift is not the same shift for everybody.
  *
- * This is not a simulation random draw — it chooses which run to watch, and it is echoed into
- * the seed field the moment it is used. Nothing inside the simulation ever calls it (CLAUDE.md
- * invariant 2: every draw inside a run comes from a named stream on the injected `StreamSet`).
+ * `crypto.getRandomValues` and not `Math.random()`: invariant 2 is about the *simulation's* random
+ * numbers and this is not one of them, but the habit is worth keeping — and a seed is written into
+ * the record, so a weak one would be a weak provenance.
  */
 function randomSeed(): bigint {
   const bytes = new Uint32Array(2);
   crypto.getRandomValues(bytes);
-  return (BigInt(bytes[0] ?? 1) << 32n) | BigInt(bytes[1] ?? 1);
+  return (BigInt(bytes[0] ?? 1) << 16n) ^ BigInt(bytes[1] ?? 1);
 }
 
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+/**
+ * The boot, and the last resort.
+ *
+ * If `elements()` throws, the page has no error slot to write into — that was the defect that put
+ * `MissingElementsError` in `elementMap.ts` — so this prepends one rather than failing silently in
+ * a console nobody has open.
+ *
+ * The condition is *is there a page at all*. In a browser it is always true and nothing about the
+ * shipped behaviour changes; under `vitest`'s `environment: 'node'` it is false, which is what lets
+ * a test import this module for the pure functions it exports. Every other module in `dev/` is
+ * already importable that way — this one ran the whole shell on import, so nothing in it could be
+ * tested, and {@link waitLegendEntries} is the first thing here that has to be.
+ */
+if (typeof document !== 'undefined') {
+  void main().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    const pre = document.createElement('pre');
+    pre.style.cssText = 'color:#e0473a;padding:12px;white-space:pre-wrap;font:12px ui-monospace,monospace';
+    pre.textContent = `The viewer did not start.\n\n${message}`;
+    document.body.prepend(pre);
+  });
 }
 
-void main().catch((error: unknown) => {
-  // A page that stops without saying so is the failure `RV-21` shipped with. There is no state to
-  // recover here, so the last thing this file does is refuse to fail quietly.
-  const node = document.getElementById('error');
-  if (node !== null) node.textContent = `the viewer failed to start: ${message(error)}`;
-});
+export { applyDeepLink, randomSeed, SPEEDS };
+export type { ViewerState };

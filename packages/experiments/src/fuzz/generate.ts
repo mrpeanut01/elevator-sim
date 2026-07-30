@@ -60,13 +60,37 @@
  * (CLAUDE.md invariant 7) — a thirteenth profile, or a second gated term, is covered on the day it
  * lands in `data/`.
  *
- * What that does **not** do is widen the axis. {@link GENERATED_CALL_TYPES} is the two rungs of the
- * information ladder the campaign explores, and `destination-entry` — the middle rung, legal for
- * eleven of the twelve shipped profiles — is still unreached by both corpora. Widening it is a
- * coverage decision with a different blast radius (it moves roughly half of every corpus, and under
- * access zoning it is a *third* case rather than a second, being a call that carries a destination
- * but no credential), and it belongs to its own task rather than to this one. `generate.test.ts` asserts
- * both halves: that every generated pair is legal, and that the unexplored rung is named.
+ * ## All three rungs are drawn, and the credential question stopped being a binary
+ *
+ * {@link GENERATED_CALL_TYPES} was for one wave the *two* ends of the ladder, with the middle rung —
+ * `destination-entry`, which knows the destination and not the credential — stated as an unexplored
+ * gap. It is now the whole of `CALL_TYPES`. What that cost, measured rather than predicted, is in
+ * `DECISIONS.md` § D126: **900 of 2 064 cases change `callType`, twelve of them also gain
+ * `access-lockout`, and no other field of any case moves** — no building, seed, horizon, arrival
+ * rate, demand template, obstruction probability or service schedule, because the draw sits in the
+ * same position in the same stream and still consumes exactly one float.
+ *
+ * Widening it made the access-zone arm a genuine three-way, and the third arm is **not** the one the
+ * gap's own description predicted. *"A call carrying a destination but no credential"* is true of
+ * `destination-entry` beside a **conventional** profile and false beside a panel: `costRequestFor`
+ * reads `callType === 'mobile-credential' || call.panelAuthorized === true`, and
+ * `Simulation.#callValue` sets `panelAuthorized` for every run whose passenger model is
+ * `destination-dispatch` — because `#bankCanCarry`, which every waiting passenger has just passed,
+ * **is** the access check, run at the kiosk with the passenger's real credential. So the credential
+ * question is a property of the `(profile, callType)` pair and not of the call type alone, and
+ * {@link callCarriesCredential} derives it from `core`'s own two functions rather than restating
+ * either. `properties.ts` asks the same function, because a fuzz property that disagreed with
+ * `costRequestFor` about who is servable would exempt exactly the passengers it exists to count.
+ *
+ * **What the widening found is a `core` defect, and it is open.** The middle rung beside a
+ * conventional profile makes a landing call that carries a destination and no credential; if the
+ * head of that landing's queue is bound for a restricted floor, every car answers
+ * `destinationAccessDenied` and **everybody behind them is stranded**, including passengers whose
+ * own journey touches no zone at all. Deep tier, 2 000 cases: **32 failures, every one of them P5
+ * on a `destination-entry` case tagged `access-lockout`** — 32 of the 90 such cases, 35.6 %, across
+ * nine dispatchers and all four topologies, with the rest of the tier clean. Proven pre-existing at
+ * `63186a8` by moving only the call type on baseline's own `fuzz-145`. See `DECISIONS.md` § D128
+ * (`C35`): the fix belongs in `sim/simulation.ts` `#callValue` and is **not** a bound to move.
  *
  * ## Connectivity is a construction guarantee, not a filter
  *
@@ -84,6 +108,7 @@ import {
   DispatchError,
   dispatchParameterValue,
   parseBuilding,
+  passengerModelOf,
   resolveBuilding,
   resolveDispatchConfig,
   type BuildingConfig,
@@ -213,30 +238,66 @@ export interface GenerateOptions {
  * -------------------------------------------------------------------------- */
 
 /**
- * The call types the campaign draws from, and the one it does not.
+ * The call types the campaign draws from: **all three rungs of the ladder**.
  *
- * The two ends of the `dispatch.callType` ladder: a landing button that knows neither destination
- * nor credential, and a phone that knows both. They are the two that matter to the rest of this
- * file, because the access-zone axis turns on whether the call carries a **credential** — a
- * restricted landing is servable under one and a lockout under the other.
+ * A landing button that knows neither destination nor credential, a panel that knows the
+ * destination, and a phone that knows both. Every rung matters to the rest of this file, because
+ * the access-zone axis turns on whether the call carries a **credential** — a restricted landing is
+ * servable when it does and a lockout when it does not.
  *
- * `destination-entry` — the middle rung, which knows the destination and not the credential — is
- * deliberately **not** here, and that is a coverage gap this file states rather than hides. See the
- * module docstring; `generate.test.ts` asserts the gap is named and not merely absent.
+ * Derived from `CALL_TYPES` rather than listed, and no longer a filter over it: a fourth rung added
+ * to `core` is drawn on the day it lands, and `legalCallTypesFor` decides per profile which of them
+ * a case may actually name.
  */
-export const GENERATED_CALL_TYPES: readonly CallType[] = Object.freeze(
-  CALL_TYPES.filter((callType) => callType !== 'destination-entry'),
-);
+export const GENERATED_CALL_TYPES: readonly CallType[] = Object.freeze([...CALL_TYPES]);
 
 /**
- * The call type an access-restricted landing needs before its passengers can be carried at all.
+ * The one call type that carries a credential **on its own**, whatever profile it sits beside.
  *
  * A literal because it is a property of what the *call type* knows rather than a tunable: `docs/06`
  * § Stage 1 — *"mobile-credential knows both"* — and `core` publishes no predicate for the
- * credential half (`isDestinationCallType` covers only the destination half). Named here so the two
- * places the generator depends on it read as one fact.
+ * credential half (`isDestinationCallType` covers only the destination half). It is only half the
+ * answer; {@link callCarriesCredential} is the whole one.
  */
 const CREDENTIALED_CALL_TYPE: CallType = 'mobile-credential';
+
+/**
+ * Whether a call registered under this `(profile, callType)` pair reaches the cars **with a
+ * credential on it** — the single fact that decides whether an access-restricted landing is
+ * servable or a lockout.
+ *
+ * Two grounds, and the second is the one widening the ladder to `destination-entry` exposed:
+ *
+ * 1. **The call type knows the credential.** `mobile-credential` and nothing else.
+ * 2. **A landing panel already checked it.** `costRequestFor` reads
+ *    `callType === 'mobile-credential' || call.panelAuthorized === true`, and
+ *    `Simulation.#callValue` sets `panelAuthorized` on every call of a run whose passenger model is
+ *    `destination-dispatch`. That is not a loophole: `#bankCanCarry` — the predicate every waiting
+ *    passenger passed before a call value exists — *is* the access check, run against the
+ *    building's zoning with the passenger's real credential, and forwarding its verdict is what
+ *    stopped a bare destination arm being unable to serve `secure-tower` at all (§ D30).
+ *
+ * So `destination-entry` beside `eta` is a call with a destination and no credential, and
+ * `destination-entry` beside a panel profile is a call with both. **The middle rung is not one arm;
+ * it is two, and which one it is depends on the profile.** Read off the **resolved** stage for the
+ * reason `cli/commands/compare.ts` § `modelOfProfile` gives: `resolveDispatchConfig` is what applies
+ * the defaults, and reading the authored `dispatch.passengerAssignment` would be a second opinion
+ * about a question `core` has already answered.
+ *
+ * A pair the resolver **refuses** has no run to be true of, so it falls back to ground 1 alone
+ * rather than throwing: this predicate is asked by `properties.ts` about a case that is already
+ * running, and by the draw below only about pairs {@link carriesCallType} has already admitted.
+ */
+export function callCarriesCredential(profile: DispatcherProfile, callType: CallType): boolean {
+  if (callType === CREDENTIALED_CALL_TYPE) return true;
+  const candidate: DispatcherProfile = { ...profile, dispatch: { ...profile.dispatch, callType } };
+  try {
+    return passengerModelOf(resolveDispatchConfig(candidate).dispatch) === 'destination-dispatch';
+  } catch (error) {
+    if (error instanceof DispatchError) return false;
+    throw error;
+  }
+}
 
 const DISPATCH_PARAMETER_BY_ID = new Map(
   DISPATCH_PARAMETERS.map((parameter) => [parameter.id, parameter]),
@@ -305,8 +366,8 @@ export function legalCallTypesFor(profile: DispatcherProfile): readonly CallType
   if (legal.length === 0) {
     throw new Error(
       `dispatcher profile "${profile.id}" can carry none of the call types the fuzz generator draws ` +
-        `(${GENERATED_CALL_TYPES.join(', ')}), so no case can name it. Widen GENERATED_CALL_TYPES or ` +
-        `fix the profile; do not skip it silently.`,
+        `(${GENERATED_CALL_TYPES.join(', ')} — the whole ladder), so no case can name it. Fix the ` +
+        `profile, or explain why a shipped dispatcher is unrunnable; do not skip it silently.`,
     );
   }
   return legal;
@@ -327,6 +388,39 @@ function pick<T>(rng: Rng, items: readonly T[]): T {
 function uniform(rng: Rng, low: number, high: number, decimals = 2): number {
   const scale = 10 ** decimals;
   return Math.round((low + rng.nextFloat() * (high - low)) * scale) / scale;
+}
+
+/**
+ * How often an access-zoned case is run with a call the restricted landings will refuse.
+ *
+ * A minority on purpose: a lockout is a legitimate operating condition and a corpus made mostly of
+ * them would be a corpus mostly measuring passengers nobody is allowed to carry. Named because two
+ * expressions now depend on the same number — whether the roll fell in the lockout arm, and where
+ * inside that arm it fell.
+ */
+const LOCKOUT_PROBABILITY = 0.25;
+
+/**
+ * Which rung of an arm a roll already inside that arm selects — **no second draw**.
+ *
+ * `roll` fell in `[0, LOCKOUT_PROBABILITY)` (the lockout arm) or in `[LOCKOUT_PROBABILITY, 1)` (the
+ * credentialed arm); its position *within* its own sub-interval is a uniform variate that has
+ * already been spent, and spending it twice costs nothing a fuzz corpus is measuring. The
+ * alternative — a second `nextFloat()` — moves every scalar drawn after it in every access-zoned
+ * case, which is the diff nobody could read that `caseFromSeed`'s draw order exists to prevent.
+ *
+ * Clamped at both ends rather than trusted: `roll` is `[0, 1)` so the index is in range by
+ * construction, and a clamp is cheaper than a `c8 ignore` on a branch nobody can reach.
+ */
+function rungFromRoll(
+  rungs: readonly CallType[],
+  roll: number,
+  inLockoutArm: boolean,
+): CallType | undefined {
+  const width = inLockoutArm ? LOCKOUT_PROBABILITY : 1 - LOCKOUT_PROBABILITY;
+  const position = (inLockoutArm ? roll : roll - LOCKOUT_PROBABILITY) / width;
+  const index = Math.min(rungs.length - 1, Math.max(0, Math.floor(position * rungs.length)));
+  return rungs[index];
 }
 
 /* -------------------------------------------------------------------------- *
@@ -740,29 +834,45 @@ export function caseFromSeed(fuzzSeed: number | bigint, options: GenerateOptions
   // The call types this profile can actually be run under — never all of them, and never a fixed
   // list. See `legalCallTypesFor`.
   const callTypes = legalCallTypesFor(dispatcherProfile);
-  const credentialed = callTypes.find((id) => id === CREDENTIALED_CALL_TYPE);
-  const uncredentialed = callTypes.find((id) => id !== CREDENTIALED_CALL_TYPE);
+  const credentialed = callTypes.filter((id) => callCarriesCredential(dispatcherProfile, id));
+  const uncredentialed = callTypes.filter((id) => !callCarriesCredential(dispatcherProfile, id));
 
-  // With restricted floors in play a bare up/down button carries no credential, so a call from
-  // a restricted landing is unassignable and those passengers are locked out for the whole run.
-  // That is a real operating condition and it is generated on purpose in a minority of cases —
-  // tagged, so the starvation property can tell "abandoned" from "not authorized to travel".
+  // With restricted floors in play a call carrying no credential is unassignable from a restricted
+  // landing, and those passengers are locked out for the whole run. That is a real operating
+  // condition and it is generated on purpose in a minority of cases — tagged, so the starvation
+  // property can tell "abandoned" from "not authorized to travel".
   //
   // The draw is made whenever there are access zones and is *then* resolved against what the
   // profile can carry, rather than the two being folded into one condition: the `fuzz.run` stream
   // must advance identically whatever the profile is, or making the generator profile-aware would
   // move every scalar drawn after it — the horizon, the arrival rate, the service schedule that is
   // a function of the horizon — in every case, for a reason that has nothing to do with them.
-  const lockoutDrawn = accessZones.length > 0 && runRng.nextFloat() < 0.25;
-  const underAccessZones = (lockoutDrawn ? uncredentialed : credentialed) ?? credentialed ?? uncredentialed;
-  /* c8 ignore next 4 -- `legalCallTypesFor` throws on an empty set, so one of the two is present. */
+  //
+  // **One float, still.** Since `destination-entry` joined the ladder each arm can hold more than
+  // one rung — `{up-down-buttons, destination-entry}` uncredentialed for a conventional profile,
+  // `{destination-entry, mobile-credential}` credentialed for a panel one, because a panel
+  // authorizes at the kiosk ({@link callCarriesCredential}). Which rung is read off the position of
+  // the **same** roll inside the sub-interval it already fell in, rather than off a second draw. A
+  // second draw here would move the horizon, the arrival rate, the door-obstruction probability and
+  // the whole service schedule of every access-zoned case, for a reason that has nothing to do with
+  // any of them — the identical argument the paragraph above makes, applied one level down.
+  const lockoutRoll = accessZones.length > 0 ? runRng.nextFloat() : undefined;
+  const lockoutDrawn = lockoutRoll !== undefined && lockoutRoll < LOCKOUT_PROBABILITY;
+  const arm = lockoutDrawn && uncredentialed.length > 0 ? uncredentialed : credentialed;
+  const underAccessZones = rungFromRoll(
+    arm.length > 0 ? arm : callTypes,
+    lockoutRoll ?? 0,
+    lockoutDrawn,
+  );
+  /* c8 ignore next 4 -- `legalCallTypesFor` throws on an empty set, so a rung is always present. */
   if (underAccessZones === undefined) {
     throw new Error(`no legal call type for dispatcher profile "${dispatcherProfileId}"`);
   }
   const callType: CallType = accessZones.length === 0 ? pick(runRng, callTypes) : underAccessZones;
-  // The tag is read off the chosen call type rather than off the draw, so it says what is true of
-  // the case: restricted landings are locked out exactly when the call carries no credential.
-  const lockout = accessZones.length > 0 && callType !== CREDENTIALED_CALL_TYPE;
+  // The tag is read off the chosen call type *beside its profile* rather than off the draw, so it
+  // says what is true of the case: restricted landings are locked out exactly when the call reaches
+  // the cars without a credential, which under a panel is never.
+  const lockout = accessZones.length > 0 && !callCarriesCredential(dispatcherProfile, callType);
 
   // Drawn here rather than inline in the returned object literal, in exactly the order they were
   // drawn before this axis existed — `arrivalRatePctPop5min`, then `durationS`, then

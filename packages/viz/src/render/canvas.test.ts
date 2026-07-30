@@ -15,12 +15,16 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { FIXTURE_DOOR_CONFIG } from '../fixtures.test-helper.js';
+import { FIXTURE_DOOR_CONFIG, fixtureSummary } from '../fixtures.test-helper.js';
 import { constantSeries } from '../contract/series.js';
 import { VIZ_SCHEMA_VERSION, type Frame, type VizRecording } from '../contract/types.js';
-import { buildLayout } from './layout.js';
+import { DEFAULT_FOOTER_PX, MIN_HEADER_PX, buildLayout } from './layout.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
-import { DEFAULT_THEME, drawScene, formatClock, type Canvas2DLike } from './canvas.js';
+import { DEFAULT_THEME, drawScene, formatClock, type Canvas2DLike, type Theme } from './canvas.js';
+import type { FloorQueue, QueuedRider, WaitBand } from '../frame/overlay.js';
+import { MOOD_GLYPH, type BuildingMood } from './mood.js';
+import { BAND_GLYPH } from './riderQueue.js';
+import { windowClause } from './runSummary.js';
 
 /* -------------------------------------------------------------------------- *
  * A recording context
@@ -63,11 +67,32 @@ class RecordingContext implements Canvas2DLike {
   beginPath(): void {
     this.#push('beginPath');
   }
+  closePath(): void {
+    this.#push('closePath');
+  }
   moveTo(x: number, y: number): void {
     this.#push('moveTo', x, y);
   }
   lineTo(x: number, y: number): void {
     this.#push('lineTo', x, y);
+  }
+  /*
+   * The four members `Canvas2DLike` gained with the design handoff's stage, **all recorded**.
+   *
+   * Recording them rather than swallowing them is the whole reason those four were the ones
+   * admitted to the interface: the sky's ramp, the car's rounded body and a rider's bobbing head
+   * are now part of the transcript, so *"equal frames draw equal call sequences"* covers them.
+   * A no-op stub here would have made the animation invisible to the one test that keeps a
+   * scrubbed frame reproducible.
+   */
+  quadraticCurveTo(cpx: number, cpy: number, x: number, y: number): void {
+    this.#push('quadraticCurveTo', cpx, cpy, x, y);
+  }
+  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number): void {
+    this.#push('arc', x, y, radius, startAngle, endAngle, this.fillStyle);
+  }
+  fill(): void {
+    this.#push('fill', this.fillStyle);
   }
   stroke(): void {
     this.#push('stroke', this.strokeStyle);
@@ -124,16 +149,13 @@ const RECORDING: VizRecording = {
     boardedLegs: constantSeries(0),
     meanWaitS: constantSeries(0),
   },
-  summary: {
-    saturated: false,
-    awtIsValid: true,
-    meanWaitS: 12,
-    wait95S: 30,
-    meanTimeToDestinationS: 40,
-    generated: 50,
-    delivered: 50,
-    undelivered: 0,
-  },
+  summary: fixtureSummary(),
+  // Version 7. Empty is the legal value for a fixture that exercises none of the three:
+  // the timeline draws one unlabelled band, the decision log draws its empty state, and
+  // no shaft is dark. See `contract/types.ts`.
+  demandPhases: [],
+  decisions: [],
+  outOfServiceCarIds: [],
   warnings: [],
 };
 
@@ -193,6 +215,81 @@ function draw(f: Frame, recording: VizRecording = RECORDING): RecordingContext {
 }
 
 /* -------------------------------------------------------------------------- *
+ * Reading the two shapes the design handoff's stage draws with paths
+ * -------------------------------------------------------------------------- */
+
+interface PathBox {
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+  readonly bottom: number;
+  /** Corner radius, recovered from the `moveTo` that opens the path. */
+  readonly radius: number;
+  readonly fill: string;
+}
+
+/**
+ * Every rounded rectangle in a transcript, as a box.
+ *
+ * `render/shapes.ts` traces a rounded rect as `beginPath · moveTo · … · closePath · fill`, and
+ * every one of those calls records its own numbers — which is the reason `Canvas2DLike` was
+ * allowed to grow `quadraticCurveTo` and `fill` at all. A disc (`beginPath · arc · fill`) is
+ * skipped by the `moveTo` check, so a rider's head is never mistaken for a car.
+ */
+function roundedPaths(ctx: RecordingContext): readonly PathBox[] {
+  const boxes: PathBox[] = [];
+  for (let index = 0; index < ctx.calls.length; index += 1) {
+    if (ctx.calls[index]?.op !== 'beginPath') continue;
+    const move = ctx.calls[index + 1];
+    if (move?.op !== 'moveTo') continue;
+    const xs: number[] = [];
+    const ys: number[] = [];
+    let fill: string | undefined;
+    for (let cursor = index + 1; cursor < ctx.calls.length; cursor += 1) {
+      const call = ctx.calls[cursor];
+      if (call === undefined) break;
+      if (call.op === 'moveTo' || call.op === 'lineTo') {
+        xs.push(Number(call.args[0]));
+        ys.push(Number(call.args[1]));
+        continue;
+      }
+      if (call.op === 'quadraticCurveTo') {
+        xs.push(Number(call.args[0]), Number(call.args[2]));
+        ys.push(Number(call.args[1]), Number(call.args[3]));
+        continue;
+      }
+      if (call.op === 'closePath') continue;
+      if (call.op === 'fill') fill = String(call.args[0]);
+      break;
+    }
+    if (fill === undefined || xs.length < 8) continue;
+    const left = Math.min(...xs);
+    boxes.push({
+      left,
+      right: Math.max(...xs),
+      top: Math.min(...ys),
+      bottom: Math.max(...ys),
+      radius: Number(move.args[0]) - left,
+      fill,
+    });
+  }
+  return boxes;
+}
+
+/** The four fills a car body can have. Read from the theme, never transcribed. */
+const LOAD_FILLS: ReadonlySet<string> = new Set([
+  DEFAULT_THEME.carLight,
+  DEFAULT_THEME.car,
+  DEFAULT_THEME.carHeavy,
+  DEFAULT_THEME.carOverload,
+]);
+
+/** The first car body in a transcript — the only rounded path filled in a load colour. */
+function carBodyPath(ctx: RecordingContext): PathBox | undefined {
+  return roundedPaths(ctx).find((box) => LOAD_FILLS.has(box.fill));
+}
+
+/* -------------------------------------------------------------------------- *
  * Tests
  * -------------------------------------------------------------------------- */
 
@@ -204,6 +301,40 @@ describe('drawScene', () => {
     expect(ctx.calls.some((call) => call.op === 'fillText')).toBe(true);
   });
 
+  /*
+   * `docs/10-experience-layer-contract.md` § 7.4 / `UX.md` RV-T4 — every figure carries its
+   * window, on the surface that leaves the building.
+   *
+   * The header quotes a running mean and the panel quotes windowed figures; a bitmap that says
+   * neither which window nor how long it was is a bitmap whose numbers will be read as covering
+   * the whole run. **Export PNG** writes this canvas to a file, so the footer is where it has to
+   * be — not in the DOM panel, which the export does not capture.
+   *
+   * Recomputed from the recording rather than written down: replacing the clause with a constant
+   * makes the second assertion fail, and dropping it makes the first fail.
+   */
+  it('names the reporting window in the footer, so the exported PNG says what it covers', () => {
+    const text = draw(frame())
+      .calls.filter((call) => call.op === 'fillText')
+      .map((call) => String(call.args[0]));
+    expect(text.some((line) => line.includes(windowClause(RECORDING.summary)))).toBe(true);
+
+    const moved: VizRecording = {
+      ...RECORDING,
+      summary: {
+        ...RECORDING.summary,
+        reportWindow: { ...RECORDING.summary.reportWindow, id: 'full-run', startS: 0, endS: 600 },
+      },
+    };
+    const after = new RecordingContext();
+    drawScene(after, { recording: moved, frame: frame(), layout, theme: DEFAULT_THEME });
+    expect(
+      after.calls
+        .filter((call) => call.op === 'fillText')
+        .some((call) => String(call.args[0]).includes('full-run 0–600 s')),
+    ).toBe(true);
+  });
+
   it('is a pure function of its inputs: equal frames draw equal call sequences', () => {
     expect(draw(frame()).transcript).toBe(draw(frame()).transcript);
   });
@@ -213,17 +344,37 @@ describe('drawScene', () => {
   });
 
   it('places the car at the pixel its height maps to, not at the nearest floor', () => {
+    /*
+     * ## Why this assertion moved, and why it is stronger than the one it replaces
+     *
+     * The car used to be a `fillRect` and this test found it by *"the rectangle whose height is
+     * `carHeightPx`"*, then checked one number: its top edge. The design handoff's car is a
+     * rounded path (`render/shapes.ts`), so that finder no longer matches anything — and the
+     * replacement is not a translation of the old assertion but a wider one, because the path
+     * records four numbers where the rectangle recorded two.
+     *
+     * Checked here: the top edge is `yForHeight(h) − carHeightPx/2` **and** the bottom edge is
+     * exactly `carHeightPx` below it **and** the corner radius lies inside the box. The old test
+     * could not see the bottom edge at all — it took the height on faith from the finder it used
+     * to locate the call, so a renderer that drew the right top and the wrong height passed it.
+     *
+     * The property being defended is unchanged and is the whole reason the frame producer
+     * evaluates an S-curve: a car's y must be a **continuous** function of its height in metres.
+     * A renderer that drew the nearest floor instead would pass every other test in this package.
+     */
     const midway = draw(frame());
-    const expectedY = layout.yForHeight(1.5) - layout.carHeightPx / 2;
-    const carRect = midway.calls.find(
-      (call) => call.op === 'fillRect' && call.args[3] === layout.carHeightPx,
-    );
-    expect(carRect).toBeDefined();
-    expect(carRect?.args[1]).toBeCloseTo(expectedY, 9);
+    const expectedTop = layout.yForHeight(1.5) - layout.carHeightPx / 2;
+    const body = carBodyPath(midway);
+    expect(body, 'the car body is drawn as a rounded path').toBeDefined();
+    expect(body?.top).toBeCloseTo(expectedTop, 9);
+    expect((body?.bottom ?? 0) - (body?.top ?? 0)).toBeCloseTo(layout.carHeightPx, 9);
+    expect(body?.radius ?? 0).toBeGreaterThan(0);
+    expect(body?.radius ?? 0).toBeLessThanOrEqual(layout.carHeightPx / 2);
 
     // And a car 1 cm higher must draw 1 cm higher, not identically.
     const nudged = draw(frame({ cars: [car({ heightM: 1.51 })] }));
     expect(nudged.transcript).not.toBe(midway.transcript);
+    expect(carBodyPath(nudged)?.top ?? 0).toBeLessThan(body?.top ?? 0);
   });
 
   it('draws the door gap in proportion to the open fraction', () => {
@@ -438,5 +589,513 @@ describe('formatClock', () => {
 
   it('does not produce a negative clock', () => {
     expect(formatClock(-30)).toBe('0:00');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * U4 — rider queues and the mood, on the bitmap (`docs/10` § 6, D1 + D4)
+ * -------------------------------------------------------------------------- */
+
+const BANDS: readonly WaitBand[] = ['settling', 'waiting', 'long', 'abandoned'];
+
+describe('drawScene draws the rider queue', () => {
+  const band = (index: number): WaitBand => BANDS[index % BANDS.length] ?? 'settling';
+
+  function queue(total: number, overrides: Partial<FloorQueue> = {}): FloorQueue {
+    const riders: QueuedRider[] = Array.from({ length: total }, (_, index) => ({
+      passengerId: `p${String(index)}`,
+      waitedS: 100 - index,
+      direction: 'up' as const,
+      destinationFloorId: 'G',
+      promisedCarId: undefined,
+      band: band(index),
+    }));
+    return {
+      floorId: 'G',
+      riders,
+      groups: [
+        { key: '', promisedCarId: undefined, riders, total, oldestWaitS: riders[0]?.waitedS ?? 0 },
+      ],
+      total,
+      oldestWaitS: riders[0]?.waitedS ?? 0,
+      worstBand: total > 3 ? 'abandoned' : band(Math.max(0, total - 1)),
+      recentlyBoarded: 0,
+      ...overrides,
+    };
+  }
+
+  function withQueues(queues: readonly FloorQueue[], theme = DEFAULT_THEME): RecordingContext {
+    const ctx = new RecordingContext();
+    drawScene(ctx, { recording: RECORDING, frame: frame(), layout, theme, queues });
+    return ctx;
+  }
+
+  /**
+   * The aggregated **bars**, and only those — `fillRect`s in a band colour that land in the
+   * landing gutter, right of the plot.
+   *
+   * ## Why the position filter is a tightening rather than a loosening
+   *
+   * A band colour used to identify a bar on its own, because a bar was the only thing on the
+   * canvas painted one. The design handoff's stage draws the waiting people as little figures in
+   * `Layout.riderLane`, tinted by the same four bands — so `queueBands.long` now matches a bar
+   * *and* every torso standing on that floor, and a bare colour filter counted three things where
+   * it means to count one (measured: 120 for the 40 rows below, where 40 is the answer).
+   *
+   * The fix is not to loosen the count. It is to say **where** a bar is, which the old assertion
+   * never did: the bar belongs to the landing row in the gutter and the figures belong inside the
+   * plot, and a renderer that drew the bar in the wrong place now fails this rather than passing
+   * it. See `render/riderFigures.ts` for why the figures are additional to the glyph row and are
+   * never allowed to replace it.
+   */
+  function barsIn(ctx: RecordingContext, band: WaitBand, at = layout): readonly Call[] {
+    const gutter = at.plot.x + at.plot.width;
+    return ctx.calls.filter(
+      (call) =>
+        call.op === 'fillRect' &&
+        call.args[4] === DEFAULT_THEME.queueBands[band] &&
+        Number(call.args[0]) >= gutter,
+    );
+  }
+
+  it('draws nothing new when no queues are supplied — the shipped picture is unchanged', () => {
+    // The regression guard for every other test in this file: U4 is additive, and a viewer that
+    // has not computed a queue draws exactly what it drew before.
+    const ctx = new RecordingContext();
+    drawScene(ctx, { recording: RECORDING, frame: frame(), layout, theme: DEFAULT_THEME });
+    expect(ctx.transcript).toBe(draw(frame()).transcript);
+  });
+
+  it('draws one glyph per waiting rider, in that rider’s own band', () => {
+    const glyphs = withQueues([queue(4)])
+      .calls.filter((call) => call.op === 'fillText')
+      .map((call) => String(call.args[0]));
+    // Read from the shipped map, never transcribed: the abandoned band was re-spelled to break a
+    // *shape* collision with `✗` (`render/landingMarks.test.ts`), and a test carrying its own
+    // copy of the four marks would have gone red for the change rather than for a defect.
+    for (const wanted of BANDS.map((band) => BAND_GLYPH[band])) {
+      expect(glyphs, `band glyph ${wanted}`).toContain(wanted);
+    }
+  });
+
+  it('keeps the band distinguishable when every band colour is the same — KB-15', () => {
+    /*
+     * The acceptance test for *"bands must be distinguishable by SHAPE, not colour alone"*, on the
+     * surface a reader actually looks at. The theme's four band colours are collapsed to one
+     * string — a greyscale display, a monochrome printer, a screenshot run through a filter — and
+     * the four bands must still be four different marks.
+     */
+    const flat: Theme = {
+      ...DEFAULT_THEME,
+      queueBands: { settling: '#fff', waiting: '#fff', long: '#fff', abandoned: '#fff' },
+    };
+    const marks = withQueues([queue(4)], flat)
+      .calls.filter((call) => call.op === 'fillText' && call.args[3] === '#fff')
+      .map((call) => String(call.args[0]));
+    expect(new Set(marks).size).toBe(4);
+    expect([...new Set(marks)].sort((a, b) => a.localeCompare(b))).toEqual(
+      BANDS.map((band) => BAND_GLYPH[band]).sort((a, b) => a.localeCompare(b)),
+    );
+  });
+
+  it('degrades to a bar past the glyph budget, with the count beside it', () => {
+    // 175 waiting is M5's measured depth on Midtown Office. The bar is a `fillRect`; the number
+    // is drawn as text beside it, because a bar is never the only carrier of its value.
+    const ctx = withQueues([queue(175)]);
+    const text = ctx.calls.filter((call) => call.op === 'fillText').map((call) => String(call.args[0]));
+    // The count survives at every gutter width. It is the value a bar may never carry alone.
+    expect(text.some((line) => line.includes('175 waiting'))).toBe(true);
+    // The oldest wait is the *secondary* fact and is dropped when the row is too narrow for it,
+    // rather than being drawn off the end of the canvas. This layout's gutter is the 76 px
+    // default, so it is dropped here — and present when there is room, below.
+    expect(text.some((line) => line.includes('longest'))).toBe(false);
+    const roomy = new RecordingContext();
+    drawScene(roomy, {
+      recording: RECORDING,
+      frame: frame(),
+      layout: buildLayout({
+        width: 900,
+        height: 640,
+        floors: RECORDING.floors,
+        shafts: RECORDING.shafts,
+        gutterRightPx: 360,
+      }),
+      theme: DEFAULT_THEME,
+      queues: [queue(175)],
+    });
+    expect(
+      roomy.calls
+        .filter((call) => call.op === 'fillText')
+        .some((call) => String(call.args[0]).includes('175 waiting · longest')),
+    ).toBe(true);
+    // …and a bar rectangle in one of the band colours, in the landing gutter — see `barsIn`.
+    expect(barsIn(ctx, 'abandoned').length).toBe(1);
+    /*
+     * Deeper queue, longer bar — and not proportionally, which is what the log scale is for.
+     *
+     * Both queues in **one** scene, because that is the comparison the scale is defined for: the
+     * bars are scaled against the deepest queue at this instant, so two of them drawn separately
+     * would each fill their own track and comparing across draws would assert nothing. Drawn
+     * together, 175 against 379 is 175 against 379.
+     */
+    const both = withQueues([queue(379), { ...queue(175), floorId: '2' }]);
+    const widths = barsIn(both, 'abandoned').map((call) => Number(call.args[2]));
+    expect(widths).toHaveLength(2);
+    const [deep, shallow] = widths as [number, number];
+    expect(deep).toBeGreaterThan(shallow);
+    // Linear would put 175 at 46 % of 379. Logarithmic puts it far higher — which is the property
+    // that keeps a queue of 20 visible on a building whose worst landing holds 379.
+    expect(shallow / deep).toBeGreaterThan(0.8);
+    expect(shallow / deep).toBeCloseTo(Math.log1p(175) / Math.log1p(379), 6);
+  });
+
+  it('draws the promised car above its riders, so a Level-1 landing is not drawn as a Level-0 one', () => {
+    const riderFor = (id: string, carId: string): QueuedRider => ({
+      passengerId: id,
+      waitedS: 20,
+      direction: 'up',
+      destinationFloorId: '3',
+      promisedCarId: carId,
+      band: 'settling',
+    });
+    const a = [riderFor('a1', 'main-A'), riderFor('a2', 'main-A')];
+    const b = [riderFor('b1', 'main-B')];
+    const panelQueue: FloorQueue = {
+      floorId: 'G',
+      riders: [...a, ...b],
+      groups: [
+        { key: 'main-A', promisedCarId: 'main-A', riders: a, total: 2, oldestWaitS: 20 },
+        { key: 'main-B', promisedCarId: 'main-B', riders: b, total: 1, oldestWaitS: 20 },
+      ],
+      total: 3,
+      oldestWaitS: 20,
+      worstBand: 'settling',
+      recentlyBoarded: 0,
+    };
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: RECORDING,
+      frame: frame(),
+      layout: buildLayout({
+        width: 900,
+        height: 640,
+        floors: RECORDING.floors,
+        shafts: RECORDING.shafts,
+        gutterRightPx: 300,
+      }),
+      theme: DEFAULT_THEME,
+      queues: [panelQueue],
+    });
+    const labels = ctx.calls
+      .filter((call) => call.op === 'fillText' && call.args[3] === DEFAULT_THEME.badge)
+      .map((call) => String(call.args[0]));
+    // The entrance badge shares the badge colour, so it is filtered out by shape rather than the
+    // assertion being loosened: `⌂ G` is the floor gutter's, and the two promises are the row's.
+    expect(labels.filter((line) => line.includes('main'))).toEqual(['main-A ', 'main-B ']);
+  });
+
+  it('draws the `+N` the plan produced, inside the row, not a constant', () => {
+    // 20 riders into a row that fits a few of them. The number is the row's, recomputed here.
+    const narrowLayout = buildLayout({
+      width: 900,
+      height: 640,
+      floors: RECORDING.floors,
+      shafts: RECORDING.shafts,
+      gutterRightPx: 150,
+    });
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: RECORDING,
+      frame: frame(),
+      layout: narrowLayout,
+      theme: DEFAULT_THEME,
+      queues: [queue(20)],
+    });
+    /*
+     * The landing **row**, which since the design handoff's stage is not the only thing on the
+     * canvas that can print a `+N`.
+     *
+     * `Layout.riderLane` draws the same crowd as little figures inside the plot and states its own
+     * overflow the same way, so `find(text === '+7')` can now land on either. The two counts are
+     * different claims — one is *this row ran out of cells*, the other is *this lobby ran out of
+     * floor* — and this test is about the first. Filtering to the gutter is what keeps it about
+     * the first; the numbers happen to agree today, and a test that would pass on either is a
+     * test measuring whichever it reached.
+     */
+    const gutter = narrowLayout.plot.x + narrowLayout.plot.width;
+    const onTheRow = ctx.calls.filter(
+      (call) => call.op === 'fillText' && Number(call.args[1]) >= gutter,
+    );
+    const drawn = onTheRow.map((call) => String(call.args[0]));
+    const bandMarks: readonly string[] = BANDS.map((band) => BAND_GLYPH[band]);
+    const glyphCount = drawn.filter((line) => bandMarks.includes(line)).length;
+    expect(glyphCount).toBeGreaterThan(0);
+    expect(glyphCount).toBeLessThan(20);
+    expect(drawn).toContain(`+${String(20 - glyphCount)}`);
+
+    /*
+     * …and it is drawn **inside** the canvas, not past its right edge.
+     *
+     * Driven on Midtown Office at 5:05, seed 42, where the Garage row read `18 waiti` with the
+     * rest under the metrics panel. The glyphs fill to the row width and the count follows them,
+     * so the row has to keep cells back for it — and nothing else in this file would notice if it
+     * stopped. A clipped count is worse than no count: the reader cannot tell which digits are
+     * missing.
+     */
+    const label = `+${String(20 - glyphCount)}`;
+    const call = onTheRow.find((entry) => entry.args[0] === label);
+    const x = Number(call?.args[1] ?? 0);
+    expect(x).toBeGreaterThan(0);
+    expect(x + label.length * 7.2).toBeLessThanOrEqual(narrowLayout.width - 12);
+  });
+
+  it('draws the counts and the queue, not one instead of the other', () => {
+    // The direction split is the only thing on the row that says which way people want to go, so
+    // U4 adds to it rather than replacing it.
+    const ctx = withQueues([queue(3)]);
+    expect(ctx.transcript).toContain('▲3');
+    expect(ctx.transcript).toContain('○');
+  });
+
+  it('marks a boarding that just happened, on both the bar row and the glyph row', () => {
+    /*
+     * **Both**, and the second half is here because the first was passing for the wrong reason.
+     * The default 76 px gutter leaves five cells, and a queue that reserves five for its own
+     * count has none left — so this row was a *bar*, and the mutation that deleted the relief mark
+     * from the **glyph** branch came back green. The wide layout below exercises that branch.
+     */
+    const narrow = withQueues([queue(2, { recentlyBoarded: 3 })]);
+    expect(
+      narrow.calls
+        .filter((call) => call.op === 'fillText' && call.args[3] === DEFAULT_THEME.queueRelief)
+        .map((call) => String(call.args[0])),
+    ).toEqual(['✓3']);
+
+    const wide = new RecordingContext();
+    drawScene(wide, {
+      recording: RECORDING,
+      frame: frame(),
+      layout: buildLayout({
+        width: 900,
+        height: 640,
+        floors: RECORDING.floors,
+        shafts: RECORDING.shafts,
+        gutterRightPx: 300,
+      }),
+      theme: DEFAULT_THEME,
+      queues: [queue(2, { recentlyBoarded: 3 })],
+    });
+    const drawn = wide.calls.filter((call) => call.op === 'fillText');
+    // Glyph mode: two riders, each drawn, and the relief mark after them.
+    expect(drawn.filter((call) => call.args[3] === DEFAULT_THEME.queueBands.settling)).toHaveLength(1);
+    expect(
+      drawn
+        .filter((call) => call.args[3] === DEFAULT_THEME.queueRelief)
+        .map((call) => String(call.args[0])),
+    ).toEqual(['✓3']);
+  });
+});
+
+describe('drawScene draws the building mood — D4, and R1’s payoff', () => {
+  const mood = (level: 'calm' | 'frustrated' | 'distressed', provisional = false): BuildingMood => ({
+    level,
+    glyph: MOOD_GLYPH[level],
+    headline: `headline for ${level}`,
+    drivers: [],
+    provisional,
+    caveat: 'not a verdict on the dispatcher',
+  });
+
+  it('puts the glyph and the headline on the canvas, so Export PNG carries them', () => {
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: RECORDING,
+      frame: frame(),
+      layout,
+      theme: DEFAULT_THEME,
+      mood: mood('distressed'),
+    });
+    expect(ctx.transcript).toContain(`${MOOD_GLYPH.distressed} headline for distressed`);
+  });
+
+  it('is drawn on a run whose mean is refused — the whole point of R1', () => {
+    /*
+     * The header two lines up says `mean wait suppressed`. The mood line is still there, because
+     * nothing it is made of is routed through `awtIsValid` — which is what makes the treatment
+     * available on the ~46 of 60 shipped configurations where no mean may be shown (M1).
+     */
+    const run = { ...RECORDING, summary: { ...RECORDING.summary, saturated: true, awtIsValid: false } };
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: run,
+      frame: frame(),
+      layout,
+      theme: DEFAULT_THEME,
+      mood: mood('distressed'),
+    });
+    expect(ctx.transcript).toContain('mean wait suppressed');
+    expect(ctx.transcript).toContain('headline for distressed');
+  });
+
+  it('reads the mood it is given rather than deriving one of its own', () => {
+    const calm = new RecordingContext();
+    drawScene(calm, {
+      recording: RECORDING,
+      frame: frame(),
+      layout,
+      theme: DEFAULT_THEME,
+      mood: mood('calm'),
+    });
+    expect(calm.transcript).toContain('headline for calm');
+    expect(calm.transcript).not.toContain('headline for distressed');
+  });
+
+  it('draws no mood line at all when none is supplied', () => {
+    expect(draw(frame()).transcript).not.toContain('headline');
+  });
+});
+
+describe('a building whose rows cannot be labelled aggregates all the way to a bar', () => {
+  /*
+   * The case driven in a browser and fixed there: Midtown Office's 21 floors in a short canvas put
+   * the floor lines 7 px apart, and two queue captions were drawn on top of each other — text that
+   * carries less than nothing. `FloorRow.labelled` is the layout's own answer to "can this row
+   * hold 12 px of type", so the queue reuses it rather than inventing a second threshold.
+   *
+   * The **limitation this test pins** is stated rather than hidden: on those rows the bar is drawn
+   * with no count beside it. The count still reaches the reader through `describeFrame`, which
+   * names the busiest floors with their numbers.
+   */
+  const tall: VizRecording = {
+    ...RECORDING,
+    floors: Array.from({ length: 40 }, (_, index) => ({
+      id: `F${String(index)}`,
+      index,
+      heightM: index * 3,
+      isEntrance: index === 0,
+      isTransferFloor: false,
+      population: 20,
+    })),
+    shafts: [shaft({ servedFloorIds: Array.from({ length: 40 }, (_, i) => `F${String(i)}`) })],
+  };
+  const tallLayout = buildLayout({
+    width: 900,
+    height: 400,
+    floors: tall.floors,
+    shafts: tall.shafts,
+  });
+
+  it('draws bars everywhere and a caption only where a label fits', () => {
+    const unlabelled = tallLayout.rows.filter((row) => !row.labelled);
+    expect(unlabelled.length).toBeGreaterThan(0);
+
+    const queues: FloorQueue[] = tall.floors.map((floor) => {
+      const rider: QueuedRider = {
+        passengerId: `p-${floor.id}`,
+        waitedS: 200,
+        direction: 'up',
+        destinationFloorId: 'F0',
+        promisedCarId: undefined,
+        band: 'long',
+      };
+      return {
+        floorId: floor.id,
+        riders: [rider, rider],
+        groups: [{ key: '', promisedCarId: undefined, riders: [rider, rider], total: 2, oldestWaitS: 200 }],
+        total: 2,
+        oldestWaitS: 200,
+        worstBand: 'long',
+        recentlyBoarded: 0,
+      };
+    });
+
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: tall,
+      frame: frame({
+        landings: tall.floors.map((floor) => ({ floorId: floor.id, waitingUp: 2, waitingDown: 0 })),
+      }),
+      layout: tallLayout,
+      theme: DEFAULT_THEME,
+      queues,
+    });
+
+    // Every floor gets a bar — the aggregation is what makes a 40-storey building drawable.
+    const bars = ctx.calls.filter(
+      (call) =>
+        call.op === 'fillRect' &&
+        call.args[4] === DEFAULT_THEME.queueBands.long &&
+        Number(call.args[0]) >= tallLayout.plot.x + tallLayout.plot.width,
+    );
+    expect(bars).toHaveLength(40);
+    // No glyphs: a row that cannot hold a label cannot hold twelve of these either.
+    const text = ctx.calls.filter((call) => call.op === 'fillText').map((call) => String(call.args[0]));
+    expect(text).not.toContain('●');
+    // …and the captions are exactly as many as the rows that can carry one.
+    const captions = text.filter((line) => line.includes('2 waiting'));
+    expect(captions.length).toBe(tallLayout.rows.filter((row) => row.labelled).length);
+    expect(captions.length).toBeLessThan(40);
+    expect(captions.length).toBeGreaterThan(0);
+  });
+
+  it('aggregates a row that has the pitch for a glyph but not the room for a label', () => {
+    /*
+     * The window between the two thresholds — pitch at least `MIN_GLYPH_PITCH_PX` (12) and less
+     * than the layout's `MIN_LABEL_PITCH_PX` (14) — where a row *could* hold a glyph and cannot
+     * hold the text that identifies it. Without this, the mutation that drops `labelled` from the
+     * decision comes back green, because every other case is already decided by the pitch alone.
+     */
+    const between = buildLayout({
+      width: 900,
+      // 20 gaps at 13 px, plus the header, footer and padding the layout subtracts. The header is
+      // `MIN_HEADER_PX` and the footer `DEFAULT_FOOTER_PX`, not literals, because both are
+      // *derived* from the rows their bands hold (`render/layout.ts`) — a transcribed 64 stopped
+      // being true the moment the header grew a row, and a transcribed 28 stopped being true the
+      // moment the foot band grew the out-of-service badge row. This test's whole point is the
+      // two-pixel window it lands the pitch in, so a stale constant does not fail it loudly; it
+      // moves the pitch out of the window and the test starts measuring a different case.
+      height: 20 * 13 + 24 + MIN_HEADER_PX + DEFAULT_FOOTER_PX,
+      floors: tall.floors.slice(0, 21),
+      shafts: tall.shafts,
+    });
+    expect(between.pitchPx).toBeGreaterThanOrEqual(12);
+    expect(between.pitchPx).toBeLessThan(14);
+    const thinned = between.rows.filter((row) => !row.labelled);
+    expect(thinned.length).toBeGreaterThan(0);
+
+    const rider: QueuedRider = {
+      passengerId: 'p',
+      waitedS: 200,
+      direction: 'up',
+      destinationFloorId: 'F0',
+      promisedCarId: undefined,
+      band: 'long',
+    };
+    const queues: FloorQueue[] = between.rows.map((row) => ({
+      floorId: row.floorId,
+      riders: [rider],
+      groups: [{ key: '', promisedCarId: undefined, riders: [rider], total: 1, oldestWaitS: 200 }],
+      total: 1,
+      oldestWaitS: 200,
+      worstBand: 'long',
+      recentlyBoarded: 0,
+    }));
+
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: { ...tall, floors: tall.floors.slice(0, 21) },
+      frame: frame({
+        landings: between.rows.map((row) => ({ floorId: row.floorId, waitingUp: 1, waitingDown: 0 })),
+      }),
+      layout: between,
+      theme: DEFAULT_THEME,
+      queues,
+    });
+
+    // One glyph per labelled row, a bar for every row — the thinned rows aggregate rather than
+    // drawing a mark nothing on the screen identifies.
+    const glyphs = ctx.calls.filter((call) => call.op === 'fillText' && call.args[0] === '●');
+    expect(glyphs).toHaveLength(between.rows.filter((row) => row.labelled).length);
+    expect(glyphs.length).toBeLessThan(between.rows.length);
   });
 });

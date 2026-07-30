@@ -466,3 +466,69 @@ describe('docs/05-roadmap.md § Phase 5 — which entry point regenerates which 
     }
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * The access-control coverage table, re-derived rather than transcribed
+ * -------------------------------------------------------------------------- */
+
+/**
+ * `docs/05-roadmap.md`'s H-ACCESS-1 table must be renderable from the study's own pins.
+ *
+ * This exists because the figures it checks went stale and **three guards watched it happen.**
+ * The `C35` fix moved the bare-kiosk arm from `27.6 | 51.7 %` to `52.2 | 100.0 %`, and:
+ *
+ * - `benchmark/accessControl.test.ts` asserted **inequalities** — *worse than conventional* — and
+ *   every one of them held *more* strongly afterwards, so it stayed green.
+ * - `benchmark/published.test.ts`'s interval layer scans for literals shaped `N [N, N]`.
+ *   `51.7 %` is not one.
+ * - Its study layer had excluded H-ACCESS-1 on the correct observation that a categorical has no
+ *   standard error and nothing for a pin to hold — which was read as a licence to hold nothing.
+ *
+ * So the number that was wrong was the one no layer could see, in the direction that made its own
+ * sentence *more* true. That is the third time this repository has published a figure its code no
+ * longer produced (`docs/07` § 3), and the first time the figure was categorical.
+ *
+ * `PINNED_COVERAGE` now holds the counts and `derivedCoverageForms()` renders every precision the
+ * documents print at. This asserts the document against that vocabulary, so the roadmap copy cannot
+ * drift from the study again without going red.
+ */
+describe('docs/05-roadmap.md § H-ACCESS-1 — the coverage table is derived, not transcribed', () => {
+  /** `| **0 of 30** | 18.2 | 33.5 % |` → `0 of 30 | 18.2 | 33.5 %`. */
+  const normalizeRow = (row: string): string =>
+    row
+      .replaceAll('**', '')
+      .split('|')
+      .map((cell) => cell.trim())
+      .filter((cell) => cell !== '')
+      .slice(1) // drop the arm label; the numbers are what is pinned
+      .join(' | ');
+
+  it('renders every published coverage row from the study’s own pins', async () => {
+    const { derivedCoverageForms } = await import('../benchmark/accessControl.js');
+    const legal = derivedCoverageForms();
+
+    expect(legal.size, 'the coverage vocabulary is empty — the pins are gone').toBeGreaterThan(3);
+
+    const roadmap = read('docs', '05-roadmap.md');
+    const heading = roadmap.indexOf('**H-ACCESS-1 — coverage.');
+    expect(heading, 'docs/05-roadmap.md no longer states H-ACCESS-1').toBeGreaterThan(0);
+
+    const table = roadmap.slice(heading, roadmap.indexOf('\n\n', roadmap.indexOf('|', heading)));
+    const rows = table
+      .split('\n')
+      .filter((line) => line.startsWith('| `'))
+      .map(normalizeRow);
+
+    expect(rows.length, 'no arm rows parsed — the table moved and this guard stopped looking').toBe(
+      3,
+    );
+
+    const undeclared = rows.filter((row) => !legal.has(row));
+    expect(
+      undeclared,
+      'a coverage row in docs/05-roadmap.md that benchmark/accessControl.ts’s PINNED_COVERAGE ' +
+        'cannot render. Re-run runAccessControlStudy and re-pin both places, or the document is ' +
+        'quoting a run the code no longer produces — which is exactly how 51.7 % survived the C35 fix.',
+    ).toEqual([]);
+  });
+});

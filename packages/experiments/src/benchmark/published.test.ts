@@ -211,16 +211,16 @@ describe('every interval printed in benchmark/ is re-derivable from a pinned est
           derivableCount += count;
           continue;
         }
-        actualUnpinned.set(`${file} ${text}`, count);
+        actualUnpinned.set(`${file}\u0000${text}`, count);
       }
     }
 
     const expectedUnpinned = new Map(
-      UNPINNED_INTERVALS.map((entry) => [`${entry.file} ${entry.text}`, entry.count]),
+      UNPINNED_INTERVALS.map((entry) => [`${entry.file}\u0000${entry.text}`, entry.count]),
     );
 
     for (const [key, count] of actualUnpinned) {
-      const [file, text] = key.split(' ');
+      const [file, text] = key.split('\u0000');
       const expected = expectedUnpinned.get(key);
       if (expected === undefined) {
         undeclared.push(
@@ -237,7 +237,7 @@ describe('every interval printed in benchmark/ is re-derivable from a pinned est
       }
     }
     for (const [key, count] of expectedUnpinned) {
-      const [file, text] = key.split(' ');
+      const [file, text] = key.split('\u0000');
       if (!actualUnpinned.has(key)) {
         undeclared.push(
           `${file}: UNPINNED_INTERVALS declares "${text}" ×${count}, which no longer appears there ` +

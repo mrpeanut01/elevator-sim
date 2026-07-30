@@ -40,8 +40,8 @@
  *
  * ## What is deliberately *not* here
  *
- * The sequential-stopping arithmetic — the t-distribution for `n ≤ 25`, the normal
- * approximation past it — and the paired-t interval belong to `stats/`. This module declares
+ * The sequential-stopping arithmetic — Student-t at `n − 1`, at **every** `n` — and the paired-t
+ * interval belong to `stats/`. This module declares
  * the **port** ({@link StoppingRule}) and consumes whatever satisfies it. That is not
  * squeamishness about a dependency: the runner's job is to decide *when to ask* and to keep the
  * answer reproducible, and a runner that also owned the statistics would make the stopping rule
@@ -53,6 +53,7 @@ import type {
   DemandTemplateId,
   DispatchPolicyOptions,
   DispatcherProfile,
+  DispatcherProfiles,
   ElevatorSpecs,
   ResolvedBuilding,
   RunRecord,
@@ -471,6 +472,18 @@ export interface ExperimentResources {
   readonly dispatcherProfilesById: ReadonlyMap<string, DispatcherProfile>;
   readonly trafficProfiles: TrafficProfiles;
   readonly elevatorSpecs?: ElevatorSpecs | undefined;
+  /**
+   * The whole of `data/dispatcher-profiles.json`, for its file-level `patternSwitching` block.
+   *
+   * Copied onto every cell's `SimulationConfig.dispatcherProfiles`, which is what lets a profile
+   * opt into a weight-set selector as data and have `compare` and `tune` honour it. Optional and
+   * satisfied by `LoadedConfig` for free, so a caller that hands `loadConfig()` straight in gets
+   * it; a caller that assembles derived resources by hand and omits it gets what it got before,
+   * and a profile of its that then asks for a selector is refused by name rather than run without
+   * one. `DispatcherArmSpec.options.weightSets` still overrides it, for a study switching among a
+   * *derived* library rather than the shipped one.
+   */
+  readonly dispatcherProfiles?: DispatcherProfiles | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -600,6 +613,12 @@ export type RawReplicationOutcome =
       readonly traceDigest: string;
       readonly tracePassengers: number;
       readonly undeliveredCount: number;
+      /**
+       * `StageActivity.kioskRefusedLegs` — see {@link ReplicationRecord.kioskRefusedLegs}.
+       *
+       * A plain number, so the worker path carries it through `postMessage` without a codec.
+       */
+      readonly kioskRefusedLegs: number;
       readonly warnings: readonly string[];
     }
   | {
@@ -636,6 +655,24 @@ export interface ReplicationRecord {
   readonly tracePassengers: number;
   readonly conservation: ConservationAudit;
   readonly undeliveredCount: number;
+  /**
+   * `StageActivity.kioskRefusedLegs`: distinct legs the **bare kiosk** refused — a destination
+   * disclosed with no credential beside it, on a floor an access zone covers.
+   *
+   * The **one** field of `StageActivity`'s twenty that this record carries, and it is here because
+   * it has a reader in the same commit (`benchmark/accessControl.ts`'s coverage column). The other
+   * nineteen are deliberately not copied: DECISIONS.md § D63 (`VizRecording.legs`) is the rule —
+   * a field lands *with* its first consumer, and copying the rest "while we are in there" is how a
+   * contract acquires twenty fields and one reader. `capacityReassignment.ts` still reaches its
+   * three counters by driving `Simulation` directly, which is the honest cost of that rule rather
+   * than an oversight.
+   *
+   * Zero for every profile `data/dispatcher-profiles.json` ships — all twelve run at
+   * `up-down-buttons` or `mobile-credential` — so a non-zero value here names a *derived* arm.
+   * It is the half an unserved fraction cannot express: an unserved leg says somebody was not
+   * carried, and this says the interface refused them before any car was asked.
+   */
+  readonly kioskRefusedLegs: number;
   /** Present iff the plan asked for records. */
   readonly record?: RunRecord | undefined;
   readonly warnings: readonly string[];
@@ -685,16 +722,31 @@ export interface StoppingVerdict {
   readonly n?: number | undefined;
   readonly mean?: number | undefined;
   readonly stdDev?: number | undefined;
-  /** Which approximation the rule used — `'t'` for `n ≤ 25`, `'z'` past it. */
+  /**
+   * Whatever the estimator calls its own quantile family, recorded verbatim and never re-derived.
+   *
+   * `'t'` from the shipped estimator, at **every** `n` — `validation/harness.ts` composes
+   * `productionStoppingRule` out of `reports/statistics`'s `estimateMean`, which is Student-t at
+   * `n − 1` throughout. This field used to document the family as *`'t'` for `n ≤ 25`, `'z'` past
+   * it*; that crossover was deleted from the code in `89bbf37` (DECISIONS.md § D14) and from
+   * docs/03 § Part 3 on 2026-07-27, and the docstring outlived both.
+   *
+   * It is a `string` rather than a union because the port takes *any* estimator: the runner's own
+   * `docHalfWidth` test double deliberately reports `'z'` past n = 25, which is how
+   * `stopping.test.ts` proves the value is recorded rather than recomputed.
+   */
   readonly distribution?: string | undefined;
 }
 
 /**
  * The sequential stopping rule, as a port.
  *
- * docs/03-traffic-and-statistics.md § Part 3 specifies the arithmetic — `t[n-1, conf]` for
- * `n ≤ 25`, `z[conf]` beyond it, stop when `halfWidth < acceptableRange` — and it lives in
- * `stats/sequentialStopping`, not here. Wire it in with a one-line adaptor:
+ * docs/03-traffic-and-statistics.md § Part 3 specifies the arithmetic — `t[n-1, conf]` at **every**
+ * `n`, no crossover, stop when `halfWidth < acceptableRange` — and it lives in
+ * `stats/sequentialStopping`, not here. (That section wrote a `t` ≤ 25 / `z` above split until
+ * 2026-07-27; it now names that as literature rather than as this repository's rule, and no code
+ * here has implemented it since `89bbf37` — DECISIONS.md § D14.) Wire it in with a one-line
+ * adaptor:
  *
  * ```ts
  * await runExperiment(spec, config, {

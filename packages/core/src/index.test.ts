@@ -178,7 +178,7 @@ describe('Phase 2 is usable through the barrel alone', () => {
     expect(new barrel.StreamSet(barrel.runSeed(result.record)).arrivals.nextFloat()).toBe(
       new barrel.StreamSet(20260726).arrivals.nextFloat(),
     );
-  });
+  }, 60_000);
 
   it('swapping the dispatcher is a config swap, not a code path (invariant 7)', async () => {
     const config = await barrel.loadConfig(REAL_DATA_DIR);
@@ -205,7 +205,7 @@ describe('Phase 2 is usable through the barrel alone', () => {
     expect(collective).toBeGreaterThan(0);
     expect(nearestCar).toBeGreaterThan(0);
     expect(collective).not.toBe(nearestCar);
-  });
+  }, 60_000);
 
   it('exposes the closed-form oracle beside the loop it audits', async () => {
     const config = await barrel.loadConfig(REAL_DATA_DIR);

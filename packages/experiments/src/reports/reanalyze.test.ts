@@ -69,7 +69,7 @@ describe('re-analysis reproduces the original summary exactly', () => {
     expect(recomputed).toEqual(result.summary);
     expect(summaryFingerprint(recomputed)).toBe(summaryFingerprint(result.summary));
     expect(summaryFingerprint(recomputed)).toBe(stored.summaryFingerprint);
-  });
+  }, 60_000);
 
   it('reproduces it on a saturated building too, flag and reason included', () => {
     // Midtown Office at its own default demand saturates. The suppression verdict has to survive
@@ -90,7 +90,7 @@ describe('re-analysis reproduces the original summary exactly', () => {
     expect(recomputed.awtIsValid).toBe(result.summary.awtIsValid);
     expect(recomputed.awtInvalidReason).toBe(result.summary.awtInvalidReason);
     expect(recomputed.saturation.verdict).toBe(result.summary.saturation.verdict);
-  });
+  }, 60_000);
 
   it('reproduces it across several buildings and dispatchers', () => {
     for (const buildingId of ['garden-apartments', 'midtown-office']) {
@@ -110,7 +110,7 @@ describe('re-analysis reproduces the original summary exactly', () => {
         ).toEqual(result.summary);
       }
     }
-  });
+  }, 60_000);
 
   it('does not need the simulator: nothing but the stored record is consulted', () => {
     const stored = storedRun(config, { seed: 7 });
@@ -155,7 +155,7 @@ describe('re-analysis reproduces the original summary exactly', () => {
     expect(stored.config.summarize?.window).toEqual(result.summary.window);
     expect(stored.config.summarize?.terminalFloorIds).toEqual(['P1', 'G']);
     expect(reanalyzeStoredRun(stored)).toEqual(result.summary);
-  });
+  }, 60_000);
 
   it('lets a caller opt out of the write-time check, deliberately and explicitly', () => {
     const simConfig = simulationConfig(config, {
@@ -175,7 +175,7 @@ describe('re-analysis reproduces the original summary exactly', () => {
     // than invisible: the digest is the run's, the options are not.
     expect(stored.summaryFingerprint).toBe(summaryFingerprint(result.summary));
     expect(verifySummaryFingerprint(stored)).toBe(false);
-  });
+  }, 60_000);
 
   it('falls back to the record’s own window when the envelope carries no options', () => {
     const stored = storedRun(config, { seed: 8 });

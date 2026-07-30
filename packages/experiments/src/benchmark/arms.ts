@@ -354,6 +354,88 @@ export const DESTINATION_CASES: readonly BenchmarkCase[] = Object.freeze([
   }),
 ]);
 
+/* -------------------------------------------------------------------------- *
+ * The lunch two-way operating point
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Midtown Office at lunch: the building's second design case, and the first shipped operating
+ * point whose directional mix moves inside the measured window.**
+ *
+ * ## Why this building, and why for its own reasons
+ *
+ * `docs/03` § Demand targets has named two-way traffic a *governing peak* since it was written,
+ * and the lift literature is blunter than that: the lunch period can be 20–30 % more demanding
+ * than the up-peak handling capacity, so a system tuned only for the morning can disappoint at
+ * midday. This repository shipped **no** two-way operating point on any office building.
+ * Midtown Office is the project's primary office building and its Phase 2 validation case, it
+ * already ships an up-peak point and an interfloor-mix point, and it shipped no lunch point at
+ * all. That gap is the reason this exists, and it would be worth closing if no dispatcher were
+ * ever measured here.
+ *
+ * The interfloor-mix point is the instructive comparison. Its 40/30/30 split is an **authored**
+ * mix with no source cited anywhere in this repository; the lunch template's 45/45/10 period mean
+ * is CIBSE Guide D's own figure for exactly this condition (see `data/traffic-profiles.json`).
+ * So the newer point is the better-cited of the two.
+ *
+ * ## Everything except the template is copied from {@link MIDTOWN_INTERFLOOR_MIX}, deliberately
+ *
+ * Same building, same 1.5 % of population per 5 minutes, same 1800 s, same single-lobby entrance
+ * weights, same full-run window. **The only difference between the two points is where the
+ * directional mix comes from**, which is what makes them a controlled pair rather than two
+ * unrelated cells. It also means the rate is not a free choice made here: it is the rate a
+ * censused, shipped Midtown point already runs at (`DESTINATION_CASES`, measured clean over 1000
+ * replications at seed 20260726).
+ *
+ * The rate is emphatically **not** the 13 %/5 min the BCO pairs with this mix in a design
+ * calculation. `nearest-car` loses its AWT on Midtown at 2 % (§ {@link BENCHMARK_CASES}); 13 %
+ * would saturate the building many times over and produce no quotable interval for anybody. The
+ * cited number is a *design* demand for sizing a system; this is a *measurement* point on a
+ * system that is already sized, and conflating the two would be the more expensive error.
+ *
+ * ## No `replications` and no `BenchmarkCase`
+ *
+ * Deliberately. A budget is a claim about a cell's measured spread, and no arm has been run here.
+ * `DECISIONS.md` § D162 condition 3 forbids the commit that adds this template from also adding a
+ * selector result, so the operating point ships with its traffic characterized (`lunchTwoWay.ts`)
+ * and its dispatcher arms unmeasured, and whoever measures them derives the budget from their own
+ * census the way `matrix.ts` § 2 requires.
+ */
+export const MIDTOWN_LUNCH_TWO_WAY: TrafficArmSpec = Object.freeze({
+  id: 'lunch-two-way-1.5pct',
+  demandTemplate: 'lunch-two-way',
+  durationS: 1800,
+  reportWindow: 'full-run',
+  demand: Object.freeze({
+    // No `directionalSplit`: the template states the mix, and setting both is refused by name.
+    entranceWeights: Object.freeze({ G: 1, P1: 0 }),
+    arrivalRatePctPop5min: 1.5,
+    peakWindowS: 300,
+  }),
+});
+
+/**
+ * The same point with the mix arc collapsed and the total demand held equal — the negative control
+ * `DECISIONS.md` § D162 condition 5 requires beside any result measured under a varying mix.
+ *
+ * `mixAmplitude: 0` holds the mix flat at the period's **own** 45/45/10 mean rather than returning
+ * the building to `office-standard`'s 85/5/10, so the control differs from the treatment in the
+ * variation of the mix and in nothing else. `core/src/traffic/mixIdentity.test.ts` asserts that it
+ * is the ordinary fixed-split code path, passenger for passenger.
+ */
+export const MIDTOWN_LUNCH_FLAT_CONTROL: TrafficArmSpec = Object.freeze({
+  id: 'lunch-two-way-1.5pct-flat',
+  demandTemplate: 'lunch-two-way',
+  durationS: 1800,
+  reportWindow: 'full-run',
+  demand: Object.freeze({
+    entranceWeights: Object.freeze({ G: 1, P1: 0 }),
+    arrivalRatePctPop5min: 1.5,
+    peakWindowS: 300,
+    mixAmplitude: 0,
+  }),
+});
+
 /** The destination case of this id. @throws Error when there is none. */
 export function destinationCase(id: string): BenchmarkCase {
   const found = DESTINATION_CASES.find((entry) => entry.id === id);

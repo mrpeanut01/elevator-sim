@@ -68,6 +68,12 @@ import { comparePaired, samplesOf } from '../validation/harness.js';
 import type { AccessControlStudy } from './accessControl.js';
 import type { DisclosureStudy } from './destinationDisclosure.js';
 import type { DispatchContrastStudy } from './destinationDispatchContrast.js';
+import type { DoubleDeckStudy } from './doubleDeck.js';
+import {
+  DESTINATION_READING_TERMS,
+  SHIPPED_DESTINATION_ARMS,
+  type DownPeakDestinationStudy,
+} from './downPeakDestination.js';
 import type { MatrixCellResult } from './matrix.js';
 import type { MixedUseStudy } from './mixedUseHighRise.js';
 import type { Phase7AcceptanceStudy } from './phase7Acceptance.js';
@@ -76,6 +82,8 @@ import type { PrepositioningStudy } from './prepositioning.js';
 import type { Stage5Study } from './capacityReassignment.js';
 import type { ForecastCausalityAudit } from './predictorLag.js';
 import type { TailStudy } from './tailStudy.js';
+import type { SelectionStudy } from './weightSetSelection.js';
+import type { SelectionSweep } from './selectionSweep.js';
 
 /* -------------------------------------------------------------------------- *
  * The domain
@@ -101,6 +109,10 @@ export const PUBLISHED_STUDY_IDS = Object.freeze([
   'mixed-use-high-rise',
   'matrix',
   'phase7-acceptance',
+  'down-peak-destination',
+  'weight-set-selection',
+  'selection-sweep',
+  'double-deck',
 ] as const);
 
 export type PublishedStudyId = (typeof PUBLISHED_STUDY_IDS)[number];
@@ -326,11 +338,106 @@ export function dispatchContrastFigures(
 }
 
 /**
+ * The down-peak study's figures: the two destination-reading terms across the gate, and the two
+ * shipped destination profiles against `eta`.
+ *
+ * **The other ten terms contribute nothing here, and that is the claim rather than an omission.**
+ * Each of them is bit-identical across the disclosure gate at every replication — `differing = 0`,
+ * `rho = 1`, an interval of exactly `[0, 0]` — and `docs/07` § 4 is explicit that no budget resolves
+ * such a thing. Their result is a **count**, asserted in `downPeakDestination.test.ts`, and pinning
+ * eighty zeroes would dress a categorical finding as a measured one. The same argument
+ * `accessControlFigures` makes for leaving H-ACCESS-1 out.
+ *
+ * The `rideTime` rows *are* pinned even where they are zero, because there the zero is the finding:
+ * it is what says the term the shipped destination profiles weight moves nothing at this point at
+ * sixteen times its shipped weight.
+ */
+export function downPeakFigures(
+  study: DownPeakDestinationStudy,
+): ReadonlyMap<string, PinnedEstimate> {
+  const figures = new Map<string, PinnedEstimate>();
+  for (const contrast of study.contrasts) {
+    if (!DESTINATION_READING_TERMS.includes(contrast.termId)) continue;
+    for (const cell of contrast.cells) {
+      figures.set(
+        `gate/${contrast.termId}@${String(contrast.weight)}/${cell.metric}`,
+        estimateOf(cell.estimate),
+      );
+    }
+  }
+  for (const arm of study.arms) {
+    if (!SHIPPED_DESTINATION_ARMS.includes(arm.armId)) continue;
+    for (const cell of arm.cells) {
+      figures.set(`arm/${arm.armId}/${cell.metric}`, estimateOf(cell.estimate));
+    }
+  }
+  return figures;
+}
+
+/**
+ * Phase 6c's figures: the gate and every cost, for both selector arms.
+ *
+ * The gate and the costs are pinned **together and labelled apart**, which is the only shape that
+ * lets a reader check § D126's rule that AWT, WT95 and the energy proxy are published *beside* the
+ * verdict rather than folded into it. A pin table holding only the gate would make the costs
+ * unfalsifiable prose.
+ */
+/**
+ * The sweep's figures: every cell's gate interval and every cost beside it, on both arms.
+ *
+ * Keyed by `cell/arm/role/metric` so a reader tracing a quoted number lands on exactly one run.
+ * The **verdict** is deliberately not pinned here — a pin holds an estimate, and whether that
+ * estimate clears a Holm-corrected level is arithmetic `selectionSweep.test.ts` re-derives from the
+ * estimate itself. Pinning the verdict would let a moved interval and a moved rule cancel.
+ */
+export function selectionSweepFigures(sweep: SelectionSweep): ReadonlyMap<string, PinnedEstimate> {
+  const figures = new Map<string, PinnedEstimate>();
+  for (const row of [...sweep.primary, ...sweep.secondary]) {
+    for (const arm of row.study.arms) {
+      figures.set(
+        `${row.cell.id}/${arm.armId}/gate/${arm.gate.metric}`,
+        estimateOf(arm.gate.estimate),
+      );
+      for (const cost of arm.costs) {
+        figures.set(
+          `${row.cell.id}/${arm.armId}/cost/${cost.metric}`,
+          estimateOf(cost.estimate),
+        );
+      }
+    }
+  }
+  return figures;
+}
+
+export function weightSetSelectionFigures(
+  study: SelectionStudy,
+): ReadonlyMap<string, PinnedEstimate> {
+  const figures = new Map<string, PinnedEstimate>();
+  for (const arm of study.arms) {
+    figures.set(`${arm.armId}/gate/${arm.gate.metric}`, estimateOf(arm.gate.estimate));
+    for (const cost of arm.costs) {
+      figures.set(`${arm.armId}/cost/${cost.metric}`, estimateOf(cost.estimate));
+    }
+  }
+  return figures;
+}
+
+/**
  * The access-control study's figures: two within-building deltas and the difference-of-differences.
  *
- * H-ACCESS-1 contributes **nothing** here and that is the point — it is categorical, it has no
- * standard error, and there is nothing for a pin to hold. Its assertions are counts, in
- * `accessControl.test.ts`.
+ * H-ACCESS-1 contributes **nothing** here, because it is categorical, it has no standard error, and
+ * there is nothing for a five-number pin to hold. **That is a statement about this table's shape and
+ * it was read for years as a statement that the counts needed no guard at all** — which they did.
+ * Between wave 5 and wave 6 the bare-kiosk row's two published figures stopped reproducing
+ * (DECISIONS.md § T50-D1) and nothing went red, because `accessControl.test.ts` asserted
+ * inequalities and the inequalities held *more* strongly afterwards, and because Layer B's scan
+ * looks for interval-shaped literals and `51.7 %` is not one.
+ *
+ * The counts now get their own two layers, next to the study that publishes them:
+ * `accessControl.ts`'s `PINNED_COVERAGE` and `derivedCoverageForms`, compared and scanned in
+ * `accessControl.test.ts`. They are pinned *there* rather than here because a `PinnedEstimate` would
+ * have to carry three `NaN`s to hold them, and a pin table whose entries are mostly holes is the
+ * kind of thing a later reader deletes.
  */
 export function accessControlFigures(
   study: AccessControlStudy,
@@ -356,6 +463,20 @@ export function accessControlFigures(
  * `mixedUseHighRise.test.ts`.
  */
 export function mixedUseFigures(study: MixedUseStudy): ReadonlyMap<string, PinnedEstimate> {
+  const figures = new Map<string, PinnedEstimate>();
+  for (const point of study.points) {
+    for (const cell of point.cells) {
+      figures.set(
+        `${point.id}/${cell.armId}−${cell.baselineId}/${cell.metric}`,
+        estimateOf(cell.estimate),
+      );
+    }
+  }
+  return figures;
+}
+
+/** The double-deck study's figures, keyed `point/arm−baseline/metric`. */
+export function doubleDeckFigures(study: DoubleDeckStudy): ReadonlyMap<string, PinnedEstimate> {
   const figures = new Map<string, PinnedEstimate>();
   for (const point of study.points) {
     for (const cell of point.cells) {
@@ -535,8 +656,40 @@ export interface UnpinnedInterval {
  *    the *commit message* of `c237d95` and nowhere in the tree. Pinning them means shipping the
  *    sweep as a function first; until then they are unguarded and are named here rather than
  *    quietly excluded from the regex.
+ * 3. **Superseded figures, quoted as history.** A study whose configuration legitimately changed
+ *    has a before and an after, and printing only the after hides the move. The *after* is pinned
+ *    like any other figure; the *before* can never be re-derived, because the tree that produced
+ *    it no longer exists. Declaring it here is what stops "unpinnable" and "quietly wrong" looking
+ *    the same — the entry has to name the commit it was measured on and what moved it, so a reader
+ *    can go and check.
+ *
+ *    This kind was added when `vertical-city` declared its ground-lobby escalator and the
+ *    double-deck gate moved from `DISPATCHER-DEPENDENT` to `BETTER-EVERYWHERE`; the alternative
+ *    considered and rejected was to reword the before/after so the scanner's regex stops matching
+ *    it, which is evading a guard rather than answering it.
  */
 export const UNPINNED_INTERVALS: readonly UnpinnedInterval[] = Object.freeze([
+  Object.freeze({
+    text: '+1.950 [+0.975, +2.925]',
+    file: 'benchmark/doubleDeck.ts',
+    count: 1,
+    reason:
+      'Kind 3, superseded. ΔTTD for the `eta` pair at up-peak 1 %, measured on baseline d7e8571 ' +
+      'where `vertical-city` declared no transport mode and the `G -> 2` lobby hop was charged to ' +
+      'a local lift bank. That building now declares a ground-lobby escalator and the same cell ' +
+      'measures −2.729 [−3.550, −1.907], which IS pinned. The before cannot be re-derived from ' +
+      'this tree by construction; it is quoted in section 5 because publishing only the after ' +
+      'would hide a verdict that moved from WORSE to BETTER.',
+  }),
+  Object.freeze({
+    text: '−1.408 [−2.400, −0.416]',
+    file: 'benchmark/doubleDeck.ts',
+    count: 1,
+    reason:
+      'Kind 3, superseded. ΔTTD for the `collective` pair at up-peak 1 % on baseline d7e8571, ' +
+      'quoted beside its successor −6.262 [−7.210, −5.315] for the same reason as the entry ' +
+      'above. The verdict did not change here; the magnitude did, by a factor of four.',
+  }),
   Object.freeze({
     text: '−6.86 [−8.19, −5.53]',
     file: 'benchmark/report.ts',
@@ -664,11 +817,42 @@ export const STUDY_ENTRY_POINTS: Readonly<Record<string, PublishedStudyId | 'no-
     runMatrix: 'matrix',
     runMatrixCell: 'matrix',
     runPhase7Acceptance: 'phase7-acceptance',
+    runDownPeakDestinationStudy: 'down-peak-destination',
+    // Phase 6c's gate and its costs, and Phase 7's fuzzy detector measured beside it. Publishes
+    // intervals, so `regeneratePins.ts` is its non-test caller.
+    runWeightSetSelectionStudy: 'weight-set-selection',
+    // Phase 6c's **sweep**: the same gate at eight pre-registered operating points, Holm-corrected
+    // within two families that are never pooled. Publishes a paired-t interval per cell per arm,
+    // so `regeneratePins.ts` is its non-test caller and `selectionSweep.test.ts` compares the pins
+    // against a fresh run. DECISIONS.md § D151.
+    runSelectionSweep: 'selection-sweep',
+    // Counts and a trajectory divergence index: how many patterns the detector entered, whether
+    // the shipped weight-set map and a permuted one produce different car trajectories, and
+    // whether the selector switched off is bit-identical to the profile run without it. There is
+    // no standard error anywhere in it — the claim is that two sequences differ, not by how much —
+    // so `livenessSuite.ts` is its driver rather than the pin table.
+    measureWeightSetSelectionLiveness: 'no-intervals',
+    // Double-deck operation against the single-deck arm the retired `doubleDeckNotSimulated`
+    // disclaimer described, at two censused operating points on `vertical-city`. Publishes
+    // paired-t intervals on ten metrics, so `regeneratePins.ts` is its non-test caller.
+    runDoubleDeckStudy: 'double-deck',
+    // The known-answer test: the same search, on `idle.repositionThresholdS`, whose optimum was
+    // published before the machinery existed. Its output is a threshold in seconds, not an
+    // interval.
+    runDeadbandKnownAnswer: 'no-intervals',
     // Categorical by construction: sample counts against the fleet's own odometers, a count of
     // samples outside the emitted window, and a sign on a difference in mean energy. A liveness
     // proof that published a confidence interval would invite a resolution question to be read
     // into a wiring question, which is the one thing it must not do.
     measureEnergyLiveness: 'no-intervals',
+    // Counts in a contingency table: how the three detector inputs' *ratios* move across the run
+    // under the lunch two-way template, against the same table shape DECISIONS.md § D156 measured
+    // the shipped templates flat over. A chi-square and a standardized residual have no standard
+    // error and the claim is categorical — the mix varies, or it does not — so `livenessSuite.ts`
+    // is its driver rather than the pin table. It constructs no `Simulation` and names no
+    // dispatcher: § D162 condition 3 forbids the commit that adds the template from also adding a
+    // selector result.
+    measureLunchTwoWayMix: 'no-intervals',
     // The driver for the five above, and the reason the five are no longer dead. Every entry point
     // mapped to a `PublishedStudyId` had `regeneratePins.ts` as its non-test caller; the
     // `'no-intervals'` half had none at all, which is how `measureEnergyLiveness` shipped as the
@@ -1425,50 +1609,50 @@ export const PINNED_ESTIMATES: Readonly<
     "secure-up-peak/zoned-uppeak/energyKJ": { n: 119, mean: -189.9670565509377, standardError: 104.78988029754012, lower: -397.47954850879, upper: 17.545435406914578 },
     "secure-up-peak/zoned-uppeak/ttdMeanS": { n: 119, mean: 9.178842327744611, standardError: 0.6919008822353758, lower: 7.80869021140643, upper: 10.548994444082792 },
     "secure-up-peak/zoned-uppeak/wt95S": { n: 119, mean: 26.859935943816907, standardError: 1.5412112931592503, lower: 23.807917989707576, upper: 29.91195389792624 },
-    "vertical-city-up-peak/auction-multi-round/awtS": { n: 50, mean: 1.8877321900020478, standardError: 0.16343505553255486, lower: 1.559297149524985, upper: 2.2161672304791105 },
-    "vertical-city-up-peak/auction-multi-round/energyKJ": { n: 50, mean: 2819.153181588007, standardError: 641.579382683948, lower: 1529.8511414936875, upper: 4108.455221682327 },
-    "vertical-city-up-peak/auction-multi-round/ttdMeanS": { n: 50, mean: -1.3900666552654843, standardError: 0.6674638169893543, lower: -2.731385413567047, upper: -0.04874789696392168 },
-    "vertical-city-up-peak/auction-multi-round/wt95S": { n: 50, mean: 2.2064686202000625, standardError: 0.4300177648765015, lower: 1.3423155683785857, upper: 3.0706216720215394 },
-    "vertical-city-up-peak/auction/awtS": { n: 50, mean: 0.5723970187467596, standardError: 0.17202498469063474, lower: 0.2266998693449252, upper: 0.9180941681485941 },
-    "vertical-city-up-peak/auction/energyKJ": { n: 50, mean: -1226.3367489825914, standardError: 666.3312886396401, lower: -2565.3796063572217, upper: 112.70610839203869 },
-    "vertical-city-up-peak/auction/ttdMeanS": { n: 50, mean: 2.1397890266760964, standardError: 0.6278514714128863, lower: 0.8780742571296094, upper: 3.4015037962225834 },
-    "vertical-city-up-peak/auction/wt95S": { n: 50, mean: 0.7490359416005752, standardError: 0.4705836436982568, lower: -0.1966372957734862, upper: 1.6947091789746365 },
-    "vertical-city-up-peak/capacity-aware/awtS": { n: 50, mean: 0.5533208836614911, standardError: 0.16444182244753305, lower: 0.22286266932252718, upper: 0.8837790980004551 },
-    "vertical-city-up-peak/capacity-aware/energyKJ": { n: 50, mean: -2390.7603027339333, standardError: 666.4355829034102, lower: -3730.0127472784106, upper: -1051.507858189456 },
-    "vertical-city-up-peak/capacity-aware/ttdMeanS": { n: 50, mean: 3.84858237991419, standardError: 0.59052360623185, lower: 2.6618807638904123, upper: 5.035283995937967 },
-    "vertical-city-up-peak/capacity-aware/wt95S": { n: 50, mean: 0.7193744521664028, standardError: 0.45624864146855365, lower: -0.19749151970265488, upper: 1.6362404240354604 },
-    "vertical-city-up-peak/destination-eta/awtS": { n: 50, mean: 0.4970140027510185, standardError: 0.16335179805803454, lower: 0.16874627443305762, upper: 0.8252817310689793 },
-    "vertical-city-up-peak/destination-eta/energyKJ": { n: 50, mean: -2516.3168479938163, standardError: 646.6862699481865, lower: -3815.8815622731604, upper: -1216.7521337144722 },
-    "vertical-city-up-peak/destination-eta/ttdMeanS": { n: 50, mean: 3.611766294373415, standardError: 0.7213807137111802, lower: 2.1620974755568168, upper: 5.061435113190013 },
-    "vertical-city-up-peak/destination-eta/wt95S": { n: 50, mean: 0.47933432633587825, standardError: 0.39965179759314196, lower: -0.323796029581483, upper: 1.2824646822532395 },
-    "vertical-city-up-peak/destination-panel/awtS": { n: 50, mean: 1.8471574687463272, standardError: 0.2688700088054252, lower: 1.3068429570442266, upper: 2.387471980448428 },
-    "vertical-city-up-peak/destination-panel/energyKJ": { n: 50, mean: -2826.976654000661, standardError: 616.3526137332133, lower: -4065.5836038988036, upper: -1588.369704102518 },
-    "vertical-city-up-peak/destination-panel/ttdMeanS": { n: 50, mean: 6.8278679040442425, standardError: 0.7543825757570625, lower: 5.311879360481084, upper: 8.3438564476074 },
-    "vertical-city-up-peak/destination-panel/wt95S": { n: 50, mean: 2.0349169028084755, standardError: 0.9681366195513097, lower: 0.08937352600016135, upper: 3.9804602796167896 },
-    "vertical-city-up-peak/energy-aware/awtS": { n: 50, mean: 0.3864248572798441, standardError: 0.1542234931615087, lower: 0.07650114443890704, upper: 0.6963485701207812 },
-    "vertical-city-up-peak/energy-aware/energyKJ": { n: 50, mean: -6030.708915104486, standardError: 653.0204739190619, lower: -7343.0026888306265, upper: -4718.415141378345 },
-    "vertical-city-up-peak/energy-aware/ttdMeanS": { n: 50, mean: 7.076641524632212, standardError: 0.6165553759089274, lower: 5.8376271088867275, upper: 8.315655940377695 },
-    "vertical-city-up-peak/energy-aware/wt95S": { n: 50, mean: 0.9635561699272586, standardError: 0.4990425655571838, lower: -0.03930741208989841, upper: 1.9664197519444155 },
-    "vertical-city-up-peak/eta/awtS": { n: 50, mean: 0.10135547863542904, standardError: 0.09106533572235484, lower: -0.08164716499307512, upper: 0.2843581222639332 },
-    "vertical-city-up-peak/eta/energyKJ": { n: 50, mean: -2893.805292661036, standardError: 469.4863445427247, lower: -3837.2734248244174, upper: -1950.337160497655 },
-    "vertical-city-up-peak/eta/ttdMeanS": { n: 50, mean: 3.4437632082834817, standardError: 0.6026711756327126, lower: 2.2326501376004213, upper: 4.654876278966542 },
-    "vertical-city-up-peak/eta/wt95S": { n: 50, mean: 0.7569791101233351, standardError: 0.34070568714939603, lower: 0.07230539807881031, upper: 1.44165282216786 },
-    "vertical-city-up-peak/fairness-first/awtS": { n: 50, mean: 0.2183462844666034, standardError: 0.1127227626167666, lower: -0.008178587948847238, upper: 0.44487115688205403 },
-    "vertical-city-up-peak/fairness-first/energyKJ": { n: 50, mean: -2762.734831786316, standardError: 504.837690939341, lower: -3777.244154267515, upper: -1748.2255093051172 },
-    "vertical-city-up-peak/fairness-first/ttdMeanS": { n: 50, mean: 3.5103327255828196, standardError: 0.5902433320296353, lower: 2.3241943416554185, upper: 4.69647110951022 },
-    "vertical-city-up-peak/fairness-first/wt95S": { n: 50, mean: 0.6574999792474854, standardError: 0.3401541847605248, lower: -0.02606544725314608, upper: 1.3410654057481168 },
-    "vertical-city-up-peak/nearest-car/awtS": { n: 50, mean: 2.721081370262659, standardError: 0.3403506399193046, lower: 2.0371211523397372, upper: 3.405041588185581 },
-    "vertical-city-up-peak/nearest-car/energyKJ": { n: 50, mean: -8307.944615110151, standardError: 602.8610551420452, lower: -9519.439262953205, upper: -7096.449967267098 },
-    "vertical-city-up-peak/nearest-car/ttdMeanS": { n: 50, mean: 14.10192173051573, standardError: 1.1107608981046915, lower: 11.869764135313119, upper: 16.334079325718342 },
-    "vertical-city-up-peak/nearest-car/wt95S": { n: 50, mean: 13.193046160493031, standardError: 1.9298670285168569, lower: 9.314833169033387, upper: 17.071259151952678 },
-    "vertical-city-up-peak/predictive-balanced/awtS": { n: 50, mean: 2.1273086371334227, standardError: 0.19987350593474465, lower: 1.7256477890487576, upper: 2.5289694852180875 },
-    "vertical-city-up-peak/predictive-balanced/energyKJ": { n: 50, mean: 5215.723355045432, standardError: 673.7977387786158, lower: 3861.6761043622564, upper: 6569.770605728608 },
-    "vertical-city-up-peak/predictive-balanced/ttdMeanS": { n: 50, mean: -2.0159237452858094, standardError: 0.7199795678268174, lower: -3.4627768560295866, upper: -0.5690706345420324 },
-    "vertical-city-up-peak/predictive-balanced/wt95S": { n: 50, mean: 2.871872770970995, standardError: 0.48703324228750866, lower: 1.893142827611257, upper: 3.8506027143307326 },
-    "vertical-city-up-peak/zoned-uppeak/awtS": { n: 50, mean: 7.77834583992402, standardError: 0.46565437959128164, lower: 6.842578329636606, upper: 8.714113350211434 },
-    "vertical-city-up-peak/zoned-uppeak/energyKJ": { n: 50, mean: -454.27845219084253, standardError: 634.0060134973797, lower: -1728.361237106197, upper: 819.804332724512 },
-    "vertical-city-up-peak/zoned-uppeak/ttdMeanS": { n: 50, mean: 22.882552542345096, standardError: 1.2397490317581292, lower: 20.39118358786902, upper: 25.373921496821172 },
-    "vertical-city-up-peak/zoned-uppeak/wt95S": { n: 50, mean: 28.4619725083991, standardError: 1.4170028747537, lower: 25.614398620353132, upper: 31.309546396445068 },
+    "vertical-city-up-peak/auction-multi-round/awtS": { n: 50, mean: 2.455852492653803, standardError: 0.2307190412631165, lower: 1.992205220597247, upper: 2.9194997647103587 },
+    "vertical-city-up-peak/auction-multi-round/energyKJ": { n: 50, mean: -2794.369019727408, standardError: 618.7866044521679, lower: -4037.8672571017646, upper: -1550.8707823530517 },
+    "vertical-city-up-peak/auction-multi-round/ttdMeanS": { n: 50, mean: 2.715427840545977, standardError: 0.49752367695547267, lower: 1.7156165794507765, upper: 3.715239101641177 },
+    "vertical-city-up-peak/auction-multi-round/wt95S": { n: 50, mean: 3.192901819377875, standardError: 0.5651214069188882, lower: 2.057247834062046, upper: 4.328555804693703 },
+    "vertical-city-up-peak/auction/awtS": { n: 50, mean: 1.5096589097888462, standardError: 0.22098800036672192, lower: 1.0655668965491767, upper: 1.9537509230285157 },
+    "vertical-city-up-peak/auction/energyKJ": { n: 50, mean: -5172.264561973397, standardError: 636.8232744864478, lower: -6452.008844808913, upper: -3892.5202791378806 },
+    "vertical-city-up-peak/auction/ttdMeanS": { n: 50, mean: 3.619700058554119, standardError: 0.44087762223191596, lower: 2.733723306312445, upper: 4.5056768107957925 },
+    "vertical-city-up-peak/auction/wt95S": { n: 50, mean: 2.239623595797196, standardError: 0.5359433313358839, lower: 1.1626051486400577, upper: 3.316642042954334 },
+    "vertical-city-up-peak/capacity-aware/awtS": { n: 50, mean: 1.4712432197606193, standardError: 0.22766408962773585, lower: 1.0137351028611519, upper: 1.9287513366600868 },
+    "vertical-city-up-peak/capacity-aware/energyKJ": { n: 50, mean: -5223.458439605929, standardError: 637.2579809065398, lower: -6504.0762976986825, upper: -3942.840581513175 },
+    "vertical-city-up-peak/capacity-aware/ttdMeanS": { n: 50, mean: 3.8448676990084465, standardError: 0.4016647845220874, lower: 3.0376920944060117, upper: 4.652043303610881 },
+    "vertical-city-up-peak/capacity-aware/wt95S": { n: 50, mean: 2.246111847593341, standardError: 0.5346516138567998, lower: 1.1716892038955369, upper: 3.320534491291145 },
+    "vertical-city-up-peak/destination-eta/awtS": { n: 50, mean: 1.0782403069441806, standardError: 0.20133166830932459, lower: 0.6736491718598462, upper: 1.4828314420285151 },
+    "vertical-city-up-peak/destination-eta/energyKJ": { n: 50, mean: -5282.390142989868, standardError: 621.4255227607459, lower: -6531.191485249949, upper: -4033.5888007297863 },
+    "vertical-city-up-peak/destination-eta/ttdMeanS": { n: 50, mean: 2.831482221034472, standardError: 0.4196449944900357, lower: 1.988174031722064, upper: 3.67479041034688 },
+    "vertical-city-up-peak/destination-eta/wt95S": { n: 50, mean: 1.7063232554209855, standardError: 0.5661096719330837, lower: 0.5686832772049082, upper: 2.843963233637063 },
+    "vertical-city-up-peak/destination-panel/awtS": { n: 50, mean: 2.913966722543325, standardError: 0.44808904430087293, lower: 2.013498075087388, upper: 3.814435369999262 },
+    "vertical-city-up-peak/destination-panel/energyKJ": { n: 50, mean: -5315.404261479816, standardError: 640.0227590058408, lower: -6601.578149177083, upper: -4029.2303737825496 },
+    "vertical-city-up-peak/destination-panel/ttdMeanS": { n: 50, mean: 5.776246884539021, standardError: 0.8417333765284766, lower: 4.0847203348022205, upper: 7.467773434275822 },
+    "vertical-city-up-peak/destination-panel/wt95S": { n: 50, mean: 13.128732881552287, standardError: 3.3491411864186733, lower: 6.398381687675711, upper: 19.85908407542886 },
+    "vertical-city-up-peak/energy-aware/awtS": { n: 50, mean: 0.9932436289889859, standardError: 0.19364206330846248, lower: 0.604105333697689, upper: 1.3823819242802826 },
+    "vertical-city-up-peak/energy-aware/energyKJ": { n: 50, mean: -5283.327937866747, standardError: 516.3108677556496, lower: -6320.893472369205, upper: -4245.762403364289 },
+    "vertical-city-up-peak/energy-aware/ttdMeanS": { n: 50, mean: 3.5214246434632703, standardError: 0.4259630379915655, lower: 2.665419870383083, upper: 4.377429416543458 },
+    "vertical-city-up-peak/energy-aware/wt95S": { n: 50, mean: 1.558774147850795, standardError: 0.513993456996487, lower: 0.525865624624207, upper: 2.591682671077383 },
+    "vertical-city-up-peak/eta/awtS": { n: 50, mean: 1.0660082150276453, standardError: 0.18211288730329095, lower: 0.7000386663408457, upper: 1.4319777637144449 },
+    "vertical-city-up-peak/eta/energyKJ": { n: 50, mean: -5052.457722057181, standardError: 477.6356448791369, lower: -6012.302486376545, upper: -4092.612957737817 },
+    "vertical-city-up-peak/eta/ttdMeanS": { n: 50, mean: 2.7945213667338504, standardError: 0.365399981668863, lower: 2.0602226119246287, upper: 3.528820121543072 },
+    "vertical-city-up-peak/eta/wt95S": { n: 50, mean: 1.5806453165956083, standardError: 0.47752413263998794, lower: 0.6210246445106746, upper: 2.5402659886805417 },
+    "vertical-city-up-peak/fairness-first/awtS": { n: 50, mean: 1.0660082150276453, standardError: 0.18211288730329095, lower: 0.7000386663408457, upper: 1.4319777637144449 },
+    "vertical-city-up-peak/fairness-first/energyKJ": { n: 50, mean: -5052.457722057181, standardError: 477.6356448791369, lower: -6012.302486376545, upper: -4092.612957737817 },
+    "vertical-city-up-peak/fairness-first/ttdMeanS": { n: 50, mean: 2.7945213667338504, standardError: 0.365399981668863, lower: 2.0602226119246287, upper: 3.528820121543072 },
+    "vertical-city-up-peak/fairness-first/wt95S": { n: 50, mean: 1.5806453165956083, standardError: 0.47752413263998794, lower: 0.6210246445106746, upper: 2.5402659886805417 },
+    "vertical-city-up-peak/nearest-car/awtS": { n: 50, mean: 3.2070765807342427, standardError: 0.3595073983931572, lower: 2.484619415358601, upper: 3.9295337461098843 },
+    "vertical-city-up-peak/nearest-car/energyKJ": { n: 50, mean: -7513.771504602412, standardError: 619.6401237326196, lower: -8758.984953187177, upper: -6268.558056017648 },
+    "vertical-city-up-peak/nearest-car/ttdMeanS": { n: 50, mean: 7.913006018503715, standardError: 0.722049588117029, lower: 6.461993046244373, upper: 9.364018990763057 },
+    "vertical-city-up-peak/nearest-car/wt95S": { n: 50, mean: 12.889899619284629, standardError: 1.8095544179149539, lower: 9.25346387080494, upper: 16.526335367764318 },
+    "vertical-city-up-peak/predictive-balanced/awtS": { n: 50, mean: 2.445210957441342, standardError: 0.20104737898582098, lower: 2.041191123141701, upper: 2.8492307917409834 },
+    "vertical-city-up-peak/predictive-balanced/energyKJ": { n: 50, mean: 1452.2215410583544, standardError: 624.1902982728985, lower: 197.86417439282968, upper: 2706.578907723879 },
+    "vertical-city-up-peak/predictive-balanced/ttdMeanS": { n: 50, mean: 2.549427190609286, standardError: 0.6032827972065926, lower: 1.3370850203568623, upper: 3.7617693608617095 },
+    "vertical-city-up-peak/predictive-balanced/wt95S": { n: 50, mean: 3.6215557081107663, standardError: 0.4906939823849435, lower: 2.6354692321016575, upper: 4.607642184119875 },
+    "vertical-city-up-peak/zoned-uppeak/awtS": { n: 50, mean: 8.380408738728606, standardError: 0.4586457003565025, lower: 7.458725696676386, upper: 9.302091780780827 },
+    "vertical-city-up-peak/zoned-uppeak/energyKJ": { n: 50, mean: 1549.2564103330476, standardError: 828.3416691088453, lower: -115.35849579038222, upper: 3213.8713164564774 },
+    "vertical-city-up-peak/zoned-uppeak/ttdMeanS": { n: 50, mean: 16.306674814221655, standardError: 1.0221975135188068, lower: 14.252492003599189, upper: 18.36085762484412 },
+    "vertical-city-up-peak/zoned-uppeak/wt95S": { n: 50, mean: 29.52081371304, standardError: 1.366289886313994, lower: 26.775151390763284, upper: 32.266476035316714 },
   }),
   "phase7-acceptance": Object.freeze({
     "holdout/c-deadband-2.582/awt": { n: 150, mean: -1.105077728188622, standardError: 0.288153532938488, lower: -1.674472906472766, upper: -0.5356825499044778 },
@@ -1489,5 +1673,191 @@ export const PINNED_ESTIMATES: Readonly<
     "tuning/c-deadband-5/awt": { n: 150, mean: -0.2016719877533211, standardError: 0.11276274544656247, lower: -0.42449265870813857, upper: 0.021148683201496404 },
     "tuning/c-deadband-5/energy": { n: 150, mean: 22.147855295391878, standardError: 3.2378310119530407, lower: 15.749858548641992, upper: 28.545852042141764 },
     "tuning/c-deadband-5/wt95": { n: 150, mean: -0.03159058689358661, standardError: 0.1303228631184574, lower: -0.28911028176984105, upper: 0.2259291079826678 },
+  }),
+  "down-peak-destination": Object.freeze({
+    "arm/destination-eta/awtS": { n: 200, mean: -0.011870604227160495, standardError: 0.011870604227160504, lower: -0.03527891991713265, upper: 0.011537711462811663 },
+    "arm/destination-eta/energyKJ": { n: 200, mean: 0.24981553577131252, standardError: 0.24981553577131274, lower: -0.24280984484869564, upper: 0.7424409163913207 },
+    "arm/destination-eta/ttdMeanS": { n: 200, mean: -0.024147941087830808, standardError: 0.024147941087830825, lower: -0.07176663154618558, upper: 0.02347074937052396 },
+    "arm/destination-eta/wt95S": { n: 200, mean: -0.07250000000000113, standardError: 0.07250000000000119, lower: -0.2154668494582585, upper: 0.07046684945825622 },
+    "arm/destination-panel/awtS": { n: 200, mean: 0.03894352575480257, standardError: 0.02621984426903395, lower: -0.012760867740781813, upper: 0.09064791925038695 },
+    "arm/destination-panel/energyKJ": { n: 200, mean: 0.6793468057713108, standardError: 0.4958089206913734, lower: -0.29836684008446146, upper: 1.657060451627083 },
+    "arm/destination-panel/ttdMeanS": { n: 200, mean: 0.024166188894132218, standardError: 0.033095176178488825, lower: -0.04109606035420488, upper: 0.08942843814246931 },
+    "arm/destination-panel/wt95S": { n: 200, mean: 0.08753771179572994, standardError: 0.13253556208989692, lower: -0.17381665721353218, upper: 0.34889208080499207 },
+    "gate/rideTime@0.2/awtS": { n: 200, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "gate/rideTime@0.2/energyKJ": { n: 200, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "gate/rideTime@0.2/ttdMeanS": { n: 200, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "gate/rideTime@0.2/wt95S": { n: 200, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "gate/rideTime@0.5/awtS": { n: 200, mean: -0.011870604227160495, standardError: 0.011870604227160504, lower: -0.03527891991713265, upper: 0.011537711462811663 },
+    "gate/rideTime@0.5/energyKJ": { n: 200, mean: 0.24981553577131252, standardError: 0.24981553577131274, lower: -0.24280984484869564, upper: 0.7424409163913207 },
+    "gate/rideTime@0.5/ttdMeanS": { n: 200, mean: -0.024147941087830808, standardError: 0.024147941087830825, lower: -0.07176663154618558, upper: 0.02347074937052396 },
+    "gate/rideTime@0.5/wt95S": { n: 200, mean: -0.07250000000000113, standardError: 0.07250000000000119, lower: -0.2154668494582585, upper: 0.07046684945825622 },
+    "gate/rideTime@1/awtS": { n: 200, mean: -0.011870604227160495, standardError: 0.011870604227160504, lower: -0.03527891991713265, upper: 0.011537711462811663 },
+    "gate/rideTime@1/energyKJ": { n: 200, mean: 0.24981553577131252, standardError: 0.24981553577131274, lower: -0.24280984484869564, upper: 0.7424409163913207 },
+    "gate/rideTime@1/ttdMeanS": { n: 200, mean: -0.024147941087830808, standardError: 0.024147941087830825, lower: -0.07176663154618558, upper: 0.02347074937052396 },
+    "gate/rideTime@1/wt95S": { n: 200, mean: -0.07250000000000113, standardError: 0.07250000000000119, lower: -0.2154668494582585, upper: 0.07046684945825622 },
+    "gate/rideTime@2/awtS": { n: 200, mean: -0.011870604227160495, standardError: 0.011870604227160504, lower: -0.03527891991713265, upper: 0.011537711462811663 },
+    "gate/rideTime@2/energyKJ": { n: 200, mean: 0.24981553577131252, standardError: 0.24981553577131274, lower: -0.24280984484869564, upper: 0.7424409163913207 },
+    "gate/rideTime@2/ttdMeanS": { n: 200, mean: -0.024147941087830808, standardError: 0.024147941087830825, lower: -0.07176663154618558, upper: 0.02347074937052396 },
+    "gate/rideTime@2/wt95S": { n: 200, mean: -0.07250000000000113, standardError: 0.07250000000000119, lower: -0.2154668494582585, upper: 0.07046684945825622 },
+    "gate/rideTime@8/awtS": { n: 200, mean: -0.011870604227160495, standardError: 0.011870604227160504, lower: -0.03527891991713265, upper: 0.011537711462811663 },
+    "gate/rideTime@8/energyKJ": { n: 200, mean: 0.24981553577131252, standardError: 0.24981553577131274, lower: -0.24280984484869564, upper: 0.7424409163913207 },
+    "gate/rideTime@8/ttdMeanS": { n: 200, mean: -0.024147941087830808, standardError: 0.024147941087830825, lower: -0.07176663154618558, upper: 0.02347074937052396 },
+    "gate/rideTime@8/wt95S": { n: 200, mean: -0.07250000000000113, standardError: 0.07250000000000119, lower: -0.2154668494582585, upper: 0.07046684945825622 },
+    "gate/stopCount@0.2/awtS": { n: 200, mean: 0.12704286804079185, standardError: 0.03173016668138338, lower: 0.06447235820323768, upper: 0.189613377878346 },
+    "gate/stopCount@0.2/energyKJ": { n: 200, mean: 0.6361274283895392, standardError: 1.0766551196168554, lower: -1.4869896806411167, upper: 2.759244537420195 },
+    "gate/stopCount@0.2/ttdMeanS": { n: 200, mean: 0.048014584799885365, standardError: 0.06515849432979422, lower: -0.08047513450734571, upper: 0.17650430410711643 },
+    "gate/stopCount@0.2/wt95S": { n: 200, mean: 0.39447700177064704, standardError: 0.13450275785449978, lower: 0.12924340819955188, upper: 0.6597105953417421 },
+    "gate/stopCount@0.5/awtS": { n: 200, mean: 1.266897620871491, standardError: 0.1660286978232581, lower: 0.9394962436653138, upper: 1.5942989980776683 },
+    "gate/stopCount@0.5/energyKJ": { n: 200, mean: -1.3818077281997079, standardError: 1.2033995801944743, lower: -3.7548594057140625, upper: 0.9912439493146468 },
+    "gate/stopCount@0.5/ttdMeanS": { n: 200, mean: 1.3589284430076563, standardError: 0.17600465929324066, lower: 1.011854903295543, upper: 1.7060019827197694 },
+    "gate/stopCount@0.5/wt95S": { n: 200, mean: 3.9120822523378758, standardError: 0.5803615863330468, lower: 2.767634424136072, upper: 5.056530080539679 },
+    "gate/stopCount@1/awtS": { n: 200, mean: 1.3204998781277697, standardError: 0.1685455535478911, lower: 0.9881353708044647, upper: 1.6528643854510747 },
+    "gate/stopCount@1/energyKJ": { n: 200, mean: -1.5356908028975014, standardError: 1.1925248448108798, lower: -3.88729797480517, upper: 0.8159163690101676 },
+    "gate/stopCount@1/ttdMeanS": { n: 200, mean: 1.418521346522438, standardError: 0.1781566425036638, lower: 1.067204189435411, upper: 1.769838503609465 },
+    "gate/stopCount@1/wt95S": { n: 200, mean: 4.059575635417621, standardError: 0.588681561550288, lower: 2.898721177638166, upper: 5.220430093197077 },
+    "gate/stopCount@2/awtS": { n: 200, mean: 1.3204998781277697, standardError: 0.1685455535478911, lower: 0.9881353708044647, upper: 1.6528643854510747 },
+    "gate/stopCount@2/energyKJ": { n: 200, mean: -1.5356908028975014, standardError: 1.1925248448108798, lower: -3.88729797480517, upper: 0.8159163690101676 },
+    "gate/stopCount@2/ttdMeanS": { n: 200, mean: 1.418521346522438, standardError: 0.1781566425036638, lower: 1.067204189435411, upper: 1.769838503609465 },
+    "gate/stopCount@2/wt95S": { n: 200, mean: 4.059575635417621, standardError: 0.588681561550288, lower: 2.898721177638166, upper: 5.220430093197077 },
+    "gate/stopCount@8/awtS": { n: 200, mean: 1.3204998781277697, standardError: 0.1685455535478911, lower: 0.9881353708044647, upper: 1.6528643854510747 },
+    "gate/stopCount@8/energyKJ": { n: 200, mean: -1.5356908028975014, standardError: 1.1925248448108798, lower: -3.88729797480517, upper: 0.8159163690101676 },
+    "gate/stopCount@8/ttdMeanS": { n: 200, mean: 1.418521346522438, standardError: 0.1781566425036638, lower: 1.067204189435411, upper: 1.769838503609465 },
+    "gate/stopCount@8/wt95S": { n: 200, mean: 4.059575635417621, standardError: 0.588681561550288, lower: 2.898721177638166, upper: 5.220430093197077 },
+  }),
+  "weight-set-selection": Object.freeze({
+    "fuzzy/cost/awtS": { n: 200, mean: 0.18667070499178734, standardError: 0.07865704864617196, lower: 0.031562423162436876, upper: 0.34177898682113783 },
+    "fuzzy/cost/energyKJ": { n: 200, mean: 238.89532961813023, standardError: 43.932239782849834, lower: 152.26286187470052, upper: 325.5277973615599 },
+    "fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 2.7016977138557805, standardError: 0.48843006731413946, lower: 1.7385348462063193, upper: 3.6648605815052417 },
+    "fuzzy/cost/wt95S": { n: 200, mean: 0.4958181695220356, standardError: 0.28774271112887445, lower: -0.0715979527493017, upper: 1.063234291793373 },
+    "fuzzy/gate/ttdMeanS": { n: 200, mean: -0.21173272081199396, standardError: 0.1035801302921803, lower: -0.41598823659611234, upper: -0.0074772050278755775 },
+    "learned/cost/awtS": { n: 200, mean: 0.42436946576747575, standardError: 0.08503496446391777, lower: 0.2566842111026344, upper: 0.5920547204323171 },
+    "learned/cost/energyKJ": { n: 200, mean: 415.85940156296755, standardError: 52.004285749379555, lower: 313.30920995033824, upper: 518.4095931755968 },
+    "learned/cost/energyPerServedLegKJ": { n: 200, mean: 4.807179602393214, standardError: 0.5966794619558817, lower: 3.630553632568674, upper: 5.983805572217754 },
+    "learned/cost/wt95S": { n: 200, mean: 0.6746101110913333, standardError: 0.3762814730038012, lower: -0.06740060207921705, upper: 1.4166208242618836 },
+    "learned/gate/ttdMeanS": { n: 200, mean: -0.2126738011766477, standardError: 0.11505015212659633, lower: -0.43954770157985373, upper: 0.01420009922655835 },
+  }),
+  "selection-sweep": Object.freeze({
+    "garden-down-peak-2pct/fuzzy/cost/awtS": { n: 200, mean: -0.12281297604772816, standardError: 0.04118151148177824, lower: -0.20402112711640114, upper: -0.04160482497905518 },
+    "garden-down-peak-2pct/fuzzy/cost/energyKJ": { n: 200, mean: 3.0206756739324936, standardError: 1.3713602338543005, lower: 0.31641288625683606, upper: 5.724938461608151 },
+    "garden-down-peak-2pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 0.21391902980790192, standardError: 0.09047294988779082, lower: 0.035510304198908244, upper: 0.3923277554168956 },
+    "garden-down-peak-2pct/fuzzy/cost/wt95S": { n: 200, mean: -0.35225452754548087, standardError: 0.12992794211414344, lower: -0.6084667832786342, upper: -0.0960422718123275 },
+    "garden-down-peak-2pct/fuzzy/gate/ttdMeanS": { n: 200, mean: -0.1891113049553149, standardError: 0.06068428014887685, lower: -0.3087780683281018, upper: -0.069444541582528 },
+    "garden-down-peak-2pct/learned/cost/awtS": { n: 200, mean: -0.12510868425085786, standardError: 0.04210769656954349, lower: -0.20814323206453794, upper: -0.04207413643717778 },
+    "garden-down-peak-2pct/learned/cost/energyKJ": { n: 200, mean: 3.3428241264324936, standardError: 1.405214772448594, lower: 0.5718016598231941, upper: 6.113846593041793 },
+    "garden-down-peak-2pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 0.24971330230790187, standardError: 0.09690009838515876, lower: 0.05863051915864542, upper: 0.4407960854571583 },
+    "garden-down-peak-2pct/learned/cost/wt95S": { n: 200, mean: -0.3672573457446645, standardError: 0.1311064117007511, lower: -0.6257934922913306, upper: -0.10872119919799844 },
+    "garden-down-peak-2pct/learned/gate/ttdMeanS": { n: 200, mean: -0.19140701315844463, standardError: 0.06230781476216987, lower: -0.314275316236734, upper: -0.06853871008015525 },
+    "garden-residential-2pct/fuzzy/cost/awtS": { n: 200, mean: -0.04156718820292118, standardError: 0.06246553981949952, lower: -0.16474651824020425, upper: 0.08161214183436188 },
+    "garden-residential-2pct/fuzzy/cost/energyKJ": { n: 200, mean: 3.881014567952195, standardError: 1.5445205581605093, lower: 0.8352871455561459, upper: 6.926741990348244 },
+    "garden-residential-2pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 0.3763017721620814, standardError: 0.14769634790360703, lower: 0.08505099235147384, upper: 0.6675525519726889 },
+    "garden-residential-2pct/fuzzy/cost/wt95S": { n: 200, mean: -0.198894545902648, standardError: 0.11045678174719653, lower: -0.4167105195260242, upper: 0.018921427720728246 },
+    "garden-residential-2pct/fuzzy/gate/ttdMeanS": { n: 200, mean: -0.1389492146751261, standardError: 0.06486253680516461, lower: -0.2668553186048433, upper: -0.011043110745408924 },
+    "garden-residential-2pct/learned/cost/awtS": { n: 200, mean: -0.0364300929870959, standardError: 0.06178059385870126, lower: -0.158258739354524, upper: 0.0853985533803322 },
+    "garden-residential-2pct/learned/cost/energyKJ": { n: 200, mean: 5.067213221485638, standardError: 1.7024034413952387, lower: 1.710147614269522, upper: 8.424278828701754 },
+    "garden-residential-2pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 0.43029597312212503, standardError: 0.15744664573582895, lower: 0.11981802969286343, upper: 0.7407739165513867 },
+    "garden-residential-2pct/learned/cost/wt95S": { n: 200, mean: -0.1886006548113123, standardError: 0.10858951138089762, lower: -0.40273445241597794, upper: 0.025533142793353364 },
+    "garden-residential-2pct/learned/gate/ttdMeanS": { n: 200, mean: -0.11053631822971845, standardError: 0.06950705173560612, lower: -0.24760120377139488, upper: 0.026528567311958004 },
+    "midtown-down-peak-1pct/fuzzy/cost/awtS": { n: 200, mean: -1.5586333735833053, standardError: 0.2094644588600445, lower: -1.9716881840205307, upper: -1.14557856314608 },
+    "midtown-down-peak-1pct/fuzzy/cost/energyKJ": { n: 200, mean: 374.77448024334836, standardError: 40.805714605116385, lower: 294.3073842849181, upper: 455.2415762017786 },
+    "midtown-down-peak-1pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 21.56374141385832, standardError: 2.4428901210727676, lower: 16.74646825272082, upper: 26.38101457499582 },
+    "midtown-down-peak-1pct/fuzzy/cost/wt95S": { n: 200, mean: -7.120676728296931, standardError: 0.7380088956456584, lower: -8.575998199781425, upper: -5.665355256812436 },
+    "midtown-down-peak-1pct/fuzzy/gate/ttdMeanS": { n: 200, mean: -2.120811960471577, standardError: 0.3044764800305503, lower: -2.7212263478385714, upper: -1.520397573104583 },
+    "midtown-down-peak-1pct/learned/cost/awtS": { n: 200, mean: -1.577901721818829, standardError: 0.20866870779344118, lower: -1.9893873457326705, upper: -1.1664160979049873 },
+    "midtown-down-peak-1pct/learned/cost/energyKJ": { n: 200, mean: 362.02634369513703, standardError: 40.917561495991635, lower: 281.3386905282911, upper: 442.71399686198293 },
+    "midtown-down-peak-1pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 20.705172262125874, standardError: 2.4454526931463616, lower: 15.882845820217733, upper: 25.527498704034016 },
+    "midtown-down-peak-1pct/learned/cost/wt95S": { n: 200, mean: -7.154337651542963, standardError: 0.7365690330502783, lower: -8.606819776559675, upper: -5.70185552652625 },
+    "midtown-down-peak-1pct/learned/gate/ttdMeanS": { n: 200, mean: -2.12986734673333, standardError: 0.30450047127632307, lower: -2.7303290437944305, upper: -1.5294056496722295 },
+    "midtown-hotel-1.5pct/fuzzy/cost/awtS": { n: 200, mean: 0.3570138257262967, standardError: 0.07683543208647035, lower: 0.20549769259296724, upper: 0.5085299588596262 },
+    "midtown-hotel-1.5pct/fuzzy/cost/energyKJ": { n: 200, mean: 303.71810890337946, standardError: 38.334860599806, lower: 228.12342967061178, upper: 379.3127881361471 },
+    "midtown-hotel-1.5pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 3.3583082324313107, standardError: 0.4415595047963524, lower: 2.4875720772715626, upper: 4.229044387591059 },
+    "midtown-hotel-1.5pct/fuzzy/cost/wt95S": { n: 200, mean: 0.9676482622620898, standardError: 0.3768432874447279, lower: 0.22452967542809887, upper: 1.7107668490960806 },
+    "midtown-hotel-1.5pct/fuzzy/gate/ttdMeanS": { n: 200, mean: -0.08110255652011272, standardError: 0.09720989485265698, lower: -0.2727962448408384, upper: 0.11059113180061295 },
+    "midtown-hotel-1.5pct/learned/cost/awtS": { n: 200, mean: 0.28835248808844144, standardError: 0.07230988729177808, lower: 0.14576053262931007, upper: 0.4309444435475728 },
+    "midtown-hotel-1.5pct/learned/cost/energyKJ": { n: 200, mean: 262.2430547608433, standardError: 36.841624420497986, lower: 189.5929723839756, upper: 334.89313713771094 },
+    "midtown-hotel-1.5pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 2.8601862828593907, standardError: 0.40659839733426684, lower: 2.0583919123537924, upper: 3.661980653364989 },
+    "midtown-hotel-1.5pct/learned/cost/wt95S": { n: 200, mean: 0.7661669426295282, standardError: 0.3581221034040376, lower: 0.05996571718071875, upper: 1.4723681680783378 },
+    "midtown-hotel-1.5pct/learned/gate/ttdMeanS": { n: 200, mean: -0.08512579780815735, standardError: 0.08974627776882896, lower: -0.2621015575766389, upper: 0.09184996196032416 },
+    "midtown-interfloor-1.0pct/fuzzy/cost/awtS": { n: 200, mean: 0.14669362108319287, standardError: 0.04474398588716329, lower: 0.058460425297091334, upper: 0.2349268168692944 },
+    "midtown-interfloor-1.0pct/fuzzy/cost/energyKJ": { n: 200, mean: 146.1390499992873, standardError: 28.567929616224806, lower: 89.80433423684816, upper: 202.47376576172644 },
+    "midtown-interfloor-1.0pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 2.404452193585284, standardError: 0.49220960718238965, lower: 1.433836237558366, upper: 3.3750681496122015 },
+    "midtown-interfloor-1.0pct/fuzzy/cost/wt95S": { n: 200, mean: 0.2906400097730424, standardError: 0.21489745268829535, lower: -0.13312842839868178, upper: 0.7144084479447665 },
+    "midtown-interfloor-1.0pct/fuzzy/gate/ttdMeanS": { n: 200, mean: -0.13719996643652685, standardError: 0.06646752120008882, lower: -0.26827102984723683, upper: -0.0061289030258168675 },
+    "midtown-interfloor-1.0pct/learned/cost/awtS": { n: 200, mean: 0.2112568248273087, standardError: 0.04906784959462372, lower: 0.11449715770682775, upper: 0.3080164919477897 },
+    "midtown-interfloor-1.0pct/learned/cost/energyKJ": { n: 200, mean: 223.90401442016847, standardError: 32.50894154611285, lower: 159.79779439161223, upper: 288.0102344487247 },
+    "midtown-interfloor-1.0pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 3.743808890886852, standardError: 0.5623983415789086, lower: 2.6347838007339677, upper: 4.852833981039736 },
+    "midtown-interfloor-1.0pct/learned/cost/wt95S": { n: 200, mean: 0.29687184864601435, standardError: 0.24232617381514554, lower: -0.18098483565225948, upper: 0.7747285329442881 },
+    "midtown-interfloor-1.0pct/learned/gate/ttdMeanS": { n: 200, mean: -0.2648280414795633, standardError: 0.08306130130823353, lower: -0.42862131816840443, upper: -0.10103476479072213 },
+    "midtown-interfloor-2.0pct/fuzzy/cost/awtS": { n: 200, mean: 0.858504254741524, standardError: 0.13769685819679928, lower: 0.5869720340974345, upper: 1.1300364753856136 },
+    "midtown-interfloor-2.0pct/fuzzy/cost/energyKJ": { n: 200, mean: 373.5036096986524, standardError: 76.29639044483329, lower: 223.05044325817337, upper: 523.9567761391314 },
+    "midtown-interfloor-2.0pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 3.1961116588324194, standardError: 0.6297467179395249, lower: 1.9542784971704852, upper: 4.437944820494353 },
+    "midtown-interfloor-2.0pct/fuzzy/cost/wt95S": { n: 200, mean: 2.9890201362613396, standardError: 0.5857229601515171, lower: 1.833999911872023, upper: 4.144040360650656 },
+    "midtown-interfloor-2.0pct/fuzzy/gate/ttdMeanS": { n: 200, mean: 0.7700448420102868, standardError: 0.21021898807555744, lower: 0.35550213274870157, upper: 1.184587551271872 },
+    "midtown-interfloor-2.0pct/learned/cost/awtS": { n: 200, mean: 1.6420719663566872, standardError: 0.14874934601897402, lower: 1.348744720021397, upper: 1.9353992126919775 },
+    "midtown-interfloor-2.0pct/learned/cost/energyKJ": { n: 200, mean: 1121.4691901659128, standardError: 75.78017612607444, lower: 972.0339759295468, upper: 1270.9044044022787 },
+    "midtown-interfloor-2.0pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 9.424999134181439, standardError: 0.6434984079473108, lower: 8.15604823741413, upper: 10.693950030948749 },
+    "midtown-interfloor-2.0pct/learned/cost/wt95S": { n: 200, mean: 4.567713389385008, standardError: 0.5570679332355025, lower: 3.469199632848438, upper: 5.666227145921578 },
+    "midtown-interfloor-2.0pct/learned/gate/ttdMeanS": { n: 200, mean: -0.1140968587627772, standardError: 0.22236112545674946, lower: -0.5525833352944084, upper: 0.324389617768854 },
+    "secure-up-peak-2pct/fuzzy/cost/awtS": { n: 126, mean: -0.19938270102712635, standardError: 0.054104728792215055, lower: -0.30646267421363416, upper: -0.09230272784061852 },
+    "secure-up-peak-2pct/fuzzy/cost/energyKJ": { n: 126, mean: -91.76116877488262, standardError: 28.300156452691894, lower: -147.77069071087016, upper: -35.7516468388951 },
+    "secure-up-peak-2pct/fuzzy/cost/energyPerServedLegKJ": { n: 126, mean: -5.107515575701308, standardError: 1.6562049830894194, lower: -8.385350787881384, upper: -1.8296803635212324 },
+    "secure-up-peak-2pct/fuzzy/cost/wt95S": { n: 126, mean: -0.08457804947473001, standardError: 0.04201084664285095, lower: -0.16772272892290147, upper: -0.0014333700265585642 },
+    "secure-up-peak-2pct/fuzzy/gate/ttdMeanS": { n: 126, mean: -0.22515287150239127, standardError: 0.067098137926129, lower: -0.35794841396943533, upper: -0.09235732903534719 },
+    "secure-up-peak-2pct/learned/cost/awtS": { n: 126, mean: -0.18863868709910442, standardError: 0.049729869011550715, lower: -0.28706026981835103, upper: -0.09021710437985782 },
+    "secure-up-peak-2pct/learned/cost/energyKJ": { n: 126, mean: -75.74604634299139, standardError: 25.5262095842503, lower: -126.26558315338556, upper: -25.226509532597227 },
+    "secure-up-peak-2pct/learned/cost/energyPerServedLegKJ": { n: 126, mean: -4.115737123301034, standardError: 1.5089054590924842, lower: -7.1020482962321285, upper: -1.129425950369939 },
+    "secure-up-peak-2pct/learned/cost/wt95S": { n: 126, mean: -0.07265215714862193, standardError: 0.04045426302294784, lower: -0.15271616442630898, upper: 0.007411850129065117 },
+    "secure-up-peak-2pct/learned/gate/ttdMeanS": { n: 126, mean: -0.21441487477441387, standardError: 0.06571061669157235, lower: -0.3444643405138095, upper: -0.08436540903501827 },
+    "vertical-city-up-peak-1pct/fuzzy/cost/awtS": { n: 200, mean: 0.11275041387366398, standardError: 0.042003566979564005, lower: 0.029921205086394204, upper: 0.19557962266093376 },
+    "vertical-city-up-peak-1pct/fuzzy/cost/energyKJ": { n: 200, mean: 434.3841011402187, standardError: 140.5132045938455, lower: 157.2981677875939, upper: 711.4700344928435 },
+    "vertical-city-up-peak-1pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 5.948827113650339, standardError: 1.803225535568218, lower: 2.392944718024646, upper: 9.504709509276031 },
+    "vertical-city-up-peak-1pct/fuzzy/cost/wt95S": { n: 200, mean: 0.049429137122255946, standardError: 0.07815598947443053, lower: -0.10469107779432163, upper: 0.2035493520388335 },
+    "vertical-city-up-peak-1pct/fuzzy/gate/ttdMeanS": { n: 200, mean: -0.040286406922495244, standardError: 0.09221159025343797, lower: -0.22212365577862714, upper: 0.14155084193363665 },
+    "vertical-city-up-peak-1pct/learned/cost/awtS": { n: 200, mean: 0.04283756256258224, standardError: 0.019073255684410748, lower: 0.0052259311955207485, upper: 0.08044919392964373 },
+    "vertical-city-up-peak-1pct/learned/cost/energyKJ": { n: 200, mean: 88.33213772201054, standardError: 56.89005051222852, lower: -23.852569688393586, upper: 200.5168451324147 },
+    "vertical-city-up-peak-1pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 1.4941670113191967, standardError: 0.8279227495211193, lower: -0.13846067273391305, upper: 3.1267946953723067 },
+    "vertical-city-up-peak-1pct/learned/cost/wt95S": { n: 200, mean: 0.04918866111823037, standardError: 0.047370039177888595, lower: -0.04422299764007089, upper: 0.14260031987653163 },
+    "vertical-city-up-peak-1pct/learned/gate/ttdMeanS": { n: 200, mean: 0.02642891794765916, standardError: 0.03624667923624022, lower: -0.045047958379640346, upper: 0.09790579427495866 },
+  }),
+  "double-deck": Object.freeze({
+    "up-peak-1.5pct/collective−collective@single-deck/awtS": { n: 200, mean: 0.3958203744435449, standardError: 0.1211146289491393, lower: 0.15698758928266196, upper: 0.6346531596044278 },
+    "up-peak-1.5pct/collective−collective@single-deck/carDistanceM": { n: 200, mean: 1741.6060000000004, standardError: 57.5937411304999, lower: 1628.0336452697675, upper: 1855.1783547302334 },
+    "up-peak-1.5pct/collective−collective@single-deck/carStarts": { n: 200, mean: 11.81, standardError: 0.531301142971303, lower: 10.762297234149282, upper: 12.85770276585072 },
+    "up-peak-1.5pct/collective−collective@single-deck/energyKJ": { n: 200, mean: 14004.640856094386, standardError: 464.8091116705003, lower: 13088.05748650788, upper: 14921.224225680891 },
+    "up-peak-1.5pct/collective−collective@single-deck/energyPerServedLegKJ": { n: 200, mean: 119.18109238198585, standardError: 4.014479464355479, lower: 111.26471333048563, upper: 127.09747143348606 },
+    "up-peak-1.5pct/collective−collective@single-deck/rideMeanS": { n: 200, mean: -10.051134748552359, standardError: 0.3187697938093537, lower: -10.679734929564509, upper: -9.42253456754021 },
+    "up-peak-1.5pct/collective−collective@single-deck/ttdMeanS": { n: 200, mean: -12.08964575773569, standardError: 0.516021937179756, lower: -13.107218593734798, upper: -11.072072921736583 },
+    "up-peak-1.5pct/collective−collective@single-deck/ttdP95S": { n: 200, mean: -31.908928989983323, standardError: 1.5516079962517337, lower: -34.96863253230534, upper: -28.849225447661304 },
+    "up-peak-1.5pct/collective−collective@single-deck/unservedFraction": { n: 200, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "up-peak-1.5pct/collective−collective@single-deck/wt95S": { n: 200, mean: 0.5634109534504419, standardError: 0.29079825081312366, lower: -0.010030560297471736, upper: 1.1368524671983555 },
+    "up-peak-1.5pct/eta−eta@single-deck/awtS": { n: 200, mean: 1.6318710775658047, standardError: 0.12000127811375065, lower: 1.3952337718708145, upper: 1.868508383260795 },
+    "up-peak-1.5pct/eta−eta@single-deck/carDistanceM": { n: 200, mean: 546.3445000000003, standardError: 36.334884595130596, lower: 474.6936865379988, upper: 617.9953134620017 },
+    "up-peak-1.5pct/eta−eta@single-deck/carStarts": { n: 200, mean: 3.07, standardError: 0.42488603260582436, lower: 2.2321432074417635, upper: 3.907856792558236 },
+    "up-peak-1.5pct/eta−eta@single-deck/energyKJ": { n: 200, mean: 3981.793803668221, standardError: 280.3446197827664, lower: 3428.966396041814, upper: 4534.621211294628 },
+    "up-peak-1.5pct/eta−eta@single-deck/energyPerServedLegKJ": { n: 200, mean: 33.247733635770835, standardError: 2.5864978250042316, lower: 28.14727232306071, upper: 38.34819494848096 },
+    "up-peak-1.5pct/eta−eta@single-deck/rideMeanS": { n: 200, mean: -7.827498450352788, standardError: 0.30168675376414933, lower: -8.422411618752083, upper: -7.232585281953495 },
+    "up-peak-1.5pct/eta−eta@single-deck/ttdMeanS": { n: 200, mean: -6.427396276152678, standardError: 0.41674140568196927, lower: -7.249192218347929, upper: -5.605600333957428 },
+    "up-peak-1.5pct/eta−eta@single-deck/ttdP95S": { n: 200, mean: -19.254872607299443, standardError: 1.3373564496408201, lower: -21.892081410166004, upper: -16.617663804432883 },
+    "up-peak-1.5pct/eta−eta@single-deck/unservedFraction": { n: 200, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "up-peak-1.5pct/eta−eta@single-deck/wt95S": { n: 200, mean: 2.5920837269063988, standardError: 0.3046649402123605, lower: 1.991297704250553, upper: 3.1928697495622442 },
+    "up-peak-1pct/collective−collective@single-deck/awtS": { n: 153, mean: 0.019467176825324044, standardError: 0.11657867651687248, lower: -0.21085660648180382, upper: 0.2497909601324519 },
+    "up-peak-1pct/collective−collective@single-deck/carDistanceM": { n: 153, mean: 962.8385620915031, standardError: 51.98108924981932, lower: 860.1398396994105, upper: 1065.5372844835958 },
+    "up-peak-1pct/collective−collective@single-deck/carStarts": { n: 153, mean: 4.980392156862745, standardError: 0.43024526691216225, lower: 4.130359195553118, upper: 5.830425118172372 },
+    "up-peak-1pct/collective−collective@single-deck/energyKJ": { n: 153, mean: 8134.488710626324, standardError: 434.01879342466435, lower: 7277.000415899496, upper: 8991.977005353152 },
+    "up-peak-1pct/collective−collective@single-deck/energyPerServedLegKJ": { n: 153, mean: 101.44029723035133, standardError: 5.4952040092116645, lower: 90.58345603724561, upper: 112.29713842345706 },
+    "up-peak-1pct/collective−collective@single-deck/rideMeanS": { n: 153, mean: -6.290463590460582, standardError: 0.311254234867015, lower: -6.905406692294137, upper: -5.6755204886270265 },
+    "up-peak-1pct/collective−collective@single-deck/ttdMeanS": { n: 153, mean: -6.262486756541246, standardError: 0.47974690492370176, lower: -7.210319803487183, upper: -5.314653709595309 },
+    "up-peak-1pct/collective−collective@single-deck/ttdP95S": { n: 153, mean: -18.841813902281217, standardError: 1.7865166398508594, lower: -22.371423979575535, upper: -15.312203824986899 },
+    "up-peak-1pct/collective−collective@single-deck/unservedFraction": { n: 153, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "up-peak-1pct/collective−collective@single-deck/wt95S": { n: 153, mean: -0.06629375359548093, standardError: 0.2703626858360339, lower: -0.6004476703095659, upper: 0.467860163118604 },
+    "up-peak-1pct/eta−eta@single-deck/awtS": { n: 153, mean: 0.7849630986064627, standardError: 0.12160100296718883, lower: 0.5447167354279387, upper: 1.0252094617849867 },
+    "up-peak-1pct/eta−eta@single-deck/carDistanceM": { n: 153, mean: 318.1477124183005, standardError: 32.99205696961752, lower: 252.96550579729106, upper: 383.32991903930997 },
+    "up-peak-1pct/eta−eta@single-deck/carStarts": { n: 153, mean: 0.6339869281045751, standardError: 0.3435923399572628, lower: -0.044846371592835665, upper: 1.312820227801986 },
+    "up-peak-1pct/eta−eta@single-deck/energyKJ": { n: 153, mean: 2622.5309611468087, standardError: 270.5324687539836, lower: 2088.0416053526837, upper: 3157.0203169409338 },
+    "up-peak-1pct/eta−eta@single-deck/energyPerServedLegKJ": { n: 153, mean: 32.22970186039005, standardError: 3.522588138713578, lower: 25.270145864539472, upper: 39.18925785624063 },
+    "up-peak-1pct/eta−eta@single-deck/rideMeanS": { n: 153, mean: -4.956125526235181, standardError: 0.2796968069570638, lower: -5.508720809369577, upper: -4.403530243100785 },
+    "up-peak-1pct/eta−eta@single-deck/ttdMeanS": { n: 153, mean: -2.728893863990816, standardError: 0.4157997615440845, lower: -3.550386928060509, upper: -1.9074007999211229 },
+    "up-peak-1pct/eta−eta@single-deck/ttdP95S": { n: 153, mean: -11.448214422622819, standardError: 1.5750258039555998, lower: -14.559983339650291, upper: -8.336445505595346 },
+    "up-peak-1pct/eta−eta@single-deck/unservedFraction": { n: 153, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "up-peak-1pct/eta−eta@single-deck/wt95S": { n: 153, mean: 1.087600644681388, standardError: 0.25049612106434077, lower: 0.5926969793532862, upper: 1.5825043100094898 },
   }),
 });

@@ -54,11 +54,35 @@ export function addedStopCount(context: TermContext): number {
   return added + (alreadyStopping ? 0 : 1);
 }
 
-/** Bounded at two: a pickup and a destination are all one call can add. */
+/**
+ * Bounded at two: a pickup and a destination are all one call can add.
+ *
+ * `partiallyActiveWhen`, and deliberately **not** `activeWhen`. Half this term's raw value — the
+ * destination increment — exists only when the call carries a destination, and the other half,
+ * the pickup, is priced under every call type. So the *quantity* is conditional and the
+ * *dimension* is not: `weights.stopCount` is a live search dimension at `up-down-buttons`, where
+ * `energy-aware` and `predictive-balanced` both weight it today.
+ *
+ * The gate was tried before this declaration was written, and measurement refused it.
+ * `sim/searchSpaceLiveness.test.ts` § *finds no activeWhen gate that hides a live region*
+ * reported `weights.stopCount ... at dispatch.callType=up-down-buttons — outside that gate — it
+ * still moves a run (0 vs 5 on midtown-office)`, and `policies.test.ts` turned red on the two
+ * shipped profiles the gate would have made invalid. A gate is a machine-readable claim, and that
+ * one is false.
+ *
+ * What the declaration *is* for is the hazard § D136 measured: authoring a destination call type
+ * onto a profile that weights this term changes what the term prices, and at `garden-down-peak`
+ * it made the wait **worse** by a resolved interval — `+1.320 [+0.988, +1.653] s` on AWT at
+ * weight 1, n = 200. A weight tuned on one side of the call type does not transfer to the other,
+ * which is the same discipline docs/06 already states for traffic patterns.
+ */
 export const stopCountTerm: CostTermDefinition = Object.freeze({
   id: 'stopCount',
   unit: '',
   measures: 'Number of stops added',
   normalization: Object.freeze({ mode: 'bounded', fullScale: 2 } as const),
+  partiallyActiveWhen: Object.freeze({
+    'dispatch.callType': Object.freeze(['destination-entry', 'mobile-credential']),
+  }),
   evaluate: addedStopCount,
 });

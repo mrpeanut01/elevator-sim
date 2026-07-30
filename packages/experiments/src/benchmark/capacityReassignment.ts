@@ -11,9 +11,12 @@
  *
  * ## Why this study runs `Simulation` directly rather than through `runExperiment`
  *
- * `StageActivity` — `capacityCrossings`, `capacityMigrations`, `capacityHeld` — lives on the
- * `Simulation` object and is not carried by `ReplicationRecord`, so the replication runner cannot
- * see it. Those three counters are the whole point of the study: a migration count of zero and a
+ * `StageActivity`'s `capacityCrossings`, `capacityMigrations` and `capacityHeld` live on the
+ * `Simulation` object and are not carried by `ReplicationRecord`, so the replication runner cannot
+ * see them. (`ReplicationRecord` carries **one** field of `StageActivity`, `kioskRefusedLegs`, and
+ * carries it because a study asked for it — see that field's own note. These three have no such
+ * reader, so copying them would be adding contract for nobody.) Those three counters are the whole
+ * point of this study: a migration count of zero and a
  * mechanism that is not wired look identical in an AWT mean, which is exactly how this project lost
  * four behaviours to a missing call site. So the study seeds itself with the runner's own
  * {@link replicationSeed} — the same function `crn.ts` uses, so replication `i` here is byte-for-byte

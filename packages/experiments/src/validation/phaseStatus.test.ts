@@ -776,42 +776,118 @@ describe('Phase 6 is partial, and the parse says why', () => {
       'Phase 6 is partial because 6a and 6b are accepted and 6c is not. Marking 6c accepted moves ' +
         'the whole phase to accepted, where the cross-document check against docs/07 § 1 fails ' +
         'until that document moves too.',
-    ).toEqual({ '6a': 'accepted', '6b': 'accepted', '6c': 'deferred' });
+    ).toEqual({ '6a': 'accepted', '6b': 'accepted', '6c': 'not-accepted' });
   });
 
-  it('keeps 6c deferred *with reasons*, enumerated rather than asserted', () => {
+  /**
+   * 6c is **refused**, not deferred — and this assertion is stronger than the one it replaces.
+   *
+   * The old form required `⬜ DEFERRED … not dropped` plus § D28's three enumerated reasons, which
+   * was exactly right while 6c was an absence of evidence. It is now evidence: implemented,
+   * measured against a criterion recorded **before** any of it existed (§ D139), and refused on an
+   * interval that contains zero.
+   *
+   * **A refusal is easier to fake than a deferral**, which is why this asks for more. A deferral
+   * needs only reasons; a refusal needs a gate that was fixed in advance, a measurement, and a
+   * verdict that does not quietly become a win. So three things are required and the third is the
+   * point: the criterion must be **cited**, so the reader can check it predates the result. That is
+   * the § D27 → § D99 failure mechanised — a criterion written after a result is indistinguishable
+   * from one fitted to it, and this project has done that once already, by accident, inside a
+   * decision whose stated purpose was to strengthen a gate.
+   */
+  it('keeps 6c refused against a criterion that predates it, not merely unfinished', () => {
     const sub = (phase6 as Phase).subPhases.find((item) => item.id === '6c');
-    expect(sub?.status).toBe('deferred');
-    expect(
-      /not dropped/iu.test(sub?.heading ?? ''),
-      'docs/05 § Phase 6c reads DEFERRED without "not dropped". CLAUDE.md and docs/07 both say ' +
-        'deferred-with-reasons, not dropped; a heading that says only DEFERRED is the weaker claim.',
-    ).toBe(true);
+    expect(sub?.status).toBe('not-accepted');
+
+    /* The three reasons § D28 gave still have to be answered rather than dropped: a phase that
+       stops citing its own objections has not resolved them, it has forgotten them. */
     const reasons = (sub?.body ?? '').split('\n').filter((line) => /^\d+\.\s/u.test(line));
     expect(
       reasons.length,
-      'docs/05 § Phase 6c states no enumerated reasons. § D28 gave three, and "deferred out of the ' +
-        'phase with reasons" is what every other document says of it.',
+      'docs/05 § Phase 6c no longer enumerates § D28’s three reasons. Two were dissolved by the ' +
+        'shape it was built in and the third was answered in writing first; dropping them loses ' +
+        'the record of why it was ever deferred.',
     ).toBeGreaterThanOrEqual(3);
+
+    const body = sub?.body ?? '';
+
+    /* The gate, cited by number, so its date can be checked against the code's. */
+    expect(
+      /§\s*D139/u.test(body),
+      'docs/05 § Phase 6c states a verdict without citing the criterion it was measured against. ' +
+        '§ D139 is that criterion and it is dated before the implementation deliberately.',
+    ).toBe(true);
+
+    /* A measured interval, not an adjective. */
+    expect(
+      /\[[−+-]?[\d.]+,\s*[+−-]?[\d.]+\]/u.test(body),
+      'docs/05 § Phase 6c reports no interval. A refusal is a measurement — CLAUDE.md § ' +
+        'Statistical discipline forbids declaring any comparison without one.',
+    ).toBe(true);
+
+    /* And it may not be read as a win. */
+    expect(
+      /\bNOT\s+ACCEPTED\b/iu.test(sub?.heading ?? ''),
+      'docs/05 § Phase 6c’s heading no longer says NOT ACCEPTED. Implemented-and-refused is a ' +
+        'distinct state from both deferred and accepted, and the heading is where a cold reader ' +
+        'sees which one it is.',
+    ).toBe(true);
   });
 
-  it('keeps double-deck recorded as configured-and-not-simulated, against a warning code that exists', () => {
+  /**
+   * Double-deck is **simulated**, and this assertion moved in the same commit as the sentence.
+   *
+   * It used to require `docs/05` § Phase 6 to say *not simulated* and to name
+   * `WARNING_CODES.doubleDeckNotSimulated`, checked against `core`'s source. That was right for as
+   * long as it was true, and the guard's real value showed at the moment it stopped being true: it
+   * went red rather than letting the roadmap quietly drop a disclaimer. **A guard that has to be
+   * edited to land a change is working**, provided the replacement is not weaker.
+   *
+   * So this is deliberately *stronger* than what it replaces. The old form asserted an absence — a
+   * capability not built, a disclaimer present. This asserts a **verdict with a direction**, and
+   * that the narrower warning code which survived is real in `core`. An empty claim cannot satisfy
+   * it: the roadmap must state that double-deck is simulated, must **not** claim it is simply
+   * better, and must name a code the source declares.
+   */
+  it('records double-deck as simulated, with a verdict that does not round itself up', () => {
     const body = (phase6 as Phase).body;
+
     expect(
-      /double-deck/iu.test(body) && /not\*{0,2}\s*simulated/iu.test(body),
-      'docs/05 § Phase 6 no longer records double-deck operation as not simulated.',
+      /double-deck/iu.test(body),
+      'docs/05 § Phase 6 no longer discusses double-deck operation at all.',
     ).toBe(true);
+
     expect(
-      body.includes('doubleDeckNotSimulated'),
-      'docs/05 § Phase 6 no longer names the warning code that carries the disclaimer.',
+      /\bsimulated\b/iu.test(body) && !/\bnot\*{0,2}\s+simulated/iu.test(body),
+      'docs/05 § Phase 6 still records double-deck as not simulated. It is simulated — paired ' +
+        'stops, per-deck design load, deck-bound legs — and the roadmap must say so or say why not.',
     ).toBe(true);
-    /* And the disclaimer is not merely a sentence: the code it names is in `core`. This is the
-       eighth dead seam's own lesson — the warning was raised and asserted in both directions with
-       nothing branching on it (§ D23) — so the citation is checked against the source. */
+
+    /* The verdict is dispatcher-dependent and the roadmap may not flatten it. `nearest-car` on the
+       Pareto front at six of eight cells (§ D106) is the standing lesson: a capability that helps
+       one arm and hurts another has no single sign, and a table that gives it one is wrong. */
+    expect(
+      /WORSE/u.test(body) && /BETTER/u.test(body),
+      'docs/05 § Phase 6 states a double-deck verdict without both directions. Measured WORSE ' +
+        'under `eta` and BETTER under `collective` at the same operating point — there is no ' +
+        'verdict of the form "double-deck is better", and a roadmap that implies one is the ' +
+        'round-up this guard exists to prevent.',
+    ).toBe(true);
+
+    expect(
+      body.includes('missingFloorPairs'),
+      'docs/05 § Phase 6 no longer names the warning code that survived. ' +
+        '`doubleDeckNotSimulated` was deleted because it became false; `missingFloorPairs` carries ' +
+        'the same sentence for the one case still true.',
+    ).toBe(true);
+
+    /* And the surviving code is not merely a sentence: it is in `core`. This is the eighth dead
+       seam's own lesson — that warning was raised and asserted in both directions with nothing
+       branching on it (§ D23) — so the citation is checked against the source. */
     expect(
       DECLARED.has('WARNING_CODES') || EXPORTED.has('WARNING_CODES'),
-      'docs/05 § Phase 6 cites WARNING_CODES.doubleDeckNotSimulated and packages/*/src declares ' +
-        'no WARNING_CODES.',
+      'docs/05 § Phase 6 cites WARNING_CODES.missingFloorPairs and packages/*/src declares no ' +
+        'WARNING_CODES.',
     ).toBe(true);
   });
 

@@ -21,11 +21,17 @@ import {
   parseTrafficProfiles,
   resolveBuilding,
   type BuildingConfig,
-  type DispatcherProfile,
+  type DispatcherProfiles,
   type ElevatorSpecs,
   type ResolvedBuilding,
   type TrafficProfiles,
 } from '@elevator-sim/core/browser';
+import { collectSearchSpace, type SearchSpace } from '@elevator-sim/experiments/browser';
+
+import { restrictedFloorIds } from '../access/zoning.js';
+import { parseCampaign } from '../campaign/parse.js';
+import type { Campaign } from '../campaign/types.js';
+import { validatePublishedGoalRates, type PublishedGoalRates } from '../scenario/published.js';
 
 /**
  * A building as both the runner and the editor need it.
@@ -45,7 +51,22 @@ export interface BuildingEntry {
 export interface BrowserResources {
   readonly elevatorSpecs: ElevatorSpecs;
   readonly trafficProfiles: TrafficProfiles;
-  readonly dispatcherProfiles: readonly DispatcherProfile[];
+  /**
+   * The whole of `data/dispatcher-profiles.json`, **not** its `profiles` array.
+   *
+   * It was the array until T75, and the difference is the file-level `patternSwitching` block:
+   * `SimulationConfig.dispatcherProfiles` is what `Simulation` turns into a weight-set library
+   * through `weightSetSourceFrom`, and an array cannot satisfy it. So a profile could author
+   * `"selection": {"policy": "fuzzy"}`, `parseDispatcherProfiles` would accept it here, and
+   * pressing **Run** would refuse it **by name** — the safe failure, and still the thirteenth
+   * instance of a behaviour that is configurable, validated and unreachable from the surface that
+   * needs it (`DECISIONS.md` § D153's own known-limitations paragraph).
+   *
+   * Named for its file, as {@link BrowserResources.trafficProfiles} and
+   * {@link BrowserResources.elevatorSpecs} already are; § D153 decision 1 argues the naming, and
+   * the array was the odd one out. Readers that want the list say `.profiles`.
+   */
+  readonly dispatcherProfiles: DispatcherProfiles;
   readonly buildings: readonly ResolvedBuilding[];
   /** The same buildings, with the document each was parsed from. */
   readonly entries: readonly BuildingEntry[];
@@ -130,12 +151,74 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
   return {
     elevatorSpecs,
     trafficProfiles,
-    dispatcherProfiles: dispatchers.profiles,
+    dispatcherProfiles: dispatchers,
     buildings,
     entries,
     trafficProfileIds,
     warnings: [...warnings, ...buildings.flatMap((b) => b.warnings.map((w) => w.message))],
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * The campaign — docs/10 § 5, W5
+ * -------------------------------------------------------------------------- */
+
+/**
+ * `data/campaign.json` and `data/scenario-goals.json`, fetched, cross-checked and parsed.
+ *
+ * **Deliberately not part of {@link loadBrowserResources}.** That function is what
+ * `dev/batchWorker.ts` calls on every worker start, and a batch worker has no use for a campaign;
+ * folding two more fetches into it would make every batch pay for a surface it does not touch.
+ * The Campaign panel is the only caller, and it calls this once.
+ *
+ * The published goal table is validated **before** the campaign is parsed against it, because a
+ * campaign checked against a malformed table would be checked against nothing.
+ */
+export async function loadCampaign(resources: BrowserResources): Promise<LoadedCampaign> {
+  const [campaignRaw, publishedRaw] = await Promise.all([
+    fetchJson('/campaign.json'),
+    fetchJson('/scenario-goals.json'),
+  ]);
+
+  const published = publishedRaw as PublishedGoalRates;
+  const tableViolations = validatePublishedGoalRates(published);
+  if (tableViolations.length > 0) {
+    throw new Error(
+      `data/scenario-goals.json is not a valid goal table, so no campaign can be checked ` +
+        `against it:\n  ${tableViolations.join('\n  ')}`,
+    );
+  }
+
+  const space = collectSearchSpace();
+  const dimensionHelp = new Map<string, string>();
+  for (const parameter of space.parameters) {
+    if (parameter.description !== undefined) dimensionHelp.set(parameter.id, parameter.description);
+  }
+
+  const campaign = parseCampaign(campaignRaw, {
+    published,
+    // The one statement anywhere about what a dimension may be, and it is derived here.
+    dimensionIds: space.ids,
+    profileIds: new Set(resources.dispatcherProfiles.profiles.map((profile) => profile.id)),
+    restrictedFloorIdsByBuilding: new Map(
+      resources.buildings.map((building) => [
+        building.id,
+        restrictedFloorIds(
+          building.floors.map((floor) => floor.id),
+          building.accessZones,
+        ),
+      ]),
+    ),
+  });
+
+  return { campaign, published, space, dimensionHelp };
+}
+
+export interface LoadedCampaign {
+  readonly campaign: Campaign;
+  readonly published: PublishedGoalRates;
+  readonly space: SearchSpace;
+  readonly dimensionHelp: ReadonlyMap<string, string>;
 }
 
 /**

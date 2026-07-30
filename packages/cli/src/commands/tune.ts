@@ -376,6 +376,9 @@ export async function runTune(
     dispatcherProfilesById: config.dispatcherProfilesById,
     trafficProfiles: config.trafficProfiles,
     ...(config.elevatorSpecs === undefined ? {} : { elevatorSpecs: config.elevatorSpecs }),
+    // The file beside the profile index, so a candidate whose profile opts into
+    // `selection.policy` finds the weight sets it names. Inert while no shipped profile opts in.
+    dispatcherProfiles: config.dispatcherProfiles,
   };
   const parallel: ParallelSpec | undefined = serial ? { mode: 'serial' } : undefined;
 

@@ -99,6 +99,7 @@ export function withProfiles(
     dispatcherProfilesById,
     trafficProfiles: config.trafficProfiles,
     elevatorSpecs: config.elevatorSpecs,
+    dispatcherProfiles: config.dispatcherProfiles,
   });
 }
 
@@ -188,12 +189,13 @@ export function gardenAt(arrivalRatePctPop5min: number): TrafficArmSpec {
  * decides `converged` from the published half-width, so a loop that stopped on a narrower estimate
  * would stop at a precision the page then declines to call converged.
  *
- * docs/03-traffic-and-statistics.md § Part 3 writes the stopping rule with a `t` (n ≤ 25) / `z`
- * (n > 25) crossover, and **this rule does not implement it.** The crossover would stop *earlier*
- * — `stopping.ts` is explicit that "one that stops too early publishes a number it did not earn" —
- * and after review finding #14 removed it from the published path it had no non-test caller left
- * anywhere. It is deleted rather than kept exported behind a false caller list; § Part 3 of that
- * doc needs correcting to `t[n-1]` at every `n`. See DECISIONS.md § D7.
+ * docs/03-traffic-and-statistics.md § Part 3 **used to** write the stopping rule with a `t`
+ * (n ≤ 25) / `z` (n > 25) crossover, and this rule never implemented it. The crossover would stop
+ * *earlier* — `stopping.ts` is explicit that "one that stops too early publishes a number it did
+ * not earn" — and after review finding #14 removed it from the published path it had no non-test
+ * caller left anywhere. It is deleted rather than kept exported behind a false caller list, and
+ * § Part 3 was corrected to `t[n-1]` at every `n` on 2026-07-27, so doc and code now agree. See
+ * DECISIONS.md § D7.
  */
 export const productionStoppingRule: StoppingRule = halfWidthStoppingRule((samples, { confidence }) =>
   estimateMean(samples, { confidence }),

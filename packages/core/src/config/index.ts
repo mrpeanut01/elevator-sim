@@ -24,6 +24,7 @@
 
 export {
   ConfigError,
+  DISPATCHER_PROFILE_OBJECT_SECTIONS,
   ISSUE_CODES,
   WARNING_CODES,
   accessZoneSchema,
@@ -45,6 +46,7 @@ export {
   serviceEventSchema,
   trafficProfileSchema,
   trafficProfilesSchema,
+  transportModeSchema,
 } from './schema.js';
 
 export {
@@ -147,6 +149,7 @@ export type {
   ServiceEventConfig,
   TrafficProfile,
   TrafficProfiles,
+  TransportModeConfig,
   TypicalMax,
   ValueRange,
 } from './types.js';

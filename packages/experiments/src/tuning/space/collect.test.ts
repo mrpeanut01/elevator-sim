@@ -272,8 +272,36 @@ describe('every parameter core declares is accounted for', () => {
     // `metrics.*` row it is declared and counted here and is correctly not authorable in a
     // dispatcher profile. A dispatcher that could tune the threshold at which its own long waits
     // stop being reported would be tuning away its own evidence.
-    expect(rows).toBe(99);
-    expect(SPACE.parameters.length).toBe(49);
+    //
+    // **99 → 106 and 49 → 56 in wave 6**, and here the two move together, which is the third
+    // possible relationship and the one neither earlier note had. All seven new rows are
+    // `DISPATCH_PARAMETERS`' `selection.*` — stage 3's weight-set selector — and all seven are
+    // authorable in a profile, because a dispatcher choosing *which of the shipped weight vectors
+    // to score with* is a dispatcher dimension in a way `sim.assignedWalkS` and
+    // `metrics.maxWaitHorizonS` are not. Their arrival also found a real defect one file over:
+    // `encode.ts`'s `PROFILE_OBJECT_SECTIONS` is a hand-written list of profile sections, so all
+    // seven were reported unauthorable and silently dropped from the space until `selection` was
+    // added to it. The biconditional above is what caught it.
+    //
+    // **The list is no longer hand-written.** It is derived from `dispatcherProfileSchema`'s own
+    // shape by `core`'s `objectSectionsOf`, so an eighth section reaches this count with no edit
+    // in `experiments` at all; `config/schema.test.ts` proves the derivation against a fictional
+    // schema the product does not ship, and `encode.test.ts` pins `encode.ts` to it by identity.
+    // These two numbers are unchanged by that work — 106 and 56 before and after — which is the
+    // claim, since a derivation that moved a count would be a second defect wearing the fix's
+    // clothes.
+    //
+    // **106 → 108 and the space unmoved at 56 in wave 9**, which is the `sim.assignedWalkS`
+    // relationship again rather than a new one. Both rows are `TRAFFIC_PARAMETERS`' —
+    // `traffic.lunchTwoWay.durationS` and `traffic.lunchTwoWay.mixAmplitude`, the geometry and the
+    // mix-arc amplitude of the third demand template — and neither is authorable in a dispatcher
+    // profile, correctly: they describe the *traffic a dispatcher is measured under*, and a
+    // dispatcher that could tune the demand it is scored on could tune away the demand it is bad
+    // at. The second is the one that matters, because it is the flat-mix negative control
+    // `DECISIONS.md` § D162 condition 5 requires — a control an arm could set for itself would
+    // not be one.
+    expect(rows).toBe(108);
+    expect(SPACE.parameters.length).toBe(56);
     // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
     // always said `false` would satisfy the biconditional above only by accident.
     expect(authorable).toBeGreaterThan(0);

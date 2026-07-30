@@ -18,9 +18,11 @@
  */
 
 import {
+  DEMAND_TEMPLATE_IDS,
   SimulationError,
   Simulation,
   WARNING_CODES,
+  type DemandTemplateId,
   type LoadedConfig,
   type SimulationConfig,
   type SimulationResult,
@@ -105,7 +107,7 @@ export const RUN_FLAGS: readonly FlagSpec[] = [
     kind: 'string',
     placeholder: '<id>',
     summary: 'demand template',
-    choices: ['rise-and-fall', 'constant-iso'],
+    choices: [...DEMAND_TEMPLATE_IDS],
     defaultText: 'rise-and-fall',
   },
   {
@@ -205,11 +207,19 @@ export interface RunPlan {
   /**
    * Load-time disclaimers about this building, carried from the config layer.
    *
-   * **This is the non-test reader `WARNING_CODES.doubleDeckNotSimulated` did not have.**
+   * **This is the non-test reader the double-deck disclaimer code did not have.**
    * `resolveBuilding` raised it, `config/doubleDeck.test.ts` asserted it in both directions, and
    * no shipped path read the code — the CLI printed the `Simulation`-side statement and never
    * looked at `ResolvedBuilding.warnings` at all. A code nothing branches on is a string with a
    * test, which is the shape of defect the standing requirement in `docs/05-roadmap.md` names.
+   *
+   * **The branch survived Phase 6's double-deck work and was re-pointed rather than deleted.**
+   * `double-deck-not-simulated` was retired because double-deck operation *is* simulated now;
+   * `missing-floor-pairs` carries the same disclaimer over the one configuration where it is
+   * still true — a double-deck bank with no declared pairing, which gets a single-deck shaft.
+   * `docs/09` § 6.3 required exactly this: *"Phase 6 must not remove that branch, or the code
+   * becomes the eighth dead seam again."* It is now raised by **no shipped building**, which is
+   * the honest state for a disclaimer: available, read, and not needed.
    *
    * Selected **by code**, so the choice of what counts as a load-time disclaimer is a machine-
    * readable decision rather than a substring match on prose.
@@ -218,7 +228,19 @@ export interface RunPlan {
 }
 
 /** Config-warning codes the CLI repeats before a run, because they qualify its numbers. */
-const DISCLAIMER_CODES: readonly string[] = [WARNING_CODES.doubleDeckNotSimulated];
+const DISCLAIMER_CODES: readonly string[] = [WARNING_CODES.missingFloorPairs];
+
+/**
+ * Whether a `--template` value is one core knows how to build.
+ *
+ * Derived from `DEMAND_TEMPLATE_IDS` rather than a disjunction of string literals, which is what
+ * the flag's `choices` list is derived from too — so a template added to `core` is offered, parsed
+ * and applied by this command without anybody remembering three places. The predicate is not
+ * redundant with `choices`: `planRun` is exported and is called in tests with hand-built args.
+ */
+function isDemandTemplateId(value: string | undefined): value is DemandTemplateId {
+  return value !== undefined && (DEMAND_TEMPLATE_IDS as readonly string[]).includes(value);
+}
 
 export function planRun(config: LoadedConfig, parsed: ParsedArgs): RunPlan {
   const buildingId = requiredStringFlag(parsed, 'building');
@@ -240,14 +262,23 @@ export function planRun(config: LoadedConfig, parsed: ParsedArgs): RunPlan {
     dispatcherProfile: profile,
     trafficProfiles: config.trafficProfiles,
     elevatorSpecs: config.elevatorSpecs,
+    // The file, beside the one profile taken out of it — and **this is the shipped caller the
+    // weight-set selector did not have.** § D141 built the mechanism and reached it only through
+    // `DispatchPolicyOptions.weightSets`, which `experiments/src/runner/experiment.ts` plumbs and
+    // no CLI command does, so a study could switch weight sets mid-run and `run` / `watch` could
+    // not. `patternSwitching` and the profiles its arms name are both file-level; handing over
+    // the file is what lets a profile opt in through `selection.policy` as **data** rather than
+    // through a code path only a study can reach (CLAUDE.md invariant 7).
+    //
+    // Unconditional, and there is no `--selection` flag: no shipped profile opts in, so this is
+    // inert on every command line anybody types today, and it is the data file that turns it on.
+    dispatcherProfiles: config.dispatcherProfiles,
     seed,
     // A run that cannot clear its demand is a measurement of saturation, not a crash. Report it
     // and let the summary's own saturation test decide what may be quoted.
     onTimeout: 'report',
     ...(durationS === undefined ? {} : { durationS }),
-    ...(template === 'constant-iso' || template === 'rise-and-fall'
-      ? { demandTemplate: template }
-      : {}),
+    ...(isDemandTemplateId(template) ? { demandTemplate: template } : {}),
     ...(rate === undefined ? {} : { demand: { arrivalRatePctPop5min: rate } }),
     ...(window === 'full-run' || window === 'peak-5min' ? { reportWindow: window } : {}),
   };
@@ -440,6 +471,37 @@ export function printRunReport(out: Output, plan: RunPlan, result: SimulationRes
     `${count(summary.counts.arrivals)} arrived · ${count(summary.counts.boarded)} boarded · ${count(summary.counts.alighted)} alighted`,
     24,
   );
+
+  /*
+   * Who the interface turned away, beside the counts that would otherwise absorb them.
+   *
+   * **This is one of the two non-test callers `StageActivity.kioskRefusedLegs` did not have**
+   * (DECISIONS.md § D137 item 2, § D149 item 2); the other is `benchmark/accessControl.ts`'s
+   * coverage column. It goes *inside* the Passengers block rather than in a block of its own
+   * because that is the block whose `undelivered` figure it explains: a refused leg is counted
+   * there too, and without this line a reader cannot tell a passenger the building could not
+   * reach from one the kiosk declined to ask about. That distinction is the whole reason the
+   * counter exists — § D137 states the bare kiosk's cost as *who* rather than as a rate, which
+   * is the half an unserved fraction cannot see.
+   *
+   * A run already raises a warning for this, and the warning is not a substitute: it is prose in
+   * a list that a busy run truncates at twelve, and it names the mechanism rather than the
+   * magnitude. This is the magnitude, in the table.
+   *
+   * Shown only when non-zero, like the door holds above. Every profile
+   * `data/dispatcher-profiles.json` ships runs at `up-down-buttons` or `mobile-credential`, so a
+   * shipped run prints nothing here — the line exists for the reader who authors
+   * `dispatch.callType: "destination-entry"` on an access-zoned building, which is exactly the
+   * configuration nothing else in the report distinguishes from ordinary overflow.
+   */
+  if (result.stageActivity.kioskRefusedLegs > 0) {
+    field(
+      out,
+      'refused at the kiosk',
+      `${count(result.stageActivity.kioskRefusedLegs)} leg(s) ${dim('— a destination disclosed with no credential, on an access-zoned floor')}`,
+      24,
+    );
+  }
 
   /*
    * The courtesy hold, whenever the run asked for one at all.

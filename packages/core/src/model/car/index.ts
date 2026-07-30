@@ -94,10 +94,15 @@ export type {
 export {
   INFEASIBILITY_REASONS,
   createShaft,
+  deckOfFloor,
+  deckSlot,
+  floorIdsServedAt,
   isAccessPermitted,
   shaftForBank,
   shaftFloor,
   shaftServes,
+  stopFloorIdOf,
+  stopFloorsOf,
 } from './types.js';
 
 export type {
@@ -111,8 +116,10 @@ export type {
   CommittedStop,
   CostEstimate,
   CostRequest,
+  DeckStopSplit,
   InfeasibilityReason,
   RouteStop,
   ServedFloor,
   ServedFloorInit,
+  ShaftOptions,
 } from './types.js';

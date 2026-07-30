@@ -32,7 +32,7 @@
  * own. Nothing in `dispatch/` reads a profile id.
  */
 
-import { isDestinationCallType } from '../config/types.js';
+import { isDestinationCallType, type CallType } from '../config/types.js';
 import { estimateCost } from '../model/car/estimateCost.js';
 import type { CarSnapshot, CostEstimate, CostRequest, ServedFloor } from '../model/car/types.js';
 import { phaseByName, travelTime } from '../physics/motion/index.js';
@@ -140,6 +140,28 @@ export function scoreableAt(registeredAt: number, config: ResolvedDispatchConfig
  * claim built on it was refuted, and a docstring asserting an unmeasured mechanism is the same
  * species of defect as a published number nothing re-derives.
  */
+/**
+ * Whether a credential reaches the car with this call.
+ *
+ * The credential reaches the car when the passenger's device carried it, **or** when a landing
+ * panel already checked it (DECISIONS.md § D30). The second is not the first in disguise: the
+ * panel is a physical kiosk that exists only under `passengerAssignment: 'panel'`, it performs
+ * the access check itself, and forwarding its verdict is what stops `estimateCost` asking a
+ * second time whether an *unbadged* passenger may reach a zoned floor — the question that,
+ * unasked, made a bare `destination-entry` arm unable to serve `secure-tower` at all.
+ *
+ * **A function rather than an expression, because a second copy of it was a defect.** The pair
+ * `isDestinationCallType(callType) && !callCarriesCredential(...)` — a call that discloses a
+ * destination and carries nothing to authorize it with — is what `Simulation` has to know before
+ * it decides which passenger a landing call speaks for (DECISIONS.md § T50-D1), and a runner that
+ * disagreed with {@link costRequestFor} about it would strand exactly the passengers it thought it
+ * was rescuing. § D126 records the same lesson one package out: a property that disagrees with
+ * this function about who is servable is not a weaker property, it is a wrong one.
+ */
+export function callCarriesCredential(callType: CallType, panelAuthorized: boolean): boolean {
+  return callType === 'mobile-credential' || panelAuthorized;
+}
+
 export function costRequestFor(
   call: DispatchCall,
   config: ResolvedDispatchConfig,
@@ -147,13 +169,7 @@ export function costRequestFor(
 ): CostRequest {
   const callType = config.dispatch.callType;
   const knowsDestination = isDestinationCallType(callType);
-  // The credential reaches the car when the passenger's device carried it, **or** when a landing
-  // panel already checked it (DECISIONS.md § D30). The second is not the first in disguise: the
-  // panel is a physical kiosk that exists only under `passengerAssignment: 'panel'`, it performs
-  // the access check itself, and forwarding its verdict is what stops `estimateCost` asking a
-  // second time whether an *unbadged* passenger may reach a zoned floor — the question that,
-  // unasked, made a bare `destination-entry` arm unable to serve `secure-tower` at all.
-  const knowsCredential = callType === 'mobile-credential' || call.panelAuthorized === true;
+  const knowsCredential = callCarriesCredential(callType, call.panelAuthorized === true);
 
   return Object.freeze({
     id: call.id,

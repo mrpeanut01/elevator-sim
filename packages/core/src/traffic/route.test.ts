@@ -102,12 +102,25 @@ describe('vertical-city: double-deck routing', () => {
     expect(planner.legCount('G', '20')).toBe(1);
   });
 
-  it('needs five legs to cross between a lower-anchored and an upper-anchored zone', () => {
-    // Zone 3 hangs off sky lobby level 26 (lower deck) and zone 4 off level 27 (upper deck),
-    // so an occupant of 40 reaching 34 goes all the way down and back up. This is geometry,
-    // not a bug, and it is why the generator's default maxLegs is 6 rather than 3.
+  it('crosses between a lower- and an upper-anchored zone at its own sky lobby', () => {
+    // Zone 3 hangs off sky lobby level 26 (lower deck) and zone 4 off level 27 (upper deck), so
+    // an occupant of 40 reaching 34 has to change levels somewhere. **Where** has moved twice and
+    // the count has come down each time:
+    //
+    // | configuration | legs | route |
+    // |---|---|---|
+    // | no transport mode at all (`d7e8571`) | 5 | 40 → 27 → 2 → G → 26 → 34 |
+    // | ground escalator only (`DECISIONS.md` § D147 § 6, § D167) | 4 | the `2 → G` step became a hop |
+    // | ground **and** sky-lobby escalators | **2** | 40 → 27 ⇢ 26 → 34, crossing at sky lobby A |
+    //
+    // The shuttle is out of this journey entirely now: a cross-lobby interfloor passenger no
+    // longer rides 105 m down and 105 m back up to change decks.
     const planner = RoutePlanner.forBuilding(building('vertical-city'));
-    expect(planner.legCount('40', '34')).toBe(5);
+    expect(planner.legCount('40', '34')).toBe(2);
+    const plan = planner.plan('40', '34');
+    expect(plan?.transportHopCount).toBe(1);
+    expect(plan?.floors).toEqual(['40', '27', '26', '34']);
+    expect(plan?.segments[1]).toMatchObject({ kind: 'transport', modeId: 'sky-lobby-a-escalator' });
   });
 });
 
@@ -154,10 +167,21 @@ describe('planner contract', () => {
     expect(() => planner.requireRoute('40', '34', 4)).toThrow(TrafficError);
   });
 
-  it('rejects a route longer than the leg budget', () => {
+  it('rejects a route longer than the leg budget, counting lift legs and not hops', () => {
     const planner = RoutePlanner.forBuilding(building('vertical-city'));
-    expect(() => planner.requireRoute('40', '34', 4)).toThrow(/needs 5 elevator legs/);
-    expect(planner.requireRoute('40', '34', 6)).toHaveLength(6);
+    /*
+     * **The longest route this building still needs is three lift legs**, and this test moved to
+     * one because its old subject stopped being over any budget worth testing. `40 → 34` was four
+     * lift legs and is now two, since sky lobby A gained an escalator — so a bound of three no
+     * longer refuses anything and the guard would have passed while asserting nothing.
+     *
+     * `30 → 60` is zone 3 to zone 5: zone-3 local to 26, shuttle 26 → 51, zone-5 local to 60.
+     * Three lift legs and no hop, because both levels of sky lobby B are served by the same
+     * local and the escalator there is never on a shortest path (`transportRoute.test.ts`).
+     */
+    expect(planner.legCount('30', '60')).toBe(3);
+    expect(() => planner.requireRoute('30', '60', 2)).toThrow(/needs 3 elevator legs/);
+    expect(planner.requireRoute('30', '60', 3)).toHaveLength(4);
   });
 
   it('is stable: the same query returns the same route every time', () => {

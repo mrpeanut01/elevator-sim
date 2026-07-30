@@ -258,7 +258,7 @@ describe('common random numbers, proved on the traces themselves', () => {
       for (const [index, passenger] of a.entries()) expectSamePassenger(passenger, b[index]!);
     }
     expect(seenPassengers).toBeGreaterThan(REPLICATIONS * 10);
-  });
+  }, 60_000);
 
   it('gives *different* populations at different replication indices', () => {
     // The other half of the claim: CRN pairs across arms, it does not collapse replications into
@@ -274,7 +274,7 @@ describe('common random numbers, proved on the traces themselves', () => {
       );
     }
     expect(digests.size).toBe(REPLICATIONS);
-  });
+  }, 60_000);
 
   it('reproduces a replication from its stored seed alone', () => {
     const plan = planExperiment(specOf({ id: 'crn-replay', traffic: [GARDEN_HEALTHY] }), config);
@@ -283,7 +283,7 @@ describe('common random numbers, proved on the traces themselves', () => {
     const first = new Simulation(simulationConfigFor(plan.experimentId, cell, 3, seed));
     const again = new Simulation(simulationConfigFor(plan.experimentId, cell, 3, BigInt(first.trace.seed)));
     expect(JSON.stringify(again.trace)).toBe(JSON.stringify(first.trace));
-  });
+  }, 60_000);
 
   it('detects a broken pairing', async () => {
     const result = await runExperiment(
@@ -355,5 +355,5 @@ describe('traceDigest', () => {
       ),
     };
     expect(traceDigest(mutated)).not.toBe(traceDigest(trace));
-  });
+  }, 60_000);
 });

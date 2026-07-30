@@ -11,6 +11,9 @@
  * `core/src/index.test.ts`, and it carries one documented exception where `core`'s carries none.
  */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import * as barrel from './index.js';
@@ -87,6 +90,89 @@ describe('the public barrel re-exports every module surface', () => {
     expect(fromRunner).toBe('{"meanS":null}');
     expect(fromReports).toBe('{"meanS":"NaN"}');
     expect(fromRunner).not.toBe(fromReports);
+  });
+});
+
+/*
+ * **C27's name list, taken from the entry that wrote it rather than from a copy of it.**
+ *
+ * `DECISIONS.md` § D62 handed back a list of names with one instruction — *"they must be added to
+ * `benchmark/index.ts` and `src/index.ts` **in the same commit**"* — and § D118 did it. So this
+ * block asserts nothing new about today's tree; what it closes is that **nothing checked the list.**
+ * The two blocks above are structural and would not notice: they compare `src/index.ts` against
+ * `benchmark/index.ts`, so a commit that deleted all thirty-four names from *both* leaves them
+ * green, and § D62's "in the same commit" is precisely the shape of edit they cannot see.
+ *
+ * The list is parsed out of `DECISIONS.md` § D62's own fenced block, because a hand-written copy
+ * here would be a second list to drift — the failure `collect.ts` argues against one package over
+ * and the one `PROFILE_OBJECT_SECTIONS` shipped.
+ *
+ * **This is a reachability check, and it is the only one in this file.** It is legitimate here for
+ * the reason the study-entry-point block at the bottom is *not* a reachability check: § D62's
+ * handback was explicitly about the **public API surface** — a consumer outside the package
+ * reproducing Phase 6a and 6b without a module path — and reachability is exactly what that asks
+ * for. It says nothing about liveness, the barrels are still excluded from every caller set
+ * computed below, and § D118 states the same disclaimer in the barrel's own docstring.
+ */
+describe('DECISIONS.md § D62’s handback list is on both barrels (C27)', () => {
+  /**
+   * § D62's names, from the fenced block in the entry itself.
+   *
+   * Parsed rather than transcribed, and bounded to the one entry: the slice runs from the § D62
+   * heading to the next `## D` heading, so a fenced block anywhere else in the file cannot feed it.
+   */
+  function handbackNames(): readonly string[] {
+    const decisions = readFileSync(join(PACKAGES_DIR, '..', 'DECISIONS.md'), 'utf8');
+    const start = decisions.indexOf('## D62 —');
+    expect(start, 'DECISIONS.md no longer contains a § D62 heading').toBeGreaterThan(0);
+    const entry = decisions.slice(start, decisions.indexOf('\n## D', start + 1));
+    const fence = /```\n([\s\S]*?)```/u.exec(entry);
+    expect(fence, '§ D62’s fenced name list is gone; this guard has stopped looking').not.toBeNull();
+    return (fence?.[1] ?? '').split(/\s+/u).filter((name) => name !== '');
+  }
+
+  /**
+   * `runMixedUseHighRiseStudy` is not in § D62's fence and belongs to the same handback.
+   *
+   * § D62 predates Phase 6b's raised criterion, so the study did not exist to be listed; § D118
+   * added it beside the thirty-three and both barrel docstrings say so. Named here rather than
+   * quietly folded in, because it is the one name in this set that is *not* derived.
+   */
+  const ALSO = 'runMixedUseHighRiseStudy';
+
+  it('parses a list of the size the entry describes, so a broken parse fails loudly', () => {
+    const names = handbackNames();
+    /* § D118 calls it "34 names"; the fence holds 33 and the 34th is ALSO. The count is asserted
+       rather than the prose corrected in place, so a fence that silently loses entries — the way
+       an unchecked list does — cannot pass by parsing to nothing. */
+    expect(names.length).toBe(33);
+    expect(new Set(names).size).toBe(33);
+    expect(names).toContain('runAccessControlStudy');
+    expect(names).not.toContain(ALSO);
+  });
+
+  it.each([
+    ['benchmark/index.ts', benchmarkModule],
+    ['src/index.ts', barrel],
+  ] as const)('binds every one of them on %s', (_file, surface) => {
+    const bound = surface as Record<string, unknown>;
+    const missing = [...handbackNames(), ALSO].filter((name) => !(name in bound));
+    expect(
+      missing,
+      'a name DECISIONS.md § D62 handed back is off this barrel. Both files must carry the list ' +
+        'and they must change in the same commit, or a consumer outside the package can no longer ' +
+        'reproduce Phase 6a/6b without a module path (§ D62, § D118)',
+    ).toEqual([]);
+  });
+
+  it('binds them identically on the two, which is what "in the same commit" buys', () => {
+    /* Presence on both is not the property § D62 asked for — two barrels can each export a name
+       and mean different things by it, which is exactly why `canonicalJson` is omitted above. */
+    for (const name of [...handbackNames(), ALSO]) {
+      expect((barrel as Record<string, unknown>)[name], name).toBe(
+        (benchmarkModule as Record<string, unknown>)[name],
+      );
+    }
   });
 });
 

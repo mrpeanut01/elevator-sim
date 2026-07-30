@@ -257,13 +257,23 @@ packages/
 │   ├── fuzz/              — Phase 8: randomized buildings, the six properties, shrinking
 │   └── validation/        — the Phase 3 acceptance gate
 ├── viz/                   — web visualization, consumes core                    (Phase 4 complete)
+│   ├── access/            — access zoning made visible: the credential lens, the locked-out landing, the dispatcher compatibility check
 │   ├── contract/          — the recording schema and its folded series
-│   ├── record/            — instrumenting a run into a VizRecording
+│   ├── record/            — instrumenting a run into a VizRecording, and the dispatch decisions behind it
 │   ├── frame/             — the deterministic frame producer
+│   ├── live/              — what the rails read at the playhead: wait bands, observations, the phase timeline, the decision rows, the honesty card
+│   ├── shift/             — the shift layer: the five scenarios, the day's event, its goals, tenant growth, the week, the day report
+│   ├── authoring/         — the four editors' models: a slider-shaped spec, and the real configuration object it becomes
 │   ├── playback/          — the playback clock and its mapping
 │   ├── render/            — layout and the minimal Canvas renderer
 │   ├── replay/            — the replay harness and its per-field negative control
 │   ├── editor/            — building-config edits, validation, history, preview geometry
+│   ├── controls/          — the schema-generated parameter form: four control renderers
+│   ├── batch/             — Phase 9 W3: N paired replications, and the paired-t report on them
+│   ├── scenario/          — Phase 9 W9: goal predicates, their measured across-seed pass rates
+│   ├── campaign/          — Phase 9 W5: the scenario schema, the seven stages, the four fail states
+│   ├── honesty/           — Phase 9 § D163 clause 1: the generated search over every player-facing string
+│   ├── mode/              — Phase 9 W6: Basic and Advanced, and the derived mode-parity check
 │   └── dev/               — the Vite dev entry points, viewer and editor (dev-only)
 └── cli/                   — headless batch entry point
     └── commands/          — list, run, compare, tune, watch
@@ -279,6 +289,46 @@ packages/
 > task that wrote them did not own `docs/`. They **moved into `packages/viz/src/editor/` with the
 > line above added in the same commit** (`f3fd3da`), which is what the guard requires. **C29 is
 > closed.** The next person to move a directory here needs to do the same thing.
+>
+> **And the next person did.** `viz/controls/` — W4's schema-generated parameter form
+> ([`docs/10`](10-experience-layer-contract.md) § 11, [`DECISIONS.md` § D127](../DECISIONS.md)) —
+> was added on 2026-07-28 with its line above **in the same change**, because the guard reddened
+> `core` the moment the directory existed and before anything else was run. The lane that added it
+> had been told not to edit `docs/` outside its own document; it edited this one line anyway and
+> said so, because the alternative was either a red suite or flattening a directory the wave plan
+> names by path. **The atomicity is the rule, and it is stronger than a file-ownership boundary.**
+>
+> **And so did the one after.** `viz/batch/` — W3's replication batch runner
+> ([`docs/10`](10-experience-layer-contract.md) § 11, [`DECISIONS.md` § D158](../DECISIONS.md)) —
+> was added on 2026-07-29 with its line above in the same commit, for the same reason and by the
+> same rule.
+>
+> **And the one after that.** `viz/scenario/` — W9's goal pass-rate measurement
+> ([`docs/10`](10-experience-layer-contract.md) § 11 W9) — was added on 2026-07-29 the same way,
+> and the guard reddened `core` first, exactly as this note predicts it will.
+>
+> **And so did W5.** `viz/campaign/` — the scenario schema, § 5.4's seven stages and § 5.3's four
+> fail states ([`docs/10`](10-experience-layer-contract.md) § 5) — was added on 2026-07-29 with its
+> line above in the same commit. The prediction held for the fourth time running: the `core` suite
+> reddened on the directory before a single `viz` test was written.
+>
+<<<<<<< HEAD
+> **And so did W6, for the fifth time.** `viz/mode/` — § 4's Basic/Advanced split and the parity
+> check [`DECISIONS.md` § D163](../DECISIONS.md) clause 2 measures Phase 9 against — was added on
+> 2026-07-29 with its line above in the same commit. The prediction held again, and the sequence is
+> now long enough to be a procedure rather than an anecdote: **write the directory, watch `core` go
+> red, add the line.**
+=======
+> **Fifth, and it reddened on the same run as `viz/boundaries.test.ts`.** `viz/honesty/` — the
+> generated search that [`DECISIONS.md` § D163](../DECISIONS.md) clause 1 requires over every
+> player-facing string — was added on 2026-07-29, and the first full-suite run after it reddened
+> **two** guards at once, neither of them in `viz/honesty/`: this one, for the undocumented
+> directory, and the DOM rule in `viz/boundaries.test.ts`, for a local variable named `window`
+> inside a text-proximity helper. The second is the more instructive: that rule's own docstring
+> says the finding it was written for was *"a method parameter named `document` shadowing the
+> global"*, and it caught the same shape again in a directory whose whole purpose is catching
+> things.
+>>>>>>> feat/t78-honesty-search
 >
 > **The guard is now scoped to packages present on disk, and C28 is closed.** It used to name
 > `viz/*` directories unconditionally, so deleting `packages/viz` turned them into phantoms and

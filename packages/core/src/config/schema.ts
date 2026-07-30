@@ -25,6 +25,7 @@ import {
   PARKING_STRATEGIES,
   REASSIGNMENT_POLICIES,
   SERVICE_MODES,
+  WEIGHT_SET_POLICIES,
   type AccessZone,
   type BankConfig,
   type BuildingConfig,
@@ -40,6 +41,7 @@ import {
   type ServiceEventConfig,
   type TrafficProfile,
   type TrafficProfiles,
+  type TransportModeConfig,
 } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -93,24 +95,28 @@ export const WARNING_CODES = {
   floorsExceedClass: 'floors-exceed-class',
   noEntranceFloor: 'no-entrance-floor',
   unknownWeightSetProfile: 'unknown-weight-set-profile',
+  /**
+   * The bank has double-deck cars and no `servesFloorPairs`, so **there is no deck geometry to
+   * simulate** and the runtime runs the car as a single deck of the combined capacity.
+   *
+   * This is the disclaimer `double-deck-not-simulated` used to be, narrowed to the only case
+   * where it is still true. Double-deck operation *is* simulated as of Phase 6: `shaftForBank`
+   * builds a deck-aware shaft from this pairing, one stop opens onto both floors of a pair, the
+   * 80 % design load applies per deck and the dwell is the busier deck. All of that is downstream
+   * of the pairing — a bank that declares none gets a single-deck shaft, really does make up to
+   * twice the stops the declared hardware would, and really does report round-trip times,
+   * intervals and handling capacities for a machine nobody configured.
+   *
+   * So the code kept its meaning and lost its scope, rather than being deleted: `planRun` in
+   * `cli/src/commands/run.ts` still branches on it and is still its named non-test reader
+   * (DECISIONS.md § D23), and `config/doubleDeck.test.ts` still asserts it in both directions.
+   * It is raised on **no shipped building** — `vertical-city`'s shuttle declares its four pairs
+   * — which is the difference between a disclaimer and a defect.
+   */
   missingFloorPairs: 'missing-floor-pairs',
   unusedFloorPairs: 'unused-floor-pairs',
   deckLoadMismatch: 'deck-load-mismatch',
   deckPersonsOutsideClassRange: 'deck-persons-outside-class-range',
-  /**
-   * The building declares double-deck cars and the runtime does not simulate them.
-   *
-   * Not a defect in the config — it is a fact about the simulator, raised where the reader can
-   * act on it. `doubleDeck`, `deckSeparationM`, `ratedLoadLbPerDeck`, `servesFloorPairs` and the
-   * whole `Bank` deck index are parsed, cross-validated by the two warnings above, resolved onto
-   * `ResolvedCar` and unit-tested — and no code in `sim/`, `model/car/` or `dispatch/` reads any
-   * of them. So a shuttle declared as a double-deck car runs as a single-deck car of the same
-   * whole-car capacity, making up to twice the stops the declared hardware would, and every
-   * round-trip time, interval and handling-capacity figure reported for that bank is for
-   * hardware nobody configured. Double-deck *dispatch* is Phase 6 (docs/07-handoff.md); saying
-   * so out loud is not.
-   */
-  doubleDeckNotSimulated: 'double-deck-not-simulated',
 } as const;
 
 /** Render a zod path as `banks[0].cars[1].spec`. */
@@ -378,6 +384,16 @@ export const elevatorSpecsSchema = z
 
 const DIRECTIONAL_SPLIT_TOLERANCE = 1e-6;
 
+/** The three shares, each in `[0, 1]` and summing to 1. Shared by profiles and templates. */
+const directionalSplitSchema = z
+  .strictObject({ incoming: fraction, outgoing: fraction, interfloor: fraction })
+  .refine(
+    (split) =>
+      Math.abs(split.incoming + split.outgoing + split.interfloor - 1) <=
+      DIRECTIONAL_SPLIT_TOLERANCE,
+    { message: 'incoming + outgoing + interfloor must sum to 1' },
+  );
+
 export const trafficProfileSchema = z.strictObject({
   $comment: comment,
   id: identifier,
@@ -391,14 +407,7 @@ export const trafficProfileSchema = z.strictObject({
     distribution: z.string().min(1),
     mean: z.number().gte(1, 'a batch contains at least one passenger'),
   }),
-  directionalSplit: z
-    .strictObject({ incoming: fraction, outgoing: fraction, interfloor: fraction })
-    .refine(
-      (split) =>
-        Math.abs(split.incoming + split.outgoing + split.interfloor - 1) <=
-        DIRECTIONAL_SPLIT_TOLERANCE,
-      { message: 'incoming + outgoing + interfloor must sum to 1' },
-    ),
+  directionalSplit: directionalSplitSchema,
 });
 
 export const trafficProfilesSchema = z
@@ -418,6 +427,8 @@ export const trafficProfilesSchema = z
         shape: z.string().optional(),
         discardFirstMin: nonNegative.optional(),
         discardLastMin: nonNegative.optional(),
+        directionalSplitAtStart: directionalSplitSchema.optional(),
+        directionalSplitAtEnd: directionalSplitSchema.optional(),
       }),
     ),
     passengerMass: z
@@ -446,6 +457,21 @@ export const trafficProfilesSchema = z
           code: 'custom',
           path: ['demandTemplates', index, 'discardFirstMin'],
           message: `discarding ${discarded} min of a ${template.durationMin} min run leaves no measurement window`,
+        });
+      }
+      // Both endpoints or neither. One alone would resolve to a template whose mix moves from the
+      // authored end to the profile's own split, which is a mix arc nobody authored and nobody
+      // cited — and it would do it silently, since either field alone is schema-valid.
+      const declared = [
+        template.directionalSplitAtStart !== undefined,
+        template.directionalSplitAtEnd !== undefined,
+      ];
+      if (declared[0] !== declared[1]) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['demandTemplates', index, 'directionalSplitAtStart'],
+          message:
+            'directionalSplitAtStart and directionalSplitAtEnd are declared together or not at all; one alone gives the run a mix arc with an unauthored endpoint',
         });
       }
     });
@@ -559,6 +585,25 @@ const auctionStageSchema = z.strictObject({
   reserveMarginalDelayS: nonNegative.optional(),
 });
 
+/**
+ * Stage 3's weight-set selection, as a profile authors it.
+ *
+ * Six scalars and no map. The arms are the file-level `patternSwitching` block, for the same
+ * reason the cost-term library is file-level: a statement of what exists is not a knob an
+ * optimizer samples. `policy` is the opt-in and its default is `off`, so a profile that says
+ * nothing here holds one weight vector for the run — which is every profile this file ships.
+ */
+const selectionStageSchema = z.strictObject({
+  $comment: comment,
+  policy: z.enum(WEIGHT_SET_POLICIES).optional(),
+  hysteresisS: nonNegative.max(900).optional(),
+  observationWindowS: positive.min(30).max(1800).optional(),
+  lobbyArrivalRateGain: nonNegative.max(4).optional(),
+  interfloorRateGain: nonNegative.max(4).optional(),
+  downPeakRateGain: nonNegative.max(4).optional(),
+  switchMargin: fraction.optional(),
+});
+
 export const dispatcherProfileSchema = z.strictObject({
   $comment: comment,
   id: identifier,
@@ -573,7 +618,97 @@ export const dispatcherProfileSchema = z.strictObject({
   answer: answerStageSchema.optional(),
   idle: idleStageSchema.optional(),
   auction: auctionStageSchema.optional(),
+  selection: selectionStageSchema.optional(),
 });
+
+/**
+ * The keys of an object schema whose values are themselves object schemas, in declaration order.
+ *
+ * ## Why this exists
+ *
+ * A dispatcher profile holds its tunables in **sections** — `profile.idle.predictorCycleS`, and so
+ * on — and `experiments/src/tuning/space/encode.ts` has to know which keys those are in order to
+ * write a candidate down as a profile and read it back. It knew by carrying a hand-written list,
+ * and CLAUDE.md's *Standing requirement* names exactly what happens next: `selection` landed in
+ * this file with seven declared, round-trip-tested rows, the list did not gain it, and all seven
+ * were reported *unauthorable* by `collectSearchSpace()` and dropped from the search space — with
+ * nothing anywhere reading as wrong ([DECISIONS.md § D146](../../../../DECISIONS.md)).
+ *
+ * So the list is derived from the schema, and it is derived **here** rather than in `experiments`
+ * for a reason that is not convenience: `experiments` does not depend on `zod` and must not start,
+ * and the fact being read is a fact about `core`'s schema. A consumer gets
+ * {@link DISPATCHER_PROFILE_OBJECT_SECTIONS}; nobody outside this file re-derives it.
+ *
+ * ## The rule, and what it deliberately does not admit
+ *
+ * A key is a section when unwrapping every wrapper that exposes an `innerType` — `.optional()`,
+ * `.default()`, `.nullable()`, `.readonly()` — reaches a `ZodObject`. Under that rule the shipped
+ * profile schema yields seven, and the seven fields that are *not* sections are each excluded for
+ * a reason rather than by name: `$comment`, `id`, `name`, `role` and `engine` are strings,
+ * `hardConstraints` is an array, and `weights` is a **record** — an open map of term id to number,
+ * which `encode.ts` handles as a pseudo-section precisely because it has no fixed keys.
+ *
+ * That last exclusion is also the honest statement of the blind spot: a future section authored as
+ * a `z.record`, a `z.union`, a `z.intersection`, a `z.lazy` or a pipe would **not** be found, and
+ * would fail the same silent way `selection` did. `schema.test.ts` asserts the rule against a
+ * fictional schema the product does not ship, including those shapes, so the boundary is pinned
+ * rather than assumed.
+ *
+ * Declaration order rather than sorted, because it is the order a profile is authored in and the
+ * order a decoded patch's JSON keys come out in; an object literal's key order is fixed by the
+ * language, unlike a module namespace's, which is why `collect.ts` sorts and this does not.
+ */
+export function objectSectionsOf(schema: {
+  readonly shape: Readonly<Record<string, unknown>>;
+}): readonly string[] {
+  return Object.freeze(
+    Object.keys(schema.shape).filter((key) => unwrapSchema(schema.shape[key]).type === 'object'),
+  );
+}
+
+/** The `def` of a zod schema, as much of it as {@link objectSectionsOf} reads. */
+interface SchemaDef {
+  readonly type?: string;
+  readonly innerType?: unknown;
+}
+
+function defOf(schema: unknown): SchemaDef | undefined {
+  if (typeof schema !== 'object' || schema === null) return undefined;
+  const def = (schema as { readonly def?: unknown }).def;
+  return typeof def === 'object' && def !== null ? (def as SchemaDef) : undefined;
+}
+
+/**
+ * Peel wrappers until the schema underneath, whatever the wrappers are.
+ *
+ * Generic in the wrapper rather than a list of them: every zod wrapper that has an inside exposes
+ * it as `def.innerType`, so `.optional().readonly()` needs no more code than `.optional()`. The
+ * depth bound is not defensive about zod — it stops a malformed cyclic `def` from hanging this
+ * module at import time, which is where the constant below is built.
+ */
+function unwrapSchema(schema: unknown): SchemaDef {
+  let def = defOf(schema);
+  for (let depth = 0; depth < 8; depth += 1) {
+    const inner = def?.innerType;
+    if (inner === undefined) break;
+    def = defOf(inner);
+  }
+  return def ?? {};
+}
+
+/**
+ * Every section a dispatcher profile writes as `profile.<section>.<key>`, from the schema itself.
+ *
+ * Seven today: `normalization`, `dispatch`, `eligibility`, `answer`, `idle`, `auction`,
+ * `selection`. An eighth added to {@link dispatcherProfileSchema} appears here, and therefore in
+ * the tuning search space, with no edit anywhere else — which is the half of CLAUDE.md invariant 8
+ * that a generic optimizer depends on and that no test used to hold.
+ *
+ * The two pseudo-sections are correctly absent: `weights` and `hardConstraints` are not written as
+ * `profile.<section>.<key>` and `encode.ts` translates them itself.
+ */
+export const DISPATCHER_PROFILE_OBJECT_SECTIONS: readonly string[] =
+  objectSectionsOf(dispatcherProfileSchema);
 
 export const dispatcherProfilesSchema = z
   .strictObject({
@@ -591,6 +726,15 @@ export const dispatcherProfilesSchema = z
           inputs: z.array(identifier).min(1),
           patterns: z.array(identifier).min(1),
           hysteresisS: nonNegative,
+          // Pattern id to input id to `[zeroAt, oneAt]` — the membership ramp that decides when
+          // the detector is in that pattern. Optional in the schema and **required by
+          // `resolveWeightSets`** for every declared pattern, and the asymmetry is deliberate:
+          // this file may be read by a consumer that only wants the profile library, but a
+          // *selector* built over a pattern with no clause has a constant membership and can
+          // neither enter nor leave that pattern on evidence.
+          membership: z
+            .record(identifier, z.record(identifier, z.tuple([z.number(), z.number()])))
+            .optional(),
         }),
         weightSetsByPattern: z.record(identifier, identifier),
       })
@@ -704,6 +848,28 @@ export const serviceEventSchema = z.strictObject({
   mode: z.enum(SERVICE_MODES),
 });
 
+/**
+ * One non-lift connection between two floors. See {@link TransportModeConfig}.
+ *
+ * `connects` is a fixed-length tuple rather than an array so "an escalator between three floors"
+ * cannot be authored at all: a machine with three landings is two machines. The two ids are
+ * required to differ here, where the message can name the field, rather than in `resolveBuilding`
+ * where it would be a cross-reference failure.
+ */
+export const transportModeSchema = z
+  .strictObject({
+    $comment: comment,
+    id: identifier,
+    name: z.string().min(1).optional(),
+    connects: z.tuple([identifier, identifier]),
+    traversalTimeS: positive,
+  })
+  .refine((mode) => mode.connects[0] !== mode.connects[1], {
+    message:
+      'connects must name two different floors; a transport mode that starts and ends on the same floor moves nobody',
+    path: ['connects'],
+  });
+
 export const accessZoneSchema = z.strictObject({
   $comment: comment,
   id: identifier,
@@ -722,6 +888,7 @@ export const buildingConfigSchema = z
     floorRanges: z.array(floorRangeSchema).optional(),
     totalPopulation: nonNegative.optional(),
     banks: z.array(bankConfigSchema).min(1, 'a building must have at least one bank'),
+    transportModes: z.array(transportModeSchema).optional(),
     accessZones: z.array(accessZoneSchema).optional(),
     serviceEvents: z.array(serviceEventSchema).optional(),
     notes: z.array(z.string().min(1)).optional(),
@@ -738,6 +905,9 @@ export const buildingConfigSchema = z
     }
     checkUniqueIds(building.banks, 'banks', ctx);
     if (building.accessZones !== undefined) checkUniqueIds(building.accessZones, 'accessZones', ctx);
+    if (building.transportModes !== undefined) {
+      checkUniqueIds(building.transportModes, 'transportModes', ctx);
+    }
     building.banks.forEach((bank, bankIndex) => {
       const seen = new Map<string, number>();
       bank.cars.forEach((car, carIndex) => {
@@ -780,5 +950,6 @@ type _FloorRangeConforms = Conforms<FloorRange, z.infer<typeof floorRangeSchema>
 type _CarConfigConforms = Conforms<CarConfig, z.infer<typeof carConfigSchema>>;
 type _BankConfigConforms = Conforms<BankConfig, z.infer<typeof bankConfigSchema>>;
 type _AccessZoneConforms = Conforms<AccessZone, z.infer<typeof accessZoneSchema>>;
+type _TransportModeConforms = Conforms<TransportModeConfig, z.infer<typeof transportModeSchema>>;
 type _ServiceEventConforms = Conforms<ServiceEventConfig, z.infer<typeof serviceEventSchema>>;
 type _BuildingConfigConforms = Conforms<BuildingConfig, z.infer<typeof buildingConfigSchema>>;

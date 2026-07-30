@@ -23,7 +23,11 @@ capacity limits driven by a load sensor.
 
 ### Out of scope (for now)
 
-- Escalators and moving walkways
+- Escalators and moving walkways **as machines**. They are now in scope as *edges*: a building may
+  declare one as a connection between two floors with a landing-to-landing traversal time, so a
+  journey is not charged an elevator leg for a hop the real building serves with an escalator. What
+  stays out of scope is the machine — no capacity, no headway, no direction, no failure modes. See
+  [`docs/02` § Non-lift transport](02-elevator-reference.md).
 - Structural, electrical, or code-compliance engineering
 - Real hardware integration or safety-critical control
 - Freight/service elevator scheduling as a distinct discipline

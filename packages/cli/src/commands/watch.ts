@@ -17,6 +17,7 @@
  */
 
 import {
+  DEMAND_TEMPLATE_IDS,
   Simulation,
   SimulationError,
   type PassengerModel,
@@ -124,7 +125,7 @@ export const WATCH_FLAGS: readonly FlagSpec[] = [
     kind: 'string',
     placeholder: '<id>',
     summary: 'demand template',
-    choices: ['rise-and-fall', 'constant-iso'],
+    choices: [...DEMAND_TEMPLATE_IDS],
   },
   { name: 'plain', kind: 'boolean', summary: 'force line output instead of a live frame' },
   { name: 'data', kind: 'string', placeholder: '<dir>', summary: 'data directory to read' },

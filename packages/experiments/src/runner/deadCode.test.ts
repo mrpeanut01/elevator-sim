@@ -58,15 +58,16 @@ const AUDITED_MODULES = ['experiments/src/runner'] as const;
  */
 const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
   /*
-   * -- The plural of a live singular, plus a check the shipped path does not perform.
-   * `replicationSeed` is live (`replicationRunner.ts` calls it per replication, twice). The plural
-   * adds a cross-batch **collision check**, and since the batch path draws one seed at a time, no
-   * shipped run performs it. That is defensible — the docstring's own argument is that at 64 bits a
-   * collision "will not happen", so the check is belt-and-braces on a construction that is already
-   * sound — but it must be said, not assumed: the loud failure it promises is not armed in a run.
+   * `runner/replicationSeeds` was here, and is **deleted rather than annotated**, which is what this
+   * list's own second assertion demands: it went red with *"now has a caller"*, and an allowlist
+   * that keeps an entry after its reason lapses is the defect one step removed.
+   *
+   * The reason it carried was true when written — the plural of a live singular, adding a
+   * cross-batch collision check that the batch path, drawing one seed at a time, never performs.
+   * What changed is that `benchmark/downPeakDestination.ts` draws a whole experiment's seeds at
+   * once, to run a census over the experiment's **own** replication seeds rather than a fresh set.
+   * So the collision check is armed now, in a shipped study, and the symbol is simply live.
    */
-  'runner/replicationSeeds':
-    'the plural of the live replicationSeed; its batch collision check is not armed in a run',
 
   /*
    * -- The throwing form of a check every caller wants un-thrown. `verifyCrnAlignment` is the

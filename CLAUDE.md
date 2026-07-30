@@ -8,14 +8,29 @@ An elevator traffic simulator for designing and benchmarking smart dispatch algo
 Read [`docs/00-project-brief.md`](docs/00-project-brief.md) first, then
 [`docs/01-architecture.md`](docs/01-architecture.md).
 
-**Current status: Phases 0–5, 7 and 8 are landed and accepted, plus a six-command CLI. Phase 6 is
-partially complete.** Read the two that need care precisely:
+**Current status: Phases 0–5 and 7–9 are landed and accepted, plus a six-command CLI. Phase 6 is
+partially complete.** Read the three that need care precisely — and **Phase 9's tick is the one that
+must never travel alone**, because it is *accepted with named gaps* and the gaps are part of the
+verdict:
 
 - **Phase 6** — 6a (destination *disclosure*) and 6b (destination *dispatch*) are accepted against a
   **raised** criterion, now measured on the building that criterion names ([§ D100](DECISIONS.md)).
   The gate is **met by the Level-0 arm and not by the Level-1 panel at any measured point** — say
-  both. 6c (learned control) is deferred out of the phase with reasons, not dropped. Double-deck
-  operation is configured, validated, disclaimed on every run — and not simulated.
+  both. 6c (learned control) is **no longer deferred — it is implemented, measured, and NOT
+  ACCEPTED**: ΔTTD `−0.213 [−0.440, +0.014]` against `collective` at n = 200 on a disjoint seed, an
+  interval containing zero, unchanged at 24 and 64 search candidates ([§ D139](DECISIONS.md) is the
+  criterion, dated before the code; [§ D145](DECISIONS.md) is the verdict). **That refusal is now
+  swept over eight pre-registered operating points and it held** — NOT ACCEPTED at all five PRIMARY
+  cells under Holm–Bonferroni, with the resolution limit measured on **TTD at each cell** rather
+  than inherited, and two cells that clear the correction refused anyway because the effect is a
+  third to a half of what the apparatus can resolve there ([§ D151](DECISIONS.md) is the protocol,
+  dated before any sweep ΔTTD; [§ D156](DECISIONS.md) is the result). The one cell that clears every
+  gate is a **secondary** one, and what its policy learned is a *busy/idle schedule* rather than a
+  traffic-pattern selection — because the shipped demand template varies the **level** and never the
+  **directional split**, which § D156 measures rather than asserts. Double-deck operation is
+  **simulated** — paired stops, per-deck design load, deck-bound legs ([§ D131](DECISIONS.md)) — and
+  the disclaimer survives only in the narrower case of a double-deck bank declaring no
+  `servesFloorPairs`, which no shipped building raises.
 - **Phase 8** — **both blocking property violations are closed**, and neither was closed by moving a
   bound: `fuzz-1001074` by a fourth `awtIsValid` ground, `fuzz-1000384` by revoking a promise a
   withdrawn car cannot keep. The deep tier is green at 2 000 cases. **All eight tracks have landed**;
@@ -23,32 +38,84 @@ partially complete.** Read the two that need care precisely:
   acceptance interval at 50–200 replications — landed in `f895a16`, so the phase's criterion (*every
   track lands, and no property violation is outstanding*) is met ([§ D108](DECISIONS.md); § D102 is
   the superseded partial verdict, left standing).
+- **Phase 9** — **ACCEPTED WITH NAMED GAPS (2026-07-30)** against [§ D163](DECISIONS.md), which also
+  wrote the rule that *the status row and the verdict land together or neither does*. All nine units
+  are built. The two clauses that decide the phase are the two the product **failed** when the
+  criterion was written, and both are now met **by a run rather than by an argument**: the honesty
+  property holds under *search* — 60 cases, **271 985 strings**, 4 650 simulations, 23 surfaces,
+  **0 violations** — and it **found two violations first**, one real and one a check accepting the
+  wrong branch, so [§ D172](DECISIONS.md)'s *"the refinement relation, not a run"* had to be
+  corrected ([§ D186](DECISIONS.md)); and mode parity is **derived from the code**, proved against a
+  fail state the product deliberately does not ship. **Say the gaps in the same breath.** Clause 4 —
+  *every unit names its non-test caller* — is **satisfied in prose and mechanised by nothing**: all
+  **19** `packages/viz/src` directories sit outside every `AUDITED_MODULES`, the four dead-code
+  audits cover 7 of 49, and the evidence is a hand-written table plus one prose line per unit. It is
+  the clause to distrust first, and a fifth audit under `packages/viz` is the fix. Also named in the
+  verdict: `Escape` does not dismiss the drawer, the honesty sweep's `mode` axis has one value,
+  three DOM panels are statically swept rather than driven, and **U6**, **U7's rider models** and
+  **Basic's curated three-dimension subset** are unbuilt.
 
-**No phase status has moved since `f895a16`.** What has moved is what the phases are *true of*:
-`destination-eta` now weights `rideTime` at **0.5** and is no longer a destination profile that
-changes no decision ([§ D112](DECISIONS.md)); the viewer and `elevator-sim watch` no longer print a
-mean the same run says is suppressed ([§ D111](DECISIONS.md)); the ninth dead seam and the two holes
-in `core`'s dead-code scanner are closed ([§ D114](DECISIONS.md)). None of that changes a phase
-verdict, and none of it was allowed to round one up.
+**Phase 9's row is the first status to move since Phase 8's on 2026-07-28, and wave 6 is the reason
+that is worth saying rather than assuming.** That wave
+built double-deck simulation, a mid-run weight-set selector, Phase 7's undelivered fuzzy detector,
+Phase 6c, and Phase 9's W4 — and **not one phase verdict changed**, because 6c did not clear the
+criterion written before it ([§ D139](DECISIONS.md)) and Phase 6 is
+therefore still partial. The fuzzy arm *did* return an interval excluding zero, ΔTTD
+`−0.212 [−0.416, −0.007]`, and is still reported **below the resolution limit** — both arms sit in
+the structural regime whose smallest detectable effect is 1.9 s, and an interval excluding zero is
+not a win when the effect is smaller than the apparatus can resolve.
+
+What has moved is what the phases are *true of*: `destination-eta` weights `rideTime` at **0.5**
+([§ D112](DECISIONS.md)); the viewer and `elevator-sim watch` no longer print a mean the same run
+says is suppressed ([§ D111](DECISIONS.md)); the ninth dead seam and the two holes in `core`'s
+dead-code scanner are closed ([§ D114](DECISIONS.md)); and the eleventh dead seam — the whole deck
+API — is closed by simulating it ([§ D131](DECISIONS.md)). None of that was allowed to round a
+verdict up.
 
 **Energy is an axis, never a score.** The matrix that closed Phase 8 measured `nearest-car` — the
-weakest shipped dispatcher and the viewer's default — **on the Pareto front at six of eight cells**,
-because it is best on energy and worst on wait. A dispatcher that drives less carries fewer people.
+weakest shipped dispatcher, and the viewer's default until § D134 — **on the Pareto front at six of
+eight cells**, because it is best on energy and worst on wait. A dispatcher that drives less carries fewer people.
 So the energy proxy may be shown **beside** AWT and WT95 and never aggregated into a grade, and
 `EnergyStatistics.workPerServedLegKJ` goes beside the raw figure: a configuration that spends less
 by serving fewer people has not saved anything. See [§ D106](DECISIONS.md).
+
+**The viewer is now built to a design handoff, and the handoff is canonical for the interface.**
+*Elevator Sim Reimagined* is vendored at [`docs/design/`](docs/design/); the requirements extracted
+from it, the audit of the old viewer against it, and every deviation with the constraint that forced
+it are [`docs/12-design-handoff.md`](docs/12-design-handoff.md) ([§ D174](DECISIONS.md)–[§ D179](DECISIONS.md)).
+Two halves, both load-bearing: **the handoff wins every disagreement about what the screen looks
+like, and the simulator wins every disagreement about what a number means.** The handoff is a
+prototype with its own toy simulator — its report sheet computes *average wait* as
+`28 + (100 − pct) × 0.9` — so its layout, copy and interaction are the deliverable and its numbers
+are not.
+
+The rule that carried that work is the standing requirement below, pointed at a slider:
+**move the control and require the run to change**, compared on the legs rather than on a window
+statistic. It found three inert or wrong controls and one false claim about a mechanism before a
+single editor was mounted ([§ D177](DECISIONS.md)). If you add a control, add that test.
 
 [`docs/07-handoff.md`](docs/07-handoff.md) is the resume brief. Work proceeds by the phases
 in [`docs/05-roadmap.md`](docs/05-roadmap.md), which carries each phase's acceptance verdict and the
 measurements behind it. Read its **Standing requirement — the integration seam has an owner** before
 planning work: a behaviour that is configurable, unit-tested in isolation and never called from a
-shipped path passes every other check this repository runs, and has already shipped **nine** times in
+shipped path passes every other check this repository runs, and has already shipped **ten** times in
 code — plus, once, in `data/`. The instructive one is the sixth: the whole of `tuning/` was reachable
 from nothing outside its own tests, the module said so in its own docstring, and the roadmap asserted
 the phase green anyway. So the rule is not "is it reachable?" but **"name the non-test caller"**. A
 barrel re-export and a `{@link}` tag look exactly like a caller and are not one.
 
-**The ninth, and the one in `data/`, are the two most recent and they are the two worth reading.**
+**The eleventh is the most recent and the most instructive, and it is the one to read first.** The
+whole deck API on `model/bank.ts` — `isDoubleDeck`, `deckAt`, `deckAssignmentFor`, `pairedFloorOf`,
+`servesFloorPair` — had **no non-test caller anywhere in the tree**. Every reference outside its own
+file was `bank.test.ts` or a barrel re-export. It is instructive because nothing about it looked
+neglected: `vertical-city` had authored eight double-deck cars and four floor pairs since the
+building was written, the config layer cross-validated them with four dedicated warning codes, and
+`Bank` indexed the geometry correctly. **The configuration was right, the validation was right, and
+nothing consulted either.** Closed by simulating it ([§ D131](DECISIONS.md)) — which is why the
+count above moved from nine to ten in code, while *"the ninth dead seam"* elsewhere in these
+documents still correctly names § D114's instance and must not be renumbered.
+
+**The ninth, and the one in `data/`, are the next two worth reading.**
 The ninth is `measureEnergyLiveness` — and it was not a one-off: `published.ts` splits `benchmark/`
 into studies that publish an interval and studies classified `'no-intervals'`, the first half has
 `regeneratePins.ts` as its driver, and the second half had **no driver at all**, so **all five** of

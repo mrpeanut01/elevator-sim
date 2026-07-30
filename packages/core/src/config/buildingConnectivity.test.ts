@@ -16,11 +16,28 @@
  * Nothing here is elevator-specific policy: it is graph reachability over
  * `servesFloors`, restricted by `servesFloorPairs` (a double-deck leg cannot change deck
  * mid-ride) and by `isTransferFloor` (a journey cannot change bank anywhere else).
+ *
+ * ## It models the **lifts alone**, and that is now a deliberate narrowing
+ *
+ * `traffic/route.ts` gained a second kind of edge — a declared `transportModes` entry, an
+ * escalator or a stair — and this model does not have it. That is on purpose and it makes this
+ * check *stronger*, not stale: the property asserted here is that the shipped buildings connect
+ * **without leaning on a non-lift connection**, so an escalator can never be what rescues a
+ * zoning mistake. `vertical-city` still routes `G → 27` on two lift legs by this model even
+ * though the real planner now sends it up the escalator and one shuttle.
+ *
+ * The narrowing is only safe while the two models are related, so {@link RoutePlanner} is asked
+ * directly, once, at the bottom of this file: whatever this model can reach, the real planner
+ * must reach in **no more lift legs**. Without that assertion the "guard whose meaning eroded
+ * when something else moved into its filtered region" shape would apply exactly — a mirror that
+ * stopped mirroring, still green.
  */
 
 import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
+
+import { RoutePlanner } from '../traffic/route.js';
 
 import { loadConfig } from './loader.js';
 import type { LoadedConfig, ResolvedBuilding } from './types.js';
@@ -311,5 +328,59 @@ describe('vertical-city: double-deck routing', () => {
       expect(car.ratedLoadLb).toBe(2 * (car.ratedLoadLbPerDeck ?? 0));
       expect(car.capacityPersonsPerDeck).toBe(13);
     }
+  });
+});
+
+/**
+ * The tie between this file's lift-only model and the planner the product actually runs.
+ *
+ * Two claims, and the second is the one that keeps this file honest: every pair this model can
+ * reach, the real planner reaches too, in **no more lift legs**. A transport edge can only ever
+ * remove lift legs, never add one and never disconnect a pair — so if that ever stopped holding,
+ * the model above would still be green while describing a building the simulator no longer routes
+ * that way.
+ */
+describe('the lift-only model is a conservative view of the planner that actually runs', () => {
+  let config: LoadedConfig;
+
+  beforeAll(async () => {
+    config = await loadConfig(REAL_DATA_DIR);
+  });
+
+  it('never claims a pair the planner cannot route, or fewer legs than it needs', () => {
+    const problems: string[] = [];
+    for (const b of config.buildings) {
+      const planner = RoutePlanner.forBuilding(b);
+      const model = topologyOf(b);
+      const targets = [...b.entranceFloors.map((floor) => floor.id), ...populatedFloors(b)];
+      for (const origin of targets) {
+        const legs = legsFrom(model, origin);
+        for (const [destination, modelLegs] of legs) {
+          if (destination === origin) continue;
+          const actual = planner.legCount(origin, destination);
+          if (actual === undefined) {
+            problems.push(`${b.id}: ${origin} -> ${destination} unreachable for the planner`);
+          } else if (actual > modelLegs) {
+            problems.push(
+              `${b.id}: ${origin} -> ${destination} costs the planner ${String(actual)} lift legs but the lift-only model says ${String(modelLegs)}`,
+            );
+          }
+        }
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it('and vertical-city is a case where it is strictly cheaper, so the check is not vacuous', () => {
+    const b = config.buildingsById.get('vertical-city');
+    if (b === undefined) throw new Error('no vertical-city');
+    const planner = RoutePlanner.forBuilding(b);
+    expect(legsFrom(topologyOf(b), 'G').get('40')).toBe(3);
+    expect(planner.legCount('G', '40')).toBe(2);
+    // The widest gap the escalators open, and the one that matters most: a cross-lobby interfloor
+    // journey. The lift-only model rides 105 m down to the ground lobby and back; the planner
+    // crosses at sky lobby A. Pinned so the gap cannot quietly close back up.
+    expect(legsFrom(topologyOf(b), '40').get('34')).toBe(5);
+    expect(planner.legCount('40', '34')).toBe(2);
   });
 });

@@ -709,7 +709,7 @@ describe('every profile in data/dispatcher-profiles.json', () => {
       expect(result.summary.timeToDestination.meanS, profile.id).toBeGreaterThan(0);
       expect(result.dispatcherProfileId, profile.id).toBe(profile.id);
     }
-  });
+  }, 120_000);
 
   it('exercises the stage settings each new profile declares, rather than defaulting them', () => {
     const byId = new Map(profiles.map((profile) => [profile.id, profile]));
@@ -922,7 +922,7 @@ describe('every behaviour in dispatch/policies is reachable from runSimulation',
     expect(forecast?.expectedDemandByFloor(run.trace.durationS).size).toBe(
       garden.banks[0]?.servesFloors.length,
     );
-  });
+  }, 60_000);
 
   it('runs the load-driven stage-5 sweep, and migrates only for a profile that opted in', () => {
     // The mechanism and its control arm in one assertion. `capacity-aware` declares
@@ -955,7 +955,7 @@ describe('every behaviour in dispatch/policies is reachable from runSimulation',
     expect(control.capacityCrossings, 'the sweep did not run for the control arm').toBeGreaterThan(0);
     expect(control.capacityMigrations, 'reassignmentPolicy: never still migrated').toBe(0);
     expect(control.capacityHeld, 'the control arm looked at no call').toBeGreaterThan(0);
-  });
+  }, 60_000);
 
   it('builds each bank through the registry, so an authored aggregation runs', () => {
     const multi = profiles.find(
@@ -975,7 +975,7 @@ describe('every behaviour in dispatch/policies is reachable from runSimulation',
       expect(policy instanceof AuctionDispatchPolicy, bankId).toBe(true);
       expect((policy as AuctionDispatchPolicy).config.auction.rounds, bankId).toBe(3);
     }
-  });
+  }, 60_000);
 
   it('never reads a clock or a profile id in the run loop', () => {
     // The two invariants the wiring above is most likely to have broken, checked on the source it

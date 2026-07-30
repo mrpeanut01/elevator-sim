@@ -23,14 +23,28 @@
  * ## Shape is code, numbers are data
  *
  * A ramp is a ramp — that is the code here. Every quantity (`durationMin`, the reported
- * window, the discards) comes from `data/traffic-profiles.json → demandTemplates` or from an
- * explicit override, per CLAUDE.md invariant 7, and each override is declared in
- * `TRAFFIC_PARAMETERS`. There is no `if (template === 'rise-and-fall') { rate = 0.7 }`
- * anywhere: both templates are the same piecewise-linear evaluator over different phase
+ * window, the discards, the endpoint mixes) comes from `data/traffic-profiles.json →
+ * demandTemplates` or from an explicit override, per CLAUDE.md invariant 7, and each override is
+ * declared in `TRAFFIC_PARAMETERS`. There is no `if (template === 'rise-and-fall') { rate = 0.7 }`
+ * anywhere: all three templates are the same piecewise-linear evaluator over different phase
  * lists.
+ *
+ * ## The third template, and the one thing it adds
+ *
+ * The **lunch two-way** template (CIBSE Guide D) is the only one whose *directional mix* moves
+ * within a run: occupants ride down to leave the building and back up on their return, so the same
+ * period is outgoing-dominant early and incoming-dominant late. `DECISIONS.md` § D156 measured the
+ * other two flat in the mix — largest standardized deviation +1.83 σ across eight operating points
+ * — because `DemandPhase` carried a scalar intensity and nothing else. It now carries an optional
+ * pair of endpoint mixes, read by the same evaluator, and {@link splitAt} is `intensityAt`'s twin.
+ *
+ * **Opt-in, and byte-identical when unused** (§ D151 § 7): a phase that declares no mix leaves
+ * every floor on its own traffic profile's split, which is what every published figure in this
+ * repository was measured under, and `traffic/mixIdentity.test.ts` holds the two shipped templates
+ * to that byte for byte.
  */
 
-import type { DemandTemplate } from '../config/types.js';
+import type { DemandTemplate, DirectionalSplit } from '../config/types.js';
 
 import {
   DEMAND_TEMPLATE_IDS,
@@ -65,8 +79,81 @@ function phaseIntegral(phase: DemandPhase): number {
   return ((phase.startIntensity + phase.endIntensity) / 2) * (phase.endS - phase.startS);
 }
 
+/** Rescale to sum to 1, rejecting a mix nobody could travel. */
+function normalizedSplit(split: DirectionalSplit, label: string): DirectionalSplit {
+  for (const [name, value] of Object.entries(split)) {
+    if (!Number.isFinite(value) || value < 0) {
+      throw new TrafficError(
+        `Demand template ${label}.${name} must be non-negative and finite; received ${value}`,
+      );
+    }
+  }
+  const total = split.incoming + split.outgoing + split.interfloor;
+  if (total <= 0) {
+    throw new TrafficError(
+      `Demand template ${label} gives every direction a zero share, which is a building nobody travels in rather than a demand pattern.`,
+    );
+  }
+  return {
+    incoming: split.incoming / total,
+    outgoing: split.outgoing / total,
+    interfloor: split.interfloor / total,
+  };
+}
+
+/**
+ * The **time-average** of the phases' splits, or `undefined` when no phase declares one.
+ *
+ * Exact rather than quadrature: each phase's split is linear in `t`, so its integral is the
+ * trapezoid `(start + end)/2 · span`, the same shape {@link phaseIntegral} uses for intensity.
+ *
+ * Time-weighted rather than demand-weighted, and the distinction is worth stating because it
+ * *could* matter and on the shipped template does not: `lunch-two-way`'s intensity is symmetric
+ * about the run's midpoint and its mix arc is antisymmetric about the same point, so the two
+ * averages coincide exactly at 45/45/10. Time-weighted is the one that can be computed in closed
+ * form from the phase list alone, which is why it is the one recorded.
+ */
+function meanSplitOf(phases: readonly DemandPhase[], durationS: number): DirectionalSplit | undefined {
+  let declared = false;
+  let incoming = 0;
+  let outgoing = 0;
+  let interfloor = 0;
+  for (const phase of phases) {
+    const { startSplit, endSplit } = phase;
+    if (startSplit === undefined || endSplit === undefined) continue;
+    declared = true;
+    const span = phase.endS - phase.startS;
+    incoming += ((startSplit.incoming + endSplit.incoming) / 2) * span;
+    outgoing += ((startSplit.outgoing + endSplit.outgoing) / 2) * span;
+    interfloor += ((startSplit.interfloor + endSplit.interfloor) / 2) * span;
+  }
+  if (!declared || durationS <= 0) return undefined;
+  return normalizedSplit({ incoming, outgoing, interfloor }, 'meanDirectionalSplit');
+}
+
+/**
+ * Every phase declares both endpoint mixes or neither.
+ *
+ * Applied to a template this module *builds* and to one a caller hands in already resolved, which
+ * is not belt-and-braces: the resolved path returns the object untouched, so a hand-built template
+ * with one authored endpoint would otherwise reach the generator, resolve its missing end to
+ * `undefined`, and drop the whole arc silently at the first phase that lacked one.
+ */
+function requireCoherentMix(phases: readonly DemandPhase[]): void {
+  for (const phase of phases) {
+    if ((phase.startSplit === undefined) !== (phase.endSplit === undefined)) {
+      throw new TrafficError(
+        `Demand phase [${phase.startS}, ${phase.endS}] declares one endpoint mix and not the other. A phase interpolates between the two, so one alone would give the run an endpoint nobody authored.`,
+      );
+    }
+  }
+}
+
 function finish(
-  parts: Omit<ResolvedDemandTemplate, 'peakIntensity' | 'intensityIntegralS'>,
+  parts: Omit<
+    ResolvedDemandTemplate,
+    'peakIntensity' | 'intensityIntegralS' | 'meanDirectionalSplit'
+  >,
 ): ResolvedDemandTemplate {
   let peak = 0;
   let integral = 0;
@@ -74,11 +161,16 @@ function finish(
     peak = Math.max(peak, phase.startIntensity, phase.endIntensity);
     integral += phaseIntegral(phase);
   }
+  requireCoherentMix(parts.phases);
+  const meanDirectionalSplit = meanSplitOf(parts.phases, parts.durationS);
   return Object.freeze({
     ...parts,
     phases: Object.freeze(parts.phases.map((phase) => Object.freeze({ ...phase }))),
     peakIntensity: peak,
     intensityIntegralS: integral,
+    // Omitted, not undefined-valued, when no phase declares a mix: a template from a run that does
+    // not use the feature must serialize as the object it was before the feature existed.
+    ...(meanDirectionalSplit === undefined ? {} : { meanDirectionalSplit }),
   });
 }
 
@@ -208,6 +300,181 @@ export function constantDemandTemplate(options: ConstantDemandOptions = {}): Res
 }
 
 /* -------------------------------------------------------------------------- *
+ * Lunch two-way (CIBSE Guide D) — the one template whose directional mix moves
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The mix arc's authored endpoints, and the derivation behind them.
+ *
+ * **Cited.** The lunch period's directional mix is 45 % incoming / 45 % outgoing / 10 % interfloor
+ * — CIBSE Guide D (2010, carried into the 2020 edition), the split the British Council for Offices
+ * *Guide to Specification 2014* pairs with a 13 %/5 min lunchtime two-way demand. The literature's
+ * alternatives are 40/40/20 (Barney 2003a) and 42/42/16 (BCO 2009); Guide D is this project's
+ * primary reference, so its figure is the one taken.
+ *
+ * **Derived, and said plainly, because no table publishes it.** Guide D gives the period's mix as
+ * a single triple; it does not give the mix as a function of time within the period. The endpoints
+ * below are constructed from the mechanism the same sources describe — occupants ride down to the
+ * terminal to leave and ride back up on their return, so the *same* period is outgoing-dominant
+ * early and incoming-dominant late — plus three stated assumptions:
+ *
+ * 1. At the instant the period opens, nobody has returned yet, so `incoming = 0`.
+ * 2. The interfloor share is background traffic and is held at the cited 10 % throughout.
+ * 3. The arc is linear in time and symmetric about the midpoint.
+ *
+ * The arithmetic then closes: `(0 + 0.90)/2 = 0.45` incoming, `(0.90 + 0)/2 = 0.45` outgoing,
+ * `(0.10 + 0.10)/2 = 0.10` interfloor. **The cited 45/45/10 is reproduced by the endpoints rather
+ * than asserted beside them**, which is what makes the amplitude a derivation rather than a taste.
+ *
+ * **The limitation, stated because it cuts the wrong way.** An endpoint of exactly zero incoming
+ * is the *widest* arc consistent with the cited mean, and a measured building's arc is smoother at
+ * its ends — real departures and returns overlap. A wider arc is the one a weight-set selector
+ * would find easiest to exploit, so this is not a conservative choice and must not be reported as
+ * one. {@link LunchTwoWayOptions.mixAmplitude} is the knob that narrows it, and 0 is the flat
+ * control `DECISIONS.md` § D162 condition 5 requires.
+ */
+export const LUNCH_TWO_WAY_SPLIT_AT_START: DirectionalSplit = Object.freeze({
+  incoming: 0,
+  outgoing: 0.9,
+  interfloor: 0.1,
+});
+
+/** The mirror of {@link LUNCH_TWO_WAY_SPLIT_AT_START}. See it for the citation and derivation. */
+export const LUNCH_TWO_WAY_SPLIT_AT_END: DirectionalSplit = Object.freeze({
+  incoming: 0.9,
+  outgoing: 0,
+  interfloor: 0.1,
+});
+
+/** Overrides for {@link lunchTwoWayTemplate}. Every one is declared in `TRAFFIC_PARAMETERS`. */
+export interface LunchTwoWayOptions {
+  /** Length of the period, seconds. Default 1800, inherited from the rise-and-fall run length. */
+  readonly durationS?: number | undefined;
+  /** Length of the intensity hold, seconds. Default 300 — the rise-and-fall value, unchanged. */
+  readonly peakWindowS?: number | undefined;
+  /** Intensity at both ends as a fraction of peak. Default 0 — the CIBSE shape, unchanged. */
+  readonly baselineFraction?: number | undefined;
+  /** Mix at `t = 0`. Default {@link LUNCH_TWO_WAY_SPLIT_AT_START}. */
+  readonly startSplit?: DirectionalSplit | undefined;
+  /** Mix at `t = durationS`. Default {@link LUNCH_TWO_WAY_SPLIT_AT_END}. */
+  readonly endSplit?: DirectionalSplit | undefined;
+  /** How much of the arc to keep, `[0, 1]`. Default 1; 0 is the flat-mix control. */
+  readonly mixAmplitude?: number | undefined;
+  readonly id?: string | undefined;
+  readonly name?: string | undefined;
+}
+
+/**
+ * The lunch mixed peak: the rise-and-fall intensity, with the directional mix swinging across it.
+ *
+ * ## What is new here, and what is deliberately not
+ *
+ * **New:** the mix arc, and only the mix arc. Every geometric number — the 1800 s period, the 300 s
+ * hold, the zero baseline — is {@link riseAndFallTemplate}'s own default, taken unchanged, so this
+ * template introduces no duration that no source supports. `docs/03` § Demand targets already
+ * names two-way traffic as a governing peak; what the shipped templates could not express is that
+ * a two-way period is *not* a constant two-way mix, which is the finding `DECISIONS.md` § D156
+ * measured rather than assumed.
+ *
+ * **Not new:** the reporting rule. The window is the whole run, for the reason `benchmark/arms.ts`
+ * already gives about `MIDTOWN_INTERFLOOR_MIX` — *"this is a pattern rather than a peak, and a
+ * 300 s window of it is a sample of the pattern rather than the thing itself"*. A 5-minute window
+ * cut out of a mix arc reports one point of it and calls it the period.
+ *
+ * @throws TrafficError if the hold does not fit, the baseline or amplitude is outside `[0, 1]`, or
+ *   either endpoint mix gives every direction a zero share.
+ */
+export function lunchTwoWayTemplate(options: LunchTwoWayOptions = {}): ResolvedDemandTemplate {
+  const durationS = requirePositive(
+    options.durationS ?? TRAFFIC_DEFAULTS.lunchTwoWayDurationS,
+    'durationS',
+  );
+  const peakWindowS = requirePositive(
+    options.peakWindowS ?? TRAFFIC_DEFAULTS.peakWindowS,
+    'peakWindowS',
+  );
+  const baselineFraction = requireNonNegative(
+    options.baselineFraction ?? TRAFFIC_DEFAULTS.baselineFraction,
+    'baselineFraction',
+  );
+  const mixAmplitude = requireNonNegative(
+    options.mixAmplitude ?? TRAFFIC_DEFAULTS.mixAmplitude,
+    'mixAmplitude',
+  );
+  if (baselineFraction > 1) {
+    throw new TrafficError(
+      `Demand template baselineFraction must lie in [0, 1]; received ${baselineFraction}. It is a fraction of the peak, not a rate.`,
+    );
+  }
+  if (mixAmplitude > 1) {
+    throw new TrafficError(
+      `Demand template mixAmplitude must lie in [0, 1]; received ${mixAmplitude}. It is the fraction of the authored mix arc to keep, and above 1 would take the mix outside the endpoints anybody authored or cited.`,
+    );
+  }
+  if (peakWindowS > durationS) {
+    throw new TrafficError(
+      `A ${peakWindowS} s peak hold does not fit inside a ${durationS} s run. Shorten the window or lengthen the run.`,
+    );
+  }
+
+  const startSplit = normalizedSplit(
+    options.startSplit ?? LUNCH_TWO_WAY_SPLIT_AT_START,
+    'startSplit',
+  );
+  const endSplit = normalizedSplit(options.endSplit ?? LUNCH_TWO_WAY_SPLIT_AT_END, 'endSplit');
+  const mean: DirectionalSplit = {
+    incoming: (startSplit.incoming + endSplit.incoming) / 2,
+    outgoing: (startSplit.outgoing + endSplit.outgoing) / 2,
+    interfloor: (startSplit.interfloor + endSplit.interfloor) / 2,
+  };
+  /** The arc at a fraction of the run, damped towards its own mean by `mixAmplitude`. */
+  const splitAtFraction = (fraction: number): DirectionalSplit => {
+    const lerp = (from: number, to: number): number => from + fraction * (to - from);
+    const damp = (value: number, centre: number): number =>
+      centre + mixAmplitude * (value - centre);
+    return {
+      incoming: damp(lerp(startSplit.incoming, endSplit.incoming), mean.incoming),
+      outgoing: damp(lerp(startSplit.outgoing, endSplit.outgoing), mean.outgoing),
+      interfloor: damp(lerp(startSplit.interfloor, endSplit.interfloor), mean.interfloor),
+    };
+  };
+
+  const rampS = (durationS - peakWindowS) / 2;
+  const holdStartS = rampS;
+  const holdEndS = rampS + peakWindowS;
+
+  const bounds: readonly (readonly [number, number, number, number])[] =
+    rampS > 0
+      ? [
+          [0, holdStartS, baselineFraction, 1],
+          [holdStartS, holdEndS, 1, 1],
+          [holdEndS, durationS, 1, baselineFraction],
+        ]
+      : [[holdStartS, holdEndS, 1, 1]];
+
+  const phases: DemandPhase[] = bounds.map(([startS, endS, startIntensity, endIntensity]) => ({
+    startS,
+    endS,
+    startIntensity,
+    endIntensity,
+    startSplit: splitAtFraction(startS / durationS),
+    endSplit: splitAtFraction(endS / durationS),
+  }));
+
+  return finish({
+    id: options.id ?? 'lunch-two-way',
+    name: options.name ?? 'CIBSE Guide D lunch two-way template',
+    recommended: true,
+    durationS,
+    phases,
+    // The whole run. See the module note above: a peak window cut out of a mix arc reports one
+    // point of the arc and calls it the period.
+    reportWindowStartS: 0,
+    reportWindowEndS: durationS,
+  });
+}
+
+/* -------------------------------------------------------------------------- *
  * Resolution from config
  * -------------------------------------------------------------------------- */
 
@@ -247,6 +514,12 @@ export function resolveDemandTemplate(
   if (typeof spec !== 'string') {
     if (isResolved(spec)) {
       requireNoOverrides(overrides, `the already-resolved template "${spec.id}"`);
+      requireCoherentMix(spec.phases);
+      if ((spec.meanDirectionalSplit === undefined) !== (spec.phases[0]?.startSplit === undefined)) {
+        throw new TrafficError(
+          `The already-resolved template "${spec.id}" disagrees with itself about whether it varies the directional mix: meanDirectionalSplit is ${spec.meanDirectionalSplit === undefined ? 'absent' : 'present'} while its first phase ${spec.phases[0]?.startSplit === undefined ? 'declares no mix' : 'declares one'}. The generator branches on meanDirectionalSplit, so the disagreement would resolve silently in its favour.`,
+        );
+      }
       return spec;
     }
     return fromRecord(spec, overrides);
@@ -257,6 +530,7 @@ export function resolveDemandTemplate(
   // No record to draw numbers from: fall back to the documented defaults for the shape.
   if (spec === 'rise-and-fall') return riseAndFall(overrides);
   if (spec === 'constant-iso') return constant(overrides);
+  if (spec === 'lunch-two-way') return lunchTwoWay(overrides);
   throw new TrafficError(
     `Unknown demand template "${spec}". Supported: ${DEMAND_TEMPLATE_IDS.join(', ')}. Declare it in data/traffic-profiles.json and add its shape in traffic/demandTemplate.ts.`,
   );
@@ -310,6 +584,27 @@ function constant(
   });
 }
 
+/** The lunch two-way shape, with `overrides` beating the record values and then the defaults. */
+function lunchTwoWay(
+  overrides: DemandTemplateOverrides | undefined,
+  recordDurationS?: number,
+  recordStartSplit?: DirectionalSplit,
+  recordEndSplit?: DirectionalSplit,
+  id?: string,
+  name?: string,
+): ResolvedDemandTemplate {
+  return lunchTwoWayTemplate({
+    durationS: overrides?.durationS ?? recordDurationS ?? TRAFFIC_DEFAULTS.lunchTwoWayDurationS,
+    peakWindowS: overrides?.peakWindowS ?? TRAFFIC_DEFAULTS.peakWindowS,
+    baselineFraction: overrides?.baselineFraction ?? TRAFFIC_DEFAULTS.baselineFraction,
+    mixAmplitude: overrides?.mixAmplitude ?? TRAFFIC_DEFAULTS.mixAmplitude,
+    ...(recordStartSplit === undefined ? {} : { startSplit: recordStartSplit }),
+    ...(recordEndSplit === undefined ? {} : { endSplit: recordEndSplit }),
+    ...(id === undefined ? {} : { id }),
+    ...(name === undefined ? {} : { name }),
+  });
+}
+
 function fromRecord(
   record: DemandTemplate,
   overrides?: DemandTemplateOverrides | undefined,
@@ -327,6 +622,16 @@ function fromRecord(
       durationS,
       (record.discardFirstMin ?? 0) * SECONDS_PER_MINUTE,
       (record.discardLastMin ?? 0) * SECONDS_PER_MINUTE,
+      record.id,
+      record.name,
+    );
+  }
+  if (record.id === 'lunch-two-way') {
+    return lunchTwoWay(
+      overrides,
+      durationS,
+      record.directionalSplitAtStart,
+      record.directionalSplitAtEnd,
       record.id,
       record.name,
     );
@@ -356,6 +661,42 @@ export function intensityAt(template: ResolvedDemandTemplate, timeS: number): nu
     return phase.startIntensity + fraction * (phase.endIntensity - phase.startIntensity);
   }
   return 0;
+}
+
+/**
+ * The directional mix at a time, or `undefined` when the template declares none.
+ *
+ * The same piecewise-linear evaluator {@link intensityAt} is, over the same knots — which is the
+ * whole design: a template's mix and its level are two readings of one phase list, so a phase
+ * boundary is a boundary for both and nothing can drift between them.
+ *
+ * Times outside `[0, durationS]` clamp to the nearest endpoint rather than returning `undefined`.
+ * Nothing arrives outside the run, so the value is unobservable in a trace; clamping keeps it a
+ * total function, so a caller integrating over a window that overhangs the run does not have to
+ * special-case the overhang.
+ */
+export function splitAt(
+  template: ResolvedDemandTemplate,
+  timeS: number,
+): DirectionalSplit | undefined {
+  if (template.meanDirectionalSplit === undefined) return undefined;
+  const clamped = Number.isFinite(timeS)
+    ? Math.max(0, Math.min(timeS, template.durationS))
+    : 0;
+  for (const phase of template.phases) {
+    if (clamped < phase.startS || clamped > phase.endS) continue;
+    const { startSplit, endSplit } = phase;
+    if (startSplit === undefined || endSplit === undefined) return undefined;
+    const span = phase.endS - phase.startS;
+    if (span <= 0) return endSplit;
+    const fraction = (clamped - phase.startS) / span;
+    return {
+      incoming: startSplit.incoming + fraction * (endSplit.incoming - startSplit.incoming),
+      outgoing: startSplit.outgoing + fraction * (endSplit.outgoing - startSplit.outgoing),
+      interfloor: startSplit.interfloor + fraction * (endSplit.interfloor - startSplit.interfloor),
+    };
+  }
+  return undefined;
 }
 
 /**

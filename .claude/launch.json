@@ -10,7 +10,7 @@
         "--workspace",
         "@elevator-sim/viz"
       ],
-      "port": 5173
+      "port": 5174
     }
   ]
 }

@@ -46,9 +46,11 @@
  * ## What this module refuses to do
  *
  * Compute a confidence interval. It records the per-replication samples in index order and the
- * verdicts the injected rule returned, and stops. The interval — paired-t on the differences, the
- * t/z switch at n = 25 — belongs to `stats/`, and a runner that also owned it could not be tested
- * apart from a simulator.
+ * verdicts the injected rule returned, and stops. The interval — paired-t on the differences,
+ * Student-t at `n − 1` at every `n` — belongs to `stats/`, and a runner that also owned it could
+ * not be tested apart from a simulator. (This sentence used to name a "t/z switch at n = 25"; that
+ * family was deleted in `89bbf37` and no estimator in this repository has implemented it since —
+ * DECISIONS.md § D14.)
  */
 
 import { summariseReplications } from '../oracle/reconcile.js';
@@ -129,6 +131,7 @@ function recordOf(outcome: Extract<RawReplicationOutcome, { ok: true }>): Replic
     tracePassengers: outcome.tracePassengers,
     conservation: outcome.conservation,
     undeliveredCount: outcome.undeliveredCount,
+    kioskRefusedLegs: outcome.kioskRefusedLegs,
     ...(outcome.record === undefined ? {} : { record: outcome.record }),
     warnings: outcome.warnings,
   };
