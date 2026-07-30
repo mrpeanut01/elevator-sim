@@ -114,15 +114,13 @@ const AUDITED_MODULES = [
  */
 const DEAD_CANDIDATES: Readonly<Record<string, string>> = Object.freeze({
   /*
-   * -- The two whose own docstrings name a caller that does not call them. defaults.ts:30 says
-   * "Non-test callers: PREFERRED_VIEWER_DISPATCHERS in dev/main.ts's boot"; main.ts does not
-   * import defaults.js at all — state.ts:282's private preferredDispatcher() re-derives the same
-   * ['collective', 'eta'] list from its own literal, so § D134's decision is enforced by a
-   * duplicate and this const decides nothing. Its two siblings (PREFERRED_BATCH_BASELINE,
-   * PREFERRED_BATCH_CANDIDATE) are genuinely imported by dev/batchPanel.ts and read as live.
+   * -- PREFERRED_VIEWER_DISPATCHERS's docstring named dev/main.ts's boot as its caller while
+   * state.ts's private preferredDispatcher() re-derived ['collective', 'eta'] from its own
+   * literal, so § D134's decision was enforced by a duplicate and the const decided nothing.
+   * Dispositioned by wiring: state.ts now resolves the opening dispatcher through the constant
+   * and preferredDispatcherId, defaults.ts's docstring names the real caller, and the
+   * duplicate literal is gone.
    */
-  'dev/PREFERRED_VIEWER_DISPATCHERS':
-    'dead: its docstring names dev/main.ts’s boot; state.ts:282 re-derives the list privately',
   /*
    * -- viewerRunConfig (T75's run builder, superseded by state.ts's shiftRunConfigOf) was the
    * worst of the eight: viewerSelector.test.ts asserted the § D153 selector seam against it while
@@ -149,8 +147,12 @@ const DEAD_CANDIDATES: Readonly<Record<string, string>> = Object.freeze({
    */
   'frame/landingAssignmentAt':
     'dead: the barrel row admits no caller outside; main.ts filters the plural form itself',
-  'honesty/formatHonestyCase':
-    'dead: zero callers, tests included; shrink.ts’s docstring promises it prints the shrunk case',
+  /*
+   * -- formatHonestyCase had zero callers while shrink.ts's replay note promised it prints the
+   * shrunk case and campaign.ts's formatFailure inlined the identical stringify. Dispositioned
+   * by wiring: formatFailure now prints the minimal case through it, so the promise is kept by
+   * the one printer rather than by a duplicate.
+   */
   /*
    * -- bands.ts:236, "for a caller holding one from a serialised state" — a hypothetical caller
    * written next to the export, which is the pattern wave 1's remediation deleted rather than

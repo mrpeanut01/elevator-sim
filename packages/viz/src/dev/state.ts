@@ -71,6 +71,7 @@ import { openWeek, takeContract } from '../shift/week.js';
 import type { DayReport, ShiftEvent, WeekState } from '../shift/types.js';
 
 import type { BrowserResources } from './data.js';
+import { PREFERRED_VIEWER_DISPATCHERS, preferredDispatcherId } from './defaults.js';
 import type { RailSegment, TabName } from './elementMap.js';
 
 /**
@@ -278,12 +279,19 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
   };
 }
 
-/** `collective` when the file has it, else whatever it does have. § D134. */
+/**
+ * `collective` when the file has it, else whatever it does have. § D134.
+ *
+ * The preference list is `dev/defaults.ts`'s — the one `defaults.test.ts` pins against § D134's
+ * measurement — not a private literal. This function re-derived `['collective', 'eta']` on its
+ * own until the fifth dead-code audit found the constant enforced by a duplicate (§ D192): two
+ * sites answering *what does the viewer open on* is how one of them goes stale unread.
+ */
 function preferredDispatcher(resources: BrowserResources): string {
-  for (const wanted of ['collective', 'eta']) {
-    if (resources.dispatcherProfiles.profiles.some((profile) => profile.id === wanted)) return wanted;
-  }
-  return resources.dispatcherProfiles.profiles[0]?.id ?? 'collective';
+  const profiles = resources.dispatcherProfiles.profiles;
+  return (
+    preferredDispatcherId(PREFERRED_VIEWER_DISPATCHERS, profiles) ?? profiles[0]?.id ?? 'collective'
+  );
 }
 
 /* -------------------------------------------------------------------------- *

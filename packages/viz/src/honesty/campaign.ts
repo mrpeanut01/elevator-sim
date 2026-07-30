@@ -23,7 +23,13 @@
  * side. The flag is read by the suite, which is a test, and handed in.
  */
 
-import { caseFromSeed, DEEP_SPACE, STANDARD_SPACE, type HonestySpace } from './generate.js';
+import {
+  caseFromSeed,
+  DEEP_SPACE,
+  formatHonestyCase,
+  STANDARD_SPACE,
+  type HonestySpace,
+} from './generate.js';
 import { evaluateCase, isFailure, type HonestyResources } from './run.js';
 import { shrinkCase, type HonestyShrinkResult } from './shrink.js';
 import type { HonestyCampaignStats, HonestyOutcome } from './types.js';
@@ -148,7 +154,9 @@ export function formatFailure(failure: HonestyShrinkResult): string {
       `  string: ${JSON.stringify(found.text)}`,
     );
   }
-  lines.push(JSON.stringify(failure.minimal.case, null, 2));
+  // The shrunk case in full, through the one printer `shrink.ts`'s replay note promises — a
+  // second inline stringify here is how the two prints drift (§ D192, candidate 4).
+  lines.push(formatHonestyCase(failure.minimal.case));
   return lines.join('\n');
 }
 
