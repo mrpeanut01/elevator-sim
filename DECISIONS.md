@@ -11016,3 +11016,83 @@ them through a driven adapter needs a `covers` entry in `honesty/surfaces.ts`. C
 **Impact on phase status: none by itself** — but W8 was Phase 9's last open half, so every one of its
 nine units is now built. Whether the phase is *accepted* is [§ D163](#d163)'s question and is measured
 separately; a unit landing is not a verdict.
+
+> **A note on this commit, because the record should not be tidier than the history.** `ae6750b`'s
+> message describes W8 alone, and the commit also contains the whole of [§ D183](#d183) below. The
+> orchestrator ran `git add -A` in a worktree two lanes were writing to concurrently. The wave's own
+> policy is one worktree per concurrent lane, and it was not followed — the lanes owned disjoint
+> *files*, which is necessary and was not sufficient, because staging is repository-wide. Nothing was
+> lost and no change is unreviewed, but **review the files, not the commit**, and the commit is not
+> evidence of what landed together.
+
+---
+
+## D183 — the refusal carries a **code beside its prose**, and Basic can finally shorten it
+
+**Date:** 2026-07-30 · **Owner:** wave 11 · **Closes** [`GAPS.md`](GAPS.md) § 3's *"Basic mode cannot
+shorten a suppression reason"* on the `core` side · **Landed inside `ae6750b`** — see the note above
+
+`GAPS.md` § 3 carried this with a named fix: *"`core` returns one of four sentences as a bare string
+with **no ground code**, so a per-ground rewording would re-decide which ground fired. Basic leads with
+a ground-free sentence and carries `core`'s words underneath. **Named fix: `core` must carry the ground
+beside the prose.**"* Done — and the **shape** matters more than the field.
+
+### The ground is not a union beside a switch
+
+The obvious form — an `AWT_INVALID_GROUNDS` tuple next to the nested conditional that returns members
+of it — is the hand-written-list defect [§ D152](#d152) closed one layer down and [§ D163](#d163)
+closed one layer up, and it fails identically: a fifth ground is added to the conditional, nobody adds
+it to the tuple, and every list-driven consumer keeps reporting four.
+
+So a ground **is** its entry in `metrics/awtValidity.ts`'s `AWT_INVALID_GROUND_SPECS` — predicate and
+sentence on one object, table order *is* the precedence — the union is
+`(typeof AWT_INVALID_GROUND_SPECS)[number]['ground']`, and the enumeration is that table's own column
+rather than a second list. Watched: adding a fifth entry is a **compile error in two places**,
+`awtValidity.test.ts`'s `Record<AwtInvalidGround, GroundCase>` and `viz/mode/disclosure.ts`'s
+`Record<AwtInvalidGround, string>`. Neither file contains a list of grounds.
+
+### A code is permission to shorten, never permission to replace
+
+Basic now leads with a sentence about *this* refusal; `core`'s sentence still follows it verbatim and
+is still on `DisclosureItem.mustCarry`, so `parity.ts` rule 2 still refuses a Basic mode that drops it
+— asserted red, with the reason quoted. **`parity.ts` is untouched** and still contains no ground, no
+figure id and no `awtIsValid`: the wording table lives in the presentation, and the check may not key
+on a ground. The new suite iterates `AWT_INVALID_GROUNDS` imported from `core`, so a fifth ground
+enters it by existing.
+
+A ground this build has no wording for falls back to the ground-free `SUPPRESSION_LEAD` — what every
+consumer did before codes existed. Showing a bare code, or nothing, would turn a widened vocabulary
+into a suppressed refusal. **That fallback is provable only because § D134's fictional technique was
+extended to grounds**: with the shipped four, every code has a sentence and the branch is dead, which
+is § D152's *"a list that looks derived only because the shipped schema happens to fit it"* pointed at
+a default branch.
+
+### Two things this found that were not the task
+
+1. **`RunSummary.awtIsValid`'s own docstring was wrong about the evaluation order, observably.** It
+   numbered the grounds *1 saturation, 2 censoring, 3 emptiness, 4 starvation* and said they were
+   *"evaluated in that order"*; the code has always checked **emptiness before censoring**. A window
+   where nobody boarded **and** more than the censoring limit went unserved reports emptiness, and the
+   docstring said censoring. Corrected **to the code, not the reverse**: *"nobody was served"* is more
+   fundamental than *"the survivors are a biased sample"*, and with a zero denominator the censoring
+   sentence's own arithmetic is the less informative of the two.
+2. **A byte-pin caught the new field, and what replaced it asks more than the pin did.**
+   `traffic/transportIdentity.test.ts` digests whole `SimulationResult`s against baseline `d7e8571`;
+   `RunSummary` is inside them, so a new key reddened **12 of 18 cells**. The digests were **not**
+   re-pinned. The key is excluded exactly as `conservation.transportHops` already is, and the
+   replacement is stronger than a digest can be: on every cell of both suites, the code is present
+   **precisely when** `awtIsValid` is `false`, is a member of `AWT_INVALID_GROUNDS`, and sits beside
+   non-empty prose. A digest would have gone green on a code with no sentence as long as the bytes
+   matched. Those 18 digests reproducing unchanged is also the proof that the four sentences **moved
+   verbatim**.
+
+### The transport is not finished, and it is named rather than implied
+
+**`VizSummary` does not carry `awtInvalidGround`**, so on a recording this build produces the ground is
+absent and Basic renders exactly what it rendered before — asserted **byte-identical**, so the shipped
+screen has not moved while the mechanism waits. A field on the recording contract is a deliberate
+`VIZ_SCHEMA_VERSION` bump with a history row, and `contract/types.ts`'s own convention is that a field
+lands **with its consumer**. The consumer is now here and waiting. Carried in
+[`GAPS.md`](GAPS.md) § 3, narrowed rather than deleted.
+
+**Impact on phase status: none.**
