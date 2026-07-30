@@ -15,10 +15,15 @@
  * minute twenty; one re-running this tree twice would prove only that the code is deterministic,
  * which was never in question. The question is whether *this* tree reproduces *that* tree.
  *
- * So {@link BASELINE_TRACE_DIGESTS} was produced by running **`9f1adf7`** — the commit this branch
- * is based on — in a separate detached git worktree, against that tree's own `packages/core/dist`
- * and its own `data/`, and is pasted here. It is a pin in the sense `experiments/benchmark/
- * published.ts` means: a number this tree must reproduce and did not compute for itself.
+ * So {@link BASELINE_TRACE_DIGESTS} is pinned (re-pinned 2026-07-30) to what commits **`9f1adf7`**,
+ * **`9fd738c`** and HEAD all reproduce on the runner that re-pinned it — Node 22 and Node 26 agree
+ * byte for byte, and `goldenRuns` replays stored records byte-identically on the same runner, so
+ * the apparatus distinguishes a moved run from a moved pin. The previous constants — kept in the
+ * superseded block inside the table, per this file's own re-pin convention — claimed that
+ * provenance and did not have it: they matched **no committed tree**, provenance unknown, produced
+ * from an unmeasurable working state. DECISIONS.md § D196 carries the finding. It is a pin in the
+ * sense `experiments/benchmark/published.ts` means: a number this tree must reproduce and did not
+ * compute for itself.
  *
  * ## Nothing is excluded, and nothing needed to be
  *
@@ -55,25 +60,62 @@ import { DEMAND_TEMPLATE_IDS, type DemandTemplateId } from './types.js';
  * SHA-256 of `JSON.stringify(generateTrace(...))` at `seed: 20260726` with every other option
  * left at its default, one entry per (building, template).
  *
- * Produced on baseline `9f1adf7` in a detached worktree, not on this tree.
+ * Re-pinned 2026-07-30 to the values commits `9f1adf7`, `9fd738c` and HEAD all reproduce (Node 22
+ * and 26 agree). The constants replaced are kept in the superseded block below (§ D196).
  */
 const BASELINE_TRACE_DIGESTS: Readonly<Record<string, string>> = {
+  /*
+   * **All ten digests are re-pinned (2026-07-30), and the previous constants matched no committed
+   * tree.**
+   *
+   * The values below are what commits `9f1adf7`, `9fd738c` and HEAD all reproduce on the runner
+   * that re-pinned them — Node 22 and Node 26 agree byte for byte, while `goldenRuns` replays
+   * stored run records byte-identically on the same runner. The constants they replace reproduced
+   * on **none** of those commits and on no other committed tree that was checked: provenance
+   * unknown, produced from an unmeasurable working state. `BASELINE_PASSENGER_COUNTS` never moved
+   * — the pinned counts pass on every commit above — so whatever produced the superseded digests
+   * shared this tree's demand and differed somewhere the digest sees and the counts do not.
+   * DECISIONS.md § D196 carries the finding.
+   *
+   * Superseded, kept per this file's re-pin convention (none reproduces from any committed tree):
+   *
+   *   'garden-apartments|rise-and-fall':
+   *     'c196360dd70df5eccc89c91aea5533861522c202ee474ed84399c1be1c3da131',
+   *   'garden-apartments|constant-iso':
+   *     '6f91e537c91540825bd0495393d962427eeeb27a5fb8a42a8c6a152da373d458',
+   *   'midtown-office|rise-and-fall':
+   *     'aef42eca6f16b573519aa649884d1c944cad700d5f4c817f411e651d770b3117',
+   *   'midtown-office|constant-iso':
+   *     '23f759bd026047ae52fd8720dd87aa822642fc56cdd46b3e40810e529a8483bc',
+   *   'mixed-use-high-rise|rise-and-fall':
+   *     'fc30a7ba19798c69e1fb87c2a7fa92f2e44616b3d3d02cef355a99ff39953659',
+   *   'mixed-use-high-rise|constant-iso':
+   *     '7af7fc5472a3296361157a97bf217b76a5d24e84c000f23f66d0756c722d4a28',
+   *   'secure-tower|rise-and-fall':
+   *     '022e163901a9f1c268126cdcb610f7cfe6b6736dec48bb74ca18408142506607',
+   *   'secure-tower|constant-iso':
+   *     '02cae53573243fefbe20d811114a1184f88e2c840791aab8df58a7b73790c668',
+   *   'vertical-city|rise-and-fall':
+   *     'a37d59c4e101bd0f229d6cec130efb36da44214f6f9ebd02090a165486899502',
+   *   'vertical-city|constant-iso':
+   *     '74e108c52d7468b65853665e1f72b77a47bfac7c36dcd6563b2779a633a6be52',
+   */
   'garden-apartments|rise-and-fall':
-    'c196360dd70df5eccc89c91aea5533861522c202ee474ed84399c1be1c3da131',
+    'e0c37900df2781979ba6bb0098ec9e53545aaa8711a10bf24e923b99c6c5ab7f',
   'garden-apartments|constant-iso':
-    '6f91e537c91540825bd0495393d962427eeeb27a5fb8a42a8c6a152da373d458',
+    '05c4c74873ab72405ff746e5b1a78914f7e970719a31ddb50c6e1af855c3d984',
   'midtown-office|rise-and-fall':
-    'aef42eca6f16b573519aa649884d1c944cad700d5f4c817f411e651d770b3117',
+    '7bfe6a021ebf93b8696f9e9770f95e5ff5231363020041e1a6ec310e70ed8f5b',
   'midtown-office|constant-iso':
-    '23f759bd026047ae52fd8720dd87aa822642fc56cdd46b3e40810e529a8483bc',
+    'aee5a7726fec2cf9b9e78095a56eb6bd9cc075f6b8c63dbb1b32ef0e0c29b94e',
   'mixed-use-high-rise|rise-and-fall':
-    'fc30a7ba19798c69e1fb87c2a7fa92f2e44616b3d3d02cef355a99ff39953659',
+    'dee292c841cbdb12570a52fc59e3b4a6dc2364ba8260e6fc408da5d8070ce5ee',
   'mixed-use-high-rise|constant-iso':
-    '7af7fc5472a3296361157a97bf217b76a5d24e84c000f23f66d0756c722d4a28',
+    'f17a16503eb5a43049be32877fbf169b502ebc3d68337a2bb829dc2a24039199',
   'secure-tower|rise-and-fall':
-    '022e163901a9f1c268126cdcb610f7cfe6b6736dec48bb74ca18408142506607',
+    '2b17c11b2b0c824372816d9292280fa5ac6f74ec8446bc01b14d20ff6a12b579',
   'secure-tower|constant-iso':
-    '02cae53573243fefbe20d811114a1184f88e2c840791aab8df58a7b73790c668',
+    '3810ffd3f33b78c21b48694cf2d9c4329e73541a44e8c432c71e625f6f6ae3c3',
   /*
    * **The two `vertical-city` digests are re-pinned, and the cause is a different lane's data
    * change rather than this file's code.**
@@ -89,11 +131,17 @@ const BASELINE_TRACE_DIGESTS: Readonly<Record<string, string>> = {
    * eight digests for the four buildings that declare no transport mode reproduce untouched. A
    * change that had leaked into the generator rather than into one building's data would have
    * moved those too, and that is the assertion doing the work here.
+   *
+   * The two constants that re-pin produced are themselves superseded by the 2026-07-30 re-pin —
+   * they claimed generation at `9f1adf7` and reproduced from no committed tree, the same § D196
+   * finding as the eight above, and they are kept in the superseded block with the others. The
+   * route-change mechanism this comment records still stands: the passenger counts have not moved,
+   * and the re-pinned values are of the escalator-declaring building.
    */
   'vertical-city|rise-and-fall':
-    'a37d59c4e101bd0f229d6cec130efb36da44214f6f9ebd02090a165486899502',
+    '8a234e46f9aa524ee334fa9853ab194b1c676c72de323cad708e234148204f0f',
   'vertical-city|constant-iso':
-    '74e108c52d7468b65853665e1f72b77a47bfac7c36dcd6563b2779a633a6be52',
+    'cf217b5aa99c381df1af832b2a5d713d2b157cb2b4d6e9e2d98d5ddc5c881134',
 };
 
 /** Passenger counts at the same seed, so a failure says *how much* moved as well as *that* it did. */

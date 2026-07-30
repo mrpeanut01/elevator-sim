@@ -1164,7 +1164,17 @@ export const PINNED_ESTIMATES: Readonly<
     "8/wt95S": { n: 60, mean: -9.468464251426326, standardError: 1.5691425049296572, lower: -12.608311151352416, upper: -6.328617351500236 },
   }),
   "forecast-causality": Object.freeze({
-    "partialCorrelationWithFutureGivenPast": { n: 100, mean: -0.01394223164765208, standardError: 0.008955159208326503, lower: -0.03171121035296866, upper: 0.0038267470576644966 },
+    // Re-pinned 2026-07-30 via this file's stated route (`regeneratePins.ts`'s
+    // `causalityFigures(await auditForecastCausalityInRun({ replications: 100 }))`), regenerated
+    // for this one study only. The superseded pin —
+    //   { n: 100, mean: -0.01394223164765208, standardError: 0.008955159208326503,
+    //     lower: -0.03171121035296866, upper: 0.0038267470576644966 }
+    // — matched no committed tree (DECISIONS.md § D196): the replacement is what commits 9f1adf7,
+    // 9fd738c and HEAD all reproduce, under Node 22 and Node 26 alike. The move is ~1e-6 to 6e-6
+    // absolute per field (~1e-4 relative), so every published rendering is unchanged:
+    // −0.0139 [−0.0317, +0.0038] at 4 dp still derives from the pin. Quoting the superseded
+    // values here is safe because Layer B's scan excludes this file (GUARD_FILES).
+    "partialCorrelationWithFutureGivenPast": { n: 100, mean: -0.013946358230608948, standardError: 0.008956110833918183, lower: -0.0317172251675561, upper: 0.0038245087063382074 },
   }),
   "destination-disclosure": Object.freeze({
     "control/garden-residential/ttdMeanS": { n: 30, mean: -0.010298960627877088, standardError: 0.01029896062787709, lower: -0.03136270018716893, upper: 0.010764778931414755 },
