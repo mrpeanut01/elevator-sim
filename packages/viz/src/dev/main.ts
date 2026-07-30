@@ -1097,8 +1097,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
       exportPng();
     });
     ui.transport.seed.addEventListener('change', () => {
-      const raw = ui.transport.seed.value.trim();
-      const seed = raw === '' ? randomSeed() : BigInt(raw.replace(/\D/g, '') || '0');
+      const entry = seedEntryOf(ui.transport.seed.value);
+      if (entry.kind === 'refuse') {
+        /*
+         * TP-08: the run must not start with a seed the field does not show. The refusal lands on
+         * the status line naming what was typed, and the field is restored to the seed that is
+         * still running — the same pair every other refusal on this transport uses.
+         */
+        ui.transport.seed.value = state.seed.toString();
+        setText(ui.transport.status, entry.message);
+        return;
+      }
+      const seed = entry.kind === 'draw' ? randomSeed() : entry.seed;
+      // A blank draws one **and shows it** — a blank field over a drawn seed is the same
+      // field-does-not-show-the-run hazard as the refusal above, one keystroke earlier.
+      ui.transport.seed.value = seed.toString();
       context.update({ seed });
       runShift();
     });
@@ -1640,6 +1653,38 @@ export function deepLinkSearchOf(state: ViewerState, defaults: DeepLinkDefaults)
   if (state.railSegment !== defaults.railSegment) params.set('rail', state.railSegment);
   if (state.mode !== defaults.mode) params.set('mode', state.mode);
   return `?${params.toString()}`;
+}
+
+/* -------------------------------------------------------------------------- *
+ * The seed field — TP-08
+ * -------------------------------------------------------------------------- */
+
+/** What one entry into the seed field asks for: a fresh draw, this seed, or nothing. */
+export type SeedEntry =
+  | { readonly kind: 'draw' }
+  | { readonly kind: 'run'; readonly seed: bigint }
+  | { readonly kind: 'refuse'; readonly message: string };
+
+/**
+ * The seed field's parse — `TP-08`, and a refusal where a coercion was.
+ *
+ * The shipped parse was `BigInt(raw.replace(/\D/g, '') || '0')`, so `banana` silently became
+ * **seed 0**: the field kept reading `banana` while the footer read *seed 0* — a provenance
+ * control reproducing a different run without saying so (§ D198). The rule is the deep-link
+ * reader's own (`deepLinkStateOf`): a seed is `/^\d+$/`, and anything else is refused by name,
+ * never coerced into a seed nobody typed. A blank field asks for a fresh draw — `UX.md` TP-08's
+ * stated contract — and the caller shows whatever seed actually runs.
+ */
+export function seedEntryOf(raw: string): SeedEntry {
+  const trimmed = raw.trim();
+  if (trimmed === '') return { kind: 'draw' };
+  if (/^\d+$/.test(trimmed)) return { kind: 'run', seed: BigInt(trimmed) };
+  return {
+    kind: 'refuse',
+    message:
+      `“${trimmed}” is not a seed — a seed is a whole number. ` +
+      'The field shows the seed that is still running.',
+  };
 }
 
 /**

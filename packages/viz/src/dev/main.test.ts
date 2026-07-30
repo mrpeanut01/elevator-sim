@@ -53,6 +53,7 @@ import {
   deepLinkSearchOf,
   deepLinkStateOf,
   provenanceLineOf,
+  seedEntryOf,
   seekActionForKey,
   shaftsForBank,
   waitLegendEntries,
@@ -371,6 +372,44 @@ describe('the deep-link reader refuses what the page cannot honour', () => {
     );
     expect(arrived.tab).toBe(base().tab);
     expect(arrived.railSegment).toBe(base().railSegment);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The seed field refuses what it cannot show — TP-08
+ * -------------------------------------------------------------------------- */
+
+describe('the seed field — TP-08', () => {
+  /*
+   * Driven red 2026-07-30 (§ D198): typing `banana` silently re-ran at **seed 0** — the shipped
+   * parse was `BigInt(raw.replace(/\D/g, '') || '0')`, so the field read `banana` while the footer
+   * read *seed 0*. The parse is now `seedEntryOf`, and a non-numeric entry is a refusal, the same
+   * stance the deep-link reader takes on `?seed=-3`.
+   */
+  it('refuses a non-numeric entry by name, and coerces nothing', () => {
+    for (const raw of ['banana', '12a4', '-3', '1.5', '0x10', '1e6', ' 4 2 ']) {
+      const entry = seedEntryOf(raw);
+      expect(entry.kind, raw).toBe('refuse');
+      if (entry.kind === 'refuse') expect(entry.message).toContain(raw.trim());
+    }
+  });
+
+  it('never yields seed 0 for an entry that is not the digit 0', () => {
+    // The exact shipped failure: the stripped-and-defaulted parse turned every wordish entry into
+    // 0n. Only a literal zero may run seed 0.
+    const entry = seedEntryOf('banana');
+    expect(entry).toStrictEqual({ kind: 'refuse', message: expect.stringContaining('banana') as string });
+    expect(seedEntryOf('0')).toStrictEqual({ kind: 'run', seed: 0n });
+  });
+
+  it('runs a whole number as itself, trimmed', () => {
+    expect(seedEntryOf('987654321')).toStrictEqual({ kind: 'run', seed: 987654321n });
+    expect(seedEntryOf('  42  ')).toStrictEqual({ kind: 'run', seed: 42n });
+  });
+
+  it('asks for a fresh draw on a blank field — the row’s own contract', () => {
+    expect(seedEntryOf('')).toStrictEqual({ kind: 'draw' });
+    expect(seedEntryOf('   ')).toStrictEqual({ kind: 'draw' });
   });
 });
 
