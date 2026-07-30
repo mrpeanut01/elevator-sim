@@ -145,6 +145,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'TP-08’s seed parse (§ D198). Its `run` and `draw` arms carry no prose; the refuse arm ' +
+        'authors one sentence that reaches `#status` through the seed field’s change handler — ' +
+        'the same shape as `provenanceLineOf`’s refusals above, and the same stated limitation ' +
+        'rather than a claim of coverage: the sentence is swept statically below, and ' +
+        '`main.test.ts` pins all three arms, including that the refusal names what was typed. ' +
+        'An adapter driving the refusal per campaign case belongs to the honesty lane, not to a ' +
+        'hand-edit here.',
+      ids: ['dev/main.ts#seedEntryOf'],
+    },
+    {
+      reason:
         'A vocabulary or a schema, not prose. `GOAL_OBSERVATION_IDS` and `SHIFT_EVENT_IDS` are the ' +
         'id tuples the two shift unions are derived from — the same id-table case as ' +
         '`campaign/types.ts#FAIL_STATES` above — and every event a reader sees is its ' +
