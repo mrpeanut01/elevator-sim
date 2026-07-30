@@ -15,7 +15,7 @@
  * | `record/decisionLog.ts` | `recordRun`, called by {@link runShift} |
  * | `dev/surfaces.ts` | {@link applyNavigation} |
  * | `frame/overlay.ts` | {@link drawStage} and the landing selector |
- * | `record/document.ts` | **Load recording** and **Verify replay** |
+ * | `record/document.ts` | **Load recording**, **Save recording** and **Verify replay** |
  * | `dev/bootstrap.ts` | {@link main}, the only thing that loads `data/` — `RV-17`/`RV-21` |
  * | `dev/motion.ts` | {@link adopt}, which asks whether a new recording may start moving — `KB-14` |
  *
@@ -44,7 +44,6 @@ import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
 import { restrictedFloorIds } from '../access/zoning.js';
 import type { VizRecording } from '../contract/types.js';
-import { frameSequence, serializeFrames } from '../frame/sequence.js';
 import {
   landingAssignmentsAt,
   meansAreSuppressed,
@@ -64,7 +63,7 @@ import {
 } from '../live/timeline.js';
 import { systemClock } from '../playback/clock.js';
 import { Playback } from '../playback/playback.js';
-import { readRecordingDocument, verifyReplay } from '../record/document.js';
+import { readRecordingDocument, verifyReplay, writeRecordingDocument } from '../record/document.js';
 import { recordRun } from '../record/recordRun.js';
 import {
   drawScene,
@@ -1278,7 +1277,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function saveRecording(): void {
     const recording = state.recording;
     if (recording === undefined) return;
-    const blob = new Blob([JSON.stringify({ recording, frames: serializeFrames(frameSequence(recording)) })], {
+    /*
+     * TP-10 (§ D198): this wrote `{recording, frames}` — a wrapper readRecordingDocument refuses
+     * by its first check — so Load could not read Save's own file. The document is now written by
+     * the reader's own module, and it is the recording itself; the frames re-derive from it.
+     */
+    const blob = new Blob([writeRecordingDocument(recording)], {
       type: 'application/json',
     });
     downloadBlob(blob, `${recording.buildingId}-${recording.seed}.json`);

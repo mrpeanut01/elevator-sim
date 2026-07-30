@@ -231,6 +231,21 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
   'scenario/GOAL_READS': 'R1’s machine-checkable form; the guard suites are its consumers',
 
   /*
+   * -- The replay-equivalence instrument — Phase 4's acceptance criterion needs a headless,
+   * browser-free way to compare two replays, and this pair is it. Its drivers are
+   * replay.test.ts's properties and record/document.test.ts's TP-10 round trip — the C24 shape,
+   * like the honesty harness above. Until 2026-07-30 the pair had a shipped caller in
+   * dev/main.ts's saveRecording, which wrote their output into the saved document — and that
+   * document was exactly the one readRecordingDocument refused (TP-10, § D198). The fix moved
+   * the writer to the reader and the frames out of the file, because a frame sequence is a pure
+   * derivation of the recording, not a fact beside it. A shipped caller reappearing here means
+   * a second persisted copy of the frames, and must be re-argued against that round trip.
+   */
+  'frame/frameSequence':
+    'the replay-equivalence instrument; its drivers are replay.test.ts and the TP-10 round trip',
+  'frame/serializeFrames': 'the sequence’s canonical byte form — same instrument, same drivers',
+
+  /*
    * -- Test doubles and test anchors, each an incident away from a literal. ManualClock is the
    * injected DisplayClock's double — a shipped caller would put a fake clock in a real path.
    * MIN_HEADER_PX is minHeaderPx(DEFAULT_PADDING_PX) precomputed for headerBand/overlayRender/

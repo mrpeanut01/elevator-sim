@@ -69,6 +69,25 @@ function parsePosition(message: string): number | undefined {
   return Number(match[1]);
 }
 
+/**
+ * Serialise one recording for saving — the writer {@link readRecordingDocument} never had (`TP-10`).
+ *
+ * Driving found Save downloading `{recording, frames}` — a wrapper this module's own reader
+ * refuses with *"the document has no numeric schemaVersion"* — so the product could not reload
+ * the file it saved (§ D198). The reader is the contract and its refusals are pinned by tests and
+ * the honesty corpus, so **the writer moves to the reader**: the document is the recording
+ * itself, whose top level already carries `schemaVersion` and every `REQUIRED_KEYS` field.
+ *
+ * The frames are deliberately **not** in the document. They are a pure derivation of the
+ * recording — `replay.test.ts` asserts `serializeFrames(frameSequence(reloaded))` equals the
+ * in-memory sequence bit for bit — so a copy in the file would be a second source of truth that
+ * can drift from the recording beside it, and the load path re-derives them anyway
+ * (`adopt` → `Playback` → `frameAt`).
+ */
+export function writeRecordingDocument(recording: VizRecording): string {
+  return JSON.stringify(recording);
+}
+
 /** Parse and check one saved recording. Never throws. */
 export function readRecordingDocument(text: string): RecordingLoad {
   let data: unknown;

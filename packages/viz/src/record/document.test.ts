@@ -13,7 +13,13 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { DATA_DIR, breadthConfig, fixtureConfig } from '../fixtures.test-helper.js';
 import { VIZ_SCHEMA_VERSION, type VizRecording } from '../contract/types.js';
 import { recordRun } from './recordRun.js';
-import { readRecordingDocument, recordingFingerprint, verifyReplay } from './document.js';
+import {
+  readRecordingDocument,
+  recordingFingerprint,
+  verifyReplay,
+  writeRecordingDocument,
+} from './document.js';
+import { frameSequence, serializeFrames } from '../frame/sequence.js';
 
 let config: LoadedConfig;
 let recording: VizRecording;
@@ -87,6 +93,51 @@ describe('readRecordingDocument — PB-07', () => {
     expect(result.failure.message).toContain('legs');
     expect(result.failure.message).toContain('summary');
   });
+});
+
+describe('writeRecordingDocument — TP-10, Save and Load finally meet', () => {
+  /*
+   * Driven red 2026-07-30 (§ D198): Save downloaded `{recording, frames}` and the shipped Load
+   * refused exactly that document — "the document has no numeric schemaVersion" — so the product
+   * could not reload the file it saved. The writer and the reader had never met. The reader is
+   * the contract (its refusals are pinned here and swept by the honesty corpus), so the writer
+   * moved to the reader; nothing below loosens a refusal.
+   */
+  it('round-trips: what Save writes, Load reads back as the identical recording', () => {
+    const result = readRecordingDocument(writeRecordingDocument(recording));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // `toEqual`, not `toStrictEqual`: JSON serialisation drops keys whose value is `undefined`
+    // (`VizFloor.label?`), and the contract's optional fields make absent and undefined the same
+    // claim — which `toEqual` is the comparison for. The fingerprint seals content equality.
+    expect(result.recording).toEqual(recording);
+    expect(recordingFingerprint(result.recording)).toBe(recordingFingerprint(recording));
+  }, 120_000);
+
+  it('still refuses the wrapper the old Save produced — the defect, pinned', () => {
+    // The exact document the shipped saveRecording built, frames and all. If this ever starts
+    // reading, the reader has been loosened toward a shape the contract never declared.
+    const wrapper = JSON.stringify({
+      recording,
+      frames: serializeFrames(frameSequence(recording)),
+    });
+    const result = readRecordingDocument(wrapper);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.kind).toBe('shape');
+    expect(result.failure.message).toContain('schemaVersion');
+  }, 120_000);
+
+  it('a reloaded document re-derives the same frames the saved run played', () => {
+    // Why the frames are not in the file: they are a pure derivation of the recording, and this
+    // is the assertion that carrying a copy would only have duplicated.
+    const result = readRecordingDocument(writeRecordingDocument(recording));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(serializeFrames(frameSequence(result.recording))).toBe(
+      serializeFrames(frameSequence(recording)),
+    );
+  }, 240_000);
 });
 
 describe('verifyReplay — PB-16', () => {

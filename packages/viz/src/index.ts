@@ -81,7 +81,7 @@
  * | {@link EditorHistory} | `src/dev/editor.ts`'s Undo / Redo / Discard |
  * | the `editorEdits.ts` operations, {@link serializeBuilding}, {@link blankBuilding}, {@link OPERATIONAL_ZONING_NOTE} | `src/dev/editor.ts`'s form controls, one control per operation |
  * | {@link frameAt} | `Playback.frame()`, every animation frame from `src/dev/main.ts`; and `frameSequence` |
- * | {@link frameSequence}, {@link serializeFrames} | `src/dev/main.ts`'s **Verify replay** control |
+ * | {@link frameSequence}, {@link serializeFrames} | the replay-equivalence instrument — drivers are `replay.test.ts` and `record/document.test.ts`'s TP-10 round trip; the shipped caller they had in `saveRecording` was the TP-10 defect itself, removed § D198 |
  * | {@link frameTimes} | `frameSequence`, in `src/frame/sequence.ts` |
  * | {@link carHeightAt}, {@link carFloorIdAt}, {@link carDirectionAt}, {@link doorFractionAt}, {@link doorPhaseAt} | `frameCar`, in `src/frame/frameAt.ts`. **Inside the package only** — no caller outside it |
  * | {@link VIZ_SCHEMA_VERSION} | `describeRun`, in `src/record/recordRun.ts`, which stamps it |
@@ -131,10 +131,14 @@
  * | {@link applyEdit} | `admitEditedVector`, in `src/controls/editedProfile.ts`. Inside the module only — every write goes through `applyControlEdit`, so a second entry point would be a second bounds check |
  *
  * `frameSequence` and `serializeFrames` exist because Phase 4's acceptance criterion needs a
- * headless, browser-free way to compare two replays. They would have shipped as "configurable,
- * unit-tested, never called from a shipped path" — the failure this repository has repeated
- * five times — so the dev viewer's **Verify replay** control runs exactly the comparison
- * `replay.test.ts` runs, from a button, on the run currently on screen.
+ * headless, browser-free way to compare two replays. The shipped **Verify replay** control now
+ * compares {@link recordingFingerprint}s, and the pair's one shipped caller — `saveRecording`
+ * writing their output into the saved document — turned out to be `TP-10` itself: the wrapper it
+ * built was exactly what {@link readRecordingDocument} refuses, and the frames it carried were a
+ * second copy of what the recording already determines (`replay.test.ts`'s reloaded-equals-
+ * in-memory property). So since § D198 the pair is the replay-equivalence *instrument*, driven by
+ * `replay.test.ts` and `record/document.test.ts`'s round trip, and `deadCode.test.ts` carries the
+ * classification.
  *
  * ## Deleted rather than kept as decoration
  *
