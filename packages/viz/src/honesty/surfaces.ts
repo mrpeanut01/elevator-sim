@@ -122,12 +122,14 @@ import {
   specFromTrafficProfile,
 } from '../authoring/patternSpec.js';
 import {
+  accessMatrixOf,
   checkBuilding,
   elevationCarsOf,
   elevationNoteOf,
   elevationRowsOf,
   specRowsOf,
   speedChipsOf,
+  zoneChoicesOf,
 } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
 import {
@@ -2867,6 +2869,84 @@ const EDITOR_PANELS: SurfaceAdapter = {
           role: 'label',
         });
       }
+    }
+
+    /*
+     * The access block, driven rather than statically swept — GAPS § 3's *"the access block's
+     * labels, tooltips and legend are statically swept, not driven"*.
+     *
+     * The register's stated fix was *"a covers entry"*, and that half turns out not to be
+     * available: `accessMatrixOf` and `zoneChoicesOf` return facts and ids with no prose literal
+     * of their own — deliberately, per `dev/buildingEditor.ts` § *Access zoning — pure*, which
+     * kept sentences out of the producers precisely so they would not become unclassifiable
+     * surfaces — so the derivation does not list them and a `covers` entry naming them would fail
+     * `derive.test.ts`'s no-stale-coverage guard. What is available is the rendering: the strings
+     * a reader sees are compositions of those facts made at the mount, and each is seeded here
+     * exactly as the shipped call site composes it — the matrix cell's `${glyph} ${word}`
+     * (`dev/buildingEditor.ts:1689`, KB-15's two signals, never colour alone), the zone chip's
+     * `${id} · ${floors}f · ${groups}g` (`:1593`), and the restricted floors as runs (§ 10.3's
+     * form). The six authored tooltip and legend sentences (`ZONE_FLOOR_TITLE` …
+     * `MATRIX_DISPATCHER_NOTE`) are module-private and reachable only through
+     * `mountBuildingEditor`, so they stay on the static R10 sweep — driving them needs an export
+     * from `dev/buildingEditor.ts`, a file this one does not own, and that is reported rather
+     * than reached for.
+     *
+     * The spec is constructed because four of the five shipped buildings declare
+     * `accessZones: []`: one zone a credential opens and one whose groups have all been
+     * withdrawn — the stranded state § 10.2 asks the matrix to make visible. One spec renders
+     * all three cell states (reachable, not permitted, unrestricted), the stranded clause of
+     * `elevationNoteOf`, `validateSpec`'s empty-group refusal, and the real loader's own refusal
+     * through `checkBuilding` — the schema's `credentialGroups.min(1)`, said in the parser's
+     * words rather than paraphrased.
+     */
+    const zonedSpec: BuildingSpec = {
+      ...BLANK_SPEC,
+      accessZones: [
+        { id: 'exec', floors: [10, 11, 12], credentialGroups: ['staff'] },
+        { id: 'service-core', floors: [5], credentialGroups: [] },
+      ],
+    };
+    const zonedMatrix = accessMatrixOf(zonedSpec);
+    seeds.push({
+      field: 'accessMatrixOf(zoned).restrictedRuns',
+      text: zonedMatrix.restrictedRuns,
+      role: 'label',
+    });
+    for (const row of zonedMatrix.rows) {
+      for (const cell of row.cells) {
+        seeds.push({
+          field: `accessMatrixOf(zoned).rows(${row.floorId}).cells(${cell.group})`,
+          text: `${cell.glyph} ${cell.word}`,
+          role: 'label',
+        });
+      }
+    }
+    for (const choice of zoneChoicesOf(zonedSpec, 'exec')) {
+      seeds.push({
+        field: `zoneChoicesOf(${choice.id}).label`,
+        text: `${choice.id} · ${String(choice.floorCount)}f · ${String(choice.groupCount)}g`,
+        role: 'label',
+      });
+      seeds.push({ field: `zoneChoicesOf(${choice.id}).runs`, text: choice.runs, role: 'label' });
+    }
+    seeds.push({ field: 'elevationNoteOf(zoned)', text: elevationNoteOf(zonedSpec), role: 'prose' });
+    for (const [index, problem] of validateSpec(zonedSpec, limitClass).entries()) {
+      seeds.push({
+        field: `validateSpec(zoned)[${String(index)}]`,
+        text: problem,
+        role: 'reason',
+      });
+    }
+    const zonedCheck = checkBuilding(zonedSpec, specs, trafficProfileIds);
+    if (zonedCheck.error !== '') {
+      seeds.push({ field: 'checkBuilding(zoned).error', text: zonedCheck.error, role: 'reason' });
+    }
+    for (const [index, warning] of zonedCheck.warnings.entries()) {
+      seeds.push({
+        field: `checkBuilding(zoned).warnings[${String(index)}]`,
+        text: warning,
+        role: 'reason',
+      });
     }
 
     /* ---- M10, the machine editor ---- */
