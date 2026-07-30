@@ -7,7 +7,7 @@
  *
  * | Module | Reached from |
  * |---|---|
- * | `live/bands.ts`, `observations.ts`, `honesty.ts`, `decisions.ts` | `dev/leftRail.ts`, mounted below |
+ * | `live/bands.ts`, `observations.ts`, `honesty.ts`, `decisions.ts` | `dev/leftRail.ts`, mounted below — and, for `WAIT_BANDS`' four `legendLabel`s, {@link waitLegendEntries} |
  * | `live/timeline.ts` | {@link drawTransport} and the header clock |
  * | `shift/contracts.ts`, `week.ts`, `goals.ts`, `events.ts`, `growth.ts` | `dev/state.ts`'s `shiftRunConfigOf`, called by {@link runShift} |
  * | `shift/report.ts` | {@link closeShift}, and `dev/reportPanel.ts` |
@@ -52,6 +52,7 @@ import {
   queueAt,
   type LandingAssignment,
 } from '../frame/overlay.js';
+import { WAIT_BANDS } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import {
   clockAt,
@@ -88,7 +89,7 @@ import { mountBatchPanel } from './batchPanel.js';
 import { mountCampaignPanel, type CampaignPanelHandle } from './campaignPanel.js';
 import { createLoader } from './bootstrap.js';
 import { loadBrowserResources, loadCampaign, type BrowserResources } from './data.js';
-import { chip, fill, fillSelect, setHidden, setText, el } from './dom.js';
+import { chip, el, fill, fillSelect, keyedFill, setHidden, setText } from './dom.js';
 import {
   ELEMENT_IDS,
   MissingElementsError,
@@ -154,6 +155,53 @@ const OVERLAY_MIN_VIEWPORT_PX = 900;
 const FRAME_S = 1 / 60;
 /** How often the live region is re-announced. Every frame would be unusable. */
 const ANNOUNCE_MS = 2000;
+
+/* ========================================================================== *
+ * The wait-age legend — § 1.3 M4
+ * ========================================================================== */
+
+/** One key of the wait-age legend: a colour to draw a disc in, and the words beside it. */
+export interface WaitLegendEntry {
+  readonly label: string;
+  readonly color: string;
+}
+
+/**
+ * The legend's four entries, in ascending severity — the handoff `:230–233`.
+ *
+ * **Derived, never written.** Both halves of every entry already exist on `live/bands.ts`'s
+ * `WAIT_BANDS`: `legendLabel` is *under 30 s* / *a minute* / *two minutes* / *gave up*, and `color`
+ * is the same band palette the mood bar, the canvas and the report all read. Until this function
+ * existed, `legendLabel` reached **no DOM anywhere** — four authored strings with no non-test
+ * caller, which is the dead-seam shape this repository has closed eleven times — and the page drew
+ * a legend title with nothing under it.
+ *
+ * Writing the four labels into the markup instead would have been the other failure: a fifth copy
+ * of a palette whose whole point is that the rail, the stage and the report cannot disagree about
+ * what amber means. So the *decision* is here and pure, and {@link legendEntryNode} is the
+ * decision-free half that puts it on the page — the pattern `dom.ts` documents, and the only one
+ * that is testable in a suite with no jsdom.
+ */
+export function waitLegendEntries(): readonly WaitLegendEntry[] {
+  return WAIT_BANDS.map((band) => ({ label: band.legendLabel, color: band.color }));
+}
+
+/** One entry as a node: the handoff's `●` in the band's colour, then the band's words. */
+function legendEntryNode(doc: Document, entry: WaitLegendEntry): HTMLElement {
+  return el(doc, 'span', {
+    className: 'legend-entry',
+    children: [
+      el(doc, 'span', {
+        text: '●',
+        style: { color: entry.color },
+        // The disc is the colour key; the words beside it are the claim. KB-15 — a reader who
+        // cannot separate amber from orange still reads *a minute* and *two minutes*.
+        attrs: { 'aria-hidden': 'true' },
+      }),
+      el(doc, 'span', { text: entry.label }),
+    ],
+  });
+}
 
 function elements(): Elements {
   const resolved = resolveElements<Elements>(document, ELEMENT_IDS);
@@ -235,6 +283,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let bankFilter = '';
 
   const clock = systemClock();
+  /**
+   * The legend's fill, keyed on the bands themselves.
+   *
+   * `WAIT_BANDS` is frozen, so the key never changes and the row is built exactly once however many
+   * times `renderAll` runs — the same guard `leftRail.ts` uses, for the same reason: a `fill` on
+   * every state change drops hover, and hover is how the reader reads a `title`.
+   */
+  const fillLegend = keyedFill(ui.stage.legend);
 
   /* ---------------------------------------------------------------------- *
    * The mount context — the only thing a panel may do to the world
@@ -416,7 +472,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawFooter(view);
     drawTransportChrome(view);
     drawParity();
+    drawLegend();
     drawStage();
+  }
+
+  /** § 1.3 M4 — the four wait-age keys, from `WAIT_BANDS` and from nowhere else. */
+  function drawLegend(): void {
+    const entries = waitLegendEntries();
+    fillLegend(entries.map((entry) => `${entry.label}·${entry.color}`).join('|'), () => [
+      ui.stage.legendTitle,
+      ...entries.map((entry) => legendEntryNode(document, entry)),
+    ]);
   }
 
   /** Only what the playhead moves. Runs at 60 Hz. */
@@ -1265,19 +1331,27 @@ function randomSeed(): bigint {
 }
 
 /**
- * The last resort.
+ * The boot, and the last resort.
  *
  * If `elements()` throws, the page has no error slot to write into — that was the defect that put
  * `MissingElementsError` in `elementMap.ts` — so this prepends one rather than failing silently in
  * a console nobody has open.
+ *
+ * The condition is *is there a page at all*. In a browser it is always true and nothing about the
+ * shipped behaviour changes; under `vitest`'s `environment: 'node'` it is false, which is what lets
+ * a test import this module for the pure functions it exports. Every other module in `dev/` is
+ * already importable that way — this one ran the whole shell on import, so nothing in it could be
+ * tested, and {@link waitLegendEntries} is the first thing here that has to be.
  */
-void main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  const pre = document.createElement('pre');
-  pre.style.cssText = 'color:#e0473a;padding:12px;white-space:pre-wrap;font:12px ui-monospace,monospace';
-  pre.textContent = `The viewer did not start.\n\n${message}`;
-  document.body.prepend(pre);
-});
+if (typeof document !== 'undefined') {
+  void main().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    const pre = document.createElement('pre');
+    pre.style.cssText = 'color:#e0473a;padding:12px;white-space:pre-wrap;font:12px ui-monospace,monospace';
+    pre.textContent = `The viewer did not start.\n\n${message}`;
+    document.body.prepend(pre);
+  });
+}
 
 export { applyDeepLink, randomSeed, SPEEDS };
 export type { ViewerState };

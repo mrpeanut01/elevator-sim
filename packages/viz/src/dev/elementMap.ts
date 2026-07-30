@@ -182,7 +182,17 @@ export interface StageElements {
   readonly alarmText: HTMLElement;
   readonly alarmSub: HTMLElement;
   readonly description: HTMLElement;
+  /** The legend's row. Its four entries are filled from `WAIT_BANDS` — `main.ts`'s `drawLegend`. */
   readonly legend: HTMLElement;
+  /**
+   * The legend's static heading, resolved rather than rebuilt.
+   *
+   * The row's four entries are derived from `live/bands.ts` and its title is design copy, so the
+   * title stays in the markup and the fill re-appends *this element* ahead of the entries. Without
+   * a handle the shell would have to either carry the string a second time or reach for
+   * `firstElementChild`, and the manifest exists so that neither is necessary.
+   */
+  readonly legendTitle: HTMLElement;
 }
 
 /** § 1.3 M5 — the transport, plus the run controls that live on its second row. */
@@ -473,6 +483,7 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     alarmSub: 'alarm-sub',
     description: 'frame-description',
     legend: 'legend',
+    legendTitle: 'legend-title',
   }),
   transport: Object.freeze({
     playPause: 'play-pause',

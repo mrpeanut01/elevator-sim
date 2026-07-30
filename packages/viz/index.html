@@ -43,8 +43,20 @@
         --card: #131924;
         --raised: #16212f;
         --edge: #212a36;
+        /* The handoff's *second* edge, one step lighter than `--edge` and darker than
+           `--edge-strong`. It is not decoration: the handoff spends it at six specific sites — the
+           range track (`:14`), the scrollbar thumb (`:17`), the phase pill's border (`:43`), the
+           report head's rule (`:240`), the segmented control's border (`:835`) and the footer copy
+           button's border (`:954`) — and every one of them was rendering at `--edge` here, with
+           `.report-head` carrying a raw `#26303d` literal that made this file's own "declared once"
+           rule false. Declared once, used six times, literal deleted. */
+        --edge-mid: #26303d;
         --edge-strong: #2f3a49;
         --hairline: #1a212c;
+        /* The dotted rule under a term that carries a tooltip. The handoff uses one colour for it
+           at every one of its seven `cursor:help` sites (`:81–84` and five more), and it is not
+           `--edge-strong` — a hint's underline is lighter than a control's border on purpose. */
+        --hint-underline: #3f4b5c;
 
         /* Ink. */
         --text: #e8edf4;
@@ -105,7 +117,7 @@
       select, button, input, textarea { font-family: inherit; }
 
       ::-webkit-scrollbar { width: 9px; height: 9px; }
-      ::-webkit-scrollbar-thumb { background: var(--edge); border-radius: 9px; }
+      ::-webkit-scrollbar-thumb { background: var(--edge-mid); border-radius: 9px; }
       ::-webkit-scrollbar-track { background: transparent; }
 
       @keyframes pulseAlarm { 0%, 100% { opacity: 1 } 50% { opacity: 0.45 } }
@@ -153,7 +165,19 @@
         margin: 18px 0 9px;
       }
       .eyebrow-row:first-child { margin-top: 0; }
+      /* § 1.2 L5 — the one eyebrow row the uniform 18px gets wrong. The handoff's TODAY'S SHIFT row
+         (`:121`) declares `margin-bottom:9px` only, so its top gap is the L4 card's own 14px; L1,
+         L4 and L7 (`:55`, `:88`, `:163`) really are 18px and stay on the rule above. */
+      .eyebrow-row-after-card { margin-top: 14px; }
+
+      /* The note that sits at the right end of an eyebrow row. The handoff writes it three ways and
+         this file had one rule for all three, so two of them were wrong.
+         - base: the rail notes (`:845`) — `500 10px`, faint. Unchanged, and the majority.
+         - `-strong`: the streak line beside YOUR RUN (`:90`) — `600 10px`.
+         - `-quiet`: the `live` marker in the decision log (`:165`) — `500 9.5px`. */
       .eyebrow-note { font: 500 10px var(--mono); color: var(--faint); white-space: nowrap; }
+      .eyebrow-note-strong { font-weight: 600; }
+      .eyebrow-note-quiet { font-size: 9.5px; }
 
       /* A figure: a monospace number with a label. The run summary, the batch
          report and the campaign result all speak this vocabulary, because a batch
@@ -240,7 +264,7 @@
 
       /* A term with a tooltip. The dotted underline is the affordance; `title` is
          the text. Never colour alone (KB-15). */
-      .helpful { cursor: help; border-bottom: 1px dotted var(--edge-strong); }
+      .helpful { cursor: help; border-bottom: 1px dotted var(--hint-underline); }
 
       /* Errors and refusals. `ConfigError` renders every issue on its own line
          (RV-18 / ED-20); collapsing the newlines would run six located problems
@@ -279,7 +303,11 @@
       }
       .brand-mark span { width: 2px; height: 14px; background: var(--accent); opacity: 0.5; }
       .brand-text { line-height: 1.1; }
-      .brand-name { font-weight: 700; letter-spacing: -0.01em; }
+      /* § 1.1 S3 — 16px, not the body's 13px. The handoff declares no `font-size` on `body`, so its
+         wordmark (`:30`) and building name (`:36`) both render at the 16px UA default; this file
+         does set one, so both had to be stated or they inherited 13px and the header came out 19%
+         small. The two rules below are the whole of that correction. */
+      .brand-name { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
       .brand-mode { font: 500 10px/1.2 var(--mono); color: var(--dimmer); letter-spacing: 0.08em; }
 
       .topbar-building {
@@ -288,7 +316,7 @@
         flex: 1 1 180px; min-width: 120px; overflow: hidden;
       }
       .topbar-building h1 {
-        font: 600 13px var(--sans); margin: 0;
+        font: 600 16px var(--sans); margin: 0;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto;
       }
       .topbar-right {
@@ -298,7 +326,15 @@
       .clock { font: 600 22px/1 var(--mono); letter-spacing: -0.02em; }
       .phase-pill {
         font: 500 11px var(--mono); color: var(--dim);
-        padding: 3px 7px; border: 1px solid var(--edge); border-radius: 20px; white-space: nowrap;
+        padding: 3px 7px; border: 1px solid var(--edge-mid); border-radius: 20px; white-space: nowrap;
+      }
+      /* § 1.1 S3 — the building's spec line. It borrowed `.phase-pill` with `border:0;padding:0`
+         inline, which made it a pill that is not a pill and gave it the pill's `--dim` ink where the
+         handoff `:37` writes `#6d7b8d`. It also lost the handoff's ellipsis, so a long spec line
+         pushed the header instead of truncating. Its own class, with all four properties. */
+      .topbar-spec {
+        font: 500 11px var(--mono); color: var(--dimmer);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto;
       }
       .topbar-day { text-align: right; line-height: 1.3; flex: none; white-space: nowrap; }
       .topbar-day-name { font-weight: 600; font-size: 13px; }
@@ -404,7 +440,11 @@
         margin: 0 14px 8px; padding: 0 2px;
         font: 500 10.5px var(--mono); color: var(--dim);
       }
-      .legend-title { color: var(--faint); letter-spacing: 0.1em; }
+      .legend-title { color: var(--faint); letter-spacing: 0.1em; text-transform: uppercase; }
+      /* One entry — the handoff `:230–233`: a coloured disc, then the band's own words. The disc's
+         colour is per-instance and is the only thing written inline, because it comes from
+         `live/bands.ts` and there is no fifth copy of that palette. */
+      .legend-entry { display: inline-flex; align-items: baseline; gap: 5px; }
 
       /* The transport, § 1.3 M5. */
       .transport {
@@ -509,7 +549,7 @@
       /* --- Right rail, § 1.4 --- */
       .segmented {
         display: flex; gap: 3px; padding: 3px;
-        border: 1px solid var(--edge); border-radius: 9px; background: var(--bg); margin-bottom: 13px;
+        border: 1px solid var(--edge-mid); border-radius: 9px; background: var(--bg); margin-bottom: 13px;
       }
       .segmented button {
         flex: 1; border: 0; border-radius: var(--r-chip); padding: 6px 8px;
@@ -524,7 +564,7 @@
       .report { max-width: 760px; }
       .report-head {
         display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;
-        border-bottom: 1.5px solid #26303d; padding-bottom: 12px;
+        border-bottom: 1.5px solid var(--edge-mid); padding-bottom: 12px;
       }
       .report h2 { margin: 6px 0 0; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
       .report h3 {
@@ -588,7 +628,7 @@
       .slider-group { font: 600 10px var(--mono); letter-spacing: 0.1em; color: var(--dimmer); margin: 6px 0 4px; }
       input[type='range'] {
         -webkit-appearance: none; appearance: none; width: 100%; margin: 0;
-        height: 4px; border-radius: 2px; background: var(--edge); outline: none; accent-color: var(--accent);
+        height: 4px; border-radius: 2px; background: var(--edge-mid); outline: none; accent-color: var(--accent);
       }
       input[type='range']::-webkit-slider-thumb {
         -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
@@ -701,7 +741,7 @@
         font: 500 11px var(--mono); color: var(--dimmer); width: 100%; min-width: 0;
       }
       #copy-run {
-        background: none; border: 1px solid var(--edge); color: var(--dim);
+        background: none; border: 1px solid var(--edge-mid); color: var(--dim);
         border-radius: var(--r-chip); padding: 3px 9px; font: inherit; cursor: pointer; white-space: nowrap;
       }
       #footer-right { margin-left: auto; min-width: 0; }
@@ -740,7 +780,7 @@
 
         <div class="topbar-building">
           <h1 id="building-name">—</h1>
-          <span data-hide-narrow id="building-sub" class="phase-pill" style="border: 0; padding: 0"></span>
+          <span data-hide-narrow id="building-sub" class="topbar-spec"></span>
         </div>
 
         <div class="topbar-right" id="topbar-right">
@@ -806,7 +846,7 @@
           <!-- L4 — YOUR RUN. -->
           <div class="eyebrow-row">
             <span class="eyebrow">Your run</span>
-            <span class="eyebrow-note" id="streak-line"></span>
+            <span class="eyebrow-note eyebrow-note-strong" id="streak-line"></span>
           </div>
           <div class="card" style="margin-bottom: 14px">
             <div class="run-figures" id="run-figures"></div>
@@ -819,7 +859,7 @@
           </div>
 
           <!-- L5 — TODAY'S SHIFT. -->
-          <div class="eyebrow-row"><span class="eyebrow">Today's shift</span></div>
+          <div class="eyebrow-row eyebrow-row-after-card"><span class="eyebrow">Today's shift</span></div>
           <div class="card" style="margin-bottom: 16px">
             <div class="shift-head">
               <div class="shift-event" id="shift-event"></div>
@@ -845,7 +885,7 @@
           <!-- L7 — WHY IT DID THAT. -->
           <div class="eyebrow-row">
             <span class="eyebrow">Why it did that</span>
-            <span class="eyebrow-note">live</span>
+            <span class="eyebrow-note eyebrow-note-quiet">live</span>
           </div>
           <div class="card" style="border-radius: 10px" id="decision-log" aria-live="off"></div>
         </aside>
@@ -920,9 +960,13 @@
 
             <p id="frame-description" class="sr-only" aria-live="polite"></p>
 
-            <!-- M4 — the wait-age legend. -->
+            <!-- M4 — the wait-age legend. The four entries are NOT written here: their words and
+                 their colours are `live/bands.ts`'s `WAIT_BANDS`, which is what the mood card, the
+                 stage strip and the canvas all read, and a second copy in this markup is exactly
+                 the palette-in-three-places defect the tokens block above exists to prevent.
+                 `main.ts`'s `drawLegend` fills them; the title is static and stays. -->
             <div class="legend" id="legend">
-              <span class="legend-title">How long they have stood</span>
+              <span class="legend-title" id="legend-title">How long they have stood</span>
             </div>
 
             <!-- M5 — the transport. -->
