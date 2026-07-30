@@ -21,7 +21,7 @@ import { BUILDING_IDS, DATA_DIR, breadthConfig } from '../fixtures.test-helper.j
 import { frameAt } from '../frame/frameAt.js';
 import { recordRun } from '../record/recordRun.js';
 
-import { BAND_COLORS, WAIT_BANDS, bandById, bandIndexOf, moodAt, moodOf, waitBandsAt } from './bands.js';
+import { BAND_COLORS, WAIT_BANDS, bandIndexOf, moodAt, moodOf, waitBandsAt } from './bands.js';
 import { syntheticRecording, waitingLeg } from './synthetic.test-helper.js';
 
 let config: LoadedConfig;
@@ -100,11 +100,6 @@ describe('the band definitions are the design’s, and the prose is pinned to th
     }
   });
 
-  it('looks a band up by id, and refuses an id it does not have', () => {
-    expect(bandById('checking-watch').color).toBe('#e0773a');
-    // @ts-expect-error — the guard exists for a value arriving from serialised state.
-    expect(() => bandById('nonsense')).toThrow(/no wait band/);
-  });
 });
 
 describe.each(BUILDING_IDS)('%s — the bands agree with the frame', (buildingId) => {

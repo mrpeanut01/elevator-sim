@@ -94,7 +94,6 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
       ids: [
         'dev/dom.ts#chip',
         'dev/dom.ts#chipRow',
-        'dev/dom.ts#eyebrow',
         'dev/dom.ts#figure',
         'dev/dom.ts#fillPlate',
         'dev/dom.ts#pick',
@@ -252,7 +251,6 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'batch/runBatch.ts#firstTraceDisagreement',
         'frame/overlay.ts#queueAt',
         'frame/overlay.ts#landingAssignmentsAt',
-        'frame/overlay.ts#landingAssignmentAt',
         'frame/sequence.ts#frameSequence',
         'frame/sequence.ts#frameTimes',
         'record/recordRun.ts#recordRun',
@@ -404,9 +402,13 @@ describe('every adapter is attached to something real', () => {
 /**
  * R10 over the authored literals, including the surfaces the generated search cannot drive.
  *
- * The static half of the net. It is the only instrument in this repository that looks inside
- * `dev/main.ts`, which has no exports and therefore appears in no derivation of exported
- * producers, and which is where the viewer's status line is written.
+ * The static half of the net. It reaches inside `dev/main.ts`'s function bodies — where the
+ * viewer's status line is written — which the producer derivation cannot: an earlier version of
+ * this sentence said main.ts *"has no exports"*, which stopped being true when
+ * `waitLegendEntries`/`WaitLegendEntry` landed in declaration form (plus the export *clause* at
+ * the bottom that exists for `main.test.ts`). The exported producers the derivation does find
+ * there (`deepLinkSearchOf`, `provenanceLineOf`) are classified above; the inline
+ * `ui.status.textContent = '…'` literals are what only this sweep sees.
  */
 describe('R10 statically — no authored prose literal contains a probability word', () => {
   /**

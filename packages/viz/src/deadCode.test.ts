@@ -20,21 +20,26 @@
  * rules.** Thirty-five of the sixty were the palette — `render/tokens.ts` consumed whole by
  * `render/canvas.ts` as `import * as tokens`, a real use no name-binding rule can see — which is
  * why the inlined scanner gained the namespace rule (its divergence 2) rather than an allowlist
- * of thirty-five live symbols labelled uncalled. **25 remain, classified below: 8 dead
+ * of thirty-five live symbols labelled uncalled. **25 remained, classified below: 8 dead
  * candidates and 17 with a reason that is correct rather than a defect.**
  *
- * Two of the eight dead candidates falsify their own documentation:
- * `dev/PREFERRED_VIEWER_DISPATCHERS`'s docstring names `dev/main.ts`'s boot as its non-test
- * caller while `dev/state.ts` re-derives the same list privately, and `dev/viewerRunConfig`'s
- * docstring says a test asserts it *"against the same function `main.ts` calls"* while `main.ts`
- * calls `shiftRunConfigOf`. **Nothing is deleted here** — classification is this audit's whole
- * deliverable, and deletion is follow-up work with its own verification.
+ * Two of the eight dead candidates falsified their own documentation:
+ * `dev/PREFERRED_VIEWER_DISPATCHERS`'s docstring named `dev/main.ts`'s boot as its non-test
+ * caller while `dev/state.ts` re-derived the same list privately, and `dev/viewerRunConfig`'s
+ * docstring said a test asserts it *"against the same function `main.ts` calls"* while `main.ts`
+ * calls `shiftRunConfigOf`. Nothing was deleted by the audit itself — classification was its
+ * deliverable. **The disposition wave then closed all eight** (same wave, later lane): four
+ * wired — the § D134 list, `formatHonestyCase`, and the dwell seam `doorTimingOf` wrapped, with
+ * the § D153 seam test re-pointed at `shiftRunConfigOf` — and four deleted with their tests and
+ * coverage claims. `DEAD_CANDIDATES` is empty; the comments inside it are the register of what
+ * moved and why, and a new entry starts the cycle again.
  *
  * ## What this audit cannot see, stated rather than implied
  *
- * (The honesty derivation states its own blind spot the same way — *"`dev/main.ts` … has no
- * exports and therefore appears in no derivation of exported producers"* — and that sentence is
- * now half-true, which is exactly why the limits below are pinned by assertions, not prose.)
+ * (The honesty derivation used to state its own blind spot as *"`dev/main.ts` … has no exports"*
+ * — a sentence that had gone half-true by the time this audit ran, and is corrected there now.
+ * That a stated limit rotted silently is exactly why the limits below are pinned by assertions,
+ * not prose.)
  *
  * 1. **Export clauses.** `dev/main.ts:1393` exports `applyDeepLink`, `randomSeed` and `SPEEDS`
  *    via `export { … }` with no `from` — no declaration at the start of a line, so the symbol
@@ -114,56 +119,53 @@ const AUDITED_MODULES = [
  */
 const DEAD_CANDIDATES: Readonly<Record<string, string>> = Object.freeze({
   /*
-   * -- The two whose own docstrings name a caller that does not call them. defaults.ts:30 says
-   * "Non-test callers: PREFERRED_VIEWER_DISPATCHERS in dev/main.ts's boot"; main.ts does not
-   * import defaults.js at all — state.ts:282's private preferredDispatcher() re-derives the same
-   * ['collective', 'eta'] list from its own literal, so § D134's decision is enforced by a
-   * duplicate and this const decides nothing. Its two siblings (PREFERRED_BATCH_BASELINE,
-   * PREFERRED_BATCH_CANDIDATE) are genuinely imported by dev/batchPanel.ts and read as live.
+   * -- PREFERRED_VIEWER_DISPATCHERS's docstring named dev/main.ts's boot as its caller while
+   * state.ts's private preferredDispatcher() re-derived ['collective', 'eta'] from its own
+   * literal, so § D134's decision was enforced by a duplicate and the const decided nothing.
+   * Dispositioned by wiring: state.ts now resolves the opening dispatcher through the constant
+   * and preferredDispatcherId, defaults.ts's docstring names the real caller, and the
+   * duplicate literal is gone.
    */
-  'dev/PREFERRED_VIEWER_DISPATCHERS':
-    'dead: its docstring names dev/main.ts’s boot; state.ts:282 re-derives the list privately',
   /*
-   * -- T75 factored "what a viewer run is" out of a click handler into viewerRunConfig so a test
-   * could assert the § D153 seam (SimulationConfig.dispatcherProfiles). The shift rebuild then
-   * built state.ts's shiftRunConfigOf — which carries the same seam at state.ts:446 — and
-   * main.ts:794/:1199 call *that*. viewerRunConfig kept the docstring claim "a test asserts it
-   * against the same function main.ts calls", now false, and viewerSelector.test.ts asserts the
-   * selector seam against a function no shipped path calls — § D159's fixture-routes-the-test
-   * shape, one file up.
+   * -- viewerRunConfig (T75's run builder, superseded by state.ts's shiftRunConfigOf) was the
+   * worst of the eight: viewerSelector.test.ts asserted the § D153 selector seam against it while
+   * every shipped path called shiftRunConfigOf — § D159's fixture-routes-the-test shape, one file
+   * up. Dispositioned first: the test now drives shiftRunConfigOf and dev/runConfig.ts is
+   * deleted, so the seam is vouched for on the builder the Run button reaches.
    */
-  'dev/viewerRunConfig':
-    'dead: superseded by state.ts’s shiftRunConfigOf (main.ts:794); its test now tests an unshipped path',
-  'dev/doorTimingOf':
-    'dead: a one-line wrapper with zero callers, tests included; levers reach runs via profileFromSpec',
   /*
-   * -- dom.ts:103. Its file header argues fifty inline copies of a four-line helper is "the way
-   * a design system stops being one"; the rails and panels then build eyebrow markup inline
-   * anyway (scenariosPanel.ts:278, leftRail, rightRail), and the helper's only importer is
-   * provenanceBlock.test.ts.
+   * -- doorTimingOf was a one-line wrapper with zero callers — and the seam it wrapped was a real
+   * defect: doorTimingFor's per-car dwell (the only difference between the snappy and normal
+   * chips) was computed, tested in authoring.test.ts against a self-assembled building, and
+   * applied by nothing in the shipped run builder, so two of the three dwell chips ran the same
+   * building. Dispositioned by deleting the wrapper and wiring the seam: shiftRunConfigOf now
+   * writes doorTimingFor's timing onto every car, with § D177's run-change test in state.test.ts.
    */
-  'dev/eyebrow': 'dead: every panel builds eyebrow markup inline instead of calling it',
-  'controls/ControlKind': 'dead: a type alias bound by nothing but the barrel — not even a test',
   /*
-   * -- The single-floor form of landingAssignmentsAt. The barrel's own table row already admits
-   * "No caller outside this package"; inside it there is none either — overlay.ts:605's docstring
-   * records that dev/main.ts holds a key and filters the plural form itself. This is the exact
-   * shape isSupportedRecording and displayMsAt were deleted in (src/index.ts § "Deleted rather
-   * than kept as decoration").
+   * -- eyebrow (dom.ts) was deleted: the inline "eyebrow" spans in scenariosPanel/leftRail/
+   * rightRail are bare spans inside a flex `scenario-line`, not the div.eyebrow-row wrapper the
+   * helper produced, so adoption would have changed the markup rather than deduplicated it, and
+   * the helper had no importer at all (provenanceBlock.test.ts matches index.html's *static*
+   * eyebrow markup, importing nothing).
+   *
+   * -- ControlKind (controls/types.ts) was deleted: a type alias bound by nothing but the barrel
+   * — not even a test. The four kinds live on as the Control union's `kind` discriminants.
+   *
+   * -- landingAssignmentAt (frame/overlay.ts) was deleted: the barrel row admitted "No caller
+   * outside this package" and inside there was none either — dev/main.ts holds a key and filters
+   * the plural form itself. The shape isSupportedRecording and displayMsAt were deleted in
+   * (src/index.ts § "Deleted rather than kept as decoration", where both now have entries).
+   *
+   * -- formatHonestyCase had zero callers while shrink.ts's replay note promised it prints the
+   * shrunk case and campaign.ts's formatFailure inlined the identical stringify. Dispositioned
+   * by wiring: formatFailure now prints the minimal case through it, so the promise is kept by
+   * the one printer rather than by a duplicate.
+   *
+   * -- bandById (bands.ts) was deleted: "for a caller holding one from a serialised state" was a
+   * hypothetical caller written next to the export, and sharper — honesty/surfaces.ts listed it
+   * as a covered declaration, so the honesty sweep vouched for strings no shipped path could
+   * reach. The covers entry went with it.
    */
-  'frame/landingAssignmentAt':
-    'dead: the barrel row admits no caller outside; main.ts filters the plural form itself',
-  'honesty/formatHonestyCase':
-    'dead: zero callers, tests included; shrink.ts’s docstring promises it prints the shrunk case',
-  /*
-   * -- bands.ts:236, "for a caller holding one from a serialised state" — a hypothetical caller
-   * written next to the export, which is the pattern wave 1's remediation deleted rather than
-   * kept. Sharper here: honesty/surfaces.ts:759 lists 'live/bands.ts#bandById' as a covered
-   * declaration, so the honesty sweep vouches for the strings of a function no shipped path can
-   * reach.
-   */
-  'live/bandById':
-    'dead: docstring names a hypothetical caller; honesty covers strings nothing can reach',
 });
 
 /**

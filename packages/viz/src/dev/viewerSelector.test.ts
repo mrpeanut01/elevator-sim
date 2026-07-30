@@ -11,10 +11,16 @@
  * `cli/src/commands/run.selector.test.ts` is written, deliberately: **nothing here hands the
  * simulator a hand-built resource bundle.** Every test drives `loadBrowserResources` — the
  * function `dev/main.ts` boots with — over the real `data/` directory through a `fetch` stub that
- * answers exactly what the Vite dev server answers, and then goes through `viewerRunConfig`, which
- * is the function the **Run** button calls. A hand-built bundle is precisely what was already
- * possible before this lane, and asserting one would be
+ * answers exactly what the Vite dev server answers, and then goes through `shiftRunConfigOf`,
+ * which is the function `main.ts`'s `runShift` calls. A hand-built bundle is precisely what was
+ * already possible before this lane, and asserting one would be
  * [§ D159](../../../../DECISIONS.md)'s *fixture routing the test past its subject*.
+ *
+ * It originally went through `viewerRunConfig` (`dev/runConfig.ts`), the run builder the shift
+ * rebuild superseded — so the § D153 seam was being vouched for on a function no shipped path
+ * called, which is § D159's shape one file up. The fifth dead-code audit caught it
+ * ([§ D192](../../../../DECISIONS.md)); `viewerRunConfig` is deleted and this file now asserts
+ * the seam on the builder the **Run** button reaches.
  *
  * ## The claims, and what a failure of each would mean
  *
@@ -39,7 +45,7 @@ import { demonstrationConfigFor } from '../campaign/stageRun.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 
 import { loadBrowserResources, type BrowserResources } from './data.js';
-import { viewerRunConfig } from './runConfig.js';
+import { initialState, shiftRunConfigOf, type ViewerState } from './state.js';
 
 /* -------------------------------------------------------------------------- *
  * The dev server, as a fetch stub
@@ -117,19 +123,20 @@ const SEED = 20_260_729n;
 const DURATION_S = 900;
 
 function configFrom(resources: BrowserResources, profileId = OPTED_IN): SimulationConfig {
-  const building = resources.buildings.find((candidate) => candidate.id === 'midtown-office');
-  const dispatcherProfile = resources.dispatcherProfiles.profiles.find(
-    (candidate) => candidate.id === profileId,
-  );
-  if (building === undefined || dispatcherProfile === undefined) {
-    throw new Error(`the viewer's own resources carry no ${profileId} on midtown-office`);
-  }
-  return viewerRunConfig(resources, {
-    building,
-    dispatcherProfile,
+  const state: ViewerState = {
+    ...initialState(resources, SEED),
+    buildingId: 'midtown-office',
+    dispatcherId: profileId,
+    shiftLengthS: DURATION_S,
     seed: SEED,
-    durationS: DURATION_S,
-  });
+  };
+  const plan = shiftRunConfigOf(resources, state);
+  // The operating point must stay the plain building at its shipped demand. Day 1 of a fresh
+  // week is the `ordinary` event, which changes nothing — asserted rather than assumed, so a
+  // reordered event schedule cannot silently move this file's operating point off § D153's.
+  expect(plan.event.effect.changesNothing).toBe(true);
+  expect(plan.withheld).toEqual([]);
+  return plan.config;
 }
 
 /**
@@ -168,7 +175,7 @@ describe('the browser viewer can enable a weight-set selector', () => {
 
   it('bundles the whole dispatcher-profiles file, not just its profiles array', () => {
     // The seam itself: `loadBrowserResources` → `BrowserResources.dispatcherProfiles` →
-    // `viewerRunConfig` → `SimulationConfig.dispatcherProfiles` → `Simulation` →
+    // `shiftRunConfigOf` → `SimulationConfig.dispatcherProfiles` → `Simulation` →
     // `weightSetSourceFrom` → `resolveWeightSets` → `selectWeightSet`.
     const file: DispatcherProfiles = shipped.dispatcherProfiles;
     expect(file.patternSwitching).toBeDefined();

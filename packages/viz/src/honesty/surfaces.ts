@@ -758,7 +758,6 @@ const LIVE_RAIL: SurfaceAdapter = {
   covers: [
     'live/bands.ts#WAIT_BANDS',
     'live/bands.ts#BAND_COLORS',
-    'live/bands.ts#bandById',
     'live/bands.ts#bandIndexOf',
     'live/bands.ts#bandOf',
     'live/bands.ts#moodAt',

@@ -19,6 +19,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { specFromBuilding } from '../authoring/buildingSpec.js';
+import { DEFAULT_LEVERS, DWELL_SETTINGS, type DwellChoice } from '../authoring/dispatcherSpec.js';
 import { recordRun } from '../record/recordRun.js';
 import { contractForBuilding } from '../shift/contracts.js';
 
@@ -98,6 +99,55 @@ describe('the run builder', () => {
     // `withheld` is a list, never a thrown error and never silence.
     expect(Array.isArray(plan.withheld)).toBe(true);
   });
+});
+
+describe('the dwell lever reaches the cars of the building being run', () => {
+  /*
+   * The seam the fifth audit found half-open (§ D192, candidate 3). A dwell choice is two
+   * documents: `answer.dwellPolicy`/`maxDwellS` on the profile — which `profileFromSpec` already
+   * wrote — and `dwellCarCallS`/`dwellHallCallS` on **every car**, which `doorTimingFor` computes
+   * and, until this seam was wired, nothing in the shipped run builder applied. Snappy and normal
+   * differ *only* in the car fields (both are `fixed`, gain 0, ceiling 20), so the shipped viewer
+   * ran two of its three chips as the same building — `authoring.test.ts` proved the three-runs
+   * property on a building it assembled itself, which is § D159's fixture shape. These tests are
+   * § D177's rule pointed at the shipped builder: move the control, require the run to change,
+   * compared on the legs.
+   */
+  const planWith = (dwell: DwellChoice | undefined): ReturnType<typeof shiftRunConfigOf> =>
+    shiftRunConfigOf(resources, {
+      ...base(),
+      shiftLengthS: 300,
+      levers: { ...DEFAULT_LEVERS, dwell },
+    });
+
+  it('writes the chosen dwell onto every resolved car, and inherit writes nothing', () => {
+    /*
+     * Asserted with `snappy`, not `normal`: normal's 3 s / 5 s are exactly the reference-data
+     * typicals `resolveCar` defaults to, so asserting normal passes on a builder that writes
+     * nothing at all. The control below pins that the two really differ on this building.
+     */
+    const inherit = planWith(undefined);
+    const snappy = planWith('snappy');
+    for (const bank of snappy.building.banks) {
+      for (const car of bank.cars) {
+        expect(car.dwellCarCallS).toBe(DWELL_SETTINGS.snappy.dwellCarCallS);
+        expect(car.dwellHallCallS).toBe(DWELL_SETTINGS.snappy.dwellHallCallS);
+      }
+    }
+    const inheritCar = inherit.building.banks[0]?.cars[0];
+    expect(inheritCar?.dwellCarCallS).not.toBe(DWELL_SETTINGS.snappy.dwellCarCallS);
+    // The fourth state is inherit, and it must stay a non-write: an unpressed chip that
+    // overwrote every car's own dwell would be the defect GroupLevers.dwell's docstring records.
+    expect(JSON.stringify(planWith(undefined).config.building)).toBe(
+      JSON.stringify(shiftRunConfigOf(resources, { ...base(), shiftLengthS: 300 }).config.building),
+    );
+  });
+
+  it('makes snappy, normal and patient three genuinely different runs — not two', () => {
+    const legsOf = (dwell: DwellChoice): string =>
+      JSON.stringify(recordRun(planWith(dwell).config, { recordDecisions: false }).recording.legs);
+    expect(new Set([legsOf('snappy'), legsOf('normal'), legsOf('patient')]).size).toBe(3);
+  }, 300_000);
 });
 
 describe('withBuilding', () => {

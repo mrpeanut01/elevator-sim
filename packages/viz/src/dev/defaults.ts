@@ -27,9 +27,12 @@
  * 50–200 band fits under it. A newcomer's first act should not be to run the one profile whose
  * headline number the project would refuse to quote.
  *
- * Non-test callers: {@link PREFERRED_VIEWER_DISPATCHERS} in `dev/main.ts`'s `boot`;
+ * Non-test callers: {@link PREFERRED_VIEWER_DISPATCHERS} in `dev/state.ts`'s
+ * `preferredDispatcher`, which `initialState` resolves the opening dispatcher through;
  * {@link PREFERRED_BATCH_BASELINE} and {@link PREFERRED_BATCH_CANDIDATE} in
- * `dev/batchPanel.ts`'s `mountBatchPanel`.
+ * `dev/batchPanel.ts`'s `mountBatchPanel`. (An earlier version of this sentence named
+ * `dev/main.ts`'s `boot` while `state.ts` re-derived the list from a private literal — a
+ * docstring naming a caller that did not call, found by the fifth audit, § D192.)
  */
 
 /**
