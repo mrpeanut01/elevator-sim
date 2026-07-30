@@ -675,7 +675,7 @@ function foldPassengers(passengers: readonly PassengerRecord[]): FoldedPassenger
   let waitSum = 0;
 
   for (const event of events) {
-    const key = `${event.floorId} ${event.direction}`;
+    const key = `${event.floorId}\u0000${event.direction}`;
     let builder = landingBuilders.get(key);
     if (builder === undefined) {
       builder = new StepSeriesBuilder(0);

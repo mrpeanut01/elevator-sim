@@ -931,7 +931,7 @@ function keyedList(host: Element): (key: string, build: () => readonly Node[]) =
 function keyedPlate(host: Element): (rows: readonly PlateEntry[]) => void {
   let last: string | undefined;
   return (rows) => {
-    const key = rows.map((entry) => `${entry.k} ${entry.v}`).join('');
+    const key = rows.map((entry) => `${entry.k}\u0000${entry.v}`).join('\u0001');
     if (key === last) return;
     last = key;
     fillPlate(host, rows);

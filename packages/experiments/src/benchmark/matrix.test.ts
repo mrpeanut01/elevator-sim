@@ -189,8 +189,8 @@ describe('the Pareto front is over three axes and never orders a tie', () => {
         // appeared in `dominated` would be an ordering the evidence does not support.
         expect(result.front.dominated).not.toContain(
           result.front.dominated.includes(pair.a) && result.front.dominated.includes(pair.b)
-            ? ' never'
-            : ' never',
+            ? '\u0000never'
+            : '\u0000never',
         );
         expect([...result.front.front, ...result.front.dominated, ...result.front.indeterminate]).toContain(pair.a);
         expect([...result.front.front, ...result.front.dominated, ...result.front.indeterminate]).toContain(pair.b);

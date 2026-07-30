@@ -217,6 +217,7 @@ discover — including the ones that are inconvenient.
 | [Experience layer contract](docs/10-experience-layer-contract.md) | Phase 9's design: the rules that keep a gamified surface honest, novice/expert modes, a schema-generated dispatcher and traffic editor, and access-zone credentials |
 | [TWIN shaft contract](docs/11-twin-shaft-contract.md) | Two independently driven cars in one shaft, designed and not built: the shaft model, the speed-dependent separation constraint, the deadlock invariant and the property that catches it, and an acceptance criterion written before the implementation |
 | [Design handoff](docs/12-design-handoff.md) | The Claude Design handoff the viewer is built to, the requirements checklist extracted from it, the gap analysis against the shipped viewer, the backend changes the front end required, and every deviation with the constraint that forced it |
+| [Phase 6c re-measurement handover](docs/13-phase-6c-handover.md) | The pre-registered § D162 protocol, written to be executed cold in its own session: the five conditions and which already hold, the gate itemised, the saturation census that must come first because no budget may be inherited, and what an acceptance would and would not be allowed to say. A third refusal is a permitted outcome |
 
 Machine-readable configuration lives in [`data/`](data/), and the design the viewer is built to is
 vendored in [`docs/design/`](docs/design/).
