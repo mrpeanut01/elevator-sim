@@ -670,3 +670,35 @@ something else.
 **All nine of Phase 9's units are now built** — W8 was the last open half — and Phase 9 still carries
 **no status row**, because [§ D163](DECISIONS.md)'s rule is that the row and the verdict land together
 and the acceptance pass is a distinct piece of work. A unit landing is not a verdict.
+
+> **Stale two paragraphs up, corrected in place (wave 12 census, 2026-07-30):** the acceptance pass
+> happened later the same wave — `b876724` landed the row and the verdict together, and Phase 9 is
+> **✅ ACCEPTED WITH NAMED GAPS (2026-07-30)**, stated identically in `docs/05`, `README.md`,
+> `GAPS.md` § 5 and `CLAUDE.md`. This close section was written at `9fd738c` and the wave's last
+> four commits postdate it. For the same reason it carries no closing suite figure; the figure is in
+> `GAPS.md`'s header — `integration` @ `bf16a2d`, **258 files / 4 794 tests, 4 784 passed,
+> 10 skipped**, `tsc -b` clean, 565 s serial.
+
+---
+
+# Wave 12 — 2026-07-30
+
+**Scope:** the known open items, verified at file:line before lanes were cut, then a playability
+baseline: the UX ledger's § 26 drive list executed in a real browser, and Phase 6c's pre-registered
+re-measurement ([`docs/13`](docs/13-phase-6c-handover.md)) run as its own serial phase.
+Board: [`WAVE12_PLAN.md`](WAVE12_PLAN.md).
+
+| ID | Unit | Lane | Status |
+|---|---|---|---|
+| T93 | Wire the bank filter (SG-15), with a picture-change test | V | 🟡 assigned |
+| T94 | `Escape` dismisses the drawer (SH-12/KX-11) + KX-10 | V | 🟡 assigned |
+| T95 | URL write-back (SH-09), round-trip tested | V | 🟡 assigned |
+| T96 | `copy run` names the traffic pattern (TP-13) | V | 🟡 assigned |
+| T97 | Machines editor "is not decoration" suite (ME-07) | T | 🟡 assigned |
+| T98 | Arrival-pattern select positive assertion (CO-02) | T | 🟡 assigned |
+| T99 | Honesty seeding: `'basic'` mode axis, express-toggle and access-block strings | H | 🟡 assigned |
+| T100 | The fifth dead-code audit, under `packages/viz` (Phase 9 clause 4 mechanised) | A | 🟡 assigned |
+| T101 | A real authored field replaces `$comment` on the pattern surface (G3-o) | P | 🟡 assigned |
+| T102 | Register corrections: `docs/07` § 8's six stale entries, `docs/10` schema version, two docstrings | D | 🟡 assigned |
+| T103 | Phase 6c measured per § D162 / `docs/13` — serial phase after integration | M | ⬜ gated on integration |
+| T104 | Drive phase: UX § 26 list in a browser; every 🔲 resolved, primary flows end-to-end | — | ⬜ gated on integration |
