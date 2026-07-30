@@ -806,7 +806,20 @@
       dialog p { margin: 0 0 12px; }
       dialog form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
+      /* RX-03 — below 768 px the columns stack: the body becomes one scrolling column with the
+         stage first and the left rail beneath it, and the canvas keeps at least 60% of the
+         viewport height (60vh on .stage-wrap, which #stage fills). The right rail is already the
+         overlay drawer at this width. Pinned by surfaces.test.ts the same way the drawer's
+         1339 px rule is, so the query and the assertion cannot drift apart. */
       @media (max-width: 767px) {
+        .body { display: flex; flex-direction: column; overflow-y: auto; }
+        .stagecol { order: -1; height: auto; flex: none; overflow: visible; }
+        /* A definite height, not a floor: #stage is height: 100%, and a percentage against an
+           auto-height wrap falls back to the canvas's own bitmap height, which the per-frame
+           resize then feeds back into the wrap — the box grows every frame. 60vh is the row's
+           own figure. */
+        .stage-wrap { height: 60vh; min-height: 60vh; flex: none; }
+        .rail-l { order: 0; flex: none; border-right: 0; border-top: 1px solid var(--edge); }
         .instrument-body { flex-direction: column; overflow: auto; }
         .sheet { padding: 16px 14px; }
         .editor-grid { grid-template-columns: minmax(0, 1fr); }

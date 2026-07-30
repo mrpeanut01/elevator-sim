@@ -173,3 +173,37 @@ describe('the breakpoint is duplicated in the stylesheet, and the two agree', ()
     expect(html).toContain(`@media (max-width: ${String(DRAWER_BREAKPOINT_PX - 1)}px)`);
   });
 });
+
+describe('the stacked layout below 768 px — RX-03', () => {
+  /*
+   * No TypeScript constant this time, deliberately: the stylesheet is the only thing that lays the
+   * stacked column out, no script consults the breakpoint, and a `STACK_BREAKPOINT_PX` whose only
+   * reader is this test would be exactly the caller-less seam the standing requirement names. So
+   * the test pins the stylesheet itself: the 767 px block must exist and must contain the three
+   * declarations that make the layout a stack — the body becomes one scrolling column, the left
+   * rail loses its column border for a top one, and the stage keeps at least 60% of the viewport
+   * height. Driving found the defect (375×667: the left rail held 236 px and the canvas 0% of the
+   * height); this is what stops it coming back.
+   */
+  it('the 767px media block stacks the body and floors the canvas at 60vh', async () => {
+    const html = await readFile(
+      fileURLToPath(new URL('../../index.html', import.meta.url)),
+      'utf8',
+    );
+    const start = html.indexOf('@media (max-width: 767px)');
+    expect(start).toBeGreaterThan(-1);
+    const rest = html.slice(start + 1);
+    const nextBoundary = [rest.indexOf('@media'), rest.indexOf('</style>')]
+      .filter((at) => at !== -1)
+      .reduce((a, b) => Math.min(a, b), rest.length);
+    const block = rest.slice(0, nextBoundary);
+    // One scrolling column instead of the grid, with the stage ordered first.
+    expect(block).toMatch(/\.body\s*\{[^}]*flex-direction:\s*column/);
+    expect(block).toMatch(/\.body\s*\{[^}]*overflow-y:\s*auto/);
+    expect(block).toMatch(/\.stagecol\s*\{[^}]*order:\s*-1/);
+    // The canvas height floor: #stage fills .stage-wrap (height: 100% in the base rules).
+    expect(block).toMatch(/\.stage-wrap\s*\{[^}]*min-height:\s*60vh/);
+    // The left rail reads as a stacked section rather than a column.
+    expect(block).toMatch(/\.rail-l\s*\{[^}]*border-top/);
+  });
+});
