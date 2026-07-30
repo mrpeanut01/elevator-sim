@@ -94,7 +94,6 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
       ids: [
         'dev/dom.ts#chip',
         'dev/dom.ts#chipRow',
-        'dev/dom.ts#eyebrow',
         'dev/dom.ts#figure',
         'dev/dom.ts#fillPlate',
         'dev/dom.ts#pick',
@@ -252,7 +251,6 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'batch/runBatch.ts#firstTraceDisagreement',
         'frame/overlay.ts#queueAt',
         'frame/overlay.ts#landingAssignmentsAt',
-        'frame/overlay.ts#landingAssignmentAt',
         'frame/sequence.ts#frameSequence',
         'frame/sequence.ts#frameTimes',
         'record/recordRun.ts#recordRun',

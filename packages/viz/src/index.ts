@@ -57,7 +57,6 @@
  * | {@link recordRun} | `src/dev/main.ts`, the browser viewer's load path |
  * | {@link overlayAt} | `src/dev/main.ts`'s draw loop, every animation frame; and `drawScene` draws its result |
  * | {@link landingAssignmentsAt} | `src/dev/main.ts`'s landing selector and its draw loop |
- * | {@link landingAssignmentAt} | `landingAssignmentsAt`'s single-floor form. **No caller outside this package** |
  * | {@link meansAreSuppressed} | three of them, which is the point: `overlayAt` here, `drawHeader` in `src/render/canvas.ts`, and `statusLine` in `src/dev/main.ts` — `D1` |
  * | {@link drawOverlay} | `drawScene`, in `src/render/canvas.ts` |
  * | {@link loadColour}, {@link loadTrackMax}, {@link doorGlyph}, {@link describeSelection} | `src/render/canvas.ts` and `src/render/overlay.ts` |
@@ -149,6 +148,16 @@
  *   where a recording arrives from somewhere else and the version can actually differ.
  * - **`displayMsAt`** inverted `simTimeAt`. `Playback` uses `simTimeAt` and `reanchor` and never
  *   needed the inverse; wave 2's click-to-seek on the timeline is where an inverse gets a caller.
+ *
+ * The fifth audit's disposition wave (§ D192) removed two more in the same shape:
+ *
+ * - **`landingAssignmentAt`** was `landingAssignmentsAt`'s single-floor form, and its own table
+ *   row already admitted *no caller outside this package*; inside it there was none either —
+ *   `dev/main.ts` holds a {@link LandingAssignment}'s `key` and filters the plural form itself,
+ *   which is the reason `key` is on the type.
+ * - **`ControlKind`** was a type alias bound by nothing but this barrel — not even a test. The
+ *   four kinds live on as the `kind` discriminants of the {@link Control} union, which is what
+ *   every renderer actually switches on.
  */
 
 export {
@@ -254,7 +263,6 @@ export { describePreview, drawPreview, type PreviewInput } from './render/previe
 export {
   DEFAULT_RELIEF_WINDOW_S,
   DEFAULT_WINDOW_S,
-  landingAssignmentAt,
   landingAssignmentsAt,
   meansAreSuppressed,
   overlayAt,
@@ -369,7 +377,6 @@ export type {
   Control,
   ControlCommon,
   ControlEdit,
-  ControlKind,
   ControlValues,
   SelectControl,
   SliderControl,

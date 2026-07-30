@@ -20,15 +20,19 @@
  * rules.** Thirty-five of the sixty were the palette — `render/tokens.ts` consumed whole by
  * `render/canvas.ts` as `import * as tokens`, a real use no name-binding rule can see — which is
  * why the inlined scanner gained the namespace rule (its divergence 2) rather than an allowlist
- * of thirty-five live symbols labelled uncalled. **25 remain, classified below: 8 dead
+ * of thirty-five live symbols labelled uncalled. **25 remained, classified below: 8 dead
  * candidates and 17 with a reason that is correct rather than a defect.**
  *
- * Two of the eight dead candidates falsify their own documentation:
- * `dev/PREFERRED_VIEWER_DISPATCHERS`'s docstring names `dev/main.ts`'s boot as its non-test
- * caller while `dev/state.ts` re-derives the same list privately, and `dev/viewerRunConfig`'s
- * docstring says a test asserts it *"against the same function `main.ts` calls"* while `main.ts`
- * calls `shiftRunConfigOf`. **Nothing is deleted here** — classification is this audit's whole
- * deliverable, and deletion is follow-up work with its own verification.
+ * Two of the eight dead candidates falsified their own documentation:
+ * `dev/PREFERRED_VIEWER_DISPATCHERS`'s docstring named `dev/main.ts`'s boot as its non-test
+ * caller while `dev/state.ts` re-derived the same list privately, and `dev/viewerRunConfig`'s
+ * docstring said a test asserts it *"against the same function `main.ts` calls"* while `main.ts`
+ * calls `shiftRunConfigOf`. Nothing was deleted by the audit itself — classification was its
+ * deliverable. **The disposition wave then closed all eight** (same wave, later lane): four
+ * wired — the § D134 list, `formatHonestyCase`, and the dwell seam `doorTimingOf` wrapped, with
+ * the § D153 seam test re-pointed at `shiftRunConfigOf` — and four deleted with their tests and
+ * coverage claims. `DEAD_CANDIDATES` is empty; the comments inside it are the register of what
+ * moved and why, and a new entry starts the cycle again.
  *
  * ## What this audit cannot see, stated rather than implied
  *
@@ -137,37 +141,30 @@ const DEAD_CANDIDATES: Readonly<Record<string, string>> = Object.freeze({
    * writes doorTimingFor's timing onto every car, with § D177's run-change test in state.test.ts.
    */
   /*
-   * -- dom.ts:103. Its file header argues fifty inline copies of a four-line helper is "the way
-   * a design system stops being one"; the rails and panels then build eyebrow markup inline
-   * anyway (scenariosPanel.ts:278, leftRail, rightRail), and the helper's only importer is
-   * provenanceBlock.test.ts.
-   */
-  'dev/eyebrow': 'dead: every panel builds eyebrow markup inline instead of calling it',
-  'controls/ControlKind': 'dead: a type alias bound by nothing but the barrel — not even a test',
-  /*
-   * -- The single-floor form of landingAssignmentsAt. The barrel's own table row already admits
-   * "No caller outside this package"; inside it there is none either — overlay.ts:605's docstring
-   * records that dev/main.ts holds a key and filters the plural form itself. This is the exact
-   * shape isSupportedRecording and displayMsAt were deleted in (src/index.ts § "Deleted rather
-   * than kept as decoration").
-   */
-  'frame/landingAssignmentAt':
-    'dead: the barrel row admits no caller outside; main.ts filters the plural form itself',
-  /*
+   * -- eyebrow (dom.ts) was deleted: the inline "eyebrow" spans in scenariosPanel/leftRail/
+   * rightRail are bare spans inside a flex `scenario-line`, not the div.eyebrow-row wrapper the
+   * helper produced, so adoption would have changed the markup rather than deduplicated it, and
+   * the helper had no importer at all (provenanceBlock.test.ts matches index.html's *static*
+   * eyebrow markup, importing nothing).
+   *
+   * -- ControlKind (controls/types.ts) was deleted: a type alias bound by nothing but the barrel
+   * — not even a test. The four kinds live on as the Control union's `kind` discriminants.
+   *
+   * -- landingAssignmentAt (frame/overlay.ts) was deleted: the barrel row admitted "No caller
+   * outside this package" and inside there was none either — dev/main.ts holds a key and filters
+   * the plural form itself. The shape isSupportedRecording and displayMsAt were deleted in
+   * (src/index.ts § "Deleted rather than kept as decoration", where both now have entries).
+   *
    * -- formatHonestyCase had zero callers while shrink.ts's replay note promised it prints the
    * shrunk case and campaign.ts's formatFailure inlined the identical stringify. Dispositioned
    * by wiring: formatFailure now prints the minimal case through it, so the promise is kept by
    * the one printer rather than by a duplicate.
+   *
+   * -- bandById (bands.ts) was deleted: "for a caller holding one from a serialised state" was a
+   * hypothetical caller written next to the export, and sharper — honesty/surfaces.ts listed it
+   * as a covered declaration, so the honesty sweep vouched for strings no shipped path could
+   * reach. The covers entry went with it.
    */
-  /*
-   * -- bands.ts:236, "for a caller holding one from a serialised state" — a hypothetical caller
-   * written next to the export, which is the pattern wave 1's remediation deleted rather than
-   * kept. Sharper here: honesty/surfaces.ts:759 lists 'live/bands.ts#bandById' as a covered
-   * declaration, so the honesty sweep vouches for the strings of a function no shipped path can
-   * reach.
-   */
-  'live/bandById':
-    'dead: docstring names a hypothetical caller; honesty covers strings nothing can reach',
 });
 
 /**

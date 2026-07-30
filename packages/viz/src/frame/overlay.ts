@@ -596,25 +596,6 @@ export function queueAt(
   return queues;
 }
 
-/**
- * The first call at one landing, or `undefined` when nobody is waiting there.
- *
- * *First*, not *the*: under `destination-dispatch` a floor carries one row per
- * `(destination, promised car)` and this returns the lowest-keyed of them. A caller that means a
- * specific call holds its {@link LandingAssignment.key} and filters
- * {@link landingAssignmentsAt} itself — which is what `dev/main.ts` does, and the reason `key`
- * is on the type.
- */
-export function landingAssignmentAt(
-  recording: VizRecording,
-  floorId: string,
-  simTimeS: SimTime,
-): LandingAssignment | undefined {
-  return landingAssignmentsAt(recording, simTimeS).find(
-    (assignment) => assignment.floorId === floorId,
-  );
-}
-
 function clamp(value: number, low: number, high: number): number {
   if (value < low) return low;
   if (value > high) return high;
