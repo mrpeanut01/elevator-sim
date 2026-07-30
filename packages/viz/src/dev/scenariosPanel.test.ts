@@ -148,6 +148,16 @@ describe('the objective line counts what has been banked', () => {
     const cards = scenarioCardsOf(CONTRACTS, week, buildings);
     expect(cards[0]?.objective).toBe('Cleared');
   });
+
+  it('never counts more banked than the contract asks — SC-05', () => {
+    // Driven 2026-07-30 (§ D198): a week that keeps playing a contract can carry a cleanRun past
+    // needClean, and the line read "2 of 1 banked". The clamp is on the display, not the data.
+    const week = weekOn('c1', { cleanRun: 2 });
+    const byId = new Map(
+      scenarioCardsOf(CONTRACTS, week, buildings).map((card) => [card.contractId, card]),
+    );
+    expect(byId.get('c1')?.objective).toBe('Clear 1 shift — 1 of 1 banked');
+  });
 });
 
 describe('the prose is the handoff’s and the art is the handoff’s', () => {

@@ -138,9 +138,11 @@ function objectiveOf(
 ): string {
   if (status === 'cleared') return 'Cleared';
   const plural = contract.needClean === 1 ? '' : 's';
+  // SC-05 (§ D198): `cleanRun` can outrun `needClean` on a week that kept playing, and the line
+  // would count "2 of 1". Clamped on the display only — the week's own count is not touched.
   const banked =
     status === 'current'
-      ? ` — ${String(week.cleanRun)} of ${String(contract.needClean)} banked`
+      ? ` — ${String(Math.min(week.cleanRun, contract.needClean))} of ${String(contract.needClean)} banked`
       : '';
   return `Clear ${String(contract.needClean)} shift${plural}${banked}`;
 }

@@ -247,6 +247,11 @@ function showLoadFailure(ui: Elements, error: unknown, retry: () => Promise<bool
   const message = error instanceof Error ? error.message : String(error);
   setText(ui.transport.error, `${message}\n`);
   setText(ui.transport.status, 'could not load data/');
+  // SH-16/SH-19 (§ D198): a failed boot left the phase pill and the footer status line blank —
+  // the two chrome slots only drawHeader/drawFooter ever fill, and neither runs when data/ does
+  // not load. Authored here in the empty state's own vocabulary.
+  setText(ui.header.phaseLabel, 'no run yet');
+  setText(ui.footer.statusLine, 'no shift run yet — data/ did not load');
   const again = el(document, 'button', { className: 'chip', text: 'Retry', attrs: { type: 'button' } });
   again.addEventListener('click', () => {
     setText(ui.transport.error, '');
