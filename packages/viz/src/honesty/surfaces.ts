@@ -2821,6 +2821,54 @@ const EDITOR_PANELS: SurfaceAdapter = {
       }
     }
 
+    /*
+     * The express toggle's two strings, driven on both throws of the toggle — GAPS § 3's
+     * *"the elevation's express toggle produces two strings the honesty search never sees"*.
+     *
+     * `elevationCarsOf` was already covered and its `legend` seeded, but none of the three specs
+     * above pins a band above the lobby, so `expressLabel` rendered `''` on every case of every
+     * campaign and `expressTitle` — the handoff's sentence at `docs/design/…:737`, kept
+     * module-private in `dev/buildingEditor.ts` precisely so that only this file could classify
+     * it, through the export that carries it — was never rendered at all. The two specs here are
+     * the two states a reader reaches by pinning a band `[6, 12]` and clicking the toggle: still
+     * landing in the lobby (the default; label `✓ express from the lobby, skipping 2–6`), and
+     * taken out of it (label `stays in its band — click to run express from the lobby`).
+     *
+     * The toggle is mounted only where `canExpress` holds (`dev/buildingEditor.ts` `:1554`), so
+     * its title is seeded under the same guard; a car without the button has no tooltip to read.
+     * Cars the toggle does not apply to render `expressLabel: ''`, which `singleRun` drops — the
+     * absence of a button is not a string. The legend is seeded too, because `band only` is a
+     * role word none of the shipped specs can produce.
+     */
+    const expressSpec: BuildingSpec = {
+      ...BLANK_SPEC,
+      bandByCar: { 0: [6, 12] as readonly [number, number] },
+    };
+    for (const [label, spec] of [
+      ['express-on', expressSpec],
+      ['express-off', { ...expressSpec, noLobby: { 0: true } }],
+    ] as const) {
+      for (const car of elevationCarsOf(spec)) {
+        seeds.push({
+          field: `elevationCarsOf(${label}).${car.id}.expressLabel`,
+          text: car.expressLabel,
+          role: 'label',
+        });
+        if (car.canExpress) {
+          seeds.push({
+            field: `elevationCarsOf(${label}).${car.id}.expressTitle`,
+            text: car.expressTitle,
+            role: 'prose',
+          });
+        }
+        seeds.push({
+          field: `elevationCarsOf(${label}).${car.id}.legend`,
+          text: car.legend,
+          role: 'label',
+        });
+      }
+    }
+
     /* ---- M10, the machine editor ---- */
     for (const machineClass of classes) {
       const machineSpec = specFromClass(machineClass);
