@@ -52,6 +52,7 @@ import {
   BLANK_SPEC,
   RATED_LOADS,
   SPEC_ROWS,
+  accessZonesOf,
   banksOf,
   bandOf,
   buildingAdvice,
@@ -59,7 +60,9 @@ import {
   buildingSummary,
   canExpress,
   carLabelOf,
+  credentialGroupsOf,
   floorIdOf,
+  nextZoneId,
   occupancyAt,
   occupancyLine,
   personsOf,
@@ -68,9 +71,22 @@ import {
   specFromBuilding,
   specIsDirty,
   validateSpec,
+  withZoneFloor,
+  withZoneGroup,
+  zoneFloorsOf,
   type BuildingSpec,
+  type SpecAccessZone,
   type SpecRow,
 } from '../authoring/buildingSpec.js';
+import {
+  CREDENTIAL_STATES,
+  STATE_GLYPHS,
+  STATE_WORDS,
+  floorRunsOf,
+  permittedGroupsByFloor,
+  restrictedFloorIds,
+  type CredentialState,
+} from '../access/zoning.js';
 import { plainDescription, specFromClass, specsWithClass, type MachineClass } from '../authoring/machineSpec.js';
 
 import {
@@ -567,6 +583,225 @@ export function occupancyAtFraction(fraction: number): number {
   return Math.min(OCCUPANCY_MAX_PCT, Math.max(0, snapped));
 }
 
+/** Every floor id of this building, lobby first — the order every run and every legend uses. */
+function floorIdsOf(spec: BuildingSpec): readonly string[] {
+  const ids: string[] = [];
+  for (let floor = 0; floor <= spec.floors; floor += 1) ids.push(floorIdOf(floor));
+  return ids;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Access zoning — pure
+ * -------------------------------------------------------------------------- *
+ *
+ * `docs/10-experience-layer-contract.md` § 10.2's two open controls: a floor multi-select over the
+ * building's own floors, and a floors × credential-groups coverage matrix.
+ *
+ * Everything below returns **facts and ids**, never a sentence. Two reasons, and the second is the
+ * load-bearing one:
+ *
+ * 1. The mount is then decision-free, which is the split `dom.ts` documents.
+ * 2. `honesty/derive.test-helper.ts` derives its corpus from *exported* declarations and calls any
+ *    two adjacent alphabetic words prose — including `a.b` inside a template substitution. A new
+ *    exported producer can only be classified in `honesty/surfaces.ts`, so a new sentence here
+ *    would be an unclassifiable surface. The one sentence access zoning adds to a *driven* surface
+ *    is in {@link elevationNoteOf}, which an adapter already covers, and it is there for the right
+ *    reason as well as the convenient one: it is said exactly where the shaft bands are explained,
+ *    which is where a reader is most likely to mistake one kind of zoning for the other.
+ *
+ * The words and glyphs the cells carry are `access/zoning.ts`'s own — `▩` for a floor a credential
+ * does not open, never a second spelling of a fact the viewer already draws — and they are read out
+ * of its tables through {@link CREDENTIAL_STATES} rather than by writing the state id here, for the
+ * same derivation reason.
+ */
+
+/** *reachable* — the state of a floor this credential opens. */
+const PERMITTED_STATE: CredentialState = CREDENTIAL_STATES[0];
+/** *not-permitted* — a shaft reaches the floor and this credential does not open it. */
+const REFUSED_STATE: CredentialState = CREDENTIAL_STATES[2];
+
+/**
+ * The third mark, for the case the credential lens has no state for: a floor in no zone.
+ *
+ * `access/zoning.ts` has three states and none of them is this one, because the lens looks *through*
+ * a credential and an unrestricted floor is simply reachable. A matrix has to say something
+ * different, because *"this group opens it"* and *"nothing restricts it"* are different facts about
+ * the building and a reader deciding where to put a zone needs to tell them apart. A hollow ring
+ * against a filled disc, so the two are distinguishable with the colour removed.
+ */
+const UNRESTRICTED_GLYPH = '○';
+const UNRESTRICTED_WORD = 'unrestricted';
+
+/** One cell of the coverage matrix: one floor under one credential group. */
+export interface AccessCell {
+  readonly group: string;
+  readonly permitted: boolean;
+  /** The floor is in no zone at all, so *every* credential opens it. */
+  readonly unrestricted: boolean;
+  readonly state: CredentialState;
+  /** KB-15's second signal. Never the only one — {@link AccessCell.word} carries the same fact. */
+  readonly glyph: string;
+  readonly word: string;
+}
+
+/** One row of the coverage matrix. */
+export interface AccessFloorRow {
+  readonly floor: number;
+  readonly floorId: string;
+  /** Zones covering this floor, in declared order. Empty means unrestricted. */
+  readonly zoneIds: readonly string[];
+  readonly restricted: boolean;
+  /**
+   * No credential group in this building opens this floor.
+   *
+   * The state § 10.2 asks the matrix to make visible, and the one that strands demand: the trips are
+   * not served slowly, they are never generated. It is reachable only by emptying a zone's group
+   * list, which the schema refuses on save — so the matrix shows it and {@link validateSpec} says
+   * the loader will not build it.
+   */
+  readonly stranded: boolean;
+  readonly cells: readonly AccessCell[];
+}
+
+export interface AccessMatrix {
+  /** The columns: every group this building names, in declared order. No fixed vocabulary. */
+  readonly groups: readonly string[];
+  /** Top floor first, the direction the elevation is drawn in. */
+  readonly rows: readonly AccessFloorRow[];
+  readonly restrictedIds: readonly string[];
+  readonly strandedIds: readonly string[];
+  /** The restricted floors as runs — `2–30`, not 29 ids. § 10.3's form. */
+  readonly restrictedRuns: string;
+}
+
+/**
+ * The floors × credential-groups coverage matrix, over the zones the document will actually carry.
+ *
+ * Computed from {@link accessZonesOf} rather than from the raw spec, so what the matrix shows and
+ * what the run does cannot disagree: a zone whose floors all fell off the top of a shortened tower
+ * is not written to the document and is not drawn here either.
+ */
+export function accessMatrixOf(spec: BuildingSpec): AccessMatrix {
+  const zones = accessZonesOf(spec);
+  const groups = credentialGroupsOf(spec);
+  const permittedBy = permittedGroupsByFloor(zones);
+  const ids = floorIdsOf(spec);
+  const rows: AccessFloorRow[] = [];
+  const strandedIds: string[] = [];
+  for (let floor = spec.floors; floor >= 0; floor -= 1) {
+    const floorId = floorIdOf(floor);
+    const permitted = permittedBy.get(floorId);
+    const restricted = permitted !== undefined;
+    const stranded = restricted && permitted.length === 0;
+    if (stranded) strandedIds.push(floorId);
+    rows.push({
+      floor,
+      floorId,
+      zoneIds: spec.accessZones
+        .filter((zone) => zoneFloorsOf(spec, zone).includes(floor))
+        .map((zone) => zone.id),
+      restricted,
+      stranded,
+      cells: groups.map((group): AccessCell => {
+        const free = permitted === undefined;
+        const opens = free || permitted.includes(group);
+        const state = opens ? PERMITTED_STATE : REFUSED_STATE;
+        return {
+          group,
+          permitted: opens,
+          unrestricted: free,
+          state,
+          glyph: free ? UNRESTRICTED_GLYPH : STATE_GLYPHS[state],
+          word: free ? UNRESTRICTED_WORD : STATE_WORDS[state],
+        };
+      }),
+    });
+  }
+  return {
+    groups,
+    rows,
+    restrictedIds: restrictedFloorIds(ids, zones),
+    strandedIds,
+    restrictedRuns: floorRunsOf(ids, restrictedFloorIds(ids, zones)),
+  };
+}
+
+/** One zone, as the selector draws it. Counts, not a label — the mount composes the words. */
+export interface ZoneChoice {
+  readonly id: string;
+  readonly floorCount: number;
+  readonly groupCount: number;
+  readonly selected: boolean;
+  /** Floors the document will carry for this zone, as runs. */
+  readonly runs: string;
+}
+
+export function zoneChoicesOf(spec: BuildingSpec, selectedId: string): readonly ZoneChoice[] {
+  const ids = floorIdsOf(spec);
+  return spec.accessZones.map((zone): ZoneChoice => {
+    const floors = zoneFloorsOf(spec, zone);
+    return {
+      id: zone.id,
+      floorCount: floors.length,
+      groupCount: zone.credentialGroups.length,
+      selected: zone.id === selectedId,
+      runs: floorRunsOf(ids, floors.map((floor) => floorIdOf(floor))),
+    };
+  });
+}
+
+/** The zone a mount should draw as selected: the one asked for, else the first, else none. */
+export function selectedZoneOf(spec: BuildingSpec, wanted: string): SpecAccessZone | undefined {
+  return spec.accessZones.find((zone) => zone.id === wanted) ?? spec.accessZones[0];
+}
+
+/**
+ * One entry of the floor multi-select — § 10.2's *"a floor multi-select over the building's own
+ * floors"*, top floor first.
+ *
+ * A control over floors that exist is the whole point: `ED-14` validates an unknown floor id in the
+ * document editor's free-text list, and § 10.2 asks this control to make that error **unreachable**
+ * rather than catchable. There is no text box here to type `31` into.
+ */
+export interface ZoneFloorChoice {
+  readonly floor: number;
+  readonly floorId: string;
+  readonly inZone: boolean;
+  /** Other zones already covering this floor. Permission is the union, so a reader must see them. */
+  readonly otherZoneIds: readonly string[];
+  readonly isEntrance: boolean;
+}
+
+export function zoneFloorChoicesOf(spec: BuildingSpec, zoneId: string): readonly ZoneFloorChoice[] {
+  const zone = spec.accessZones.find((entry) => entry.id === zoneId);
+  const held = new Set(zone === undefined ? [] : zoneFloorsOf(spec, zone));
+  const choices: ZoneFloorChoice[] = [];
+  for (let floor = spec.floors; floor >= 0; floor -= 1) {
+    choices.push({
+      floor,
+      floorId: floorIdOf(floor),
+      inZone: held.has(floor),
+      otherZoneIds: spec.accessZones
+        .filter((entry) => entry.id !== zoneId && zoneFloorsOf(spec, entry).includes(floor))
+        .map((entry) => entry.id),
+      isEntrance: floor === 0,
+    });
+  }
+  return choices;
+}
+
+/** One entry of the credential control: the groups the building already names, plus this zone's. */
+export interface ZoneGroupChoice {
+  readonly group: string;
+  readonly inZone: boolean;
+}
+
+export function zoneGroupChoicesOf(spec: BuildingSpec, zoneId: string): readonly ZoneGroupChoice[] {
+  const zone = spec.accessZones.find((entry) => entry.id === zoneId);
+  const held = new Set(zone?.credentialGroups ?? []);
+  return credentialGroupsOf(spec).map((group) => ({ group, inZone: held.has(group) }));
+}
+
 /** The sentence under the legend: how many banks there are, and what a bank means. */
 export function elevationNoteOf(spec: BuildingSpec): string {
   const banks = banksOf(spec);
@@ -587,7 +822,37 @@ export function elevationNoteOf(spec: BuildingSpec): string {
      */
     (closed
       ? ' A band with express turned off never calls at the lobby, so its floors are reachable only through a transfer level.'
-      : '')
+      : '') +
+    /*
+     * The one access-zoning sentence on a *driven* surface, and it is said here on purpose: this
+     * paragraph is where the bands are explained, so it is where a reader is most likely to read a
+     * credential as a shaft. `CLAUDE.md` forbids collapsing the three zonings, and the two facts
+     * that keep them apart are both stated — the floors are *served*, and the barrier is a
+     * credential. Only said when the building has a zone, because a building with none has no such
+     * distinction to draw and a sentence about nothing is the weakest form of a rule.
+     */
+    accessNoteOf(spec)
+  );
+}
+
+/** The access-zoning half of {@link elevationNoteOf}, or `''` when the building has no zone. */
+function accessNoteOf(spec: BuildingSpec): string {
+  const matrix = accessMatrixOf(spec);
+  const restricted = matrix.restrictedIds.length;
+  if (restricted === 0) return '';
+  const total = spec.floors + 1;
+  const groups = matrix.groups.length;
+  const runs = matrix.restrictedRuns;
+  const stranded = matrix.strandedIds.length;
+  return (
+    ` ${String(restricted)} of ${String(total)} floors sit in an access zone (${runs}) and ` +
+    `${String(groups)} credential group${groups === 1 ? '' : 's'} ` +
+    `${groups === 1 ? 'is' : 'are'} named. That is a credential and not a shaft: every one of those ` +
+    'floors is physically served, and a rider whose credential does not open one is not waiting — ' +
+    'the trip is never generated. A floor in no zone is unrestricted.' +
+    (stranded === 0
+      ? ''
+      : ` ${String(stranded)} of them ${stranded === 1 ? 'is' : 'are'} open to no group at all.`)
   );
 }
 
@@ -662,6 +927,44 @@ interface CarHandles {
   readonly gripBottom: HTMLElement;
 }
 
+/* -------------------------------------------------------------------------- *
+ * The access block's copy
+ * -------------------------------------------------------------------------- *
+ *
+ * Module-private, for `EXPRESS_TITLE`'s reason and with the same consequence: a new **exported**
+ * prose declaration is a surface only `honesty/surfaces.ts` can classify, and this change does not
+ * own that file. These reach the corpus through `mountBuildingEditor`, which `derive.test.ts`
+ * excludes as DOM-bound and whose literals its static R10 sweep still reads — weaker than being
+ * driven, and stated as a limitation rather than presented as coverage. The one access sentence on a
+ * *driven* surface is `elevationNoteOf`'s.
+ */
+
+const ZONE_FLOOR_TITLE =
+  'Click to put this floor in the selected zone, or take it out. The options are this building’s own ' +
+  'floors, so a zone can never name one the document does not have.';
+
+const ZONE_LOBBY_TITLE =
+  'The lobby. Restricting it is a building where nobody may enter from the ground — a legitimate ' +
+  'thing to draw and watch, and not usually what is meant: every shipped building leaves it open.';
+
+const ZONE_GROUP_TITLE =
+  'Click to admit this credential group to the selected zone, or withdraw it. Permission on a floor ' +
+  'is the union over every zone covering it.';
+
+const MATRIX_EMPTY =
+  'No access zone, so every floor is open to every credential — core’s own semantics for a floor no ' +
+  'zone covers, and what four of the five shipped buildings declare. Add a zone to restrict the ' +
+  'floors it names; every floor outside it stays unrestricted.';
+
+const MATRIX_LEGEND =
+  'A row is a floor, a column is a credential group. ● this group opens the floor · ▩ it does not · ' +
+  '○ the floor is in no zone, so every credential opens it. Service zoning is a different question ' +
+  'and is drawn in the elevation above: a floor no shaft reaches is ⊘ there, never ▩ here.';
+
+const MATRIX_DISPATCHER_NOTE =
+  'Which dispatchers can read a credential at all is a third question again — the note beside the ' +
+  'dispatcher list answers it for the pairing you have selected.';
+
 export function mountBuildingEditor(
   elements: BuildingEditorElements,
   context: MountContext,
@@ -716,6 +1019,22 @@ export function mountBuildingEditor(
     patch({ noLobby: { ...current.noLobby, [car]: off } });
   }
 
+  /*
+   * Which zone the controls are pointed at.
+   *
+   * Mount-local rather than a `ViewerState` field, and that is the honest place for it: it is not a
+   * fact about the building, nothing downstream reads it, and a run replays identically whichever
+   * zone was selected when it started. `selectedZoneOf` falls back to the first zone, so a stale id
+   * after a removal draws the surviving zone rather than an empty form.
+   */
+  let selectedZoneId = '';
+
+  function zoneOf(current: BuildingSpec): SpecAccessZone | undefined {
+    const zone = selectedZoneOf(current, selectedZoneId);
+    if (zone !== undefined) selectedZoneId = zone.id;
+    return zone;
+  }
+
   /* --- static wiring, once ------------------------------------------------ */
 
   elements.name.addEventListener('input', () => {
@@ -761,6 +1080,56 @@ export function mountBuildingEditor(
       if (Number(key) < cars) bands[Number(key)] = band;
     }
     patch({ cars, bandByCar: bands });
+  });
+
+  elements.addZone.addEventListener('click', () => {
+    const current = spec();
+    if (current === undefined) return;
+    const id = nextZoneId(current);
+    /*
+     * A new zone starts on **no** floor, and with the building's first credential group when it has
+     * one. Both halves matter: a zone covering no floor is not written to the document at all
+     * (`accessZonesOf`), so adding one cannot break a building that was loading a moment ago, and
+     * seeding the group means the reader's next action is a floor click rather than a text box. On a
+     * building with no group yet the list is empty and `validateSpec` says what is missing.
+     */
+    const first = credentialGroupsOf(current)[0];
+    const zone: SpecAccessZone = {
+      id,
+      floors: [],
+      credentialGroups: first === undefined ? [] : [first],
+    };
+    selectedZoneId = id;
+    patch({ accessZones: [...current.accessZones, zone] });
+  });
+
+  elements.removeZone.addEventListener('click', () => {
+    const current = spec();
+    if (current === undefined) return;
+    const zone = zoneOf(current);
+    if (zone === undefined) return;
+    selectedZoneId = '';
+    patch({ accessZones: current.accessZones.filter((entry) => entry.id !== zone.id) });
+  });
+
+  function addTypedGroup(): void {
+    const current = spec();
+    if (current === undefined) return;
+    const zone = zoneOf(current);
+    const typed = elements.groupName.value.trim();
+    if (zone === undefined || typed === '') return;
+    // Free entry retained, which § 10.2 asks for explicitly: the chips offer the groups the building
+    // already uses and this is how the first one, and any new one, gets named.
+    elements.groupName.value = '';
+    if (zone.credentialGroups.includes(typed)) return;
+    patch({ accessZones: withZoneGroup(current, zone.id, typed) });
+  }
+
+  elements.groupAdd.addEventListener('click', addTypedGroup);
+  elements.groupName.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    addTypedGroup();
   });
 
   elements.elevationLevelOcc.addEventListener('click', () => {
@@ -1205,6 +1574,171 @@ export function mountBuildingEditor(
     );
   }
 
+  /* --- access zoning ------------------------------------------------------ */
+
+  function drawAccess(current: BuildingSpec): void {
+    const zone = zoneOf(current);
+    const matrix = accessMatrixOf(current);
+
+    fill(
+      elements.zoneChips,
+      chipRow(
+        doc,
+        zoneChoicesOf(current, selectedZoneId).map((choice) => {
+          const id = choice.id;
+          const floors = choice.floorCount;
+          const groups = choice.groupCount;
+          const runs = choice.runs;
+          return {
+            label: `${id} · ${String(floors)}f · ${String(groups)}g`,
+            selected: choice.selected,
+            title:
+              floors === 0
+                ? `${id} covers no floor yet, so it is not written to the document.`
+                : `${id} covers ${runs} and admits ${String(groups)} credential group${groups === 1 ? '' : 's'}.`,
+            onPick: () => {
+              selectedZoneId = id;
+              // A selection is not a document edit, so it re-renders through the shell rather than
+              // through `patch` — which would mark the building dirty for a click that changed nothing.
+              drawAccess(current);
+            },
+          };
+        }),
+      ),
+    );
+    elements.removeZone.disabled = zone === undefined;
+
+    fill(
+      elements.zoneFloors,
+      ...(zone === undefined
+        ? []
+        : zoneFloorChoicesOf(current, zone.id).map((choice) => {
+            const shared = choice.otherZoneIds;
+            const node = el(doc, 'button', {
+              className: 'zone-floor',
+              text: choice.floorId,
+              title:
+                (choice.isEntrance ? `${ZONE_LOBBY_TITLE} ` : '') +
+                ZONE_FLOOR_TITLE +
+                (shared.length === 0
+                  ? ''
+                  : ` Also covered by ${shared.join(', ')} — permission is the union of every zone on a floor.`),
+              attrs: {
+                type: 'button',
+                'aria-pressed': choice.inZone ? 'true' : 'false',
+                'data-shared': shared.length > 0 ? 'true' : 'false',
+              },
+            });
+            node.addEventListener('click', () => {
+              patch({ accessZones: withZoneFloor(current, zone.id, choice.floor) });
+            });
+            return node;
+          })),
+    );
+
+    fill(
+      elements.zoneGroups,
+      zone === undefined
+        ? null
+        : chipRow(
+            doc,
+            zoneGroupChoicesOf(current, zone.id).map((choice) => ({
+              label: choice.group,
+              selected: choice.inZone,
+              title: ZONE_GROUP_TITLE,
+              onPick: () => {
+                patch({ accessZones: withZoneGroup(current, zone.id, choice.group) });
+              },
+            })),
+          ),
+    );
+    elements.groupAdd.disabled = zone === undefined;
+    elements.groupName.disabled = zone === undefined;
+
+    /* The coverage matrix. A table, because it is one — rows are floors, columns are groups. */
+    if (matrix.groups.length === 0) {
+      fill(
+        elements.accessMatrix,
+        el(doc, 'div', {
+          text: MATRIX_EMPTY,
+          style: { font: '500 11px var(--mono)', color: 'var(--faint)', 'line-height': '1.6' },
+        }),
+      );
+      setText(elements.accessLegend, '');
+    } else {
+      const head = el(doc, 'tr', {
+        children: [
+          el(doc, 'th', { text: 'FLOOR' }),
+          ...matrix.groups.map((group) => el(doc, 'th', { text: group })),
+          el(doc, 'th', { text: 'ZONE' }),
+        ],
+      });
+      const body = matrix.rows.map((row) =>
+        el(doc, 'tr', {
+          attrs: { 'data-stranded': row.stranded ? 'true' : 'false' },
+          children: [
+            el(doc, 'th', { text: row.floorId }),
+            ...row.cells.map((cell) =>
+              el(doc, 'td', {
+                /*
+                 * The glyph *and* the word, in every cell, which is KB-15 rather than a preference:
+                 * the three states differ by a green, a red and a grey, and a colour is the second
+                 * signal here and never the only one. The class carries the colour; the text
+                 * carries the fact.
+                 */
+                text: `${cell.glyph} ${cell.word}`,
+                className: cell.unrestricted ? 'zcell-free' : cell.permitted ? 'zcell-open' : 'zcell-closed',
+              }),
+            ),
+            el(doc, 'td', {
+              text: row.zoneIds.join(', '),
+              style: { color: 'var(--faint)' },
+            }),
+          ],
+        }),
+      );
+      fill(
+        elements.accessMatrix,
+        el(doc, 'table', {
+          children: [
+            el(doc, 'thead', { children: [head] }),
+            el(doc, 'tbody', { children: body }),
+          ],
+        }),
+      );
+      setText(elements.accessLegend, MATRIX_LEGEND);
+    }
+
+    /*
+     * The state that strands demand, named rather than left to the colour of a row. It is reachable
+     * only by emptying a zone's group list, and `validateSpec` says beside the elevation that the
+     * loader will refuse it — this says which floors, at the control that produced them.
+     */
+    const stranded = matrix.strandedIds;
+    setText(
+      elements.accessWarning,
+      stranded.length === 0
+        ? ''
+        : `No credential opens floor ${stranded.join(', ')} — every group has been withdrawn from ` +
+            `the zone covering ${stranded.length === 1 ? 'it' : 'them'}, so the trips to ` +
+            `${stranded.length === 1 ? 'that floor' : 'those floors'} are never generated at all ` +
+            'and the run would report a mean over the people it could still carry.',
+    );
+
+    const restricted = matrix.restrictedIds.length;
+    const zones = accessZonesOf(current).length;
+    const groupCount = matrix.groups.length;
+    setText(
+      elements.accessNote,
+      zones === 0
+        ? ''
+        : `${String(zones)} zone${zones === 1 ? '' : 's'} · ${String(restricted)} of ` +
+            `${String(current.floors + 1)} floors restricted (${matrix.restrictedRuns}) · ` +
+            `${String(groupCount)} credential group${groupCount === 1 ? '' : 's'}. ` +
+            MATRIX_DISPATCHER_NOTE,
+    );
+  }
+
   /* --- render ------------------------------------------------------------- */
 
   function render(at: ViewAt): void {
@@ -1316,8 +1850,9 @@ export function mountBuildingEditor(
     setText(elements.summary, buildingSummary(current));
     setText(elements.advice, buildingAdvice(current));
 
-    /* The elevation. */
+    /* The elevation, then access zoning — the second kind, in its own block. */
     drawElevation(current);
+    drawAccess(current);
 
     const handSet = Object.keys(current.occupancyByFloor).length;
     // *Release every shaft* now clears the lobby flag too, so it has to appear when only that was

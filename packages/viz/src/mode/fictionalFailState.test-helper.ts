@@ -21,7 +21,7 @@
  * same convention `src/fixtures.test-helper.ts` and `controls/fictionalSchema.test-helper.ts` use.
  */
 
-import type { FailStateDisclosure } from './disclosure.js';
+import type { FailStateDisclosure, GroundedSummary } from './disclosure.js';
 import { constantSeries } from '../contract/series.js';
 import { VIZ_SCHEMA_VERSION, type VizRecording, type VizSummary } from '../contract/types.js';
 import { FIXTURE_DOOR_CONFIG, fixtureSummary } from '../fixtures.test-helper.js';
@@ -36,6 +36,16 @@ export const FICTIONAL_SUPPRESSION_REASON =
 
 /** A warning code `core` does not raise. */
 export const FICTIONAL_WARNING = 'fountain-overflow-not-simulated';
+
+/**
+ * A suppression **ground code** no entry of `core`'s `AWT_INVALID_GROUND_SPECS` produces.
+ *
+ * The same technique as the three above, pointed at the field `core` gained when the four grounds
+ * acquired machine-readable codes. It exists so *"a consumer handed a ground it has no wording for
+ * falls back and still shows the reason"* is a **measured** claim: with only the shipped four, every
+ * code has a sentence and the fallback branch could never run.
+ */
+export const FICTIONAL_SUPPRESSION_GROUND = 'flooded-pit';
 
 /**
  * A fifth fail state, complete.
@@ -61,14 +71,32 @@ export function fictionalFailStateReport(
   };
 }
 
-/** A recording with a suppressed mean whose reason is the fictional one. */
-export function fictionalRecording(overrides: Partial<VizRecording> = {}): VizRecording {
-  const summary: VizSummary = fixtureSummary({
+/**
+ * A recording with a suppressed mean whose reason is the fictional one.
+ *
+ * @param ground the suppression **ground code** to carry beside the reason, or `undefined` for a
+ *   recording that carries none — which is every recording this build's `record/recordRun.ts`
+ *   produces, because `VizSummary` does not declare the field yet. Both cases are shipped shapes and
+ *   both are asserted in `mode/disclosure.test.ts`, so the default is the one that is real today.
+ */
+export function fictionalRecording(
+  overrides: Partial<VizRecording> = {},
+  ground?: string | undefined,
+): VizRecording {
+  const base: VizSummary = fixtureSummary({
     saturated: true,
     awtIsValid: false,
     awtInvalidReason: FICTIONAL_SUPPRESSION_REASON,
     undelivered: 7,
   });
+  /*
+   * The widening is on the consumer — see `GroundedSummary` in `mode/disclosure.ts`. Written as a
+   * spread onto the fixture rather than as an override of it, because `fixtureSummary` takes
+   * `Partial<VizSummary>` and the whole point of this parameter is a field `VizSummary` does not
+   * have.
+   */
+  const summary: GroundedSummary =
+    ground === undefined ? base : { ...base, awtInvalidGround: ground };
   return {
     schemaVersion: VIZ_SCHEMA_VERSION,
     runId: 'fictional',

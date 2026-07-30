@@ -66,6 +66,7 @@ landed"* as *"6c is closer to accepted."*
 | **The structural-refusal reason is prose keyed on an id the leg record does not carry** | So it cannot be joined to a leg. **This was in the wave plan and I never briefed it** — an orchestration miss, recorded rather than dropped. |
 | **Basic's curated three-dimension subset is not built** | The campaign editor is restricted to each stage's declared editable set instead, which is data. |
 | **The elevation's express toggle produces two strings the honesty search never sees** | `honesty/surfaces.ts` seeds only `car.legend` from `elevationCarsOf`, so `expressLabel` and `expressTitle` are outside R1–R13. Stated rather than discovered: the toggle landed in [§ D181](DECISIONS.md) from a lane that did not own `surfaces.ts`, and adding the two seeds is the whole fix. |
+| **The access block's labels, tooltips and legend are statically swept, not driven** | Same cause and same fix as the row above — a `covers` entry in `honesty/surfaces.ts`, from a lane that owns it ([§ D182](DECISIONS.md)). The one access sentence that *is* on a driven surface is `elevationNoteOf`'s, exercised on Secure Tower by the campaign. Two rows with one cause is the point: **`surfaces.ts` is a chokepoint every editor lane hits and no editor lane owns.** |
 
 ---
 

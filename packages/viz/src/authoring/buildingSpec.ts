@@ -29,6 +29,25 @@
  * changes which floors the shaft opens onto, not who is allowed through the door (access) and not
  * which car the group offers a call to (operational). The three stay apart.
  *
+ * ## Access zoning is the second kind, and it is carried here rather than inferred
+ *
+ * {@link BuildingSpec.accessZones} is `docs/10-experience-layer-contract.md` § 10.2's half of W8.
+ * It is a **credential** fact — which groups may open which floors — and it is deliberately not
+ * derived from, mixed into, or drawn as, the bands above: a floor a shaft reaches and a credential
+ * does not open is a different defect with a different fix, and `access/zoning.ts` already draws
+ * the two with different glyphs for exactly that reason.
+ *
+ * It is carried at all because leaving it out was **destructive**. Before this change
+ * {@link specFromBuilding} read no zones and {@link buildingFromSpec} wrote `accessZones: []`
+ * unconditionally, so a reader who opened Secure Tower here and saved it untouched got a building
+ * with none of its five zones — and nothing on any surface said so. `authoring.test.ts` holds the
+ * round trip to the shipped documents for all five buildings.
+ *
+ * Floors are held as **floor numbers**, the same vocabulary `skyFloors` and `bandByCar` use, and
+ * turned into ids by {@link floorIdOf} on the way out. That is what makes the multi-select a
+ * control over *this building's own floors* rather than a text box that can name a floor the
+ * document does not have — § 10.2's *"the control should make it unreachable"*.
+ *
  * That is not a limitation being worked around; it is service zoning being modelled correctly.
  * `CLAUDE.md` is explicit that the three zonings are distinct concepts — service (physical), access
  * (credential), operational (dispatcher strategy) — and a shaft's reachable floors is the first of
@@ -40,13 +59,17 @@
  * defect `experiments/src/validation/documentation.test.ts` exists to catch one level up.
  */
 
+import { expandFloors } from '@elevator-sim/core/browser';
 import type {
+  AccessZone,
   BankConfig,
   BuildingConfig,
   BuildingType,
   ElevatorSpecs,
   FloorConfig,
 } from '@elevator-sim/core/browser';
+
+import { credentialGroupsIn } from '../access/zoning.js';
 
 /** Rated loads and their persons, verbatim from `data/elevator-specs.json`'s capacities table. */
 export const RATED_LOADS: readonly number[] = Object.freeze([1000, 1600, 2500, 3000, 3500, 4000, 5000]);
@@ -70,6 +93,22 @@ export const PERSONS_BY_LB: Readonly<Record<number, number>> = Object.freeze({
 
 export function personsOf(ratedLoadLb: number): number {
   return PERSONS_BY_LB[ratedLoadLb] ?? Math.floor(ratedLoadLb / 150);
+}
+
+/**
+ * One access zone, in the editor's own vocabulary.
+ *
+ * `core`'s {@link AccessZone} names floors by **id**; this names them by floor number, because the
+ * floor a reader clicks in the multi-select is a row of the elevation and a spec that stored ids
+ * would go stale the moment the floor slider moved. {@link accessZonesOf} is the translation, and
+ * it is the only place the two vocabularies meet.
+ */
+export interface SpecAccessZone {
+  readonly id: string;
+  /** Floor numbers, `0` being the lobby. Kept in the order the reader (or the document) gave. */
+  readonly floors: readonly number[];
+  /** Credential groups permitted on those floors. Empty is a document the loader refuses. */
+  readonly credentialGroups: readonly string[];
 }
 
 /** The editor's whole state. Flat, total, slider-shaped. */
@@ -104,6 +143,12 @@ export interface BuildingSpec {
    * flag is inert on a car whose band already starts at the lobby.
    */
   readonly noLobby: Readonly<Record<number, boolean>>;
+  /**
+   * Credential zoning, in declared order. Empty means every floor is open to every credential,
+   * which is `Building.isAccessPermitted`'s own semantics and what four of the five shipped
+   * buildings' `accessZones: []` says.
+   */
+  readonly accessZones: readonly SpecAccessZone[];
 }
 
 export const BLANK_SPEC: BuildingSpec = Object.freeze({
@@ -123,6 +168,7 @@ export const BLANK_SPEC: BuildingSpec = Object.freeze({
   skyFloors: Object.freeze([]),
   bandByCar: Object.freeze({}),
   noLobby: Object.freeze({}),
+  accessZones: Object.freeze([]),
 });
 
 /** One row of the spec column — the handoff's five sliders, § 1.3 M11. */
@@ -387,6 +433,128 @@ export function carLabelOf(car: number): string {
   return String.fromCharCode(65 + (car % 26));
 }
 
+/* -------------------------------------------------------------------------- *
+ * Access zoning — pure
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A zone's floors, narrowed to floors this building actually has, de-duplicated, in declared order.
+ *
+ * The narrowing is what makes the floor slider safe to drag downward. `config/parse.ts` refuses a
+ * zone naming a floor the building lacks, so a reader who shortened a 30-storey tower to ten with a
+ * zone on floor 25 would otherwise be holding a document that cannot load, with the refusal
+ * arriving from a control they were not touching. {@link validateSpec} says what was dropped.
+ */
+export function zoneFloorsOf(spec: BuildingSpec, zone: SpecAccessZone): readonly number[] {
+  const kept: number[] = [];
+  for (const floor of zone.floors) {
+    if (floor < 0 || floor > spec.floors) continue;
+    if (!kept.includes(floor)) kept.push(floor);
+  }
+  return kept;
+}
+
+/**
+ * The zones as `core`'s own shape — floors named by id — which is what the document receives.
+ *
+ * A zone left naming no floor of this building is **omitted**: the schema requires at least one,
+ * so writing it would produce a refusal whose message is about an array length rather than about
+ * the tower having got shorter. A zone naming no credential *group* is written out as it stands,
+ * because that one the reader can see and fix, and it is the state the coverage matrix exists to
+ * make visible — a floor no credential opens.
+ */
+export function accessZonesOf(spec: BuildingSpec): readonly AccessZone[] {
+  const zones: AccessZone[] = [];
+  for (const zone of spec.accessZones) {
+    const floors = zoneFloorsOf(spec, zone);
+    if (floors.length === 0) continue;
+    zones.push({
+      id: zone.id,
+      floors: floors.map((floor) => floorIdOf(floor)),
+      credentialGroups: [...zone.credentialGroups],
+    });
+  }
+  return zones;
+}
+
+/**
+ * Every credential group this building already names, in declared order.
+ *
+ * The vocabulary the editor's group control offers, and § 10.2 is explicit that there is no other:
+ * *"No fixed vocabulary — `core` has none and inventing one would be a second source of truth."*
+ * It is `access/zoning.ts`'s own {@link credentialGroupsIn}, over the **unpruned** list, so a group
+ * a reader typed does not vanish from the picker because its zone's floors went out of range.
+ */
+export function credentialGroupsOf(spec: BuildingSpec): readonly string[] {
+  return credentialGroupsIn(
+    spec.accessZones.map((zone) => ({
+      id: zone.id,
+      floors: [],
+      credentialGroups: zone.credentialGroups,
+    })),
+  );
+}
+
+/** The next unused `zone-N` id, so adding a zone never collides with one the reader kept. */
+export function nextZoneId(spec: BuildingSpec): string {
+  const taken = new Set(spec.accessZones.map((zone) => zone.id));
+  /*
+   * `limit` is lifted out of the template deliberately. `honesty/derive.test-helper.ts` keeps a
+   * substitution's text and calls any `a.b` inside it two adjacent words, so
+   * `${String(taken.size + 1)}` made this function an unclassified **prose** surface over an id it
+   * generates — a red `derive.test.ts`, measured rather than guessed. Same constraint that keeps
+   * `EXPRESS_TITLE` in `dev/buildingEditor.ts` module-private.
+   */
+  const limit = taken.size + 1;
+  for (let index = 1; index <= limit; index += 1) {
+    const id = `zone-${String(index)}`;
+    if (!taken.has(id)) return id;
+  }
+  return `zone-${String(limit)}`;
+}
+
+/**
+ * One floor toggled in or out of one zone — the multi-select's edit, as a value.
+ *
+ * A pure function rather than a mutation inside the mount, for the reason every other decision in
+ * `authoring/` is one: the test that says *the control changes the run* has to be able to make the
+ * same edit the reader's click makes, and a click handler is not callable under Node.
+ */
+export function withZoneFloor(
+  spec: BuildingSpec,
+  zoneId: string,
+  floor: number,
+): readonly SpecAccessZone[] {
+  return spec.accessZones.map((zone) => {
+    if (zone.id !== zoneId) return zone;
+    const held = zone.floors.includes(floor);
+    const floors = held
+      ? zone.floors.filter((entry) => entry !== floor)
+      : [...zone.floors, floor].sort((a, b) => a - b);
+    return { ...zone, floors };
+  });
+}
+
+/** One credential group toggled in or out of one zone. The other half of the same control. */
+export function withZoneGroup(
+  spec: BuildingSpec,
+  zoneId: string,
+  group: string,
+): readonly SpecAccessZone[] {
+  const wanted = group.trim();
+  if (wanted === '') return spec.accessZones;
+  return spec.accessZones.map((zone) => {
+    if (zone.id !== zoneId) return zone;
+    const held = zone.credentialGroups.includes(wanted);
+    return {
+      ...zone,
+      credentialGroups: held
+        ? zone.credentialGroups.filter((entry) => entry !== wanted)
+        : [...zone.credentialGroups, wanted],
+    };
+  });
+}
+
 /**
  * What a caller must supply beyond the spec for the document to load.
  *
@@ -499,7 +667,13 @@ export function buildingFromSpec(
     floors,
     totalPopulation: totalPopulation(spec),
     banks,
-    accessZones: [],
+    /*
+     * Credential zoning, written out rather than blanked. This line read `accessZones: []` and the
+     * consequence was not cosmetic: opening Secure Tower here and saving it untouched produced a
+     * building whose five zones were gone, so the run it then described was a different building
+     * from the one named at the top of the screen.
+     */
+    accessZones: accessZonesOf(spec),
   };
 }
 
@@ -555,6 +729,47 @@ export function validateSpec(
       orphans.length > 6
         ? `No shaft serves ${String(orphans.length)} floors — a call there is one nobody may answer, which looks nothing like a slow one.`
         : `No shaft serves floor ${orphans.map((floor) => (floor === 0 ? 'G' : String(floor))).join(', ')} — a call there is one nobody may answer, which looks nothing like a slow one.`,
+    );
+  }
+  /*
+   * The three access-zoning states, said in the editor's words before the loader says them in its
+   * own — and each worded for **what actually happens**, which is the part that took care.
+   *
+   * Only the first is a refusal, and only for a zone that will really be written: `config/schema.ts`
+   * requires `credentialGroups.min(1)`, so a zone with none does not parse — but {@link accessZonesOf}
+   * omits a zone covering no floor, so the same empty group list on a zone the reader has not yet
+   * given a floor to is refused by nothing. Saying *the loader refuses this* there would be a false
+   * claim about a mechanism, which is the defect class
+   * `experiments/src/validation/documentation.test.ts` exists to catch one level up.
+   */
+  const written = spec.accessZones.filter((zone) => zoneFloorsOf(spec, zone).length > 0);
+  for (const zone of written) {
+    if (zone.credentialGroups.length > 0) continue;
+    const floors = zoneFloorsOf(spec, zone).map((floor) => floorIdOf(floor));
+    problems.push(
+      `Access zone ${zone.id} covers floor ${floors.join(', ')} and names no credential group, so ` +
+        'no credential opens those floors at all. Those are calls no car may legally answer, and the ' +
+        'trips are never generated rather than served slowly — the run would report a mean over the ' +
+        'people it could still carry. The loader refuses a zone with no group, so this building will ' +
+        'not build until one is named or the zone is removed.',
+    );
+  }
+  const trimmed = spec.accessZones.filter(
+    (zone) => zoneFloorsOf(spec, zone).length < new Set(zone.floors).size,
+  );
+  if (trimmed.length > 0) {
+    problems.push(
+      `Access zone ${trimmed.map((zone) => zone.id).join(', ')} name${trimmed.length === 1 ? 's' : ''} ` +
+        `a floor this tower does not have — it is ${String(spec.floors + 1)} floors tall now. Those ` +
+        'floors are left out of the saved document rather than refused, so the zone covers fewer ' +
+        'floors than it says.',
+    );
+  }
+  const unwritten = spec.accessZones.filter((zone) => zoneFloorsOf(spec, zone).length === 0);
+  if (unwritten.length > 0) {
+    problems.push(
+      `Access zone ${unwritten.map((zone) => zone.id).join(', ')} covers no floor of this building, ` +
+        'so it is not written to the saved document and restricts nobody. Pick its floors, or remove it.',
     );
   }
   if (machineClass !== undefined) {
@@ -643,20 +858,64 @@ function normalize(spec: BuildingSpec): unknown {
     noLobby: Object.entries(spec.noLobby)
       .filter(([, off]) => off)
       .sort(([a], [b]) => a.localeCompare(b)),
+    // The document's own zones rather than the raw list, so a floor the tower no longer has does
+    // not read as an edit — `dirty` has to mean *this saves a different building*, and a zone floor
+    // that is never written cannot make one.
+    accessZones: accessZonesOf(spec),
   };
+}
+
+/**
+ * Every floor a document declares, ranges expanded, sorted ascending by index.
+ *
+ * `parseBuilding` returns the document as authored, and two of the five shipped buildings declare
+ * almost all of their floors as `floorRanges` — `mixed-use-high-rise` has **two** explicit floors
+ * and 59 in ranges. Reading `config.floors` alone therefore read Mixed-Use High-Rise back as a
+ * *three-storey* building, which is a second way the same round trip was destructive, and the one
+ * that made access zoning impossible to carry: a zone naming floor `32` cannot survive into a
+ * building that has three.
+ *
+ * `expandFloors` is `core`'s own expansion and it throws on a malformed range. Caught rather than
+ * propagated, because this function runs while a reader is typing — the same requirement
+ * `editorPreview.ts` was written for — and the authored floors are the honest fallback.
+ */
+function declaredFloorsOf(config: BuildingConfig): readonly FloorConfig[] {
+  try {
+    return expandFloors(config);
+  } catch {
+    return [...(config.floors ?? [])].sort((left, right) => left.index - right.index);
+  }
 }
 
 /**
  * Read a shipped building back into the editor's shape.
  *
- * Lossy in one direction and honest about it: a shipped building's floors have ids, per-floor
- * traffic profiles and access zones that a `floors × capacity × occupancy` model cannot express.
- * What comes back is the *shape* — how tall, how many people, how many cars, how fast — so a reader
- * can start from Midtown Office and change one thing. The document editor beneath the elevation is
- * where the parts this drops are edited, which is why it is still there (§ 4.5).
+ * Lossy in one direction and honest about it: a shipped building's floors have ids and per-floor
+ * traffic profiles that a `floors × capacity × occupancy` model cannot express. What comes back is
+ * the *shape* — how tall, how many people, how many cars, how fast — so a reader can start from
+ * Midtown Office and change one thing. The document editor beneath the elevation is where the parts
+ * this drops are edited, which is why it is still there (§ 4.5).
+ *
+ * **Access zoning is no longer one of the parts it drops.** Zone floors are matched by their
+ * **position** in the building's own non-entrance floor order — the same convention `skyFloors`
+ * below already uses — never by arithmetic on the id, because a floor id is a string and
+ * `mixed-use-high-rise` has no floor at index 1 at all. On all five shipped buildings the ids come
+ * back identical, which `authoring.test.ts` asserts against the documents rather than asserting the
+ * mapping.
  */
 export function specFromBuilding(config: BuildingConfig, id: string): BuildingSpec {
-  const floors = (config.floors ?? []).filter((floor) => floor.isEntrance !== true);
+  const declared = declaredFloorsOf(config);
+  const floors = declared.filter((floor) => floor.isEntrance !== true);
+  /*
+   * Floor id to the spec's own floor number. Position `i` in the non-entrance list is spec floor
+   * `i + 1`; every entrance is spec floor 0, which is what `buildingFromSpec` writes back — and
+   * Midtown Office really does declare two of them.
+   */
+  const floorNumberById = new Map<string, number>();
+  for (const floor of declared) if (floor.isEntrance === true) floorNumberById.set(floor.id, 0);
+  floors.forEach((floor, index) => {
+    floorNumberById.set(floor.id, index + 1);
+  });
   const populations = floors.map((floor) => floor.population);
   const peak = Math.max(1, ...populations);
   const mean = populations.reduce((total, value) => total + value, 0) / Math.max(1, populations.length);
@@ -691,5 +950,18 @@ export function specFromBuilding(config: BuildingConfig, id: string): BuildingSp
     // being inferred from a `servesFloors` this model did not produce.
     bandByCar: {},
     noLobby: {},
+    /*
+     * Access zoning, in declared order, with each zone's floors in the order the document gave
+     * them. A floor id the expansion does not know is dropped rather than guessed — it cannot occur
+     * on a document `parseBuilding` accepted, since `config/parse.ts` cross-references every one,
+     * and dropping it is still the right answer for a document this function was handed directly.
+     */
+    accessZones: (config.accessZones ?? []).map((zone) => ({
+      id: zone.id,
+      floors: zone.floors
+        .map((floorId) => floorNumberById.get(floorId))
+        .filter((floor): floor is number => floor !== undefined),
+      credentialGroups: [...zone.credentialGroups],
+    })),
   };
 }

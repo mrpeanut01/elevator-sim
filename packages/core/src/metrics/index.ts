@@ -108,6 +108,10 @@ export type {
   WaitStatistics,
 } from './types.js';
 
+export { AWT_INVALID_GROUNDS, diagnoseAwtValidity } from './awtValidity.js';
+
+export type { AwtInvalidGround, AwtInvalidity, AwtValidityEvidence } from './awtValidity.js';
+
 export {
   countAbove,
   fractionAbove,

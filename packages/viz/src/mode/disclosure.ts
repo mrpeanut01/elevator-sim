@@ -28,28 +28,47 @@
  * locked-out landings from `access/lockedOut.ts`. **No list in this file enumerates a member of
  * any of them.**
  *
- * ## The one thing Basic cannot do, stated rather than faked
+ * ## How Basic shortens a suppression reason, and what it still may not drop
  *
- * § 4's table says the raw `awtInvalidReason` goes *"behind 'why?' on the plain-language form"*,
- * and R3 allows Basic to **shorten** a reason. Basic here does not shorten it, and that is a
- * finding rather than an omission: `core` emits the reason as **prose with no ground code**
- * (`metrics/summarize.ts` builds one of four sentences and returns a `string`), so a per-ground
- * Basic rewording would have to decide *which* ground fired by re-reading `saturated`,
- * `waitCount`, `unservedCount` and `serviceLevel.verdict` in `core`'s own precedence order. That
- * is a second source of truth about a question `core` has already answered — **R9**, exactly — and
- * it would be wrong in the case that matters: the fourth ground exists precisely because a run can
- * look unsaturated and uncensored and still be refused.
+ * § 4's table says the raw `awtInvalidReason` goes *"behind 'why?' on the plain-language form"*, and
+ * R3 allows Basic to **shorten** a reason. It used not to, and the reason was a real gap rather than
+ * an omission: `core` emitted the refusal as **prose with no ground code**, so a per-ground Basic
+ * rewording would have had to decide *which* ground fired by re-reading `saturated`, `waitCount`,
+ * `unservedCount` and `serviceLevel.verdict` in `core`'s own precedence order. That is a second
+ * source of truth about a question `core` has already answered — **R9**, exactly — and it would be
+ * wrong in the case that matters: the fourth ground exists precisely because a run can look
+ * unsaturated and uncensored and still be refused.
  *
- * So Basic leads with a **ground-free** plain sentence and carries the measurement layer's reason
- * verbatim underneath. Closing this properly needs `core` to carry the ground beside the prose;
- * until it does, the honest Basic form is the one that cannot contradict Advanced.
+ * `core` now carries the ground **beside** the prose — `metrics/awtValidity.ts`, whose
+ * `AWT_INVALID_GROUNDS` is derived from the branch table itself — so Basic leads with a sentence
+ * about *this* refusal instead of a ground-free apology. Three properties of that, each of which
+ * something here could get wrong:
+ *
+ * 1. **The lead is a lead, never a replacement.** `core`'s sentence still follows it verbatim and is
+ *    still on {@link DisclosureItem.mustCarry}, so `parity.ts` rule 2 still refuses a Basic mode
+ *    that drops it. R3's *"may shorten, may not remove"* is one word about what a mode may do to a
+ *    reason and this reads both halves of it.
+ * 2. **An unrecognised ground falls back rather than showing nothing.** A ground this build has no
+ *    wording for — a fifth one from a newer `core` — gets {@link SUPPRESSION_LEAD}, the ground-free
+ *    sentence, which is exactly the behaviour every consumer had before codes existed. Showing a
+ *    bare code, or nothing, would turn a widened vocabulary into a suppressed refusal.
+ * 3. **The code decides the wording and never the refusal.** Whether a figure is refused at all is
+ *    still `figure.kind === 'suppressed'`, from `meansAreSuppressed` — one gate, R9. The ground is
+ *    read only to choose a sentence.
+ *
+ * **The transport is not finished, and this is where it stops.** `VizSummary` does not carry
+ * `awtInvalidGround` — a field on the recording contract is a deliberate `VIZ_SCHEMA_VERSION` bump,
+ * which `contract/types.ts` and `record/recordRun.ts` own — so on a recording produced by this build
+ * the ground is absent and case 2 above is what ships: Basic renders exactly what it rendered
+ * before. The per-ground path is proved in `mode/disclosure.test.ts` against grounds handed in
+ * directly, including one no `core` branch emits. Stated here rather than discovered later.
  */
 
-import type { PassengerModel } from '@elevator-sim/core/browser';
+import type { AwtInvalidGround, PassengerModel } from '@elevator-sim/core/browser';
 
 import type { LockedOutLanding } from '../access/lockedOut.js';
 import type { FailStateReport } from '../campaign/failStates.js';
-import type { VizRecording } from '../contract/types.js';
+import type { VizRecording, VizSummary } from '../contract/types.js';
 import {
   ENERGY_ID,
   INTERVAL_ID,
@@ -71,7 +90,8 @@ import type { DisclosureItem, Rendering, Severity } from './types.js';
  * complexity, not the failures — and it is guarded from both sides:
  *
  * - a figure named here that {@link runSummaryFigures} does not produce is caught by
- *   `mode/disclosure.test.ts`, which checks every id against `FIGURE_ORDER`;
+ *   `mode/parity.test.ts`, which checks every id against `FIGURE_ORDER` — this pointer said
+ *   `mode/disclosure.test.ts`, which did not exist when it was written;
  * - a figure named here that turns out to carry a failure is caught by the parity check, because
  *   a suppressed figure never reaches this list — it becomes a `suppression` item first.
  *
@@ -187,15 +207,82 @@ function rendering(
 }
 
 /**
- * The ground-free lead sentence for a refused statistic.
+ * The ground-free lead sentence for a refused statistic — **the fallback, and still the shipped one.**
  *
- * Says the same thing whichever ground fired, because this package cannot know which one did
- * without re-deciding it — see the module docstring. It never replaces the reason; it precedes it.
+ * Says the same thing whichever ground fired. Used when the run carries no ground code, and when it
+ * carries one this build has no wording for: a code is permission to shorten, never permission to
+ * show nothing. It never replaces the reason; it precedes it.
  */
 export const SUPPRESSION_LEAD =
   'There is no number here, and that is a result rather than a gap: this run’s own statistics ' +
   'refuse to stand behind one. The measurement’s reason follows, in its own words — rewriting it ' +
   'would be a second answer to the same question.';
+
+/**
+ * `VizSummary` plus the suppression **ground code** `core` publishes beside the prose.
+ *
+ * The widening is on the **consumer**, exactly as {@link FailStateDisclosure} widens `state` to
+ * `string` and for the same reason (§ D166): the field is `AwtInvalidGround` where `core` writes it,
+ * and `string` where this module reads it, so a ground **no shipped branch emits** can be handed in
+ * and the unrecognised-code fallback is provable rather than asserted. A `Record` keyed on the union
+ * would make the fallback unreachable by construction and therefore untestable — which is § D152's
+ * *"a list that looks derived only because the shipped schema happens to fit it"*, pointed at a
+ * default branch.
+ *
+ * `VizSummary` does not declare the field today. See the module docstring: carrying it is a
+ * `VIZ_SCHEMA_VERSION` bump on the recording contract, which this module does not own.
+ */
+export interface GroundedSummary extends VizSummary {
+  readonly awtInvalidGround?: string | undefined;
+}
+
+/**
+ * The clause that names *this* refusal, per ground.
+ *
+ * Not exported, deliberately: a new exported prose declaration is an unclassified surface to
+ * `honesty/derive.test.ts`, and this reaches the honesty search through `disclosureItems` — which
+ * `honesty/surfaces.ts` already covers — by the transitive clause that derivation is built on.
+ *
+ * `Record<AwtInvalidGround, string>` is **total**, so a fifth ground in `core`'s
+ * `AWT_INVALID_GROUND_SPECS` is a compile error here until somebody writes the sentence for it. That
+ * is `disclosureClassOf`'s exhaustive-switch discipline applied to wording instead of to
+ * classification: the point is not that a fifth ground breaks the build, it is that it cannot
+ * silently acquire the wording of a different one.
+ *
+ * Each clause says what the *reader* lost, never what the statistic is. None of them restates a
+ * number — `core`'s sentence carries every figure, and a second copy of a figure is a second figure.
+ */
+const SUPPRESSION_CLAUSE_BY_GROUND: Readonly<Record<AwtInvalidGround, string>> = Object.freeze({
+  saturated:
+    'the queues never settled during this run, so no one number describes what the wait was.',
+  'empty-window':
+    'nobody finished waiting inside the stretch of the run being measured, so there is nothing ' +
+    'to average.',
+  censored:
+    'too many riders were still waiting when the clock stopped, so an average of the rest ' +
+    'flatters this run.',
+  starved:
+    'somebody waited far longer than any average could admit to, so the average describes a run ' +
+    'nobody had.',
+});
+
+/**
+ * The Basic lead for a refused statistic: ground-specific where the ground is known.
+ *
+ * The shell is shared and the clause is per ground, so R3's *"a suppression is a result, not a
+ * gap"* framing is written once and cannot go missing from one of the four.
+ */
+function suppressionLeadFor(ground: string | undefined): string {
+  if (ground === undefined) return SUPPRESSION_LEAD;
+  const clause = (SUPPRESSION_CLAUSE_BY_GROUND as Readonly<Record<string, string | undefined>>)[
+    ground
+  ];
+  if (clause === undefined) return SUPPRESSION_LEAD;
+  return (
+    `There is no number here, and that is a result rather than a gap: ${clause} ` +
+    'The measurement’s reason follows, in its own words.'
+  );
+}
 
 /**
  * Every item a run puts in front of a player, with both modes' renderings.
@@ -313,12 +400,25 @@ function itemForFigure(figure: SummaryFigure, input: DisclosureInput): Disclosur
    */
   if (figure.kind === 'suppressed') {
     const reason = figure.note ?? '';
+    /*
+     * The ground decides the **wording** and never the refusal — `figure.kind` already decided
+     * that, from `meansAreSuppressed`. Read off the summary rather than re-derived from it, which is
+     * the whole point of `core` carrying it.
+     */
+    const lead = suppressionLeadFor(
+      (input.recording.summary as GroundedSummary).awtInvalidGround,
+    );
     return {
       id: figure.id,
       label: figure.label,
       origin: { kind: 'suppression', figureId: figure.id },
       advanced: rendering(figure.value, reason, severity, figure),
-      basic: rendering(figure.value, `${SUPPRESSION_LEAD} ${reason}`, severity, figure),
+      basic: rendering(figure.value, `${lead} ${reason}`, severity, figure),
+      /*
+       * Unchanged, and it must stay unchanged. Shortening the *lead* is what R3 permits; dropping
+       * `core`'s sentence is what it forbids, and this is the line `parity.ts` rule 2 reads to
+       * refuse a Basic mode that tried.
+       */
       mustCarry: [figure.value, reason],
     };
   }

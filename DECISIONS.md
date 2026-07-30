@@ -10908,3 +10908,111 @@ same case by its stronger counterpart: the same band with the toggle off has rol
   classify it. Kept private, the sentence still reaches the corpus through `elevationCarsOf`.
 
 **Impact on phase status: none.**
+
+---
+
+## D182 — access zoning reaches the new building editor, and the round trip that was silently deleting it
+
+**Date:** 2026-07-30 · **Owner:** wave 11 · **Closes** [`docs/10`](docs/10-experience-layer-contract.md)
+§ 11 **W8**, and with it the last open half of Phase 9's nine units
+
+`docs/10` § 11 W8 recorded the dispatcher-compatibility warning DONE and § 10.2's editor controls
+open: a floor multi-select and a floors × credential-groups coverage matrix. **Building them found a
+defect first, and it was destructive rather than missing.**
+
+### The defect: opening Secure Tower and saving it deleted its access zoning
+
+`authoring/buildingSpec.ts`'s `specFromBuilding` read no `accessZones`, and `buildingFromSpec` wrote
+`accessZones: []` **unconditionally**. A reader who opened Secure Tower in the new building editor and
+saved it untouched got a building with none of its five zones — [§ D159](#d159)'s puzzle, locked-out
+legs equalling undelivered legs, disappearing with nothing on any surface saying so. Three shipped
+buildings declare zones: `secure-tower` (5), `mixed-use-high-rise` (2), `vertical-city` (2).
+
+**Measured, not argued**, and the assertion was written first and watched fail: over all five shipped
+buildings, `expect(rebuilt.accessZones).toStrictEqual(config.accessZones)` was red on `secure-tower`.
+The same spec with and without those zones, under a dispatcher that reads no credential, produces
+**different legs** — which is what makes this a correctness fix rather than a fidelity one.
+
+### It was two defects, and the second was larger and invisible until the first was under test
+
+`specFromBuilding` read `config.floors` and **ignored `floorRanges`**. `mixed-use-high-rise` declares
+two explicit floors and 59 in ranges, so it read back as a **three-storey building**; `vertical-city`
+likewise. A zone naming floor `32` cannot survive into a building that has three, so the access fix
+was not reachable without this one. Closed with `core`'s own `expandFloors`, caught rather than
+propagated because the function runs while a reader is typing. Vertical City now opens as *100 floors
+· 386.1 m · 4 950 people · 12 cars* with both zones intact, verified in a browser.
+
+Zone floors are matched by **position** in the building's own non-entrance floor order — the
+convention `skyFloors` already used — never by arithmetic on the id. `mixed-use-high-rise` has no
+floor at index 1 **at all**, so the numeric reading was not merely fragile, it was wrong.
+
+### The controls, and the assertion that keeps the three zonings three
+
+**Move the control and require the run to change**, compared on the legs. Four arms; the first is the
+one that matters:
+
+| Arm | What it compares |
+|---|---|
+| an access zone is authored | `shafts[].servedFloorIds` **identical**, `legs` **differ** |
+| a floor enters the zone | legs differ; the same click again restores the original run exactly |
+| a zone's group is renamed | legs differ, served floors identical |
+| Secure Tower with its zones vs `accessZones: []` | legs differ — the defect above, measured |
+
+The first is the **anti-collapse** assertion. `CLAUDE.md` forbids collapsing service, access and
+operational zoning, and a control that quietly rewrote `servesFloors` would pass a whole-fingerprint
+comparison. So served floors are asserted **equal** while legs are asserted **different** — § D181's
+split applied to the credential axis. Access zoning also gets its own block rather than a column of
+the elevation or a floor badge, which respects the stage lane's refusal of the handoff's `⚿`
+([`WAVE10_PLAN.md`](WAVE10_PLAN.md) § 6) rather than re-litigating it.
+
+### A mechanism measured rather than assumed: a redundant credential group is a no-op
+
+The credential arm was first written as *"add a second group to the zone"* and it **failed**.
+`credentialAssignment` defaults to `permitted-first` and `traffic/generator.ts`'s `credentialForRoute`
+returns the *first* group permitted on every restricted floor of a route, so widening `tenant` to
+`tenant, facilities` leaves every route's chosen credential and every leg bit-identical.
+
+**The test was not weakened.** The fact is pinned with its reason, and the run-change arm was
+rewritten to the edit that genuinely moves the **feasible set** — two zones with disjoint groups,
+which is Secure Tower's own documented design. A group set decides which routes exist at all; an edit
+that does not change the set changes nothing, and a test expecting otherwise was pinning a wish.
+
+### What the matrix exists to make visible
+
+A floor reachable by **no** group — the state that strands demand. It is reachable only by withdrawing
+every group from a zone, which `config/schema.ts` refuses on save (`credentialGroups.min(1)`), so the
+matrix draws it, the warning names the floors, and `validateSpec` says the loader will refuse it. All
+three checked against the real loader's own message.
+
+The three validation sentences are each worded for what actually happens, and only the first claims a
+refusal — for a zone that **will be written**. `accessZonesOf` omits a zone covering no floor, so the
+same empty group list on a zone with no floor yet is refused by nothing, and *"the loader refuses
+this"* there would be the false-mechanism defect `validation/documentation.test.ts` exists to catch one
+level up. A zone naming a floor a shortened tower no longer has is **trimmed and said**, not refused,
+because the document still loads.
+
+### Two constraints worth recording, one of which has now cost a red test twice
+
+- **KB-15, per cell.** Every matrix cell carries a glyph *and* a word (`▩ not permitted`), colour
+  third — and `▩` rather than `⊘`, because `⊘` already means *no shaft reaches this floor* on the
+  canvas and the preview. A third mark, `○ unrestricted`, was needed because the credential lens has
+  no state for *in no zone*: it looks through a credential, and a matrix must distinguish *this group
+  opens it* from *nothing restricts it*.
+- **`honesty/derive.test-helper.ts` reads any `a.b` inside a template substitution as two adjacent
+  words.** `` `zone-${String(taken.size + 1)}` `` made `nextZoneId` an unclassified **prose** surface
+  and turned `derive.test.ts` red — measured, not anticipated. Every new export here returns facts and
+  ids; the member access is lifted into a local; new prose lives either in `validateSpec`, which an
+  adapter already covers, or module-private behind `mountBuildingEditor`, excluded as DOM-bound. That
+  is § D181's `EXPRESS_TITLE` rule, and **the second time in one wave it has cost a red test** — which
+  makes it a property of the derivation worth knowing before writing a template literal, not a
+  surprise.
+
+### Left open rather than absorbed
+
+The access block's labels, tooltips and legend are **statically swept for R10, not driven** — routing
+them through a driven adapter needs a `covers` entry in `honesty/surfaces.ts`. Carried in
+[`GAPS.md`](GAPS.md) § 3 beside § D181's two strings, which have the same cause.
+
+**Impact on phase status: none by itself** — but W8 was Phase 9's last open half, so every one of its
+nine units is now built. Whether the phase is *accepted* is [§ D163](#d163)'s question and is measured
+separately; a unit landing is not a verdict.

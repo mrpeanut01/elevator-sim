@@ -14,12 +14,17 @@
  *
  * Asserted: the apparatus (CRN alignment, budgets as declared, the front decided over three
  * *active* axes), the structural findings that would be wiring bugs if they changed
- * (bit-identity classes), the refusal to order a tie, and the pins.
+ * (bit-identity classes), the refusal to order a tie, and the pins — **both kinds**. The interval
+ * pins are `published.ts`'s; the categorical pin is `matrix.ts`'s `PINNED_FRONTS`, and it
+ * holds the front memberships, the identity classes and the verdict census, which no interval pin
+ * can see because the front is decided arm-against-arm and every interval is arm-against-baseline.
+ * `matrixFront.test.ts` is its Layer B and costs no simulation.
  *
  * Reported and **not** asserted: which arm wins where. A gate that asserted `zoned-uppeak` beats
  * `collective` on Garden would be asserting a measurement, and the measurement is the output of
  * this file rather than its precondition — CLAUDE.md § *Do not weaken an acceptance criterion*
- * read from the other end. The pins are what stop those numbers moving in silence.
+ * read from the other end. The pins are what stop those numbers moving in silence, and a pin is not
+ * a criterion: it says *this is what the code produced*, never *this is what it ought to produce*.
  */
 
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -34,6 +39,9 @@ import {
   MIN_REPLICATIONS,
   budgetFor,
   cellResult,
+  checkFrontPins,
+  frontPinOf,
+  publishedFrontRow,
   runMatrix,
   type MatrixCellResult,
 } from './matrix.js';
@@ -384,6 +392,54 @@ describe('every published matrix figure is the one the code still produces', () 
     expect(describeMismatches('matrix', mismatches), describeMismatches('matrix', mismatches)).toBe(
       '',
     );
+  });
+
+  /*
+   * **The half the interval pins structurally cannot see.** `matrix.ts` § *The categorical
+   * publication pin* has the mechanism and the instance: `7fac568` regenerated this cell's 44
+   * interval pins and moved the front at `vertical-city-up-peak` with them, and nothing turned red,
+   * because the front is decided by comparing arms against **each other** through `pareto.ts` while
+   * every pin holds an arm's difference against the **baseline**. A change to the dominance rule,
+   * to `pareto.ts`'s invalid-fraction tolerance, to the energy proxy's wiring or to `verdict.ts`'s
+   * resolution limit moves this table with all 352 pins unchanged.
+   *
+   * It costs no simulation: the run is the one `matrixOf()` already holds.
+   *
+   * This is a pin and not a criterion. Nothing here asserts that any arm *ought* to be on any front
+   * — the suite docstring's refusal to assert which arm wins where stands. What it asserts is that
+   * a move is a question rather than a silence, and the question is which of the two is right.
+   */
+  it('matches the categorical pin — fronts, identity classes and verdict census — in both directions', async () => {
+    const failures = checkFrontPins(await matrixOf());
+    const message =
+      failures.length === 0
+        ? ''
+        : `the matrix no longer reproduces its published categorical result — ${String(failures.length)} disagreement(s):\n` +
+          `${failures.map((line) => `  ${line}`).join('\n')}\n` +
+          'Establish WHICH of the two is correct before touching PINNED_FRONTS. A front regenerated ' +
+          'to make this green has destroyed the only thing the table is for; and if the code is ' +
+          'right, docs/05-roadmap.md § *What the matrix found* and every count derived from it have ' +
+          'to move in the same commit (matrixFront.test.ts holds the register).';
+    expect(message, message).toBe('');
+  });
+
+  it('prints the categorical pin block, so a legitimate move is regenerated rather than retyped', async () => {
+    const lines: string[] = [];
+    for (const result of await matrixOf()) {
+      const pin = frontPinOf(result);
+      lines.push(
+        `  ${result.cell.id.padEnd(24)} n=${String(pin.replications).padStart(3)} ` +
+          `front=[${pin.front.join(' ')}] unquotable=[${pin.unquotable.join(' ')}] ` +
+          `classes={${pin.identityClasses.map((members) => members.join('+')).join(' | ')}} ` +
+          `verdicts=${Object.entries(pin.verdicts)
+            .sort(([a], [b]) => (a < b ? -1 : 1))
+            .map(([verdict, count]) => `${verdict}:${String(count)}`)
+            .join(' ')}`,
+      );
+      lines.push(`      published row: ${publishedFrontRow(pin)}`);
+    }
+    console.log(`matrix categorical result, as measured:\n${lines.join('\n')}`);
+    expect(lines.length).toBe(MATRIX_CELLS.length * 2);
   });
 });
 

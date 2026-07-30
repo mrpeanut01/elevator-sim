@@ -340,6 +340,25 @@ export interface BuildingEditorElements {
   readonly elevationWarning: HTMLElement;
   readonly addShaft: HTMLButtonElement;
   readonly removeShaft: HTMLButtonElement;
+  /**
+   * `docs/10` § 10.2's access-zoning controls — W8's open half.
+   *
+   * A separate block from the elevation above, because the elevation draws **service** zoning and
+   * these draw **access** zoning; `CLAUDE.md` forbids collapsing the two and `WAVE10_PLAN.md` § 6
+   * records the stage lane refusing the handoff's `⚿` floor badge on the same ground.
+   */
+  readonly zoneChips: HTMLElement;
+  readonly addZone: HTMLButtonElement;
+  readonly removeZone: HTMLButtonElement;
+  /** The floor multi-select, over the building's own floors and nothing else. */
+  readonly zoneFloors: HTMLElement;
+  readonly zoneGroups: HTMLElement;
+  readonly groupName: HTMLInputElement;
+  readonly groupAdd: HTMLButtonElement;
+  readonly accessMatrix: HTMLElement;
+  readonly accessLegend: HTMLElement;
+  readonly accessWarning: HTMLElement;
+  readonly accessNote: HTMLElement;
   /** § 4.5 — the document editor kept whole beneath the elevation. */
   readonly document: HTMLDetailsElement;
 }
@@ -619,6 +638,17 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     elevationWarning: 'elevation-warning',
     addShaft: 'elevation-add-shaft',
     removeShaft: 'elevation-remove-shaft',
+    zoneChips: 'building-zone-chips',
+    addZone: 'building-add-zone',
+    removeZone: 'building-remove-zone',
+    zoneFloors: 'building-zone-floors',
+    zoneGroups: 'building-zone-groups',
+    groupName: 'building-group-name',
+    groupAdd: 'building-group-add',
+    accessMatrix: 'building-access-matrix',
+    accessLegend: 'building-access-legend',
+    accessWarning: 'building-access-warning',
+    accessNote: 'building-access-note',
     document: 'building-document',
   }),
   rail: Object.freeze({

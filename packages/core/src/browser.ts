@@ -813,6 +813,8 @@ export type {
  * -------------------------------------------------------------------------- */
 
 export {
+  AWT_INVALID_GROUNDS,
+  diagnoseAwtValidity,
   DEFAULT_DEPARTURE_GAP_S,
   DEFAULT_DESIGN_LOAD_FACTOR,
   DEFAULT_LOAD_FACTOR_EDGES,
@@ -899,6 +901,9 @@ export {
 
 export type {
   AssignmentDetails,
+  AwtInvalidGround,
+  AwtInvalidity,
+  AwtValidityEvidence,
   BoardingDetails,
   CarTimings,
   ModelSensitiveMetric,

@@ -1864,7 +1864,7 @@ same unit because both are about turning a shipped surface into something a play
 > > `font`/`textAlign`/`textBaseline` and requires the boxes above `plot.y` to be pairwise disjoint
 > > at five viewport sizes.
 
-### W8 — Access-zoning editor and the dispatcher compatibility warning *(depends on W7b)* — **the warning ✅ DONE 2026-07-29; the editor controls open**
+### W8 — Access-zoning editor and the dispatcher compatibility warning *(depends on W7b)* — ✅ **DONE — the warning 2026-07-29, the editor controls 2026-07-30, and they found the editor was deleting what they were built to edit**
 
 Floor multi-select, credential autocomplete, coverage matrix, and § 10.3's pre-run warning in both
 the editor and the viewer.
@@ -1902,9 +1902,42 @@ the editor and the viewer.
 > gauge and W2's summary already in that column the stage had fallen to **149 px** for a 30-floor
 > building. The runs take the note from 78 px to 59 px and the stage back to **281 px**.
 >
-> **Still open from § 10.2:** the floor multi-select and the floors × credential-groups coverage
-> matrix. The credential *autocomplete* is landed in its § 10.2 form (options over the groups the
-> building already uses, no fixed vocabulary) as the lens's own picker.
+> **§ 10.2's last two controls landed 2026-07-30** — the floor multi-select and the floors ×
+> credential-groups coverage matrix ([§ D182](../DECISIONS.md)). The credential *autocomplete* had
+> already landed in its § 10.2 form (options over the groups the building already uses, no fixed
+> vocabulary) as the lens's own picker, and is now also the editor's chips. **W8 is closed, and with
+> it the last open half of Phase 9's nine units.**
+>
+> **Building them found the editor was destroying the thing they were built to edit, and then found a
+> larger defect underneath.** `authoring/buildingSpec.ts`'s `specFromBuilding` read no `accessZones`
+> and `buildingFromSpec` wrote `accessZones: []` **unconditionally**, so a reader who opened Secure
+> Tower in the new building editor and saved it untouched got a building with none of its five zones —
+> § D159's puzzle disappearing with nothing on any surface saying so. Measured rather than argued:
+> that same spec with and without its zones, under a dispatcher that reads no credential, produces
+> **different legs**.
+>
+> The second defect was invisible until the first was under test. `specFromBuilding` read
+> `config.floors` and **ignored `floorRanges`**, so `mixed-use-high-rise` — two explicit floors and 59
+> in ranges — read back as a **three-storey building**, and `vertical-city` likewise. A zone naming
+> floor `32` cannot survive into a building that has three, so the access fix was not possible without
+> it. Vertical City now opens as *100 floors · 386.1 m · 4 950 people · 12 cars*, both zones intact.
+>
+> **A mechanism measured rather than assumed.** The credential run-change arm was first written as
+> *"add a second group to the zone"* and it **failed**: `credentialAssignment` defaults to
+> `permitted-first` and `credentialForRoute` returns the *first* group permitted on every restricted
+> floor of a route, so widening `tenant` to `tenant, facilities` leaves every leg bit-identical. The
+> test was not weakened — the fact is pinned with its reason, and the arm was rewritten to the edit
+> that moves the **feasible set**: two zones with disjoint groups, which is Secure Tower's own
+> documented design. A test expecting otherwise would have been pinning a wish.
+>
+> **The three zonings stay three.** The first run-change assertion is the anti-collapse one:
+> `shafts[].servedFloorIds` asserted **identical** while the legs are asserted **different**, because
+> a control that quietly rewrote `servesFloors` would pass a whole-fingerprint comparison. Access
+> zoning gets its own block rather than a column of the elevation or a floor badge, which respects the
+> stage lane's refusal of the handoff's `⚿` ([`WAVE10_PLAN.md`](../WAVE10_PLAN.md) § 6) rather than
+> re-litigating it. Every matrix cell carries a glyph **and** a word (`▩ not permitted`), colour third
+> — KB-15 per cell — and `▩` rather than `⊘`, because `⊘` already means *no shaft reaches this floor*
+> everywhere else in the viewer.
 
 ### W9 — R12, made mechanical *(depends on W3)* — ✅ **DONE 2026-07-29, and it emptied a category**
 

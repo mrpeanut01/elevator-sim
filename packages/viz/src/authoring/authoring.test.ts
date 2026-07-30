@@ -30,10 +30,13 @@ import { recordRun } from '../record/recordRun.js';
 
 import {
   BLANK_SPEC,
+  accessZonesOf,
   banksOf,
   buildingFromSpec,
   canExpress,
+  credentialGroupsOf,
   floorIdOf,
+  nextZoneId,
   occupancyLine,
   orphanFloors,
   personsOf,
@@ -43,6 +46,9 @@ import {
   totalPopulation,
   unreachableFloors,
   validateSpec,
+  withZoneFloor,
+  withZoneGroup,
+  zoneFloorsOf,
   type BuildingSpec,
 } from './buildingSpec.js';
 import {
@@ -533,6 +539,86 @@ describe('the building spec', () => {
     }
   });
 
+  it('carries a shipped building’s access zoning through the round trip rather than dropping it', () => {
+    /*
+     * The destructive half of the round trip, and it was silent. `specFromBuilding` read no
+     * `accessZones` and `buildingFromSpec` wrote `accessZones: []` unconditionally, so opening
+     * Secure Tower in the new editor and saving it untouched produced a building with **zero**
+     * access zones — § D159's puzzle (locked-out legs equalling undelivered legs) disappearing
+     * with nothing on screen saying so. Three shipped buildings declare zones: `secure-tower`
+     * (5), `mixed-use-high-rise` (2), `vertical-city` (2).
+     *
+     * Asserted over all five, not only the three, because the two that declare `[]` are the arms
+     * that would keep passing if the field were dropped again.
+     */
+    for (const id of BUILDING_IDS) {
+      const config = parseBuilding(read(`buildings/${id}.json`));
+      const rebuilt = buildingFromSpec(specFromBuilding(config, id), { specs: SPECS });
+      expect(rebuilt.accessZones ?? [], id).toStrictEqual(config.accessZones ?? []);
+    }
+  });
+
+  it('writes only the zone floors this tower has, and says what it left out', () => {
+    /*
+     * The floor slider and the zones are the same building, so shortening the tower has to do
+     * something honest with a zone that named the top of it. `config/parse.ts` refuses a zone naming
+     * a floor the building lacks, so the choice is between a document that will not load and one
+     * that carries fewer floors — and the second is only defensible if the editor *says so*, which
+     * is the assertion below.
+     */
+    const tall: BuildingSpec = {
+      ...BLANK_SPEC,
+      floors: 20,
+      accessZones: [{ id: 'zone-1', floors: [4, 18], credentialGroups: ['alpha'] }],
+    };
+    expect(accessZonesOf(tall)[0]?.floors).toStrictEqual(['5', '19']);
+    const short: BuildingSpec = { ...tall, floors: 8 };
+    expect(accessZonesOf(short)[0]?.floors).toStrictEqual(['5']);
+    expect(validateSpec(short, undefined).join(' ')).toMatch(/a floor this tower does not have/);
+    // And the shortened document still loads, which is what makes the wording above the true one.
+    expect(() =>
+      resolveBuilding(parseBuilding(buildingFromSpec(short, { specs: SPECS }) as unknown), SPECS),
+    ).not.toThrow();
+  });
+
+  it('leaves a zone that covers nothing out of the document, and does not claim a refusal', () => {
+    const empty: BuildingSpec = {
+      ...BLANK_SPEC,
+      accessZones: [{ id: nextZoneId(BLANK_SPEC), floors: [], credentialGroups: [] }],
+    };
+    expect(nextZoneId(empty)).toBe('zone-2');
+    expect(accessZonesOf(empty)).toStrictEqual([]);
+    const said = validateSpec(empty, undefined).join(' ');
+    expect(said).toMatch(/covers no floor of this building/);
+    // A zone with no group is a refusal only once it covers a floor. Saying it here would be a false
+    // claim about a mechanism — the document loads, because the zone is never written.
+    expect(said).not.toMatch(/loader refuses/);
+    expect(() =>
+      resolveBuilding(parseBuilding(buildingFromSpec(empty, { specs: SPECS }) as unknown), SPECS),
+    ).not.toThrow();
+  });
+
+  it('reports dirty when a zone changes, and not when a floor nothing writes is toggled', () => {
+    const base: BuildingSpec = {
+      ...BLANK_SPEC,
+      accessZones: [{ id: 'zone-1', floors: [4], credentialGroups: ['alpha'] }],
+    };
+    expect(buildingSpecIsDirty(base, base)).toBe(false);
+    expect(
+      buildingSpecIsDirty({ ...base, accessZones: withZoneFloor(base, 'zone-1', 5) }, base),
+    ).toBe(true);
+    expect(
+      buildingSpecIsDirty({ ...base, accessZones: withZoneGroup(base, 'zone-1', 'bravo') }, base),
+    ).toBe(true);
+    // A floor above the roof is never written, so pinning one is not a building that saves differently.
+    expect(
+      buildingSpecIsDirty(
+        { ...base, accessZones: withZoneFloor(base, 'zone-1', base.floors + 4) },
+        base,
+      ),
+    ).toBe(false);
+  });
+
   it('takes persons from the capacities table rather than dividing by 150', () => {
     // 1600 / 150 is 10.67; the table says 10, and a car capacity is a denominator.
     expect(personsOf(1600)).toBe(10);
@@ -640,6 +726,98 @@ describe('the building editor is not decoration', () => {
       SPECS,
     );
     expect(RoutePlanner.forBuilding(joinedBuilding).plan('G', '9')?.elevatorLegCount).toBe(2);
+  });
+
+  /* ---- access zoning: the credential half, and only that ------------------ */
+
+  const ZONED: BuildingSpec = {
+    ...spec,
+    accessZones: [{ id: 'zone-1', floors: [6, 7, 8, 9, 10], credentialGroups: ['tenant'] }],
+  };
+  const partsOf = (of: BuildingSpec): readonly [readonly string[], unknown] =>
+    JSON.parse(runWith(of)) as [readonly string[], unknown];
+
+  it('an access zone changes the run, and leaves every shaft serving exactly what it did', () => {
+    /*
+     * The whole of why access zoning is a *second* kind of zoning. The two arms are the same three
+     * cars over the same ten floors — no band moved, no bank split — so `servedFloorIds` must be
+     * byte-identical, and the **legs** must not be: a credential-blind dispatcher assigns cars to
+     * trips the passenger may not legally take, and the trips it cannot assign are never generated
+     * rather than served slowly (§ D159, and `docs/10` § 10.3's structural refusal).
+     *
+     * A test that compared only the whole fingerprint could pass with a control that quietly
+     * rewrote `servesFloors` — which is precisely the collapse `CLAUDE.md` forbids, and the one
+     * `WAVE10_PLAN.md` § 6 refused the handoff's `⚿` badge over.
+     */
+    expect(partsOf(ZONED)[0]).toStrictEqual(partsOf(spec)[0]);
+    expect(JSON.stringify(partsOf(ZONED)[1])).not.toBe(JSON.stringify(partsOf(spec)[1]));
+  });
+
+  it('the floor multi-select changes the run — one more floor inside the zone', () => {
+    const wider: BuildingSpec = { ...ZONED, accessZones: withZoneFloor(ZONED, 'zone-1', 5) };
+    expect(zoneFloorsOf(wider, wider.accessZones[0] as never)).toStrictEqual([5, 6, 7, 8, 9, 10]);
+    expect(runWith(wider)).not.toBe(runWith(ZONED));
+    // And clicking the same floor again is the inverse edit, back to the run we started from.
+    const back: BuildingSpec = { ...wider, accessZones: withZoneFloor(wider, 'zone-1', 5) };
+    expect(runWith(back)).toBe(runWith(ZONED));
+  });
+
+  it('the credential control changes the run — the same floors under a different group', () => {
+    /*
+     * Two zones, one credential each, and the **only** difference between the arms is the name of
+     * the second zone's group. Secure Tower's own note is the mechanism: *"an interfloor trip such
+     * as 6 → 18 is legal by credential only for holders of both tenant groups"* — so when the two
+     * zones share a group every interfloor pair between them is feasible, and when they do not,
+     * `traffic/generator.ts`'s `credentialForRoute` finds no credential and the pair is never
+     * generated at all. No band moved, no bank split, no floor changed hands.
+     */
+    const shared: BuildingSpec = {
+      ...spec,
+      accessZones: [
+        { id: 'zone-1', floors: [3, 4, 5], credentialGroups: ['alpha'] },
+        { id: 'zone-2', floors: [8, 9, 10], credentialGroups: ['alpha'] },
+      ],
+    };
+    const split: BuildingSpec = {
+      ...shared,
+      accessZones: withZoneGroup(
+        { ...shared, accessZones: withZoneGroup(shared, 'zone-2', 'alpha') },
+        'zone-2',
+        'bravo',
+      ),
+    };
+    expect(credentialGroupsOf(split)).toStrictEqual(['alpha', 'bravo']);
+    expect(partsOf(split)[0]).toStrictEqual(partsOf(shared)[0]);
+    expect(runWith(split)).not.toBe(runWith(shared));
+  });
+
+  it('a group added beside one that already works is a no-op, and that is the mechanism, not a bug', () => {
+    /*
+     * Measured, and worth pinning rather than discovering twice. `credentialAssignment` defaults to
+     * `permitted-first`, and `credentialForRoute` returns the **first** group permitted on every
+     * restricted floor of the route — so widening a zone from `tenant` to `tenant, facilities`
+     * leaves every route's chosen credential and every leg bit-identical.
+     *
+     * That is not an inert control: the group set decides which routes are feasible at all (the
+     * case above) and which credential a locked-out rider is reported as carrying. It is a control
+     * whose effect is on the *set*, so an edit that does not change the set changes nothing — and a
+     * test that expected otherwise would have been pinning a wish. The coverage matrix is where the
+     * reader sees which columns a floor is open to, which is the fact this edit does move.
+     */
+    const wider: BuildingSpec = { ...ZONED, accessZones: withZoneGroup(ZONED, 'zone-1', 'facilities') };
+    expect(credentialGroupsOf(wider)).toStrictEqual(['tenant', 'facilities']);
+    expect(runWith(wider)).toBe(runWith(ZONED));
+  });
+
+  it('the access zones the round trip used to drop change the run on Secure Tower', () => {
+    /*
+     * The measurement that makes the round-trip fix a correctness fix rather than a tidy-up. Before
+     * it, opening this building here and saving it produced `accessZones: []` — and these two arms
+     * are exactly that difference, under `eta`, which reads no credential.
+     */
+    const tower = specFromBuilding(parseBuilding(read('buildings/secure-tower.json')), 'secure-tower');
+    expect(accessZonesOf(tower)).toHaveLength(5);
+    expect(runWith(tower)).not.toBe(runWith({ ...tower, accessZones: [] }));
   });
 
   it('says exactly what the real route planner says about who can get out of the lobby', () => {

@@ -45,6 +45,7 @@
 import type { SimTime } from '../kernel/types.js';
 import type { CredentialGroup, Direction } from '../model/types.js';
 
+import type { AwtInvalidGround } from './awtValidity.js';
 import type { PassengerModel } from './comparability.js';
 
 /* -------------------------------------------------------------------------- *
@@ -1353,19 +1354,20 @@ export interface RunSummary {
   /**
    * Whether {@link waiting}'s mean may carry a confidence interval.
    *
-   * `false` on any of four independent grounds:
+   * `false` on any of four independent grounds — the members of `AWT_INVALID_GROUNDS`, which is
+   * derived from the table in `metrics/awtValidity.ts` rather than listed here or anywhere else:
    *
-   * 1. **Saturation** — the queue diverged over the window. docs/03-traffic-and-statistics.md:
+   * 1. **`saturated`** — the queue diverged over the window. docs/03-traffic-and-statistics.md:
    *    "If a configuration saturates, flag it and suppress the AWT interval. Do not report a
    *    mean for a system whose queues grow without bound."
-   * 2. **Censoring** — too large a fraction of the window's arrivals were never served, so the
+   * 2. **`empty-window`** — nobody was served at all, so there is no mean.
+   * 3. **`censored`** — too large a fraction of the window's arrivals were never served, so the
    *    mean is taken over the survivors, who are systematically the passengers who waited
    *    least. See `DEFAULT_MAX_UNSERVED_FRACTION`. This is checked *separately* from the
    *    trend test: recorded queue samples can legitimately overturn the trend verdict (only
    *    the simulation knows why a landing emptied), but nothing can make the mean of the
    *    fastest sixth of a cohort trustworthy.
-   * 3. **Emptiness** — nobody was served at all, so there is no mean.
-   * 4. **Starvation** — somebody waited past `DEFAULT_MAX_WAIT_HORIZON_S`. Gates 1 and 2 are
+   * 4. **`starved`** — somebody waited past `DEFAULT_MAX_WAIT_HORIZON_S`. Gates 1 and 3 are
    *    both proxies for "the backlog did not clear" and neither sees a backlog that *did*
    *    clear, just late enough to leave a passenger on a landing for a quarter of an hour. See
    *    {@link ServiceLevelDiagnosis}, which carries the evidence.
@@ -1373,11 +1375,35 @@ export interface RunSummary {
    * The four are evaluated in that order, so a run that trips more than one reports the most
    * fundamental reason rather than the last one checked.
    *
+   * **The order above is corrected, not restated.** This list used to number censoring second and
+   * emptiness third while claiming the four were *"evaluated in that order"*, and the code has
+   * always checked emptiness first. They disagree observably on a window where nobody boarded and
+   * more than the censoring limit went unserved: the run reports emptiness, and this docstring said
+   * it would report censoring. `metrics/awtValidity.ts` records why the code's order is the right
+   * one to keep.
+   *
    * Phase 3 reads this and suppresses the interval.
    */
   readonly awtIsValid: boolean;
-  /** Why not, when {@link awtIsValid} is `false`. */
+  /**
+   * Why not, when {@link awtIsValid} is `false`. **The prose, and it is never a code.**
+   *
+   * Present exactly when {@link awtInvalidGround} is, and never without it.
+   */
   readonly awtInvalidReason?: string | undefined;
+  /**
+   * **Which** of the grounds refused the mean, beside {@link awtInvalidReason}'s sentence.
+   *
+   * Present exactly when {@link awtInvalidReason} is. This is what lets a presentation layer word a
+   * refusal per ground — a plain-language lead for a player, a per-kind count in a report — *without
+   * re-deciding which ground fired* from `saturation`, `waiting` and `serviceLevel`, which would be
+   * a second answer to a question `diagnoseAwtValidity` has already answered.
+   *
+   * It does not replace the prose and may not be shown instead of it: a consumer handed a ground it
+   * has no wording for quotes {@link awtInvalidReason}, which is what every consumer did before this
+   * field existed. See `metrics/awtValidity.ts`.
+   */
+  readonly awtInvalidGround?: AwtInvalidGround | undefined;
 }
 
 /* -------------------------------------------------------------------------- *

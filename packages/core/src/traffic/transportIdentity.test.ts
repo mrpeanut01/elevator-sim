@@ -16,12 +16,21 @@
  * in exactly the sense `experiments/benchmark/published.ts` means: a number this tree must
  * reproduce and did not compute for itself.
  *
- * ## The one field that is excluded, and why excluding it is not a hole
+ * ## The two fields that are excluded, and why excluding them is not a hole
  *
  * `ConservationAudit.transportHops` is new, so a baseline result has no such key and a digest
  * over it could never match. It is deleted before hashing — and asserted to be `0` separately, in
  * the same test. That is the difference between excluding a field and hiding one: if this change
  * ever made a lift-only building take a hop, the exclusion would not conceal it.
+ *
+ * `RunSummary.awtInvalidGround` is the second, added when the four `awtIsValid` grounds acquired a
+ * machine-readable code beside their prose (`metrics/awtValidity.ts`). It is new in exactly the same
+ * sense and is excluded in exactly the same way — and the assertion that replaces it is **stronger
+ * than the digest was**, because a digest over the key only ever pinned its bytes. What is asserted
+ * instead, on every cell of both suites, is that the code is present precisely when `awtIsValid` is
+ * `false`, that it is one of `AWT_INVALID_GROUNDS`, and that the prose it sits beside is still
+ * there. A digest could not have said any of that: it would have gone green on a summary that
+ * carried a code with no sentence, or a sentence with no code, as long as the bytes matched.
  *
  * Nothing else is excluded, and nothing else needed to be: `GeneratedPassenger.transportHops` and
  * `PassengerRecord.egressTransitSeconds` are both **omitted rather than emptied** when they carry
@@ -33,6 +42,7 @@ import { createHash } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { LoadedConfig } from '../config/types.js';
+import { AWT_INVALID_GROUNDS } from '../metrics/awtValidity.js';
 import { BUILDING_IDS, DATA_DIR, load } from '../sim/fixtures.test-helper.js';
 import { runSimulation } from '../sim/simulation.js';
 
@@ -112,6 +122,10 @@ beforeAll(async () => {
 interface Measured {
   readonly digest: string;
   readonly transportHops: number;
+  /** The excluded suppression code, kept so the assertion below can be about its *meaning*. */
+  readonly awtInvalidGround: string | undefined;
+  readonly awtInvalidReason: string | undefined;
+  readonly awtIsValid: boolean;
 }
 
 function measure(buildingId: string, profileId: string): Measured {
@@ -129,10 +143,42 @@ function measure(buildingId: string, profileId: string): Measured {
   });
   const clone = JSON.parse(JSON.stringify(result)) as {
     conservation: { transportHops?: number };
+    summary: {
+      awtIsValid: boolean;
+      awtInvalidReason?: string;
+      awtInvalidGround?: string;
+    };
   };
   const transportHops = clone.conservation.transportHops ?? 0;
   delete clone.conservation.transportHops;
-  return { digest: createHash('sha256').update(JSON.stringify(clone)).digest('hex'), transportHops };
+  const { awtIsValid, awtInvalidReason, awtInvalidGround } = clone.summary;
+  delete clone.summary.awtInvalidGround;
+  return {
+    digest: createHash('sha256').update(JSON.stringify(clone)).digest('hex'),
+    transportHops,
+    awtInvalidGround,
+    awtInvalidReason,
+    awtIsValid,
+  };
+}
+
+/**
+ * What replaces the excluded `awtInvalidGround` byte, and it asks more than the byte did.
+ *
+ * Three claims, and the first two are the ones a digest structurally could not make: the code and
+ * the sentence travel **together or not at all**, and the code is a member of the derived
+ * enumeration rather than any string the branch happened to return.
+ */
+function expectSuppressionCodeBesideItsProse(measured: Measured, key: string): void {
+  if (measured.awtIsValid) {
+    expect(measured.awtInvalidGround, key).toBeUndefined();
+    expect(measured.awtInvalidReason, key).toBeUndefined();
+    return;
+  }
+  expect(measured.awtInvalidGround, key).toBeDefined();
+  expect(AWT_INVALID_GROUNDS as readonly string[], key).toContain(measured.awtInvalidGround);
+  // The prose is not replaced by the code. It is the thing several guards assert on.
+  expect(measured.awtInvalidReason ?? '', key).not.toBe('');
 }
 
 describe('a building that declares no transport mode runs exactly as it did before they existed', () => {
@@ -163,11 +209,12 @@ describe('a building that declares no transport mode runs exactly as it did befo
     for (const profileId of PROFILES) {
       const key = `${buildingId}|${profileId}`;
       it(`${key} reproduces baseline d7e8571 byte for byte`, () => {
-        const { digest, transportHops } = measure(buildingId, profileId);
-        expect(digest).toBe(BASELINE_DIGESTS[key]);
-        // The excluded field, asserted rather than assumed. A lift-only building taking a hop
+        const measured = measure(buildingId, profileId);
+        expect(measured.digest).toBe(BASELINE_DIGESTS[key]);
+        // The excluded fields, asserted rather than assumed. A lift-only building taking a hop
         // would be invisible to the digest and is not invisible here.
-        expect(transportHops).toBe(0);
+        expect(measured.transportHops).toBe(0);
+        expectSuppressionCodeBesideItsProse(measured, key);
       });
     }
   }
@@ -177,7 +224,9 @@ describe('the building that declares one moved, and moved everywhere', () => {
   for (const profileId of PROFILES) {
     const key = `vertical-city|${profileId}`;
     it(`${key} reproduces the re-derived digest and is neither superseded one`, () => {
-      const { digest, transportHops } = measure('vertical-city', profileId);
+      const measured = measure('vertical-city', profileId);
+      const { digest, transportHops } = measured;
+      expectSuppressionCodeBesideItsProse(measured, key);
       expect(digest).toBe(MOVED_DIGESTS[key]);
       // Distinct from *both* prior states, so a regression that silently reverts either the
       // sky-lobby escalators or the ground one fails here by name rather than by a moved mean.

@@ -26,13 +26,16 @@ import {
   orphanFloors,
   personsOf,
   validateSpec,
+  withZoneGroup,
   type BuildingSpec,
 } from '../authoring/buildingSpec.js';
 import { classesFromSpecs, type MachineClass } from '../authoring/machineSpec.js';
+import { STATE_GLYPHS, STATE_WORDS } from '../access/zoning.js';
 
 import {
   CAPACITY_TICK_PCT,
   OCCUPANCY_MAX_PCT,
+  accessMatrixOf,
   checkBuilding,
   elevationCarsOf,
   elevationNoteOf,
@@ -41,6 +44,7 @@ import {
   floorAtFraction,
   loadChipsOf,
   occupancyAtFraction,
+  selectedZoneOf,
   shaftTintOf,
   skyChipsOf,
   skyFloorsEvery,
@@ -49,6 +53,9 @@ import {
   specRowsOf,
   specTrackOf,
   speedChipsOf,
+  zoneChoicesOf,
+  zoneFloorChoicesOf,
+  zoneGroupChoicesOf,
 } from './buildingEditor.js';
 import { speedLadderOf } from './machinesEditor.js';
 
@@ -469,5 +476,196 @@ describe('validating against the real loader', () => {
   it('accepts a bank split produced by a drag', () => {
     const check = checkBuilding({ ...TOWER, bandByCar: { 0: [6, 12] } }, SPECS);
     expect(check.error).toBe('');
+  });
+});
+
+/* ========================================================================== *
+ * Access zoning — docs/10 § 10.2's two controls
+ * ========================================================================== */
+
+const ZONED: BuildingSpec = {
+  ...TOWER,
+  accessZones: [
+    { id: 'zone-1', floors: [3, 4, 5], credentialGroups: ['alpha', 'facilities'] },
+    { id: 'zone-2', floors: [9, 10, 11, 12], credentialGroups: ['bravo'] },
+  ],
+};
+
+describe('the floor multi-select', () => {
+  it('offers this building’s own floors, top first, and nothing else', () => {
+    const choices = zoneFloorChoicesOf(ZONED, 'zone-1');
+    // Every floor including the lobby, so a reader can restrict the entrance if they mean to.
+    expect(choices).toHaveLength(TOWER.floors + 1);
+    expect(choices[0]?.floor).toBe(TOWER.floors);
+    expect(choices.at(-1)?.floor).toBe(0);
+    expect(choices.at(-1)?.isEntrance).toBe(true);
+    // There is no id here the document does not have — `ED-14`'s error made unreachable, § 10.2.
+    expect(choices.map((choice) => choice.floorId)).toStrictEqual(
+      elevationRowsOf(TOWER).map((row) => floorIdOf(row.floor)),
+    );
+  });
+
+  it('marks exactly the floors in the selected zone, and names the zones that share one', () => {
+    const choices = zoneFloorChoicesOf(ZONED, 'zone-1');
+    const held = choices.filter((choice) => choice.inZone).map((choice) => choice.floor);
+    expect(held).toStrictEqual([5, 4, 3]);
+    /*
+     * Permission on a floor is the **union** over every zone covering it, so the other zones a floor
+     * already belongs to have to be visible at the control: a reader adding floor 10 to zone-1 is
+     * widening its permission, not moving it out of zone-2, and a control that hid that would be
+     * offering an edit whose effect is not the one it draws.
+     */
+    for (const choice of choices) {
+      expect([choice.floor, choice.otherZoneIds]).toStrictEqual([
+        choice.floor,
+        choice.floor >= 9 && choice.floor <= 12 ? ['zone-2'] : [],
+      ]);
+    }
+    expect(zoneFloorChoicesOf(ZONED, 'zone-2').filter((choice) => choice.inZone)).toHaveLength(4);
+  });
+
+  it('drops a floor the tower no longer has rather than offering it', () => {
+    const shortened: BuildingSpec = { ...ZONED, floors: 6 };
+    const choices = zoneFloorChoicesOf(shortened, 'zone-2');
+    expect(choices).toHaveLength(7);
+    expect(choices.some((choice) => choice.inZone)).toBe(false);
+    expect(zoneChoicesOf(shortened, 'zone-2')[1]?.floorCount).toBe(0);
+  });
+});
+
+describe('the credential control', () => {
+  it('offers the groups the building already names, in declared order, and no fixed vocabulary', () => {
+    expect(zoneGroupChoicesOf(ZONED, 'zone-1').map((choice) => choice.group)).toStrictEqual([
+      'alpha',
+      'facilities',
+      'bravo',
+    ]);
+    expect(zoneGroupChoicesOf(ZONED, 'zone-1').map((choice) => choice.inZone)).toStrictEqual([
+      true,
+      true,
+      false,
+    ]);
+    // A building with no zone has no vocabulary at all, which is the state the free-entry box is for.
+    expect(zoneGroupChoicesOf(TOWER, 'zone-1')).toStrictEqual([]);
+  });
+});
+
+describe('the coverage matrix', () => {
+  it('is floors × credential groups, top floor first, with every group as a column', () => {
+    const matrix = accessMatrixOf(ZONED);
+    expect(matrix.groups).toStrictEqual(['alpha', 'facilities', 'bravo']);
+    expect(matrix.rows).toHaveLength(TOWER.floors + 1);
+    expect(matrix.rows[0]?.floor).toBe(TOWER.floors);
+    for (const row of matrix.rows) expect(row.cells).toHaveLength(3);
+  });
+
+  it('says unrestricted, permitted and not permitted as three different things', () => {
+    const matrix = accessMatrixOf(ZONED);
+    const at = (floorId: string) => matrix.rows.find((row) => row.floorId === floorId);
+
+    // A floor in no zone: open to every column, and marked as *unrestricted* rather than as granted.
+    const lobby = at('G');
+    expect(lobby?.restricted).toBe(false);
+    expect(lobby?.cells.map((cell) => cell.unrestricted)).toStrictEqual([true, true, true]);
+    expect(lobby?.cells.every((cell) => cell.permitted)).toBe(true);
+
+    // A floor in zone-1: alpha and facilities open it, bravo does not.
+    const inZone = at('4');
+    expect(inZone?.restricted).toBe(true);
+    expect(inZone?.zoneIds).toStrictEqual(['zone-1']);
+    expect(inZone?.cells.map((cell) => cell.permitted)).toStrictEqual([true, true, false]);
+    expect(inZone?.cells.map((cell) => cell.unrestricted)).toStrictEqual([false, false, false]);
+  });
+
+  it('carries a glyph *and* a word in every cell — KB-15, not a colour-only signal', () => {
+    const matrix = accessMatrixOf(ZONED);
+    for (const row of matrix.rows) {
+      for (const cell of row.cells) {
+        expect(cell.glyph).not.toBe('');
+        expect(cell.word).not.toBe('');
+      }
+    }
+    const inZone = matrix.rows.find((row) => row.floorId === '4');
+    const refused = inZone?.cells.find((cell) => !cell.permitted);
+    // The lens's own vocabulary, not a second spelling of a fact the viewer already draws — and
+    // `▩` rather than `⊘`, because `⊘` means *no shaft reaches this floor* on every other surface.
+    expect(refused?.state).toBe('not-permitted');
+    expect(refused?.glyph).toBe(STATE_GLYPHS['not-permitted']);
+    expect(refused?.word).toBe(STATE_WORDS['not-permitted']);
+    expect(refused?.glyph).not.toBe(STATE_GLYPHS['not-served']);
+    const granted = inZone?.cells.find((cell) => cell.permitted);
+    expect(granted?.glyph).toBe(STATE_GLYPHS.reachable);
+    // And the unrestricted mark is a third shape, distinguishable with the colour removed.
+    const free = matrix.rows.find((row) => row.floorId === 'G')?.cells[0];
+    expect(free?.glyph).not.toBe(STATE_GLYPHS.reachable);
+    expect(free?.glyph).not.toBe(STATE_GLYPHS['not-permitted']);
+    expect(free?.word).not.toBe(STATE_WORDS.reachable);
+  });
+
+  it('makes a floor no group opens visible, which is the state that strands demand', () => {
+    // Reachable by withdrawing every group from a zone — which the schema refuses on save, so the
+    // matrix showing it and `validateSpec` refusing it are the same fact said twice.
+    const emptied: BuildingSpec = {
+      ...ZONED,
+      accessZones: withZoneGroup(ZONED, 'zone-2', 'bravo'),
+    };
+    const matrix = accessMatrixOf(emptied);
+    expect(matrix.strandedIds).toStrictEqual(['13', '12', '11', '10']);
+    const row = matrix.rows.find((entry) => entry.floorId === '10');
+    expect(row?.stranded).toBe(true);
+    expect(row?.cells.every((cell) => !cell.permitted)).toBe(true);
+    expect(validateSpec(emptied, undefined).join(' ')).toMatch(/names no credential group/);
+    // And the loader really does refuse it, so the editor's sentence is not a false claim.
+    expect(checkBuilding(emptied, SPECS).error).not.toBe('');
+  });
+
+  it('names the restricted floors as runs, not as a comma-separated census', () => {
+    const matrix = accessMatrixOf(ZONED);
+    expect(matrix.restrictedIds).toStrictEqual(['4', '5', '6', '10', '11', '12', '13']);
+    expect(matrix.restrictedRuns).toBe('4–6, 10–13');
+  });
+
+  it('has no column and no restricted floor on a building with no zone', () => {
+    const matrix = accessMatrixOf(TOWER);
+    expect(matrix.groups).toStrictEqual([]);
+    expect(matrix.restrictedIds).toStrictEqual([]);
+    expect(matrix.strandedIds).toStrictEqual([]);
+    expect(matrix.rows.every((row) => row.cells.length === 0)).toBe(true);
+  });
+});
+
+describe('the elevation’s note keeps the two zonings apart', () => {
+  it('says nothing about credentials on a building with no zone', () => {
+    const note = elevationNoteOf(TOWER);
+    expect(note).toContain('bank is the set of cars');
+    expect(note).not.toMatch(/credential/);
+  });
+
+  it('names the credential barrier as a credential, and the floors as served', () => {
+    const note = elevationNoteOf(ZONED);
+    expect(note).toMatch(/credential and not a shaft/);
+    expect(note).toMatch(/physically served/);
+    expect(note).toContain('4–6, 10–13');
+    // The sentence a reader needs most: an unanswerable call is not a slow one.
+    expect(note).toMatch(/never generated/);
+  });
+
+  it('says how many floors no group opens, when that is the state', () => {
+    const emptied: BuildingSpec = { ...ZONED, accessZones: withZoneGroup(ZONED, 'zone-2', 'bravo') };
+    expect(elevationNoteOf(emptied)).toMatch(/open to no group at all/);
+  });
+});
+
+describe('the zone selector', () => {
+  it('counts what each zone will carry, and falls back to the first when the id is stale', () => {
+    const choices = zoneChoicesOf(ZONED, 'zone-2');
+    expect(choices.map((choice) => choice.id)).toStrictEqual(['zone-1', 'zone-2']);
+    expect(choices.map((choice) => choice.selected)).toStrictEqual([false, true]);
+    expect(choices[0]?.floorCount).toBe(3);
+    expect(choices[0]?.groupCount).toBe(2);
+    expect(choices[0]?.runs).toBe('4–6');
+    // A removal leaves a stale id behind; the form must draw the surviving zone, not an empty one.
+    expect(selectedZoneOf(ZONED, 'zone-9')?.id).toBe('zone-1');
+    expect(selectedZoneOf(TOWER, 'zone-1')).toBeUndefined();
   });
 });

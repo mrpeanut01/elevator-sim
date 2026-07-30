@@ -705,6 +705,29 @@
       .elev-grip { height: 10px; flex: none; cursor: ns-resize; opacity: 0.5; border: 0; padding: 0; }
       .elev-legend-row { display: flex; align-items: center; gap: 10px; font: 500 10.5px var(--mono); color: var(--dim); padding: 3px 2px; }
 
+      /* Access zoning — docs/10 § 10.2's floor multi-select and coverage matrix.
+         A credential is not a shaft, so none of this borrows the shaft tints or the
+         wait-age bands: the only colours here are the shared --ok / --over / --faint,
+         and every cell carries a glyph and a word as well (KB-15). */
+      .zone-floors { display: flex; flex-wrap: wrap; gap: 4px; }
+      .zone-floor {
+        min-width: 30px; padding: 3px 5px; border-radius: var(--r-chip); cursor: pointer;
+        font: 600 10px var(--mono); color: var(--dim);
+        background: var(--bg); border: 1px solid var(--edge);
+      }
+      .zone-floor[aria-pressed='true'] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+      .zone-floor[data-shared='true'] { border-style: dashed; }
+      .zmatrix { overflow: auto; max-height: 320px; }
+      .zmatrix table { border-collapse: collapse; font: 500 10px var(--mono); }
+      .zmatrix th, .zmatrix td {
+        border-bottom: 1px solid var(--hairline); padding: 2px 7px; text-align: left; white-space: nowrap;
+      }
+      .zmatrix th { color: var(--faint); font-weight: 600; letter-spacing: 0.05em; position: sticky; top: 0; background: #0d1219; }
+      .zmatrix td.zcell-open { color: var(--ok); }
+      .zmatrix td.zcell-closed { color: var(--over); }
+      .zmatrix td.zcell-free { color: var(--faint); }
+      .zmatrix tr[data-stranded='true'] th { color: var(--over); }
+
       /* The retained instrument surfaces, § 2.3. Same `.figure` vocabulary. */
       .instrument-bar {
         display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
@@ -1356,6 +1379,65 @@
                       until you save the building or run a fresh day from it. A smarter dispatcher is free; a
                       fifth shaft is not.
                     </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- docs/10 § 10.2 — access zoning, the half of W8 that was open.
+                   Deliberately its own block and not a column of the elevation: the
+                   elevation draws service zoning (which floors a shaft reaches) and this
+                   draws access zoning (which credential opens them). The stage lane
+                   refused the handoff's `⚿` floor badge for collapsing the two
+                   (WAVE10_PLAN.md § 6) and that refusal is respected here — the two
+                   pictures are separate, and the elevation's own note says which is which. -->
+              <div style="margin: 18px 0 0">
+                <div class="eyebrow-row">
+                  <span class="eyebrow">Access zoning — credentials, not shafts</span>
+                </div>
+                <div style="font: 500 10px var(--mono); color: var(--faint); margin: 0 0 9px; line-height: 1.5">
+                  pick a zone, then click the floors it covers and the credential groups it admits ·
+                  a floor in no zone is unrestricted · the matrix is floors × credential groups
+                </div>
+                <div class="editor-panel">
+                  <div class="chip-row">
+                    <span class="helpful" style="font-size: 11.5px; color: var(--dim); margin-right: 4px"
+                          title="An access zone is a set of floors and the credential groups permitted to reach them. Floors in no zone are unrestricted — that is core's own semantics, not a default this editor invented.">zone</span>
+                    <span class="chip-row" id="building-zone-chips"></span>
+                    <button type="button" class="chip" id="building-add-zone">+ zone</button>
+                    <button type="button" class="chip" id="building-remove-zone">− zone</button>
+                  </div>
+                  <div style="margin-top: 11px">
+                    <div class="eyebrow helpful"
+                         title="The floors this zone covers. A multi-select over the building's own floors, so a zone can never name a floor the document does not have.">
+                      Floors in this zone
+                    </div>
+                    <div class="zone-floors" style="margin-top: 6px" id="building-zone-floors"></div>
+                  </div>
+                  <div style="margin-top: 11px">
+                    <div class="eyebrow helpful"
+                         title="The credential groups permitted on those floors. The options are the groups this building already names — there is no fixed vocabulary, because core has none and inventing one would be a second source of truth.">
+                      Credential groups admitted
+                    </div>
+                    <div class="chip-row" style="margin-top: 6px" id="building-zone-groups"></div>
+                    <div class="chip-row" style="margin-top: 6px">
+                      <label class="field" style="margin: 0">new group
+                        <input id="building-group-name" size="18" />
+                      </label>
+                      <button type="button" class="chip" id="building-group-add">add to this zone</button>
+                    </div>
+                  </div>
+                  <div style="margin-top: 13px; padding-top: 11px; border-top: 1px solid #1c2532">
+                    <div class="eyebrow helpful"
+                         title="Coverage: every floor against every credential group this building names. A row no column opens is a floor whose trips are never generated at all.">
+                      Coverage — floors × credential groups
+                    </div>
+                    <div class="zmatrix" style="margin-top: 7px" id="building-access-matrix"></div>
+                    <div style="font: 500 10px var(--mono); color: var(--faint); margin-top: 7px; line-height: 1.6"
+                         id="building-access-legend"></div>
+                    <div style="font: 500 10.5px var(--mono); color: var(--over); margin-top: 5px; line-height: 1.5"
+                         role="alert" id="building-access-warning"></div>
+                    <div style="font: 500 10.5px var(--mono); color: var(--accent-soft); margin-top: 5px; line-height: 1.5"
+                         id="building-access-note"></div>
                   </div>
                 </div>
               </div>
