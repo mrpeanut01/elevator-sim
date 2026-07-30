@@ -19,16 +19,23 @@
  *    Vertical City run.
  */
 
-import { loadConfig, type DispatcherProfile, type LoadedConfig } from '@elevator-sim/core';
+import {
+  loadConfig,
+  type DispatcherProfile,
+  type LoadedConfig,
+  type TrafficProfiles,
+} from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { classesFromSpecs, type MachineClass } from '../authoring/machineSpec.js';
 import { DEFAULT_PATTERN, specFromTrafficProfile } from '../authoring/patternSpec.js';
+import { probabilityWordIn } from '../campaign/words.js';
 import type { VizRecording } from '../contract/types.js';
 import { DATA_DIR, breadthConfig, requireBuilding } from '../fixtures.test-helper.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import { recordRun } from '../record/recordRun.js';
 
+import type { BrowserResources } from './data.js';
 import type { PlateEntry } from './dom.js';
 import {
   buildingPlateOf,
@@ -39,6 +46,7 @@ import {
   machineWarningOf,
   nameplateOf,
   nameplateVisibleIn,
+  patternOptionsOf,
   trafficPlateOf,
 } from './rightRail.js';
 
@@ -267,6 +275,101 @@ describe('trafficPlateOf', () => {
     expect(valueOf(trafficPlateOf(DEFAULT_PATTERN, undefined), 'population')).toBe(
       'no building resolved',
     );
+  });
+});
+
+/**
+ * The pattern list's words — the sibling of *the dispatcher list's words* above, because it had
+ * the sibling defect: `patternOptionsOf` used to read `profile.$comment` onto a card's `help`,
+ * the identical route § D186 closed for dispatchers. It stayed benign here only because the one
+ * shipped traffic comment was short and player-safe, which is luck, not a bound.
+ *
+ * So these cases are about the **mechanism**: a shipped card's `help` is the profile's authored
+ * `blurb` (a field `core`'s schema requires and caps), a `$comment` may not reach any rendered
+ * string of any option, and — the direction the shipped file cannot exercise — an adversarial
+ * essay of maintainer prose planted as every profile's `$comment` still reaches nothing. Anyone
+ * re-pointing this surface at `$comment` turns that last case red.
+ */
+function resourcesWith(trafficProfiles: TrafficProfiles): BrowserResources {
+  return {
+    elevatorSpecs: config.elevatorSpecs,
+    trafficProfiles,
+    dispatcherProfiles: config.dispatcherProfiles,
+    buildings: config.buildings,
+    entries: [],
+    trafficProfileIds: new Set(trafficProfiles.profiles.map((entry) => entry.id)),
+    warnings: [],
+  };
+}
+
+describe('the pattern list’s words', () => {
+  const optionsOver = (trafficProfiles: TrafficProfiles) =>
+    patternOptionsOf(resourcesWith(trafficProfiles), [], requireBuilding(config, 'midtown-office'));
+
+  it('reads every shipped card’s help from the profile’s authored `blurb`', () => {
+    const options = optionsOver(config.trafficProfiles);
+    for (const entry of config.trafficProfiles.profiles) {
+      expect(options.find((option) => option.id === entry.id)?.help).toBe(entry.blurb);
+    }
+  });
+
+  it('never renders a traffic profile’s `$comment`, whole or in part', () => {
+    const commented = config.trafficProfiles.profiles.filter(
+      (entry) => (entry.$comment ?? '').trim() !== '',
+    );
+    // Both ways: a file that stopped carrying comments would make the loop below vacuous.
+    expect(commented.length).toBeGreaterThan(0);
+    const options = optionsOver(config.trafficProfiles);
+    for (const entry of commented) {
+      const option = options.find((candidate) => candidate.id === entry.id);
+      expect(option).toBeDefined();
+      const opening = (entry.$comment ?? '').slice(0, 24);
+      for (const text of [option?.label, option?.tag, option?.sub, option?.help]) {
+        expect(text).not.toBe(entry.$comment);
+        expect(text?.includes(opening)).toBe(false);
+      }
+    }
+  });
+
+  it('refuses an adversarial `$comment` planted on every profile, not merely the shipped ones', () => {
+    // The exact shape § D186 describes: maintainer prose, numerals in a clause with an estimate
+    // cue, far past any card's length. The shipped file never carries this; the route must
+    // refuse it anyway, or the guard above is only as strong as today's data.
+    const essay =
+      'INTERNAL-ONLY: mean AWT refused on 30 of 30 replications at seed 4242; ' +
+      'interval +0.295 [+0.154, +0.437] at n = 150; do not quote. '.repeat(80);
+    const poisoned: TrafficProfiles = {
+      ...config.trafficProfiles,
+      profiles: config.trafficProfiles.profiles.map((entry) => ({ ...entry, $comment: essay })),
+    };
+    const options = optionsOver(poisoned);
+    // The list still renders in full: the 'building' row plus one card per profile.
+    expect(options.length).toBe(poisoned.profiles.length + 1);
+    const opening = essay.slice(0, 24);
+    for (const option of options) {
+      for (const text of [option.label, option.tag, option.sub, option.help]) {
+        expect(text).not.toBe(essay);
+        expect(text.includes(opening), `${option.id}: ${text}`).toBe(false);
+        expect(text.includes('INTERNAL-ONLY')).toBe(false);
+      }
+    }
+    // Refused is not blanked: each card's help is still the authored blurb.
+    for (const entry of poisoned.profiles) {
+      expect(options.find((option) => option.id === entry.id)?.help).toBe(entry.blurb);
+    }
+  });
+
+  it('ships blurbs a driven honesty surface can carry — no estimate cue, no probability word, bounded', () => {
+    // `honesty/surfaces.ts` seeds every option's `help` as prose, so these strings are inside
+    // R1–R13. The cue list restates `honesty/properties.ts`'s module-private ESTIMATE_CUES, as
+    // the dispatcher suite above already does; the probability check is the shared word list.
+    const cues =
+      /\b(?:average|mean|awt|typical|95th|wt95|percentile|one in twenty|1 in 20|time to destination|ttd)\b/i;
+    for (const entry of config.trafficProfiles.profiles) {
+      expect(cues.test(entry.blurb), `${entry.id}: ${entry.blurb}`).toBe(false);
+      expect(probabilityWordIn(entry.blurb), `${entry.id}: ${entry.blurb}`).toBeNull();
+      expect(entry.blurb.length, `${entry.id} is ${String(entry.blurb.length)} characters`).toBeLessThanOrEqual(160);
+    }
   });
 });
 
