@@ -56,9 +56,34 @@ does not ship.
 
 ## 4 — Lanes
 
-*Populated as scouting completes. Boundaries are enforced by assignment: each lane is told the exact
-files it may write, and told to report anything it needs from another lane rather than reach for
-it.*
+Boundaries were enforced by assignment: each lane was told the exact files it might write and told to
+**report** anything it needed from another rather than reach for it. That held — no lane wrote outside
+its list, and one stopped and reported a file it needed instead of taking it.
+
+| Lane | Owns | Landed |
+|---|---|---|
+| **T81 — land wave 10** | the tree | wave 10 verified against its own claim and pushed (`22a1021`) |
+| **T83 — the 6c handover** | `docs/13` | the § D162 protocol written to be executed cold, in its own session |
+| **T89 — conformance audit** | read-only | the gap register that drove every lane below |
+| **A — shell and left rail** | `index.html`, `dev/main.ts`, `dev/elementMap.ts` | M4's missing legend, and six token/type/spacing gaps (`65de5d9`) |
+| **B — transport** | the same three, serially after A | § 4.7, § D180, and the block restyled into the handoff's vocabulary |
+| **C — elevation** | `dev/buildingEditor.ts`, `authoring/buildingSpec.ts` | the express toggle, and the stranded-band refusal (§ D181) |
+| **D — access zoning** | the same two, plus markup, serially after C | W8's last two controls, and the round trip that was deleting them (§ D182) |
+| **E — suppression ground** | `core/src/`, `viz/src/mode/` | the ground beside the prose, derivation intact (§ D183) |
+| **F — matrix front** | `experiments/src/benchmark/` | the front pinned, and a four-day-old published drift found (§ D184) |
+| **G — the transport of E** | `viz/src/contract/`, `record/`, `mode/` | schema 8, and the fixtures that could not tell wired from working (§ D185) |
+
+### What the boundary policy did **not** cover, and it cost a commit
+
+Lanes owned disjoint **files**. That is necessary and it is **not sufficient**, because `git add -A`
+stages the whole repository: `ae6750b`'s message describes lane D alone and the commit contains lanes
+E, F and D together. The wave's own § 5 says one worktree per concurrent lane and the orchestrator did
+not use worktrees. Recorded under [§ D182](DECISIONS.md) rather than tidied away, and the remedy from
+that point on was explicit paths at every `git add`.
+
+**The generalisable form:** file ownership partitions *editing*; only a worktree partitions
+*committing*. A wave that parallelises without worktrees can still produce a correct tree and cannot
+produce an honest history.
 
 ## 5 — Shared files, and who owns them
 

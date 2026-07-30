@@ -622,3 +622,51 @@ rather than by rereading the code that fixed it.
 [`GAPS.md`](GAPS.md) — every known limitation in one place, ordered by whether it can produce a
 wrong number, a wrong screen, or neither. Written so the next reader does not have to reconstruct
 it from thirty commit messages.
+
+---
+
+# Wave 11 — 2026-07-30
+
+**Scope:** take the wave-10 viewer from *implemented* to *implemented per spec*, measured against
+[`docs/12`](docs/12-design-handoff.md) § 5's eleven-point definition of done and § 1's thirty-seven
+requirement rows; close the named gaps in [`GAPS.md`](GAPS.md); hand Phase 6c on rather than run it.
+Board: [`WAVE11_PLAN.md`](WAVE11_PLAN.md).
+
+**Wave 10 was uncommitted when this wave opened** — the entire design-handoff rebuild sat in the
+working tree, closed against its own claim and verified by nobody. It reproduced exactly (253 files /
+4 700 tests) and landed as `22a1021`.
+
+| ID | Unit | Verdict |
+|---|---|---|
+| T81 | Verify and land wave 10 | Claim reproduced exactly; pushed |
+| T83 | Phase 6c handover | [`docs/13`](docs/13-phase-6c-handover.md) — written to be executed cold; the lane corrected five line references in the index it was given |
+| T89 | Conformance audit | 37 rows audited against the vendored prototype; drove every lane below |
+| T90 | Transport block | § D180 — thirteen controls in **no** requirement row and no deviation; recorded and restyled |
+| T91 | Elevation express toggle | § D181 — built; found a band closed with no transfer level silently losing 93 % of demand |
+| T86 | Access-zoning controls | § D182 — W8 closed; found the editor **deleting** access zones on save, and Vertical City reading back as three floors |
+| T88 | Suppression ground | § D183 — the ground beside the prose, with the parity derivation intact |
+| T87 | Matrix pins | § D184 — the recorded gap was **false**; the real gap was the Pareto front, already drifted four days |
+| T92 | Schema 8 transport | § D185 — the ground reaches the screen; the fixtures could not tell *wired* from *working* |
+
+## The two results worth carrying past this wave
+
+**A tooling defect produced two false findings, and one of them was in the register.** Five source
+files carried raw NUL bytes; `grep` here wraps `ugrep -I`, which **silently skips** such files —
+no output, exit 1, indistinguishable from a genuine miss. It produced a false *"nothing writes
+`#rail-access-note`"*, caught within the hour by driving the page; and a false `GAPS.md` entry saying
+the matrix pins were re-derived by no test, which sat where a lane would plan a day's work against it.
+Closed in `f78dc42`. **A register entry is evidence about the tree and inherits the reliability of
+whatever produced it.**
+
+**Three defects were found by building against a thing rather than reading it**, which is the wave's
+own rule pointed at four different subjects: the legend labels that reached no DOM (M4), the editor
+that deleted the zoning it was being taught to edit, the band that could strand a building's traffic,
+and the disclosure suite that was green for a whole commit while the screen it described rendered
+something else.
+
+## Where the phases stand at close
+
+**No phase verdict moved, and none was in scope.** Phase 6 is still ⚠️ partial with 6c handed on.
+**All nine of Phase 9's units are now built** — W8 was the last open half — and Phase 9 still carries
+**no status row**, because [§ D163](DECISIONS.md)'s rule is that the row and the verdict land together
+and the acceptance pass is a distinct piece of work. A unit landing is not a verdict.

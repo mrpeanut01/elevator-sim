@@ -1,5 +1,16 @@
 # Risk register
 
+> ## ↩️ Reopened 2026-07-30 for **wave 11**. Three risks were realised that this register had no row
+> ## for, and all three are properties of *how the work is done* rather than of the simulator.
+>
+> | # | Risk | State |
+> |---|---|---|
+> | **R24** | **A search tool that fails silently makes every negative finding unreliable, including the ones already written down.** `grep` here wraps `ugrep -I`, which skips files it deems binary by printing *nothing* — exit 1, indistinguishable from a genuine miss. Five source files carried raw NUL bytes, among them two pin guards and the § D163 clause-2 parity check. | **Realised twice.** A false *"nothing writes `#rail-access-note`"*, caught within the hour by driving the page; and a false [`GAPS.md`](GAPS.md) entry claiming the matrix pins were re-derived by no test — which **sat in the register** where a lane would plan against it. Closed at the cause in `f78dc42`. **Mitigation:** a negative result from a search tool is evidence about the tool as well as the tree; confirm *"nothing does X"* by driving, by types, or by a reader that fails loudly. **Escalation:** any register entry whose only evidence is a search that found nothing. |
+> | **R25** | **File-level lane ownership partitions *editing* and does not partition *committing*.** `git add -A` stages the whole repository regardless of who owns what. | **Realised.** `ae6750b` describes one lane and contains three ([§ D182](DECISIONS.md)). Nothing was lost and nothing was unreviewed, but the commit is not evidence of what landed together. **Mitigation:** one worktree per concurrent lane — the wave's own policy, not followed — or, failing that, explicit paths at every `git add`. **Escalation:** any commit whose diff touches a file its message does not mention. |
+> | **R26** | **A test suite built entirely from fixtures cannot distinguish *the mechanism is correct* from *the mechanism is reached*.** | **Realised.** Every assertion in `mode/disclosure.test.ts` handed a suppression ground in directly, and all of them were green for a whole commit while the shipped screen rendered the ground-free lead ([§ D185](DECISIONS.md)). This is the standing requirement's *reachable* vs *has a non-test caller* distinction arriving through a fixture instead of a barrel re-export. **Mitigation:** at least one case per surface must originate in a real run. **Escalation:** a suite that would stay green with the production wiring removed. |
+>
+> **R1, R5, R7 and R10 below remain live and permanent.**
+
 > ## ↩️ The delivery reopened 2026-07-28 as **wave 5**, and this register stays retired in place.
 >
 > Wave 5's own risks are in [`WAVE5_PLAN.md`](WAVE5_PLAN.md) § 7 — four of them concrete and

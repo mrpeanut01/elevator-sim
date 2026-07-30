@@ -1,5 +1,28 @@
 # Test matrix
 
+> ## ↩️ Wave 11 — coverage added, and the two shapes it found that a matrix row cannot express
+>
+> Wave 11's coverage is in [`WAVE11_PLAN.md`](WAVE11_PLAN.md) § 4 lane by lane. Two findings belong
+> *here* rather than there, because both are about what a coverage table can and cannot claim.
+>
+> **1. A fixture-only row is not a covered row.** Every assertion in `mode/disclosure.test.ts` handed a
+> suppression ground in directly, so the whole block was green for a commit while the shipped screen
+> rendered something else ([§ D185](DECISIONS.md)). A row reading *"Basic shortens a suppression
+> reason — ✅ tested"* would have been **true about the test and false about the product**. This file's
+> own opening rule — *a component test does not close a row* — has a second half it did not state:
+> **a row is closed by a case that originates in a real run**, because a fixture proves the mechanism
+> is correct and cannot prove it is reached.
+>
+> **2. A row can go stale while every sentence it supports stays true.** `docs/05`'s Pareto-front
+> table published three arms where the tree computes six, for four days, and nothing caught it —
+> because `nearest-car`'s 6-of-8 count, which is what § D106 and the refusal of an eco score actually
+> rest on, never moved ([§ D184](DECISIONS.md)). That is [§ D149](DECISIONS.md)'s rule arriving at a
+> table instead of a figure: **a stale number that still supports its own sentence is the only kind
+> nobody re-checks.** The fix was not a row; it was a guard that re-derives the table from the run the
+> suite already pays for.
+>
+> Wave 10's rule below is unchanged and carried every wave-11 control that shipped.
+
 > ## ↩️ Wave 10 — the design handoff. This matrix stays retired in place; wave 10's coverage is in [`WAVE10_PLAN.md`](WAVE10_PLAN.md) § 5.
 >
 > Wave 10's own standing rule is this file's, one level down. This file says *a component test does
