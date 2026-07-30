@@ -170,6 +170,97 @@ export function goalLabel(spec: GoalSpec): string {
 }
 
 /* -------------------------------------------------------------------------- *
+ * Narrowing a spec to what one replication can actually answer
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A {@link GoalSpec} narrowed to the specs {@link judgeReplication} can answer — **the type that
+ * makes its two throws unreachable.**
+ *
+ * ## Why this type exists at all
+ *
+ * `judgeReplication` has always thrown on a spec it cannot judge, and that is the right behaviour:
+ * a silent `unmeasured` would let a *blocked* goal ship looking like a *measured* one, which is the
+ * exact confusion `docs/10` § 10.4 was written to stop. But "the right behaviour on a bad call" is
+ * not the same as "the bad call cannot be made". Every caller in this package guarded correctly —
+ * `isPerReplicationGoal(spec.kind)` at four sites — and **nothing in the types required them to**,
+ * so the guard was a convention held by four separate authors reading the same docstring.
+ *
+ * A convention held by reading is the shape this repository has shipped as a dead seam twelve
+ * times, one level over: the check exists, it is correct, and nothing makes it happen. So the
+ * domain is a type now. A caller that has not narrowed does not get a runtime error on the twenty
+ * seeds it was about to judge — it does not compile.
+ *
+ * ## The threshold is in the type, not only in the validator
+ *
+ * `long-waits-under` carries a `number`, never `null`. `campaign/parse.ts` already refuses an
+ * authored goal that omits it, so shipped `data/` cannot produce one — but a UI assembling a spec
+ * in memory never goes through that validator, and that is precisely the caller this type is for.
+ * Splitting the union is what lets the compiler know the difference between the kind that takes a
+ * threshold and the six that do not.
+ */
+export type PerReplicationGoalSpec =
+  | {
+      readonly kind: Exclude<PerReplicationGoalKind, 'long-waits-under'>;
+      readonly threshold: number | null;
+    }
+  | { readonly kind: 'long-waits-under'; readonly threshold: number };
+
+/**
+ * Why a spec cannot be judged on one replication — the machine facts, not a sentence.
+ *
+ * Deliberately **not** prose. `goalReport.ts` and `scenario/measure.ts` each author their own
+ * wording for a withheld goal, tuned to the surface it appears on, and a third authored sentence
+ * here would be a third place for the same fact to drift. A caller gets the facts and composes the
+ * words its own surface needs — {@link GOAL_BLOCKER} is there when the reason is a blocker.
+ */
+export interface GoalUnjudgeable {
+  readonly judgeable: false;
+  /** Why the kind is not a per-run predicate. `per-replication` here means the *threshold* is what is missing. */
+  readonly judgement: GoalJudgement;
+  /** {@link GOAL_BLOCKER}'s entry for the kind, so a caller need not look it up separately. */
+  readonly blocker: string | null;
+  /** `true` for a `long-waits-under` that declared no threshold — a judgeable kind, unjudgeable as written. */
+  readonly missingThreshold: boolean;
+}
+
+export type GoalNarrowing =
+  | { readonly judgeable: true; readonly spec: PerReplicationGoalSpec }
+  | GoalUnjudgeable;
+
+/**
+ * The one place a {@link GoalSpec} becomes judgeable-or-not, checking **both** grounds.
+ *
+ * Total: every spec gets an answer and nothing throws. This is the function to call before
+ * {@link judgeReplication} or {@link measureGoalRate}, and after it those two cannot fail.
+ *
+ * The two grounds were previously checked in different places — the kind at four call sites, the
+ * threshold inside the predicate — so no single check answered *"may I judge this?"*. Now one does.
+ */
+export function asPerReplicationGoal(spec: GoalSpec): GoalNarrowing {
+  if (!isPerReplicationGoal(spec.kind)) {
+    return {
+      judgeable: false,
+      judgement: GOAL_JUDGEMENT[spec.kind],
+      blocker: GOAL_BLOCKER[spec.kind],
+      missingThreshold: false,
+    };
+  }
+  if (spec.kind === 'long-waits-under') {
+    if (spec.threshold === null) {
+      return {
+        judgeable: false,
+        judgement: 'per-replication',
+        blocker: null,
+        missingThreshold: true,
+      };
+    }
+    return { judgeable: true, spec: { kind: spec.kind, threshold: spec.threshold } };
+  }
+  return { judgeable: true, spec: { kind: spec.kind, threshold: spec.threshold } };
+}
+
+/* -------------------------------------------------------------------------- *
  * Judging one replication
  * -------------------------------------------------------------------------- */
 
@@ -187,11 +278,18 @@ export type GoalOutcome = 'pass' | 'fail' | 'unmeasured';
 /**
  * Judge one replication against one goal.
  *
- * @throws Error when `spec.kind` is not a per-replication kind — a caller that reaches here with
- *   `beat-the-baseline` or `everyone-can-get-there` has a bug that a silent `unmeasured` would
- *   hide, and hiding it is how a blocked goal ships looking like a measured one.
+ * Takes a {@link PerReplicationGoalSpec}, so **a spec this cannot judge is a compile error at the
+ * call site** rather than a throw twenty seeds in. Get one from {@link asPerReplicationGoal}.
+ *
+ * @throws Error when a caller with no types — plain JavaScript, or a `spec` cast past the compiler
+ *   — reaches here with a kind no single run answers. Defence in depth, not the guard: a silent
+ *   `unmeasured` would let a blocked goal ship looking like a measured one, and that is worth a
+ *   throw even on a path the type system says is unreachable.
  */
-export function judgeReplication(spec: GoalSpec, replication: BatchReplication): GoalOutcome {
+export function judgeReplication(
+  spec: PerReplicationGoalSpec,
+  replication: BatchReplication,
+): GoalOutcome {
   switch (spec.kind) {
     case 'deliver-everyone':
       return compareToZero(replication.metrics.unservedFraction);
@@ -203,13 +301,25 @@ export function judgeReplication(spec: GoalSpec, replication: BatchReplication):
       return answersTheDemand(replication);
     case 'long-waits-under':
       return longWaitsUnder(replication, spec.threshold);
-    case 'everyone-can-get-there':
-    case 'beat-the-baseline':
-      throw new Error(
-        `"${spec.kind}" is not judged on one replication (${GOAL_JUDGEMENT[spec.kind]}). ` +
-          `${GOAL_BLOCKER[spec.kind] ?? 'It compares two arms, so a single run cannot answer it.'}`,
-      );
+    default:
+      return refuseUnjudgeable(spec);
   }
+}
+
+/**
+ * The `default` arm of a switch the type system already made exhaustive.
+ *
+ * Reached only from untyped callers. `never` in the parameter position is what keeps it honest: if
+ * an eighth kind is added to {@link PerReplicationGoalSpec} and `judgeReplication` gains no case
+ * for it, this line stops compiling rather than silently becoming the handler for it.
+ */
+function refuseUnjudgeable(spec: never): never {
+  const { kind } = spec as GoalSpec;
+  throw new Error(
+    `"${kind}" is not judged on one replication (${GOAL_JUDGEMENT[kind] ?? 'unknown kind'}). ` +
+      `${GOAL_BLOCKER[kind] ?? 'It compares two arms, so a single run cannot answer it.'} ` +
+      'Narrow the spec with `asPerReplicationGoal` before judging it.',
+  );
 }
 
 /** `counts.unserved === 0`, through the fraction the batch carries. */
@@ -232,9 +342,18 @@ function answersTheDemand(replication: BatchReplication): GoalOutcome {
   return carried >= offered ? 'pass' : 'fail';
 }
 
-function longWaitsUnder(replication: BatchReplication, threshold: number | null): GoalOutcome {
-  if (threshold === null) {
-    throw new Error('"long-waits-under" needs a threshold; the scenario declared none.');
+/**
+ * `threshold` is a `number` in {@link PerReplicationGoalSpec}, so the null check below is for
+ * untyped callers only — the same defence-in-depth as {@link refuseUnjudgeable}, and for the same
+ * reason: judging a percentage against `null` would compare every run to `NaN` and quietly fail all
+ * of them, which is a wrong number rather than an error.
+ */
+function longWaitsUnder(replication: BatchReplication, threshold: number): GoalOutcome {
+  if ((threshold as number | null) === null) {
+    throw new Error(
+      '"long-waits-under" needs a threshold; the scenario declared none. `asPerReplicationGoal` ' +
+        'reports this as `missingThreshold` without throwing.',
+    );
   }
   const pct = replication.metrics.pctOverLongWait;
   if (pct === null) return 'unmeasured';
@@ -309,9 +428,13 @@ export interface GoalRate {
  *
  * Pure. The replications come from `runBatch` — one arm of one batch, which is *"at least 20
  * seeds on its own scenario"* in the form the shipped runner produces it.
+ *
+ * Takes a {@link PerReplicationGoalSpec} for the reason that type exists: this is the function a
+ * caller reaches for first, it judges every replication it is given, and a spec it cannot judge
+ * used to throw on the first one. Narrow with {@link asPerReplicationGoal} and it cannot.
  */
 export function measureGoalRate(
-  spec: GoalSpec,
+  spec: PerReplicationGoalSpec,
   replications: readonly BatchReplication[],
 ): GoalRate {
   let passes = 0;

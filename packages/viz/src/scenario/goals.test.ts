@@ -15,11 +15,13 @@ import {
   GOAL_JUDGEMENT,
   GOAL_KINDS,
   GOAL_TAKES_THRESHOLD,
+  asPerReplicationGoal,
   goalLabel,
   isPerReplicationGoal,
   judgeReplication,
   measureGoalRate,
   type GoalSpec,
+  type PerReplicationGoalSpec,
 } from './goals.js';
 import { fakeReplication } from '../batch/fixtures.test-helper.js';
 import type { BatchReplication } from '../batch/types.js';
@@ -28,11 +30,30 @@ import type { BatchReplication } from '../batch/types.js';
 const PROBABILITY_WORDS =
   /\b(?:likely|unlikely|probabl\w*|probability|chances?|odds|certainly|certain|maybe|perhaps|presumably|plausibl\w*|good bet|fifty-fifty)\b/i;
 
-const DELIVER: GoalSpec = { kind: 'deliver-everyone', threshold: null };
-const DIVERGE: GoalSpec = { kind: 'no-divergence', threshold: null };
-const ABANDON: GoalSpec = { kind: 'nobody-abandoned', threshold: null };
-const DEMAND: GoalSpec = { kind: 'answer-the-demand', threshold: null };
-const LONG_WAITS: GoalSpec = { kind: 'long-waits-under', threshold: 10 };
+/**
+ * The five judgeable fixtures, typed as {@link PerReplicationGoalSpec} rather than `GoalSpec`.
+ *
+ * That is not a convenience — it is the assertion. `judgeReplication` and `measureGoalRate` take
+ * the narrowed type now, so a fixture that were *not* judgeable would not compile at the call
+ * sites below, and the tests in `refuses …` have to cast past the compiler to reach the throws at
+ * all. The type is doing the work the four call-site guards used to do by convention.
+ */
+const DELIVER: PerReplicationGoalSpec = { kind: 'deliver-everyone', threshold: null };
+const DIVERGE: PerReplicationGoalSpec = { kind: 'no-divergence', threshold: null };
+const ABANDON: PerReplicationGoalSpec = { kind: 'nobody-abandoned', threshold: null };
+const DEMAND: PerReplicationGoalSpec = { kind: 'answer-the-demand', threshold: null };
+const LONG_WAITS: PerReplicationGoalSpec = { kind: 'long-waits-under', threshold: 10 };
+
+/**
+ * Reach a throw the type system says is unreachable.
+ *
+ * Named, rather than an inline `as`, so that the *reason* is in one place: these throws exist for
+ * callers with no compiler — plain JavaScript, or a spec cast past it — and the only way to test
+ * defence in depth is to defeat the defence in front of it. A test that could pass these specs
+ * *without* a cast would mean the narrowing had stopped working.
+ */
+const untyped = (spec: GoalSpec): PerReplicationGoalSpec =>
+  spec as unknown as PerReplicationGoalSpec;
 
 function replication(
   index: number,
@@ -106,17 +127,88 @@ describe('judging one replication', () => {
 
   it('refuses a kind that no single run can answer, and says which', () => {
     expect(() =>
-      judgeReplication({ kind: 'everyone-can-get-there', threshold: null }, replication(0)),
+      judgeReplication(untyped({ kind: 'everyone-can-get-there', threshold: null }), replication(0)),
     ).toThrow(/credential/i);
     expect(() =>
-      judgeReplication({ kind: 'beat-the-baseline', threshold: null }, replication(0)),
+      judgeReplication(untyped({ kind: 'beat-the-baseline', threshold: null }), replication(0)),
     ).toThrow(/two arms/i);
   });
 
   it('refuses a thresholded goal with no threshold rather than inventing one', () => {
     expect(() =>
-      judgeReplication({ kind: 'long-waits-under', threshold: null }, replication(0)),
+      judgeReplication(untyped({ kind: 'long-waits-under', threshold: null }), replication(0)),
     ).toThrow(/needs a threshold/);
+  });
+
+  it('names the narrowing function in every refusal, so the fix is in the message', () => {
+    // A throw that says what is wrong and not what to do next is how a caller ends up casting past
+    // it. Both messages point at `asPerReplicationGoal`, which is the call that makes them moot.
+    for (const spec of [
+      { kind: 'beat-the-baseline', threshold: null },
+      { kind: 'long-waits-under', threshold: null },
+    ] satisfies GoalSpec[]) {
+      expect(() => judgeReplication(untyped(spec), replication(0))).toThrow(
+        /asPerReplicationGoal/,
+      );
+    }
+  });
+});
+
+describe('narrowing a spec before judging it — the crash a caller cannot cause any more', () => {
+  it('admits the five per-replication kinds and hands back a spec judgeReplication accepts', () => {
+    for (const spec of [DELIVER, DIVERGE, ABANDON, DEMAND, LONG_WAITS]) {
+      const narrowed = asPerReplicationGoal(spec);
+      expect(narrowed.judgeable, spec.kind).toBe(true);
+      if (!narrowed.judgeable) continue;
+      // The point of the whole change: no cast, no guard, no throw.
+      expect(judgeReplication(narrowed.spec, replication(0))).toMatch(/pass|fail|unmeasured/);
+    }
+  });
+
+  it('refuses the blocked kind and carries its blocker, without throwing', () => {
+    const narrowed = asPerReplicationGoal({ kind: 'everyone-can-get-there', threshold: null });
+    expect(narrowed.judgeable).toBe(false);
+    if (narrowed.judgeable) return;
+    expect(narrowed.judgement).toBe('blocked');
+    expect(narrowed.blocker).toMatch(/credential/i);
+    expect(narrowed.missingThreshold).toBe(false);
+  });
+
+  it('refuses the comparison kind with its judgement and no blocker', () => {
+    const narrowed = asPerReplicationGoal({ kind: 'beat-the-baseline', threshold: null });
+    expect(narrowed.judgeable).toBe(false);
+    if (narrowed.judgeable) return;
+    expect(narrowed.judgement).toBe('batch-only');
+    // `null`, not a sentence: this module reports facts and the two surfaces author their own
+    // wording. A blocker here would be a third place for the same claim to drift.
+    expect(narrowed.blocker).toBeNull();
+    expect(narrowed.missingThreshold).toBe(false);
+  });
+
+  it('separates "the kind cannot be judged" from "this instance cannot"', () => {
+    const narrowed = asPerReplicationGoal({ kind: 'long-waits-under', threshold: null });
+    expect(narrowed.judgeable).toBe(false);
+    if (narrowed.judgeable) return;
+    // The distinction the old code could not express: a judgeable kind, unjudgeable as written.
+    expect(narrowed.judgement).toBe('per-replication');
+    expect(narrowed.missingThreshold).toBe(true);
+  });
+
+  it('is total over every shipped kind — nothing throws and nothing returns undefined', () => {
+    for (const kind of GOAL_KINDS) {
+      const spec: GoalSpec = { kind, threshold: GOAL_TAKES_THRESHOLD[kind] ? 10 : null };
+      const narrowed = asPerReplicationGoal(spec);
+      expect(narrowed.judgeable, kind).toBe(isPerReplicationGoal(kind));
+    }
+  });
+
+  it('agrees with isPerReplicationGoal on the kind, and is stricter on the instance', () => {
+    // Both are exported and a caller could reach for either. The narrowing is the stricter of the
+    // two by exactly one case, and stating which case keeps the older guard honest rather than
+    // leaving two overlapping answers to `may I judge this?`.
+    const spec: GoalSpec = { kind: 'long-waits-under', threshold: null };
+    expect(isPerReplicationGoal(spec.kind)).toBe(true);
+    expect(asPerReplicationGoal(spec).judgeable).toBe(false);
   });
 });
 

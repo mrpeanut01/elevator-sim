@@ -21,7 +21,7 @@
  */
 
 import { CANDIDATE_GOALS } from './candidates.js';
-import { goalLabel, isPerReplicationGoal, measureGoalRate, type GoalSpec } from './goals.js';
+import { asPerReplicationGoal, goalLabel, measureGoalRate, type GoalSpec } from './goals.js';
 import { GOAL_BLOCKER, GOAL_JUDGEMENT, type GoalDisposition, type GoalRateClass } from './goals.js';
 import { MIN_SEEDS_PER_GOAL } from './published.js';
 import type { BatchResult } from '../batch/types.js';
@@ -75,20 +75,27 @@ export function goalReport(
   const withheld: GoalReportWithheld[] = [];
 
   for (const spec of specs) {
-    if (!isPerReplicationGoal(spec.kind)) {
+    const narrowed = asPerReplicationGoal(spec);
+    if (!narrowed.judgeable) {
       withheld.push({
         label: goalLabel(spec),
-        reason:
-          GOAL_BLOCKER[spec.kind] ??
-          (GOAL_JUDGEMENT[spec.kind] === 'batch-only'
-            ? 'Judged on the difference between two arms, which is what the comparison rows above ' +
-              'are. There is no per-run predicate to take a pass rate of.'
-            : 'Not judgeable from a recording as it stands.'),
+        reason: narrowed.missingThreshold
+          ? // Unreachable from shipped `data/` — `campaign/parse.ts` refuses an authored
+            // `long-waits-under` with no threshold at load. Withheld rather than thrown because a
+            // caller assembling a spec in memory never passes through that validator, and a
+            // missing ceiling is a thing to report, not a reason to lose the other six goals.
+            'Declares no threshold, so there is no ceiling to judge a wait against. The kind is ' +
+            'judgeable on one run; this instance of it is not.'
+          : (narrowed.blocker ??
+            (narrowed.judgement === 'batch-only'
+              ? 'Judged on the difference between two arms, which is what the comparison rows ' +
+                'above are. There is no per-run predicate to take a pass rate of.'
+              : 'Not judgeable from a recording as it stands.')),
       });
       continue;
     }
     for (const arm of result.arms) {
-      const rate = measureGoalRate(spec, arm.replications);
+      const rate = measureGoalRate(narrowed.spec, arm.replications);
       rows.push({
         armId: arm.armId,
         dispatcherProfileId: arm.dispatcherProfileId,

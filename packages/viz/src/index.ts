@@ -108,6 +108,7 @@
  * | {@link BatchError} | thrown by `runBatch`; caught and flattened by `src/dev/batchWorker.ts` |
  * | {@link goalReport} | `src/dev/batchPanel.ts`, on the batch the Compare tab just ran — `docs/10` § 11 **W9** |
  * | {@link measureGoalRate}, {@link judgeReplication} | `goalReport`, and `src/scenario/measure.ts`. R12's arithmetic, in one place |
+ * | {@link asPerReplicationGoal} | `goalReport` in `src/scenario/goalReport.ts`, `measureScenario` in `src/scenario/measure.ts`, and `judgeStage` in `src/campaign/judge.ts` — all three of the callers that used to hold the guard by convention. It is also the gate a caller outside this package must pass to reach {@link judgeReplication} at all, because that function's parameter type is the narrowed one |
  * | {@link measureScenario}, {@link publishedScenarioFor} | `src/scenario/regenerate.test-helper.ts`, the driver that writes `data/scenario-goals.json`, and `src/scenario/goalRates.test.ts`, which re-derives it. **The only export here whose shipped caller is a driver rather than a screen**, and it is the shape `experiments/src/benchmark/regeneratePins.ts` already has: a published number needs something that can produce it again |
  * | {@link validatePublishedGoalRates} | `src/scenario/goalRates.test.ts` — the guard. A goal kind with no measured rate on a scenario is a failure, not an omission |
  * | {@link CANDIDATE_GOALS}, {@link CANDIDATE_SCENARIOS} | `goalReport`, `regenerate.test-helper.ts` and the guard |
@@ -457,6 +458,7 @@ export {
   GOAL_KINDS,
   GOAL_READS,
   GOAL_TAKES_THRESHOLD,
+  asPerReplicationGoal,
   goalLabel,
   isPerReplicationGoal,
   judgeReplication,
@@ -464,11 +466,14 @@ export {
   type GoalDisposition,
   type GoalJudgement,
   type GoalKind,
+  type GoalNarrowing,
   type GoalOutcome,
   type GoalRate,
   type GoalRateClass,
   type GoalSpec,
+  type GoalUnjudgeable,
   type PerReplicationGoalKind,
+  type PerReplicationGoalSpec,
 } from './scenario/goals.js';
 
 export {

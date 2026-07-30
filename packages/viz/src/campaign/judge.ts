@@ -49,8 +49,9 @@ import type { BatchComparisonRow, BatchReport } from '../batch/report.js';
 import type { BatchResult } from '../batch/types.js';
 import {
   goalLabel,
-  isPerReplicationGoal,
+  asPerReplicationGoal,
   measureGoalRate,
+  type PerReplicationGoalSpec,
   type GoalKind,
   type GoalRate,
   type GoalSpec,
@@ -110,11 +111,31 @@ export function judgeStage(input: JudgeStageInput): StageReport {
   const baselineArm = result.arms[0];
   const candidateArm = result.arms[1] ?? result.arms[0];
 
-  const goals = stage.goals.map((spec) =>
-    isPerReplicationGoal(spec.kind)
-      ? judgeCountGoal(spec, published, baselineArm, candidateArm)
-      : judgeComparisonGoal(spec, report),
-  );
+  const goals = stage.goals.map((spec) => {
+    const narrowed = asPerReplicationGoal(spec);
+    if (narrowed.judgeable) {
+      return judgeCountGoal(narrowed.spec, published, baselineArm, candidateArm);
+    }
+    // A `long-waits-under` with no threshold is a *count* goal that cannot be counted, so it must
+    // not fall through to the comparison arm — that arm answers `beat-the-baseline` and would
+    // judge this one against an interval it has nothing to do with. `parse.ts` refuses the case at
+    // load, so no shipped campaign reaches here; it is handled rather than assumed away because
+    // the stage's other goals should still be judged.
+    if (narrowed.missingThreshold) {
+      const label = goalLabel(spec);
+      return {
+        kind: spec.kind,
+        label,
+        met: null,
+        reproduced: null,
+        sentence: `${label}: declares no threshold, so there is no ceiling to judge a wait against.`,
+        note:
+          'The kind is judgeable on one run; this instance of it is not. A campaign file is ' +
+          'refused at load for this, so seeing it here means the stage was assembled in memory.',
+      };
+    }
+    return judgeComparisonGoal(spec, report);
+  });
 
   const met = goals.filter((goal) => goal.met === true).length;
   const cleared = goals.length > 0 && met === goals.length;
@@ -138,7 +159,7 @@ export function judgeStage(input: JudgeStageInput): StageReport {
 type Arm = BatchResult['arms'][number] | undefined;
 
 function judgeCountGoal(
-  spec: GoalSpec,
+  spec: PerReplicationGoalSpec,
   published: PublishedScenario,
   baselineArm: Arm,
   candidateArm: Arm,
@@ -227,7 +248,7 @@ function judgeCountGoal(
   };
 }
 
-function rateOf(spec: GoalSpec, arm: Arm): GoalRate | null {
+function rateOf(spec: PerReplicationGoalSpec, arm: Arm): GoalRate | null {
   if (arm === undefined || arm.replications.length === 0) return null;
   return measureGoalRate(spec, arm.replications);
 }

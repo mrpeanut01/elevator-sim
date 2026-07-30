@@ -76,6 +76,15 @@ import {
   type CampaignPanelHandle,
 } from './campaignPanel.js';
 import { createLoader } from './bootstrap.js';
+import {
+  ELEMENT_IDS,
+  MissingElementsError,
+  TABS,
+  isTabName,
+  resolveElements,
+  type Elements,
+  type TabName,
+} from './elementMap.js';
 import { PREFERRED_VIEWER_DISPATCHERS, preferredDispatcherId } from './defaults.js';
 import { shouldAutoplay } from './motion.js';
 import { loadBrowserResources, loadCampaign, resolveEdited, type BrowserResources } from './data.js';
@@ -99,159 +108,16 @@ const OVERLAY_MIN_VIEWPORT_PX = 900;
 const FRAME_S = 1 / 60;
 
 /**
- * The surfaces, in tab order — `D11`, and the `tab` key in the URL.
+ * Resolve every element the page must contain.
  *
- * A list rather than a pair of fields. It was a pair until W4 (`docs/10` § 11) added a third
- * surface, and the pair form had the tab machinery written out twice: two `setAttribute` calls,
- * two `tabIndex` assignments, two `hidden` assignments and a hand-written arrow-key table of
- * `[tab, other, which]` triples that only works for exactly two tabs. Three of anything is where
- * that stops being cheaper than a loop.
+ * One pass over `ELEMENT_IDS`, so a page that is missing four things says so once instead of four
+ * times. The ids, the `Elements` shape and the tab list all live in `elementMap.ts` now — see its
+ * docstring for why the manifest is typed against the interface rather than written beside it.
  */
-const TABS = ['viewer', 'editor', 'parameters', 'compare', 'campaign'] as const;
-type TabName = (typeof TABS)[number];
-
-const isTabName = (value: string | null): value is TabName =>
-  value !== null && (TABS as readonly string[]).includes(value);
-
-interface Elements {
-  readonly canvas: HTMLCanvasElement;
-  readonly building: HTMLSelectElement;
-  readonly dispatcher: HTMLSelectElement;
-  readonly duration: HTMLInputElement;
-  readonly speed: HTMLSelectElement;
-  readonly seed: HTMLInputElement;
-  readonly run: HTMLButtonElement;
-  readonly verify: HTMLButtonElement;
-  readonly copyProvenance: HTMLButtonElement;
-  readonly saveRecording: HTMLButtonElement;
-  readonly loadRecording: HTMLInputElement;
-  readonly bankFilter: HTMLSelectElement;
-  readonly landingSelect: HTMLSelectElement;
-  readonly exportPng: HTMLButtonElement;
-  readonly playPause: HTMLButtonElement;
-  readonly stepBack: HTMLButtonElement;
-  readonly stepForward: HTMLButtonElement;
-  readonly loop: HTMLInputElement;
-  readonly scrub: HTMLInputElement;
-  readonly status: HTMLElement;
-  readonly error: HTMLElement;
-  readonly banner: HTMLElement;
-  readonly description: HTMLElement;
-  /** Where `render/runSummary.ts`'s figures are drawn — `docs/10` § 11 W2. */
-  readonly runSummary: HTMLElement;
-  /** § 4's mode toggle, and the place `mode/parity.ts` puts a refusal it finds. */
-  readonly viewMode: HTMLSelectElement;
-  readonly modeParity: HTMLElement;
-  /** § 10.3's pre-run compatibility note. Empty when there is nothing to say. */
-  readonly accessNote: HTMLElement;
-  /** Where `render/mood.ts`'s gauge is drawn — `docs/10` § 6 / D4, W6's U4. */
-  readonly mood: HTMLElement;
-  /** Tab button and its panel, per surface. Keyed by {@link TabName}, so a fourth is one entry. */
-  readonly tabs: Readonly<Record<TabName, HTMLButtonElement>>;
-  readonly panels: Readonly<Record<TabName, HTMLElement>>;
-  readonly paramSource: HTMLSelectElement;
-  readonly paramForm: HTMLElement;
-  readonly paramStatus: HTMLElement;
-  readonly paramRefusal: HTMLElement;
-  /** The Compare surface's controls — `docs/10` § 11 **W3**. */
-  readonly batch: BatchPanelElements;
-  /** The Campaign surface's controls — `docs/10` § 5, W5. */
-  readonly campaign: CampaignPanelElements;
-  readonly confirm: HTMLDialogElement;
-  readonly confirmMessage: HTMLElement;
-  readonly confirmOk: HTMLButtonElement;
-  readonly confirmCancel: HTMLButtonElement;
-}
-
 function elements(): Elements {
-  const find = <T extends HTMLElement>(id: string): T => {
-    const node = document.getElementById(id);
-    if (node === null) throw new Error(`missing #${id} in index.html`);
-    return node as T;
-  };
-  return {
-    canvas: find<HTMLCanvasElement>('stage'),
-    viewMode: find<HTMLSelectElement>('view-mode'),
-    modeParity: find<HTMLElement>('mode-parity'),
-    building: find<HTMLSelectElement>('building'),
-    dispatcher: find<HTMLSelectElement>('dispatcher'),
-    duration: find<HTMLInputElement>('duration'),
-    speed: find<HTMLSelectElement>('speed'),
-    seed: find<HTMLInputElement>('seed'),
-    run: find<HTMLButtonElement>('run'),
-    verify: find<HTMLButtonElement>('verify'),
-    copyProvenance: find<HTMLButtonElement>('copy-provenance'),
-    saveRecording: find<HTMLButtonElement>('save-recording'),
-    loadRecording: find<HTMLInputElement>('load-recording'),
-    bankFilter: find<HTMLSelectElement>('bank-filter'),
-    landingSelect: find<HTMLSelectElement>('landing-select'),
-    exportPng: find<HTMLButtonElement>('export-png'),
-    playPause: find<HTMLButtonElement>('play-pause'),
-    stepBack: find<HTMLButtonElement>('step-back'),
-    stepForward: find<HTMLButtonElement>('step-forward'),
-    loop: find<HTMLInputElement>('loop'),
-    scrub: find<HTMLInputElement>('scrub'),
-    status: find<HTMLElement>('status'),
-    error: find<HTMLElement>('error'),
-    banner: find<HTMLElement>('banner'),
-    description: find<HTMLElement>('frame-description'),
-    runSummary: find<HTMLElement>('run-summary'),
-    accessNote: find<HTMLElement>('access-note'),
-    mood: find<HTMLElement>('building-mood'),
-    tabs: {
-      viewer: find<HTMLButtonElement>('tab-viewer'),
-      editor: find<HTMLButtonElement>('tab-editor'),
-      parameters: find<HTMLButtonElement>('tab-parameters'),
-      compare: find<HTMLButtonElement>('tab-compare'),
-      campaign: find<HTMLButtonElement>('tab-campaign'),
-    },
-    panels: {
-      viewer: find<HTMLElement>('panel-viewer'),
-      editor: find<HTMLElement>('panel-editor'),
-      parameters: find<HTMLElement>('panel-parameters'),
-      compare: find<HTMLElement>('panel-compare'),
-      campaign: find<HTMLElement>('panel-campaign'),
-    },
-    paramSource: find<HTMLSelectElement>('param-source'),
-    paramForm: find<HTMLElement>('param-form'),
-    paramStatus: find<HTMLElement>('param-status'),
-    paramRefusal: find<HTMLElement>('param-refusal'),
-    batch: {
-      building: find<HTMLSelectElement>('batch-building'),
-      baseline: find<HTMLSelectElement>('batch-baseline'),
-      candidate: find<HTMLSelectElement>('batch-candidate'),
-      duration: find<HTMLInputElement>('batch-duration'),
-      seed: find<HTMLInputElement>('batch-seed'),
-      replications: find<HTMLInputElement>('batch-replications'),
-      demand: find<HTMLInputElement>('batch-demand'),
-      run: find<HTMLButtonElement>('batch-run'),
-      cancel: find<HTMLButtonElement>('batch-cancel'),
-      progress: find<HTMLProgressElement>('batch-progress'),
-      status: find<HTMLElement>('batch-status'),
-      error: find<HTMLElement>('batch-error'),
-      output: find<HTMLElement>('batch-output'),
-    },
-    campaign: {
-      stage: find<HTMLSelectElement>('campaign-stage'),
-      profile: find<HTMLSelectElement>('campaign-profile'),
-      run: find<HTMLButtonElement>('campaign-run'),
-      cancel: find<HTMLButtonElement>('campaign-cancel'),
-      progress: find<HTMLProgressElement>('campaign-progress'),
-      status: find<HTMLElement>('campaign-status'),
-      error: find<HTMLElement>('campaign-error'),
-      brief: find<HTMLElement>('campaign-brief'),
-      output: find<HTMLElement>('campaign-output'),
-      edit: find<HTMLInputElement>('campaign-edit'),
-      weightsBar: find<HTMLElement>('campaign-weights-bar'),
-      weights: find<HTMLElement>('campaign-weights'),
-      weightsStatus: find<HTMLElement>('campaign-weights-status'),
-      weightsRefusal: find<HTMLElement>('campaign-weights-refusal'),
-    },
-    confirm: find<HTMLDialogElement>('confirm'),
-    confirmMessage: find<HTMLElement>('confirm-message'),
-    confirmOk: find<HTMLButtonElement>('confirm-ok'),
-    confirmCancel: find<HTMLButtonElement>('confirm-cancel'),
-  };
+  const resolved = resolveElements<Elements>(document, ELEMENT_IDS);
+  if (!resolved.ok) throw new MissingElementsError(resolved.missing, resolved.total);
+  return resolved.elements;
 }
 
 /** The controls that need something on screen before they mean anything — UX.md § B.3. */
@@ -1611,6 +1477,24 @@ function message(error: unknown): string {
 void main().catch((error: unknown) => {
   // A page that stops without saying so is the failure `RV-21` shipped with. There is no state to
   // recover here, so the last thing this file does is refuse to fail quietly.
+  const text = `the viewer failed to start: ${message(error)}`;
   const node = document.getElementById('error');
-  if (node !== null) node.textContent = `the viewer failed to start: ${message(error)}`;
+  if (node !== null) {
+    node.textContent = text;
+    return;
+  }
+  /*
+   * `#error` is itself one of the ids `ELEMENT_IDS` requires, so the most likely reason it is absent
+   * is the very failure being reported — a page whose markup does not match this viewer. That used
+   * to mean the *report* was lost along with the element: `if (node !== null)` and nothing else, so
+   * the one case where the message matters most was the one case nobody saw it. A new page gets its
+   * list of missing ids either way now.
+   *
+   * `console.error` first because it cannot fail and survives a page that renders nothing at all.
+   */
+  console.error(text);
+  const fallback = document.createElement('pre');
+  fallback.style.cssText = 'margin:0;padding:12px;white-space:pre-wrap;color:#e0473a';
+  fallback.textContent = text;
+  document.body?.prepend(fallback);
 });

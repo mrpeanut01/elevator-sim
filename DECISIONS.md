@@ -10433,3 +10433,99 @@ A property narrowed five times is a property that might now be blind. So the lan
 **Ten producers classified: seven driven, three excluded with individual reasons.** The mode adapter renders both projections, so Basic's own strings are searched and not just Advanced's.
 
 **Impact.** `OUTSTANDING` is **empty — both entries deleted because both were resolved, neither by widening the register.** The both-ways assertions stay, plus a new negative control proving an empty register still accepts nothing. Always-on tier: 48 cases, **86 587 strings**, 0 failures. Deep tier at 24 cases: 46 442 strings, 0 failures. **Known limit, stated as deduction rather than measurement:** the deep tier was already red on `integration` before this lane, and the argument for that rests on both narrowings being **strict refinements** of the old predicate — the baseline control run was blocked and the claim stands on the refinement relation, not on a run.
+
+## D173 — two ways a **new UI** could crash this one, closed by making both failures unrepresentable
+
+**Context.** A reimagined UI layer is coming. The question asked of the existing tree was narrow and
+worth answering literally: *is anything left over that will impact that — minor inaccuracies are
+fine as long as it doesn't cause a crash?* Every one of the nineteen gaps in [`GAPS.md`](GAPS.md)
+survived that filter as a *wrong number* or *wrong screen* and **none of them can throw**, so the
+answer was no blocker. Two things outside that document could throw, and this entry is both of them.
+
+Neither was a bug. Both were correct code that made a **caller's** mistake cheap to commit and
+expensive to discover — which is the same shape as the dead-seam family this repository has now
+shipped twelve times, one level up: the check exists, it is right, and nothing makes it happen.
+
+### 1. `judgeReplication` threw on a spec no single run can judge — and four callers held the guard by convention
+
+`GOAL_JUDGEMENT` classifies the seven goal kinds as `per-replication`, `batch-only` or `blocked`, and
+`judgeReplication` threw for the latter two. **That throw is correct and stays**: a silent
+`unmeasured` would let a *blocked* goal ship looking like a *measured* one, which is precisely the
+confusion `docs/10` § 10.4 exists to prevent. `long-waits-under` threw a second way, on a `null`
+threshold.
+
+What was missing is that **nothing obliged a caller to check.** All four shipped call sites did —
+`goalReport.ts`, `measure.ts`, `judge.ts`, and `goalRates.test.ts` — each with its own
+`isPerReplicationGoal(spec.kind)`, four separate authors having read the same docstring. And the two
+grounds were checked in *different places*: the kind at the call sites, the threshold inside the
+predicate, so **no single call answered "may I judge this?"**. A UI assembling a spec in memory
+never passes through `campaign/parse.ts`, which is the only thing that refuses a missing threshold,
+and would have discovered the problem as a throw partway through fifty replications.
+
+**Closed by making the domain a type.** `PerReplicationGoalSpec` is a discriminated union in which
+`long-waits-under` carries a `number` and the two unjudgeable kinds do not appear;
+`judgeReplication` and `measureGoalRate` take it. `asPerReplicationGoal` is the one total narrowing
+that checks **both** grounds and returns the facts when it refuses.
+
+**The type has teeth, and that is not an assertion — it is what the change cost.** Every unnarrowed
+call site stopped compiling: three shipped modules and twenty-four lines of `goals.test.ts`. The
+tests that exercise the throws now have to **cast past the compiler** to reach them, through a
+helper named `untyped` so the reason sits in one place. A test that could reach those throws without
+a cast would mean the narrowing had stopped working.
+
+**What it deliberately does not do: author any prose.** `goalReport.ts` and `measure.ts` each phrase
+a withheld goal for the surface it appears on. A third sentence here would have been a third place
+for one fact to drift, so the narrowing returns `judgement`, `blocker` and `missingThreshold` and
+lets each surface compose its own words. Registered in `honesty/derive.test.ts` on exactly that
+ground — *this is where player-facing text was kept out on purpose, and the two surfaces downstream
+are the coverage.*
+
+**One distinction the old code could not express**, now measurable: `missingThreshold` separates *the
+kind cannot be judged on one run* from *this instance cannot, as written*. The second is a judgeable
+kind with an unusable parameter, and it needed a different sentence and a different disposition in
+all three callers.
+
+### 2. The viewer resolved 73 element ids and threw on the **first** one absent
+
+```text
+missing #stage in index.html
+```
+
+True, and nearly useless to whoever is replacing the markup: one id out of however many are
+actually gone, so a new page is fixed one reload at a time. Worse, `#error` — the page's own
+last-resort message slot — **was itself one of the 73**, and the top-level catch was
+`if (node !== null)` and nothing else. So the single case where the message matters most was the
+case where nobody saw it. There was also no list anywhere of what a page must contain: the answer
+was 73 calls spread down a 1 600-line file, among the event wiring.
+
+**Closed by `dev/elementMap.ts`.** The ids are data, resolution is one pass that collects every
+miss, and the manifest is typed `IdsFor<Elements>` — a mapped type over the interface — so a field
+with no id and an id with no field are both **compile errors**. That is stronger than a test,
+because it holds for the shape rather than for the ids a test happened to enumerate. The ids
+themselves are pinned against `index.html` in both directions, and the second direction is the
+useful one: *which of the page's ids does the viewer never look up* — 34 of them, all editor
+controls plus the preview canvas and the no-canvas fallback — is the answer to **what may a new page
+drop?**, asserted exactly rather than as a lower bound.
+
+**Driven end to end, not argued.** Four ids in the shipped page were renamed the way a rewritten
+markup would rename them — including `#error` — and the page reported:
+
+```text
+the viewer failed to start: the page is missing 4 of the 73 elements the viewer needs:
+#stage, #error, #batch-run, #campaign-weights. Every id is listed in src/dev/elementMap.ts
+beside the field that holds it.
+```
+
+to `console.error` **and** to a `<pre>` prepended to `document.body`, then the page was restored and
+confirmed to boot and run. The suite's own version of that check tripped on the renamed page while
+the experiment was live, which is the test working rather than a failure.
+
+**What this explicitly does not do: make any element optional.** Every id stays required, because
+`main.ts` dereferences all 73 unconditionally — a `requirement: 'optional'` field would be a promise
+the page does not keep, which is the failure above wearing the opposite mask. Making a surface
+genuinely optional means guarding its wiring, one surface at a time. What changed is that *"the page
+died"* became *"the page is missing these four things"*, which is the difference between a crash and
+a diagnosis.
+
+**Impact on phase status: none, and that is the point.** No verdict moved, no criterion was touched,
+and no number was republished. Both changes are about what a *future caller* can do wrong.

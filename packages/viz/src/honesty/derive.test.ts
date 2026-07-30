@@ -146,6 +146,27 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '`campaign/brief.ts`, both driven.',
       ids: ['scenario/measure.ts#measureScenario', 'scenario/measure.ts#publishedScenarioFor'],
     },
+    {
+      reason:
+        'Returns the *facts* about why a goal cannot be judged and deliberately authors none of ' +
+        'the words. Derived only because its literals are goal-kind ids and `GoalJudgement` keys, ' +
+        'which the two-adjacent-words scanner reads as phrases. Carrying a sentence here would ' +
+        'have been a third authored wording for one fact — `goalReport.ts` and `measure.ts` each ' +
+        'phrase a withheld goal for the surface it appears on, and both of those are driven. So ' +
+        'the exclusion is not "this is not player-facing text"; it is "this is where player-' +
+        'facing text was kept out on purpose", and the two surfaces downstream are the coverage.',
+      ids: ['scenario/goals.ts#asPerReplicationGoal'],
+    },
+    {
+      reason:
+        'About the page’s own markup, not about a run. `ELEMENT_IDS` is a table of element ids — ' +
+        'the id/key case again, and derived only because hyphenated ids read as adjacent words. ' +
+        '`MissingElementsError` reports which ids a document lacks, so it can only be seen when ' +
+        'the viewer did not start; it makes no claim about a simulation, a statistic or a goal, ' +
+        'and there is nothing for R1, R2 or R13 to be true or false of. `elementMap.test.ts` ' +
+        'asserts its wording directly — the count, the total, every id, and the file to look in.',
+      ids: ['dev/elementMap.ts#ELEMENT_IDS', 'dev/elementMap.ts#MissingElementsError'],
+    },
   ]);
 
 const excludedIds = new Set(NOT_PLAYER_FACING.flatMap((group) => group.ids));

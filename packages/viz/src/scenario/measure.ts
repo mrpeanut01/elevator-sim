@@ -37,8 +37,8 @@ import type { BatchReplication, BatchRequest, BatchResources } from '../batch/ty
 import {
   GOAL_BLOCKER,
   GOAL_JUDGEMENT,
+  asPerReplicationGoal,
   goalLabel,
-  isPerReplicationGoal,
   measureGoalRate,
   type GoalDisposition,
   type GoalRate,
@@ -157,16 +157,17 @@ export function measureScenario(
   const unmeasurable: { spec: GoalSpec; disposition: GoalDisposition; reason: string }[] = [];
 
   for (const spec of scenario.candidateGoals) {
-    if (!isPerReplicationGoal(spec.kind)) {
+    const narrowed = asPerReplicationGoal(spec);
+    if (!narrowed.judgeable) {
       unmeasurable.push({
         spec,
-        disposition: GOAL_JUDGEMENT[spec.kind] === 'batch-only' ? 'batch' : 'not-shippable',
-        reason: unmeasurableReason(spec),
+        disposition: narrowed.judgement === 'batch-only' ? 'batch' : 'not-shippable',
+        reason: unmeasurableReason(spec, narrowed.missingThreshold),
       });
       continue;
     }
-    const tuning = measureGoalRate(spec, tuningReplications);
-    const holdout = measureGoalRate(spec, holdoutReplications);
+    const tuning = measureGoalRate(narrowed.spec, tuningReplications);
+    const holdout = measureGoalRate(narrowed.spec, holdoutReplications);
     const holdoutAgrees = tuning.rateClass === holdout.rateClass;
     measured.push({
       spec,
@@ -200,7 +201,16 @@ function runSeedSet(
   return result.arms[0]?.replications ?? [];
 }
 
-function unmeasurableReason(spec: GoalSpec): string {
+function unmeasurableReason(spec: GoalSpec, missingThreshold: boolean): string {
+  if (missingThreshold) {
+    // `campaign/parse.ts` refuses this at load, so no shipped scenario reaches here. Kept as a
+    // measurable outcome rather than a throw: a driver that regenerates the published table should
+    // report an unmeasurable goal, not die on it and lose the ones beside it.
+    return (
+      'Declares no threshold, so there is no ceiling to judge a wait against. The kind is ' +
+      'judgeable on one run; this instance of it is not, and it cannot be measured as written.'
+    );
+  }
   if (GOAL_JUDGEMENT[spec.kind] === 'batch-only') {
     return (
       'Judged on a difference between two arms, so no single run answers it and there is no ' +

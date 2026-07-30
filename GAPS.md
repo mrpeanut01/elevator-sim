@@ -78,6 +78,15 @@ family label can still print on a convergence report whose half-width is already
 `estimateMean` returns a zero half-width on a zero-variance sample · `prepositionPlan` has zero
 callers and is classified rather than deleted · `stats/` consolidation is unstarted.
 
+**All 73 of the viewer's elements are required, and no surface is optional.** A page supplying only
+some of them now gets one list naming every id it lacks rather than dying on the first
+([§ D173](DECISIONS.md)), and `dev/elementMap.ts` is the list. But `dev/main.ts` still dereferences
+every one unconditionally, so *"this page has no Campaign tab"* is not expressible — it is a missing
+element, not a disabled surface. Declaring an element optional without guarding its wiring would be
+a promise the page does not keep, so the declaration was **not** added. Making a surface genuinely
+optional is a change to `main.ts`, one surface at a time, and nothing needs it until a UI wants to
+ship a subset.
+
 ---
 
 ## 5. Where a status claim is weaker than it looks
