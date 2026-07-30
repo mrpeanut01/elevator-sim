@@ -165,10 +165,19 @@ export interface EditorOptions {
    * the acceptance case is exactly that: *"authoring an access zone on a building and switching
    * to a conventional dispatcher raises it live."* Read at render time.
    *
-   * Optional so a test can mount the editor without one, in which case no compatibility note is
-   * shown — the same silence the viewer keeps when it cannot name a profile.
+   * **Required, and it was optional until this cost the feature.** Wave 10 rebuilt the shell and
+   * dropped this option from the only call site; `renderAccessNote` then took its
+   * `profile === undefined` early return on every render and blanked itself, so § D159's warning
+   * was dead on this surface from `22a1021` until it was driven. Nothing went red, because
+   * `checkAccessCompatibility` kept its own unit tests and the honesty search kept driving it
+   * directly — the seam was what broke, not the function.
+   *
+   * The optionality was there so a test could mount without one. No such test exists, and no test
+   * can: this mount is DOM-bound and the suite has no jsdom, which is why `honesty/derive.test.ts`
+   * excludes it. So the exemption protected nothing and hid a live regression. Required means the
+   * compiler is the guard, which is the only guard this seam can have.
    */
-  readonly currentDispatcherId?: (() => string) | undefined;
+  readonly currentDispatcherId: () => string;
 }
 
 function el<T extends HTMLElement>(id: string): T {

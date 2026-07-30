@@ -351,6 +351,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
       adoptEditedBuilding(config);
     },
     confirm: confirmDiscard,
+    /*
+     * § D159's access/dispatcher compatibility warning is keyed on whoever is currently driving.
+     * Without this the editor's `renderAccessNote` takes its early return and blanks itself, so
+     * the warning is dead on this surface — which is exactly what happened between `aa7d943`,
+     * where the old shell passed `() => ui.dispatcher.value`, and here. The five-tab viewer had a
+     * `<select>` to read; the shift viewer keeps the same fact in `state.dispatcherId`.
+     */
+    currentDispatcherId: () => state.dispatcherId,
   });
 
   mountParameterForm({
