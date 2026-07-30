@@ -1239,13 +1239,15 @@ const GOAL_REPORT: SurfaceAdapter = {
 /**
  * Basic and Advanced, both drawn, and the parity check that runs on what was drawn.
  *
- * ## Why both modes, when `HONESTY_MODES` currently names one
+ * ## Why both modes, on every case, whatever `context.case.mode` says
  *
  * A `DisclosureItem` carries **both** renderings at once — that is what makes parity a comparison
  * rather than a re-derivation — so a mode is a projection of one datum, not a second run. Driving
- * only `context.case.mode` would leave every Basic string unsearched while the corpus looked
- * complete, and the Basic strings are the ones with new prose in them: `SUPPRESSION_LEAD`, the
- * plain-language locked-out note, `BASIC_WINDOW_VALUE`. Both projections cost one call.
+ * only `context.case.mode` would leave half the strings unsearched on every case while the corpus
+ * looked complete, and the Basic strings are the ones with new prose in them: `SUPPRESSION_LEAD`,
+ * the plain-language locked-out note, `BASIC_WINDOW_VALUE`. Both projections cost one call. This
+ * held when `HONESTY_MODES` named one mode and still holds now it names two: the generated axis
+ * exists for a future renderer that *branches* on the case's mode, and this adapter is not one.
  *
  * ## The inputs are `dev/main.ts`'s, line for line
  *
