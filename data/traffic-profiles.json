@@ -9,6 +9,7 @@
     {
       "id": "office-prestige",
       "name": "Prestige office",
+      "blurb": "The morning crush at a headline address: nearly everyone pours in through the lobby at once, and the bank is judged on how fast that queue clears.",
       "governingPeak": "up-peak",
       "arrivalRatePctPop5min": { "min": 15, "max": 17, "typical": 16 },
       "targetIntervalS": 25,
@@ -19,6 +20,7 @@
     {
       "id": "office-standard",
       "name": "Standard office",
+      "blurb": "An ordinary office morning: a steady stream in through the lobby, with light floor-to-floor errands once people are at their desks.",
       "governingPeak": "up-peak",
       "arrivalRatePctPop5min": { "min": 11, "max": 15, "typical": 12 },
       "targetIntervalS": 30,
@@ -29,6 +31,7 @@
     {
       "id": "residential",
       "name": "Residential",
+      "blurb": "Apartment mornings run downward — residents leave through the lobby, and families ride together, so groups are larger. Evenings invert to an up-peak.",
       "governingPeak": "down-peak-am",
       "arrivalRatePctPop5min": { "min": 3, "max": 7, "typical": 5 },
       "targetIntervalS": 70,
@@ -40,6 +43,7 @@
     {
       "id": "hotel",
       "name": "Hotel",
+      "blurb": "Hotel demand runs both ways all day: guests come and go while housekeeping and room service move between floors, with no single dominant direction.",
       "governingPeak": "two-way",
       "arrivalRatePctPop5min": { "min": 10, "max": 15, "typical": 12 },
       "targetIntervalS": 40,

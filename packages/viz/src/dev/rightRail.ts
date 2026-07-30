@@ -686,6 +686,18 @@ export interface PatternOption {
  * run's demand is the building's own `trafficProfile` — the demand every published figure in this
  * repository was measured under. Choosing anything else is choosing to leave the comparable case,
  * and the card says so rather than leaving a reader to find out from `DECISIONS.md`.
+ *
+ * ## A shipped profile's `help` is its authored `blurb`, and `$comment` may not stand in
+ *
+ * It used to be `profile.$comment` with a derived fallback — the identical route § D186 closed
+ * for dispatcher cards, where the "comment" a card rendered was 5 082 characters of maintainer
+ * documentation whose numerals collide with refused run figures. It stayed benign here only
+ * because the one shipped traffic `$comment` happened to be 64 characters of player-safe copy;
+ * nothing bounded the next authored paragraph. `TrafficProfile.blurb` is the field that exists
+ * to be read (required, validated, capped at 160 characters by `core`'s schema), `$comment` is
+ * maintainer documentation again, and `rightRail.test.ts` asserts the refusal in both
+ * directions — the shipped file's comments never reach an option, and an adversarial comment
+ * planted on every profile reaches none of the three rendered strings.
  */
 export function patternOptionsOf(
   resources: BrowserResources,
@@ -718,7 +730,7 @@ export function patternOptionsOf(
         `${profile.arrivalRatePctPop5min.typical.toFixed(1)} %pop/5 min · groups of ` +
         `${profile.batchSize.mean.toFixed(1)} · ` +
         `${String(Math.round(profile.directionalSplit.interfloor * 100))}% interfloor`,
-      help: profile.$comment ?? `Sized against ${profile.governingPeak}.`,
+      help: profile.blurb,
     });
   }
   for (const entry of saved) {

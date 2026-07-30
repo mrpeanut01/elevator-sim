@@ -147,6 +147,16 @@ describe('loadConfig against the real data/ directory', () => {
     expect([...config.dispatcherProfilesById.keys()]).toContain('predictive-balanced');
   });
 
+  it('every shipped traffic profile authors a bounded player-facing blurb that is not its $comment', () => {
+    // `blurb` is the one authored string in traffic-profiles.json a rendered surface may read;
+    // `$comment` stays maintainer documentation (the § D186 route, closed for this file too).
+    for (const profile of config.trafficProfiles.profiles) {
+      expect(profile.blurb.trim().length, profile.id).toBeGreaterThan(0);
+      expect(profile.blurb.length, profile.id).toBeLessThanOrEqual(160);
+      if (profile.$comment !== undefined) expect(profile.blurb).not.toBe(profile.$comment);
+    }
+  });
+
   it('loads every shipped building, in filename order', () => {
     expect(config.buildings.map((building) => building.id)).toEqual([
       'garden-apartments',
@@ -568,6 +578,33 @@ describe('schema validation messages', () => {
 
     expect(error.message).toContain('must sum to 1');
     expect(error.issues[0]?.path).toBe('profiles[0].directionalSplit');
+  });
+
+  it('rejects a traffic profile that authors no player-facing blurb', async () => {
+    const traffic = await readReal(DATA_FILES.trafficProfiles);
+    delete (traffic['profiles'] as Record<string, unknown>[])[0]!['blurb'];
+    const dir = await makeDataDir({ traffic });
+
+    const error = await expectLoadError(dir);
+
+    expect(codes(error)).toEqual([ISSUE_CODES.schema]);
+    expect(error.issues[0]?.path).toBe('profiles[0].blurb');
+  });
+
+  it('rejects an empty blurb and an essay-length one — copy is authored on purpose, and bounded', async () => {
+    for (const [bad, fragment] of [
+      ['', 'may not be empty'],
+      ['x'.repeat(161), 'D186'],
+    ] as const) {
+      const traffic = await readReal(DATA_FILES.trafficProfiles);
+      (traffic['profiles'] as Record<string, unknown>[])[0]!['blurb'] = bad;
+      const dir = await makeDataDir({ traffic });
+
+      const error = await expectLoadError(dir);
+
+      expect(error.issues[0]?.path).toBe('profiles[0].blurb');
+      expect(error.message).toContain(fragment);
+    }
   });
 
   it('rejects a building that declares no floors', async () => {

@@ -211,6 +211,17 @@ export interface DirectionalSplit {
 export interface TrafficProfile extends Commented {
   readonly id: string;
   readonly name: string;
+  /**
+   * Player-facing copy for the pattern picker — the **only** authored prose in this file a
+   * rendered surface may read.
+   *
+   * Required and bounded (`schema.ts` caps it at 160 characters), because the alternative was
+   * already the defect: the picker used to fall back to `$comment`, the same route
+   * `DECISIONS.md` § D186 closed for dispatcher cards, where one authored paragraph of
+   * maintainer documentation — seeds, intervals, replication counts — rendered verbatim on a
+   * driven surface. `$comment` stays maintainer documentation; this field is the copy.
+   */
+  readonly blurb: string;
   /** The peak this profile is sized against, e.g. `up-peak`, `down-peak-am`. */
   readonly governingPeak: string;
   /** Arrival rate as a percentage of building population per 5 minutes. */
