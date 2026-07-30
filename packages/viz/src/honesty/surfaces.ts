@@ -122,12 +122,14 @@ import {
   specFromTrafficProfile,
 } from '../authoring/patternSpec.js';
 import {
+  accessMatrixOf,
   checkBuilding,
   elevationCarsOf,
   elevationNoteOf,
   elevationRowsOf,
   specRowsOf,
   speedChipsOf,
+  zoneChoicesOf,
 } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
 import {
@@ -1239,13 +1241,15 @@ const GOAL_REPORT: SurfaceAdapter = {
 /**
  * Basic and Advanced, both drawn, and the parity check that runs on what was drawn.
  *
- * ## Why both modes, when `HONESTY_MODES` currently names one
+ * ## Why both modes, on every case, whatever `context.case.mode` says
  *
  * A `DisclosureItem` carries **both** renderings at once — that is what makes parity a comparison
  * rather than a re-derivation — so a mode is a projection of one datum, not a second run. Driving
- * only `context.case.mode` would leave every Basic string unsearched while the corpus looked
- * complete, and the Basic strings are the ones with new prose in them: `SUPPRESSION_LEAD`, the
- * plain-language locked-out note, `BASIC_WINDOW_VALUE`. Both projections cost one call.
+ * only `context.case.mode` would leave half the strings unsearched on every case while the corpus
+ * looked complete, and the Basic strings are the ones with new prose in them: `SUPPRESSION_LEAD`,
+ * the plain-language locked-out note, `BASIC_WINDOW_VALUE`. Both projections cost one call. This
+ * held when `HONESTY_MODES` named one mode and still holds now it names two: the generated axis
+ * exists for a future renderer that *branches* on the case's mode, and this adapter is not one.
  *
  * ## The inputs are `dev/main.ts`'s, line for line
  *
@@ -2817,6 +2821,132 @@ const EDITOR_PANELS: SurfaceAdapter = {
           role: 'reason',
         });
       }
+    }
+
+    /*
+     * The express toggle's two strings, driven on both throws of the toggle — GAPS § 3's
+     * *"the elevation's express toggle produces two strings the honesty search never sees"*.
+     *
+     * `elevationCarsOf` was already covered and its `legend` seeded, but none of the three specs
+     * above pins a band above the lobby, so `expressLabel` rendered `''` on every case of every
+     * campaign and `expressTitle` — the handoff's sentence at `docs/design/…:737`, kept
+     * module-private in `dev/buildingEditor.ts` precisely so that only this file could classify
+     * it, through the export that carries it — was never rendered at all. The two specs here are
+     * the two states a reader reaches by pinning a band `[6, 12]` and clicking the toggle: still
+     * landing in the lobby (the default; label `✓ express from the lobby, skipping 2–6`), and
+     * taken out of it (label `stays in its band — click to run express from the lobby`).
+     *
+     * The toggle is mounted only where `canExpress` holds (`dev/buildingEditor.ts` `:1554`), so
+     * its title is seeded under the same guard; a car without the button has no tooltip to read.
+     * Cars the toggle does not apply to render `expressLabel: ''`, which `singleRun` drops — the
+     * absence of a button is not a string. The legend is seeded too, because `band only` is a
+     * role word none of the shipped specs can produce.
+     */
+    const expressSpec: BuildingSpec = {
+      ...BLANK_SPEC,
+      bandByCar: { 0: [6, 12] as readonly [number, number] },
+    };
+    for (const [label, spec] of [
+      ['express-on', expressSpec],
+      ['express-off', { ...expressSpec, noLobby: { 0: true } }],
+    ] as const) {
+      for (const car of elevationCarsOf(spec)) {
+        seeds.push({
+          field: `elevationCarsOf(${label}).${car.id}.expressLabel`,
+          text: car.expressLabel,
+          role: 'label',
+        });
+        if (car.canExpress) {
+          seeds.push({
+            field: `elevationCarsOf(${label}).${car.id}.expressTitle`,
+            text: car.expressTitle,
+            role: 'prose',
+          });
+        }
+        seeds.push({
+          field: `elevationCarsOf(${label}).${car.id}.legend`,
+          text: car.legend,
+          role: 'label',
+        });
+      }
+    }
+
+    /*
+     * The access block, driven rather than statically swept — GAPS § 3's *"the access block's
+     * labels, tooltips and legend are statically swept, not driven"*.
+     *
+     * The register's stated fix was *"a covers entry"*, and that half turns out not to be
+     * available: `accessMatrixOf` and `zoneChoicesOf` return facts and ids with no prose literal
+     * of their own — deliberately, per `dev/buildingEditor.ts` § *Access zoning — pure*, which
+     * kept sentences out of the producers precisely so they would not become unclassifiable
+     * surfaces — so the derivation does not list them and a `covers` entry naming them would fail
+     * `derive.test.ts`'s no-stale-coverage guard. What is available is the rendering: the strings
+     * a reader sees are compositions of those facts made at the mount, and each is seeded here
+     * exactly as the shipped call site composes it — the matrix cell's `${glyph} ${word}`
+     * (`dev/buildingEditor.ts:1689`, KB-15's two signals, never colour alone), the zone chip's
+     * `${id} · ${floors}f · ${groups}g` (`:1593`), and the restricted floors as runs (§ 10.3's
+     * form). The six authored tooltip and legend sentences (`ZONE_FLOOR_TITLE` …
+     * `MATRIX_DISPATCHER_NOTE`) are module-private and reachable only through
+     * `mountBuildingEditor`, so they stay on the static R10 sweep — driving them needs an export
+     * from `dev/buildingEditor.ts`, a file this one does not own, and that is reported rather
+     * than reached for.
+     *
+     * The spec is constructed because four of the five shipped buildings declare
+     * `accessZones: []`: one zone a credential opens and one whose groups have all been
+     * withdrawn — the stranded state § 10.2 asks the matrix to make visible. One spec renders
+     * all three cell states (reachable, not permitted, unrestricted), the stranded clause of
+     * `elevationNoteOf`, `validateSpec`'s empty-group refusal, and the real loader's own refusal
+     * through `checkBuilding` — the schema's `credentialGroups.min(1)`, said in the parser's
+     * words rather than paraphrased.
+     */
+    const zonedSpec: BuildingSpec = {
+      ...BLANK_SPEC,
+      accessZones: [
+        { id: 'exec', floors: [10, 11, 12], credentialGroups: ['staff'] },
+        { id: 'service-core', floors: [5], credentialGroups: [] },
+      ],
+    };
+    const zonedMatrix = accessMatrixOf(zonedSpec);
+    seeds.push({
+      field: 'accessMatrixOf(zoned).restrictedRuns',
+      text: zonedMatrix.restrictedRuns,
+      role: 'label',
+    });
+    for (const row of zonedMatrix.rows) {
+      for (const cell of row.cells) {
+        seeds.push({
+          field: `accessMatrixOf(zoned).rows(${row.floorId}).cells(${cell.group})`,
+          text: `${cell.glyph} ${cell.word}`,
+          role: 'label',
+        });
+      }
+    }
+    for (const choice of zoneChoicesOf(zonedSpec, 'exec')) {
+      seeds.push({
+        field: `zoneChoicesOf(${choice.id}).label`,
+        text: `${choice.id} · ${String(choice.floorCount)}f · ${String(choice.groupCount)}g`,
+        role: 'label',
+      });
+      seeds.push({ field: `zoneChoicesOf(${choice.id}).runs`, text: choice.runs, role: 'label' });
+    }
+    seeds.push({ field: 'elevationNoteOf(zoned)', text: elevationNoteOf(zonedSpec), role: 'prose' });
+    for (const [index, problem] of validateSpec(zonedSpec, limitClass).entries()) {
+      seeds.push({
+        field: `validateSpec(zoned)[${String(index)}]`,
+        text: problem,
+        role: 'reason',
+      });
+    }
+    const zonedCheck = checkBuilding(zonedSpec, specs, trafficProfileIds);
+    if (zonedCheck.error !== '') {
+      seeds.push({ field: 'checkBuilding(zoned).error', text: zonedCheck.error, role: 'reason' });
+    }
+    for (const [index, warning] of zonedCheck.warnings.entries()) {
+      seeds.push({
+        field: `checkBuilding(zoned).warnings[${String(index)}]`,
+        text: warning,
+        role: 'reason',
+      });
     }
 
     /* ---- M10, the machine editor ---- */
