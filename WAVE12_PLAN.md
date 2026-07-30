@@ -110,7 +110,8 @@ from finding to fix during this phase.
    longer zero.
 6. `npx tsc -b` clean and `npx vitest run` green, measured serially on an idle machine, red runs
    reported.
-7. No phase verdict rounded up, no criterion weakened. New decisions numbered from § D187.
+7. No phase verdict rounded up, no criterion weakened. New decisions continue the numbering
+   after [§ D186](DECISIONS.md).
 
 ## 7 — Deliberately deferred
 
