@@ -30,6 +30,7 @@ import { recordRun } from '../record/recordRun.js';
 
 import {
   BLANK_SPEC,
+  RATED_LOADS,
   accessZonesOf,
   banksOf,
   buildingFromSpec,
@@ -67,6 +68,8 @@ import {
   machineIsDirty,
   specFromClass,
   specsWithClass,
+  type MachineClass,
+  type MachineSpec,
 } from './machineSpec.js';
 import {
   DEFAULT_PATTERN,
@@ -450,6 +453,121 @@ describe('the machine spec', () => {
       'cls-1',
     );
     expect(() => parseElevatorSpecs(specsWithClass(SPECS, mine) as unknown)).not.toThrow();
+  });
+});
+
+describe('the machines editor is not decoration', () => {
+  /*
+   * ME-07, the one editor § D177's rule did not cover. Every case drives the whole shipped chain
+   * rather than the class record alone: the machines editor's save (`classFromSpec` under a fresh
+   * `cls-` id, then `specsWithClass` widening the file — `dev/state.ts`'s own step 2), the building
+   * editor's *fit* (`buildingEditor.ts`'s class-chip `onPick`: `specClass` takes the id, the rated
+   * speed snaps to the class typical, the rated load clamps into the class's own range), and then
+   * `resolveBuilding` against the widened file into `recordRun`. That chain is where a class edit
+   * could quietly die — `resolveCar` prefers the car's own `ratedSpeedMps`/`ratedLoadLb` over the
+   * class's, so a suite that skipped the fit would be asserting a path no shipped control takes.
+   *
+   * The building is Garden Apartments **because of its own notes**: at a 3.0 m pitch a hydraulic
+   * car reaches rated speed inside one floor, so 0.63 → 1.00 m/s is a measured 11 % round-trip
+   * change — a decision-flip-sized delta. Midtown Office is this repository's named speed negative
+   * control (2.5 m/s never reached on a 3.8 m pitch), and running the speed arm there would produce
+   * a false "inert" finding about a control that works.
+   */
+  const fingerprint = (config: SimulationConfig): string =>
+    JSON.stringify(
+      recordRun(config, { recordDecisions: false }).recording.legs.map((leg) => [
+        leg.passengerId,
+        leg.carId ?? '',
+        leg.boardedAt ?? -1,
+      ]),
+    );
+
+  const eta = PROFILES.profiles.find((p) => p.id === 'eta') as DispatcherProfile;
+  const hydraulic = classesFromSpecs(SPECS).find(
+    (entry) => entry.id === 'hydraulic',
+  ) as MachineClass;
+  const garden = specFromBuilding(
+    parseBuilding(read('buildings/garden-apartments.json')),
+    'garden-apartments',
+  );
+
+  /** The building editor's fit, restated from `buildingEditor.ts`'s class-chip `onPick`. */
+  const fit = (spec: BuildingSpec, machineClass: MachineClass): BuildingSpec => {
+    const load = Math.min(
+      machineClass.loadMaxLb,
+      Math.max(machineClass.loadMinLb, spec.ratedLoadLb),
+    );
+    const nearest = RATED_LOADS.filter(
+      (lb) => lb >= machineClass.loadMinLb && lb <= machineClass.loadMaxLb,
+    );
+    return {
+      ...spec,
+      specClass: machineClass.id,
+      ratedSpeedMps: machineClass.speedTypicalMps,
+      ratedLoadLb: nearest.includes(load) ? load : (nearest[0] ?? load),
+    };
+  };
+
+  const runWith = (
+    machineClass: MachineClass,
+    overrides: Partial<SimulationConfig> = {},
+  ): string => {
+    // dev/state.ts widens the file only with what the reader *saved*; a shipped class rides plain.
+    const specs = machineClass.yours ? specsWithClass(SPECS, machineClass) : SPECS;
+    const building = resolveBuilding(
+      parseBuilding(buildingFromSpec(fit(garden, machineClass), { specs }) as unknown),
+      specs,
+    );
+    return fingerprint(configFor(eta, { building, elevatorSpecs: specs, ...overrides }));
+  };
+
+  /** The machines editor's save: the shipped class opened, one field moved, kept as `cls-1`. */
+  const saved = (edit: Partial<MachineSpec>): MachineClass =>
+    classFromSpec({ ...specFromClass(hydraulic), ...edit }, 'cls-1');
+
+  const control = runWith(saved({}));
+
+  it('an unchanged spec produces a bit-identical run — the negative control', () => {
+    /*
+     * Opening the hydraulic class, saving it untouched and fitting the copy must not change a
+     * single boarding against fitting the shipped class itself — otherwise every arm below would be
+     * measuring the copy chain rather than its edit. And the arm is only an instrument if it
+     * carries legs at all: a fingerprint of zero legs is equal to anything.
+     */
+    expect(JSON.parse(control)).not.toHaveLength(0);
+    expect(control).toBe(runWith(hydraulic));
+  });
+
+  it('a changed rated speed changes the legs', () => {
+    /*
+     * 0.63 → 1.00 m/s, the delta the building's own notes measured at 11 % of the round trip. The
+     * band ceiling moves with it because `classFromSpec` clamps the typical into the band — an edit
+     * of the typical alone would be clamped back to 0.75 and the arm would test the clamp, not the
+     * slider.
+     */
+    expect(runWith(saved({ speedTypicalMps: 1.0, speedMaxMps: 1.0 }))).not.toBe(control);
+  });
+
+  it('a changed acceleration changes the legs', () => {
+    // Doubled, 0.6 → 1.2 m/s² — the field reaches `resolveCar` directly, since no car config this
+    // editor writes declares an acceleration of its own.
+    expect(runWith(saved({ accelerationMps2: 1.2 }))).not.toBe(control);
+  });
+
+  it('a changed capacity changes the legs, on a load where capacity binds', () => {
+    /*
+     * The class range is the control: [1000, 1000] forces the fit to a 1 000 lb car — 6 persons in
+     * the capacities table against the control's 10 — and the demand is raised until the smaller
+     * car actually fills. At the shipped residential trickle no car reaches 80 % of either rating
+     * and the two arms are identical, which would be a true statement about that operating point
+     * and a useless test of the control — the same trap the load-sensor arm above documents.
+     */
+    const smaller = saved({ loadMinLb: 1000, loadMaxLb: 1000 });
+    expect(fit(garden, smaller).ratedLoadLb).toBe(1000);
+    const BUSY = { demand: { arrivalRatePctPop5min: 30 } } satisfies Partial<SimulationConfig>;
+    const busyControl = runWith(saved({}), BUSY);
+    expect(JSON.parse(busyControl)).not.toHaveLength(0);
+    expect(runWith(smaller, BUSY)).not.toBe(busyControl);
   });
 });
 
