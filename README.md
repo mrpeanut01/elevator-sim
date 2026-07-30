@@ -151,6 +151,29 @@ routed it silently past the code path it named, and, one level up, a checking to
 "no failures" for every case because a command-line flag it depended on had been renamed. It
 would have certified a dead test suite as fully live.
 
+### 10. Where a caller can get it wrong, we try to make it impossible rather than merely detected
+
+The practices above are about the numbers. This one is about the code that produces them, and it is
+the newest.
+
+A function that refuses a bad argument by failing loudly is doing the right thing — but "the right
+behaviour on a bad call" is not the same as "the bad call cannot be made". The routine that scores
+one simulated run against one design goal used to refuse two of the seven goal types, correctly,
+because those two compare *two* configurations and no single run can answer them. Four places in the
+codebase checked for that before calling it. All four were right, and **nothing obliged them to be** —
+the check was a convention four authors held by having read the same comment. So the restriction is
+now part of the type the function accepts: a caller that has not checked no longer fails at run time,
+it fails to compile. Three modules and two dozen test lines stopped building the moment that landed,
+which is how we know the change has teeth rather than merely reads well.
+
+The same reasoning fixed how the browser viewer reports a page it cannot start on. It resolves 73
+named elements, and it used to stop at the first one missing — including, awkwardly, the element it
+writes its own error messages into, so the one situation where the message mattered most was the one
+where nobody ever saw it. It now names every missing element at once, and the list of what a page must
+contain is a document rather than 73 calls buried in a 1,600-line file.
+
+Neither change fixed a bug. Both removed a way for the *next* person to introduce one.
+
 ### What this does not claim
 
 It is a simulation, not a building. It does not model passenger psychology, lift-lobby crowd
@@ -200,7 +223,7 @@ Machine-readable configuration lives in [`data/`](data/).
 
 **Phases 0–5, 7 and 8 are landed and accepted. Phase 6 is partially complete** — see the table for
 what that means. Four packages (`core`, `experiments`, `viz`, `cli`), a six-command CLI,
-**190 test files, 3,505 tests** (3,496 passing, 9 skipped), `tsc -b` clean.
+**226 test files, 4,148 tests** (4,138 passing, 10 skipped), `tsc -b` clean.
 
 | Phase | Status |
 |---|---|
@@ -212,7 +235,7 @@ what that means. Four packages (`core`, `experiments`, `viz`, `cli`), a six-comm
 | 5 — Smart dispatch | ✅ Twelve cost terms, auction, predictor, benchmark suite |
 | 7 — Automated tuning | ✅ Search space, three searches, held-out validation, `elevator-sim tune` — **and its one undelivered bullet, the fuzzy traffic-pattern detector with hysteresis driving per-pattern weight sets, now ships and drives a run**; measured BETTER on TTD and reported **below the resolution limit**, because the effect is smaller than the apparatus resolves |
 | CLI | ✅ `list`, `run`, `compare`, `tune`, `fuzz`, `watch` |
-| 6 — Destination dispatch & learned control | ⚠️ 6a (disclosure) and 6b (dispatch) accepted against a **raised** criterion, now measured on the Mixed-Use High-Rise the criterion names: **met by the Level-0 arm, not met by the Level-1 panel at any measured point**. 6c (learned control) is **no longer deferred — it is implemented, measured, and NOT ACCEPTED**: ΔTTD `−0.213 [−0.440, +0.014]` against `collective`, an interval containing zero, against a criterion recorded *before* the code. Double-deck operation **is simulated**, and benchmarked to a **dispatcher-dependent** verdict — WORSE under `eta`, BETTER under `collective`, with no verdict of the form *double-deck is better*. Every sub-phase now has a measurement rather than a deferral, and the phase is still partial because one of them was refused |
+| 6 — Destination dispatch & learned control | ⚠️ 6a (disclosure) and 6b (dispatch) accepted against a **raised** criterion, now measured on the Mixed-Use High-Rise the criterion names: **met by the Level-0 arm, not met by the Level-1 panel at any measured point**. 6c (learned control) is **implemented, measured, and NOT ACCEPTED** — and the refusal is no longer one operating point: it was swept over **eight pre-registered cells** and held, refused at **all five primary cells** under a multiple-comparison correction, with the smallest detectable effect re-measured at each cell rather than inherited from another. Two of those cells clear the correction and were **refused anyway**, because the effect is a third to a half of what the apparatus can resolve there. Double-deck operation **is simulated**; its verdict became BETTER-EVERYWHERE once a real escalator replaced a lift leg the hardware would never pay for — on **two cells at one operating point where the previous answer had four at two**, and a better word on a narrower base is not a stronger result. Every sub-phase now has a measurement rather than a deferral, and the phase is still partial because one of them was refused |
 | 8 — Testing campaign | ✅ All eight tracks landed — fuzzing, oracle across all five buildings, physics, statistics, determinism, scale, adversarial, and the full experiment matrix (8 cells × 12 profiles, Pareto front over AWT / energy / WT95) — and found four real defects, **all four now fixed**; the deep tier is green at 2 000 cases and **no property violation is outstanding**, so both halves of the criterion are met |
 
 Try it — six commands, all against the real `data/` directory:
@@ -225,7 +248,7 @@ npm run sim -- compare --building midtown-office --a eta --b nearest-car --reps 
 npm run sim -- tune --building garden-apartments --params idle.repositionThresholdS --seed 42
 npm run sim -- fuzz --cases 8                  # or: --tier deep --cases 2000, the overnight pass
 npm run sim -- watch --building garden-apartments --dispatcher eta --speed 10
-npm test        # 190 files, 3,505 tests — the benchmarks execute real replications, so this is minutes, not seconds
+npm test        # 226 files, 4,148 tests — the benchmarks execute real replications, so this is minutes, not seconds
 ```
 
 `compare` prints a paired-t interval on the difference and refuses to rank two arms whose interval
@@ -236,9 +259,17 @@ mean the run's own summary suppresses; `watch` printed one on both of its render
 [§ D111](DECISIONS.md).
 
 **What is not done is in the brief, not in this table.** Phase 6c is **measured and refused**, which
-is a different state from deferred and a better one. Phase 9 is designed in
-[`docs/10`](docs/10-experience-layer-contract.md) and **only W4 is built** — the schema-driven
-control renderers, proved generic against a schema the product does not ship. TWIN operation — two
+is a different state from deferred and a better one. Phase 9 — the experience layer designed in
+[`docs/10`](docs/10-experience-layer-contract.md) — has **eight and a half of its nine units
+built**: a novice/expert split, a schema-generated dispatcher form, per-floor rider queues, a
+building-mood gauge, an access-credential lens, a seven-stage campaign whose bars are the shipped
+configuration's own measured scores rather than numbers somebody picked, and a comparison tab that
+runs a proper replication batch in a worker and shows the interval without naming a winner when the
+interval contains zero. The half that is open is the access-zoning **editor** controls; its
+dispatcher-compatibility warning is done. **It still has no phase status row, deliberately.** Its
+acceptance criterion exists and its two load-bearing clauses now measure as satisfied, but the row
+and the verdict land together or neither does, and the sweep that would write the verdict has not
+been run. A design with most of its code built is not an accepted phase. TWIN operation — two
 independently driven cars in one shaft — is **designed and not built**, in
 [`docs/11`](docs/11-twin-shaft-contract.md); it is not double-deck, and the contract says why. A
 phase's *status* is now bound to **evidence that
@@ -249,6 +280,18 @@ guard cannot tell a raised criterion from a weakened one. See [`docs/07` § 8](d
 
 The browser viewer and building editor live in `packages/viz` and are dev-served with Vite;
 `packages/core` exposes a `./browser` subpath so nothing pulls `node:fs` into a bundle.
+
+**Replacing the front end.** The layers under the viewer are designed to outlive it: the recording
+contract, the frame producer, the metric overlays and every layout planner are pure functions of
+`(recording, time)` with no DOM anywhere near them, and the two functions that turn a time into a
+picture **clamp** their time argument, so scrubbing anywhere — including past the end of a run —
+cannot throw. `packages/viz/src/dev/elementMap.ts` is the integration contract for the page itself:
+every element the viewer resolves, in one list, checked against the shipped HTML in both directions.
+The second direction is the useful one — it names the 34 ids in the page the viewer never looks up,
+which is the answer to *what can new markup safely drop?* A page missing elements now gets one
+message naming all of them rather than dying on the first. One honest limitation, recorded rather
+than glossed: every element is still **required**, because the viewer dereferences all of them
+unconditionally, so *"this build has no campaign tab"* is not yet expressible as a disabled surface.
 
 See the [Roadmap](docs/05-roadmap.md) for per-phase acceptance verdicts and the measurements behind
 them, and the [Handoff brief](docs/07-handoff.md) for current state and open debt.

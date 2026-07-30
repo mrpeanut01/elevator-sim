@@ -1681,15 +1681,22 @@ at its own seed and operating point. Neither is wrong; inheriting either across 
   against one 2,765-line file is the Phase 5 configuration with a larger blast radius
   ([§ D28](../DECISIONS.md)). 6c needs its own acceptance question before it needs an implementation.
 
-## What remains, as of 2026-07-28
+## What remains, as of 2026-07-29
+
+> **Five rows of this table were stale when it was re-dated, and they are corrected below rather
+> than deleted.** The table said Phase 6c was *deferred*, Phase 9 was *not built*,
+> `packages/experiments` had *no browser export*, double-deck was *disclaimed on every run*, and
+> fuzzy pattern switching was *read by nothing*. All five had been resolved by waves 6–9 and the
+> table had not moved with them. It is dated, which is a partial defence and not a sufficient one: a
+> dated register that contradicts the current tree is the same failure as an undated one, just
+> harder to blame. The stale wording is quoted here so the correction is legible as a correction.
 
 | Item | Where it is recorded |
 |---|---|
-| **Phase 6c — learned control** | § Phase 6c above; deferred with reasons, not dropped |
-| **Phase 9 — the experience layer** | Designed in [`docs/10`](10-experience-layer-contract.md) and **not built**. No phase row exists for it in any status table, deliberately: a design is not a phase in progress |
-| **`packages/experiments` has no browser export**, which blocks `docs/10`'s generated editor | [`docs/10`](10-experience-layer-contract.md) § 13 q1 — a **prerequisite**, not an optimization. The package declares `"."` and `"./package.json"` only, so a deep import of `tuning/space` is refused by the resolver, and the one entry it does declare pulls `node:worker_threads` through `runner/parallel.ts` |
-| **Double-deck simulation and Vertical City** | § Phase 6 above; disclaimed on every run of that building |
-| **Fuzzy traffic-pattern switching** | § Phase 7 above; authored in `data/`, read by nothing |
+| **Phase 6c — learned control** | § Phase 6c above. **No longer deferred: implemented, measured and NOT ACCEPTED**, and the refusal was then broadened from one operating point to eight pre-registered cells and held ([§ D151](../DECISIONS.md) is the protocol, dated before any sweep figure; [§ D156](../DECISIONS.md) is the result). What remains is one re-measurement, on the mix-varying demand template built after the sweep named the shipped template's flat directional split as the mechanism — protocol pre-registered at [§ D162](../DECISIONS.md), **not run**. A third refusal is an explicitly permitted outcome |
+| **Phase 9 — the experience layer** | Designed in [`docs/10`](10-experience-layer-contract.md), and **eight and a half of its nine units are built** — W1–W7 and W9 done, W8's compatibility warning done and its access-zoning editor controls open. **Still no phase row in any status table, and that is now a different decision from the one this row used to record**: not *"a design is not a phase in progress"* but *"the row and the verdict land together"*. Its criterion is [§ D163](../DECISIONS.md), both load-bearing clauses measure as satisfied, and the sweep that would write the verdict has not been run |
+| **Access-zoning editor controls** | [`docs/10`](10-experience-layer-contract.md) § 11 W8 — the open half. The dispatcher-compatibility warning that depended on it shipped anyway ([§ D159](../DECISIONS.md)) |
+| **A zone cannot be changed mid-run** | Operational zoning is a shipped concept with no mechanism over time. Deliberately deferred: nothing measures it and no published result depends on it |
 | **The Level-1 panel does not clear the Phase 6 gate on `mixed-use-high-rise`** | § *Phase 6 on the building the criterion names* above. A measured result, not a task — but it is what a reader planning 6c needs |
 | **`garden-down-peak` is `destination-eta`'s remaining identity class at n = 51** | § *What the matrix found* above. It is blind to **`rideTime`**, not to the destination — and the distinction is measured, not argued ([§ D136](../DECISIONS.md)). `rideTime` separates the candidate cars in **1 of 1 727 contested decisions**, so a constant cannot move an argmin and no weight rescues it: 0.5, 1, 2 and 8 form one identity class, and sixteen times the shipped weight buys the same single flip. **The destination itself is not blind there**: `stopCount` separates the cars in **139** of those decisions — and pricing it is **WORSE** on AWT `+1.320 [+0.988, +1.653]`, WT95 `+4.060 [+2.899, +5.220]` and TTD `+1.419 [+1.067, +1.770]` at n = 200 at two seeds. So the open question is **answered, in the negative-for-the-operator direction**, and what remains open is the mechanism — *which* car the increment prefers and why it is worse placed — which is **unmeasured and not asserted**. The class is stated at n = 51 deliberately: it does not hold at n = 200 |
 | **The editor's ⇧/⇩ buttons reorder the JSON declaration and not the building** | the retired T29 lane record § T29-4, and [§ D111](../DECISIONS.md). Relabelled honestly rather than repurposed; the scope call — give the declaration its own view, or drop `moveFloor` and let `index` be the only ordering control — is **handed back to the owner** |
