@@ -11692,3 +11692,29 @@ and a constant whose only reader is a test is the caller-less seam by another na
 Four rows are recorded **drive-limited** with what could and could not be verified (`TP-17`,
 `SG-17`, `MD-07`, `DE-11` among them) rather than marked green — a row the product's own validation
 makes unreachable is a fact about the product, not a coverage gap to paper over.
+
+## D199 — the eight driven defects, fixed the same day, each red before green
+
+**Date: 2026-07-30 · Wave 12, defect-fix lane · All § D198 findings closed; re-driven in Chromium, all green.**
+
+`DR-13` (`b94d602`): both `mountReport` and `wireKeyboard` wired `#report-next-day` and each applied
+`nextDay` — the panel now owns its buttons per the `mountTypes.ts` idiom, the duplicates are
+deleted, and `reportPanel.test.ts` pins **one binding site per button** so the double-wiring class
+cannot ship silently again (`#report-back` carried the same double wiring, idempotent only by
+luck). `TP-08` (`815e314`): `BigInt(raw.replace(/\D/g,'') || '0')` — "banana" → 0, "12a4" → 124,
+both demonstrated red — replaced by the deep-link reader's own rule (`/^\d+$/` or a refusal on
+`#status` naming what was typed, field restored); only the literal `0` may run seed 0. `SH-09`
+(`4a62387`): one `syncUrl()` after boot's flip, § D189's three intents untouched. `RR-11`
+(`3f8dd8c`): the handoff itself decides the fix — its drawer label reads *"Close controls"* while
+open and it ships no close control inside the drawer, so the toggle **is** the close control and
+now stacks above the overlay; the re-drive is a real hit-test that timed out before the fix.
+`TP-10` (`a2a95b4`): the reader was never loosened — `writeRecordingDocument` now exists beside it
+and **the document is the recording itself**; frames are deliberately not persisted (a pure
+derivation persisted beside its source is drift waiting to happen), which exposed that the frame
+serializer's last shipped caller *was* the defect — reclassified deliberate-API with the C24
+precedent. Cosmetics (`2a2cdc0`): the favicon 404 that trained every session to ignore the console;
+the failed-boot pill and footer authored; the "2 of 1 clean shifts" clamp, display-only.
+
+One honest deviation kept as its own commit (`0564338`): TP-08's extraction created a new prose
+producer and the honesty derivation guard went red — correctly — before the lane classified it.
+**The tripwire § D195 recorded lane V answering is now a routine any lane answers.**
