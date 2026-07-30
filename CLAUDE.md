@@ -50,8 +50,13 @@ verdict:
   *every unit names its non-test caller* — is **satisfied in prose and mechanised by nothing**: all
   **19** `packages/viz/src` directories sit outside every `AUDITED_MODULES`, the four dead-code
   audits cover 7 of 49, and the evidence is a hand-written table plus one prose line per unit. It is
-  the clause to distrust first, and a fifth audit under `packages/viz` is the fix. Also named in the
-  verdict: `Escape` does not dismiss the drawer, the honesty sweep's `mode` axis has one value,
+  the clause to distrust first, and a fifth audit under `packages/viz` is the fix — **done in
+  wave 12** (`packages/viz/src/deadCode.test.ts`, [§ D192](DECISIONS.md)): 19 directories derived
+  from disk and asserted both ways, 1 017 exports classified, and it immediately found two
+  docstrings naming callers that do not call; the verdict itself is unchanged. Also named in the
+  verdict: `Escape` does not dismiss the drawer *(closed in wave 12, [§ D188](DECISIONS.md))*, the
+  honesty sweep's `mode` axis has one value *(closed in wave 12, [§ D194](DECISIONS.md) — the
+  second value produced zero new strings, a measured null)*,
   three DOM panels are statically swept rather than driven, and **U6**, **U7's rider models** and
   **Basic's curated three-dimension subset** are unbuilt.
 

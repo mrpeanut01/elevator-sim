@@ -161,16 +161,35 @@ DR- SC- RR- DE- TE- ME- BE- IS- MD- KX- RX-`.
 | State | Rows | Where they are |
 |---|---|---|
 | ✅ **run** — driven in a browser | **0** | — the pass that wrote the ledger held no browser, and it carried no `✅ run` across from the retired board |
-| ✅ **test** — the whole row asserted, and the assertion located and read | **117** | `BE` 21 · `LR` 20 · `SG` 10 · `DR` 10 · `DE` 9 · `TE` 7 · `SC` 6 · `RR` 6 · `IS` 6 · `MD` 6 · `ME` 5 · `SH` 4 · `KX` 3 · `TP` 2 · `RX` 2 · `CO` 0 |
-| ✅ **test** + ⚠️ — one clause each way | **40** | `SH` 11 · `TP` 8 · `SG` 5 · `CO` 3 · `RR` 3 · `RX` 3 · `DR` 2 · `SC` 2 · `KX` 2 · `LR` 1 |
-| ⚠️ **unverified** — built and reachable, neither driven nor covered | **55** | `KX` 10 · `TP` 7 · `CO` 5 · `RX` 5 · `DR` 4 · `MD` 4 · `SH` 3 · `BE` 3 · `IS` 3 · `SG` 2 · `RR` 2 · `DE` 2 · `ME` 2 · `LR` 1 · `SC` 1 · `TE` 1 |
-| 🔲 **not built, inert, or failing its own condition** | **7** | `SH-09` · `SH-12` · `KX-11` · `SG-15` · `TP-13` · `KX-10` · `RX-03` |
+| ✅ **test** — the whole row asserted, and the assertion located and read | **118** | `BE` 21 · `LR` 20 · `SG` 10 · `DR` 10 · `DE` 9 · `TE` 7 · `SC` 6 · `RR` 6 · `IS` 6 · `MD` 6 · `ME` 6 · `SH` 4 · `KX` 3 · `TP` 2 · `RX` 2 · `CO` 0 |
+| ✅ **test** + ⚠️ — one clause each way | **47** | `SH` 13 · `TP` 9 · `SG` 6 · `CO` 4 · `KX` 4 · `RR` 3 · `RX` 3 · `DR` 2 · `SC` 2 · `LR` 1 |
+| ⚠️ **unverified** — built and reachable, neither driven nor covered | **53** | `KX` 10 · `TP` 7 · `RX` 5 · `CO` 4 · `DR` 4 · `MD` 4 · `SH` 3 · `BE` 3 · `IS` 3 · `SG` 2 · `RR` 2 · `DE` 2 · `LR` 1 · `ME` 1 · `SC` 1 · `TE` 1 |
+| 🔲 **not built, inert, or failing its own condition** | **1** | `RX-03` |
 
 These five counts are **derived from `UX.md`'s own tables**, not tallied by hand, on the rule *a row
 carrying `🔲` is not built; a row carrying both `✅ test` and `⚠️` is half; a row carrying one is
 that one.* Editing a row's marks makes this table wrong until it is re-derived.
 
-**The 40 half rows are the two rules at the top of this file arriving at the same place.** Rule
+> **Re-derived 2026-07-30 (wave 12), counted from `UX.md` §§ 9–24's mark cells after the wave-12 row
+> updates (struck-through history spans excluded).** The table read *117 / 40 / 55 / 7* until this
+> date. Six of the seven `🔲` rows are closed by a fix **with a test**, per-row: `SG-15` — the bank
+> filter wired through `buildLayout` with the § D177 legs-of-the-picture test and the visible
+> *showing N of M* caption ([§ D187](DECISIONS.md)); `SH-12` / `KX-11` — `Escape` closes the drawer,
+> deliberately inert in column mode ([§ D188](DECISIONS.md)); `KX-10` — fixed-seconds seek and
+> <kbd>Home</kbd>/<kbd>End</kbd> via `seekActionForKey` ([§ D188](DECISIONS.md)); `SH-09` — URL
+> write-back at the `renderAll` chokepoint, round-trip tested ([§ D189](DECISIONS.md)); `TP-13` —
+> `copy run` emits `--traffic`/`--template`, driven bit-identical to the CLI route at 10 of 10
+> cells, or refuses with named reasons ([§ D190](DECISIONS.md)). Each carries `✅ test` on its
+> mechanism and `⚠️` on its listener/browser half — **the § 26 browser re-drive is owed in the drive
+> phase, so none carries `✅ run`**. `RX-03` is the one remaining `🔲`, expected to graduate from
+> finding to fix during the drive phase. `ME-07` and `CO-02` moved `⚠️` → `✅ test` on
+> [§ D191](DECISIONS.md): the machines-editor suite drives the **fit path** — the naive fit-less
+> path would have called a live control dead — and `CO-02`'s DOM change-listener half stays `⚠️`
+> for the drive phase.
+
+**The 40 half rows are the two rules at the top of this file arriving at the same place.** *(47
+since the wave-12 re-derivation — the six fixed `🔲` rows and `CO-02` joined this bucket, each
+tested on its mechanism and unverified on its listener.)* Rule
 one: *a component test does not close a row.* Rule two, from wave 11: *a row is closed by a case
 that originates in a real run, because a fixture proves the mechanism is correct and cannot prove
 it is reached.* Every one of those 40 is a surface whose **decision** is asserted and whose **DOM
@@ -179,7 +198,12 @@ writing or event listener** is not — and that is not an oversight anybody coul
 with the reason stated as *"weaker than driving them … a limitation rather than coverage."* A plain
 `✅ test` on those rows would claim exactly what that exclusion refuses to claim.
 
-**Why the ⚠️ column is 59 rows.** `packages/viz/src/dev/main.ts` is 1 394 lines and holds every
+**Why the ⚠️ column is 59 rows.** *(The number 59 was wrong when written: the derived table above
+said **55** at the time, and re-deriving on 2026-07-30 — counted from `UX.md` §§ 9–24's mark cells
+after the wave-12 edits, struck history spans excluded — gives **53**, `ME-07` and `CO-02` having
+left the bucket on [§ D191](DECISIONS.md). Nothing reconciled this heading against the table it sits
+under until wave 12; the sentence below stands, and is still the right explanation of the column.)*
+`packages/viz/src/dev/main.ts` is 1 394 lines and holds every
 event listener in the viewer. `main.test.ts` exists — it did not when wave 10 landed — but its
 three blocks are entirely about the wait-age legend. Forty-odd `addEventListener` calls,
 `drawHeader`, `drawFooter`, `drawCoach`, `drawStage`, `drawTransportChrome`, `runShift`, `adopt`,
@@ -190,6 +214,10 @@ three blocks are entirely about the wait-age legend. Forty-odd `addEventListener
 `pushState`/`replaceState` survives, so nothing writes the URL back) and `RX-03` (the left rail
 never yields; there is no stacked layout below 768 px). They are stated as findings-from-reading.
 `UX.md` § 26 is the ordered list of what to drive, highest risk first, and those three lead it.
+*(Wave 12, 2026-07-30: `SG-15` was then confirmed inert **by driving** before being wired
+([§ D187](DECISIONS.md)) and `SH-09` was built ([§ D189](DECISIONS.md)) — see the re-derivation
+note above; `RX-03` remains, deferred to the drive phase. The § 26 list still leads with the two
+fixes, now as re-drives to confirm.)*
 
 The scenario classes this matrix demands of every UI feature — happy path, alternate valid path,
 invalid input, empty state, loading state, failure and recovery, keyboard and focus, responsive

@@ -35,11 +35,14 @@ the shape of all three, and **Phase 9's ✅ is the one that must not be read alo
   [§ D186](../DECISIONS.md) exists and why [§ D172](../DECISIONS.md)'s *"the refinement relation,
   not a run"* had to be corrected. Mode parity is derived from the code and proved against a fail
   state the product does not ship. **The gaps are not decoration.** Clause 4 — *every unit names its
-  non-test caller* — is **satisfied in prose and mechanised by nothing**: all 19 `packages/viz/src`
-  directories sit outside every `AUDITED_MODULES`, and it is the clause a reader should distrust
-  first. `Escape` does not dismiss the drawer. **U6**, **U7's rider models** and **Basic's curated
-  three-dimension subset** are unbuilt and named in the verdict. § Phase 9 of
-  [the roadmap](05-roadmap.md) is the whole finding.
+  non-test caller* — was **satisfied in prose and mechanised by nothing** at acceptance: all 19
+  `packages/viz/src` directories sat outside every `AUDITED_MODULES`, and it was the clause a reader
+  should distrust first — **mechanised in wave 12 by the fifth audit,
+  `packages/viz/src/deadCode.test.ts` ([§ D192](../DECISIONS.md)), whose first harvest was 8 dead
+  candidates and two docstrings naming callers that do not call.** `Escape` did not dismiss the
+  drawer at acceptance; **closed in wave 12 ([§ D188](../DECISIONS.md))**. **U6**, **U7's rider
+  models** and **Basic's curated three-dimension subset** are unbuilt and named in the verdict.
+  § Phase 9 of [the roadmap](05-roadmap.md) is the whole finding.
 
 > **This opening sentence has been wrong twice, in the same place, about the same phase.** It once
 > read "Phases 0–5 … are complete; Phases 6, 4 and 8 remain" — asserting Phase 4 both complete and
@@ -162,7 +165,7 @@ is not being read honestly.
 | CLI | ✅ `list`, `run`, `compare`, `tune`, `fuzz`, `watch` |
 | **6 — Destination dispatch & learned control** | ⚠️ 6a and 6b accepted against the raised criterion, measured on the building it names: **met by Level 0, not met by the Level-1 panel**; **6c implemented, measured and NOT ACCEPTED**; double-deck **simulated and benchmarked**, to a **dispatcher-dependent** verdict |
 | **8 — Testing campaign** | ✅ Blocking clause **discharged** — 0 outstanding property violations, deep tier green at 2 000 cases — and all eight tracks landed, the last being the full experiment matrix (8 cells × 12 profiles, Pareto over AWT / energy / WT95) with Phase 7's acceptance interval at n = 150 |
-| **9 — Experience layer** | ✅ **ACCEPTED WITH NAMED GAPS** — all nine units built; clause 1 (the honesty property under **search**) green at 60 cases / 271 985 strings / 0 violations after finding two, clause 2 (mode parity) **derived** from the code, clause 3 re-derived in the always-on tier, clause 5 discharged **by driving a browser**. **Clause 4 — name the non-test caller — is satisfied in prose and mechanised by nothing.** Unbuilt and named: U6, U7's rider models, Basic's curated three-dimension subset |
+| **9 — Experience layer** | ✅ **ACCEPTED WITH NAMED GAPS** — all nine units built; clause 1 (the honesty property under **search**) green at 60 cases / 271 985 strings / 0 violations after finding two, clause 2 (mode parity) **derived** from the code, clause 3 re-derived in the always-on tier, clause 5 discharged **by driving a browser**. **Clause 4 — name the non-test caller — was satisfied in prose and mechanised by nothing at acceptance; mechanised in wave 12 ([§ D192](../DECISIONS.md))**. Unbuilt and named: U6, U7's rider models, Basic's curated three-dimension subset |
 
 **Every sub-phase now has a measurement rather than a deferral, and Phase 6 is still ⚠️ because one
 of them was refused.** Phase 7's one undelivered scope bullet — the fuzzy traffic-pattern detector —
