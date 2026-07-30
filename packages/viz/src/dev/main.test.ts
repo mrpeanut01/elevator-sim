@@ -27,14 +27,30 @@
  * decision is the pure export and the DOM writing is decision-free — `dom.ts`'s pattern.
  */
 
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
+import {
+  parseBuilding,
+  parseDispatcherProfiles,
+  parseElevatorSpecs,
+  parseTrafficProfiles,
+  resolveBuilding,
+} from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
 import { WAIT_BANDS } from '../live/bands.js';
 
-import { seekActionForKey, waitLegendEntries } from './main.js';
+import type { BrowserResources } from './data.js';
+import {
+  deepLinkDefaultsOf,
+  deepLinkSearchOf,
+  deepLinkStateOf,
+  seekActionForKey,
+  waitLegendEntries,
+} from './main.js';
+import { initialState, type ViewerState } from './state.js';
 
 async function indexHtml(): Promise<string> {
   return readFile(fileURLToPath(new URL('../../index.html', import.meta.url)), 'utf8');
@@ -130,6 +146,152 @@ describe('keyboard seeking — KX-10', () => {
       expect(seekActionForKey(key, false)).toBeUndefined();
       expect(seekActionForKey(key, true)).toBeUndefined();
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The URL follows the run — SH-09
+ * -------------------------------------------------------------------------- */
+
+const DATA = new URL('../../../../data/', import.meta.url);
+const readData = (path: string): unknown =>
+  JSON.parse(readFileSync(fileURLToPath(new URL(path, DATA)), 'utf8')) as unknown;
+
+/** The shipped data, exactly as `state.test.ts` builds it — the reader validates ids against it. */
+function resourcesOf(): BrowserResources {
+  const elevatorSpecs = parseElevatorSpecs(readData('elevator-specs.json'));
+  const entries = [
+    'garden-apartments',
+    'midtown-office',
+    'secure-tower',
+    'mixed-use-high-rise',
+    'vertical-city',
+  ].map((id) => {
+    const config = parseBuilding(readData(`buildings/${id}.json`));
+    return { file: `${id}.json`, config, resolved: resolveBuilding(config, elevatorSpecs) };
+  });
+  const trafficProfiles = parseTrafficProfiles(readData('traffic-profiles.json'));
+  return {
+    elevatorSpecs,
+    trafficProfiles,
+    dispatcherProfiles: parseDispatcherProfiles(readData('dispatcher-profiles.json')),
+    buildings: entries.map((entry) => entry.resolved),
+    entries,
+    trafficProfileIds: new Set(trafficProfiles.profiles.map((profile) => profile.id)),
+    warnings: [],
+  };
+}
+
+const resources = resourcesOf();
+const defaults = deepLinkDefaultsOf(resources);
+
+/** The seven facts a deep link carries, read off a state for comparison. */
+function linkedFieldsOf(state: ViewerState): Record<string, unknown> {
+  return {
+    buildingId: state.buildingId,
+    dispatcherId: state.dispatcherId,
+    seed: state.seed,
+    shiftLengthS: state.shiftLengthS,
+    tab: state.tab,
+    railSegment: state.railSegment,
+    mode: state.mode,
+  };
+}
+
+describe('the URL round-trips — SH-09', () => {
+  const scenarios: readonly { readonly name: string; readonly state: ViewerState }[] = [
+    {
+      name: 'everything moved',
+      state: {
+        ...initialState(resources, 987654321n),
+        buildingId: 'vertical-city',
+        dispatcherId: 'eta',
+        shiftLengthS: 3600,
+        tab: 'compare',
+        railSegment: 'traffic',
+        mode: 'advanced',
+      },
+    },
+    {
+      name: 'only the seed moved',
+      state: { ...initialState(resources, 42n) },
+    },
+    {
+      name: 'a building and a tab',
+      state: { ...initialState(resources, 7n), buildingId: 'secure-tower', tab: 'scenarios' },
+    },
+  ];
+
+  it('reproduces every linked field when the produced link is applied to a fresh state', () => {
+    for (const scenario of scenarios) {
+      const search = deepLinkSearchOf(scenario.state, defaults);
+      const arrived = deepLinkStateOf(
+        initialState(resources, 111111n), // a different session: different random seed
+        resources,
+        new URLSearchParams(search),
+      );
+      expect(linkedFieldsOf(arrived), scenario.name).toStrictEqual(linkedFieldsOf(scenario.state));
+    }
+  });
+
+  it('omits defaults, so the first write after an untouched boot carries only the seed', () => {
+    const untouched = initialState(resources, 42n);
+    expect(deepLinkSearchOf(untouched, defaults)).toBe('?seed=42');
+  });
+
+  it('always carries the seed — the one param without which the link is a different run', () => {
+    for (const scenario of scenarios) {
+      const params = new URLSearchParams(deepLinkSearchOf(scenario.state, defaults));
+      expect(params.get('seed'), scenario.name).toBe(scenario.state.seed.toString());
+    }
+  });
+
+  it('derives the defaults from initialState rather than restating them', () => {
+    const opening = initialState(resources, 0n);
+    expect(defaults).toStrictEqual({
+      buildingId: opening.buildingId,
+      dispatcherId: opening.dispatcherId,
+      shiftLengthS: opening.shiftLengthS,
+      tab: opening.tab,
+      railSegment: opening.railSegment,
+      mode: opening.mode,
+    });
+  });
+});
+
+describe('the deep-link reader refuses what the page cannot honour', () => {
+  const base = (): ViewerState => initialState(resources, 5n);
+
+  it('ignores a building the data does not ship', () => {
+    const arrived = deepLinkStateOf(base(), resources, new URLSearchParams('?building=atlantis'));
+    expect(arrived.buildingId).toBe(base().buildingId);
+  });
+
+  it('ignores a dispatcher the profiles file does not declare', () => {
+    const arrived = deepLinkStateOf(base(), resources, new URLSearchParams('?dispatcher=psychic'));
+    expect(arrived.dispatcherId).toBe(base().dispatcherId);
+  });
+
+  it('ignores a seed that is not a whole number, keeping the session’s own', () => {
+    const arrived = deepLinkStateOf(base(), resources, new URLSearchParams('?seed=-3'));
+    expect(arrived.seed).toBe(5n);
+  });
+
+  it('clamps the duration into the run lengths the page offers', () => {
+    const short = deepLinkStateOf(base(), resources, new URLSearchParams('?duration=10'));
+    const long = deepLinkStateOf(base(), resources, new URLSearchParams('?duration=999999'));
+    expect(short.shiftLengthS).toBe(60);
+    expect(long.shiftLengthS).toBe(7200);
+  });
+
+  it('refuses a tab and a rail segment this page does not have', () => {
+    const arrived = deepLinkStateOf(
+      base(),
+      resources,
+      new URLSearchParams('?tab=settings&rail=plumbing'),
+    );
+    expect(arrived.tab).toBe(base().tab);
+    expect(arrived.railSegment).toBe(base().railSegment);
   });
 });
 

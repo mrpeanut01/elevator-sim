@@ -76,7 +76,7 @@ import { describeFrame } from '../render/describeFrame.js';
 import { buildLayout } from '../render/layout.js';
 import { disclosureItems } from '../mode/disclosure.js';
 import { parityRefusal } from '../mode/parity.js';
-import { isViewMode, itemsIn, type DisclosureItem } from '../mode/types.js';
+import { isViewMode, itemsIn, type DisclosureItem, type ViewMode } from '../mode/types.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
 import { eventFor } from '../shift/events.js';
 import { shiftObservationsOf } from '../shift/observations.js';
@@ -264,6 +264,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
   // A deep link names the building before anything can have been edited, so the editor's working
   // copy follows it unconditionally here — `withBuilding`'s pristine test is trivially true.
   state = withBuilding(state, resources, state.buildingId);
+  const deepLinkDefaults = deepLinkDefaultsOf(resources);
+  /**
+   * Whether {@link syncUrl} may write yet — `SH-09`.
+   *
+   * False until the boot sequence below has run, so a fresh page keeps a clean address bar: the
+   * first `renderAll` is not the reader doing anything, and a bar that grew `?seed=…` on load
+   * would bury the params that mean something under one that names a run nobody chose. From the
+   * first real state change onward the address follows the run, seed included.
+   */
+  let urlWritable = false;
   let playback: Playback | undefined;
   let building = resources.entries[0]?.resolved;
   let lastAnnouncedMs = 0;
@@ -436,6 +446,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   renderAll();
   runShift();
+  urlWritable = true;
   requestAnimationFrame(tick);
 
   /* ====================================================================== *
@@ -480,6 +491,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   /** Everything. Runs when the state changed. */
   function renderAll(): void {
+    syncUrl();
     applyNavigation();
     const view = viewAt();
     for (const panel of statePanels) panel.render(view);
@@ -539,6 +551,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
     applySurfaceState(ui, surfaceStateFor(state.tab, state.revealedTabs));
     applyRailState(ui, railStateFor(state.railSegment));
     applyDrawerState(ui, drawerStateFor(window.innerWidth, state.drawerOpen));
+  }
+
+  /**
+   * The address bar follows the run — `SH-09`, the other half of {@link applyDeepLink}.
+   *
+   * `replaceState`, never `pushState`: every state change through {@link renderAll} would
+   * otherwise become a history entry, and Back would unwind fifty tweaks one keypress at a time
+   * before it left the page. The address is a *description* of the current state, not a journal
+   * of how it was reached, so it is replaced in place and Back keeps meaning *leave*.
+   */
+  function syncUrl(): void {
+    if (!urlWritable) return;
+    const search = deepLinkSearchOf(state, deepLinkDefaults);
+    if (window.location.search === search) return;
+    window.history.replaceState(null, '', `${window.location.pathname}${search}`);
   }
 
   function wireNavigation(): void {
@@ -1386,9 +1413,21 @@ export function seekActionForKey(key: string, shiftKey: boolean): SeekAction | u
  * `?building&dispatcher&seed&duration&tab&mode` — the same keys the old viewer accepted, plus
  * nothing: a link that named a surface this page had renamed would be a broken promise, and
  * `isTabName` is what refuses one rather than silently opening the first tab.
+ *
+ * The window read lives here and the decisions live in {@link deepLinkStateOf}, which is pure in
+ * its `URLSearchParams` — the same split the rest of `dev/` uses, and what lets the reader be
+ * tested against the serializer it must round-trip with.
  */
 function applyDeepLink(state: ViewerState, resources: BrowserResources): ViewerState {
-  const params = new URLSearchParams(window.location.search);
+  return deepLinkStateOf(state, resources, new URLSearchParams(window.location.search));
+}
+
+/** The reader's decisions: which of the seven params are honoured, and what refuses each. */
+export function deepLinkStateOf(
+  state: ViewerState,
+  resources: BrowserResources,
+  params: URLSearchParams,
+): ViewerState {
   const patch: { -readonly [K in keyof ViewerState]?: ViewerState[K] } = {};
   const buildingId = params.get('building');
   if (buildingId !== null && buildingConfigOf(resources, [], buildingId) !== undefined) {
@@ -1414,6 +1453,58 @@ function applyDeepLink(state: ViewerState, resources: BrowserResources): ViewerS
   const mode = params.get('mode');
   if (isViewMode(mode)) patch.mode = mode;
   return { ...state, ...patch, shiftLengthS: patch.shiftLengthS ?? DEFAULT_SHIFT_LENGTH_S };
+}
+
+/**
+ * The values the serializer omits — a fresh page's own state, so a fresh page's address stays
+ * clean. Derived from {@link initialState} rather than written twice: if § D134 moves the opening
+ * dispatcher again, the URL's idea of *default* moves with it.
+ */
+export interface DeepLinkDefaults {
+  readonly buildingId: string;
+  readonly dispatcherId: string;
+  readonly shiftLengthS: number;
+  readonly tab: TabName;
+  readonly railSegment: RailSegment;
+  readonly mode: ViewMode;
+}
+
+export function deepLinkDefaultsOf(resources: BrowserResources): DeepLinkDefaults {
+  // The seed argument is irrelevant to the six fields read off; `0n` is not a default seed.
+  const opening = initialState(resources, 0n);
+  return {
+    buildingId: opening.buildingId,
+    dispatcherId: opening.dispatcherId,
+    shiftLengthS: opening.shiftLengthS,
+    tab: opening.tab,
+    railSegment: opening.railSegment,
+    mode: opening.mode,
+  };
+}
+
+/**
+ * The other half of {@link deepLinkStateOf}: the same seven params, written — `SH-09`.
+ *
+ * Two decisions, both deliberate:
+ *
+ * - **A default is omitted.** A URL that spelt out `?tab=run&rail=dispatcher&duration=1800` on a
+ *   page nobody has touched is noise, and noise in an address is what stops people reading the
+ *   part that matters.
+ * - **The seed is always written.** It has no default to omit — it is drawn at random per session
+ *   — and it is the one param without which the pasted link is a different run wearing the same
+ *   address. Invariant 5 puts the seed on every persisted run record; the address bar is a place
+ *   a run gets persisted to.
+ */
+export function deepLinkSearchOf(state: ViewerState, defaults: DeepLinkDefaults): string {
+  const params = new URLSearchParams();
+  if (state.buildingId !== defaults.buildingId) params.set('building', state.buildingId);
+  if (state.dispatcherId !== defaults.dispatcherId) params.set('dispatcher', state.dispatcherId);
+  params.set('seed', state.seed.toString());
+  if (state.shiftLengthS !== defaults.shiftLengthS) params.set('duration', String(state.shiftLengthS));
+  if (state.tab !== defaults.tab) params.set('tab', state.tab);
+  if (state.railSegment !== defaults.railSegment) params.set('rail', state.railSegment);
+  if (state.mode !== defaults.mode) params.set('mode', state.mode);
+  return `?${params.toString()}`;
 }
 
 /**
