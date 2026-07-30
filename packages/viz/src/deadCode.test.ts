@@ -124,16 +124,12 @@ const DEAD_CANDIDATES: Readonly<Record<string, string>> = Object.freeze({
   'dev/PREFERRED_VIEWER_DISPATCHERS':
     'dead: its docstring names dev/main.ts’s boot; state.ts:282 re-derives the list privately',
   /*
-   * -- T75 factored "what a viewer run is" out of a click handler into viewerRunConfig so a test
-   * could assert the § D153 seam (SimulationConfig.dispatcherProfiles). The shift rebuild then
-   * built state.ts's shiftRunConfigOf — which carries the same seam at state.ts:446 — and
-   * main.ts:794/:1199 call *that*. viewerRunConfig kept the docstring claim "a test asserts it
-   * against the same function main.ts calls", now false, and viewerSelector.test.ts asserts the
-   * selector seam against a function no shipped path calls — § D159's fixture-routes-the-test
-   * shape, one file up.
+   * -- viewerRunConfig (T75's run builder, superseded by state.ts's shiftRunConfigOf) was the
+   * worst of the eight: viewerSelector.test.ts asserted the § D153 selector seam against it while
+   * every shipped path called shiftRunConfigOf — § D159's fixture-routes-the-test shape, one file
+   * up. Dispositioned first: the test now drives shiftRunConfigOf and dev/runConfig.ts is
+   * deleted, so the seam is vouched for on the builder the Run button reaches.
    */
-  'dev/viewerRunConfig':
-    'dead: superseded by state.ts’s shiftRunConfigOf (main.ts:794); its test now tests an unshipped path',
   'dev/doorTimingOf':
     'dead: a one-line wrapper with zero callers, tests included; levers reach runs via profileFromSpec',
   /*
