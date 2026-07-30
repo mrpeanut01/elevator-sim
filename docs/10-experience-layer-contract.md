@@ -494,10 +494,16 @@ gamification fixes it. **A scenario library at usable demand levels does.**
 
 ### 2.3 The recording already carries everything a rider queue needs
 
-`VizRecording` is at `VIZ_SCHEMA_VERSION` **4**. `legs` landed at v3 with `overlayAt` and
+`VizRecording` ~~is at `VIZ_SCHEMA_VERSION` **4**~~ *(true when this survey was written; corrected
+2026-07-30 — the shipped version is **8**: W2 took 5, `credentialGroup` 6,
+`alightedAt`/`decisions`/`demandPhases` 7, `awtInvalidGround` 8 ([§ D185](../DECISIONS.md)). The
+version table in `packages/viz/src/contract/types.ts` is the authority; the landing records below
+and in § 11 correctly keep the versions they landed at)*. `legs` landed at v3 with `overlayAt` and
 `landingAssignmentsAt` as its consumers; `passengerModel`, `VizLeg.destinationFloorId` and
-`VizLeg.assignedCarId` landed at v4. `VizLeg` today carries: `passengerId`, `originFloorId`,
-`destinationFloorId`, `direction`, `arrivedAt`, `boardedAt?`, `carId?`, `bankId?`, `assignedCarId?`.
+`VizLeg.assignedCarId` landed at v4. `VizLeg` ~~today carries~~ carried, at the version this
+section surveyed: `passengerId`, `originFloorId`,
+`destinationFloorId`, `direction`, `arrivedAt`, `boardedAt?`, `carId?`, `bankId?`, `assignedCarId?`
+*(v6 added `credentialGroup`, v7 `alightedAt`)*.
 
 **A per-floor queue of individual riders is derivable from that with no contract change at all.**
 Every waiting rider at time `t` is a leg with `arrivedAt <= t` and `boardedAt` absent or `> t` —
