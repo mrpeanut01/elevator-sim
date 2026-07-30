@@ -36,9 +36,10 @@
  *
  * ## What this audit cannot see, stated rather than implied
  *
- * (The honesty derivation states its own blind spot the same way — *"`dev/main.ts` … has no
- * exports and therefore appears in no derivation of exported producers"* — and that sentence is
- * now half-true, which is exactly why the limits below are pinned by assertions, not prose.)
+ * (The honesty derivation used to state its own blind spot as *"`dev/main.ts` … has no exports"*
+ * — a sentence that had gone half-true by the time this audit ran, and is corrected there now.
+ * That a stated limit rotted silently is exactly why the limits below are pinned by assertions,
+ * not prose.)
  *
  * 1. **Export clauses.** `dev/main.ts:1393` exports `applyDeepLink`, `randomSeed` and `SPEEDS`
  *    via `export { … }` with no `from` — no declaration at the start of a line, so the symbol
