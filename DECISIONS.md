@@ -11623,3 +11623,72 @@ which the superseded and re-derived values are the same digits, so the quoted se
 unchanged, checked rather than assumed. **A handoff figure is a claim about a pushed tree, or it
 is not a figure** — the wave-12 close figure below § D195 is measured on the pushed tree, and the
 commit that carries it is named beside it.
+
+## D197 — eight dead candidates dispositioned, and one of them was the signature seam wearing a test
+
+**Date: 2026-07-30 · Wave 12, dead-candidates lane · Disposes § D192's findings: 4 wired, 4 deleted, `DEAD_CANDIDATES` empty.**
+
+Deleted, each with its evidence: `dev/viewerRunConfig` (after re-pointing `viewerSelector.test.ts`
+at `shiftRunConfigOf`, the builder the Run button actually reaches — all five § D153 seam claims
+survive on the shipped path), `dev/eyebrow` (adoption checked and refused: the inline sites are a
+different DOM shape, so "adoption" would have been a change wearing a cleanup), `frame/landingAssignmentAt`
+(different semantics from the plural form `main.ts` uses), `controls/ControlKind` (bound by nothing,
+not public API by the barrel's own doc). Wired: `dev/PREFERRED_VIEWER_DISPATCHERS` (the § D134
+obligation now has one authoritative site instead of a guarded constant plus an unguarded duplicate
+literal), `honesty/formatHonestyCase` (the printer `shrink.ts` promised), and — the headline —
+`doorTimingFor`'s car half. `live/bandById` deleted **with its honesty `covers` entry**, which had
+the sweep vouching for strings no shipped path could reach.
+
+**The headline: the dwell chips were inert in every shipped shift, and a test vouched for them.**
+`doorTimingFor`'s per-car `dwellCarCallS`/`dwellHallCallS` is the *only* thing distinguishing the
+snappy and normal chips — and `shiftRunConfigOf` never applied it. `authoring.test.ts`'s
+three-runs-distinct property held only on a building the test assembled itself through
+`buildingFromSpec`'s `dwell` option — § D159's fixture shape — so the suite was green while snappy
+≡ normal on the shipped path, **measured byte-identical on the legs before the fix and three-way
+distinct after it**. The signature defect (configurable, unit-tested in isolation, unapplied in the
+shipped path) *plus* the fixture-routes-the-test shape, in one candidate; `viewerRunConfig` was the
+same pairing without the product defect. **Two of the eight "dead code" findings were tests routing
+past their subject** — the audit's value was not the deletions.
+
+One vacuity caught in-lane and worth keeping: normal's 3 s/5 s dwell equals `resolveCar`'s
+reference-data defaults, so asserting the *normal* chip reaches the car passes even on a builder
+that writes nothing. The assertion uses **snappy**, whose values nothing defaults to.
+
+## D198 — the playability baseline: 81 rows driven green, and the ledger's ✅ run column stops being zero
+
+**Date: 2026-07-30 · Wave 12, drive phase (T104) · Chromium against the dev server; UX.md § 26 executed in order.**
+
+At wave open the UX ledger's own § 3 said it plainly: *the pass that wrote the ledger held no
+browser* — 0 of 219 rows had ever been driven. The drive phase closes at
+**81 run / 106 test / 20 half / 8 unverified / 4 🔲** (counts re-derived mechanically from the
+rows, not carried in prose). All six wave-12 fixes re-drove green — the bank filter's eight bank
+choices hash to eight distinct bitmaps with playback paused, the URL round-trips through a real
+address bar to a bit-identical run, `copy run` refuses day 5 with the CLI's missing flag named.
+Every primary flow is green end-to-end: boot → shift select → run → stage → day report → all four
+editors → campaign stage → Compare batch under CRN. `RX-03` — the last wave-open 🔲 — is fixed in
+CSS alone at 767 px, deliberately without a script-side breakpoint constant: no script consults it,
+and a constant whose only reader is a test is the caller-less seam by another name.
+
+**Driving found what reading and testing had not — eight defects, four of them driven-red rows:**
+
+1. **`DR-13` — one press of "open the doors on tomorrow" advances two days.** Both
+   `reportPanel.ts` and `main.ts` wire the same button and each applies `nextDay`. Tuesday and
+   Thursday — and their scheduled events — are unreachable by the button. Blocks playability.
+2. **`TP-10` — Save writes a file Load refuses**: `saveRecording` writes `{recording, frames}`,
+   `readRecordingDocument` demands top-level `schemaVersion`; the writer and the reader have never
+   met. A reviewer cannot reload what they saved.
+3. **`RR-11` — the open drawer covers its own toggle** below 1340 px; pointer-only close is
+   impossible, and wave 12's `Escape` is accidentally the only exit.
+4. **`TP-08` — a non-numeric seed silently runs seed 0** while the field still shows "banana" —
+   a provenance control reproducing a different run without saying so.
+5. **`SH-09` residual — the boot URL is bare until first interaction**, so a link copied before
+   touching anything is a different run wearing the same address.
+6. `SH-16`/`SH-19` — a failed boot leaves the phase pill and footer status blank; SH-19's row also
+   claims markup literals that do not exist.
+7. **`/favicon.ico` 404s on every load** — the only console error in every session, training a
+   reader to ignore the console. No ledger row covered the favicon; the absence is the finding.
+8. `SC-05`/`DR-09` — the contract objective can read "2 of 1 clean shifts banked".
+
+Four rows are recorded **drive-limited** with what could and could not be verified (`TP-17`,
+`SG-17`, `MD-07`, `DE-11` among them) rather than marked green — a row the product's own validation
+makes unreachable is a fact about the product, not a coverage gap to paper over.
