@@ -1704,6 +1704,123 @@ at its own seed and operating point. Neither is wrong; inheriting either across 
 
 ---
 
+## Phase 9 — Experience layer
+
+The layer that lets somebody who is not a lift engineer drive this simulator without being lied to.
+Designed in [`docs/10`](10-experience-layer-contract.md); built, since wave 10, to the interface
+handoff vendored at [`docs/design/`](design/), whose extracted requirements, audit and deviations
+are [`docs/12`](12-design-handoff.md) ([§ D174](../DECISIONS.md)–[§ D179](../DECISIONS.md)). Nine
+units, W1–W9, and **all nine are built** — the last open half, § 10.2's floor multi-select and
+coverage matrix, landed with the access-zoning building editor ([§ D182](../DECISIONS.md)).
+
+- W1 — close the honesty leak: no running mean on the header of a run the same run suppresses
+- W2 — `VizSummary` widened to what the report sheet needs, now at `VIZ_SCHEMA_VERSION` 8
+- W3 — a real replication batch in a worker, with the interval and no winner when it contains zero
+- W4 — schema-generated dispatcher and traffic controls, proved against a schema this repo does not ship
+- W5 — scenarios as data, and a seven-stage campaign judged on the shipped configuration's own scores
+- W6 — the Casual/Engineer split, the live weight editor, and a **derived** mode-parity check
+- W7a/W7b — per-floor rider queues, a building-mood gauge, and the access-credential lens
+- W8 — access zoning in the building editor, and the dispatcher-compatibility warning
+- W9 — every shipped goal carrying its measured across-seed pass rate
+
+**Acceptance:** [§ D163](../DECISIONS.md), five clauses. Two are load-bearing because the product
+**failed** them on the day the criterion was written — **(1)** the honesty property holds under
+*search* rather than on hand-chosen examples, and **(2)** mode parity is *derived from the code*
+rather than listed by hand. Three are standing requirements that *"can turn the phase red by
+regressing, and cannot turn it green by having already been true"* — **(3)** every shipped goal
+carries its measured pass rate, **(4)** every unit names its **non-test caller**, **(5)** the viewer
+is **driven** for every acceptance claim, never read. § D163 also binds the shape of this section:
+the row and the verdict **land together or neither does**, and **anything unbuilt at acceptance is
+named in the verdict**.
+
+> **This criterion was written after seven of the nine units existed, and that is its known
+> weakness.** § D163 says so about itself and defends itself structurally rather than
+> chronologically: a clause the product already satisfied would be a description, not a gate. A
+> reader checking whether the gate was fitted to the work should check clauses 1 and 2 first — those
+> are the two that were red when it was written — and should treat clause 4 as the one this verdict
+> is weakest on. Its own list of what would make it a bad criterion is worth reading beside the
+> table below.
+
+**Status: ✅ ACCEPTED WITH NAMED GAPS (2026-07-30) — the two load-bearing clauses are met by a run
+rather than by an argument, and the gaps below are part of the verdict rather than a footnote to
+it.** The gate suites are `packages/viz/src/honesty/honesty.test.ts`,
+`packages/viz/src/mode/parity.test.ts`, `packages/viz/src/scenario/goalRates.test.ts` and
+`packages/viz/src/campaign/judge.test.ts`.
+
+| clause | finding |
+|---|---|
+| **1 — the honesty property under *search*** | **MET, and met by a run.** The deep tier is green: **60 cases, 271 985 strings, 4 650 simulations, 43 of 60 runs suppressed, 23 surfaces, 398.7 s, 0 violations** (`ELEVATOR_SIM_HONESTY=deep`, `packages/viz/src/honesty/campaign.ts`). It **found two violations first** ([§ D186](../DECISIONS.md)) — one real, fixed at the cause, and one a false positive whose check was *accepting the other branch for the wrong reason*. **[§ D172](../DECISIONS.md) had asserted this tier clean on "the refinement relation, not a run"; running it said otherwise**, which is what the label on that claim was for |
+| **2 — mode parity, derived** | **MET.** `packages/viz/src/mode/parity.ts` computes the failure/suppression set from the code — a discriminated union with an exhaustive switch, so a tenth failure state is a compile error rather than a silent omission — and is proved against a fail state the product deliberately does **not** ship (`packages/viz/src/mode/fictionalFailState.test-helper.ts`). `parityRefusal` runs in the shipped path, not only in the suite (`packages/viz/src/dev/main.ts`, `packages/viz/src/dev/campaignPanel.ts`). **Driven this session:** toggling Casual↔Engineer changes the rail's content and raises no refusal |
+| **3 — every goal carries its measured pass rate** | **MET.** `packages/viz/src/scenario/goalRates.test.ts` re-derives the published counts from **both** disjoint seed sets in the always-on tier, and `docs/10` § M30's table is compared cell-by-cell **in both directions**, against `data/scenario-goals.json`. The surface half — the `goal-without-rate` property on the campaign judge — is deep-tier only, and is now green |
+| **4 — every unit names its non-test caller** | **SATISFIED IN PROSE, MECHANISED BY NOTHING.** See below. This is the clause a future reader should distrust first |
+| **5 — the viewer is driven, never read** | **MET, by driving.** There is **no browser automation in this repository** — no Playwright, no Puppeteer, no jsdom, and all four `vitest.config.ts` projects are `environment: 'node'` — and § D163 explicitly refuses *"a test that renders to a canvas mock and never opens a browser"* as a substitute. Discharged by driving the shipped page; one gap found by doing so, below |
+
+**Clause 4 is the honest weak point, and the fix is a fifth copy of an audit this repository already
+has four of.** All **19** directories under `packages/viz/src` sit outside every `AUDITED_MODULES`:
+the four dead-code audits — `packages/core/src/dispatch/deadCode.test.ts`,
+`packages/experiments/src/runner/deadCode.test.ts`,
+`packages/experiments/src/tuning/deadCode.test.ts` and
+`packages/experiments/src/fuzz/deadCode.test.ts` — cover **7 of 49** `packages/*/src` directories
+(`dispatch/policies`, `dispatch/predictor`, `runner`, `fuzz`, `tuning/search`, `tuning/space`,
+`tuning/report`), and **none of Phase 9's**.
+The whole evidence for clause 4 is a hand-written table in `packages/viz/src/index.ts` plus
+one prose `**Non-test caller:**` line per unit in `docs/10` § 11, **re-derived by nothing**. That
+table is honest about itself — it lists the two rows whose entry reads *none* — but a hand-written
+table is the defect [§ D152](../DECISIONS.md) closed one layer down and the standing requirement
+above warns about in the same words: *a barrel re-export and a `{@link}` tag look exactly like a
+caller and are not one*. Under § D163 this clause is a **standing requirement**, so it cannot green
+the phase and it has not; the acceptance rests on clauses 1 and 2. It could still be false today
+without anything going red, and the fix is a `deadCode.test.ts` under `packages/viz/src`.
+
+**What driving found, since clause 5 is the clause that is discharged by doing rather than
+asserting.** At 1280–1440 px, on the shipped page: the tab arrow ring **skips all four hidden
+contextual tabs and crosses into the nested `.tabs-right` div**, moving both selection and panel; a
+deep link to a contextual tab works on a **cold** load, with exactly one focusable tab per tablist;
+the mode toggle works in the shipped path rather than only in `packages/viz/src/mode/`; the drawer
+opens on **one** press after crossing the 1340 px breakpoint **in both directions**, so the recorded
+two-press bug does not reproduce; and [§ D159](../DECISIONS.md)'s access-compatibility warning is
+live and correct on the right rail and **clears** when the dispatcher reads credentials. **One gap:
+`Escape` does not dismiss the drawer**, which below 1340 px sits at `z-index: 20` over the stage and
+can be closed only by its own toggle. It is in [`GAPS.md`](../GAPS.md) rather than in this verdict's
+favour.
+
+**Named limits on clause 1, in the same breath as the verdict.** The sweep's `mode` axis has **one
+value** — it plugs in at a tuple in `packages/viz/src/honesty/types.ts`, and the corpus assertion
+tightens automatically when it does. The three DOM panels are **statically swept rather than
+driven**, so a sentence assembled at runtime there is invisible to the search. The access block's
+labels, tooltips and legend, and the elevation express toggle's two strings, are **not seeded** into
+`packages/viz/src/honesty/surfaces.ts` and are therefore outside R1–R13. Two rows with one cause:
+`surfaces.ts` is a chokepoint every editor lane hits and no editor lane owns. All four are in
+[`GAPS.md`](../GAPS.md).
+
+**Named limits on clause 2.** Two of [§ D168](../DECISIONS.md)'s four are **closed** — Basic can now
+shorten a suppression reason, because `core` carries the ground beside the prose
+([§ D183](../DECISIONS.md)) and `VizSummary` transports it at schema 8
+([§ D185](../DECISIONS.md)) — and two stand: the **structural-refusal reason is prose keyed on an id
+the leg record does not carry**, so it cannot be joined to a leg, and thirteen warning rows on
+Secure Tower is a wall that is deliberately **not** grouped, because parity requires each warning's
+text in Basic and a summarising group is the first place one could go missing.
+
+**Unbuilt at acceptance, which § D163 requires this verdict to name rather than absorb:** **U6**;
+**U7's rider models**; and **Basic's curated three-dimension subset**, whose place is taken by the
+campaign editor restricted to each stage's declared editable set, which is data. § 10.2's floor
+multi-select and coverage matrix *were* on this list and are not any more — they landed this wave
+([§ D182](../DECISIONS.md)), so **W8 and all nine units are built**, which is why this section says
+*all nine* where the register said *eight and a half*. **Feature completeness was never the gate**,
+and § D163 says why: a phase gate that requires every designed feature measures ambition rather than
+quality. These three are named because the verdict is required to name them, not because they were
+weighed against it.
+
+**What this verdict does not say.** It does not say the experience layer is *good*: § D163 excludes
+playability from the criterion as unfalsifiable, and puts [§ D161](../DECISIONS.md)'s uncomfortable
+measured fact in its place — **four of seven campaign stages clear from the dispatcher dropdown
+alone**. It does not say the honesty property holds; it says it held over 271 985 generated strings
+on 23 seeded surfaces with one mode value, which is a bounded claim and is the strongest one this
+apparatus can make. And it does not say clause 4 is true — only that nothing has shown it false,
+which is exactly the distinction the standing requirement above exists to keep visible.
+
+---
+
 ## Sequencing notes
 
 - **Phases 0–3 are strictly sequential.** Phase 3 must land before any dispatcher
@@ -1719,7 +1836,7 @@ at its own seed and operating point. Neither is wrong; inheriting either across 
   against one 2,765-line file is the Phase 5 configuration with a larger blast radius
   ([§ D28](../DECISIONS.md)). 6c needs its own acceptance question before it needs an implementation.
 
-## What remains, as of 2026-07-29
+## What remains, as of 2026-07-30
 
 > **Five rows of this table were stale when it was re-dated, and they are corrected below rather
 > than deleted.** The table said Phase 6c was *deferred*, Phase 9 was *not built*,
@@ -1733,8 +1850,8 @@ at its own seed and operating point. Neither is wrong; inheriting either across 
 |---|---|
 | **The viewer is now built to a design handoff** | Not an open item — a change of source. *Elevator Sim Reimagined* is canonical for the interface ([§ D174](../DECISIONS.md)); the requirements, the gap analysis and the five deviations are [`docs/12`](12-design-handoff.md). **No phase verdict moved and no published number was recomputed**, which is the point rather than an aside: the sheet reads `VizSummary`, which reads `RunSummary`, which is the same object the CLI and the experiment matrix read. Board: [`WAVE10_PLAN.md`](../WAVE10_PLAN.md) |
 | **Phase 6c — learned control** | § Phase 6c above. **No longer deferred: implemented, measured and NOT ACCEPTED**, and the refusal was then broadened from one operating point to eight pre-registered cells and held ([§ D151](../DECISIONS.md) is the protocol, dated before any sweep figure; [§ D156](../DECISIONS.md) is the result). What remains is one re-measurement, on the mix-varying demand template built after the sweep named the shipped template's flat directional split as the mechanism — protocol pre-registered at [§ D162](../DECISIONS.md), **not run**. A third refusal is an explicitly permitted outcome |
-| **Phase 9 — the experience layer** | Designed in [`docs/10`](10-experience-layer-contract.md), and **eight and a half of its nine units are built** — W1–W7 and W9 done, W8's compatibility warning done and its access-zoning editor controls open. **Still no phase row in any status table, and that is now a different decision from the one this row used to record**: not *"a design is not a phase in progress"* but *"the row and the verdict land together"*. Its criterion is [§ D163](../DECISIONS.md), both load-bearing clauses measure as satisfied, and the sweep that would write the verdict has not been run |
-| **Access-zoning editor controls** | [`docs/10`](10-experience-layer-contract.md) § 11 W8 — the open half. The dispatcher-compatibility warning that depended on it shipped anyway ([§ D159](../DECISIONS.md)) |
+| **Phase 9 — the experience layer** | **No longer open: measured against [§ D163](../DECISIONS.md) and ACCEPTED WITH NAMED GAPS on 2026-07-30** — § Phase 9 above carries the verdict and the gaps, and the row and the verdict landed together as § D163 required. All nine units are built. What remains is not the phase: it is **U6**, **U7's rider models**, **Basic's curated three-dimension subset**, and clause 4 — *name the non-test caller* — which is **satisfied in prose and mechanised by nothing**, because no dead-code audit reaches `packages/viz` |
+| ~~**Access-zoning editor controls**~~ **CLOSED** | [`docs/10`](10-experience-layer-contract.md) § 11 W8's open half — § 10.2's floor multi-select and coverage matrix — landed with the building editor's zoning round trip ([§ D182](../DECISIONS.md)). The dispatcher-compatibility warning had shipped ahead of it ([§ D159](../DECISIONS.md)) |
 | **A zone cannot be changed mid-run** | Operational zoning is a shipped concept with no mechanism over time. Deliberately deferred: nothing measures it and no published result depends on it |
 | **The Level-1 panel does not clear the Phase 6 gate on `mixed-use-high-rise`** | § *Phase 6 on the building the criterion names* above. A measured result, not a task — but it is what a reader planning 6c needs |
 | **`garden-down-peak` is `destination-eta`'s remaining identity class at n = 51** | § *What the matrix found* above. It is blind to **`rideTime`**, not to the destination — and the distinction is measured, not argued ([§ D136](../DECISIONS.md)). `rideTime` separates the candidate cars in **1 of 1 727 contested decisions**, so a constant cannot move an argmin and no weight rescues it: 0.5, 1, 2 and 8 form one identity class, and sixteen times the shipped weight buys the same single flip. **The destination itself is not blind there**: `stopCount` separates the cars in **139** of those decisions — and pricing it is **WORSE** on AWT `+1.320 [+0.988, +1.653]`, WT95 `+4.060 [+2.899, +5.220]` and TTD `+1.419 [+1.067, +1.770]` at n = 200 at two seeds. So the open question is **answered, in the negative-for-the-operator direction**, and what remains open is the mechanism — *which* car the increment prefers and why it is worse placed — which is **unmeasured and not asserted**. The class is stated at n = 51 deliberately: it does not hold at n = 200 |

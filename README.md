@@ -231,8 +231,9 @@ npm run dev -w @elevator-sim/viz     # → http://localhost:5174
 
 ## Status
 
-**Phases 0–5, 7 and 8 are landed and accepted. Phase 6 is partially complete** — see the table for
-what that means. Four packages (`core`, `experiments`, `viz`, `cli`), a six-command CLI, and a
+**Phases 0–5 and 7–9 are landed and accepted. Phase 6 is partially complete** — see the table for
+what that means, and read Phase 9's row rather than its tick: it is **accepted with named gaps**,
+and the gaps are part of the verdict. Four packages (`core`, `experiments`, `viz`, `cli`), a six-command CLI, and a
 viewer built to a [design handoff](docs/12-design-handoff.md). **253 test files, 4,700 tests**
 (4,690 passing, 10 skipped), `tsc -b` clean, 550 s serially on an idle machine.
 
@@ -253,6 +254,7 @@ reads `RunSummary`, which is the object the CLI and the experiment matrix alread
 | CLI | ✅ `list`, `run`, `compare`, `tune`, `fuzz`, `watch` |
 | 6 — Destination dispatch & learned control | ⚠️ 6a (disclosure) and 6b (dispatch) accepted against a **raised** criterion, now measured on the Mixed-Use High-Rise the criterion names: **met by the Level-0 arm, not met by the Level-1 panel at any measured point**. 6c (learned control) is **implemented, measured, and NOT ACCEPTED** — and the refusal is no longer one operating point: it was swept over **eight pre-registered cells** and held, refused at **all five primary cells** under a multiple-comparison correction, with the smallest detectable effect re-measured at each cell rather than inherited from another. Two of those cells clear the correction and were **refused anyway**, because the effect is a third to a half of what the apparatus can resolve there. Double-deck operation **is simulated**; its verdict became BETTER-EVERYWHERE once a real escalator replaced a lift leg the hardware would never pay for — on **two cells at one operating point where the previous answer had four at two**, and a better word on a narrower base is not a stronger result. Every sub-phase now has a measurement rather than a deferral, and the phase is still partial because one of them was refused |
 | 8 — Testing campaign | ✅ All eight tracks landed — fuzzing, oracle across all five buildings, physics, statistics, determinism, scale, adversarial, and the full experiment matrix (8 cells × 12 profiles, Pareto front over AWT / energy / WT95) — and found four real defects, **all four now fixed**; the deep tier is green at 2 000 cases and **no property violation is outstanding**, so both halves of the criterion are met |
+| 9 — Experience layer | ✅ **ACCEPTED WITH NAMED GAPS** — all nine units built, and the two clauses that decide the phase are met **by a run rather than by an argument**: the honesty property held under **search** over 60 cases, **271 985 generated strings** and 23 surfaces with **0 violations** — *after* finding two, one real and one a check accepting the wrong branch — and mode parity is **derived from the code**, not listed by hand. **The gaps are named because they are part of the verdict, not beside it**: clause 4, *every unit names its non-test caller*, is **satisfied in prose and mechanised by nothing** — no dead-code audit reaches `packages/viz`, so it is the clause to distrust first; `Escape` does not dismiss the drawer; and **U6**, **U7's rider models** and **Basic's curated three-dimension subset** are unbuilt |
 
 Try it — six commands, all against the real `data/` directory:
 
@@ -276,16 +278,17 @@ mean the run's own summary suppresses; `watch` printed one on both of its render
 
 **What is not done is in the brief, not in this table.** Phase 6c is **measured and refused**, which
 is a different state from deferred and a better one. Phase 9 — the experience layer designed in
-[`docs/10`](docs/10-experience-layer-contract.md) — has **eight and a half of its nine units
-built**: a novice/expert split, a schema-generated dispatcher form, per-floor rider queues, a
-building-mood gauge, an access-credential lens, a seven-stage campaign whose bars are the shipped
-configuration's own measured scores rather than numbers somebody picked, and a comparison tab that
-runs a proper replication batch in a worker and shows the interval without naming a winner when the
-interval contains zero. The half that is open is the access-zoning **editor** controls; its
-dispatcher-compatibility warning is done. **It still has no phase status row, deliberately.** Its
-acceptance criterion exists and its two load-bearing clauses now measure as satisfied, but the row
-and the verdict land together or neither does, and the sweep that would write the verdict has not
-been run. A design with most of its code built is not an accepted phase. TWIN operation — two
+[`docs/10`](docs/10-experience-layer-contract.md) — has **all nine of its units built** and, as of
+2026-07-30, a status row: a Casual/Engineer split, a schema-generated dispatcher form, per-floor
+rider queues, a building-mood gauge, an access-credential lens, a seven-stage campaign whose bars
+are the shipped configuration's own measured scores rather than numbers somebody picked, and a
+comparison tab that runs a proper replication batch in a worker and shows the interval without
+naming a winner when the interval contains zero. **It carried no status row for as long as it had
+no criterion**, and then for as long as the criterion was unmeasured — the row and the verdict land
+together or neither does, which is [§ D163](DECISIONS.md)'s own rule. Both now exist, and the
+verdict is **accepted with named gaps**: what a reader should take from it is not the tick but the
+four gaps under it, the first of which is that *every unit names its non-test caller* is a sentence
+in a document and not a test. TWIN operation — two
 independently driven cars in one shaft — is **designed and not built**, in
 [`docs/11`](docs/11-twin-shaft-contract.md); it is not double-deck, and the contract says why. A
 phase's *status* is now bound to **evidence that

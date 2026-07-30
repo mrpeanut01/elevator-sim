@@ -8,8 +8,10 @@ An elevator traffic simulator for designing and benchmarking smart dispatch algo
 Read [`docs/00-project-brief.md`](docs/00-project-brief.md) first, then
 [`docs/01-architecture.md`](docs/01-architecture.md).
 
-**Current status: Phases 0–5, 7 and 8 are landed and accepted, plus a six-command CLI. Phase 6 is
-partially complete.** Read the two that need care precisely:
+**Current status: Phases 0–5 and 7–9 are landed and accepted, plus a six-command CLI. Phase 6 is
+partially complete.** Read the three that need care precisely — and **Phase 9's tick is the one that
+must never travel alone**, because it is *accepted with named gaps* and the gaps are part of the
+verdict:
 
 - **Phase 6** — 6a (destination *disclosure*) and 6b (destination *dispatch*) are accepted against a
   **raised** criterion, now measured on the building that criterion names ([§ D100](DECISIONS.md)).
@@ -36,8 +38,25 @@ partially complete.** Read the two that need care precisely:
   acceptance interval at 50–200 replications — landed in `f895a16`, so the phase's criterion (*every
   track lands, and no property violation is outstanding*) is met ([§ D108](DECISIONS.md); § D102 is
   the superseded partial verdict, left standing).
+- **Phase 9** — **ACCEPTED WITH NAMED GAPS (2026-07-30)** against [§ D163](DECISIONS.md), which also
+  wrote the rule that *the status row and the verdict land together or neither does*. All nine units
+  are built. The two clauses that decide the phase are the two the product **failed** when the
+  criterion was written, and both are now met **by a run rather than by an argument**: the honesty
+  property holds under *search* — 60 cases, **271 985 strings**, 4 650 simulations, 23 surfaces,
+  **0 violations** — and it **found two violations first**, one real and one a check accepting the
+  wrong branch, so [§ D172](DECISIONS.md)'s *"the refinement relation, not a run"* had to be
+  corrected ([§ D186](DECISIONS.md)); and mode parity is **derived from the code**, proved against a
+  fail state the product deliberately does not ship. **Say the gaps in the same breath.** Clause 4 —
+  *every unit names its non-test caller* — is **satisfied in prose and mechanised by nothing**: all
+  **19** `packages/viz/src` directories sit outside every `AUDITED_MODULES`, the four dead-code
+  audits cover 7 of 49, and the evidence is a hand-written table plus one prose line per unit. It is
+  the clause to distrust first, and a fifth audit under `packages/viz` is the fix. Also named in the
+  verdict: `Escape` does not dismiss the drawer, the honesty sweep's `mode` axis has one value,
+  three DOM panels are statically swept rather than driven, and **U6**, **U7's rider models** and
+  **Basic's curated three-dimension subset** are unbuilt.
 
-**No phase status has moved, and wave 6 is the reason that sentence is worth reading.** That wave
+**Phase 9's row is the first status to move since Phase 8's on 2026-07-28, and wave 6 is the reason
+that is worth saying rather than assuming.** That wave
 built double-deck simulation, a mid-run weight-set selector, Phase 7's undelivered fuzzy detector,
 Phase 6c, and Phase 9's W4 — and **not one phase verdict changed**, because 6c did not clear the
 criterion written before it ([§ D139](DECISIONS.md)) and Phase 6 is

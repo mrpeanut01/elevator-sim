@@ -1,7 +1,13 @@
 # Known gaps — stated, measured where possible, and not closed
 
-**As of:** 2026-07-29, wave 9 closed · **Suite:** 225 files / 4 122 tests, 10 skipped, `tsc -b`
-clean · **Branch:** `integration` at `55f04f8`, pushed
+**As of:** 2026-07-30, wave 11, the wave that wrote Phase 9's verdict · **Branch:** `integration` at
+`bf16a2d` · **Suite:** **258 files / 4 794 tests, 4 784 passed, 10 skipped**, `tsc -b` clean, 565 s —
+measured **serially on an idle machine with no lanes running**, at `9fd738c`, so it predates the two
+commits after it and is a lower bound by a handful of tests rather than by six hundred. The wave-9
+figure this line used to carry (225 files / 4 122 tests) was thirty-three files stale.
+
+> **The skip count is 10 and has not moved all wave.** That is the number worth watching here: a wave
+> that quietly skips a test to go green moves it, and a growing test count says nothing on its own.
 
 This document exists because the alternative is worse. Every item here is something the project
 **does not do**, **cannot yet say**, or **says with a caveat** — collected in one place rather than
@@ -71,6 +77,7 @@ landed"* as *"6c is closer to accepted."*
 | **The elevation's express toggle produces two strings the honesty search never sees** | `honesty/surfaces.ts` seeds only `car.legend` from `elevationCarsOf`, so `expressLabel` and `expressTitle` are outside R1–R13. Stated rather than discovered: the toggle landed in [§ D181](DECISIONS.md) from a lane that did not own `surfaces.ts`, and adding the two seeds is the whole fix. |
 | **A dispatcher card's words are derived, and the better ones are authored where nothing may read them** | `$comment` is maintainer documentation and no longer reaches a card ([§ D186](DECISIONS.md)) — the longest rendered card went from **5 133 characters to 164**. The derived replacement is honest and bounded and **reads as configuration, not as a sentence a building manager would say**, which `docs/12` § 2.2 makes a requirement rather than a flavour. The handoff already writes the right copy per dispatcher; `data/dispatcher-profiles.json` has no field to put it in, and `$comment` must not be made to serve. |
 | **`patternOptionsOf`'s `help` still reads a *traffic* profile's `$comment` onto a driven surface** | The identical route § D186 closed one surface over. Benign **today** — the only shipped traffic `$comment` is 64 characters of player-safe copy — and bounded by nothing, so it is one authored paragraph away from being the same defect. |
+| **`Escape` does not dismiss the right-rail drawer** | Below the 1340 px breakpoint the right rail becomes an overlay at `z-index: 20` over the stage, and **its own toggle is the only way to close it** — the key every other overlay on the web answers to does nothing. Found by **driving** the shipped page at 1280 px while discharging [§ D163](DECISIONS.md) clause 5, not by reading the markup, which is the whole reason that clause forbids a canvas mock. It is a keyboard-trap-shaped defect rather than a cosmetic one: a reader who opened the drawer to see who is driving has to find the toggle again to see the building. Named in Phase 9's verdict rather than counted against it ([`docs/05`](docs/05-roadmap.md) § Phase 9). |
 | **The access block's labels, tooltips and legend are statically swept, not driven** | Same cause and same fix as the row above — a `covers` entry in `honesty/surfaces.ts`, from a lane that owns it ([§ D182](DECISIONS.md)). The one access sentence that *is* on a driven surface is `elevationNoteOf`'s, exercised on Secure Tower by the campaign. Two rows with one cause is the point: **`surfaces.ts` is a chokepoint every editor lane hits and no editor lane owns.** |
 
 ---
@@ -99,16 +106,23 @@ ship a subset.
 
 ## 5. Where a status claim is weaker than it looks
 
-- **Phase 9 has a criterion for the first time** ([§ D163](DECISIONS.md)), written **after** seven of
-  its nine units existed. Its defence is structural, not chronological: the clauses that decide it
-  were ones the product **failed** at the time of writing. **Both load-bearing clauses now measure
-  as satisfied** — clause 2 (mode parity) by [§ D168](DECISIONS.md), clause 1 (the honesty property
-  under search) by [§ D171](DECISIONS.md)/[§ D172](DECISIONS.md), whose `OUTSTANDING` register is
-  empty. **That is not the same as a formal acceptance pass.** Clauses 3–5 (goal pass rates, the
-  named non-test caller, the viewer driven rather than read) are standing requirements this wave
-  checked per-lane rather than swept once as a whole, and no phase-status row has been written. **It
-  still has no status row**, deliberately — the row and the verdict land together or neither does,
-  and that measurement is a distinct piece of work this wave did not do.
+- **Phase 9 is ACCEPTED WITH NAMED GAPS, and its criterion was written after seven of its nine units
+  existed** ([§ D163](DECISIONS.md)). The defence of that ordering is structural, not chronological:
+  the clauses that decide the phase were ones the product **failed** at the time of writing, and
+  both are now met by a run — clause 2 (mode parity) derived from the code
+  ([§ D168](DECISIONS.md)), clause 1 (the honesty property under search) green at 60 cases and
+  271 985 strings **after finding two violations** ([§ D186](DECISIONS.md)). **[§ D172](DECISIONS.md)
+  had asserted that tier clean on an argument rather than a run, and the run disagreed** — which is
+  what the label on that claim was for, and is the single best reason to distrust any *"this holds"*
+  in this repository that does not name a run.
+- **Phase 9's clause 4 is the weakest thing under an accepted phase in this repository.** *Every unit
+  names its non-test caller* is discharged by a hand-written table in `packages/viz/src/index.ts` and
+  one prose line per unit in `docs/10` § 11, **re-derived by nothing**: all **19** directories under
+  `packages/viz/src` sit outside every `AUDITED_MODULES`, and the four dead-code audits cover **7 of
+  49** `packages/*/src` directories. Under § D163 clauses 3–5 are standing requirements — they can
+  redden the phase and cannot green it — so this does not undo the acceptance, and it does mean the
+  clause could be false today without anything going red. The fix is a fifth `deadCode.test.ts`
+  under `packages/viz/src`.
 - **Phase 9's own contract has been wrong about the code four times** in this wave — a reachability
   claim, a field list, a hard-coded percentage in an example message, and a goal table disagreeing
   with the shipped data in three of five cells. Being *binding* does not make a document *right*.
