@@ -17,6 +17,11 @@ stated first and not last.
 > every entry to be linked (`documentation.test.ts:385-403`; the instance is review finding #2). The
 > commit that created this file was scoped to one file and could not add that row. **Adding it is the
 > first thing you do**, before anything else in this document.
+>
+> *(Already discharged — do not hunt for missing work. Checked 2026-07-30, before any executor
+> picked this document up: `README.md`'s `## Documentation` table carries the row (`README.md:220`)
+> and `documentation.test.ts`'s docs-inventory check is green. The instruction above is kept, dated,
+> because deleting it would delete the reason the row exists.)*
 
 ---
 

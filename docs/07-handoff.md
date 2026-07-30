@@ -1007,7 +1007,11 @@ and double-deck simulation ([§ D131](../DECISIONS.md)) with its disclaimers
 ([§ D136](../DECISIONS.md)) · the citation-guard gap ([§ D138](../DECISIONS.md)) · Phase 7's
 fuzzy-detector bullet ([§ D143](../DECISIONS.md)) · the bare-kiosk re-pin
 ([§ D149](../DECISIONS.md)). **Phase 6c is neither closed nor open: it is measured and refused**
-([§ D145](../DECISIONS.md)).
+([§ D145](../DECISIONS.md)). *(Corrected 2026-07-30: the sentence stands, but § D145's single-point
+verdict is no longer the operative one — wave 7 swept the refusal over eight pre-registered
+operating points and it held, NOT ACCEPTED at all five PRIMARY cells under Holm–Bonferroni,
+[§ D156](../DECISIONS.md). § D145 is kept as the history it is; cite § D156 for the current
+verdict.)*
 
 ### Where this register was wrong about itself
 
@@ -1089,22 +1093,45 @@ reachability and liveness come apart. It is a note, not debt.
 
 **Still open, in one place, because a reader planning work needs the list and not the prose:**
 
+*(Checked against this section's own tables at wave-12 open, 2026-07-30: **six entries below were
+stale, every one in the pessimistic direction** — each is struck through or corrected in place
+rather than deleted, and one item appeared twice, once in each list. This short list has now
+drifted from the tables above it in **both** directions — wave 6 found six optimistic errors, this
+check found six pessimistic ones — so read the tables, not this list, before planning work.)*
+
 *Deferred by a recorded argument, not by neglect* — **TWIN**, designed and not
-built · the double-deck closed-form RTT · a **phase-varying directional split** in `DemandPhase`,
+built · the double-deck closed-form RTT · ~~a **phase-varying directional split** in `DemandPhase`,
 which [§ D151](../DECISIONS.md) § 7 constrains in advance and [§ D156](../DECISIONS.md) shows is the
-condition the whole selection question turns on.
+condition the whole selection question turns on~~ *(landed 2026-07-29 as `lunch-two-way`,
+[§ D169](../DECISIONS.md), under exactly § D151 § 7's three constraints — see the demand-template
+row in the wave-6 table above. This list also carried the same item under live debt below: one item,
+counted twice, stale in both places.)*
 
 *Live debt* — **the campaign judges only on its tuning seeds**, so the live weight editor makes
 overfitting them the dominant strategy: stage 2's clearing vector is beaten by the shipped setting
 on three measures over the declared holdout set, and nothing on the shipped surface says so
-(asserted in `campaign/campaign.test.ts`) · **`awtInvalidReason` is prose with no ground code**, so
+(asserted in `campaign/campaign.test.ts`) · ~~**`awtInvalidReason` is prose with no ground code**, so
 Basic mode cannot shorten a suppression reason without re-deciding which of `core`'s four grounds
-fired — R9's forbidden operation — and leads with a ground-free sentence instead · the **`G → 2`
-lobby leg** charged as an elevator leg · the seed-marginal 1.5 %
-double-deck point · the **liveness sweep's** section list hand-written, and its seven
-`selection.*` rows unprobed because the sweep passes no `dispatcherProfiles` · **the shipped
-demand template unable to vary the directional split within a run** · **W4's U7 half blocked on
-a `core` fix** · the **viewer** still unable to enable a selector ·
+fired — R9's forbidden operation — and leads with a ground-free sentence instead~~ *(closed, both
+halves: the ground code landed in `core` beside the prose, [§ D183](../DECISIONS.md), and reaches
+the screen at `VIZ_SCHEMA_VERSION` 8, [§ D185](../DECISIONS.md))* · ~~the **`G → 2`
+lobby leg** charged as an elevator leg~~ *(closed — the wave-6 table above strikes it through
+itself: a non-elevator transport mode, 292 hops at the standard seed, and the double-deck verdict
+moved)* · the seed-marginal 1.5 %
+double-deck point · the **liveness sweep's** section list in `core`'s
+`sim/searchSpaceLiveness.test.ts` hand-written — *(half of this entry closed: `encode.ts`'s copy,
+which this entry used to cover too, **is** derived from the schema, [§ D152](../DECISIONS.md). The
+`core` copy genuinely still carries the array — deliberately, guarded against drift by comparison
+with the derived list — and its seven `selection.*` rows are still unprobed because the sweep
+passes no `dispatcherProfiles`, an exclusion that is now an asserted claim with a reason rather
+than a silence)* · ~~**the shipped
+demand template unable to vary the directional split within a run**~~ *(landed 2026-07-29:
+`lunch-two-way`, [§ D169](../DECISIONS.md) — the same item this list carried under
+deferred-by-argument above, a double count)* · ~~**W4's U7 half blocked on
+a `core` fix**~~ *(closed by T75 — the Standing table above: two rows were a defect, four were
+deliberate, and `CollectOptions.nullDefault` draws the difference)* · ~~the **viewer** still unable
+to enable a selector~~ *(closed by T75 — all three viewer run paths carry `dispatcherProfiles`; see
+the weight-set-library row in the wave-6 table above)* ·
 `nearest-car` unusable on a **fifth** building (**no longer a default anywhere a newcomer meets it** —
 T73) · `RunRecord`'s missing
 **car-move series**, now with two consumers · `published.test.ts` holding nothing for the
