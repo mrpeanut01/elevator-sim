@@ -160,11 +160,11 @@ DR- SC- RR- DE- TE- ME- BE- IS- MD- KX- RX-`.
 
 | State | Rows | Where they are |
 |---|---|---|
-| ✅ **run** — driven in a browser | **0** | — the pass that wrote the ledger held no browser, and it carried no `✅ run` across from the retired board |
-| ✅ **test** — the whole row asserted, and the assertion located and read | **118** | `BE` 21 · `LR` 20 · `SG` 10 · `DR` 10 · `DE` 9 · `TE` 7 · `SC` 6 · `RR` 6 · `IS` 6 · `MD` 6 · `ME` 6 · `SH` 4 · `KX` 3 · `TP` 2 · `RX` 2 · `CO` 0 |
-| ✅ **test** + ⚠️ — one clause each way | **47** | `SH` 13 · `TP` 9 · `SG` 6 · `CO` 4 · `KX` 4 · `RR` 3 · `RX` 3 · `DR` 2 · `SC` 2 · `LR` 1 |
-| ⚠️ **unverified** — built and reachable, neither driven nor covered | **53** | `KX` 10 · `TP` 7 · `RX` 5 · `CO` 4 · `DR` 4 · `MD` 4 · `SH` 3 · `BE` 3 · `IS` 3 · `SG` 2 · `RR` 2 · `DE` 2 · `LR` 1 · `ME` 1 · `SC` 1 · `TE` 1 |
-| 🔲 **not built, inert, or failing its own condition** | **1** | `RX-03` |
+| ✅ **run** — every clause driven in a browser, or driven where the remaining clause is `✅ test` | **81** | `SH` 15 · `TP` 14 · `KX` 12 · `RX` 7 · `SG` 6 · `DR` 5 · `CO` 5 · `LR` 4 · `RR` 3 · `MD` 3 · `SC` 2 · `BE` 2 · `DE` 1 · `ME` 1 · `IS` 1 |
+| ✅ **test** — the whole row asserted, and the drive did not reach it | **106** | `BE` 21 · `LR` 17 · `DR` 10 · `DE` 9 · `SG` 8 · `TE` 7 · `SC` 6 · `RR` 6 · `IS` 6 · `MD` 6 · `ME` 5 · `KX` 2 · `RX` 2 · `SH` 1 |
+| ✅ + ⚠️ — one clause established (by test or by drive), another still unverified | **20** | `SH` 3 · `SG` 3 · `KX` 3 · `IS` 2 · `RX` 2 · `CO` 1 · `TP` 1 · `SC` 1 · `RR` 1 · `TE` 1 · `ME` 1 · `BE` 1 |
+| ⚠️ **unverified** — built and reachable, neither driven nor covered | **8** | `CO` 2 · `SH` 1 · `LR` 1 · `SG` 1 · `TP` 1 · `DE` 1 · `MD` 1 |
+| 🔲 **not built, inert, or failing its own condition** | **4** | `TP-08` · `TP-10` · `DR-13` · `RR-11` — all four **found by the drive** and filed, not fixed |
 
 These five counts are **derived from `UX.md`'s own tables**, not tallied by hand, on the rule *a row
 carrying `🔲` is not built; a row carrying both `✅ test` and `⚠️` is half; a row carrying one is
@@ -186,6 +186,22 @@ that one.* Editing a row's marks makes this table wrong until it is re-derived.
 > [§ D191](DECISIONS.md): the machines-editor suite drives the **fit path** — the naive fit-less
 > path would have called a live control dead — and `CO-02`'s DOM change-listener half stays `⚠️`
 > for the drive phase.
+
+> **Re-derived 2026-07-30 (drive phase), counted from `UX.md` §§ 9–24's mark cells after § 26 was
+> executed in a real browser (Chromium via Playwright).** The table read *0 / 118 / 47 / 53 / 1*
+> until the drive. 81 rows now carry `✅ run` with one-line evidence each in the ledger; the six
+> wave-12 fix rows (`SG-15`, `SH-12`/`KX-11`, `KX-10`, `SH-09`, `TP-13`) all confirmed green in
+> the browser, with one defect filed beside `SH-09` (the opening seed never reaches the address
+> bar until the first interaction). `RX-03` was reproduced at 375×667, fixed in `5d4b782`
+> (stylesheet-only, pinned by `surfaces.test.ts`; no caller-less breakpoint constant), and
+> re-driven green. The four `🔲` ids are **new, found by driving** — `TP-08` (a non-numeric seed
+> silently becomes seed 0), `TP-10` (Save writes `{recording, frames}` and Load requires a
+> top-level `schemaVersion`, so the product refuses its own artifact), `DR-13`
+> (`reportPanel.ts:400` and `main.ts:1359` both wire `#report-next-day`, so one press advances two
+> days), `RR-11` (below 1340 px the open drawer overlays `#drawer-toggle`, so pointer-only readers
+> cannot close it) — the fourth consecutive pass in which driving found what reading and the suite
+> had both passed. `TP-17`, `SG-17`, `MD-07` and `DE-11` could not be provoked through the shipped
+> UI and stay `⚠️` with that stated.
 
 **The 40 half rows are the two rules at the top of this file arriving at the same place.** *(47
 since the wave-12 re-derivation — the six fixed `🔲` rows and `CO-02` joined this bucket, each
