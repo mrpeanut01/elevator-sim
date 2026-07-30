@@ -84,7 +84,7 @@ import { eventFor } from '../shift/events.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { dayReportOf } from '../shift/report.js';
-import { closeDay, nextDay, outcomeOf } from '../shift/week.js';
+import { closeDay, outcomeOf } from '../shift/week.js';
 import { weekdayOf } from '../shift/types.js';
 
 import { mountBatchPanel } from './batchPanel.js';
@@ -1356,13 +1356,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
           break;
       }
     });
-    ui.report.nextDay.addEventListener('click', () => {
-      state = { ...state, week: nextDay(state.week), report: undefined, tab: 'run' };
-      runShift();
-    });
-    ui.report.back.addEventListener('click', () => {
-      context.update({ tab: 'run' });
-    });
+    /*
+     * The report sheet's buttons are wired by `mountReport` and nowhere else. This function held a
+     * second listener on `#report-next-day` and `#report-back` until 2026-07-30, when driving found
+     * one press of "Open the doors on tomorrow" advancing TWO days (DR-13, § D198): both handlers
+     * applied `nextDay`, so Tuesday and Thursday were unreachable by the button.
+     * `reportPanel.test.ts` now pins one binding site per button.
+     */
   }
 
   /* ---------------------------------------------------------------------- *

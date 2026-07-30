@@ -396,6 +396,11 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
    * The recording and the report are cleared in the same patch that advances the day, so that if
    * the run refuses the reader is looking at an empty sheet for a day that has not happened rather
    * than at yesterday's figures under today's date.
+   *
+   * This is the **only** listener on `#report-next-day`. Until 2026-07-30 `main.ts` wired a second
+   * one that applied `nextDay` again, so one press advanced two days (DR-13, § D198) — the panel
+   * owns its own buttons, and `reportPanel.test.ts` pins the single binding site. The tab move to
+   * the run surface lived in that deleted duplicate; it is `takeNext`'s own idiom and belongs here.
    */
   ui.nextDay.addEventListener('click', () => {
     const view = latest;
@@ -406,6 +411,7 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
       report: undefined,
       withheld: [],
     });
+    context.openTab('run');
     context.runShift();
   });
 
