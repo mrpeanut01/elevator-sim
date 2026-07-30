@@ -306,6 +306,91 @@ absorbed.
 - **`skyEvery` chips** seed `isTransferFloor` on the floors they name, which is a real field; the
   handoff's *shuttle vs local* car roles are derived from the bank structure rather than assigned.
 
+### 4.7 Twelve controls the handoff has no row for, one deleted, and what each survivor is for
+
+**The handoff** specifies the transport as six things (M5): a 34 px play/pause square, a 26 px
+phase-segmented timeline, a white playhead, click-to-scrub, five o'clock ticks and speed chips. All
+six are implemented as drawn and **none of them moves here.**
+
+**The constraint.** The same `.transport` card carried **thirteen further controls that appear in no
+requirement row above and in no deviation above it** — so § 5 point 11 was false about them in its
+quietest direction. Not § 4 and `DECISIONS.md` disagreeing: a block neither document mentioned at
+all, which is the failure mode a *both documents agree* check cannot see. § 2.3 records only the
+three retained **tabs**; it says nothing about these.
+
+They rendered as native, unstyled form chrome — a raw *Choose File / No file chosen*, bare `<select>`
+arrows, a bare checkbox — in a viewer whose entire visual language is chips, ghosts and plates. It
+was the single most visible departure from the handoff on the screen.
+
+The handoff has no opinion about them because **its prototype has no need of them.** Its simulator
+steps in real time and draws arrivals from `Math.random()`: it keeps no seed, records nothing,
+verifies nothing and exports nothing, so there is nothing to reproduce, verify, save, load or hand
+to a third party. This simulator's obligations are the reason each control exists. Naming them
+collectively as *the provenance controls* would be the phrase under which an inert control hides,
+so each is named with the obligation that requires it, and each obligation was checked against
+`packages/viz/UX.md` and the invariants rather than assumed.
+
+**One is deleted rather than restyled.** `#copy-provenance` called the same `copyProvenance()`, with
+the same state and producing the same `--building … --dispatcher … --seed … --duration …` line, as
+the footer's `#copy-run` — and `#copy-run` is the handoff's **own S4 requirement**. `UX.md`'s
+`RV-T7` asks for *one* control that copies a run's provenance in the form the CLI accepts; there
+were two, and deleting the one the handoff did not ask for discharges the obligation inside the
+handoff's own component. The footer keeps it. There is now exactly one.
+
+**The twelve that stay, and why.**
+
+| Control | What it does | The obligation, and where it is written |
+|---|---|---|
+| `#seed` | The only control that **sets the shift's seed**. The footer's `#seed-line` displays it and cannot change it; Compare's `#batch-seed` is a different run's base seed, not this one's | Invariant 5 — *every persisted run record carries its seed, so any run replays exactly*. `UX.md` § 1 makes it a **role** requirement: the Reviewer "cannot do their job without it", and § 7.1 rule 5 freezes *the seed is visible and copyable on every surface that shows a run*. `RV-04` requires the drawn seed be written **back into the field** |
+| `#verify` | Re-simulates from the same seed and compares `recordingFingerprint`s, keeping the stored recording on screen either way | Invariants 4 and 5 together: a replay that matched only sometimes is what a non-deterministic tie-break looks like from the outside, so this is where those two invariants become something a reader can press. `PB-16` — *must not silently show the new run* |
+| `#save-recording` / `#load-recording` | The recording document round-trip, and the schema-version check on the way back in | `PB-07`, `PB-15` (a schema **newer or older** than this build is refused by name), `PB-17`, `PB-18`. [§ D16](../DECISIONS.md): `readRecordingDocument` is `VIZ_SCHEMA_VERSION`'s first caller that can actually **disagree** |
+| `#export-png` | Writes the current frame to a file, from `canvas.toBlob` | `RS-08`. [§ D111](../DECISIONS.md) is why this one is load-bearing rather than convenient: **the export *is* the canvas**, so the suppressed-mean leak did not stay on one screen — `Export PNG` baked it into a shareable artifact. The re-check after the fix was run on the decoded bitmap, not on the page |
+| `#bank-filter` | Narrows the stage to one bank | `RV-06`; and `RS-05`, which permits horizontal scroll **or** a bank filter and forbids silent truncation |
+| `#landing-select` | Picks a landing on the stage and captions its calls | `RV-T3`, `RV-08` |
+| `#run` | Runs what the coach ribbon's three selects describe | `RV-T2`, `RV-01`. Moved — see below |
+| `#loop` | Restarts at `startedAt` when the shift ends | `PB-06`, `PB-T7`. `PB-09` (a *sub-window* loop) is still **not built**, and this control does not claim to be it |
+| `#step-back` / `#step-forward` | One display frame each way, pausing first | `PB-T4`, `PB-08`, `KB-06` — the buttons and the `,`/`.` keys share one handler |
+| `#status` | The run's own verdict line: the AWT-or-suppression sentence, the replay verdict, `loading data…`, and *the shift did not run* | `UX.md` § B.3 **Loading** — *progress or at least an indeterminate state with a label*. It is **not** the footer's fact; see below |
+| `#error` | `role="alert"`, `tabindex="-1"`, and focus moves to it | `KB-11`, one of the seven ⛔ non-negotiable keyboard rows |
+
+Four of those are also named in `packages/viz/src/index.ts`'s caller register — the repository's own
+answer to *"name the non-test caller"*. `readRecordingDocument`, `verifyReplay`,
+`recordingFingerprint`, `frameSequence` and `serializeFrames` list **these controls** as their only
+non-test callers, and `windowClause` lists *"the surface `Export PNG` writes to a file"*. Deleting a
+control here does not simplify the viewer; it creates a dead seam of the exact class the roadmap's
+standing requirement is written about.
+
+**What is implemented.** The handoff has no *layout* for this block, so the constraint it imposes is
+its **vocabulary**, not its arrangement:
+
+1. `#copy-provenance` is **deleted**, in the markup, in `dev/elementMap.ts`'s manifest and in
+   `main.ts`'s wiring, in one change.
+2. `#run` moves into the **coach ribbon** (M2), beside the building, pattern and shift-length selects
+   that are its actual inputs, as a `.primary` at the ribbon's scale. It had been three controls away
+   from everything that decides what it runs. Its manifest entry moves from `transport` to `coach`
+   with it, so the grouping in the type says which surface owns it.
+3. `#load-recording` is `.sr-only` behind a `.ghost` label. A bare file input appears nowhere in the
+   handoff, and its chrome is the one thing no stylesheet can reach. The input stays in the tab order
+   and the label carries the focus ring `:focus-visible` would have drawn on it (`KB-02`).
+4. `#loop` is a `.chip[aria-pressed]` beside the speed chips — the handoff's own toggle pattern, and
+   the same kind of claim as a speed chip: how the transport behaves, not what the run contains.
+   `main.ts` holds the state and `setLooping` is its only writer, because `.chip[aria-pressed='true']`
+   is the *only* thing that makes the chip look on.
+5. `#seed`, `#bank-filter` and `#landing-select` use `.field-inline` — the editors' own `.field`
+   border, radius, background and focus, turned sideways for a toolbar. A select here and a select in
+   an editor are now visibly the same control.
+6. What remains is grouped under an **eyebrow** — `PROVENANCE AND REPLAY`, with the standing note
+   *every run carries its seed and replays from it* — so it reads as a deliberate block rather than a
+   strip of leftovers.
+
+**`#status` is deliberately *not* folded into the footer's `#status-line`.** They look like the same
+control and carry different facts. `#status-line` is S4 and says where the *playhead* is —
+`running · 412 arrived, 380 carried · collective`. `#status` says what the *run* is —
+`AWT 19.4 s · WT95 41.2 s`, or `AWT suppressed — …` with the reason, or the replay verdict, or
+`could not load data/`. Merging them would put a suppression reason and a live counter in one slot
+where the second would overwrite the first, on the one screen whose whole discipline is that a
+refused mean stays refused and visible.
+
 ---
 
 ## 5 — Definition of done

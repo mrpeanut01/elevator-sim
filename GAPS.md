@@ -49,6 +49,7 @@ landed"* as *"6c is closer to accepted."*
 | **Two of `vertical-city`'s three sky-lobby escalators carry nobody** | The zone locals already serve both levels. Declared because the machines exist in the building being modelled, **measured and pinned in both directions** so it is loud rather than discovered. |
 | **A zone cannot be changed mid-run** | Operational zoning is a shipped concept with no mechanism over time. Deliberately deferred this wave — nothing measures it and no published result depends on it. |
 | **The double-deck closed-form round-trip-time check is single-deck** | The Barney/CIBSE derivation *is* the single-deck one; retiring the warning would be the over-claim. |
+| **`copy run` emits a CLI line that reproduces a *different* run whenever the pattern or the day is non-default** | The line names `--building`, `--dispatcher`, `--seed` and `--duration` and **no traffic**. The coach ribbon's pattern select really does move the run off the building's own profile, and the day's event multiplies demand on top. `--traffic` is a real `elevator-sim watch` flag, so the CLI would honour the line and produce something else. This is a **provenance** surface, which makes it worse than an ordinary display bug: the reader cannot check it, because the whole point of the control is that they could not otherwise reproduce the run. Found while verifying `RV-T7` for [§ D180](DECISIONS.md); carried in `UX.md`'s `RV-T7` row. Not fixed there because changing the payload has its own verification burden. |
 
 ---
 
@@ -64,6 +65,7 @@ landed"* as *"6c is closer to accepted."*
 | **The honesty search's `mode` dimension has one value** | It plugs in at one line — a tuple in `types.ts` — and the corpus assertion tightens automatically when it does. |
 | **The structural-refusal reason is prose keyed on an id the leg record does not carry** | So it cannot be joined to a leg. **This was in the wave plan and I never briefed it** — an orchestration miss, recorded rather than dropped. |
 | **Basic's curated three-dimension subset is not built** | The campaign editor is restricted to each stage's declared editable set instead, which is data. |
+| **The elevation's express toggle produces two strings the honesty search never sees** | `honesty/surfaces.ts` seeds only `car.legend` from `elevationCarsOf`, so `expressLabel` and `expressTitle` are outside R1–R13. Stated rather than discovered: the toggle landed in [§ D181](DECISIONS.md) from a lane that did not own `surfaces.ts`, and adding the two seeds is the whole fix. |
 
 ---
 

@@ -414,6 +414,9 @@
         border-radius: var(--r-control); padding: 5px 8px;
         font-size: 11.5px; font-weight: 600; cursor: pointer; max-width: 190px;
       }
+      /* § 4.7 — Run is the ribbon's action, so it is `.primary` at the ribbon's own scale rather
+         than at the report sheet's. The same scoping `.transport-tail .chip` already does. */
+      .coach-controls .primary { padding: 6px 12px; font-size: 12px; }
 
       /* The stage, § 1.3 M3. */
       .stage-wrap {
@@ -478,6 +481,31 @@
       .transport-tail { display: flex; gap: 4px; flex: none; align-items: center; flex-wrap: wrap; }
       .transport-tail .chip { padding: 6px 9px; }
       #status { color: var(--dim); font: 500 11px var(--mono); }
+
+      /* § 4.7 — the provenance block. A row of the shared vocabulary, nothing new: chips, a ghost
+         label standing in for a file input, and the editors' own field styling made inline. */
+      .provenance { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+      .provenance .chip { padding: 6px 9px; }
+      .provenance-rule { width: 1px; align-self: stretch; min-height: 20px; background: var(--edge); flex: none; }
+
+      /* An inline field: the `.field` pair turned sideways, for a toolbar rather than a form
+         column. Same border, radius, background and focus as `.field`, so a select here and a
+         select in an editor are visibly the same control. */
+      .field-inline {
+        display: inline-flex; align-items: center; gap: 6px;
+        font: 500 10.5px var(--mono); color: var(--dimmer);
+        letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
+      }
+      .field-inline input, .field-inline select {
+        background: var(--bg); border: 1px solid var(--edge-strong); border-radius: var(--r-control);
+        color: var(--text); padding: 5px 8px; font: 500 11.5px var(--mono);
+        text-transform: none; letter-spacing: normal; max-width: 12em;
+      }
+      /* A file input has no chrome any stylesheet can reach, so it is `.sr-only` and this label is
+         the control. It keeps the input in the tab order and borrows its focus ring, because a
+         focusable element with an invisible focus ring is worse than a native one (KB-02). */
+      .file-ghost { display: inline-flex; align-items: center; }
+      .file-ghost:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
 
       /* --- Left rail, § 1.2 --- */
       .mood-head { display: flex; align-items: center; gap: 12px; }
@@ -939,6 +967,11 @@
                      sixteen-hour day this simulator cannot produce honestly. -->
                 <label class="sr-only" for="pick-shift">shift length</label>
                 <select id="pick-shift" title="how much simulated demand this shift covers"></select>
+                <!-- § 4.7 — Run sits beside its own inputs. It spent the design refactor on the
+                     transport's second row, three controls away from the three selects that decide
+                     what it runs; the handoff has no requirement row for it because the handoff's
+                     toy simulator steps in real time and never needed one. -->
+                <button type="button" class="primary" id="run">Run this shift</button>
                 <button type="button" class="ghost" id="open-scenarios">All scenarios</button>
               </div>
             </div>
@@ -984,33 +1017,48 @@
                   <button type="button" class="chip" id="step-back" title="one display frame back (,)">◀|</button>
                   <button type="button" class="chip" id="step-forward" title="one display frame forward (.)">|▶</button>
                   <span id="speed-chips" class="chip-row" role="group" aria-label="playback speed"></span>
-                  <label class="dim" style="font: 500 10.5px var(--mono)">
-                    loop <input type="checkbox" id="loop" />
-                  </label>
+                  <!-- § 4.7 — loop is the handoff's own toggle pattern, not a native checkbox. It
+                       sits with the speed chips because it is the same kind of claim: how the
+                       transport behaves, not what the run contains. -->
+                  <button type="button" class="chip" id="loop" aria-pressed="false"
+                          title="when the shift ends, start it again from the beginning">loop</button>
                 </div>
               </div>
               <div class="transport-row" style="margin-top: 8px">
                 <span id="status" role="status">booting…</span>
                 <span id="error" role="alert" tabindex="-1"></span>
-                <span style="margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap">
-                  <button type="button" class="chip" id="run">Run this shift</button>
-                  <button type="button" class="chip" id="verify" title="re-simulate from this seed and compare the frame sequences">Verify replay</button>
-                  <button type="button" class="chip" id="copy-provenance" title="copy building, dispatcher, seed and duration in the form the CLI accepts">Copy provenance</button>
-                  <button type="button" class="chip" id="save-recording">Save recording</button>
-                  <label class="dim" style="font: 500 10.5px var(--mono)">
-                    load <input id="load-recording" type="file" accept="application/json,.json" />
-                  </label>
-                  <button type="button" class="chip" id="export-png">Export PNG</button>
-                  <label class="dim" style="font: 500 10.5px var(--mono)">
-                    seed <input id="seed" size="12" inputmode="numeric" placeholder="random" />
-                  </label>
-                  <label class="dim" style="font: 500 10.5px var(--mono)">
-                    bank <select id="bank-filter"><option value="">all</option></select>
-                  </label>
-                  <label class="dim" style="font: 500 10.5px var(--mono)">
-                    landing <select id="landing-select"><option value="">none</option></select>
-                  </label>
-                </span>
+              </div>
+
+              <!-- =============================================================
+                   § 4.7 — the provenance block.
+
+                   Nine controls the handoff has no requirement row for, because its prototype
+                   simulator has nothing to reproduce: it draws from `Math.random()` and keeps no
+                   seed. This simulator does, and invariant 5 makes that a promise rather than a
+                   convenience. So the block is labelled and grouped rather than trailing off the
+                   end of the transport, and every control in it speaks the handoff's vocabulary —
+                   chips, a ghost, and the field styling the editors already use.
+                   ============================================================= -->
+              <div class="eyebrow-row eyebrow-row-after-card">
+                <span class="eyebrow">Provenance and replay</span>
+                <span class="eyebrow-note">every run carries its seed and replays from it</span>
+              </div>
+              <div class="provenance">
+                <label class="field-inline" for="seed">seed
+                  <input id="seed" size="12" inputmode="numeric" placeholder="random" /></label>
+                <button type="button" class="chip" id="verify" title="re-simulate from this seed and compare the frame sequences">Verify replay</button>
+                <button type="button" class="chip" id="save-recording">Save recording</button>
+                <!-- The native file input is the one control with no styleable chrome at all, so it
+                     is hidden from sight and kept in the tab order behind a ghost label. The label
+                     carries the focus ring `:focus-visible` would have drawn on the input. -->
+                <label class="ghost file-ghost" for="load-recording">Load recording…
+                  <input id="load-recording" class="sr-only" type="file" accept="application/json,.json" /></label>
+                <button type="button" class="chip" id="export-png">Export PNG</button>
+                <span class="provenance-rule" aria-hidden="true"></span>
+                <label class="field-inline" for="bank-filter">bank
+                  <select id="bank-filter"><option value="">all</option></select></label>
+                <label class="field-inline" for="landing-select">landing
+                  <select id="landing-select"><option value="">none</option></select></label>
               </div>
             </div>
           </section>

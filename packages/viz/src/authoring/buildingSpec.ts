@@ -23,6 +23,12 @@
  * bank is not a building this loader will build. So a drag produces a *bank split*: cars that share
  * a band share a bank, and a band that no other car matches becomes a bank of one.
  *
+ * The handoff's **express toggle** (§ 1.3 M11) is the second half of the same field. A band above
+ * the lobby lands in the lobby by default; turning the toggle off keeps the car inside its band,
+ * and {@link BuildingSpec.noLobby} is where that lives. It is service zoning and only that — it
+ * changes which floors the shaft opens onto, not who is allowed through the door (access) and not
+ * which car the group offers a call to (operational). The three stay apart.
+ *
  * That is not a limitation being worked around; it is service zoning being modelled correctly.
  * `CLAUDE.md` is explicit that the three zonings are distinct concepts — service (physical), access
  * (credential), operational (dispatcher strategy) — and a shaft's reachable floors is the first of
@@ -89,6 +95,15 @@ export interface BuildingSpec {
   readonly skyFloors: readonly number[];
   /** Per-car service band `[lowFloor, highFloor]` as floor numbers, when a reader pinned one. */
   readonly bandByCar: Readonly<Record<number, readonly [number, number]>>;
+  /**
+   * Cars whose band starts above the lobby and which have been taken **out** of the lobby.
+   *
+   * The handoff's express toggle, § 1.3 M11, in its *off* position. A band above the lobby lands in
+   * the lobby by default and runs non-stop past the floors beneath it; setting this keeps the car
+   * entirely inside its band. Keyed by car index; `false` and absent mean the same thing, and the
+   * flag is inert on a car whose band already starts at the lobby.
+   */
+  readonly noLobby: Readonly<Record<number, boolean>>;
 }
 
 export const BLANK_SPEC: BuildingSpec = Object.freeze({
@@ -107,6 +122,7 @@ export const BLANK_SPEC: BuildingSpec = Object.freeze({
   ratedLoadLb: 2500,
   skyFloors: Object.freeze([]),
   bandByCar: Object.freeze({}),
+  noLobby: Object.freeze({}),
 });
 
 /** One row of the spec column — the handoff's five sliders, § 1.3 M11. */
@@ -234,18 +250,50 @@ export function bandOf(spec: BuildingSpec, car: number): readonly [number, numbe
 }
 
 /**
+ * Whether the express toggle is offered for this car at all.
+ *
+ * Only a band with at least one floor *between* it and the lobby has the question to answer — the
+ * handoff's own gate, `lo > 1` at `:3131`. A band starting at the lobby obviously has no choice to
+ * make; a band starting at floor 1 has none either, because its express form serves `0..high`,
+ * which is contiguous, and is therefore the same set of floors as a band starting at the lobby.
+ * Offering the control there would be offering a choice between a building and itself, which is
+ * the "control that claims a mechanism it does not have" defect at widget scale.
+ */
+export function canExpress(spec: BuildingSpec, car: number): boolean {
+  return bandOf(spec, car)[0] > 1;
+}
+
+/** Whether this car opens at the lobby: always, unless a band above it was taken out of it. */
+export function servesLobby(spec: BuildingSpec, car: number): boolean {
+  return !canExpress(spec, car) || spec.noLobby[car] !== true;
+}
+
+/** Every floor this car opens onto — its band, plus the lobby when it runs express to it. */
+export function servedFloorsOf(spec: BuildingSpec, car: number): readonly number[] {
+  const [low, high] = bandOf(spec, car);
+  const floors: number[] = [];
+  if (low > 0 && servesLobby(spec, car)) floors.push(0);
+  for (let floor = low; floor <= high; floor += 1) floors.push(floor);
+  return floors;
+}
+
+/**
  * Floors no car reaches.
  *
  * The elevation's warning, and a genuine defect in a building rather than a display nicety: a call
  * at an unserved floor is a call nobody may answer, which looks nothing like a slow one and must
  * never be reported as one. `access/lockedOut.ts` makes the same distinction for the credential
  * case; this is the service-zoning half of it.
+ *
+ * Counted over {@link servedFloorsOf} rather than over the raw band, because an express car really
+ * does open at the lobby and `buildingFromSpec` really does write `G` into its `servesFloors`. The
+ * band alone said otherwise, which was harmless while every band above the lobby was express and is
+ * not once one of them can be closed.
  */
 export function orphanFloors(spec: BuildingSpec): readonly number[] {
   const served = new Set<number>();
   for (let car = 0; car < spec.cars; car += 1) {
-    const [low, high] = bandOf(spec, car);
-    for (let floor = low; floor <= high; floor += 1) served.add(floor);
+    for (const floor of servedFloorsOf(spec, car)) served.add(floor);
   }
   const orphans: number[] = [];
   for (let floor = 0; floor <= spec.floors; floor += 1) if (!served.has(floor)) orphans.push(floor);
@@ -253,24 +301,85 @@ export function orphanFloors(spec: BuildingSpec): readonly number[] {
 }
 
 /**
- * Cars grouped into banks by the band they serve.
+ * Floors a shaft serves that a passenger standing in the lobby cannot get to.
+ *
+ * A different defect from {@link orphanFloors} and a worse one, because nothing downstream says a
+ * word about it. Measured on this branch: a single bank closed to floors `7–11` with no transfer
+ * level below it **loads with no error and no warning** — `parseBuilding` and `resolveBuilding` are
+ * both silent — and then `traffic/generator.ts`'s `classifyTrip` returns `unreachable` for every
+ * lobby-origin trip and the run carries 8 legs where the same building carries 114. That is demand
+ * disappearing into a census, which is precisely the "confident nonsense" `CLAUDE.md` names.
+ *
+ * The model is `traffic/route.ts`'s, narrowed to what a spec can express: a car's served floors are
+ * an edge, and a journey may change cars only on a floor flagged `isTransferFloor` — which in this
+ * editor is a sky floor, and nothing else. `authoring.test.ts` holds it to the real
+ * {@link RoutePlanner} on the resolved building in both directions, so this cannot drift into a
+ * mirror that stopped mirroring.
+ */
+export function unreachableFloors(spec: BuildingSpec): readonly number[] {
+  const transfers = new Set(spec.skyFloors.filter((floor) => floor > 0 && floor <= spec.floors));
+  const served: readonly (readonly number[])[] = Array.from({ length: spec.cars }, (_, car) =>
+    servedFloorsOf(spec, car),
+  );
+  const seen = new Set<number>([0]);
+  let frontier: number[] = [0];
+  while (frontier.length > 0) {
+    const next: number[] = [];
+    for (const at of frontier) {
+      for (const floors of served) {
+        if (!floors.includes(at)) continue;
+        for (const floor of floors) {
+          if (seen.has(floor)) continue;
+          seen.add(floor);
+          if (transfers.has(floor)) next.push(floor);
+        }
+      }
+    }
+    frontier = next;
+  }
+  const stranded: number[] = [];
+  for (let floor = 0; floor <= spec.floors; floor += 1) if (!seen.has(floor)) stranded.push(floor);
+  return stranded;
+}
+
+export interface SpecBank {
+  readonly band: readonly [number, number];
+  /** Whether this bank's cars open at the lobby. Always true of a band that starts there. */
+  readonly lobby: boolean;
+  readonly cars: readonly number[];
+}
+
+/**
+ * Cars grouped into banks by the floors they open onto.
  *
  * A bank is *the set of cars that open onto the same floors*, which is what `BankConfig` means. So
  * the grouping key is the band, and a reader who drags one car's band away from the rest has split
  * the bank — correctly, and visibly, because the elevation redraws the legend with two banks in it.
+ *
+ * The lobby is part of that key, not a decoration on it. Two cars with the same band, one running
+ * express to the lobby and one closed inside it, do **not** open onto the same floors and therefore
+ * are not one bank — `BankConfig` has a single `servesFloors`, so a bank cannot hold both claims.
+ * Keying on the band alone would have silently made one of the two cars serve floors it does not.
  */
-export function banksOf(spec: BuildingSpec): readonly { readonly band: readonly [number, number]; readonly cars: readonly number[] }[] {
-  const byBand = new Map<string, { band: readonly [number, number]; cars: number[] }>();
+export function banksOf(spec: BuildingSpec): readonly SpecBank[] {
+  const byBand = new Map<string, { band: readonly [number, number]; lobby: boolean; cars: number[] }>();
   for (let car = 0; car < spec.cars; car += 1) {
     const band = bandOf(spec, car);
-    const key = `${String(band[0])}:${String(band[1])}`;
+    const lobby = servesLobby(spec, car);
+    const key = `${String(band[0])}:${String(band[1])}:${lobby ? 'L' : '-'}`;
     const found = byBand.get(key);
-    if (found === undefined) byBand.set(key, { band, cars: [car] });
+    if (found === undefined) byBand.set(key, { band, lobby, cars: [car] });
     else found.cars.push(car);
   }
   // Sorted by the band's low floor, so two specs that describe the same building produce the same
-  // document — invariant 4's rule applied to authoring, and what makes `dirty` comparable.
-  return [...byBand.values()].sort((a, b) => a.band[0] - b.band[0] || a.band[1] - b.band[1]);
+  // document — invariant 4's rule applied to authoring, and what makes `dirty` comparable. The
+  // lobby breaks the remaining tie, for the same reason and by the same rule.
+  return [...byBand.values()].sort(
+    (a, b) =>
+      a.band[0] - b.band[0] ||
+      a.band[1] - b.band[1] ||
+      Number(b.lobby) - Number(a.lobby),
+  );
 }
 
 /** Car ids, `A` onward, matching what the canvas draws over each shaft. */
@@ -342,8 +451,13 @@ export function buildingFromSpec(
      * is, and every shipped building with one says so. Adding the entrance rather than leaving the
      * band closed is the difference between an express group and a service car nobody can reach
      * from the ground.
+     *
+     * Which is exactly why it is a *choice* and not a rule: the handoff's express toggle (§ 1.3
+     * M11) turns it off, and a bank with `lobby: false` is that self-contained service car. It is a
+     * building this loader builds without complaint — measured, not assumed — and it is one a
+     * reader can strand, so {@link unreachableFloors} guards it at the control.
      */
-    if (group.band[0] > 0 && !servesFloors.includes('G')) servesFloors.unshift('G');
+    if (group.band[0] > 0 && group.lobby && !servesFloors.includes('G')) servesFloors.unshift('G');
     return {
       /*
        * The single-bank case keeps the id every shipped building uses, so a spec that describes
@@ -351,7 +465,12 @@ export function buildingFromSpec(
        * downloaded JSON with `midtown-office.json` is not distracted by a gratuitous rename.
        */
       id: groups.length === 1 ? 'main' : `bank-${String(index + 1)}`,
-      name: group.band[0] === 0 ? 'Main bank' : `Floors ${String(group.band[0])}–${String(group.band[1])}`,
+      name:
+        group.band[0] === 0
+          ? 'Main bank'
+          : group.lobby
+            ? `Floors ${String(group.band[0])}–${String(group.band[1])}`
+            : `Floors ${String(group.band[0])}–${String(group.band[1])}, no lobby`,
       servesFloors,
       cars: group.cars.map((car) => {
         const config: Record<string, unknown> = {
@@ -414,6 +533,23 @@ export function validateSpec(
 ): readonly string[] {
   const problems: string[] = [];
   const orphans = orphanFloors(spec);
+  const orphaned = new Set(orphans);
+  /*
+   * Reported before the orphans and separately from them, because they are different defects with
+   * different fixes: an orphan floor needs a shaft, a stranded one already has one and needs a way
+   * in. Floors that are both are counted once, as orphans, since "no shaft serves it" is the more
+   * specific thing to say.
+   */
+  const stranded = unreachableFloors(spec).filter((floor) => !orphaned.has(floor));
+  if (stranded.length > 0) {
+    const named =
+      stranded.length > 6
+        ? `${String(stranded.length)} floors have a shaft`
+        : `Floor${stranded.length === 1 ? '' : 's'} ${stranded.map((floor) => floorIdOf(floor)).join(', ')} ${stranded.length === 1 ? 'has' : 'have'} a shaft`;
+    problems.push(
+      `${named} nobody can board from the lobby — nothing connects ${stranded.length === 1 ? 'it' : 'them'} to the entrance, directly or through a transfer level. The loader builds this without a word; the run then generates no trip to those floors at all, so the mean it reports is over the people it could still carry.`,
+    );
+  }
   if (orphans.length > 0) {
     problems.push(
       orphans.length > 6
@@ -502,6 +638,11 @@ function normalize(spec: BuildingSpec): unknown {
     ratedLoadLb: spec.ratedLoadLb,
     skyFloors: [...spec.skyFloors].sort((a, b) => a - b),
     bandByCar: Object.entries(spec.bandByCar).sort(([a], [b]) => a.localeCompare(b)),
+    // Only the cars actually taken out of the lobby, so `{}` and `{ 0: false }` are the same
+    // building rather than two — the flag's absent and false cases mean one thing.
+    noLobby: Object.entries(spec.noLobby)
+      .filter(([, off]) => off)
+      .sort(([a], [b]) => a.localeCompare(b)),
   };
 }
 
@@ -544,6 +685,11 @@ export function specFromBuilding(config: BuildingConfig, id: string): BuildingSp
     skyFloors: floors
       .map((floor, index) => (floor.isTransferFloor === true ? index + 1 : 0))
       .filter((floor) => floor > 0),
+    // Both empty for the same documented reason: a shipped building's zoning is not a set of
+    // per-car bands, so reading one back gives the *shape* and not the banks (§ 4.5). `noLobby` is
+    // meaningless without a band to hang it on, so it comes back empty with `bandByCar` rather than
+    // being inferred from a `servesFloors` this model did not produce.
     bandByCar: {},
+    noLobby: {},
   };
 }

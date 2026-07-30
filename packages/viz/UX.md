@@ -68,7 +68,7 @@ live counters.
 | RV-T4 | Read the headline statistics without leaving the view | AWT, WT95, TTD, handling capacity and saturation verdict are visible, each labelled with the window it was computed over |
 | RV-T5 | Distinguish the live running mean from the reported AWT | Two visibly different labels; the running mean is never called "AWT" |
 | RV-T6 | Notice that a run saturated | A persistent banner, not a transient toast; the AWT figure is replaced by the suppression reason |
-| RV-T7 | Copy a run's provenance | One control copies `building, dispatcher, traffic, seed, duration` in a form the CLI accepts |
+| RV-T7 | Copy a run's provenance | One control copies `building, dispatcher, traffic, seed, duration` in a form the CLI accepts. **"One" is now literally true and was not**: the design refactor left `#copy-provenance` on the transport calling the same `copyProvenance()` with the same state as the footer's `#copy-run`, which is the handoff's own S4 requirement, so two controls emitted the identical line. The transport's is deleted (`docs/12` § 4.7). **The success condition is still not fully met, and this row now says so**: the line reads `--building … --dispatcher … --seed … --duration …` and names **no traffic**, while the coach ribbon's pattern select really does move the run off the building's own profile and the day's event multiplies demand on top of it. `--traffic` is a real `elevator-sim watch` flag. So a shift run on a non-default pattern, or on any day past the first, copies a line that reproduces a *different* run — a provenance claim the CLI would honour and the reader could not check |
 
 ### A.2 Paths
 
@@ -158,7 +158,7 @@ The transport over a recording: play, pause, scrub, speed, step, and replay-from
 | PB-06 | alternate | Loop enabled | Restarts at `startedAt` with no accumulated drift | ✅ w1 |
 | PB-07 | alternate | Load a recording from a file rather than re-simulating | Same picture; schema version checked first | ✅ run — **Save recording** then **load**, round-tripped in the browser. `readRecordingDocument` in `record/document.ts` is the version check's first caller that can actually disagree (D16) |
 | PB-08 | alternate | Step one frame while paused | Advances exactly one display frame | ✅ run — two transport buttons and the `,`/`.` keys; each pauses first, then seeks by one 60 Hz frame at the current speed |
-| PB-09 | alternate | Window selection then loop | Only the selected span repeats | 🔲 — **not built.** Whole-run looping is (a checkbox, rebuilt transport at the current instant); selecting a sub-window is not |
+| PB-09 | alternate | Window selection then loop | Only the selected span repeats | 🔲 — **not built.** Whole-run looping is (a `.chip[aria-pressed]` beside the speed chips since `docs/12` § 4.7, a native checkbox before it; either way the transport is rebuilt at the current instant, because `Playback` takes `loop` at construction); selecting a sub-window is not |
 | PB-10 | edge | Seek before `startedAt` / after `endedAt` | Clamps; never extrapolates | ✅ w1 |
 | PB-11 | edge | Speed set to the extremes | ×0.05 and ×1000 accepted; outside that range refused with a message | ✅ w1 |
 | PB-12 | edge | Tab hidden, then restored (rAF stops firing) | The playhead reflects **elapsed display time**, so it resumes at the right instant rather than replaying the gap | ✅ w1 (anchored mapping) |

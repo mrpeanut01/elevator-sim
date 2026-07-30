@@ -172,6 +172,14 @@ export interface CoachElements {
   readonly pattern: HTMLSelectElement;
   /** § 4.1 — the select the handoff does not have, because a shift is a run and a run has a length. */
   readonly shiftLength: HTMLSelectElement;
+  /**
+   * § 4.7 — the control that runs what the three selects above it describe.
+   *
+   * It lived on the transport's second row until § 4.7, which put it three controls away from its
+   * own inputs. The handoff has no requirement row for it at all: its prototype simulator steps in
+   * real time, so pressing play *is* running.
+   */
+  readonly run: HTMLButtonElement;
   readonly allScenarios: HTMLButtonElement;
 }
 
@@ -195,7 +203,16 @@ export interface StageElements {
   readonly legendTitle: HTMLElement;
 }
 
-/** § 1.3 M5 — the transport, plus the run controls that live on its second row. */
+/**
+ * § 1.3 M5 — the transport, plus the provenance block under it (`docs/12` § 4.7).
+ *
+ * The six the handoff specifies are {@link playPause}, {@link timeline}, {@link playhead},
+ * {@link ticks}, {@link speedChips} and the click-to-scrub the timeline carries. Everything else
+ * here is an obligation this simulator has and the handoff's prototype does not — a seed to
+ * reproduce from, a replay to verify against, a recording to write and read, an export that leaves
+ * the building. § 4.7 names each one and the obligation behind it; `run` is on {@link CoachElements}
+ * rather than here, because it belongs beside its own inputs.
+ */
 export interface TransportElements {
   readonly playPause: HTMLButtonElement;
   readonly timeline: HTMLElement;
@@ -204,12 +221,11 @@ export interface TransportElements {
   readonly speedChips: HTMLElement;
   readonly stepBack: HTMLButtonElement;
   readonly stepForward: HTMLButtonElement;
-  readonly loop: HTMLInputElement;
+  /** A `.chip[aria-pressed]`, not a checkbox — the handoff's own toggle. `docs/12` § 4.7. */
+  readonly loop: HTMLButtonElement;
   readonly status: HTMLElement;
   readonly error: HTMLElement;
-  readonly run: HTMLButtonElement;
   readonly verify: HTMLButtonElement;
-  readonly copyProvenance: HTMLButtonElement;
   readonly saveRecording: HTMLButtonElement;
   readonly loadRecording: HTMLInputElement;
   readonly exportPng: HTMLButtonElement;
@@ -474,6 +490,7 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     building: 'pick-building',
     pattern: 'pick-pattern',
     shiftLength: 'pick-shift',
+    run: 'run',
     allScenarios: 'open-scenarios',
   }),
   stage: Object.freeze({
@@ -496,9 +513,7 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     loop: 'loop',
     status: 'status',
     error: 'error',
-    run: 'run',
     verify: 'verify',
-    copyProvenance: 'copy-provenance',
     saveRecording: 'save-recording',
     loadRecording: 'load-recording',
     exportPng: 'export-png',

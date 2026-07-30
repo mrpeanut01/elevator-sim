@@ -57,12 +57,14 @@ import {
   buildingAdvice,
   buildingFromSpec,
   buildingSummary,
+  canExpress,
   carLabelOf,
   floorIdOf,
   occupancyAt,
   occupancyLine,
   personsOf,
   populationAt,
+  servesLobby,
   specFromBuilding,
   specIsDirty,
   validateSpec,
@@ -78,6 +80,7 @@ import {
   type SliderHandles,
 } from './dispatcherEditor.js';
 import {
+  chip,
   chipRow,
   el,
   fill,
@@ -466,7 +469,33 @@ export interface ElevationCar {
   readonly serves: string;
   readonly pinned: boolean;
   readonly legend: string;
+  /** Whether the express toggle is offered at all — only a band above the lobby has the question. */
+  readonly canExpress: boolean;
+  /** Whether it is on: the car runs non-stop to the lobby rather than staying in its band. */
+  readonly expressOn: boolean;
+  /** The toggle's label, which carries the state in words as well as in colour (KB-15). */
+  readonly expressLabel: string;
+  /** The toggle's tooltip, verbatim from the handoff at `:737`. */
+  readonly expressTitle: string;
 }
+
+/**
+ * The express toggle's tooltip, **verbatim** from the vendored prototype at
+ * `docs/design/elevator-sim-reimagined.dc.html:737`.
+ *
+ * Copied rather than paraphrased because the handoff wins every disagreement about what the screen
+ * says (§ D174), and because the sentence is the only place the *default* is explained: a reader who
+ * has never dragged a band has no way to know that a band above the lobby already lands in it.
+ *
+ * Deliberately **not exported**. `honesty/derive.test-helper.ts` derives its corpus from exported
+ * declarations, and a new exported string constant is a new unclassified surface that only
+ * `honesty/surfaces.ts` can classify — a file this change does not own. Kept module-private, the
+ * sentence reaches the corpus the way every other word in this module does: through
+ * {@link elevationCarsOf}, which is already an adapter's subject.
+ */
+const EXPRESS_TITLE =
+  'A band above the first floor still lands in the lobby and runs non-stop past the floors beneath ' +
+  'it. Turn this off to keep the car entirely inside its band.';
 
 /**
  * One column per car, positioned against the same row grid the floors are drawn on.
@@ -481,12 +510,23 @@ export function elevationCarsOf(spec: BuildingSpec): readonly ElevationCar[] {
   for (let car = 0; car < spec.cars; car += 1) {
     const band = bandOf(spec, car);
     const [low, high] = band;
-    const bankIndex = banks.findIndex((bank) => bank.band[0] === low && bank.band[1] === high);
-    const role = low === 0 ? (high >= spec.floors ? 'every floor' : 'low bank') : 'express';
+    const lobby = servesLobby(spec, car);
+    const bankIndex = banks.findIndex(
+      (bank) => bank.band[0] === low && bank.band[1] === high && bank.lobby === lobby,
+    );
+    /*
+     * Three roles, and the third is new. `express` is a band above the lobby that still lands in it;
+     * `band only` is the same band with the toggle off, which is a different bank and a different
+     * building. Calling both of them `express` would be the `serves` defect one column to the left.
+     */
+    const role =
+      low === 0 ? (high >= spec.floors ? 'every floor' : 'low bank') : lobby ? 'express' : 'band only';
     const serves =
       low === 0
         ? `${floorIdOf(0)}–${floorIdOf(high)}`
-        : `G + ${floorIdOf(low)}–${floorIdOf(high)}`;
+        : lobby
+          ? `G + ${floorIdOf(low)}–${floorIdOf(high)}`
+          : `${floorIdOf(low)}–${floorIdOf(high)}`;
     const id = carLabelOf(car);
     cars.push({
       car,
@@ -500,6 +540,14 @@ export function elevationCarsOf(spec: BuildingSpec): readonly ElevationCar[] {
       serves,
       pinned: spec.bandByCar[car] !== undefined,
       legend: `${id} · ${role} · ${serves}`,
+      canExpress: canExpress(spec, car),
+      expressOn: canExpress(spec, car) && lobby,
+      expressLabel: !canExpress(spec, car)
+        ? ''
+        : lobby
+          ? `✓ express from the lobby, skipping ${floorIdOf(1)}–${floorIdOf(low - 1)}`
+          : 'stays in its band — click to run express from the lobby',
+      expressTitle: EXPRESS_TITLE,
     });
   }
   return cars;
@@ -522,7 +570,8 @@ export function occupancyAtFraction(fraction: number): number {
 /** The sentence under the legend: how many banks there are, and what a bank means. */
 export function elevationNoteOf(spec: BuildingSpec): string {
   const banks = banksOf(spec);
-  const express = banks.some((bank) => bank.band[0] > 0);
+  const express = banks.some((bank) => bank.band[0] > 0 && bank.lobby);
+  const closed = banks.some((bank) => bank.band[0] > 0 && !bank.lobby);
   const plural = banks.length === 1 ? '' : 's';
   return (
     `${String(spec.cars)} shaft${spec.cars === 1 ? '' : 's'} in ${String(banks.length)} bank${plural} — ` +
@@ -530,6 +579,14 @@ export function elevationNoteOf(spec: BuildingSpec): string {
     'splits it.' +
     (express
       ? ' A band that starts above the lobby still lands in the lobby and runs non-stop past the floors beneath it.'
+      : '') +
+    /*
+     * Said only when a band is actually closed, because it is the sentence that stops the one above
+     * being read as a law. Both can be true at once — a tower can have an express group and a
+     * service car — and then both are said.
+     */
+    (closed
+      ? ' A band with express turned off never calls at the lobby, so its floors are reachable only through a transfer level.'
       : '')
   );
 }
@@ -645,6 +702,20 @@ export function mountBuildingEditor(
     patch({ bandByCar: { ...current.bandByCar, [car]: next } });
   }
 
+  /**
+   * Take one car out of the lobby, or put it back — the handoff's express toggle, § 1.3 M11.
+   *
+   * Writes the flag rather than rewriting the band, because the two are different facts: the band is
+   * where the reader dragged the grips, and this is whether the car stops at the ground on its way
+   * there. Folding the lobby into the band would make *release every shaft* silently forget which of
+   * the two the reader had chosen.
+   */
+  function setNoLobby(car: number, off: boolean): void {
+    const current = spec();
+    if (current === undefined) return;
+    patch({ noLobby: { ...current.noLobby, [car]: off } });
+  }
+
   /* --- static wiring, once ------------------------------------------------ */
 
   elements.name.addEventListener('input', () => {
@@ -697,7 +768,10 @@ export function mountBuildingEditor(
   });
 
   elements.elevationClearRanges.addEventListener('click', () => {
-    patch({ bandByCar: {} });
+    // The lobby flag goes with the bands, as it does in the handoff at `:3187`. It is only ever
+    // meaningful on a band above the lobby, so leaving it behind would leave a flag on cars that no
+    // longer have the band it described, waiting to change a building the next time one is dragged.
+    patch({ bandByCar: {}, noLobby: {} });
   });
 
   elements.save.addEventListener('click', () => {
@@ -1084,7 +1158,46 @@ export function mountBuildingEditor(
             }),
             el(doc, 'span', {
               text: car.pinned ? 'pinned' : '',
-              style: { flex: '1', color: 'var(--faint)' },
+              style: { width: '46px', flex: 'none', color: 'var(--faint)' },
+            }),
+            /*
+             * The handoff's express toggle, `:736–738`, in the handoff's own trailing flex cell.
+             *
+             * A `chip` rather than a bare button so the state is on `aria-pressed` and not only in
+             * the colour (KB-15) — and the label says it in words as well, because a reader
+             * scanning this row should not have to hover to learn which way the switch is thrown.
+             *
+             * The two inline styles are the exception the module docstring allows only grudgingly,
+             * and they are here because the stylesheet is not this change's to edit: `.chip` is
+             * `white-space: nowrap`, the handoff's label is a whole clause, and the legend is a
+             * narrow column. Ellipsis rather than overflow, with the full sentence in the tooltip.
+             * They belong in an `.elev-legend-row .chip` rule in `index.html` when that file is free.
+             */
+            el(doc, 'span', {
+              style: {
+                flex: '1',
+                'min-width': '0',
+                display: 'flex',
+                'align-items': 'center',
+                gap: '6px',
+              },
+              children: [
+                car.canExpress
+                  ? (() => {
+                      const toggle = chip(doc, {
+                        label: car.expressLabel,
+                        selected: car.expressOn,
+                        title: car.expressTitle,
+                        onPick: () => {
+                          setNoLobby(car.car, car.expressOn);
+                        },
+                      });
+                      toggle.style.setProperty('overflow', 'hidden');
+                      toggle.style.setProperty('text-overflow', 'ellipsis');
+                      return toggle;
+                    })()
+                  : null,
+              ],
             }),
           ],
         }),
@@ -1207,7 +1320,12 @@ export function mountBuildingEditor(
     drawElevation(current);
 
     const handSet = Object.keys(current.occupancyByFloor).length;
-    const pinned = Object.keys(current.bandByCar).length;
+    // *Release every shaft* now clears the lobby flag too, so it has to appear when only that was
+    // set — a reader who has turned express off on a default sky-lobby band has something to release
+    // even though they have pinned nothing.
+    const pinned =
+      Object.keys(current.bandByCar).length +
+      Object.values(current.noLobby).filter((off) => off).length;
     setText(
       elements.elevationOccNote,
       handSet === 0

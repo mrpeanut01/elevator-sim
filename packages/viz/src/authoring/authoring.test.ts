@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  RoutePlanner,
   parseBuilding,
   parseDispatcherProfiles,
   parseElevatorSpecs,
@@ -31,11 +32,16 @@ import {
   BLANK_SPEC,
   banksOf,
   buildingFromSpec,
+  canExpress,
+  floorIdOf,
   occupancyLine,
   orphanFloors,
   personsOf,
+  servesLobby,
   specFromBuilding,
+  specIsDirty as buildingSpecIsDirty,
   totalPopulation,
+  unreachableFloors,
   validateSpec,
   type BuildingSpec,
 } from './buildingSpec.js';
@@ -572,5 +578,152 @@ describe('the building editor is not decoration', () => {
   it('a pinned shaft band changes which car answers', () => {
     const pinned = runWith({ ...spec, bandByCar: { 0: [6, 10] } });
     expect(pinned).not.toBe(control);
+  });
+
+  it('the express toggle changes the run — and it is the legs that move, not just the label', () => {
+    /*
+     * The handoff's per-shaft express toggle, § 1.3 M11. The two arms are the same three cars and
+     * the same band on car A; the only difference is whether A stops at the lobby on its way there.
+     *
+     * The comparison is deliberately split. The whole fingerprint would differ the moment `G` left
+     * `servedFloorIds`, and that is a *label* changing, not a run — precisely the false positive
+     * this block's `shafts[].servedFloorIds` was added to close in the other direction. So the
+     * served floors are asserted for what they say, and the **legs** are asserted separately to
+     * differ. A toggle that only rewrote the shaft's floor list would pass the first and fail the
+     * second, which is the failure this test exists to produce.
+     */
+    const express: BuildingSpec = { ...spec, bandByCar: { 0: [6, 10] } };
+    const closed: BuildingSpec = { ...express, noLobby: { 0: true } };
+
+    const partsOf = (of: BuildingSpec): readonly [readonly string[], unknown] =>
+      JSON.parse(runWith(of)) as [readonly string[], unknown];
+
+    // The shaft really does stop declaring the lobby, and really does keep the rest of its band.
+    expect(partsOf(express)[0]).toContain('G/7/8/9/10/11');
+    expect(partsOf(closed)[0]).toContain('7/8/9/10/11');
+    expect(partsOf(closed)[0]).not.toContain('G/7/8/9/10/11');
+    // And the people move differently: a different car answers, or answers at a different time.
+    expect(JSON.stringify(partsOf(closed)[1])).not.toBe(JSON.stringify(partsOf(express)[1]));
+    // Neither arm is the do-nothing arm.
+    expect(runWith(express)).not.toBe(control);
+    expect(runWith(closed)).not.toBe(control);
+  });
+
+  it('a lobby the toggle closed off is a building that strands people, and the editor says so first', () => {
+    /*
+     * The reason the toggle needed a guard rather than only a label. Two cars, both closed inside
+     * `7–11`, no transfer level: measured on this branch the document **parses and resolves with no
+     * error and no warning**, and the run then carries 8 legs where the same building with the
+     * lobby carries 114 — the missing passengers are not slow, they were never generated. So the
+     * refusal has to be said at the control, which is what `validateSpec` is for.
+     */
+    const stranded: BuildingSpec = {
+      ...spec,
+      cars: 2,
+      bandByCar: { 0: [6, 10], 1: [6, 10] },
+      noLobby: { 0: true, 1: true },
+    };
+    const resolved = resolveBuilding(
+      parseBuilding(buildingFromSpec(stranded, { specs: SPECS }) as unknown),
+      SPECS,
+    );
+    expect(resolved.warnings).toStrictEqual([]);
+    expect(RoutePlanner.forBuilding(resolved).plan('G', '8')).toBeUndefined();
+    expect(validateSpec(stranded, undefined).join(' ')).toMatch(/nobody can board from the lobby/);
+
+    // A sky lobby is the way back in, and the editor stops complaining once there is one.
+    const joined: BuildingSpec = { ...stranded, skyFloors: [6], bandByCar: { 0: [0, 6], 1: [6, 10] } };
+    expect(unreachableFloors(joined)).toStrictEqual([]);
+    expect(validateSpec(joined, undefined)).toStrictEqual([]);
+    const joinedBuilding = resolveBuilding(
+      parseBuilding(buildingFromSpec(joined, { specs: SPECS }) as unknown),
+      SPECS,
+    );
+    expect(RoutePlanner.forBuilding(joinedBuilding).plan('G', '9')?.elevatorLegCount).toBe(2);
+  });
+
+  it('says exactly what the real route planner says about who can get out of the lobby', () => {
+    /*
+     * `unreachableFloors` is a small model of `traffic/route.ts` over a spec, and a model that
+     * stopped mirroring would be green forever — the shape `buildingConnectivity.test.ts` names in
+     * its own header. So it is held to the real planner on the resolved building, in **both**
+     * directions, over the states the express toggle and the band drags can actually reach.
+     */
+    const cases: readonly BuildingSpec[] = [
+      spec,
+      { ...spec, bandByCar: { 0: [6, 10] } },
+      { ...spec, bandByCar: { 0: [6, 10] }, noLobby: { 0: true } },
+      { ...spec, cars: 2, bandByCar: { 0: [6, 10], 1: [6, 10] }, noLobby: { 0: true, 1: true } },
+      { ...spec, cars: 2, skyFloors: [6], bandByCar: { 0: [0, 6], 1: [6, 10] }, noLobby: { 1: true } },
+      { ...spec, cars: 1, bandByCar: { 0: [0, 6] } },
+      { ...spec, cars: 3, skyFloors: [4, 7], noLobby: { 1: true, 2: true } },
+    ];
+    for (const candidate of cases) {
+      const resolved = resolveBuilding(
+        parseBuilding(buildingFromSpec(candidate, { specs: SPECS }) as unknown),
+        SPECS,
+      );
+      const planner = RoutePlanner.forBuilding(resolved);
+      const stranded = new Set(unreachableFloors(candidate));
+      for (let floor = 1; floor <= candidate.floors; floor += 1) {
+        expect([floor, planner.plan('G', floorIdOf(floor)) !== undefined]).toStrictEqual([
+          floor,
+          !stranded.has(floor),
+        ]);
+      }
+    }
+  });
+});
+
+describe('the express toggle is service zoning and only that', () => {
+  it('offers the choice only where there is one to make', () => {
+    // A band at the lobby has no lobby question; a band at floor 1 has none either, because its
+    // express form serves 0..high, which is the band that starts at the lobby.
+    expect(canExpress({ ...BLANK_SPEC, cars: 1 }, 0)).toBe(false);
+    expect(canExpress({ ...BLANK_SPEC, cars: 1, bandByCar: { 0: [1, 8] } }, 0)).toBe(false);
+    expect(canExpress({ ...BLANK_SPEC, cars: 1, bandByCar: { 0: [2, 8] } }, 0)).toBe(true);
+    // And the flag is inert where the choice is absent, rather than half-applied.
+    const inert: BuildingSpec = { ...BLANK_SPEC, cars: 1, bandByCar: { 0: [1, 8] }, noLobby: { 0: true } };
+    expect(servesLobby(inert, 0)).toBe(true);
+    expect(banksOf(inert)[0]?.lobby).toBe(true);
+  });
+
+  it('splits the bank, because two cars that disagree about the lobby do not open onto the same floors', () => {
+    /*
+     * `BankConfig` has one `servesFloors`. Grouping these two cars together would have had to pick
+     * one of their two claims and quietly apply it to both — which is a car serving floors it does
+     * not serve, the defect this whole module exists to avoid.
+     */
+    const split: BuildingSpec = {
+      ...BLANK_SPEC,
+      floors: 10,
+      cars: 2,
+      bandByCar: { 0: [6, 10], 1: [6, 10] },
+      noLobby: { 0: true },
+    };
+    const banks = banksOf(split);
+    expect(banks.length).toBe(2);
+    expect(banks.map((bank) => bank.lobby)).toStrictEqual([true, false]);
+    const document = buildingFromSpec(split, { specs: SPECS });
+    expect(document.banks.map((bank) => bank.servesFloors)).toStrictEqual([
+      ['G', '7', '8', '9', '10', '11'],
+      ['7', '8', '9', '10', '11'],
+    ]);
+    // It writes no access zone and touches no dispatcher weight: service zoning, and only that.
+    expect(document.accessZones).toStrictEqual([]);
+  });
+
+  it('counts the lobby an express car really opens at, and stops counting it when it does not', () => {
+    const one = { ...BLANK_SPEC, floors: 10, cars: 1 } satisfies BuildingSpec;
+    const express: BuildingSpec = { ...one, bandByCar: { 0: [6, 10] } };
+    // The express car lands in the lobby, so the lobby is not an orphan; floors 1–5 still are.
+    expect(orphanFloors(express)).toStrictEqual([1, 2, 3, 4, 5]);
+    expect(orphanFloors({ ...express, noLobby: { 0: true } })).toStrictEqual([0, 1, 2, 3, 4, 5]);
+  });
+
+  it('reports dirty when the toggle moves, and not when a redundant false is written', () => {
+    const base: BuildingSpec = { ...BLANK_SPEC, floors: 10, cars: 2, bandByCar: { 0: [6, 10] } };
+    expect(buildingSpecIsDirty({ ...base, noLobby: { 0: true } }, base)).toBe(true);
+    expect(buildingSpecIsDirty({ ...base, noLobby: { 0: false } }, base)).toBe(false);
   });
 });

@@ -10752,3 +10752,159 @@ by a property search that has now driven 194 206 strings per campaign across 22 
 was found by opening the page.
 
 **Impact on phase status: none.**
+
+---
+
+## D180 — thirteen controls the handoff never mentioned, and the check that could not see them
+
+**Date:** 2026-07-30 · **Owner:** wave 11 · **Source:** [`docs/12`](docs/12-design-handoff.md) § 4.7 ·
+**Contradicts nothing above; closes a hole in § 5 point 11**
+
+### The context
+
+`docs/12` § 5 point 11 is the refactor's own honesty gate: *"§ 4 and `DECISIONS.md` agree"*. It is a
+check for **contradiction between two documents**, and it is satisfied *vacuously* by anything in
+neither. The `.transport` card was exactly that. § 1.3 M5 specifies six things — a 34 px play/pause
+square, a 26 px phase-segmented timeline, a white playhead, click-to-scrub, five o'clock ticks and
+speed chips — and all six match the prototype. The same card also carried **thirteen further controls
+in no requirement row and in no recorded deviation**: `#step-back`, `#step-forward`, `#loop`,
+`#status`, `#error`, `#run`, `#verify`, `#copy-provenance`, `#save-recording`, `#load-recording`,
+`#export-png`, `#seed`, `#bank-filter`, `#landing-select`.
+
+Driven in a browser, they rendered as **native, unstyled form chrome** — a raw *Choose File / No file
+chosen*, bare `<select>` arrows, a bare checkbox — in a viewer whose whole visual language is chips,
+ghosts and plates. It was the most visible departure from the handoff anywhere on the screen, and
+nothing in the suite was looking at it. § 2.3 records only the three retained **tabs**.
+
+**The generalisable part is the shape of the miss, not the controls.** An agreement check between two
+documents cannot see a subject absent from both. That is the same class as § D149's stale figure that
+still supported its own sentence, and the same class as a dead seam whose unit tests all pass: the
+instrument is pointed at the wrong question. A *completeness* check — every control on the card is
+named somewhere — is a different assertion from an *agreement* check, and this repository had only
+the second.
+
+The handoff has no opinion about these controls because **its prototype has no need of them**: its
+toy simulator steps in real time and draws arrivals from `Math.random()`, so it keeps no seed,
+records nothing, verifies nothing and exports nothing. This simulator has all four, and invariants 4
+and 5 make them promises rather than conveniences.
+
+### The alternatives
+
+1. **Delete them to match the handoff.** Refused, on a measurement rather than a preference.
+   `packages/viz/src/index.ts`'s caller register — this repository's own answer to *"name the non-test
+   caller"* — lists these controls as the **only** non-test callers of `readRecordingDocument`,
+   `verifyReplay`, `recordingFingerprint`, `frameSequence` and `serializeFrames`. Deleting the block
+   would not simplify the viewer; it would manufacture five dead seams of exactly the class the
+   roadmap's standing requirement is written about.
+2. **Record them and change nothing.** Refused: recording a defect is not fixing one, and the handoff
+   is canonical for what the screen looks like ([§ D174](#d174)).
+3. **Invent a layout.** Refused: the handoff has no layout here to deviate *from*, so what it
+   constrains is its **vocabulary**, not its arrangement. A new pattern would be a fourth opinion
+   about what a toggle looks like.
+4. **Record and restyle.** Chosen.
+
+### What was chosen
+
+`docs/12` § 4.7 names each retained control with the obligation that requires it, **one at a time** —
+*the provenance controls* is the phrase under which an inert control would hide. `#copy-provenance`
+is **deleted**: it called the same `copyProvenance()`, on the same state, producing the same CLI
+line, as the footer's `#copy-run`, and `#copy-run` **is** the handoff's own S4 requirement, so
+deleting the one the handoff did not ask for discharges `RV-T7` inside the handoff's own component.
+`#run` moves into the coach ribbon beside the three selects that are its actual inputs;
+`#load-recording` becomes `.sr-only` behind a `.ghost` label; `#loop` becomes a `.chip[aria-pressed]`
+beside the speed chips; `#seed`, `#bank-filter` and `#landing-select` take the editors' own field
+styling; and what remains is grouped under a `PROVENANCE AND REPLAY` eyebrow.
+
+**`#status` is deliberately *not* folded into the footer's `#status-line`.** They look like one
+control and carry different facts — `#status-line` says where the *playhead* is, `#status` says what
+the *run* is, including the suppression reason. Merging them would let a live counter overwrite a
+refused mean, on the one screen whose whole discipline is that a refused mean stays refused and
+visible ([§ D111](#d111)).
+
+### Two claims that did not survive verification, and are recorded corrected
+
+1. **`#seed` is not the only control that sets *a* seed** — Compare's `#batch-seed` sets a batch's
+   base seed. It is the only control that sets **the shift's** seed, which is what invariant 5 and
+   `UX.md` § 7.1 rule 5 actually require, and that is what § 4.7 says.
+2. **`RV-T7`'s success condition is still not met, and `UX.md` now says so.** The copied line names
+   `--building`, `--dispatcher`, `--seed` and `--duration` and **no traffic**, while the coach
+   ribbon's pattern select really does move the run off the building's own profile and the day's
+   event multiplies demand on top. `--traffic` is a real `elevator-sim watch` flag. So a shift on a
+   non-default pattern, or on any day past the first, copies a line that reproduces a **different
+   run** — a provenance claim the CLI would honour and the reader could not check. **Not fixed here**;
+   it is a change to the emitted payload with its own verification burden, and it belongs to
+   `#copy-run` (S4). Carried in `UX.md`'s `RV-T7` row and in [`GAPS.md`](GAPS.md).
+
+### Impact
+
+`packages/viz/src/dev/provenanceBlock.test.ts` makes § 5 point 11 **non-vacuous for this block**, in
+both directions: every id the card carries must be named in § 4.7, and every control § 4.7 names must
+be on the page in the handoff's vocabulary. A control added and not written down goes red; a document
+describing a control the markup dropped goes red. `elementMap.test.ts`'s both-directions manifest
+check is unchanged and the frozen 34-id never-resolved list did not move — `#copy-provenance` left
+the manifest and the page together.
+
+**Impact on phase status: none.**
+
+---
+
+## D181 — the elevation's express toggle, and the demand a closed band loses in silence
+
+**Date:** 2026-07-30 · **Owner:** wave 11 · **Closes** `docs/12` § 1.3 **M11**'s last unmet clause
+
+### The context
+
+The prototype's per-shaft legend carries an express toggle writing `spec.noLobby[i]`
+(`docs/design/elevator-sim-reimagined.dc.html:729–741`, state at `:3134–3140`). The implementation
+rendered the row without it, and — the part that made it more than a missing button — hard-wired
+`serves` to `G + low–high` for **any** band above the lobby, so the toggle's *off* state was not
+expressible at all. M11 listed a requirement the code could not meet.
+
+### Chosen: build it, after checking the refusal argument rather than assuming it
+
+A refusal would have had to rest on a lobby-less band being unbuildable, or on the control collapsing
+service zoning into something else — the ground on which the stage lane correctly refused the `⚿`
+badge ([`WAVE10_PLAN.md`](WAVE10_PLAN.md) § 6). Both were checked against the real loader:
+`parseBuilding → resolveBuilding` accepts a bank whose `servesFloors` omits `G` with **zero errors
+and zero warnings**, and the toggle writes only `servesFloors` — no `accessZones`, no dispatcher
+weight — so it is service zoning and nothing else. With a sky lobby beneath it, `RoutePlanner` routes
+`G → 9` in two legs through the transfer level, which is what a self-contained upper bank *is*.
+
+### What building it found, which is the reason this entry exists
+
+**A band closed off with no way back in loses demand in silence.** Two cars closed inside `7–11` with
+no transfer level make `RoutePlanner.plan('G','8')` return `undefined`; the loader says nothing; and
+the run carries **8 legs where the same building with the lobby carries 114**. The missing passengers
+are not slow — `traffic/generator.ts`'s `classifyTrip` returns `unreachable` and they are **never
+generated**. A control that can silently delete 93 % of a building's traffic while every validator
+stays quiet is the shape this repository has shipped twelve times, arriving through a slider.
+
+So the control ships with a **refusal at the control**: `validateSpec` gains a stranded-floors check,
+reported separately from orphaned floors, and `unreachableFloors` is pinned against the real
+`RoutePlanner` **in both directions** over seven reachable spec states, so it cannot become a mirror
+that has stopped mirroring.
+
+### The run-change test, and why its comparison is split
+
+The standing rule is *move the control and require the run to change*, compared on the legs. Here the
+comparison is deliberately **split**: `servedFloorIds` is asserted for what it says, and the **legs**
+are asserted separately to differ. Comparing the whole fingerprint would pass the moment `G` left
+`servedFloorIds` — that is a label moving, not a run. Measured: **108 of 114 legs move**, and car A
+goes from 31 legs to 5, from carrying the lobby to picking up only interfloor traffic inside its
+band. Mutation-checked: dropping `group.lobby &&` from `buildingFromSpec` kills four tests.
+
+**No assertion was weakened to make room.** *"calls a band that starts above the lobby express, and
+says it still lands in the lobby"* still holds — that is the default — and is now followed in the
+same case by its stronger counterpart: the same band with the toggle off has role `band only`, serves
+`7–13`, and the note stops saying it lands in the lobby.
+
+### Two things left open rather than closed quietly
+
+- **`expressLabel` and `expressTitle` are not driven by the honesty search.** `honesty/surfaces.ts`
+  seeds only `car.legend` from `elevationCarsOf`, and that file is owned elsewhere. Carried in
+  [`GAPS.md`](GAPS.md) § 3 rather than left to be discovered.
+- **`EXPRESS_TITLE` is module-private on purpose.** Exporting it turned `honesty/derive.test.ts` red,
+  because a newly exported prose declaration is an unclassified surface and only `surfaces.ts` can
+  classify it. Kept private, the sentence still reaches the corpus through `elevationCarsOf`.
+
+**Impact on phase status: none.**

@@ -284,6 +284,10 @@ describe('the elevation’s shaft bands', () => {
       { ...TOWER, bandByCar: { 0: [6, 12] } },
       { ...TOWER, floors: 40, skyFloors: [10, 20, 30] },
       { ...TOWER, cars: 1 },
+      // Two cars on the same band that disagree about the lobby: two banks, not one, and the
+      // legend has to name the right one for each of them.
+      { ...TOWER, bandByCar: { 0: [6, 12], 1: [6, 12] }, noLobby: { 0: true } },
+      { ...TOWER, floors: 40, skyFloors: [10, 20, 30], noLobby: { 1: true, 2: true } },
     ];
     for (const spec of specs) {
       const banks = banksOf(spec);
@@ -328,6 +332,62 @@ describe('the elevation’s shaft bands', () => {
     expect(elevationNoteOf(spec)).toContain('2 banks');
     expect(elevationNoteOf(spec)).toContain('still lands in the lobby and runs non-stop');
     expect(elevationNoteOf(TOWER)).toContain('1 bank');
+    /*
+     * The sentence above is the *default*, not a law, and now that the express toggle exists it has
+     * to stop being said when it stops being true. This is the stronger form of the claim: the
+     * default still lands in the lobby, and the same band with the toggle off does not — asserted
+     * on the descriptor and on the note, in both directions.
+     */
+    const off: BuildingSpec = { ...spec, noLobby: { 0: true } };
+    const closed = elevationCarsOf(off);
+    expect(closed[0]?.role).toBe('band only');
+    expect(closed[0]?.serves).toBe('7–13');
+    expect(closed[0]?.legend).toBe('A · band only · 7–13');
+    expect(elevationNoteOf(off)).not.toContain('still lands in the lobby and runs non-stop');
+    expect(elevationNoteOf(off)).toContain('never calls at the lobby');
+    // The untouched car is untouched — the flag is per car, not per building.
+    expect(closed[1]?.role).toBe('every floor');
+  });
+
+  it('offers the express toggle exactly where the choice exists, and labels which way it is thrown', () => {
+    const express = elevationCarsOf({ ...TOWER, bandByCar: { 0: [6, 12] } });
+    expect(express[0]?.canExpress).toBe(true);
+    expect(express[0]?.expressOn).toBe(true);
+    // Band low = 6 is floor id `7`; the floors it runs past are indices 1–5, ids `2`–`6`.
+    expect(express[0]?.expressLabel).toBe('✓ express from the lobby, skipping 2–6');
+    // The car that has no band above the lobby gets no button at all, rather than a dead one.
+    expect(express[1]?.canExpress).toBe(false);
+    expect(express[1]?.expressLabel).toBe('');
+
+    const closed = elevationCarsOf({ ...TOWER, bandByCar: { 0: [6, 12] }, noLobby: { 0: true } });
+    expect(closed[0]?.canExpress).toBe(true);
+    expect(closed[0]?.expressOn).toBe(false);
+    expect(closed[0]?.expressLabel).toBe('stays in its band — click to run express from the lobby');
+
+    // A band starting at floor 1 is offered nothing: its express form is the band that starts at
+    // the lobby, so the "choice" would be between a building and itself.
+    expect(elevationCarsOf({ ...TOWER, bandByCar: { 0: [1, 12] } })[0]?.canExpress).toBe(false);
+  });
+
+  it('takes the toggle’s tooltip verbatim from the handoff rather than paraphrasing it', () => {
+    /*
+     * The handoff wins every disagreement about what the screen says (§ D174), and this sentence is
+     * the only place the default is explained — a reader who has never dragged a band has no way to
+     * know that a band above the lobby already lands in it. Pinned against the vendored prototype
+     * itself, so a reworded copy here is a failing test rather than a silent drift.
+     */
+    const prototype = readFileSync(
+      fileURLToPath(new URL('../../../../docs/design/elevator-sim-reimagined.dc.html', import.meta.url)),
+      'utf8',
+    );
+    const title = elevationCarsOf({ ...TOWER, bandByCar: { 0: [6, 12] } })[0]?.expressTitle ?? '';
+    expect(title).not.toBe('');
+    expect(prototype).toContain(title);
+    // And it is the same sentence whichever way the toggle is thrown — the tooltip explains the
+    // control, not its current state; the state is in the label.
+    expect(
+      elevationCarsOf({ ...TOWER, bandByCar: { 0: [6, 12] }, noLobby: { 0: true } })[0]?.expressTitle,
+    ).toBe(title);
   });
 
   it('gives every bank index a tint, wrapping rather than running out', () => {

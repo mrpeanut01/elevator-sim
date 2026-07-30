@@ -281,6 +281,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   let carBadgeHits: readonly CarBadgeHit[] = [];
   let bankFilter = '';
+  /**
+   * Whether the transport restarts at the end.
+   *
+   * A boot-scope boolean rather than `#loop.checked`, because `#loop` is a `.chip[aria-pressed]`
+   * now (`docs/12` § 4.7) and a button has no checked state. The element carries the same fact in
+   * `aria-pressed`, written by {@link setLooping} and read by nothing — one source, one writer.
+   */
+  let looping = false;
 
   const clock = systemClock();
   /**
@@ -607,11 +615,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const remembered = window.localStorage.getItem(MODE_KEY);
     if (!isViewMode(linked) && isViewMode(remembered)) state = { ...state, mode: remembered };
 
+    /*
+     * One copy control, not two. `#copy-provenance` on the transport called this same function
+     * with the same arguments and produced the same line as the footer's `#copy-run` — and
+     * `#copy-run` is the handoff's own S4 requirement, so the duplicate was the one to go
+     * (`docs/12` § 4.7). RV-T7 asks for *one* control that copies the run's provenance, and it now
+     * has exactly one.
+     */
     ui.footer.copyRun.addEventListener('click', () => {
       void copyProvenance('copy run', ui.footer.copyRun);
-    });
-    ui.transport.copyProvenance.addEventListener('click', () => {
-      void copyProvenance('Copy provenance', ui.transport.copyProvenance);
     });
   }
 
@@ -813,7 +825,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function adopt(recording: VizRecording): void {
     playback = new Playback(recording, clock, {
       speed: playback?.speed ?? 60,
-      loop: ui.transport.loop.checked,
+      loop: looping,
       // KB-14: a reader who asked for less motion gets a paused first frame.
       autoplay: shouldAutoplay(window.matchMedia.bind(window)),
     });
@@ -1009,7 +1021,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ui.transport.stepForward.addEventListener('click', () => {
       step(1);
     });
-    ui.transport.loop.addEventListener('change', () => {
+    ui.transport.loop.addEventListener('click', () => {
+      setLooping(!looping);
+      // `Playback` takes `loop` at construction, so the change reaches a run already on screen only
+      // by re-adopting it. That was true of the checkbox too; only the event name moved.
       if (state.recording !== undefined) adopt(state.recording);
     });
     ui.transport.timeline.addEventListener('click', (event) => {
@@ -1020,7 +1035,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       event.preventDefault();
       step(event.key === 'ArrowRight' ? 60 : -60);
     });
-    ui.transport.run.addEventListener('click', () => {
+    // § 4.7 — Run moved into the coach ribbon, beside the three selects that decide what it runs.
+    ui.coach.run.addEventListener('click', () => {
       runShift();
     });
     ui.transport.verify.addEventListener('click', () => {
@@ -1049,6 +1065,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
       selectedLandingId = ui.transport.landingSelect.value;
       drawStage();
     });
+  }
+
+  /**
+   * The one writer of the loop toggle's two representations.
+   *
+   * `aria-pressed` is not decoration here: `.chip[aria-pressed='true']` is the *only* thing that
+   * makes the chip look on, so a state that reached `looping` without reaching the attribute would
+   * be a transport that loops with its own control drawn off (KB-15 — the state is announced in
+   * words as well as drawn).
+   */
+  function setLooping(on: boolean): void {
+    looping = on;
+    ui.transport.loop.setAttribute('aria-pressed', on ? 'true' : 'false');
   }
 
   function step(frames: number): void {
