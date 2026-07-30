@@ -155,16 +155,16 @@ Legend: ⬜ not started · 🟡 in progress · ✅ passing · ❌ failing · ⚪
 > section for the record. **Nothing below claims a mark that ledger does not carry.**
 
 **The inventory is [`packages/viz/UX.md`](packages/viz/UX.md); its live per-surface ledger is
-§§ 9–24 there and its count is § 25.** Sixteen surfaces, **219 rows**, ids `SH- LR- CO- SG- TP-
+§§ 9–24 there and its count is § 25.** Sixteen surfaces, **220 rows**, ids `SH- LR- CO- SG- TP-
 DR- SC- RR- DE- TE- ME- BE- IS- MD- KX- RX-`.
 
 | State | Rows | Where they are |
 |---|---|---|
-| ✅ **run** — every clause driven in a browser, or driven where the remaining clause is `✅ test` | **81** | `SH` 15 · `TP` 14 · `KX` 12 · `RX` 7 · `SG` 6 · `DR` 5 · `CO` 5 · `LR` 4 · `RR` 3 · `MD` 3 · `SC` 2 · `BE` 2 · `DE` 1 · `ME` 1 · `IS` 1 |
-| ✅ **test** — the whole row asserted, and the drive did not reach it | **106** | `BE` 21 · `LR` 17 · `DR` 10 · `DE` 9 · `SG` 8 · `TE` 7 · `SC` 6 · `RR` 6 · `IS` 6 · `MD` 6 · `ME` 5 · `KX` 2 · `RX` 2 · `SH` 1 |
-| ✅ + ⚠️ — one clause established (by test or by drive), another still unverified | **20** | `SH` 3 · `SG` 3 · `KX` 3 · `IS` 2 · `RX` 2 · `CO` 1 · `TP` 1 · `SC` 1 · `RR` 1 · `TE` 1 · `ME` 1 · `BE` 1 |
-| ⚠️ **unverified** — built and reachable, neither driven nor covered | **8** | `CO` 2 · `SH` 1 · `LR` 1 · `SG` 1 · `TP` 1 · `DE` 1 · `MD` 1 |
-| 🔲 **not built, inert, or failing its own condition** | **4** | `TP-08` · `TP-10` · `DR-13` · `RR-11` — all four **found by the drive** and filed, not fixed |
+| ✅ **run** — every clause driven in a browser, or driven where the remaining clause is `✅ test` | **87** | `SH` 18 · `TP` 15 · `KX` 12 · `RX` 7 · `DR` 6 · `SG` 6 · `CO` 5 · `LR` 4 · `RR` 4 · `MD` 3 · `BE` 2 · `SC` 2 · `DE` 1 · `IS` 1 · `ME` 1 |
+| ✅ **test** — the whole row asserted, and the drive did not reach it | **107** | `BE` 21 · `LR` 17 · `DR` 10 · `DE` 9 · `SG` 8 · `TE` 7 · `IS` 6 · `MD` 6 · `RR` 6 · `SC` 6 · `ME` 5 · `KX` 2 · `RX` 2 · `SH` 1 · `TP` 1 |
+| ✅ + ⚠️ — one clause established (by test or by drive), another still unverified | **19** | `KX` 3 · `SG` 3 · `IS` 2 · `RX` 2 · `SH` 2 · `BE` 1 · `CO` 1 · `ME` 1 · `RR` 1 · `SC` 1 · `TE` 1 · `TP` 1 |
+| ⚠️ **unverified** — built and reachable, neither driven nor covered | **7** | `CO` 2 · `DE` 1 · `LR` 1 · `MD` 1 · `SG` 1 · `TP` 1 |
+| 🔲 **not built, inert, or failing its own condition** | **0** | — the four the drive filed (`TP-08` · `TP-10` · `DR-13` · `RR-11`) were fixed, pinned and re-driven the same day ([§ D199](DECISIONS.md)) |
 
 These five counts are **derived from `UX.md`'s own tables**, not tallied by hand, on the rule *a row
 carrying `🔲` is not built; a row carrying both `✅ test` and `⚠️` is half; a row carrying one is
@@ -202,6 +202,28 @@ that one.* Editing a row's marks makes this table wrong until it is re-derived.
 > cannot close it) — the fourth consecutive pass in which driving found what reading and the suite
 > had both passed. `TP-17`, `SG-17`, `MD-07` and `DE-11` could not be provoked through the shipped
 > UI and stay `⚠️` with that stated.
+
+> **Re-derived 2026-07-30 (wave 12, defect-fix lane), counted from `UX.md` §§ 9–24's mark cells
+> after [§ D199](DECISIONS.md)'s fixes landed (struck-through history spans excluded).** The table
+> read *81 / 106 / 20 / 8 / 4* until this pass. All four driven-red rows closed, each red before
+> green and re-driven in Chromium: `TP-08` — the parse is `seedEntryOf`, holding the deep-link
+> reader's own rule, so a non-numeric seed is refused by name on `#status` with the field restored,
+> a blank draws and shows the drawn seed, and only the literal `0` runs seed 0 (`815e314`); `TP-10`
+> — Save writes via `writeRecordingDocument` and **the document is the recording itself**, frames
+> re-derived on load and asserted bit-identical (`a2a95b4`; `✅ test`, with the browser adopt
+> through the file input still `TP-11`'s `⚠️`); `DR-13` — the report panel owns its buttons,
+> `main.ts`'s duplicate listeners are deleted, `reportPanel.test.ts` pins one binding site per
+> button, and one press goes Day 1 → Day 2 (`b94d602`; `#report-back` carried the same double
+> wiring, idempotent only by luck, now pinned too); `RR-11` — the toggle stacks above the overlay
+> it closes, the handoff's own close-control treatment with no added chrome, both stylesheet
+> z-indexes pinned by `surfaces.test.ts` and the pointer close re-driven at 1200 px (`3f8dd8c`).
+> `SH-09` lost its residual `⚠️` — boot writes `?seed=…` once boot completes, § D189's intents
+> intact (`4a62387`); `SH-16`/`SH-19` — a failed boot now fills the phase pill and footer status
+> with the two authored strings in `showLoadFailure`, and `SH-19`'s false markup-literal claim is
+> corrected in place; `SC-05`/`DR-09` — the banked count is clamped on display in both surfaces,
+> with tests pinning *1 of 1* / *2 of 2* (`2a2cdc0`); and `SH-21` (the favicon) was **added**,
+> because § D198 recorded that *no ledger row covered the favicon; the absence is the finding* —
+> so 219 rows became 220 and no `🔲` remains.
 
 **The 40 half rows are the two rules at the top of this file arriving at the same place.** *(47
 since the wave-12 re-derivation — the six fixed `🔲` rows and `CO-02` joined this bucket, each
