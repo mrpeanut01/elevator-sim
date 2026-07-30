@@ -11577,3 +11577,49 @@ wave that only records its lanes' findings is reading itself optimistically:
   sitting uncommitted both times; resumed both times by direct message. Wait on a signal you own,
   and a lane that goes quiet holding an uncommitted edit is a lane the orchestrator pings, not
   waits out.
+
+## D196 — the inherited green was not reproducible, and the pins that failed matched no committed tree
+
+**Date: 2026-07-30 · Wave 12, orchestrator · The wave's integration serial run, and what it found.**
+
+The wave-12 integration suite — the first full serial run this wave reports, after § D195's
+invalidated attempt — came back **26 failed / 4 817 passed / 10 skipped**, skip count unchanged.
+All 26 are pin guards in three files: `core/src/traffic/mixIdentity.test.ts` (10),
+`core/src/traffic/transportIdentity.test.ts` (15), `experiments/src/benchmark/predictorLag.test.ts`
+(1 test, 4 fields of `forecast-causality`). The handoff's close figure — *258 files / 4 794 tests,
+4 784 passed, measured serially on an idle machine* — implies all three were green at `9fd738c`.
+
+**They were not, for any tree this repository contains. The chain, each link measured:**
+
+1. The failures reproduce **identically on the untouched pre-wave tree** (`ba9d851`) — wave 12 did
+   not cause them. Lane P's `blurb` was the obvious suspect and is exonerated: the trace digests do
+   not contain it.
+2. They reproduce **at `9fd738c`**, the commit the handoff's figure was measured at.
+3. They reproduce **under Node 22 and Node 26** (installed for this purpose; the repo declares
+   `>= 26`) — with **bit-identical measured digests**, so the engine mismatch this container runs
+   under is not the cause, and V8's math is stable across the majors for everything this suite does.
+4. `validation/goldenRuns.test.ts` is **green**: stored run records replay byte-identically, so the
+   simulator and generator are deterministic here and agree with the machine that produced those
+   records.
+5. Decisively: **the baseline commit `9f1adf7`, checked out and built against its own `dist/` and
+   its own `data/`, computes the digests this tree computes** — `e0c37900…` where the pin says
+   `c19636…` — for the very values `mixIdentity.test.ts`'s header claims were *"produced by running
+   `9f1adf7` in a separate detached git worktree"*.
+
+**Verdict: the pinned values match no committed tree, at their claimed baseline or since.** The
+traces never moved across `9f1adf7 → 9fd738c → HEAD`; what the pins describe is a working state
+that was never committed — the failure mode this repository has already named twice (wave 10's
+uncommitted rebuild; R7's *"a polluted tree reported clean"*), now found inside a handoff's own
+close figure. Whether the previous session's serial run executed against uncommitted
+modifications, a different data state, or was mis-transcribed cannot be recovered from here;
+what is recoverable is that its green cannot be reproduced from what was pushed.
+
+**Decision:** re-pin all 26 values to what three commits and two Node majors reproducibly compute,
+keeping every superseded constant beside its replacement per each file's own convention, with
+provenance-unknown recorded on the old values. The re-derived values are the only ones any reader
+of this repository can check. `forecast-causality`'s four fields move in the sixth decimal; the one document
+that quotes them — `docs/05` § Phase 5, *"−0.0139 [−0.0317, +0.0038]"* — prints a precision at
+which the superseded and re-derived values are the same digits, so the quoted sentence survives
+unchanged, checked rather than assumed. **A handoff figure is a claim about a pushed tree, or it
+is not a figure** — the wave-12 close figure below § D195 is measured on the pushed tree, and the
+commit that carries it is named beside it.
