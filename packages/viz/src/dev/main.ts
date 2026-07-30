@@ -940,11 +940,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
     const frame = playback.frame();
     const wantsOverlay = width >= OVERLAY_MIN_VIEWPORT_PX;
+    // SG-15: the filter narrows what is laid out, so the shown bank gets the whole plot width.
+    // Everything keyed by floor — queues, landings, locked-out marks — stays whole-building.
+    const bank = shaftsForBank(recording.shafts, bankFilter);
     const layout = buildLayout({
       width,
       height,
       floors: recording.floors,
-      shafts: recording.shafts,
+      shafts: bank.shafts,
       gutterRightPx: QUEUE_GUTTER_PX,
       overlayWidthPx: wantsOverlay ? OVERLAY_WIDTH_PX : 0,
     });
@@ -964,6 +967,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       lockedOutLandings: lockedOut,
       queues: queueAt(recording, frame.simTimeS),
       dayStartS: DAY_START_S,
+      filteredBankId: bank.filtered ? bankFilter : undefined,
     });
     carBadgeHits = hits.carBadges;
 
@@ -1372,6 +1376,40 @@ function boot(ui: Elements, resources: BrowserResources): void {
 }
 
 const MODE_KEY = 'elevator-sim.viewMode';
+
+/* ========================================================================== *
+ * The bank filter — SG-15
+ * ========================================================================== */
+
+/** What the stage should draw for a bank filter: the shafts, and whether any were held back. */
+export interface BankFilterResult<T> {
+  readonly shafts: readonly T[];
+  /** True only when the filter actually narrowed the set — what turns the caption on. */
+  readonly filtered: boolean;
+}
+
+/**
+ * The shafts the stage draws under a bank filter — `SG-15`, and the function whose absence made
+ * `#bank-filter` inert: the `change` handler wrote a binding and `drawStage` handed
+ * `recording.shafts` whole to `buildLayout` regardless (`GAPS.md`, § D180's false premise).
+ *
+ * `''` is *all*, the select's own first option. A filter naming a bank this recording does not
+ * have — the run changed under a remembered selection — matches nothing, and drawing an empty
+ * stage would claim the building has no shafts; the filter falls back to the whole set instead,
+ * unfiltered, so the picture never lies about the geometry. A single-bank building filtered to
+ * its only bank narrows nothing and reports `filtered: false`, so no caption counts N of N.
+ */
+export function shaftsForBank<T extends { readonly bankId: string }>(
+  shafts: readonly T[],
+  bankId: string,
+): BankFilterResult<T> {
+  if (bankId === '') return { shafts, filtered: false };
+  const matching = shafts.filter((shaft) => shaft.bankId === bankId);
+  if (matching.length === 0 || matching.length === shafts.length) {
+    return { shafts, filtered: false };
+  }
+  return { shafts: matching, filtered: true };
+}
 
 /* ========================================================================== *
  * Keyboard seeking — KX-10

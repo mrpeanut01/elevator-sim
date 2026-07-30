@@ -351,6 +351,16 @@ export interface SceneInput {
    * from it and `render/sky.ts`'s copy should be deleted rather than kept in step by hand.
    */
   readonly dayStartS?: number | undefined;
+  /**
+   * The bank the caller narrowed `layout` to, when it narrowed it at all — `SG-15`, `RS-05`.
+   *
+   * The layout arrives already filtered — `buildLayout` takes the shafts it is given — so this
+   * field carries the *claim*, not the geometry: `RS-05` forbids silent truncation, and a stage
+   * showing two of twelve shafts must say so. `drawNotices` counts the whole building from
+   * {@link SceneInput.recording} and the shown set from the layout, so the caption cannot drift
+   * from either. `undefined` means the layout holds the whole building and no caption is owed.
+   */
+  readonly filteredBankId?: string | undefined;
 }
 
 /** A rectangle the caller can hit-test a pointer against. Canvas coordinates, CSS pixels. */
@@ -1133,14 +1143,18 @@ function drawRiderLanes(
 }
 
 /**
- * The notices row: the shaft-count warning and the selected landing's caption, on **one** row.
+ * The notices row: the bank-filter caption, the shaft-count warning and the selected landing's
+ * caption, on **one** row.
  *
- * They were drawn by two different functions at the same `y` (`plot.y − 20`), left-aligned at the
- * same `x`, so a reader who selected a landing on a window too narrow for every shaft got the two
- * sentences written through each other. They are drawn here in one place, in order, with the
- * cursor carried between them — which is the only way two left-aligned strings share a row.
+ * The last two were drawn by two different functions at the same `y` (`plot.y − 20`), left-aligned
+ * at the same `x`, so a reader who selected a landing on a window too narrow for every shaft got
+ * the two sentences written through each other. They are drawn here in one place, in order, with
+ * the cursor carried between them — which is the only way left-aligned strings share a row. The
+ * bank filter's caption (`SG-15`) joined them for the same reason, first in the row because it
+ * changes what every count after it is counting.
  *
- * Both keep their own colour: `RS-05`'s warning is a warning and `RV-T3`'s caption is a selection.
+ * Each keeps its own colour: `RS-05`'s warning is a warning, and the filter caption and `RV-T3`'s
+ * caption are selections.
  */
 function drawNotices(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   const { layout, selection } = input;
@@ -1154,6 +1168,24 @@ function drawNotices(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   ctx.textBaseline = 'bottom';
   let cursor = layout.plot.x;
   const rightEdge = layout.plot.x + layout.plot.width;
+
+  if (input.filteredBankId !== undefined) {
+    /*
+     * RS-05's no-silent-truncation clause, applied to a *chosen* narrowing: the filter is the
+     * reader's own move, and the caption is what keeps the picture from being mistaken for the
+     * whole building — an exported PNG carries the canvas and nothing else, so the claim has to
+     * be on the canvas. Shown counts the *filtered set*, not the columns, so the two notices
+     * stay consistent when the filtered bank itself overflows the window's capacity.
+     */
+    ctx.fillStyle = theme.highlight;
+    const shown = layout.columns.length + layout.hiddenShaftCount;
+    const text = fitLabel(
+      `bank ${input.filteredBankId} — showing ${String(shown)} of ${String(input.recording.shafts.length)} shafts`,
+      rightEdge - cursor,
+    );
+    ctx.fillText(text, cursor, layout.header.noticeY);
+    cursor += CHAR_ADVANCE_PX * (text.length + 2);
+  }
 
   if (layout.hiddenShaftCount > 0) {
     // RS-05: never silently truncated. The CLI's `watch` says "showing N of M" and so does this.

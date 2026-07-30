@@ -41,6 +41,8 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { WAIT_BANDS } from '../live/bands.js';
+import { buildLayout, type ShaftGeometry } from '../render/layout.js';
+import type { VizFloor } from '../contract/types.js';
 
 import type { BrowserResources } from './data.js';
 import {
@@ -48,6 +50,7 @@ import {
   deepLinkSearchOf,
   deepLinkStateOf,
   seekActionForKey,
+  shaftsForBank,
   waitLegendEntries,
 } from './main.js';
 import { initialState, type ViewerState } from './state.js';
@@ -146,6 +149,78 @@ describe('keyboard seeking — KX-10', () => {
       expect(seekActionForKey(key, false)).toBeUndefined();
       expect(seekActionForKey(key, true)).toBeUndefined();
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The bank filter narrows the picture — SG-15, § D177
+ * -------------------------------------------------------------------------- */
+
+/** A two-bank building: two `express` shafts, two `local` ones. */
+const BANKED_SHAFTS: readonly ShaftGeometry[] = [
+  { carId: 'express-A', bankId: 'express', label: 'A', servedFloorIds: ['G', '10'] },
+  { carId: 'express-B', bankId: 'express', label: 'B', servedFloorIds: ['G', '10'] },
+  { carId: 'local-A', bankId: 'local', label: 'A', servedFloorIds: ['G', '2', '10'] },
+  { carId: 'local-B', bankId: 'local', label: 'B', servedFloorIds: ['G', '2', '10'] },
+];
+
+const FILTER_FLOORS: readonly VizFloor[] = [
+  { id: 'G', index: 0, heightM: 0, isEntrance: true, isTransferFloor: false, population: 0 },
+  { id: '2', index: 1, heightM: 4, isEntrance: false, isTransferFloor: false, population: 40 },
+  { id: '10', index: 2, heightM: 30, isEntrance: false, isTransferFloor: true, population: 40 },
+];
+
+function layoutOf(shafts: readonly ShaftGeometry[]): ReturnType<typeof buildLayout> {
+  return buildLayout({ width: 900, height: 640, floors: FILTER_FLOORS, shafts });
+}
+
+describe('the bank filter narrows what is laid out — SG-15', () => {
+  it('moving the filter changes the picture: the laid-out shaft set is the chosen bank’s', () => {
+    /*
+     * § D177's rule, on structure rather than a bitmap: the filter's whole job is that the layout
+     * a filtered stage draws holds different columns from the unfiltered one. This is the claim
+     * that was false of the shipped viewer — `drawStage` handed `recording.shafts` whole to
+     * `buildLayout` and a canvas hash was byte-identical across every option (`UX.md` SG-15).
+     */
+    const all = layoutOf(shaftsForBank(BANKED_SHAFTS, '').shafts);
+    const local = layoutOf(shaftsForBank(BANKED_SHAFTS, 'local').shafts);
+    expect(all.columns.map((column) => column.carId)).toStrictEqual([
+      'express-A',
+      'express-B',
+      'local-A',
+      'local-B',
+    ]);
+    expect(local.columns.map((column) => column.carId)).toStrictEqual(['local-A', 'local-B']);
+    expect(local.columns.map((column) => column.carId)).not.toStrictEqual(
+      all.columns.map((column) => column.carId),
+    );
+  });
+
+  it('returning to “all” restores exactly the unfiltered default, untouched', () => {
+    // The '' arm hands the same array through, not a copy — the unfiltered path is unchanged
+    // from before the filter was wired, by identity rather than by resemblance.
+    const result = shaftsForBank(BANKED_SHAFTS, '');
+    expect(result.shafts).toBe(BANKED_SHAFTS);
+    expect(result.filtered).toBe(false);
+  });
+
+  it('reports filtered only when the set actually narrowed', () => {
+    expect(shaftsForBank(BANKED_SHAFTS, 'express').filtered).toBe(true);
+    expect(shaftsForBank(BANKED_SHAFTS, 'express').shafts.map((shaft) => shaft.carId)).toStrictEqual(
+      ['express-A', 'express-B'],
+    );
+    // A single-bank building filtered to its only bank narrows nothing.
+    const single = BANKED_SHAFTS.filter((shaft) => shaft.bankId === 'local');
+    expect(shaftsForBank(single, 'local')).toStrictEqual({ shafts: single, filtered: false });
+  });
+
+  it('falls back to the whole building when the filter names a bank the run does not have', () => {
+    // A remembered selection can outlive the recording it was made against; an empty stage would
+    // claim the building has no shafts, so the fallback is all of them, with no caption owed.
+    expect(shaftsForBank(BANKED_SHAFTS, 'zeppelin')).toStrictEqual({
+      shafts: BANKED_SHAFTS,
+      filtered: false,
+    });
   });
 });
 
