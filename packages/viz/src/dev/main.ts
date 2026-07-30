@@ -77,6 +77,8 @@ import { buildLayout } from '../render/layout.js';
 import { disclosureItems } from '../mode/disclosure.js';
 import { parityRefusal } from '../mode/parity.js';
 import { isViewMode, itemsIn, type DisclosureItem, type ViewMode } from '../mode/types.js';
+import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
+import { demandFromSpec, specFromTrafficProfile } from '../authoring/patternSpec.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
 import { eventFor } from '../shift/events.js';
 import { shiftObservationsOf } from '../shift/observations.js';
@@ -697,15 +699,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
   }
 
   async function copyProvenance(label: string, button: HTMLButtonElement): Promise<void> {
-    const line =
-      `--building ${state.buildingId} --dispatcher ${state.dispatcherId} ` +
-      `--seed ${state.seed.toString()} --duration ${String(state.shiftLengthS)}`;
+    const provenance = provenanceLineOf(state, resources);
+    if (!provenance.ok) {
+      /*
+       * TP-13: the control refuses rather than copying a line the CLI would honour and turn into
+       * a *different* run. A refused copy names every reason, because each one is a fact about
+       * this run the reader would otherwise discover as an unexplained mismatch.
+       */
+      setText(ui.transport.status, `no CLI line reproduces this run — ${provenance.reasons.join('; ')}`);
+      setText(button, 'no CLI line');
+      window.setTimeout(() => {
+        setText(button, label);
+      }, 1400);
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(line);
+      await navigator.clipboard.writeText(provenance.line);
       setText(button, 'copied');
     } catch {
       // A clipboard a browser refuses is not an error the reader caused. Show the line instead.
-      setText(ui.transport.status, line);
+      setText(ui.transport.status, provenance.line);
     }
     window.setTimeout(() => {
       setText(button, label);
@@ -1409,6 +1422,90 @@ export function shaftsForBank<T extends { readonly bankId: string }>(
     return { shafts, filtered: false };
   }
   return { shafts: matching, filtered: true };
+}
+
+/* ========================================================================== *
+ * Copy run — TP-13
+ * ========================================================================== */
+
+/** A CLI line that reproduces the run, or the reasons no such line exists. */
+export type Provenance =
+  | { readonly ok: true; readonly line: string }
+  | { readonly ok: false; readonly reasons: readonly string[] };
+
+/**
+ * The `copy run` payload — `TP-13`, the retired `RV-T7`'s outstanding half.
+ *
+ * The shipped line named `--building --dispatcher --seed --duration` and **no traffic and no
+ * day**, so on any non-default pattern or any later day it was a provenance claim the CLI would
+ * honour and turn into a different run (`GAPS.md`). Two changes close that:
+ *
+ * - **A shipped pattern is named with `--traffic`, plus `--template` when the pattern's template
+ *   is not the CLI's `rise-and-fall` default.** That pair was verified by driving, not argued:
+ *   the viewer's pattern pipeline (`specFromTrafficProfile` → `demandFromSpec` → a patched
+ *   profile) and the CLI's `withTrafficProfile` route produced **bit-identical legs at 10 of 10
+ *   cells** — two buildings × (the building's own demand + four shipped profiles), seed 123,
+ *   900 s, hashed over `legs`/`boardedLegs`/`waiting`, with the CLI side holding the shipped
+ *   dispatcher profile object as `planRun` does — and the two-way cells **diverge without
+ *   `--template`**, which is why it is emitted rather than assumed. The equivalence holds only
+ *   from the base the refusals below protect; `main.test.ts` pins one cell of it.
+ * - **A run no flag set can express gets no line at all.** A saved pattern has no CLI loader; a
+ *   day past the first grows the building and schedules an event; a held car, a moved group
+ *   lever, a saved building or dispatcher all change the run and have no flag. Refusing with the
+ *   reasons is the honest form — the whole point of the control is that the reader could not
+ *   otherwise reproduce the run, so a line that reproduces a *different* one is worse than none.
+ *
+ * Pure, so the claim *this line is this run* is testable without a clipboard.
+ */
+export function provenanceLineOf(state: ViewerState, resources: BrowserResources): Provenance {
+  const reasons: string[] = [];
+  const flags: string[] = [`--building ${state.buildingId}`, `--dispatcher ${state.dispatcherId}`];
+
+  if (!resources.entries.some((entry) => entry.config.id === state.buildingId)) {
+    reasons.push(`the building “${state.buildingId}” is yours alone and data/buildings/ does not ship it`);
+  }
+  if (!resources.dispatcherProfiles.profiles.some((profile) => profile.id === state.dispatcherId)) {
+    reasons.push(
+      `the dispatcher “${state.dispatcherId}” is yours alone and data/dispatcher-profiles.json does not ship it`,
+    );
+  }
+
+  let template: string | undefined;
+  if (state.pattern !== 'building') {
+    const shipped = resources.trafficProfiles.profiles.find((profile) => profile.id === state.pattern);
+    if (shipped === undefined) {
+      reasons.push(`the pattern “${state.pattern}” is yours alone and the CLI has no flag that loads a saved pattern`);
+    } else {
+      flags.push(`--traffic ${shipped.id}`);
+      const demand = demandFromSpec(specFromTrafficProfile(resources.trafficProfiles, shipped.id));
+      if (demand.demandTemplate !== 'rise-and-fall') template = demand.demandTemplate;
+    }
+  }
+
+  const event = eventFor(state.week.day, state.week.dayIdx);
+  if (state.week.day !== 1 || !event.effect.changesNothing) {
+    reasons.push(
+      `day ${String(state.week.day)} grows the building and schedules “${event.name}”, and the CLI has no --day`,
+    );
+  }
+  if (state.outOfServiceCarIds.length > 0) {
+    reasons.push(
+      `${String(state.outOfServiceCarIds.length)} car(s) are held out of service and the CLI has no flag to hold one`,
+    );
+  }
+  if (
+    state.levers.parking !== DEFAULT_LEVERS.parking ||
+    state.levers.express !== DEFAULT_LEVERS.express ||
+    state.levers.dwell !== DEFAULT_LEVERS.dwell
+  ) {
+    reasons.push('the group levers are moved off their defaults and the CLI has no lever flags');
+  }
+
+  if (reasons.length > 0) return { ok: false, reasons };
+  // The CLI's own echo order — `planRun`'s `commandLine` puts `--template` after `--duration`.
+  flags.push(`--seed ${state.seed.toString()}`, `--duration ${String(state.shiftLengthS)}`);
+  if (template !== undefined) flags.push(`--template ${template}`);
+  return { ok: true, line: flags.join(' ') };
 }
 
 /* ========================================================================== *

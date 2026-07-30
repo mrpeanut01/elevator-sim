@@ -119,10 +119,30 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/surfaces.ts#applyRailState',
         'dev/surfaces.ts#applySurfaceState',
         'dev/surfaces.ts#drawerStateFor',
+        // Derived only through `drawerStateFor`'s toggle label; it returns a boolean and
+        // authors nothing. Same plumbing, same reason — SH-12/KX-11's Escape decision.
+        'dev/surfaces.ts#escapeClosesDrawer',
+        // SH-09's serializer. Its output is a URL query string — `?seed=42&tab=report` — and its
+        // literals are the seven param keys, single words all; it is derived only because the
+        // scanner keeps a template substitution's text (`params.toString`) and reads it as
+        // adjacent words. The keys' agreement with the reader is what `main.test.ts`'s
+        // round-trip asserts.
+        'dev/main.ts#deepLinkSearchOf',
         'dev/state.ts#initialState',
         'dev/state.ts#SHIFT_LENGTHS',
         'dev/state.ts#shiftRunConfigOf',
       ],
+    },
+    {
+      reason:
+        'TP-13’s provenance emitter. Its `ok` line is CLI flags — machine text the CLI parses, ' +
+        'pinned flag-for-flag and leg-for-leg by `main.test.ts` — but its refusal reasons are ' +
+        'authored sentences that reach `#status` through `copyProvenance`, so this exclusion is ' +
+        'a stated limitation, not a claim of coverage: the sentences are swept statically below ' +
+        'like the DOM-bound mounts’ status text, which is weaker than driving them. An adapter ' +
+        'that renders the refusals per campaign case is the better home, and belongs to the ' +
+        'honesty lane rather than to a hand-edit here.',
+      ids: ['dev/main.ts#provenanceLineOf'],
     },
     {
       reason:

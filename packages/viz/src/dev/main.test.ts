@@ -37,6 +37,7 @@ import {
   parseElevatorSpecs,
   parseTrafficProfiles,
   resolveBuilding,
+  type SimulationConfig,
 } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
@@ -45,15 +46,18 @@ import { buildLayout, type ShaftGeometry } from '../render/layout.js';
 import type { VizFloor } from '../contract/types.js';
 
 import type { BrowserResources } from './data.js';
+import { recordRun } from '../record/recordRun.js';
+
 import {
   deepLinkDefaultsOf,
   deepLinkSearchOf,
   deepLinkStateOf,
+  provenanceLineOf,
   seekActionForKey,
   shaftsForBank,
   waitLegendEntries,
 } from './main.js';
-import { initialState, type ViewerState } from './state.js';
+import { initialState, profileById, shiftRunConfigOf, type ViewerState } from './state.js';
 
 async function indexHtml(): Promise<string> {
   return readFile(fileURLToPath(new URL('../../index.html', import.meta.url)), 'utf8');
@@ -367,6 +371,139 @@ describe('the deep-link reader refuses what the page cannot honour', () => {
     );
     expect(arrived.tab).toBe(base().tab);
     expect(arrived.railSegment).toBe(base().railSegment);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * copy run names the traffic — TP-13
+ * -------------------------------------------------------------------------- */
+
+/** `--flag value` pairs of an emitted line, for asserting what it names. */
+function flagsOf(line: string): ReadonlyMap<string, string> {
+  const tokens = line.split(' ');
+  const map = new Map<string, string>();
+  for (let index = 0; index + 1 < tokens.length; index += 2) {
+    map.set(String(tokens[index]), String(tokens[index + 1]));
+  }
+  return map;
+}
+
+describe('copy run names the same run — TP-13', () => {
+  it('names building, dispatcher, seed, duration and the non-default pattern, CLI-flag for flag', () => {
+    const state: ViewerState = {
+      ...initialState(resources, 123n),
+      buildingId: 'garden-apartments',
+      pattern: 'hotel',
+      shiftLengthS: 900,
+    };
+    const provenance = provenanceLineOf(state, resources);
+    expect(provenance.ok).toBe(true);
+    if (!provenance.ok) return;
+    const flags = flagsOf(provenance.line);
+    expect(flags.get('--building')).toBe(state.buildingId);
+    expect(flags.get('--dispatcher')).toBe(state.dispatcherId);
+    expect(flags.get('--seed')).toBe(state.seed.toString());
+    expect(flags.get('--duration')).toBe(String(state.shiftLengthS));
+    expect(flags.get('--traffic')).toBe('hotel');
+    // hotel is governed two-way, and the two-way cells diverge without the template flag —
+    // measured, not assumed. See provenanceLineOf's docstring.
+    expect(flags.get('--template')).toBe('lunch-two-way');
+  });
+
+  it('emits no --template when the pattern runs the CLI’s own default template', () => {
+    const state: ViewerState = { ...initialState(resources, 9n), pattern: 'office-standard' };
+    const provenance = provenanceLineOf(state, resources);
+    expect(provenance.ok).toBe(true);
+    if (!provenance.ok) return;
+    expect(flagsOf(provenance.line).get('--traffic')).toBe('office-standard');
+    expect(provenance.line).not.toContain('--template');
+  });
+
+  it('emits no traffic flags at all for the building’s own demand', () => {
+    const provenance = provenanceLineOf(initialState(resources, 9n), resources);
+    expect(provenance.ok).toBe(true);
+    if (!provenance.ok) return;
+    expect(provenance.line).not.toContain('--traffic');
+    expect(provenance.line).not.toContain('--template');
+  });
+
+  it('the emitted flags rebuild the same run, leg for leg', () => {
+    /*
+     * The pin behind the whole task: the line is only provenance if the CLI, honouring it,
+     * produces *this* run. The CLI side is built the way `planRun` builds it — the building's
+     * trafficProfile swapped to the --traffic id, the shipped dispatcher profile object, the
+     * --template value applied — and the legs must match bit for bit. The shipped line failed
+     * exactly this on every non-default pattern (GAPS.md, TP-13).
+     */
+    const state: ViewerState = {
+      ...initialState(resources, 123n),
+      buildingId: 'garden-apartments',
+      pattern: 'hotel',
+      shiftLengthS: 900,
+    };
+    const provenance = provenanceLineOf(state, resources);
+    expect(provenance.ok).toBe(true);
+    if (!provenance.ok) return;
+    const flags = flagsOf(provenance.line);
+
+    const viewerRun = recordRun(shiftRunConfigOf(resources, state).config, {
+      recordDecisions: false,
+    });
+
+    const raw = readData(`buildings/${String(flags.get('--building'))}.json`) as Record<
+      string,
+      unknown
+    >;
+    const swapped = parseBuilding({ ...raw, trafficProfile: flags.get('--traffic') });
+    const template = flags.get('--template');
+    const cliConfig: SimulationConfig = {
+      building: resolveBuilding(swapped, resources.elevatorSpecs),
+      dispatcherProfile: profileById(resources, [], String(flags.get('--dispatcher'))),
+      trafficProfiles: resources.trafficProfiles,
+      elevatorSpecs: resources.elevatorSpecs,
+      dispatcherProfiles: resources.dispatcherProfiles,
+      seed: BigInt(String(flags.get('--seed'))),
+      durationS: Number(flags.get('--duration')),
+      onTimeout: 'report',
+      ...(template === undefined
+        ? {}
+        : { demandTemplate: template as SimulationConfig['demandTemplate'] }),
+    };
+    const cliRun = recordRun(cliConfig, { recordDecisions: false });
+
+    expect(viewerRun.recording.legs.length).toBeGreaterThan(0);
+    expect(cliRun.recording.legs).toStrictEqual(viewerRun.recording.legs);
+    expect(cliRun.recording.progress.boardedLegs).toStrictEqual(
+      viewerRun.recording.progress.boardedLegs,
+    );
+  }, 120_000);
+
+  it('refuses a saved pattern, naming it — no CLI flag loads one', () => {
+    const state: ViewerState = { ...initialState(resources, 9n), pattern: 'my-lunch-rush' };
+    const provenance = provenanceLineOf(state, resources);
+    expect(provenance.ok).toBe(false);
+    if (provenance.ok) return;
+    expect(provenance.reasons.join(' ')).toContain('my-lunch-rush');
+  });
+
+  it('refuses any day but the first — growth and the day’s event have no flags', () => {
+    const opening = initialState(resources, 9n);
+    const state: ViewerState = { ...opening, week: { ...opening.week, day: 3 } };
+    const provenance = provenanceLineOf(state, resources);
+    expect(provenance.ok).toBe(false);
+    if (provenance.ok) return;
+    expect(provenance.reasons.join(' ')).toContain('day 3');
+  });
+
+  it('refuses a run with cars held out of service', () => {
+    const state: ViewerState = { ...initialState(resources, 9n), outOfServiceCarIds: ['main-A'] };
+    expect(provenanceLineOf(state, resources).ok).toBe(false);
+  });
+
+  it('refuses moved group levers', () => {
+    const opening = initialState(resources, 9n);
+    const state: ViewerState = { ...opening, levers: { ...opening.levers, express: true } };
+    expect(provenanceLineOf(state, resources).ok).toBe(false);
   });
 });
 
