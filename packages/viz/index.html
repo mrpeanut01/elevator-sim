@@ -363,7 +363,11 @@
           box-shadow: -18px 0 40px rgb(0 0 0 / 0.5);
         }
         .rail-r[hidden] { display: none; }
-        #drawer-toggle { display: inline-flex !important; }
+        /* RR-11 (§ D198): the overlay spans top to bottom of the body and lay over the strip's
+           right end where this button sits, so the control labelled 'Close controls' could not be
+           pressed. The handoff's toggle IS the close control (`design.html` :2447 — no close
+           control exists inside the drawer), so it stacks above the overlay's z-index: 20. */
+        #drawer-toggle { display: inline-flex !important; position: relative; z-index: 21; }
       }
       @media (max-width: 899px) { .body { grid-template-columns: 236px minmax(0, 1fr); } }
 

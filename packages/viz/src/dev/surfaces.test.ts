@@ -174,6 +174,40 @@ describe('the breakpoint is duplicated in the stylesheet, and the two agree', ()
   });
 });
 
+describe('the open drawer must not cover its own toggle — RR-11', () => {
+  /*
+   * Driven red 2026-07-30 (§ D198): below 1340 px the drawer overlay (`.rail-r`, `z-index: 20`,
+   * `width: min(var(--rail-right), 90vw)`) lay over the tab strip's right end where
+   * `#drawer-toggle` sits, so the button labelled *Close controls* could not be pressed — a
+   * pointer-only reader could not close what they opened, and Escape was accidentally the only
+   * exit. The handoff's own drawer treatment (`design.html` :2447) is that the toggle *is* the
+   * close control — `drawerLabel` reads 'Close controls' while open, and no close control exists
+   * inside the drawer — so the fix is (b) of the two natural ones: the toggle stacks above the
+   * overlay, no new chrome. Same stylesheet-pin idiom as RX-03 below: the 1339 px block is the
+   * only thing that lays the drawer out, and no script consults either z-index.
+   */
+  it('the 1339px media block stacks the toggle above the drawer overlay', async () => {
+    const html = await readFile(
+      fileURLToPath(new URL('../../index.html', import.meta.url)),
+      'utf8',
+    );
+    const start = html.indexOf(`@media (max-width: ${String(DRAWER_BREAKPOINT_PX - 1)}px)`);
+    expect(start).toBeGreaterThan(-1);
+    const rest = html.slice(start + 1);
+    const nextBoundary = [rest.indexOf('@media'), rest.indexOf('</style>')]
+      .filter((at) => at !== -1)
+      .reduce((a, b) => Math.min(a, b), rest.length);
+    const block = rest.slice(0, nextBoundary);
+    const drawerZ = /\.rail-r\s*\{[^}]*z-index:\s*(\d+)/.exec(block);
+    const toggleZ = /#drawer-toggle\s*\{[^}]*z-index:\s*(\d+)/.exec(block);
+    expect(drawerZ?.[1], 'the drawer overlay carries its z-index').toBeDefined();
+    expect(toggleZ?.[1], 'the toggle carries a z-index in the same block').toBeDefined();
+    // z-index does nothing on a static element: the toggle must also be positioned.
+    expect(block).toMatch(/#drawer-toggle\s*\{[^}]*position:\s*relative/);
+    expect(Number(toggleZ?.[1])).toBeGreaterThan(Number(drawerZ?.[1]));
+  });
+});
+
 describe('the stacked layout below 768 px — RX-03', () => {
   /*
    * No TypeScript constant this time, deliberately: the stylesheet is the only thing that lays the
