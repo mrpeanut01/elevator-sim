@@ -1,13 +1,17 @@
 # Known gaps — stated, measured where possible, and not closed
 
-**As of:** 2026-07-30, wave 11, the wave that wrote Phase 9's verdict · **Branch:** `integration` at
-`bf16a2d` · **Suite:** **258 files / 4 794 tests, 4 784 passed, 10 skipped**, `tsc -b` clean, 565 s —
-measured **serially on an idle machine with no lanes running**, at `9fd738c`, so it predates the two
-commits after it and is a lower bound by a handful of tests rather than by six hundred. The wave-9
-figure this line used to carry (225 files / 4 122 tests) was thirty-three files stale.
+**As of:** 2026-07-30, wave 12 · **Branch:** `claude/project-completion-orchestration-7dz4qp` at
+`821210a` · **Suite:** **261 files / 4 853 tests, 4 843 passed, 10 skipped**, `tsc -b` clean,
+1 373 s under Node v26.5.1 — measured **serially on an idle machine with no lanes running, on the
+pushed tree**, and the commit that carries the figure is the commit it describes. The wave-11
+figure this line used to carry (258 files / 4 794, *4 784 passed*) **was not reproducible from any
+committed tree**: 26 of its claimed passes fail on the tree as pushed, at the very commit the
+figure was measured at, under Node 22 and 26 alike — the pins they check matched an unpushed
+working state. The finding, the chain of evidence, and the re-pin are [§ D196](DECISIONS.md).
 
-> **The skip count is 10 and has not moved all wave.** That is the number worth watching here: a wave
-> that quietly skips a test to go green moves it, and a growing test count says nothing on its own.
+> **The skip count is 10 and has not moved all wave** — through wave 12 either. That is the number
+> worth watching here: a wave that quietly skips a test to go green moves it, and a growing test
+> count says nothing on its own.
 
 This document exists because the alternative is worse. Every item here is something the project
 **does not do**, **cannot yet say**, or **says with a caveat** — collected in one place rather than

@@ -708,3 +708,10 @@ Board: [`WAVE12_PLAN.md`](WAVE12_PLAN.md).
 commit contains another lane's work — R25's remedy held. The wave's own errors — an invalidated
 baseline measurement, a decision number cited before it existed, two silent lane stalls — are
 recorded in [§ D195](DECISIONS.md) rather than tidied away.
+
+**Final (integration close):** `npx tsc -b` clean, `npx vitest run` → **261 files / 4 853 tests,
+4 843 passed, 10 skipped**, exit 0, 1 373 s, **Node v26.5.1, serially on an idle machine, on the
+pushed tree at `821210a`**. The first integration run was **red — 26 failed — and the red run is
+the wave's largest finding**: the failures were inherited pins that matched no committed tree,
+including the handoff's own close figure, traced link by link and re-pinned under
+[§ D196](DECISIONS.md). The skip count did not move all wave.
