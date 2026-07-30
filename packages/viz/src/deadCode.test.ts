@@ -128,8 +128,14 @@ const DEAD_CANDIDATES: Readonly<Record<string, string>> = Object.freeze({
    * up. Dispositioned first: the test now drives shiftRunConfigOf and dev/runConfig.ts is
    * deleted, so the seam is vouched for on the builder the Run button reaches.
    */
-  'dev/doorTimingOf':
-    'dead: a one-line wrapper with zero callers, tests included; levers reach runs via profileFromSpec',
+  /*
+   * -- doorTimingOf was a one-line wrapper with zero callers — and the seam it wrapped was a real
+   * defect: doorTimingFor's per-car dwell (the only difference between the snappy and normal
+   * chips) was computed, tested in authoring.test.ts against a self-assembled building, and
+   * applied by nothing in the shipped run builder, so two of the three dwell chips ran the same
+   * building. Dispositioned by deleting the wrapper and wiring the seam: shiftRunConfigOf now
+   * writes doorTimingFor's timing onto every car, with § D177's run-change test in state.test.ts.
+   */
   /*
    * -- dom.ts:103. Its file header argues fifty inline copies of a four-line helper is "the way
    * a design system stops being one"; the rails and panels then build eyebrow markup inline
