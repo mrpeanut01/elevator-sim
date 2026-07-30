@@ -130,7 +130,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'id tuples the two shift unions are derived from — the same id-table case as ' +
         '`campaign/types.ts#FAIL_STATES` above — and every event a reader sees is its ' +
         '`ShiftEvent.name` and `note`, both of which `SHIFT_REPORT` drives. ' +
-        '`contract/types.ts#VIZ_SCHEMA_VERSION` is the integer 7; it is derived only because the ' +
+        '`contract/types.ts#VIZ_SCHEMA_VERSION` is the integer 8; it is derived only because the ' +
         'declaration scanner gives a `const` the span up to the next `const`, which in a file of ' +
         'interfaces swallows the string-literal unions of the types below it. A version number ' +
         'reaches a reader only through `record/document.ts#verifyReplay`, which is driven.',

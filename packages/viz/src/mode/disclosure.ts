@@ -56,19 +56,22 @@
  *    still `figure.kind === 'suppressed'`, from `meansAreSuppressed` — one gate, R9. The ground is
  *    read only to choose a sentence.
  *
- * **The transport is not finished, and this is where it stops.** `VizSummary` does not carry
- * `awtInvalidGround` — a field on the recording contract is a deliberate `VIZ_SCHEMA_VERSION` bump,
- * which `contract/types.ts` and `record/recordRun.ts` own — so on a recording produced by this build
- * the ground is absent and case 2 above is what ships: Basic renders exactly what it rendered
- * before. The per-ground path is proved in `mode/disclosure.test.ts` against grounds handed in
- * directly, including one no `core` branch emits. Stated here rather than discovered later.
+ * **The transport is finished.** `VizSummary.awtInvalidGround` landed at `VIZ_SCHEMA_VERSION` **8**
+ * with its history row, and `record/recordRun.ts`'s `describeSummary` copies it beside the prose —
+ * so on a recording this build produces, a refused mean now reaches Basic with its ground and case 1
+ * above is what ships. Case 2 is no longer the shipped path and is still the shipped **behaviour**
+ * for two real inputs: a run whose mean is quotable carries no ground at all, and
+ * `record/document.ts` casts a loaded file to `VizRecording` without checking any field's value, so
+ * a same-version recording carrying a code this build has no wording for is a shape that reaches
+ * here. Both are proved in `mode/disclosure.test.ts` — the second against a ground no `core` branch
+ * emits (§ D134's technique).
  */
 
 import type { AwtInvalidGround, PassengerModel } from '@elevator-sim/core/browser';
 
 import type { LockedOutLanding } from '../access/lockedOut.js';
 import type { FailStateReport } from '../campaign/failStates.js';
-import type { VizRecording, VizSummary } from '../contract/types.js';
+import type { VizRecording } from '../contract/types.js';
 import {
   ENERGY_ID,
   INTERVAL_ID,
@@ -219,24 +222,6 @@ export const SUPPRESSION_LEAD =
   'would be a second answer to the same question.';
 
 /**
- * `VizSummary` plus the suppression **ground code** `core` publishes beside the prose.
- *
- * The widening is on the **consumer**, exactly as {@link FailStateDisclosure} widens `state` to
- * `string` and for the same reason (§ D166): the field is `AwtInvalidGround` where `core` writes it,
- * and `string` where this module reads it, so a ground **no shipped branch emits** can be handed in
- * and the unrecognised-code fallback is provable rather than asserted. A `Record` keyed on the union
- * would make the fallback unreachable by construction and therefore untestable — which is § D152's
- * *"a list that looks derived only because the shipped schema happens to fit it"*, pointed at a
- * default branch.
- *
- * `VizSummary` does not declare the field today. See the module docstring: carrying it is a
- * `VIZ_SCHEMA_VERSION` bump on the recording contract, which this module does not own.
- */
-export interface GroundedSummary extends VizSummary {
-  readonly awtInvalidGround?: string | undefined;
-}
-
-/**
  * The clause that names *this* refusal, per ground.
  *
  * Not exported, deliberately: a new exported prose declaration is an unclassified surface to
@@ -271,6 +256,16 @@ const SUPPRESSION_CLAUSE_BY_GROUND: Readonly<Record<AwtInvalidGround, string>> =
  *
  * The shell is shared and the clause is per ground, so R3's *"a suppression is a result, not a
  * gap"* framing is written once and cannot go missing from one of the four.
+ *
+ * **The parameter is `string` and not `AwtInvalidGround`, and that is the load-bearing part.**
+ * `VizSummary.awtInvalidGround` is the union — schema version 8 carries `core`'s own type — so a
+ * signature that took the union would make {@link SUPPRESSION_CLAUSE_BY_GROUND}'s lookup total and
+ * the fallback below **unreachable by construction**, which is § D152's *"a list that looks derived
+ * only because the shipped schema happens to fit it"* pointed at a default branch. Widened here, on
+ * the consumer, exactly as {@link FailStateDisclosure} widens `state` (§ D166) — and it is not
+ * hypothetical: `record/document.ts` casts a loaded document to `VizRecording` without checking any
+ * field's *value*, so a file that declares schema 8 and carries a ground this build has no wording
+ * for reaches this function in the shipped path.
  */
 function suppressionLeadFor(ground: string | undefined): string {
   if (ground === undefined) return SUPPRESSION_LEAD;
@@ -403,11 +398,10 @@ function itemForFigure(figure: SummaryFigure, input: DisclosureInput): Disclosur
     /*
      * The ground decides the **wording** and never the refusal — `figure.kind` already decided
      * that, from `meansAreSuppressed`. Read off the summary rather than re-derived from it, which is
-     * the whole point of `core` carrying it.
+     * the whole point of `core` carrying it, and read **without a cast** since schema version 8:
+     * the field is on `VizSummary` and the consumer-side widening it needed is gone.
      */
-    const lead = suppressionLeadFor(
-      (input.recording.summary as GroundedSummary).awtInvalidGround,
-    );
+    const lead = suppressionLeadFor(input.recording.summary.awtInvalidGround);
     return {
       id: figure.id,
       label: figure.label,

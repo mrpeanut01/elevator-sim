@@ -11203,3 +11203,76 @@ it belongs in a lane that also owns `physics/doors/types.ts`, whose docstring ju
 
 **Impact on phase status: none.** Phase 8's matrix verdict is unchanged; what changed is that the
 published table is now re-derived rather than transcribed.
+
+---
+
+## D185 — the ground reaches the screen: `VIZ_SCHEMA_VERSION` 8, and the fixtures that could not tell *wired* from *working*
+
+**Date:** 2026-07-30 · **Owner:** wave 11 · **Completes** [§ D183](#d183) · **Closes**
+[`GAPS.md`](GAPS.md) § 3's *"Basic mode cannot shorten a suppression reason"*, both halves
+
+§ D183 landed the mechanism and named what it lacked: *"`VizSummary` does not carry
+`awtInvalidGround`, so on a recording this build produces the ground is absent and Basic renders
+exactly what it rendered before."* `VizSummary` carries it now, at `VIZ_SCHEMA_VERSION` **8** with its
+history row, and `describeSummary` copies it on the line under the prose it belongs to — adjacency
+being what keeps *present exactly when the reason is* true without that file re-deciding anything.
+
+### The finding worth keeping: a fixture-only suite cannot tell *wired* from *working*
+
+Every assertion in `mode/disclosure.test.ts` handed a ground in directly. **Every one of them was
+green for a whole commit while the shipped screen still rendered the ground-free lead.** The suite
+could prove the wording table was correct and could not prove anything reached a reader — the same
+distinction the roadmap's standing requirement makes between *reachable* and *has a non-test caller*,
+arriving through a test fixture instead of a barrel re-export.
+
+The new cases record **real runs**: `vertical-city` at the shipped rates, where the ground is present,
+is a member of `AWT_INVALID_GROUNDS`, sits beside non-empty prose, survives the document round trip at
+the bumped schema, and produces a Basic note whose **suffix** is `core`'s sentence verbatim; and
+`garden-apartments` as the control, where a quotable run carries neither half and `JSON.stringify`
+writes neither key.
+
+### A vacuous assertion replaced, said out loud
+
+`disclosure.test.ts`'s R9 case passed a ground as `fictionalRecording`'s second argument **and**
+overrode the whole summary. The override spreads last, so the ground was silently dropped and the case
+asserted only that a quotable run has no suppression item — true, and not the claim in its own name.
+The ground is now written onto the quotable summary, making the recording deliberately
+self-contradictory, which is what R9 actually asserts: **the flag decides and the ground is inert.**
+Not a weakened assertion replaced — a **vacuous** one replaced, which is the failure wave 8 found six
+of, one of them in the instrument that checks for tests that cannot fail.
+
+### Typed as `core`'s union, widened only where the widening buys something
+
+The contract field is `AwtInvalidGround`, so a misspelt ground cannot be *recorded* and a fifth one
+widens the contract by existing. § D183's consumer-side `GroundedSummary` is **deleted** rather than
+kept: its last remaining consumer would have been a test helper, which is the *"name the non-test
+caller"* defect in the very file whose docstring cites it.
+
+What survives is the widening on `suppressionLeadFor(ground: string | undefined)`, which is on the
+shipped path and is load-bearing rather than vestigial: taking the union would make
+`SUPPRESSION_CLAUSE_BY_GROUND`'s lookup **total** and the unknown-ground fallback **unreachable by
+construction** — § D152's *"a list that looks derived only because the shipped schema happens to fit
+it"* pointed at a default branch. The fallback is not hypothetical: `record/document.ts` checks a
+loaded document's *keys* and never a field's *value*, so a same-version file carrying an unfamiliar
+code reaches that branch in the shipped path.
+
+### Driven, not read
+
+Vertical City, Campaign stage 3 at 50 replications per setting. Casual: *"There is no number here, and
+that is a result rather than a gap: **the queues never settled during this run, so no one number
+describes what the wait was.** The measurement's reason follows, in its own words. Queue length rose by
+154.1 persons …"* Engineer, re-run: `core`'s sentence alone, unchanged. **The refusal gained a sentence
+and lost nothing**, which is the direction [§ D111](#d111) cares about, and no mean appears in either
+mode.
+
+### Two consequences stated rather than discovered
+
+- **A saved recording at schema 7 is now refused on load**, by `readRecordingDocument`'s `PB-15`
+  older-schema branch, with *"Re-record it from its seed rather than drawing it."* That is the designed
+  behaviour of a deliberate bump and it is **user-visible**.
+- **`render/mood.ts`'s docstring** lists the summary fields deliberately omitted from `MoodSummary` and
+  names `awtIsValid` and `awtInvalidReason`; it should name `awtInvalidGround` too. The omission itself
+  is real — both the `Pick` and the explicit copy list exclude it, so nothing leaks — and only the
+  docstring is incomplete. Carried in [`GAPS.md`](GAPS.md).
+
+**Impact on phase status: none.**

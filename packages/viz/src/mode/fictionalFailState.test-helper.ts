@@ -21,7 +21,7 @@
  * same convention `src/fixtures.test-helper.ts` and `controls/fictionalSchema.test-helper.ts` use.
  */
 
-import type { FailStateDisclosure, GroundedSummary } from './disclosure.js';
+import type { FailStateDisclosure } from './disclosure.js';
 import { constantSeries } from '../contract/series.js';
 import { VIZ_SCHEMA_VERSION, type VizRecording, type VizSummary } from '../contract/types.js';
 import { FIXTURE_DOOR_CONFIG, fixtureSummary } from '../fixtures.test-helper.js';
@@ -75,9 +75,15 @@ export function fictionalFailStateReport(
  * A recording with a suppressed mean whose reason is the fictional one.
  *
  * @param ground the suppression **ground code** to carry beside the reason, or `undefined` for a
- *   recording that carries none — which is every recording this build's `record/recordRun.ts`
- *   produces, because `VizSummary` does not declare the field yet. Both cases are shipped shapes and
- *   both are asserted in `mode/disclosure.test.ts`, so the default is the one that is real today.
+ *   recording that carries none. Both are shipped shapes at schema version 8 and both are asserted
+ *   in `mode/disclosure.test.ts`: `core` publishes the pair only for a run whose mean is refused, so
+ *   a quotable run carries no ground, and `record/document.ts` casts a loaded file to
+ *   `VizRecording` without checking any field's *value*, so a same-version recording carrying a code
+ *   this build has no wording for is a shape a reader can actually hand the viewer.
+ *
+ *   Typed `string` rather than `AwtInvalidGround` on purpose: {@link FICTIONAL_SUPPRESSION_GROUND} is
+ *   not a member of the union, and a fixture that could only pass one of the shipped four could not
+ *   reach the fallback branch at all.
  */
 export function fictionalRecording(
   overrides: Partial<VizRecording> = {},
@@ -90,13 +96,17 @@ export function fictionalRecording(
     undelivered: 7,
   });
   /*
-   * The widening is on the consumer — see `GroundedSummary` in `mode/disclosure.ts`. Written as a
-   * spread onto the fixture rather than as an override of it, because `fixtureSummary` takes
-   * `Partial<VizSummary>` and the whole point of this parameter is a field `VizSummary` does not
-   * have.
+   * The one cast in this file, and it is the fiction itself. `VizSummary.awtInvalidGround` is
+   * `core`'s `AwtInvalidGround` since schema version 8 — correctly, so a misspelt ground cannot be
+   * *recorded* — and this fixture's whole job is to produce a value no `AWT_INVALID_GROUND_SPECS`
+   * entry emits. § D134's technique needs exactly one place where the type system is told that a
+   * shape it forbids is nonetheless a shape a file on disk can hold; this is that place, and
+   * `mode/disclosure.ts` needs no widening of its own as a result.
    */
-  const summary: GroundedSummary =
-    ground === undefined ? base : { ...base, awtInvalidGround: ground };
+  const summary: VizSummary =
+    ground === undefined
+      ? base
+      : ({ ...base, awtInvalidGround: ground } as unknown as VizSummary);
   return {
     schemaVersion: VIZ_SCHEMA_VERSION,
     runId: 'fictional',

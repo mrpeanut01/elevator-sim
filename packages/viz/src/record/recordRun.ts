@@ -472,6 +472,15 @@ function describeSummary(result: SimulationResult): VizSummary {
     saturated: summary.saturation.saturated,
     awtIsValid: summary.awtIsValid,
     awtInvalidReason: summary.awtInvalidReason,
+    /*
+     * Version 8, and copied on the line under the prose it belongs to rather than filed with the
+     * version-5 block below, because the two halves of one refusal are one datum. `core` emits both
+     * or neither — `metrics/summarize.ts` spreads the pair out of a single `AwtInvalidity` — so
+     * copying them adjacently and unconditionally is what keeps *"present exactly when the reason
+     * is"* true here without this file re-deciding anything. It is never re-derived from
+     * `saturated`/`waitCount`/`unservedCount`, which is the whole reason `core` publishes it.
+     */
+    awtInvalidGround: summary.awtInvalidGround,
     meanWaitS: waiting.meanS,
     wait95S: waiting.p95S,
     meanTimeToDestinationS: summary.timeToDestination.meanS,

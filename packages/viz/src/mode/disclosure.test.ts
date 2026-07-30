@@ -21,9 +21,12 @@
  *    {@link FICTIONAL_SUPPRESSION_GROUND}, which no `core` branch emits — § D134's technique, and
  *    the only way the fallback branch is reachable at all. A code is permission to shorten, never
  *    permission to go quiet.
- * 4. **The rendering changes for recordings that carry no ground.** That is every recording this
- *    build produces, because `VizSummary` does not declare the field. Asserted byte-identical to the
- *    fallback, so the shipped screen has not moved.
+ * 4. **The rendering changes for recordings that carry no ground.** No longer *every* recording this
+ *    build produces — `VizSummary` declares the field at schema version 8 and `describeSummary`
+ *    copies it — but still two real ones: a run whose mean is quotable carries no ground at all, and
+ *    a loaded file can carry a code this build has no wording for, because `record/document.ts`
+ *    checks a document's *keys* and never a field's *value*. Asserted byte-identical to the
+ *    ground-free fallback in both cases.
  *
  * ## Why the enumeration is imported rather than listed
  *
@@ -32,8 +35,15 @@
  * relies on one layer up, and the reason neither file contains a list of grounds.
  */
 
+import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { AWT_INVALID_GROUNDS } from '@elevator-sim/core/browser';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+
+import type { VizRecording } from '../contract/types.js';
+import { DATA_DIR, breadthConfig, fixtureConfig } from '../fixtures.test-helper.js';
+import { meansAreSuppressed } from '../frame/overlay.js';
+import { readRecordingDocument } from '../record/document.js';
+import { recordRun } from '../record/recordRun.js';
 
 import { SUPPRESSION_LEAD, disclosureItems } from './disclosure.js';
 import {
@@ -116,8 +126,12 @@ describe('a code this build does not recognise falls back, and does not go quiet
   });
 
   it('renders a recording that carries no ground exactly as it did before codes existed', () => {
-    // Every recording `record/recordRun.ts` produces today is this one: `VizSummary` does not carry
-    // the field. So this assertion is the shipped screen, and it must not have moved.
+    /*
+     * This was *every* recording until `VizSummary` gained the field at schema version 8. It is now
+     * the shape a **quotable** run has — `core` emits the ground and the prose together or neither —
+     * and it is still the exact bytes the screen carried before codes existed, which is what makes
+     * the version-8 transport a widening rather than a rewrite.
+     */
     expect(basicNote(undefined)).toBe(`${SUPPRESSION_LEAD} ${FICTIONAL_SUPPRESSION_REASON}`);
   });
 
@@ -164,21 +178,139 @@ describe('shortening is not removing — parity still guards core’s sentence',
     /*
      * R9: one gate. A recording whose mean is *quotable* has no suppression item at all, whatever it
      * carries in `awtInvalidGround` — so the code cannot create a refusal, only word one.
+     *
+     * **The ground is now written into the summary override rather than passed as the second
+     * argument, and that is a strengthening rather than a tidy-up.** `fictionalRecording` spreads
+     * `overrides` last, so an override that replaces the whole summary also replaced the *grounded*
+     * one: this case used to run with no ground present at all, and asserted only that a quotable run
+     * has no suppression item — true, and not the claim in its own name. Writing the ground onto the
+     * quotable summary makes the recording deliberately self-contradictory (a code beside
+     * `awtIsValid: true`, a shape `core` cannot emit and a hand-edited file can) and asserts what R9
+     * actually says: the flag decides, and the ground is inert.
      */
-    const quotable = fictionalRecording(
-      {
-        summary: {
-          ...fictionalRecording().summary,
-          saturated: false,
-          awtIsValid: true,
-          awtInvalidReason: undefined,
-        },
+    const ground = AWT_INVALID_GROUNDS[0];
+    expect(ground, 'core ships at least one ground').toBeDefined();
+    const quotable = fictionalRecording({
+      summary: {
+        ...fictionalRecording().summary,
+        saturated: false,
+        awtIsValid: true,
+        awtInvalidReason: undefined,
+        awtInvalidGround: ground,
       },
-      AWT_INVALID_GROUNDS[0],
-    );
+    });
     const items = disclosureItems({ recording: quotable });
     expect(items.filter((item) => item.origin.kind === 'suppression')).toEqual([]);
     expect(itemsIn(items, 'basic').length).toBeGreaterThan(0);
     expect(parityViolations(items)).toEqual([]);
   });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The transport, on a run this build actually produces
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Everything above hands a ground in. **Nothing above proves a recording carries one.**
+ *
+ * That distinction is the whole of `GAPS.md` § 3's remaining half: the per-ground wording landed one
+ * commit before `VizSummary` had the field, so every assertion in this file passed while the shipped
+ * screen still rendered the ground-free lead. A fixture-only suite cannot tell *"the mechanism works"*
+ * from *"the mechanism is wired"* — which is the roadmap's standing requirement (**name the non-test
+ * caller**) pointed at a contract field rather than at a function.
+ *
+ * So this suite records **real runs** and asserts on what came out of them: `vertical-city` at the
+ * shipped rates, which is the building `live/noMeans.test.ts` uses for the same reason (it saturates
+ * hardest), and `garden-apartments`, which does not saturate and is therefore the control that keeps
+ * the first assertion from being true of everything.
+ */
+const SUPPRESSED_ID = 'vertical-city';
+
+let config: LoadedConfig;
+let suppressed: VizRecording;
+let quotable: VizRecording;
+
+beforeAll(async () => {
+  config = await loadConfig(DATA_DIR);
+  suppressed = recordRun(breadthConfig(config, SUPPRESSED_ID)).recording;
+  quotable = recordRun(fixtureConfig(config)).recording;
+}, 600_000);
+
+describe(`${SUPPRESSED_ID} — a recorded run carries its ground, and Basic reads it`, () => {
+  it('really is refused, or the rest of this proves nothing', () => {
+    expect(meansAreSuppressed(suppressed)).toBe(true);
+    expect(suppressed.summary.awtIsValid).toBe(false);
+  }, 600_000);
+
+  it('carries a ground that is one of core’s, beside non-empty prose', () => {
+    const { awtInvalidGround, awtInvalidReason } = suppressed.summary;
+    expect(awtInvalidGround).toBeDefined();
+    expect(AWT_INVALID_GROUNDS as readonly string[]).toContain(awtInvalidGround);
+    expect(awtInvalidReason ?? '').not.toBe('');
+  }, 600_000);
+
+  it('leads Basic with a sentence about this refusal, and still carries core’s underneath', () => {
+    /*
+     * The assertion the whole change exists for. Before the transport this note was
+     * `SUPPRESSION_LEAD` plus the reason on every real recording; it is now the per-ground lead plus
+     * the reason, and the second half is what R3 forbids dropping.
+     */
+    const items = disclosureItems({ recording: suppressed }).filter(
+      (item) => item.origin.kind === 'suppression',
+    );
+    expect(items.length).toBeGreaterThan(0);
+    const reason = suppressed.summary.awtInvalidReason ?? '';
+    for (const item of items) {
+      const note = item.basic?.note ?? '';
+      expect(note).not.toContain(SUPPRESSION_LEAD);
+      expect(note).toContain('that is a result rather than a gap');
+      expect(note).toContain(reason);
+      /*
+       * The lead is a **lead**: `core`'s sentence is the suffix of the note, not a paraphrase folded
+       * into it. Asserted as a suffix rather than as *"the ground code does not appear"*, because for
+       * the `saturated` ground `core`'s own prose contains the word `saturated` — a not-to-contain
+       * check there would fail on correct output. The *unrecognised* code's invisibility is asserted
+       * against the fictional ground above, where no such collision exists.
+       */
+      expect(note.endsWith(reason)).toBe(true);
+      expect(note.length).toBeGreaterThan(reason.length);
+      expect(item.advanced.note).toBe(reason);
+      expect(item.mustCarry).toContain(reason);
+    }
+    expect(parityViolations(disclosureItems({ recording: suppressed }))).toEqual([]);
+  }, 600_000);
+
+  it('survives the round trip through a saved document at the bumped schema', () => {
+    /*
+     * `readRecordingDocument` refuses a schema newer *or* older than this build by name (`PB-15`), so
+     * a version bump that forgot to stamp the new number would fail here rather than at a reader's
+     * screen. And the ground must survive `JSON.stringify` — a field the contract carries and a file
+     * loses is a field that works only in the session that produced it.
+     */
+    const loaded = readRecordingDocument(JSON.stringify(suppressed));
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.recording.summary.awtInvalidGround).toBe(suppressed.summary.awtInvalidGround);
+    expect(loaded.recording.summary.awtInvalidReason).toBe(suppressed.summary.awtInvalidReason);
+  }, 600_000);
+});
+
+describe('garden-apartments — the control: a quotable run carries no ground at all', () => {
+  it('has no ground, no reason and no suppression item', () => {
+    expect(quotable.summary.awtIsValid).toBe(true);
+    expect(quotable.summary.awtInvalidGround).toBeUndefined();
+    expect(quotable.summary.awtInvalidReason).toBeUndefined();
+    const items = disclosureItems({ recording: quotable });
+    expect(items.filter((item) => item.origin.kind === 'suppression')).toEqual([]);
+    // Not vacuous: the run produced rows, it just produced no refused one.
+    expect(itemsIn(items, 'basic').length).toBeGreaterThan(0);
+  }, 600_000);
+
+  it('drops the pair from the serialised document rather than writing two nulls', () => {
+    // `JSON.stringify` turns an `undefined` value into an absent key, which is why the contract
+    // carries the pair as optional rather than nullable — a `null` ground would be a fifth value.
+    const text = JSON.stringify(quotable);
+    expect(text).not.toContain('awtInvalidGround');
+    expect(text).not.toContain('awtInvalidReason');
+  }, 600_000);
 });

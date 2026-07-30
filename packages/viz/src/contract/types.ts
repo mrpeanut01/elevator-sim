@@ -45,6 +45,7 @@
  */
 
 import type {
+  AwtInvalidGround,
   CarMotion,
   Direction,
   DoorConfig,
@@ -73,6 +74,7 @@ import type {
  * | 5 | {@link VizSummary} widened to what `docs/10-experience-layer-contract.md` § 11 **W2** names: the reporting {@link VizSummary.window}, the long-wait triple, **the count every estimate was computed from** (R13), {@link VizHandlingCapacity}, {@link VizAchievedInterval}, {@link VizServiceLevel} and {@link VizEnergy}. Every field lands with the figure that draws it — `src/render/runSummary.ts`, mounted by `src/dev/main.ts` — because a field with no consumer is this repository's signature defect and W2 is the unit the design says is most likely to acquire one. |
  * | 6 | {@link VizLeg.credentialGroup} added — `docs/10` § 10.4's *"one genuine contract widening U8 needs"*, so the recording can tell **nobody came** from **nobody may come**. Its consumers land in the same change: `src/access/lockedOut.ts` classifies a locked-out landing by it, `src/render/canvas.ts` marks the landing and banners it, and `src/render/describeFrame.ts` says which credential went unread. § 10.4 asked for version 5 and W2 took that number first; this is the same field at the next one. |
  * | 7 | {@link VizLeg.alightedAt}, {@link VizRecording.decisions} and {@link VizRecording.demandPhases} added, for `docs/12-design-handoff.md` § 3.1 BE1, BE2 and BE4. Each lands with the surface that reads it: *carried today* and the report's carried figure read `alightedAt`, the left rail's **WHY IT DID THAT** log reads `decisions`, and the transport timeline reads `demandPhases`. None of the three is derivable from version 6 — `boardedAt` is not delivery, a decision's losing bids are discarded by the time the run returns, and the phase schedule lives on the resolved template rather than on the result. |
+ * | 8 | {@link VizSummary.awtInvalidGround} added — the machine-readable half of a refused mean, beside the sentence {@link VizSummary.awtInvalidReason} has carried since version 1. `core` publishes it on `RunSummary` from `metrics/awtValidity.ts`'s ground table (`the root DECISIONS.md` § D183), and **the consumer landed one commit before the transport**: `src/mode/disclosure.ts` already words a Basic suppression lead per ground and, without this field, fell back to the ground-free sentence on every recording this build produced. So this is the reverse of the usual order and the reason is stated rather than implied — a field arriving before its reader is this repository's dead seam, a reader arriving before its field is a fallback that fires. Not derivable from version 7: which of the four grounds fired is a decision `diagnoseAwtValidity` makes in its own precedence order, and re-deriving it here from `saturated`, `waitCount`, `unservedCount` and `serviceLevel` would be a second answer to a question `core` has already answered — wrong in exactly the case the fourth ground exists for. |
  *
  * ## What version 4 fixed, measured rather than predicted
  *
@@ -105,7 +107,7 @@ import type {
  * a recording arrives from somewhere other than this build and the versions genuinely can
  * disagree (`UX.md` `PB-07`/`PB-15`).
  */
-export const VIZ_SCHEMA_VERSION = 7;
+export const VIZ_SCHEMA_VERSION = 8;
 
 /* -------------------------------------------------------------------------- *
  * Geometry
@@ -637,6 +639,42 @@ export interface VizSummary {
   readonly saturated: boolean;
   readonly awtIsValid: boolean;
   readonly awtInvalidReason?: string | undefined;
+  /**
+   * **Which** ground refused the mean, beside {@link awtInvalidReason}'s sentence — version 8.
+   *
+   * Copied from `RunSummary.awtInvalidGround`, so it is present exactly when
+   * {@link awtInvalidReason} is and carries whatever `core`'s
+   * `metrics/awtValidity.ts#AWT_INVALID_GROUND_SPECS` decided. Typed as `core`'s own
+   * `AwtInvalidGround` rather than `string`, so a fifth ground widens this contract by existing and
+   * a misspelt one does not compile.
+   *
+   * ## It is permission to shorten and never permission to replace
+   *
+   * The reason a renderer wants this is `docs/10` R3: *Basic mode may shorten the reason; it may not
+   * remove it.* Shortening it **honestly** means saying something about *this* refusal, and before
+   * this field the only way to know which one fired was to re-read `saturated`, `waitCount`,
+   * `unservedCount` and `serviceLevel` in `core`'s own precedence order — a second answer to a
+   * question `diagnoseAwtValidity` has already answered, and wrong in precisely the case the fourth
+   * ground exists for (a run that looks unsaturated and uncensored and is refused anyway).
+   *
+   * So `src/mode/disclosure.ts` reads it to choose a **lead sentence** and nothing else.
+   * {@link awtInvalidReason} still follows that lead verbatim and is still on the parity check's
+   * must-carry list. A consumer handed a ground it has no wording for falls back to the ground-free
+   * lead and still shows the prose; showing a bare code, or nothing, would turn a widened
+   * vocabulary into a suppressed refusal, which is the one failure this whole gate exists to
+   * prevent (`the root DECISIONS.md` § D111, § D183).
+   *
+   * **It decides no refusal.** Whether a figure is suppressed at all is still `awtIsValid` through
+   * the single `meansAreSuppressed` gate (R9). A recording could carry a ground beside
+   * `awtIsValid: true` only by being malformed, and a renderer that read the ground *instead of* the
+   * flag would be a second gate.
+   *
+   * Copied beside {@link awtInvalidReason} in one place — `describeSummary` in
+   * `src/record/recordRun.ts` — and never separately, because `core` emits the pair together or not
+   * at all. `JSON.stringify` drops both when the run's mean is quotable, so a recording that
+   * round-trips through a file is byte-identical to one that did not.
+   */
+  readonly awtInvalidGround?: AwtInvalidGround | undefined;
   readonly meanWaitS: number;
   readonly wait95S: number;
   readonly meanTimeToDestinationS: number;

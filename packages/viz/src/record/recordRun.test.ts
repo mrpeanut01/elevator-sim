@@ -140,6 +140,20 @@ describe('a recording', () => {
     const { recording, result } = recordRun(fixtureConfig(config));
     expect(recording.summary.awtIsValid).toBe(result.summary.awtIsValid);
     expect(recording.summary.saturated).toBe(result.summary.saturation.saturated);
+    /*
+     * Version 8: the **ground** travels with the prose, and both are copied rather than re-decided.
+     * Asserted as an identity against `core`'s own field, not against a re-reading of `saturated`,
+     * `waitCount` and `unservedCount` — which is the second source of truth the field exists to
+     * remove. The pair invariant is asserted in both directions because a code without a sentence is
+     * a suppressed refusal and a sentence without a code silently reverts every consumer to the
+     * ground-free lead.
+     */
+    expect(recording.summary.awtInvalidGround).toBe(result.summary.awtInvalidGround);
+    expect(recording.summary.awtInvalidReason).toBe(result.summary.awtInvalidReason);
+    expect(recording.summary.awtInvalidGround === undefined).toBe(
+      recording.summary.awtInvalidReason === undefined,
+    );
+    expect(recording.summary.awtInvalidGround === undefined).toBe(recording.summary.awtIsValid);
   }, 120_000);
 
   it('orders the landings deterministically, not by Map insertion', () => {
