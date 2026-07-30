@@ -326,6 +326,23 @@ describe('the URL round-trips — SH-09', () => {
     }
   });
 
+  it('writes the boot state to the address bar the moment boot completes — the SH-09 residual', async () => {
+    /*
+     * Driven red 2026-07-30 (§ D198): the boot URL stayed bare until the first interaction,
+     * because `urlWritable` flips true only after boot's `runShift()` has already passed
+     * `renderAll`/`syncUrl` — so a link copied before touching anything was a different run
+     * wearing the same address, the exact hazard § D189's "the seed is always written" clause
+     * exists for. § D189's third clause is *nothing writes before boot completes*, not *nothing
+     * writes at boot*: the fix is one `syncUrl()` immediately after the flip, and with the
+     * serializer's own omit-defaults rule an untouched boot writes exactly `?seed=…` (asserted
+     * above). There is no DOM here, so the ordering is pinned at the source: the flip and the
+     * write, adjacent, in that order.
+     */
+    const shell = await readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+    // The flip, then the write, with nothing but whitespace and comments between them.
+    expect(shell).toMatch(/urlWritable = true;(?:\s|\/\*[\s\S]*?\*\/|\/\/[^\n]*)*syncUrl\(\);/);
+  });
+
   it('derives the defaults from initialState rather than restating them', () => {
     const opening = initialState(resources, 0n);
     expect(defaults).toStrictEqual({

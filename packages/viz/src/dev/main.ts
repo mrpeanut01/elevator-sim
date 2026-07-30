@@ -449,6 +449,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
   renderAll();
   runShift();
   urlWritable = true;
+  /*
+   * The one write boot itself owes — the `SH-09` residual (§ D198). The flip above happens after
+   * boot's `runShift()` has already passed `renderAll`/`syncUrl`, so without this line the address
+   * bar stayed bare until the first interaction, and a link copied at that instant was a different
+   * run wearing the same address. § D189's clause is *nothing writes before boot completes*; boot
+   * has completed on this line, and the opening run's seed belongs in the bar from here on —
+   * `replaceState` only and defaults omitted, both `syncUrl`'s own rules, so an untouched boot
+   * writes exactly `?seed=…`.
+   */
+  syncUrl();
   requestAnimationFrame(tick);
 
   /* ====================================================================== *
