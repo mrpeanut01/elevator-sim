@@ -690,15 +690,21 @@ Board: [`WAVE12_PLAN.md`](WAVE12_PLAN.md).
 
 | ID | Unit | Lane | Status |
 |---|---|---|---|
-| T93 | Wire the bank filter (SG-15), with a picture-change test | V | 🟡 assigned |
-| T94 | `Escape` dismisses the drawer (SH-12/KX-11) + KX-10 | V | 🟡 assigned |
-| T95 | URL write-back (SH-09), round-trip tested | V | 🟡 assigned |
-| T96 | `copy run` names the traffic pattern (TP-13) | V | 🟡 assigned |
-| T97 | Machines editor "is not decoration" suite (ME-07) | T | 🟡 assigned |
-| T98 | Arrival-pattern select positive assertion (CO-02) | T | 🟡 assigned |
-| T99 | Honesty seeding: `'basic'` mode axis, express-toggle and access-block strings | H | 🟡 assigned |
-| T100 | The fifth dead-code audit, under `packages/viz` (Phase 9 clause 4 mechanised) | A | 🟡 assigned |
-| T101 | A real authored field replaces `$comment` on the pattern surface (G3-o) | P | 🟡 assigned |
-| T102 | Register corrections: `docs/07` § 8's six stale entries, `docs/10` schema version, two docstrings | D | 🟡 assigned |
+| T93 | Wire the bank filter (SG-15), with a picture-change test | V | ✅ landed `6f6c320` — [§ D187](DECISIONS.md), and § D180's contradiction recorded where it was fixed |
+| T94 | `Escape` dismisses the drawer (SH-12/KX-11) + KX-10 | V | ✅ landed `43ab0ab` — [§ D188](DECISIONS.md); KX-10 built in the same commit |
+| T95 | URL write-back (SH-09), round-trip tested | V | ✅ landed `1e958b3` — [§ D189](DECISIONS.md); `applyDeepLink`'s first direct tests |
+| T96 | `copy run` names the traffic pattern (TP-13) | V | ✅ landed `dbfc22e` — [§ D190](DECISIONS.md); equivalence driven 10/10, refusals for what no flag expresses |
+| T97 | Machines editor "is not decoration" suite (ME-07) | T | ✅ landed `52ae8fc` — [§ D191](DECISIONS.md); the fit-path wiring fact is the keeper |
+| T98 | Arrival-pattern select positive assertion (CO-02) | T | ✅ landed `ea81cb3` — [§ D191](DECISIONS.md) |
+| T99 | Honesty seeding: `'basic'` mode axis, express-toggle and access-block strings | H | ✅ landed `848b182`+`409de31`+`62b7a6d` — [§ D194](DECISIONS.md); always-on corpus 200 248 → 201 832, 0 violations |
+| T100 | The fifth dead-code audit, under `packages/viz` (Phase 9 clause 4 mechanised) | A | ✅ landed `f3084a2` — [§ D192](DECISIONS.md); 8 dead candidates opened as follow-up |
+| T101 | A real authored field replaces `$comment` on the pattern surface (G3-o) | P | ✅ landed `29d8137` — [§ D193](DECISIONS.md) |
+| T102 | Register corrections: `docs/07` § 8's six stale entries, `docs/10` schema version, two docstrings | D | ✅ landed `9ce6a6f` — six pessimistic stale entries retired in place |
 | T103 | Phase 6c measured per § D162 / `docs/13` — serial phase after integration | M | ⬜ gated on integration |
 | T104 | Drive phase: UX § 26 list in a browser; every 🔲 resolved, primary flows end-to-end | — | ⬜ gated on integration |
+| — | Disposition of T100's 8 dead candidates (wire or delete, each with its own verification) | — | ⬜ opened by § D192 |
+
+**Lane conduct:** six lanes, six worktrees, six branches; every `git add` named explicit paths and no
+commit contains another lane's work — R25's remedy held. The wave's own errors — an invalidated
+baseline measurement, a decision number cited before it existed, two silent lane stalls — are
+recorded in [§ D195](DECISIONS.md) rather than tidied away.
