@@ -11785,3 +11785,61 @@ different measurement.
 Phase 6 stays partial in all four status documents; `PINNED_ESTIMATES['lunch-two-way-selection']`
 (20 figures) and `PINNED_LUNCH_COUNTS` are the reproducible record, re-derived by
 `lunchTwoWaySelection.test.ts` on every run.
+
+## D201 — the § D196 pins are environment-dependent, and the symmetry says both measurements were right
+
+**Date: 2026-07-30 · Post-wave-12 review, on `main` at `b25cce3` · Supplements [§ D196](DECISIONS.md); does not overturn it.**
+
+§ D196 found 26 pin guards failing, established that the values they asserted matched no tree it
+could check, and re-pinned them. On a second machine — darwin/arm64, Node 26.5.0 — **the re-pinned
+values fail and the values § D196 replaced pass.** The two results are not in conflict about the
+code. They are the same observation from opposite sides:
+
+| environment | before the re-pin (`821210a^`) | after the re-pin (`821210a`) |
+|---|---|---|
+| § D196's container | **26 fail** | green — 4 873 passed / 10 skipped |
+| darwin arm64 | green — 4 873 passed / 10 skipped | **26 fail** |
+
+Identical in both directions, which is what makes it a finding rather than a dispute: the same three
+files (`traffic/mixIdentity.test.ts` 10, `traffic/transportIdentity.test.ts` 15,
+`benchmark/predictorLag.test.ts` 1), the same 26 assertions, the same skip count of 10. Each
+environment reproduces its own pin set exactly and the other's not at all.
+
+**What is eliminated.** Node version. Measured digests and `forecast-causality` figures are
+bit-identical under Node 26.5.0 and 26.5.1 here; § D196 independently found them bit-identical under
+Node 22 and Node 26. Both investigations controlled for the same variable and neither controlled for
+the platform. § D196 names it in passing — *"the engine mismatch this container runs under"* — and it
+is the one axis no measurement on either side has isolated.
+
+**What is withdrawn.** This review first concluded the re-pinned values could only have come from an
+uncommitted working tree. That is retracted: § D196 documents checking out `9f1adf7` and computing
+them from it, and the symmetry above explains every observation without any accusation. § D196's
+verdict — *"the pinned values match no committed tree"* — was true **of the tree it could reach**,
+and the missing qualifier is the whole finding.
+
+**The mechanism is a hypothesis, not a result.** Traces run through `Math.log` and `Math.cos` in
+`random/rng.ts` (Box–Muller, and the exponential draw) and `Math.log` in `traffic/poissonBatch.ts`.
+V8 ships its own fdlibm precisely to keep these stable across platforms, so the obvious explanation
+is also the one that ought not to hold. Confirming it needs the two platforms measured side by side,
+which is what `.github/workflows/ci.yml` now does.
+
+**Decision.** Treat the pin design as the defect, not either pin set. A whole-result digest compared
+with `toBe` is an excellent regression oracle and an invalid portability oracle, and nothing in the
+suite distinguished the two roles. Three consequences:
+
+1. **CI exists, and it is a two-OS matrix** (`ubuntu-latest`, `macos-latest`). Until now this
+   repository had no CI at all, so *no* environment was canonical and the first machine to run a
+   suite silently became the reference. A pin that holds on both legs is portable; a pin that splits
+   the matrix is environment-dependent and is now visible as such on the run that proves it.
+2. **The revert of `821210a` is provisional and is not a fix.** It makes the suite green on
+   darwin/arm64 and would return § D196's container to red. It is in the branch so the matrix can
+   judge both pin sets on both platforms in one run.
+3. **A published exact value needs its environment recorded beside it**, the way
+   [§ D106](DECISIONS.md) requires a figure to carry its run. `GAPS.md`'s close figure now names the
+   platform it was measured on; a figure that names only its commit and its Node version is
+   under-specified, which is how two correct measurements came to look like one wrong one.
+
+**Impact.** No phase verdict moves — none of the 26 assertions is an acceptance criterion. The
+standing rule this adds is in the same family as the repository's existing one about stale numbers:
+*if you publish a number, pin it to the run that produced it* — and a run is a machine, not only a
+commit.
