@@ -70,6 +70,14 @@ export interface StreamSeed {
 export interface StreamSetSnapshot {
   /** Decimal string, because a `bigint` does not survive `JSON.stringify`. */
   readonly masterSeed: string;
+  /**
+   * Decimal string, present only when the set was built with one.
+   *
+   * Absent rather than equal to `masterSeed` when unset: "there was no traffic seed" and "the
+   * traffic seed happened to match the run seed" are different runs, and a snapshot that conflated
+   * them would replay one as the other.
+   */
+  readonly trafficSeed?: string;
   readonly streams: Readonly<Record<string, RngState>>;
 }
 
@@ -129,6 +137,37 @@ export function deriveStreamSeed(masterSeed: number | bigint, streamName: string
 }
 
 /**
+ * The streams that describe **who turns up**, as opposed to how the machine behaves.
+ *
+ * The split is the whole content of {@link StreamSetOptions.trafficSeed}: give these four a
+ * separate seed and you can re-roll the crowd while the building, the doors and the dispatcher's
+ * own noise stay exactly where they were — or hold the crowd and change the machine, which is
+ * common random numbers expressed as a knob rather than as a convention.
+ *
+ * `doorObstruction` is deliberately **not** here. An obstruction is a property of the door and the
+ * moment, not of the person: putting it on the traffic seed would mean "the same crowd" also meant
+ * "the same doors jamming", and the two questions would stop being separable.
+ */
+const TRAFFIC_STREAM_NAMES: ReadonlySet<string> = new Set([
+  'arrivals',
+  'origins',
+  'destinations',
+  'passengerMass',
+]);
+
+/** Optional second seed, for separating demand from machine. See {@link StreamSet}. */
+export interface StreamSetOptions {
+  /**
+   * Seeds the demand-side streams ({@link TRAFFIC_STREAM_NAMES}) independently of the run seed.
+   *
+   * **Omit it and nothing changes.** Every stream then derives from the master seed exactly as it
+   * did before this option existed, which is what keeps every pinned figure and both identity
+   * digests reproducing byte for byte (docs/14 § 0).
+   */
+  readonly trafficSeed?: number | bigint | undefined;
+}
+
+/**
  * The six named streams required by the architecture, plus on-demand derivation for any
  * additional source.
  *
@@ -143,10 +182,33 @@ export function deriveStreamSeed(masterSeed: number | bigint, streamName: string
  *
  * For common random numbers, hand every candidate configuration a `new StreamSet(sameSeed)`.
  * Each will see the identical passenger trace regardless of how differently the cars behave.
+ *
+ * ## Two seeds, when you want to vary one thing at a time
+ *
+ * A second, optional seed splits *who turns up* from *how the machine behaves*
+ * ({@link StreamSetOptions.trafficSeed}):
+ *
+ * ```ts
+ * new StreamSet(runSeed, { trafficSeed: 7 });  // same building, a different Tuesday
+ * new StreamSet(otherRunSeed, { trafficSeed: 7 });  // the same Tuesday, a different machine
+ * ```
+ *
+ * Omit it and every stream derives from the master seed exactly as before, which is what keeps
+ * every published figure reproducing (docs/14 § 0).
  */
 export class StreamSet {
   /** The seed this set was built from. Persist it with every run record (invariant 5). */
   readonly masterSeed: bigint;
+
+  /**
+   * The demand-side seed, when one was given.
+   *
+   * `undefined` means the demand streams derive from {@link masterSeed}, which is the default and
+   * the pre-existing behaviour. **When it is set, invariant 5 requires both seeds on the run
+   * record** — a record carrying only the master seed cannot replay a run whose crowd came from
+   * somewhere else, and that is a corrupt record rather than a terse one.
+   */
+  readonly trafficSeed: bigint | undefined;
 
   /** Passenger arrival times. */
   readonly arrivals: Rng;
@@ -163,8 +225,10 @@ export class StreamSet {
 
   readonly #streams = new Map<string, Pcg32>();
 
-  constructor(seed: number | bigint) {
+  constructor(seed: number | bigint, options: StreamSetOptions = {}) {
     this.masterSeed = normalizeSeed(seed);
+    this.trafficSeed =
+      options.trafficSeed === undefined ? undefined : normalizeSeed(options.trafficSeed);
 
     this.arrivals = this.#derive('arrivals');
     this.origins = this.#derive('origins');
@@ -202,7 +266,12 @@ export class StreamSet {
    * stored seed instead — that is the sanctioned path and it needs no snapshot.
    */
   clone(): StreamSet {
-    const copy = new StreamSet(this.masterSeed);
+    // Both seeds, or the copy would silently re-derive the demand streams from the master seed and
+    // branch into a different crowd — the one failure a clone must not have.
+    const copy = new StreamSet(
+      this.masterSeed,
+      this.trafficSeed === undefined ? {} : { trafficSeed: this.trafficSeed },
+    );
     for (const [name, rng] of this.#streams) {
       copy.#derive(name).setState(rng.getState());
     }
@@ -217,8 +286,22 @@ export class StreamSet {
     }
     return Object.freeze({
       masterSeed: this.masterSeed.toString(),
+      ...(this.trafficSeed === undefined ? {} : { trafficSeed: this.trafficSeed.toString() }),
       streams: Object.freeze(streams),
     });
+  }
+
+  /**
+   * Which seed a stream derives from.
+   *
+   * Returns {@link masterSeed} for every stream unless a traffic seed was supplied *and* the stream
+   * is a demand stream — so with no traffic seed this is the identity function on the old
+   * behaviour, and byte-identity is structural rather than tested for.
+   */
+  #seedFor(name: string): bigint {
+    return this.trafficSeed !== undefined && TRAFFIC_STREAM_NAMES.has(name)
+      ? this.trafficSeed
+      : this.masterSeed;
   }
 
   #derive(name: string): Pcg32 {
@@ -229,7 +312,7 @@ export class StreamSet {
     if (name.length === 0) {
       throw new RangeError('Stream name must not be empty');
     }
-    const { initState, initSeq } = deriveStreamSeed(this.masterSeed, name);
+    const { initState, initSeq } = deriveStreamSeed(this.#seedFor(name), name);
     const rng = new Pcg32(initState, initSeq);
     this.#streams.set(name, rng);
     return rng;

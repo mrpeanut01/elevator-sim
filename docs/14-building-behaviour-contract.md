@@ -1,6 +1,12 @@
 # Building behaviour — the contract
 
-**Status: designed, not built. Criteria written before the implementation, which is the point.**
+**Status: designed; step 1 built. Criteria written before the implementation, which is the point.**
+
+| Step | State |
+|---|---|
+| 0 — dual-lobby / escalator authoring (§ 5a) | designed |
+| **1 — traffic seed separation (§ 1.1)** | **built** — `StreamSet(seed, { trafficSeed })`, reaching `runSimulation` and reported on the result; `sim/trafficSeedSeam.test.ts` drives it end to end |
+| 2–6 | designed |
 
 This document covers one program in three parts: **richer traffic variance**, **passenger
 behaviour**, and **a learned dispatcher you can teach**. They are one program because they share a
@@ -212,12 +218,41 @@ the saturation detector already exists to catch and report it.
 
 ### 3.3 Stairs, with the asymmetry real people have
 
-**Contract.** An optional per-passenger mode choice from the `modeChoice` stream. A journey may be
-taken by stairs when all hold:
+**This one is half-built already, and that changes its cost.** Upper and lower lobbies joined by an
+escalator ship today: `TransportModeConfig` declares a non-lift connection between two floors with a
+traversal time, `vertical-city` authors four of them (`G↔2`, `26↔27`, `51↔52`, `76↔77` — a ground
+lobby and three sky lobbies), the router sends journeys over them, and `ConservationAudit.
+transportHops` accounts for every crossing. § D170 recorded the effect when they landed: *26
+journeys routed over different floors — `30 → 45` stops going `30>26>G>2>27>45` and goes
+`30>26>27>45`*.
 
-1. the floors are connected by a stairwell the building declares;
+So the geometry, the traversal accounting, the conservation audit and the config validation all
+exist. **Stairs are a new mode kind on a shipped model, not a new subsystem.** Three additions:
+
+**1. A `kind` discriminator.** `'escalator' | 'stairs'`, defaulting to `'escalator'` when absent so
+every existing building parses unchanged and every trace stays byte-identical (§ 0).
+
+**2. Directional traversal time — the physical asymmetry.** `traversalTimeS` is a single number
+today, which is correct for an escalator: it carries you at one speed in the direction it runs.
+Stairs are not symmetric. Climbing a flight costs more time and more effort than descending it, so
+the field must accept either a scalar (escalator, unchanged) or `{ upS, downS }` (stairs). A stairs
+mode declared with a scalar is a config error, not a default — the asymmetry is the modelling
+content, and silently symmetrising it would be the failure this section exists to avoid.
+
+**3. Elective use — the behavioural asymmetry.** An escalator is *structural*: the router uses it
+because the building's geometry says those floors connect. Stairs are *chosen*: the passenger
+decides, and most of the time decides against. So a stairs mode is not consulted by the router at
+all. It is offered to the passenger, and taken when all hold:
+
+1. the floors are connected by a declared stairs mode;
 2. the journey is within a declared floor-count reach;
 3. the drawn propensity clears the threshold for that journey.
+
+**The two asymmetries are independent and both are required.** A rider descending four flights and
+one climbing four flights face different *costs* (1) and have different *willingness* (3). Modelling
+only the cost would have people cheerfully climbing forty floors slowly; modelling only the
+willingness would have the ones who do climb arrive as fast as those going down. Neither is a
+building.
 
 **The asymmetry is the modelling content, and it is the request.** Propensity must be a function of
 *signed* floor delta, not of distance. Descending two floors is close to free; ascending two floors
@@ -310,12 +345,46 @@ run, not an argument.
 
 ---
 
+## 5a. The dual-lobby gap is in the designer, not the engine
+
+Found 2026-07-31 while scoping § 3.3, and it is the inverse of this repository's usual defect: the
+engine is complete and the **authoring surface is missing**.
+
+Shipping today: `TransportModeConfig` in the schema, four escalators authored in
+`data/buildings/vertical-city.json`, cross-validation with dedicated warning codes, routing over
+them, and `ConservationAudit.transportHops` counting every crossing. Measured, pinned, and green on
+both CI platforms.
+
+Not shipping: **any way to author one.** `viz/src/authoring/buildingSpec.ts` exposes five
+parameters — floors, floor height, capacity per floor, occupancy, cars — and produces a uniform
+tower. The string `transportMode` does not appear anywhere in `packages/viz` outside one comment.
+
+So the most interesting building this simulator can *run* is one a player cannot *build*. A
+supertall with sky lobbies is the canonical case for group control — it is why `vertical-city`
+exists as a reference building — and it is reachable only by hand-editing JSON.
+
+**Contract.** The building designer gains a sky-lobby section: zero or more lobby pairs, each
+declaring the two floors it joins and the traversal time between them, emitted as
+`transportModes` entries. The generated building is validated by the same schema path as an
+authored one, because a designer that can produce a config the loader rejects is worse than one that
+cannot produce it at all.
+
+**Why it is sequenced first.** It touches no draw, moves no trace, and invalidates no pin — it adds
+a way to *write* a config the engine has always read. It is the cheapest item in this document and
+the most visible in play, and it is independent of every other step. It also carries its own
+version of § 5 criterion 2: **move the control and require the run to change**, compared on the
+legs. A sky-lobby control that emits a mode the router ignores would be the eleventh defect wearing
+a new hat.
+
+---
+
 ## 6. Sequencing
 
 The order is forced by the dependencies, not chosen for convenience:
 
 | Step | Delivers | Why here |
 |---|---|---|
+| 0 | Dual-lobby / escalator authoring in the designer (§ 5a) | Independent of everything else; moves no trace; the engine already supports it |
 | 1 | Traffic seed separation (§ 1.1) | Nothing else can be held-out-tested without it; changes no draw |
 | 2 | `trafficModel: 'v2'` + `batchSize` stream (§ 1.3) | The one trace-moving change, isolated behind a flag and landed alone |
 | 3 | Mass control, group-size curve (§ 2.1–2.2) | Both need step 2's stream; both are pure traffic |

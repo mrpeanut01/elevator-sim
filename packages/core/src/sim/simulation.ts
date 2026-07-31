@@ -566,7 +566,10 @@ export class Simulation {
 
   constructor(config: SimulationConfig) {
     this.#options = resolveOptions(config);
-    this.#streams = new StreamSet(config.seed);
+    this.#streams = new StreamSet(
+      config.seed,
+      config.trafficSeed === undefined ? {} : { trafficSeed: config.trafficSeed },
+    );
     this.#kernel = new SimKernel({ maxEventsPerRun: this.#options.maxEvents });
     this.#resolved = config.building;
 
@@ -3349,6 +3352,15 @@ export class Simulation {
       status,
       runId: this.#runId,
       seed: record.seed,
+      /*
+       * Spread-or-omit rather than `trafficSeed: x ?? undefined`: under `exactOptionalPropertyTypes`
+       * those are different types, and more importantly they are different *claims*. An absent key
+       * says the run had no traffic seed; a present `undefined` says it had one that is missing.
+       * Invariant 5 cares about the difference — only the first replays from `seed` alone.
+       */
+      ...(this.#streams.trafficSeed === undefined
+        ? {}
+        : { trafficSeed: this.#streams.trafficSeed.toString() }),
       buildingId: this.#resolved.id,
       dispatcherProfileId: this.#profileId,
       trace: this.#trace,
