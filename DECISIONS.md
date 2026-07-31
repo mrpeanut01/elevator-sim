@@ -11718,3 +11718,70 @@ the failed-boot pill and footer authored; the "2 of 1 clean shifts" clamp, displ
 One honest deviation kept as its own commit (`0564338`): TP-08's extraction created a new prose
 producer and the honesty derivation guard went red — correctly — before the lane classified it.
 **The tripwire § D195 recorded lane V answering is now a routine any lane answers.**
+
+## D200 — **Phase 6c on `lunch-two-way`: the third refusal, on the traffic the first two could not express** — and the flat control's BETTER is a static hybrid, named by its own probe
+
+**Date:** 2026-07-30 · **Owner:** T103 · **Measures against:** [§ D139](#d139) as raised by [§ D140](#d140) and [§ D151](#d151) §§ 2–3, under [§ D162](#d162)'s five conditions · **Verdict:** `NOT ACCEPTED` · **Closes:** `GAPS.md` § 1 and § D162's gated measurement · **Protocol:** `docs/13-phase-6c-handover.md`, executed cold
+
+**Context.** § D156 refused Phase 6c at all five PRIMARY cells and named the mechanism: no shipped
+operating point varied the directional mix within a run. § D169 built the condition
+(`lunch-two-way`, χ² 383.4 against a flat control's 4.8) and ran no arm; § D162 fixed, in advance,
+the only terms under which measuring on it could count — the unchanged gate, and a flat-mix
+negative control at equal total demand, measured in the same run, that can still refuse the phase.
+
+**What ran.** `benchmark/lunchTwoWaySelection.ts`, three times with identical gate figures. Step 0
+censused both shipped cells at tuning seed 20260726 (200 × 12): every arm quotable on both, no
+ceiling on either, reference **`auction-multi-round` on both**. Budget variance-derived per
+`matrix.ts` on the gate metric — binding arm `nearest-car`, s_D 19.414/14.725 s, unclamped
+1448/833, clamped to the band's **ceiling of 200**; the 50-floor checked by hand because the study
+clamp has none. Then per cell: the regime screen, the TTD resolution limit at the cell at the
+tuning seed (structural **0.412 s** / **0.461 s**), the 64-candidate search, the verdict at n = 200
+on disjoint holdout 20261537 under CRN; Holm within a **new declared family of exactly the
+treatment cell**, never pooled with § D151's; the 2 s deadband known-answer in-session
+(**1.691 s**, inside [1, 3], ΔAWT −2.189).
+
+**A wiring bug first, caught by G11's own rule.** The first run's treatment and control screens
+were byte-identical — five diagnostic `runSimulation` call sites dropped the point's
+`demandTemplate`. The gate path (`runner/experiment.ts`) always passed it, so no
+published-figure-bearing number moved on the fix (commit `0a7bb4d`); the screen, traces and
+liveness did. A no-op for every § D145/§ D151 cell.
+
+**The numbers.** Treatment (mix 90/0/10 → 0/90/10): learned ΔTTD **−0.170 [−0.405, +0.064]**
+INDISTINGUISHABLE, p = 0.1538, an eighth of the cell's own 0.412 s limit; generalizes in sign
+(−0.205 → −0.170) and is still unresolvable. Fuzzy +0.186 [−0.026, +0.399]. Costs beside, never
+folded in: AWT +0.263 WORSE, WT95 +0.809 WORSE, energy +4.444 kJ/served leg WORSE beside the raw
++415.9 kJ. The screen proves the condition occurred: `two-way` incumbent on **66.1 %** of
+observations, 3 regimes, split drift +10.38 σ against the control's +3.97 σ. Flat control (same
+template, `mixAmplitude: 0`, equal total demand, same seeds): learned ΔTTD **−0.576
+[−0.833, −0.319]** BETTER, above its own 0.461 s limit, holding `predictive-balanced`'s vector on
+90.9 % of decisions.
+
+**The verdict, and the clauses that decided it.** NOT ACCEPTED on four independent grounds: the
+interval contains zero; Holm retains it (α = 0.05, family of one, declared before any ΔTTD); the
+effect is below the cell's own TTD-measured limit — § D140's raise, a gate condition and not a
+caveat; and § D162 condition 5 fired. The condition-5 finding was investigated, not filed: pinning
+`predictive-balanced`'s vector on the reference profile for the whole run — no selector — is
+BETTER by **−0.720 [−0.973, −0.467]** on the control and **−0.667 [−0.923, −0.412]** on the
+treatment at the verdict seed, more than the learned arm achieves on either cell. The advantage is
+a **static weight-vector hybrid** (the auction stages carrying a better-for-TTD vector at this
+point, at an AWT cost of ~+0.4 s); the switching subtracts from it. It is not mix exploitation and
+it accepts nothing — and it is a finding about `data/`, not about learning: the shipped
+`auction-multi-round` vector is not TTD-optimal at this point.
+
+**What is claimed and what is not.** Claimed: learned weight-set selection **does not** improve
+TTD, measurably, under traffic whose directional mix changes within the run, at the one shipped
+operating point that expresses it — with the detector engaged (`two-way` incumbent), the search
+validated on a known answer, and the budget, reference and limits fixed before the result. Not
+claimed: *"learned control does not work"* anywhere else, any statement about other mix-varying
+points, or any reading of the control's BETTER as a selector win. § D145 (one cell, −0.213
+[−0.440, +0.014]) and § D156 (eight cells, refused at all five PRIMARY under Holm) stand unchanged
+beside this entry. The § D169 discount cuts against every better-side figure here: the shipped arc
+is the **widest** its citation permits, and a real building's smoother arc is harder to exploit.
+This is the third refusal, § D162 explicitly permitted it, and it closes the question § D156
+opened rather than leaving it open — what would move Phase 6c now is a different selector, not a
+different measurement.
+
+**Impact.** `GAPS.md` § 1 closed; the lunch census gap closed (no ceiling at 200 on either cell);
+Phase 6 stays partial in all four status documents; `PINNED_ESTIMATES['lunch-two-way-selection']`
+(20 figures) and `PINNED_LUNCH_COUNTS` are the reproducible record, re-derived by
+`lunchTwoWaySelection.test.ts` on every run.

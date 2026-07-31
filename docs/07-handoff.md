@@ -23,7 +23,7 @@ the shape of all three, and **Phase 9's ✅ is the one that must not be read alo
   the learned arm's ΔTTD is `−0.170 [−0.405, +0.064]`, containing zero and below the cell's own
   0.412 s TTD-measured limit, and the flat-mix negative control exposed the residual advantage as a
   **static weight-vector hybrid** the switching subtracts from (`benchmark/lunchTwoWaySelection.ts`;
-  verdict entry drafted, landing as the next numbered decision).
+  [§ D200](../DECISIONS.md) is the verdict).
   Double-deck operation
   is **simulated** ([§ D131](../DECISIONS.md)) and **benchmarked** ([§ D147](../DECISIONS.md)) to a
   **dispatcher-dependent** verdict; the disclaimer survives only in the narrower case of a
@@ -1025,7 +1025,7 @@ operating points and it held, NOT ACCEPTED at all five PRIMARY cells under Holm�
 [§ D156](../DECISIONS.md). § D145 is kept as the history it is; cite § D156 for the current
 verdict. Corrected again later the same day: the § D162 re-measurement on `lunch-two-way` has now
 also run and refused, so the mix-varying question itself is closed — the record is
-`benchmark/lunchTwoWaySelection.ts` and its pinned figures, verdict entry to follow.)*
+`benchmark/lunchTwoWaySelection.ts` and its pinned figures, [§ D200](../DECISIONS.md).)*
 
 ### Where this register was wrong about itself
 

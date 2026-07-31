@@ -24,7 +24,7 @@ Nothing in this file is a plan. Items are ordered by whether they can produce a 
 
 ---
 
-## 1. ~~The largest one: Phase 6c has not been re-measured~~ — CLOSED BY MEASUREMENT (2026-07-30, under [§ D162](DECISIONS.md); verdict entry drafted, landing as the next numbered decision), and the answer is the third refusal
+## 1. ~~The largest one: Phase 6c has not been re-measured~~ — CLOSED BY MEASUREMENT (2026-07-30, under [§ D162](DECISIONS.md); [§ D200](DECISIONS.md) is the verdict), and the answer is the third refusal
 
 **Phase 6 is ⚠️ partial and stays partial — now with the question closed rather than open.**
 
