@@ -61,7 +61,9 @@ import {
   canExpress,
   carLabelOf,
   credentialGroupsOf,
+  escalatorSecondsFor,
   floorIdOf,
+  nextTransportModeId,
   nextZoneId,
   occupancyAt,
   occupancyLine,
@@ -70,13 +72,17 @@ import {
   servesLobby,
   specFromBuilding,
   specIsDirty,
+  transportModesOf,
   validateSpec,
+  withTransportEnd,
+  withTransportSeconds,
   withZoneFloor,
   withZoneGroup,
   zoneFloorsOf,
   type BuildingSpec,
   type SpecAccessZone,
   type SpecRow,
+  type SpecTransportMode,
 } from '../authoring/buildingSpec.js';
 import {
   CREDENTIAL_STATES,
@@ -802,6 +808,112 @@ export function zoneGroupChoicesOf(spec: BuildingSpec, zoneId: string): readonly
   return credentialGroupsOf(spec).map((group) => ({ group, inZone: held.has(group) }));
 }
 
+/* -------------------------------------------------------------------------- *
+ * Sky lobbies — pure
+ * -------------------------------------------------------------------------- */
+
+/** One escalator, as the selector draws it. Facts, not a label — the mount composes the words. */
+export interface TransportChoice {
+  readonly id: string;
+  readonly lowerId: string;
+  readonly upperId: string;
+  readonly seconds: number;
+  readonly selected: boolean;
+  /** Whether this machine is written to the saved document at all. */
+  readonly written: boolean;
+  /** Whether a journey may change onto a lift at either of its two landings. */
+  readonly wayThrough: boolean;
+}
+
+export function transportChoicesOf(
+  spec: BuildingSpec,
+  selectedId: string,
+): readonly TransportChoice[] {
+  const written = new Set(transportModesOf(spec).map((mode) => mode.id));
+  const skies = new Set(spec.skyFloors);
+  return spec.transportModes.map((mode): TransportChoice => {
+    const [low, high] = [Math.min(...mode.connects), Math.max(...mode.connects)];
+    return {
+      id: mode.id,
+      lowerId: floorIdOf(low),
+      upperId: floorIdOf(high),
+      seconds: mode.traversalTimeS,
+      selected: mode.id === selectedId,
+      written: written.has(mode.id),
+      wayThrough: mode.connects.some((floor) => skies.has(floor)),
+    };
+  });
+}
+
+/** The machine a mount should draw as selected: the one asked for, else the first, else none. */
+export function selectedTransportOf(
+  spec: BuildingSpec,
+  wanted: string,
+): SpecTransportMode | undefined {
+  return spec.transportModes.find((mode) => mode.id === wanted) ?? spec.transportModes[0];
+}
+
+/**
+ * One entry of a landing picker — the same control the zone floor multi-select is, single-select.
+ *
+ * The floor already held by the *other* end is offered as `blocked` rather than dropped, because a
+ * gap in the ladder is a control that has silently changed shape. `withTransportEnd` refuses the
+ * click, so the state the loader refuses stays unreachable either way.
+ */
+export interface TransportFloorChoice {
+  readonly floor: number;
+  readonly floorId: string;
+  readonly chosen: boolean;
+  readonly blocked: boolean;
+  readonly isTransfer: boolean;
+}
+
+export function transportFloorChoicesOf(
+  spec: BuildingSpec,
+  modeId: string,
+  end: 0 | 1,
+): readonly TransportFloorChoice[] {
+  const mode = spec.transportModes.find((entry) => entry.id === modeId);
+  const skies = new Set(spec.skyFloors);
+  const choices: TransportFloorChoice[] = [];
+  for (let floor = spec.floors; floor >= 0; floor -= 1) {
+    choices.push({
+      floor,
+      floorId: floorIdOf(floor),
+      chosen: mode?.connects[end] === floor,
+      blocked: mode?.connects[1 - end] === floor,
+      isTransfer: skies.has(floor),
+    });
+  }
+  return choices;
+}
+
+/**
+ * The sentence under the escalator controls, or `''` when the building declares none.
+ *
+ * It says the one thing the two pickers cannot: whether the machine is a *way through* or a
+ * two-floor errand. `traffic/route.ts` lets a journey change onto a lift only at a transfer level,
+ * so an escalator with neither landing marked carries exactly the people who start on one of its
+ * floors and finish on the other. That is a building somebody may mean; it is not one anybody
+ * means by accident.
+ */
+export function transportNoteOf(spec: BuildingSpec): string {
+  const choices = transportChoicesOf(spec, '');
+  if (choices.length === 0) return '';
+  const written = choices.filter((choice) => choice.written);
+  const through = written.filter((choice) => choice.wayThrough).length;
+  const lead =
+    `${String(written.length)} of ${String(choices.length)} escalator${choices.length === 1 ? '' : 's'} ` +
+    'written to the document. The router rides one in preference to a lift leg, so a crossing it ' +
+    'carries is a crossing the lifts are no longer charged for.';
+  if (written.length === 0) return lead;
+  return (
+    `${lead} ${String(through)} of ${String(written.length)} touch a transfer level and are a way ` +
+    'through the building; the rest carry only the people who start on one of their two floors ' +
+    'and finish on the other.'
+  );
+}
+
 /** The sentence under the legend: how many banks there are, and what a bank means. */
 export function elevationNoteOf(spec: BuildingSpec): string {
   const banks = banksOf(spec);
@@ -951,6 +1063,19 @@ const ZONE_GROUP_TITLE =
   'Click to admit this credential group to the selected zone, or withdraw it. Permission on a floor ' +
   'is the union over every zone covering it.';
 
+/*
+ * Module-private, like `EXPRESS_TITLE` above and for the constraint stated there: a string literal
+ * carrying an `a.b` inside a template becomes an unclassified prose surface in `honesty/derive`.
+ */
+const TRANSPORT_LANDING_TITLE =
+  'One of the escalator’s two landings. The picker offers this building’s own floors, so a connection can never name a floor the document does not have.';
+
+const TRANSPORT_TRANSFER_TITLE =
+  'A transfer level: a journey may change onto a lift here, so an escalator landing here is a way through the building rather than a trip between two floors.';
+
+const TRANSPORT_BLOCKED_TITLE =
+  'The other landing already stands here. The loader refuses a connection whose two ends name one floor — a machine that starts and ends on the same floor moves nobody.';
+
 const MATRIX_EMPTY =
   'No access zone, so every floor is open to every credential — core’s own semantics for a floor no ' +
   'zone covers, and what four of the five shipped buildings declare. Add a zone to restrict the ' +
@@ -1033,6 +1158,15 @@ export function mountBuildingEditor(
     const zone = selectedZoneOf(current, selectedZoneId);
     if (zone !== undefined) selectedZoneId = zone.id;
     return zone;
+  }
+
+  /** Which escalator the landing pickers are pointed at. Mount-local, for `selectedZoneId`'s reason. */
+  let selectedTransportId = '';
+
+  function transportOf(current: BuildingSpec): SpecTransportMode | undefined {
+    const mode = selectedTransportOf(current, selectedTransportId);
+    if (mode !== undefined) selectedTransportId = mode.id;
+    return mode;
   }
 
   /* --- static wiring, once ------------------------------------------------ */
@@ -1124,6 +1258,47 @@ export function mountBuildingEditor(
     if (zone.credentialGroups.includes(typed)) return;
     patch({ accessZones: withZoneGroup(current, zone.id, typed) });
   }
+
+  elements.addTransport.addEventListener('click', () => {
+    const current = spec();
+    if (current === undefined) return;
+    const id = nextTransportModeId(current);
+    /*
+     * A new machine starts on the two-level lobby every building already has the floors for: the
+     * lowest sky floor and the level above it, or the ground lobby and floor 1 when the reader has
+     * marked none. Adjacent by construction, which is the case the EN 115-1 seed is derived for.
+     */
+    const lower = [...current.skyFloors]
+      .filter((floor) => floor > 0 && floor < current.floors)
+      .sort((a, b) => a - b)[0];
+    const connects: readonly [number, number] = lower === undefined ? [0, 1] : [lower, lower + 1];
+    const mode: SpecTransportMode = {
+      id,
+      connects,
+      traversalTimeS: escalatorSecondsFor(current, connects),
+    };
+    selectedTransportId = id;
+    patch({ transportModes: [...current.transportModes, mode] });
+  });
+
+  elements.removeTransport.addEventListener('click', () => {
+    const current = spec();
+    if (current === undefined) return;
+    const mode = transportOf(current);
+    if (mode === undefined) return;
+    selectedTransportId = '';
+    patch({ transportModes: current.transportModes.filter((entry) => entry.id !== mode.id) });
+  });
+
+  elements.transportSeconds.addEventListener('change', () => {
+    const current = spec();
+    if (current === undefined) return;
+    const mode = transportOf(current);
+    if (mode === undefined) return;
+    patch({
+      transportModes: withTransportSeconds(current, mode.id, Number(elements.transportSeconds.value)),
+    });
+  });
 
   elements.groupAdd.addEventListener('click', addTypedGroup);
   elements.groupName.addEventListener('keydown', (event) => {
@@ -1739,6 +1914,71 @@ export function mountBuildingEditor(
     );
   }
 
+  /* --- sky lobbies -------------------------------------------------------- */
+
+  function drawTransport(current: BuildingSpec): void {
+    const mode = transportOf(current);
+
+    fill(
+      elements.transportChips,
+      chipRow(
+        doc,
+        transportChoicesOf(current, selectedTransportId).map((choice) => ({
+          label: `${choice.lowerId}↔${choice.upperId} · ${choice.seconds.toFixed(1)} s`,
+          selected: choice.selected,
+          title: choice.written
+            ? choice.wayThrough
+              ? `${choice.id} joins ${choice.lowerId} and ${choice.upperId} in ${choice.seconds.toFixed(1)} s, and one of the two is a transfer level, so a journey can change onto a lift there.`
+              : `${choice.id} joins ${choice.lowerId} and ${choice.upperId} in ${choice.seconds.toFixed(1)} s. Neither is a transfer level, so it carries only the people who start on one of those floors and finish on the other.`
+            : `${choice.id} is not written to the saved document — the elevation's warnings say why.`,
+          onPick: () => {
+            selectedTransportId = choice.id;
+            // A selection is not a document edit, so it redraws rather than going through `patch`.
+            drawTransport(current);
+          },
+        })),
+      ),
+    );
+    elements.removeTransport.disabled = mode === undefined;
+    elements.transportSeconds.disabled = mode === undefined;
+    const seconds = mode === undefined ? '' : mode.traversalTimeS.toFixed(1);
+    if (elements.transportSeconds.value !== seconds) elements.transportSeconds.value = seconds;
+
+    for (const [end, node] of [
+      [0, elements.transportLower],
+      [1, elements.transportUpper],
+    ] as const) {
+      fill(
+        node,
+        ...(mode === undefined
+          ? []
+          : transportFloorChoicesOf(current, mode.id, end).map((choice) => {
+              const button = el(doc, 'button', {
+                className: 'zone-floor',
+                text: choice.floorId,
+                title: choice.blocked
+                  ? TRANSPORT_BLOCKED_TITLE
+                  : choice.isTransfer
+                    ? `${TRANSPORT_TRANSFER_TITLE} ${TRANSPORT_LANDING_TITLE}`
+                    : TRANSPORT_LANDING_TITLE,
+                attrs: {
+                  type: 'button',
+                  'aria-pressed': choice.chosen ? 'true' : 'false',
+                  'data-shared': choice.isTransfer ? 'true' : 'false',
+                },
+              });
+              button.disabled = choice.blocked;
+              button.addEventListener('click', () => {
+                patch({ transportModes: withTransportEnd(current, mode.id, end, choice.floor) });
+              });
+              return button;
+            })),
+      );
+    }
+
+    setText(elements.transportNote, transportNoteOf(current));
+  }
+
   /* --- render ------------------------------------------------------------- */
 
   function render(at: ViewAt): void {
@@ -1850,9 +2090,11 @@ export function mountBuildingEditor(
     setText(elements.summary, buildingSummary(current));
     setText(elements.advice, buildingAdvice(current));
 
-    /* The elevation, then access zoning — the second kind, in its own block. */
+    /* The elevation, then access zoning — the second kind, in its own block — then the machines
+     * that are not lifts, which are neither. */
     drawElevation(current);
     drawAccess(current);
+    drawTransport(current);
 
     const handSet = Object.keys(current.occupancyByFloor).length;
     // *Release every shaft* now clears the lobby flag too, so it has to appear when only that was

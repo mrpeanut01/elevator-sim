@@ -359,6 +359,23 @@ export interface BuildingEditorElements {
   readonly accessLegend: HTMLElement;
   readonly accessWarning: HTMLElement;
   readonly accessNote: HTMLElement;
+  /**
+   * `docs/14` § 5a's sky-lobby controls — the escalators joining the two levels of a lobby.
+   *
+   * A third block, beside the elevation's **service** zoning and the **access** zoning above,
+   * because a transport mode is neither: it is an edge outside every bank, and the floors it joins
+   * are floors some shaft already serves. Marking a floor a transfer level (the sky chips, service
+   * zoning) and joining two floors by escalator are separate authorings, and
+   * `authoring/buildingSpec.ts`'s header says why they are not derived from one another.
+   */
+  readonly transportChips: HTMLElement;
+  readonly addTransport: HTMLButtonElement;
+  readonly removeTransport: HTMLButtonElement;
+  /** The two landing pickers, each over this building's own floors and nothing else. */
+  readonly transportLower: HTMLElement;
+  readonly transportUpper: HTMLElement;
+  readonly transportSeconds: HTMLInputElement;
+  readonly transportNote: HTMLElement;
   /** § 4.5 — the document editor kept whole beneath the elevation. */
   readonly document: HTMLDetailsElement;
 }
@@ -649,6 +666,13 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     accessLegend: 'building-access-legend',
     accessWarning: 'building-access-warning',
     accessNote: 'building-access-note',
+    transportChips: 'building-transport-chips',
+    addTransport: 'building-add-transport',
+    removeTransport: 'building-remove-transport',
+    transportLower: 'building-transport-lower',
+    transportUpper: 'building-transport-upper',
+    transportSeconds: 'building-transport-seconds',
+    transportNote: 'building-transport-note',
     document: 'building-document',
   }),
   rail: Object.freeze({

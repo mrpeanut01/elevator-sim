@@ -1466,6 +1466,54 @@
                 </div>
               </div>
 
+              <!-- docs/14 § 5a — sky lobbies. A third block, and deliberately not folded into
+                   either of the two above it: the sky chips mark a floor a transfer level, which
+                   is service zoning and decides where the tower is cut; this joins two floors by
+                   a machine that is not a lift, which is an edge outside every bank. The engine
+                   has carried transportModes since § D147 and vertical-city has authored four of
+                   them; until now nothing could write one. -->
+              <div style="margin: 18px 0 0">
+                <div class="eyebrow-row">
+                  <span class="eyebrow">Sky lobbies — escalators, not shafts</span>
+                </div>
+                <div style="font: 500 10px var(--mono); color: var(--faint); margin: 0 0 9px; line-height: 1.5">
+                  a two-level lobby is joined by an escalator, not by a lift · pick the two landings ·
+                  a journey may change lifts only at a transfer level, so mark one of them a sky lobby above
+                </div>
+                <div class="editor-panel">
+                  <div class="chip-row">
+                    <span class="helpful" style="font-size: 11.5px; color: var(--dim); margin-right: 4px"
+                          title="An escalator pair joining two floors at a declared landing-to-landing time. The router rides it in preference to a lift leg, so the lifts stop being charged for a crossing the real building does not charge them for.">escalator</span>
+                    <span class="chip-row" id="building-transport-chips"></span>
+                    <button type="button" class="chip" id="building-add-transport">+ escalator</button>
+                    <button type="button" class="chip" id="building-remove-transport">− escalator</button>
+                  </div>
+                  <div style="margin-top: 11px">
+                    <div class="eyebrow helpful"
+                         title="The lower landing. A multi-select over the building's own floors, so a connection can never name a floor the document does not have.">
+                      Lower landing
+                    </div>
+                    <div class="zone-floors" style="margin-top: 6px" id="building-transport-lower"></div>
+                  </div>
+                  <div style="margin-top: 11px">
+                    <div class="eyebrow helpful"
+                         title="The upper landing. The floor already holding the other end is not offered — a machine that starts and ends on the same floor moves nobody, and the loader refuses one.">
+                      Upper landing
+                    </div>
+                    <div class="zone-floors" style="margin-top: 6px" id="building-transport-upper"></div>
+                  </div>
+                  <div class="chip-row" style="margin-top: 11px">
+                    <label class="field" style="margin: 0">landing to landing
+                      <input id="building-transport-seconds" type="number" min="0.1" max="600" step="0.1" size="8" />
+                    </label>
+                    <span class="helpful" style="font: 500 10px var(--mono); color: var(--faint)"
+                          title="Seconds, including stepping on and stepping off. A new machine is seeded from this building's own rise by the EN 115-1 derivation vertical-city performs by hand — 30 degrees, 0.5 m/s nominal, two flat steps at each landing — and the seed is a starting point, not a measurement of your building.">seconds · seeded from the rise, EN 115-1</span>
+                  </div>
+                  <div style="font: 500 10.5px var(--mono); color: var(--accent-soft); margin-top: 9px; line-height: 1.5"
+                       id="building-transport-note"></div>
+                </div>
+              </div>
+
               <!-- § 4.5 — the document editor, kept whole beneath the elevation.
                    The sliders above design a building; this is the one surface that
                    can express access zoning, per-floor ids and a floor range, and

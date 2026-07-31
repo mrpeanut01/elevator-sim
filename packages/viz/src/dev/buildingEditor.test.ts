@@ -44,6 +44,7 @@ import {
   floorAtFraction,
   loadChipsOf,
   occupancyAtFraction,
+  selectedTransportOf,
   selectedZoneOf,
   shaftTintOf,
   skyChipsOf,
@@ -53,6 +54,9 @@ import {
   specRowsOf,
   specTrackOf,
   speedChipsOf,
+  transportChoicesOf,
+  transportFloorChoicesOf,
+  transportNoteOf,
   zoneChoicesOf,
   zoneFloorChoicesOf,
   zoneGroupChoicesOf,
@@ -667,5 +671,94 @@ describe('the zone selector', () => {
     // A removal leaves a stale id behind; the form must draw the surviving zone, not an empty one.
     expect(selectedZoneOf(ZONED, 'zone-9')?.id).toBe('zone-1');
     expect(selectedZoneOf(TOWER, 'zone-1')).toBeUndefined();
+  });
+});
+
+/* ========================================================================== *
+ * Sky lobbies — docs/14 § 5a's controls
+ * ========================================================================== */
+
+const LOBBIES: BuildingSpec = {
+  ...TOWER,
+  skyFloors: [6],
+  transportModes: [
+    // A two-level sky lobby, and a machine between two ordinary floors — the two states the
+    // selector and the note have to tell apart.
+    { id: 'escalator-1', connects: [6, 7], traversalTimeS: 21.2 },
+    { id: 'escalator-2', connects: [2, 3], traversalTimeS: 21.2 },
+  ],
+};
+
+describe('the escalator selector', () => {
+  it('says which machines are written and which are a way through, and falls back when the id is stale', () => {
+    const choices = transportChoicesOf(LOBBIES, 'escalator-2');
+    expect(choices.map((choice) => choice.id)).toStrictEqual(['escalator-1', 'escalator-2']);
+    expect(choices.map((choice) => choice.selected)).toStrictEqual([false, true]);
+    expect(choices.map((choice) => [choice.lowerId, choice.upperId])).toStrictEqual([
+      ['7', '8'],
+      ['3', '4'],
+    ]);
+    /*
+     * The distinction the whole block exists to draw. `traffic/route.ts` lets a journey change onto
+     * a lift only at a transfer level, so the first machine is a way through the building and the
+     * second carries only the people who start on one of its two floors — and the reader can see
+     * neither of those facts from the floor numbers.
+     */
+    expect(choices.map((choice) => choice.wayThrough)).toStrictEqual([true, false]);
+    expect(choices.every((choice) => choice.written)).toBe(true);
+
+    // A removal leaves a stale id behind; the form draws the survivor rather than an empty one.
+    expect(selectedTransportOf(LOBBIES, 'escalator-9')?.id).toBe('escalator-1');
+    expect(selectedTransportOf(TOWER, 'escalator-1')).toBeUndefined();
+  });
+
+  it('marks a machine the tower has outgrown as unwritten rather than dropping it from the list', () => {
+    /*
+     * The floor slider and the machines are the same building. A shortened tower omits the machine
+     * from the *document* (`transportModesOf`), and the selector must keep drawing it — a control
+     * that silently lost the row would leave a reader with no way to move the landing back.
+     */
+    const shortened: BuildingSpec = { ...LOBBIES, floors: 4 };
+    const choices = transportChoicesOf(shortened, '');
+    expect(choices).toHaveLength(2);
+    expect(choices.map((choice) => choice.written)).toStrictEqual([false, true]);
+  });
+});
+
+describe('the landing pickers', () => {
+  it('offer this building’s own floors, top first, with the transfer levels marked', () => {
+    const choices = transportFloorChoicesOf(LOBBIES, 'escalator-1', 0);
+    expect(choices).toHaveLength(TOWER.floors + 1);
+    expect(choices.map((choice) => choice.floorId)).toStrictEqual(
+      elevationRowsOf(TOWER).map((row) => floorIdOf(row.floor)),
+    );
+    expect(choices.filter((choice) => choice.chosen).map((choice) => choice.floor)).toStrictEqual([6]);
+    expect(choices.filter((choice) => choice.isTransfer).map((choice) => choice.floor)).toStrictEqual([6]);
+  });
+
+  it('blocks the floor the other landing already stands on, rather than hiding it', () => {
+    /*
+     * `transportModeSchema` refuses a connection whose two ends name one floor. The picker offers
+     * the floor and refuses the click, because dropping the row would leave a gap in a ladder of
+     * floor numbers — a control that has silently changed shape is harder to read than one that
+     * says no.
+     */
+    const lower = transportFloorChoicesOf(LOBBIES, 'escalator-1', 0);
+    const upper = transportFloorChoicesOf(LOBBIES, 'escalator-1', 1);
+    expect(lower.filter((choice) => choice.blocked).map((choice) => choice.floor)).toStrictEqual([7]);
+    expect(upper.filter((choice) => choice.blocked).map((choice) => choice.floor)).toStrictEqual([6]);
+    expect(lower.some((choice) => choice.blocked && choice.chosen)).toBe(false);
+  });
+});
+
+describe('the escalator note', () => {
+  it('is silent on a building with no machine, and counts the ways through on one that has them', () => {
+    expect(transportNoteOf(TOWER)).toBe('');
+    const said = transportNoteOf(LOBBIES);
+    expect(said).toMatch(/2 of 2 escalators written/);
+    expect(said).toMatch(/1 of 2 touch a transfer level/);
+    // A machine the tower has outgrown is counted as unwritten, which is what the reader needs to
+    // know: it is declared in the editor and absent from the run.
+    expect(transportNoteOf({ ...LOBBIES, floors: 4 })).toMatch(/1 of 2 escalators written/);
   });
 });

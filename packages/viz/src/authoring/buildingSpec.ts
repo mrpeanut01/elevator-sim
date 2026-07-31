@@ -48,6 +48,29 @@
  * control over *this building's own floors* rather than a text box that can name a floor the
  * document does not have — § 10.2's *"the control should make it unreachable"*.
  *
+ * ## Sky lobbies are two mechanisms, and they are deliberately kept apart
+ *
+ * A sky lobby in this editor is **two** independent facts, and collapsing them would repeat the
+ * mistake the paragraph above refuses:
+ *
+ * - {@link BuildingSpec.skyFloors} sets `FloorConfig.isTransferFloor`. That is *bank segmentation*
+ *   — where the tower is cut, which cars are dealt into which segment ({@link defaultBandOf}), and
+ *   the only floors at which `traffic/route.ts` lets a journey change lifts.
+ * - {@link BuildingSpec.transportModes} declares an **edge outside every bank**: an escalator
+ *   joining two floors at a declared cost, which the router traverses in preference to a lift leg.
+ *
+ * They are neither derived from one another nor cross-checked into one field. Deriving a transfer
+ * flag from an escalator would silently re-deal every car's default band the moment a reader added
+ * a machine, and deriving an escalator from a transfer flag would author hardware nobody asked for.
+ * `data/buildings/vertical-city.json` declares both, separately, for all four of its two-level
+ * lobbies — which is the shape this editor now reproduces.
+ *
+ * What *is* stated, at the control, is how the two interact, because it is the one thing a reader
+ * cannot see: a floor reached over a transport edge only re-enters `route.ts`'s search when it is a
+ * transfer floor, so an escalator between two ordinary floors carries only journeys that begin on
+ * one of them and end on the other. {@link validateSpec} says so; it does not fix it, because a
+ * two-level lobby whose upper level is a dead end is a building somebody may mean to build.
+ *
  * That is not a limitation being worked around; it is service zoning being modelled correctly.
  * `CLAUDE.md` is explicit that the three zonings are distinct concepts — service (physical), access
  * (credential), operational (dispatcher strategy) — and a shaft's reachable floors is the first of
@@ -67,6 +90,7 @@ import type {
   BuildingType,
   ElevatorSpecs,
   FloorConfig,
+  TransportModeConfig,
 } from '@elevator-sim/core/browser';
 
 import { credentialGroupsIn } from '../access/zoning.js';
@@ -111,6 +135,37 @@ export interface SpecAccessZone {
   readonly credentialGroups: readonly string[];
 }
 
+/**
+ * One non-lift connection between two floors — an escalator pair joining the two levels of a
+ * lobby — in the editor's own vocabulary.
+ *
+ * The {@link SpecAccessZone} precedent, followed exactly: `core`'s {@link TransportModeConfig}
+ * names floors by **id**, and this names them by floor number, because the floor a reader picks is
+ * a row of the elevation and a spec holding ids would go stale the moment the floor slider moved.
+ * {@link transportModesOf} is the translation and the only place the two vocabularies meet.
+ *
+ * `connects` is a fixed pair for the reason the schema makes it one: a machine with three landings
+ * is two machines.
+ */
+export interface SpecTransportMode {
+  readonly id: string;
+  /** The two floor numbers it joins, `0` being the lobby. The two must differ. */
+  readonly connects: readonly [number, number];
+  /**
+   * Landing-to-landing seconds, **including** stepping on and stepping off.
+   *
+   * Carried rather than derived, and that is a decision with a cost either way. Deriving it from
+   * the building's own floor height ({@link escalatorSecondsFor}) would keep it honest when the
+   * height slider moves — but it would also make {@link specFromBuilding} lossy on every document
+   * whose floors are not evenly pitched, and `vertical-city` is exactly that document: its four
+   * escalators all declare 21.2 s over a real 4.5 m rise that no single floor pitch reproduces. A
+   * round trip that quietly rewrites an authored, cited reference value is worse than a seeded one
+   * a reader can see and change, so the derivation seeds a *new* machine and never overwrites a
+   * loaded one.
+   */
+  readonly traversalTimeS: number;
+}
+
 /** The editor's whole state. Flat, total, slider-shaped. */
 export interface BuildingSpec {
   readonly id: string;
@@ -149,6 +204,11 @@ export interface BuildingSpec {
    * buildings' `accessZones: []` says.
    */
   readonly accessZones: readonly SpecAccessZone[];
+  /**
+   * Non-lift connections, in declared order. Empty is a building whose every floor-to-floor move
+   * is charged to a lift, which is what four of the five shipped buildings say by declaring none.
+   */
+  readonly transportModes: readonly SpecTransportMode[];
 }
 
 export const BLANK_SPEC: BuildingSpec = Object.freeze({
@@ -169,6 +229,7 @@ export const BLANK_SPEC: BuildingSpec = Object.freeze({
   bandByCar: Object.freeze({}),
   noLobby: Object.freeze({}),
   accessZones: Object.freeze([]),
+  transportModes: Object.freeze([]),
 });
 
 /** One row of the spec column — the handoff's five sliders, § 1.3 M11. */
@@ -357,28 +418,39 @@ export function orphanFloors(spec: BuildingSpec): readonly number[] {
  * disappearing into a census, which is precisely the "confident nonsense" `CLAUDE.md` names.
  *
  * The model is `traffic/route.ts`'s, narrowed to what a spec can express: a car's served floors are
- * an edge, and a journey may change cars only on a floor flagged `isTransferFloor` — which in this
- * editor is a sky floor, and nothing else. `authoring.test.ts` holds it to the real
- * {@link RoutePlanner} on the resolved building in both directions, so this cannot drift into a
- * mirror that stopped mirroring.
+ * an edge, **a transport mode is a second kind of edge**, and a journey may change cars only on a
+ * floor flagged `isTransferFloor` — which in this editor is a sky floor, and nothing else.
+ * `authoring.test.ts` holds it to the real {@link RoutePlanner} on the resolved building in both
+ * directions, so this cannot drift into a mirror that stopped mirroring.
+ *
+ * The transport edges are counted here rather than left out because leaving them out would have
+ * been a *false refusal*: a two-level lobby whose upper level is reached only by escalator is a
+ * building the loader builds and the router routes, and an editor calling those floors stranded
+ * would be arguing with the run it is about to produce.
  */
 export function unreachableFloors(spec: BuildingSpec): readonly number[] {
   const transfers = new Set(spec.skyFloors.filter((floor) => floor > 0 && floor <= spec.floors));
   const served: readonly (readonly number[])[] = Array.from({ length: spec.cars }, (_, car) =>
     servedFloorsOf(spec, car),
   );
+  const edges = writtenTransportModes(spec);
   const seen = new Set<number>([0]);
   let frontier: number[] = [0];
   while (frontier.length > 0) {
     const next: number[] = [];
+    const reach = (floor: number): void => {
+      if (seen.has(floor)) return;
+      seen.add(floor);
+      if (transfers.has(floor)) next.push(floor);
+    };
     for (const at of frontier) {
+      for (const edge of edges) {
+        if (edge.connects[0] === at) reach(edge.connects[1]);
+        if (edge.connects[1] === at) reach(edge.connects[0]);
+      }
       for (const floors of served) {
         if (!floors.includes(at)) continue;
-        for (const floor of floors) {
-          if (seen.has(floor)) continue;
-          seen.add(floor);
-          if (transfers.has(floor)) next.push(floor);
-        }
+        for (const floor of floors) reach(floor);
       }
     }
     frontier = next;
@@ -555,6 +627,136 @@ export function withZoneGroup(
   });
 }
 
+/* -------------------------------------------------------------------------- *
+ * Transport modes — pure
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Escalator inclination, nominal speed and landing run — the EN 115-1 derivation
+ * `data/buildings/vertical-city.json` performs by hand in each of its four `$comment`s, moved
+ * here so a machine a reader adds carries the same arithmetic rather than a guessed constant.
+ *
+ * 30° is the only angle BS EN 115-1 permits above a 6 m rise and the common commercial compromise
+ * below it; 0.5 m/s is the common commercial nominal speed (EN 115-1 permits up to 0.75 m/s at
+ * 30°); the standard step depth is 0.40 m and EN 115-1 requires at least two flat steps at each
+ * landing for a rise of 6 m or less. See `docs/02-elevator-reference.md`.
+ */
+const ESCALATOR_SPEED_MPS = 0.5;
+const ESCALATOR_SIN_INCLINATION = 0.5;
+const ESCALATOR_FLAT_RUN_M = 2 * 2 * 0.4;
+
+/**
+ * The traversal time a newly added escalator is seeded with, in seconds, one decimal place.
+ *
+ * Incline length is `rise / sin 30°`, ridden at nominal speed, plus the flat run at each landing.
+ * On a 4.5 m rise that is `18.0 + 3.2 = 21.2 s`, which is `vertical-city`'s figure to the digit —
+ * asserted in `authoring.test.ts` rather than claimed here.
+ *
+ * **Its one stated limit.** The two-flat-step allowance holds for a rise of 6 m or less, which
+ * covers every adjacent floor pair this editor can produce (the height slider stops at 5.5 m). A
+ * machine spanning more than one floor is extrapolating past that clause, and the number it seeds
+ * is a starting point the reader can change rather than a cited figure.
+ */
+export function escalatorSecondsFor(spec: BuildingSpec, connects: readonly [number, number]): number {
+  const riseM = Math.abs(connects[1] - connects[0]) * spec.floorHeightM;
+  const inclineM = riseM / ESCALATOR_SIN_INCLINATION;
+  const seconds = (inclineM + ESCALATOR_FLAT_RUN_M) / ESCALATOR_SPEED_MPS;
+  return Math.max(0.1, Math.round(seconds * 10) / 10);
+}
+
+/** The next unused `escalator-N` id, minted exactly as {@link nextZoneId} mints a zone's. */
+export function nextTransportModeId(spec: BuildingSpec): string {
+  const taken = new Set(spec.transportModes.map((mode) => mode.id));
+  // Lifted out of the template for the reason `nextZoneId` lifts it: a `${a.b}` inside a string
+  // literal makes this an unclassified prose surface over an id it generates.
+  const limit = taken.size + 1;
+  for (let index = 1; index <= limit; index += 1) {
+    const id = `escalator-${String(index)}`;
+    if (!taken.has(id)) return id;
+  }
+  return `escalator-${String(limit)}`;
+}
+
+/**
+ * One end of one machine moved to a floor — the landing picker's edit, as a value.
+ *
+ * Pure for the reason every edit in this module is: the test that says *the control changes the
+ * run* has to make the same edit the reader's click makes, and a click handler is not callable
+ * under Node.
+ *
+ * Setting an end onto the floor the other end already holds is **refused rather than applied**.
+ * The schema will not accept a machine that starts and ends on the same floor, and § 10.2's rule
+ * for a control is to make the unloadable state unreachable rather than catchable.
+ */
+export function withTransportEnd(
+  spec: BuildingSpec,
+  modeId: string,
+  end: 0 | 1,
+  floor: number,
+): readonly SpecTransportMode[] {
+  return spec.transportModes.map((mode) => {
+    if (mode.id !== modeId) return mode;
+    if (mode.connects[1 - end] === floor) return mode;
+    const connects: readonly [number, number] =
+      end === 0 ? [floor, mode.connects[1]] : [mode.connects[0], floor];
+    return { ...mode, connects };
+  });
+}
+
+/**
+ * One machine's traversal time set — the seconds control's edit.
+ *
+ * Clamped to a positive value, because `transportModeSchema` requires one and this is the only
+ * control that could write otherwise. {@link validateSpec} still carries the refusal, for a spec
+ * that reached a non-positive time by some route this function did not author.
+ */
+export function withTransportSeconds(
+  spec: BuildingSpec,
+  modeId: string,
+  seconds: number,
+): readonly SpecTransportMode[] {
+  const wanted = Number.isFinite(seconds) ? Math.round(seconds * 10) / 10 : 0;
+  return spec.transportModes.map((mode) =>
+    mode.id === modeId ? { ...mode, traversalTimeS: Math.min(600, Math.max(0.1, wanted)) } : mode,
+  );
+}
+
+/**
+ * The machines this spec will actually write, in declared order.
+ *
+ * Two are dropped, and both follow {@link accessZonesOf}'s narrow-and-omit rule rather than
+ * deviating from it:
+ *
+ * - **An end this tower no longer has.** `config/parse.ts` refuses a mode naming an unknown floor,
+ *   so a reader who shortened a thirty-storey tower to ten would otherwise be holding a document
+ *   that cannot load, with the refusal arriving from a control they were not touching. Unlike a
+ *   zone's floor list there is nothing to *narrow* — `connects` is a pair, and a pair with one end
+ *   removed is not a connection — so the omission is of the whole machine.
+ * - **Both ends on one floor.** The schema refuses it in as many words; writing it would produce a
+ *   refusal about a tuple rather than about the two pickers that produced it.
+ *
+ * A non-positive `traversalTimeS` is **not** dropped, and the asymmetry is deliberate: that one a
+ * reader can see and fix on the control that set it, so it is written out and {@link validateSpec}
+ * says the loader will refuse the building — the same split {@link accessZonesOf} draws between a
+ * zone covering no floor and a zone naming no credential group.
+ */
+export function transportModesOf(spec: BuildingSpec): readonly TransportModeConfig[] {
+  return writtenTransportModes(spec).map((mode) => ({
+    id: mode.id,
+    connects: [floorIdOf(mode.connects[0]), floorIdOf(mode.connects[1])] as readonly [string, string],
+    traversalTimeS: mode.traversalTimeS,
+  }));
+}
+
+/** {@link transportModesOf} in the spec's own floor-number vocabulary. */
+function writtenTransportModes(spec: BuildingSpec): readonly SpecTransportMode[] {
+  return spec.transportModes.filter(
+    (mode) =>
+      mode.connects[0] !== mode.connects[1] &&
+      mode.connects.every((floor) => floor >= 0 && floor <= spec.floors),
+  );
+}
+
 /**
  * What a caller must supply beyond the spec for the document to load.
  *
@@ -659,6 +861,14 @@ export function buildingFromSpec(
     };
   });
 
+  /*
+   * Written only when there is one, unlike `accessZones` below. `transportModes` is optional on
+   * `BuildingConfig` and four of the five shipped buildings carry no such key at all, so emitting
+   * `transportModes: []` on every download would put a field in the reader's JSON that says
+   * nothing — the same argument that keeps the single-bank id `main` rather than `bank-1`.
+   */
+  const transportModes = transportModesOf(spec);
+
   return {
     id: spec.id,
     name: spec.name.trim() === '' ? 'My building' : spec.name.trim(),
@@ -667,6 +877,7 @@ export function buildingFromSpec(
     floors,
     totalPopulation: totalPopulation(spec),
     banks,
+    ...(transportModes.length === 0 ? {} : { transportModes }),
     /*
      * Credential zoning, written out rather than blanked. This line read `accessZones: []` and the
      * consequence was not cosmetic: opening Secure Tower here and saving it untouched produced a
@@ -772,6 +983,54 @@ export function validateSpec(
         'so it is not written to the saved document and restricts nobody. Pick its floors, or remove it.',
     );
   }
+  /*
+   * The transport modes, in the same order the loader would meet them: the two states it refuses,
+   * then the state it builds without a word and a reader cannot see.
+   */
+  const offTower = spec.transportModes.filter((mode) =>
+    mode.connects.some((floor) => floor < 0 || floor > spec.floors),
+  );
+  if (offTower.length > 0) {
+    problems.push(
+      `Escalator ${offTower.map((mode) => mode.id).join(', ')} connect${offTower.length === 1 ? 's' : ''} ` +
+        `a floor this tower does not have — it is ${String(spec.floors + 1)} floors tall now. ` +
+        'A connection is a pair of floors, so there is nothing to shorten the way a zone shortens ' +
+        'its floor list: the whole machine is left out of the saved document rather than refused, ' +
+        'and the run routes as though it had never been there.',
+    );
+  }
+  const selfJoined = spec.transportModes.filter((mode) => mode.connects[0] === mode.connects[1]);
+  for (const mode of selfJoined) {
+    problems.push(
+      `Escalator ${mode.id} starts and ends on floor ${floorIdOf(mode.connects[0])}. The loader ` +
+        'refuses a connection whose two ends name one floor — a machine that starts and ends on ' +
+        'the same floor moves nobody — so it is left out of the saved document instead of being ' +
+        'written and refused.',
+    );
+  }
+  for (const mode of writtenTransportModes(spec)) {
+    if (mode.traversalTimeS > 0) continue;
+    problems.push(
+      `Escalator ${mode.id} takes ${String(mode.traversalTimeS)} s to ride. The loader refuses a ` +
+        'traversal time that is not greater than zero, so this building will not build until it ' +
+        'is raised. Unlike a floor this tower no longer has, it is written to the document as it ' +
+        'stands, because it is a number on a control the reader can see.',
+    );
+  }
+  const skies = new Set(spec.skyFloors);
+  const deadEnds = writtenTransportModes(spec).filter(
+    (mode) => !mode.connects.some((floor) => skies.has(floor)),
+  );
+  for (const mode of deadEnds) {
+    problems.push(
+      `Escalator ${mode.id} joins floor ${floorIdOf(mode.connects[0])} and floor ` +
+        `${floorIdOf(mode.connects[1])}, and neither is a transfer level. A journey may only ` +
+        'change onto a lift at a transfer level, so this machine carries the people who start on ' +
+        'one of those two floors and finish on the other, and nobody else — it is not a way ' +
+        'through. The loader builds it without a word. Mark one of the two a sky lobby if it was ' +
+        'meant to be one.',
+    );
+  }
   if (machineClass !== undefined) {
     const rise = riseM(spec);
     if (rise > machineClass.maxRiseM) {
@@ -862,6 +1121,9 @@ function normalize(spec: BuildingSpec): unknown {
     // not read as an edit — `dirty` has to mean *this saves a different building*, and a zone floor
     // that is never written cannot make one.
     accessZones: accessZonesOf(spec),
+    // The document's own machines, for the same reason: a machine that is never written cannot
+    // make a building that saves differently.
+    transportModes: transportModesOf(spec),
   };
 }
 
@@ -963,5 +1225,28 @@ export function specFromBuilding(config: BuildingConfig, id: string): BuildingSp
         .filter((floor): floor is number => floor !== undefined),
       credentialGroups: [...zone.credentialGroups],
     })),
+    /*
+     * The machines, by the same floor-id-to-number map and for the same reason access zoning is
+     * carried: leaving them out was **destructive**. Before this line `specFromBuilding` never
+     * looked at `transportModes`, so opening Vertical City here and saving it untouched produced a
+     * building with none of its four escalators — a tower whose two-level lobbies had lost their
+     * escalators and charged every lobby-level crossing back to a lift, with nothing on any
+     * surface saying so.
+     *
+     * A machine either of whose ends the expansion does not know is dropped whole rather than
+     * half-read. It cannot occur on a document `parseBuilding` accepted — `config/parse.ts`
+     * cross-references both ends — and dropping it is still the right answer for a document this
+     * function was handed directly.
+     */
+    transportModes: (config.transportModes ?? [])
+      .map((mode) => ({
+        id: mode.id,
+        connects: mode.connects.map((floorId) => floorNumberById.get(floorId)),
+        traversalTimeS: mode.traversalTimeS,
+      }))
+      .filter(
+        (mode): mode is { id: string; connects: [number, number]; traversalTimeS: number } =>
+          mode.connects.every((floor) => floor !== undefined),
+      ),
   };
 }
