@@ -1096,7 +1096,53 @@ every demand source. What *does* move is the **level**, and exactly one of the f
 (`idle`) is level-triggered. **So the shipped demand template cannot express the condition weight-set
 selection exists to exploit**, and that is a different finding from *learned control does not help*.
 
-**No status moves. Phase 6 stays ⚠️ partial.**
+#### The re-measurement on `lunch-two-way` — the third refusal, on the traffic the first two could not express ([§ D162](../DECISIONS.md); verdict entry drafted, landing as the next numbered decision)
+
+**The condition § D156 named as missing now occurs, and the selector still does not clear the
+gate.** Measured 2026-07-30 by `benchmark/lunchTwoWaySelection.ts` under § D162's five conditions —
+the template cited and untouched, the operating point shipped for the building's own reasons, the
+commit ordering on record, the gate § D139 as raised and unchanged, and the flat-mix negative
+control measured in the same run at the same seeds and equal total demand. Census at the tuning
+seed on both cells: **all twelve arms quotable, no ceiling, reference `auction-multi-round` on
+both**; budget variance-derived per `matrix.ts`'s rule on the gate metric and clamped to the band's
+ceiling of 200; resolution limits measured on TTD at each cell (structural **0.412 s** treatment,
+**0.461 s** control); n = 200 on the disjoint holdout seed under CRN; Holm within a **new declared
+family of exactly the treatment cell**, never pooled with this sweep's families.
+
+| cell | learned ΔTTD vs `auction-multi-round` | verdict |
+|---|---|---|
+| `lunch-two-way` 1.5 % (mix swings 90/0/10 → 0/90/10) | **−0.170 [−0.405, +0.064]** | NOT ACCEPTED — contains zero (p = 0.1538), below the cell's own 0.412 s limit |
+| flat-mix control (same template, `mixAmplitude: 0`, same total demand) | **−0.576 [−0.833, −0.319]** | BETTER, above its own limit — **§ D162 condition 5's trigger, investigated below** |
+
+**The refusal is of the selector, not of the traffic.** The regime screen — fixed first by a wiring finding this measurement reported, five diagnostic
+call sites that dropped the point's `demandTemplate` (commit `0a7bb4d`; the gate experiments run
+through the runner and were never wrong) — shows the
+condition present: `two-way` is the detector's incumbent on **66.1 %** of post-warm-up observations
+(three regimes, 21 preference changes), and the trace-level split drift is **+10.38 σ** against the
+control's +3.97 σ in the same apparatus. The fitted policy generalizes in sign (−0.205 s tuning →
+−0.170 s holdout) and is still unresolvable — § D145's sentence, still true: a generalizing effect
+that cannot be resolved is still an effect that cannot be resolved.
+
+**The flat control's BETTER is the § D162 negative control doing exactly what it was built for.**
+Pinning `predictive-balanced`'s weight vector on the reference profile for the **whole run** — no
+selector, no switching — beats the reference by **−0.720 [−0.973, −0.467]** on the control and
+**−0.667 [−0.923, −0.412]** on the treatment at the verdict seed: *more than the learned arm
+achieves on either cell*. So the advantage is a **static weight-vector hybrid** — the auction
+dispatch stages carrying a better-for-TTD vector at this point — present at full strength where the
+mix cannot vary, and the switching *subtracts* value (−0.170 learned against −0.667 constant on the
+mix-varying cell). It is not mix exploitation, and it accepts nothing. On the treatment the learned
+arm held `interfloor` (= `eta`'s vector) 51.0 % and `two-way` 32.0 % of decisions; on the control it
+pinned `two-way` for 90.9 %. Costs beside the gate, never folded in: the treatment's learned arm is
+WORSE on AWT (+0.263), WT95 (+0.809) and energy (+4.444 kJ per served leg beside the raw figure).
+The deadband known-answer returned **1.691 s** in the same session, so the refusal is a fact about
+the policy and not the search. And the standing § D169 discount cuts the same way: the shipped arc
+is the **widest** amplitude its citation permits, so even these figures are measured under
+conditions *more* favourable to the selector than a real building's smoother arc.
+
+**No status moves. Phase 6 stays ⚠️ partial.** Learned weight-set selection now stands refused on
+fixed-mix traffic at nine operating points (§ D145, § D156) **and on mix-varying traffic at the one
+shipped point that expresses it**, with a third refusal § D162 explicitly permitted; the record is
+`benchmark/lunchTwoWaySelection.ts`, whose figures are pinned and re-derived by its own suite.
 
 ### Also still not built in this phase's original scope
 
@@ -1867,7 +1913,7 @@ which is exactly the distinction the standing requirement above exists to keep v
 | Item | Where it is recorded |
 |---|---|
 | **The viewer is now built to a design handoff** | Not an open item — a change of source. *Elevator Sim Reimagined* is canonical for the interface ([§ D174](../DECISIONS.md)); the requirements, the gap analysis and the five deviations are [`docs/12`](12-design-handoff.md). **No phase verdict moved and no published number was recomputed**, which is the point rather than an aside: the sheet reads `VizSummary`, which reads `RunSummary`, which is the same object the CLI and the experiment matrix read. Board: [`WAVE10_PLAN.md`](../WAVE10_PLAN.md) |
-| **Phase 6c — learned control** | § Phase 6c above. **No longer deferred: implemented, measured and NOT ACCEPTED**, and the refusal was then broadened from one operating point to eight pre-registered cells and held ([§ D151](../DECISIONS.md) is the protocol, dated before any sweep figure; [§ D156](../DECISIONS.md) is the result). What remains is one re-measurement, on the mix-varying demand template built after the sweep named the shipped template's flat directional split as the mechanism — protocol pre-registered at [§ D162](../DECISIONS.md), **not run**. A third refusal is an explicitly permitted outcome |
+| **Phase 6c — learned control** | § Phase 6c above. **No longer deferred: implemented, measured and NOT ACCEPTED**, the refusal broadened from one operating point to eight pre-registered cells and held ([§ D151](../DECISIONS.md) is the protocol; [§ D156](../DECISIONS.md) is the result) — **and the re-measurement on the mix-varying template is now run, under [§ D162](../DECISIONS.md)'s five conditions, and it refused a third time** (`benchmark/lunchTwoWaySelection.ts`; verdict entry drafted, landing as the next numbered decision): ΔTTD `−0.170 [−0.405, +0.064]` at n = 200 on the disjoint seed at `midtown-office`/`lunch-two-way` 1.5 %, below the cell's own TTD-measured limit, with the flat-mix negative control exposing the residual advantage as a static weight-vector hybrid rather than mix exploitation. The question § D156 left open is **closed, in the refusing direction**; what would move it now is a different selector, not a different measurement |
 | **Phase 9 — the experience layer** | **No longer open: measured against [§ D163](../DECISIONS.md) and ACCEPTED WITH NAMED GAPS on 2026-07-30** — § Phase 9 above carries the verdict and the gaps, and the row and the verdict landed together as § D163 required. All nine units are built. What remains is not the phase: it is **U6**, **U7's rider models**, **Basic's curated three-dimension subset**, and clause 4 — *name the non-test caller* — which is **satisfied in prose and mechanised by nothing**, because no dead-code audit reaches `packages/viz` *(the clause-4 item closed later the same day: wave 12's `packages/viz/src/deadCode.test.ts` mechanises it, [§ D192](../DECISIONS.md) — verdict unchanged)* |
 | ~~**Access-zoning editor controls**~~ **CLOSED** | [`docs/10`](10-experience-layer-contract.md) § 11 W8's open half — § 10.2's floor multi-select and coverage matrix — landed with the building editor's zoning round trip ([§ D182](../DECISIONS.md)). The dispatcher-compatibility warning had shipped ahead of it ([§ D159](../DECISIONS.md)) |
 | **A zone cannot be changed mid-run** | Operational zoning is a shipped concept with no mechanism over time. Deliberately deferred: nothing measures it and no published result depends on it |

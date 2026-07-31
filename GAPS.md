@@ -24,27 +24,31 @@ Nothing in this file is a plan. Items are ordered by whether they can produce a 
 
 ---
 
-## 1. The largest one: Phase 6c has not been re-measured
+## 1. ~~The largest one: Phase 6c has not been re-measured~~ — CLOSED BY MEASUREMENT (2026-07-30, under [§ D162](DECISIONS.md); verdict entry drafted, landing as the next numbered decision), and the answer is the third refusal
 
-**Phase 6 is ⚠️ partial and stays partial.**
+**Phase 6 is ⚠️ partial and stays partial — now with the question closed rather than open.**
 
 Learned weight-set selection was refused across eight pre-registered operating points
 ([§ D156](DECISIONS.md)), and the mechanism was named: the shipped demand model varied *how busy*
 the building was and never *the mix* of up, down and interfloor traffic within a run, so the
-condition selection exists to exploit did not occur anywhere.
+condition selection exists to exploit did not occur anywhere. `lunch-two-way`
+([§ D169](DECISIONS.md)) built that condition — χ² 383.4 against a flat control's 4.8 — and
+[§ D162](DECISIONS.md) pre-registered the protocol under which measuring on it could count.
 
-**That condition now exists** — `lunch-two-way` ([§ D169](DECISIONS.md)) varies the directional mix
-across the run, χ² 383.4 against a flat control's 4.8, cited to CIBSE Guide D and BCO where citable
-and derived-with-the-arithmetic-shown where not.
+**The measurement is now done** (`benchmark/lunchTwoWaySelection.ts`), and
+the selector does not clear the gate even under traffic whose directional mix changes within the
+run: ΔTTD `−0.170 [−0.405, +0.064]` against `auction-multi-round` at n = 200 on the disjoint seed,
+an interval containing zero, an eighth of the cell's own TTD-measured 0.412 s limit — while the
+regime screen shows `two-way` as the detector's incumbent on 66.1 % of observations, so the
+condition genuinely occurred and it is the selector that was refused. The § D162 flat-mix negative
+control earned its clause: its learned arm came back BETTER (`−0.576 [−0.833, −0.319]`) on traffic
+whose mix cannot vary, and the constant-override probe named the mechanism — a **static
+weight-vector hybrid** the switching subtracts from, not mix exploitation.
 
-**And nothing has been measured on it.** The protocol is pre-registered
-([§ D162](DECISIONS.md), five conditions, including a flat-mix negative control at equal total
-demand), the template is committed, and the commit that added it deliberately ran **no selector
-arm** — the ordering is the evidence. The measurement is simply not done.
-
-**What that means for anyone reading a status table:** the capability is built, the question is
-still open, and a third refusal remains an explicitly permitted outcome. Do not read *"the template
-landed"* as *"6c is closer to accepted."*
+**What that means for anyone reading a status table:** the largest open item is no longer open.
+Learned selection is refused on fixed-mix traffic at nine operating points and on mix-varying
+traffic at the one shipped point that expresses it. What would move Phase 6c now is a different
+selector, not a different measurement.
 
 ---
 
@@ -52,8 +56,8 @@ landed"* as *"6c is closer to accepted."*
 
 | Gap | State |
 |---|---|
-| **The `lunch-two-way` operating point has no saturation census** | One clean run at 1.5 % with a quotable mean is one seed, not a ceiling. Whoever measures arms there must derive the budget from their own census. |
-| **The `lunch-two-way` arc is the widest amplitude consistent with its citation** | A real building's departures and returns overlap. **A wider arc is the one a selector finds easiest to exploit**, so this cuts against any future positive result and is stated first in three places rather than last. `mixAmplitude` narrows it. |
+| **~~The `lunch-two-way` operating point has no saturation census~~ — CLOSED (2026-07-30)** | The § D162 measurement (`benchmark/lunchTwoWaySelection.ts`) censused both the point and its flat control at 200 replications over all twelve shipped profiles: **every arm quotable on both cells, no ceiling on either**, `firstInvalidOf` reading all four `awtIsValid` grounds. The budget was then variance-derived (binding arm `nearest-car`, clamped to the band's ceiling of 200) rather than inherited. |
+| **The `lunch-two-way` arc is the widest amplitude consistent with its citation** | A real building's departures and returns overlap. **A wider arc is the one a selector finds easiest to exploit**, so this cuts against any future positive result and is stated first in three places rather than last. `mixAmplitude` narrows it. The § D162 measurement carries the discount beside its figures — and it now also cuts against the flat control's static-hybrid BETTER being read as anything about mix. |
 | **~~The `matrix` study's pins are re-derived by no test~~ — this entry was FALSE, and its cause is worth more than the entry** | `matrix.test.ts` has called `checkPinned('matrix', …)` against a **full-budget** `runMatrix()` on every always-on run since `f895a16`, and `published.test.ts`'s scan — which reads sources with `readFileSync` — has enforced that call's existence for all fifteen ids, so the claimed state would have made an existing test **red**. The finding came from a `grep`; `matrix.test.ts` carried a raw NUL byte, `grep` here wraps `ugrep -I`, and the file was **silently skipped**. That is the same artifact `f78dc42` documents producing a false `#rail-access-note` finding — **second victim of one tooling defect**, and this one sat in the register where a lane would plan against it. Kept struck through rather than deleted: a false gap costs a lane a day, and the mechanism is now twice-attested. See [§ D184](DECISIONS.md). |
 | **The `matrix` study's *Pareto front* was re-derived by nothing, and it had already drifted — NOW CLOSED** | The real gap, one study over from § D149's. Every one of the 352 pins is an **arm-against-baseline** paired estimate; front membership is decided **arm-against-arm** over raw per-replication energy, so no interval pin can see a front move. `7fac568` legitimately moved `vertical-city-up-peak` and `docs/05` did not follow — for four days the published front there read three arms where the tree computes six. **`nearest-car`'s 6-of-8 count never moved, which is why nobody noticed**, and that count is what § D106 and the refusal of an eco score actually rest on. Closed by `PINNED_FRONTS` + `matrixFront.test.ts` at ~0.3 s, on the run the suite already pays for; the document is corrected. |
 | **One door-hold figure is annotated rather than re-derived** | The 50-cell study behind it has **no shipped entry point** — it lives in the commit that measured it. 40 of 50 cells provably cannot have moved; 10 can have. Marked *"measured on the pre-escalator configuration"* rather than quietly kept. |

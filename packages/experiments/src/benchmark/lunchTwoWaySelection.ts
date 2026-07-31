@@ -86,7 +86,7 @@
  * it pinned `two-way` (`predictive-balanced`'s vector) for **90.9 %** of decisions.
  *
  * **The control's BETTER is § D162 condition 5 doing exactly what it was built for, and the
- * mechanism is named rather than filed** (probe recorded in the § D200 decision entry): pinning
+ * mechanism is named rather than filed** (probe recorded in this measurement's decision entry): pinning
  * `predictive-balanced`'s vector on the reference profile for the **whole run** — no selector, no
  * switching — beats the reference by −0.720 s on the flat control and −0.667 s on the treatment
  * at the verdict seed, **more than the learned arm achieves on either cell**. So the advantage is
