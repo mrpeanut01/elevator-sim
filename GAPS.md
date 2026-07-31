@@ -1,11 +1,13 @@
 # Known gaps — stated, measured where possible, and not closed
 
 **As of:** 2026-07-30, wave 12 · **Branch:** `claude/project-completion-orchestration-7dz4qp` at
-`6150b9f` · **Suite:** **261 files / 4 869 tests, 4 859 passed, 10 skipped**, `tsc -b` clean,
-1 324 s under Node v26.5.1 — measured **serially on an idle machine with no lanes running, on the
-pushed tree**, and the commit that carries the figure is the commit it describes. (The integration
-figure this line briefly carried — 4 853 at `821210a` — was superseded the same day by the drive
-phase, its defect fixes, and the dead-candidate dispositions; § D197–§ D199.) The wave-11
+`a8acf65` · **Suite:** **262 files / 4 883 tests, 4 873 passed, 10 skipped**, `tsc -b` clean,
+1 918 s under Node v26.5.1 — measured **serially on an idle machine with no lanes running, on the
+pushed tree**; the wall-clock includes the new `lunch-two-way-selection` study re-deriving its own
+20 pinned figures at full budget, which is the price of a pin that cannot go § D196-stale. (The two
+figures this line carried earlier the same day — 4 853 at `821210a`, 4 859 at `6150b9f` — were each
+superseded by landed work within hours: the drive phase and its fixes, then the Phase 6c
+measurement; § D197–§ D200.) The wave-11
 figure this line used to carry (258 files / 4 794, *4 784 passed*) **was not reproducible from any
 committed tree**: 26 of its claimed passes fail on the tree as pushed, at the very commit the
 figure was measured at, under Node 22 and 26 alike — the pins they check matched an unpushed

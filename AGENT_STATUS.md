@@ -700,9 +700,9 @@ Board: [`WAVE12_PLAN.md`](WAVE12_PLAN.md).
 | T100 | The fifth dead-code audit, under `packages/viz` (Phase 9 clause 4 mechanised) | A | ✅ landed `f3084a2` — [§ D192](DECISIONS.md); 8 dead candidates opened as follow-up |
 | T101 | A real authored field replaces `$comment` on the pattern surface (G3-o) | P | ✅ landed `29d8137` — [§ D193](DECISIONS.md) |
 | T102 | Register corrections: `docs/07` § 8's six stale entries, `docs/10` schema version, two docstrings | D | ✅ landed `9ce6a6f` — six pessimistic stale entries retired in place |
-| T103 | Phase 6c measured per § D162 / `docs/13` — serial phase after integration | M | ⬜ gated on integration |
-| T104 | Drive phase: UX § 26 list in a browser; every 🔲 resolved, primary flows end-to-end | — | ⬜ gated on integration |
-| — | Disposition of T100's 8 dead candidates (wire or delete, each with its own verification) | — | ⬜ opened by § D192 |
+| T103 | Phase 6c measured per § D162 / `docs/13` — serial phase after integration | M | ✅ landed `0a7bb4d`+`b4be48b`+`e70082f` — **NOT ACCEPTED, the third refusal** ([§ D200](DECISIONS.md)); the detector engaged, the selector refused, and the flat control's BETTER named as a static hybrid |
+| T104 | Drive phase: UX § 26 list in a browser; every 🔲 resolved, primary flows end-to-end | — | ✅ landed `5d4b782`+`0f56719` — [§ D198](DECISIONS.md); 87 rows driven green from zero, 🔲 = 0, eight defects found and fixed same-day ([§ D199](DECISIONS.md)) |
+| — | Disposition of T100's 8 dead candidates (wire or delete, each with its own verification) | — | ✅ landed — [§ D197](DECISIONS.md); 4 wired, 4 deleted, and the dwell chips were inert in every shipped shift |
 
 **Lane conduct:** six lanes, six worktrees, six branches; every `git add` named explicit paths and no
 commit contains another lane's work — R25's remedy held. The wave's own errors — an invalidated
@@ -715,3 +715,9 @@ pushed tree at `821210a`**. The first integration run was **red — 26 failed �
 the wave's largest finding**: the failures were inherited pins that matched no committed tree,
 including the handoff's own close figure, traced link by link and re-pinned under
 [§ D196](DECISIONS.md). The skip count did not move all wave.
+
+**Final (wave close, superseding the line above):** after the drive phase, its eight same-day
+defect fixes, the dead-candidate dispositions and the Phase 6c measurement — **262 files / 4 883
+tests, 4 873 passed, 10 skipped**, `tsc -b` clean, 1 918 s, Node v26.5.1, serial on an idle
+machine, **on the pushed tree at `a8acf65`**. Every task on the wave board is landed; the wave's
+verdicts are § D187–§ D200, and no phase marker moved in either direction.
