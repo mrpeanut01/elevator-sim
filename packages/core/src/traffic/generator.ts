@@ -145,6 +145,7 @@ import {
   type TraceLeg,
   type TraceTransportHop,
   type TrafficConfig,
+  type TrafficModelVersion,
 } from './types.js';
 
 /** The arrival process this module implements. Anything else in the data is a hard error. */
@@ -303,6 +304,7 @@ interface ResolvedOptions {
   readonly idPrefix: string;
   readonly journeyIdPrefix: string;
   readonly batchIdPrefix: string;
+  readonly trafficModel: TrafficModelVersion;
 }
 
 function resolveOptions(config: DemandConfig): ResolvedOptions {
@@ -320,6 +322,7 @@ function resolveOptions(config: DemandConfig): ResolvedOptions {
     idPrefix: config.idPrefix ?? 'p',
     journeyIdPrefix: config.journeyIdPrefix ?? 'j',
     batchIdPrefix: config.batchIdPrefix ?? 'b',
+    trafficModel: config.trafficModel ?? TRAFFIC_DEFAULTS.trafficModel,
   };
 }
 
@@ -1000,10 +1003,24 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
     const fixedOrigin =
       source.originFloorId === undefined ? undefined : requireFloor(source.originFloorId);
 
+    // Which stream the group-size draw comes from — the whole of docs/14 § 1.3, and the one
+    // trace-moving change in the building-behaviour program.
+    //
+    // Under `v1` it is `arrivals`, so group size and arrival instants share a sequence and any
+    // change to the group-size curve — even one preserving the mean — consumes a different number
+    // of draws and shifts every subsequent arrival instant. That is the ordering all 981 pinned
+    // estimates and both identity digests were measured under, and it is the default: a run that
+    // does not ask for `v2` is byte-identical to the run before this branch existed.
+    //
+    // Under `v2` it is `batchSize`, and the two become independent. Resolved once per source
+    // rather than per batch because it cannot change within a run.
+    const batchSizeStream =
+      options.trafficModel === 'v2' ? streams.batchSize : streams.arrivals;
+
     // Pass B: per batch, its origin (entrance sources only), its size, its destinations.
     for (const timeS of times) {
       const originFloor = fixedOrigin ?? entranceTable.pick(streams.origins);
-      const size = drawBatchSize(streams.arrivals, profileFor(originFloor).batchSize);
+      const size = drawBatchSize(batchSizeStream, profileFor(originFloor).batchSize);
       // Under a mix arc the table is the batch's own: the same destinations, reweighted by the
       // directional mix at the instant the batch appears. Rebuilt rather than mutated so that
       // `pick` stays one uniform draw whatever the weights are — a rejection scheme here would

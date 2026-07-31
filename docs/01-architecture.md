@@ -174,8 +174,14 @@ interface StreamSet {
   passengerMass: RNG;    // body weight, drives the load sensor
   doorObstruction: RNG;  // door reopen events
   policyNoise: RNG;      // stochastic dispatcher exploration
+  batchSize: RNG;        // group size — consumed only under `trafficModel: 'v2'`
 }
 ```
+
+`batchSize` is the newest and the only one that is conditional. Under the default
+`trafficModel: 'v1'` the group-size draw stays on `arrivals`, exactly where it has always been, and
+this stream is materialized and never consumed — which is what keeps every published figure
+reproducing byte for byte. See [docs/14 § 1.3](14-building-behaviour-contract.md).
 
 This matters more than it looks. With a single global RNG, if dispatcher B causes one
 extra door reopen, **every subsequent draw shifts** and the two runs diverge into entirely

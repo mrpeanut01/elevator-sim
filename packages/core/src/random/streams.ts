@@ -56,6 +56,16 @@ export const STREAM_NAMES = [
   'passengerMass',
   'doorObstruction',
   'policyNoise',
+  /**
+   * Group size (docs/14 § 1.2). Appended rather than filed next to `arrivals`, because a name's
+   * *spelling* decides its parameters and its *position* decides nothing — so appending is the
+   * edit that cannot disturb the six above.
+   *
+   * Drawn from only under `trafficModel: 'v2'`. Under `v1` the batch draw stays on `arrivals`
+   * exactly as it always has, this stream is materialized and never consumed, and every published
+   * figure reproduces (docs/14 § 1.3).
+   */
+  'batchSize',
 ] as const;
 
 export type StreamName = (typeof STREAM_NAMES)[number];
@@ -139,7 +149,7 @@ export function deriveStreamSeed(masterSeed: number | bigint, streamName: string
 /**
  * The streams that describe **who turns up**, as opposed to how the machine behaves.
  *
- * The split is the whole content of {@link StreamSetOptions.trafficSeed}: give these four a
+ * The split is the whole content of {@link StreamSetOptions.trafficSeed}: give these five a
  * separate seed and you can re-roll the crowd while the building, the doors and the dispatcher's
  * own noise stay exactly where they were — or hold the crowd and change the machine, which is
  * common random numbers expressed as a knob rather than as a convention.
@@ -147,12 +157,17 @@ export function deriveStreamSeed(masterSeed: number | bigint, streamName: string
  * `doorObstruction` is deliberately **not** here. An obstruction is a property of the door and the
  * moment, not of the person: putting it on the traffic seed would mean "the same crowd" also meant
  * "the same doors jamming", and the two questions would stop being separable.
+ *
+ * `batchSize` **is** here, by that same test read the other way: how many people walk in together
+ * is a fact about the crowd and nothing about the machine. A traffic seed that re-rolled who turns
+ * up and when, but left every group the same size, would be re-rolling half a Tuesday.
  */
 const TRAFFIC_STREAM_NAMES: ReadonlySet<string> = new Set([
   'arrivals',
   'origins',
   'destinations',
   'passengerMass',
+  'batchSize',
 ]);
 
 /** Optional second seed, for separating demand from machine. See {@link StreamSet}. */
@@ -168,7 +183,7 @@ export interface StreamSetOptions {
 }
 
 /**
- * The six named streams required by the architecture, plus on-demand derivation for any
+ * The seven named streams required by the architecture, plus on-demand derivation for any
  * additional source.
  *
  * Construct one per replication and inject it. Never create generators inline in simulation
@@ -222,6 +237,16 @@ export class StreamSet {
   readonly doorObstruction: Rng;
   /** Stochastic dispatcher exploration. */
   readonly policyNoise: Rng;
+  /**
+   * How many people walk in together. Consumed only under `trafficModel: 'v2'` (docs/14 § 1.3).
+   *
+   * Materialized here with the rest rather than derived lazily, because a name in
+   * {@link STREAM_NAMES} without a property beside it is a source the architecture declares and
+   * the type does not. Materializing costs one derivation and consumes nothing: a stream nobody
+   * draws from leaves every other stream exactly where it was, which is the independence
+   * guarantee this whole module is built on and what `streams.test.ts` asserts in both directions.
+   */
+  readonly batchSize: Rng;
 
   readonly #streams = new Map<string, Pcg32>();
 
@@ -236,6 +261,7 @@ export class StreamSet {
     this.passengerMass = this.#derive('passengerMass');
     this.doorObstruction = this.#derive('doorObstruction');
     this.policyNoise = this.#derive('policyNoise');
+    this.batchSize = this.#derive('batchSize');
   }
 
   /** Typed accessor for the required streams. Returns the same instance as the property. */
@@ -244,7 +270,7 @@ export class StreamSet {
   }
 
   /**
-   * Get (creating on first use) a stream for a source outside the required six.
+   * Get (creating on first use) a stream for a source outside the required seven.
    *
    * Memoized, so repeated calls with the same name return the same generator rather than
    * restarting the sequence. Prefer adding the name to {@link STREAM_NAMES} once a source is

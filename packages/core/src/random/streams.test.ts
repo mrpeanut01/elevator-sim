@@ -16,7 +16,7 @@ const others = (name: StreamName): readonly StreamName[] =>
   STREAM_NAMES.filter((candidate) => candidate !== name);
 
 describe('StreamSet — required streams', () => {
-  it('exposes exactly the six sources named in the architecture', () => {
+  it('exposes exactly the sources named in the architecture', () => {
     expect([...STREAM_NAMES]).toEqual([
       'arrivals',
       'origins',
@@ -24,10 +24,13 @@ describe('StreamSet — required streams', () => {
       'passengerMass',
       'doorObstruction',
       'policyNoise',
+      // Appended, never inserted: a name's spelling decides its PCG parameters, so the six above
+      // keep theirs. See the COMPATIBILITY LOCK below.
+      'batchSize',
     ]);
   });
 
-  it('materializes all six on construction', () => {
+  it('materializes every one of them on construction', () => {
     const set = new StreamSet(MASTER_SEED);
     expect(set.streamNames()).toEqual([...STREAM_NAMES]);
   });
@@ -40,6 +43,7 @@ describe('StreamSet — required streams', () => {
     expect(set.stream('passengerMass')).toBe(set.passengerMass);
     expect(set.stream('doorObstruction')).toBe(set.doorObstruction);
     expect(set.stream('policyNoise')).toBe(set.policyNoise);
+    expect(set.stream('batchSize')).toBe(set.batchSize);
   });
 
   it('keeps the seed available for the run record', () => {
@@ -324,6 +328,20 @@ const GOLDEN_STREAMS: Readonly<Record<StreamName, GoldenVector>> = {
     initSeq: 5524437755935699479n,
     firstDraws: [3214590096, 3644864734, 3822589677, 2368049409],
   },
+  /*
+   * Added with the stream itself (docs/14 § 1.3), and produced the same way the six above were:
+   * by an independent BigInt implementation of FNV-1a-64, SplitMix64 and
+   * `pcg_setseq_64_xsh_rr_32` written from the algorithm specifications, which was first required
+   * to reproduce all six of them and the ad-hoc vector below before this seventh was taken from it.
+   *
+   * That order matters. A value read out of `streams.ts` would pin the code to itself and prove
+   * nothing; a value from a program that independently agrees on seven of seven pins the *scheme*.
+   */
+  batchSize: {
+    initState: 10950848240609012255n,
+    initSeq: 11551578178733633914n,
+    firstDraws: [2215659223, 3273889632, 4109878313, 4090393260],
+  },
 };
 
 /** An ad-hoc stream, pinned too: `derive()` outputs are just as persisted as the required six. */
@@ -503,7 +521,12 @@ describe('StreamSet — statistical sanity through the named streams', () => {
  * -------------------------------------------------------------------------- */
 
 describe('a separate traffic seed splits who turns up from how the machine behaves', () => {
-  const DEMAND = ['arrivals', 'origins', 'destinations', 'passengerMass'] as const;
+  /*
+   * `batchSize` is demand: how many people walk in together is a fact about the crowd and nothing
+   * about the machine, so a traffic seed that re-rolled who turns up and when but left every group
+   * the same size would be re-rolling half a Tuesday.
+   */
+  const DEMAND = ['arrivals', 'origins', 'destinations', 'passengerMass', 'batchSize'] as const;
   const MACHINE = ['doorObstruction', 'policyNoise'] as const;
 
   const firstDraws = (set: StreamSet, name: StreamName, count = 8): readonly number[] =>

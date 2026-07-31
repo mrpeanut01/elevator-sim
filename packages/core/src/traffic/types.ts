@@ -483,6 +483,24 @@ export interface DemandTemplateOverrides {
   readonly mixAmplitude?: number | undefined;
 }
 
+/**
+ * Which draw ordering the generator uses. docs/14 § 1.3.
+ *
+ * Not a tunable and not a knob an optimizer may sample: it names *which simulator* produced a
+ * number, the way a file-format version names which writer produced a file.
+ *
+ * - `v1` — the ordering every figure in this repository was measured under. `drawBatchSize` draws
+ *   from `arrivals`, so group size and arrival instants share a sequence.
+ * - `v2` — group size draws from its own `batchSize` stream. The two become independent, which is
+ *   what makes a group-size study readable at all: under `v1`, any change to the group-size curve
+ *   — even one that preserves the mean — consumes a different number of draws from `arrivals` and
+ *   shifts every subsequent arrival instant, so the two effects can never be told apart.
+ *
+ * `v1` is the default and is deleted only when the last figure depending on it has been re-derived
+ * under `v2` **and** the re-derivation has been published as a comparison — not before.
+ */
+export type TrafficModelVersion = 'v1' | 'v2';
+
 /** Everything {@link generateTrace} needs. Only `building`, `profiles` and `streams` are required. */
 export interface TrafficConfig {
   /** The building, floors expanded and cross-references checked. */
@@ -490,11 +508,19 @@ export interface TrafficConfig {
   /** The whole of `data/traffic-profiles.json`: profiles, templates and the mass distribution. */
   readonly profiles: TrafficProfiles;
   /**
-   * This replication's streams. Arrival times and batch sizes come from `arrivals`, origins
-   * from `origins`, destinations from `destinations`, mass from `passengerMass`. `doorObstruction`
-   * and `policyNoise` are never touched here, and `generator.test.ts` asserts it.
+   * This replication's streams. Arrival times come from `arrivals`, origins from `origins`,
+   * destinations from `destinations`, mass from `passengerMass`. Batch sizes come from `arrivals`
+   * under {@link trafficModel} `v1` and from `batchSize` under `v2`. `doorObstruction` and
+   * `policyNoise` are never touched here, and `generator.test.ts` asserts it.
    */
   readonly streams: StreamSet;
+  /**
+   * Which draw ordering to use. Default `v1`, which is every figure this repository publishes.
+   *
+   * See {@link TrafficModelVersion}. This is a version, not a tunable: it is `null` in
+   * `parameters.test.ts`'s map for the same reason `building` is.
+   */
+  readonly trafficModel?: TrafficModelVersion | undefined;
   /**
    * Demand shape. A {@link DemandTemplateId} is looked up in `profiles.demandTemplates`; a
    * {@link ResolvedDemandTemplate} is used as given. Defaults to `rise-and-fall`.
@@ -580,6 +606,13 @@ export interface TrafficConfig {
  * repeat them — a declared schema that disagrees with the resolver is worse than none.
  */
 export const TRAFFIC_DEFAULTS = Object.freeze({
+  /**
+   * The draw ordering every published figure was measured under. See {@link TrafficModelVersion}.
+   *
+   * A default that is not `'v1'` re-derives 981 pinned estimates and both identity digests in one
+   * edit, which is precisely the failure docs/14 § 0 exists to prevent.
+   */
+  trafficModel: 'v1',
   templateId: 'rise-and-fall',
   demandLevel: 'typical',
   batchSharesDestination: false,
@@ -609,6 +642,7 @@ export const TRAFFIC_DEFAULTS = Object.freeze({
   /** Full authored arc. See {@link DemandTemplateOverrides.mixAmplitude}. */
   mixAmplitude: 1,
 } as const satisfies {
+  readonly trafficModel: TrafficModelVersion;
   readonly templateId: DemandTemplateId;
   readonly demandLevel: DemandLevel;
   readonly batchSharesDestination: boolean;
