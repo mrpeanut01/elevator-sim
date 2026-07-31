@@ -1,0 +1,134 @@
+# Code review, in two halves that fail for different reasons.
+#
+# `ci.yml` answers "does it still work". This answers "should it land", and it is deliberately a
+# separate workflow: the suite takes ~35 minutes on the Linux leg, and a review that only arrives
+# after it has no chance of being read before the author has moved on. These jobs finish in
+# seconds-to-minutes and post while the suite is still running.
+#
+# ## The two halves
+#
+# `gates` is mechanical and blocking. It enforces the CLAUDE.md invariants that have an exact
+# checkable form — no global RNG, no wall-clock in `core/`, no `core → viz` dependency, no branch on
+# a dispatcher profile id — plus the file-sync duplicates that cost this repository 21 spurious
+# failures to diagnose. No secrets, no network, runs on a fork PR.
+#
+# `claude-review` is judgement and advisory. It reads the diff for the things a regex cannot see:
+# whether a control is wired to anything, whether a published number is pinned to the run that
+# produced it, whether a new statistical claim has an interval behind it.
+#
+# Keeping them separate is the point. A missing API key degrades the review to its mechanical half
+# and says so; it does not silently pass a pull request nobody read.
+name: Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: invariant gates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+
+      # No `npm ci`: the gates read source with `node:fs` and nothing else, so they must not be able
+      # to fail for a reason unrelated to the code under review.
+      - name: Invariant gates
+        run: node scripts/review-gates.mjs
+
+  claude-review:
+    name: claude review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # `secrets` is not available in a job-level `if`, so the presence check is a step that exports
+      # a boolean. Without this the job fails confusingly on every fork PR and on any clone that has
+      # not set the key — a review that cannot run should be skipped, visibly, not failed.
+      - name: Is a key configured?
+        id: key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Claude review skipped::No ANTHROPIC_API_KEY secret is set. The mechanical gates still ran; the reading half did not."
+          fi
+
+      - name: Review
+        if: steps.key.outputs.present == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # The prompt is repository-specific on purpose. A generic "review this PR" produces generic
+          # findings, and every item below is a defect class this repository has actually shipped —
+          # the numbers are from its own DECISIONS.md, not from a checklist.
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request against `CLAUDE.md`, which is authoritative. The PR branch is
+            already checked out. Read `CLAUDE.md` first; it is short and it is the standard.
+
+            The mechanical invariants (no global RNG, no wall-clock in core/, no core→viz import, no
+            branch on a dispatcher profile id) are already enforced by `scripts/review-gates.mjs` in
+            the `gates` job. Do not re-check them. Look for what a regex cannot see:
+
+            1. THE DEAD INTEGRATION SEAM — this repository's signature defect, shipped ELEVEN times.
+               A behaviour that is configurable, unit-tested in isolation, and called from nothing
+               shipped passes every other check here. The rule is not "is it reachable?" but "NAME
+               THE NON-TEST CALLER". A barrel re-export and a {@link} tag look exactly like a caller
+               and are not one. If this PR adds a control, an option or a cost term, find the shipped
+               path that reaches it, or say that you could not.
+
+            2. A PUBLISHED NUMBER THAT IS NOT PINNED TO THE RUN THAT PRODUCED IT. Three figures here
+               did not reproduce from the code meant to produce them, and § D196/§ D201 cost a whole
+               wave: 26 pins were re-pinned to values that were correct on one machine and wrong on
+               another, because a pin is a claim about a machine as well as a commit. Flag any new
+               exact-value assertion over a floating-point quantity, and any figure quoted in prose
+               without a run behind it.
+
+            3. A STATED MECHANISM WITH NO MEASUREMENT. Seven places once asserted that destination
+               dispatch does better under access control BECAUSE authorization and optimization
+               happen together. Measured, it buys LESS. If this PR says why something performs
+               better, either it measured it or it must say it is unmeasured.
+
+            4. STATISTICAL DISCIPLINE. No "better" without a paired-t interval excluding zero; never
+               conclude from two overlapping intervals; 50-200 replications, not 10; common random
+               numbers across compared alternatives; an effect below the resolution limit is not a
+               win even if its interval excludes zero. Energy is an axis, never a score, and
+               `workPerServedLegKJ` goes beside any raw energy figure — a configuration that spends
+               less by serving fewer people has not saved anything.
+
+            5. A WEAKENED ACCEPTANCE CRITERION. Criteria are raised, never lowered, and a phase is
+               done when its criteria pass rather than when the code exists. A test changed to match
+               new behaviour, a tolerance widened, a skip added — say so plainly.
+
+            Be specific and actionable: file:line, what is wrong, what would fix it. Say what you
+            verified as sound, not only what is wrong. If the PR is fine, say so briefly — do not
+            manufacture findings, and do not block on style.
+
+            Use `gh pr comment` for top-level feedback.
+            Use `mcp__github_inline_comment__create_inline_comment` (with `confirmed: true`) for
+            specific lines. Only post GitHub comments — do not return the review as a message.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"

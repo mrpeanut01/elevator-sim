@@ -21,6 +21,7 @@
     "rebuild": "tsc -b --clean && tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
+    "review": "node scripts/review-gates.mjs",
     "sim": "node packages/cli/dist/index.js"
   },
   "devDependencies": {
