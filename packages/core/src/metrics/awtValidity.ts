@@ -1,5 +1,5 @@
 /**
- * **The four grounds on which a run refuses its own mean — as a code beside the prose.**
+ * **The grounds on which a run refuses its own mean — as a code beside the prose.**
  *
  * `RunSummary.awtIsValid` is the single most consequential boolean this package produces: a run
  * whose mean is refused must never display a mean (docs/07 § 3, `the root DECISIONS.md` § D111).
@@ -35,7 +35,10 @@
  * The table is evaluated top to bottom and the **first** ground that fires is the one reported, so
  * a run that trips several reports the most fundamental one rather than the last one checked. The
  * order below is the order `summarizeRun`'s nested conditional had before this module extracted it,
- * preserved exactly: **saturation, then emptiness, then censoring, then starvation.**
+ * preserved exactly — **saturation, then emptiness, then censoring, then starvation** — with
+ * **abandonment** inserted between emptiness and censoring when docs/14 § 3.1 made riders able to
+ * leave. It goes *above* censoring rather than below it, and that placement was corrected by a
+ * run rather than argued: see the ground's own comment.
  *
  * (`RunSummary.awtIsValid`'s docstring numbered these 1 saturation, 2 censoring, 3 emptiness,
  * 4 starvation and claimed they were *"evaluated in that order"*. They were not, and never have
@@ -88,6 +91,17 @@ export interface AwtValidityEvidence {
   readonly maxUnservedFraction: number;
   /** `unservedCount / arrivalCount`, or `0` when the window held no arrivals. */
   readonly unservedFraction: number;
+  /**
+   * Legs in the window whose rider gave up and left (docs/14 § 3.1).
+   *
+   * `0` on every run that declares no `sim.patience`, which is every run this repository has
+   * published — so the fifth ground below cannot fire on one, and the four above are unchanged.
+   */
+  readonly abandonedCount: number;
+  /** `abandonedCount / arrivalCount`, or `0` when the window held no arrivals. */
+  readonly abandonmentFraction: number;
+  /** The abandonment limit applied. `DEFAULT_MAX_ABANDONMENT_FRACTION` unless overridden. */
+  readonly maxAbandonmentFraction: number;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -137,6 +151,33 @@ const AWT_INVALID_GROUND_SPECS = [
     fires: (evidence: AwtValidityEvidence): boolean => evidence.waiting.count === 0,
     reason: (): string =>
       'No passenger was served within the reporting window, so there is no waiting time to average.',
+  },
+  {
+    /*
+     * **The fifth ground, and it is placed *ahead* of censoring because a measurement said so.**
+     *
+     * The argument written first put it after `censored`, on the reasoning that both describe a
+     * biased survivor cohort and censoring is the older claim. The first run that abandoned
+     * anybody refuted it: an abandoned leg never boards, so `WaitStatistics.unservedCount`
+     * counts it too, and a run at a 4 % abandonment rate reported **`censored`** — *"too many
+     * arrivals were never served"* — about a window whose queue had drained perfectly. The
+     * sentence was true and the diagnosis was useless: it sends a reader to look for a backlog
+     * that is not there, when what happened is that the backlog walked out.
+     *
+     * So the precedence is by **cause**, which is what "the most fundamental ground" has always
+     * meant here. Where riders abandoned, the censoring *is* the abandonment seen from the other
+     * side, and the same is true of the tail gate below — nobody can wait past a 900 s horizon on
+     * a run where everybody leaves at five minutes, so `starved` goes quiet exactly when this
+     * fires hardest.
+     *
+     * It stays below `empty-window` for the reason that ground is second at all: with nothing
+     * served there is no mean, and no account of *why* changes that.
+     */
+    ground: 'abandoned',
+    fires: (evidence: AwtValidityEvidence): boolean =>
+      evidence.abandonmentFraction > evidence.maxAbandonmentFraction,
+    reason: (evidence: AwtValidityEvidence): string =>
+      `${evidence.abandonedCount} of ${evidence.waiting.arrivalCount} arrivals in the reporting window (${(evidence.abandonmentFraction * 100).toFixed(1)}%) gave up and left before a car reached them, above the ${(evidence.maxAbandonmentFraction * 100).toFixed(1)}% abandonment limit. Every one of those waits was longer than the ones the mean is taken over, so abandonment lowers AWT by construction and the reported mean of ${evidence.waiting.meanS.toFixed(1)} s describes the riders who stayed rather than the service they were offered; its confidence interval must be suppressed.`,
   },
   {
     /*
@@ -211,7 +252,7 @@ export interface AwtInvalidity {
  * Pure. Total on well-formed evidence: every predicate is a comparison over numbers the caller
  * already computed, and none of them throws.
  *
- * This is the **only** place the four grounds are evaluated. `summarizeRun` calls it once and
+ * This is the **only** place the grounds are evaluated. `summarizeRun` calls it once and
  * publishes both halves of what it returns; nothing else in the project may re-decide a refusal
  * from a summary's other fields, because a second decision is a second answer.
  */

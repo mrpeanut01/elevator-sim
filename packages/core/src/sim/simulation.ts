@@ -176,6 +176,7 @@ import type {
 } from '../traffic/types.js';
 
 import {
+  abandonmentEvent,
   batchArrivalEvent,
   carArrivedEvent,
   carDoorEvent,
@@ -185,6 +186,12 @@ import {
   transferArrivalEvent,
   transportArrivalEvent,
 } from './events.js';
+import {
+  drawPatienceTable,
+  patienceKeyOf,
+  requireValidPatience,
+  type PatienceConfig,
+} from './patience.js';
 import {
   SIM_DEFAULTS,
   SimulationError,
@@ -324,6 +331,11 @@ interface ResolvedOptions {
   readonly doorObstructionProbability: number;
   readonly maxEvents: number;
   readonly onTimeout: 'throw' | 'report';
+  /**
+   * The declared patience curve, or `undefined` when the run models none — which is every run
+   * this repository has published (docs/14 § 3.1).
+   */
+  readonly patience: PatienceConfig | undefined;
 }
 
 /**
@@ -534,6 +546,23 @@ export class Simulation {
   /** How often the drain deadline refused to schedule something. `> 0` means it really bit. */
   #deadlineTruncations = 0;
 
+  /* ---- patience and abandonment (docs/14 § 3.1) ---- */
+
+  /**
+   * One patience value per **planned** leg, drawn before the run started and keyed by
+   * `patienceKeyOf(journeyId, legIndex)`.
+   *
+   * Empty on every run that declares no `sim.patience`, and the `patience` stream is then never
+   * drawn from at all — which is what makes such a run byte-identical to one produced before this
+   * feature existed. See `sim/patience.ts` for why the draw is taken in trace order rather than
+   * as legs reach landings.
+   */
+  readonly #patienceByLeg: ReadonlyMap<string, SimTime>;
+  /** Leg ids whose rider gave up and walked out. See {@link #abandon}. */
+  readonly #abandonedLegs = new Set<string>();
+  /** Journeys ended by an abandonment. See {@link ConservationAudit.abandoned}. */
+  readonly #abandonedJourneys = new Set<string>();
+
   /* ---- double-deck operation, counted rather than asserted ---- */
 
   /** Stops begun by a double-deck car, whether or not both decks had a floor to open onto. */
@@ -590,6 +619,18 @@ export class Simulation {
       this.#recordIndexById.set(record.id, index);
     }
     this.#warnings.push(...this.#trace.warnings);
+
+    /*
+     * **Patience, drawn here or not at all.** In trace order, one value per planned leg, before
+     * any car has moved — so who gives up is a property of the crowd and not of the dispatcher,
+     * and two arms of a paired comparison lose the same people. `sim/patience.ts` states the
+     * argument in full. With no declared curve this is an empty map and the `patience` stream is
+     * never touched, which is the whole of docs/14 § 0 for this feature.
+     */
+    this.#patienceByLeg =
+      this.#options.patience === undefined
+        ? new Map()
+        : drawPatienceTable(this.#streams.patience, this.#options.patience, this.#trace.passengers);
 
     /* ---- the building, with real cars ---- */
     const profile = config.dispatcherProfile;
@@ -1347,6 +1388,114 @@ export class Simulation {
     this.#recorder.recordArrival(passenger);
     this.#observeArrival(passenger);
     this.#building.requireFloor(passenger.originFloorId).addWaiting(passenger);
+    this.#armPatience(passenger);
+  }
+
+  /**
+   * Start this leg's patience clock, if the run declared one.
+   *
+   * The value was drawn before the run started; all that happens here is the scheduling. A leg
+   * whose key is absent — every leg of every run with no `sim.patience`, and any leg the trace did
+   * not plan — is left alone, so this is a no-op on the shipped path rather than a branch that
+   * merely evaluates to nothing.
+   *
+   * **A timer past the drain deadline is not scheduled, and is not counted as truncated work.**
+   * `#deadlineTruncations` is the evidence `#timeoutDiagnosis` uses to tell a genuine drain
+   * timeout from a run that simply ran out of events, and a patience timer beyond the deadline is
+   * neither: the run stops before it, so it could not have fired whether or not it was queued.
+   * Counting it would send a reader to `sim.drainGraceS` for a run the deadline never touched.
+   */
+  #armPatience(passenger: Passenger): void {
+    const patienceS = this.#patienceByLeg.get(
+      patienceKeyOf(passenger.journeyId, passenger.legIndex),
+    );
+    if (patienceS === undefined) return;
+    const leavesAt = passenger.arrivedAt + patienceS;
+    if (leavesAt > this.#deadlineS) return;
+    this.#kernel.schedule(
+      leavesAt,
+      abandonmentEvent({ legId: passenger.id }, (payload, context) => {
+        this.#onPatienceExpired(payload.legId, context.time);
+      }),
+    );
+  }
+
+  /**
+   * A drawn patience running out. **Almost always a no-op**, and that is the design.
+   *
+   * The timer is armed when the leg reaches the landing and is never cancelled, because the
+   * kernel has no cancel and adding one to support this would put a mutable index of pending
+   * events beside the queue — the sort of structure invariant 4 exists to keep out. So the guard
+   * is here instead: a leg that has boarded, has already abandoned, or is no longer on its floor
+   * simply has nothing to do. Cheaper than cancellation and impossible to get out of step with.
+   */
+  #onPatienceExpired(legId: string, at: SimTime): void {
+    const passenger = this.#legs.get(legId);
+    if (passenger === undefined) return;
+    if (passenger.hasBoarded || this.#abandonedLegs.has(legId)) return;
+    this.#abandon(passenger, at);
+  }
+
+  /**
+   * A rider giving up: off the landing, out of the books as neither served nor waiting, and the
+   * call withdrawn behind them if nobody else is holding it (docs/14 § 3.1).
+   *
+   * The order matters and is not arbitrary. The passenger leaves the floor **first**, so every
+   * predicate downstream — `#eligibleWaiting`, `#syncButton`, the next dispatch pass — sees a
+   * landing that no longer contains them. Withdrawing the call before removing the rider would
+   * ask "is anybody still here?" of a queue they were still in.
+   *
+   * **`cancel`, not `complete`.** The policy lifecycle has two exits and they mean different
+   * things: `complete` says the landing was collected, `cancel` says the work went away. A
+   * withdrawn call was not served, and filing it as served would put a phantom collection into
+   * every stage-5 statistic the policy keeps about its own hit rate.
+   */
+  #abandon(passenger: Passenger, at: SimTime): void {
+    const floor = this.#building.requireFloor(passenger.originFloorId);
+    floor.removeWaiting(passenger);
+    this.#abandonedLegs.add(passenger.id);
+    this.#abandonedJourneys.add(passenger.journeyId);
+    // The recorder clears any promise the rider was holding, so the record can never show a car
+    // reserving itself for somebody who had already left.
+    this.#recorder.recordAbandonment(passenger, at);
+    passenger.releasePromise(at);
+
+    for (const active of this.#callsAtFloor(passenger.originFloorId)) {
+      const bank = this.#building.bankById(active.bankId);
+      if (bank === undefined) continue;
+      if (this.#eligibleWaiting(bank, active).count > 0) continue;
+      this.#withdrawCall(active, at);
+    }
+    this.#syncButton(passenger.originFloorId, passenger.direction);
+  }
+
+  /** Every live call at a floor, whichever bank or direction it belongs to. */
+  #callsAtFloor(floorId: string): readonly ActiveCall[] {
+    const found: ActiveCall[] = [];
+    for (const active of this.#activeCalls.values()) {
+      if (active.floorId === floorId) found.push(active);
+    }
+    return found;
+  }
+
+  /**
+   * Take a call back because the people who pressed the button have gone.
+   *
+   * The mirror image of {@link #completeCall}: the same teardown, through the lifecycle's other
+   * exit. See {@link #abandon} for why the difference between the two is load-bearing rather than
+   * cosmetic.
+   */
+  #withdrawCall(active: ActiveCall, at: SimTime): void {
+    this.#unservable.delete(active.id);
+    this.#refusals.delete(active.id);
+    this.#policies.get(active.bankId)?.cancel(active.id);
+    for (const carId of active.carIds) this.#carsById.get(carId)?.releaseHallCall(active.id);
+    active.carIds = Object.freeze([]);
+    this.#activeCalls.delete(active.id);
+    this.#syncButton(active.floorId, active.direction);
+    // A car standing idle for a call that has just evaporated should be told, or it waits for a
+    // landing nobody is on until the next tick happens to fire.
+    this.#scheduleTick(active.bankId, at);
   }
 
   /**
@@ -3523,6 +3672,7 @@ export class Simulation {
     const problems: string[] = [];
     const undelivered: UndeliveredJourney[] = [];
     let delivered = 0;
+    let abandoned = 0;
 
     // Which car took each leg, so an undelivered rider can be named with the car it is in.
     const carOfLeg = new Map<string, string>();
@@ -3582,6 +3732,21 @@ export class Simulation {
         continue;
       }
 
+      /*
+       * **A rider who walked out is a third outcome, not a slow delivery** (docs/14 § 3.1).
+       *
+       * They are not `undelivered`: that list is *"who is still in the system"*, and it is what
+       * decides whether the run reports `timed-out`. Somebody who went home is in no queue and no
+       * car, so filing them there would report a run as having failed to drain when it drained
+       * perfectly — and would hide the reason it drained, which is that a third of the demand
+       * left. They are counted here instead and published as `ConservationAudit.abandoned`,
+       * beside the AWT their departure improved.
+       */
+      if (this.#abandonedLegs.has(last.id)) {
+        abandoned += 1;
+        continue;
+      }
+
       const reason: UndeliveredReason = last.hasAlighted
         ? 'transferring'
         : last.hasBoarded
@@ -3612,9 +3777,9 @@ export class Simulation {
         `${legsCreated} legs were created but ${legsRecorded} reached the recorder; the difference is invisible to every metric`,
       );
     }
-    if (delivered + undelivered.length !== generated) {
+    if (delivered + undelivered.length + abandoned !== generated) {
       problems.push(
-        `${generated} journeys were generated but ${delivered} were delivered and ${undelivered.length} accounted for as undelivered`,
+        `${generated} journeys were generated but ${delivered} were delivered, ${undelivered.length} accounted for as undelivered and ${abandoned} as abandoned`,
       );
     }
 
@@ -3694,11 +3859,19 @@ export class Simulation {
       wrongCarBoardings: this.#wrongCarBoardings,
       brokenPromises: this.#brokenPromises,
       promisesRevoked: this.#promisesRevoked,
+      /*
+       * Present when the run modelled patience, absent when it did not — never `0` on a run that
+       * never asked the question. A key that appeared on every run would move
+       * `structuralDigestOfResult`, which hashes every key whatever its value, and with it every
+       * pinned figure (docs/14 § 5 criterion 1). Present and `0` is the different, useful claim:
+       * riders *could* have left and none did.
+       */
+      ...(this.#options.patience === undefined ? {} : { abandoned }),
       balanced:
         problems.length === 0 &&
         legsCreated === legsRecorded &&
         this.#wrongCarBoardings === 0 &&
-        delivered + undelivered.length === generated,
+        delivered + undelivered.length + abandoned === generated,
     });
 
     return { audit, undelivered, problems };
@@ -3755,6 +3928,10 @@ function resolveOptions(config: SimulationConfig): ResolvedOptions {
     ),
     maxEvents: positive(config.maxEvents ?? SIM_DEFAULTS.maxEvents, 'maxEvents'),
     onTimeout: config.onTimeout ?? 'throw',
+    // Validated here rather than at first use: a mean patience of zero abandons everybody at the
+    // instant they arrive, and a run that discovered that a thousand events in would report an
+    // AWT over nobody rather than a configuration error.
+    patience: config.patience === undefined ? undefined : requireValidPatience(config.patience),
   });
 }
 

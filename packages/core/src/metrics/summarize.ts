@@ -78,6 +78,7 @@ import {
   windowContainsArrival,
   windowContainsJourney,
   windowDurationS,
+  type AbandonmentStatistics,
   type CarTimings,
   type DepartureGapBasis,
   type DurationStatistics,
@@ -163,6 +164,23 @@ export const DEFAULT_LOAD_FACTOR_EDGES: readonly number[] = Object.freeze(
  * essentially none.
  */
 export const DEFAULT_MAX_UNSERVED_FRACTION = 0.05;
+
+/**
+ * Fraction of a window's arrivals that may **walk out** before its AWT stops being quotable
+ * (docs/14 § 3.1).
+ *
+ * Lower than {@link DEFAULT_MAX_UNSERVED_FRACTION}, and deliberately: an unserved leg is a leg the
+ * mean *omits*, while an abandoned leg is one the passenger has deleted from the sample at
+ * precisely the moment it would have become the worst observation in it. Censoring biases the mean
+ * low; abandonment biases it low **and** hides the evidence, because the queue then drains, the
+ * window reports as fully served and the trend test flattens.
+ *
+ * 2 % is where that bias becomes bigger than the effects this project publishes. The dispatcher
+ * comparisons here turn on differences of a second or two in AWT; losing the top 2 % of a wait
+ * distribution moves a mean by more than that on every shipped building, so a run past this limit
+ * cannot be compared with one below it whatever its interval says.
+ */
+export const DEFAULT_MAX_ABANDONMENT_FRACTION = 0.02;
 
 /**
  * Seconds a passenger may be known to have waited before the window's AWT stops being quotable.
@@ -674,11 +692,23 @@ export function diagnoseServiceLevel(
   let overHorizonCount = 0;
 
   for (const leg of legs) {
-    const censored = leg.boardedAt === undefined;
+    /*
+     * **An abandoned leg's wait is known, not censored** (docs/14 § 3.1).
+     *
+     * A leg that never boarded is normally a lower bound — it was still standing there when the
+     * clock stopped, so `censoredAtS - arrivedAt` is the least it could have waited. A leg whose
+     * rider *left* is the opposite case: their wait ended, exactly, at the moment they walked
+     * out. Reading it as censored would credit them with every second between their departure
+     * and the end of the run — up to twenty-five minutes on a half-hour horizon — and report a
+     * `starved` verdict about somebody who was not there. `abandonedAt` is absent on every leg of
+     * every run that declares no patience, so this term is inert on the shipped path.
+     */
+    const endedAtS = leg.boardedAt ?? leg.abandonedAt ?? censoredAtS;
+    const censored = leg.boardedAt === undefined && leg.abandonedAt === undefined;
     // A leg that arrived after the censoring instant (a record whose horizon precedes its last
     // arrival) would otherwise contribute a negative wait and drag the maximum down; clamp at 0
     // rather than let a malformed record understate the tail.
-    const waitS = Math.max(0, (leg.boardedAt ?? censoredAtS) - leg.arrivedAt);
+    const waitS = Math.max(0, endedAtS - leg.arrivedAt);
     if (waitS > horizonS) overHorizonCount += 1;
     if (longest === undefined || waitS > longestWaitS) {
       longestWaitS = waitS;
@@ -1452,6 +1482,49 @@ export function achievedIntervalOf(
 }
 
 /* -------------------------------------------------------------------------- *
+ * Abandonment
+ * -------------------------------------------------------------------------- */
+
+/**
+ * How many riders in this cohort walked out, and how long they stood there first.
+ *
+ * **Returns `undefined` when nobody did**, which is every run that declares no `sim.patience` —
+ * and that is what keeps the key off `RunSummary` and the whole result byte-identical to one
+ * produced before abandonment existed (docs/14 § 5 criterion 1). `0` would be a different claim
+ * and a different object.
+ *
+ * `arrivalCount` is passed in rather than recomputed from `legs.length`, so the denominator here
+ * is provably the one {@link summarizeWaiting} used: two counts of the same cohort computed two
+ * ways are two answers waiting to disagree, and the *ratio* is what the fifth `awtIsValid` ground
+ * is decided on.
+ *
+ * `legs` is expected to be pre-filtered to the window, exactly as {@link summarizeWaiting}'s is.
+ */
+export function summarizeAbandonment(
+  legs: readonly PassengerRecord[],
+  arrivalCount: number,
+): AbandonmentStatistics | undefined {
+  let count = 0;
+  let totalS = 0;
+  let maxS = 0;
+  for (const leg of legs) {
+    if (leg.abandonedAt === undefined) continue;
+    const stoodForS = leg.abandonedAt - leg.arrivedAt;
+    count += 1;
+    totalS += stoodForS;
+    if (stoodForS > maxS) maxS = stoodForS;
+  }
+  if (count === 0) return undefined;
+  return Object.freeze({
+    count,
+    arrivalCount,
+    fraction: arrivalCount === 0 ? 0 : count / arrivalCount,
+    meanWaitBeforeLeavingS: totalS / count,
+    maxWaitBeforeLeavingS: maxS,
+  });
+}
+
+/* -------------------------------------------------------------------------- *
  * Waiting
  * -------------------------------------------------------------------------- */
 
@@ -1529,6 +1602,11 @@ export interface SummarizeOptions {
    * Default {@link DEFAULT_MAX_UNSERVED_FRACTION}.
    */
   readonly maxUnservedFraction?: number | undefined;
+  /**
+   * Fraction of a window's arrivals that may abandon before the AWT is marked invalid.
+   * Default {@link DEFAULT_MAX_ABANDONMENT_FRACTION}.
+   */
+  readonly maxAbandonmentFraction?: number | undefined;
   /**
    * Seconds a passenger may be known to have waited before the AWT is marked invalid.
    * Default {@link DEFAULT_MAX_WAIT_HORIZON_S}.
@@ -1664,6 +1742,19 @@ export function summarizeRun(record: RunRecord, options: SummarizeOptions = {}):
   const unservedFraction =
     waiting.arrivalCount === 0 ? 0 : waiting.unservedCount / waiting.arrivalCount;
 
+  const maxAbandonmentFraction =
+    options.maxAbandonmentFraction ?? DEFAULT_MAX_ABANDONMENT_FRACTION;
+  if (
+    !Number.isFinite(maxAbandonmentFraction) ||
+    maxAbandonmentFraction < 0 ||
+    maxAbandonmentFraction > 1
+  ) {
+    throw new MetricsError(
+      `maxAbandonmentFraction must be a fraction in [0, 1]; received ${maxAbandonmentFraction}.`,
+    );
+  }
+  const abandonment = summarizeAbandonment(legsInWindow, waiting.arrivalCount);
+
   const serviceLevel = diagnoseServiceLevel(legsInWindow, {
     censoredAtS: record.endedAt,
     ...(options.maxWaitHorizonS === undefined ? {} : { horizonS: options.maxWaitHorizonS }),
@@ -1683,6 +1774,9 @@ export function summarizeRun(record: RunRecord, options: SummarizeOptions = {}):
     windowSeconds: windowDurationS(window),
     maxUnservedFraction,
     unservedFraction,
+    abandonedCount: abandonment?.count ?? 0,
+    abandonmentFraction: abandonment?.fraction ?? 0,
+    maxAbandonmentFraction,
   });
 
   return Object.freeze({
@@ -1705,6 +1799,14 @@ export function summarizeRun(record: RunRecord, options: SummarizeOptions = {}):
     achievedInterval,
     saturation,
     serviceLevel,
+    /*
+     * Present exactly when somebody left, absent otherwise — so a run that declared no patience
+     * produces the summary object it produced before this key existed, which is what docs/14 § 5
+     * criterion 1 holds the whole `SimulationResult` to. It sits here, immediately before the
+     * validity verdict, because that is the reading order: the count is what the verdict below is
+     * partly decided on.
+     */
+    ...(abandonment === undefined ? {} : { abandonment }),
     awtIsValid: awtInvalidity === undefined,
     /*
      * Both keys or neither. A summary carrying a code with no sentence would be a refusal a reader
@@ -1825,6 +1927,15 @@ export const METRICS_PARAMETERS: readonly MetricsParameterSpec[] = [
     default: DEFAULT_MAX_UNSERVED_FRACTION,
     description:
       'Fraction of a window’s arrivals that may go unserved before its AWT is marked invalid. AWT averages the legs that boarded, so unserved legs are censored observations and censored in the direction that flatters the result.',
+  },
+  {
+    id: 'metrics.maxAbandonmentFraction',
+    type: 'continuous',
+    range: [0, 1],
+    scale: 'linear',
+    default: DEFAULT_MAX_ABANDONMENT_FRACTION,
+    description:
+      'Fraction of a window\u2019s arrivals that may give up and leave before its AWT is marked invalid. An abandoned leg is not merely omitted from the mean the way an unserved one is \u2014 it is deleted from the sample at the moment it would have become the worst observation in it, and the queue then drains, so the trend and censoring gates both go quiet. Analysis-side: changing it re-reads a stored run rather than re-simulating one.',
   },
   {
     id: 'metrics.maxWaitHorizonS',

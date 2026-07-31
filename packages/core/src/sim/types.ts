@@ -59,6 +59,7 @@ import type {
   ResolvedDemandTemplate,
   TrafficModelVersion,
 } from '../traffic/types.js';
+import type { PatienceConfig } from './patience.js';
 
 /* -------------------------------------------------------------------------- *
  * Errors
@@ -453,6 +454,15 @@ export interface SimulationConfig {
   readonly queueSampleCount?: number | undefined;
   readonly doorObstructionProbability?: number | undefined;
   readonly maxEvents?: number | undefined;
+  /**
+   * How long riders will stand at a landing before giving up (docs/14 § 3.1).
+   *
+   * **Absent means nobody ever leaves**, which is every run this repository has produced. Present,
+   * and the run models abandonment — at which point `RunSummary.abandonment` is published beside
+   * AWT and may not be read without it, because abandonment *improves* AWT by construction. See
+   * `sim/patience.ts`.
+   */
+  readonly patience?: PatienceConfig | undefined;
   /** `throw` (default) or `report`. See {@link SimulationError}. */
   readonly onTimeout?: TimeoutPolicy | undefined;
 }
@@ -591,7 +601,31 @@ export interface ConservationAudit {
    */
   readonly promisesRevoked: number;
 
-  /** `generated === delivered + undelivered && legsCreated === legsRecorded`. */
+  /**
+   * Journeys whose rider **gave up and left** before a car reached them (docs/14 § 3.1).
+   *
+   * **Absent, not `0`, on every run that declares no `sim.patience`** — so a run that did not ask
+   * for abandonment carries the audit object it carried before this field existed, which is what
+   * `traffic/transportIdentity.test.ts` holds the whole `SimulationResult` to. Present and `0`
+   * means the run modelled patience and nobody's ran out, which is a different claim from "the
+   * question was never asked" and is worth being able to tell apart.
+   *
+   * These journeys are neither {@link delivered} nor {@link undelivered}: they are not in the
+   * system, and they did not arrive. The balance is
+   * `generated === delivered + undelivered + abandoned`.
+   *
+   * **It is a published figure, not a diagnostic.** Abandonment removes the longest waits from the
+   * sample, so a configuration that abandons a third of its riders posts a superb AWT — the same
+   * trap `workPerServedLegKJ` sits beside the raw energy figure for (§ D106), on a different axis.
+   * `RunSummary.abandonment` is the window-scoped half that a report shows beside AWT; this is the
+   * whole-run count, and `awtIsValid`'s fifth ground is what stops the mean being quoted at all
+   * once the rate passes its declared threshold.
+   */
+  readonly abandoned?: number;
+
+  /**
+   * `generated === delivered + undelivered + (abandoned ?? 0) && legsCreated === legsRecorded`.
+   */
   readonly balanced: boolean;
 }
 

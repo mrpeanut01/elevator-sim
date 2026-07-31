@@ -205,6 +205,7 @@ interface LegState {
     readonly egressTransitSeconds: number;
     boardedAt: SimTime | undefined;
     alightedAt: SimTime | undefined;
+    abandonedAt: SimTime | undefined;
     carId: string | undefined;
     bankId: string | undefined;
     assignedCarId: string | undefined;
@@ -248,6 +249,7 @@ export class MetricsRecorder {
   #assignedCount = 0;
   #releasedCount = 0;
   #alightedCount = 0;
+  #abandonedCount = 0;
   #finishedAt: SimTime | undefined;
 
   constructor(options: MetricsRecorderOptions) {
@@ -321,6 +323,14 @@ export class MetricsRecorder {
     return this.#alightedCount;
   }
 
+  /**
+   * Legs whose rider gave up and left the landing. `0` under every run that declares no
+   * `sim.patience`. See {@link recordAbandonment}.
+   */
+  get abandonedCount(): number {
+    return this.#abandonedCount;
+  }
+
   /** Latest simulated time handed to any method. `finish` must not precede it. */
   get lastEventAt(): SimTime {
     return this.#lastEventAt;
@@ -381,6 +391,7 @@ export class MetricsRecorder {
         egressTransitSeconds: passenger.egressTransitS ?? 0,
         boardedAt: undefined,
         alightedAt: undefined,
+        abandonedAt: undefined,
         carId: undefined,
         bankId: undefined,
         assignedCarId: undefined,
@@ -493,6 +504,55 @@ export class MetricsRecorder {
     leg.record.carId = details.carId;
     leg.record.bankId = details.bankId;
     this.#boardedCount += 1;
+    this.#observe(at);
+  }
+
+  /**
+   * Record a passenger **giving up and leaving the landing** (docs/14 § 3.1).
+   *
+   * The third way a wait can end, beside boarding and the run stopping, and it is recorded here —
+   * rather than being left as "a leg that never boarded" — because the two are different facts
+   * that produce the same silence. A leg still standing there when the run ends is a *censored*
+   * observation, and `awtIsValid`'s censoring ground already accounts for it. A leg whose rider
+   * walked out is not censored: nothing was going to serve it, and the longest wait in the cohort
+   * has been removed from the sample by the person themselves. Filing the second as the first
+   * would let a configuration abandon a third of its riders and report an improved mean over a
+   * window that looks fully served.
+   *
+   * @throws MetricsError if the leg never arrived, has already boarded, has already abandoned, or
+   *   abandons before it arrived. Boarding and abandoning are mutually exclusive by construction —
+   *   a rider who got in did not leave — and the recorder refuses the pair rather than storing it,
+   *   because a record carrying both would make every wait derived from it ambiguous.
+   */
+  recordAbandonment(passenger: RecordablePassenger | string, at: SimTime): void {
+    this.#assertOpen('recordAbandonment');
+    const id = typeof passenger === 'string' ? passenger : passenger.id;
+    const leg = this.#require(id, 'abandon');
+    if (leg.record.boardedAt !== undefined) {
+      throw new MetricsError(
+        `Leg "${id}" boarded at t=${leg.record.boardedAt} and cannot abandon at t=${at}: a rider who got into the car did not walk out of the lobby.`,
+      );
+    }
+    if (leg.record.abandonedAt !== undefined) {
+      throw new MetricsError(
+        `Leg "${id}" abandoned at t=${leg.record.abandonedAt} and cannot abandon again at t=${at}.`,
+      );
+    }
+    if (!Number.isFinite(at) || at < leg.record.arrivedAt) {
+      throw new MetricsError(
+        `Leg "${id}" cannot abandon at t=${at}: it arrived at t=${leg.record.arrivedAt}.`,
+      );
+    }
+    leg.record.abandonedAt = at;
+    // A promise the rider is no longer there to take. Cleared here rather than by a second call
+    // at the abandonment site, so a record can never claim a car was holding itself for somebody
+    // who had already gone home.
+    if (leg.record.assignedCarId !== undefined) {
+      leg.record.assignedCarId = undefined;
+      leg.record.assignedAt = undefined;
+      this.#releasedCount += 1;
+    }
+    this.#abandonedCount += 1;
     this.#observe(at);
   }
 
@@ -787,6 +847,10 @@ function freezeLeg(leg: LegState): PassengerRecord {
       : { egressTransitSeconds: source.egressTransitSeconds }),
     ...(source.boardedAt === undefined ? {} : { boardedAt: source.boardedAt }),
     ...(source.alightedAt === undefined ? {} : { alightedAt: source.alightedAt }),
+    // Omitted on every leg that did not abandon, by the rule the two keys above and the four
+    // below follow: a run that declared no patience writes the record it wrote before this
+    // field existed.
+    ...(source.abandonedAt === undefined ? {} : { abandonedAt: source.abandonedAt }),
     ...(source.carId === undefined ? {} : { carId: source.carId }),
     ...(source.bankId === undefined ? {} : { bankId: source.bankId }),
     // Omitted, not `undefined`, so a conventional run's record is byte-identical to one written

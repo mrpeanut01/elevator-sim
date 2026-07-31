@@ -253,6 +253,21 @@ export interface PassengerRecord {
   readonly boardedAt?: SimTime | undefined;
   /** When the passenger left the car, or absent if they never boarded or never arrived. */
   readonly alightedAt?: SimTime | undefined;
+  /**
+   * When the passenger **gave up and left the landing**, on a run that declares `sim.patience`
+   * (docs/14 § 3.1).
+   *
+   * **Absent on every leg that did not abandon**, which is every leg of every run that declares no
+   * patience — so such a record is the object it was before this field existed. Never present
+   * beside {@link boardedAt}: a passenger who boarded did not abandon, and the recorder refuses
+   * the combination rather than storing it.
+   *
+   * A leg carrying this is **not served and not censored** — it is a third outcome. AWT averages
+   * the legs that boarded, and an abandoned leg is one whose long wait has been deleted from that
+   * average by the passenger walking away, which is why `RunSummary.abandonment` has to be read
+   * beside the mean and why `awtIsValid` refuses the mean outright once the rate is high enough.
+   */
+  readonly abandonedAt?: SimTime | undefined;
   /** The car that served this leg, when known. */
   readonly carId?: string | undefined;
   /** The bank that served this leg, when known. */
@@ -1020,6 +1035,37 @@ export const SERVICE_LEVEL_VERDICTS = [
 export type ServiceLevelVerdict = (typeof SERVICE_LEVEL_VERDICTS)[number];
 
 /**
+ * **How many riders gave up, beside the average of the ones who did not** (docs/14 § 3.1).
+ *
+ * This is `EnergyStatistics.workPerServedLegKJ`'s rule on a second axis, and the sentence
+ * `DECISIONS.md` § D106 wrote for energy transfers word for word: *a configuration that spends
+ * less by serving fewer people has not saved anything*. Abandonment is the version of that trap
+ * that improves the headline metric directly — the passengers it removes from the AWT sample are,
+ * by construction, exactly the ones who waited longest — so a mean that falls while this count
+ * rises is not an improvement and must never be shown as one.
+ *
+ * `RunSummary.abandonment` is therefore **present exactly when somebody left**. A consumer that
+ * shows AWT must show this beside it whenever it is present; a consumer that finds it absent is
+ * looking at a run in which nobody abandoned, which is every run that declares no `sim.patience`.
+ *
+ * Window-scoped, like every other cohort statistic on a summary: a leg is counted here when its
+ * `arrivedAt` falls in the reporting window, the same membership key AWT uses, so the count and
+ * the mean describe the same cohort and the ratio between them means something.
+ */
+export interface AbandonmentStatistics {
+  /** Legs in the window whose rider left before a car reached them. Never `0` when present. */
+  readonly count: number;
+  /** Legs that arrived in the window — the denominator, and the same one `WaitStatistics` uses. */
+  readonly arrivalCount: number;
+  /** `count / arrivalCount`, or `0` when the window held no arrivals. */
+  readonly fraction: number;
+  /** Mean seconds an abandoning rider stood there before leaving. `NaN` never appears: count > 0. */
+  readonly meanWaitBeforeLeavingS: number;
+  /** The longest any of them stood there. */
+  readonly maxWaitBeforeLeavingS: number;
+}
+
+/**
  * How long one passenger waited, and whether that alone makes the mean unquotable.
  *
  * ## The hole this closes
@@ -1400,6 +1446,20 @@ export interface RunSummary {
    * second. See {@link ServiceLevelDiagnosis}.
    */
   readonly serviceLevel: ServiceLevelDiagnosis;
+  /**
+   * **How many riders left rather than waiting — the figure that goes beside {@link waiting}.**
+   *
+   * Present exactly when somebody abandoned in the window, and therefore absent on every run that
+   * declares no `sim.patience` — which keeps such a summary byte-identical to one produced before
+   * patience existed (docs/14 § 0, § 5 criterion 1).
+   *
+   * It is on the same footing `EnergyStatistics.workPerServedLegKJ` is on beside the raw energy
+   * figure (`DECISIONS.md` § D106) and for the identical reason: abandonment *improves* AWT by
+   * construction, because the waits it removes from the sample are the longest ones. A report that
+   * shows {@link waiting} without showing this when it is present is showing an average of the
+   * survivors and calling it the wait. See {@link AbandonmentStatistics}.
+   */
+  readonly abandonment?: AbandonmentStatistics | undefined;
 
   /**
    * Whether {@link waiting}'s mean may carry a confidence interval.

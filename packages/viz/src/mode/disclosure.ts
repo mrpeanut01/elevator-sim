@@ -246,6 +246,12 @@ const SUPPRESSION_CLAUSE_BY_GROUND: Readonly<Record<AwtInvalidGround, string>> =
   censored:
     'too many riders were still waiting when the clock stopped, so an average of the rest ' +
     'flatters this run.',
+  // The fifth ground, and the wording has to distinguish it from `censored` rather than echo it:
+  // there, the riders were still standing at the landing when the clock stopped; here they had
+  // already gone home, which is why the queue looks like it cleared.
+  abandoned:
+    'enough riders gave up and walked out that the average describes the ones who stayed, not ' +
+    'the wait the building handed out.',
   starved:
     'somebody waited far longer than any average could admit to, so the average describes a run ' +
     'nobody had.',

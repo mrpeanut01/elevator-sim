@@ -27,6 +27,8 @@ describe('StreamSet — required streams', () => {
       // Appended, never inserted: a name's spelling decides its PCG parameters, so the six above
       // keep theirs. See the COMPATIBILITY LOCK below.
       'batchSize',
+      'patience',
+      'modeChoice',
     ]);
   });
 
@@ -341,6 +343,27 @@ const GOLDEN_STREAMS: Readonly<Record<StreamName, GoldenVector>> = {
     initState: 10950848240609012255n,
     initSeq: 11551578178733633914n,
     firstDraws: [2215659223, 3273889632, 4109878313, 4090393260],
+  },
+  /*
+   * Added with the streams themselves (docs/14 § 3.1 and § 3.3), and produced by the same
+   * independent BigInt program, run under the same rule: it was required to reproduce **all
+   * eight** vectors already pinned above — the seven streams and the ad-hoc one — before either
+   * of these two was taken from it. It did.
+   *
+   * That the seven above are untouched is the measurement, not an assumption:
+   * `deriveStreamSeed` hashes the stream's **name**, so a name appended to `STREAM_NAMES` cannot
+   * move an existing stream's parameters by position. This table is where that claim is checked
+   * rather than asserted — every earlier row still holds with two new names in the list.
+   */
+  patience: {
+    initState: 2723526455862252969n,
+    initSeq: 7952846625298762981n,
+    firstDraws: [1106427436, 3028617148, 1717110874, 4003086497],
+  },
+  modeChoice: {
+    initState: 8546373963621181858n,
+    initSeq: 4920448037779798214n,
+    firstDraws: [238409173, 3289634889, 937522763, 3447560127],
   },
 };
 

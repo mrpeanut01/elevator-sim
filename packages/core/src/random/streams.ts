@@ -66,6 +66,24 @@ export const STREAM_NAMES = [
    * figure reproduces (docs/14 § 1.3).
    */
   'batchSize',
+  /**
+   * Per-passenger abandonment tolerance (docs/14 § 3.1). Appended for `batchSize`'s reason: the
+   * spelling decides the parameters and the position decides nothing.
+   *
+   * Drawn from only when a run declares `sim.patience`. A run that does not materializes the
+   * stream and consumes nothing from it, which leaves every other stream exactly where it was —
+   * the independence guarantee at the head of this module, asserted in both directions by
+   * `streams.test.ts`.
+   */
+  'patience',
+  /**
+   * The stairs-versus-lift decision (docs/14 § 3.3).
+   *
+   * Drawn from only for a journey that is *offered* a stairs mode — the floors are joined by a
+   * declared `kind: 'stairs'` edge and the journey is within its reach. No shipped building
+   * declares one, so no shipped run draws from it.
+   */
+  'modeChoice',
 ] as const;
 
 export type StreamName = (typeof STREAM_NAMES)[number];
@@ -164,6 +182,23 @@ export function deriveStreamSeed(masterSeed: number | bigint, streamName: string
  * `batchSize` **is** here, by that same test read the other way: how many people walk in together
  * is a fact about the crowd and nothing about the machine. A traffic seed that re-rolled who turns
  * up and when, but left every group the same size, would be re-rolling half a Tuesday.
+ *
+ * `patience` and `modeChoice` are here for that same reason, and the `doorObstruction` test is
+ * applied to each explicitly rather than by analogy:
+ *
+ * - **`patience`** — how long a person will stand at a landing before giving up is a property of
+ *   *that person*, not of the door or the dispatcher. Two arms of a comparison that were handed
+ *   "the same crowd" and then disagreed about who was willing to wait would not be the same crowd,
+ *   and the abandonment counts they publish beside their AWTs would not be comparable.
+ * - **`modeChoice`** — whether a rider takes the stairs is the same kind of fact: a disposition
+ *   they walked in with. Seeding it off the run seed would mean re-rolling the machine silently
+ *   changed *which people left the lift system*, so two arms would be measured over different
+ *   populations — the very thing docs/14 § 5 criterion 4 exists to keep visible.
+ *
+ * The contrast is exact: an obstruction is a property of the door and the moment, so putting it on
+ * the traffic seed would make "the same crowd" also mean "the same doors jamming". Willingness to
+ * wait and willingness to climb are properties of the person, so leaving *them* off it would make
+ * "the same crowd" mean two different crowds.
  */
 const TRAFFIC_STREAM_NAMES: ReadonlySet<string> = new Set([
   'arrivals',
@@ -171,6 +206,8 @@ const TRAFFIC_STREAM_NAMES: ReadonlySet<string> = new Set([
   'destinations',
   'passengerMass',
   'batchSize',
+  'patience',
+  'modeChoice',
 ]);
 
 /** Optional second seed, for separating demand from machine. See {@link StreamSet}. */
@@ -186,8 +223,8 @@ export interface StreamSetOptions {
 }
 
 /**
- * The seven named streams required by the architecture, plus on-demand derivation for any
- * additional source.
+ * The named streams required by the architecture — {@link STREAM_NAMES}, materialized one
+ * property each — plus on-demand derivation for any additional source.
  *
  * Construct one per replication and inject it. Never create generators inline in simulation
  * code, and never share a stream between two sources.
@@ -250,6 +287,16 @@ export class StreamSet {
    * guarantee this whole module is built on and what `streams.test.ts` asserts in both directions.
    */
   readonly batchSize: Rng;
+  /**
+   * How long a person will stand at a landing before leaving. Consumed only when a run declares
+   * `sim.patience` (docs/14 § 3.1).
+   *
+   * Materialized here for {@link batchSize}'s reason — a name in {@link STREAM_NAMES} without a
+   * property beside it is a source the architecture declares and the type does not.
+   */
+  readonly patience: Rng;
+  /** Stairs versus lift. Consumed only for a journey a stairs mode is offered to (docs/14 § 3.3). */
+  readonly modeChoice: Rng;
 
   readonly #streams = new Map<string, Pcg32>();
 
@@ -265,6 +312,8 @@ export class StreamSet {
     this.doorObstruction = this.#derive('doorObstruction');
     this.policyNoise = this.#derive('policyNoise');
     this.batchSize = this.#derive('batchSize');
+    this.patience = this.#derive('patience');
+    this.modeChoice = this.#derive('modeChoice');
   }
 
   /** Typed accessor for the required streams. Returns the same instance as the property. */
