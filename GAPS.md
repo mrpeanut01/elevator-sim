@@ -2,16 +2,26 @@
 
 **As of:** 2026-07-30, wave 12 · **Branch:** `claude/project-completion-orchestration-7dz4qp` at
 `a8acf65` · **Suite:** **262 files / 4 883 tests, 4 873 passed, 10 skipped**, `tsc -b` clean,
-1 918 s under Node v26.5.1 — measured **serially on an idle machine with no lanes running, on the
+1 918 s under Node v26.5.1 **on the wave-12 container (Linux)** — measured **serially on an idle
+machine with no lanes running, on the
 pushed tree**; the wall-clock includes the new `lunch-two-way-selection` study re-deriving its own
 20 pinned figures at full budget, which is the price of a pin that cannot go § D196-stale. (The two
 figures this line carried earlier the same day — 4 853 at `821210a`, 4 859 at `6150b9f` — were each
 superseded by landed work within hours: the drive phase and its fixes, then the Phase 6c
 measurement; § D197–§ D200.) The wave-11
 figure this line used to carry (258 files / 4 794, *4 784 passed*) **was not reproducible from any
-committed tree**: 26 of its claimed passes fail on the tree as pushed, at the very commit the
-figure was measured at, under Node 22 and 26 alike — the pins they check matched an unpushed
-working state. The finding, the chain of evidence, and the re-pin are [§ D196](DECISIONS.md).
+committed tree this wave could reach**: 26 of its claimed passes fail on the tree as pushed, at the
+very commit the figure was measured at, under Node 22 and 26 alike — for which the re-pin is
+[§ D196](DECISIONS.md).
+
+> **That figure names a platform now, and the qualifier above is load-bearing.** Re-measured on
+> darwin/arm64 under Node 26.5.0 and 26.5.1, the § D196 re-pin is **exactly inverted**: its 26
+> replacements fail and the 26 values it superseded pass, same three files, same skip count of 10 —
+> while the total, *4 873 passed / 10 skipped*, reproduces this line precisely. Both measurements
+> are correct on their own machine; neither pin set is portable, and Node was eliminated as the
+> variable on both sides. **A suite figure is a claim about a machine as well as a commit.** The
+> symmetry, what it retracts, and the two-OS CI matrix that now judges it are
+> [§ D201](DECISIONS.md).
 
 > **The skip count is 10 and has not moved all wave** — through wave 12 either. That is the number
 > worth watching here: a wave that quietly skips a test to go green moves it, and a growing test

@@ -1,0 +1,75 @@
+# The environment this repository's results are true of, made explicit.
+#
+# This repository pins whole-result digests (`core/src/traffic/*Identity.test.ts`) and published
+# statistical figures (`experiments/src/benchmark/published.ts`) as exact values. A pin like that is
+# a claim about a *machine* as much as about the code, and until this file existed nothing recorded
+# which machine. DECISIONS.md § D196 re-pinned 26 values that failed in one environment; the same 26
+# then failed in another, in the opposite direction, with each environment reproducing its own pin
+# set exactly (§ D201). Both measurements were correct. Neither was portable, and no gate noticed,
+# because there was no CI.
+#
+# So the matrix is deliberately two operating systems rather than one. A single runner would restore
+# the status quo — one environment silently canonical, its pins indistinguishable from portable ones.
+# Running both makes portability a measured property: a pin that holds on both is portable, and a
+# pin that splits the matrix is an environment-dependent oracle wearing an equality assertion, which
+# is the defect § D201 names.
+#
+# Node is pinned to a single version ON PURPOSE. Both § D196 and the § D201 measurement independently
+# found the digests bit-identical across Node versions (22 vs 26, and 26.5.0 vs 26.5.1), so a Node
+# axis would spend runner minutes re-confirming the one variable already eliminated while leaving the
+# one that has never been isolated — the platform — untested.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    name: suite (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Both legs always run. `fail-fast: true` would cancel the second the moment the first went
+      # red, which would destroy exactly the comparison this matrix exists to make: "does this pin
+      # hold on both platforms?" is unanswerable if one leg is cancelled for being slow.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # The floor package.json declares. Kept as one value — see the header on why there is no
+          # Node axis.
+          node-version: '26'
+          cache: npm
+
+      - name: Record the environment the pins are being judged against
+        # Printed before anything can fail, because when a pin splits the matrix this block is the
+        # first thing a reader needs and the last thing a failed run would otherwise show.
+        run: |
+          echo "os          : ${{ matrix.os }}"
+          echo "runner arch : $(uname -m)"
+          echo "kernel      : $(uname -sr)"
+          echo "node        : $(node --version)"
+          echo "npm         : $(npm --version)"
+
+      - run: npm ci
+
+      # Before the suite: packages/cli/src/process.test.ts spawns the built CLI from dist/ and only
+      # rebuilds it when it is *missing*, not when it is stale — a stale dist/ produced 5 spurious
+      # failures during the § D201 investigation. Building first makes that class of failure
+      # impossible rather than merely unlikely, and typechecking is a gate worth having regardless.
+      - name: Typecheck and build
+        run: npm run build
+
+      - name: Test suite
+        run: npm test

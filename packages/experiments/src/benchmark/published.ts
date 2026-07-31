@@ -154,19 +154,56 @@ export interface PinnedEstimate {
 /**
  * Relative tolerance for a pin match.
  *
- * The studies are deterministic from their seeds — same seed, same doubles, in the same order — so
- * the honest tolerance is zero. `1e-12` is the concession to nothing more than a future refactor
- * that reassociates a sum; it is nine orders of magnitude below the smallest drift any of the three
- * known instances produced (the smallest was `0.0288 s` on a `0.26 s` mean).
+ * ## The premise this used to rest on, and why it was only half true
+ *
+ * It read: *"The studies are deterministic from their seeds — same seed, same doubles, in the same
+ * order — so the honest tolerance is zero"*, and set `1e-12` as a concession to a future refactor
+ * reassociating a sum.
+ *
+ * That is true **on one machine** and false across two. CI's two-OS matrix measured
+ * `forecast-causality`'s partial correlation at `-0.013946358230608948` on x64 and
+ * `-0.01394223164765208` on arm64 — the same commit, the same seed, the same replication count
+ * ([§ D201](../../../../DECISIONS.md)). `1e-12` cannot absorb that, so the pin was not a claim about
+ * the study; it was a claim about the machine that last regenerated it, and it inverted every time
+ * the machine changed (§ D196).
+ *
+ * ## Why the drift is larger than float noise, and still not a difference
+ *
+ * `4.1e-6` absolute is far above a last-bit difference, because a study is not a formula: a
+ * one-ULP difference in an arrival instant can reorder a queue, change which car answers, and
+ * propagate. The divergence is *chaotic*, not merely rounding.
+ *
+ * It is nonetheless not a difference in any sense this project reports. That absolute gap is
+ * `3e-4` **relative**, and the smallest effect the apparatus can resolve at all is a `1.9 s`
+ * limit on a `~30 s` statistic — `6e-2` relative, two hundred times larger. A drift this size
+ * cannot move a verdict, and no published rendering changes: `docs/05` § Phase 5 prints
+ * `−0.0139 [−0.0317, +0.0038]` at 4 dp from either value.
+ *
+ * ## The two bounds
+ *
+ * `1e-6` relative with a `1e-5` absolute floor. The floor is what makes it work on a quantity that
+ * lives near zero — a correlation of `0.0139` has no useful relative scale, which is exactly the
+ * case that broke the old constant. Both bounds sit far below the resolution limit above and far
+ * above the measured divergence, and CI's matrix is what keeps that claim honest: if a study drifts
+ * further than this across the two platforms, the run says so with the measured gap rather than
+ * leaving a pin to be re-inverted.
  */
-export const PIN_TOLERANCE = 1e-12;
+export const PIN_TOLERANCE = 1e-6;
+
+/**
+ * Absolute floor, for figures whose magnitude is near zero.
+ *
+ * Without it, a correlation of `0.0139` would need agreement to `1.4e-8` absolute while a `1 000 s`
+ * mean got `1e-3` — the tightest demand on the noisiest quantity, which is backwards.
+ */
+export const PIN_ABSOLUTE_FLOOR = 1e-5;
 
 /** `true` when `actual` matches `expected` to within {@link PIN_TOLERANCE}, relatively. */
 export function pinMatches(expected: number, actual: number): boolean {
   if (Number.isNaN(expected) && Number.isNaN(actual)) return true;
   if (!Number.isFinite(expected) || !Number.isFinite(actual)) return expected === actual;
   const scale = Math.max(1, Math.abs(expected));
-  return Math.abs(expected - actual) <= PIN_TOLERANCE * scale;
+  return Math.abs(expected - actual) <= Math.max(PIN_TOLERANCE * scale, PIN_ABSOLUTE_FLOOR);
 }
 
 /* -------------------------------------------------------------------------- *
@@ -1202,17 +1239,7 @@ export const PINNED_ESTIMATES: Readonly<
     "8/wt95S": { n: 60, mean: -9.468464251426326, standardError: 1.5691425049296572, lower: -12.608311151352416, upper: -6.328617351500236 },
   }),
   "forecast-causality": Object.freeze({
-    // Re-pinned 2026-07-30 via this file's stated route (`regeneratePins.ts`'s
-    // `causalityFigures(await auditForecastCausalityInRun({ replications: 100 }))`), regenerated
-    // for this one study only. The superseded pin —
-    //   { n: 100, mean: -0.01394223164765208, standardError: 0.008955159208326503,
-    //     lower: -0.03171121035296866, upper: 0.0038267470576644966 }
-    // — matched no committed tree (DECISIONS.md § D196): the replacement is what commits 9f1adf7,
-    // 9fd738c and HEAD all reproduce, under Node 22 and Node 26 alike. The move is ~1e-6 to 6e-6
-    // absolute per field (~1e-4 relative), so every published rendering is unchanged:
-    // −0.0139 [−0.0317, +0.0038] at 4 dp still derives from the pin. Quoting the superseded
-    // values here is safe because Layer B's scan excludes this file (GUARD_FILES).
-    "partialCorrelationWithFutureGivenPast": { n: 100, mean: -0.013946358230608948, standardError: 0.008956110833918183, lower: -0.0317172251675561, upper: 0.0038245087063382074 },
+    "partialCorrelationWithFutureGivenPast": { n: 100, mean: -0.01394223164765208, standardError: 0.008955159208326503, lower: -0.03171121035296866, upper: 0.0038267470576644966 },
   }),
   "destination-disclosure": Object.freeze({
     "control/garden-residential/ttdMeanS": { n: 30, mean: -0.010298960627877088, standardError: 0.01029896062787709, lower: -0.03136270018716893, upper: 0.010764778931414755 },
