@@ -1,5 +1,28 @@
 # Test matrix
 
+> ## ↩️ Wave 13 — the coverage shape a behaviour needs, which is not the shape a feature needs
+>
+> Wave 13's coverage lands lane by lane in [`WAVE13_PLAN.md`](WAVE13_PLAN.md). One rule belongs
+> *here*, because it is about what this table can claim.
+>
+> **A row for a tunable is closed by a run, not by a control.** Every feature in
+> `docs/14` §§ 2–3 is a knob, and a knob is the exact shape this repository's dominant defect
+> takes: authored, schema-valid, unit-tested in isolation, and consulted by nothing. Such a knob
+> passes a component test, passes a schema test, passes a round-trip test, and does nothing. The
+> eleven instances in code all had tests.
+>
+> So a wave-13 row is closed only by a test that **moves the control and requires the run to
+> change, compared on the legs** — not on the emitted config, and not on a window statistic. A
+> window statistic is the weaker half of this: two runs can post the same AWT and route different
+> people to different floors, which is why [§ D170](DECISIONS.md) counted *26 journeys routed over
+> different floors* rather than a mean.
+>
+> This is the same rule as the wave-11 opening below, one level stricter. Wave 11 learned that a
+> fixture-only row is not a covered row, because a fixture proves the mechanism is correct and
+> cannot prove it is reached. Wave 13's addition: **a control-only row is not a covered row
+> either**, because a control proves the value arrives at the config and cannot prove it arrives at
+> the simulation.
+
 > ## ↩️ Wave 11 — coverage added, and the two shapes it found that a matrix row cannot express
 >
 > Wave 11's coverage is in [`WAVE11_PLAN.md`](WAVE11_PLAN.md) § 4 lane by lane. Two findings belong

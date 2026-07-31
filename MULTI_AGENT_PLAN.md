@@ -1,5 +1,28 @@
 # Multi-agent execution plan
 
+> ## ↩️ REOPENED 2026-07-31 as **wave 13** — the building-behaviour program.
+>
+> Wave 13 works `docs/14-building-behaviour-contract.md` steps 0–6: richer traffic variance,
+> passenger behaviour, and a learned dispatcher that can be taught. Board:
+> **[`WAVE13_PLAN.md`](WAVE13_PLAN.md)** · contract:
+> [`docs/14`](docs/14-building-behaviour-contract.md) · status:
+> [`AGENT_STATUS.md`](AGENT_STATUS.md) § Wave 13.
+>
+> **It is the first wave since wave 1 that adds behaviour rather than closing findings**, and that
+> is the whole of its risk. This repository's signature defect — a behaviour configurable,
+> unit-tested in isolation and called from nothing shipped — has landed **eleven times in code and
+> once in `data/`**, and §§ 2–3 of the contract are almost entirely new tunables. So the wave's
+> governing rule is the roadmap's standing requirement pointed at a knob: **move the control and
+> require the run to change, compared on the legs.** A control that fails it is deleted, not
+> documented.
+>
+> Its blocking criterion is `docs/14 § 0`, quoting [§ D151](DECISIONS.md) § 7 — written before the
+> last traffic-model change landed: **opt-in, and byte-identical when unused.** All 981 pinned
+> estimates and both identity digests must reproduce. A pin is never edited to fit a changed tree;
+> that is what [§ D196](DECISIONS.md)/[§ D201](DECISIONS.md) cost a wave to unpick.
+>
+> Everything below this line is the closed record of waves 1–9 and is not updated.
+
 > ## ↩️ REOPENED 2026-07-30 as **wave 10** — the design handoff.
 >
 > A Claude Design handoff, *Elevator Sim Reimagined*, is now the canonical source for the user

@@ -721,3 +721,61 @@ defect fixes, the dead-candidate dispositions and the Phase 6c measurement — *
 tests, 4 873 passed, 10 skipped**, `tsc -b` clean, 1 918 s, Node v26.5.1, serial on an idle
 machine, **on the pushed tree at `a8acf65`**. Every task on the wave board is landed; the wave's
 verdicts are § D187–§ D200, and no phase marker moved in either direction.
+
+---
+
+# Wave 13 — 2026-07-31
+
+**Scope:** the building-behaviour program, `docs/14-building-behaviour-contract.md` steps 0–6 —
+richer traffic variance, passenger behaviour, and a learned dispatcher that can be taught. Board:
+[`WAVE13_PLAN.md`](WAVE13_PLAN.md).
+
+**What makes this wave different from 1–12:** those closed findings, built a design handoff, and
+audited what already existed. This one **adds behaviour**, which is the thing this repository is
+worst at adding safely — the signature defect has landed eleven times in code and once in `data/`,
+and §§ 2–3 of the contract are almost entirely new tunables. The wave's rule is therefore
+`docs/14 § 5` criterion 2: **move the control and require the run to change, on the legs.**
+
+| ID | Unit | Branch | Depends | Status |
+|---|---|---|---|---|
+| T1 | Traffic seed separation (§ 1.1) | — | — | ✅ landed `d52f347` — `StreamSet(seed, { trafficSeed })` reaching `runSimulation` and reported on the result; 4 885 → 4 896 tests, no existing figure moved |
+| T0 | Sky-lobby / escalator authoring in the designer (§ 5a) | `feat/w13-sky-lobby-authoring` | — | ⏸️ **halted at open** — see *Environment* below |
+| T2 | `trafficModel: 'v2'` + `batchSize` stream (§ 1.3) | `feat/w13-traffic-model-v2` | — | ⏸️ **halted at open** — see *Environment* below |
+| T3 | Mass control, group-size curve (§ 2.1–2.2) | `feat/w13-traffic-variance` | T2 | ⬜ blocked |
+| T4 | Day variation (§ 2.3) | `feat/w13-day-variation` | T3 | ⬜ blocked |
+| T5 | Patience, lobby crowding, stairs (§ 3) | `feat/w13-passenger-behaviour` | T2 | ⬜ blocked |
+| T6 | Learned-dispatcher teaching surface (§ 4) | `feat/w13-teaching-surface` | T3, T4 | ⬜ blocked |
+
+**Baseline at open:** `d52f347` — **4 896 tests, 4 886 passed, 0 failed, 10 skipped**, `tsc -b`
+clean, `review-gates` green, all 981 pins and both identity digests reproducing.
+
+## Environment — the wave's first finding, and it is not about the code
+
+**Both lanes were halted within minutes of opening, because the working tree is not stable.** The
+repository lives under `~/Documents/`, and **Dropbox and OneDrive are both running against it**.
+Observed inside a four-minute window, all of it while two agents held open worktrees:
+
+| Observed | Evidence |
+|---|---|
+| An untracked file deleted seconds after it was written | `WAVE13_PLAN.md` written, confirmed, then absent |
+| A tracked file's staged modification reverted | the wave-13 append to this file, lost and re-applied |
+| `.worktrees/` deleted whole, with two live agents inside it | `ls: .worktrees/: No such file or directory` |
+| `node_modules/` replaced by a dangling symlink, then restored | `readlink` → `../../node_modules`, target absent; a real directory again two minutes later |
+| A `git checkout` silently reverted | `integration/wave-13` checked out; `HEAD` back on `fix/repin-to-reproducible-values` |
+| Every file's mtime rewritten wholesale | uniform `11:51` across the tree |
+
+**This is the same client that already cost this repository a wave.** `scripts/review-gates.mjs`
+gates on `name 2.ts` copies for exactly this reason, and its docstring records what they did: *"they
+produced **21** failures that had nothing to do with the code"*. `GAPS 3.md` — a third-generation
+conflict copy — was present, absent and present again during this session. The gate treats the
+symptom; the cause is that a sync client is a second writer to the tree.
+
+**Why this halts the wave rather than merely annoying it.** Every acceptance criterion in `docs/14`
+is *a run, not an argument*, and the blocking one is byte-identity across 981 pins. A suite result
+from a tree a second process is rewriting is not evidence of anything — green or red. That is
+precisely the failure mode [§ D196](DECISIONS.md)/[§ D201](DECISIONS.md) cost a wave to unpick: a
+pin correct on one tree and wrong on another, with no way to tell which was right. Running lanes
+here would manufacture that condition deliberately.
+
+`git fsck` is clean — no object corruption, only the dangling objects expected after worktree
+removal. **Nothing is lost**, and both agents were stopped before either wrote a file.
