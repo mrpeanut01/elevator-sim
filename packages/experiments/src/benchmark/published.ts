@@ -84,6 +84,7 @@ import type { ForecastCausalityAudit } from './predictorLag.js';
 import type { TailStudy } from './tailStudy.js';
 import type { SelectionStudy } from './weightSetSelection.js';
 import type { SelectionSweep } from './selectionSweep.js';
+import type { LunchTwoWaySelectionStudy } from './lunchTwoWaySelection.js';
 
 /* -------------------------------------------------------------------------- *
  * The domain
@@ -112,6 +113,7 @@ export const PUBLISHED_STUDY_IDS = Object.freeze([
   'down-peak-destination',
   'weight-set-selection',
   'selection-sweep',
+  'lunch-two-way-selection',
   'double-deck',
 ] as const);
 
@@ -417,6 +419,36 @@ export function weightSetSelectionFigures(
     figures.set(`${arm.armId}/gate/${arm.gate.metric}`, estimateOf(arm.gate.estimate));
     for (const cost of arm.costs) {
       figures.set(`${arm.armId}/cost/${cost.metric}`, estimateOf(cost.estimate));
+    }
+  }
+  return figures;
+}
+
+/**
+ * The lunch two-way measurement's figures: the gate interval and every cost beside it, on both
+ * selector arms, on **both** cells — the treatment and § D162 condition 5's flat-mix control.
+ *
+ * Keyed `cell/arm/role/metric`, `selectionSweepFigures`'s convention. The verdict, the Holm
+ * decision and the headline counts are deliberately not here: the verdict is arithmetic
+ * `lunchTwoWaySelection.test.ts` re-derives from these estimates, and the counts are pinned as
+ * counts in `PINNED_LUNCH_COUNTS` beside the study (§ D149's pattern).
+ */
+export function lunchTwoWaySelectionFigures(
+  study: LunchTwoWaySelectionStudy,
+): ReadonlyMap<string, PinnedEstimate> {
+  const figures = new Map<string, PinnedEstimate>();
+  for (const outcome of [study.treatment, study.control]) {
+    for (const arm of outcome.study.arms) {
+      figures.set(
+        `${outcome.cell.id}/${arm.armId}/gate/${arm.gate.metric}`,
+        estimateOf(arm.gate.estimate),
+      );
+      for (const cost of arm.costs) {
+        figures.set(
+          `${outcome.cell.id}/${arm.armId}/cost/${cost.metric}`,
+          estimateOf(cost.estimate),
+        );
+      }
     }
   }
   return figures;
@@ -826,6 +858,12 @@ export const STUDY_ENTRY_POINTS: Readonly<Record<string, PublishedStudyId | 'no-
     // so `regeneratePins.ts` is its non-test caller and `selectionSweep.test.ts` compares the pins
     // against a fresh run. DECISIONS.md § D151.
     runSelectionSweep: 'selection-sweep',
+    // Phase 6c's § D162 re-measurement on the mix-varying template: the same § D139 gate at the
+    // shipped lunch two-way point, beside its flat-mix negative control, Holm within its own
+    // declared family that is never pooled with § D151's. Publishes paired-t intervals on both
+    // cells' arms, so `regeneratePins.ts` is its non-test caller and
+    // `lunchTwoWaySelection.test.ts` compares the pins against a fresh run.
+    runLunchTwoWaySelectionStudy: 'lunch-two-way-selection',
     // Counts and a trajectory divergence index: how many patterns the detector entered, whether
     // the shipped weight-set map and a permuted one produce different car trajectories, and
     // whether the selector switched off is bit-identical to the profile run without it. There is
@@ -1827,6 +1865,28 @@ export const PINNED_ESTIMATES: Readonly<
     "vertical-city-up-peak-1pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 1.4941670113191967, standardError: 0.8279227495211193, lower: -0.13846067273391305, upper: 3.1267946953723067 },
     "vertical-city-up-peak-1pct/learned/cost/wt95S": { n: 200, mean: 0.04918866111823037, standardError: 0.047370039177888595, lower: -0.04422299764007089, upper: 0.14260031987653163 },
     "vertical-city-up-peak-1pct/learned/gate/ttdMeanS": { n: 200, mean: 0.02642891794765916, standardError: 0.03624667923624022, lower: -0.045047958379640346, upper: 0.09790579427495866 },
+  }),
+  "lunch-two-way-selection": Object.freeze({
+    "midtown-lunch-two-way-1.5pct-flat/fuzzy/cost/awtS": { n: 200, mean: 0.29473512218223963, standardError: 0.06707864992311303, lower: 0.1624589394867818, upper: 0.42701130487769745 },
+    "midtown-lunch-two-way-1.5pct-flat/fuzzy/cost/energyKJ": { n: 200, mean: 423.7045020604479, standardError: 52.06417449362999, lower: 321.0362124466669, upper: 526.3727916742289 },
+    "midtown-lunch-two-way-1.5pct-flat/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 4.740361611701387, standardError: 0.5689706642413653, lower: 3.618376186863337, upper: 5.862347036539438 },
+    "midtown-lunch-two-way-1.5pct-flat/fuzzy/cost/wt95S": { n: 200, mean: 1.3957089675125303, standardError: 0.27248267992541564, lower: 0.8583849636383402, upper: 1.9330329713867203 },
+    "midtown-lunch-two-way-1.5pct-flat/fuzzy/gate/ttdMeanS": { n: 200, mean: -0.04919050878216346, standardError: 0.11417119298419749, lower: -0.27433113995238617, upper: 0.17595012238805924 },
+    "midtown-lunch-two-way-1.5pct-flat/learned/cost/awtS": { n: 200, mean: 0.3600864377565663, standardError: 0.08002469135896803, lower: 0.20228122392951933, upper: 0.5178916515836133 },
+    "midtown-lunch-two-way-1.5pct-flat/learned/cost/energyKJ": { n: 200, mean: 764.8501305781607, standardError: 56.407038402013576, lower: 653.6179020594478, upper: 876.0823590968736 },
+    "midtown-lunch-two-way-1.5pct-flat/learned/cost/energyPerServedLegKJ": { n: 200, mean: 8.674859937938496, standardError: 0.6381213806590205, lower: 7.416512305320952, upper: 9.933207570556041 },
+    "midtown-lunch-two-way-1.5pct-flat/learned/cost/wt95S": { n: 200, mean: 1.5205644221075747, standardError: 0.3106783647823233, lower: 0.9079201875176264, upper: 2.133208656697523 },
+    "midtown-lunch-two-way-1.5pct-flat/learned/gate/ttdMeanS": { n: 200, mean: -0.5759046378323341, standardError: 0.1304358596908561, lower: -0.8331184849548265, upper: -0.31869079070984174 },
+    "midtown-lunch-two-way-1.5pct/fuzzy/cost/awtS": { n: 200, mean: 0.25392997610201073, standardError: 0.065417818627184, lower: 0.12492888054945836, upper: 0.3829310716545631 },
+    "midtown-lunch-two-way-1.5pct/fuzzy/cost/energyKJ": { n: 200, mean: 145.28678389300057, standardError: 48.31927453515855, lower: 50.00327425989563, upper: 240.5702935261055 },
+    "midtown-lunch-two-way-1.5pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 1.3183239152668562, standardError: 0.5354891988582492, lower: 0.26236248520218175, upper: 2.374285345331531 },
+    "midtown-lunch-two-way-1.5pct/fuzzy/cost/wt95S": { n: 200, mean: 0.8755520103981754, standardError: 0.20992978465604142, lower: 0.4615795977123248, upper: 1.2895244230840262 },
+    "midtown-lunch-two-way-1.5pct/fuzzy/gate/ttdMeanS": { n: 200, mean: 0.18645914443154543, standardError: 0.10778343359223243, lower: -0.026085102802585886, upper: 0.3990033916656768 },
+    "midtown-lunch-two-way-1.5pct/learned/cost/awtS": { n: 200, mean: 0.2634305480263069, standardError: 0.07090128377726525, lower: 0.12361629748587516, upper: 0.4032447985667386 },
+    "midtown-lunch-two-way-1.5pct/learned/cost/energyKJ": { n: 200, mean: 415.899133058157, standardError: 51.936241856497894, lower: 313.48312104539207, upper: 518.315145070922 },
+    "midtown-lunch-two-way-1.5pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 4.443549783624212, standardError: 0.5830506682747879, lower: 3.293799202689362, upper: 5.593300364559061 },
+    "midtown-lunch-two-way-1.5pct/learned/cost/wt95S": { n: 200, mean: 0.8087805158646946, standardError: 0.23605125713104458, lower: 0.3432976945862684, upper: 1.2742633371431207 },
+    "midtown-lunch-two-way-1.5pct/learned/gate/ttdMeanS": { n: 200, mean: -0.1701872278619276, standardError: 0.11887551599771772, lower: -0.4046045795849358, upper: 0.0642301238610806 },
   }),
   "double-deck": Object.freeze({
     "up-peak-1.5pct/collective−collective@single-deck/awtS": { n: 200, mean: 0.3958203744435449, standardError: 0.1211146289491393, lower: 0.15698758928266196, upper: 0.6346531596044278 },
