@@ -11893,10 +11893,19 @@ superseded trees checked out. Asserting them anyway — against a value the curr
 produce — is the exact shape § D201 found in the re-pin. The values are kept as a record, and the
 routing claim they supported is carried by the structural pin plus § D170's mechanism.
 
-**What is still measured rather than assumed.** Whether *decisions* agree across platforms is an
-open question this decision does not answer. If a float difference ever flips a dispatch tie, the
-structural digest will split the matrix — and that would be a real finding about the simulator, not
-a pin-maintenance problem. CI is what will say so, and the failure prints the relative gap.
+**The open question, now answered by a run.** Whether *decisions* agree across platforms was left
+open when this was written: if a float difference ever flipped a dispatch tie, the structural digest
+would split the matrix, and that would be a finding about the simulator rather than about pins. **It
+does not.** The matrix at `c52323c` is green on both legs with one pin set — `ubuntu-latest`
+(x86_64) and `macos-latest` (arm64), Node v26.5.1 on both, **262 files / 4 874 passed / 10 skipped,
+identical to the test**.
+
+So the divergence is now bounded precisely, and the boundary is the useful result: **every discrete
+decision this simulator makes is bit-portable across architectures — which floors, which routes,
+which car answers, every count — and only the continuous magnitudes drift, by `3e-4` relative at
+worst.** The queue reordering the tolerance was sized for is real in principle and does not occur in
+the shipped configurations at this seed. That is measured, not assumed, and the matrix is what keeps
+it measured as the simulator changes.
 
 **Impact.** No phase verdict moves. The standing rule this leaves: *a pin is a claim about a
 machine as well as a commit — so pin decisions exactly, magnitudes within a band you can defend in
