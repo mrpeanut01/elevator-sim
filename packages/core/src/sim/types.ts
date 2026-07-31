@@ -771,8 +771,16 @@ export interface SimulationResult {
   /**
    * The demand seed as a decimal string, present only when the run was given one.
    *
-   * Absent — not equal to {@link seed} — when unset, because "there was no traffic seed" and "the
-   * traffic seed matched the run seed" are different runs that must not replay as one another.
+   * Absent — not equal to {@link seed} — when unset. That records how the run was authored rather
+   * than a difference in its trace: a traffic seed equal to the run seed derives the same demand
+   * streams and produces the same legs, measured on garden-apartments and asserted stream by
+   * stream in `random/streams.test.ts`. This docstring claimed the two "must not replay as one
+   * another" until wave 13 measured it; they replay alike, and the key is kept because it is
+   * provenance and costs nothing.
+   *
+   * Copied from `RunRecord.trafficSeed` rather than re-derived, exactly as {@link seed} is copied
+   * from `record.seed`. The record is what gets persisted and what a replay reads; a result that
+   * computed this a second way could disagree with the dataset beside it.
    */
   readonly trafficSeed?: string;
   /**
@@ -789,6 +797,10 @@ export interface SimulationResult {
    *
    * Present and `'v2'` means the group-size draw came from the `batchSize` stream, and this result
    * may not be paired against one that does not say so.
+   *
+   * Copied from `RunRecord.trafficModel`, which is where it has to live for a stored `v2` run to
+   * replay as one: a result dies with the process, and a replay rebuilt without this re-runs under
+   * `v1` — a different trace at the same seed rather than a different answer.
    */
   readonly trafficModel?: TrafficModelVersion;
   readonly buildingId: string;

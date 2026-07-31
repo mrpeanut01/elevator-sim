@@ -73,4 +73,41 @@ describe('the traffic seed reaches a run', () => {
     expect((await run({ trafficSeed: 6 })).trafficSeed).toBe('6');
     expect((await run()).trafficSeed).toBeUndefined();
   }, 300_000);
+
+  /*
+   * And on the record, which is the half that gets persisted. The result dies with the process; a
+   * seed that reaches only the result is a seed a replay cannot ask for, and the run above —
+   * "the same crowd through a different machine" — is exactly the run that then comes back wrong.
+   */
+  it('stamps the traffic seed on the record, which is the thing that gets persisted', async () => {
+    expect((await run({ trafficSeed: 6 })).record.trafficSeed).toBe('6');
+    expect(Object.keys((await run()).record)).not.toContain('trafficSeed');
+  }, 300_000);
+
+  /**
+   * **The mechanism this field's docstrings used to assert, refuted and pinned.**
+   *
+   * Four places in this repository once said that "there was no traffic seed" and "the traffic
+   * seed happened to match the run seed" are *different runs* that would replay one as the other.
+   * They are not. `StreamSet.#seedFor` hands the demand streams a bigint of the same value either
+   * way, so the trace, the legs and the record are identical — everything but the provenance key
+   * itself. `random/streams.test.ts` asserts the same identity at the generator; this asserts it
+   * at the entry point a study actually calls, because the false sentence was about *runs*.
+   *
+   * The decision to record the key anyway stands and is unaffected: it is provenance, and it costs
+   * nothing because it is absent when unused. What was wrong was the reason, and CLAUDE.md's rule
+   * is that a sentence about *why* something behaves as it does is either measured or declared
+   * unmeasured. This is the measurement.
+   */
+  it('is the same run when the traffic seed equals the run seed — only the key differs', async () => {
+    const absent = await run();
+    const coinciding = await run({ trafficSeed: SEED });
+
+    expect(legsOf(coinciding)).toBe(legsOf(absent));
+    expect(coinciding.record.passengers).toEqual(absent.record.passengers);
+    // The whole record, not a headline: identical once the provenance key is set aside.
+    const { trafficSeed, ...rest } = coinciding.record;
+    expect(trafficSeed).toBe(String(SEED));
+    expect(rest).toEqual(absent.record);
+  }, 300_000);
 });

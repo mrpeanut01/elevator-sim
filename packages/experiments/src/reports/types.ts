@@ -75,6 +75,7 @@ import type {
   SaturationThresholds,
   SimulationResult,
   TimeoutPolicy,
+  TrafficModelVersion,
 } from '@elevator-sim/core';
 
 /* -------------------------------------------------------------------------- *
@@ -211,6 +212,36 @@ export interface StoredRunConfig {
    * two different seeds on one record is an unreplayable record.
    */
   readonly seed: string;
+  /**
+   * The demand seed, as a decimal string — present only when the run was given one.
+   *
+   * The other half of invariant 5 on a run that separated the crowd from the machine. A replay
+   * given only {@link seed} would rebuild the same building and drive it with a different crowd,
+   * and the record it produced would diverge on every leg while looking like a determinism failure
+   * in `core`.
+   *
+   * Absent, never equal to {@link seed}, when the run was given none — which records how the run
+   * was authored rather than a difference in its trace. A traffic seed equal to the run seed
+   * derives the same demand streams and produces the same legs; `random/streams.test.ts` asserts
+   * that stream by stream, and it was measured end to end on garden-apartments. The field earns
+   * its place on the case it exists for — a seed that *differs* from the run seed, where dropping
+   * it replays a different crowd — and costs nothing on the case it does not.
+   *
+   * Mirrors `RunRecord.trafficSeed` and is cross-checked against it on parse.
+   */
+  readonly trafficSeed?: string | undefined;
+  /**
+   * Which traffic draw ordering produced the run — present only when it was not `v1`.
+   *
+   * Not a tunable: it names *which simulator* wrote the dataset. Stored because the replay has to
+   * ask for it back — a stored `v2` run rebuilt without it re-runs under `v1`, which is a different
+   * trace at the same seed rather than a slightly different answer.
+   *
+   * Absent at `v1` however it was reached, because a `v1` run is the run this repository produced
+   * before the option existed. Mirrors `RunRecord.trafficModel` and is cross-checked against it on
+   * parse: two statements about which simulator ran is one statement too many unless they agree.
+   */
+  readonly trafficModel?: TrafficModelVersion | undefined;
   readonly buildingId: string;
   readonly dispatcherProfileId: string;
   /**

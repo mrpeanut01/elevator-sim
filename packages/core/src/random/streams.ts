@@ -83,9 +83,12 @@ export interface StreamSetSnapshot {
   /**
    * Decimal string, present only when the set was built with one.
    *
-   * Absent rather than equal to `masterSeed` when unset: "there was no traffic seed" and "the
-   * traffic seed happened to match the run seed" are different runs, and a snapshot that conflated
-   * them would replay one as the other.
+   * Absent rather than equal to `masterSeed` when unset — a record of how the set was *built*, not
+   * of a difference in what it produces. A traffic seed equal to the master seed derives every
+   * stream from the same value; {@link StreamSet.#seedFor} returns the coinciding bigint either
+   * way and `streams.test.ts` asserts the identity stream by stream ("is the identity when it
+   * equals the run seed"). A snapshot that conflated the two would *not* replay one as the other,
+   * and this docstring said it would until wave 13 measured it.
    */
   readonly trafficSeed?: string;
   readonly streams: Readonly<Record<string, RngState>>;
