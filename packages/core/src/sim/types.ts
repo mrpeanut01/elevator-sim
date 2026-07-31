@@ -771,8 +771,12 @@ export interface SimulationResult {
   /**
    * The demand seed as a decimal string, present only when the run was given one.
    *
-   * Absent — not equal to {@link seed} — when unset, because "there was no traffic seed" and "the
-   * traffic seed matched the run seed" are different runs that must not replay as one another.
+   * Absent — not equal to {@link seed} — when unset. That records how the run was authored rather
+   * than a difference in its trace: a traffic seed equal to the run seed derives the same demand
+   * streams and produces the same legs, measured on garden-apartments and asserted stream by
+   * stream in `random/streams.test.ts`. This docstring claimed the two "must not replay as one
+   * another" until wave 13 measured it; they replay alike, and the key is kept because it is
+   * provenance and costs nothing.
    *
    * Copied from `RunRecord.trafficSeed` rather than re-derived, exactly as {@link seed} is copied
    * from `record.seed`. The record is what gets persisted and what a replay reads; a result that

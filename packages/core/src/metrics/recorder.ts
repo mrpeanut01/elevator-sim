@@ -41,7 +41,9 @@
 import type { SimTime } from '../kernel/types.js';
 import type { PassengerModel } from './comparability.js';
 import type { CredentialGroup, Direction } from '../model/types.js';
-import type { TrafficModelVersion } from '../traffic/types.js';
+// The default is read, not repeated: a declared default that disagrees with the resolver is worse
+// than none, which is the argument `TRAFFIC_DEFAULTS`'s own docstring makes.
+import { TRAFFIC_DEFAULTS, type TrafficModelVersion } from '../traffic/types.js';
 
 import {
   METRICS_SCHEMA_VERSION,
@@ -98,8 +100,9 @@ export interface SeedSource {
    *
    * Read off the same object as {@link masterSeed} on purpose. Both halves of invariant 5 then come
    * from the generator that actually filled the run, and the record cannot carry one seed while the
-   * streams were derived from another. Absent when there was none; see `RunRecord.trafficSeed` for
-   * why that is not the same as "equal to the master seed".
+   * streams were derived from another. Absent when there was none — which is a statement about how
+   * the run was *authored*, not about its trace: a traffic seed equal to the master seed derives
+   * the same streams. See `RunRecord.trafficSeed`.
    */
   readonly trafficSeed?: bigint | undefined;
 }
@@ -250,7 +253,7 @@ export class MetricsRecorder {
   constructor(options: MetricsRecorderOptions) {
     this.#seed = normalizeSeedString(options.seed);
     this.#trafficSeed = normalizeTrafficSeedString(options.seed);
-    // Kept as given rather than resolved to `'v1'`: the record reports it by *presence*, so
+    // Kept as given rather than resolved to the default: the record reports it by *presence*, so
     // resolving here would lose the only distinction the record needs to make. See
     // `RunRecord.trafficModel`.
     this.#trafficModel = options.trafficModel;
@@ -689,19 +692,21 @@ export class MetricsRecorder {
       seed: this.#seed,
       /*
        * Both halves of invariant 5, spread-or-omitted rather than written as `undefined` — under
-       * `exactOptionalPropertyTypes` those are different types, and they are different *claims*:
-       * an absent key says the run had no traffic seed, a present `undefined` says it had one that
-       * is missing. Only the first replays from `seed` alone.
+       * `exactOptionalPropertyTypes` those are different types, and an absent key and a present
+       * `undefined` are different claims about what was stored.
        *
-       * The two omit on **different** boundaries and the difference is deliberate. `trafficSeed`
-       * is omitted when it was never given, because a given seed that happens to equal the run
-       * seed is still a different statement. `trafficModel` is omitted at `v1` *however it was
-       * reached*, because a `v1` run and a run predating the option are the same run — same draws,
-       * same trace, same record — and a key that says so would move every pinned record to assert
-       * nothing.
+       * The two omit on **different** boundaries, and only one of the two boundaries is
+       * behavioural. `trafficModel` is omitted at the default *however it was reached*, and that
+       * one matters: a run at the default is byte-identical to one predating the option, so a key
+       * saying otherwise would move every pinned record and both identity digests to assert
+       * nothing. `trafficSeed` is omitted only when it was never given — but a traffic seed equal
+       * to the run seed produces *the same run*, measured and asserted in `random/streams.test.ts`
+       * ("is the identity when it equals the run seed"), so that boundary records the caller's
+       * intent rather than a difference in the trace. It is free: absent when unused.
        */
       ...(this.#trafficSeed === undefined ? {} : { trafficSeed: this.#trafficSeed }),
-      ...(this.#trafficModel === undefined || this.#trafficModel === 'v1'
+      ...(this.#trafficModel === undefined ||
+      this.#trafficModel === TRAFFIC_DEFAULTS.trafficModel
         ? {}
         : { trafficModel: this.#trafficModel }),
       ...(this.#buildingId === undefined ? {} : { buildingId: this.#buildingId }),

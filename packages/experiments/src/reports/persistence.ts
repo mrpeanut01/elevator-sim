@@ -64,6 +64,7 @@ import {
   METRICS_SCHEMA_VERSION,
   PERCENTILE_METHODS,
   TIMEOUT_POLICIES,
+  TRAFFIC_DEFAULTS,
   TRAFFIC_MODEL_VERSIONS,
   WEIGHT_SET_POLICIES,
   normalizeSeed,
@@ -460,8 +461,10 @@ export function parseStoredRun(input: string | unknown): StoredRunRecord {
     );
   }
   if (config.trafficModel !== record.trafficModel) {
+    const named = (version: string | undefined): string =>
+      version ?? `${TRAFFIC_DEFAULTS.trafficModel} (absent)`;
     throw new ReportsError(
-      `Stored run "${record.runId}" was produced by traffic model ${record.trafficModel ?? 'v1'} according to its record and ${config.trafficModel ?? 'v1'} according to its configuration. Those are two different simulators, and a replay would rebuild the wrong one: the group-size draw moves to its own stream at v2, so the same seed yields a different trace rather than a different answer (CLAUDE.md invariant 5)`,
+      `Stored run "${record.runId}" was produced by traffic model ${named(record.trafficModel)} according to its record and ${named(config.trafficModel)} according to its configuration. Those are two different simulators, and a replay would rebuild the wrong one: the group-size draw moves to its own stream at v2, so the same seed yields a different trace rather than a different answer (CLAUDE.md invariant 5)`,
     );
   }
 

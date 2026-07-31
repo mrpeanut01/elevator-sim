@@ -668,10 +668,19 @@ export interface RunRecord {
    * *this* value, so a record carrying only the master seed replays a different crowd through the
    * same building.
    *
-   * **Absent, never equal to {@link seed}, when the run was given none.** "There was no traffic
-   * seed" and "the traffic seed happened to match the run seed" are different runs — the first
-   * derives every stream from the master seed and the second derives five of them from a value that
-   * merely coincides with it — and a record that conflated the two would replay one as the other.
+   * **Absent, never equal to {@link seed}, when the run was given none — and that records the
+   * caller's intent, not a behavioural difference.** A traffic seed equal to the run seed produces
+   * *the same run*: `StreamSet.#seedFor` hands the demand streams a bigint of the same value either
+   * way, and `random/streams.test.ts` asserts it stream by stream ("is the identity when it equals
+   * the run seed"). Measured end to end on garden-apartments at seed 20260731: 23 legs either way,
+   * the passenger records equal, the whole record equal once this key is removed.
+   *
+   * So the key is provenance — *this run was authored as a crowd/machine split* — and it is kept
+   * because it costs nothing: absent when unused, so a default run's record is byte-identical to
+   * one written before the field existed. It is **not** kept because omitting it would replay a
+   * different crowd; at a coinciding seed it would not. Where the seed differs from the run seed —
+   * the case this field exists for — dropping it does replay a different crowd, and that is
+   * measured in `experiments/reports/trafficModelReplay.test.ts`.
    */
   readonly trafficSeed?: string | undefined;
   /**

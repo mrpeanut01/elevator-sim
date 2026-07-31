@@ -220,8 +220,14 @@ export interface StoredRunConfig {
    * and the record it produced would diverge on every leg while looking like a determinism failure
    * in `core`.
    *
-   * Absent, never equal to {@link seed}, when the run was given none — see `RunRecord.trafficSeed`,
-   * which this mirrors and is cross-checked against on parse.
+   * Absent, never equal to {@link seed}, when the run was given none — which records how the run
+   * was authored rather than a difference in its trace. A traffic seed equal to the run seed
+   * derives the same demand streams and produces the same legs; `random/streams.test.ts` asserts
+   * that stream by stream, and it was measured end to end on garden-apartments. The field earns
+   * its place on the case it exists for — a seed that *differs* from the run seed, where dropping
+   * it replays a different crowd — and costs nothing on the case it does not.
+   *
+   * Mirrors `RunRecord.trafficSeed` and is cross-checked against it on parse.
    */
   readonly trafficSeed?: string | undefined;
   /**
