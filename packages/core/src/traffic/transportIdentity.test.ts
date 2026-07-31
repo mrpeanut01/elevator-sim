@@ -11,19 +11,10 @@
  * only that the code is deterministic, which was never in question. The question is whether
  * *this* tree reproduces *that* tree, and the only answer is a value taken from that tree.
  *
- * So {@link BASELINE_DIGESTS} claimed, in its first revision, to have been produced by running
- * `d7e8571` — the commit this branch is based on — in a separate git worktree, against
- * `packages/core/dist`. That claim did not survive measurement: the constants it held did not
- * describe that baseline and matched **no committed tree** — provenance unknown, produced from an
- * unmeasurable working state. DECISIONS.md § D196 carries the finding. The digests below are
- * re-pinned (2026-07-30) to what commits `9f1adf7`, `9fd738c` and HEAD all reproduce on the
- * runner that re-pinned them — Node 22 and Node 26 agree byte for byte, and `goldenRuns` replays
- * stored run records byte-identically on the same runner, so a moved run and a moved pin stay
- * distinguishable. The superseded constants are kept, per this file's own convention, in
- * {@link SUPERSEDED_BASELINE_DIGESTS} and as the `unattributed` state of
- * {@link VERTICAL_CITY_BEFORE}. It is a pin in exactly the sense
- * `experiments/benchmark/published.ts` means: a number this tree must reproduce and did not
- * compute for itself.
+ * So {@link BASELINE_DIGESTS} was produced by running `d7e8571` — the commit this branch is based
+ * on — in a separate git worktree, against `packages/core/dist`, and is pasted here. It is a pin
+ * in exactly the sense `experiments/benchmark/published.ts` means: a number this tree must
+ * reproduce and did not compute for itself.
  *
  * ## The two fields that are excluded, and why excluding them is not a hole
  *
@@ -59,41 +50,12 @@ import { runSimulation } from '../sim/simulation.js';
  * SHA-256 of `JSON.stringify(result)` at `seed: 20260726`, `onTimeout: 'report'`, with
  * `conservation.transportHops` deleted.
  *
- * Re-pinned 2026-07-30: these are the values commits `9f1adf7`, `9fd738c` and HEAD all reproduce
- * (Node 22 and 26 agree). The first revision's constants — which claimed baseline `d7e8571` and
- * matched no committed tree, § D196 — are kept in {@link SUPERSEDED_BASELINE_DIGESTS}.
- * `mixed-use-high-rise` needs `onTimeout: 'report'` because `nearest-car` leaves 93 of 757
- * journeys in the system there — a known property of the weakest shipped dispatcher (`docs/07`
- * § 4), and exactly the kind of run whose bytes are worth pinning.
+ * Produced on baseline `d7e8571` in a detached worktree, not on this tree. `mixed-use-high-rise`
+ * needs `onTimeout: 'report'` because `nearest-car` leaves 93 of 757 journeys in the system there
+ * — a known property of the weakest shipped dispatcher (`docs/07` § 4), and exactly the kind of
+ * run whose bytes are worth pinning.
  */
 const BASELINE_DIGESTS: Readonly<Record<string, string>> = {
-  'garden-apartments|nearest-car':
-    'c47d765cc87fa35f3a03c142997bd38c5d38b570a84132702ba3604cd64181aa',
-  'garden-apartments|eta': '1e7df20dcdedfe7d7e3c2a0bea7d4543378511a9485787b1d4936a603befb717',
-  'garden-apartments|collective': '56c830df0fe911e79a877d3a154ef6f442895dc575d9e672db846f86ed2b8077',
-  'midtown-office|nearest-car': 'e2d9a8eafcddbb8de6cc70972bd3a88e0ba730078cd202bd51d7636581dcf7d6',
-  'midtown-office|eta': '37d267f389c3260aaf40f25dc211170bb53a59c6b86b959a0626f4d86bae0a6c',
-  'midtown-office|collective': 'bfd5d294787297a021120966e41d6f9ee3ade08431802f565ad984761135f326',
-  'mixed-use-high-rise|nearest-car':
-    '124f60a05bdc770e68c683aede89507f0507ac89827565a051fe499109bf4668',
-  'mixed-use-high-rise|eta': 'bb25180e575374a9ad25d17b3128dc3a25d5a42e6338a33b70e1dd808192fb83',
-  'mixed-use-high-rise|collective':
-    '4baaa48dd6f88a120e1ac50263891399d9c397be74f1046d182f84a78edfff4c',
-  'secure-tower|nearest-car': 'ed00cfe1d84b3c671ceb5ec1c60b5e2c408f6500c35fb77e6a279f20d66611f4',
-  'secure-tower|eta': '00cf4d534ca51071ec76c63020d74c14a2ffc207f832b633cc1b4acec8616600',
-  'secure-tower|collective': '7637e886f329517ec39d58165008390bb09277f441a9eac7818b54fdeb6c0b57',
-};
-
-/**
- * The superseded first revision of {@link BASELINE_DIGESTS}, kept per this file's convention —
- * a superseded pin is retained beside its replacement so the guard can say *which* prior state a
- * regression resurrects rather than only *that* something moved.
- *
- * These constants claimed to be baseline `d7e8571` and were not: they reproduce from **no
- * committed tree** — provenance unknown, produced from an unmeasurable working state. Re-pinned
- * 2026-07-30; DECISIONS.md § D196 carries the finding.
- */
-const SUPERSEDED_BASELINE_DIGESTS: Readonly<Record<string, string>> = {
   'garden-apartments|nearest-car':
     'da2cf8d8be8c1d9d9d1e0a58ae1a85c6e412e9ef67b47aa5ace54f1b66df77e3',
   'garden-apartments|eta': 'c60a23308b1d803a8e8597e54928b5d565362b04c1775d5c3ab0b7acae4460e5',
@@ -118,46 +80,34 @@ const SUPERSEDED_BASELINE_DIGESTS: Readonly<Record<string, string>> = {
  * Pinned rather than omitted. The moved figure is the finding, and a guard that simply stopped
  * looking at the building the change was made for would be the fourth entry in this repository's
  * list of tests that cannot fail.
- *
- * Re-pinned 2026-07-30: the previous revision of these three — now the `unattributed` state in
- * {@link VERTICAL_CITY_BEFORE} — matched no committed tree (§ D196). The values below are what
- * commits `9f1adf7`, `9fd738c` and HEAD all reproduce (Node 22 and 26 agree).
  */
 const MOVED_DIGESTS: Readonly<Record<string, string>> = {
-  'vertical-city|nearest-car': '63559cdad7ca92a184daabbd7bdae07412fbcc0c7eef95084c795c8c135bc1c8',
-  'vertical-city|eta': 'f428ebd61bb756615ee0b7212f3eb94959f990c286a4f88d70177353c37bbd39',
-  'vertical-city|collective': '45d7df2e72e1dc6bc28c5f69a33c18c475c07432aa2ea4d5e4aaf37c58af42ce',
+  'vertical-city|nearest-car': '77c37f9b186e2e210e610deb6d68e172428e5beb4bf36639f7943dbacf1a0b12',
+  'vertical-city|eta': '37d5a747c45a3c3a43f33c50e080deca27fa16c47a562361f50c2e7a901cdf59',
+  'vertical-city|collective': 'a91bf06e4b1c708a5b78c6fd78657af71c8bcd69c44fad4dbae546d5923866af',
 };
 
 /**
- * The three superseded states of the same building, kept so the guard can say *which* change moved
+ * The two superseded states of the same building, kept so the guard can say *which* change moved
  * it rather than only *that* it moved.
  *
  * `allLift` is baseline `d7e8571`, before `core` had a transport mode at all. `groundOnly` is the
  * tree that declared the ground-lobby escalator and nothing else — the configuration every
  * `vertical-city` figure published between those two changes was measured under, and the arm
- * `sim/transportHop.test.ts` and `config/doubleDeck.test.ts` still run live. `unattributed` is
- * the first revision of {@link MOVED_DIGESTS}, superseded by the 2026-07-30 re-pin: it claimed to
- * be the re-derived all-escalator digest and reproduces from **no committed tree** — provenance
- * unknown, produced from an unmeasurable working state (§ D196).
+ * `sim/transportHop.test.ts` and `config/doubleDeck.test.ts` still run live.
  */
-const VERTICAL_CITY_BEFORE: Readonly<
-  Record<string, { allLift: string; groundOnly: string; unattributed: string }>
-> = {
+const VERTICAL_CITY_BEFORE: Readonly<Record<string, { allLift: string; groundOnly: string }>> = {
   'vertical-city|nearest-car': {
     allLift: 'a8f78f82129dcefc6b36d905b500047906b2a9d10358ffcf033607a98ece08f3',
     groundOnly: '788a0199c73089092bb78f863a745364cfee8a4f1cdf2f8ced88b12fb94360ac',
-    unattributed: '77c37f9b186e2e210e610deb6d68e172428e5beb4bf36639f7943dbacf1a0b12',
   },
   'vertical-city|eta': {
     allLift: 'f3587fabdc00d41057fe972bdf15c50f96c194e20c2620f41be497964d2147f6',
     groundOnly: '96a55b58dee7fa618242d06cf16dec777a63df3f06fa068c97037dd2535a6c54',
-    unattributed: '37d5a747c45a3c3a43f33c50e080deca27fa16c47a562361f50c2e7a901cdf59',
   },
   'vertical-city|collective': {
     allLift: 'd7f3f3bf74d36a72ede1288612e1b3ba173eec69b932d907ccfd724510907cd4',
     groundOnly: '03fe08156be7ec5da7b7f2969fe514660743f6f4e805adcbcbf9334813ef935f',
-    unattributed: 'a91bf06e4b1c708a5b78c6fd78657af71c8bcd69c44fad4dbae546d5923866af',
   },
 };
 
@@ -258,11 +208,9 @@ describe('a building that declares no transport mode runs exactly as it did befo
   for (const buildingId of withoutModes) {
     for (const profileId of PROFILES) {
       const key = `${buildingId}|${profileId}`;
-      it(`${key} reproduces the re-pinned digest byte for byte, and is not the superseded one`, () => {
+      it(`${key} reproduces baseline d7e8571 byte for byte`, () => {
         const measured = measure(buildingId, profileId);
         expect(measured.digest).toBe(BASELINE_DIGESTS[key]);
-        // Not the first revision's constant, which matched no committed tree (§ D196).
-        expect(measured.digest).not.toBe(SUPERSEDED_BASELINE_DIGESTS[key]);
         // The excluded fields, asserted rather than assumed. A lift-only building taking a hop
         // would be invisible to the digest and is not invisible here.
         expect(measured.transportHops).toBe(0);
@@ -275,36 +223,30 @@ describe('a building that declares no transport mode runs exactly as it did befo
 describe('the building that declares one moved, and moved everywhere', () => {
   for (const profileId of PROFILES) {
     const key = `vertical-city|${profileId}`;
-    it(`${key} reproduces the re-pinned digest and is none of the superseded states`, () => {
+    it(`${key} reproduces the re-derived digest and is neither superseded one`, () => {
       const measured = measure('vertical-city', profileId);
       const { digest, transportHops } = measured;
       expectSuppressionCodeBesideItsProse(measured, key);
       expect(digest).toBe(MOVED_DIGESTS[key]);
-      // Distinct from *all three* prior states, so a regression that silently reverts either the
-      // sky-lobby escalators or the ground one — or resurrects the unattributed first revision —
-      // fails here by name rather than by a moved mean.
+      // Distinct from *both* prior states, so a regression that silently reverts either the
+      // sky-lobby escalators or the ground one fails here by name rather than by a moved mean.
       expect(digest).not.toBe(VERTICAL_CITY_BEFORE[key]?.allLift);
       expect(digest).not.toBe(VERTICAL_CITY_BEFORE[key]?.groundOnly);
-      expect(digest).not.toBe(VERTICAL_CITY_BEFORE[key]?.unattributed);
       expect(transportHops).toBeGreaterThan(0);
     });
   }
 
   /*
-   * The four prior digests are only meaningful if they are four *different* digests. Without
-   * this, a copy-paste that made two superseded states the same value would leave the
-   * `not.toBe` chain above asserting one thing twice — the "value with two readers" shape, in the
+   * The three prior digests are only meaningful if they are three *different* digests. Without
+   * this, a copy-paste that made `allLift` and `groundOnly` the same value would leave the
+   * `not.toBe` pair above asserting one thing twice — the "value with two readers" shape, in the
    * expectation rather than in the subject.
    */
-  it('the four pinned states of this building are four distinct digests', () => {
+  it('the three pinned states of this building are three distinct runs', () => {
     for (const profileId of PROFILES) {
       const key = `vertical-city|${profileId}`;
       const before = VERTICAL_CITY_BEFORE[key];
-      expect(
-        new Set([before?.allLift, before?.groundOnly, before?.unattributed, MOVED_DIGESTS[key]])
-          .size,
-        key,
-      ).toBe(4);
+      expect(new Set([before?.allLift, before?.groundOnly, MOVED_DIGESTS[key]]).size, key).toBe(3);
     }
   });
 });
