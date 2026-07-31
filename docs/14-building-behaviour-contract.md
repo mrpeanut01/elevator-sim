@@ -1,12 +1,14 @@
 # Building behaviour — the contract
 
-**Status: designed; step 1 built. Criteria written before the implementation, which is the point.**
+**Status: designed; steps 1 and 2 built. Criteria written before the implementation, which is the
+point — and step 2's criterion is the first one measurement sent back for correction.**
 
 | Step | State |
 |---|---|
 | 0 — dual-lobby / escalator authoring (§ 5a) | designed |
 | **1 — traffic seed separation (§ 1.1)** | **built** — `StreamSet(seed, { trafficSeed })`, reaching `runSimulation` and reported on the result; `sim/trafficSeedSeam.test.ts` drives it end to end |
-| 2–6 | designed |
+| **2 — `trafficModel: 'v2'` + `batchSize` stream (§ 1.3)** | **built** — `batchSize` in `STREAM_NAMES` and `TRAFFIC_STREAM_NAMES`, `trafficModel` on the run config and reported on the result when it is not `v1`; `sim/trafficModelSeam.test.ts` drives it end to end. **§ 1.3's stated consequence was wrong and is corrected below.** |
+| 3–6 | designed |
 
 This document covers one program in three parts: **richer traffic variance**, **passenger
 behaviour**, and **a learned dispatcher you can teach**. They are one program because they share a
@@ -41,12 +43,20 @@ was right.
 
 ### The specific trap in this program
 
-`drawBatchSize` currently draws from the **`arrivals`** stream
-(`traffic/generator.ts:1006`). Group size and arrival instants share a sequence.
+`drawBatchSize` drew from the **`arrivals`** stream (`traffic/generator.ts`, now
+`batchSizeStream` at the head of pass B). Group size and arrival instants shared a sequence, and
+still do under `v1`.
 
 So *any* change to the group-size curve — even one that leaves the mean untouched — consumes a
 different number of draws from `arrivals` and shifts every subsequent arrival instant in the run.
 The trace does not change a little. It changes completely.
+
+> **Measured, and overstated.** The paragraph above was written before the change; it is not what a
+> run says. `drawGeometricBatchSize` consumes exactly one draw per call for every mean, so *today*
+> the draw count moves only with the **number of batches**, and the coupling that is real is
+> **across demand sources** rather than within one. See § 1.3 → ***What measuring it found***, which
+> states the corrected version and the two measurements behind it. The conclusion — that the move
+> must be gated and landed alone — is unchanged, and § 2.2 is exactly when the strong form returns.
 
 That is what makes "give group size its own stream" a **correctness** change and not a tidiness one,
 and it is also why the move cannot be made silently: relocating the draw is itself trace-moving. The
@@ -58,7 +68,7 @@ sequencing in § 1 exists to make it survivable.
 
 ### 1.1 A traffic seed, separate from the run seed
 
-Today one seed derives all six streams (`random/streams.ts`), so "same building, different crowd" is
+Before this step, one seed derived every stream (`random/streams.ts`), so "same building, different crowd" is
 impossible to ask for: changing the seed changes the door obstructions and the policy noise too.
 
 **Contract.** A run accepts an optional `trafficSeed` distinct from `seed`. When absent it is
@@ -83,7 +93,7 @@ Added to `STREAM_NAMES`, because invariant 2 admits no unnamed draw:
 
 | Stream | Draws |
 |---|---|
-| `batchSize` | group size — **moved off `arrivals`**, see § 1.3 |
+| `batchSize` | group size — **moved off `arrivals`**, see § 1.3. **Built.** Also in `TRAFFIC_STREAM_NAMES`: how many people walk in together is a fact about the crowd, so § 1.1's traffic seed must seed it |
 | `patience` | per-passenger abandonment tolerance (§ 3.1) |
 | `modeChoice` | stairs-versus-lift decision (§ 3.3) |
 | `dayVariation` | the per-day multipliers of § 2.3 |
@@ -103,6 +113,49 @@ to say *"this figure has not moved since Phase 5"* — the property those pins e
 
 `v1` is deleted when the last figure that depends on it has been re-derived under `v2` **and the
 re-derivation has been published as a comparison**, not before.
+
+#### What measuring it found — the paragraph above overstated the coupling
+
+Built and measured 2026-07-31. The step landed; **the sentence at the head of § 0 did not survive
+contact with a run**, and it is corrected here rather than quietly dropped.
+
+The pre-registered test was *"under `v1`, changing the group-size mean shifts arrival instants;
+under `v2` it leaves them untouched"*. It was written first, watched failing, and its second half
+then **failed on the finished implementation** — for two reasons, both properties of the model
+rather than defects in the wiring:
+
+1. **`batchesPerSecond = passengerRate / meanBatchSize`** (`traffic/poissonBatch.ts`). Total
+   *passenger* demand is held fixed, so the *batch* arrival rate is a function of the mean **by
+   construction**: bigger groups mean fewer, larger batches. No stream separation can make the batch
+   arrival process invariant to the group-size mean, and one that did would describe a building
+   where raising the group size raised the headcount. Measured: a mean change moves the instants
+   under `v2` exactly as it does under `v1`.
+2. **`drawGeometricBatchSize` consumes exactly one draw per call for every mean**, deliberately and
+   with its own comment saying so. So a mean change never changes the *per-batch* draw count. A
+   **rate-compensated** change — mean and passenger rate scaled together, batch rate held fixed —
+   leaves the instants untouched under `v1` *and* `v2` alike. Measured, and now asserted, because
+   it is the property a future group-size sampler must not quietly break.
+
+So *"any change to the group-size curve consumes a different number of draws"* is false today. The
+draw count changes only through the **number of batches**, and the coupling that is real is
+**across demand sources**, not within one:
+
+> `generateTrace` walks `plan.sources` in order and, for each, draws all of that source's arrival
+> times (pass A) and then all of its group sizes (pass B). Under `v1` both come from `arrivals`, so
+> **source *k*'s group sizes displace source *k+1*'s arrival times.** The residents of Midtown
+> Office turn up when they do partly because of how many people walked through the lobby door
+> together.
+
+That is what `v2` removes, and it is measured directly: at one fixed configuration and seed, `v1`
+and `v2` agree exactly on the **first** source's instants — drawn before any group-size draw exists
+— and disagree on **all nineteen** later ones. One unchanged and nineteen displaced is the coupling
+seen rather than argued.
+
+**None of this weakens the case for the flag; it sharpens what the flag is for.** § 2.2 will add a
+group-size *curve*, and a sampler whose draw count depends on its parameters — a table, a truncated
+Poisson, anything but the current one-parameter geometric — reintroduces the strong form of the
+coupling immediately. Under `v2` it cannot. The flag is insurance bought before the risk arrives,
+which is the only time it is available.
 
 ---
 

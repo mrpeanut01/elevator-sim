@@ -20,7 +20,7 @@ import { loadConfig } from '../config/loader.js';
 import { parseBuilding, resolveBuilding } from '../config/parse.js';
 import type { BuildingConfig, LoadedConfig, ResolvedBuilding, TrafficProfiles } from '../config/types.js';
 import { Passenger } from '../model/index.js';
-import { StreamSet } from '../random/index.js';
+import { STREAM_NAMES, StreamSet } from '../random/index.js';
 
 import {
   egressTransitSecondsOf,
@@ -135,12 +135,61 @@ describe('stream discipline', () => {
     expect(streams.passengerMass.getState()).not.toEqual(fresh.passengerMass.getState());
   });
 
-  it('materializes no stream beyond the six the architecture declares', () => {
+  it('materializes no stream beyond the ones the architecture declares', () => {
     const streams = new StreamSet(78);
     generateTrace({ building: building('mixed-use-high-rise'), profiles, streams });
-    expect([...streams.streamNames()].sort()).toEqual(
-      ['arrivals', 'destinations', 'doorObstruction', 'origins', 'passengerMass', 'policyNoise'].sort(),
-    );
+    // Derived from `STREAM_NAMES` rather than re-typed: a name added there and never derived here
+    // is the thing this asserts, and a hand-written list would have to be edited to keep saying so.
+    expect([...streams.streamNames()].sort()).toEqual([...STREAM_NAMES].sort());
+  });
+
+  /**
+   * **The one draw `trafficModel` moves** (docs/14 § 1.3).
+   *
+   * Asserted on stream *state* rather than on the trace, because the claim is about which sequence
+   * was consumed and that is not recoverable from the output. Under `v1` the `batchSize` stream is
+   * materialized — it is in `STREAM_NAMES` — and stands exactly where a stream set that generated
+   * nothing at all stands, which is what makes the default byte-identical rather than merely
+   * equivalent. Under `v2` it has moved and `arrivals` has moved *less*, by one draw per batch.
+   */
+  it('draws batch sizes from arrivals under v1 and from batchSize under v2', () => {
+    const fresh = new StreamSet(79);
+
+    const underV1 = new StreamSet(79);
+    const trace = generateTrace({ building: building('midtown-office'), profiles, streams: underV1 });
+    expect(underV1.batchSize.getState()).toEqual(fresh.batchSize.getState());
+
+    const underV2 = new StreamSet(79);
+    generateTrace({
+      building: building('midtown-office'),
+      profiles,
+      streams: underV2,
+      trafficModel: 'v2',
+    });
+    expect(underV2.batchSize.getState()).not.toEqual(fresh.batchSize.getState());
+    expect(underV2.arrivals.getState()).not.toEqual(underV1.arrivals.getState());
+    expect(trace.arrivals.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * `v1` is the default at the generator too, not only at `runSimulation`.
+   *
+   * The blocking criterion of docs/14 § 5 stated where the draw actually happens: an absent
+   * `trafficModel` and an explicit `'v1'` must leave every stream in the same place.
+   */
+  it('defaults to v1, so an absent trafficModel consumes exactly what it always did', () => {
+    const absent = new StreamSet(80);
+    const explicit = new StreamSet(80);
+    generateTrace({ building: building('midtown-office'), profiles, streams: absent });
+    generateTrace({
+      building: building('midtown-office'),
+      profiles,
+      streams: explicit,
+      trafficModel: 'v1',
+    });
+    for (const name of STREAM_NAMES) {
+      expect(explicit.stream(name).getState(), name).toEqual(absent.stream(name).getState());
+    }
   });
 });
 

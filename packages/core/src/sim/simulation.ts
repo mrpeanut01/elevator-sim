@@ -172,6 +172,7 @@ import type {
   PassengerTrace,
   TraceTransportHop,
   TrafficConfig,
+  TrafficModelVersion,
 } from '../traffic/types.js';
 
 import {
@@ -442,6 +443,14 @@ export class Simulation {
    */
   readonly #panelAssigns: boolean;
   readonly #passengerModel: PassengerModel;
+  /**
+   * The traffic draw ordering this run asked for, or `undefined` for the default.
+   *
+   * Kept as the caller gave it rather than resolved to `'v1'`, because the result reports it by
+   * *presence* and resolving here would lose the only distinction the result needs to make. See
+   * {@link SimulationResult.trafficModel}.
+   */
+  readonly #trafficModel: TrafficModelVersion | undefined;
   readonly #runId: string;
   readonly #reportWindow: ReportWindow;
   readonly #summarizeOptions: SimulationConfig['summarize'];
@@ -571,6 +580,7 @@ export class Simulation {
       config.trafficSeed === undefined ? {} : { trafficSeed: config.trafficSeed },
     );
     this.#kernel = new SimKernel({ maxEventsPerRun: this.#options.maxEvents });
+    this.#trafficModel = config.trafficModel;
     this.#resolved = config.building;
 
     /* ---- the trace, before anything moves (common random numbers) ---- */
@@ -3361,6 +3371,17 @@ export class Simulation {
       ...(this.#streams.trafficSeed === undefined
         ? {}
         : { trafficSeed: this.#streams.trafficSeed.toString() }),
+      /*
+       * Spread-or-omit again, but on a *different* boundary, and the difference is the point.
+       * `trafficSeed` is omitted when it was never given, because a given seed equal to the run
+       * seed is still a different statement. `trafficModel` is omitted when it is `v1` **however it
+       * was reached**, because a `v1` run and a run predating the option are the same run — same
+       * draws, same trace, same record. Emitting `'v1'` would be a key that changes both identity
+       * digests to say nothing.
+       */
+      ...(this.#trafficModel === undefined || this.#trafficModel === 'v1'
+        ? {}
+        : { trafficModel: this.#trafficModel }),
       buildingId: this.#resolved.id,
       dispatcherProfileId: this.#profileId,
       trace: this.#trace,
@@ -3780,6 +3801,7 @@ function traceConfigFor(config: SimulationConfig, streams: StreamSet): TrafficCo
     building: config.building,
     profiles: config.trafficProfiles,
     streams,
+    ...(config.trafficModel === undefined ? {} : { trafficModel: config.trafficModel }),
     ...(config.demandTemplate === undefined ? {} : { template: config.demandTemplate }),
     // `generateTrace` rejects overrides against an already-resolved template, which carries its
     // own geometry; passing an empty record would trip that check for no benefit.

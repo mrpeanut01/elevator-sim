@@ -71,6 +71,13 @@ const PARAMETERS_BY_CONFIG_FIELD = {
   idPrefix: null,
   journeyIdPrefix: null,
   batchIdPrefix: null,
+  /*
+   * A model version, not a knob. It says *which simulator* produced a number, so an optimizer that
+   * sampled it would be searching across two simulators and reporting the difference as a tuning
+   * result — the exact confusion `docs/03`'s pairing rules exist to prevent. Metrics do move when
+   * it changes, which is why it is `null` for a different reason than `idPrefix` is.
+   */
+  trafficModel: null,
 
   template: ['traffic.template'],
   templateOverrides: [

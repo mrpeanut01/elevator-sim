@@ -57,6 +57,7 @@ import type {
   InterfloorWeighting,
   PassengerTrace,
   ResolvedDemandTemplate,
+  TrafficModelVersion,
 } from '../traffic/types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -368,6 +369,19 @@ export interface SimulationConfig {
    * the run, so {@link SimulationResult.trafficSeed} reports it and the caller must persist it.
    */
   readonly trafficSeed?: number | bigint | undefined;
+  /**
+   * Which traffic draw ordering to run. Default `v1` (docs/14 § 1.3).
+   *
+   * `v1` is the ordering every published figure in this repository was measured under, and a run
+   * that leaves this unset is byte-identical to the run before the option existed. `v2` moves the
+   * group-size draw onto its own stream, which is what makes group size and arrival instants
+   * separable — and is therefore a **different run at the same seed**, deliberately.
+   *
+   * It is a model version, not a tunable: it says which simulator produced a number, so a study
+   * comparing a `v1` arm against a `v2` arm is comparing two simulators and is not a paired
+   * comparison of anything. See {@link SimulationResult.trafficModel} for how a run reports it.
+   */
+  readonly trafficModel?: TrafficModelVersion | undefined;
   /** `rise-and-fall` (default), `constant-iso`, or an already-resolved template. */
   readonly demandTemplate?: DemandTemplateId | ResolvedDemandTemplate | undefined;
   /**
@@ -761,6 +775,22 @@ export interface SimulationResult {
    * traffic seed matched the run seed" are different runs that must not replay as one another.
    */
   readonly trafficSeed?: string;
+  /**
+   * The traffic draw ordering this run used — **present only when it was not `v1`**.
+   *
+   * Absent rather than `'v1'`, and that is a claim rather than a convenience. A `v1` run is
+   * byte-identical to every run this repository produced before the option existed: the draws, the
+   * trace and the record are the same objects they always were. A result that announced `'v1'`
+   * would assert a distinction that does not exist, and it would differ — key for key — from the
+   * pinned results it is supposed to equal, because `structuralDigestOfResult` hashes every key
+   * whatever its value. So "there was no traffic model" and "the traffic model was v1" are the
+   * *same* run here, which is the opposite of {@link trafficSeed}'s case and is why the two are
+   * reasoned separately rather than by analogy.
+   *
+   * Present and `'v2'` means the group-size draw came from the `batchSize` stream, and this result
+   * may not be paired against one that does not say so.
+   */
+  readonly trafficModel?: TrafficModelVersion;
   readonly buildingId: string;
   readonly dispatcherProfileId: string;
   /** The trace this run was driven by. Replayable from {@link seed} — and {@link trafficSeed}, when the run carries one. */
