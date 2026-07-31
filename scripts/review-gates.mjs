@@ -250,13 +250,16 @@ for (const duplicate of duplicates) {
 
 /**
  * This repository's signature defect: a behaviour that is configurable, unit-tested in isolation and
- * called from nothing shipped. It has landed **eleven** times, and the audits that catch it cover 25
- * of 47 source directories — `core/` has 14 unaudited, including `model/`, where the eleventh
- * instance was found.
+ * called from nothing shipped. It has landed **eleven** times.
  *
- * Advisory, not blocking. A barrel re-export and a `{@link}` tag look exactly like a caller and are
- * not one, so the rule is *"name the non-test caller"* and that needs a human. This prints
- * candidates; it does not fail the build.
+ * As of 2026-07-31 `core`'s own audit covers all fourteen of these directories with a proper
+ * import-graph scanner, so this list is now a **backstop rather than the only coverage** — it exists
+ * because a crude second opinion that runs on every PR is worth having beside a precise one that
+ * runs in the suite, and because the two disagree in useful ways (this one sees a file the audit's
+ * module partition does not).
+ *
+ * Advisory, not blocking, and it stays that way. A barrel re-export and a `{@link}` tag look exactly
+ * like a caller and are not one, so the rule is *"name the non-test caller"* and that needs a human.
  */
 const UNAUDITED = [
   'packages/core/src/analytical', 'packages/core/src/config', 'packages/core/src/dispatch/terms',

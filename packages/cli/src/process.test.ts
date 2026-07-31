@@ -6,12 +6,30 @@
  * two real streams a message came out of — both of those are properties of the entry point, and
  * both of them shipped broken. So these tests spawn the built CLI and watch its file descriptors.
  *
- * They need `dist/`. The suite builds it once if it is missing rather than skipping, because a
- * regression test that quietly does not run is worse than no test at all.
+ * They need `dist/`, and they build it rather than skipping, because a regression test that quietly
+ * does not run is worse than no test at all.
+ *
+ * ## Missing was never the only way `dist/` can be wrong
+ *
+ * This used to build only when `dist/index.js` was **absent**. A `dist/` that exists but predates
+ * the source is the more common case by far — it is what any branch switch leaves behind — and it
+ * made these tests spawn a *stale* CLI and assert against last week's behaviour. On 2026-07-31 that
+ * produced 5 failures on a tree whose source was correct, and cost real time to attribute because
+ * the failures pointed at the CLI rather than at the build.
+ *
+ * So the build runs unconditionally and `tsc -b` decides whether there is anything to do. It is
+ * incremental and answers exactly that question; on an up-to-date tree it costs a couple of seconds
+ * and writes nothing.
+ *
+ * An mtime comparison — newest `.ts` against the built entry point — was written first and
+ * rejected, because it is wrong in both directions. `tsc -b` keys on **content**, not timestamps,
+ * so a `git checkout` that rewrites mtimes without changing content leaves the guard permanently
+ * convinced the build is stale while `tsc` correctly does nothing: the mtime never advances, and
+ * every subsequent run spawns a compiler to no effect. Reimplementing "is this build current?" with
+ * `stat` is the same shape of half-correct guard as the `existsSync` check it was meant to replace.
  */
 
 import { spawn, execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -64,7 +82,6 @@ async function runCli(
 }
 
 beforeAll(() => {
-  if (existsSync(CLI)) return;
   execFileSync('npx', ['tsc', '-b'], { cwd: REPO, stdio: 'inherit' });
 }, 600_000);
 
