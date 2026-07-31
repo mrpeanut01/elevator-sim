@@ -836,3 +836,56 @@ main checkout, so `@elevator-sim/*` points at the wrong tree and built-artifact 
 code you did not write. Verified by `realpath` that each worktree's `@elevator-sim/core` resolves
 into **its own** `packages/core`, which is the property the script was hand-rolling and which npm
 workspaces provides directly.
+
+## Wave 13 — cycle 2, both opening lanes merged and reviewed
+
+**`integration/wave-13` at `cab33d0`.** Suite on the merged tree: **264 files / 4 924 tests, 4 914
+passed, 0 failed, 10 skipped**, `tsc -b` clean, `review-gates` green over 584 files.
+
+| Tree | Files | Tests | Passed | Failed | Skipped |
+|---|---|---|---|---|---|
+| Baseline `866e6a1` | 263 | 4 896 | 4 886 | 0 | **10** |
+| + T2 | 264 | 4 907 | 4 897 | 0 | **10** |
+| + T2 + T0 | 264 | 4 924 | 4 914 | 0 | **10** |
+
+**The skip count did not move once.** That is the column to read: a wave that quietly skips a test
+to go green moves it, and a rising test count says nothing on its own.
+
+### What independent review was worth
+
+Both lanes were reviewed by agents instructed to **refute rather than approve**, and neither review
+was a formality — each caught something the lane's own report did not.
+
+- **T2.** The reviewer settled the question that mattered by *diffing* rather than reasoning:
+  `docs/14` § 5, the pre-registered acceptance criteria, is **byte-identical to base**. It then
+  mutated the implementation three ways — forcing the draw back onto `arrivals` (3 failures),
+  forcing `v1` onto `batchSize` (28, including every identity cell), replacing spread-or-omit with
+  `?? 'v1'` (16) — so the identity digests are **demonstrably able to fail**, and their passing is
+  evidence rather than absence of evidence. The new golden vector was reproduced from a third
+  implementation written from the FNV-1a-64 / SplitMix64 / PCG specs.
+- **T0.** The reviewer built the negative control the lane had not: strip `transportModes` from the
+  emitted document before `parseBuilding`, and the run returns **bit-identical** to the control arm.
+  That converts *"the legs differ"* from a correlation into a mechanism. It also **refuted** the
+  lane's losslessness claim — `name` and `$comment` were being dropped, and the test could not see
+  it because it projected the expectation through the same three surviving fields. The tell was that
+  the access-zone precedent it was modelled on compares **raw**.
+
+### Two findings that would have survived a green suite
+
+1. **Two sentences in `index.html` stated a mechanism the code contradicts** — a picker called
+   *multi-select* that is single-select, a floor called *not offered* that is offered disabled. This
+   is the failure `CLAUDE.md` opens with, landing in the one prose location this repository does not
+   sweep. Fixed and pinned in both directions; the rest of that file's control copy is now **named as
+   a gap** rather than implied to be covered.
+2. **The criterion-2 inequality was insufficient on its own.** Stranding the escalator arm leaves
+   `legsOf(ESCALATOR) < legsOf(SKY)` passing while `generated` falls 114 → 64. Conservation is now
+   pinned, and a mutation demonstrates the hole is closed.
+
+### Open, and the first one blocks step 3
+
+| # | Finding | Severity |
+|---|---|---|
+| **F1** | **A `v2` run cannot be replayed from its persisted record.** `RunRecord` does not carry `trafficModel` and `replaySimulationConfig` rebuilds by explicit field enumeration, so a stored `v2` run replays as `v1` — **a different trace at the same seed**, which is invariant 5's exact hazard. Harmless today because no shipped path sets `v2`; **step 3 is the step that will.** | medium-high, **blocks T3** |
+| F2 | The `v1`/`v2` pairing prohibition is a **sentence** where `metrics/comparability.ts` exists to carry it as data — whose own docstring argues such a rule must be carried on the run rather than written where the code cannot check it | medium |
+| F3 | The § 0 correction is **unpinned**: the overstated paragraph and its rebuttal can be edited back to the false version with a green suite. `validation/documentation.test.ts` is the established mechanism and was not used | medium-low |
+| F4 | Four low findings against T0 — a raw-`skyFloors` divergence between mirror and advisory, an unreachable refusal branch, a seed label that outlives its seed, and an above-6-m EN 115-1 branch that is wrong but unreachable | low |

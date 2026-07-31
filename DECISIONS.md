@@ -11910,3 +11910,114 @@ it measured as the simulator changes.
 **Impact.** No phase verdict moves. The standing rule this leaves: *a pin is a claim about a
 machine as well as a commit — so pin decisions exactly, magnitudes within a band you can defend in
 both directions, and never a hash of a real number.*
+
+## D203 — the group-size coupling was overstated, and step 2's criterion was corrected rather than met
+
+**Date: 2026-07-31 · Wave 13 step 2 (`docs/14` § 1.3). The criterion was pre-registered; the run
+refused it; the criterion was wrong.**
+
+`trafficModel: 'v1' | 'v2'` ships, `batchSize` is a named stream in both `STREAM_NAMES` and
+`TRAFFIC_STREAM_NAMES`, and the flag is reported on `SimulationResult`. `v1` is byte-identical:
+**264 files / 4 907 tests, 4 897 passed, 0 failed, 10 skipped**, all 981 pins and both identity
+digests unmoved, `review-gates` green over 584 files.
+
+**What was measured, and what it refused.** `docs/14` § 0 stated, as motivation, that *any* change to
+the group-size curve — even one preserving the mean — consumes a different number of draws and
+shifts every subsequent arrival instant. The pre-registered test made that falsifiable: under `v1` a
+mean change shifts the instants, under `v2` it leaves them untouched. It was written first, watched
+failing, and **its second half then failed on the finished implementation.** Two reasons, both
+properties of the model rather than defects in the wiring:
+
+1. `batchesPerSecond` is `passengerRate / meanBatchSize` (`traffic/poissonBatch.ts:93-102`). Total
+   *passenger* demand is held fixed, so the *batch* rate is a function of the mean by construction.
+   No stream separation can make the batch arrival process invariant to it, and one that did would
+   describe a building where larger groups meant more people.
+2. `drawGeometricBatchSize` consumes exactly one draw per call for every mean, including the
+   degenerate `mean === 1`, which returns after drawing rather than short-circuiting.
+
+**The second point is why this is a correction and not a concession.** That property is stated in the
+function's own docstring, and **the docstring predates the sentence that contradicted it** — three
+files from the design document asserting the opposite. The claim was refutable from the repository
+as it stood on the day it was written.
+
+**What replaced it is sharper, because it is true.** The coupling that exists runs *across* demand
+sources rather than within one: `generateTrace` walks `plan.sources` in order, drawing each source's
+arrival times and then its group sizes from the same stream, so under `v1` **source *k*'s group sizes
+displace source *k+1*'s arrival instants.** Measured at one fixed configuration and seed on
+`midtown-office`: `v1` and `v2` agree exactly on the **first** source's instants — drawn before any
+group-size draw exists — and disagree on **all nineteen** later ones. The agreeing source is pinned
+by name and the count is derived (`one.size - 1`), not written down.
+
+**This narrows the flag's justification rather than widening it, and that is the tell.** The strong
+form of the coupling returns at § 2.2, when a group-size *curve* — a table, a truncated Poisson,
+anything but today's one-parameter geometric — makes the draw count depend on the parameters. Under
+`v2` it cannot bite. The flag is insurance bought before the risk arrives, which is the only time it
+is available.
+
+**`docs/14` § 5, the pre-registered acceptance criteria, is byte-identical to base.** The edit is to
+§ 0's motivation prose and a new § 1.3 subsection; criterion 1, the blocking one, is untouched. The
+overstated paragraph is left standing with the refutation beneath it rather than deleted, matching
+how this repository has filed corrections before. **This is not the rule against weakening a
+criterion being bent** — it is the rule *"either measure it or say it is unmeasured"* being applied
+to a sentence that had never been measured.
+
+**`trafficModel` is absent at `'v1'`, not reported as `'v1'`.** `structuralDigestOfResult`
+`JSON.stringify`s the whole result, so a key present on the default path moves every digest — but the
+substantive reason is stronger: a `v1` run *is* the run that predates the flag, and announcing it
+would claim a distinction that does not exist. This is deliberately **not** § D-step-1's reasoning
+for `trafficSeed`, where a seed equal to the run seed is still a different statement.
+
+**Adversarial review confirmed all six claims and could not break the blocking one.** Mutations
+forcing the draw back onto `arrivals` (3 failures), forcing `v1` onto `batchSize` (28, including
+every `mixIdentity` and `transportIdentity` cell) and replacing spread-or-omit with `?? 'v1'` (16)
+were each caught by a test that already existed — so the digests' passing is evidence rather than
+absence of evidence. The new golden vector was reproduced from a third implementation written from
+the FNV-1a-64 / SplitMix64 / PCG specs, required first to reproduce an existing pin.
+
+**Open, and blocking step 3.** `RunRecord` does not carry `trafficModel`, and
+`replaySimulationConfig` rebuilds by explicit field enumeration, so **a stored `v2` run replays as
+`v1` — a different trace at the same seed.** That is invariant 5's exact hazard. It is harmless today
+because no shipped path sets `v2`; step 3 is the step that will. Nothing may be published under `v2`
+until it is closed.
+
+## D204 — sky lobbies are authored independently of transfer flags, and the traversal time is carried rather than derived
+
+**Date: 2026-07-31 · Wave 13 step 0 (`docs/14` § 5a). The inverse of this repository's usual defect:
+the engine was complete and the authoring surface was missing.**
+
+The building designer can now author `transportModes`. Three decisions were taken deliberately rather
+than discovered.
+
+**1. `skyFloors` and `transportModes` are independent, and cross-stated rather than cross-derived.**
+`skyFloors` sets `isTransferFloor`, which is *bank segmentation* — it decides where `defaultBandOf`
+cuts the tower. A transport mode is an edge outside every bank. Deriving a transfer flag from an
+escalator would silently re-deal every car's default band the moment a reader added a machine;
+deriving an escalator from a transfer flag would author hardware nobody asked for. `vertical-city`
+declares both separately for all four lobbies. What *is* stated at the control is the interaction a
+reader cannot see: `route.ts` re-enters its search only at a transfer floor, so a machine touching
+none of them carries exactly the people who start on one of its two floors and finish on the other.
+That is an **advisory**, and the test asserts the message does *not* say the loader refuses — because
+it does not.
+
+**2. Shrinking `floors` below a connected floor omits the whole machine.** `connects` is a pair, so
+there is nothing to narrow: a pair with one end removed is not a connection. This follows
+`accessZonesOf`'s narrow-and-omit with the one deviation the shape forces, and the selector keeps
+drawing the row as *unwritten* so the reader can move the landing back.
+
+**3. `traversalTimeS` is carried in the spec, not derived.** Deriving it from floor height would keep
+it honest under the height slider but make `specFromBuilding` lossy on any unevenly pitched document
+— and `vertical-city`, the only document with escalators, is exactly that. The derivation seeds a
+*new* machine and never overwrites a loaded one. Losslessness was the stated deliverable, so it won.
+
+**The criterion-2 evidence is a mechanism, not a correlation.** Adversarial review built the negative
+control the lane had not: strip `transportModes` from the emitted document before `parseBuilding`,
+and the run returns **bit-identically** to the control arm — 205 legs both — so a router that ignored
+the field fails the test. Conservation confirms it: the same 114 journeys generated and delivered in
+both arms, with exactly **51 lift legs becoming 51 escalator hops**.
+
+**One claim was refuted and is recorded as refuted.** The round trip is **not** lossless: `name` and
+`$comment` are dropped from all four `vertical-city` escalators, and the `$comment` is where the
+EN 115-1 derivation lives. The test could not see it because it projected the expectation through the
+same three surviving fields — where the access-zone precedent it was modelled on compares raw. **A
+test written so it cannot fail on the loss it exists to prevent is worse than no test**, and the
+asymmetry against its own precedent is the tell.
