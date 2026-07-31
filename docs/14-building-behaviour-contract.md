@@ -1,14 +1,47 @@
 # Building behaviour — the contract
 
-**Status: designed; steps 1 and 2 built. Criteria written before the implementation, which is the
+**Status: designed; steps 0, 1 and 2 built. Criteria written before the implementation, which is the
 point — and step 2's criterion is the first one measurement sent back for correction.**
 
 | Step | State |
 |---|---|
-| 0 — dual-lobby / escalator authoring (§ 5a) | designed |
+| **0 — dual-lobby / escalator authoring (§ 5a)** | **built, and § 5 criterion 2 met on the legs** — `SpecTransportMode` on `BuildingSpec`, emitted by `buildingFromSpec`, read back by `specFromBuilding`, refused in the designer by `validateSpec`, with the controls in `dev/buildingEditor.ts`. **Say the gaps in the same breath**, below |
 | **1 — traffic seed separation (§ 1.1)** | **built** — `StreamSet(seed, { trafficSeed })`, reaching `runSimulation` and reported on the result; `sim/trafficSeedSeam.test.ts` drives it end to end |
 | **2 — `trafficModel: 'v2'` + `batchSize` stream (§ 1.3)** | **built** — `batchSize` in `STREAM_NAMES` and `TRAFFIC_STREAM_NAMES`, `trafficModel` on the run config and reported on the result when it is not `v1`; `sim/trafficModelSeam.test.ts` drives it end to end. **§ 1.3's stated consequence was wrong and is corrected below.** |
 | 3–6 | designed |
+
+**Step 0's criterion is met by a run, not an argument.** Three banks, both lobby levels marked
+transfer, and the escalator the only difference between the arms: `servedFloorIds` byte-identical,
+**205 lift legs without the machine and 154 with it**, and the books balanced rather than inferred —
+the same journeys generated in both arms, the same undelivered count, and every lift leg that
+disappeared became exactly one `ConservationAudit.transportHops` entry. The landing picker and the
+traversal-time field each move the run on their own. An adversarial check confirmed the negative
+case: strip `transportModes` from the document before `parseBuilding` and the run returns
+bit-identical to the control, so a mode the router ignored genuinely fails the test.
+
+**The four gaps, named rather than left to be discovered:**
+
+1. **`drawTransport` has a shipped caller and no DOM driver.** `dev/main.ts` is the only caller of
+   `mountBuildingEditor`, and no test drives the mounted panel. This is the known Phase 9 gap —
+   *"three DOM panels are statically swept rather than driven"* — matched exactly by the
+   access-zone editor beside it. It is **not widened** by this step, and it is not closed either.
+2. **The round trip carries three fields, not five.** `id`, `connects` and `traversalTimeS`
+   survive; `name` and `$comment` do not, both deliberately (`buildingSpec.ts`'s
+   `specFromBuilding` states the reason for each). `authoring.test.ts` asserts the surviving key
+   set **exactly**, so the claim cannot quietly widen or narrow.
+3. **Static `title` prose in `index.html` has no producer, so `honesty/derive.ts` cannot classify
+   it.** Two sentences describing the landing pickers were false about the mechanism they
+   described and were caught by review rather than by a test. They are now pinned in both
+   directions in `buildingEditor.test.ts`, but that is a targeted pin on two claims, **not** a
+   sweep of the file — the rest of `index.html`'s control copy remains unswept.
+4. **The EN 115-1 seed extrapolates past its own clause above a 6 m rise.** The two-flat-step
+   allowance is stated for a rise of 6 m or less, which covers every adjacent floor pair the
+   height slider can produce. A machine spanning more floors says so in its own emitted
+   `$comment` rather than presenting the figure as a citation.
+
+Step 0 emits the citation `TransportModeConfig.traversalTimeS` requires — the derivation is
+computed from the spec's own geometry on every write rather than carried, so it cannot go stale,
+and a hand-set figure is labelled the author's and explicitly **not** cited.
 
 This document covers one program in three parts: **richer traffic variance**, **passenger
 behaviour**, and **a learned dispatcher you can teach**. They are one program because they share a

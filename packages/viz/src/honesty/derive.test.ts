@@ -253,6 +253,37 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
       ],
     },
     {
+      /*
+       * The exclusion this repository's reference-data rule *requires*, rather than one it
+       * tolerates. `TransportModeConfig.traversalTimeS` is a reference value and its own contract
+       * says it "must be cited in the declaring building's `$comment`", so `transportModesOf`
+       * writes the EN 115-1 derivation onto every escalator it emits. That comment is a **JSON
+       * document field** — the same field `data/buildings/vertical-city.json` writes by hand four
+       * times, which no honesty sweep has ever looked at because `data/` is not a viewer surface.
+       *
+       * Driving it would be a category error in the direction that costs something: it would put
+       * *"inclination 30 degrees, which BS EN 115-1 makes the only permitted angle above a 6 m
+       * rise"* into the player-facing corpus and judge a standards citation by R1/R2/R13, which
+       * are written for what a reader is shown about a run. The same argument `elementMap.ts`'s
+       * exclusion makes, and answered the same way: the wording is asserted **directly**, in
+       * `authoring.test.ts`, in both branches — the derived one for the arithmetic it prints, and
+       * the hand-set one for the sentence that refuses to call itself a citation.
+       *
+       * `specIsDirty` is here only through the transitive clause: it returns a boolean, and it
+       * reaches this text because `normalize` compares the emitted document. Its sibling
+       * `dispatcherSpec.ts#specIsDirty` is excluded a few groups above for that same shape.
+       */
+      reason:
+        'A `data/` document field, not a viewer surface. `transportModesOf` writes the citation ' +
+        '`TransportModeConfig.traversalTimeS` requires into each emitted escalator’s `$comment`, ' +
+        'which is read by whoever opens the downloaded JSON and is never shown to a player — the ' +
+        'same standing as the hand-written `$comment`s in `data/buildings/vertical-city.json`. ' +
+        'Its wording is asserted directly by `authoring.test.ts`, in both the derived and the ' +
+        'set-by-hand branch, which is what makes this an exclusion rather than a gap. ' +
+        '`specIsDirty` returns a boolean and is derived only through the transitive clause.',
+      ids: ['authoring/buildingSpec.ts#transportModesOf', 'authoring/buildingSpec.ts#specIsDirty'],
+    },
+    {
       reason:
         'Produces data, not prose. Derived only through the transitive clause — it names a helper ' +
         'that has a sentence in it — and its own return value carries ids, counts or geometry. ' +
