@@ -739,8 +739,9 @@ and §§ 2–3 of the contract are almost entirely new tunables. The wave's rule
 | ID | Unit | Branch | Depends | Status |
 |---|---|---|---|---|
 | T1 | Traffic seed separation (§ 1.1) | — | — | ✅ landed `d52f347` — `StreamSet(seed, { trafficSeed })` reaching `runSimulation` and reported on the result; 4 885 → 4 896 tests, no existing figure moved |
-| T0 | Sky-lobby / escalator authoring in the designer (§ 5a) | `feat/w13-sky-lobby-authoring` | — | 🔄 **open** — halt lifted 2026-07-31, see *Environment — closed* below |
-| T2 | `trafficModel: 'v2'` + `batchSize` stream (§ 1.3) | `feat/w13-traffic-model-v2` | — | 🔄 **open** — halt lifted 2026-07-31, see *Environment — closed* below |
+| T0 | Sky-lobby / escalator authoring in the designer (§ 5a) | `feat/w13-sky-lobby-authoring` | — | ✅ **merged** `cab33d0` — criterion 2 met on the legs; two rounds, the second closing a false mechanism statement and a refuted losslessness claim ([§ D204](DECISIONS.md)) |
+| T2 | `trafficModel: 'v2'` + `batchSize` stream (§ 1.3) | `feat/w13-traffic-model-v2` | — | ✅ **merged** `81c1859` — byte-identical at `v1`; **its pre-registered criterion was wrong and was corrected, not met** ([§ D203](DECISIONS.md)) |
+| F1 | A `v2` run must replay from its record (invariant 5) | `fix/w13-v2-replay` | T2 | 🔄 **open — blocks T3** |
 | T3 | Mass control, group-size curve (§ 2.1–2.2) | `feat/w13-traffic-variance` | T2 | ⬜ blocked |
 | T4 | Day variation (§ 2.3) | `feat/w13-day-variation` | T3 | ⬜ blocked |
 | T5 | Patience, lobby crowding, stairs (§ 3) | `feat/w13-passenger-behaviour` | T2 | ⬜ blocked |
