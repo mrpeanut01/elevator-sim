@@ -739,8 +739,8 @@ and §§ 2–3 of the contract are almost entirely new tunables. The wave's rule
 | ID | Unit | Branch | Depends | Status |
 |---|---|---|---|---|
 | T1 | Traffic seed separation (§ 1.1) | — | — | ✅ landed `d52f347` — `StreamSet(seed, { trafficSeed })` reaching `runSimulation` and reported on the result; 4 885 → 4 896 tests, no existing figure moved |
-| T0 | Sky-lobby / escalator authoring in the designer (§ 5a) | `feat/w13-sky-lobby-authoring` | — | ⏸️ **halted at open** — see *Environment* below |
-| T2 | `trafficModel: 'v2'` + `batchSize` stream (§ 1.3) | `feat/w13-traffic-model-v2` | — | ⏸️ **halted at open** — see *Environment* below |
+| T0 | Sky-lobby / escalator authoring in the designer (§ 5a) | `feat/w13-sky-lobby-authoring` | — | 🔄 **open** — halt lifted 2026-07-31, see *Environment — closed* below |
+| T2 | `trafficModel: 'v2'` + `batchSize` stream (§ 1.3) | `feat/w13-traffic-model-v2` | — | 🔄 **open** — halt lifted 2026-07-31, see *Environment — closed* below |
 | T3 | Mass control, group-size curve (§ 2.1–2.2) | `feat/w13-traffic-variance` | T2 | ⬜ blocked |
 | T4 | Day variation (§ 2.3) | `feat/w13-day-variation` | T3 | ⬜ blocked |
 | T5 | Patience, lobby crowding, stairs (§ 3) | `feat/w13-passenger-behaviour` | T2 | ⬜ blocked |
@@ -779,3 +779,59 @@ here would manufacture that condition deliberately.
 
 `git fsck` is clean — no object corruption, only the dangling objects expected after worktree
 removal. **Nothing is lost**, and both agents were stopped before either wrote a file.
+
+## Environment — closed 2026-07-31, by a run rather than by an argument
+
+**The repository was relocated to `~/Development/04-personal-projects/elevator-sim`** — a real local
+directory on the data volume, outside `~/Documents`, `~/Desktop`, `~/Library/CloudStorage/*`,
+`~/Dropbox` and `~/OneDrive`. **Both sync clients are still running**, and that is the point worth
+stating precisely: the precondition was never *"kill the client"*, it was *"the client cannot see the
+tree"*. Checked rather than assumed:
+
+| Check | Result |
+|---|---|
+| `git rev-parse --show-toplevel`, `realpath`, `df` | a real local path on `/System/Volumes/Data`, no symlink, no cloud-storage ancestor |
+| 30-second write-and-wait probe | **passed** — the untracked file survived and `git status` stayed clean. The same sequence previously lost the file, reverted a staged edit, and reverted a `git checkout` |
+| Conflict copies | `GAPS 3.md` removed. It was **not** a byte-copy of `GAPS.md` — 41 lines were unique to it, a superseded wave-11 generation — so it was preserved outside the repository before deletion rather than discarded |
+
+**Baseline re-established on the relocated tree, at `866e6a1`:**
+
+```
+Test Files  263 passed (263)
+     Tests  4886 passed | 10 skipped (4896)
+  Duration  703.81s
+```
+
+`tsc -b` clean; `review-gates` scanned 583 source files and **all blocking gates pass**; all 981 pins
+and both identity digests reproduce. This matches § 1's inherited figure exactly — 4 896 / 4 886 / 0
+/ 10 — so it is now **confirmed rather than inherited**, which was the whole reason for re-running
+it.
+
+**The skip count is 10 and still has not moved.** That is the number [`GAPS.md`](GAPS.md) says to
+watch, because a wave that quietly skips a test to go green moves it and a growing test count says
+nothing on its own.
+
+**[§ D201](DECISIONS.md)'s platform hazard did not bite, and it was the live risk here.** That
+decision found this suite's *pass/fail split* to be platform-dependent — the § D196 re-pin inverts
+between Linux and darwin/arm64 — while the **totals** reproduce across both. This run is
+darwin/arm64 and the totals reproduce, so the deviation § D201 predicts is absent and no finding is
+outstanding. A suite figure is a claim about a machine as well as a commit, and this one now names
+both.
+
+## Lanes — opened 2026-07-31 against the confirmed baseline
+
+One worktree per lane, one branch per worktree, one agent per branch — R25's remedy, followed this
+time rather than adopted after the fact. Both lane branches and `integration/wave-13` were moved from
+`d52f347` to `866e6a1`, the tree the baseline was actually measured on.
+
+| Lane | Worktree | Branch | Scope |
+|---|---|---|---|
+| **T0** | `.worktrees/w13-t0-sky-lobby` | `feat/w13-sky-lobby-authoring` | `packages/viz` only; moves no draw |
+| **T2** | `.worktrees/w13-t2-traffic-model` | `feat/w13-traffic-model-v2` | `packages/core`; forbidden `published.ts` |
+
+**Worktrees were given a real `npm ci` rather than the symlinked `node_modules` of
+`.worktree-setup.sh`.** That script exists because the naive symlink resolves to its realpath in the
+main checkout, so `@elevator-sim/*` points at the wrong tree and built-artifact evidence is about
+code you did not write. Verified by `realpath` that each worktree's `@elevator-sim/core` resolves
+into **its own** `packages/core`, which is the property the script was hand-rolling and which npm
+workspaces provides directly.
