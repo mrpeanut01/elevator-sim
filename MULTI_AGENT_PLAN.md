@@ -21,6 +21,40 @@
 > estimates and both identity digests must reproduce. A pin is never edited to fit a changed tree;
 > that is what [§ D196](DECISIONS.md)/[§ D201](DECISIONS.md) cost a wave to unpick.
 >
+> ### Wave 13 — ownership, merge order, rollback
+>
+> **Baseline confirmed 2026-07-31 at `866e6a1`:** 4 896 tests / 4 886 passed / 0 failed / 10 skipped,
+> `tsc -b` clean, `review-gates` green across 583 files, 981 pins and both identity digests
+> reproducing. Measured *after* the repository left the synced folder, so it is confirmed rather
+> than inherited. Every lane below is cut from that tree.
+>
+> **Ownership — one worktree, one branch, one agent (R25's remedy, followed rather than retrofitted):**
+>
+> | Lane | Owns | May not touch |
+> |---|---|---|
+> | **T0** | `packages/viz/src/authoring/`, `packages/viz/src/dev/`, `packages/viz/index.html` | `packages/core/**`, `packages/experiments/**` |
+> | **T2** | `packages/core/src/random/`, `core/src/traffic/`, `core/src/sim/` | **`packages/experiments/src/benchmark/published.ts`**, `packages/viz/**` |
+> | *orchestrator* | every root-level `.md` | — |
+>
+> The root-level documents are owned by the orchestrator precisely because R25 is about *committing*
+> rather than editing: two lanes appending to one board is how `ae6750b` came to describe one lane
+> and contain three.
+>
+> **Merge order.** `T0` and `T2` are file-disjoint and may merge in either order into
+> `integration/wave-13` — but **T2 merges alone**, with the full suite run before anything lands on
+> top of it. It is the only change in the wave that can move a published number, and there is no
+> value in discovering that beside a feature. T3–T6 follow in dependency order, full suite after
+> each.
+>
+> **The gate T2 must clear is not "the suite is green".** It is byte-identity: all 981 pins and both
+> identity digests unchanged under the `'v1'` default. A moved pin is a **finding**, reported and
+> stopped on — never a value edited to fit.
+>
+> **Rollback.** Each lane merges `--no-ff`, so a failed integration is `git revert -m 1 <merge>` on
+> `integration/wave-13` with the lane branch still alive for a follow-up. `main` is untouched until
+> `integration/wave-13` is green end to end. A worktree is removed only after its branch is merged
+> and the post-merge suite is green.
+>
 > Everything below this line is the closed record of waves 1–9 and is not updated.
 
 > ## ↩️ REOPENED 2026-07-30 as **wave 10** — the design handoff.
