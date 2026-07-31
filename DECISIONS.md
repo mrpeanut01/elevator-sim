@@ -11843,3 +11843,61 @@ suite distinguished the two roles. Three consequences:
 standing rule this adds is in the same family as the repository's existing one about stale numbers:
 *if you publish a number, pin it to the run that produced it* — and a run is a machine, not only a
 commit.
+
+## D202 — identity splits in two: decisions exactly, magnitudes within tolerance
+
+**Date: 2026-07-31 · Implements the fix [§ D201](DECISIONS.md) called for, against a criterion set by the project owner.**
+
+§ D201 established that the 26 pins were environment-dependent and left the design decision open.
+The criterion that closes it is not the one this review had assumed:
+
+> There is no reason for the simulations to match between systems. It's a game, and that is OK as
+> long as it doesn't diverge the outcome significantly.
+
+That is a weaker and more accurate requirement than bit-portability, and it is the one the code now
+encodes. Bit-equality across machines was never needed: common random numbers pair alternatives
+*within one run on one machine*, so paired comparisons keep their 5–20× variance reduction
+per-platform, and invariant 5's replay guarantee is a same-machine claim that still holds.
+
+**What was wrong with the oracle.** `expect(digest).toBe(...)` over `SHA-256(JSON.stringify(x))`
+asserts bit-identical output everywhere. Worse, **a hash cannot say how far apart two runs are** —
+one ULP and a rewritten generator are indistinguishable in its output — so the pins could report
+*that* something moved and never *how much*, which is the only question the criterion above asks.
+
+**The split.** Every identity guard now has two halves that fail for different reasons:
+
+| half | covers | compared |
+|---|---|---|
+| structural digest | decisions — which floors, which routes, which legs, which credential, which batch, and every integer count | exactly |
+| continuous summary | magnitudes — arrival instants, masses, AWT, WT95, TTD, energy | within a relative tolerance |
+
+For a trace (`mixIdentity`), the structural half is an explicit allow-list of decision fields, so a
+field added to `GeneratedPassenger` must be classified by whoever adds it. For a whole result
+(`transportIdentity`), where no small field list exists, the general rule is **counts are decisions
+and reals are magnitudes**: non-integer numbers are elided from the hash to a placeholder — hashed
+in place, so a key appearing or disappearing still moves the digest — and compared separately.
+
+**Tolerances, both anchored rather than tuned.** `1e-9` relative on trace summaries, which draw
+directly from the streams and accumulate nothing. `1e-6` relative with a `1e-5` absolute floor on
+published estimates, because a *study* is not a formula: one ULP in an arrival instant can reorder
+a queue and change which car answers, so its divergence is chaotic rather than rounding. The
+measured cross-platform gap on `forecast-causality` is `4.1e-6` absolute — `3e-4` relative — and
+the smallest effect this apparatus can resolve is `1.9 s` on a `~30 s` statistic, `6e-2` relative.
+**Two hundred times larger.** The floor exists because a correlation near zero has no useful
+relative scale, which is precisely the case that broke `PIN_TOLERANCE = 1e-12`.
+
+**What is given up, and stated rather than papered over.** `transportIdentity`'s comparison against
+the two superseded `vertical-city` states is deleted. Those are values of the old digest function,
+and **a digest cannot be compared across a change of digest**; re-deriving them would need two
+superseded trees checked out. Asserting them anyway — against a value the current code can never
+produce — is the exact shape § D201 found in the re-pin. The values are kept as a record, and the
+routing claim they supported is carried by the structural pin plus § D170's mechanism.
+
+**What is still measured rather than assumed.** Whether *decisions* agree across platforms is an
+open question this decision does not answer. If a float difference ever flips a dispatch tie, the
+structural digest will split the matrix — and that would be a real finding about the simulator, not
+a pin-maintenance problem. CI is what will say so, and the failure prints the relative gap.
+
+**Impact.** No phase verdict moves. The standing rule this leaves: *a pin is a claim about a
+machine as well as a commit — so pin decisions exactly, magnitudes within a band you can defend in
+both directions, and never a hash of a real number.*

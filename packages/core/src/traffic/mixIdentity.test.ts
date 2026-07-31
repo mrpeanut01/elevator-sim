@@ -1,33 +1,40 @@
 /**
  * **The opt-in guard for the directional-mix arc.** A run under a template that declares no mix
  * must produce the trace it produced before mixes could vary — the same batches, the same
- * destinations, the same masses, the same object shape, bit for bit.
+ * destinations, the same masses.
  *
  * `DECISIONS.md` § D151 § 7 fixed this in advance, before the template existed: *"It must be
  * opt-in and byte-identical when unused. Every existing published number must reproduce exactly; a
  * traffic-model change that moves a shipped figure invalidates far more than this phase."*
  *
- * ## Why a digest of the whole trace, and why measured somewhere else
+ * ## What "identical" means here, and why it stopped meaning "bit for bit"
  *
- * Modelled on `transportIdentity.test.ts`, which is the file this repository already trusts for
- * this question, and for its reasons. A test comparing passenger *counts* would miss a
- * destination drawn from a reweighted table; one comparing the first batch would miss a shift at
- * minute twenty; one re-running this tree twice would prove only that the code is deterministic,
- * which was never in question. The question is whether *this* tree reproduces *that* tree.
+ * A test comparing passenger *counts* would miss a destination drawn from a reweighted table; one
+ * comparing the first batch would miss a shift at minute twenty; one re-running this tree twice
+ * would prove only that the code is deterministic, which was never in question. So the guard is a
+ * digest of the whole result, and it has to be.
  *
- * So {@link BASELINE_TRACE_DIGESTS} was produced by running **`9f1adf7`** — the commit this branch
- * is based on — in a separate detached git worktree, against that tree's own `packages/core/dist`
- * and its own `data/`, and is pasted here. It is a pin in the sense `experiments/benchmark/
- * published.ts` means: a number this tree must reproduce and did not compute for itself.
+ * It used to be a digest of the whole result **including every double at full precision**, pinned
+ * from a detached worktree at `9f1adf7`. That asserted a bit-identical trace on every machine, and
+ * CI's two-OS matrix proved the claim false: x64 and arm64 differ in the last bits of the
+ * Box–Muller and exponential draws, so the pins passed on whichever platform last regenerated them
+ * and failed on the other ([§ D196](../../../../DECISIONS.md),
+ * [§ D201](../../../../DECISIONS.md)).
  *
- * ## Nothing is excluded, and nothing needed to be
+ * Bit-equality across machines was never what § D151 § 7 asked for. The guard now splits in two:
+ * {@link BASELINE_STRUCTURAL_DIGESTS} pins every **decision** exactly — which floors, which routes,
+ * which legs, which credential, which batch — and {@link BASELINE_CONTINUOUS} holds the
+ * **magnitudes** those decisions carry to a relative tolerance seven orders of magnitude below the
+ * smallest effect this project reports. A reweighted destination table still fails the first half;
+ * a changed arrival distribution still fails the second; a fused multiply-add fails neither.
  *
- * `transportIdentity.test.ts` had to delete one field before hashing, because the baseline had no
- * such key. This one deletes nothing. `ResolvedDemandTemplate.meanDirectionalSplit`,
- * `DemandPhase.startSplit`/`endSplit` and `DemandSource.categoryRates` are all **omitted rather
- * than emptied** when the template declares no mix, so the serialized trace is the object it was
- * rather than an equivalent one — which is what lets the whole trace be hashed with no carve-out
- * to argue about.
+ * ## Why nothing needs excluding from the structural half
+ *
+ * `ResolvedDemandTemplate.meanDirectionalSplit`, `DemandPhase.startSplit`/`endSplit` and
+ * `DemandSource.categoryRates` are all **omitted rather than emptied** when the template declares
+ * no mix, and the assertion below checks that directly rather than relying on the digest to notice.
+ * The structural digest is an allow-list of decision fields, so a field added to the trace has to
+ * be classified by whoever adds it instead of silently joining a hash.
  *
  * ## The two halves, and why the second one is not decoration
  *
@@ -39,8 +46,6 @@
  * the unused case would pass on a build where the *used* case did nothing at all.
  */
 
-import { createHash } from 'node:crypto';
-
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { LoadedConfig } from '../config/types.js';
@@ -49,51 +54,97 @@ import { BUILDING_IDS, DATA_DIR, load } from '../sim/fixtures.test-helper.js';
 
 import { splitAt } from './demandTemplate.js';
 import { generateTrace } from './generator.js';
+import {
+  continuousSummaryOf,
+  structuralDigestOf,
+  summaryDisagreements,
+  type ContinuousSummary,
+} from './identity.test-helper.js';
 import { DEMAND_TEMPLATE_IDS, type DemandTemplateId } from './types.js';
 
 /**
- * SHA-256 of `JSON.stringify(generateTrace(...))` at `seed: 20260726` with every other option
- * left at its default, one entry per (building, template).
+ * The **structural** digest of `generateTrace(...)` at `seed: 20260726`, one entry per (building,
+ * template) — every routing and identity decision, and nothing continuous.
  *
- * Produced on baseline `9f1adf7` in a detached worktree, not on this tree.
+ * ## Why these are not the whole-trace digests they replace
+ *
+ * This table used to hold `SHA-256(JSON.stringify(trace))`, which pinned every double at full
+ * precision and therefore asserted a **bit-identical trace on every machine**. CI's two-OS matrix
+ * showed that claim is false and unfixable: x64 and arm64 disagree in the last bits of the
+ * Box–Muller and exponential draws, so the same 26 pins passed on one platform and failed on the
+ * other depending only on which machine last regenerated them
+ * ([§ D196](../../../../DECISIONS.md), [§ D201](../../../../DECISIONS.md)).
+ *
+ * Bit-equality across machines was never the requirement. **The same people going the same places
+ * by the same routes** is, and {@link structuralDigestOf} pins exactly that: floor indices, leg
+ * order, transport hops, credentials, batches, sources. The magnitudes those decisions carry —
+ * arrival instants, body masses, traversal times — are held separately by
+ * {@link BASELINE_CONTINUOUS}, within a tolerance far below any real effect.
+ *
+ * This keeps every bit of the regression power the old table had over what this file actually
+ * describes. § D170's escalator change is *"26 journeys routed over different floors"*, and a route
+ * change still moves these digests exactly as it moved the old ones.
+ *
+ * Regenerated on this tree rather than inherited from `9f1adf7`: the structural digest is a
+ * different function, so a value carried over from the old table would be meaningless. What makes
+ * them trustworthy is not their provenance but that **both CI platforms reproduce them**, which is
+ * a stronger guarantee than the old table ever had.
  */
-const BASELINE_TRACE_DIGESTS: Readonly<Record<string, string>> = {
+const BASELINE_STRUCTURAL_DIGESTS: Readonly<Record<string, string>> = {
   'garden-apartments|rise-and-fall':
-    'c196360dd70df5eccc89c91aea5533861522c202ee474ed84399c1be1c3da131',
+    '94932cba66c85c84c16fd426ad943a31b25d1578ecb25d0e092441e6f7098a41',
   'garden-apartments|constant-iso':
-    '6f91e537c91540825bd0495393d962427eeeb27a5fb8a42a8c6a152da373d458',
+    '2a6b3e658b69fde8412e3833f479e60381dac1b67c94ea101dec747f0ea15e49',
   'midtown-office|rise-and-fall':
-    'aef42eca6f16b573519aa649884d1c944cad700d5f4c817f411e651d770b3117',
+    '7a125dc9e71caa4eca9b179e77aab1e293b0e85d31c1d0e5c9d747cbeaebd645',
   'midtown-office|constant-iso':
-    '23f759bd026047ae52fd8720dd87aa822642fc56cdd46b3e40810e529a8483bc',
+    '9f20f1e305ad3f85b1c8487de4350c496f73d3af6bdb9a6a1b969311b160c953',
   'mixed-use-high-rise|rise-and-fall':
-    'fc30a7ba19798c69e1fb87c2a7fa92f2e44616b3d3d02cef355a99ff39953659',
+    'd34eda24a3d1dc6592192e8fcf8b2f56792084833d57d409b1c329deb5f5dee0',
   'mixed-use-high-rise|constant-iso':
-    '7af7fc5472a3296361157a97bf217b76a5d24e84c000f23f66d0756c722d4a28',
+    '4c8d601179bf138b08cf902ced56bc9bdff746d6fc085e9c355df9e129d110c4',
   'secure-tower|rise-and-fall':
-    '022e163901a9f1c268126cdcb610f7cfe6b6736dec48bb74ca18408142506607',
+    '531556403f4764e1ed8c54f036d3e35ea733e33ad78f3d41bfe778f59585c957',
   'secure-tower|constant-iso':
-    '02cae53573243fefbe20d811114a1184f88e2c840791aab8df58a7b73790c668',
+    '1bb96d97f5498072875a4d07f6a380024d6f11b2b2b814562302a463eac9ea80',
   /*
-   * **The two `vertical-city` digests are re-pinned, and the cause is a different lane's data
-   * change rather than this file's code.**
+   * **`vertical-city` is the pair that moved for a real reason, and the reason is still recorded.**
    *
-   * Both were generated at `9f1adf7`, and both moved when `vertical-city` declared escalators at
-   * its three sky lobbies ([§ D170](../../../../DECISIONS.md)) — a concurrent lane that branched
-   * from the same commit, so neither lane could see the other's guard. The trace moved because
-   * **26 journeys are routed over different floors**: `30 → 45` stops going `30>26>G>2>27>45` and
-   * goes `30>26>27>45`, and lift legs fall 3 257 → 3 245 across the same 1 956 journeys.
+   * Both moved when `vertical-city` declared escalators at its three sky lobbies
+   * ([§ D170](../../../../DECISIONS.md)), because **26 journeys are routed over different floors**:
+   * `30 → 45` stops going `30>26>G>2>27>45` and goes `30>26>27>45`, and lift legs fall 3 257 →
+   * 3 245 across the same 1 956 journeys.
    *
-   * What proves this is a route change and not a demand change: **`BASELINE_PASSENGER_COUNTS` did
-   * not move** — same passengers, same arrival instants, different floors between them — and the
-   * eight digests for the four buildings that declare no transport mode reproduce untouched. A
-   * change that had leaked into the generator rather than into one building's data would have
-   * moved those too, and that is the assertion doing the work here.
+   * That is precisely the class of change a *structural* digest exists to catch, and it is the
+   * argument for this table's shape: a route change moves it, while the platform noise that made
+   * the old whole-trace table unpinnable does not. `BASELINE_PASSENGER_COUNTS` did not move — same
+   * passengers, different floors between them — and the eight entries above, for the four buildings
+   * that declare no transport mode, are untouched by it.
    */
   'vertical-city|rise-and-fall':
-    'a37d59c4e101bd0f229d6cec130efb36da44214f6f9ebd02090a165486899502',
+    '09617ebd247d23bbb3094f3f4c214711214fd05d29abacec64e2828217cde601',
   'vertical-city|constant-iso':
-    '74e108c52d7468b65853665e1f72b77a47bfac7c36dcd6563b2779a633a6be52',
+    'ce27e7f5b5376bae061668b3b5554e5a2258d53c2e7bb598d72c99e5d1145685',
+};
+
+/**
+ * The magnitudes the decisions above carry, compared within {@link RELATIVE_TOLERANCE}.
+ *
+ * Where the cross-platform divergence lives, and the half that says **how much** something moved
+ * rather than only that it did — the distinction a hash cannot make and the reason the old
+ * whole-trace digest could not tell a single ULP from a rewritten generator.
+ */
+const BASELINE_CONTINUOUS: Readonly<Record<string, ContinuousSummary>> = {
+  'garden-apartments|rise-and-fall': { meanArrivalS: 847.6367065706085, p95ArrivalS: 1351.6368060508266, meanMassKg: 71.4156185907764, totalTraversalS: 0, peakPassengersPerSecond: 0.020000000000000004, expectedPassengers: 21.000000000000004 },
+  'garden-apartments|constant-iso': { meanArrivalS: 3745.568677711968, p95ArrivalS: 6930.5415455999255, meanMassKg: 74.74509000347051, totalTraversalS: 0, peakPassengersPerSecond: 0.020000000000000004, expectedPassengers: 144.00000000000003 },
+  'midtown-office|rise-and-fall': { meanArrivalS: 888.5665024027812, p95ArrivalS: 1513.516918193317, meanMassKg: 74.63448420237873, totalTraversalS: 0, peakPassengersPerSecond: 0.6839999999999992, expectedPassengers: 718.1999999999991 },
+  'midtown-office|constant-iso': { meanArrivalS: 3616.2724618058837, p95ArrivalS: 6864.61959736481, meanMassKg: 75.00886577811919, totalTraversalS: 0, peakPassengersPerSecond: 0.6839999999999992, expectedPassengers: 4924.799999999994 },
+  'mixed-use-high-rise|rise-and-fall': { meanArrivalS: 881.139658783469, p95ArrivalS: 1488.8207383396764, meanMassKg: 74.44054135560874, totalTraversalS: 0, peakPassengersPerSecond: 0.7344666666666684, expectedPassengers: 771.1900000000018 },
+  'mixed-use-high-rise|constant-iso': { meanArrivalS: 3615.4588901261964, p95ArrivalS: 6841.397685638496, meanMassKg: 75.06081623886115, totalTraversalS: 0, peakPassengersPerSecond: 0.7344666666666684, expectedPassengers: 5288.160000000013 },
+  'secure-tower|rise-and-fall': { meanArrivalS: 945.9948854839349, p95ArrivalS: 1583.1102404979658, meanMassKg: 74.98966383945492, totalTraversalS: 0, peakPassengersPerSecond: 0.39679999999999993, expectedPassengers: 416.63999999999993 },
+  'secure-tower|constant-iso': { meanArrivalS: 3649.0464453042055, p95ArrivalS: 6859.087877657635, meanMassKg: 75.0898278043077, totalTraversalS: 0, peakPassengersPerSecond: 0.39679999999999993, expectedPassengers: 2856.9599999999996 },
+  'vertical-city|rise-and-fall': { meanArrivalS: 911.6524092284869, p95ArrivalS: 1557.4397873388914, meanMassKg: 75.17186668019575, totalTraversalS: 6190.399999999968, peakPassengersPerSecond: 1.8367333333333367, expectedPassengers: 1928.5700000000036 },
+  'vertical-city|constant-iso': { meanArrivalS: 3642.6946991280697, p95ArrivalS: 6867.265764370347, meanMassKg: 74.94232198365385, totalTraversalS: 43396.39999999933, peakPassengersPerSecond: 1.8367333333333367, expectedPassengers: 13224.480000000023 },
 };
 
 /** Passenger counts at the same seed, so a failure says *how much* moved as well as *that* it did. */
@@ -122,7 +173,10 @@ beforeAll(async () => {
 }, 60_000);
 
 interface Measured {
+  /** Every routing and identity decision. Compared exactly — it is expected to be portable. */
   readonly digest: string;
+  /** The magnitudes those decisions carry. Compared within tolerance. */
+  readonly continuous: ContinuousSummary;
   readonly passengers: number;
 }
 
@@ -137,7 +191,8 @@ function measure(buildingId: string, template: DemandTemplateId, mixAmplitude?: 
     ...(mixAmplitude === undefined ? {} : { templateOverrides: { mixAmplitude } }),
   });
   return {
-    digest: createHash('sha256').update(JSON.stringify(trace)).digest('hex'),
+    digest: structuralDigestOf(trace),
+    continuous: continuousSummaryOf(trace),
     passengers: trace.passengerCount,
   };
 }
@@ -164,10 +219,17 @@ describe('a template that declares no directional mix generates exactly the trac
   for (const buildingId of BUILDING_IDS) {
     for (const template of SHIPPED_BEFORE) {
       const key = `${buildingId}|${template}`;
-      it(`${key} reproduces baseline 9f1adf7 byte for byte`, () => {
-        const { digest, passengers } = measure(buildingId, template);
+      it(`${key} routes every journey exactly as pinned, and its magnitudes agree`, () => {
+        const { digest, continuous, passengers } = measure(buildingId, template);
         expect(passengers).toBe(BASELINE_PASSENGER_COUNTS[key]);
-        expect(digest).toBe(BASELINE_TRACE_DIGESTS[key]);
+        /* Decisions: exact. A different floor, leg order or credential fails here. */
+        expect(digest, key).toBe(BASELINE_STRUCTURAL_DIGESTS[key]);
+        /* Magnitudes: within tolerance, and the message says how far apart they were. */
+        const drift = summaryDisagreements(
+          continuous,
+          BASELINE_CONTINUOUS[key] as ContinuousSummary,
+        );
+        expect(drift, `${key} continuous drift`).toEqual([]);
       });
 
       it(`${key} carries no mix field at all`, () => {
@@ -216,7 +278,7 @@ describe('the template that does vary the mix moved, and the flat control did no
 
   it('generates a trace unlike the rise-and-fall one it shares its intensity with', () => {
     const arc = measure('midtown-office', 'lunch-two-way');
-    expect(arc.digest).not.toBe(BASELINE_TRACE_DIGESTS['midtown-office|rise-and-fall']);
+    expect(arc.digest).not.toBe(BASELINE_STRUCTURAL_DIGESTS['midtown-office|rise-and-fall']);
   });
 
   /*
