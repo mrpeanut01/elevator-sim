@@ -94,7 +94,6 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
       ids: [
         'dev/dom.ts#chip',
         'dev/dom.ts#chipRow',
-        'dev/dom.ts#eyebrow',
         'dev/dom.ts#figure',
         'dev/dom.ts#fillPlate',
         'dev/dom.ts#pick',
@@ -119,10 +118,41 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/surfaces.ts#applyRailState',
         'dev/surfaces.ts#applySurfaceState',
         'dev/surfaces.ts#drawerStateFor',
+        // Derived only through `drawerStateFor`'s toggle label; it returns a boolean and
+        // authors nothing. Same plumbing, same reason — SH-12/KX-11's Escape decision.
+        'dev/surfaces.ts#escapeClosesDrawer',
+        // SH-09's serializer. Its output is a URL query string — `?seed=42&tab=report` — and its
+        // literals are the seven param keys, single words all; it is derived only because the
+        // scanner keeps a template substitution's text (`params.toString`) and reads it as
+        // adjacent words. The keys' agreement with the reader is what `main.test.ts`'s
+        // round-trip asserts.
+        'dev/main.ts#deepLinkSearchOf',
         'dev/state.ts#initialState',
         'dev/state.ts#SHIFT_LENGTHS',
         'dev/state.ts#shiftRunConfigOf',
       ],
+    },
+    {
+      reason:
+        'TP-13’s provenance emitter. Its `ok` line is CLI flags — machine text the CLI parses, ' +
+        'pinned flag-for-flag and leg-for-leg by `main.test.ts` — but its refusal reasons are ' +
+        'authored sentences that reach `#status` through `copyProvenance`, so this exclusion is ' +
+        'a stated limitation, not a claim of coverage: the sentences are swept statically below ' +
+        'like the DOM-bound mounts’ status text, which is weaker than driving them. An adapter ' +
+        'that renders the refusals per campaign case is the better home, and belongs to the ' +
+        'honesty lane rather than to a hand-edit here.',
+      ids: ['dev/main.ts#provenanceLineOf'],
+    },
+    {
+      reason:
+        'TP-08’s seed parse (§ D198). Its `run` and `draw` arms carry no prose; the refuse arm ' +
+        'authors one sentence that reaches `#status` through the seed field’s change handler — ' +
+        'the same shape as `provenanceLineOf`’s refusals above, and the same stated limitation ' +
+        'rather than a claim of coverage: the sentence is swept statically below, and ' +
+        '`main.test.ts` pins all three arms, including that the refusal names what was typed. ' +
+        'An adapter driving the refusal per campaign case belongs to the honesty lane, not to a ' +
+        'hand-edit here.',
+      ids: ['dev/main.ts#seedEntryOf'],
     },
     {
       reason:
@@ -232,7 +262,6 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'batch/runBatch.ts#firstTraceDisagreement',
         'frame/overlay.ts#queueAt',
         'frame/overlay.ts#landingAssignmentsAt',
-        'frame/overlay.ts#landingAssignmentAt',
         'frame/sequence.ts#frameSequence',
         'frame/sequence.ts#frameTimes',
         'record/recordRun.ts#recordRun',
@@ -384,9 +413,13 @@ describe('every adapter is attached to something real', () => {
 /**
  * R10 over the authored literals, including the surfaces the generated search cannot drive.
  *
- * The static half of the net. It is the only instrument in this repository that looks inside
- * `dev/main.ts`, which has no exports and therefore appears in no derivation of exported
- * producers, and which is where the viewer's status line is written.
+ * The static half of the net. It reaches inside `dev/main.ts`'s function bodies — where the
+ * viewer's status line is written — which the producer derivation cannot: an earlier version of
+ * this sentence said main.ts *"has no exports"*, which stopped being true when
+ * `waitLegendEntries`/`WaitLegendEntry` landed in declaration form (plus the export *clause* at
+ * the bottom that exists for `main.test.ts`). The exported producers the derivation does find
+ * there (`deepLinkSearchOf`, `provenanceLineOf`) are classified above; the inline
+ * `ui.status.textContent = '…'` literals are what only this sweep sees.
  */
 describe('R10 statically — no authored prose literal contains a probability word', () => {
   /**

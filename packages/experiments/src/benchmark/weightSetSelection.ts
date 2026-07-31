@@ -321,6 +321,10 @@ function trajectoryOf(
     durationS: point.durationS as number,
     reportWindow: point.reportWindow ?? 'full-run',
     demand: point.demand,
+    // The point's template, or the liveness half measures different traffic from the verdict
+    // half. A no-op for § D145's default cell and every § D151 cell; load-bearing for the lunch
+    // two-way cells, whose mix arc lives in the template.
+    ...(point.demandTemplate === undefined ? {} : { demandTemplate: point.demandTemplate }),
     onTimeout: 'report',
     ...(options.selection === undefined && options.weightSets === undefined
       ? {}
@@ -538,6 +542,8 @@ async function tracePatterns(
     durationS: point.durationS as number,
     reportWindow: point.reportWindow ?? 'full-run',
     demand: point.demand,
+    // Same wiring as trajectoryOf: the patterns traced must be the run's own.
+    ...(point.demandTemplate === undefined ? {} : { demandTemplate: point.demandTemplate }),
     onTimeout: 'report',
     createPolicy: (candidate, policyOptions) =>
       new Traced(

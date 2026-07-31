@@ -4,6 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Elevator Sim — shift mode</title>
+    <!-- An inline icon so /favicon.ico stops 404ing on every load — the only console error every
+         session carried, training a reader to ignore the console (§ D198). Two shaft rects and a
+         car, in the page's own tokens (--bg #0b0e14, --accent #4f9ee8, near --edge). -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230b0e14'/%3E%3Crect x='3' y='2' width='4' height='12' fill='%23223046'/%3E%3Crect x='9' y='2' width='4' height='12' fill='%23223046'/%3E%3Crect x='3.5' y='7' width='3' height='4' fill='%234f9ee8'/%3E%3Crect x='9.5' y='3' width='3' height='4' fill='%234f9ee8'/%3E%3C/svg%3E"
+    />
     <!--
       ============================================================================
       The page is the integration contract, and it is checked in both directions.
@@ -363,7 +370,11 @@
           box-shadow: -18px 0 40px rgb(0 0 0 / 0.5);
         }
         .rail-r[hidden] { display: none; }
-        #drawer-toggle { display: inline-flex !important; }
+        /* RR-11 (§ D198): the overlay spans top to bottom of the body and lay over the strip's
+           right end where this button sits, so the control labelled 'Close controls' could not be
+           pressed. The handoff's toggle IS the close control (`design.html` :2447 — no close
+           control exists inside the drawer), so it stacks above the overlay's z-index: 20. */
+        #drawer-toggle { display: inline-flex !important; position: relative; z-index: 21; }
       }
       @media (max-width: 899px) { .body { grid-template-columns: 236px minmax(0, 1fr); } }
 
@@ -806,7 +817,20 @@
       dialog p { margin: 0 0 12px; }
       dialog form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
+      /* RX-03 — below 768 px the columns stack: the body becomes one scrolling column with the
+         stage first and the left rail beneath it, and the canvas keeps at least 60% of the
+         viewport height (60vh on .stage-wrap, which #stage fills). The right rail is already the
+         overlay drawer at this width. Pinned by surfaces.test.ts the same way the drawer's
+         1339 px rule is, so the query and the assertion cannot drift apart. */
       @media (max-width: 767px) {
+        .body { display: flex; flex-direction: column; overflow-y: auto; }
+        .stagecol { order: -1; height: auto; flex: none; overflow: visible; }
+        /* A definite height, not a floor: #stage is height: 100%, and a percentage against an
+           auto-height wrap falls back to the canvas's own bitmap height, which the per-frame
+           resize then feeds back into the wrap — the box grows every frame. 60vh is the row's
+           own figure. */
+        .stage-wrap { height: 60vh; min-height: 60vh; flex: none; }
+        .rail-l { order: 0; flex: none; border-right: 0; border-top: 1px solid var(--edge); }
         .instrument-body { flex-direction: column; overflow: auto; }
         .sheet { padding: 16px 14px; }
         .editor-grid { grid-template-columns: minmax(0, 1fr); }

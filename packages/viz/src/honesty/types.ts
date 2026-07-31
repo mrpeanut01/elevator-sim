@@ -186,17 +186,22 @@ export interface RenderedText {
 /**
  * The presentation modes the search sweeps.
  *
- * § D163 names *(building × shipped dispatcher × seed × mode)* and clause 2 records that **only
- * one mode exists today** — the Basic/Advanced split is agent T76's lane, in a different
- * worktree, and this one does not depend on its files. So the dimension is present, generated,
- * and currently single-valued.
+ * § D163 names *(building × shipped dispatcher × seed × mode)*, and clause 2 recorded that only
+ * one mode existed when the criterion was written. The Basic/Advanced split has since landed, so
+ * the tuple now carries both — the one-line change the previous docstring promised — and
+ * `honesty.test.ts`'s corpus assertion (`stats.modes` keys equal this tuple) tightened with it:
+ * a corpus that never drew `'basic'` is red, not quietly narrower.
  *
- * **Adding the second mode is one line**: put `'basic'` in this tuple. Every case then carries a
- * mode, `caseFromSeed` draws over both, the corpus doubles, and `surfaces.ts`'s adapters receive
- * `context.case.mode` — which they already do — so a mode-aware renderer is checked the day it
- * lands rather than the day somebody remembers to check it.
+ * **What the axis buys today, said precisely.** `caseFromSeed` draws the mode last, so the 48
+ * pinned cases keep their building, dispatcher, seed and batch shape and only the `mode` field
+ * differs; the corpus *distributes* across the two values rather than doubling. No shipped
+ * adapter branches on `context.case.mode` yet — the disclosure adapter deliberately renders
+ * **both** `VIEW_MODES` on every case, because parity is a comparison of two projections of one
+ * datum (`surfaces.ts` § *Why both modes*). So the value of generating the axis is the day a
+ * mode-aware renderer lands: it is driven on both modes from that day, rather than from the day
+ * somebody remembers to check it.
  */
-export const HONESTY_MODES = ['advanced'] as const;
+export const HONESTY_MODES = ['basic', 'advanced'] as const;
 
 export type HonestyMode = (typeof HONESTY_MODES)[number];
 

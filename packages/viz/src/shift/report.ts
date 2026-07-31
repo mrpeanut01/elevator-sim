@@ -464,8 +464,11 @@ function contractLineFor(contract: ScenarioContract | undefined, week: WeekState
   if (contract === undefined) {
     return 'Your own building — nothing is being banked, and the goals are still read from what happened.';
   }
+  // SC-05/DR-09 (§ D198): `cleanRun` keeps counting on a contract already cleared, so the raw
+  // figure can read "2 of 1". The clamp is on the display only — the data keeps its truth.
+  const banked = Math.min(week.cleanRun, contract.needClean);
   return (
-    `${contract.label} — ${contract.title} · ${String(week.cleanRun)} of ` +
+    `${contract.label} — ${contract.title} · ${String(banked)} of ` +
     `${String(contract.needClean)} clean shifts banked`
   );
 }

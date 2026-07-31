@@ -227,3 +227,17 @@ export function applyDrawerState(elements: Elements, state: DrawerState): void {
   elements.rail.drawerToggle.textContent = state.toggleLabel;
   elements.rail.drawerToggle.setAttribute('aria-expanded', state.open ? 'true' : 'false');
 }
+
+/**
+ * Whether <kbd>Escape</kbd> dismisses the drawer — `SH-12` / `KX-11`.
+ *
+ * True only when the layout is in drawer mode **and** the reader opened it. In column mode the
+ * rail is not dismissable, and Escape must not write `drawerOpen: false` over a choice the reader
+ * never made — {@link drawerStateFor} remembers that choice across the breakpoint precisely so
+ * narrowing the window restores what they had. A closed drawer answers false too, so the caller
+ * leaves focus where it is rather than yanking it to the toggle for a key that did nothing.
+ */
+export function escapeClosesDrawer(viewportPx: number, openedByReader: boolean): boolean {
+  const state = drawerStateFor(viewportPx, openedByReader);
+  return state.isDrawer && openedByReader;
+}

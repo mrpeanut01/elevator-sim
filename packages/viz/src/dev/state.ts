@@ -71,6 +71,7 @@ import { openWeek, takeContract } from '../shift/week.js';
 import type { DayReport, ShiftEvent, WeekState } from '../shift/types.js';
 
 import type { BrowserResources } from './data.js';
+import { PREFERRED_VIEWER_DISPATCHERS, preferredDispatcherId } from './defaults.js';
 import type { RailSegment, TabName } from './elementMap.js';
 
 /**
@@ -278,12 +279,19 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
   };
 }
 
-/** `collective` when the file has it, else whatever it does have. § D134. */
+/**
+ * `collective` when the file has it, else whatever it does have. § D134.
+ *
+ * The preference list is `dev/defaults.ts`'s — the one `defaults.test.ts` pins against § D134's
+ * measurement — not a private literal. This function re-derived `['collective', 'eta']` on its
+ * own until the fifth dead-code audit found the constant enforced by a duplicate (§ D192): two
+ * sites answering *what does the viewer open on* is how one of them goes stale unread.
+ */
 function preferredDispatcher(resources: BrowserResources): string {
-  for (const wanted of ['collective', 'eta']) {
-    if (resources.dispatcherProfiles.profiles.some((profile) => profile.id === wanted)) return wanted;
-  }
-  return resources.dispatcherProfiles.profiles[0]?.id ?? 'collective';
+  const profiles = resources.dispatcherProfiles.profiles;
+  return (
+    preferredDispatcherId(PREFERRED_VIEWER_DISPATCHERS, profiles) ?? profiles[0]?.id ?? 'collective'
+  );
 }
 
 /* -------------------------------------------------------------------------- *
@@ -396,8 +404,9 @@ export function shiftRunConfigOf(
   let specs: ElevatorSpecs = resources.elevatorSpecs;
   for (const machineClass of state.savedClasses) specs = specsWithClass(specs, machineClass);
 
-  // 1 — grown to the day, then re-parsed so a grown building is validated like any other.
-  const grown = grownBuilding(authored, state.week.day);
+  // 1 — grown to the day, then the dwell lever written onto the cars, then re-parsed so a grown
+  // building is validated like any other.
+  const grown = withDoorTiming(grownBuilding(authored, state.week.day), doorTimingFor(state.levers));
   const building = resolveBuilding(parseBuilding(grown as unknown), specs);
 
   // 3 — the dispatcher, plus the levers.
@@ -521,9 +530,36 @@ function baseOf(
   return baseDemandOf(profile);
 }
 
-/** The door timings the group levers ask of every car, or `undefined` for *the profile's own*. */
-export function doorTimingOf(state: ViewerState): ReturnType<typeof doorTimingFor> {
-  return doorTimingFor(state.levers);
+/**
+ * The dwell lever reaching the cars — the second half of a dwell choice, and the half that was
+ * configurable, unit-tested and unapplied until the fifth audit (§ D192, candidate 3).
+ *
+ * `profileFromSpec` writes the profile half (`answer.dwellPolicy`, `dwellAdaptationGain`,
+ * `maxDwellS`); this writes the car half (`dwellCarCallS`/`dwellHallCallS`), which is the *only*
+ * half that separates snappy from normal — both are `fixed` with the same ceiling, so without
+ * this write two of the three chips ran the same building. See `dispatcherSpec.ts`'s
+ * {@link DwellSetting} for why a dwell is a car field, and `state.test.ts`'s three-runs test for
+ * § D177's rule pointed at this builder.
+ *
+ * `undefined` — the *inherit* state — returns the config untouched, object identity included: an
+ * unpressed chip must not overwrite a car's own authored dwell.
+ */
+function withDoorTiming(
+  config: BuildingConfig,
+  timing: ReturnType<typeof doorTimingFor>,
+): BuildingConfig {
+  if (timing === undefined) return config;
+  return {
+    ...config,
+    banks: config.banks.map((bank) => ({
+      ...bank,
+      cars: bank.cars.map((car) => ({
+        ...car,
+        dwellCarCallS: timing.dwellCarCallS,
+        dwellHallCallS: timing.dwellHallCallS,
+      })),
+    })),
+  };
 }
 
 /** Re-exported so a mount does not import `buildingFromSpec` and this module for the same job. */

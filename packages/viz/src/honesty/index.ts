@@ -16,9 +16,9 @@
  *
  * ## Where the mode dimension plugs in
  *
- * One line: `HONESTY_MODES` in `types.ts`. Adding `'basic'` to that tuple makes every case carry
- * a mode, doubles the generated space, and hands `context.case.mode` to every adapter — which
- * they already receive. Nothing else changes.
+ * `HONESTY_MODES` in `types.ts`, which now names both `'basic'` and `'advanced'`. Every case
+ * carries a mode, the corpus distributes across both, and `context.case.mode` reaches every
+ * adapter — see the tuple's own docstring for what the axis does and does not buy today.
  */
 
 export { caseFromSeed, formatHonestyCase, DEEP_SPACE, STANDARD_SPACE } from './generate.js';

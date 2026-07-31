@@ -28,6 +28,10 @@
  * allowed. That is deliberate and it is stronger: a scorer that cannot see the suppression flag
  * cannot be *made* to branch on it later, and `mood.test.ts` proves the omission has teeth by
  * flipping all five omitted fields on a real recording and requiring the mood to be byte-identical.
+ * **`awtInvalidGround`** — the gate's machine-readable half, added at schema version 8 (`the root
+ * DECISIONS.md` § D185) — is omitted with them, by the same `Pick` and the same copy list; it
+ * postdates the five-field tamper fixture and is named here (2026-07-30) so the omission is
+ * documented rather than accidental.
  *
  * ## R2 and R6, which are about what the words may claim
  *
@@ -61,7 +65,7 @@ import { BAND_WORDS } from './riderQueue.js';
  * | Omitted | Why |
  * |---|---|
  * | `meanWaitS`, `wait95S`, `meanTimeToDestinationS` | the three estimates `awtIsValid` speaks for — R1 forbids scoring them |
- * | `awtIsValid`, `awtInvalidReason` | the gate itself. A scorer that cannot see it cannot come to depend on it |
+ * | `awtIsValid`, `awtInvalidReason`, `awtInvalidGround` | the gate itself — the flag, its sentence, and (schema version 8) its machine-readable ground. A scorer that cannot see it cannot come to depend on it |
  * | `achievedInterval`, `energy` | estimates and an axis. R11: energy is never aggregated into a grade, and the cheapest way to keep that true is not to hand it to the thing that grades |
  *
  * `saturated` **is** here, and it is not an estimate: R4 makes *Overwhelmed* (`summary.saturated`)

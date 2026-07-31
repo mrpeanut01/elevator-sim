@@ -26,8 +26,19 @@ verdict:
   third to a half of what the apparatus can resolve there ([§ D151](DECISIONS.md) is the protocol,
   dated before any sweep ΔTTD; [§ D156](DECISIONS.md) is the result). The one cell that clears every
   gate is a **secondary** one, and what its policy learned is a *busy/idle schedule* rather than a
-  traffic-pattern selection — because the shipped demand template varies the **level** and never the
-  **directional split**, which § D156 measures rather than asserts. Double-deck operation is
+  traffic-pattern selection — because the demand template shipped at that time varied the **level**
+  and never the **directional split**, which § D156 measures rather than asserts. **The missing
+  condition was then built (`lunch-two-way`, [§ D169](DECISIONS.md)) and the re-measurement
+  [§ D162](DECISIONS.md) pre-registered has now run — and refused a third time
+  (`benchmark/lunchTwoWaySelection.ts`):** at `midtown-office`/`lunch-two-way` 1.5 %, with the detector's
+  `two-way` pattern the incumbent on 66.1 % of observations, the learned arm's ΔTTD is
+  `−0.170 [−0.405, +0.064]` at n = 200 on the disjoint seed — containing zero and below the cell's
+  own TTD-measured 0.412 s limit — and the flat-mix negative control's own BETTER
+  (`−0.576 [−0.833, −0.319]`) was investigated, not filed: a constant weight-vector hybrid beats
+  the reference by more on *both* cells than the selector does on either, so the advantage is
+  static and the switching subtracts from it. The mix-varying question is closed in the refusing
+  direction; what would move 6c now is a different selector, not a different measurement.
+  Double-deck operation is
   **simulated** — paired stops, per-deck design load, deck-bound legs ([§ D131](DECISIONS.md)) — and
   the disclaimer survives only in the narrower case of a double-deck bank declaring no
   `servesFloorPairs`, which no shipped building raises.
@@ -50,8 +61,13 @@ verdict:
   *every unit names its non-test caller* — is **satisfied in prose and mechanised by nothing**: all
   **19** `packages/viz/src` directories sit outside every `AUDITED_MODULES`, the four dead-code
   audits cover 7 of 49, and the evidence is a hand-written table plus one prose line per unit. It is
-  the clause to distrust first, and a fifth audit under `packages/viz` is the fix. Also named in the
-  verdict: `Escape` does not dismiss the drawer, the honesty sweep's `mode` axis has one value,
+  the clause to distrust first, and a fifth audit under `packages/viz` is the fix — **done in
+  wave 12** (`packages/viz/src/deadCode.test.ts`, [§ D192](DECISIONS.md)): 19 directories derived
+  from disk and asserted both ways, 1 017 exports classified, and it immediately found two
+  docstrings naming callers that do not call; the verdict itself is unchanged. Also named in the
+  verdict: `Escape` does not dismiss the drawer *(closed in wave 12, [§ D188](DECISIONS.md))*, the
+  honesty sweep's `mode` axis has one value *(closed in wave 12, [§ D194](DECISIONS.md) — the
+  second value produced zero new strings, a measured null)*,
   three DOM panels are statically swept rather than driven, and **U6**, **U7's rider models** and
   **Basic's curated three-dimension subset** are unbuilt.
 

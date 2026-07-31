@@ -20,6 +20,9 @@
  *    recording's own span, and the mockup's `08:30` / `17:20` appear nowhere.
  */
 
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+
 import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -409,6 +412,50 @@ describe('the goal rows carry a second, non-colour signal — KB-15', () => {
     expect(row.background).toBe('transparent');
     expect(row.help).toContain('not graded');
     expect(row.display).toBe('—');
+  });
+});
+
+describe('the sheet’s buttons have one owner — DR-13', () => {
+  /*
+   * Driven red 2026-07-30 (§ D198): one press of “Open the doors on tomorrow” advanced TWO days —
+   * Day 1 → Day 3, and the even days were unreachable by the button — because `reportPanel.ts`
+   * and `main.ts` both wired `#report-next-day` and each applied `nextDay`. There is no jsdom
+   * here, so the wiring itself is pinned at the source: the mount idiom (`mountTypes.ts`) is that
+   * a panel wires the elements it owns, and the shell may not add a second listener to any of
+   * them. One binding site, and it is the panel’s.
+   */
+  const sourceOf = async (name: string): Promise<string> =>
+    readFile(fileURLToPath(new URL(name, import.meta.url)), 'utf8');
+
+  it('exactly one site binds the next-day button, and it is the panel’s', async () => {
+    const panel = await sourceOf('./reportPanel.ts');
+    const shell = await sourceOf('./main.ts');
+    const bindings = (source: string): number =>
+      (source.match(/nextDay\.addEventListener/g) ?? []).length;
+    expect(bindings(panel), 'reportPanel.ts owns #report-next-day').toBe(1);
+    expect(bindings(shell), 'main.ts must not wire #report-next-day a second time').toBe(0);
+  });
+
+  it('exactly one site binds the Back button, by the same rule', async () => {
+    // The same double wiring, latent: both handlers sent the reader to the run surface, so two
+    // listeners happened to be idempotent — until one of them changes.
+    const panel = await sourceOf('./reportPanel.ts');
+    const shell = await sourceOf('./main.ts');
+    const bindings = (source: string): number =>
+      (source.match(/[.\s]back\.addEventListener/g) ?? []).length;
+    expect(bindings(panel), 'reportPanel.ts owns #report-back').toBe(1);
+    expect(bindings(shell), 'main.ts must not wire #report-back a second time').toBe(0);
+  });
+
+  it('the panel applies nextDay exactly once per press', async () => {
+    // The defect’s mechanism was two `nextDay(...)` applications for one click. The panel’s own
+    // handler must hold exactly one, and `main.ts` none at all.
+    const panel = await sourceOf('./reportPanel.ts');
+    const shell = await sourceOf('./main.ts');
+    const applications = (source: string): number =>
+      (source.match(/week:\s*nextDay\(/g) ?? []).length;
+    expect(applications(panel)).toBe(1);
+    expect(applications(shell)).toBe(0);
   });
 });
 

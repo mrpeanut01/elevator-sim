@@ -9857,6 +9857,9 @@ Its first draft filed **every** kind with no per-run predicate as unshippable �
 
 **And, measured over every admissible shipped profile: three of the seven clear from the dispatcher dropdown alone** — stage 3 by `fairness-first`, stage 4 by `destination-eta`/`destination-panel`, stage 7 by `destination-panel`. Four do not, because `beat-the-baseline` requires a paired interval excluding zero **with nothing resolving the other way**.
 
+> **Superseded on the count (2026-07-30, wave 12):** the number is **four**, re-derived and pinned
+> by a test; `GAPS.md` § 5 carries the correction. The sentence above stands as this entry's record.
+
 **§ 5.4's claim that stage 1 is *"winnable trivially"* is measurably false** under that bar, and is corrected in place rather than left as flavour text. Publishing which stages are already solved by a dropdown is less flattering than not measuring it, and it is the only version a player cannot be misled by.
 
 ### The bar is not a number somebody chose
@@ -10844,6 +10847,12 @@ describing a control the markup dropped goes red. `elementMap.test.ts`'s both-di
 check is unchanged and the frozen 34-id never-resolved list did not move — `#copy-provenance` left
 the manifest and the page together.
 
+> **Corrected (2026-07-30, wave 12):** this entry restyled `#bank-filter` and treated it as
+> load-bearing under `RS-05` while the control was **inert** — the lane audited what the control was
+> for and never asked whether it works. The filter is wired now, and the contradiction is recorded
+> where it was fixed: [§ D187](#d187). `RV-T7`'s payload defect, carried above as *not fixed here*,
+> is closed by [§ D190](#d190).
+
 **Impact on phase status: none.**
 
 ---
@@ -11365,3 +11374,414 @@ Both in [`GAPS.md`](GAPS.md).
 
 **Impact on phase status:** [§ D163](#d163) clause 1 is the gate, and it is the reason this entry
 exists rather than a status row.
+
+## D187 — the bank filter filters, and § D180 had recorded the inert control as load-bearing
+
+**Date: 2026-07-30 · Wave 12, lane V (T93).**
+
+Wave 11 restyled `#bank-filter` and [§ D180](#d180) recorded it as load-bearing, citing `RS-05` —
+which permits horizontal scroll *or* a bank filter and forbids silent truncation. `GAPS.md` then
+measured the control inert by driving it: the `change` handler wrote a binding `drawStage` never
+read, canvas bitmap hash byte-identical across `(all)`, `shuttle`, `zone-6-local` on `vertical-city`.
+**§ D180's citation was false of the shipped viewer when it was written, and this entry is the
+correction it is owed**: the wave-11 lane audited what the control was *for* and never asked whether
+it *works* — "name the non-test caller" has the sibling question nothing asked, *name the reader of
+the value*.
+
+**Decision: wire, not retire.** `RS-05`'s either/or is only satisfiable here by the filter — the
+stage already reserves the bank-label band for exactly this, and `render/layout.ts`'s `HeaderBand`
+docstring sentence *"`dev/main.ts` filters the shafts by bank"* was written ahead of the fact. It is
+now true. Mechanism: a pure `shaftsForBank(shafts, bankId)` threaded through `drawStage` →
+`buildLayout`, so the chosen bank gets the whole plot width; floor-keyed facts (queues, landings,
+locked-out floors, alarms) stay whole-building; `''` means *all* **by identity** (the same array
+through); a filter naming a bank the recording lacks falls back to unfiltered with no caption. The
+no-silent-truncation clause is a visible caption — *"bank X — showing N of M shafts"* — drawn first
+on the existing notices row, counting `columns + hiddenShaftCount` of `recording.shafts.length` so
+it composes with the capacity-overflow warning.
+
+**The § D177 test exists**: moving the filter changes `buildLayout`'s column set, `''` is asserted
+unchanged by identity, and the unknown-bank fallback is pinned. An exported PNG of a filtered stage
+carries the caption, deliberately.
+
+## D188 — `Escape` closes the drawer it can see, and the arrows seek fixed seconds
+
+**Date: 2026-07-30 · Wave 12, lane V (T94).**
+
+The right rail below 1340 px is an overlay at `z-index: 20` whose own toggle was the only way to
+close it — keyboard-trap-shaped, found by driving under § D163 clause 5 and named inside Phase 9's
+verdict. Fix: a pure `escapeClosesDrawer(viewportPx, openedByReader)` in `dev/surfaces.ts`, wired
+into `wireKeyboard`, with focus returned to `#drawer-toggle`. **Deliberately inert in column mode**:
+at ≥ 1340 px the rail is a remembered layout choice, not a modal, and `Escape` dismissing it would
+destroy state the reader set on purpose.
+
+`KX-10` landed in the same commit: `←`/`→` seek ∓5 s, `Shift+←`/`→` ∓60 s, `Home`/`End` jump to the
+run's ends, via a pure `seekActionForKey(key, shiftKey)`. The fixed-seconds seek is **distinct from
+`KX-09`'s speed-relative frame step on purpose** — two idioms, two rows — and an
+`event.defaultPrevented` guard keeps the timeline's own arrows, the tab strip and the rail segments
+from double-firing with the global handler.
+
+## D189 — the URL is a description of state, not a journal
+
+**Date: 2026-07-30 · Wave 12, lane V (T95).**
+
+`applyDeepLink` read seven params and nothing anywhere in `packages/viz` wrote one back — the
+retired rows `RV-03`/`RV-T2` had claimed otherwise and were false of this viewer (`SH-09`). Fix at
+the `renderAll` chokepoint: `history.replaceState`, never `pushState` — every state change flows
+through one path, and `pushState` would make Back unwind fifty tweaks before leaving the page.
+
+Param policy, recorded because each clause is load-bearing: **deterministic defaults are omitted**
+(derived from `initialState`, not restated, so a fresh page keeps a clean address bar); **the seed
+is always written** — it has no default, and a link without it is a different run (invariant 5
+arriving at an address bar); **nothing writes before boot completes**. The round trip is asserted
+directly — `deepLinkStateOf(deepLinkSearchOf(state))` reproduces the linked fields — and
+`applyDeepLink` has its first tests, via the pure `deepLinkStateOf` it was refactored around.
+
+## D190 — `copy run` names the traffic or refuses, and the equivalence was driven rather than assumed
+
+**Date: 2026-07-30 · Wave 12, lane V (T96).**
+
+The emitted CLI line named `--building/--dispatcher/--seed/--duration` and no traffic, so whenever
+pattern or day was non-default it reproduced a *different* run — a provenance defect carried as
+`RV-T7` then `TP-13` since the retired board. The fix was not assumable from `--traffic` existing:
+the viewer routes a pattern through `specFromTrafficProfile → demandFromSpec`, the CLI through
+`withTrafficProfile` — different mechanisms that merely ought to agree. **So the equivalence was
+driven**: 10 of 10 cells (2 buildings × the building's own demand + 4 shipped profiles, seed 123,
+900 s, sha256 over `legs`/`boardedLegs`/`waiting`) bit-identical — and the two-way cells **diverge
+without `--template lunch-two-way`**, which is why the line emits `--template` whenever the
+pattern's template is not the CLI default. One cell is re-pinned leg-for-leg in a committed test as
+the tripwire on the two pipelines staying equivalent.
+
+What no flag can express — a saved pattern, any day but the first, held cars, moved group levers,
+saved buildings or dispatchers — now **refuses with named reasons** on `#status` and copies
+nothing. A control that cannot tell the truth must say so rather than approximate; the pre-existing
+line also lied on all five of those, beyond `TP-13`'s named scope, and each is a refusal now.
+
+## D191 — the machines editor's test drives the fit, because the naive path would have called a live control dead
+
+**Date: 2026-07-30 · Wave 12, lane T (T97, T98).**
+
+`ME-07`: the machines editor was the one editor § D177's rule did not cover — four tests, all
+spec-object claims, none calling `recordRun`. The suite that closes it drives the whole shipped
+chain, and the reason is a wiring fact worth more than the suite: **`resolveCar` prefers the car's
+own `ratedSpeedMps`/`ratedLoadLb`, so a class's rated speed and capacity reach a run only through
+the building editor's *fit*** (the class-chip `onPick` snaps speed to the class typical and clamps
+load into the class range); only acceleration and jerk reach `resolveCar` directly. A test of
+`specsWithClass → resolveBuilding` alone would have produced a false *inert* finding about a
+control that works — the exact shape § D177 exists to catch, inverted.
+
+Also recorded: the speed arm must run on **Garden Apartments**, whose 3.0 m pitch makes
+0.63 → 1.00 m/s a measured 11 % round-trip change; Midtown Office is this repository's named speed
+negative control (2.5 m/s never reached on a 3.8 m pitch), and running the arm there would test the
+building, not the slider. Every arm asserts non-empty legs — a fingerprint of zero legs equals
+anything — and the unchanged-spec arm asserts bit-identity as the negative control. `CO-02`'s
+positive half landed beside it: a shipped non-default arrival pattern changes both the handed
+config and the legs.
+
+## D192 — the fifth audit, and the prose table it replaces had two rows whose docstrings named callers that do not call
+
+**Date: 2026-07-30 · Wave 12, lane A (T100).**
+
+Phase 9's clause 4 — *every unit names its non-test caller* — was satisfied by a hand table in
+`viz/src/index.ts` and re-derived by nothing; the verdict named it the clause to distrust first.
+**It is mechanised now**: `packages/viz/src/deadCode.test.ts`, the fifth copy of the audit, with
+`AUDITED_MODULES` derived from `readdirSync` and asserted in both directions so a twentieth
+directory turns the suite red. 1 017 exports, 992 live, 25 zero-caller exports classified — 8
+`DEAD_CANDIDATES`, 17 `PUBLIC_API_ONLY` — both lists asserted in both directions plus disjointness.
+
+The scanner is **inlined**, `core`'s precedent, on three verified grounds: the helper is not on
+`experiments`' barrels and cannot be (it reads `node:fs`); `boundaries.test.ts` makes the bare
+specifier an offence in every viz file; and a cross-package relative import violates `rootDir`
+under project references. Two divergences are themselves decisions: a **namespace-import rule**
+(`render/canvas.ts`'s `import * as tokens` is invisible to name-binding extraction; the rule
+carried 38 live tokens, positive-controlled both ways), and **`readSource` throws on NUL bytes and
+invalid UTF-8** rather than substituting — R24's class, the one that produced two false findings in
+wave 11, refused at the reader.
+
+**The mechanisation immediately out-performed the prose it replaces.** Two exports carry docstrings
+naming callers that do not call them: `dev/viewerRunConfig`, whose test asserts the § D153 selector
+seam **against a function no shipped path calls** (§ D159's fixture-routes-the-test shape, one file
+up); and `dev/PREFERRED_VIEWER_DISPATCHERS`, whose § D134 obligation is actually enforced by a
+duplicated literal in `state.ts`. Six more candidates are ranked in the audit. Disposition — wire
+or delete, each with its own verification — is follow-up work, deliberately not this entry's.
+
+## D193 — authored player copy is a schema field, and `$comment` is never player-facing on any file
+
+**Date: 2026-07-30 · Wave 12, lane P (T101).**
+
+[§ D186](#d186) closed the `$comment`-onto-a-driven-surface route for dispatcher cards and left two
+things open, one of which was the same route on the traffic file: `patternOptionsOf`'s `help` read
+`profile.$comment` — benign at 64 characters of player-safe copy, bounded by nothing, one authored
+paragraph from being § D186's defect again. Traffic copy cannot be derived the way a dispatcher
+blurb derives from weights (a demand vector yields numbers, and numbers beside an estimate-shaped
+card are the defect), so this is the authored-field half: **`TrafficProfile.blurb`, required, 1–160
+characters, schema-validated in `core`** — a profile with nothing to say still has to say it on
+purpose — and the card reads it and nothing else.
+
+The refusal is enforced by **adversarial injection**, not by shipped data alone: a § D186-shaped
+essay (estimate cue, colliding numerals, essay length) planted on *every* profile must reach none
+of a card's rendered strings, because a guard over today's data is only as strong as today's data.
+The guard was mutation-checked red — re-pointing `help` at `$comment ?? blurb` fails three tests —
+before landing. The dispatcher half of § D186's "left open" (an authored field in
+`data/dispatcher-profiles.json`) remains open; `blurb` is named so that field can share it.
+
+## D194 — the mode axis's second value changed nothing, and for a prose-free producer coverage is a seed, not a `covers` claim
+
+**Date: 2026-07-30 · Wave 12, lane H (T99).**
+
+`'basic'` joined `HONESTY_MODES` and the always-on corpus produced **zero new strings** — the
+measured fact, not the hoped one. No shipped adapter branches on `context.case.mode`: the
+disclosure adapter renders both `VIEW_MODES` on every case because parity compares two projections
+of one datum. The old docstring claimed the corpus would double and was wrong; it now records the
+axis as generative headroom that becomes load-bearing the day a renderer branches on case mode.
+The axis assertion tightened itself (`modes` keys now `advanced`+`basic`, 28/20 across 48 seeds).
+
+The two named string groups are driven: the elevation express toggle's `expressLabel`/`expressTitle`
+(both throws included, one via a legend no shipped spec can produce) and the access block. **The
+register's prescribed fix for the access block was half wrong**: `accessMatrixOf`/`zoneChoicesOf`
+are deliberately prose-free — facts and ids only — so `deriveTextProducers` does not list them and
+a `covers` entry naming them fails derive's own no-stale-coverage guard. For a prose-free producer,
+coverage is **seeds composing the strings exactly as the mount does**, with liveness held by the
+adapter-liveness assertion rather than by `covers`. Always-on corpus: 48 cases, 200 248 → **201 832
+strings** (+1 584, itemised per case), 22 of 23 surfaces live, **0 violations**. The deep-tier
+figures (60 / 271 985 / 23) are the acceptance run's record and are not restated by this entry; the
+next deep run renders the new seeds on every case. Six mount-private copy sentences in
+`dev/buildingEditor.ts` remain static-only; the named fix is exporting them.
+
+## D195 — the wave-12 orchestration record: a polluted measurement stopped rather than reported, and the register wrong in the pessimistic direction
+
+**Date: 2026-07-30 · Wave 12, orchestrator.**
+
+Six lanes, six worktrees, six branches — **R25's remedy held**: no commit contains another lane's
+work, `ae6750b`'s class did not recur. The rest of this entry is what went wrong anyway, because a
+wave that only records its lanes' findings is reading itself optimistically:
+
+- **The orchestrator invalidated its own baseline.** A full serial suite was started in the main
+  worktree to verify the inherited tree's green claim — and lanes were then merged into that same
+  tree while vitest read it. The result was a measurement of no tree at all (R7's class, wave 5's
+  lesson re-learned one level up: *parallelise the work, serialise the measurement* applies to the
+  orchestrator's own tree, not only to lanes). Stopped and discarded rather than quoted; the
+  integration-close serial run is the only suite figure this wave reports.
+- **The board cited § D187 before any decision carried the number.** `citations.test.ts` — installed
+  after § D138's hand-cited § D144 — went red on exactly its target class, in six worktree copies at
+  once. The number is now assigned, by this entry's neighbour.
+- **Six stale entries in `docs/07` § 8's short list, all pessimistic** — closed items still listed
+  as live debt, one item counted twice, one paragraph citing the superseded single-cell § D145
+  where § D156's sweep stands. Wave 6's six register errors were optimistic. **A register drifts in
+  whichever direction is not being read**, and the short list three screens below its own tables is
+  the least-read text in the file.
+- **Lane V edited a file outside its set** — `honesty/derive.test.ts` — because the harness's
+  designed tripwire fired on the lane's own three new exports. Judged correct at review: the
+  alternative was landing red, and the hunks were classification, not behavior. The boundary policy
+  gains the corollary: a tripwire that names the offender may be answered by the offender.
+- **Lane H stalled silently twice** waiting on a monitor that never fired, with correct work
+  sitting uncommitted both times; resumed both times by direct message. Wait on a signal you own,
+  and a lane that goes quiet holding an uncommitted edit is a lane the orchestrator pings, not
+  waits out.
+
+## D196 — the inherited green was not reproducible, and the pins that failed matched no committed tree
+
+**Date: 2026-07-30 · Wave 12, orchestrator · The wave's integration serial run, and what it found.**
+
+The wave-12 integration suite — the first full serial run this wave reports, after § D195's
+invalidated attempt — came back **26 failed / 4 817 passed / 10 skipped**, skip count unchanged.
+All 26 are pin guards in three files: `core/src/traffic/mixIdentity.test.ts` (10),
+`core/src/traffic/transportIdentity.test.ts` (15), `experiments/src/benchmark/predictorLag.test.ts`
+(1 test, 4 fields of `forecast-causality`). The handoff's close figure — *258 files / 4 794 tests,
+4 784 passed, measured serially on an idle machine* — implies all three were green at `9fd738c`.
+
+**They were not, for any tree this repository contains. The chain, each link measured:**
+
+1. The failures reproduce **identically on the untouched pre-wave tree** (`ba9d851`) — wave 12 did
+   not cause them. Lane P's `blurb` was the obvious suspect and is exonerated: the trace digests do
+   not contain it.
+2. They reproduce **at `9fd738c`**, the commit the handoff's figure was measured at.
+3. They reproduce **under Node 22 and Node 26** (installed for this purpose; the repo declares
+   `>= 26`) — with **bit-identical measured digests**, so the engine mismatch this container runs
+   under is not the cause, and V8's math is stable across the majors for everything this suite does.
+4. `validation/goldenRuns.test.ts` is **green**: stored run records replay byte-identically, so the
+   simulator and generator are deterministic here and agree with the machine that produced those
+   records.
+5. Decisively: **the baseline commit `9f1adf7`, checked out and built against its own `dist/` and
+   its own `data/`, computes the digests this tree computes** — `e0c37900…` where the pin says
+   `c19636…` — for the very values `mixIdentity.test.ts`'s header claims were *"produced by running
+   `9f1adf7` in a separate detached git worktree"*.
+
+**Verdict: the pinned values match no committed tree, at their claimed baseline or since.** The
+traces never moved across `9f1adf7 → 9fd738c → HEAD`; what the pins describe is a working state
+that was never committed — the failure mode this repository has already named twice (wave 10's
+uncommitted rebuild; R7's *"a polluted tree reported clean"*), now found inside a handoff's own
+close figure. Whether the previous session's serial run executed against uncommitted
+modifications, a different data state, or was mis-transcribed cannot be recovered from here;
+what is recoverable is that its green cannot be reproduced from what was pushed.
+
+**Decision:** re-pin all 26 values to what three commits and two Node majors reproducibly compute,
+keeping every superseded constant beside its replacement per each file's own convention, with
+provenance-unknown recorded on the old values. The re-derived values are the only ones any reader
+of this repository can check. `forecast-causality`'s four fields move in the sixth decimal; the one document
+that quotes them — `docs/05` § Phase 5, *"−0.0139 [−0.0317, +0.0038]"* — prints a precision at
+which the superseded and re-derived values are the same digits, so the quoted sentence survives
+unchanged, checked rather than assumed. **A handoff figure is a claim about a pushed tree, or it
+is not a figure** — the wave-12 close figure below § D195 is measured on the pushed tree, and the
+commit that carries it is named beside it.
+
+## D197 — eight dead candidates dispositioned, and one of them was the signature seam wearing a test
+
+**Date: 2026-07-30 · Wave 12, dead-candidates lane · Disposes § D192's findings: 4 wired, 4 deleted, `DEAD_CANDIDATES` empty.**
+
+Deleted, each with its evidence: `dev/viewerRunConfig` (after re-pointing `viewerSelector.test.ts`
+at `shiftRunConfigOf`, the builder the Run button actually reaches — all five § D153 seam claims
+survive on the shipped path), `dev/eyebrow` (adoption checked and refused: the inline sites are a
+different DOM shape, so "adoption" would have been a change wearing a cleanup), `frame/landingAssignmentAt`
+(different semantics from the plural form `main.ts` uses), `controls/ControlKind` (bound by nothing,
+not public API by the barrel's own doc). Wired: `dev/PREFERRED_VIEWER_DISPATCHERS` (the § D134
+obligation now has one authoritative site instead of a guarded constant plus an unguarded duplicate
+literal), `honesty/formatHonestyCase` (the printer `shrink.ts` promised), and — the headline —
+`doorTimingFor`'s car half. `live/bandById` deleted **with its honesty `covers` entry**, which had
+the sweep vouching for strings no shipped path could reach.
+
+**The headline: the dwell chips were inert in every shipped shift, and a test vouched for them.**
+`doorTimingFor`'s per-car `dwellCarCallS`/`dwellHallCallS` is the *only* thing distinguishing the
+snappy and normal chips — and `shiftRunConfigOf` never applied it. `authoring.test.ts`'s
+three-runs-distinct property held only on a building the test assembled itself through
+`buildingFromSpec`'s `dwell` option — § D159's fixture shape — so the suite was green while snappy
+≡ normal on the shipped path, **measured byte-identical on the legs before the fix and three-way
+distinct after it**. The signature defect (configurable, unit-tested in isolation, unapplied in the
+shipped path) *plus* the fixture-routes-the-test shape, in one candidate; `viewerRunConfig` was the
+same pairing without the product defect. **Two of the eight "dead code" findings were tests routing
+past their subject** — the audit's value was not the deletions.
+
+One vacuity caught in-lane and worth keeping: normal's 3 s/5 s dwell equals `resolveCar`'s
+reference-data defaults, so asserting the *normal* chip reaches the car passes even on a builder
+that writes nothing. The assertion uses **snappy**, whose values nothing defaults to.
+
+## D198 — the playability baseline: 81 rows driven green, and the ledger's ✅ run column stops being zero
+
+**Date: 2026-07-30 · Wave 12, drive phase (T104) · Chromium against the dev server; UX.md § 26 executed in order.**
+
+At wave open the UX ledger's own § 3 said it plainly: *the pass that wrote the ledger held no
+browser* — 0 of 219 rows had ever been driven. The drive phase closes at
+**81 run / 106 test / 20 half / 8 unverified / 4 🔲** (counts re-derived mechanically from the
+rows, not carried in prose). All six wave-12 fixes re-drove green — the bank filter's eight bank
+choices hash to eight distinct bitmaps with playback paused, the URL round-trips through a real
+address bar to a bit-identical run, `copy run` refuses day 5 with the CLI's missing flag named.
+Every primary flow is green end-to-end: boot → shift select → run → stage → day report → all four
+editors → campaign stage → Compare batch under CRN. `RX-03` — the last wave-open 🔲 — is fixed in
+CSS alone at 767 px, deliberately without a script-side breakpoint constant: no script consults it,
+and a constant whose only reader is a test is the caller-less seam by another name.
+
+**Driving found what reading and testing had not — eight defects, four of them driven-red rows:**
+
+1. **`DR-13` — one press of "open the doors on tomorrow" advances two days.** Both
+   `reportPanel.ts` and `main.ts` wire the same button and each applies `nextDay`. Tuesday and
+   Thursday — and their scheduled events — are unreachable by the button. Blocks playability.
+2. **`TP-10` — Save writes a file Load refuses**: `saveRecording` writes `{recording, frames}`,
+   `readRecordingDocument` demands top-level `schemaVersion`; the writer and the reader have never
+   met. A reviewer cannot reload what they saved.
+3. **`RR-11` — the open drawer covers its own toggle** below 1340 px; pointer-only close is
+   impossible, and wave 12's `Escape` is accidentally the only exit.
+4. **`TP-08` — a non-numeric seed silently runs seed 0** while the field still shows "banana" —
+   a provenance control reproducing a different run without saying so.
+5. **`SH-09` residual — the boot URL is bare until first interaction**, so a link copied before
+   touching anything is a different run wearing the same address.
+6. `SH-16`/`SH-19` — a failed boot leaves the phase pill and footer status blank; SH-19's row also
+   claims markup literals that do not exist.
+7. **`/favicon.ico` 404s on every load** — the only console error in every session, training a
+   reader to ignore the console. No ledger row covered the favicon; the absence is the finding.
+8. `SC-05`/`DR-09` — the contract objective can read "2 of 1 clean shifts banked".
+
+Four rows are recorded **drive-limited** with what could and could not be verified (`TP-17`,
+`SG-17`, `MD-07`, `DE-11` among them) rather than marked green — a row the product's own validation
+makes unreachable is a fact about the product, not a coverage gap to paper over.
+
+## D199 — the eight driven defects, fixed the same day, each red before green
+
+**Date: 2026-07-30 · Wave 12, defect-fix lane · All § D198 findings closed; re-driven in Chromium, all green.**
+
+`DR-13` (`b94d602`): both `mountReport` and `wireKeyboard` wired `#report-next-day` and each applied
+`nextDay` — the panel now owns its buttons per the `mountTypes.ts` idiom, the duplicates are
+deleted, and `reportPanel.test.ts` pins **one binding site per button** so the double-wiring class
+cannot ship silently again (`#report-back` carried the same double wiring, idempotent only by
+luck). `TP-08` (`815e314`): `BigInt(raw.replace(/\D/g,'') || '0')` — "banana" → 0, "12a4" → 124,
+both demonstrated red — replaced by the deep-link reader's own rule (`/^\d+$/` or a refusal on
+`#status` naming what was typed, field restored); only the literal `0` may run seed 0. `SH-09`
+(`4a62387`): one `syncUrl()` after boot's flip, § D189's three intents untouched. `RR-11`
+(`3f8dd8c`): the handoff itself decides the fix — its drawer label reads *"Close controls"* while
+open and it ships no close control inside the drawer, so the toggle **is** the close control and
+now stacks above the overlay; the re-drive is a real hit-test that timed out before the fix.
+`TP-10` (`a2a95b4`): the reader was never loosened — `writeRecordingDocument` now exists beside it
+and **the document is the recording itself**; frames are deliberately not persisted (a pure
+derivation persisted beside its source is drift waiting to happen), which exposed that the frame
+serializer's last shipped caller *was* the defect — reclassified deliberate-API with the C24
+precedent. Cosmetics (`2a2cdc0`): the favicon 404 that trained every session to ignore the console;
+the failed-boot pill and footer authored; the "2 of 1 clean shifts" clamp, display-only.
+
+One honest deviation kept as its own commit (`0564338`): TP-08's extraction created a new prose
+producer and the honesty derivation guard went red — correctly — before the lane classified it.
+**The tripwire § D195 recorded lane V answering is now a routine any lane answers.**
+
+## D200 — **Phase 6c on `lunch-two-way`: the third refusal, on the traffic the first two could not express** — and the flat control's BETTER is a static hybrid, named by its own probe
+
+**Date:** 2026-07-30 · **Owner:** T103 · **Measures against:** [§ D139](#d139) as raised by [§ D140](#d140) and [§ D151](#d151) §§ 2–3, under [§ D162](#d162)'s five conditions · **Verdict:** `NOT ACCEPTED` · **Closes:** `GAPS.md` § 1 and § D162's gated measurement · **Protocol:** `docs/13-phase-6c-handover.md`, executed cold
+
+**Context.** § D156 refused Phase 6c at all five PRIMARY cells and named the mechanism: no shipped
+operating point varied the directional mix within a run. § D169 built the condition
+(`lunch-two-way`, χ² 383.4 against a flat control's 4.8) and ran no arm; § D162 fixed, in advance,
+the only terms under which measuring on it could count — the unchanged gate, and a flat-mix
+negative control at equal total demand, measured in the same run, that can still refuse the phase.
+
+**What ran.** `benchmark/lunchTwoWaySelection.ts`, three times with identical gate figures. Step 0
+censused both shipped cells at tuning seed 20260726 (200 × 12): every arm quotable on both, no
+ceiling on either, reference **`auction-multi-round` on both**. Budget variance-derived per
+`matrix.ts` on the gate metric — binding arm `nearest-car`, s_D 19.414/14.725 s, unclamped
+1448/833, clamped to the band's **ceiling of 200**; the 50-floor checked by hand because the study
+clamp has none. Then per cell: the regime screen, the TTD resolution limit at the cell at the
+tuning seed (structural **0.412 s** / **0.461 s**), the 64-candidate search, the verdict at n = 200
+on disjoint holdout 20261537 under CRN; Holm within a **new declared family of exactly the
+treatment cell**, never pooled with § D151's; the 2 s deadband known-answer in-session
+(**1.691 s**, inside [1, 3], ΔAWT −2.189).
+
+**A wiring bug first, caught by G11's own rule.** The first run's treatment and control screens
+were byte-identical — five diagnostic `runSimulation` call sites dropped the point's
+`demandTemplate`. The gate path (`runner/experiment.ts`) always passed it, so no
+published-figure-bearing number moved on the fix (commit `0a7bb4d`); the screen, traces and
+liveness did. A no-op for every § D145/§ D151 cell.
+
+**The numbers.** Treatment (mix 90/0/10 → 0/90/10): learned ΔTTD **−0.170 [−0.405, +0.064]**
+INDISTINGUISHABLE, p = 0.1538, an eighth of the cell's own 0.412 s limit; generalizes in sign
+(−0.205 → −0.170) and is still unresolvable. Fuzzy +0.186 [−0.026, +0.399]. Costs beside, never
+folded in: AWT +0.263 WORSE, WT95 +0.809 WORSE, energy +4.444 kJ/served leg WORSE beside the raw
++415.9 kJ. The screen proves the condition occurred: `two-way` incumbent on **66.1 %** of
+observations, 3 regimes, split drift +10.38 σ against the control's +3.97 σ. Flat control (same
+template, `mixAmplitude: 0`, equal total demand, same seeds): learned ΔTTD **−0.576
+[−0.833, −0.319]** BETTER, above its own 0.461 s limit, holding `predictive-balanced`'s vector on
+90.9 % of decisions.
+
+**The verdict, and the clauses that decided it.** NOT ACCEPTED on four independent grounds: the
+interval contains zero; Holm retains it (α = 0.05, family of one, declared before any ΔTTD); the
+effect is below the cell's own TTD-measured limit — § D140's raise, a gate condition and not a
+caveat; and § D162 condition 5 fired. The condition-5 finding was investigated, not filed: pinning
+`predictive-balanced`'s vector on the reference profile for the whole run — no selector — is
+BETTER by **−0.720 [−0.973, −0.467]** on the control and **−0.667 [−0.923, −0.412]** on the
+treatment at the verdict seed, more than the learned arm achieves on either cell. The advantage is
+a **static weight-vector hybrid** (the auction stages carrying a better-for-TTD vector at this
+point, at an AWT cost of ~+0.4 s); the switching subtracts from it. It is not mix exploitation and
+it accepts nothing — and it is a finding about `data/`, not about learning: the shipped
+`auction-multi-round` vector is not TTD-optimal at this point.
+
+**What is claimed and what is not.** Claimed: learned weight-set selection **does not** improve
+TTD, measurably, under traffic whose directional mix changes within the run, at the one shipped
+operating point that expresses it — with the detector engaged (`two-way` incumbent), the search
+validated on a known answer, and the budget, reference and limits fixed before the result. Not
+claimed: *"learned control does not work"* anywhere else, any statement about other mix-varying
+points, or any reading of the control's BETTER as a selector win. § D145 (one cell, −0.213
+[−0.440, +0.014]) and § D156 (eight cells, refused at all five PRIMARY under Holm) stand unchanged
+beside this entry. The § D169 discount cuts against every better-side figure here: the shipped arc
+is the **widest** its citation permits, and a real building's smoother arc is harder to exploit.
+This is the third refusal, § D162 explicitly permitted it, and it closes the question § D156
+opened rather than leaving it open — what would move Phase 6c now is a different selector, not a
+different measurement.
+
+**Impact.** `GAPS.md` § 1 closed; the lunch census gap closed (no ceiling at 200 on either cell);
+Phase 6 stays partial in all four status documents; `PINNED_ESTIMATES['lunch-two-way-selection']`
+(20 figures) and `PINNED_LUNCH_COUNTS` are the reproducible record, re-derived by
+`lunchTwoWaySelection.test.ts` on every run.

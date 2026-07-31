@@ -448,6 +448,21 @@ describe('the rest of the sheet', () => {
     expect(report.taught).toContain('Bank 1 more clean shift');
   });
 
+  it('never claims more banked than the contract asks — SC-05/DR-09', () => {
+    // Driven 2026-07-30 (§ D198): cleanRun keeps counting on a contract already cleared, so the
+    // sheet could read "2 of 1 clean shifts banked". Display clamp only; the week keeps its count.
+    const report = dayReportOf({
+      recording: clean,
+      observations: observationsOfRun(clean),
+      goals: goalsForDay(4),
+      week: { ...openWeek('c2'), cleanRun: 5 },
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+    });
+    expect(report.contractLine).toContain('2 of 2 clean shifts banked');
+    expect(report.contractLine).not.toContain('5 of');
+  });
+
   it('grades a reader’s own building without pretending it banks anything', () => {
     const report = dayReportOf({
       recording: clean,

@@ -248,8 +248,9 @@ export interface ProseLiteral {
  *
  * A static sweep over their literals is weaker than driving them — it cannot see a sentence
  * assembled at runtime — and it is not nothing: R10 is a rule about **words**, and every word in
- * an authored literal is visible here. `dev/main.ts` has no exports at all, so this is the only
- * instrument in the repository that looks at it.
+ * an authored literal is visible here. `dev/main.ts` does export a handful of declarations (its
+ * producers are classified in `derive.test.ts`), but its status text is authored inside function
+ * bodies no export carries, so this sweep is the only instrument that reads those sentences.
  */
 export async function deriveProseLiterals(root: string = VIZ_SRC): Promise<readonly ProseLiteral[]> {
   const found: ProseLiteral[] = [];

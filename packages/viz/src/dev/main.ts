@@ -15,7 +15,7 @@
  * | `record/decisionLog.ts` | `recordRun`, called by {@link runShift} |
  * | `dev/surfaces.ts` | {@link applyNavigation} |
  * | `frame/overlay.ts` | {@link drawStage} and the landing selector |
- * | `record/document.ts` | **Load recording** and **Verify replay** |
+ * | `record/document.ts` | **Load recording**, **Save recording** and **Verify replay** |
  * | `dev/bootstrap.ts` | {@link main}, the only thing that loads `data/` — `RV-17`/`RV-21` |
  * | `dev/motion.ts` | {@link adopt}, which asks whether a new recording may start moving — `KB-14` |
  *
@@ -44,7 +44,6 @@ import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
 import { restrictedFloorIds } from '../access/zoning.js';
 import type { VizRecording } from '../contract/types.js';
-import { frameSequence, serializeFrames } from '../frame/sequence.js';
 import {
   landingAssignmentsAt,
   meansAreSuppressed,
@@ -64,7 +63,7 @@ import {
 } from '../live/timeline.js';
 import { systemClock } from '../playback/clock.js';
 import { Playback } from '../playback/playback.js';
-import { readRecordingDocument, verifyReplay } from '../record/document.js';
+import { readRecordingDocument, verifyReplay, writeRecordingDocument } from '../record/document.js';
 import { recordRun } from '../record/recordRun.js';
 import {
   drawScene,
@@ -76,13 +75,15 @@ import { describeFrame } from '../render/describeFrame.js';
 import { buildLayout } from '../render/layout.js';
 import { disclosureItems } from '../mode/disclosure.js';
 import { parityRefusal } from '../mode/parity.js';
-import { isViewMode, itemsIn, type DisclosureItem } from '../mode/types.js';
+import { isViewMode, itemsIn, type DisclosureItem, type ViewMode } from '../mode/types.js';
+import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
+import { demandFromSpec, specFromTrafficProfile } from '../authoring/patternSpec.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
 import { eventFor } from '../shift/events.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { dayReportOf } from '../shift/report.js';
-import { closeDay, nextDay, outcomeOf } from '../shift/week.js';
+import { closeDay, outcomeOf } from '../shift/week.js';
 import { weekdayOf } from '../shift/types.js';
 
 import { mountBatchPanel } from './batchPanel.js';
@@ -131,6 +132,7 @@ import {
   applyRailState,
   applySurfaceState,
   drawerStateFor,
+  escapeClosesDrawer,
   railStateFor,
   segmentAfterKey,
   surfaceStateFor,
@@ -245,6 +247,11 @@ function showLoadFailure(ui: Elements, error: unknown, retry: () => Promise<bool
   const message = error instanceof Error ? error.message : String(error);
   setText(ui.transport.error, `${message}\n`);
   setText(ui.transport.status, 'could not load data/');
+  // SH-16/SH-19 (§ D198): a failed boot left the phase pill and the footer status line blank —
+  // the two chrome slots only drawHeader/drawFooter ever fill, and neither runs when data/ does
+  // not load. Authored here in the empty state's own vocabulary.
+  setText(ui.header.phaseLabel, 'no run yet');
+  setText(ui.footer.statusLine, 'no shift run yet — data/ did not load');
   const again = el(document, 'button', { className: 'chip', text: 'Retry', attrs: { type: 'button' } });
   again.addEventListener('click', () => {
     setText(ui.transport.error, '');
@@ -263,6 +270,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
   // A deep link names the building before anything can have been edited, so the editor's working
   // copy follows it unconditionally here — `withBuilding`'s pristine test is trivially true.
   state = withBuilding(state, resources, state.buildingId);
+  const deepLinkDefaults = deepLinkDefaultsOf(resources);
+  /**
+   * Whether {@link syncUrl} may write yet — `SH-09`.
+   *
+   * False until the boot sequence below has run, so a fresh page keeps a clean address bar: the
+   * first `renderAll` is not the reader doing anything, and a bar that grew `?seed=…` on load
+   * would bury the params that mean something under one that names a run nobody chose. From the
+   * first real state change onward the address follows the run, seed included.
+   */
+  let urlWritable = false;
   let playback: Playback | undefined;
   let building = resources.entries[0]?.resolved;
   let lastAnnouncedMs = 0;
@@ -435,6 +452,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   renderAll();
   runShift();
+  urlWritable = true;
+  /*
+   * The one write boot itself owes — the `SH-09` residual (§ D198). The flip above happens after
+   * boot's `runShift()` has already passed `renderAll`/`syncUrl`, so without this line the address
+   * bar stayed bare until the first interaction, and a link copied at that instant was a different
+   * run wearing the same address. § D189's clause is *nothing writes before boot completes*; boot
+   * has completed on this line, and the opening run's seed belongs in the bar from here on —
+   * `replaceState` only and defaults omitted, both `syncUrl`'s own rules, so an untouched boot
+   * writes exactly `?seed=…`.
+   */
+  syncUrl();
   requestAnimationFrame(tick);
 
   /* ====================================================================== *
@@ -479,6 +507,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   /** Everything. Runs when the state changed. */
   function renderAll(): void {
+    syncUrl();
     applyNavigation();
     const view = viewAt();
     for (const panel of statePanels) panel.render(view);
@@ -538,6 +567,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
     applySurfaceState(ui, surfaceStateFor(state.tab, state.revealedTabs));
     applyRailState(ui, railStateFor(state.railSegment));
     applyDrawerState(ui, drawerStateFor(window.innerWidth, state.drawerOpen));
+  }
+
+  /**
+   * The address bar follows the run — `SH-09`, the other half of {@link applyDeepLink}.
+   *
+   * `replaceState`, never `pushState`: every state change through {@link renderAll} would
+   * otherwise become a history entry, and Back would unwind fifty tweaks one keypress at a time
+   * before it left the page. The address is a *description* of the current state, not a journal
+   * of how it was reached, so it is replaced in place and Back keeps meaning *leave*.
+   */
+  function syncUrl(): void {
+    if (!urlWritable) return;
+    const search = deepLinkSearchOf(state, deepLinkDefaults);
+    if (window.location.search === search) return;
+    window.history.replaceState(null, '', `${window.location.pathname}${search}`);
   }
 
   function wireNavigation(): void {
@@ -669,15 +713,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
   }
 
   async function copyProvenance(label: string, button: HTMLButtonElement): Promise<void> {
-    const line =
-      `--building ${state.buildingId} --dispatcher ${state.dispatcherId} ` +
-      `--seed ${state.seed.toString()} --duration ${String(state.shiftLengthS)}`;
+    const provenance = provenanceLineOf(state, resources);
+    if (!provenance.ok) {
+      /*
+       * TP-13: the control refuses rather than copying a line the CLI would honour and turn into
+       * a *different* run. A refused copy names every reason, because each one is a fact about
+       * this run the reader would otherwise discover as an unexplained mismatch.
+       */
+      setText(ui.transport.status, `no CLI line reproduces this run — ${provenance.reasons.join('; ')}`);
+      setText(button, 'no CLI line');
+      window.setTimeout(() => {
+        setText(button, label);
+      }, 1400);
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(line);
+      await navigator.clipboard.writeText(provenance.line);
       setText(button, 'copied');
     } catch {
       // A clipboard a browser refuses is not an error the reader caused. Show the line instead.
-      setText(ui.transport.status, line);
+      setText(ui.transport.status, provenance.line);
     }
     window.setTimeout(() => {
       setText(button, label);
@@ -912,11 +967,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
     const frame = playback.frame();
     const wantsOverlay = width >= OVERLAY_MIN_VIEWPORT_PX;
+    // SG-15: the filter narrows what is laid out, so the shown bank gets the whole plot width.
+    // Everything keyed by floor — queues, landings, locked-out marks — stays whole-building.
+    const bank = shaftsForBank(recording.shafts, bankFilter);
     const layout = buildLayout({
       width,
       height,
       floors: recording.floors,
-      shafts: recording.shafts,
+      shafts: bank.shafts,
       gutterRightPx: QUEUE_GUTTER_PX,
       overlayWidthPx: wantsOverlay ? OVERLAY_WIDTH_PX : 0,
     });
@@ -936,6 +994,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       lockedOutLandings: lockedOut,
       queues: queueAt(recording, frame.simTimeS),
       dayStartS: DAY_START_S,
+      filteredBankId: bank.filtered ? bankFilter : undefined,
     });
     carBadgeHits = hits.carBadges;
 
@@ -1052,8 +1111,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
       exportPng();
     });
     ui.transport.seed.addEventListener('change', () => {
-      const raw = ui.transport.seed.value.trim();
-      const seed = raw === '' ? randomSeed() : BigInt(raw.replace(/\D/g, '') || '0');
+      const entry = seedEntryOf(ui.transport.seed.value);
+      if (entry.kind === 'refuse') {
+        /*
+         * TP-08: the run must not start with a seed the field does not show. The refusal lands on
+         * the status line naming what was typed, and the field is restored to the seed that is
+         * still running — the same pair every other refusal on this transport uses.
+         */
+        ui.transport.seed.value = state.seed.toString();
+        setText(ui.transport.status, entry.message);
+        return;
+      }
+      const seed = entry.kind === 'draw' ? randomSeed() : entry.seed;
+      // A blank draws one **and shows it** — a blank field over a drawn seed is the same
+      // field-does-not-show-the-run hazard as the refusal above, one keystroke earlier.
+      ui.transport.seed.value = seed.toString();
       context.update({ seed });
       runShift();
     });
@@ -1210,7 +1282,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function saveRecording(): void {
     const recording = state.recording;
     if (recording === undefined) return;
-    const blob = new Blob([JSON.stringify({ recording, frames: serializeFrames(frameSequence(recording)) })], {
+    /*
+     * TP-10 (§ D198): this wrote `{recording, frames}` — a wrapper readRecordingDocument refuses
+     * by its first check — so Load could not read Save's own file. The document is now written by
+     * the reader's own module, and it is the recording itself; the frames re-derive from it.
+     */
+    const blob = new Blob([writeRecordingDocument(recording)], {
       type: 'application/json',
     });
     downloadBlob(blob, `${recording.buildingId}-${recording.seed}.json`);
@@ -1257,6 +1334,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const target = event.target;
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
       if (target instanceof HTMLSelectElement) return;
+      /*
+       * A key a focused control already answered is not this handler's to answer again. The tab
+       * strip, the rail segments and the timeline all `preventDefault` on the arrows and on
+       * Home/End when they handle one, and they run first — target before window — so without
+       * this guard an arrow pressed on the timeline would both frame-step (`KX-09`, the
+       * timeline's own handler) and seek (`KX-10`, below), two moves for one key.
+       */
+      if (event.defaultPrevented) return;
+      const seek = seekActionForKey(event.key, event.shiftKey);
+      if (seek !== undefined && playback !== undefined) {
+        event.preventDefault();
+        playback.pause();
+        if (seek.kind === 'by') playback.seekBy(seek.deltaS);
+        else playback.seekToProgress(seek.kind === 'toEnd' ? 1 : 0);
+        renderLive();
+        drawTransportChrome(viewAt());
+        return;
+      }
       switch (event.key) {
         case ' ':
           event.preventDefault();
@@ -1280,17 +1375,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
         case 'Enter':
           if (event.metaKey || event.ctrlKey) closeShift();
           break;
+        case 'Escape':
+          // SH-12 / KX-11: Escape dismisses the drawer, and only the drawer — in column mode the
+          // key is inert and focus stays wherever it was. Focus returns to the toggle because the
+          // toggle is what re-opens what Escape just closed.
+          if (escapeClosesDrawer(window.innerWidth, state.drawerOpen)) {
+            context.update({ drawerOpen: false });
+            ui.rail.drawerToggle.focus();
+          }
+          break;
         default:
           break;
       }
     });
-    ui.report.nextDay.addEventListener('click', () => {
-      state = { ...state, week: nextDay(state.week), report: undefined, tab: 'run' };
-      runShift();
-    });
-    ui.report.back.addEventListener('click', () => {
-      context.update({ tab: 'run' });
-    });
+    /*
+     * The report sheet's buttons are wired by `mountReport` and nowhere else. This function held a
+     * second listener on `#report-next-day` and `#report-back` until 2026-07-30, when driving found
+     * one press of "Open the doors on tomorrow" advancing TWO days (DR-13, § D198): both handlers
+     * applied `nextDay`, so Tuesday and Thursday were unreachable by the button.
+     * `reportPanel.test.ts` now pins one binding site per button.
+     */
   }
 
   /* ---------------------------------------------------------------------- *
@@ -1318,15 +1422,179 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
 const MODE_KEY = 'elevator-sim.viewMode';
 
+/* ========================================================================== *
+ * The bank filter — SG-15
+ * ========================================================================== */
+
+/** What the stage should draw for a bank filter: the shafts, and whether any were held back. */
+export interface BankFilterResult<T> {
+  readonly shafts: readonly T[];
+  /** True only when the filter actually narrowed the set — what turns the caption on. */
+  readonly filtered: boolean;
+}
+
+/**
+ * The shafts the stage draws under a bank filter — `SG-15`, and the function whose absence made
+ * `#bank-filter` inert: the `change` handler wrote a binding and `drawStage` handed
+ * `recording.shafts` whole to `buildLayout` regardless (`GAPS.md`, § D180's false premise).
+ *
+ * `''` is *all*, the select's own first option. A filter naming a bank this recording does not
+ * have — the run changed under a remembered selection — matches nothing, and drawing an empty
+ * stage would claim the building has no shafts; the filter falls back to the whole set instead,
+ * unfiltered, so the picture never lies about the geometry. A single-bank building filtered to
+ * its only bank narrows nothing and reports `filtered: false`, so no caption counts N of N.
+ */
+export function shaftsForBank<T extends { readonly bankId: string }>(
+  shafts: readonly T[],
+  bankId: string,
+): BankFilterResult<T> {
+  if (bankId === '') return { shafts, filtered: false };
+  const matching = shafts.filter((shaft) => shaft.bankId === bankId);
+  if (matching.length === 0 || matching.length === shafts.length) {
+    return { shafts, filtered: false };
+  }
+  return { shafts: matching, filtered: true };
+}
+
+/* ========================================================================== *
+ * Copy run — TP-13
+ * ========================================================================== */
+
+/** A CLI line that reproduces the run, or the reasons no such line exists. */
+export type Provenance =
+  | { readonly ok: true; readonly line: string }
+  | { readonly ok: false; readonly reasons: readonly string[] };
+
+/**
+ * The `copy run` payload — `TP-13`, the retired `RV-T7`'s outstanding half.
+ *
+ * The shipped line named `--building --dispatcher --seed --duration` and **no traffic and no
+ * day**, so on any non-default pattern or any later day it was a provenance claim the CLI would
+ * honour and turn into a different run (`GAPS.md`). Two changes close that:
+ *
+ * - **A shipped pattern is named with `--traffic`, plus `--template` when the pattern's template
+ *   is not the CLI's `rise-and-fall` default.** That pair was verified by driving, not argued:
+ *   the viewer's pattern pipeline (`specFromTrafficProfile` → `demandFromSpec` → a patched
+ *   profile) and the CLI's `withTrafficProfile` route produced **bit-identical legs at 10 of 10
+ *   cells** — two buildings × (the building's own demand + four shipped profiles), seed 123,
+ *   900 s, hashed over `legs`/`boardedLegs`/`waiting`, with the CLI side holding the shipped
+ *   dispatcher profile object as `planRun` does — and the two-way cells **diverge without
+ *   `--template`**, which is why it is emitted rather than assumed. The equivalence holds only
+ *   from the base the refusals below protect; `main.test.ts` pins one cell of it.
+ * - **A run no flag set can express gets no line at all.** A saved pattern has no CLI loader; a
+ *   day past the first grows the building and schedules an event; a held car, a moved group
+ *   lever, a saved building or dispatcher all change the run and have no flag. Refusing with the
+ *   reasons is the honest form — the whole point of the control is that the reader could not
+ *   otherwise reproduce the run, so a line that reproduces a *different* one is worse than none.
+ *
+ * Pure, so the claim *this line is this run* is testable without a clipboard.
+ */
+export function provenanceLineOf(state: ViewerState, resources: BrowserResources): Provenance {
+  const reasons: string[] = [];
+  const flags: string[] = [`--building ${state.buildingId}`, `--dispatcher ${state.dispatcherId}`];
+
+  if (!resources.entries.some((entry) => entry.config.id === state.buildingId)) {
+    reasons.push(`the building “${state.buildingId}” is yours alone and data/buildings/ does not ship it`);
+  }
+  if (!resources.dispatcherProfiles.profiles.some((profile) => profile.id === state.dispatcherId)) {
+    reasons.push(
+      `the dispatcher “${state.dispatcherId}” is yours alone and data/dispatcher-profiles.json does not ship it`,
+    );
+  }
+
+  let template: string | undefined;
+  if (state.pattern !== 'building') {
+    const shipped = resources.trafficProfiles.profiles.find((profile) => profile.id === state.pattern);
+    if (shipped === undefined) {
+      reasons.push(`the pattern “${state.pattern}” is yours alone and the CLI has no flag that loads a saved pattern`);
+    } else {
+      flags.push(`--traffic ${shipped.id}`);
+      const demand = demandFromSpec(specFromTrafficProfile(resources.trafficProfiles, shipped.id));
+      if (demand.demandTemplate !== 'rise-and-fall') template = demand.demandTemplate;
+    }
+  }
+
+  const event = eventFor(state.week.day, state.week.dayIdx);
+  if (state.week.day !== 1 || !event.effect.changesNothing) {
+    reasons.push(
+      `day ${String(state.week.day)} grows the building and schedules “${event.name}”, and the CLI has no --day`,
+    );
+  }
+  if (state.outOfServiceCarIds.length > 0) {
+    reasons.push(
+      `${String(state.outOfServiceCarIds.length)} car(s) are held out of service and the CLI has no flag to hold one`,
+    );
+  }
+  if (
+    state.levers.parking !== DEFAULT_LEVERS.parking ||
+    state.levers.express !== DEFAULT_LEVERS.express ||
+    state.levers.dwell !== DEFAULT_LEVERS.dwell
+  ) {
+    reasons.push('the group levers are moved off their defaults and the CLI has no lever flags');
+  }
+
+  if (reasons.length > 0) return { ok: false, reasons };
+  // The CLI's own echo order — `planRun`'s `commandLine` puts `--template` after `--duration`.
+  flags.push(`--seed ${state.seed.toString()}`, `--duration ${String(state.shiftLengthS)}`);
+  if (template !== undefined) flags.push(`--template ${template}`);
+  return { ok: true, line: flags.join(' ') };
+}
+
+/* ========================================================================== *
+ * Keyboard seeking — KX-10
+ * ========================================================================== */
+
+/** What a transport key asks of the playhead. `by` is simulated seconds, sign and all. */
+export type SeekAction =
+  | { readonly kind: 'by'; readonly deltaS: number }
+  | { readonly kind: 'toStart' }
+  | { readonly kind: 'toEnd' };
+
+/**
+ * The seek a key asks for, if any — `KX-10`, the retired `KB-04`/`KB-05`'s successor.
+ *
+ * Fixed **simulated** seconds, not display frames: <kbd>←</kbd>/<kbd>→</kbd> move 5 s,
+ * <kbd>Shift</kbd> makes it 60 s, and <kbd>Home</kbd>/<kbd>End</kbd> are the run's own ends. The
+ * timeline's focused arrows remain `KX-09`'s frame step — a *speed-relative* move — and the two
+ * never fire together because a key the timeline answered is `defaultPrevented` before the global
+ * handler sees it. Pure, so the mapping is testable without a window.
+ */
+export function seekActionForKey(key: string, shiftKey: boolean): SeekAction | undefined {
+  switch (key) {
+    case 'ArrowLeft':
+      return { kind: 'by', deltaS: shiftKey ? -60 : -5 };
+    case 'ArrowRight':
+      return { kind: 'by', deltaS: shiftKey ? 60 : 5 };
+    case 'Home':
+      return { kind: 'toStart' };
+    case 'End':
+      return { kind: 'toEnd' };
+    default:
+      return undefined;
+  }
+}
+
 /**
  * Deep links, so a finding can be sent to somebody.
  *
  * `?building&dispatcher&seed&duration&tab&mode` — the same keys the old viewer accepted, plus
  * nothing: a link that named a surface this page had renamed would be a broken promise, and
  * `isTabName` is what refuses one rather than silently opening the first tab.
+ *
+ * The window read lives here and the decisions live in {@link deepLinkStateOf}, which is pure in
+ * its `URLSearchParams` — the same split the rest of `dev/` uses, and what lets the reader be
+ * tested against the serializer it must round-trip with.
  */
 function applyDeepLink(state: ViewerState, resources: BrowserResources): ViewerState {
-  const params = new URLSearchParams(window.location.search);
+  return deepLinkStateOf(state, resources, new URLSearchParams(window.location.search));
+}
+
+/** The reader's decisions: which of the seven params are honoured, and what refuses each. */
+export function deepLinkStateOf(
+  state: ViewerState,
+  resources: BrowserResources,
+  params: URLSearchParams,
+): ViewerState {
   const patch: { -readonly [K in keyof ViewerState]?: ViewerState[K] } = {};
   const buildingId = params.get('building');
   if (buildingId !== null && buildingConfigOf(resources, [], buildingId) !== undefined) {
@@ -1352,6 +1620,90 @@ function applyDeepLink(state: ViewerState, resources: BrowserResources): ViewerS
   const mode = params.get('mode');
   if (isViewMode(mode)) patch.mode = mode;
   return { ...state, ...patch, shiftLengthS: patch.shiftLengthS ?? DEFAULT_SHIFT_LENGTH_S };
+}
+
+/**
+ * The values the serializer omits — a fresh page's own state, so a fresh page's address stays
+ * clean. Derived from {@link initialState} rather than written twice: if § D134 moves the opening
+ * dispatcher again, the URL's idea of *default* moves with it.
+ */
+export interface DeepLinkDefaults {
+  readonly buildingId: string;
+  readonly dispatcherId: string;
+  readonly shiftLengthS: number;
+  readonly tab: TabName;
+  readonly railSegment: RailSegment;
+  readonly mode: ViewMode;
+}
+
+export function deepLinkDefaultsOf(resources: BrowserResources): DeepLinkDefaults {
+  // The seed argument is irrelevant to the six fields read off; `0n` is not a default seed.
+  const opening = initialState(resources, 0n);
+  return {
+    buildingId: opening.buildingId,
+    dispatcherId: opening.dispatcherId,
+    shiftLengthS: opening.shiftLengthS,
+    tab: opening.tab,
+    railSegment: opening.railSegment,
+    mode: opening.mode,
+  };
+}
+
+/**
+ * The other half of {@link deepLinkStateOf}: the same seven params, written — `SH-09`.
+ *
+ * Two decisions, both deliberate:
+ *
+ * - **A default is omitted.** A URL that spelt out `?tab=run&rail=dispatcher&duration=1800` on a
+ *   page nobody has touched is noise, and noise in an address is what stops people reading the
+ *   part that matters.
+ * - **The seed is always written.** It has no default to omit — it is drawn at random per session
+ *   — and it is the one param without which the pasted link is a different run wearing the same
+ *   address. Invariant 5 puts the seed on every persisted run record; the address bar is a place
+ *   a run gets persisted to.
+ */
+export function deepLinkSearchOf(state: ViewerState, defaults: DeepLinkDefaults): string {
+  const params = new URLSearchParams();
+  if (state.buildingId !== defaults.buildingId) params.set('building', state.buildingId);
+  if (state.dispatcherId !== defaults.dispatcherId) params.set('dispatcher', state.dispatcherId);
+  params.set('seed', state.seed.toString());
+  if (state.shiftLengthS !== defaults.shiftLengthS) params.set('duration', String(state.shiftLengthS));
+  if (state.tab !== defaults.tab) params.set('tab', state.tab);
+  if (state.railSegment !== defaults.railSegment) params.set('rail', state.railSegment);
+  if (state.mode !== defaults.mode) params.set('mode', state.mode);
+  return `?${params.toString()}`;
+}
+
+/* -------------------------------------------------------------------------- *
+ * The seed field — TP-08
+ * -------------------------------------------------------------------------- */
+
+/** What one entry into the seed field asks for: a fresh draw, this seed, or nothing. */
+export type SeedEntry =
+  | { readonly kind: 'draw' }
+  | { readonly kind: 'run'; readonly seed: bigint }
+  | { readonly kind: 'refuse'; readonly message: string };
+
+/**
+ * The seed field's parse — `TP-08`, and a refusal where a coercion was.
+ *
+ * The shipped parse was `BigInt(raw.replace(/\D/g, '') || '0')`, so `banana` silently became
+ * **seed 0**: the field kept reading `banana` while the footer read *seed 0* — a provenance
+ * control reproducing a different run without saying so (§ D198). The rule is the deep-link
+ * reader's own (`deepLinkStateOf`): a seed is `/^\d+$/`, and anything else is refused by name,
+ * never coerced into a seed nobody typed. A blank field asks for a fresh draw — `UX.md` TP-08's
+ * stated contract — and the caller shows whatever seed actually runs.
+ */
+export function seedEntryOf(raw: string): SeedEntry {
+  const trimmed = raw.trim();
+  if (trimmed === '') return { kind: 'draw' };
+  if (/^\d+$/.test(trimmed)) return { kind: 'run', seed: BigInt(trimmed) };
+  return {
+    kind: 'refuse',
+    message:
+      `“${trimmed}” is not a seed — a seed is a whole number. ` +
+      'The field shows the seed that is still running.',
+  };
 }
 
 /**

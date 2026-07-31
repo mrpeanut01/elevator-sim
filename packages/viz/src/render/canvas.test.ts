@@ -1099,3 +1099,54 @@ describe('a building whose rows cannot be labelled aggregates all the way to a b
     expect(glyphs.length).toBeLessThan(between.rows.length);
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * The bank-filter caption — SG-15 / RS-05
+ * -------------------------------------------------------------------------- */
+
+describe('the bank-filter caption', () => {
+  /** The synthetic building grown a second bank, so a filter has something to hold back. */
+  const twoBanks: VizRecording = {
+    ...RECORDING,
+    shafts: [shaft({}), shaft({ carId: 'aux-A', bankId: 'aux', label: 'B' })],
+  };
+
+  it('names the bank and counts shown of total when the layout was narrowed', () => {
+    // The caller filtered the layout to `main`; RS-05 forbids the narrowing to pass in silence,
+    // and the caption has to live on the canvas because Export PNG carries the canvas alone.
+    const narrowed = buildLayout({
+      width: 900,
+      height: 640,
+      floors: twoBanks.floors,
+      shafts: twoBanks.shafts.filter((entry) => entry.bankId === 'main'),
+    });
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: twoBanks,
+      frame: frame(),
+      layout: narrowed,
+      theme: DEFAULT_THEME,
+      filteredBankId: 'main',
+    });
+    const caption = ctx.calls.find(
+      (call) => call.op === 'fillText' && String(call.args[0]).startsWith('bank '),
+    );
+    expect(caption?.args[0]).toBe('bank main — showing 1 of 2 shafts');
+    // A selection's colour, not a warning's: the narrowing is the reader's own move.
+    expect(caption?.args[3]).toBe(DEFAULT_THEME.highlight);
+  });
+
+  it('draws no caption when the layout holds the whole building', () => {
+    const whole = buildLayout({
+      width: 900,
+      height: 640,
+      floors: twoBanks.floors,
+      shafts: twoBanks.shafts,
+    });
+    const ctx = new RecordingContext();
+    drawScene(ctx, { recording: twoBanks, frame: frame(), layout: whole, theme: DEFAULT_THEME });
+    expect(
+      ctx.calls.some((call) => call.op === 'fillText' && String(call.args[0]).startsWith('bank ')),
+    ).toBe(false);
+  });
+});

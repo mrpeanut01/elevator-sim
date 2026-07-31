@@ -1096,7 +1096,53 @@ every demand source. What *does* move is the **level**, and exactly one of the f
 (`idle`) is level-triggered. **So the shipped demand template cannot express the condition weight-set
 selection exists to exploit**, and that is a different finding from *learned control does not help*.
 
-**No status moves. Phase 6 stays ⚠️ partial.**
+#### The re-measurement on `lunch-two-way` — the third refusal, on the traffic the first two could not express ([§ D162](../DECISIONS.md) is the protocol; [§ D200](../DECISIONS.md) is the verdict)
+
+**The condition § D156 named as missing now occurs, and the selector still does not clear the
+gate.** Measured 2026-07-30 by `benchmark/lunchTwoWaySelection.ts` under § D162's five conditions —
+the template cited and untouched, the operating point shipped for the building's own reasons, the
+commit ordering on record, the gate § D139 as raised and unchanged, and the flat-mix negative
+control measured in the same run at the same seeds and equal total demand. Census at the tuning
+seed on both cells: **all twelve arms quotable, no ceiling, reference `auction-multi-round` on
+both**; budget variance-derived per `matrix.ts`'s rule on the gate metric and clamped to the band's
+ceiling of 200; resolution limits measured on TTD at each cell (structural **0.412 s** treatment,
+**0.461 s** control); n = 200 on the disjoint holdout seed under CRN; Holm within a **new declared
+family of exactly the treatment cell**, never pooled with this sweep's families.
+
+| cell | learned ΔTTD vs `auction-multi-round` | verdict |
+|---|---|---|
+| `lunch-two-way` 1.5 % (mix swings 90/0/10 → 0/90/10) | **−0.170 [−0.405, +0.064]** | NOT ACCEPTED — contains zero (p = 0.1538), below the cell's own 0.412 s limit |
+| flat-mix control (same template, `mixAmplitude: 0`, same total demand) | **−0.576 [−0.833, −0.319]** | BETTER, above its own limit — **§ D162 condition 5's trigger, investigated below** |
+
+**The refusal is of the selector, not of the traffic.** The regime screen — fixed first by a wiring finding this measurement reported, five diagnostic
+call sites that dropped the point's `demandTemplate` (commit `0a7bb4d`; the gate experiments run
+through the runner and were never wrong) — shows the
+condition present: `two-way` is the detector's incumbent on **66.1 %** of post-warm-up observations
+(three regimes, 21 preference changes), and the trace-level split drift is **+10.38 σ** against the
+control's +3.97 σ in the same apparatus. The fitted policy generalizes in sign (−0.205 s tuning →
+−0.170 s holdout) and is still unresolvable — § D145's sentence, still true: a generalizing effect
+that cannot be resolved is still an effect that cannot be resolved.
+
+**The flat control's BETTER is the § D162 negative control doing exactly what it was built for.**
+Pinning `predictive-balanced`'s weight vector on the reference profile for the **whole run** — no
+selector, no switching — beats the reference by **−0.720 [−0.973, −0.467]** on the control and
+**−0.667 [−0.923, −0.412]** on the treatment at the verdict seed: *more than the learned arm
+achieves on either cell*. So the advantage is a **static weight-vector hybrid** — the auction
+dispatch stages carrying a better-for-TTD vector at this point — present at full strength where the
+mix cannot vary, and the switching *subtracts* value (−0.170 learned against −0.667 constant on the
+mix-varying cell). It is not mix exploitation, and it accepts nothing. On the treatment the learned
+arm held `interfloor` (= `eta`'s vector) 51.0 % and `two-way` 32.0 % of decisions; on the control it
+pinned `two-way` for 90.9 %. Costs beside the gate, never folded in: the treatment's learned arm is
+WORSE on AWT (+0.263), WT95 (+0.809) and energy (+4.444 kJ per served leg beside the raw figure).
+The deadband known-answer returned **1.691 s** in the same session, so the refusal is a fact about
+the policy and not the search. And the standing § D169 discount cuts the same way: the shipped arc
+is the **widest** amplitude its citation permits, so even these figures are measured under
+conditions *more* favourable to the selector than a real building's smoother arc.
+
+**No status moves. Phase 6 stays ⚠️ partial.** Learned weight-set selection now stands refused on
+fixed-mix traffic at nine operating points (§ D145, § D156) **and on mix-varying traffic at the one
+shipped point that expresses it**, with a third refusal § D162 explicitly permitted; the record is
+`benchmark/lunchTwoWaySelection.ts`, whose figures are pinned and re-derived by its own suite.
 
 ### Also still not built in this phase's original scope
 
@@ -1752,7 +1798,7 @@ it.** The gate suites are `packages/viz/src/honesty/honesty.test.ts`,
 | **1 — the honesty property under *search*** | **MET, and met by a run.** The deep tier is green: **60 cases, 271 985 strings, 4 650 simulations, 43 of 60 runs suppressed, 23 surfaces, 398.7 s, 0 violations** (`ELEVATOR_SIM_HONESTY=deep`, `packages/viz/src/honesty/campaign.ts`). It **found two violations first** ([§ D186](../DECISIONS.md)) — one real, fixed at the cause, and one a false positive whose check was *accepting the other branch for the wrong reason*. **[§ D172](../DECISIONS.md) had asserted this tier clean on "the refinement relation, not a run"; running it said otherwise**, which is what the label on that claim was for |
 | **2 — mode parity, derived** | **MET.** `packages/viz/src/mode/parity.ts` computes the failure/suppression set from the code — a discriminated union with an exhaustive switch, so a tenth failure state is a compile error rather than a silent omission — and is proved against a fail state the product deliberately does **not** ship (`packages/viz/src/mode/fictionalFailState.test-helper.ts`). `parityRefusal` runs in the shipped path, not only in the suite (`packages/viz/src/dev/main.ts`, `packages/viz/src/dev/campaignPanel.ts`). **Driven this session:** toggling Casual↔Engineer changes the rail's content and raises no refusal |
 | **3 — every goal carries its measured pass rate** | **MET.** `packages/viz/src/scenario/goalRates.test.ts` re-derives the published counts from **both** disjoint seed sets in the always-on tier, and `docs/10` § M30's table is compared cell-by-cell **in both directions**, against `data/scenario-goals.json`. The surface half — the `goal-without-rate` property on the campaign judge — is deep-tier only, and is now green |
-| **4 — every unit names its non-test caller** | **SATISFIED IN PROSE, MECHANISED BY NOTHING.** See below. This is the clause a future reader should distrust first |
+| **4 — every unit names its non-test caller** | **SATISFIED IN PROSE, MECHANISED BY NOTHING.** See below. This is the clause a future reader should distrust first *(as of the verdict date — mechanised in wave 12, [§ D192](../DECISIONS.md); see the dated note below the next paragraph. The verdict language stands as written)* |
 | **5 — the viewer is driven, never read** | **MET, by driving.** There is **no browser automation in this repository** — no Playwright, no Puppeteer, no jsdom, and all four `vitest.config.ts` projects are `environment: 'node'` — and § D163 explicitly refuses *"a test that renders to a canvas mock and never opens a browser"* as a substitute. Discharged by driving the shipped page; one gap found by doing so, below |
 
 **Clause 4 is the honest weak point, and the fix is a fifth copy of an audit this repository already
@@ -1772,6 +1818,18 @@ caller and are not one*. Under § D163 this clause is a **standing requirement**
 the phase and it has not; the acceptance rests on clauses 1 and 2. It could still be false today
 without anything going red, and the fix is a `deadCode.test.ts` under `packages/viz/src`.
 
+> **The fix landed (2026-07-30, wave 12, [§ D192](../DECISIONS.md)) — recorded beside the gap
+> rather than by rewriting it, and the verdict above is unchanged: the phase stays ACCEPTED WITH
+> NAMED GAPS, and this gap is now closed.** `packages/viz/src/deadCode.test.ts` is the fifth copy of
+> the audit: `AUDITED_MODULES` is derived from `readdirSync` and asserted in **both directions**, so
+> all 19 `packages/viz/src` directories are covered and a twentieth turns the suite red; **1 017
+> exports**, with the 25 zero-caller exports classified as 8 `DEAD_CANDIDATES` + 17
+> `PUBLIC_API_ONLY`, both lists asserted in both directions plus disjointness. The hand-written
+> table in `packages/viz/src/index.ts` is demoted to commentary. The mechanisation immediately
+> out-performed the prose it replaces — it found **two docstrings naming callers that do not call**
+> (`dev/viewerRunConfig`, `dev/PREFERRED_VIEWER_DISPATCHERS`) — and the 8 dead candidates await
+> disposition as recorded follow-up work.
+
 **What driving found, since clause 5 is the clause that is discharged by doing rather than
 asserting.** At 1280–1440 px, on the shipped page: the tab arrow ring **skips all four hidden
 contextual tabs and crosses into the nested `.tabs-right` div**, moving both selection and panel; a
@@ -1782,7 +1840,9 @@ two-press bug does not reproduce; and [§ D159](../DECISIONS.md)'s access-compat
 live and correct on the right rail and **clears** when the dispatcher reads credentials. **One gap:
 `Escape` does not dismiss the drawer**, which below 1340 px sits at `z-index: 20` over the stage and
 can be closed only by its own toggle. It is in [`GAPS.md`](../GAPS.md) rather than in this verdict's
-favour.
+favour. *(Closed in wave 12, [§ D188](../DECISIONS.md): `escapeClosesDrawer` wired into
+`wireKeyboard`, focus returned to the toggle, deliberately inert in column mode; the browser
+re-drive is owed in the drive phase.)*
 
 **Named limits on clause 1, in the same breath as the verdict.** The sweep's `mode` axis has **one
 value** — it plugs in at a tuple in `packages/viz/src/honesty/types.ts`, and the corpus assertion
@@ -1791,7 +1851,11 @@ driven**, so a sentence assembled at runtime there is invisible to the search. T
 labels, tooltips and legend, and the elevation express toggle's two strings, are **not seeded** into
 `packages/viz/src/honesty/surfaces.ts` and are therefore outside R1–R13. Two rows with one cause:
 `surfaces.ts` is a chokepoint every editor lane hits and no editor lane owns. All four are in
-[`GAPS.md`](../GAPS.md).
+[`GAPS.md`](../GAPS.md). *(Wave 12, [§ D194](../DECISIONS.md): the `mode` axis now has two values —
+and the second produced **zero new strings**, a measured null, because no shipped adapter branches
+on case mode — and the express-toggle strings and the access block are seeded, as seeds rather than
+`covers` entries because their producers are deliberately prose-free. The three DOM panels remain
+statically swept — that limit stands.)*
 
 **Named limits on clause 2.** Two of [§ D168](../DECISIONS.md)'s four are **closed** — Basic can now
 shorten a suppression reason, because `core` carries the ground beside the prose
@@ -1849,8 +1913,8 @@ which is exactly the distinction the standing requirement above exists to keep v
 | Item | Where it is recorded |
 |---|---|
 | **The viewer is now built to a design handoff** | Not an open item — a change of source. *Elevator Sim Reimagined* is canonical for the interface ([§ D174](../DECISIONS.md)); the requirements, the gap analysis and the five deviations are [`docs/12`](12-design-handoff.md). **No phase verdict moved and no published number was recomputed**, which is the point rather than an aside: the sheet reads `VizSummary`, which reads `RunSummary`, which is the same object the CLI and the experiment matrix read. Board: [`WAVE10_PLAN.md`](../WAVE10_PLAN.md) |
-| **Phase 6c — learned control** | § Phase 6c above. **No longer deferred: implemented, measured and NOT ACCEPTED**, and the refusal was then broadened from one operating point to eight pre-registered cells and held ([§ D151](../DECISIONS.md) is the protocol, dated before any sweep figure; [§ D156](../DECISIONS.md) is the result). What remains is one re-measurement, on the mix-varying demand template built after the sweep named the shipped template's flat directional split as the mechanism — protocol pre-registered at [§ D162](../DECISIONS.md), **not run**. A third refusal is an explicitly permitted outcome |
-| **Phase 9 — the experience layer** | **No longer open: measured against [§ D163](../DECISIONS.md) and ACCEPTED WITH NAMED GAPS on 2026-07-30** — § Phase 9 above carries the verdict and the gaps, and the row and the verdict landed together as § D163 required. All nine units are built. What remains is not the phase: it is **U6**, **U7's rider models**, **Basic's curated three-dimension subset**, and clause 4 — *name the non-test caller* — which is **satisfied in prose and mechanised by nothing**, because no dead-code audit reaches `packages/viz` |
+| **Phase 6c — learned control** | § Phase 6c above. **No longer deferred: implemented, measured and NOT ACCEPTED**, the refusal broadened from one operating point to eight pre-registered cells and held ([§ D151](../DECISIONS.md) is the protocol; [§ D156](../DECISIONS.md) is the result) — **and the re-measurement on the mix-varying template is now run, under [§ D162](../DECISIONS.md)'s five conditions, and it refused a third time** (`benchmark/lunchTwoWaySelection.ts`; [§ D200](../DECISIONS.md) is the verdict): ΔTTD `−0.170 [−0.405, +0.064]` at n = 200 on the disjoint seed at `midtown-office`/`lunch-two-way` 1.5 %, below the cell's own TTD-measured limit, with the flat-mix negative control exposing the residual advantage as a static weight-vector hybrid rather than mix exploitation. The question § D156 left open is **closed, in the refusing direction**; what would move it now is a different selector, not a different measurement |
+| **Phase 9 — the experience layer** | **No longer open: measured against [§ D163](../DECISIONS.md) and ACCEPTED WITH NAMED GAPS on 2026-07-30** — § Phase 9 above carries the verdict and the gaps, and the row and the verdict landed together as § D163 required. All nine units are built. What remains is not the phase: it is **U6**, **U7's rider models**, **Basic's curated three-dimension subset**, and clause 4 — *name the non-test caller* — which is **satisfied in prose and mechanised by nothing**, because no dead-code audit reaches `packages/viz` *(the clause-4 item closed later the same day: wave 12's `packages/viz/src/deadCode.test.ts` mechanises it, [§ D192](../DECISIONS.md) — verdict unchanged)* |
 | ~~**Access-zoning editor controls**~~ **CLOSED** | [`docs/10`](10-experience-layer-contract.md) § 11 W8's open half — § 10.2's floor multi-select and coverage matrix — landed with the building editor's zoning round trip ([§ D182](../DECISIONS.md)). The dispatcher-compatibility warning had shipped ahead of it ([§ D159](../DECISIONS.md)) |
 | **A zone cannot be changed mid-run** | Operational zoning is a shipped concept with no mechanism over time. Deliberately deferred: nothing measures it and no published result depends on it |
 | **The Level-1 panel does not clear the Phase 6 gate on `mixed-use-high-rise`** | § *Phase 6 on the building the criterion names* above. A measured result, not a task — but it is what a reader planning 6c needs |

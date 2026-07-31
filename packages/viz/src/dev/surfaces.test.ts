@@ -14,6 +14,7 @@ import { CONTEXTUAL_TABS, RAIL_SEGMENTS, TABS, type TabName } from './elementMap
 import {
   DRAWER_BREAKPOINT_PX,
   drawerStateFor,
+  escapeClosesDrawer,
   railStateFor,
   segmentAfterKey,
   surfaceStateFor,
@@ -133,6 +134,30 @@ describe('the drawer', () => {
   });
 });
 
+describe('Escape and the drawer — SH-12 / KX-11', () => {
+  it('dismisses an open drawer below the breakpoint', () => {
+    expect(escapeClosesDrawer(DRAWER_BREAKPOINT_PX - 1, true)).toBe(true);
+  });
+
+  it('does nothing when the drawer is already closed', () => {
+    // The caller moves focus to the toggle only on a real close; a false here is what keeps
+    // Escape from stealing focus for a key that changed nothing.
+    expect(escapeClosesDrawer(DRAWER_BREAKPOINT_PX - 1, false)).toBe(false);
+  });
+
+  it('is inert in column mode, whatever the reader last chose', () => {
+    /*
+     * In column mode the rail is always shown and `drawerOpen` is a *remembered* choice, not an
+     * applied one. Escape writing it to false here would silently close the drawer the reader had
+     * open the next time the window narrows — a change to state the key visibly did nothing to.
+     */
+    for (const opened of [true, false]) {
+      expect(escapeClosesDrawer(DRAWER_BREAKPOINT_PX, opened)).toBe(false);
+      expect(escapeClosesDrawer(DRAWER_BREAKPOINT_PX + 400, opened)).toBe(false);
+    }
+  });
+});
+
 describe('the breakpoint is duplicated in the stylesheet, and the two agree', () => {
   it('matches the @media rule that actually does the layout', async () => {
     const html = await readFile(
@@ -146,5 +171,73 @@ describe('the breakpoint is duplicated in the stylesheet, and the two agree', ()
      * than noticing that at 1339 px.
      */
     expect(html).toContain(`@media (max-width: ${String(DRAWER_BREAKPOINT_PX - 1)}px)`);
+  });
+});
+
+describe('the open drawer must not cover its own toggle — RR-11', () => {
+  /*
+   * Driven red 2026-07-30 (§ D198): below 1340 px the drawer overlay (`.rail-r`, `z-index: 20`,
+   * `width: min(var(--rail-right), 90vw)`) lay over the tab strip's right end where
+   * `#drawer-toggle` sits, so the button labelled *Close controls* could not be pressed — a
+   * pointer-only reader could not close what they opened, and Escape was accidentally the only
+   * exit. The handoff's own drawer treatment (`design.html` :2447) is that the toggle *is* the
+   * close control — `drawerLabel` reads 'Close controls' while open, and no close control exists
+   * inside the drawer — so the fix is (b) of the two natural ones: the toggle stacks above the
+   * overlay, no new chrome. Same stylesheet-pin idiom as RX-03 below: the 1339 px block is the
+   * only thing that lays the drawer out, and no script consults either z-index.
+   */
+  it('the 1339px media block stacks the toggle above the drawer overlay', async () => {
+    const html = await readFile(
+      fileURLToPath(new URL('../../index.html', import.meta.url)),
+      'utf8',
+    );
+    const start = html.indexOf(`@media (max-width: ${String(DRAWER_BREAKPOINT_PX - 1)}px)`);
+    expect(start).toBeGreaterThan(-1);
+    const rest = html.slice(start + 1);
+    const nextBoundary = [rest.indexOf('@media'), rest.indexOf('</style>')]
+      .filter((at) => at !== -1)
+      .reduce((a, b) => Math.min(a, b), rest.length);
+    const block = rest.slice(0, nextBoundary);
+    const drawerZ = /\.rail-r\s*\{[^}]*z-index:\s*(\d+)/.exec(block);
+    const toggleZ = /#drawer-toggle\s*\{[^}]*z-index:\s*(\d+)/.exec(block);
+    expect(drawerZ?.[1], 'the drawer overlay carries its z-index').toBeDefined();
+    expect(toggleZ?.[1], 'the toggle carries a z-index in the same block').toBeDefined();
+    // z-index does nothing on a static element: the toggle must also be positioned.
+    expect(block).toMatch(/#drawer-toggle\s*\{[^}]*position:\s*relative/);
+    expect(Number(toggleZ?.[1])).toBeGreaterThan(Number(drawerZ?.[1]));
+  });
+});
+
+describe('the stacked layout below 768 px — RX-03', () => {
+  /*
+   * No TypeScript constant this time, deliberately: the stylesheet is the only thing that lays the
+   * stacked column out, no script consults the breakpoint, and a `STACK_BREAKPOINT_PX` whose only
+   * reader is this test would be exactly the caller-less seam the standing requirement names. So
+   * the test pins the stylesheet itself: the 767 px block must exist and must contain the three
+   * declarations that make the layout a stack — the body becomes one scrolling column, the left
+   * rail loses its column border for a top one, and the stage keeps at least 60% of the viewport
+   * height. Driving found the defect (375×667: the left rail held 236 px and the canvas 0% of the
+   * height); this is what stops it coming back.
+   */
+  it('the 767px media block stacks the body and floors the canvas at 60vh', async () => {
+    const html = await readFile(
+      fileURLToPath(new URL('../../index.html', import.meta.url)),
+      'utf8',
+    );
+    const start = html.indexOf('@media (max-width: 767px)');
+    expect(start).toBeGreaterThan(-1);
+    const rest = html.slice(start + 1);
+    const nextBoundary = [rest.indexOf('@media'), rest.indexOf('</style>')]
+      .filter((at) => at !== -1)
+      .reduce((a, b) => Math.min(a, b), rest.length);
+    const block = rest.slice(0, nextBoundary);
+    // One scrolling column instead of the grid, with the stage ordered first.
+    expect(block).toMatch(/\.body\s*\{[^}]*flex-direction:\s*column/);
+    expect(block).toMatch(/\.body\s*\{[^}]*overflow-y:\s*auto/);
+    expect(block).toMatch(/\.stagecol\s*\{[^}]*order:\s*-1/);
+    // The canvas height floor: #stage fills .stage-wrap (height: 100% in the base rules).
+    expect(block).toMatch(/\.stage-wrap\s*\{[^}]*min-height:\s*60vh/);
+    // The left rail reads as a stacked section rather than a column.
+    expect(block).toMatch(/\.rail-l\s*\{[^}]*border-top/);
   });
 });

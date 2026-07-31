@@ -370,7 +370,12 @@ export interface DispatcherArmSpec {
  */
 export interface TrafficArmSpec {
   readonly id: string;
-  /** `'rise-and-fall'` (the doc's recommendation) or `'constant-iso'`. */
+  /**
+   * `'rise-and-fall'` (the doc's recommendation), `'constant-iso'`, or `'lunch-two-way'` — the
+   * third shipped template, whose directional mix varies within the run (DECISIONS.md § D169).
+   * `core`'s `DEMAND_TEMPLATE_IDS` is the authority; this sentence named two when three shipped,
+   * corrected 2026-07-30.
+   */
   readonly demandTemplate?: DemandTemplateId | undefined;
   /** Demand horizon, seconds. Defaults to the template's own. */
   readonly durationS?: number | undefined;

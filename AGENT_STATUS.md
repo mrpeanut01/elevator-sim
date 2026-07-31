@@ -670,3 +670,54 @@ something else.
 **All nine of Phase 9's units are now built** — W8 was the last open half — and Phase 9 still carries
 **no status row**, because [§ D163](DECISIONS.md)'s rule is that the row and the verdict land together
 and the acceptance pass is a distinct piece of work. A unit landing is not a verdict.
+
+> **Stale two paragraphs up, corrected in place (wave 12 census, 2026-07-30):** the acceptance pass
+> happened later the same wave — `b876724` landed the row and the verdict together, and Phase 9 is
+> **✅ ACCEPTED WITH NAMED GAPS (2026-07-30)**, stated identically in `docs/05`, `README.md`,
+> `GAPS.md` § 5 and `CLAUDE.md`. This close section was written at `9fd738c` and the wave's last
+> four commits postdate it. For the same reason it carries no closing suite figure; the figure is in
+> `GAPS.md`'s header — `integration` @ `bf16a2d`, **258 files / 4 794 tests, 4 784 passed,
+> 10 skipped**, `tsc -b` clean, 565 s serial.
+
+---
+
+# Wave 12 — 2026-07-30
+
+**Scope:** the known open items, verified at file:line before lanes were cut, then a playability
+baseline: the UX ledger's § 26 drive list executed in a real browser, and Phase 6c's pre-registered
+re-measurement ([`docs/13`](docs/13-phase-6c-handover.md)) run as its own serial phase.
+Board: [`WAVE12_PLAN.md`](WAVE12_PLAN.md).
+
+| ID | Unit | Lane | Status |
+|---|---|---|---|
+| T93 | Wire the bank filter (SG-15), with a picture-change test | V | ✅ landed `6f6c320` — [§ D187](DECISIONS.md), and § D180's contradiction recorded where it was fixed |
+| T94 | `Escape` dismisses the drawer (SH-12/KX-11) + KX-10 | V | ✅ landed `43ab0ab` — [§ D188](DECISIONS.md); KX-10 built in the same commit |
+| T95 | URL write-back (SH-09), round-trip tested | V | ✅ landed `1e958b3` — [§ D189](DECISIONS.md); `applyDeepLink`'s first direct tests |
+| T96 | `copy run` names the traffic pattern (TP-13) | V | ✅ landed `dbfc22e` — [§ D190](DECISIONS.md); equivalence driven 10/10, refusals for what no flag expresses |
+| T97 | Machines editor "is not decoration" suite (ME-07) | T | ✅ landed `52ae8fc` — [§ D191](DECISIONS.md); the fit-path wiring fact is the keeper |
+| T98 | Arrival-pattern select positive assertion (CO-02) | T | ✅ landed `ea81cb3` — [§ D191](DECISIONS.md) |
+| T99 | Honesty seeding: `'basic'` mode axis, express-toggle and access-block strings | H | ✅ landed `848b182`+`409de31`+`62b7a6d` — [§ D194](DECISIONS.md); always-on corpus 200 248 → 201 832, 0 violations |
+| T100 | The fifth dead-code audit, under `packages/viz` (Phase 9 clause 4 mechanised) | A | ✅ landed `f3084a2` — [§ D192](DECISIONS.md); 8 dead candidates opened as follow-up |
+| T101 | A real authored field replaces `$comment` on the pattern surface (G3-o) | P | ✅ landed `29d8137` — [§ D193](DECISIONS.md) |
+| T102 | Register corrections: `docs/07` § 8's six stale entries, `docs/10` schema version, two docstrings | D | ✅ landed `9ce6a6f` — six pessimistic stale entries retired in place |
+| T103 | Phase 6c measured per § D162 / `docs/13` — serial phase after integration | M | ✅ landed `0a7bb4d`+`b4be48b`+`e70082f` — **NOT ACCEPTED, the third refusal** ([§ D200](DECISIONS.md)); the detector engaged, the selector refused, and the flat control's BETTER named as a static hybrid |
+| T104 | Drive phase: UX § 26 list in a browser; every 🔲 resolved, primary flows end-to-end | — | ✅ landed `5d4b782`+`0f56719` — [§ D198](DECISIONS.md); 87 rows driven green from zero, 🔲 = 0, eight defects found and fixed same-day ([§ D199](DECISIONS.md)) |
+| — | Disposition of T100's 8 dead candidates (wire or delete, each with its own verification) | — | ✅ landed — [§ D197](DECISIONS.md); 4 wired, 4 deleted, and the dwell chips were inert in every shipped shift |
+
+**Lane conduct:** six lanes, six worktrees, six branches; every `git add` named explicit paths and no
+commit contains another lane's work — R25's remedy held. The wave's own errors — an invalidated
+baseline measurement, a decision number cited before it existed, two silent lane stalls — are
+recorded in [§ D195](DECISIONS.md) rather than tidied away.
+
+**Final (integration close):** `npx tsc -b` clean, `npx vitest run` → **261 files / 4 853 tests,
+4 843 passed, 10 skipped**, exit 0, 1 373 s, **Node v26.5.1, serially on an idle machine, on the
+pushed tree at `821210a`**. The first integration run was **red — 26 failed — and the red run is
+the wave's largest finding**: the failures were inherited pins that matched no committed tree,
+including the handoff's own close figure, traced link by link and re-pinned under
+[§ D196](DECISIONS.md). The skip count did not move all wave.
+
+**Final (wave close, superseding the line above):** after the drive phase, its eight same-day
+defect fixes, the dead-candidate dispositions and the Phase 6c measurement — **262 files / 4 883
+tests, 4 873 passed, 10 skipped**, `tsc -b` clean, 1 918 s, Node v26.5.1, serial on an idle
+machine, **on the pushed tree at `a8acf65`**. Every task on the wave board is landed; the wave's
+verdicts are § D187–§ D200, and no phase marker moved in either direction.

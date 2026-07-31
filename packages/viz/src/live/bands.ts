@@ -38,7 +38,7 @@ import type { SimTime } from '@elevator-sim/core/browser';
 import type { VizRecording } from '../contract/types.js';
 import { queueAt } from '../frame/overlay.js';
 
-import type { Mood, WaitBandCount, WaitBandDefinition, WaitBandId, WaitBands } from './types.js';
+import type { Mood, WaitBandCount, WaitBandDefinition, WaitBands } from './types.js';
 
 /**
  * The four bands, in ascending severity — design `:1365–1371` for the boundaries and the colours,
@@ -230,13 +230,6 @@ export function moodOf(bands: WaitBands): Mood {
     edge: band.color,
     bg: MOOD_BG[index] ?? MOOD_BG[0] ?? 'transparent',
   };
-}
-
-/** Lookup by id, for a caller holding one from a serialised state. */
-export function bandById(id: WaitBandId): WaitBandDefinition {
-  const band = WAIT_BANDS.find((candidate) => candidate.id === id);
-  if (band === undefined) throw new Error(`live/bands: no wait band with id "${id}".`);
-  return band;
 }
 
 /**

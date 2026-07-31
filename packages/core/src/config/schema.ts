@@ -398,6 +398,16 @@ export const trafficProfileSchema = z.strictObject({
   $comment: comment,
   id: identifier,
   name: z.string().min(1),
+  // Player-facing copy for the pattern picker. Required — a profile with nothing to say still has
+  // to say it on purpose — and capped at the dispatcher blurbs' 160-character bound, because an
+  // uncapped authored string on a driven surface is the § D186 defect with a different key name.
+  blurb: z
+    .string()
+    .min(1, 'blurb is player-facing copy and may not be empty')
+    .max(
+      160,
+      'a blurb over 160 characters is maintainer prose on a player surface; see DECISIONS.md § D186',
+    ),
   governingPeak: z.string().min(1),
   arrivalRatePctPop5min: valueRangeSchema,
   targetIntervalS: positive,

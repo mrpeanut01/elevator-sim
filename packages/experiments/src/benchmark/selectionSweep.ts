@@ -267,6 +267,22 @@ export const SWEEP_CELLS: readonly SweepCell[] = Object.freeze([
   ...SECONDARY_CELLS,
 ]);
 
+/**
+ * The cell fields the regime screen, the resolution probe and the learned-regime trace actually
+ * read: the operating point, plus — for the screen's default profile only — an optional
+ * pre-registered reference.
+ *
+ * Widened from {@link SweepCell} for the lunch two-way measurement (`lunchTwoWaySelection.ts`,
+ * DECISIONS.md § D162): those cells are judged as their **own declared family**, and § D151 § 3
+ * forbids pooling them with this sweep's PRIMARY/SECONDARY families — so they must be expressible
+ * without wearing a § D151 `family` label that would misdescribe them. None of the three functions
+ * reads `family`, `replications` or `ceilingExcludedArms`, which is what this type states; a
+ * {@link SweepCell} still satisfies it structurally, so nothing about the sweep moved.
+ */
+export type ProbeCell = SelectionCell & {
+  readonly preRegisteredReference?: string | undefined;
+};
+
 /** The tuning seed, and the disjoint holdout the verdict is measured at. § D145's pair. */
 export const SWEEP_TUNING_SEED = BENCHMARK_SEED;
 export const SWEEP_HOLDOUT_SEED = BENCHMARK_SEED + 811;
@@ -439,7 +455,7 @@ function quantile(sorted: readonly number[], p: number): number {
  * that ramp as a regime change would report a cold start as traffic variety at every cell.
  */
 export async function screenRegimes(input: {
-  readonly cell: SweepCell;
+  readonly cell: ProbeCell;
   readonly config: LoadedConfig;
   readonly resources: ExperimentResources;
   readonly profileId?: string | undefined;
@@ -448,6 +464,11 @@ export async function screenRegimes(input: {
   const { cell, config } = input;
   const seeds = input.seeds ?? [SWEEP_TUNING_SEED, SWEEP_TUNING_SEED + 1, SWEEP_TUNING_SEED + 2];
   const profileId = input.profileId ?? cell.preRegisteredReference;
+  if (profileId === undefined) {
+    throw new Error(
+      `Regime screen: cell "${cell.id}" pre-registers no reference profile, so a profileId must be passed explicitly.`,
+    );
+  }
   const profile = config.dispatcherProfilesById.get(profileId);
   const building = input.resources.buildingsById.get(cell.building);
   if (profile === undefined || building === undefined) {
@@ -481,6 +502,13 @@ export async function screenRegimes(input: {
       durationS: cell.point.durationS as number,
       reportWindow: cell.point.reportWindow ?? 'full-run',
       demand: cell.point.demand,
+      // The operating point's template, or the screen measures different traffic from the study:
+      // found on the lunch two-way cells, where the treatment and flat-control screens came back
+      // byte-identical (X^2 6.0 where the template's own record is 383.4) because this call
+      // dropped the field. A no-op for every § D151 cell, none of which carries a template.
+      ...(cell.point.demandTemplate === undefined
+        ? {}
+        : { demandTemplate: cell.point.demandTemplate }),
       onTimeout: 'report',
       createPolicy: (candidate, options) =>
         new Screened(
@@ -594,7 +622,7 @@ export async function screenRegimes(input: {
  * standard deviations apart.
  */
 export function splitDriftOf(input: {
-  readonly cell: SweepCell;
+  readonly cell: ProbeCell;
   readonly config: LoadedConfig;
   readonly building: ResolvedBuilding;
   readonly profile: DispatcherProfile;
@@ -618,6 +646,10 @@ export function splitDriftOf(input: {
       durationS,
       reportWindow: input.cell.point.reportWindow ?? 'full-run',
       demand: input.cell.point.demand,
+      // Same wiring as the screen above: the drift is a statement about the point's own traffic.
+      ...(input.cell.point.demandTemplate === undefined
+        ? {}
+        : { demandTemplate: input.cell.point.demandTemplate }),
       onTimeout: 'report',
     });
     for (const passenger of result.trace.passengers) {
@@ -693,7 +725,7 @@ export interface LearnedRegimeTrace {
  * provenance accessor — rather than re-deriving the selection outside the simulator.
  */
 export function traceLearnedRegimes(input: {
-  readonly cell: SweepCell;
+  readonly cell: ProbeCell;
   readonly config: LoadedConfig;
   readonly resources: ExperimentResources;
   readonly referenceProfileId: string;
@@ -735,6 +767,10 @@ export function traceLearnedRegimes(input: {
       durationS: input.cell.point.durationS as number,
       reportWindow: input.cell.point.reportWindow ?? 'full-run',
       demand: input.cell.point.demand,
+      // Same wiring as the screen: the trace must run the traffic the verdict ran.
+      ...(input.cell.point.demandTemplate === undefined
+        ? {}
+        : { demandTemplate: input.cell.point.demandTemplate }),
       onTimeout: 'report',
       createPolicy: (candidate, options) =>
         new Traced(
@@ -836,7 +872,7 @@ export interface CellResolution extends ResolutionLimits {
  * would quietly delete § D140's raise.
  */
 export async function probeCellResolution(input: {
-  readonly cell: SweepCell;
+  readonly cell: ProbeCell;
   readonly census: SelectionCensus;
   readonly resources: ExperimentResources;
   readonly config: LoadedConfig;

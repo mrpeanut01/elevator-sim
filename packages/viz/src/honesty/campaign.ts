@@ -23,7 +23,13 @@
  * side. The flag is read by the suite, which is a test, and handed in.
  */
 
-import { caseFromSeed, DEEP_SPACE, STANDARD_SPACE, type HonestySpace } from './generate.js';
+import {
+  caseFromSeed,
+  DEEP_SPACE,
+  formatHonestyCase,
+  STANDARD_SPACE,
+  type HonestySpace,
+} from './generate.js';
 import { evaluateCase, isFailure, type HonestyResources } from './run.js';
 import { shrinkCase, type HonestyShrinkResult } from './shrink.js';
 import type { HonestyCampaignStats, HonestyOutcome } from './types.js';
@@ -148,7 +154,9 @@ export function formatFailure(failure: HonestyShrinkResult): string {
       `  string: ${JSON.stringify(found.text)}`,
     );
   }
-  lines.push(JSON.stringify(failure.minimal.case, null, 2));
+  // The shrunk case in full, through the one printer `shrink.ts`'s replay note promises — a
+  // second inline stringify here is how the two prints drift (§ D192, candidate 4).
+  lines.push(formatHonestyCase(failure.minimal.case));
   return lines.join('\n');
 }
 
@@ -170,8 +178,10 @@ export function formatFailure(failure: HonestyShrinkResult): string {
  *   product rather than about the corpus: `batch/report.ts` withholds the ordering below the
  *   budget and emits `under-budget` instead, so R2's third clause is now defence in depth on
  *   both tiers rather than a leak this tier could still find;
- * - horizons above 900 s, and demand above 12 %/5 min;
- * - `mode`, which has one value until the Basic/Advanced split lands.
+ * - horizons above 900 s, and demand above 12 %/5 min.
+ *
+ * `mode` is no longer on this list: `HONESTY_MODES` names both values, so the pinned cases
+ * distribute across Basic and Advanced and the corpus assertion requires both to appear.
  */
 export const STANDARD_CORPUS: readonly number[] = Object.freeze([
   9001, 9002, 9003, 9004, 9005, 9006, 9007, 9008, 9009, 9010, 9011, 9012, 9013, 9014, 9015, 9016,

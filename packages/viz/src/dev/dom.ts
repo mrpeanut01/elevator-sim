@@ -99,17 +99,6 @@ export function setHidden(node: HTMLElement, hidden: boolean): void {
  * The handoff's components
  * -------------------------------------------------------------------------- */
 
-/** A small tracked uppercase section label — `docs/12` § 1.1 S8. */
-export function eyebrow(doc: Document, text: string, note?: string): HTMLElement {
-  return el(doc, 'div', {
-    className: 'eyebrow-row',
-    children: [
-      el(doc, 'span', { className: 'eyebrow', text }),
-      note === undefined ? null : el(doc, 'span', { className: 'eyebrow-note', text: note }),
-    ],
-  });
-}
-
 export interface ChipSpec {
   readonly label: string;
   readonly selected: boolean;

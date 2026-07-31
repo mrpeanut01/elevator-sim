@@ -65,9 +65,6 @@ import type { ParameterScale, ParameterValue } from '@elevator-sim/experiments/b
  */
 export type ControlValues = ReadonlyMap<string, ParameterValue>;
 
-/** The four kinds docs/06 declares, one renderer each, named for what they draw. */
-export type ControlKind = 'slider' | 'stepper' | 'select' | 'checkbox';
-
 /** What every control carries, whatever its kind. */
 export interface ControlCommon {
   /** The parameter's dotted id. Unique in a form; used as the DOM id suffix. */
