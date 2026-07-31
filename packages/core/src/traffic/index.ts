@@ -47,6 +47,7 @@ export {
   DIRECTION_CATEGORIES,
   INTERFLOOR_WEIGHTINGS,
   TRAFFIC_DEFAULTS,
+  TRAFFIC_MODEL_VERSIONS,
   TRAFFIC_PARAMETERS,
   TrafficError,
 } from './types.js';
@@ -68,6 +69,7 @@ export type {
   ResolvedDemandTemplate,
   TraceLeg,
   TrafficConfig,
+  TrafficModelVersion,
   TrafficParameterSpec,
   TrafficParameterType,
 } from './types.js';

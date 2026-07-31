@@ -101,8 +101,8 @@ export function replaySourcesFrom(config: LoadedConfig): ReplaySources {
 /**
  * Rebuild the `SimulationConfig` that produced a stored run.
  *
- * Every field comes from the record; nothing is defaulted here that was not defaulted there. Two
- * details are worth stating because getting either wrong produces a replay that is *nearly*
+ * Every field comes from the record; nothing is defaulted here that was not defaulted there. Three
+ * details are worth stating because getting any of them wrong produces a replay that is *nearly*
  * identical:
  *
  * - **`reportWindow` is passed as the resolved window** the run was summarized over, not as
@@ -110,6 +110,12 @@ export function replaySourcesFrom(config: LoadedConfig): ReplaySources {
  * - **`seed` is passed as a `bigint`.** The stored form is a decimal string precisely because a
  *   64-bit seed does not survive `JSON.stringify` as anything else, and `Number(seed)` would lose
  *   precision above 2^53 — for the seeds a sweep generates, silently.
+ * - **`trafficSeed` and `trafficModel` are restored, and are absent rather than defaulted.** They
+ *   are inputs to the *trace* rather than to the machine, so dropping one does not shade the
+ *   answer, it replaces the passengers: a stored `v2` run rebuilt without its model version
+ *   re-runs under `v1` and comes back with roughly half the legs. That is this function's own
+ *   named failure mode, arriving in the field, and it is why the enumeration above is a liability
+ *   as well as a design — a field added to `StoredRunConfig` and not added here is invisible.
  *
  * @throws ReportsError if a building or dispatcher profile id is not present in the sources, or if
  *   the run used `elevatorSpecs` and none were supplied. Replaying against a *substitute* building
@@ -160,6 +166,20 @@ export function replaySimulationConfig(
       ? {}
       : { dispatcherProfiles: sources.dispatcherProfiles }),
     seed: BigInt(config.seed),
+    /*
+     * The rest of invariant 5. Both are spread-or-omitted rather than passed as `undefined`,
+     * because at their pre-flag defaults the run must be the run this repository has always
+     * produced — a present `trafficSeed` that happens to equal the run seed is a *different* run
+     * from one that was never given a traffic seed, and `SimulationConfig` distinguishes them by
+     * presence exactly as the record does.
+     *
+     * `BigInt`, not `Number`, for the reason `seed` is: a demand seed is a 64-bit value and
+     * `Number()` loses it silently above 2^53. A `v2` record rebuilt without `trafficModel` would
+     * replay under `v1` — a different trace at the same seed, roughly half the legs on the
+     * fixture — which is the failure `reports/replay.ts`'s docstring names and this line closes.
+     */
+    ...(config.trafficSeed === undefined ? {} : { trafficSeed: BigInt(config.trafficSeed) }),
+    ...(config.trafficModel === undefined ? {} : { trafficModel: config.trafficModel }),
     demandTemplate: config.demandTemplate,
     ...(config.durationS === undefined ? {} : { durationS: config.durationS }),
     ...(config.summarize?.window === undefined ? {} : { reportWindow: config.summarize.window }),
@@ -306,6 +326,11 @@ function diffRecords(
 
   scalar('runId', left.runId, right.runId);
   scalar('seed', left.seed, right.seed);
+  // Listed among the scalars rather than left to the catch-all, because these two are the fields
+  // whose divergence looks *least* like what it is: every leg moves, so the interesting line is the
+  // one naming the cause rather than the first of a thousand symptoms.
+  scalar('trafficSeed', left.trafficSeed, right.trafficSeed);
+  scalar('trafficModel', left.trafficModel, right.trafficModel);
   scalar('buildingId', left.buildingId, right.buildingId);
   scalar('dispatcherProfileId', left.dispatcherProfileId, right.dispatcherProfileId);
   scalar('demandTemplateId', left.demandTemplateId, right.demandTemplateId);

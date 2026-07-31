@@ -41,6 +41,7 @@
 import type { SimTime } from '../kernel/types.js';
 import type { PassengerModel } from './comparability.js';
 import type { CredentialGroup, Direction } from '../model/types.js';
+import type { TrafficModelVersion } from '../traffic/types.js';
 
 import {
   METRICS_SCHEMA_VERSION,
@@ -92,6 +93,15 @@ export interface RecordablePassenger {
 /** Anything carrying the master seed. `StreamSet` satisfies it. */
 export interface SeedSource {
   readonly masterSeed: bigint;
+  /**
+   * The demand seed, when the set was built with one — `StreamSet.trafficSeed`.
+   *
+   * Read off the same object as {@link masterSeed} on purpose. Both halves of invariant 5 then come
+   * from the generator that actually filled the run, and the record cannot carry one seed while the
+   * streams were derived from another. Absent when there was none; see `RunRecord.trafficSeed` for
+   * why that is not the same as "equal to the master seed".
+   */
+  readonly trafficSeed?: bigint | undefined;
 }
 
 /** Which car served a leg. Both fields optional: a bare simulation may not track banks. */
@@ -110,11 +120,21 @@ export interface MetricsRecorderOptions {
   /**
    * The seed that produced this run (CLAUDE.md invariant 5).
    *
-   * Pass the run's `StreamSet` — `{ masterSeed }` — and the record cannot disagree with the
-   * generator that filled it. A `bigint`, a safe-integer `number` or a decimal string are
-   * also accepted for tests and for replays loaded from disk.
+   * Pass the run's `StreamSet` — `{ masterSeed, trafficSeed }` — and the record cannot disagree
+   * with the generator that filled it. A `bigint`, a safe-integer `number` or a decimal string are
+   * also accepted for tests and for replays loaded from disk; those forms carry no traffic seed,
+   * which is correct, because a run described by a bare number never had one.
    */
   readonly seed: bigint | number | string | SeedSource;
+  /**
+   * Which traffic draw ordering produced this run — see `RunRecord.trafficModel`.
+   *
+   * Omitted for `v1`, so a record written by a default run is byte-identical to one written before
+   * the option existed and every pinned record still reproduces. Unlike the traffic seed this
+   * cannot be read off the `StreamSet`: the streams are materialized either way and it is the
+   * *generator* that decides which one the batch draw comes from, so the caller has to say.
+   */
+  readonly trafficModel?: TrafficModelVersion | undefined;
   /** Identity of this replication. Defaults to `run`. */
   readonly runId?: string | undefined;
   readonly buildingId?: string | undefined;
@@ -199,6 +219,8 @@ interface LegState {
  */
 export class MetricsRecorder {
   readonly #seed: string;
+  readonly #trafficSeed: string | undefined;
+  readonly #trafficModel: TrafficModelVersion | undefined;
   readonly #runId: string;
   readonly #buildingId: string | undefined;
   readonly #dispatcherProfileId: string | undefined;
@@ -227,6 +249,11 @@ export class MetricsRecorder {
 
   constructor(options: MetricsRecorderOptions) {
     this.#seed = normalizeSeedString(options.seed);
+    this.#trafficSeed = normalizeTrafficSeedString(options.seed);
+    // Kept as given rather than resolved to `'v1'`: the record reports it by *presence*, so
+    // resolving here would lose the only distinction the record needs to make. See
+    // `RunRecord.trafficModel`.
+    this.#trafficModel = options.trafficModel;
     this.#runId = options.runId ?? 'run';
     if (this.#runId.length === 0) {
       throw new MetricsError('Run id must not be empty; it is how a stored record is addressed.');
@@ -660,6 +687,23 @@ export class MetricsRecorder {
       schemaVersion: METRICS_SCHEMA_VERSION,
       runId: this.#runId,
       seed: this.#seed,
+      /*
+       * Both halves of invariant 5, spread-or-omitted rather than written as `undefined` — under
+       * `exactOptionalPropertyTypes` those are different types, and they are different *claims*:
+       * an absent key says the run had no traffic seed, a present `undefined` says it had one that
+       * is missing. Only the first replays from `seed` alone.
+       *
+       * The two omit on **different** boundaries and the difference is deliberate. `trafficSeed`
+       * is omitted when it was never given, because a given seed that happens to equal the run
+       * seed is still a different statement. `trafficModel` is omitted at `v1` *however it was
+       * reached*, because a `v1` run and a run predating the option are the same run — same draws,
+       * same trace, same record — and a key that says so would move every pinned record to assert
+       * nothing.
+       */
+      ...(this.#trafficSeed === undefined ? {} : { trafficSeed: this.#trafficSeed }),
+      ...(this.#trafficModel === undefined || this.#trafficModel === 'v1'
+        ? {}
+        : { trafficModel: this.#trafficModel }),
       ...(this.#buildingId === undefined ? {} : { buildingId: this.#buildingId }),
       ...(this.#dispatcherProfileId === undefined
         ? {}
@@ -774,6 +818,20 @@ function normalizeSeedString(seed: bigint | number | string | SeedSource): strin
     return seed;
   }
   return assertNonNegative(seed.masterSeed);
+}
+
+/**
+ * The demand seed a `StreamSet` was built with, as the decimal string a record stores.
+ *
+ * `undefined` for every other accepted seed form, and that is the honest answer rather than a
+ * fallback: a run described by a bare seed was not given a separate crowd, so the record must say
+ * nothing rather than repeat the master seed. See `RunRecord.trafficSeed`.
+ */
+function normalizeTrafficSeedString(
+  seed: bigint | number | string | SeedSource,
+): string | undefined {
+  if (typeof seed !== 'object') return undefined;
+  return seed.trafficSeed === undefined ? undefined : assertNonNegative(seed.trafficSeed);
 }
 
 function assertNonNegative(seed: bigint): string {

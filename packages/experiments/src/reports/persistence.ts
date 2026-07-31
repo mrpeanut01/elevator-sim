@@ -64,6 +64,7 @@ import {
   METRICS_SCHEMA_VERSION,
   PERCENTILE_METHODS,
   TIMEOUT_POLICIES,
+  TRAFFIC_MODEL_VERSIONS,
   WEIGHT_SET_POLICIES,
   normalizeSeed,
   parseRunRecord,
@@ -200,6 +201,20 @@ export function createStoredRun(input: CreateStoredRunInput): StoredRunRecord {
   const sim = simOptionsOf(config);
   const storedConfig: StoredRunConfig = Object.freeze({
     seed,
+    /*
+     * Copied from the **record**, not from `config`, and that is the one place this function reads
+     * the result instead of the configuration. Both fields are already normalized there — the
+     * traffic seed to a decimal string by the `StreamSet` that produced it, the model version to
+     * "present iff not v1" — so taking them from the record means the envelope cannot claim a
+     * different simulator or a different crowd from the dataset sitting beside it. `parseStoredRun`
+     * enforces that agreement on the way back in.
+     */
+    ...(result.record.trafficSeed === undefined
+      ? {}
+      : { trafficSeed: result.record.trafficSeed }),
+    ...(result.record.trafficModel === undefined
+      ? {}
+      : { trafficModel: result.record.trafficModel }),
     buildingId: config.building.id,
     dispatcherProfileId: config.dispatcherProfile.id,
     trafficProfileId: config.building.trafficProfile,
@@ -431,6 +446,24 @@ export function parseStoredRun(input: string | unknown): StoredRunRecord {
       `Stored run "${record.runId}" carries seed ${config.seed} on its configuration and ${record.seed} on its record. One of the two did not produce the other, so the run is neither replayable nor comparable (CLAUDE.md invariant 5)`,
     );
   }
+  /*
+   * The same check for the other two halves of the run's identity, and it is a check rather than a
+   * preference for one side. The envelope is what the replay rebuilds a `SimulationConfig` from and
+   * the record is what the replay is compared against; if they disagree the replay runs one crowd
+   * and grades it against another, and reports the mismatch as a determinism failure in `core`.
+   * Both are written from the record by `createStoredRun`, so a disagreement means the file was
+   * edited or assembled by hand.
+   */
+  if (config.trafficSeed !== record.trafficSeed) {
+    throw new ReportsError(
+      `Stored run "${record.runId}" carries traffic seed ${config.trafficSeed ?? '(none)'} on its configuration and ${record.trafficSeed ?? '(none)'} on its record. The demand streams were derived from one of the two, so a replay would run a different crowd through the same building and call the divergence a determinism failure (CLAUDE.md invariant 5)`,
+    );
+  }
+  if (config.trafficModel !== record.trafficModel) {
+    throw new ReportsError(
+      `Stored run "${record.runId}" was produced by traffic model ${record.trafficModel ?? 'v1'} according to its record and ${config.trafficModel ?? 'v1'} according to its configuration. Those are two different simulators, and a replay would rebuild the wrong one: the group-size draw moves to its own stream at v2, so the same seed yields a different trace rather than a different answer (CLAUDE.md invariant 5)`,
+    );
+  }
 
   const summaryFingerprintText = readOptional(root, 'summaryFingerprint', [], expectString);
   const metadata = readOptional(root, 'metadata', [], expectMetadata);
@@ -549,6 +582,8 @@ function parseStoredRunConfig(value: unknown, path: Path): StoredRunConfig {
   const object = expectObject(value, path);
   rejectUnknownKeys(object, path, [
     'seed',
+    'trafficSeed',
+    'trafficModel',
     'buildingId',
     'dispatcherProfileId',
     'trafficProfileId',
@@ -564,6 +599,13 @@ function parseStoredRunConfig(value: unknown, path: Path): StoredRunConfig {
 
   return Object.freeze({
     seed: expectSeed(object['seed'], [...path, 'seed']),
+    ...spread('trafficSeed', readOptional(object, 'trafficSeed', path, expectSeed)),
+    ...spread(
+      'trafficModel',
+      readOptional(object, 'trafficModel', path, (value, at) =>
+        expectEnum(value, at, TRAFFIC_MODEL_VERSIONS),
+      ),
+    ),
     buildingId: expectString(object['buildingId'], [...path, 'buildingId']),
     dispatcherProfileId: expectString(object['dispatcherProfileId'], [
       ...path,

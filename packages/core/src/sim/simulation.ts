@@ -812,7 +812,14 @@ export class Simulation {
     }
 
     this.#recorder = new MetricsRecorder({
+      // The `StreamSet`, not `config.seed`: it carries the traffic seed as well, so both halves of
+      // invariant 5 reach the record from the generator that filled the run rather than from a
+      // second copy of the caller's intent.
       seed: this.#streams,
+      // Passed through unresolved; the recorder omits `v1` however it was reached. The run seed and
+      // the traffic seed are enough to replay a `v1` run, and are not enough to replay a `v2` one —
+      // which is the whole reason this field is on the record and not only on the result.
+      ...(this.#trafficModel === undefined ? {} : { trafficModel: this.#trafficModel }),
       ...(this.#passengerModel === 'conventional'
         ? {}
         : { passengerModel: this.#passengerModel }),
@@ -3363,25 +3370,19 @@ export class Simulation {
       runId: this.#runId,
       seed: record.seed,
       /*
+       * Read off the record, exactly as `seed` is, rather than re-derived from the streams and the
+       * config. The record is what is persisted and what invariant 5 lives on; a result that
+       * computed the same two fields a second way could disagree with the thing a replay reads,
+       * and the disagreement would be invisible in memory and fatal on disk.
+       *
        * Spread-or-omit rather than `trafficSeed: x ?? undefined`: under `exactOptionalPropertyTypes`
        * those are different types, and more importantly they are different *claims*. An absent key
        * says the run had no traffic seed; a present `undefined` says it had one that is missing.
-       * Invariant 5 cares about the difference — only the first replays from `seed` alone.
+       * The record omits each on its own boundary — see `MetricsRecorder.finish` — and this
+       * inherits both.
        */
-      ...(this.#streams.trafficSeed === undefined
-        ? {}
-        : { trafficSeed: this.#streams.trafficSeed.toString() }),
-      /*
-       * Spread-or-omit again, but on a *different* boundary, and the difference is the point.
-       * `trafficSeed` is omitted when it was never given, because a given seed equal to the run
-       * seed is still a different statement. `trafficModel` is omitted when it is `v1` **however it
-       * was reached**, because a `v1` run and a run predating the option are the same run — same
-       * draws, same trace, same record. Emitting `'v1'` would be a key that changes both identity
-       * digests to say nothing.
-       */
-      ...(this.#trafficModel === undefined || this.#trafficModel === 'v1'
-        ? {}
-        : { trafficModel: this.#trafficModel }),
+      ...(record.trafficSeed === undefined ? {} : { trafficSeed: record.trafficSeed }),
+      ...(record.trafficModel === undefined ? {} : { trafficModel: record.trafficModel }),
       buildingId: this.#resolved.id,
       dispatcherProfileId: this.#profileId,
       trace: this.#trace,

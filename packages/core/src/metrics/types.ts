@@ -44,6 +44,7 @@
 
 import type { SimTime } from '../kernel/types.js';
 import type { CredentialGroup, Direction } from '../model/types.js';
+import type { TrafficModelVersion } from '../traffic/types.js';
 
 import type { AwtInvalidGround } from './awtValidity.js';
 import type { PassengerModel } from './comparability.js';
@@ -633,6 +634,15 @@ export interface CarTimings {
  * The seed is a **decimal string** because it is a 64-bit unsigned value: `bigint` does not
  * survive `JSON.stringify`, and `number` silently loses precision above 2^53. `runSeed()`
  * converts it back.
+ *
+ * **The seed alone stopped being sufficient in wave 13, and this type says so rather than
+ * assuming it.** A run may now separate the crowd from the machine ({@link trafficSeed}) and may
+ * declare which draw ordering produced it ({@link trafficModel}); both are inputs to the trace, so
+ * a record that omitted either would still replay *deterministically* — to a different answer, off
+ * a different set of passengers. That is the failure `experiments/reports/replay.ts` exists to
+ * catch, and the reason both fields are stamped here rather than only on `SimulationResult`, which
+ * dies with the process. Neither is *required*, because absence is the pre-flag default and has to
+ * stay byte-identical to it; both are read back by `replaySimulationConfig`.
  */
 export interface RunRecord {
   readonly schemaVersion: number;
@@ -650,6 +660,37 @@ export interface RunRecord {
   readonly runId: string;
   /** The `StreamSet` master seed, as a decimal string. Invariant 5. */
   readonly seed: string;
+  /**
+   * The demand seed, as a decimal string — present only when the run was given one.
+   *
+   * The second half of invariant 5 on a run that separated the crowd from the machine (docs/14
+   * § 1.1). {@link seed} alone does not reproduce such a run: the demand streams were derived from
+   * *this* value, so a record carrying only the master seed replays a different crowd through the
+   * same building.
+   *
+   * **Absent, never equal to {@link seed}, when the run was given none.** "There was no traffic
+   * seed" and "the traffic seed happened to match the run seed" are different runs — the first
+   * derives every stream from the master seed and the second derives five of them from a value that
+   * merely coincides with it — and a record that conflated the two would replay one as the other.
+   */
+  readonly trafficSeed?: string | undefined;
+  /**
+   * Which traffic draw ordering produced this run — **present only when it was not `v1`**.
+   *
+   * Recorded for the reason {@link passengerModel} is: a stored record outlives the build that
+   * wrote it, and this one names *which simulator* the dataset came from. It is not a tunable. A
+   * replay that dropped it would re-run the same building at the same seed against a different
+   * trace — more than half the legs, measured — and report the divergence as a determinism failure
+   * in `core` rather than as the incomplete record it is.
+   *
+   * Absent rather than `'v1'`, and that is a claim rather than a convenience: a `v1` run *is* the
+   * run this repository produced before the option existed, same draws and same record, so
+   * announcing `'v1'` would assert a distinction that does not exist and would add a key to every
+   * pinned record to say nothing. Note this is the **opposite** boundary to {@link trafficSeed}'s,
+   * which is omitted only when it was never given — the two are reasoned separately rather than by
+   * analogy.
+   */
+  readonly trafficModel?: TrafficModelVersion | undefined;
   readonly buildingId?: string | undefined;
   readonly dispatcherProfileId?: string | undefined;
   readonly trafficProfileId?: string | undefined;

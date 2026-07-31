@@ -773,6 +773,10 @@ export interface SimulationResult {
    *
    * Absent — not equal to {@link seed} — when unset, because "there was no traffic seed" and "the
    * traffic seed matched the run seed" are different runs that must not replay as one another.
+   *
+   * Copied from `RunRecord.trafficSeed` rather than re-derived, exactly as {@link seed} is copied
+   * from `record.seed`. The record is what gets persisted and what a replay reads; a result that
+   * computed this a second way could disagree with the dataset beside it.
    */
   readonly trafficSeed?: string;
   /**
@@ -789,6 +793,10 @@ export interface SimulationResult {
    *
    * Present and `'v2'` means the group-size draw came from the `batchSize` stream, and this result
    * may not be paired against one that does not say so.
+   *
+   * Copied from `RunRecord.trafficModel`, which is where it has to live for a stored `v2` run to
+   * replay as one: a result dies with the process, and a replay rebuilt without this re-runs under
+   * `v1` — a different trace at the same seed rather than a different answer.
    */
   readonly trafficModel?: TrafficModelVersion;
   readonly buildingId: string;

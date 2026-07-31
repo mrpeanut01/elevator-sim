@@ -499,7 +499,18 @@ export interface DemandTemplateOverrides {
  * `v1` is the default and is deleted only when the last figure depending on it has been re-derived
  * under `v2` **and** the re-derivation has been published as a comparison — not before.
  */
-export type TrafficModelVersion = 'v1' | 'v2';
+export type TrafficModelVersion = (typeof TRAFFIC_MODEL_VERSIONS)[number];
+
+/**
+ * Every draw ordering this build can run, as data — see {@link TrafficModelVersion}.
+ *
+ * A runtime list rather than only a type, because the version has to survive a round trip through
+ * disk: `metrics/serialization.ts` validates a stored `RunRecord` against it and
+ * `experiments/reports/persistence.ts` validates the envelope beside it. A version a reader cannot
+ * name is a version a reader will silently drop, and a dropped version replays as `v1` — a
+ * different trace at the same seed, which is exactly what CLAUDE.md invariant 5 forbids.
+ */
+export const TRAFFIC_MODEL_VERSIONS = ['v1', 'v2'] as const;
 
 /** Everything {@link generateTrace} needs. Only `building`, `profiles` and `streams` are required. */
 export interface TrafficConfig {

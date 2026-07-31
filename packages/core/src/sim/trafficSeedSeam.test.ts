@@ -73,4 +73,14 @@ describe('the traffic seed reaches a run', () => {
     expect((await run({ trafficSeed: 6 })).trafficSeed).toBe('6');
     expect((await run()).trafficSeed).toBeUndefined();
   }, 300_000);
+
+  /*
+   * And on the record, which is the half that gets persisted. The result dies with the process; a
+   * seed that reaches only the result is a seed a replay cannot ask for, and the run above —
+   * "the same crowd through a different machine" — is exactly the run that then comes back wrong.
+   */
+  it('stamps the traffic seed on the record, which is the thing that gets persisted', async () => {
+    expect((await run({ trafficSeed: 6 })).record.trafficSeed).toBe('6');
+    expect(Object.keys((await run()).record)).not.toContain('trafficSeed');
+  }, 300_000);
 });

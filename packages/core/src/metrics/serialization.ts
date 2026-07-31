@@ -20,6 +20,7 @@
 import { z } from 'zod';
 
 import { DIRECTIONS } from '../model/types.js';
+import { TRAFFIC_MODEL_VERSIONS } from '../traffic/types.js';
 
 import { PASSENGER_MODELS } from './comparability.js';
 
@@ -138,6 +139,12 @@ export const runRecordSchema = z.strictObject({
   schemaVersion: z.number().int().positive(),
   runId: identifier,
   seed: seedString,
+  // Both optional in both directions: a record written before the two traffic knobs existed parses
+  // unchanged, and a record written by a run that used one round-trips it. Validated rather than
+  // waved through, because a traffic seed that does not survive `BigInt()` and a model version this
+  // build cannot run are both records that replay to something other than what they stored.
+  trafficSeed: seedString.optional(),
+  trafficModel: z.enum(TRAFFIC_MODEL_VERSIONS).optional(),
   buildingId: z.string().min(1).optional(),
   dispatcherProfileId: z.string().min(1).optional(),
   trafficProfileId: z.string().min(1).optional(),

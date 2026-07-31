@@ -459,6 +459,7 @@ export {
   SECONDS_PER_5MIN,
   SUPPORTED_BATCH_DISTRIBUTIONS,
   TRAFFIC_DEFAULTS,
+  TRAFFIC_MODEL_VERSIONS,
   TRAFFIC_PARAMETERS,
   TrafficError,
   batchesPerSecond,
@@ -513,6 +514,7 @@ export type {
   RouteTopology,
   TraceLeg,
   TrafficConfig,
+  TrafficModelVersion,
   TrafficParameterSpec,
   TrafficParameterType,
 } from './traffic/index.js';
