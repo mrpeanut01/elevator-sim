@@ -20,6 +20,7 @@ import {
   parseElevatorSpecs,
   parseTrafficProfiles,
   resolveBuilding,
+  type ConservationAudit,
   type DispatcherProfile,
   type ElevatorSpecs,
   type SimulationConfig,
@@ -696,15 +697,53 @@ describe('the building spec', () => {
     for (const id of BUILDING_IDS) {
       const config = parseBuilding(read(`buildings/${id}.json`));
       const rebuilt = buildingFromSpec(specFromBuilding(config, id), { specs: SPECS });
-      expect(rebuilt.transportModes ?? [], id).toStrictEqual(
-        (config.transportModes ?? []).map((mode) => ({
-          id: mode.id,
-          connects: mode.connects,
-          traversalTimeS: mode.traversalTimeS,
-        })),
-      );
-      if ((config.transportModes ?? []).length === 0) {
+      const source = config.transportModes ?? [];
+      const written = rebuilt.transportModes ?? [];
+      if (source.length === 0) {
         expect(Object.hasOwn(rebuilt, 'transportModes'), id).toBe(false);
+        continue;
+      }
+      /*
+       * **Raw, with no projection.** An earlier version of this loop mapped the expectation
+       * through the same three fields `specFromBuilding` carries, which made it structurally
+       * incapable of failing on a dropped field — it was defending a claim stronger than the one
+       * that holds. The key set is asserted exactly instead, so a field that starts or stops
+       * surviving turns this red and forces the docstring to be rewritten with it.
+       */
+      for (const mode of written) {
+        expect(Object.keys(mode).sort(), id).toStrictEqual([
+          '$comment',
+          'connects',
+          'id',
+          'traversalTimeS',
+        ]);
+      }
+      expect(written.map((mode) => mode.id), id).toStrictEqual(source.map((mode) => mode.id));
+      expect(written.map((mode) => mode.connects), id).toStrictEqual(
+        source.map((mode) => mode.connects),
+      );
+      expect(written.map((mode) => mode.traversalTimeS), id).toStrictEqual(
+        source.map((mode) => mode.traversalTimeS),
+      );
+      /*
+       * The two fields that do **not** survive, asserted as losses rather than projected away.
+       * The source really does declare both on every machine, so these are live assertions and
+       * not a description of an empty set.
+       */
+      expect(source.every((mode) => mode.name !== undefined), id).toBe(true);
+      expect(written.every((mode) => mode.name === undefined), id).toBe(true);
+      expect(source.every((mode) => mode.$comment !== undefined), id).toBe(true);
+      expect(
+        written.every((mode, index) => mode.$comment !== source[index]?.$comment),
+        id,
+      ).toBe(true);
+      /*
+       * And what replaces the dropped citation is the honest one. `specFromBuilding` cannot
+       * preserve an uneven floor pitch, so 21.2 s is not what this spec's geometry gives — and
+       * the emitted comment says so rather than reprinting a derivation that no longer holds.
+       */
+      for (const mode of written) {
+        expect(mode.$comment, id).toMatch(/SET BY HAND and NOT cited/);
       }
     }
     const tower = specFromBuilding(parseBuilding(read('buildings/vertical-city.json')), 'vertical-city');
@@ -731,6 +770,59 @@ describe('the building spec', () => {
     }
     // And it moves with the geometry, which is why it is derived rather than a constant.
     expect(escalatorSecondsFor({ ...spec, floorHeightM: 3.6 }, [0, 1])).toBe(17.6);
+  });
+
+  it('cites the traversal time it emits, and says so plainly when the number is not derived', () => {
+    /*
+     * `TransportModeConfig.traversalTimeS` is a **reference value**, and its own contract requires
+     * the declaring building's `$comment` to cite it. A designer emitting the number bare would
+     * put *a guess wearing a number* into `data/buildings/` with nothing to notice — this
+     * repository's own phrase for the defect, and its reference-data rule forbids it.
+     *
+     * Computed rather than carried, so it cannot go stale: it is re-derived from the current spec
+     * on every emit. The two branches are the whole of why that is safe.
+     */
+    const spec: BuildingSpec = { ...BLANK_SPEC, floorHeightM: 4.5 };
+    const seeded: BuildingSpec = {
+      ...spec,
+      transportModes: [
+        { id: 'escalator-1', connects: [0, 1], traversalTimeS: escalatorSecondsFor(spec, [0, 1]) },
+      ],
+    };
+    const derived = transportModesOf(seeded)[0]?.$comment ?? '';
+    expect(derived).toMatch(/DERIVED by the building designer/);
+    // The arithmetic is in the comment, with this building's own numbers rather than a template.
+    expect(derived).toMatch(/rise 4\.50 m/);
+    expect(derived).toMatch(/4\.50 \/ sin 30 = 9\.00 m at 0\.5 m\/s = 18\.0 s/);
+    expect(derived).toMatch(/Total landing to landing 21\.2 s/);
+    expect(derived).toMatch(/docs\/02-elevator-reference\.md/);
+
+    // A hand-set figure is labelled the author's and is **not** claimed to be cited. Writing the
+    // derivation beside a number it does not produce is the stale-citation defect itself.
+    const byHand: BuildingSpec = {
+      ...seeded,
+      transportModes: withTransportSeconds(seeded, 'escalator-1', 30),
+    };
+    const hand = transportModesOf(byHand)[0]?.$comment ?? '';
+    expect(hand).toMatch(/SET BY HAND and NOT cited: 30\.0 s/);
+    expect(hand).toMatch(/derives 21\.2 s by the EN 115-1 method/);
+    expect(hand).not.toMatch(/DERIVED by the building designer/);
+
+    // And the clause that does not travel is named where it stops holding, rather than left to be
+    // read as a citation: EN 115-1 states the two-flat-step allowance for a rise of 6 m or less.
+    const tall: BuildingSpec = {
+      ...spec,
+      transportModes: [
+        { id: 'escalator-1', connects: [0, 3], traversalTimeS: escalatorSecondsFor(spec, [0, 3]) },
+      ],
+    };
+    expect(transportModesOf(tall)[0]?.$comment ?? '').toMatch(/above 6 m, where the two-flat-step/);
+    expect(derived).not.toMatch(/above 6 m/);
+
+    // The comment is a real document field, so the loader has to take it.
+    expect(() =>
+      resolveBuilding(parseBuilding(buildingFromSpec(seeded, { specs: SPECS }) as unknown), SPECS),
+    ).not.toThrow();
   });
 
   it('mints an escalator id that never collides with one the reader kept', () => {
@@ -1139,6 +1231,14 @@ describe('the building editor is not decoration', () => {
     RoutePlanner.forBuilding(
       resolveBuilding(parseBuilding(buildingFromSpec(of, { specs: SPECS }) as unknown), SPECS),
     );
+  /** The books for one arm — `runWith`'s run, read for conservation rather than for the legs. */
+  const auditOf = (of: BuildingSpec): ConservationAudit => {
+    const building = resolveBuilding(
+      parseBuilding(buildingFromSpec(of, { specs: SPECS }) as unknown),
+      SPECS,
+    );
+    return recordRun(configFor(eta, { building }), { recordDecisions: false }).result.conservation;
+  };
 
   it('an escalator changes the run — the same shafts, and a lift leg the passengers stop riding', () => {
     /*
@@ -1155,6 +1255,23 @@ describe('the building editor is not decoration', () => {
     // merely reshuffle them. Pinned as an inequality on the counts, not on the two numbers.
     const legsOf = (of: BuildingSpec): number => (partsOf(of)[1] as unknown[]).length;
     expect(legsOf(ESCALATOR)).toBeLessThan(legsOf(SKY));
+
+    /*
+     * The inequality alone is not enough, and this is the hole it leaves: a future change that
+     * **stranded** floors in the escalator arm would satisfy it too, because demand to an
+     * unreachable floor is never generated and the leg count falls. So the books are balanced.
+     *
+     * Same journeys in both arms — nobody was lost — and every lift leg that disappeared became
+     * exactly one escalator hop. That is § D147 § 6's mechanism stated as an equation rather than
+     * inferred from a total.
+     */
+    const before = auditOf(SKY);
+    const after = auditOf(ESCALATOR);
+    expect(after.generated).toBe(before.generated);
+    expect(after.undelivered).toBe(before.undelivered);
+    expect(before.transportHops).toBe(0);
+    expect(after.transportHops).toBeGreaterThan(0);
+    expect(before.legsCreated - after.legsCreated).toBe(after.transportHops);
 
     // The mechanism, said by the real planner rather than inferred from the counts.
     expect(plannerFor(SKY).plan('G', '9')?.elevatorLegCount).toBe(3);

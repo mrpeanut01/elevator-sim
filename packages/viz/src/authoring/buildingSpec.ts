@@ -742,10 +742,91 @@ export function withTransportSeconds(
  */
 export function transportModesOf(spec: BuildingSpec): readonly TransportModeConfig[] {
   return writtenTransportModes(spec).map((mode) => ({
+    $comment: transportCommentFor(spec, mode),
     id: mode.id,
     connects: [floorIdOf(mode.connects[0]), floorIdOf(mode.connects[1])] as readonly [string, string],
     traversalTimeS: mode.traversalTimeS,
   }));
+}
+
+/**
+ * The citation `TransportModeConfig.traversalTimeS` requires, written on every machine this
+ * editor emits.
+ *
+ * The field's own contract is explicit — *"Reference value, so it must be cited in the declaring
+ * building's `$comment`"* — and a designer that emitted the number without it would put *a guess
+ * wearing a number* into `data/buildings/` with nothing to notice. `vertical-city` writes this
+ * derivation by hand four times; here it is computed, so it cannot go stale: it is re-derived from
+ * the current spec on every emit rather than carried from whatever the geometry used to be.
+ *
+ * **Two branches, and the second is the one that keeps the first honest.** A value still equal to
+ * {@link escalatorSecondsFor} is derived, and the derivation is written out with this building's
+ * own numbers. A value that is not — a reader's edit, or a figure that came back through
+ * {@link specFromBuilding} off a document whose floors are not evenly pitched — is labelled as the
+ * author's and is **not** claimed to be cited. Writing the derivation beside a number it does not
+ * produce would be the stale-citation defect this function exists to avoid.
+ */
+function transportCommentFor(spec: BuildingSpec, mode: SpecTransportMode): string {
+  const [low, high] = [Math.min(...mode.connects), Math.max(...mode.connects)];
+  const heightOf = (floor: number): string =>
+    (Math.round(floor * spec.floorHeightM * 100) / 100).toFixed(2);
+  const riseM = (high - low) * spec.floorHeightM;
+  const inclineM = riseM / ESCALATOR_SIN_INCLINATION;
+  const derivedS = escalatorSecondsFor(spec, mode.connects);
+  /*
+   * Every number is a local before it reaches a template, which is the constraint `nextZoneId`
+   * states for its own `limit`: `honesty/derive.test-helper.ts` reads a dotted member expression
+   * inside a substitution as prose, and that would make this function — and everything that calls
+   * it, up to `specIsDirty` — an unclassified **player-facing text** surface. It is not one. It is
+   * a document field, on the same footing as the `$comment` `vertical-city` writes by hand in
+   * `data/`, and classifying it as player copy would put JSON provenance under the rules written
+   * for what a reader is shown on screen. Measured, not guessed: `derive.test.ts` went red on
+   * exactly this and named the substitution.
+   */
+  const rise = riseM.toFixed(2);
+  const incline = inclineM.toFixed(2);
+  const inclineS = (inclineM / ESCALATOR_SPEED_MPS).toFixed(1);
+  const derived = derivedS.toFixed(1);
+  const declared = mode.traversalTimeS.toFixed(1);
+  const pitch = spec.floorHeightM.toFixed(2);
+  const lowId = floorIdOf(low);
+  const highId = floorIdOf(high);
+  const lowAt = heightOf(low);
+  const highAt = heightOf(high);
+  const where = `${lowId} at ${lowAt} m, ${highId} at ${highAt} m, ${pitch} m floor to floor`;
+  const method =
+    'inclination 30 degrees, which BS EN 115-1 makes the only permitted angle above a 6 m rise ' +
+    'and which is the common commercial compromise below it; nominal speed 0.5 m/s, the common ' +
+    'commercial nominal speed (EN 115-1 permits up to 0.75 m/s at 30 degrees); 2 flat steps at ' +
+    'each landing at the standard 0.40 m step depth, so 2 x 2 x 0.40 = 1.60 m of horizontal run ' +
+    'adds 3.2 s';
+  /*
+   * The one clause that does not travel. EN 115-1's two-flat-step allowance is stated for a rise
+   * of 6 m or less; above that the arithmetic below is an extrapolation, and saying so is cheaper
+   * than a number that quietly stops being a citation.
+   */
+  const beyond =
+    riseM > 6
+      ? ' This rise is above 6 m, where the two-flat-step clause does not hold, so the flat run is ' +
+        'extrapolated rather than derived.'
+      : '';
+  const source =
+    ' No CIBSE Guide D lumped escalator traversal figure was available to check this against; see ' +
+    'docs/02-elevator-reference.md.';
+  if (mode.traversalTimeS === derivedS) {
+    return (
+      `Traversal time DERIVED by the building designer from this building's own geometry, not ` +
+      `quoted: rise ${rise} m (${where}); ${method}. Incline length = ${rise} / sin 30 = ` +
+      `${incline} m at 0.5 m/s = ${inclineS} s, plus 3.2 s of landing run. Total landing to ` +
+      `landing ${derived} s.${beyond}${source}`
+    );
+  }
+  return (
+    `Traversal time SET BY HAND and NOT cited: ${declared} s landing to landing, which is not the ` +
+    `figure this building's own geometry gives. A rise of ${rise} m (${where}) derives ` +
+    `${derived} s by the EN 115-1 method — ${method}. The declared value is the author's and this ` +
+    `comment is not a citation for it.${beyond}${source}`
+  );
 }
 
 /** {@link transportModesOf} in the spec's own floor-number vocabulary. */
@@ -1232,6 +1313,23 @@ export function specFromBuilding(config: BuildingConfig, id: string): BuildingSp
      * building with none of its four escalators — a tower whose two-level lobbies had lost their
      * escalators and charged every lobby-level crossing back to a lift, with nothing on any
      * surface saying so.
+     *
+     * **The claim is exactly three fields, and it is narrower than "lossless".** `id`, `connects`
+     * and `traversalTimeS` survive; `name` and `$comment` do not, and both losses are deliberate
+     * rather than overlooked:
+     *
+     * - `name` is a label naming floors — *"Ground lobby escalator pair (G <-> 2)"* — and there is
+     *   no control here to edit one. Carrying it would mean a reader who moved a landing kept a
+     *   name that now says the wrong floors, with no way to fix it.
+     * - `$comment` carries the traversal time's citation, and a citation is only worth having
+     *   while it is true of the building it sits in. `specFromBuilding` cannot preserve an uneven
+     *   floor pitch, so `vertical-city`'s *"rise 4.5 m"* is false of the spec the moment it is
+     *   read back. {@link transportModesOf} writes a fresh one derived from the spec's own
+     *   geometry instead, and labels the value uncited when it is not the figure that geometry
+     *   gives — which is what `vertical-city`'s four machines come back as.
+     *
+     * `authoring.test.ts` asserts the surviving key set exactly, so a field that starts or stops
+     * surviving turns that test red and this paragraph has to be rewritten with it.
      *
      * A machine either of whose ends the expansion does not know is dropped whole rather than
      * half-read. It cannot occur on a document `parseBuilding` accepted — `config/parse.ts`

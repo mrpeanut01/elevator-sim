@@ -10,6 +10,7 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -748,6 +749,62 @@ describe('the landing pickers', () => {
     expect(lower.filter((choice) => choice.blocked).map((choice) => choice.floor)).toStrictEqual([7]);
     expect(upper.filter((choice) => choice.blocked).map((choice) => choice.floor)).toStrictEqual([6]);
     expect(lower.some((choice) => choice.blocked && choice.chosen)).toBe(false);
+  });
+});
+
+/**
+ * The static `title` on a landing picker, from the shipped page.
+ *
+ * Located by the control it labels rather than by position: the eyebrow sits immediately before
+ * the container it describes, so the last `title` opened before the id is that control's.
+ */
+function landingTitle(html: string, id: string): string {
+  const at = html.indexOf(`id="${id}"`);
+  expect(at, id).toBeGreaterThan(0);
+  const titles = [...html.slice(0, at).matchAll(/title="([^"]*)"/g)];
+  return titles.at(-1)?.[1] ?? '';
+}
+
+describe('the landing pickers say what they do', () => {
+  it('describes single-select, and a blocked floor that is listed rather than withheld', async () => {
+    /*
+     * Two sentences in `index.html` were **false about the mechanism they describe** — the failure
+     * mode `CLAUDE.md` opens with, landing in the one prose location this repository does not
+     * sweep. They said the picker was a *multi-select* (it is single-select) and that the blocked
+     * floor *is not offered* (it is offered, disabled).
+     *
+     * `honesty/derive.ts` classifies **producers** — functions that return strings — and a static
+     * `title` attribute has no producer, so nothing generic can reach these. This is therefore a
+     * targeted pin and not a sweep: each claim is asserted against the model fact it is a claim
+     * about, in **both** directions, so a copy edit that reintroduces either phrase turns red and
+     * so does a mechanism change that makes the corrected phrase false.
+     *
+     * The half this cannot see is the rendering: `drawTransport` maps each choice to a button and
+     * sets `disabled` on the blocked one, and that mount is not driven by any test here. What is
+     * pinned is that the choice reaches the mount at all.
+     */
+    const html = await readFile(fileURLToPath(new URL('../../index.html', import.meta.url)), 'utf8');
+    const lower = landingTitle(html, 'building-transport-lower');
+    const upper = landingTitle(html, 'building-transport-upper');
+
+    // Single-select, said and true: an end holds one floor, so at most one choice is ever chosen.
+    for (const end of [0, 1] as const) {
+      const chosen = transportFloorChoicesOf(LOBBIES, 'escalator-1', end).filter(
+        (choice) => choice.chosen,
+      );
+      expect(chosen).toHaveLength(1);
+    }
+    expect(lower).toMatch(/Pick one floor/);
+    expect(upper).toMatch(/Pick one floor/);
+    expect(`${lower} ${upper}`).not.toMatch(/multi-select/);
+
+    // Offered-but-blocked, said and true: the floor is in the list the mount draws from.
+    const blocked = transportFloorChoicesOf(LOBBIES, 'escalator-1', 1).filter(
+      (choice) => choice.blocked,
+    );
+    expect(blocked).toHaveLength(1);
+    expect(upper).toMatch(/still listed, disabled/);
+    expect(upper).not.toMatch(/is not offered/);
   });
 });
 
