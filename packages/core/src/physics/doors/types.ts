@@ -195,11 +195,14 @@ export interface DoorStopReason {
  *
  * ## Where the numbers come from
  *
- * The **shape** is the standard pedestrian speed-density relation — walking speed falls roughly
- * linearly with density above a free-flow threshold, which is the form Fruin's level-of-service
- * bands and CIBSE Guide D's lift-lobby queueing areas are both built on.
+ * The **shape** is one this module chooses and does not attribute: transfer time rises linearly
+ * with occupancy above a free-flow threshold, and is bounded. A first draft said that Fruin's
+ * level-of-service bands and CIBSE Guide D's lift-lobby queueing areas were "both built on" that
+ * relation. That is a claim about two documents neither of which was opened, so it is gone —
+ * along with the § reference beside it that a review caught first. **This module cites nothing,
+ * and says so**, which is the only honest state for a term whose provenance is a modelling choice.
  *
- * **The numbers are not.** No value here is calibrated against a cited source, and this docstring
+ * **The numbers are not calibrated either.** No value here is calibrated against a cited source, and this docstring
  * deliberately does not name a clause it has not checked: this repository's reference-data rule
  * says a figure carries its citation, and a plausible-looking section number is exactly the kind
  * of claim that goes stale without anything noticing. So there is **no default term at all** —

@@ -119,43 +119,43 @@ describe('lobby crowding reaches a shipped run', () => {
   }, 300_000);
 
   /**
-   * **The occupancy read is the landing, not the boarding cohort — which is what makes it a
-   * loop.**
+   * **The occupancy read is the landing, not the boarding cohort — proved by a threshold no
+   * cohort can reach.**
    *
-   * A car that fills up and leaves twenty people behind leaves twenty people *in the way* of the
-   * next car's boarders. If the term read `hallQueueLength` (the cohort this car is taking)
-   * instead, crowding would be a monotone function of what the car could already carry and there
-   * would be no feedback at all — raising `passengerTransferS` would do the same job.
+   * This is what makes the term a feedback loop rather than a second `passengerTransferS`: a car
+   * that fills up and leaves twenty people behind leaves twenty people *in the way* of the next
+   * car's boarders. If the term read `hallQueueLength` — the cohort this car is taking — crowding
+   * would be a monotone function of what the car could already carry, and there would be no
+   * feedback at all.
    *
-   * Measured as a difference of differences: the gap between a crowded arm and its control is
-   * larger where the queues are deeper. `midtown-office` at 12 % leaves people behind; at 3 % it
-   * does not, and the same term barely registers.
+   * **The first version of this test could not fail on that.** It compared two *arrival rates*
+   * and asserted the crowded-versus-control gap was larger where queues are deeper, which is true
+   * of the boarding cohort as well — mutating `lobbyOccupancy` to the cohort left it green. A test
+   * written so it cannot fail on the loss it exists to prevent is worse than no test
+   * (`DECISIONS.md` § D204).
+   *
+   * What replaces it is arithmetic rather than correlation. Midtown Office's cars hold **16**
+   * persons at a design load of **12**, so a boarding cohort can never exceed 16 and a threshold
+   * of **30** is unreachable by any cohort on any stop of any run. Under the cohort reading the
+   * factor would therefore be exactly 1 everywhere and the run would be bit-identical to its
+   * control. It is not — so the number being read is the landing.
    */
-  it('bites where the queues are deep and barely registers where they are not', async () => {
+  it('bites at a threshold no boarding cohort can reach', async () => {
     const config = await load();
     const building = config.buildingsById.get('midtown-office');
-    const dispatcherProfile = config.dispatcherProfilesById.get('eta');
-    if (building === undefined || dispatcherProfile === undefined) throw new Error('fixtures');
-    const at = (rate: number, lobbyCrowding?: DoorCrowdingConfig): SimulationResult =>
-      runSimulation({
-        building,
-        dispatcherProfile,
-        trafficProfiles: config.trafficProfiles,
-        elevatorSpecs: config.elevatorSpecs,
-        seed: SEED,
-        demand: { arrivalRatePctPop5min: rate },
-        reportWindow: 'full-run',
-        onTimeout: 'report',
-        ...(lobbyCrowding === undefined ? {} : { lobbyCrowding }),
-      });
-    const term: DoorCrowdingConfig = {
-      thresholdPersons: 4,
-      factorPerPerson: 0.08,
-      maxFactor: 3,
-    };
-    const deepGap = at(12, term).summary.waiting.meanS - at(12).summary.waiting.meanS;
-    const shallowGap = at(3, term).summary.waiting.meanS - at(3).summary.waiting.meanS;
-    expect(deepGap).toBeGreaterThan(shallowGap);
+    if (building === undefined) throw new Error('fixtures');
+    // Not an assumption: read off the resolved fleet, so a re-specced car fails this rather than
+    // silently making the threshold reachable and the proof vacuous.
+    const largestCar = Math.max(
+      ...building.banks.flatMap((bank) => bank.cars.map((car) => car.capacityPersons)),
+    );
+    expect(largestCar).toBeLessThan(30);
+
+    const control = legsOf(await run());
+    const crowded = legsOf(
+      await run({ thresholdPersons: 30, factorPerPerson: 0.05, maxFactor: 3 }),
+    );
+    expect(crowded).not.toBe(control);
   }, 300_000);
 
   /**

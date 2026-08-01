@@ -117,6 +117,52 @@ describe('patience reaches a shipped run', () => {
     expect(departuresOf(uniform)).not.toBe(departuresOf(exponential));
   }, 300_000);
 
+  /**
+   * **`spreadS` on its own, on the legs.**
+   *
+   * It had no criterion-2 test at all: it appeared once as a fixed value inside the
+   * distribution comparison and once in a throw test, which between them prove it is *readable*
+   * and not that it is *live*. Criterion 2 says a control that fails this is deleted rather than
+   * documented, so it needed either a test or a deletion.
+   *
+   * Measured at `midtown-office`/12 %, mean 60 s, holding everything else fixed: the width of the
+   * support alone moves who leaves and when — 335 abandonments at `spreadS: 0`, 339 at 5, 347 at
+   * 20, 366 at 55 — and the first rider out changes from `p54` at t=468.8 to `p1` at t=118.6.
+   * `garden-apartments` at 8 % was the wrong cell to look at (0 versus 1 abandonment) and would
+   * have made the knob look nearly inert; the control is live, the cell was too quiet.
+   */
+  it('widens who leaves when the uniform support widens', async () => {
+    const config = await load();
+    const building = config.buildingsById.get('midtown-office');
+    const dispatcherProfile = config.dispatcherProfilesById.get('eta');
+    if (building === undefined || dispatcherProfile === undefined) throw new Error('fixtures');
+    const at = (spreadS: number): SimulationResult =>
+      runSimulation({
+        building,
+        dispatcherProfile,
+        trafficProfiles: config.trafficProfiles,
+        elevatorSpecs: config.elevatorSpecs,
+        seed: SEED,
+        demand: { arrivalRatePctPop5min: 12 },
+        reportWindow: 'full-run',
+        onTimeout: 'report',
+        patience: { distribution: 'uniform', meanS: 60, spreadS },
+      });
+
+    const tight = at(0);
+    const wide = at(55);
+    // The legs, not a count: different people leaving at different instants.
+    expect(departuresOf(wide)).not.toBe(departuresOf(tight));
+    // …and in the direction the distribution demands — a wider support puts more of its mass
+    // below the mean, so more riders run out early.
+    expect(wide.conservation.abandoned ?? 0).toBeGreaterThan(tight.conservation.abandoned ?? 0);
+    // A middle point, so this is a monotone response rather than two endpoints that happen to
+    // differ: an implementation reading `spreadS` as a boolean would pass the two lines above.
+    const middle = at(20);
+    expect(middle.conservation.abandoned ?? 0).toBeGreaterThan(tight.conservation.abandoned ?? 0);
+    expect(middle.conservation.abandoned ?? 0).toBeLessThan(wide.conservation.abandoned ?? 0);
+  }, 300_000);
+
   it('honours the floor below which nobody leaves', async () => {
     const floored = await run({ distribution: 'exponential', meanS: 45, minS: 30 });
     for (const leg of floored.record.passengers) {
@@ -286,6 +332,35 @@ describe('patience reaches a shipped run', () => {
     expect(abandonment?.count).toBeGreaterThan(0);
     expect(abandonment?.fraction).toBeGreaterThan(0);
     expect(abandonment?.arrivalCount).toBe(leaving.summary.waiting.arrivalCount);
+  }, 300_000);
+
+  /**
+   * **The disclaimer travels with the record, because two shipped surfaces do not carry the
+   * figure yet.**
+   *
+   * `RunSummary.abandonment` and `ConservationAudit.abandoned` are the figures, and a consumer
+   * that reads them is fine. Two do not: `viz/src/record/recordRun.ts` copies
+   * `generated`/`delivered`/`undelivered` into `VizSummary` and neither new term, and
+   * `viz/src/shift/goals.ts` reads `serviceLevel.overHorizonCount` — which abandonment improves by
+   * construction, since a rider who left cannot wait past the horizon.
+   *
+   * A disclaimer is not a substitute for projecting the figures through, and this test does not
+   * pretend otherwise. What it buys is that the gap **cannot be silent**: warnings are on the
+   * `RunRecord`, are ordered disclaimers-first, and every consumer that truncates has to keep
+   * them. Silent on every run that declares neither behaviour.
+   */
+  it('says in the record that its per-leg figures describe a different population', async () => {
+    const leaving = await run({ distribution: 'exponential', meanS: 45 });
+    const disclaimer = leaving.warnings[0] ?? '';
+    expect(disclaimer).toContain('were abandoned');
+    expect(disclaimer).toContain('overHorizonCount');
+    expect(disclaimer).toContain('summary.abandonment');
+    // On the record, which is the half that gets persisted and the half viz reads.
+    expect(leaving.record.warnings?.[0]).toBe(disclaimer);
+
+    // …and silent when nobody left, so no pinned record acquires a line.
+    const quiet = await run();
+    expect(quiet.warnings.join(' ')).not.toContain('were abandoned');
   }, 300_000);
 
   /**
