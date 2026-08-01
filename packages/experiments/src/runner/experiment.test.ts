@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import type { LoadedConfig } from '@elevator-sim/core';
+import type { LoadedConfig, SimulationDemandOptions } from '@elevator-sim/core';
 
 import { GARDEN_HEALTHY, MIDTOWN_UP_PEAK, loadResources, specOf } from './fixtures.test-helper.js';
 import {
@@ -46,6 +46,105 @@ const VALID_JSON = {
   parallel: { mode: 'auto', workers: 4 },
   simulation: { onTimeout: 'report', drainGraceS: 1800 },
 };
+
+/**
+ * One non-default value per field of `SimulationDemandOptions`, as a spec author writes it.
+ *
+ * The `satisfies` is the guard: a field added to the demand surface without a row here fails to
+ * compile, which is what `DEMAND_KEYS` — a bare `as const` — could not do, and is why the
+ * allow-list and the parser were able to drift apart in the first place.
+ */
+const DEMAND_JSON = {
+  demandLevel: 'max',
+  arrivalRatePctPop5min: 9,
+  directionalSplit: { incoming: 1, outgoing: 0, interfloor: 0 },
+  batchSharesDestination: true,
+  entranceWeights: { G: 1 },
+  interfloorWeighting: 'uniform',
+  credentialAssignment: 'none',
+  maxLegs: 4,
+  peakWindowS: 420,
+  baselineFraction: 0.25,
+  mixAmplitude: 0.5,
+  batchSize: { distribution: 'explicit', weights: [0, 0, 0, 1] },
+  passengerMass: { distribution: 'lognormal', meanKg: 110, stdDevKg: 15, minKg: 40, maxKg: 200 },
+} as const satisfies Record<keyof SimulationDemandOptions, unknown>;
+
+describe('parseExperimentSpec reads every demand key it accepts', () => {
+  /**
+   * **The regression this block exists for, and it is worse than the bug it came from.**
+   *
+   * `parseDemand` has two hand-written lists: `DEMAND_KEYS`, which `rejectUnknown` consults, and
+   * the field-by-field projection that follows it. Wave 13's T3 added three keys to the first and
+   * not the second — so a spec setting them stopped being *refused with a clear error* and started
+   * being *accepted and silently ignored*. Fail-loud became fail-silent, which is strictly the
+   * wrong direction and is the same defect class the commit was written to eliminate.
+   *
+   * It survived every guard that commit added because `crn.test.ts` and the rest build specs
+   * through `fixtures.test-helper.ts`'s `specOf`, which constructs a typed `ExperimentSpec`
+   * directly and never calls `parseDemand`. Only the JSON door is affected, so only a test that
+   * comes through the JSON door can see it.
+   */
+  it('parses every key it accepts, rather than accepting keys it drops', () => {
+    const spec = parseExperimentSpec({
+      ...VALID_JSON,
+      traffic: [{ id: 'every-knob', durationS: 900, demand: DEMAND_JSON }],
+    });
+    const parsed = spec.traffic[0]?.demand;
+
+    for (const [key, value] of Object.entries(DEMAND_JSON)) {
+      expect(
+        (parsed as Record<string, unknown> | undefined)?.[key],
+        `demand.${key} is accepted by rejectUnknown and must be parsed, not dropped`,
+      ).toEqual(value);
+    }
+  });
+
+  /**
+   * The negative control the clause above needs. If `rejectUnknown` had simply been widened to
+   * accept anything, the assertion would pass by accepting a typo too.
+   */
+  it('still refuses a key that is not on the surface at all', () => {
+    expect(() =>
+      parseExperimentSpec({
+        ...VALID_JSON,
+        traffic: [{ id: 'typo', durationS: 900, demand: { passengerMasses: {} } }],
+      }),
+    ).toThrow(/passengerMasses/);
+  });
+
+  /**
+   * A malformed value inside a newly-parsed key is refused by name rather than coerced. A parser
+   * that read the key but did not validate it would pass the first clause and hand the simulator a
+   * weight vector of strings.
+   */
+  it('validates inside the keys it now parses', () => {
+    expect(() =>
+      parseExperimentSpec({
+        ...VALID_JSON,
+        traffic: [
+          {
+            id: 'bad-curve',
+            durationS: 900,
+            demand: { batchSize: { distribution: 'explicit', weights: ['many'] } },
+          },
+        ],
+      }),
+    ).toThrow(/weights/);
+    expect(() =>
+      parseExperimentSpec({
+        ...VALID_JSON,
+        traffic: [
+          {
+            id: 'bad-mass',
+            durationS: 900,
+            demand: { passengerMass: { distribution: 'normal', meanKg: 75 } },
+          },
+        ],
+      }),
+    ).toThrow(/stdDevKg/);
+  });
+});
 
 describe('parseExperimentSpec', () => {
   it('round-trips a spec that is pure JSON', () => {

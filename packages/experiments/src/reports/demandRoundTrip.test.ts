@@ -14,8 +14,16 @@
  * It has happened three times. `selection` was dropped until the weight-set selector became
  * reachable (`persistence.ts` records it in as many words: *"an invariant-5 violation the moment
  * something could turn it on"*). `trafficModel` was dropped until wave 13's F1 lane found a stored
- * `v2` run replaying as `v1`. And this commit found two more: `mixAmplitude`, live in
- * `benchmark/lunchTwoWaySelection.ts` since § D200, plus the two knobs docs/14 §§ 2.1–2.2 add.
+ * `v2` run replaying as `v1`. And this commit found two more: `mixAmplitude`, plus the two knobs
+ * docs/14 §§ 2.1–2.2 add.
+ *
+ * **What the `mixAmplitude` instance is and is not.** `TRAFFIC_DEFAULTS.mixAmplitude` is 1, so a
+ * stored flat-mix control at `0` that lost the field would rebuild at the full authored arc — the
+ * control replaying with its treatment's mix. That is the mechanism. It is **not** a claim that any
+ * published figure is wrong: `createStoredRun` has no non-test caller in this tree, so nothing has
+ * yet stored a run through this path. The right description is a **latent violation on a public
+ * exported API**, and it is the most serious of the three anyway, because it predates this branch
+ * and sits underneath the negative control § D162 condition 5 requires.
  *
  * ## Why the existing guards did not catch any of them
  *
@@ -121,13 +129,17 @@ describe('the stored record carries every demand override', () => {
   }, 300_000);
 
   /**
-   * **And the rebuilt configuration carries them too**, which is the half that actually decides
-   * whether the run reproduces.
+   * **And the rebuilt configuration carries them too.**
    *
-   * `replaySimulationConfig` rebuilds by explicit field enumeration — the same construction that
-   * dropped `trafficModel` — so a field can survive the record and still be lost on the way back
-   * into a `SimulationConfig`. Storage and reconstruction are two separate hand-written lists and
-   * this asserts both.
+   * An earlier version of this comment said `replaySimulationConfig` rebuilds the demand block by
+   * explicit field enumeration. **It does not** — `replay.ts` spreads `config.demand` wholesale,
+   * so nothing is lost on that leg. The enumeration that is the risk is on the **storage** side,
+   * which is where all three historical drops happened.
+   *
+   * The assertion is still worth making, for the narrower reason: `replaySimulationConfig` *does*
+   * rebuild by explicit enumeration at the level above — that is how `trafficModel` was dropped —
+   * so this pins that the demand block continues to reach a `SimulationConfig` whole rather than
+   * being re-projected field by field at some later date.
    */
   it('rebuilds a replay configuration that still carries every field', () => {
     const stored = parseStoredRun(

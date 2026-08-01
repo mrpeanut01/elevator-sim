@@ -29,12 +29,14 @@ import {
 } from '@elevator-sim/core';
 
 import type {
+  BatchSizeCurve,
   CredentialAssignment,
   DemandLevel,
   DemandTemplateId,
   DirectionalSplit,
   DispatchPolicyOptions,
   InterfloorWeighting,
+  PassengerMassOverride,
   ReportWindow,
   SimulationDemandOptions,
   SummarizeOptions,
@@ -126,6 +128,11 @@ function asStringArray(value: unknown, path: string): readonly string[] {
   return (value as unknown[]).map((entry, index) => asString(entry, `${path}[${index}]`));
 }
 
+function asNumberArray(value: unknown, path: string): readonly number[] {
+  if (!Array.isArray(value)) fail(path, `expected an array, received ${describe(value)}`);
+  return (value as unknown[]).map((entry, index) => asFiniteNumber(entry, `${path}[${index}]`));
+}
+
 function asNumberRecord(value: unknown, path: string): Readonly<Record<string, number>> {
   const record = asRecord(value, path);
   const out: Record<string, number> = {};
@@ -141,25 +148,6 @@ const present = (record: Record<string, unknown>, key: string): boolean =>
  * Spec validation
  * -------------------------------------------------------------------------- */
 
-const DEMAND_KEYS = [
-  'demandLevel',
-  'arrivalRatePctPop5min',
-  'directionalSplit',
-  'batchSharesDestination',
-  'entranceWeights',
-  'interfloorWeighting',
-  'credentialAssignment',
-  'maxLegs',
-  'peakWindowS',
-  'baselineFraction',
-  // `mixAmplitude` was live on the demand surface and unreachable from a spec; the two below are
-  // docs/14 §§ 2.1-2.2. A knob `rejectUnknown` refuses here is a knob no experiment can sweep,
-  // which is the quieter half of the same drift `crn.ts` records.
-  'mixAmplitude',
-  'batchSize',
-  'passengerMass',
-] as const;
-
 function parseDirectionalSplit(value: unknown, path: string): DirectionalSplit {
   const record = asRecord(value, path);
   rejectUnknown(record, ['incoming', 'outgoing', 'interfloor'], path);
@@ -170,51 +158,93 @@ function parseDirectionalSplit(value: unknown, path: string): DirectionalSplit {
   };
 }
 
+/** A group-size curve as a spec author writes it. docs/14 § 2.2. */
+function parseBatchSize(value: unknown, path: string): BatchSizeCurve {
+  const record = asRecord(value, path);
+  rejectUnknown(record, ['distribution', 'mean', 'weights'], path);
+  return {
+    distribution: asString(record['distribution'], `${path}.distribution`),
+    ...(present(record, 'mean') ? { mean: asFiniteNumber(record['mean'], `${path}.mean`) } : {}),
+    ...(present(record, 'weights')
+      ? { weights: asNumberArray(record['weights'], `${path}.weights`) }
+      : {}),
+  };
+}
+
+/** A body-mass block as a spec author writes it. All five required. docs/14 § 2.1. */
+function parsePassengerMass(value: unknown, path: string): PassengerMassOverride {
+  const record = asRecord(value, path);
+  rejectUnknown(record, ['distribution', 'meanKg', 'stdDevKg', 'minKg', 'maxKg'], path);
+  return {
+    distribution: asString(record['distribution'], `${path}.distribution`),
+    meanKg: asFiniteNumber(record['meanKg'], `${path}.meanKg`),
+    stdDevKg: asFiniteNumber(record['stdDevKg'], `${path}.stdDevKg`),
+    // Both bounds required, here as everywhere: an override that reaches the sampler without them
+    // draws from an untruncated distribution, and docs/14 § 2.1 makes that a refusal rather than a
+    // default. A spec is the one door where they could arrive half-written.
+    minKg: asFiniteNumber(record['minKg'], `${path}.minKg`),
+    maxKg: asFiniteNumber(record['maxKg'], `${path}.maxKg`),
+  };
+}
+
+/**
+ * **One parser per field of `SimulationDemandOptions`, and the allow-list is derived from it.**
+ *
+ * This was two hand-written lists — a `DEMAND_KEYS` array that `rejectUnknown` consulted and a
+ * field-by-field projection beneath it — and they drifted, in the worse of the two possible
+ * directions. Wave 13's T3 added three keys to the allow-list and not to the projection, so a spec
+ * setting them stopped being *refused with a clear error* and started being *accepted and silently
+ * ignored*: the parser advertised three knobs it dropped on the floor.
+ *
+ * The mapped type is what stops that recurring, and it is stronger than a `satisfies` on a list of
+ * names. `-?` makes every key of the demand surface **required here**, so a new field fails the
+ * build until it has a parser; the return type is `NonNullable<SimulationDemandOptions[K]>`, so a
+ * parser that returns the wrong shape fails too. {@link DEMAND_KEYS} is then `Object.keys` of this
+ * record rather than a second list, which makes "accepted but not parsed" unrepresentable rather
+ * than merely tested for.
+ *
+ * `experiment.test.ts` drives this through `parseExperimentSpec` — the JSON door — because that is
+ * the only door affected: every other test builds a typed `ExperimentSpec` directly and never
+ * reaches this function.
+ */
+type DemandParsers = {
+  readonly [K in keyof Required<SimulationDemandOptions>]-?: (
+    value: unknown,
+    path: string,
+  ) => NonNullable<SimulationDemandOptions[K]>;
+};
+
+const DEMAND_PARSERS: DemandParsers = {
+  demandLevel: (value, path) => asMember<DemandLevel>(value, DEMAND_LEVELS, path),
+  arrivalRatePctPop5min: asFiniteNumber,
+  directionalSplit: parseDirectionalSplit,
+  batchSharesDestination: asBoolean,
+  entranceWeights: asNumberRecord,
+  interfloorWeighting: (value, path) =>
+    asMember<InterfloorWeighting>(value, INTERFLOOR_WEIGHTINGS, path),
+  credentialAssignment: (value, path) =>
+    asMember<CredentialAssignment>(value, CREDENTIAL_ASSIGNMENTS, path),
+  maxLegs: asFiniteNumber,
+  peakWindowS: asFiniteNumber,
+  baselineFraction: asFiniteNumber,
+  mixAmplitude: asFiniteNumber,
+  batchSize: parseBatchSize,
+  passengerMass: parsePassengerMass,
+};
+
+/** The accepted key set, derived rather than restated. See {@link DEMAND_PARSERS}. */
+const DEMAND_KEYS = Object.keys(DEMAND_PARSERS) as readonly (keyof SimulationDemandOptions)[];
+
 function parseDemand(value: unknown, path: string): SimulationDemandOptions {
   const record = asRecord(value, path);
   rejectUnknown(record, DEMAND_KEYS, path);
-  return {
-    ...(present(record, 'demandLevel')
-      ? { demandLevel: asMember<DemandLevel>(record['demandLevel'], DEMAND_LEVELS, `${path}.demandLevel`) }
-      : {}),
-    ...(present(record, 'arrivalRatePctPop5min')
-      ? { arrivalRatePctPop5min: asFiniteNumber(record['arrivalRatePctPop5min'], `${path}.arrivalRatePctPop5min`) }
-      : {}),
-    ...(present(record, 'directionalSplit')
-      ? { directionalSplit: parseDirectionalSplit(record['directionalSplit'], `${path}.directionalSplit`) }
-      : {}),
-    ...(present(record, 'batchSharesDestination')
-      ? { batchSharesDestination: asBoolean(record['batchSharesDestination'], `${path}.batchSharesDestination`) }
-      : {}),
-    ...(present(record, 'entranceWeights')
-      ? { entranceWeights: asNumberRecord(record['entranceWeights'], `${path}.entranceWeights`) }
-      : {}),
-    ...(present(record, 'interfloorWeighting')
-      ? {
-          interfloorWeighting: asMember<InterfloorWeighting>(
-            record['interfloorWeighting'],
-            INTERFLOOR_WEIGHTINGS,
-            `${path}.interfloorWeighting`,
-          ),
-        }
-      : {}),
-    ...(present(record, 'credentialAssignment')
-      ? {
-          credentialAssignment: asMember<CredentialAssignment>(
-            record['credentialAssignment'],
-            CREDENTIAL_ASSIGNMENTS,
-            `${path}.credentialAssignment`,
-          ),
-        }
-      : {}),
-    ...(present(record, 'maxLegs') ? { maxLegs: asFiniteNumber(record['maxLegs'], `${path}.maxLegs`) } : {}),
-    ...(present(record, 'peakWindowS')
-      ? { peakWindowS: asFiniteNumber(record['peakWindowS'], `${path}.peakWindowS`) }
-      : {}),
-    ...(present(record, 'baselineFraction')
-      ? { baselineFraction: asFiniteNumber(record['baselineFraction'], `${path}.baselineFraction`) }
-      : {}),
-  };
+  const parsed: Record<string, unknown> = {};
+  for (const key of DEMAND_KEYS) {
+    // Spread-or-omit, as a loop: a key the spec did not set stays absent rather than becoming a
+    // present `undefined`, which `exactOptionalPropertyTypes` and `traceKeyOf` both distinguish.
+    if (present(record, key)) parsed[key] = DEMAND_PARSERS[key](record[key], `${path}.${key}`);
+  }
+  return parsed as SimulationDemandOptions;
 }
 
 function parseWindowSelection(value: unknown, path: string): WindowSelection {

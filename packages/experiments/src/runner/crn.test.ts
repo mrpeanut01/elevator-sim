@@ -185,7 +185,8 @@ describe('traceKeyOf', () => {
    *
    * Found by adversarial review of wave 13's T3: the two docs/14 §§ 2.1-2.2 knobs were omitted, and
    * so was `mixAmplitude` — the flat-mix negative control § D162 condition 5 requires, which would
-   * have been cohorted *with the treatment it is the control for*.
+   * have been cohorted *with the treatment it is the control for*. No shipped experiment sets it,
+   * so this is a cohort that could have merged rather than one that did.
    *
    * `satisfies Record<keyof SimulationDemandOptions, ...>` is what stops the next one: a field
    * added to the demand surface without a row here fails to compile. `verifyCrnAlignment` compares
