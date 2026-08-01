@@ -1063,6 +1063,8 @@ export type {
   SimEventType,
   SimParameterSpec,
   SimParameterType,
+  PatienceConfig,
+  PatienceDistribution,
   SimulationConfig,
   SimulationDemandOptions,
   SimulationResult,
