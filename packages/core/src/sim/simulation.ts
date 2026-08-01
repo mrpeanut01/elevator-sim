@@ -766,11 +766,25 @@ export class Simulation {
 
     this.#factory = new PassengerFactory({
       streams: this.#streams,
-      // The run's own block when it overrode one (docs/14 § 2.1), so the factory and the trace
-      // cannot draw from two different populations. `PassengerFactory.arrive` has no shipped
-      // caller today — the trace carries every first-leg mass and `transfer` reuses it — so this
-      // is the seam being kept honest rather than a behaviour changing.
-      massConfig: config.demand?.passengerMass ?? config.trafficProfiles.passengerMass,
+      /*
+       * **The reference block, not the run's `demand.passengerMass` override — and that is a
+       * decision, not an oversight.**
+       *
+       * Wave 13's T3 briefly resolved the override here so the factory and the trace could not
+       * draw from two different populations. Adversarial review pointed out the cost: reverting it
+       * passed every test in `traffic`, `sim` and `model`, because **nothing reaches it**.
+       * `PassengerFactory.arrive` has no caller outside its own docstring — `toPassengerInit`
+       * bypasses the factory for every first leg and `transfer` reuses the mass it already drew —
+       * so the line was an untested behaviour guarding a path that does not exist, which is the
+       * defect this repository's standing requirement names rather than a defence against it.
+       *
+       * **The obligation it was carrying is real and is recorded here instead.** The moment
+       * `arrive` gains a shipped caller, this argument must become
+       * `config.demand?.passengerMass ?? config.trafficProfiles.passengerMass` and that wiring must
+       * be tested on the legs, or a run with a mass override will create arrivals from the
+       * reference population while its trace uses the overridden one.
+       */
+      massConfig: config.trafficProfiles.passengerMass,
       topology: this.#building,
       // Distinct from the trace's `p...` ids, so a leg id can never collide with a journey's
       // first-leg id and silently overwrite it in the recorder.

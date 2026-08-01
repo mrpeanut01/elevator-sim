@@ -703,7 +703,44 @@ function parseDemandOptions(value: unknown, path: Path): StoredDemandOptions {
     'maxLegs',
     'peakWindowS',
     'baselineFraction',
+    'mixAmplitude',
+    'batchSize',
+    'passengerMass',
   ]);
+
+  const batchSize = readOptional(object, 'batchSize', path, (entry, entryPath) => {
+    const inner = expectObject(entry, entryPath);
+    rejectUnknownKeys(inner, entryPath, ['distribution', 'mean', 'weights']);
+    return Object.freeze({
+      distribution: expectString(inner['distribution'], [...entryPath, 'distribution']),
+      ...spread('mean', readOptional(inner, 'mean', entryPath, expectNumber)),
+      ...spread(
+        'weights',
+        readOptional(inner, 'weights', entryPath, expectNumberArray),
+      ),
+    });
+  });
+
+  const passengerMass = readOptional(object, 'passengerMass', path, (entry, entryPath) => {
+    const inner = expectObject(entry, entryPath);
+    rejectUnknownKeys(inner, entryPath, [
+      'distribution',
+      'meanKg',
+      'stdDevKg',
+      'minKg',
+      'maxKg',
+    ]);
+    // All five required on the way back in, exactly as the override type requires them on the way
+    // out: a stored block missing a truncation bound would replay an unbounded population, which
+    // is the failure docs/14 § 2.1 makes the bounds mandatory to prevent.
+    return Object.freeze({
+      distribution: expectString(inner['distribution'], [...entryPath, 'distribution']),
+      meanKg: expectNumber(inner['meanKg'], [...entryPath, 'meanKg']),
+      stdDevKg: expectNumber(inner['stdDevKg'], [...entryPath, 'stdDevKg']),
+      minKg: expectNumber(inner['minKg'], [...entryPath, 'minKg']),
+      maxKg: expectNumber(inner['maxKg'], [...entryPath, 'maxKg']),
+    });
+  });
 
   const split = readOptional(object, 'directionalSplit', path, (entry, entryPath) => {
     const inner = expectObject(entry, entryPath);
@@ -750,6 +787,9 @@ function parseDemandOptions(value: unknown, path: Path): StoredDemandOptions {
     ...spread('maxLegs', readOptional(object, 'maxLegs', path, expectNumber)),
     ...spread('peakWindowS', readOptional(object, 'peakWindowS', path, expectNumber)),
     ...spread('baselineFraction', readOptional(object, 'baselineFraction', path, expectNumber)),
+    ...spread('mixAmplitude', readOptional(object, 'mixAmplitude', path, expectNumber)),
+    ...spread('batchSize', batchSize),
+    ...spread('passengerMass', passengerMass),
   });
 }
 
@@ -982,6 +1022,16 @@ function demandOptionsOf(demand: NonNullable<SimulationConfig['demand']>): Store
     ...spread('maxLegs', demand.maxLegs),
     ...spread('peakWindowS', demand.peakWindowS),
     ...spread('baselineFraction', demand.baselineFraction),
+    // Pre-existing, and the same defect class: live in `benchmark/lunchTwoWaySelection.ts` and
+    // dropped here since it landed. See `StoredDemandOptions.mixAmplitude`.
+    ...spread('mixAmplitude', demand.mixAmplitude),
+    // docs/14 §§ 2.1-2.2, and they are here for the reason `dispatcherOptionsOf` records beside
+    // `selection`: a hand-written projection that omits a reachable override stores the run as a
+    // run without it, and the replay then succeeds against **a different crowd**. `demandKeyRound
+    // Trip.test.ts` derives this list from `SimulationDemandOptions` itself so the next field
+    // cannot be forgotten the same way.
+    ...spread('batchSize', demand.batchSize),
+    ...spread('passengerMass', demand.passengerMass),
   });
 }
 

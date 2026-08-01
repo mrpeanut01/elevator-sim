@@ -183,7 +183,12 @@ function canonicalize(value: unknown): unknown {
  * The CRN equivalence class of a cell: everything the passenger trace is a function of, apart
  * from the seed.
  *
- * The field list mirrors core's `traceConfigFor` exactly, and the omissions are the point:
+ * The field list mirrors core's `traceConfigFor`, and the omissions below the `demand.*` row are
+ * the point. **That mirroring is maintained by hand and has drifted before**: the two docs/14
+ * §§ 2.1-2.2 knobs and `mixAmplitude` were all absent from this key while being live on the demand
+ * surface, so two cells running different populations shared a cohort and were paired. A field
+ * missing here does not fail — it *merges*, which is why `crn.test.ts` now derives the field list
+ * from `keyof SimulationDemandOptions` with a `satisfies` rather than trusting this sentence.
  *
  * | Field | In the key? | Why |
  * |---|---|---|
@@ -216,6 +221,11 @@ export function traceKeyOf(simulation: CellSimulationConfig): string {
     maxLegs: demand.maxLegs,
     peakWindowS: demand.peakWindowS,
     baselineFraction: demand.baselineFraction,
+    // `canonicalize` drops `undefined` entries, so a cell that sets none of these three produces
+    // exactly the key it produced before they existed — no cohort in any existing experiment moves.
+    mixAmplitude: demand.mixAmplitude,
+    batchSize: demand.batchSize,
+    passengerMass: demand.passengerMass,
   });
 }
 

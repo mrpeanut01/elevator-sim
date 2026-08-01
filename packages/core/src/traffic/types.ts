@@ -828,14 +828,27 @@ export interface TrafficParameterSpec {
 /**
  * Every demand tunable this module honours.
  *
- * Two entries carry `default: null`, meaning "unset, and unset is meaningful".
+ * **Twelve entries carry `default: null`**, meaning "unset, and unset is meaningful" — the count is
+ * asserted in `parameters.test.ts` rather than only stated here, because this sentence said "two"
+ * while four were declared and would otherwise still say it now there are twelve.
+ *
  * `traffic.arrivalRatePctPop5min` unset means "use the profile's own number for the selected
  * `demandLevel`", which is not a number this schema can name — naming one would silently run
  * every building at it. Its range spans the union of the shipped profiles' ranges
  * (residential 3% to prestige office 17%) with headroom above, because pushing demand past
  * handling capacity to exercise saturation detection is a legitimate experiment. The three
  * `traffic.directionalSplit.*` entries are the same: unset means each floor keeps its own
- * profile's mix, and they are set together or not at all.
+ * profile's mix, and they are set together or not at all. The three `traffic.batchSize.*` and
+ * five `traffic.passengerMass.*` entries (docs/14 §§ 2.1-2.2) are the same again: the curve and
+ * the population live in `data/traffic-profiles.json`, and a number here would be a second source
+ * of truth for one the reference file already states.
+ *
+ * **What `default: null` costs, said plainly rather than implied.** `collectSearchSpace` classifies
+ * a null-default row as *unsearchable* — "a search needs a point it can start from" — so all
+ * twelve are declared, typed, ranged and **excluded from the space a generic optimizer walks**.
+ * These rows satisfy invariant 8's *declaration* requirement and not its *searchability* purpose,
+ * and calling them "searchable tunables" would overstate what shipped. Making them searchable means
+ * giving the collector a per-building origin to start from, which is a different piece of work.
  *
  * What is deliberately *not* here: `idPrefix`, `journeyIdPrefix` and `batchIdPrefix` (labels
  * on the output, which cannot move a metric) and `building`, `profiles` and `streams` (the

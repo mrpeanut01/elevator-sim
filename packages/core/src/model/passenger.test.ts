@@ -433,3 +433,69 @@ describe('PassengerFactory', () => {
     ).toThrow(/Unknown destination floor "99"/);
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * The premise a comment in `sim/simulation.ts` depends on
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **`PassengerFactory.arrive` has no caller, and that fact is load-bearing elsewhere.**
+ *
+ * `sim/simulation.ts` hands the factory `config.trafficProfiles.passengerMass` — the *reference*
+ * block — rather than the run's `demand.passengerMass` override, and the comment there says why:
+ * nothing reaches `arrive`, so resolving the override would have been an untested behaviour
+ * guarding a path that does not exist. That is only true while the premise holds.
+ *
+ * A comment cannot fail. This repository has just spent two commits repairing sentences that went
+ * stale exactly this way — `crn.ts`'s *"mirrors `traceConfigFor` exactly"* and `patternSpec.ts`'s
+ * *"`SimulationDemandOptions` has no batch-size field"* were both true when written. So the premise
+ * is asserted rather than asserted-about: the moment somebody wires `arrive` into a shipped path,
+ * this reds and points at the argument that then has to change.
+ *
+ * Comments and docstrings are blanked before scanning, because both surviving mentions of
+ * `.arrive(` in the tree are inside docstrings — `PassengerFactory`'s own usage example here, and
+ * a `bank.arrive(...)` line in `kernel/types.ts` illustrating `kernel.schedule`.
+ */
+describe('PassengerFactory.arrive', () => {
+  it('has no caller in any shipped path, which is what lets simulation.ts use the reference block', async () => {
+    const { readdirSync, readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+
+    const packagesDir = fileURLToPath(new URL('../../..', import.meta.url));
+    const blankComments = (text: string): string =>
+      text
+        // Preserve line numbers so the reported location is the real one.
+        .replace(/\/\*[\s\S]*?\*\//g, (match) => match.replace(/[^\n]/g, ' '))
+        .replace(/\/\/[^\n]*/g, '');
+
+    const sources: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.name === 'node_modules' || entry.name === 'dist') continue;
+        if (entry.isDirectory()) walk(full);
+        else if (full.endsWith('.ts') && !full.includes('.test.')) sources.push(full);
+      }
+    };
+    walk(packagesDir);
+    // Guard against a vacuous pass if the walk ever stops finding anything.
+    expect(sources.length).toBeGreaterThan(100);
+
+    const callers: string[] = [];
+    for (const file of sources) {
+      blankComments(readFileSync(file, 'utf8'))
+        .split('\n')
+        .forEach((line, index) => {
+          if (/\.arrive\s*\(/.test(line)) {
+            callers.push(`${file.slice(packagesDir.length)}:${index + 1}`);
+          }
+        });
+    }
+
+    expect(
+      callers,
+      'PassengerFactory.arrive gained a caller. sim/simulation.ts hands the factory the REFERENCE mass block on the premise that nothing reaches it; that argument must now become `config.demand?.passengerMass ?? config.trafficProfiles.passengerMass` and be tested on the legs (docs/14 § 2.1).',
+    ).toEqual([]);
+  });
+});

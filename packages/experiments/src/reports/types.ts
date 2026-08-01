@@ -60,6 +60,7 @@
  */
 
 import type {
+  BatchSizeCurve,
   CredentialAssignment,
   DemandLevel,
   DemandTemplateId,
@@ -67,6 +68,7 @@ import type {
   EligibilityStageConfig,
   InterfloorWeighting,
   ResolvedNormalization,
+  PassengerMassOverride,
   PercentileMethod,
   ReportWindow,
   ResolvedDemandTemplate,
@@ -123,6 +125,35 @@ export interface StoredDemandOptions {
   readonly maxLegs?: number | undefined;
   readonly peakWindowS?: number | undefined;
   readonly baselineFraction?: number | undefined;
+  /**
+   * How much of a mix-varying template's authored arc the run kept.
+   *
+   * **Found missing by wave 13's T3 while adding the two fields below.** § D162 condition 5 makes
+   * `0` the flat-mix negative control every mix-varying result must be measured against, and
+   * `TRAFFIC_DEFAULTS.mixAmplitude` is `1` — so a stored control that lost this field would rebuild
+   * at the full authored arc, the control carrying its treatment's mix.
+   *
+   * **Latent rather than realised**: `createStoredRun` has no non-test caller, so no shipped study
+   * has been stored through this path and no published figure is in question. It is recorded as the
+   * more serious of the three omissions all the same, because it predates the branch that found it
+   * and sits under a published negative control.
+   */
+  readonly mixAmplitude?: number | undefined;
+  /**
+   * The group-size curve and the body-mass block, docs/14 §§ 2.1-2.2.
+   *
+   * These joined the list the moment they became reachable from `runSimulation`, and the reason is
+   * the one `dispatcherOptionsOf` records beside `selection`: a field this projection drops is a
+   * field the record does not carry, and a record that stores an override as nothing **replays as
+   * the default**. For a group-size curve that is a different crowd; for a mass block it is a
+   * different population in the same crowd. Either way it is an invariant-5 violation — the run
+   * cannot be reproduced from its own record — and it is silent, because the replay succeeds.
+   *
+   * Both are plain JSON: `BatchSizeCurve` is a string, an optional number and an optional number
+   * array; `PassengerMassOverride` is a string and four numbers.
+   */
+  readonly batchSize?: BatchSizeCurve | undefined;
+  readonly passengerMass?: PassengerMassOverride | undefined;
 }
 
 /**
