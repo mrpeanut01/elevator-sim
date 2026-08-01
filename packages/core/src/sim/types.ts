@@ -622,6 +622,22 @@ export interface ConservationAudit {
    * once the rate passes its declared threshold.
    */
   readonly abandoned?: number;
+  /**
+   * Hall calls **taken back** because everybody who had pressed the button walked away.
+   *
+   * Absent on a run that declares no `sim.patience`, by {@link abandoned}'s rule and for the same
+   * reason. Present and `0` would mean riders left but never emptied a landing.
+   *
+   * It is counted rather than assumed because the withdrawal is a real behaviour with a measured
+   * effect and not an obvious one. Removing it does **not** strand anybody — a car sent to an
+   * empty landing declines to stop and `#reofferCall` clears the call on arrival — so a reader
+   * could reasonably conclude the whole path is redundant. Measured on `midtown-office` under
+   * `nearest-car` at 12 % arrivals with a 60 s mean patience, it is not: withdrawing the call
+   * boards **258** legs against **251**, abandons **437** against **444**, and drives **3 323 m**
+   * against **3 409 m**. The difference is a car released to work that still exists instead of
+   * committed to a landing nobody is standing on.
+   */
+  readonly callsWithdrawn?: number;
 
   /**
    * `generated === delivered + undelivered + (abandoned ?? 0) && legsCreated === legsRecorded`.

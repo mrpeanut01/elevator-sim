@@ -87,6 +87,7 @@ describe('patience reaches a shipped run', () => {
   it('adds no key to a run that did not ask for it', async () => {
     const quiet = await run();
     expect(Object.keys(quiet.conservation)).not.toContain('abandoned');
+    expect(Object.keys(quiet.conservation)).not.toContain('callsWithdrawn');
     expect(Object.keys(quiet.summary)).not.toContain('abandonment');
     for (const leg of quiet.record.passengers) {
       expect(Object.keys(leg)).not.toContain('abandonedAt');
@@ -146,6 +147,30 @@ describe('patience reaches a shipped run', () => {
     expect(result.warnings.join(' ')).not.toContain('was never collected');
   }, 300_000);
 
+  /**
+   * **An abandoned rider's wait is known, not censored.**
+   *
+   * `diagnoseServiceLevel` treats a leg that never boarded as waiting until the run stopped,
+   * which is the right lower bound for somebody still standing there. For somebody who left at
+   * t=60 of a half-hour run it credits them with twenty-nine minutes they spent elsewhere, and
+   * reports a `starved` verdict about a person who was not in the building.
+   */
+  it('does not credit a rider who left with the time they spent elsewhere', async () => {
+    const result = await run({ distribution: 'exponential', meanS: 45 });
+    const longest = Math.max(
+      ...result.record.passengers.map((leg) =>
+        leg.boardedAt === undefined
+          ? leg.abandonedAt === undefined
+            ? result.endedAt - leg.arrivedAt
+            : leg.abandonedAt - leg.arrivedAt
+          : leg.boardedAt - leg.arrivedAt,
+      ),
+    );
+    expect(result.summary.serviceLevel.longestWaitS).toBeLessThanOrEqual(longest + 1e-9);
+    // Not vacuous: the run really is long enough for the censored reading to be much bigger.
+    expect(result.endedAt).toBeGreaterThan(longest * 2);
+  }, 300_000);
+
   it('keeps the books balanced with a third column', async () => {
     const result = await run({ distribution: 'exponential', meanS: 45 });
     const { generated, delivered, undelivered, abandoned } = result.conservation;
@@ -154,6 +179,44 @@ describe('patience reaches a shipped run', () => {
     expect(result.conservation.balanced).toBe(true);
     // The abandoned are *not* in the undelivered list: they are not in the system.
     expect(result.undelivered.length).toBe(undelivered);
+  }, 300_000);
+
+  /**
+   * **The hall call goes with them, and the withdrawal is a measured behaviour rather than a
+   * tidy-up.**
+   *
+   * A reader could reasonably think this path is redundant: a car sent to an empty landing
+   * declines to stop and `#reofferCall` clears the call on arrival, so nobody is stranded either
+   * way. Measured, it is not redundant. On `midtown-office` under `nearest-car` at 12 % arrivals
+   * with a 60 s mean patience, withdrawing the call boards **258** legs against **251**, abandons
+   * **437** against **444** and drives **3 323 m** against **3 409 m** — a car released to work
+   * that still exists instead of committed to a landing nobody is standing on. The cell is
+   * `nearest-car`'s rather than `eta`'s deliberately: `eta` re-scores often enough that the two
+   * arms coincide there, and a test pinned to the arm where a mechanism happens to be invisible
+   * is a test that cannot fail on the thing it exists for.
+   */
+  it('takes the call back when the landing empties', async () => {
+    const config = await load();
+    const building = config.buildingsById.get('midtown-office');
+    const dispatcherProfile = config.dispatcherProfilesById.get('nearest-car');
+    if (building === undefined || dispatcherProfile === undefined) throw new Error('fixtures');
+    const result = runSimulation({
+      building,
+      dispatcherProfile,
+      trafficProfiles: config.trafficProfiles,
+      elevatorSpecs: config.elevatorSpecs,
+      seed: SEED,
+      demand: { arrivalRatePctPop5min: 12 },
+      reportWindow: 'full-run',
+      onTimeout: 'report',
+      patience: { distribution: 'exponential', meanS: 60 },
+    });
+    expect(result.conservation.callsWithdrawn ?? 0).toBeGreaterThan(0);
+    // The measured consequence, pinned: more people boarded and fewer left than the arm that
+    // leaves the button lit. Both halves, because a withdrawal that only moved the travel figure
+    // would be a cost with no benefit.
+    expect(result.summary.counts.boarded).toBe(258);
+    expect(result.conservation.abandoned).toBe(437);
   }, 300_000);
 
   it('reports `abandoned: 0` when the question was asked and nobody left', async () => {

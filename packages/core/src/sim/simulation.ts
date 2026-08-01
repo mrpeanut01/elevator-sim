@@ -562,6 +562,8 @@ export class Simulation {
   readonly #abandonedLegs = new Set<string>();
   /** Journeys ended by an abandonment. See {@link ConservationAudit.abandoned}. */
   readonly #abandonedJourneys = new Set<string>();
+  /** Calls taken back because their landing emptied. See {@link ConservationAudit.callsWithdrawn}. */
+  #callsWithdrawn = 0;
 
   /* ---- double-deck operation, counted rather than asserted ---- */
 
@@ -1486,6 +1488,7 @@ export class Simulation {
    * cosmetic.
    */
   #withdrawCall(active: ActiveCall, at: SimTime): void {
+    this.#callsWithdrawn += 1;
     this.#unservable.delete(active.id);
     this.#refusals.delete(active.id);
     this.#policies.get(active.bankId)?.cancel(active.id);
@@ -3866,7 +3869,9 @@ export class Simulation {
        * pinned figure (docs/14 § 5 criterion 1). Present and `0` is the different, useful claim:
        * riders *could* have left and none did.
        */
-      ...(this.#options.patience === undefined ? {} : { abandoned }),
+      ...(this.#options.patience === undefined
+        ? {}
+        : { abandoned, callsWithdrawn: this.#callsWithdrawn }),
       balanced:
         problems.length === 0 &&
         legsCreated === legsRecorded &&

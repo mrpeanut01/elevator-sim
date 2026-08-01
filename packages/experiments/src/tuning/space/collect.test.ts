@@ -300,7 +300,23 @@ describe('every parameter core declares is accounted for', () => {
     // at. The second is the one that matters, because it is the flat-mix negative control
     // `DECISIONS.md` § D162 condition 5 requires — a control an arm could set for itself would
     // not be one.
-    expect(rows).toBe(108);
+    //
+    // **108 -> 113 and the space unmoved at 56 in wave 13**, which is the `sim.assignedWalkS`
+    // relationship a fourth time and an eleventh schema. Five rows landed with docs/14 § 3.1's
+    // patience and abandonment: four are a new `PATIENCE_PARAMETERS` schema in `core/src/sim`
+    // (`sim.patience.distribution`, `.meanS`, `.spreadS`, `.minS`) and the fifth is
+    // `metrics.maxAbandonmentFraction`, the rate above which a run refuses its own mean. None is
+    // authorable in a dispatcher profile and none should be: patience is a property of the
+    // *crowd* a dispatcher is measured against, and a dispatcher that could tune how long riders
+    // are willing to wait — or the rate at which their leaving stops being reportable — could
+    // tune away the evidence of its own queues. That is `metrics.maxWaitHorizonS`'s argument
+    // exactly, one axis over.
+    //
+    // The patience rows are their own schema rather than four more on `SIM_PARAMETERS` because
+    // that table's ids are flat `sim.<key>` names bound one-for-one to `SIM_DEFAULTS`, and a
+    // patience curve has no scalar default: the absent block *is* the default, which is what
+    // keeps a run that declares none byte-identical to one produced before the feature existed.
+    expect(rows).toBe(113);
     expect(SPACE.parameters.length).toBe(56);
     // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
     // always said `false` would satisfy the biconditional above only by accident.
