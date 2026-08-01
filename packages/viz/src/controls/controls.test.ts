@@ -248,7 +248,7 @@ describe('coverage of the shipped schema — the one claim that needs the real o
      *   the demand horizon; the fallback to the reconstructed queue series), so the bound was
      *   right and the scale was wrong. Fixed in `core`, and `sim/simulation.test.ts` now reds on a
      *   regression from `core`'s own side.
-     * - `TRAFFIC_PARAMETERS` was **honest**. Its four `default: null` rows say *"there is no
+     * - `TRAFFIC_PARAMETERS` was **honest**. Its `default: null` rows say *"there is no
      *   default; unset is meaningful"*, which `traffic/parameters.test.ts` defends with a
      *   measurement — 12 %/5 min imposed on Garden Apartments is 2.4x its demand. Honest and
      *   unsearchable at once, which is a distinction `collectSearchSpace` could not previously
@@ -259,6 +259,13 @@ describe('coverage of the shipped schema — the one claim that needs the real o
      * spaces, so a fifth null default, or a sixth, or one appearing in a schema nobody has thought
      * about, reds this. And the collection goes through `collectFormSource` — the function the
      * mount calls — so a test that passes is a statement about the shipped form.
+     *
+     * **That prediction was borne out, and the count it was written beside was not.** Wave 13
+     * § 2.1–2.2 declared eight more null-default rows and this block went red exactly as the
+     * sentence above says it would — four became twelve. The mechanism sentence needed no change;
+     * the number did, and it is now gone rather than restated, because a count in prose beside a
+     * list derived from code is a second source of truth that can only ever drift. The list below
+     * is the assertion; there is deliberately no longer a figure in the prose to disagree with it.
      */
     const refused = new Map<string, string>();
     const spaces = new Map<string, SearchSpace>();
