@@ -197,4 +197,49 @@ describe('the stored record carries every demand override', () => {
     const heavy = replayed.trace.passengers.filter((p) => p.massKg > 100).length;
     expect(heavy * 2).toBeGreaterThan(replayed.trace.passengers.length);
   }, 300_000);
+
+  /**
+   * **The day the record replays is the day the run had.** docs/14 § 2.3.
+   *
+   * The same strengthening the mass block gets one test up, and for the same reason: the two
+   * configuration-to-configuration tests above are the weaker claim, because a projection can
+   * carry a field the simulator then ignores. `dayVariation` was landed with only that weaker
+   * claim, which adversarial review noticed was an inconsistency against its own neighbour rather
+   * than a considered scope.
+   *
+   * It matters more here than for the mass block, not less: the stored block is what the
+   * `dayVariation` **stream is drawn against**, so a record that lost it replays at
+   * `demandFactor: 1` with the stream never consumed — a different number of people, arriving at
+   * different times, reported as a faithful reproduction. The band is deliberately far from 1 and
+   * degenerate, so the replayed factor is arithmetic rather than a draw and a lost block shows up
+   * as a specific missing number instead of as a plausible one.
+   */
+  it('replays the stored day rather than the average one', async () => {
+    const { runSimulation } = await import('@elevator-sim/core');
+    const stored = parseStoredRun(
+      serializeStoredRun(
+        storedRun(config, {
+          seed: 20_260_731,
+          buildingId: 'garden-apartments',
+          overrides: {
+            demand: { dayVariation: { minDemandFactor: 1.75, maxDemandFactor: 1.75, peakShiftS: 200 } },
+          },
+        }),
+      ),
+    );
+    const replayed = runSimulation(replaySimulationConfig(stored, sources));
+
+    expect(replayed.trace.dayVariation?.demandFactor).toBe(1.75);
+    expect(replayed.trace.dayVariation?.peakShiftS).not.toBe(0);
+
+    // And the day reached the population rather than only the report of it. The control is the
+    // same seed with no block: a replay that dropped it lands on the control's numbers exactly.
+    const control = runSimulation({
+      ...replaySimulationConfig(stored, sources),
+      demand: { ...replaySimulationConfig(stored, sources).demand, dayVariation: undefined },
+    });
+    expect(control.trace.dayVariation).toBeUndefined();
+    expect(replayed.trace.expectedPassengers / control.trace.expectedPassengers).toBeCloseTo(1.75, 12);
+    expect(replayed.trace.reportWindowStartS).not.toBe(control.trace.reportWindowStartS);
+  }, 300_000);
 });

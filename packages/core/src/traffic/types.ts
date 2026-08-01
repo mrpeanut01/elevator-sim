@@ -797,9 +797,15 @@ export interface DayVariationConfig {
 /**
  * What a run actually drew for its day. Reported, never authored.
  *
- * Present on {@link PassengerTrace} and on `SimulationResult` **only** when the run declared a
- * {@link DayVariationConfig} — spread-or-omit, because `structuralDigestOfResult` hashes a key's
- * presence as well as its value, so a key on the default path moves 981 pins to say nothing.
+ * Present on {@link PassengerTrace} **only** when the run declared a {@link DayVariationConfig} —
+ * spread-or-omit, because `structuralDigestOfResult` hashes a key's presence as well as its value,
+ * so a key on the default path moves 981 pins to say nothing.
+ *
+ * **On the trace and nowhere else.** A `SimulationResult` reaches it through `result.trace`, and
+ * there is deliberately no second copy beside `trafficSeed` and `trafficModel`: those two are
+ * *provenance carried from `RunRecord`* and this is a *drawn outcome of the trace*, so a copy on
+ * the result would be two places one draw could be read from and one of them could go stale. This
+ * docstring claimed the field was on `SimulationResult` until adversarial review read it.
  */
 export interface ResolvedDayVariation {
   /** The multiplier applied to every source's rate. 1 means the average day. */

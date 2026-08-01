@@ -12146,3 +12146,126 @@ a bridge, not the coupling.** § D106's rule is enforced at the renderer by test
 `workKJ` appears without `workPerServedLegKJ`; nothing analogous exists here, and no test fails if a
 renderer shows AWT without the abandonment figure. **This is the clause to distrust first in this
 step's work**, and it is recorded as the lane's own assessment because the lane volunteered it.
+
+## D206 — inter-day variability, and a criterion I refused that my own code passes
+
+**Date: 2026-07-31 · Wave 13 step 4 (`docs/14` § 2.3). Filed the § D203 way, with one difference:
+§ D203 recorded a criterion that measurement refused. This records a criterion I refused that
+measurement says is met — an over-reach caught by adversarial review and corrected here.**
+
+`demand.dayVariation` ships: an optional block drawing two bounded values per run from a new
+`dayVariation` stream — a multiplier on total demand and a shift on peak timing — taken before a
+single arrival instant exists. Absent, and a run is the object it was before the feature: no key on
+the trace, no draw consumed, all 981 pins and both identity digests unmoved.
+
+**`traceKeyOf` carries it, and the reasoning is against `patience` rather than by analogy to it.**
+Both draw from a stream in `TRAFFIC_STREAM_NAMES`, so stream membership decides nothing. What
+decides it is *when*: `patience` is drawn after the trace exists and displaces no arrival instant,
+so two cells differing in it see the same passengers and must be paired. `dayVariation` is drawn
+first and multiplies the rate the trace is generated at, so two cells differing in it see different
+people — measured on the structural trace digest, not argued.
+
+### The criterion judgement, which is the substance of this entry
+
+`docs/14` § 5 criterion 3 has two sentences and they do not say the same thing. The first asks for
+paired variance *no larger than the same comparison without day variation*. The second — and the
+body of § 2.3 — is about a **leak**: day variation outside the shared trace *"silently inflates the
+paired variance"*, i.e. **shared against leaked**.
+
+**Under the reading § 2.3 supplies, the criterion is met, on every seed set tried.** `midtown-office`
+at 2 %/5 min, ±15 % band, one dispatcher at two door-obstruction rates:
+
+| seeds | n | SE shared | SE leaked | ratio | Pitman–Morgan t |
+|---|---|---|---|---|---|
+| `900000+7919i` | 20 | 0.1803 s | 1.4963 s | **8.30** | 18.83 |
+| `500000+1013i` | 20 | 0.2602 s | 0.9137 s | **3.51** | 7.08 |
+| `41+65537i` | 100 | 0.1131 s | 0.4166 s | **3.68** | 16.89 |
+| `900000+7919i` | 200 | 0.1139 s | 0.3789 s | **3.33** | 21.65 |
+
+Pitman–Morgan rather than an F-ratio because the two conditions are driven by the same seeds.
+
+**What I claimed instead, and why it was wrong.** The lane read the first sentence against a no-day
+baseline, found `SE(shared)/SE(no day)` above 1 at six readings, and called the criterion
+**unsatisfiable by any correct implementation**. Adversarial review refuted every part of it and the
+refutation reproduces on this tree:
+
+1. **The direction is decided by the seed set, not by the code.** Same building, band, arms and
+   shipped code: `900000+7919i` gives 2.44, `500000+1013i` gives 0.38, `2000000+31i` gives 0.34,
+   `41+65537i` at n = 100 gives 0.55. Four of nine sets the reviewer drove failed the pin, three
+   significantly in the opposite direction, and at n ≥ 100 the ratio straddles 1. **My headline 2.44
+   was the largest value found anywhere.**
+2. **The term I blamed contributes 2.5 %.** The decomposition
+   `Var(D | day) = E_day[Var(D|day)] + Var_day(E[D|day])` is correct, but it needs a second premise
+   — `E_day[Var(D|f)] ≥ Var(D|f=1)`, a convexity claim — which appeared once, unmeasured. Measured
+   with degenerate bands at nine fixed factors: `E_day[Var]` = 1.4009 against `Var_day(E)` = 0.0363.
+3. **The mechanism sentence was false.** It said AWT variance rises with demand faster than it
+   falls. `Var(D|f)` runs 0.520, 0.011, 0.109, 6.368, 0.305, 1.076, 0.966, 2.234, 1.019 across the
+   band — violently non-monotone, with `f = 1` the second lowest of nine. `CLAUDE.md`'s rule applies
+   exactly: *if you write a sentence about why something performs better, either measure it or say
+   it is unmeasured.*
+4. **The six ratios quoted as six confirmations were one seed set wearing six hats.** `SEEDS` was
+   defined once and iterated by every condition, so they were six correlated readings of one draw.
+   Two of the six were not significant, and four named no arm pair and were not reproducible.
+
+**The pin is replaced rather than deleted.** `sim/dayVariationSeam.test.ts` now asserts the only
+thing that is true — the two seed sets land on **opposite sides of 1** — and says in as many words
+that it is not a criterion. The old pin's docstring named the wrong two causes for a future failure
+(*"the interaction vanished, or the multiplier stopped reaching the run"*); the real cause is that
+`Var(D|f)` is rough in `f`, and a maintainer would have hunted a wiring bug that is not there.
+
+**`docs/14` § 5 is byte-identical to base — verified by blob hash.** A criterion is neither weakened
+to make a step pass nor refused to make a measurement look decisive.
+
+### What is still weak, said rather than left to be found
+
+- **The acceptance cell was chosen after measurement.** Picking the quiet arm pair for power is
+  defensible a priori — the day's contribution is only measurable when the arms are otherwise
+  quiet — but it was not pre-registered, and § D151's protocol exists for exactly this shape of
+  question. The dispatcher pair, where the leak is *not* separable at n = 20, is disclosed in the
+  tree as its own test rather than omitted.
+- **`suppressed === 0` is a guard on these seeds, not a property of the cell.** A different n = 100
+  set at the identical configuration produced two runs whose mean `awtIsValid` suppresses.
+- **The negative control was 23 % stronger than the defect it stands for.** `(seed * k) % m` for
+  both arms correlated them: mean `|f_A − f_B|` was 0.1230 against the 0.1000 two independent
+  uniforms of width 0.30 give. Replaced by a 32-bit avalanche mix, which measures 0.1180 — 1.1
+  standard errors above 0.1000, small-sample noise rather than construction.
+
+### Four smaller decisions
+
+**Both bounds required, by the type and at runtime**, following `PassengerMassOverride`'s truncation
+bounds: an unbounded demand multiplier is a run whose saturation state nobody declared, reported
+beside a mean that may or may not be valid.
+
+**The declared bound is validated against the template every time, not only the drawn shift.** A
+bound of 900 s on a template that absorbs 750 s would otherwise run at one seed and throw at
+another; a configuration error must not be a coin flip.
+
+**The peak shift conserves total demand exactly.** Interior knots move, both endpoints are pinned,
+so the up-ramp lengthens by precisely as much as the down-ramp shortens and `intensityIntegralS` is
+unchanged — confirmed by independent quadrature at ±1, ±333 and ±750 s. `constant-iso` is flat and
+is **refused** a shift: shifting only its measurement window would change which passengers were
+counted without changing a single arrival.
+
+**Factor-invariance to `peakShiftS` follows from order OR from count, and both earlier statements of
+it were half right.** The lane credited the fixed draw count; review credited drawing the factor
+first. The mutants settle it: reversing the order with two draws kept leaves the factor invariant,
+skipping the second draw at a zero bound with the order kept also leaves it invariant, and **only
+breaking both together moves it**. The shipped code holds both, and the two are now asserted
+separately at the stream's own state — which is where they had to go, because with no second
+consumer of `dayVariation` a one-draw variant produces byte-identical runs and survived every other
+test in the tree.
+
+### Three smaller findings, fixed at source
+
+The drawn shift was reported as `-0` at some seeds and `+0` at others under a zero bound —
+`Object.is` and `toEqual` separate them and `JSON.stringify` does not, so it would have shown up in
+one guard and not another. `ResolvedDayVariation`'s docstring claimed the field appears on
+`SimulationResult`; it appears on `PassengerTrace` and is reached transitively, and there is
+deliberately no second copy. And `dayVariation`'s storage round trip stopped at the
+configuration-level claim where `passengerMass` gets the replayed-trace one two tests above it — an
+inconsistency against its own neighbour rather than a considered scope, now closed.
+
+**`docs/01-architecture.md`'s stream list was three streams stale.** `patience` and `modeChoice`
+shipped in step 5 and never reached the section `random/streams.ts` names as the source of its own
+list. All four conditional streams are now there. Nothing mechanises that agreement: `streams.test.ts`
+pins the names and their derived parameters, and no test reads that file.

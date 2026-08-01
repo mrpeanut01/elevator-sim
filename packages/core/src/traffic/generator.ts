@@ -431,12 +431,26 @@ function requireDayVariationBounds(config: DayVariationConfig): void {
 /**
  * Draw this run's day: how busy it is, and how late its peak runs. docs/14 § 2.3.
  *
- * **Exactly two draws, in this order, always** — the factor first, then the shift, even when the
- * shift bound is zero and the second draw is multiplied away. Two reasons, and the first is the
- * one that matters: turning the peak shift on must not move the demand factor, or two arms of a
- * study differing only in `peakShiftS` would silently be running at different demand levels. The
- * second is that a constant draw count is what makes this stream's position a function of the
- * seed alone.
+ * **The factor must be invariant to `peakShiftS`** — two arms of a study differing only in the
+ * shift bound must not silently be running at different demand levels. This code holds that two
+ * ways over, and the relationship between them was got wrong twice before it was measured:
+ *
+ * - the factor is drawn **first**, so it is draw 1 whatever the bound does; **or**
+ * - the count is **fixed at two**, so the factor is at a fixed offset whatever the order.
+ *
+ * Either alone is sufficient and neither is necessary, which is why the mutants settle it rather
+ * than the argument. Reversing the order while keeping two draws leaves the factor invariant
+ * (mutation survives); keeping the order while skipping the second draw at a zero bound also
+ * leaves it invariant; **breaking both together is what moves it**, and only then. An earlier
+ * version of this comment credited the count alone and adversarial review credited the order
+ * alone; both were half right.
+ *
+ * The fixed count buys one further thing on its own: this stream's position after the draw is a
+ * function of the seed and the block's *presence* rather than of its contents, so anything that
+ * ever draws from `dayVariation` after this point — nothing does today — could not be displaced
+ * by a bound changing. `dayVariationSeam.test.ts` asserts order and count separately at the
+ * stream's own state, because neither is visible in a trace: with no second consumer, a one-draw
+ * variant produces byte-identical runs and survived every other test in the tree.
  *
  * Both draws are uniform. Bounded by construction rather than by rejection, so the draw count
  * cannot depend on the values drawn — the property `DECISIONS.md` § D203 records as the one a
