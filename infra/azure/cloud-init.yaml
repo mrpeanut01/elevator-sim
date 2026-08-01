@@ -1,0 +1,175 @@
+#cloud-config
+#
+# Provisions one ephemeral GitHub Actions runner, per boot.
+#
+# The lifecycle is deliberately "one job, then throw the machine away", not "one job, then restart
+# the process". `docs/15-compute-offload-contract.md` § 2 requires the runner be ephemeral because
+# "a reused runner is a shared mutable environment, and this repository has already lost a wave to a
+# second writer on its tree." A restarted runner process on the same filesystem satisfies the letter
+# of `--ephemeral` and not that sentence: `node_modules`, `dist/`, the npm cache and `/tmp` all
+# survive it, and a stale `dist/` is exactly what produced 5 spurious failures during the § D201
+# investigation.
+#
+# So the last thing the runner does is reimage the VM it is running on. With an ephemeral OS disk
+# that restores the platform image from local NVMe and re-runs this file — a genuinely clean tree,
+# at a cost of roughly 60–120 s of re-provisioning per job, which is stated in infra/README.md
+# rather than hidden.
+#
+# Tokens written in double-underscored capitals are substituted by main.bicep, and
+# `infra/checks/cloudInitPlaceholders.test.mjs` asserts that every one of them is — the first draft
+# of this file had one that was not, which would have deployed a machine with a literal placeholder
+# where a username belonged.
+#
+# Nothing secret is substituted: the only credential involved is fetched at boot from Key Vault
+# using the VM's managed identity, is never written to disk, and is unset as soon as it has been
+# exchanged for a registration token.
+
+package_update: true
+packages:
+  - curl
+  - jq
+  - git
+  - tar
+  - unzip
+  - ca-certificates
+  - libicu74
+
+users:
+  # `default` keeps the admin user Azure provisions from the scale set's osProfile, including its
+  # SSH key. Omitting it would replace that user rather than add to it, which is how a customData
+  # block silently locks the owner out of their own VMs.
+  - default
+  - name: runner
+    # No sudo. The runner executes whatever a workflow tells it to; giving that root on a machine
+    # that is about to be destroyed anyway buys nothing and widens the blast radius of a malicious
+    # pull request in the window before it is.
+    shell: /bin/bash
+    system: false
+
+write_files:
+  - path: /opt/ghrunner/run-once.sh
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/usr/bin/env bash
+      # One registration, one job, one reimage. Any failure before the job exits non-zero and
+      # systemd retries, because a VM that is billing and answering nothing is the worst outcome
+      # available.
+      set -euo pipefail
+
+      REPO_URL='__REPO_URL__'
+      VAULT_NAME='__KEY_VAULT_NAME__'
+      SECRET_NAME='__SECRET_NAME__'
+      RUNNER_LABELS='__RUNNER_LABELS__'
+      IDENTITY_CLIENT_ID='__IDENTITY_CLIENT_ID__'
+      RUNNER_HOME=/opt/actions-runner
+      OWNER_REPO="${REPO_URL#https://github.com/}"
+
+      imds() {
+        curl --fail --silent --show-error --retry 6 --retry-delay 5 --retry-connrefused \
+          -H 'Metadata: true' "http://169.254.169.254/metadata/$1"
+      }
+
+      token_for() {
+        imds "identity/oauth2/token?api-version=2018-02-01&resource=$1&client_id=$IDENTITY_CLIENT_ID" \
+          | jq -er .access_token
+      }
+
+      # ---------------------------------------------------------------------
+      # 1. The repository-admin credential. Fetched over the metadata endpoint's
+      #    managed identity, held in a shell variable, never written to disk.
+      # ---------------------------------------------------------------------
+      kv_token="$(token_for 'https://vault.azure.net')"
+      gh_credential="$(curl --fail --silent --show-error --retry 6 --retry-delay 5 \
+        -H "Authorization: Bearer $kv_token" \
+        "https://${VAULT_NAME}.vault.azure.net/secrets/${SECRET_NAME}?api-version=7.4" | jq -er .value)"
+      unset kv_token
+
+      # ---------------------------------------------------------------------
+      # 2. Exchange it for a registration token, which GitHub scopes to this one
+      #    repository and expires in an hour.
+      # ---------------------------------------------------------------------
+      registration_token="$(curl --fail --silent --show-error --retry 6 --retry-delay 5 \
+        -X POST -H "Authorization: Bearer $gh_credential" \
+        -H 'Accept: application/vnd.github+json' \
+        -H 'X-GitHub-Api-Version: 2022-11-28' \
+        "https://api.github.com/repos/${OWNER_REPO}/actions/runners/registration-token" | jq -er .token)"
+      unset gh_credential
+
+      # ---------------------------------------------------------------------
+      # 3. One job. `--ephemeral` makes GitHub deregister this runner the moment
+      #    the job finishes, so it can never be handed a second one.
+      #    `--disableupdate` keeps the binary the version this boot installed;
+      #    an agent that silently updates itself mid-fleet is a second
+      #    uncontrolled variable in an environment whose whole purpose is being
+      #    a controlled one (contract § 0.2).
+      # ---------------------------------------------------------------------
+      cd "$RUNNER_HOME"
+      ./config.sh \
+        --url "$REPO_URL" \
+        --token "$registration_token" \
+        --name "$(hostname)" \
+        --labels "$RUNNER_LABELS" \
+        --work "$RUNNER_HOME/_work" \
+        --ephemeral --unattended --replace --disableupdate
+      unset registration_token
+
+      set +e
+      ./run.sh
+      job_status=$?
+      set -e
+      echo "runner exited with $job_status; reimaging this instance"
+
+      # ---------------------------------------------------------------------
+      # 4. Destroy the machine. Not conditional on the job passing — a failed job
+      #    leaves exactly the dirty tree the next one must not inherit.
+      # ---------------------------------------------------------------------
+      arm_token="$(token_for 'https://management.azure.com')"
+      resource_id="$(imds 'instance/compute/resourceId?api-version=2021-12-13&format=text')"
+      curl --fail --silent --show-error --retry 3 --retry-delay 10 \
+        -X POST -H "Authorization: Bearer $arm_token" -H 'Content-Length: 0' \
+        "https://management.azure.com${resource_id}/reimage?api-version=2024-07-01"
+
+      # The reimage is asynchronous. Sit still rather than looping back into a second registration
+      # on a machine that is already on its way out.
+      sleep 600
+
+  - path: /etc/systemd/system/gh-runner.service
+    permissions: '0644'
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Ephemeral GitHub Actions runner: one job, then reimage
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      User=runner
+      WorkingDirectory=/opt/actions-runner
+      ExecStart=/opt/ghrunner/run-once.sh
+      # Role assignments can take a minute to propagate after a fresh deployment, and the metadata
+      # and GitHub endpoints are both networks. Retry rather than strand the instance.
+      Restart=always
+      RestartSec=30
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - set -eux
+  - install -d -o runner -g runner /opt/actions-runner
+  - |
+    version='__RUNNER_VERSION__'
+    if [ "$version" = "latest" ]; then
+      version="$(curl -fsSL https://api.github.com/repos/actions/runner/releases/latest | jq -er .tag_name | tr -d v)"
+    fi
+    curl -fsSL --retry 6 --retry-delay 5 \
+      -o /tmp/runner.tar.gz \
+      "https://github.com/actions/runner/releases/download/v${version}/actions-runner-linux-x64-${version}.tar.gz"
+    tar -xzf /tmp/runner.tar.gz -C /opt/actions-runner
+    rm -f /tmp/runner.tar.gz
+    chown -R runner:runner /opt/actions-runner
+  - /opt/actions-runner/bin/installdependencies.sh
+  - systemctl daemon-reload
+  - systemctl enable --now gh-runner.service

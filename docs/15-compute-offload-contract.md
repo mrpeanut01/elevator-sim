@@ -4,8 +4,23 @@
 
 | Phase | State |
 |---|---|
-| A — self-hosted CI runners | designed |
+| A — self-hosted CI runners | **built, inert, unprovisioned** — see [`infra/README.md`](../infra/README.md) |
 | B — measurement fan-out | designed |
+
+**What "built, inert, unprovisioned" means, said precisely, because two of those three words are the
+kind that get rounded up.** The infrastructure exists as code (`infra/azure/`, Bicep, compiles clean
+and has never been deployed) and `ci.yml`'s Linux leg can be moved to it by setting one repository
+variable. **With that variable unset — the shipped state — CI does exactly what it did before**, on
+`ubuntu-latest`, and criterion 3 below is mechanised against the workflow file itself
+(`infra/checks/`, run by the `matrix shape` job): the inert default is *evaluated*, in both
+directions, and nine mutations of the shipped `ci.yml` are each required to be rejected.
+
+Of the criteria in § 4, Phase A can meet exactly two. **3 is met and mechanised. 7's ceiling is
+declared** — $250/month at the shipped defaults, derived in `infra/README.md` § 6 from public list
+prices, with the honest note that an Azure budget alerts and does not cap, so the real ceiling is
+the instance count. **4 cannot be checked until a runner exists**, and is the first thing to check
+when one does: a pin that moves on the first self-hosted run is a finding about the runner, not a
+value to edit. 1, 2, 5 and 6 are Phase B's.
 
 This document covers moving compute off one laptop. It exists because the constraint is **not**
 "more cores make things faster" — that part is uninteresting and mostly true. The constraint is that
