@@ -250,8 +250,7 @@ const SUPPRESSION_CLAUSE_BY_GROUND: Readonly<Record<AwtInvalidGround, string>> =
   // there, the riders were still standing at the landing when the clock stopped; here they had
   // already gone home, which is why the queue looks like it cleared.
   abandoned:
-    'enough riders gave up and walked out that the average describes the ones who stayed, not ' +
-    'the wait the building handed out.',
+    'too many riders gave up and left, so the average describes the ones who stayed.',
   starved:
     'somebody waited far longer than any average could admit to, so the average describes a run ' +
     'nobody had.',
