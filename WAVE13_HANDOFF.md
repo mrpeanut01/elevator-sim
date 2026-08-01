@@ -29,12 +29,41 @@ behaviour steps merged* carries the per-measurement table.
 
 ## 1. The one thing outstanding — T6
 
-**Branch `feat/w13-teaching-surface` at `5d15b01`, worktree `.worktrees/w13-t6-teaching-surface`.**
+**Branch `feat/w13-teaching-surface` at `a6e8e2f`, worktree `.worktrees/w13-t6-teaching-surface`.**
 
-Its commit subject is *"the teaching gate gains § D200's static hybrid, and it is what refuses the
-round"* — so it appears to be **a fourth refusal**, which is a permitted and pre-registered outcome
-(`docs/14` § 5 criterion 5, and § 7: *"any step may return a refusal — the learned dispatcher already
-has, three times"*).
+**Verdict: REFUSED a fourth time — and on a new ground.** Pre-registered spec, n = 200 on held-out
+traffic, `midtown-office`, two cells in one declared Holm family, both carrying step 4's day
+variation:
+
+| cell | taught ΔTTD (held-out) | static hybrid | taught − static |
+|---|---|---|---|
+| `interfloor-mix-1.5pct` | **−0.957 [−1.277, −0.636]** BETTER | **−1.207 [−1.535, −0.879]** | `+0.250 [+0.093, +0.407]` **WORSE** |
+| `lunch-two-way-1.5pct` | **−0.714 [−0.961, −0.466]** BETTER | **−0.731 [−0.983, −0.479]** | `+0.017 [−0.023, +0.058]` INDIST. |
+
+**The shape of this refusal is what makes it worth reviewing carefully.** § D145/§ D156/§ D200 all
+refused *on the interval* — it contained zero, or the effect sat below the resolution limit. This arm
+**clears all four of criterion 5's clauses at both cells**: interval excludes zero, above each cell's
+own TTD-measured limit (0.501 s, 0.521 s), Holm rejects at α = 0.025/0.05 in a family declared before
+any ΔTTD, and it generalizes in sign.
+
+**It is refused by a fifth clause the lane added *after* its first run came back ACCEPTED.** That
+clause is § D200's own advice turned into a gate: pin the weight vector the policy actually spent its
+time in (`two-way` → `predictive-balanced`, held on 83.1 % / 86.6 % of decisions), run it for the
+whole run with no selector, and require the policy to beat it. It does not. **§ D200's sentence
+reproduces on two cells it was never measured on** — *the advantage is static, and the switching
+subtracts from it.*
+
+Costs reported beside, never folded in: AWT **+0.580 / +0.409 WORSE**, WT95 +2.245 WORSE /
+indistinguishable, energy worse on the raw figure and per served leg.
+
+**It survives a seed change** — § D206's lesson applied by the lane to itself. Six cells across three
+seed configurations: switching premium **WORSE at three, indistinguishable at three, favouring the
+policy at none.** Notably the *taught* arm's own ΔTTD is **not** stable (above its limit at four
+cells, below at two) while the static vector beats the census's pick at all six.
+
+**Budget was never the constraint.** 200 replications × 3 arms at 1 800 s is 12.4 s serial; the whole
+pre-registered measurement is ≈ 6 minutes locally, run three times. No "cannot resolve at this
+budget" disclaimer is needed, and `n = 200` is the top of the 50–200 band.
 
 **It has not been reviewed and must not be merged on its commit message.** Every feature lane in this
 wave was sent back at least once, and in each case the review found something the lane's own report
@@ -50,13 +79,33 @@ did not contain. Do this before anything else:
 4. A refusal is published like the first three ([§ D145](DECISIONS.md), [§ D156](DECISIONS.md),
    [§ D200](DECISIONS.md)) — it needs a `DECISIONS.md` entry, not just a commit.
 
-**Scrutinise the refusal itself hardest.** § D200 found that a *constant weight-vector hybrid* beat
-the selector on both cells, so *"the advantage is static and the switching subtracts from it."* If T6
-has added that hybrid to the gate and been refused by it, that is a coherent and honest result — but
-check whether the comparison is the honest one (held-out traffic, disjoint **by construction** via
-step 1's `trafficSeed`) rather than the flattering one, and whether the budget could resolve the
-effect at all. **There is no compute fleet.** *"We cannot resolve this at the budget available"* is a
-correct result; a narrow interval around a small effect is not a win.
+**What a reviewer must check, specifically:**
+
+- **Is the fifth clause a raise or a weakening?** The lane says a raise, and `docs/14` § 5
+  byte-identical with digest `0b98cc86…`. **Verify that digest against base `88756c6`.** A gate
+  stricter than § 5 asks for is exactly what *"do not weaken a criterion — raise it instead"* means,
+  but it is also how a lane could refuse a result it did not like. The distinguishing fact is that
+  the raise was added **after an ACCEPTED run**, against the lane's own interest.
+- **Is the static control fair?** It pins the *dominant* vector, which is sound at 83–97 % occupancy
+  and would be a weak control for a policy alternating evenly between two. Confirm the occupancy.
+- **The robustness sweep ran *after* the pre-registered verdict.** That checks a refusal, which is the
+  safe direction — but confirm all six cells are reported whole rather than quoted from.
+- **Is the honest comparison genuinely the only expressible one?** The lane claims no parameter, flag
+  or field can ask for an interval on training traffic, and that the training number survives only as
+  a bare mean. Drive it rather than read it.
+- **A `data/` finding rides along and should be filed separately:** the shipped `auction-multi-round`
+  and `collective` vectors are **not TTD-optimal at their own census's point** — the § D112 shape
+  again, in reference data rather than in code.
+
+**Known issues the lane reported:** `parseTeachingSpec` does not reject unknown keys, so a misspelled
+field runs at its default; `traceDigest` hashes the master seed and so cannot witness the traffic
+split (deliberately left alone — *an audit trail is not moved to make a new test convenient*);
+and `docs/14`'s header row `| 4, 6 | designed |` became two rows, so **expect a merge conflict there.**
+
+**The orchestrator still owes:** a `DECISIONS.md` entry for this verdict (all figures reproducible via
+`elevator-sim tune --teaching packages/experiments/src/teaching/phase6c-midtown.teaching.json`), the
+root-`.md` status rows, and a decision on whether these figures belong in `published.ts`. **Phase 6
+stays partial — nothing here changes that.**
 
 ---
 
