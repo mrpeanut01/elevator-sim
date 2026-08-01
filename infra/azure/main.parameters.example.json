@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "_comment": [
+    "Copy to main.parameters.json (which .gitignore excludes) and fill in.",
+    "Nothing here is a secret. The GitHub credential is set separately with `az keyvault secret set`",
+    "after the deployment; see infra/README.md § 3. adminSshPublicKey is a PUBLIC key, but it is",
+    "still yours, so it is passed at deploy time rather than committed."
+  ],
+  "parameters": {
+    "githubRepositoryUrl": {
+      "value": "https://github.com/OWNER/elevator-sim"
+    },
+    "adminSshPublicKey": {
+      "value": "ssh-ed25519 AAAA... your-key-here"
+    },
+    "runnerCount": {
+      "value": 2
+    },
+    "vmSize": {
+      "value": "Standard_D8ds_v5"
+    },
+    "useSpot": {
+      "value": true
+    },
+    "egressMode": {
+      "value": "instancePublicIp"
+    },
+    "budgetAlertEmail": {
+      "value": ""
+    },
+    "monthlyBudgetAmount": {
+      "value": 250
+    }
+  }
+}
