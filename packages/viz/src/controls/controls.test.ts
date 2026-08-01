@@ -280,9 +280,17 @@ describe('coverage of the shipped schema — the one claim that needs the real o
     }
     expect([...unsearchable.keys()].sort()).toEqual([
       'traffic.arrivalRatePctPop5min',
+      'traffic.batchSize.distribution',
+      'traffic.batchSize.mean',
+      'traffic.batchSize.weight',
       'traffic.directionalSplit.incoming',
       'traffic.directionalSplit.interfloor',
       'traffic.directionalSplit.outgoing',
+      'traffic.passengerMass.distribution',
+      'traffic.passengerMass.maxKg',
+      'traffic.passengerMass.meanKg',
+      'traffic.passengerMass.minKg',
+      'traffic.passengerMass.stdDevKg',
     ]);
     for (const [id, reason] of unsearchable) {
       expect(reason, id).toContain(id);

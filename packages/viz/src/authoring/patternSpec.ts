@@ -319,10 +319,18 @@ export function patternIsDirty(spec: PatternSpec, source: PatternSpec): boolean 
  *
  * ## Why this exists, and why it is not an option on `demand`
  *
- * `SimulationDemandOptions` has no batch-size field. Mean group size lives on the **traffic
- * profile** — `data/traffic-profiles.json`'s `batchSize.mean` — and the generator reads it from the
- * file `SimulationConfig.trafficProfiles` supplies. So a *mean group size* slider bound to
- * `demand` writes nothing at all, and it is the most consequential slider on the panel:
+ * **Corrected in wave 13:** `SimulationDemandOptions` *now has* a `batchSize` field, added by
+ * `docs/14` § 2.2 along with the group-size curve. This docstring said it had none, and that was
+ * true when it was written and false the moment step 3 landed — so the sentence is retracted here
+ * rather than left to be discovered. The **workaround below still works**, and is left standing
+ * because replacing it is a behaviour change this repair is not making: widening the file is not
+ * equivalent to writing an override, since the file reaches every source and the override is a
+ * run-level curve. Whoever next touches this panel should decide between them deliberately.
+ *
+ * What remains true, and is the reason the row exists at all: mean group size lives on the
+ * **traffic profile** — `data/traffic-profiles.json`'s `batchSize.mean` — and the generator reads
+ * it from the file `SimulationConfig.trafficProfiles` supplies. It is the most consequential
+ * slider on the panel:
  * `CLAUDE.md` says in as many words that **passengers arrive in batches, not one at a time**, and
  * `data/traffic-profiles.json`'s own comment says batch size *"materially changes loading and stop
  * patterns"*.
