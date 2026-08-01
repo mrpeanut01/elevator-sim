@@ -158,3 +158,48 @@ Unchanged, and it held all wave: **981 pinned estimates and both identity digest
 moved pin is a finding rather than a value to edit.** Nothing in `packages/experiments/src/benchmark/
 published.ts` moved. `docs/14` § 5 is byte-identical to base through three separate criterion
 judgements — which is the only reason a correction can be distinguished from a weakening.
+
+---
+
+## 5. Decided, not implemented — `populationDigest`
+
+**Finding.** `runner/replication.ts:112`'s `traceDigest` hashes `trace.seed` — the **master** seed —
+as its first field. Since step 1 split the demand seed off, two runs generating the *same passenger
+population* against two different machines digest differently, and two runs with *different*
+populations at the same master seed also differ. **The digest can no longer distinguish "same crowd"
+from "same seed".**
+
+**Not a defect today.** Every cell of one experiment shares one master seed, so `verifyCrnAlignment`
+and `assertCrnAligned` work exactly as intended. It becomes one the moment anything audits CRN
+*across* experiments that differ in run seed but share a traffic seed — which is what
+`packages/experiments/src/teaching/` now does.
+
+**Checked first, and the answer is the opposite of what was expected: no digest is pinned anywhere.**
+`published.ts` never mentions `traceDigest`; `crn.test.ts` asserts only relationally
+(`toBe(traceDigest(other))`, `not.toBe`, `/^[0-9a-f]{16}$/`, and one fabricated
+`'deadbeefdeadbeef'` mismatch fixture); nothing under `reports/` carries one. So changing it would
+cost nothing mechanical.
+
+**Decision: add `populationDigest`, do not change `traceDigest` — and the reason is not pinning.**
+`traceDigest` is the CRN **audit trail**: `assertCrnAligned` reports it and stored records carry it.
+An audit trail is not moved to make a new capability convenient, which is the reasoning T6 already
+applied when it declined to move it. Pinning would have been a second reason; its absence does not
+remove the first.
+
+**Shape.** The population is *already* fully hashed — `passengerLine` covers id, journey, batch,
+arrival instant, origin, destination, mass, category, demand floor, profile, credential and every
+leg. `trace.seed` and `buildingId` are a provenance prefix on top of it. So:
+
+- extract the tail (everything from `buildingId` onward) as `populationDigest`;
+- `traceDigest` becomes `hashBytes(seed) → populationDigest`'s body, so its value is **unchanged**;
+- **`buildingId` stays inside `populationDigest`** — a population is defined against a building's
+  floor ids, and *"same crowd, different machine"* means a different dispatcher, not a different
+  building. A cross-building population comparison is meaningless, not merely unequal.
+
+**Not implemented, deliberately.** There was no budget left to land it with a **real non-test caller**
+and a watched-failing test. A `populationDigest` shipped with no caller is this repository's
+signature defect — twelve instances, one of them T5 in this very wave, sent back for exactly that.
+**Whoever picks it up: give it a caller in `teaching/` first, then the digest.** The test to write is
+the three-run contrast `trafficSeed.test.ts` already uses — same traffic seed and different run
+seeds must produce the **same** `populationDigest` and **different** `traceDigest`s; that assertion
+fails today, which is the whole finding.
