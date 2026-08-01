@@ -300,7 +300,21 @@ describe('every parameter core declares is accounted for', () => {
     // at. The second is the one that matters, because it is the flat-mix negative control
     // `DECISIONS.md` § D162 condition 5 requires — a control an arm could set for itself would
     // not be one.
-    expect(rows).toBe(108);
+    //
+    // **108 → 116 and the space unmoved at 56 in wave 13**, which is the wave-9 relationship a
+    // third time and for the same reason. All eight rows are `TRAFFIC_PARAMETERS`' — three for
+    // the group-size curve (`traffic.batchSize.distribution` / `.mean` / `.weight`) and five for
+    // the body-mass distribution (`traffic.passengerMass.distribution` / `.meanKg` / `.stdDevKg` /
+    // `.minKg` / `.maxKg`), docs/14 §§ 2.1–2.2 — and none is authorable in a dispatcher profile,
+    // correctly: they describe *the crowd a dispatcher is measured against*, and a dispatcher that
+    // could make its passengers lighter or its groups smaller would be tuning away the traffic it
+    // is bad at. `traffic.batchSize.weight` is the second row in the repository to declare
+    // `perMemberOf`, after `traffic.entranceWeight`.
+    //
+    // **This is a count of declared rows, not a published estimate.** Nothing in `published.ts`
+    // moved and neither identity digest moved; the eight tunables are absent from every default
+    // run by construction, which is docs/14 § 5 criterion 1.
+    expect(rows).toBe(116);
     expect(SPACE.parameters.length).toBe(56);
     // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
     // always said `false` would satisfy the biconditional above only by accident.

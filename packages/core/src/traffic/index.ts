@@ -46,6 +46,7 @@ export {
   DEMAND_TEMPLATE_IDS,
   DIRECTION_CATEGORIES,
   INTERFLOOR_WEIGHTINGS,
+  SUPPORTED_BATCH_DISTRIBUTIONS,
   TRAFFIC_DEFAULTS,
   TRAFFIC_MODEL_VERSIONS,
   TRAFFIC_PARAMETERS,
@@ -54,6 +55,7 @@ export {
 
 export type {
   ArrivalEvent,
+  BatchSizeCurve,
   CredentialAssignment,
   DemandLevel,
   DemandPhase,
@@ -65,6 +67,7 @@ export type {
   DirectionCategory,
   GeneratedPassenger,
   InterfloorWeighting,
+  PassengerMassOverride,
   PassengerTrace,
   ResolvedDemandTemplate,
   TraceLeg,
@@ -80,10 +83,12 @@ export type {
 
 export {
   SECONDS_PER_5MIN,
-  SUPPORTED_BATCH_DISTRIBUTIONS,
   batchesPerSecond,
   drawBatchSize,
+  drawExplicitBatchSize,
   drawGeometricBatchSize,
+  drawZeroTruncatedPoissonBatchSize,
+  meanBatchSizeOf,
   passengersPer5Min,
   passengersPerSecond,
   sampleBatchArrivalTimes,

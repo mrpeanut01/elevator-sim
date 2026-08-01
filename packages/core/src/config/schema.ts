@@ -394,6 +394,74 @@ const directionalSplitSchema = z
     { message: 'incoming + outgoing + interfloor must sum to 1' },
   );
 
+/** How close an authored `mean` must sit to the mean its own weight vector implies. */
+const BATCH_MEAN_TOLERANCE = 1e-9;
+
+/**
+ * A profile's group-size curve. docs/14 § 2.2.
+ *
+ * Three families, one of which takes a vector instead of a moment. The refinements are the whole
+ * point of declaring it separately: an `explicit` curve without weights, or a weight vector on a
+ * family that cannot read one, is schema-valid under a looser object and fails much later — at the
+ * first draw, a thousand batches into a trace, or not at all if the family name is what was
+ * mistyped.
+ *
+ * An unknown `distribution` is deliberately **not** refused here. `drawBatchSize` throws for it by
+ * name, listing what it supports, and that error is more useful than a schema path; tightening
+ * this to an enum would move the failure earlier and make it less legible.
+ */
+const batchSizeSchema = z
+  .strictObject({
+    $comment: comment,
+    distribution: z.string().min(1),
+    mean: z.number().gte(1, 'a batch contains at least one passenger'),
+    /** Relative likelihood of group sizes 1..n. `explicit` only; normalized when sampled. */
+    weights: z
+      .array(nonNegative)
+      .min(1, 'a weight vector needs at least one group size')
+      .optional(),
+  })
+  .superRefine((batch, ctx) => {
+    if (batch.distribution === 'explicit') {
+      if (batch.weights === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['weights'],
+          message:
+            'an explicit batch size distribution needs a weights vector over group sizes 1..n; weights[0] is the relative likelihood of a lone passenger',
+        });
+        return;
+      }
+      const total = batch.weights.reduce((sum, weight) => sum + weight, 0);
+      if (total <= 0) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['weights'],
+          message:
+            'at least one group size needs a positive weight; all zero is a building nobody arrives at rather than a group-size curve',
+        });
+        return;
+      }
+      const derived =
+        batch.weights.reduce((sum, weight, index) => sum + (index + 1) * weight, 0) / total;
+      if (Math.abs(derived - batch.mean) > BATCH_MEAN_TOLERANCE) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['mean'],
+          message: `mean must equal the mean these weights imply, ${derived}; the batch rate divides by it, so a mean that drifts from its own vector changes total demand without changing any group`,
+        });
+      }
+      return;
+    }
+    if (batch.weights !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['weights'],
+        message: `weights are read only by the explicit distribution; "${batch.distribution}" takes a mean, and a vector it ignores is a curve nobody is drawing from`,
+      });
+    }
+  });
+
 export const trafficProfileSchema = z.strictObject({
   $comment: comment,
   id: identifier,
@@ -412,11 +480,13 @@ export const trafficProfileSchema = z.strictObject({
   arrivalRatePctPop5min: valueRangeSchema,
   targetIntervalS: positive,
   targetAvgWaitS: positive,
-  batchSize: z.strictObject({
-    $comment: comment,
-    distribution: z.string().min(1),
-    mean: z.number().gte(1, 'a batch contains at least one passenger'),
-  }),
+  // docs/14 § 2.2. `mean` stays required for every family, `explicit` included, and `weights` is
+  // cross-checked against it below: the sampler *derives* the mean from the vector, so a carried
+  // mean that disagreed with its own weights would make `batchesPerSecond` divide by a number the
+  // draws do not produce and change total demand silently. Carried and validated rather than
+  // omitted because `mean` is on the published surface — `cli list` and the viewer's traffic panel
+  // both read it — and a `number | undefined` there would be a display bug in three places.
+  batchSize: batchSizeSchema,
   directionalSplit: directionalSplitSchema,
 });
 

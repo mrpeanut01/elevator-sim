@@ -766,7 +766,11 @@ export class Simulation {
 
     this.#factory = new PassengerFactory({
       streams: this.#streams,
-      massConfig: config.trafficProfiles.passengerMass,
+      // The run's own block when it overrode one (docs/14 § 2.1), so the factory and the trace
+      // cannot draw from two different populations. `PassengerFactory.arrive` has no shipped
+      // caller today — the trace carries every first-leg mass and `transfer` reuses it — so this
+      // is the seam being kept honest rather than a behaviour changing.
+      massConfig: config.demand?.passengerMass ?? config.trafficProfiles.passengerMass,
       topology: this.#building,
       // Distinct from the trace's `p...` ids, so a leg id can never collide with a journey's
       // first-leg id and silently overwrite it in the recorder.
@@ -3825,6 +3829,11 @@ function traceConfigFor(config: SimulationConfig, streams: StreamSet): TrafficCo
       ? {}
       : { credentialAssignment: demand.credentialAssignment }),
     ...(demand.maxLegs === undefined ? {} : { maxLegs: demand.maxLegs }),
+    // docs/14 §§ 2.1-2.2. Spread-or-omit, never `?? <a default of this file's own>`: unset means
+    // the reference data decides, and a default invented here would be a second source of truth
+    // for a number `data/traffic-profiles.json` already states.
+    ...(demand.batchSize === undefined ? {} : { batchSize: demand.batchSize }),
+    ...(demand.passengerMass === undefined ? {} : { passengerMass: demand.passengerMass }),
   };
 }
 

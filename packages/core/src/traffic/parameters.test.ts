@@ -102,6 +102,18 @@ const PARAMETERS_BY_CONFIG_FIELD = {
   interfloorWeighting: ['traffic.interfloorWeighting'],
   credentialAssignment: ['traffic.credentialAssignment'],
   maxLegs: ['traffic.maxLegs'],
+  batchSize: [
+    'traffic.batchSize.distribution',
+    'traffic.batchSize.mean',
+    'traffic.batchSize.weight',
+  ],
+  passengerMass: [
+    'traffic.passengerMass.distribution',
+    'traffic.passengerMass.meanKg',
+    'traffic.passengerMass.stdDevKg',
+    'traffic.passengerMass.minKg',
+    'traffic.passengerMass.maxKg',
+  ],
 } satisfies Record<keyof TrafficConfig, readonly string[] | null>;
 
 describe('traffic tunables declare their schema', () => {
@@ -154,6 +166,19 @@ describe('traffic tunables declare their schema', () => {
         'traffic.directionalSplit.incoming',
         'traffic.directionalSplit.outgoing',
         'traffic.directionalSplit.interfloor',
+        // docs/14 §§ 2.1-2.2. The same reasoning, twice more. The group-size curve's default is
+        // whatever `data/traffic-profiles.json` authors per profile — 1.4 for a standard office
+        // and 2.0 for a hotel — so a number here would impose one building's grouping on every
+        // other. The body-mass block's default is a single figure in the same file, and declaring
+        // it here would make two places that state it and one place that can go stale.
+        'traffic.batchSize.distribution',
+        'traffic.batchSize.mean',
+        'traffic.batchSize.weight',
+        'traffic.passengerMass.distribution',
+        'traffic.passengerMass.meanKg',
+        'traffic.passengerMass.stdDevKg',
+        'traffic.passengerMass.minKg',
+        'traffic.passengerMass.maxKg',
       ]),
     );
 
@@ -189,7 +214,10 @@ describe('traffic tunables declare their schema', () => {
         case 'categorical': {
           const values = parameter.values;
           expect(values, parameter.id).toBeDefined();
-          expect(values ?? []).toContain(parameter.default);
+          // `null` is "leave it unset", exactly as in the numeric branch above — the value then
+          // comes from the data rather than from this schema, so it is not one of `values` and
+          // must not be. An optimizer reads it as "omit the key", never as "the first option".
+          if (parameter.default !== null) expect(values ?? [], parameter.id).toContain(parameter.default);
           break;
         }
         case 'boolean':
@@ -225,15 +253,50 @@ describe('traffic tunables declare their schema', () => {
     }
   });
 
+  /**
+   * The group-size curve's two shape parameters are inert under the other family, and the gate
+   * says so. A `mean` sampled against an `explicit` curve is ignored — the mean is derived from
+   * the weights — and a weight vector sampled against a `geometric` one is ignored too. An
+   * optimizer that did not know would spend half its budget moving a number that changes nothing,
+   * which is the failure `activeWhen` exists to prevent.
+   */
+  it('marks each group-size shape parameter inert under the other family', () => {
+    const gate = (id: string): unknown =>
+      TRAFFIC_PARAMETERS.find((parameter) => parameter.id === id)?.activeWhen;
+    expect(gate('traffic.batchSize.mean')).toEqual({
+      'traffic.batchSize.distribution': ['geometric', 'zeroTruncatedPoisson'],
+    });
+    expect(gate('traffic.batchSize.weight')).toEqual({
+      'traffic.batchSize.distribution': ['explicit'],
+    });
+    // The five mass parameters are live under both families and declare no gate: `lognormal` and
+    // `normal` take the same four numbers, they just interpret the spread differently.
+    for (const id of [
+      'traffic.passengerMass.distribution',
+      'traffic.passengerMass.meanKg',
+      'traffic.passengerMass.stdDevKg',
+      'traffic.passengerMass.minKg',
+      'traffic.passengerMass.maxKg',
+    ]) {
+      expect(gate(id), id).toBeUndefined();
+    }
+  });
+
   it('names the collection a per-member parameter ranges over', () => {
     // `traffic.entranceWeight` is declared once and supplied once per entrance floor, the way
     // `car.doorOpenS` is declared once for however many cars a building has. Without naming
     // the collection an optimizer cannot know how many values to sample.
     const spec = TRAFFIC_PARAMETERS.find((parameter) => parameter.id === 'traffic.entranceWeight');
     expect(spec?.perMemberOf).toBe('building.entranceFloors');
+    // `traffic.batchSize.weight` is the second, and its collection is not a building's: the sizes
+    // a group-size curve names are the vector's own length, chosen by whoever authors the curve.
+    // Declaring it is what tells an optimizer how many values to sample rather than leaving it to
+    // guess that one weight is one number.
+    const weight = TRAFFIC_PARAMETERS.find((p) => p.id === 'traffic.batchSize.weight');
+    expect(weight?.perMemberOf).toBe('traffic.batchSize.sizes');
     expect(
       TRAFFIC_PARAMETERS.filter((parameter) => parameter.perMemberOf !== undefined).map((p) => p.id),
-    ).toEqual(['traffic.entranceWeight']);
+    ).toEqual(['traffic.entranceWeight', 'traffic.batchSize.weight']);
   });
 });
 
@@ -427,6 +490,106 @@ const PROBES: readonly Probe[] = [
       return splitAt(template, 0)?.outgoing;
     },
     expected: 0.675,
+  },
+
+  /* ---- docs/14 § 2.2 — the group-size curve ------------------------------- */
+
+  {
+    // Observed on the *drawn* sizes, not on the field the option was written into. A weight vector
+    // with a single non-zero entry admits exactly one group size, so a resolver that stored the
+    // curve and drew from the profile's geometric anyway shows up as a set with several members.
+    ids: ['traffic.batchSize.distribution'],
+    buildingId: 'midtown-office',
+    probe: { batchSize: { distribution: 'explicit', weights: [0, 1] } },
+    observe: (config) => [
+      ...new Set(generateTrace(config).arrivals.map((batch) => batch.passengers.length)),
+    ],
+    expected: [2],
+  },
+  {
+    ids: ['traffic.batchSize.mean'],
+    buildingId: 'midtown-office',
+    probe: { batchSize: { distribution: 'geometric', mean: 4 } },
+    // The plan's own mean, which is the number `batchesPerSecond` divides by. office-standard
+    // declares 1.4, so the probe moves it and the batch rate with it.
+    observe: (config) => planDemand(config).sources[0]?.meanBatchSize,
+    expected: 4,
+  },
+  {
+    // The vector's mean is **derived**, and this is the assertion that says so: `(1·3 + 2·1) / 4`
+    // is 1.25, a number appearing nowhere in the configuration. A resolver that carried a mean
+    // beside the weights, or that fell back to the profile's 1.4, fails here.
+    ids: ['traffic.batchSize.weight'],
+    buildingId: 'midtown-office',
+    probe: { batchSize: { distribution: 'explicit', weights: [3, 1] } },
+    observe: (config) => planDemand(config).sources[0]?.meanBatchSize,
+    expected: 1.25,
+  },
+
+  /* ---- docs/14 § 2.1 — body mass ----------------------------------------- */
+
+  {
+    ids: ['traffic.passengerMass.distribution'],
+    buildingId: 'midtown-office',
+    probe: {
+      passengerMass: {
+        distribution: 'lognormal',
+        meanKg: 75,
+        stdDevKg: 15,
+        minKg: 20,
+        maxKg: 200,
+      },
+    },
+    // The block the draw actually reads, resolved once in `planDemand` and passed to `drawMass`.
+    // Not an echo of the option: `generateTrace` has no second path to a mass distribution.
+    observe: (config) => planDemand(config).passengerMass.distribution,
+    expected: 'lognormal',
+  },
+  {
+    // A zero spread makes every passenger identical, so the observation is the drawn population
+    // itself rather than the configuration: one distinct mass, and it is the one asked for.
+    ids: ['traffic.passengerMass.meanKg'],
+    buildingId: 'midtown-office',
+    probe: {
+      passengerMass: { distribution: 'normal', meanKg: 99, stdDevKg: 0, minKg: 20, maxKg: 200 },
+    },
+    observe: (config) => [
+      ...new Set(generateTrace(config).passengers.map((passenger) => passenger.massKg)),
+    ],
+    expected: [99],
+  },
+  {
+    ids: ['traffic.passengerMass.stdDevKg'],
+    buildingId: 'midtown-office',
+    probe: {
+      passengerMass: { distribution: 'normal', meanKg: 75, stdDevKg: 0, minKg: 20, maxKg: 200 },
+    },
+    observe: (config) =>
+      new Set(generateTrace(config).passengers.map((passenger) => passenger.massKg)).size,
+    expected: 1,
+  },
+  {
+    // The truncation is observed where it binds. A lower bound just under the mean clamps roughly
+    // half the population onto itself, so the lightest passenger in the run *is* the bound — which
+    // a resolver that dropped the bound could not produce.
+    ids: ['traffic.passengerMass.minKg'],
+    buildingId: 'midtown-office',
+    probe: {
+      passengerMass: { distribution: 'normal', meanKg: 75, stdDevKg: 15, minKg: 74.5, maxKg: 200 },
+    },
+    observe: (config) =>
+      Math.min(...generateTrace(config).passengers.map((passenger) => passenger.massKg)),
+    expected: 74.5,
+  },
+  {
+    ids: ['traffic.passengerMass.maxKg'],
+    buildingId: 'midtown-office',
+    probe: {
+      passengerMass: { distribution: 'normal', meanKg: 75, stdDevKg: 15, minKg: 20, maxKg: 75.5 },
+    },
+    observe: (config) =>
+      Math.max(...generateTrace(config).passengers.map((passenger) => passenger.massKg)),
+    expected: 75.5,
   },
 ];
 

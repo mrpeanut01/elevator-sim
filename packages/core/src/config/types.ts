@@ -191,12 +191,6 @@ export interface ArrivalProcessConfig extends Commented {
   readonly type: string;
 }
 
-/** Passengers arrive in groups; batch size materially changes loading and stop patterns. */
-export interface BatchSizeConfig extends Commented {
-  readonly distribution: string;
-  readonly mean: number;
-}
-
 /** Fractions of demand by direction. Must sum to 1. */
 export interface DirectionalSplit {
   /** Entrance floor to upper floors. */
@@ -232,6 +226,23 @@ export interface TrafficProfile extends Commented {
   readonly targetAvgWaitS: number;
   readonly batchSize: BatchSizeConfig;
   readonly directionalSplit: DirectionalSplit;
+}
+
+/**
+ * A profile's group-size curve: passengers arrive in groups, and batch size materially changes
+ * loading and stop patterns. docs/14 § 2.2.
+ *
+ * `mean` is present for every family. For `explicit` it is **derived from {@link weights} and
+ * validated against them** rather than free — `schema.ts` refuses a profile whose stated mean
+ * differs from the one its own vector implies — because the batch rate is `passengerRate / mean`
+ * and a mean that drifted from its weights would change how many people the building generates
+ * while changing no group.
+ */
+export interface BatchSizeConfig extends Commented {
+  readonly distribution: string;
+  readonly mean: number;
+  /** Relative likelihood of group sizes `1..n`. `explicit` only; normalized when sampled. */
+  readonly weights?: readonly number[] | undefined;
 }
 
 /** A demand shape over a run: how long, and which window is reported. */
