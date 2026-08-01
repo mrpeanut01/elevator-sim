@@ -59,10 +59,17 @@ export function simulationConfigFor(
   cell: ExperimentCell,
   replication: number,
   seed: bigint,
+  trafficSeed?: bigint | undefined,
 ): SimulationConfig {
   return {
     ...cell.simulation,
     seed,
+    // docs/14 § 1.1. Spread-or-omit rather than `trafficSeed: trafficSeed ?? undefined`: under
+    // `exactOptionalPropertyTypes` an explicitly-undefined key is not the same object as an
+    // absent one, and `core`'s `runSimulation` reports `trafficSeed` on the result only when the
+    // key was there. An experiment that declared no traffic seed must produce the config it
+    // produced before this parameter existed.
+    ...(trafficSeed === undefined ? {} : { trafficSeed }),
     replication,
     runId: runIdFor(experimentId, cell.cellId, replication),
   };
@@ -155,8 +162,9 @@ export function runOneReplication(
   replication: number,
   seed: bigint,
   keepRecords: boolean,
+  trafficSeed?: bigint | undefined,
 ): RawReplicationOutcome {
-  const config = simulationConfigFor(experimentId, cell, replication, seed);
+  const config = simulationConfigFor(experimentId, cell, replication, seed, trafficSeed);
   try {
     const result = runSimulation(config);
     return {
