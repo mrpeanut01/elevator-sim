@@ -140,6 +140,50 @@ describe('the round declares what it measured, and on which traffic', () => {
   });
 });
 
+describe('§ D200’s static hybrid is a gate clause, not a follow-up', () => {
+  it('instruments what the policy did and pins the vector it held most', () => {
+    const cell = round.cells[0];
+    if (cell === undefined) throw new Error('the round produced no cell');
+    expect(cell.regimes.decisions).toBeGreaterThan(0);
+    /* The pinned vector is one the shipped library names — never an invented one, and never the
+       arm under test. `weightSetsByPattern`'s values plus the reference (the abstention case). */
+    const known = new Set([
+      ...Object.values(config.dispatcherProfiles?.patternSwitching?.weightSetsByPattern ?? {}),
+      cell.referenceProfileId,
+    ]);
+    expect(known).toContain(cell.dominantWeightSetId);
+    expect(cell.staticGate.armId).toBe('static');
+    expect(cell.switchingPremium.baselineId).toBe('static');
+    expect(cell.switchingPremium.armId).toBe('taught');
+    expect(cell.switchingPremium.estimate.n).toBe(cell.replications);
+  });
+
+  it('refuses a cell whose switching earns nothing over its own pinned vector', () => {
+    const cell = round.cells[0];
+    if (cell === undefined) throw new Error('the round produced no cell');
+    /* The biconditional, asserted rather than described: acceptance is a conjunction of five
+       clauses, and the fifth is this one. A cell that clears the first four and not this one is
+       refused, and the reason says so — § D200's *the advantage is static and the switching
+       subtracts from it*. */
+    const clauses =
+      cell.gate.verdict === 'BETTER' &&
+      !cell.belowResolutionLimit &&
+      cell.generalizes &&
+      cell.switchingPremium.verdict === 'BETTER';
+    if (!clauses) expect(cell.accepted).toBe(false);
+    if (cell.switchingPremium.verdict !== 'BETTER' && cell.gate.verdict === 'BETTER') {
+      expect(cell.reason).toContain('the advantage is static');
+    }
+  });
+
+  it('prints the control and the premium beside the gate', () => {
+    const page = formatTeachingRound(round);
+    expect(page).toContain('static ctrl');
+    expect(page).toContain('switching ');
+    expect(page).toContain('what it did');
+  });
+});
+
 describe('the two seeds move different things', () => {
   it('a different holdout traffic seed moves the published interval and not the policy', async () => {
     const other = await runTeachingRound({

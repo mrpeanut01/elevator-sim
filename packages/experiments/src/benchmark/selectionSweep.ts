@@ -731,6 +731,13 @@ export function traceLearnedRegimes(input: {
   readonly referenceProfileId: string;
   readonly selection: SelectionStageConfig;
   readonly seeds: readonly bigint[];
+  /**
+   * The demand seed to trace at (docs/14 § 1.1). Omitted by the sweep, which leaves § D156's
+   * occupancy shares the run they were. `teaching/` passes its **holdout** traffic seed, because
+   * the question *"what did this policy actually do?"* has to be asked about the traffic the
+   * verdict was taken on.
+   */
+  readonly trafficSeed?: number | bigint | undefined;
 }): LearnedRegimeTrace {
   const profile = input.config.dispatcherProfilesById.get(input.referenceProfileId);
   const building = input.resources.buildingsById.get(input.cell.building);
@@ -764,6 +771,7 @@ export function traceLearnedRegimes(input: {
       trafficProfiles: input.config.trafficProfiles,
       elevatorSpecs: input.config.elevatorSpecs,
       seed,
+      ...(input.trafficSeed === undefined ? {} : { trafficSeed: input.trafficSeed }),
       durationS: input.cell.point.durationS as number,
       reportWindow: input.cell.point.reportWindow ?? 'full-run',
       demand: input.cell.point.demand,

@@ -39,6 +39,25 @@
  *   cheapest way to produce a training-set win — reuse the seed — is a refusal rather than a
  *   result.
  *
+ * ## The clause § D200 forced, and it is a raise rather than a caveat
+ *
+ * § D200 measured a **constant weight-vector hybrid** beating the reference by more than the
+ * selector did on either of its cells, and drew the only conclusion available: *the advantage is
+ * static and the switching subtracts from it.* An acceptance that has not ruled that out is not an
+ * acceptance, so the control is a **gate clause** here rather than a follow-up investigation: the
+ * taught policy is instrumented on the holdout traffic, the weight set it held most is pinned on
+ * the reference profile for the whole run with no selector, and the taught arm must beat *that*.
+ * A taught arm that does not has demonstrated that one of the shipped vectors is better at this
+ * point than the census's pick — a finding about `data/`, not about learning.
+ *
+ * ## The budget is never lowered after a census
+ *
+ * `spec.budget.verdictReplications` is spent whatever the census ceiling says. `benchmark/
+ * doubleDeck.ts` is the shipped precedent: a re-census dropped a point's ceiling from 386 to 90,
+ * the pre-registered 200 was left at 200, and the point was published **UNQUOTABLE**. So a cell
+ * whose arms lose their AWT over the declared budget reports `quotable: false` and an `UNQUOTABLE`
+ * gate, rather than a clean interval taken over a budget chosen after seeing the answer.
+ *
  * ## The pieces this module does not reimplement
  *
  * The census, the resolution probe, the paired-t cell and Holm–Bonferroni are `benchmark/`'s, and
@@ -62,15 +81,23 @@ import {
   holmDecisions,
   pairedPValue,
   probeCellResolution,
+  traceLearnedRegimes,
   type CellResolution,
   type HolmDecision,
+  type LearnedRegimeTrace,
 } from '../benchmark/selectionSweep.js';
 import { compareCell, type CellComparison } from '../benchmark/verdict.js';
 import type { DispatcherArmSpec, ExperimentResources } from '../runner/types.js';
 import { policyNoiseStream, sampleCandidate } from '../tuning/space/sample.js';
 import { searchSpace, subspace } from '../tuning/space/collect.js';
 import type { Candidate } from '../tuning/space/types.js';
-import { cellOf, digestsOf, runGateExperiment, samplesOf } from '../validation/harness.js';
+import {
+  cellOf,
+  derivedProfile,
+  digestsOf,
+  runGateExperiment,
+  samplesOf,
+} from '../validation/harness.js';
 
 import {
   TeachingError,
@@ -140,6 +167,31 @@ export interface TeachingCellResult {
   readonly costs: readonly CellComparison[];
   /** Phase 7's authored detector, measured beside. **Not the gate** — § D145's standing warning. */
   readonly fuzzyGate: CellComparison;
+  /**
+   * **What the policy actually did**, instrumented on the holdout traffic through the policy's own
+   * `activePattern` accessor — which weight sets it held, for what share of decisions, and how
+   * often it changed. § D156 § 4's device, and the input to the static control below.
+   */
+  readonly regimes: LearnedRegimeTrace;
+  /** The weight set the taught policy held most, and therefore the vector the control pins. */
+  readonly dominantWeightSetId: string;
+  /**
+   * The static hybrid against the reference: the reference profile carrying the dominant weight
+   * set's vector for the **whole run**, no selector, same traffic, same `n`.
+   */
+  readonly staticGate: CellComparison;
+  /**
+   * **The clause that can refuse an acceptance** — the taught arm against that static hybrid.
+   *
+   * § D200 measured a constant weight-vector hybrid beating the reference by *more* than the
+   * selector did, and drew the only available conclusion: *the advantage is static and the
+   * switching subtracts from it.* So a taught arm that does not beat its own pinned dominant
+   * vector has not demonstrated **selection**; it has demonstrated that one of the shipped vectors
+   * is better at this point than the census's pick, which is a finding about `data/` and not about
+   * learning. § D156 § 4 ran exactly this control and reported `+1.157 [+0.719, +1.595] WORSE` for
+   * the constant arm, which is what let that cell's effect be attributed to the selector at all.
+   */
+  readonly switchingPremium: CellComparison;
   readonly identicalReplications: number;
   readonly regime: 'near-neighbour' | 'structural';
   readonly resolutionLimitS: number;
@@ -272,6 +324,10 @@ export async function runTeachingRound(input: TeachingRoundInput): Promise<Teach
   }
 
   const trainingSums = new Array<number>(sampled.length).fill(0);
+  /* Per cell as well as averaged, because the averaged number is a fact about the *policy* and a
+     reader looking at one cell's row wants that cell's own training delta beside it. Reporting the
+     cross-cell mean under a per-cell heading is how a figure becomes wrong without becoming false. */
+  const trainingByCell: number[][] = [];
   for (const [index, cell] of cells.entries()) {
     const census = censuses[index] as SelectionCensus;
     const arms: DispatcherArmSpec[] = [
@@ -291,13 +347,16 @@ export async function runTeachingRound(input: TeachingRoundInput): Promise<Teach
       resources: input.resources,
     });
     const reference = samplesOf(experiment, 'reference', spec.objective.gate);
+    const perCandidate: number[] = [];
     sampled.forEach((_, candidate) => {
       const values = samplesOf(experiment, `candidate-${String(candidate)}`, spec.objective.gate);
       let sum = 0;
       for (let i = 0; i < values.length; i += 1) sum += (values[i] as number) - (reference[i] as number);
-      trainingSums[candidate] =
-        (trainingSums[candidate] as number) + (values.length === 0 ? Number.NaN : sum / values.length);
+      const mean = values.length === 0 ? Number.NaN : sum / values.length;
+      perCandidate.push(mean);
+      trainingSums[candidate] = (trainingSums[candidate] as number) + mean;
     });
+    trainingByCell[index] = perCandidate;
   }
 
   const candidates: TaughtCandidate[] = sampled.map((selection, index) =>
@@ -326,10 +385,56 @@ export async function runTeachingRound(input: TeachingRoundInput): Promise<Teach
   for (const [index, cell] of cells.entries()) {
     const census = censuses[index] as SelectionCensus;
     const resolution = resolutions[index] as CellResolution;
+    /* **Before the verdict experiment is built: what does this policy actually do?**
+       Instrumented on the holdout traffic through the policy's own `activePattern` accessor, over
+       the first few realized holdout seeds. It decides which vector the static control pins, and
+       nothing about the gate, so reading it here chooses nothing after seeing a result. */
+    const regimes = traceLearnedRegimes({
+      cell,
+      config: input.config,
+      resources: input.resources,
+      referenceProfileId: census.referenceProfileId,
+      selection: winner.selection,
+      seeds: seedSets.holdout.slice(0, REGIME_TRACE_SEEDS),
+      trafficSeed: spec.seeds.holdoutTrafficSeed,
+    });
+    const dominantPattern = dominantPatternOf(regimes);
+    const dominantWeightSetId =
+      dominantPattern === undefined
+        ? census.referenceProfileId
+        : (library.patternSwitching.weightSetsByPattern[dominantPattern] ??
+          census.referenceProfileId);
+
+    /* The static hybrid: the reference profile carrying that vector for the whole run, no selector.
+       § D200's probe, promoted from a follow-up investigation to a gate clause, because it is what
+       separates *learned selection helped* from *one of the shipped vectors is better here than the
+       census's pick*, and the second is a finding about `data/`. */
+    const referenceProfile = input.resources.dispatcherProfilesById.get(census.referenceProfileId);
+    if (referenceProfile === undefined) {
+      throw new TeachingError(`No profile "${census.referenceProfileId}" to build the static control from.`);
+    }
+    const dominantWeights = library.weightsByProfileId.get(dominantWeightSetId);
+    if (dominantWeights === undefined) {
+      throw new TeachingError(
+        `The weight-set library carries no vector for "${dominantWeightSetId}", so the static control cannot be built and the switching premium cannot be measured.`,
+      );
+    }
+    const staticProfile = derivedProfile(referenceProfile, `${census.referenceProfileId}-static`, {
+      weights: Object.fromEntries(dominantWeights),
+    });
+    const withStatic: ExperimentResources = Object.freeze({
+      ...input.resources,
+      dispatcherProfilesById: new Map([
+        ...input.resources.dispatcherProfilesById,
+        [staticProfile.id, staticProfile],
+      ]),
+    });
+
     const armSpecs: DispatcherArmSpec[] = [
       Object.freeze({ id: 'reference', profile: census.referenceProfileId }),
       selectorArm('fuzzy', census.referenceProfileId, { policy: 'fuzzy' }, library),
       selectorArm('taught', census.referenceProfileId, winner.selection, library),
+      Object.freeze({ id: 'static', profile: staticProfile.id }),
     ];
     const experiment = await runGateExperiment({
       id: `teaching/verdict/${cell.id}`,
@@ -339,7 +444,7 @@ export async function runTeachingRound(input: TeachingRoundInput): Promise<Teach
       dispatchers: armSpecs,
       traffic: cell.point,
       replications: spec.budget.verdictReplications,
-      resources: input.resources,
+      resources: withStatic,
     });
 
     const armIds = armSpecs.map((arm) => arm.id as string);
@@ -364,6 +469,16 @@ export async function runTeachingRound(input: TeachingRoundInput): Promise<Teach
 
     const gate = comparisonOf('taught', spec.objective.gate);
     const costs = spec.objective.costs.map((metric) => comparisonOf('taught', metric));
+    const staticGate = comparisonOf('static', spec.objective.gate);
+    const switchingPremium = compareCell({
+      metric: spec.objective.gate,
+      armId: 'taught',
+      baselineId: 'static',
+      candidate: samplesOf(experiment, 'taught', spec.objective.gate),
+      baseline: samplesOf(experiment, 'static', spec.objective.gate),
+      quotable,
+      ...(census.ceiling === undefined ? {} : { admissibleReplications: census.ceiling }),
+    });
 
     let identical = 0;
     for (let replication = 0; replication < spec.budget.verdictReplications; replication += 1) {
@@ -381,7 +496,8 @@ export async function runTeachingRound(input: TeachingRoundInput): Promise<Teach
     const structural = identical < spec.budget.verdictReplications;
     const limit = structural ? resolution.structuralS : resolution.nearNeighbourS;
     const belowResolutionLimit = Math.abs(gate.estimate.mean) < limit;
-    const generalizes = winner.trainingMeanDeltaS < 0 && gate.estimate.mean < 0;
+    const trainingMeanDeltaS = (trainingByCell[index] ?? [])[winner.index] ?? Number.NaN;
+    const generalizes = trainingMeanDeltaS < 0 && gate.estimate.mean < 0;
 
     results.push(
       Object.freeze({
@@ -394,6 +510,10 @@ export async function runTeachingRound(input: TeachingRoundInput): Promise<Teach
         gate,
         costs: Object.freeze(costs),
         fuzzyGate: comparisonOf('fuzzy', spec.objective.gate),
+        regimes,
+        dominantWeightSetId,
+        staticGate,
+        switchingPremium,
         identicalReplications: identical,
         regime: structural ? ('structural' as const) : ('near-neighbour' as const),
         resolutionLimitS: limit,
@@ -401,7 +521,7 @@ export async function runTeachingRound(input: TeachingRoundInput): Promise<Teach
         replications: spec.budget.verdictReplications,
         quotable,
         crnAligned,
-        trainingMeanDeltaS: winner.trainingMeanDeltaS,
+        trainingMeanDeltaS,
         generalizes,
         accepted: false,
         reason: '',
@@ -426,7 +546,10 @@ export async function runTeachingRound(input: TeachingRoundInput): Promise<Teach
     const decision = holmByKey.get(cell.cellId);
     const better = cell.gate.verdict === 'BETTER';
     const rejected = decision?.rejected === true;
-    const accepted = better && rejected && !cell.belowResolutionLimit && cell.generalizes;
+    /* The fifth clause, and the one that can refuse an otherwise clean acceptance. § D200. */
+    const switchingPays = cell.switchingPremium.verdict === 'BETTER';
+    const accepted =
+      better && rejected && !cell.belowResolutionLimit && cell.generalizes && switchingPays;
     const reason = accepted
       ? `ΔTTD ${formatInterval(cell.gate)} against "${cell.referenceProfileId}" on held-out traffic seed ${String(spec.seeds.holdoutTrafficSeed)}, n = ${String(cell.replications)}, above this cell's own ${cell.regime} limit of ${cell.resolutionLimitS.toFixed(3)} s.`
       : cell.gate.verdict === 'IDENTICAL'
@@ -439,6 +562,9 @@ export async function runTeachingRound(input: TeachingRoundInput): Promise<Teach
               ? `the effect is below this cell's own ${cell.regime} resolution limit of ${cell.resolutionLimitS.toFixed(3)} s, measured on ${spec.objective.gate} at the training traffic`
               : undefined,
             cell.generalizes ? undefined : 'the training and holdout signs disagree',
+            switchingPays
+              ? undefined
+              : `the switching earns nothing over pinning its own dominant vector — taught against the static "${cell.dominantWeightSetId}" hybrid is ${formatInterval(cell.switchingPremium)}, while that hybrid alone is ${formatInterval(cell.staticGate)} against the reference. § D200: the advantage is static, and this is a finding about data/ rather than about learning`,
           ]
             .filter((clause) => clause !== undefined)
             .join('; ') + '.';
@@ -468,6 +594,42 @@ export async function runTeachingRound(input: TeachingRoundInput): Promise<Teach
     verdictReason,
     measuredOn: 'held-out traffic' as const,
   });
+}
+
+/* -------------------------------------------------------------------------- *
+ * The static control's vector
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Holdout seeds the regime trace runs on. Five, because the trace is a description of the policy
+ * rather than an estimate: § D156 § 4's occupancy shares were stable across seeds, and this figure
+ * decides which vector the control pins and nothing that is graded.
+ */
+export const REGIME_TRACE_SEEDS = 5;
+
+/**
+ * The pattern the taught policy held for the largest share of its decisions, or `undefined` when
+ * it abstained throughout.
+ *
+ * `'none'` is abstention — the detector recognising no regime, at which the profile's own weights
+ * stand — so a policy that mostly abstains pins the reference's own vector and the static control
+ * is the reference. That is the right answer rather than an edge case: a policy that abstains is
+ * not selecting, and its switching premium is then measured against the arm it mostly was.
+ * Ties break by name, so the control is a function of the trace and of nothing else (invariant 4).
+ */
+export function dominantPatternOf(trace: LearnedRegimeTrace): string | undefined {
+  let best: string | undefined;
+  let bestShare = -1;
+  for (const [pattern, share] of Object.entries(trace.weightSetShares).sort((a, b) =>
+    a[0].localeCompare(b[0]),
+  )) {
+    if (pattern === 'none') continue;
+    if (share > bestShare) {
+      bestShare = share;
+      best = pattern;
+    }
+  }
+  return best;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -536,6 +698,18 @@ export function formatTeachingRound(round: TeachingRound): string {
     lines.push(`  HELD-OUT     ΔTTD ${formatInterval(cell.gate)}   regime ${cell.regime} (limit ${cell.resolutionLimitS.toFixed(3)} s), below limit: ${String(cell.belowResolutionLimit)}`);
     for (const cost of cell.costs) lines.push(`    ${cost.metric.padEnd(22)} ${formatInterval(cost)}`);
     lines.push(`  fuzzy arm    ΔTTD ${formatInterval(cell.fuzzyGate)} — Phase 7's authored detector, measured beside and NOT the gate`);
+    lines.push(
+      `  what it did  ${Object.entries(cell.regimes.weightSetShares)
+        .sort((a, b) => b[1] - a[1])
+        .map(([pattern, share]) => `${pattern} ${(share * 100).toFixed(1)} %`)
+        .join(', ')} over ${String(cell.regimes.decisions)} decisions, ${String(cell.regimes.patternChanges)} changes, ${String(cell.regimes.distinctWeightSets)} distinct weight sets`,
+    );
+    lines.push(
+      `  static ctrl  "${cell.dominantWeightSetId}" pinned for the whole run: ΔTTD ${formatInterval(cell.staticGate)} against the reference`,
+    );
+    lines.push(
+      `  switching    taught against that static hybrid: ΔTTD ${formatInterval(cell.switchingPremium)} — the clause that refuses a static advantage dressed as selection (§ D200)`,
+    );
     lines.push(`  identical ${String(cell.identicalReplications)}/${String(cell.replications)}  CRN aligned ${String(cell.crnAligned)}  quotable ${String(cell.quotable)}  generalizes ${String(cell.generalizes)}`);
     lines.push(`  ${cell.accepted ? 'ACCEPTED' : 'NOT ACCEPTED'}: ${cell.reason}`);
     lines.push('');
