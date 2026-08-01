@@ -59,6 +59,7 @@ import type {
   ResolvedDemandTemplate,
   TrafficModelVersion,
 } from '../traffic/types.js';
+import type { DoorCrowdingConfig } from '../physics/doors/types.js';
 import type { PatienceConfig } from './patience.js';
 
 /* -------------------------------------------------------------------------- *
@@ -463,6 +464,22 @@ export interface SimulationConfig {
    * `sim/patience.ts`.
    */
   readonly patience?: PatienceConfig | undefined;
+  /**
+   * How much a crowded landing slows boarding (docs/14 § 3.2).
+   *
+   * **Absent means a lobby's size does not affect how fast it loads**, which is what every run
+   * this repository has published assumed. Present, and per-passenger transfer time rises with
+   * the number of people standing there, bounded — one monotone term on the existing dwell model
+   * (`physics/doors`), not a spatial crowd simulation.
+   *
+   * It is a property of the **building and its demand**, which is why it lives here and not in a
+   * dispatcher profile's `answer` stage: see `DoorConfigOverrides.crowding`.
+   *
+   * **Being a feedback loop, it can destabilise a run that was stable.** Slow boarding lengthens
+   * the queue and a longer queue slows boarding. That is a finding to be read off
+   * `RunSummary.saturation`, not a defect — the detector exists for exactly this.
+   */
+  readonly lobbyCrowding?: DoorCrowdingConfig | undefined;
   /** `throw` (default) or `report`. See {@link SimulationError}. */
   readonly onTimeout?: TimeoutPolicy | undefined;
 }

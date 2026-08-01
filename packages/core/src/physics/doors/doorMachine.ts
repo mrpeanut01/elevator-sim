@@ -67,6 +67,7 @@ import type {
   DoorCommand,
   DoorConfig,
   DoorConfigOverrides,
+  DoorCrowdingConfig,
   DoorEvent,
   DoorMachineState,
   DoorReopenCause,
@@ -101,6 +102,7 @@ const NO_REASON: DoorStopReason = Object.freeze({
   hallCall: false,
   hallQueueLength: 0,
   transferSeconds: 0,
+  lobbyOccupancy: 0,
 });
 
 const NO_EVENTS: readonly DoorEvent[] = Object.freeze([]);
@@ -209,7 +211,33 @@ export function resolveDoorConfig(
     reopenOnLateArrival,
     maxReopensPerStop,
     maxTransferSeconds,
+    // Spread-or-omit, not `crowding: overrides?.crowding`: under `exactOptionalPropertyTypes` a
+    // present `undefined` is a different type and a different claim, and a `DoorConfig` that
+    // carried the key on every car would say every run had been asked the crowding question.
+    // Read only from `overrides` — see `DoorConfigOverrides.crowding` for why a dispatcher
+    // profile may not author it.
+    ...(overrides?.crowding === undefined
+      ? {}
+      : { crowding: requireValidCrowding(overrides.crowding) }),
   });
+}
+
+/**
+ * Validate a crowding term, loudly.
+ *
+ * @throws RangeError with the field named. A `maxFactor` below 1 would make a crowd *speed
+ *   boarding up*, which is not a configuration anybody means and would quietly invert the
+ *   feedback loop the term exists to introduce.
+ */
+function requireValidCrowding(crowding: DoorCrowdingConfig): DoorCrowdingConfig {
+  requireNonNegative(crowding.thresholdPersons, 'crowding.thresholdPersons');
+  requireNonNegative(crowding.factorPerPerson, 'crowding.factorPerPerson');
+  if (!Number.isFinite(crowding.maxFactor) || crowding.maxFactor < 1) {
+    throw new RangeError(
+      `Door config: crowding.maxFactor must be a finite number >= 1; received ${crowding.maxFactor}. Below 1 a crowded lobby would board faster than an empty one.`,
+    );
+  }
+  return crowding;
 }
 
 // ---------------------------------------------------------------------------
@@ -228,6 +256,31 @@ function transferOf(reason: DoorStopReason): number {
   return seconds === undefined || !Number.isFinite(seconds) || seconds < 0 ? 0 : seconds;
 }
 
+/** People standing on the landing, defaulting to none. See {@link DoorStopReason.lobbyOccupancy}. */
+function occupancyOf(reason: DoorStopReason): number {
+  const people = reason.lobbyOccupancy;
+  return people === undefined || !Number.isFinite(people) || people < 0 ? 0 : people;
+}
+
+/**
+ * How much longer each passenger takes to get through the doorway, given the crowd behind them.
+ *
+ * **Exactly `1` when the run declares no crowding**, which is what keeps the transfer term — and
+ * therefore every published stop length — the number it was before this existed. Monotone
+ * non-decreasing in occupancy, and bounded by `maxFactor`; see {@link DoorCrowdingConfig} for the
+ * shape's provenance and for what it deliberately is not.
+ *
+ * Exported because it is the term itself: a study asking *how much of this run is crowding* needs
+ * the factor, and re-deriving it from the formula in a second place is the shape that lets two
+ * copies of a rule disagree.
+ */
+export function crowdingFactorFor(config: DoorConfig, reason: DoorStopReason): number {
+  const crowding = config.crowding;
+  if (crowding === undefined) return 1;
+  const excess = Math.max(0, occupancyOf(reason) - crowding.thresholdPersons);
+  return Math.min(crowding.maxFactor, 1 + crowding.factorPerPerson * excess);
+}
+
 /**
  * Combine two reasons for the same stop: the union of the calls, and the larger of each
  * quantity.
@@ -243,6 +296,9 @@ export function mergeStopReasons(a: DoorStopReason, b: DoorStopReason): DoorStop
     hallCall: a.hallCall || b.hallCall,
     hallQueueLength: Math.max(queueOf(a), queueOf(b)),
     transferSeconds: Math.max(transferOf(a), transferOf(b)),
+    // The larger crowd, by the rule the two above follow: each declaration states what the whole
+    // stop faces, revised as the run learns more.
+    lobbyOccupancy: Math.max(occupancyOf(a), occupancyOf(b)),
   });
 }
 
@@ -252,7 +308,8 @@ function sameStopReason(a: DoorStopReason, b: DoorStopReason): boolean {
     a.carCall === b.carCall &&
     a.hallCall === b.hallCall &&
     queueOf(a) === queueOf(b) &&
-    transferOf(a) === transferOf(b)
+    transferOf(a) === transferOf(b) &&
+    occupancyOf(a) === occupancyOf(b)
   );
 }
 
@@ -306,7 +363,13 @@ function policyDwellSeconds(config: DoorConfig, reason: DoorStopReason): number 
  * {@link maxStopSeconds} finite.
  */
 export function dwellSecondsFor(config: DoorConfig, reason: DoorStopReason): number {
-  const transfer = Math.min(transferOf(reason), config.maxTransferSeconds);
+  // Crowding scales the transfer **before** the ceiling, never after: applied afterwards it
+  // would be an unbounded stop wearing a bound's clothes, and `maxStopSeconds` would stop being
+  // true. At no declared crowding the factor is exactly 1 and this line is the line it was.
+  const transfer = Math.min(
+    transferOf(reason) * crowdingFactorFor(config, reason),
+    config.maxTransferSeconds,
+  );
   return Math.max(policyDwellSeconds(config, reason), transfer);
 }
 

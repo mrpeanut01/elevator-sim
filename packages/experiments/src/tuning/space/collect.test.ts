@@ -316,7 +316,15 @@ describe('every parameter core declares is accounted for', () => {
     // that table's ids are flat `sim.<key>` names bound one-for-one to `SIM_DEFAULTS`, and a
     // patience curve has no scalar default: the absent block *is* the default, which is what
     // keeps a run that declares none byte-identical to one produced before the feature existed.
-    expect(rows).toBe(113);
+    //
+    // **113 -> 116, twelve schemas, and the space still unmoved at 56**, with docs/14 § 3.2's
+    // lobby-crowding term: `sim.lobbyCrowding.thresholdPersons`, `.factorPerPerson` and
+    // `.maxFactor`, declared as `CROWDING_PARAMETERS` in `core/src/physics/doors`. The ids are
+    // `sim.*` rather than `answer.*` deliberately and that is the whole reason they are a separate
+    // table from `DOOR_PARAMETERS`: how crowded a lobby gets is a property of the building and its
+    // demand, and a dispatcher that could author the term could tune away the cost of the queues
+    // it produces.
+    expect(rows).toBe(116);
     expect(SPACE.parameters.length).toBe(56);
     // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
     // always said `false` would satisfy the biconditional above only by accident.

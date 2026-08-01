@@ -158,6 +158,7 @@ import {
   type Floor,
   type HallCall,
 } from '../model/index.js';
+import type { DoorCrowdingConfig } from '../physics/doors/index.js';
 import { travelTime } from '../physics/motion/index.js';
 import { StreamSet } from '../random/index.js';
 import {
@@ -336,6 +337,8 @@ interface ResolvedOptions {
    * this repository has published (docs/14 § 3.1).
    */
   readonly patience: PatienceConfig | undefined;
+  /** The lobby-crowding term, or `undefined` when the run models none (docs/14 § 3.2). */
+  readonly lobbyCrowding: DoorCrowdingConfig | undefined;
 }
 
 /**
@@ -707,6 +710,7 @@ export class Simulation {
       );
     }
 
+    const crowding = this.#options.lobbyCrowding;
     this.#building = createBuilding<Car>(resolved, {
       createCar: (spec, context) => {
         const passengerTransferS = spec.passengerTransferS ?? typeTransferS;
@@ -725,6 +729,15 @@ export class Simulation {
           ...(answer === undefined ? {} : { answer }),
           ...(loadSensorSpec === undefined ? {} : { loadSensorSpec }),
           ...(passengerTransferS === undefined ? {} : { passengerTransferS }),
+          /*
+           * **The non-test caller `CarInit.doorOverrides` did not have.** It has been declared,
+           * typed and read by `resolveDoorConfig` since the door machine landed, and nothing in a
+           * shipped path ever supplied one — the shape docs/05's standing requirement names. The
+           * lobby-crowding term is what it now carries, and it carries nothing when the run
+           * declares none, so a run that does not ask for crowding hands the same `undefined` the
+           * constructor has always received.
+           */
+          ...(crowding === undefined ? {} : { doorOverrides: { crowding } }),
         });
       },
     });
@@ -2254,6 +2267,22 @@ export class Simulation {
       hallCall: served.length > 0 || boarding > 0,
       hallQueueLength: car.isDoubleDeck ? Math.max(deckBoarding[0], deckBoarding[1]) : boarding,
       transferSeconds: movers * car.passengerTransferS,
+      /*
+       * **Everybody standing here, not everybody boarding here** (docs/14 § 3.2).
+       *
+       * `hallQueueLength` above is the boarding cohort — the people this car is about to take.
+       * This is the whole landing, in both directions, including the riders going the other way
+       * and the ones this car has no room for. That is the number a crowd is: the people you have
+       * to get past to reach the doorway do not stop being in the way because they are waiting
+       * for a different car.
+       *
+       * The busier of the two landings on a paired double-deck stop, by the rule the dwell above
+       * already follows: the decks open on one interlock and the stop takes the slower of them.
+       *
+       * Read only by `DoorConfig.crowding`, so on a run that declares none the door normalizes it
+       * to a factor of exactly 1 and this argument changes nothing.
+       */
+      lobbyOccupancy: Math.max(...floors.map((each) => each.queueLength())),
     });
     if (car.isDoubleDeck) {
       this.#doubleDeckStops += 1;
@@ -2572,6 +2601,9 @@ export class Simulation {
       hallCall: true,
       hallQueueLength: holdCohort,
       transferSeconds: holdCohort * car.passengerTransferS,
+      // The same landing, still as crowded: a courtesy hold re-grants the *hold's own* cohort,
+      // and the crowd it has to move through is unchanged by the door reversing.
+      lobbyOccupancy: Math.max(...floors.map((each) => each.queueLength())),
     });
     // Refused — the profile declined the courtesy hold, or the stop's reopen budget is spent.
     // The door carries on closing and the passenger waits for the next car, which is the
@@ -3937,6 +3969,9 @@ function resolveOptions(config: SimulationConfig): ResolvedOptions {
     // instant they arrive, and a run that discovered that a thousand events in would report an
     // AWT over nobody rather than a configuration error.
     patience: config.patience === undefined ? undefined : requireValidPatience(config.patience),
+    // Validated by `resolveDoorConfig`, where the bound it has to satisfy lives; passed straight
+    // through so the runner has exactly one opinion about it and the door module has the other.
+    lobbyCrowding: config.lobbyCrowding,
   });
 }
 
