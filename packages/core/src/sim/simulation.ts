@@ -4230,6 +4230,9 @@ function traceConfigFor(config: SimulationConfig, streams: StreamSet): TrafficCo
     // for a number `data/traffic-profiles.json` already states.
     ...(demand.batchSize === undefined ? {} : { batchSize: demand.batchSize }),
     ...(demand.passengerMass === undefined ? {} : { passengerMass: demand.passengerMass }),
+    // docs/14 § 2.3. Spread-or-omit for the same reason, one step further: a run that declares no
+    // day is the run that predates the feature, and the trace it generates must be that object.
+    ...(demand.dayVariation === undefined ? {} : { dayVariation: demand.dayVariation }),
   };
 }
 

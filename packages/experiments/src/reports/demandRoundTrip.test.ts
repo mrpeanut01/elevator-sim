@@ -86,6 +86,10 @@ const DEMAND_SAMPLE = {
     minKg: 40,
     maxKg: 200,
   },
+  // docs/14 § 2.3. `peakShiftS` is included deliberately: it is the one optional field inside the
+  // block, so a projection that carried the two bounds and dropped it would still round-trip a
+  // *bounded* multiplier and lose only the timing — the quietest of the three losses.
+  dayVariation: { minDemandFactor: 0.8, maxDemandFactor: 1.25, peakShiftS: 120 },
 } as const satisfies Record<keyof SimulationDemandOptions, unknown>;
 
 describe('the stored record carries every demand override', () => {
@@ -96,7 +100,7 @@ describe('the stored record carries every demand override', () => {
    * not quietly shrinking either — a row deleted to make a failure go away shows up here.
    */
   it('samples every field the demand surface declares', () => {
-    expect(Object.keys(DEMAND_SAMPLE).length).toBe(13);
+    expect(Object.keys(DEMAND_SAMPLE).length).toBe(14);
   });
 
   /**

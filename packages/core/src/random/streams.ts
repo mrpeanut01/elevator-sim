@@ -84,6 +84,17 @@ export const STREAM_NAMES = [
    * declares one, so no shipped run draws from it.
    */
   'modeChoice',
+  /**
+   * The per-run inter-day multipliers (docs/14 § 2.3). Appended for `batchSize`'s reason: the
+   * spelling decides the parameters and the position decides nothing.
+   *
+   * Drawn from only when a run declares `demand.dayVariation`, and then **exactly twice, before a
+   * single arrival instant exists** — a demand factor and a peak shift, in that order. Two draws
+   * rather than one-when-shifting so that turning the shift on cannot move the factor; and on this
+   * stream rather than on `arrivals` so that turning day variation on cannot move any *other*
+   * draw either. What it does move is the demand the trace is generated at, deliberately.
+   */
+  'dayVariation',
 ] as const;
 
 export type StreamName = (typeof STREAM_NAMES)[number];
@@ -194,6 +205,13 @@ export function deriveStreamSeed(masterSeed: number | bigint, streamName: string
  *   they walked in with. Seeding it off the run seed would mean re-rolling the machine silently
  *   changed *which people left the lift system*, so two arms would be measured over different
  *   populations — the very thing docs/14 § 5 criterion 4 exists to keep visible.
+ * - **`dayVariation`** — *which Tuesday this is* is the most purely crowd-side fact on the list:
+ *   it scales how many people walk in and moves when they do it, and it touches no car. Off the
+ *   traffic seed it would be the machine deciding how busy the day was, and re-rolling a
+ *   dispatcher would silently re-roll the demand level it was measured at. This is also the one
+ *   whose misplacement is a *statistical* fault rather than only a modelling one: two arms of a
+ *   paired comparison must see the same Monday, and docs/14 § 5 criterion 3 is written for
+ *   exactly that.
  *
  * The contrast is exact: an obstruction is a property of the door and the moment, so putting it on
  * the traffic seed would make "the same crowd" also mean "the same doors jamming". Willingness to
@@ -208,6 +226,7 @@ const TRAFFIC_STREAM_NAMES: ReadonlySet<string> = new Set([
   'batchSize',
   'patience',
   'modeChoice',
+  'dayVariation',
 ]);
 
 /** Optional second seed, for separating demand from machine. See {@link StreamSet}. */
@@ -297,6 +316,15 @@ export class StreamSet {
   readonly patience: Rng;
   /** Stairs versus lift. Consumed only for a journey a stairs mode is offered to (docs/14 § 3.3). */
   readonly modeChoice: Rng;
+  /**
+   * How busy this particular day is, and how late its peak runs (docs/14 § 2.3).
+   *
+   * Consumed only when a run declares `demand.dayVariation`, and then exactly twice, before the
+   * trace exists. Materialized here for {@link batchSize}'s reason — a name in
+   * {@link STREAM_NAMES} without a property beside it is a source the architecture declares and
+   * the type does not.
+   */
+  readonly dayVariation: Rng;
 
   readonly #streams = new Map<string, Pcg32>();
 
@@ -314,6 +342,7 @@ export class StreamSet {
     this.batchSize = this.#derive('batchSize');
     this.patience = this.#derive('patience');
     this.modeChoice = this.#derive('modeChoice');
+    this.dayVariation = this.#derive('dayVariation');
   }
 
   /** Typed accessor for the required streams. Returns the same instance as the property. */

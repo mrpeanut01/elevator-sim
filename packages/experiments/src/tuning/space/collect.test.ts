@@ -335,10 +335,18 @@ describe('every parameter core declares is accounted for', () => {
     // gets is a property of the building and its demand, and a dispatcher that could author the
     // term could tune away the cost of the queues it produces.
     //
+    // **Three from docs/14 § 2.3**, inter-day variability:
+    // `traffic.dayVariation.minDemandFactor`, `.maxDemandFactor` and `.peakShiftS`, on
+    // `TRAFFIC_PARAMETERS` beside the other demand knobs. All three carry `default: null`, so all
+    // three land in `space.unsearchable` — they satisfy invariant 8's *declaration* requirement
+    // and not its *searchability* purpose, exactly as the twelve null-default rows before them do.
+    // Null is the only honest default here: a multiplier declared as a number would silently make
+    // every run in this repository a different Tuesday.
+    //
     // **This is a count of declared rows, not a published estimate.** Nothing in `published.ts`
-    // moved and neither identity digest moved; all sixteen tunables are absent from every default
+    // moved and neither identity digest moved; all nineteen tunables are absent from every default
     // run by construction, which is docs/14 § 5 criterion 1.
-    expect(rows).toBe(124);
+    expect(rows).toBe(127);
     expect(SPACE.parameters.length).toBe(56);
     // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
     // always said `false` would satisfy the biconditional above only by accident.

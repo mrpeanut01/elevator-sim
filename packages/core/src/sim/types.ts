@@ -53,11 +53,13 @@ import type { ReportWindow, RunRecord, RunSummary } from '../metrics/types.js';
 import type {
   BatchSizeCurve,
   CredentialAssignment,
+  DayVariationConfig,
   DemandLevel,
   DemandTemplateId,
   InterfloorWeighting,
   PassengerMassOverride,
   PassengerTrace,
+  ResolvedDayVariation,
   ResolvedDemandTemplate,
   TrafficModelVersion,
 } from '../traffic/types.js';
@@ -337,6 +339,24 @@ export interface SimulationDemandOptions {
    * with the crowd rather than which crowd turns up.
    */
   readonly passengerMass?: PassengerMassOverride | undefined;
+
+  /* ---- docs/14 § 2.3, inter-day variability ---- */
+
+  /**
+   * Make this run a *particular day* rather than the average one. docs/14 § 2.3.
+   *
+   * **Absent means Tuesday is a copy of Monday**, which is every run this repository has
+   * published: a template is deterministic given its seed. Present, and one bounded multiplier on
+   * total demand and one bounded shift on peak timing are drawn per run from the `dayVariation`
+   * stream, before a car moves.
+   *
+   * It lives on the **demand** surface and not beside `patience` on the runner's, and that
+   * placement is the load-bearing part rather than a filing decision: it changes what the trace
+   * generator produces, so it is in `runner/crn.ts`'s `traceKeyOf` and two cells that disagree
+   * about it are never paired. `patience` is the exact contrast — a demand-side *stream*, drawn
+   * after the trace exists, deliberately out of that key.
+   */
+  readonly dayVariation?: DayVariationConfig | undefined;
 }
 
 /** What to do when the drain deadline fires with passengers still in the system. */

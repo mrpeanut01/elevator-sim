@@ -201,8 +201,26 @@ function canonicalize(value: unknown): unknown {
  * | `doorObstructionProbability` | **no** | draws from `doorObstruction`, not from the trace streams |
  * | `patience` | **no** | draws from `patience`, its own stream, **after** the trace is generated |
  * | `lobbyCrowding` | **no** | a term on the dwell; it draws nothing at all |
+ * | `demand.dayVariation` | **yes** | draws *before* the trace and scales the rate it is generated at |
  *
- * **The two new omissions are worth reading twice, because one of them is a trap.**
+ * **`dayVariation` and `patience` are the pair to compare, and they land on opposite sides.**
+ * Both draw from a stream in `TRAFFIC_STREAM_NAMES`, so stream membership decides nothing. What
+ * decides it is *when* the draw happens relative to the trace. `patience` is drawn after the trace
+ * exists and displaces no arrival instant, so two cells differing in it see the same passengers
+ * and must be paired. `dayVariation` is drawn before anything else in `generateTrace` and its
+ * multiplier goes through `planDemand`'s `rateOf`, so two cells differing in it see a different
+ * number of people arriving at different times — a *different Monday*. Pairing those would be the
+ * arithmetic-across-unrelated-populations this module exists to refuse.
+ *
+ * **Being in the key is also what makes docs/14 § 5 criterion 3 achievable rather than lucky.**
+ * The criterion is that a paired comparison under day variation shows variance no larger than the
+ * same comparison without it. Two cells that share a `dayVariation` block share a cohort, are
+ * handed the same replication seeds, and therefore draw the *same* factor and the same peak shift:
+ * the day is common to both arms and cancels out of every paired difference. A `dayVariation`
+ * left out of this key would put a varying cell and a non-varying cell in one cohort, and the
+ * difference would carry the day's variance — the exact silent inflation the criterion tests for.
+ *
+ * **The two older omissions are worth reading twice, because one of them is a trap.**
  * `patience` draws from a *demand-side* stream (`TRAFFIC_STREAM_NAMES`), which makes it look like
  * it belongs in the key. It does not: the trace is generated in full before the patience table is
  * drawn, and the draws come from a separate stream, so they cannot displace a single arrival
@@ -243,6 +261,12 @@ export function traceKeyOf(simulation: CellSimulationConfig): string {
     mixAmplitude: demand.mixAmplitude,
     batchSize: demand.batchSize,
     passengerMass: demand.passengerMass,
+    // docs/14 § 2.3. **In**, and this is the field the docstring above says to reason about
+    // rather than to file by analogy. It draws from a demand-side stream exactly as `patience`
+    // does — and unlike `patience` it draws *before* the trace exists and multiplies the rate the
+    // trace is generated at, so two cells differing in it see different people. Measured, not
+    // argued: `core/src/sim/dayVariationSeam.test.ts` compares the two structural trace digests.
+    dayVariation: demand.dayVariation,
   });
 }
 

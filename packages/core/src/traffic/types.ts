@@ -397,6 +397,20 @@ export interface PassengerTrace {
   readonly peakPassengersPerSecond: number;
   /** Analytic expectation `peakPassengersPerSecond * template.intensityIntegralS`. */
   readonly expectedPassengers: number;
+  /**
+   * The day this trace turned out to be — **present only when the run asked for one**
+   * (docs/14 § 2.3).
+   *
+   * Absent, not `{ demandFactor: 1, peakShiftS: 0 }`, when the run declared no
+   * {@link DayVariationConfig}: a run that did not ask for a particular day *is* the run that
+   * predates the feature, and `identity.test-helper.ts`'s structural digest hashes a key's
+   * presence. The same reasoning `SimulationResult.trafficModel` records for `v1`.
+   *
+   * Reported rather than re-derivable by eye: {@link peakPassengersPerSecond} above already has
+   * the multiplier in it, so a reader comparing two traces needs this to know whether the
+   * difference was the building or the day.
+   */
+  readonly dayVariation?: ResolvedDayVariation;
   /** Non-fatal diagnostics: a populated floor with no demand, an entrance with no weight. */
   readonly warnings: readonly string[];
 }
@@ -715,6 +729,83 @@ export interface TrafficConfig {
   readonly journeyIdPrefix?: string | undefined;
   /** Prefix for generated batch ids. Default `b`. */
   readonly batchIdPrefix?: string | undefined;
+  /**
+   * Make this run a *particular day* rather than the average one. docs/14 § 2.3.
+   *
+   * Unset means what every published figure was measured under: a template is deterministic given
+   * its seed, and Tuesday is a copy of Monday. See {@link DayVariationConfig}.
+   */
+  readonly dayVariation?: DayVariationConfig | undefined;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Inter-day variability (docs/14 § 2.3)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * How much one day may differ from the average one: a bounded multiplier on total demand and a
+ * bounded shift on when the peak happens, both drawn once per run from the `dayVariation` stream.
+ *
+ * ## What this is for, and what it deliberately is not
+ *
+ * It answers one question: *is this dispatcher robust to a 15 % heavier Monday, or is its win an
+ * artefact of one demand level?* — the question a learned dispatcher must not be allowed to
+ * overfit. It is **not** a random walk across days and **not** a calendar; a richer model can come
+ * later with a reason, and today there is none.
+ *
+ * ## Two knobs that do not overlap, and the arithmetic says so
+ *
+ * - {@link minDemandFactor}/{@link maxDemandFactor} change **how many people** arrive and not
+ *   when: every source's rate is multiplied, the template's shape is untouched.
+ * - {@link peakShiftS} changes **when** they arrive and not how many: the shift moves the interior
+ *   phase boundaries, and the up-ramp lengthens by exactly as much as the down-ramp shortens, so
+ *   `intensityIntegralS` is conserved *exactly*. See `shiftTemplatePeak`.
+ *
+ * ## Both bounds are required by the type, and that follows a precedent rather than a taste
+ *
+ * `PassengerMassOverride` requires both truncation bounds because an untruncated draw surfaces
+ * three layers from its cause (docs/14 § 2.1). The same argument applies harder here: an
+ * unbounded demand multiplier is a run whose saturation state nobody declared, reported beside a
+ * mean that may or may not be valid.
+ *
+ * ## The statistical hazard, which is the whole reason § 5 criterion 3 exists
+ *
+ * Day variation adds a variance component *between* replications. Under common random numbers both
+ * arms of a comparison must see the **same** Monday, or the paired standard error rises and the
+ * 5–20× the CRN design buys is spent on nothing. That is delivered structurally rather than by
+ * convention: the draws come from a stream of the injected {@link StreamSet}, before a car moves,
+ * so two arms handed the same seed draw the same day — and this block is in
+ * `runner/crn.ts`'s `traceKeyOf`, so two cells that *disagree* about it are never paired at all.
+ */
+export interface DayVariationConfig {
+  /** Lower bound of the demand multiplier, drawn uniformly. Must be > 0 and <= the upper bound. */
+  readonly minDemandFactor: number;
+  /** Upper bound of the demand multiplier, drawn uniformly. */
+  readonly maxDemandFactor: number;
+  /**
+   * Largest peak shift in either direction, seconds. Default 0 — the peak stays where the template
+   * puts it. The shift itself is drawn uniformly from `[-peakShiftS, +peakShiftS]`.
+   *
+   * Refused above what the template can absorb, and refused outright for a template with no
+   * interior phase boundary to move: `constant-iso` is flat, so "when the peak happens" is not a
+   * question it can be asked. Shifting only its report window would move which passengers were
+   * measured without moving any of them, which is noise dressed as a model.
+   */
+  readonly peakShiftS?: number | undefined;
+}
+
+/**
+ * What a run actually drew for its day. Reported, never authored.
+ *
+ * Present on {@link PassengerTrace} and on `SimulationResult` **only** when the run declared a
+ * {@link DayVariationConfig} — spread-or-omit, because `structuralDigestOfResult` hashes a key's
+ * presence as well as its value, so a key on the default path moves 981 pins to say nothing.
+ */
+export interface ResolvedDayVariation {
+  /** The multiplier applied to every source's rate. 1 means the average day. */
+  readonly demandFactor: number;
+  /** Seconds the peak was moved by. Positive is later. 0 means the template's own timing. */
+  readonly peakShiftS: number;
 }
 
 /**
@@ -828,9 +919,9 @@ export interface TrafficParameterSpec {
 /**
  * Every demand tunable this module honours.
  *
- * **Twelve entries carry `default: null`**, meaning "unset, and unset is meaningful" — the count is
+ * **Fifteen entries carry `default: null`**, meaning "unset, and unset is meaningful" — the count is
  * asserted in `parameters.test.ts` rather than only stated here, because this sentence said "two"
- * while four were declared and would otherwise still say it now there are twelve.
+ * while four were declared and would otherwise still say it now there are fifteen.
  *
  * `traffic.arrivalRatePctPop5min` unset means "use the profile's own number for the selected
  * `demandLevel`", which is not a number this schema can name — naming one would silently run
@@ -841,7 +932,10 @@ export interface TrafficParameterSpec {
  * profile's mix, and they are set together or not at all. The three `traffic.batchSize.*` and
  * five `traffic.passengerMass.*` entries (docs/14 §§ 2.1-2.2) are the same again: the curve and
  * the population live in `data/traffic-profiles.json`, and a number here would be a second source
- * of truth for one the reference file already states.
+ * of truth for one the reference file already states. The three `traffic.dayVariation.*` entries
+ * (docs/14 § 2.3) are null for the neighbouring reason rather than that one — there is no
+ * reference file to defer to, and *no day variation at all* is the only default that leaves every
+ * published figure standing, so a number here would silently make every run a different Tuesday.
  *
  * **What `default: null` costs, said plainly rather than implied.** `collectSearchSpace` classifies
  * a null-default row as *unsearchable* — "a search needs a point it can start from" — so all
@@ -1131,5 +1225,43 @@ export const TRAFFIC_PARAMETERS: readonly TrafficParameterSpec[] = [
     unit: 'kg',
     description:
       'Upper truncation. Required whenever the block is overridden at all, for the symmetric reason: the tails of both families run to infinity and neither is a person. Draws above it are clamped, never re-drawn.',
+  },
+
+  /* ---- docs/14 § 2.3 — inter-day variability ------------------------------ */
+
+  {
+    id: 'traffic.dayVariation.minDemandFactor',
+    type: 'continuous',
+    // A **search bound, not a measurement**. No reference in this project gives a distribution of
+    // day-to-day demand, and none is invented here: 0.25 is a quiet day rather than a public
+    // holiday, and 4 is past every shipped building's handling capacity, so the interval admits
+    // the question docs/14 § 2.3 asks and refuses a typo. Labelled as such rather than cited.
+    range: [0.25, 4],
+    scale: 'linear',
+    default: null,
+    description:
+      "Lower bound of the per-run multiplier on total demand, drawn uniformly. Unset (the default) means Tuesday is a copy of Monday, which is what every published figure was measured under. Set together with maxDemandFactor or not at all: a one-sided bound is an unbounded demand multiplier, and that is a run whose saturation state nobody declared. It scales how many people arrive and not when — the peak keeps the shape and the position the template gives it.",
+  },
+  {
+    id: 'traffic.dayVariation.maxDemandFactor',
+    type: 'continuous',
+    range: [0.25, 4],
+    scale: 'linear',
+    default: null,
+    description:
+      "Upper bound of the per-run demand multiplier. Required whenever the block is declared at all, for the reason both mass truncation bounds are. min == max is legal and is the useful degenerate case: a fixed multiplier, which is a demand level rather than a variability, and it is the control arm for measuring what the variability itself costs.",
+  },
+  {
+    id: 'traffic.dayVariation.peakShiftS',
+    type: 'continuous',
+    // Bounded above by what the shipped template can absorb rather than by taste: the 30-minute
+    // rise-and-fall's outermost interior knot is 750 s from an end, so 600 leaves headroom under
+    // it. A shorter run absorbs less and the generator refuses the excess by name.
+    range: [0, 600],
+    scale: 'linear',
+    default: null,
+    unit: 's',
+    description:
+      "Largest shift of the peak in either direction, seconds; the shift itself is drawn uniformly from [-peakShiftS, +peakShiftS]. Unset means the peak stays where the template puts it, and unset is also what an author means by declaring the block without this field. It moves when people arrive and not how many: the up-ramp lengthens by exactly as much as the down-ramp shortens, so the intensity integral is conserved exactly. Refused outright on constant-iso, which is flat and therefore has no peak to move.",
   },
 ];

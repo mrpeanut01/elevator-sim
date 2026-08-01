@@ -290,6 +290,11 @@ describe('coverage of the shipped schema — the one claim that needs the real o
       'traffic.batchSize.distribution',
       'traffic.batchSize.mean',
       'traffic.batchSize.weight',
+      // docs/14 § 2.3. Three more rows that are declared and not searchable, for the reason every
+      // other entry here is: `default: null`, and a search needs a point it can start from.
+      'traffic.dayVariation.maxDemandFactor',
+      'traffic.dayVariation.minDemandFactor',
+      'traffic.dayVariation.peakShiftS',
       'traffic.directionalSplit.incoming',
       'traffic.directionalSplit.interfloor',
       'traffic.directionalSplit.outgoing',

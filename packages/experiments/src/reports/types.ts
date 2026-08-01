@@ -62,6 +62,7 @@
 import type {
   BatchSizeCurve,
   CredentialAssignment,
+  DayVariationConfig,
   DemandLevel,
   DemandTemplateId,
   DirectionalSplit,
@@ -154,6 +155,17 @@ export interface StoredDemandOptions {
    */
   readonly batchSize?: BatchSizeCurve | undefined;
   readonly passengerMass?: PassengerMassOverride | undefined;
+  /**
+   * The day this run was made a particular one, docs/14 § 2.3.
+   *
+   * Here for {@link batchSize}'s reason, and it is the sharpest instance of it yet: the block is
+   * what the `dayVariation` stream is *drawn against*, so a record that lost it replays at
+   * `demandFactor: 1` with the stream never consumed — a different number of people, arriving at
+   * different times, reported as a faithful reproduction. The **configuration** is stored and not
+   * the drawn factor: the draw is a function of the seed and the block, so storing the block is
+   * what makes it reproducible, and storing the outcome instead would let the two disagree.
+   */
+  readonly dayVariation?: DayVariationConfig | undefined;
 }
 
 /**
