@@ -572,6 +572,16 @@ export class Simulation {
   readonly #abandonedJourneys = new Set<string>();
   /** Calls taken back because their landing emptied. See {@link ConservationAudit.callsWithdrawn}. */
   #callsWithdrawn = 0;
+  /**
+   * Promises voided because the rider they named walked out.
+   *
+   * Counted apart from {@link #promisesRevoked}, which is the group taking a promise back from a
+   * car that left service. These two look identical in the record — an assignment cleared — and
+   * are opposite events: one is the *machine* withdrawing, the other the *person*. Merging them
+   * would put a car's service change and a rider's patience into one number, and
+   * `ConservationAudit.promisesRevoked`'s whole point is that it is not that number.
+   */
+  #promisesAbandoned = 0;
 
   /* ---- stairs (docs/14 § 3.3) ---- */
 
@@ -1518,6 +1528,7 @@ export class Simulation {
     this.#abandonedJourneys.add(passenger.journeyId);
     // The recorder clears any promise the rider was holding, so the record can never show a car
     // reserving itself for somebody who had already left.
+    if (passenger.assignedCarId !== undefined) this.#promisesAbandoned += 1;
     this.#recorder.recordAbandonment(passenger, at);
     passenger.releasePromise(at);
 
@@ -3915,9 +3926,11 @@ export class Simulation {
         `${this.#legsAssigned} landing-panel assignments were made but ${this.#recorder.assignedCount} reached the recorder; a promise the record does not carry cannot be audited from the record`,
       );
     }
-    if (this.#promisesRevoked !== this.#recorder.releasedCount) {
+    // Both ways a promise can be cleared, summed, because the recorder counts both on one
+    // counter: the group revoking it and the rider walking out from under it.
+    if (this.#promisesRevoked + this.#promisesAbandoned !== this.#recorder.releasedCount) {
       problems.push(
-        `${this.#promisesRevoked} landing-panel promises were revoked but ${this.#recorder.releasedCount} reached the recorder; a record still naming a car the group took the passenger back off is a promise no reader could audit`,
+        `${this.#promisesRevoked} landing-panel promises were revoked and ${this.#promisesAbandoned} voided by abandonment, but ${this.#recorder.releasedCount} releases reached the recorder; a record still naming a car the group took the passenger back off is a promise no reader could audit`,
       );
     }
     /*
@@ -3929,10 +3942,23 @@ export class Simulation {
      * event count instead would fail every run with a mid-run service change in it, which is the
      * shape this arithmetic exists to survive.
      */
-    const promisesInForce = this.#legsAssigned - this.#promisesRevoked;
-    if (this.#panelAssigns && undelivered.length === 0 && promisesInForce !== legsCreated) {
+    const promisesInForce =
+      this.#legsAssigned - this.#promisesRevoked - this.#promisesAbandoned;
+    /*
+     * **A leg whose rider walked out holds no promise, and never boarded to need one.**
+     *
+     * `recordAbandonment` clears the assignment — a record that showed a car reserving itself for
+     * somebody who had gone home would be a false record — so an abandoned leg is `legsCreated`
+     * without being a promise in force, and the identity below has to net it out. Without this
+     * term the first destination-dispatch run with `sim.patience` on it would fail its own
+     * conservation audit for a reason that is not a defect. Zero on every run that declares no
+     * patience, which is every run this repository has published.
+     */
+    const abandonedLegs = this.#abandonedLegs.size;
+    const promisableLegs = legsCreated - abandonedLegs;
+    if (this.#panelAssigns && undelivered.length === 0 && promisesInForce !== promisableLegs) {
       problems.push(
-        `${legsCreated} legs were created and every journey was delivered, but ${promisesInForce} promises were in force at the end (${this.#legsAssigned} made, ${this.#promisesRevoked} revoked); ${legsCreated - promisesInForce} boarded without being promised anything`,
+        `${promisableLegs} legs were created and not abandoned and every journey was delivered, but ${promisesInForce} promises were in force at the end (${this.#legsAssigned} made, ${this.#promisesRevoked} revoked, ${this.#promisesAbandoned} voided by abandonment); ${promisableLegs - promisesInForce} boarded without being promised anything`,
       );
     }
 

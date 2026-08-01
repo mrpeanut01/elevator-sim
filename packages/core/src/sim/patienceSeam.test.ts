@@ -228,6 +228,40 @@ describe('patience reaches a shipped run', () => {
     expect(calm.summary.abandonment).toBeUndefined();
   }, 300_000);
 
+  /**
+   * **Destination dispatch and abandonment together, because the audit's promise identity is
+   * where the two collide.**
+   *
+   * `#reconcile` asserts that on a delivered panel run every leg held a promise at the end.
+   * `recordAbandonment` clears the promise of a rider who left — a record showing a car reserving
+   * itself for somebody who went home would be a false record — so an abandoned leg is a created
+   * leg with no promise, and the identity has to net it out. Without that term the first
+   * destination-dispatch run with patience on it fails its own conservation audit for a reason
+   * that is not a defect, which is the worst kind of failing audit: a true alarm's shape wrapped
+   * round a false one.
+   */
+  it('balances the promise books on a destination-dispatch run where riders leave', async () => {
+    const config = await load();
+    const building = config.buildingsById.get('midtown-office');
+    const dispatcherProfile = config.dispatcherProfilesById.get('destination-panel');
+    if (building === undefined || dispatcherProfile === undefined) throw new Error('fixtures');
+    const result = runSimulation({
+      building,
+      dispatcherProfile,
+      trafficProfiles: config.trafficProfiles,
+      elevatorSpecs: config.elevatorSpecs,
+      seed: SEED,
+      demand: { arrivalRatePctPop5min: 8 },
+      reportWindow: 'full-run',
+      onTimeout: 'report',
+      patience: { distribution: 'exponential', meanS: 60 },
+    });
+    // Live on both counts, or the audit line this exercises is never evaluated.
+    expect(result.conservation.abandoned ?? 0).toBeGreaterThan(0);
+    expect(result.conservation.legsAssigned).toBeGreaterThan(0);
+    expect(result.conservation.balanced).toBe(true);
+  }, 300_000);
+
   /* ---- criterion 4: reported beside AWT, never folded into it ---- */
 
   /**
