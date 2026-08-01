@@ -8,7 +8,9 @@ point — and step 2's criterion is the first one measurement sent back for corr
 | **0 — dual-lobby / escalator authoring (§ 5a)** | **built, and § 5 criterion 2 met on the legs** — `SpecTransportMode` on `BuildingSpec`, emitted by `buildingFromSpec`, read back by `specFromBuilding`, refused in the designer by `validateSpec`, with the controls in `dev/buildingEditor.ts`. **Say the gaps in the same breath**, below |
 | **1 — traffic seed separation (§ 1.1)** | **built** — `StreamSet(seed, { trafficSeed })`, reaching `runSimulation` and reported on the result; `sim/trafficSeedSeam.test.ts` drives it end to end |
 | **2 — `trafficModel: 'v2'` + `batchSize` stream (§ 1.3)** | **built** — `batchSize` in `STREAM_NAMES` and `TRAFFIC_STREAM_NAMES`, `trafficModel` on the run config and reported on the result when it is not `v1`; `sim/trafficModelSeam.test.ts` drives it end to end. **§ 1.3's stated consequence was wrong and is corrected below.** |
-| 3–6 | designed |
+| **3 — mass control, group-size curve (§§ 2.1–2.2)** | **built** — three group-size families and a schema-bearing mass block with required truncation bounds, all five samplers one-draw-per-call so none is gated to `v2`; `traffic/varianceControls.test.ts` drives each on the legs |
+| **5 — patience, lobby crowding, stairs (§ 3)** | **built, and the gaps are part of the verdict** — abandonment with a fifth `awtIsValid` ground above censoring, a crowding term that **destabilises four of nine measured cells** (a finding, not a bug), and stairs with both asymmetries. **§ 3.3's condition 2 is withdrawn**, below. Criterion 4 is met inside `core` and **not** at the renderer the way [§ D106](../DECISIONS.md)'s rule is — `viz/shift/goals.ts`'s horizon goal is still improved by abandonment with no figure beside it, bridged by a run-record disclaimer and not closed. **That is the clause to distrust first.** |
+| 4, 6 | designed |
 
 **Step 0's criterion is met by a run, not an argument.** Three banks, both lobby levels marked
 transfer, and the escalator the only difference between the arms: `servedFloorIds` byte-identical,
@@ -331,8 +333,28 @@ decides, and most of the time decides against. So a stairs mode is not consulted
 all. It is offered to the passenger, and taken when all hold:
 
 1. the floors are connected by a declared stairs mode;
-2. the journey is within a declared floor-count reach;
+2. ~~the journey is within a declared floor-count reach;~~ **withdrawn — see below;**
 3. the drawn propensity clears the threshold for that journey.
+
+> **Condition 2 is withdrawn, and the reason is measured rather than argued.** `connects` is a
+> **pair**, so a mode's floor span is fixed by the mode itself and conditions 1 and 2 collapse into
+> one: once the pair is declared, the span is decided and there is nothing left for a reach to
+> range over. The reach was expressed as a propensity *array* indexed by flight count, whose length
+> doubled as the reach — and only `curve[span − 1]` was ever read. Zeroing index 0 of a two-flight
+> stair produced a **bit-identical `SimulationResult`**: schema-valid, authorable, validated, and
+> consulted by nothing. That is [§ D112](../DECISIONS.md)'s shape at the data layer, inside the
+> feature this section specifies.
+>
+> Worse, the reach did not protect what it was written to protect. An author declaring
+> `connects: ["2","8"]` with a one-entry curve got a mode that parsed, validated, and did nothing at
+> all — the exact configured-and-dead outcome condition 2 existed to prevent.
+>
+> Replaced by a scalar pair, `use: { up, down }`, both read. **The signed-delta requirement below is
+> unchanged and is not what was withdrawn** — it is now realised *across* modes rather than within
+> one, since each mode carries its own up and down number for its own fixed span. One consequence
+> to know: nothing enforces monotonicity in span, so an author may declare a six-flight stair at
+> `up: 0.9` beside a one-flight stair at `up: 0.1` and no check will object. That was equally true
+> of the array form; it is simply no longer implied by the type.
 
 **The two asymmetries are independent and both are required.** A rider descending four flights and
 one climbing four flights face different *costs* (1) and have different *willingness* (3). Modelling

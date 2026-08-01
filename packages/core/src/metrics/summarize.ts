@@ -176,9 +176,19 @@ export const DEFAULT_MAX_UNSERVED_FRACTION = 0.05;
  * window reports as fully served and the trend test flattens.
  *
  * 2 % is where that bias becomes bigger than the effects this project publishes. The dispatcher
- * comparisons here turn on differences of a second or two in AWT; losing the top 2 % of a wait
- * distribution moves a mean by more than that on every shipped building, so a run past this limit
- * cannot be compared with one below it whatever its interval says.
+ * comparisons here turn on differences of a second or two in AWT, and trimming the top 2 % of a
+ * served-wait distribution under `eta` moves the mean by **10.86 s** on `midtown-office`,
+ * **14.16 s** on `vertical-city`, **17.16 s** on `mixed-use-high-rise` and **18.40 s** on
+ * `secure-tower` — an order of magnitude past anything this repository publishes an interval about.
+ *
+ * **It is not true of every shipped building, and the sentence here used to say it was.**
+ * `garden-apartments` moves **0.48 s**, and that is not a light-load artefact: 0.36 s at 12 %,
+ * 1.88 s at 20 %, and still only 2.03 s at 30 %. Its wait distribution is too short-tailed for the
+ * trim to bite. The threshold is defensible on the four towers and is kept for all five, because a
+ * suppression ground that varied per building would be a mean whose quotability depended on which
+ * building you asked about; the universal quantifier was the part that was wrong, not the constant.
+ * Corrected after review measured it, per this repository's rule that a sentence explaining *why* a
+ * number is what it is must be measured or say it is unmeasured.
  */
 export const DEFAULT_MAX_ABANDONMENT_FRACTION = 0.02;
 

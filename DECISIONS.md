@@ -12021,3 +12021,128 @@ EN 115-1 derivation lives. The test could not see it because it projected the ex
 same three surviving fields — where the access-zone precedent it was modelled on compares raw. **A
 test written so it cannot fail on the loss it exists to prevent is worse than no test**, and the
 asymmetry against its own precedent is the tell.
+
+## D205 — patience, crowding and stairs: three behaviours, and what measurement changed about each
+
+**Date: 2026-07-31 · Wave 13 step 5 (`docs/14` § 3). Every figure below was reproduced by an
+independent reviewer before it landed; two were corrected in the process and both corrections are
+recorded rather than absorbed.**
+
+### The fifth AWT suppression ground is placed by cause, and measurement moved it
+
+Drafted *below* `censored`, on the argument that both describe a biased survivor cohort. Refuted by
+the first run that abandoned anyone: an abandoned leg never boards, so `WaitStatistics.unservedCount`
+counts it too, and a 4 % abandonment run reported **`censored`** — *"too many arrivals were never
+served"* — about a window whose queue had drained perfectly. True, and useless: it sends a reader
+hunting a backlog that went home. `abandoned` now sits above `censored` and above `starved`, which
+abandonment mutes by construction, and below `empty-window`.
+
+`DEFAULT_MAX_ABANDONMENT_FRACTION = 0.02`, lower than censoring's 0.05, because censoring biases the
+mean low while abandonment biases it low **and hides the evidence** — the queue drains, the window
+reports fully served, the trend flattens.
+
+**The rationale as first written was overstated, and review measured it.** It claimed trimming the
+top 2 % moves a mean by more than a second or two *on every shipped building*. Measured under `eta`:
+`midtown-office` **10.86 s**, `vertical-city` **14.16 s**, `mixed-use-high-rise` **17.16 s**,
+`secure-tower` **18.40 s** — and `garden-apartments` **0.48 s**, which is not a light-load artefact
+(0.36 s at 12 %, 1.88 s at 20 %, 2.03 s at 30 %). Its distribution is too short-tailed for the trim
+to bite. **The constant is kept; the universal quantifier was the error.** A suppression ground that
+varied per building would make a mean's quotability depend on which building you asked about.
+
+### An abandoned rider's wait is known, not censored
+
+`diagnoseServiceLevel` treated any leg that never boarded as waiting until the run stopped. For a
+rider who left at t = 60 of an 1 800 s horizon that credits them with 1 740 s and reports `starved`
+about someone who was not in the building. Measured with the defect in place: `longestWaitS`
+**1 521.4 s against a true maximum of 29.3 s**. Their wait ended, exactly, when they walked out.
+
+### A promise voided by the rider is not a promise revoked by the group
+
+The first run combining `destination-panel` with patience failed its own conservation audit twice —
+the recorder counted 188 releases the runner counted none of, and the *every delivered leg held a
+promise* identity broke by 188 the other way. `#promisesAbandoned` is kept separate from
+`ConservationAudit.promisesRevoked` deliberately: the two look identical in the record and are
+opposite events, one the machine withdrawing (§ T22-D1) and one the person leaving.
+
+### Lobby crowding destabilises runs that were stable, and that is the finding
+
+`midtown-office`/`eta`, seed 20260731, `{ thresholdPersons: 4, factorPerPerson: 0.08, maxFactor: 3 }`,
+arrivals swept in 0.1 % steps: **four of the nine cells in [6.1, 6.9] % flip `stable` →
+`diverging-queue`**. At 6.1 % the control is stable with a quotable **55.3 s** mean; the crowded arm
+diverges and its mean is suppressed. **Pinned as the verdict, never the crowded arm's mean.**
+`garden-apartments` is bit-identical with the term on at 6 % and 12 % — two cars, and its landings
+never reach four people. W13-R6 predicted exactly this, which is why it is reported rather than fixed.
+
+### The withdrawn hall call is a measured behaviour, not a tidy-up
+
+Deleting the withdrawal left the whole seam test green, and under `eta` the arms coincide exactly on
+all five shipped buildings. Under `nearest-car` on `midtown-office` at 12 % with 60 s mean patience
+they do not: **258 legs board against 251, 437 abandon against 444, 3 323 m driven against 3 409 m.**
+The test pins the cell where the mechanism is observable, not the one where it is invisible — which
+is the distinction R26 exists to force.
+
+### The propensity arrays were dead data, and § 3.3's condition 2 is withdrawn
+
+`StairsUseConfig` declared arrays indexed by flight count whose length doubled as a reach. `connects`
+is a **pair**, so only `curve[span − 1]` is ever read: zeroing index 0 of a two-flight stair produced
+a **bit-identical `SimulationResult`** — schema-valid, authorable, validated, consulted by nothing.
+[§ D112](DECISIONS.md)'s shape at the data layer, inside the feature that specified it.
+
+The reach also failed to protect what it was written for: `connects: ["2","8"]` with a one-entry
+curve parsed, validated and did nothing at all. Now `use: { up, down }`, both read, with the old
+array shape refused by `z.strictObject`. **The signed-delta requirement is unchanged** — it is
+realised across modes rather than within one. Nothing enforces monotonicity in span, which was
+equally true of the array form and is simply no longer implied by the type.
+
+### A raw NUL byte, caught by the audit that exists for it
+
+`stairs.ts` used `\0` as its floor-pair separator. Every test passed and **every `grep` over that
+file was worthless** — `ugrep -I` skips a file it deems binary by printing nothing, so negative
+results were evidence about the tool. `packages/viz/src/deadCode.test.ts` refuses to scan such a file
+rather than reporting a clean sweep, which is how it was found: **the second time that check has paid
+for itself** (`f78dc42` was the first). R24, realised a third time this wave. Note
+`core/src/dispatch/deadCode.test.ts` has no such guard and would have scanned it silently.
+
+### A citation retracted, twice
+
+The crowding term originally cited *"the queueing-area rows of CIBSE Guide D § 4 on lift lobbies"*
+and Fruin's LOS bands, as though its three numbers came from them. The § reference was written
+without opening the document; review then caught a **surviving** sentence claiming both sources were
+"built on" the linear speed-density relation — a claim about two documents neither of which had been
+opened. Both are gone. The module cites nothing and says so, there is no default term, and a study
+that switches it on states its own numbers and their provenance.
+
+### Criterion 6 was not met on landing, and the precedent invoked was wrong
+
+`patience` and `lobbyCrowding` had **no non-test caller anywhere** — the wave's own signature defect,
+in the lane most warned about it. The claim that they ship off *"like `doorObstructionProbability`"*
+was false: that field **is** driven, from `experiments/src/runner/experiment.ts` and
+`fuzz/generate.ts`. Both are now `SimulationOverridesSpec` fields, driven end to end from a JSON file
+on disk through to a run that abandons twenty-seven riders.
+
+Neither enters the CRN trace key, correctly: `patience` draws from a demand-side stream but only
+*after* the trace is complete, so paired cells see identical passengers. What they do not share is
+the **served population**, which is what `summary.abandonment` and the fifth ground exist to report.
+
+**Stairs are not the same gap and were not treated as one.** `stairsIndexOf` and `routeTopologyOf`'s
+filter execute on every shipped run, so the non-test caller exists; what is missing is *authored
+data*, the inverse of the eleventh dead seam (deck API: data authored, code uncalled). A
+`SimulationOverrides` entry would mean overriding building fabric from a run spec, and
+`ExperimentResources` keys buildings by id with nowhere to put a per-cell variant. **Named residual:**
+a *new* stairs-declaring building document is additive — `loadConfig` enumerates `data/buildings/`
+from disk while every pinned test iterates a hand-written `BUILDING_IDS` list — so it would move no
+pin and would take stairs from *reachable, never exercised* to *exercised on a shipped run*.
+
+### Named gap: two viz surfaces do not carry the figures
+
+`viz/src/record/recordRun.ts` copies `generated`/`delivered`/`undelivered` into `VizSummary` and
+neither new term, so a patience recording carries three numbers that no longer add up.
+`viz/src/shift/goals.ts` reads `serviceLevel.overHorizonCount`, which abandonment improves by
+construction, so a patience run posts a **perfect horizon goal with no figure beside it**.
+
+Mitigated by a disclaimer on `RunRecord.warnings` naming all five affected figures, which review
+verified reaches Basic mode verbatim under the parity check — further than the lane claimed. **It is
+a bridge, not the coupling.** § D106's rule is enforced at the renderer by tests that redden if
+`workKJ` appears without `workPerServedLegKJ`; nothing analogous exists here, and no test fails if a
+renderer shows AWT without the abandonment figure. **This is the clause to distrust first in this
+step's work**, and it is recorded as the lane's own assessment because the lane volunteered it.
