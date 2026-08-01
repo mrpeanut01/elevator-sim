@@ -378,6 +378,262 @@ describe('the refuted access-control mechanism stays refuted (DECISIONS.md § D6
 });
 
 /* -------------------------------------------------------------------------- *
+ * The overstated group-size coupling — DECISIONS.md § D203
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The second refuted mechanism, pinned the same three ways as the first.**
+ *
+ * `docs/14-building-behaviour-contract.md` § 0 stated, as the motivation for the whole
+ * `trafficModel` flag, that *"any change to the group-size curve — even one that leaves the mean
+ * untouched — consumes a different number of draws from `arrivals` and shifts every subsequent
+ * arrival instant"*. Wave 13 step 2 pre-registered a test for it, watched it fail, and found the
+ * sentence false of the shipped model on two independent grounds (§ D203):
+ *
+ * 1. `batchesPerSecond = passengerRate / meanBatchSize`, so the *batch* rate is a function of the
+ *    mean by construction and no stream separation can make it otherwise;
+ * 2. `drawGeometricBatchSize` consumes **exactly one draw per call for every mean** — stated in
+ *    its own docstring, which *predates* the sentence that contradicted it.
+ *
+ * The correction is filed additively: the overstated paragraph is left standing in § 0 under a
+ * rebuttal block, with the corrected form in § 1.3. **That is a shape nothing executes.** Both the
+ * paragraph and its rebuttal are prose, and either could be edited back to the false version with
+ * a fully green suite — the same hole `REFUTED_MECHANISM_SITES` above exists to close for § D60,
+ * one wave later and in the opposite document.
+ *
+ * ## Two sites carry the claim uncorrected and are **not** guarded here
+ *
+ * See {@link UNGUARDED_COUPLING_SITES}. Both are outside this lane's ownership, both are asserted
+ * to *still* carry the claim, and that assertion is what stops the exemption from going quiet.
+ */
+const COUPLING_DOC = 'docs/14-building-behaviour-contract.md';
+
+/**
+ * The **strong** form of the coupling: a change to the group-size *curve* costing a different
+ * number of draws. Deliberately keyed on the group-size subject rather than on the draw-count
+ * phrase alone, because two other files in `core` say something that reads similarly and is true:
+ * `traffic/poissonBatch.ts` on a truncated sampler and `model/passenger.ts` on the mass families,
+ * both describing samplers whose draw count *would* be parameter-dependent if written badly. The
+ * refuted claim is about the group-size curve as shipped, and only that.
+ */
+const COUPLING_CLAIM_PATTERNS = new RegExp(
+  [
+    'change to the group-size curve',
+    'change to the group size curve',
+    'group-size curve[^.]{0,80}different number of draws',
+  ].join('|'),
+  'gi',
+);
+
+/**
+ * Prose that marks the claim as measured-and-refuted rather than asserted. Several wordings, for
+ * {@link REFUTATION_MARKERS}' reason: the correction was written before this guard existed.
+ */
+const COUPLING_REFUTATION_MARKERS =
+  /overstated|is false today|did not survive contact with a run|refut\w*|corrected here|failed on the finished implementation/gi;
+
+/**
+ * **Sites that still assert the strong form with no correction beside them.**
+ *
+ * Not an allowlist of things that are fine — a register of two known-false sentences this lane was
+ * not permitted to edit, each with the constraint that stopped it:
+ *
+ * - `packages/core/src/traffic/types.ts` — `TrafficModelVersion`'s docstring. `core/src/traffic/`
+ *   is owned by a concurrently running lane in this same wave; a docstring rewrite there is a
+ *   merge conflict with work in flight.
+ * - `WAVE13_RESUME.md` — § T2 of the wave brief, which is the paragraph § 0 was written from.
+ *   Root-level markdown, explicitly out of this lane's scope.
+ *
+ * The test below asserts each **still carries the claim**. That is the direction that matters: the
+ * day one of them is corrected, this guard goes red and says so, and the site moves into the
+ * scanned set rather than sitting in a register nobody re-reads.
+ */
+const UNGUARDED_COUPLING_SITES: readonly string[] = Object.freeze([
+  'packages/core/src/traffic/types.ts',
+  'WAVE13_RESUME.md',
+]);
+
+/** § D203's descriptive-and-true site, excluded for `estimateCost.ts`'s reason. Both directions. */
+const COUPLING_DESCRIPTIVE_SITE = 'packages/core/src/traffic/poissonBatch.ts';
+
+/** The property the whole correction rests on, as `poissonBatch.ts` states it. */
+const ONE_DRAW_PATTERN = /exactly one[^.]{0,40}draw is consumed per call/i;
+
+describe('the overstated group-size coupling stays corrected (DECISIONS.md § D203)', () => {
+  const sourceOf = (file: string): string => plain(read(...file.split('/')));
+
+  /** Distance from a claim occurrence to the nearest marker, or `Infinity`. Mirrors § D60's. */
+  function nearestCouplingMarker(text: string, start: number, end: number): number {
+    let best = Number.POSITIVE_INFINITY;
+    for (const marker of text.matchAll(COUPLING_REFUTATION_MARKERS)) {
+      const from = marker.index;
+      const to = from + marker[0].length;
+      const distance = from >= end ? from - end : to <= start ? start - to : 0;
+      if (distance < best) best = distance;
+    }
+    return best;
+  }
+
+  it('never states the strong coupling in docs/ without the correction beside it', () => {
+    // Every doc, not only docs/14: the claim was copied from the wave brief into the contract
+    // once already, and a third copy would arrive the same way.
+    const unmarked: string[] = [];
+    for (const name of readdirSync(DOCS).filter((entry) => entry.endsWith('.md'))) {
+      const text = plain(read('docs', name));
+      for (const claim of text.matchAll(COUPLING_CLAIM_PATTERNS)) {
+        const start = claim.index;
+        const distance = nearestCouplingMarker(text, start, start + claim[0].length);
+        if (distance > MARKER_WINDOW) {
+          unmarked.push(
+            `docs/${name}: "${claim[0]}" with no correction within ${String(MARKER_WINDOW)} ` +
+              `characters (nearest ${Number.isFinite(distance) ? String(distance) : 'none in the file'}). ` +
+              'Measured, the strong form is false of the shipped model: batchesPerSecond = ' +
+              'passengerRate / meanBatchSize, and drawGeometricBatchSize consumes exactly one ' +
+              'draw per call for every mean (DECISIONS.md § D203).',
+          );
+        }
+      }
+    }
+    expect(unmarked.join('\n'), unmarked.join('\n')).toBe('');
+  });
+
+  it('still carries the correction in docs/14 — it cannot be silently deleted', () => {
+    // The other direction, and the one that matters most for an *additive* correction: deleting
+    // the rebuttal block AND the overstated paragraph together passes the check above by leaving
+    // nothing to match, and the repository quietly forgets that it measured this.
+    const text = sourceOf(COUPLING_DOC);
+    const claims = [...text.matchAll(COUPLING_CLAIM_PATTERNS)];
+    expect(
+      claims.length,
+      `${COUPLING_DOC} no longer states the coupling at all. § D203 records the overstated ` +
+        'paragraph as left standing under a rebuttal, which is how this repository files ' +
+        'corrections; if the whole passage has gone, § D203 is describing a document that does ' +
+        'not exist.',
+    ).toBeGreaterThan(0);
+
+    const marked = claims.some((claim) =>
+      Number.isFinite(nearestCouplingMarker(text, claim.index, claim.index + claim[0].length)),
+    );
+    expect(
+      marked,
+      `${COUPLING_DOC} states the group-size coupling and no longer marks it as overstated. ` +
+        'The correction was filed additively (§ D203); this is the test that stops it being ' +
+        'edited back to the version a run refused.',
+    ).toBe(true);
+
+    // Non-vacuity: the corrected form, not merely the word "overstated" somewhere in the file.
+    for (const required of [
+      'batchesPerSecond',
+      'drawGeometricBatchSize',
+      'across demand sources',
+    ]) {
+      expect(text, `${COUPLING_DOC} no longer names ${required} in the correction`).toContain(
+        required,
+      );
+    }
+  });
+
+  it('excludes poissonBatch.ts, and the exclusion is asserted in both directions', () => {
+    // § D60's third check, transplanted. `drawGeometricBatchSize`'s docstring is the *evidence*
+    // the correction rests on — the claim was refutable from the repository as it stood on the
+    // day it was written, and this is the sentence that made it so.
+    const text = sourceOf(COUPLING_DESCRIPTIVE_SITE);
+    expect(
+      ONE_DRAW_PATTERN.test(text),
+      `${COUPLING_DESCRIPTIVE_SITE} no longer states that exactly one draw is consumed per call. ` +
+        'That sentence is § D203’s second ground and it predates the claim it refutes; if it ' +
+        'has gone, the correction is standing on evidence that is no longer in the tree. ' +
+        '(The behaviour itself is measured in core/src/traffic/poissonBatch.test.ts — ' +
+        '“every group-size family costs exactly one draw”.)',
+    ).toBe(true);
+    expect(
+      [...text.matchAll(COUPLING_CLAIM_PATTERNS)].map((claim) => claim[0]),
+      `${COUPLING_DESCRIPTIVE_SITE} is excluded because what it says about draw counts is ` +
+        'descriptive and true. It now carries the refuted group-size claim, so either the claim ' +
+        'goes or the file joins the scanned set.',
+    ).toEqual([]);
+  });
+
+  it('keeps the two unguarded sites honest: each still carries the claim it was exempted for', () => {
+    const corrected: string[] = [];
+    for (const file of UNGUARDED_COUPLING_SITES) {
+      if ([...sourceOf(file).matchAll(COUPLING_CLAIM_PATTERNS)].length === 0) corrected.push(file);
+    }
+    expect(
+      corrected,
+      'exempted from the § D203 guard on the grounds that it still asserts the refuted coupling ' +
+        'and was outside the correcting lane’s ownership. It no longer asserts it, so the ' +
+        'exemption is stale: delete the entry, or move the file into the scanned set if the claim ' +
+        'has merely been reworded.',
+    ).toEqual([]);
+  });
+
+  /**
+   * **The rebuttal quotes two counts, and they are derived rather than transcribed.**
+   *
+   * *"`v1` and `v2` agree exactly on the **first** source's instants … and disagree on **all
+   * nineteen** later ones."* The **run** that produces it is
+   * `core/src/sim/trafficModelSeam.test.ts`, which asserts the agreeing source **by name**
+   * (`['entrance']`) and the displaced count as `one.size - 1` — derived, never written down. So
+   * the pair is already pinned to a run; what was *not* pinned is the arithmetic that turns
+   * `one.size - 1` into the English word *nineteen*, which is a property of `midtown-office`'s
+   * demand plan and would go stale the day a floor's population reached zero.
+   *
+   * That gap is closed here rather than declared unpinned, because it is cheap: `planDemand` is
+   * pure arithmetic over the loaded config — no simulation, no draws — so the document's two
+   * numbers are re-derived in milliseconds. This follows H-ACCESS-1's rule below (*render the
+   * published form from the code and assert the document against it*) rather than transcribing a
+   * figure and hoping.
+   */
+  it('re-derives the one-agreeing / nineteen-displaced counts the rebuttal quotes', async () => {
+    const [{ loadResources }, core] = await Promise.all([
+      import('./harness.js'),
+      import('@elevator-sim/core'),
+    ]);
+    const config = await loadResources();
+    const building = config.buildingsById.get('midtown-office');
+    expect(building, 'midtown-office is no longer a shipped building').toBeDefined();
+
+    const plan = core.planDemand({
+      building: building as NonNullable<typeof building>,
+      profiles: config.trafficProfiles,
+    });
+
+    // One source's arrival times are drawn before any group-size draw exists, so exactly one can
+    // agree between the models; every other is displaced.
+    const displaced = plan.sources.length - 1;
+    expect(plan.sources.length, 'midtown-office no longer has twenty demand sources').toBe(20);
+
+    const asWords: Readonly<Record<number, string>> = {
+      17: 'seventeen',
+      18: 'eighteen',
+      19: 'nineteen',
+      20: 'twenty',
+      21: 'twenty-one',
+    };
+    const word = asWords[displaced];
+    expect(
+      word,
+      `midtown-office now plans ${String(plan.sources.length)} demand sources, and this guard has ` +
+        'no English word for the displaced count. Widen the table and re-read the document.',
+    ).toBeDefined();
+
+    const text = sourceOf(COUPLING_DOC);
+    expect(
+      text,
+      `${COUPLING_DOC} quotes a displaced-source count that midtown-office's demand plan no ` +
+        `longer produces. planDemand gives ${String(plan.sources.length)} sources, so the ` +
+        `rebuttal should read "all ${word as string}" — re-run core/src/sim/trafficModelSeam.test.ts ` +
+        'and re-word § 1.3, or the document is quoting a building it no longer describes.',
+    ).toContain(`all ${word as string}`);
+
+    // …and the agreeing one, named. `trafficModelSeam.test.ts` pins the identity `['entrance']`;
+    // this pins that the document says *one*, so the pair cannot drift apart.
+    expect(text).toMatch(/agree exactly on the first source/i);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
  * README's documentation table
  * -------------------------------------------------------------------------- */
 
