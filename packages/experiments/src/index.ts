@@ -789,6 +789,45 @@ export type {
 } from './tuning/index.js';
 
 /* -------------------------------------------------------------------------- *
+ * teaching/ — docs/14 § 4.2's teaching surface: the declared training
+ * configuration a learned dispatcher is fitted under, and the round that judges
+ * it on traffic it has never seen.
+ *
+ * Exported for `tuning/`'s reason — what a consumer needs is the declaration and
+ * the driver — and with `tuning/`'s disclaimer attached: this barrel proves
+ * reachability and is not a caller. The named non-test caller is
+ * `packages/cli/src/commands/tune.ts` under `--teaching`.
+ * -------------------------------------------------------------------------- */
+
+export {
+  ACTION_PARAMETER_PREFIX,
+  MAX_VERDICT_REPLICATIONS,
+  MIN_VERDICT_REPLICATIONS,
+  OBSERVATION_CAUSALITIES,
+  TeachingError,
+  formatTeachingRound,
+  parseTeachingSpec,
+  runTeachingRound,
+  teachingSeedSets,
+} from './teaching/index.js';
+
+export type {
+  ObservationCausality,
+  ObservationFeature,
+  TaughtCandidate,
+  TaughtPolicy,
+  TeachingActionSpace,
+  TeachingBudget,
+  TeachingCellResult,
+  TeachingObjective,
+  TeachingRound,
+  TeachingRoundInput,
+  TeachingSeedPlan,
+  TeachingSeedSets,
+  TeachingSpec,
+} from './teaching/index.js';
+
+/* -------------------------------------------------------------------------- *
  * fuzz/ — Phase 8: randomized buildings and traffic, checked against the six
  * invariants docs/07-handoff.md § 7 requires of any configuration — no passenger
  * lost, none delivered to the wrong floor, no car over capacity, no negative

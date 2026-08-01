@@ -204,6 +204,16 @@ export const productionStoppingRule: StoppingRule = halfWidthStoppingRule((sampl
 export interface GateRunInput {
   readonly id: string;
   readonly seed: number | string;
+  /**
+   * The demand seed, when the caller is separating the crowd from the machine (docs/14 § 1.1).
+   *
+   * Omitted by every gate suite and by every study that produced a pinned figure, and omitting it
+   * is what keeps those figures reproducing: the spec then carries no `trafficSeed` key at all.
+   * `teaching/` is the caller that supplies it, because a held-out *traffic* set is the one thing
+   * a second run seed cannot express — a second run seed changes the machine too, and a policy
+   * that failed to generalize would then have two candidate reasons.
+   */
+  readonly trafficSeed?: number | string | undefined;
   readonly building: string;
   readonly dispatchers: readonly (string | DispatcherArmSpec)[];
   readonly traffic: TrafficArmSpec;
@@ -226,6 +236,7 @@ export async function runGateExperiment(input: GateRunInput): Promise<Experiment
   const spec: ExperimentSpec = {
     id: input.id,
     seed: input.seed,
+    ...(input.trafficSeed === undefined ? {} : { trafficSeed: input.trafficSeed }),
     buildings: [input.building],
     dispatchers: input.dispatchers,
     traffic: [input.traffic],

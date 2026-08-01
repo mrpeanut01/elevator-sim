@@ -877,6 +877,14 @@ export async function probeCellResolution(input: {
   readonly resources: ExperimentResources;
   readonly config: LoadedConfig;
   readonly seed: number;
+  /**
+   * The demand seed to probe at (docs/14 § 1.1). Omitted by the sweep, which is what keeps
+   * § D156's eight measured limits reproducing. `teaching/` passes its **training** traffic seed,
+   * for the same reason this probe runs at the tuning seed: a limit measured on the traffic it
+   * grades would make *below the resolution limit* arithmetically identical to *the interval
+   * contains zero*, which is § D140's raise deleted rather than applied.
+   */
+  readonly trafficSeed?: number | string | undefined;
   readonly replications: number;
 }): Promise<CellResolution> {
   const { cell, census } = input;
@@ -908,6 +916,7 @@ export async function probeCellResolution(input: {
   const experiment = await runGateExperiment({
     id: `phase6c/resolution/${cell.id}`,
     seed: input.seed,
+    ...(input.trafficSeed === undefined ? {} : { trafficSeed: input.trafficSeed }),
     building: cell.building,
     dispatchers: arms,
     traffic: cell.point,
@@ -943,7 +952,10 @@ export async function probeCellResolution(input: {
     referenceTtdMeanS,
     nearNeighbourS: smallestDetectableEffect(nearNeighbourSdS, input.replications),
     structuralS: smallestDetectableEffect(structuralSdS, input.replications),
-    provenance: `measured on ttdMeanS at ${cell.id}, seed ${String(input.seed)}, n = ${String(input.replications)}, 80 % power against a two-sided 95 % paired-t`,
+    // The traffic seed is appended only when there is one, so every provenance string the sweep
+    // has ever published is the string it published. A limit whose traffic is not named cannot be
+    // checked against the traffic it was supposed to be measured on.
+    provenance: `measured on ttdMeanS at ${cell.id}, seed ${String(input.seed)}${input.trafficSeed === undefined ? '' : `, traffic seed ${String(input.trafficSeed)}`}, n = ${String(input.replications)}, 80 % power against a two-sided 95 % paired-t`,
   });
 }
 
