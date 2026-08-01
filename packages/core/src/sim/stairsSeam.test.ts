@@ -52,15 +52,22 @@ const SEED = 20_260_731;
  *
  * The numbers are a *shape*, and the shape is the point — climbing costs half again what
  * descending does, and roughly half as many people will do it. See the sign asymmetry asserted at
- * the bottom of this file. A shipped building declaring a stair would carry its own curve and the
- * citation for it in `$comment`, per this repository's reference-data rule.
+ * the bottom of this file. A shipped building declaring a stair would carry its own pair and the
+ * source for it in `$comment`, per this repository's reference-data rule.
+ *
+ * **`use` is two numbers, not two arrays, and that is a correction rather than a simplification.**
+ * The first version indexed a curve by flight count with the array length doubling as a reach.
+ * Review measured it: `connects` is a pair, so only the last entry of each array was ever read and
+ * zeroing index 0 of the two-flight fixture below produced a **bit-identical** `SimulationResult` —
+ * schema-valid, authorable, validated dead data, which is § D112's shape at the data layer. The
+ * assertion at the bottom of this file is the guard that shape cannot come back.
  */
 interface StairsCurve {
-  readonly propensityUp: readonly number[];
-  readonly propensityDown: readonly number[];
+  readonly up: number;
+  readonly down: number;
 }
 
-const CLIMB: StairsCurve = { propensityUp: [0.3], propensityDown: [0.55] };
+const CLIMB: StairsCurve = { up: 0.3, down: 0.55 };
 
 /** One stairs mode per adjacent office floor pair, 2 through 20. */
 function stairwell(use: StairsCurve = CLIMB): readonly unknown[] {
@@ -83,7 +90,7 @@ const TWO_FLIGHT = {
   kind: 'stairs',
   connects: ['2', '4'],
   traversalTimeS: { upS: 34, downS: 22 },
-  use: { propensityUp: [0.9, 0.9], propensityDown: [0.9, 0.9] },
+  use: { up: 0.9, down: 0.9 },
 } as const;
 
 const STAIRS = TWO_FLIGHT;
@@ -206,27 +213,42 @@ describe('stairs are offered, not routed', () => {
 
   it('moves the run when the propensity curve moves', async () => {
     const shy = await run(
-      await buildingWith(stairwell({ propensityUp: [0.02], propensityDown: [0.02] })),
+      await buildingWith(stairwell({ up: 0.02, down: 0.02 })),
     );
     const keen = await run(
-      await buildingWith(stairwell({ propensityUp: [0.95], propensityDown: [0.95] })),
+      await buildingWith(stairwell({ up: 0.95, down: 0.95 })),
     );
     expect(keen.conservation.stairsJourneys ?? 0).toBeGreaterThan(shy.conservation.stairsJourneys ?? 0);
     expect(servedLegsOf(keen)).toBeLessThan(servedLegsOf(shy));
   }, 300_000);
 
-  it('moves the run when the reach shortens', async () => {
-    // The array **is** the reach: a one-entry curve reaches one floor, and this stair spans two,
-    // so nobody can take it at all.
-    const reaching = await run(await buildingWith([TWO_FLIGHT]));
-    expect(reaching.conservation.stairsJourneys ?? 0).toBeGreaterThan(0);
+  /**
+   * **Every declared number is read, and the shape that let one hide is refused.**
+   *
+   * `use` was `propensityUp: number[]` / `propensityDown: number[]`, indexed by flight count, with
+   * the array length doubling as a floor-count reach. Because `connects` is a pair the span is
+   * fixed, so only `curve[span - 1]` was ever consulted: on `TWO_FLIGHT`, zeroing index 0 of both
+   * arrays produced a `SimulationResult` **identical byte for byte** to leaving them at 0.9.
+   * Schema-valid, authorable, validated, and dead — `destination-eta`'s `weights.rideTime: 0`
+   * (§ D112) reproduced at the data layer in a field this file's own fixture populated deadly.
+   *
+   * Two numbers is the shape where that cannot happen, and this is the test that says so: each of
+   * the two is moved on its own and the run has to follow. A third number nobody reads would fail
+   * it by not existing.
+   */
+  it('reads every number it declares — no dead entry can hide in the pair', async () => {
+    const both = await run(await buildingWith([TWO_FLIGHT]));
+    expect(both.conservation.stairsJourneys ?? 0).toBeGreaterThan(0);
 
-    const unreachable = await run(
-      await buildingWith([
-        { ...TWO_FLIGHT, use: { propensityUp: [0.9], propensityDown: [0.9] } },
-      ]),
-    );
-    expect(unreachable.conservation.stairsJourneys).toBeUndefined();
+    const noClimb = await run(await buildingWith([{ ...TWO_FLIGHT, use: { up: 0, down: 0.9 } }]));
+    const noDescent = await run(await buildingWith([{ ...TWO_FLIGHT, use: { up: 0.9, down: 0 } }]));
+
+    // Each number alone changes the outcome, so neither is inert.
+    expect(noClimb.conservation.stairsJourneys ?? 0).not.toBe(both.conservation.stairsJourneys);
+    expect(noDescent.conservation.stairsJourneys ?? 0).not.toBe(both.conservation.stairsJourneys);
+    // …and zeroing both empties the mode entirely, which is the negative control.
+    const neither = await run(await buildingWith([{ ...TWO_FLIGHT, use: { up: 0, down: 0 } }]));
+    expect(neither.conservation.stairsJourneys).toBeUndefined();
   }, 300_000);
 
   /**
@@ -259,7 +281,7 @@ describe('stairs are offered, not routed', () => {
   it('serves fewer legs and publishes how many walked', async () => {
     const plain = await run(await buildingWith(undefined));
     const withStair = await run(
-      await buildingWith(stairwell({ propensityUp: [0.9], propensityDown: [0.95] })),
+      await buildingWith(stairwell({ up: 0.9, down: 0.95 })),
     );
 
     // The population really is different — this is the comparison docs/14 § 3.3 warns about.
@@ -278,6 +300,22 @@ describe('stairs are offered, not routed', () => {
     );
   }, 300_000);
 
+  /**
+   * The same disclaimer, for the same reason, on the stairs axis: a rider who walked appears in
+   * `delivered` and in no wait, ride or time-to-destination figure at all, so a surface that shows
+   * per-leg statistics beside a delivery count is describing two different populations.
+   */
+  it('says in the record that some riders never entered the lift system', async () => {
+    const withStair = await run(await buildingWith(stairwell()));
+    const disclaimer = withStair.warnings[0] ?? '';
+    expect(disclaimer).toContain('took a declared stairs mode');
+    expect(disclaimer).toContain('conservation.stairsJourneys');
+    expect(withStair.record.warnings?.[0]).toBe(disclaimer);
+
+    const plain = await run(await buildingWith(undefined));
+    expect(plain.warnings.join(' ')).not.toContain('took a declared stairs mode');
+  }, 300_000);
+
   /* ---- the asymmetry, which is the whole request ---- */
 
   /**
@@ -290,10 +328,10 @@ describe('stairs are offered, not routed', () => {
    */
   it('reads the curve by sign, so climbing and descending are different journeys', async () => {
     const downOnly = await run(
-      await buildingWith(stairwell({ propensityUp: [0], propensityDown: [0.9] })),
+      await buildingWith(stairwell({ up: 0, down: 0.9 })),
     );
     const upOnly = await run(
-      await buildingWith(stairwell({ propensityUp: [0.9], propensityDown: [0] })),
+      await buildingWith(stairwell({ up: 0.9, down: 0 })),
     );
     // Both arms are live, and they are not the same set of people.
     expect(downOnly.conservation.stairsJourneys ?? 0).toBeGreaterThan(0);

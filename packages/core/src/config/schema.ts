@@ -878,12 +878,10 @@ export const transportModeSchema = z
       positive,
       z.strictObject({ upS: positive, downS: positive }),
     ]),
-    use: z
-      .strictObject({
-        propensityUp: z.array(fraction).min(1, 'propensityUp must cover at least one floor'),
-        propensityDown: z.array(fraction).min(1, 'propensityDown must cover at least one floor'),
-      })
-      .optional(),
+    // Two numbers, not two curves. `connects` is a pair, so the span is already declared and an
+    // array indexed by flight count would be dead in every entry but its last — measured, and
+    // recorded on {@link StairsUseConfig}.
+    use: z.strictObject({ up: fraction, down: fraction }).optional(),
   })
   .refine((mode) => mode.connects[0] !== mode.connects[1], {
     message:
@@ -923,7 +921,7 @@ export const transportModeSchema = z
         code: 'custom',
         path: ['use'],
         message:
-          'a stairs mode must declare "use": stairs are chosen rather than structural, so without a propensity curve nobody would ever take them and the mode would be inert. The curve is per building and its source belongs in $comment.',
+          'a stairs mode must declare "use": { up, down } — stairs are chosen rather than structural, so without a propensity nobody would ever take them and the mode would be inert. The pair is per building and its source belongs in $comment.',
       });
     }
     if (kind === 'escalator' && mode.use !== undefined) {

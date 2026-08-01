@@ -114,10 +114,7 @@ export function routeTopologyOf(building: ResolvedBuilding): RouteTopology {
       .map((mode) => ({
         id: mode.id,
         connects: mode.connects,
-        // Narrowed by the filter above: only an escalator reaches here, and an escalator's
-        // traversal time is a scalar by `transportModeSchema`'s own refinement.
-        traversalTimeS:
-          typeof mode.traversalTimeS === 'number' ? mode.traversalTimeS : mode.traversalTimeS.downS,
+        traversalTimeS: escalatorTraversalOf(mode),
       })),
     transferFloors: new Set(building.transferFloors.map((floor) => floor.id)),
   };
@@ -145,6 +142,29 @@ export function legDestinations(bank: RouteBank, from: string): readonly string[
     if (upper) reachable.push(pair[1]);
   }
   return reachable;
+}
+
+/**
+ * An escalator's single traversal time, refusing a directional one rather than picking a side.
+ *
+ * `transportModeSchema` already forbids `{ upS, downS }` on a non-stairs mode, and that is not
+ * enough: this module is also handed hand-built topologies by tests and by the fuzz generator,
+ * where the schema is not in the path at all. Falling back to `downS` there would **silently
+ * symmetrise** a machine whose asymmetry is the only thing distinguishing it — the exact failure
+ * `transportModeSchema`'s refinement exists to prevent, reintroduced one layer down where nothing
+ * would notice. So the fallback throws.
+ *
+ * @throws TrafficError naming the mode. Unreachable through `parseBuilding`, and reachable
+ *   through every path that skips it.
+ */
+function escalatorTraversalOf(mode: {
+  readonly id: string;
+  readonly traversalTimeS: number | { readonly upS: number; readonly downS: number };
+}): number {
+  if (typeof mode.traversalTimeS === 'number') return mode.traversalTimeS;
+  throw new TrafficError(
+    `Transport mode "${mode.id}" declares a directional traversalTimeS ({ upS, downS }) but is not kind "stairs", so the router would have to pick one of the two and silently symmetrise it. Declare kind "stairs" — which the router does not plan over at all — or a single traversal time.`,
+  );
 }
 
 /** The far end of `transport` from `at`, or `undefined` when it does not touch `at`. */

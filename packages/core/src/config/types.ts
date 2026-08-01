@@ -827,8 +827,8 @@ export interface TransportModeConfig extends Commented {
    */
   readonly traversalTimeS: number | DirectionalTraversalTime;
   /**
-   * Who will actually use the stairs, as a function of **signed** floor delta. Required on a
-   * `stairs` mode and refused on an escalator, which nobody chooses.
+   * Who will actually use the stairs, by the **sign** of the floor delta. Required on a `stairs`
+   * mode and refused on an escalator, which nobody chooses.
    */
   readonly use?: StairsUseConfig | undefined;
 }
@@ -853,42 +853,57 @@ export interface DirectionalTraversalTime {
 }
 
 /**
- * **The behavioural asymmetry: who chooses the stairs, as a function of signed floor delta.**
+ * **The behavioural asymmetry: who chooses the stairs, by the sign of the floor delta.**
  *
- * ## Why two arrays and not one curve
+ * ## Two numbers, and why it is not two curves
+ *
+ * The first version of this type declared `propensityUp` and `propensityDown` as **arrays**
+ * indexed by flight count, with the array length doubling as a floor-count reach. Review measured
+ * it and it was **dead data**: `connects` is a pair, so a mode's floor delta is fixed, only
+ * `curve[flights - 1]` is ever read, and every earlier entry is schema-valid, authorable,
+ * validated and never consulted. Zeroing index 0 of a two-flight stair produced a
+ * **bit-identical `SimulationResult`**. That is `destination-eta`'s `weights.rideTime: 0` shape
+ * (`DECISIONS.md` § D112) reproduced at the data layer, in a field the seam test's own fixture
+ * populated deadly.
+ *
+ * So the shape is two numbers, both read, neither optional. The *magnitude* of the climb is
+ * already declared — it is the span between the two floors in `connects` — and the **sign** is
+ * what selects between these. A stair between floors 2 and 8 is a six-flight climb and
+ * {@link up} is the probability for that climb, not for one flight of it.
+ *
+ * **The reach condition went with it, and that is a correction rather than a dropped
+ * requirement.** docs/14 § 3.3 lists three conditions, of which the second is *"the journey is
+ * within a declared floor-count reach"*. On a pair-connected mode that condition is not
+ * independently expressible: the pair fixes the span, so conditions 1 and 2 collapse into one and
+ * the array form that appeared to separate them was expressing it with dead entries. An author
+ * who does not want a six-flight climb taken declares a low {@link up}, or does not declare the
+ * stair.
+ *
+ * ## Why the sign, and not the distance
  *
  * A model symmetric in `|Δfloor|` would be **worse than no model at all**, because it would
  * quietly claim that up-traffic self-relieves at the same rate as down-traffic — and down-peak is
- * exactly where a real building's stairs take load off the lifts. Two arrays make that mistake
- * impossible to make by accident: symmetry has to be *typed out twice* to happen.
+ * exactly where a real building's stairs take load off the lifts. Two separately declared numbers
+ * make that mistake impossible to make by accident: symmetry has to be typed out twice.
  *
  * The two asymmetries are **independent and both are required**. Modelling only the cost
  * ({@link DirectionalTraversalTime}) gives people cheerfully climbing forty floors slowly;
  * modelling only the willingness gives the ones who do climb arriving as fast as those going
  * down. Neither is a building.
  *
- * ## The arrays are the reach
- *
- * `propensityUp[i]` is the probability a rider climbing `i + 1` floors takes the stairs, so the
- * array's **length is the floor-count reach** — there is no separate reach field to disagree with
- * it, and a reach without a curve cannot be declared.
- *
  * ## Per building, and cited
  *
  * These are reference values under this repository's data rule, and they are **per building**: a
- * hotel's guests, an office tower's staff and a hospital's do not behave alike, so the curve is
- * authored on the mode with its citation in the declaring building's `$comment`. There is no
- * default curve in code, deliberately — a default would put an uncited behavioural claim into
- * every study that declared a stair.
+ * hotel's guests, an office tower's staff and a hospital's do not behave alike, so the pair is
+ * authored on the mode with its source in the declaring building's `$comment`. There is no
+ * default in code, deliberately — a default would put an uncited behavioural claim into every
+ * study that declared a stair.
  */
 export interface StairsUseConfig {
-  /**
-   * Probability of climbing, by floors ascended: index 0 is one floor up. Length is the reach.
-   * Beyond it nobody climbs.
-   */
-  readonly propensityUp: readonly number[];
-  /** Probability of descending, by floors descended: index 0 is one floor down. */
-  readonly propensityDown: readonly number[];
+  /** Probability that a rider **climbing** this stair's span takes it rather than a lift. */
+  readonly up: number;
+  /** Probability that a rider **descending** it does. Normally the larger of the two. */
+  readonly down: number;
 }
 
 /**

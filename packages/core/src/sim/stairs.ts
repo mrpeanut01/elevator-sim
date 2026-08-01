@@ -10,20 +10,24 @@
  *
  * A stair is not that. It is **offered**, and mostly declined. So the router never sees one —
  * `routeTopologyOf` filters `kind: 'stairs'` out of its edge set — and this module makes the offer
- * instead, at the moment the rider appears at the landing, on three conditions, all of which must
- * hold (docs/14 § 3.3):
+ * instead, **in trace order before the run starts** (see below), on two conditions:
  *
  * 1. the journey's two ends are joined by a declared stairs mode;
- * 2. the journey is within that mode's declared floor-count reach;
- * 3. the drawn propensity clears the threshold **for that journey**.
+ * 2. the drawn propensity for that direction clears.
+ *
+ * docs/14 § 3.3 lists a third — *"the journey is within a declared floor-count reach"* — and on
+ * this data shape it is **not independently expressible**: `connects` is a pair, so the mode's
+ * span is fixed and condition 1 already decides it. The array form that appeared to separate the
+ * two was measured to be dead in every entry but its last; `StairsUseConfig` records that, and it
+ * is a correction to the contract rather than a requirement quietly dropped.
  *
  * ## Both asymmetries, and why either alone is worse than neither
  *
  * A stair is asymmetric twice over, and the two are independent:
  *
  * - **Cost** — climbing takes longer than descending (`traversalTimeS: { upS, downS }`).
- * - **Willingness** — far more people will walk down two floors than up two
- *   (`use.propensityUp` / `use.propensityDown`, indexed by *signed* delta).
+ * - **Willingness** — far more people will walk down two floors than up two (`use.up` /
+ *   `use.down`, selected by the *sign* of the delta).
  *
  * Model only the cost and you get riders cheerfully climbing forty floors, slowly. Model only the
  * willingness and the ones who do climb arrive as fast as those going down. Neither is a building,
@@ -38,6 +42,10 @@
  * pre-drawing keeps the rule uniform and makes the table a pure function of `(trafficSeed, trace)`
  * that can be inspected without running anything. Only a journey that is genuinely **offered** a
  * stair consumes a draw, so a building with no stairs never touches the `modeChoice` stream.
+ *
+ * **The header used to say the offer is made "at the moment the rider appears at the landing".**
+ * It is not, and the two sentences contradicted each other three paragraphs apart. `#onBatchArrival`
+ * *applies* a decision this module took before the first event fired.
  *
  * Nothing here reads a clock (invariant 3); every draw comes from the injected stream
  * (invariant 2).
@@ -109,16 +117,12 @@ export function stairsOfferFor(
   const mode = index.get(pairKeyOf(originFloorId, destinationFloorId));
   if (mode === undefined || mode.use === undefined) return undefined;
 
-  // **Signed**, never `Math.abs`. The whole point of the two curves is that the sign decides
-  // which one is read, and a distance would silently average a climb with a descent.
+  // **Signed**, never `Math.abs`. The whole point of declaring two numbers is that the sign
+  // decides which is read; a distance would silently average a climb with a descent.
   const delta = destinationFloorIndex - originFloorIndex;
   if (delta === 0) return undefined;
-  const curve = delta > 0 ? mode.use.propensityUp : mode.use.propensityDown;
-  const flights = Math.abs(delta);
-  // The array **is** the reach: beyond its length nobody climbs, and there is no separate reach
-  // field that could disagree with the curve it bounds.
-  const propensity = curve[flights - 1];
-  if (propensity === undefined || propensity <= 0) return undefined;
+  const propensity = delta > 0 ? mode.use.up : mode.use.down;
+  if (propensity <= 0) return undefined;
 
   const transitS =
     typeof mode.traversalTimeS === 'number'
