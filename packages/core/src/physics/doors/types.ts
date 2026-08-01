@@ -195,11 +195,16 @@ export interface DoorStopReason {
  *
  * ## Where the numbers come from
  *
- * The shape is the standard pedestrian speed-density relation: walking speed falls roughly
- * linearly with density above a free-flow threshold (Fruin's level-of-service bands, and the
- * queueing-area rows of CIBSE Guide D § 4 on lift lobbies). It is a *shape*, not a calibrated
- * constant — which is exactly why all three numbers are declared per run rather than baked in,
- * and why there is no default that would put an uncited figure into every study.
+ * The **shape** is the standard pedestrian speed-density relation — walking speed falls roughly
+ * linearly with density above a free-flow threshold, which is the form Fruin's level-of-service
+ * bands and CIBSE Guide D's lift-lobby queueing areas are both built on.
+ *
+ * **The numbers are not.** No value here is calibrated against a cited source, and this docstring
+ * deliberately does not name a clause it has not checked: this repository's reference-data rule
+ * says a figure carries its citation, and a plausible-looking section number is exactly the kind
+ * of claim that goes stale without anything noticing. So there is **no default term at all** —
+ * absent means no crowding — and a study that switches it on states its own three numbers and
+ * their provenance. What is offered here is a mechanism, not a calibration.
  */
 export interface DoorCrowdingConfig {
   /** People on the landing below which nothing happens. The free-flow band. */
@@ -766,7 +771,7 @@ export const CROWDING_PARAMETERS: readonly DoorParameterSpec[] = [
     default: 0,
     unit: 'persons',
     description:
-      'People standing on the landing below which boarding is unaffected — the free-flow band of the pedestrian speed-density relation (Fruin level-of-service A/B; CIBSE Guide D lift-lobby queueing areas). Below it the crowding factor is exactly 1 and the stop is the stop it was.',
+      'People standing on the landing below which boarding is unaffected — the free-flow band of the pedestrian speed-density relation. Below it the crowding factor is exactly 1 and the stop is the stop it was. The default of 0 is the value that makes the term inert, not a calibrated threshold: a study that switches crowding on states its own three numbers and where they came from.',
   },
   {
     id: 'sim.lobbyCrowding.factorPerPerson',
