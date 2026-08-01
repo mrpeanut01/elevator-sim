@@ -188,6 +188,11 @@ import {
   transportArrivalEvent,
 } from './events.js';
 import {
+  drawStairsChoices,
+  stairsIndexOf,
+  type StairsOffer,
+} from './stairs.js';
+import {
   drawPatienceTable,
   patienceKeyOf,
   requireValidPatience,
@@ -568,6 +573,18 @@ export class Simulation {
   /** Calls taken back because their landing emptied. See {@link ConservationAudit.callsWithdrawn}. */
   #callsWithdrawn = 0;
 
+  /* ---- stairs (docs/14 § 3.3) ---- */
+
+  /**
+   * Journeys that took the stairs instead of a lift, decided in trace order before the run.
+   *
+   * Empty on every building that declares no `kind: 'stairs'` mode, which is every building this
+   * repository ships — and the `modeChoice` stream is then never drawn from at all.
+   */
+  readonly #stairsTaken: ReadonlyMap<string, StairsOffer>;
+  /** Seconds spent on stairs, summed. See {@link ConservationAudit.stairsTransitS}. */
+  #stairsTransitS = 0;
+
   /* ---- double-deck operation, counted rather than asserted ---- */
 
   /** Stops begun by a double-deck car, whether or not both decks had a floor to open onto. */
@@ -636,6 +653,20 @@ export class Simulation {
       this.#options.patience === undefined
         ? new Map()
         : drawPatienceTable(this.#streams.patience, this.#options.patience, this.#trace.passengers);
+
+    /*
+     * **Who takes the stairs, offered here and decided before anything moves** (docs/14 § 3.3).
+     *
+     * `routeTopologyOf` has already refused to plan any journey over a stair, so every record in
+     * the trace is routed as though the stair did not exist. This asks each rider whether they
+     * would rather walk. A building declaring none produces an empty index, `drawStairsChoices`
+     * returns without touching `modeChoice`, and the run is the run it was.
+     */
+    this.#stairsTaken = drawStairsChoices(
+      this.#streams.modeChoice,
+      stairsIndexOf(this.#resolved),
+      this.#trace.passengers,
+    );
 
     /* ---- the building, with real cars ---- */
     const profile = config.dispatcherProfile;
@@ -1321,6 +1352,18 @@ export class Simulation {
     }
 
     for (const record of batch.passengers) {
+      /*
+       * **The rider who walks.** They never join a lift queue, so no leg is created, no hall call
+       * is pressed and no statistic derived from `record.passengers` describes them — which is
+       * exactly the honesty problem docs/14 § 5 criterion 4 exists for, and why the count and the
+       * seconds are published on the audit rather than left to be inferred from a shortfall.
+       */
+      const stairs = this.#stairsTaken.get(record.journeyId);
+      if (stairs !== undefined) {
+        this.#transportHops += 1;
+        this.#stairsTransitS += stairs.transitS;
+        continue;
+      }
       // A journey that opens on the building's escalator is not standing at a lift landing yet.
       // Its leg 0 is admitted when the hop finishes; until then it is neither waiting nor
       // visible to a dispatcher, which is the whole difference between a hop and a leg.
@@ -1421,6 +1464,9 @@ export class Simulation {
    * Counting it would send a reader to `sim.drainGraceS` for a run the deadline never touched.
    */
   #armPatience(passenger: Passenger): void {
+    // The empty-map check comes first so the shipped path — no declared patience — does not build
+    // a key string per leg. It is one branch against an allocation on every arrival in the run.
+    if (this.#patienceByLeg.size === 0) return;
     const patienceS = this.#patienceByLeg.get(
       patienceKeyOf(passenger.journeyId, passenger.legIndex),
     );
@@ -2282,7 +2328,7 @@ export class Simulation {
        * Read only by `DoorConfig.crowding`, so on a run that declares none the door normalizes it
        * to a factor of exactly 1 and this argument changes nothing.
        */
-      lobbyOccupancy: Math.max(...floors.map((each) => each.queueLength())),
+      lobbyOccupancy: busiestLandingOf(floors),
     });
     if (car.isDoubleDeck) {
       this.#doubleDeckStops += 1;
@@ -2603,7 +2649,7 @@ export class Simulation {
       transferSeconds: holdCohort * car.passengerTransferS,
       // The same landing, still as crowded: a courtesy hold re-grants the *hold's own* cohort,
       // and the crowd it has to move through is unchanged by the door reversing.
-      lobbyOccupancy: Math.max(...floors.map((each) => each.queueLength())),
+      lobbyOccupancy: busiestLandingOf(floors),
     });
     // Refused — the profile declined the courtesy hold, or the stop's reopen budget is spent.
     // The door carries on closing and the passenger waits for the next car, which is the
@@ -3716,6 +3762,16 @@ export class Simulation {
     }
 
     for (const record of this.#trace.passengers) {
+      /*
+       * A journey that walked is **delivered**, and has no leg to check it against. Counted here,
+       * before the missing-leg problem below, because "never materialized a leg" is otherwise the
+       * exact symptom of the catastrophic failure this audit exists to catch — a passenger who
+       * quietly stopped existing. The two are told apart by the run knowing it made the offer.
+       */
+      if (this.#stairsTaken.has(record.journeyId)) {
+        delivered += 1;
+        continue;
+      }
       const legs = this.#legsByJourney.get(record.journeyId) ?? [];
       if (legs.length === 0) {
         problems.push(
@@ -3904,6 +3960,21 @@ export class Simulation {
       ...(this.#options.patience === undefined
         ? {}
         : { abandoned, callsWithdrawn: this.#callsWithdrawn }),
+      /*
+       * Present only when somebody actually walked — absent, not `0`, on every building that
+       * declares no stair, so a run that has none carries the audit object it always did.
+       *
+       * **These are docs/14 § 5 criterion 4's figures for stairs**, and they are on the audit for
+       * the same reason `abandoned` is: a stairs rider leaves the lift system, so the served-leg
+       * count falls and any comparison across configurations with different uptake compares
+       * different populations. Without the count that shortfall reads as a better building.
+       */
+      ...(this.#stairsTaken.size === 0
+        ? {}
+        : {
+            stairsJourneys: this.#stairsTaken.size,
+            stairsTransitS: this.#stairsTransitS,
+          }),
       balanced:
         problems.length === 0 &&
         legsCreated === legsRecorded &&
@@ -3973,6 +4044,24 @@ function resolveOptions(config: SimulationConfig): ResolvedOptions {
     // through so the runner has exactly one opinion about it and the door module has the other.
     lobbyCrowding: config.lobbyCrowding,
   });
+}
+
+/**
+ * The fullest of the landings a stop opens onto — one for a single-deck car, two for a paired
+ * double-deck stop.
+ *
+ * A loop rather than `Math.max(...floors.map(...))` because this runs at **every stop of every
+ * run**, including the overwhelming majority that declare no crowding term and never read the
+ * result: the spread form allocates an array and an argument list per stop, and it measurably
+ * lengthened the identity suite before it was written this way.
+ */
+function busiestLandingOf(floors: readonly Floor[]): number {
+  let busiest = 0;
+  for (const floor of floors) {
+    const queued = floor.queueLength();
+    if (queued > busiest) busiest = queued;
+  }
+  return busiest;
 }
 
 function nonNegative(value: number, id: string): number {

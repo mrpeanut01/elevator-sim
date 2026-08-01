@@ -135,6 +135,7 @@ export {
   ASSIGNMENT_MODES,
   ASSIGNMENT_TIMINGS,
   BUILDING_TYPES,
+  TRANSPORT_MODE_KINDS,
   CALL_TYPES,
   COMMITMENT_POINTS,
   ConfigError,
@@ -241,7 +242,10 @@ export type {
   ServiceEventConfig,
   TrafficProfile,
   TrafficProfiles,
+  DirectionalTraversalTime,
+  StairsUseConfig,
   TransportModeConfig,
+  TransportModeKind,
   TypicalMax,
   ValueRange,
 } from './config/index.js';

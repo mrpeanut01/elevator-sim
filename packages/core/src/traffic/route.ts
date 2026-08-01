@@ -99,11 +99,26 @@ export function routeTopologyOf(building: ResolvedBuilding): RouteTopology {
     })),
     // `?? []` rather than a required read: `ResolvedBuilding.transportModes` is required, but
     // this module is also handed hand-built topologies by tests and by the fuzz generator.
-    transports: (building.transportModes ?? []).map((mode) => ({
-      id: mode.id,
-      connects: mode.connects,
-      traversalTimeS: mode.traversalTimeS,
-    })),
+    //
+    // **Stairs are filtered out here, and that is the whole of docs/14 § 3.3's third addition.**
+    // An escalator is *structural*: the router uses it because the geometry says those floors
+    // connect, and the passenger has no say. Stairs are *chosen* — offered to the rider at the
+    // landing by `sim/simulation.ts` and taken when the drawn propensity clears — so a router
+    // that planned journeys over them would be deciding for people who mostly decide otherwise,
+    // and would move every route in the building rather than the fraction who climb.
+    //
+    // A `kind` absent means `escalator`, which is every mode authored before the field existed,
+    // so this filter removes nothing from any shipped building.
+    transports: (building.transportModes ?? [])
+      .filter((mode) => (mode.kind ?? 'escalator') !== 'stairs')
+      .map((mode) => ({
+        id: mode.id,
+        connects: mode.connects,
+        // Narrowed by the filter above: only an escalator reaches here, and an escalator's
+        // traversal time is a scalar by `transportModeSchema`'s own refinement.
+        traversalTimeS:
+          typeof mode.traversalTimeS === 'number' ? mode.traversalTimeS : mode.traversalTimeS.downS,
+      })),
     transferFloors: new Set(building.transferFloors.map((floor) => floor.id)),
   };
 }

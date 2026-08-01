@@ -657,6 +657,33 @@ export interface ConservationAudit {
   readonly callsWithdrawn?: number;
 
   /**
+   * Journeys that **took the stairs** and never joined a lift queue (docs/14 § 3.3).
+   *
+   * Absent — not `0` — on every building that declares no `kind: 'stairs'` mode, which is every
+   * building this repository ships.
+   *
+   * **A published figure, for `abandoned`'s reason and § D106's.** A stairs rider leaves the lift
+   * system entirely: no leg, no hall call, no wait, nothing in `record.passengers`. So the
+   * served-leg count falls, and any comparison across configurations with different stair uptake
+   * **compares different populations**. Without this count that shortfall reads as a building
+   * that got better at serving people, when what happened is that some of them walked.
+   *
+   * Counted in {@link delivered} — they reached their destination — and in
+   * {@link transportHops}, which is the same accounting an escalator hop gets.
+   */
+  readonly stairsJourneys?: number;
+  /**
+   * Seconds those riders spent on the stairs, summed. Absent with {@link stairsJourneys}.
+   *
+   * The **only** observable consequence of `traversalTimeS: { upS, downS }`, and therefore the
+   * thing docs/14 § 5 criterion 2 is checked on for that knob: a stairs rider contributes to no
+   * wait, ride or time-to-destination statistic, so a directional traversal time that moved
+   * nothing else would move this. It is also where the physical asymmetry becomes visible — an
+   * up-peak's stair seconds and a down-peak's differ at the same headcount.
+   */
+  readonly stairsTransitS?: number;
+
+  /**
    * `generated === delivered + undelivered + (abandoned ?? 0) && legsCreated === legsRecorded`.
    */
   readonly balanced: boolean;

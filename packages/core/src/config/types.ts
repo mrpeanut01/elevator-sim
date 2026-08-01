@@ -765,15 +765,22 @@ export interface BankConfig extends Commented {
  * breakdown, because none of those would be read by anything — the simulator measures lift
  * service, and this type exists to stop the lifts being charged for work they do not do.
  *
- * Three things were deliberately **not** declared, each because nothing in the tree would consult
- * them and an unread field is the dead seam `CLAUDE.md` names ten times over:
+ * Two things are still deliberately **not** declared, each because nothing in the tree would
+ * consult them and an unread field is the dead seam `CLAUDE.md` names eleven times over:
  *
- * - **No `kind` enum** (`escalator` / `stair` / `walk`). Nothing branches on it. What the machine
- *   is belongs in `name` and `$comment`, beside the citation for {@link traversalTimeS}.
- * - **No direction.** A one-way escalator is a real configuration and this cannot express it; the
- *   edge is traversable both ways at the same cost. Named as a limitation rather than half-built.
+ * - **No one-way direction.** A one-way escalator is a real configuration and this cannot express
+ *   it. Note this is *not* the same as {@link traversalTimeS}'s asymmetry, which says climbing and
+ *   descending take different lengths of time; a one-way machine is one you cannot use at all in
+ *   the other direction. Named as a limitation rather than half-built.
  * - **No capacity or headway.** An escalator's handling capacity is enormous relative to a lift's
  *   and modelling it would put a queue on the one edge that exists to *remove* a queue.
+ *
+ * **A third was declared, and the reason it was refused is worth keeping.** *"No `kind` enum —
+ * nothing branches on it"* was correct for as long as every mode behaved identically. docs/14
+ * § 3.3 makes stairs behave differently in two ways that no amount of `$comment` can express: they
+ * cost more to climb than to descend, and — unlike an escalator, which the router uses because the
+ * geometry says those floors connect — they are **chosen**. {@link kind} is what those two branch
+ * on, and it arrived with them rather than ahead of them.
  */
 export interface TransportModeConfig extends Commented {
   /** Unique within the building, e.g. `lobby-escalator`. */
@@ -786,7 +793,28 @@ export interface TransportModeConfig extends Commented {
    */
   readonly connects: readonly [string, string];
   /**
+   * What the machine is, and therefore how it behaves. Defaults to `escalator` when absent, so
+   * every building written before this field existed parses and routes unchanged.
+   *
+   * The two kinds differ in exactly two ways, and both are modelling content rather than labels:
+   *
+   * - **Cost.** An escalator carries you at one speed; {@link traversalTimeS} is one number.
+   *   Stairs are not symmetric, so a stairs mode declares `{ upS, downS }` and a scalar is a
+   *   **config error rather than a default** — silently symmetrising the asymmetry is the failure
+   *   this whole section exists to avoid.
+   * - **Use.** An escalator is *structural*: `traffic/route.ts` uses it because the geometry says
+   *   those floors connect, and a passenger has no say. Stairs are *chosen*, so the router never
+   *   sees them at all; they are offered to the rider at the landing and taken when the drawn
+   *   propensity clears. See {@link StairsUseConfig}.
+   */
+  readonly kind?: TransportModeKind | undefined;
+  /**
    * Landing-to-landing seconds, **including** stepping on and stepping off.
+   *
+   * A scalar for an escalator — it carries you at one speed in either direction — and
+   * `{ upS, downS }` for stairs, where climbing costs more than descending. The two forms are not
+   * interchangeable: a `stairs` mode declaring a scalar is refused, because a symmetric stair is
+   * a stair with its modelling content deleted.
    *
    * A *deterministic* number, not a distribution, and deliberately so: a random draw would need a
    * new named stream on `StreamSet`, and adding a stream shifts every downstream draw, which
@@ -797,7 +825,70 @@ export interface TransportModeConfig extends Commented {
    * **Reference value, so it must be cited** in the declaring building's `$comment`; see
    * `docs/02-elevator-reference.md` § *Non-lift transport*.
    */
-  readonly traversalTimeS: number;
+  readonly traversalTimeS: number | DirectionalTraversalTime;
+  /**
+   * Who will actually use the stairs, as a function of **signed** floor delta. Required on a
+   * `stairs` mode and refused on an escalator, which nobody chooses.
+   */
+  readonly use?: StairsUseConfig | undefined;
+}
+
+/** What a {@link TransportModeConfig} is. See {@link TransportModeConfig.kind}. */
+export const TRANSPORT_MODE_KINDS = ['escalator', 'stairs'] as const;
+
+export type TransportModeKind = (typeof TRANSPORT_MODE_KINDS)[number];
+
+/**
+ * Landing-to-landing seconds in each direction, for a machine that is not symmetric.
+ *
+ * `upS >= downS` is required rather than assumed: a stair you climb faster than you descend is a
+ * transcription error, and accepting one would silently invert the asymmetry the model is here to
+ * carry.
+ */
+export interface DirectionalTraversalTime {
+  /** Seconds to climb, landing to landing. */
+  readonly upS: number;
+  /** Seconds to descend. */
+  readonly downS: number;
+}
+
+/**
+ * **The behavioural asymmetry: who chooses the stairs, as a function of signed floor delta.**
+ *
+ * ## Why two arrays and not one curve
+ *
+ * A model symmetric in `|Δfloor|` would be **worse than no model at all**, because it would
+ * quietly claim that up-traffic self-relieves at the same rate as down-traffic — and down-peak is
+ * exactly where a real building's stairs take load off the lifts. Two arrays make that mistake
+ * impossible to make by accident: symmetry has to be *typed out twice* to happen.
+ *
+ * The two asymmetries are **independent and both are required**. Modelling only the cost
+ * ({@link DirectionalTraversalTime}) gives people cheerfully climbing forty floors slowly;
+ * modelling only the willingness gives the ones who do climb arriving as fast as those going
+ * down. Neither is a building.
+ *
+ * ## The arrays are the reach
+ *
+ * `propensityUp[i]` is the probability a rider climbing `i + 1` floors takes the stairs, so the
+ * array's **length is the floor-count reach** — there is no separate reach field to disagree with
+ * it, and a reach without a curve cannot be declared.
+ *
+ * ## Per building, and cited
+ *
+ * These are reference values under this repository's data rule, and they are **per building**: a
+ * hotel's guests, an office tower's staff and a hospital's do not behave alike, so the curve is
+ * authored on the mode with its citation in the declaring building's `$comment`. There is no
+ * default curve in code, deliberately — a default would put an uncited behavioural claim into
+ * every study that declared a stair.
+ */
+export interface StairsUseConfig {
+  /**
+   * Probability of climbing, by floors ascended: index 0 is one floor up. Length is the reach.
+   * Beyond it nobody climbs.
+   */
+  readonly propensityUp: readonly number[];
+  /** Probability of descending, by floors descended: index 0 is one floor down. */
+  readonly propensityDown: readonly number[];
 }
 
 /**
