@@ -32,6 +32,10 @@
 import type { DirectionalSplit, ResolvedBuilding, TrafficProfiles } from '../config/types.js';
 import type { SimTime } from '../kernel/index.js';
 import type { CredentialGroup } from '../model/index.js';
+// A *value* import, and the narrow path rather than the barrel: `TRAFFIC_PARAMETERS` declares the
+// mass families an optimizer may sample, and a declared list that could drift from the sampler's
+// own is worse than no declaration. `model/` imports nothing from `traffic/`, so this is a leaf.
+import { SUPPORTED_MASS_DISTRIBUTIONS } from '../model/passenger.js';
 import type { StreamSet } from '../random/index.js';
 
 /* -------------------------------------------------------------------------- *
@@ -401,6 +405,80 @@ export interface PassengerTrace {
  * Generator configuration
  * -------------------------------------------------------------------------- */
 
+/**
+ * Batch-size distributions `drawBatchSize` knows how to sample. docs/14 § 2.2.
+ *
+ * All three are distributions over the integers `{1, 2, 3, ...}` — a batch contains at least one
+ * passenger — and **all three consume exactly one draw per call, for every parameter**. That is
+ * not an implementation detail: `DECISIONS.md` § D203 records that a sampler whose draw count
+ * depends on its parameters desynchronizes common random numbers between two configurations that
+ * differ in it, and that the strong form of the cross-source coupling `trafficModel: 'v2'` exists
+ * to remove *returns* the moment one appears. Keeping the property is what makes these families
+ * usable under `v1` as well as `v2`; a rejection loop or a Knuth-style Poisson sampler would not
+ * be, and would have had to be gated behind the flag instead.
+ *
+ * | Family | Shape | Reads as |
+ * |---|---|---|
+ * | `geometric` | mean | the curve every published figure was measured under, unchanged |
+ * | `zeroTruncatedPoisson` | mean | tighter clustering around the mean |
+ * | `explicit` | a weight vector over sizes 1..n | authored — "this hotel arrives in fours" |
+ *
+ * Lives here rather than in `poissonBatch.ts` so {@link TRAFFIC_PARAMETERS} can declare the same
+ * list the sampler dispatches on: a schema whose `values` could drift from the code is worse than
+ * no schema, and `poissonBatch.ts` already imports this module for `TrafficError`.
+ */
+export const SUPPORTED_BATCH_DISTRIBUTIONS = [
+  'geometric',
+  'zeroTruncatedPoisson',
+  'explicit',
+] as const;
+
+/**
+ * A group-size curve, as either reference data or a run-level override supplies it.
+ *
+ * `TrafficProfile.batchSize` (a `BatchSizeConfig`, which always carries a `mean`) is assignable
+ * to this; so is a run override that names only a weight vector, because `explicit` **derives**
+ * its mean rather than carrying one. `meanBatchSizeOf` is the single place that resolves the
+ * difference, and it is the number `batchesPerSecond` divides by — see docs/14 § 2.2's rate-
+ * coupling warning, which is the way this feature would otherwise change total demand silently.
+ */
+export interface BatchSizeCurve {
+  /** One of {@link SUPPORTED_BATCH_DISTRIBUTIONS}. A string, so an unknown name fails at the draw. */
+  readonly distribution: string;
+  /** Mean group size, at least 1. Required by every family except `explicit`, which derives it. */
+  readonly mean?: number | undefined;
+  /** Relative likelihood of group sizes `1..n`. `explicit` only; normalized when sampled. */
+  readonly weights?: readonly number[] | undefined;
+}
+
+/**
+ * A body-mass distribution, as a run supplies it. docs/14 § 2.1.
+ *
+ * Mass was already a distribution (`drawMass`, `profiles.passengerMass`) — the modelling rule was
+ * met. What this adds is **control**: the shape was fixed in reference data and could not be
+ * varied per building or per run.
+ *
+ * **Both truncation bounds are required, and that is the one place this type is stricter than the
+ * data it overrides.** `PassengerMassConfig.maxKg` is optional and every shipped profile omits it,
+ * which `drawMass` reads as `+Infinity`; an untruncated normal eventually draws a negative mass,
+ * and a load sensor reading a negative passenger surfaces three layers away as a strange capacity
+ * result rather than as an error. A caller reaching for this knob is asking for a different
+ * population, so it is exactly the moment to make them say where it stops.
+ *
+ * Assignable to `PassengerMassConfig`, so the resolved value can be handed straight to the
+ * samplers in `traffic/generator.ts` and `model/passenger.ts` without a second shape.
+ */
+export interface PassengerMassOverride {
+  /** `normal` or `lognormal`. A string, so an unknown name fails at the draw rather than silently. */
+  readonly distribution: string;
+  readonly meanKg: number;
+  readonly stdDevKg: number;
+  /** Lower truncation, kilograms. Required. */
+  readonly minKg: number;
+  /** Upper truncation, kilograms. Required — see the type docstring. */
+  readonly maxKg: number;
+}
+
 /** Which point of a profile's `arrivalRatePctPop5min` range to run at. */
 export const DEMAND_LEVELS = ['min', 'typical', 'max'] as const;
 
@@ -569,6 +647,33 @@ export interface TrafficConfig {
    * them independently in `[0, 1]`. At least one must be positive.
    */
   readonly directionalSplit?: DirectionalSplit | undefined;
+  /**
+   * Override every profile's group-size curve with one curve. docs/14 § 2.2.
+   *
+   * Unset means each floor uses its own profile's `batchSize`, which is the normal case and the
+   * one every published figure was measured under. The same kind of override as
+   * {@link arrivalRatePctPop5min}, and for the same reason: a study of group *shape* wants to hold
+   * the building fixed and move one curve, not to edit reference data per arm.
+   *
+   * **The mean is what `batchesPerSecond` divides by**, so a curve with a different mean is also a
+   * different batch arrival process at the same passenger rate — bigger groups mean fewer, larger
+   * batches. Two curves sharing a mean share the batch process exactly, which is what makes shape
+   * separable from rate.
+   */
+  readonly batchSize?: BatchSizeCurve | undefined;
+  /**
+   * Override the reference data's body-mass distribution. docs/14 § 2.1.
+   *
+   * Unset means `profiles.passengerMass`, byte for byte. Set, it replaces the whole block — family,
+   * mean, spread and **both** truncation bounds, which are required rather than optional; see
+   * {@link PassengerMassOverride}.
+   *
+   * Mass is drawn from its own stream in final trace order, so moving this changes *what the cars
+   * can do with the crowd* and not *which crowd turns up*: the arrival instants, the group sizes
+   * and the planned legs are untouched, and `traffic/varianceControls.test.ts` asserts that
+   * alongside the change it does make.
+   */
+  readonly passengerMass?: PassengerMassOverride | undefined;
   /**
    * Whether everyone in a batch shares a destination. Default `false`.
    *
@@ -916,5 +1021,102 @@ export const TRAFFIC_PARAMETERS: readonly TrafficParameterSpec[] = [
     description:
       "How much of the authored mix arc to keep. 1 is the arc as authored — outgoing-dominant early, incoming-dominant late; 0 collapses it to a flat run at the period's own mean mix with the total demand unchanged, which is the negative control any mix-varying result must be measured against.",
     activeWhen: { 'traffic.template': ['lunch-two-way'] },
+  },
+
+  /* ---- docs/14 § 2.2 — the group-size curve ------------------------------- */
+
+  {
+    id: 'traffic.batchSize.distribution',
+    type: 'categorical',
+    values: [...SUPPORTED_BATCH_DISTRIBUTIONS],
+    default: null,
+    description:
+      "Group-size family, overriding every profile's own curve. Unset (the default) means each floor keeps the curve data/traffic-profiles.json authors for it, which is what every published figure was measured under. geometric is that curve's family; zeroTruncatedPoisson clusters more tightly around the same mean; explicit takes an authored weight vector over sizes 1..n, which is the only one of the three that can say 'this hotel arrives in fours'.",
+  },
+  {
+    id: 'traffic.batchSize.mean',
+    type: 'continuous',
+    // Lower bound is the model's own: a batch contains at least one passenger. Upper bound is a
+    // **search bound, not a measurement** — the shipped profiles run 1.4 to 2.0 and no CIBSE or
+    // ISO table gives a group-size ceiling, so 12 is headroom chosen to admit a tour party and
+    // refuse a typo, and is labelled as such rather than presented as reference data.
+    range: [1, 12],
+    scale: 'linear',
+    default: null,
+    unit: 'passengers',
+    description:
+      "Mean group size, overriding every profile's own. Unset means the profile decides, which is the only honest default: 2.0 is a hotel number and would run an office at 1.4x its group size. Total passenger demand is held fixed, so raising the mean lowers the batch rate rather than adding people.",
+    activeWhen: {
+      'traffic.batchSize.distribution': ['geometric', 'zeroTruncatedPoisson'],
+    },
+  },
+  {
+    id: 'traffic.batchSize.weight',
+    type: 'continuous',
+    range: [0, 1],
+    scale: 'linear',
+    default: null,
+    perMemberOf: 'traffic.batchSize.sizes',
+    description:
+      'Relative likelihood of one group size, supplied once per size from 1 upwards and normalized across them — so [0, 1] per size spans every distinct curve, and the vector length is the largest group the building produces. Declared once for however many sizes the curve names, the way traffic.entranceWeight is declared once for however many entrances a building has. The mean is DERIVED from this vector, never authored beside it, because the batch rate divides by it and a mean that drifted from its own weights would change total demand silently.',
+    activeWhen: { 'traffic.batchSize.distribution': ['explicit'] },
+  },
+
+  /* ---- docs/14 § 2.1 — body mass ----------------------------------------- */
+
+  {
+    id: 'traffic.passengerMass.distribution',
+    type: 'categorical',
+    values: [...SUPPORTED_MASS_DISTRIBUTIONS],
+    default: null,
+    description:
+      "Body-mass family, overriding data/traffic-profiles.json's passengerMass block. Unset means the reference block, which is normal. lognormal is right-skewed and strictly positive, which is the shape a measured population has; normal is what the shipped data declares and what every published figure was measured under. The five passengerMass parameters are set together or left together: a partial override is refused, because both truncation bounds are required.",
+  },
+  {
+    id: 'traffic.passengerMass.meanKg',
+    type: 'continuous',
+    // The shipped block is 75 kg, which is also EN 81's nominal passenger mass (see
+    // `LOAD_SENSOR_DEFAULTS.nominalPassengerMassKg`, cited in docs/02-elevator-reference.md).
+    // The range around it is a **search bound, not a measurement**: no reference in this project
+    // gives a population mean outside it, and nothing here claims one does.
+    range: [40, 140],
+    scale: 'linear',
+    default: null,
+    unit: 'kg',
+    description:
+      'Mean body mass. Unset means the reference block (75 kg, EN 81 nominal). A heavier population fills cars by weight sooner: boarding stops at design load in kilograms and there is no head-count clause, so the number of people a car takes falls as the population gets heavier.',
+  },
+  {
+    id: 'traffic.passengerMass.stdDevKg',
+    type: 'continuous',
+    // 0 is admissible and is the degenerate case — every passenger identical — which the load
+    // sensor exists to make impossible in *data* (schema.ts refuses it there) but which is a
+    // legitimate control arm for an experiment measuring what the spread is worth.
+    range: [0, 40],
+    scale: 'linear',
+    default: null,
+    unit: 'kg',
+    description:
+      'Standard deviation of body mass. Unset means the reference block (15 kg). Zero makes every passenger identical, which is the control arm for measuring what the distribution buys — never a default, because a load sensor reading a constant has nothing to measure.',
+  },
+  {
+    id: 'traffic.passengerMass.minKg',
+    type: 'continuous',
+    range: [1, 120],
+    scale: 'linear',
+    default: null,
+    unit: 'kg',
+    description:
+      'Lower truncation. Required whenever the block is overridden at all: the normal distribution runs to minus infinity, and a load sensor reading a negative passenger surfaces three layers away as a strange capacity result rather than as an error. Draws below it are clamped, never re-drawn, so the draw count stays independent of the values drawn.',
+  },
+  {
+    id: 'traffic.passengerMass.maxKg',
+    type: 'continuous',
+    range: [40, 400],
+    scale: 'linear',
+    default: null,
+    unit: 'kg',
+    description:
+      'Upper truncation. Required whenever the block is overridden at all, for the symmetric reason: the tails of both families run to infinity and neither is a person. Draws above it are clamped, never re-drawn.',
   },
 ];

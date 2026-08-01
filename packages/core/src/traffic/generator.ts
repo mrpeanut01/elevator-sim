@@ -109,11 +109,13 @@ import type {
   AccessZone,
   DirectionalSplit,
   FloorConfig,
+  PassengerMassConfig,
   ResolvedBuilding,
   TrafficProfile,
   TrafficProfiles,
 } from '../config/types.js';
 import type { CredentialGroup, PassengerInit } from '../model/index.js';
+import { SUPPORTED_MASS_DISTRIBUTIONS } from '../model/passenger.js';
 import type { Rng } from '../random/index.js';
 
 import {
@@ -125,6 +127,7 @@ import {
 import {
   batchesPerSecond,
   drawBatchSize,
+  meanBatchSizeOf,
   passengersPerSecond,
   sampleBatchArrivalTimes,
 } from './poissonBatch.js';
@@ -133,6 +136,7 @@ import {
   TRAFFIC_DEFAULTS,
   TrafficError,
   type ArrivalEvent,
+  type BatchSizeCurve,
   type CredentialAssignment,
   type DemandLevel,
   type DemandSource,
@@ -245,6 +249,19 @@ export interface DemandPlan {
   readonly expectedPassengers: number;
   /** Expected passengers arriving inside the measurement window. */
   readonly expectedPassengersInReportWindow: number;
+  /**
+   * The body-mass distribution this plan's trace will draw from. docs/14 § 2.1.
+   *
+   * `TrafficConfig.passengerMass` when the run overrode it, `profiles.passengerMass` otherwise —
+   * resolved once, here, and read by `generateTrace`'s `drawMass` rather than re-resolved at the
+   * draw. A declared knob whose resolution happens twice is a knob that can be honoured in one
+   * place and forgotten in the other.
+   *
+   * On the **plan**, deliberately, and not on `DemandSource` or the trace: `PassengerTrace` is
+   * `JSON.stringify`d whole by `structuralDigestOfResult`, so a new key there would move every
+   * identity digest to say nothing. The plan is not part of any result.
+   */
+  readonly passengerMass: PassengerMassConfig;
   readonly warnings: readonly string[];
 }
 
@@ -305,6 +322,10 @@ interface ResolvedOptions {
   readonly journeyIdPrefix: string;
   readonly batchIdPrefix: string;
   readonly trafficModel: TrafficModelVersion;
+  /** `undefined` means every floor keeps its own profile's group-size curve. docs/14 § 2.2. */
+  readonly batchSize: BatchSizeCurve | undefined;
+  /** The resolved body-mass block: the override when one was given, the data otherwise. */
+  readonly passengerMass: PassengerMassConfig;
 }
 
 function resolveOptions(config: DemandConfig): ResolvedOptions {
@@ -312,6 +333,10 @@ function resolveOptions(config: DemandConfig): ResolvedOptions {
   if (!Number.isInteger(maxLegs) || maxLegs < 1) {
     throw new TrafficError(`maxLegs must be a positive integer; received ${maxLegs}`);
   }
+  // Validated here rather than at the first draw, so a mis-specified curve fails while the plan is
+  // being built instead of a thousand batches into a trace. `meanBatchSizeOf` is the whole check:
+  // every family has to expose a mean, because the batch rate divides by it.
+  if (config.batchSize !== undefined) meanBatchSizeOf(config.batchSize);
   return {
     demandLevel: config.demandLevel ?? TRAFFIC_DEFAULTS.demandLevel,
     interfloorWeighting: config.interfloorWeighting ?? TRAFFIC_DEFAULTS.interfloorWeighting,
@@ -323,7 +348,44 @@ function resolveOptions(config: DemandConfig): ResolvedOptions {
     journeyIdPrefix: config.journeyIdPrefix ?? 'j',
     batchIdPrefix: config.batchIdPrefix ?? 'b',
     trafficModel: config.trafficModel ?? TRAFFIC_DEFAULTS.trafficModel,
+    batchSize: config.batchSize,
+    // No `?? { ... }` of this module's own: unset means *the data decides*, and the only honest
+    // resolution is the block `data/traffic-profiles.json` authored. A default invented here would
+    // be a second source of truth for a number the reference file already states.
+    passengerMass: resolvePassengerMass(config),
   };
+}
+
+/**
+ * The body-mass block a run will draw from: the override, or the reference data.
+ *
+ * The override's bounds are **required by the type** (`PassengerMassOverride`); this re-checks
+ * them at runtime because `TrafficConfig` crosses a package boundary and a JavaScript caller — or
+ * a JSON round trip — can hand over a partial object the compiler never saw. An untruncated
+ * normal eventually draws a negative mass; the load sensor would then report a car getting
+ * *lighter* as it filled, three layers from the cause.
+ */
+function resolvePassengerMass(config: DemandConfig): PassengerMassConfig {
+  const override = config.passengerMass;
+  if (override === undefined) return config.profiles.passengerMass;
+  for (const [name, value] of [
+    ['meanKg', override.meanKg],
+    ['stdDevKg', override.stdDevKg],
+    ['minKg', override.minKg],
+    ['maxKg', override.maxKg],
+  ] as const) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new TrafficError(
+        `passengerMass.${name} must be a finite number; received ${String(value)}. Both truncation bounds are required when the mass distribution is overridden at all (docs/14 § 2.1).`,
+      );
+    }
+  }
+  if (override.minKg <= 0 || override.maxKg <= override.minKg) {
+    throw new TrafficError(
+      `passengerMass needs 0 < minKg < maxKg; received minKg=${override.minKg}, maxKg=${override.maxKg}. A load sensor reading a negative or unbounded passenger is a capacity result nobody can explain.`,
+    );
+  }
+  return override;
 }
 
 /**
@@ -465,7 +527,7 @@ export function planDemand(config: DemandConfig): DemandPlan {
     floorId: floor.id,
     floorIndex: floor.index,
     weight: entranceWeightTotal > 0 ? (rawEntranceWeights[index] ?? 0) / entranceWeightTotal : 0,
-    meanBatchSize: profileFor(floor).batchSize.mean,
+    meanBatchSize: meanBatchSizeOf(options.batchSize ?? profileFor(floor).batchSize),
   }));
 
   /* ---- feasibility of an (origin, destination) pair ---------------------- */
@@ -664,8 +726,8 @@ export function planDemand(config: DemandConfig): DemandPlan {
       originFloorId: floor.id,
       profileId: profile.id,
       peakPassengersPerSecond: rate,
-      peakBatchesPerSecond: batchesPerSecond(rate, profile.batchSize.mean),
-      meanBatchSize: profile.batchSize.mean,
+      peakBatchesPerSecond: batchesPerSecond(rate, meanBatchSizeOf(options.batchSize ?? profile.batchSize)),
+      meanBatchSize: meanBatchSizeOf(options.batchSize ?? profile.batchSize),
       destinations,
       ...withCategoryRates(categoryRatesOf(destinations)),
     });
@@ -724,6 +786,7 @@ export function planDemand(config: DemandConfig): DemandPlan {
       template.reportWindowStartS,
       template.reportWindowEndS,
     ),
+    passengerMass: options.passengerMass,
     warnings: Object.freeze(warnings),
   });
 }
@@ -1020,7 +1083,12 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
     // Pass B: per batch, its origin (entrance sources only), its size, its destinations.
     for (const timeS of times) {
       const originFloor = fixedOrigin ?? entranceTable.pick(streams.origins);
-      const size = drawBatchSize(batchSizeStream, profileFor(originFloor).batchSize);
+      // The run's own curve when it declared one, the origin floor's profile otherwise. Every
+      // family here draws exactly once, so which one is selected never moves a later draw.
+      const size = drawBatchSize(
+        batchSizeStream,
+        options.batchSize ?? profileFor(originFloor).batchSize,
+      );
       // Under a mix arc the table is the batch's own: the same destinations, reweighted by the
       // directional mix at the instant the batch appears. Rebuilt rather than mutated so that
       // `pick` stays one uniform draw whatever the weights are — a rejection scheme here would
@@ -1141,7 +1209,7 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
         ...(hops.length === 0 ? {} : { transportHops: Object.freeze(hops) }),
         // Mass is drawn here, in final trace order, so the mass column is a function of the
         // sorted trace rather than of the order the sources happened to be sampled in.
-        massKg: drawMass(streams.passengerMass, config.profiles),
+        massKg: drawMass(streams.passengerMass, options.passengerMass),
         credentialGroup: credentialGroupFor(route),
         category: pick.category,
         demandFloorId: pick.demandFloorId,
@@ -1192,15 +1260,30 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
  * so the clamping rule (one draw per call, tails clamped rather than rejected) is stated
  * where the trace is built. A rejection loop here would make the `passengerMass` draw count
  * depend on the values drawn.
+ *
+ * The mirror is asserted rather than trusted: `traffic/varianceControls.test.ts` requires the two
+ * to produce identical sequences from the same stream for both families, so the duplication
+ * cannot drift into two different populations.
+ *
+ * Takes the **resolved** block — `TrafficConfig.passengerMass` when the run supplied one, and
+ * `profiles.passengerMass` otherwise — rather than the whole profiles object, so there is exactly
+ * one place the override can be forgotten and it is `planDemand`.
  */
-function drawMass(rng: Rng, profiles: TrafficProfiles): number {
-  const config = profiles.passengerMass;
-  if (config.distribution !== 'normal') {
+function drawMass(rng: Rng, config: PassengerMassConfig): number {
+  if (config.distribution !== 'normal' && config.distribution !== 'lognormal') {
     throw new TrafficError(
-      `Unsupported passenger mass distribution "${config.distribution}". Supported: normal.`,
+      `Unsupported passenger mass distribution "${config.distribution}". Supported: ${SUPPORTED_MASS_DISTRIBUTIONS.join(', ')}.`,
     );
   }
-  const draw = rng.normal(config.meanKg, config.stdDevKg);
+  let draw: number;
+  if (config.distribution === 'lognormal') {
+    // Moments of the *mass*, not of its logarithm: `sigma^2 = ln(1 + s^2/m^2)`,
+    // `mu = ln(m) - sigma^2/2`. One `normal` call, exactly as the `normal` branch takes one.
+    const variance = Math.log1p((config.stdDevKg * config.stdDevKg) / (config.meanKg * config.meanKg));
+    draw = Math.exp(rng.normal(Math.log(config.meanKg) - variance / 2, Math.sqrt(variance)));
+  } else {
+    draw = rng.normal(config.meanKg, config.stdDevKg);
+  }
   return Math.min(Math.max(draw, config.minKg), config.maxKg ?? Number.POSITIVE_INFINITY);
 }
 

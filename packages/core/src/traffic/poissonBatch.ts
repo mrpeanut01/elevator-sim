@@ -32,16 +32,21 @@
  * process stays a pure function of the `arrivals` stream.
  */
 
-import type { BatchSizeConfig } from '../config/types.js';
 import type { Rng } from '../random/index.js';
 
-import { TrafficError } from './types.js';
+import { SUPPORTED_BATCH_DISTRIBUTIONS, TrafficError, type BatchSizeCurve } from './types.js';
 
 /** The reporting window lift engineering states demand in. Seconds. */
 export const SECONDS_PER_5MIN = 300;
 
-/** Batch-size distributions {@link drawBatchSize} knows how to sample. */
-export const SUPPORTED_BATCH_DISTRIBUTIONS = ['geometric'] as const;
+/**
+ * Largest group size {@link drawZeroTruncatedPoissonBatchSize} will return before giving up.
+ *
+ * Not a modelling bound — it is a termination guard on an inversion walk whose support is
+ * infinite. The geometric needs none because its inverse is closed-form, and the explicit family
+ * needs none because its support is the vector it was given.
+ */
+const MAX_BATCH_SIZE = 4_000;
 
 /**
  * Guard against a pathological configuration spinning forever. A proposal rate high enough
@@ -130,19 +135,168 @@ export function drawGeometricBatchSize(rng: Rng, mean: number): number {
 }
 
 /**
- * Draw one batch size from a profile's declared distribution.
+ * Solve `λ / (1 - e^-λ) = mean` for the Poisson rate behind a zero-truncated mean.
+ *
+ * The map is strictly increasing from 1 (as `λ → 0`) to infinity, so a mean above 1 has exactly
+ * one root and bisection finds it without a derivative. **Deterministic and draw-free**: a fixed
+ * iteration count, so the answer is a pure function of the mean and two configurations sharing a
+ * mean share a rate exactly.
+ *
+ * Bisection rather than Newton because Newton's iteration count depends on the starting point,
+ * and a loop whose length depends on its parameters is the habit this module is built to avoid —
+ * here it would only cost float determinism rather than draw alignment, but the same discipline
+ * costs nothing to keep.
+ */
+function poissonRateForTruncatedMean(mean: number): number {
+  let low = 0;
+  let high = 1;
+  // `mean` grows without bound in `λ`, so double until it brackets. Ten doublings reach λ = 1024,
+  // a mean far past any group a lift lobby produces.
+  while (high / (1 - Math.exp(-high)) < mean && high < 1024) high *= 2;
+  for (let step = 0; step < 80; step += 1) {
+    const mid = (low + high) / 2;
+    if (mid / (1 - Math.exp(-mid)) < mean) low = mid;
+    else high = mid;
+  }
+  return (low + high) / 2;
+}
+
+/**
+ * Draw from the **zero-truncated Poisson** on `{1, 2, 3, ...}` with the given mean.
+ *
+ * The same first moment as {@link drawGeometricBatchSize} and a much tighter shoulder: a
+ * geometric with mean 2 puts half its mass on singles and has a long tail, while a
+ * zero-truncated Poisson with mean 2 clusters around two. That is the whole reason it is offered
+ * — "groups of about three" and "mostly singles, occasionally eleven" are different buildings at
+ * the same headcount, and the geometric can only say the second.
+ *
+ * Sampled by **inversion**, walking `P(B = k+1) = P(B = k) · λ / (k+1)` from
+ * `P(B = 1) = λ e^-λ / (1 - e^-λ)`. **Exactly one underlying draw is consumed per call, for every
+ * mean** — the loop consumes no randomness, only the single uniform drawn before it. A
+ * Knuth-style Poisson sampler would consume a number of draws that depends on λ and would have to
+ * be gated behind `trafficModel: 'v2'`; this does not.
+ */
+export function drawZeroTruncatedPoissonBatchSize(rng: Rng, mean: number): number {
+  if (!Number.isFinite(mean) || mean < 1) {
+    throw new TrafficError(
+      `Zero-truncated Poisson batch size needs a mean of at least 1; received ${mean}. A batch contains at least one passenger.`,
+    );
+  }
+  // Drawn before the degenerate check, never after it: a sampler that short-circuits at mean 1
+  // consumes a different number of draws there than elsewhere, which is the desynchronization
+  // `drawGeometricBatchSize` refuses for the same reason.
+  const u = rng.nextFloat();
+  if (mean === 1) return 1;
+
+  const lambda = poissonRateForTruncatedMean(mean);
+  // p1 = λ e^-λ / (1 - e^-λ). `expm1` keeps the denominator accurate for small λ.
+  let probability = (lambda * Math.exp(-lambda)) / -Math.expm1(-lambda);
+  let cumulative = probability;
+  for (let size = 1; size < MAX_BATCH_SIZE; size += 1) {
+    if (u < cumulative) return size;
+    probability *= lambda / (size + 1);
+    cumulative += probability;
+  }
+  return MAX_BATCH_SIZE;
+}
+
+/**
+ * Draw from an **authored** weight vector over group sizes `1..n`.
+ *
+ * The family docs/14 § 2.2 calls the one worth having: *"a conference floor emptying in groups of
+ * eight is a different building from one emptying in ones and twos at the same passenger rate,
+ * and no mean can express that."* Weights are relative and are normalized here, so an author — or
+ * a generic optimizer sampling `traffic.batchSize.weight` in `[0, 1]` — never has to make them
+ * sum to anything.
+ *
+ * **Exactly one underlying draw is consumed per call, for every vector**: inversion over the
+ * cumulative weights, never rejection.
+ */
+export function drawExplicitBatchSize(rng: Rng, weights: readonly number[]): number {
+  const total = validateWeights(weights);
+  const target = rng.nextFloat() * total;
+  let cumulative = 0;
+  for (const [index, weight] of weights.entries()) {
+    cumulative += weight;
+    if (target < cumulative) return index + 1;
+  }
+  // Reached only when `target` lands on the very top of the range through rounding. The largest
+  // size with positive weight is the honest answer; falling off the end would be a silent 0.
+  for (let index = weights.length - 1; index >= 0; index -= 1) {
+    if ((weights[index] ?? 0) > 0) return index + 1;
+  }
+  /* c8 ignore next -- unreachable: validateWeights refuses an all-zero vector */
+  throw new TrafficError('Explicit batch size weights contain no positive entry');
+}
+
+/** Shared validation for {@link drawExplicitBatchSize} and {@link meanBatchSizeOf}. */
+function validateWeights(weights: readonly number[] | undefined): number {
+  if (weights === undefined || weights.length === 0) {
+    throw new TrafficError(
+      'An explicit batch size distribution needs a weights vector over group sizes 1..n; received none. weights[0] is the relative likelihood of a lone passenger.',
+    );
+  }
+  let total = 0;
+  for (const [index, weight] of weights.entries()) {
+    if (!Number.isFinite(weight) || weight < 0) {
+      throw new TrafficError(
+        `Batch size weight for group size ${index + 1} must be non-negative and finite; received ${weight}`,
+      );
+    }
+    total += weight;
+  }
+  if (total <= 0) {
+    throw new TrafficError(
+      'Explicit batch size weights must give at least one group size a positive weight; all are zero, which is a building nobody arrives at rather than a group-size curve.',
+    );
+  }
+  return total;
+}
+
+/**
+ * The mean group size a curve implies — **the number {@link batchesPerSecond} divides by**.
+ *
+ * Every family has to expose one, and `explicit` has to *derive* it rather than carry it. The
+ * trap is named in docs/14 § 2.2: total passenger demand is held fixed at `λ`, so the batch rate
+ * is `λ / E[B]`, and a family whose mean was authored beside its shape could drift from it and
+ * silently change how many people the building generates. Derived here, on every call, from the
+ * same vector the sampler draws from.
+ */
+export function meanBatchSizeOf(curve: BatchSizeCurve): number {
+  if (curve.distribution === 'explicit') {
+    const total = validateWeights(curve.weights);
+    let weighted = 0;
+    for (const [index, weight] of (curve.weights ?? []).entries()) weighted += (index + 1) * weight;
+    return weighted / total;
+  }
+  if (curve.mean === undefined) {
+    throw new TrafficError(
+      `Batch size distribution "${curve.distribution}" needs a mean; received none. Only the explicit family derives its mean from a weight vector.`,
+    );
+  }
+  return curve.mean;
+}
+
+/**
+ * Draw one batch size from a declared group-size curve.
  *
  * @throws TrafficError for a distribution this module cannot sample. Adding one means adding
  *   the sampler here **and** its name to {@link SUPPORTED_BATCH_DISTRIBUTIONS}, so a typo in
  *   `data/traffic-profiles.json` fails loudly instead of silently falling back to singles.
  */
-export function drawBatchSize(rng: Rng, config: BatchSizeConfig): number {
-  if (config.distribution !== 'geometric') {
-    throw new TrafficError(
-      `Unsupported batch size distribution "${config.distribution}". Supported: ${SUPPORTED_BATCH_DISTRIBUTIONS.join(', ')}. Add the sampler in traffic/poissonBatch.ts and declare it in data/traffic-profiles.json.`,
-    );
+export function drawBatchSize(rng: Rng, config: BatchSizeCurve): number {
+  switch (config.distribution) {
+    case 'geometric':
+      return drawGeometricBatchSize(rng, meanBatchSizeOf(config));
+    case 'zeroTruncatedPoisson':
+      return drawZeroTruncatedPoissonBatchSize(rng, meanBatchSizeOf(config));
+    case 'explicit':
+      return drawExplicitBatchSize(rng, config.weights ?? []);
+    default:
+      throw new TrafficError(
+        `Unsupported batch size distribution "${config.distribution}". Supported: ${SUPPORTED_BATCH_DISTRIBUTIONS.join(', ')}. Add the sampler in traffic/poissonBatch.ts and declare it in data/traffic-profiles.json.`,
+      );
   }
-  return drawGeometricBatchSize(rng, config.mean);
 }
 
 /** Inputs to {@link sampleBatchArrivalTimes}. */

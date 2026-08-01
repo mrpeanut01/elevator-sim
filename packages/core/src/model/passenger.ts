@@ -34,8 +34,28 @@ import type { Rng, StreamSet } from '../random/index.js';
 
 import { ModelError, type CredentialGroup, type Direction, type FloorTopology } from './types.js';
 
-/** Distributions {@link drawPassengerMass} knows how to sample. */
-export const SUPPORTED_MASS_DISTRIBUTIONS = ['normal'] as const;
+/**
+ * Distributions {@link drawPassengerMass} knows how to sample.
+ *
+ * `lognormal` is docs/14 § 2.1's addition and is the shape a measured population has: strictly
+ * positive and right-skewed, so its median sits below its mean. It is offered rather than
+ * imposed — every shipped profile is `normal`, which is what every published figure in this
+ * repository was measured under.
+ */
+export const SUPPORTED_MASS_DISTRIBUTIONS = ['normal', 'lognormal'] as const;
+
+/**
+ * The underlying normal's `(mu, sigma)` for a lognormal with the given mean and standard
+ * deviation **in kilograms**.
+ *
+ * The parameters a caller supplies are the moments of the *mass*, not of its logarithm, because
+ * "mean 75 kg, spread 15 kg" is the sentence an author can check and `mu = 4.3` is not. The
+ * inversion is standard: `sigma^2 = ln(1 + s^2 / m^2)`, `mu = ln(m) - sigma^2 / 2`.
+ */
+function lognormalParameters(meanKg: number, stdDevKg: number): { mu: number; sigma: number } {
+  const variance = Math.log1p((stdDevKg * stdDevKg) / (meanKg * meanKg));
+  return { mu: Math.log(meanKg) - variance / 2, sigma: Math.sqrt(variance) };
+}
 
 /**
  * Draw one body mass, in kilograms, from `rng`.
@@ -44,15 +64,18 @@ export const SUPPORTED_MASS_DISTRIBUTIONS = ['normal'] as const;
  * that — a function cannot know which stream it was handed — which is why simulation code
  * should go through {@link PassengerFactory}, which does.
  *
- * **Exactly one underlying draw is consumed per call, whatever the outcome.** The tails are
- * clamped into `[minKg, maxKg]` rather than rejected and re-drawn, because rejection would
- * make the number of draws depend on the values drawn: under common random numbers two
- * configurations would then fall out of step on this stream the first time one of them
- * happened to draw a 130 kg passenger. Clamping is also the physically honest choice — the
- * normal distribution's tails run to zero and to infinity, and neither is a person.
+ * **Exactly one underlying draw is consumed per call, whatever the outcome, and both families
+ * consume the same number.** The tails are clamped into `[minKg, maxKg]` rather than rejected and
+ * re-drawn, because rejection would make the number of draws depend on the values drawn: under
+ * common random numbers two configurations would then fall out of step on this stream the first
+ * time one of them happened to draw a 130 kg passenger. Clamping is also the physically honest
+ * choice — the normal distribution's tails run to zero and to infinity, and neither is a person.
+ * `lognormal` routes through the same single `rng.normal` call for the same reason: a family that
+ * consumed a different number of draws could not be compared against `normal` under common random
+ * numbers at all.
  */
 export function drawPassengerMass(rng: Rng, config: PassengerMassConfig): number {
-  if (config.distribution !== 'normal') {
+  if (config.distribution !== 'normal' && config.distribution !== 'lognormal') {
     throw new ModelError(
       `Unsupported passenger mass distribution "${config.distribution}". Supported: ${SUPPORTED_MASS_DISTRIBUTIONS.join(', ')}. Add the sampler here and declare it in data/traffic-profiles.json.`,
     );
@@ -75,8 +98,24 @@ export function drawPassengerMass(rng: Rng, config: PassengerMassConfig): number
     );
   }
 
-  const draw = rng.normal(config.meanKg, config.stdDevKg);
+  const draw =
+    config.distribution === 'lognormal'
+      ? drawLognormal(rng, config.meanKg, config.stdDevKg)
+      : rng.normal(config.meanKg, config.stdDevKg);
   return Math.min(Math.max(draw, config.minKg), maxKg);
+}
+
+/**
+ * One lognormal draw with the given mass mean and standard deviation. One `rng.normal` call.
+ *
+ * Duplicated clause-for-clause in `traffic/generator.ts` for the reason its `drawMass` states —
+ * `traffic/` depends on the model's *types* and not on its runtime — and
+ * `traffic/varianceControls.test.ts` asserts the two produce identical sequences from the same
+ * stream, so the duplication cannot drift unnoticed.
+ */
+function drawLognormal(rng: Rng, meanKg: number, stdDevKg: number): number {
+  const { mu, sigma } = lognormalParameters(meanKg, stdDevKg);
+  return Math.exp(rng.normal(mu, sigma));
 }
 
 /** Everything a {@link Passenger} needs. Optional fields default to a single-leg journey. */

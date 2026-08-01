@@ -95,11 +95,52 @@ describe('drawPassengerMass', () => {
   });
 
   it('rejects a distribution it cannot sample', () => {
+    // `lognormal` used to be this test's example and is now a supported family (docs/14 § 2.1),
+    // so the example moved rather than the assertion: an unknown name must still be refused by
+    // name instead of falling back to a normal nobody asked for.
     const rng = new StreamSet(1).passengerMass;
-    expect(() => drawPassengerMass(rng, { ...MASS, distribution: 'lognormal' })).toThrow(ModelError);
-    expect(() => drawPassengerMass(rng, { ...MASS, distribution: 'lognormal' })).toThrow(
+    expect(() => drawPassengerMass(rng, { ...MASS, distribution: 'weibull' })).toThrow(ModelError);
+    expect(() => drawPassengerMass(rng, { ...MASS, distribution: 'weibull' })).toThrow(
       /Unsupported passenger mass distribution/,
     );
+  });
+
+  /**
+   * **`lognormal` is a different population, and it costs the same number of draws.**
+   *
+   * The moments a caller supplies are the moments of the *mass* — "mean 75 kg, spread 15 kg" —
+   * not of its logarithm, so the two families are directly comparable and the sample mean lands
+   * where it was asked to. What differs is the shape: right-skewed, so the median sits strictly
+   * below the mean and no draw is ever negative before clamping.
+   *
+   * The draw-count clause is the load-bearing one. A family that consumed a different number of
+   * uniforms could not be compared against `normal` under common random numbers at all, which is
+   * the same discipline `drawGeometricBatchSize` keeps for group size (`DECISIONS.md` § D203).
+   */
+  it('samples lognormal at the requested mass moments, on the same draw budget', () => {
+    const lognormal: PassengerMassConfig = { ...MASS, distribution: 'lognormal' };
+    const rng = new StreamSet(4242).passengerMass;
+    const draws = Array.from({ length: 20_000 }, () => drawPassengerMass(rng, lognormal));
+
+    const mean = draws.reduce((sum, kg) => sum + kg, 0) / draws.length;
+    const variance =
+      draws.reduce((sum, kg) => sum + (kg - mean) ** 2, 0) / (draws.length - 1);
+    expect(mean).toBeCloseTo(MASS.meanKg, 0);
+    expect(Math.sqrt(variance)).toBeCloseTo(MASS.stdDevKg, 0);
+
+    // Right-skewed: more than half the population is lighter than the mean. A normal splits evenly,
+    // so this is the clause that fails if the family name is stored and ignored.
+    const lighter = draws.filter((kg) => kg < MASS.meanKg).length;
+    expect(lighter).toBeGreaterThan(draws.length * 0.52);
+
+    // One `rng.normal` per call, exactly as the normal branch takes one.
+    const counted = new StreamSet(11).passengerMass;
+    const reference = counted.clone();
+    for (let i = 0; i < 25; i += 1) {
+      drawPassengerMass(counted, lognormal);
+      reference.normal(0, 1);
+    }
+    expect(counted.getState()).toEqual(reference.getState());
   });
 
   it('rejects an incoherent distribution', () => {

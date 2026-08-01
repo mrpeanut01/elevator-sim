@@ -17,12 +17,15 @@ import {
   SECONDS_PER_5MIN,
   batchesPerSecond,
   drawBatchSize,
+  drawExplicitBatchSize,
   drawGeometricBatchSize,
+  drawZeroTruncatedPoissonBatchSize,
+  meanBatchSizeOf,
   passengersPer5Min,
   passengersPerSecond,
   sampleBatchArrivalTimes,
 } from './poissonBatch.js';
-import { TrafficError } from './types.js';
+import { SUPPORTED_BATCH_DISTRIBUTIONS, TrafficError } from './types.js';
 
 const rng = (seed: number): Pcg32 => new Pcg32(seed, 1);
 
@@ -145,6 +148,156 @@ describe('geometric batch size', () => {
     );
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * docs/14 § 2.2 — the group-size curve
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The property `DECISIONS.md` § D203 says a future group-size sampler must not quietly break.**
+ *
+ * One draw per call, for every family and every parameter. § D203 records that the strong form of
+ * the cross-source coupling `trafficModel: 'v2'` exists to remove *returns* the moment a sampler's
+ * draw count becomes parameter-dependent — so this is the assertion that decides whether the
+ * families below are available under `v1` as well as `v2`, and they are.
+ *
+ * Asserted on the generator's **state**, not on a counter: a sampler that drew twice and threw one
+ * away would pass a call count and fail this.
+ */
+describe('every group-size family costs exactly one draw', () => {
+  const CURVES = [
+    { distribution: 'geometric', mean: 1 },
+    { distribution: 'geometric', mean: 1.4 },
+    { distribution: 'geometric', mean: 9 },
+    { distribution: 'zeroTruncatedPoisson', mean: 1 },
+    { distribution: 'zeroTruncatedPoisson', mean: 1.4 },
+    { distribution: 'zeroTruncatedPoisson', mean: 9 },
+    { distribution: 'explicit', weights: [1] },
+    { distribution: 'explicit', weights: [0.6, 0.4] },
+    { distribution: 'explicit', weights: [0, 0, 0, 0, 0, 0, 0, 1] },
+  ] as const;
+
+  it.each(CURVES.map((curve) => [JSON.stringify(curve), curve] as const))(
+    '%s advances the stream by one uniform',
+    (_name, curve) => {
+      const drawing = rng(2026);
+      const reference = rng(2026);
+      for (let i = 0; i < 32; i += 1) {
+        drawBatchSize(drawing, curve);
+        reference.nextFloat();
+      }
+      expect(drawing.getState()).toEqual(reference.getState());
+    },
+  );
+
+  it('costs the same draws whichever family is selected, at the same call count', () => {
+    // The cross-family form of the same property: two configurations differing *only* in the
+    // group-size family stay in step on the stream, which is what makes them a paired comparison.
+    const states = CURVES.map((curve) => {
+      const generator = rng(77);
+      for (let i = 0; i < 40; i += 1) drawBatchSize(generator, curve);
+      return generator.getState();
+    });
+    for (const state of states) expect(state).toEqual(states[0]);
+  });
+});
+
+describe('zero-truncated Poisson batch size', () => {
+  it('hits the requested mean, and clusters more tightly than the geometric at that mean', () => {
+    const target = 3;
+    const sample = (draw: (generator: Pcg32) => number): readonly number[] => {
+      const generator = rng(515);
+      return Array.from({ length: 40_000 }, () => draw(generator));
+    };
+    const poisson = sample((g) => drawZeroTruncatedPoissonBatchSize(g, target));
+    const geometric = sample((g) => drawGeometricBatchSize(g, target));
+
+    const meanOf = (xs: readonly number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const sdOf = (xs: readonly number[]): number => {
+      const m = meanOf(xs);
+      return Math.sqrt(xs.reduce((a, b) => a + (b - m) ** 2, 0) / (xs.length - 1));
+    };
+    expect(meanOf(poisson)).toBeCloseTo(target, 1);
+    // The whole reason it is offered: same first moment, much smaller spread. A geometric with
+    // mean 3 puts a third of its mass on singles and has a long tail; this does neither.
+    expect(sdOf(poisson)).toBeLessThan(sdOf(geometric) / 1.5);
+    expect(Math.min(...poisson)).toBeGreaterThanOrEqual(1);
+  });
+
+  it('is degenerate at a mean of 1, and still draws', () => {
+    const generator = rng(3);
+    const reference = rng(3);
+    expect(drawZeroTruncatedPoissonBatchSize(generator, 1)).toBe(1);
+    reference.nextFloat();
+    expect(generator.getState()).toEqual(reference.getState());
+  });
+
+  it('refuses a mean below one — a batch contains at least one passenger', () => {
+    expect(() => drawZeroTruncatedPoissonBatchSize(rng(1), 0.5)).toThrow(TrafficError);
+  });
+});
+
+describe('explicit batch size', () => {
+  it('draws only the sizes the vector names, in the proportions it names them', () => {
+    const generator = rng(88);
+    const weights = [3, 1, 0, 6];
+    const counts = [0, 0, 0, 0];
+    const trials = 40_000;
+    for (let i = 0; i < trials; i += 1) {
+      const index = drawExplicitBatchSize(generator, weights) - 1;
+      counts[index] = (counts[index] ?? 0) + 1;
+    }
+
+    expect(counts[2]).toBe(0);
+    const total = weights.reduce((a, b) => a + b, 0);
+    for (const [index, weight] of weights.entries()) {
+      expect((counts[index] ?? 0) / trials).toBeCloseTo(weight / total, 2);
+    }
+  });
+
+  it('derives the mean from the vector rather than taking one on trust', () => {
+    // The rate coupling docs/14 § 2.2 warns about: `batchesPerSecond` divides by this number, so a
+    // mean carried beside the weights could change total demand without changing any group.
+    expect(meanBatchSizeOf({ distribution: 'explicit', weights: [3, 1] })).toBe(1.25);
+    expect(meanBatchSizeOf({ distribution: 'explicit', weights: [0, 0, 0, 1] })).toBe(4);
+    // Weights are relative: scaling the vector cannot move the mean.
+    expect(meanBatchSizeOf({ distribution: 'explicit', weights: [30, 10] })).toBe(1.25);
+    // And a carried mean is ignored rather than preferred, which is what makes it underivable.
+    expect(meanBatchSizeOf({ distribution: 'explicit', weights: [0, 1], mean: 99 })).toBe(2);
+  });
+
+  it('refuses a vector that names no group', () => {
+    expect(() => drawExplicitBatchSize(rng(1), [])).toThrow(/needs a weights vector/);
+    expect(() => drawExplicitBatchSize(rng(1), [0, 0])).toThrow(/at least one group size/);
+    expect(() => drawExplicitBatchSize(rng(1), [1, -1])).toThrow(/non-negative and finite/);
+    expect(() => drawBatchSize(rng(1), { distribution: 'explicit' })).toThrow(
+      /needs a weights vector/,
+    );
+  });
+
+  it('refuses a mean-taking family that was given no mean', () => {
+    expect(() => meanBatchSizeOf({ distribution: 'geometric' })).toThrow(/needs a mean/);
+  });
+});
+
+describe('the supported-family list is the list the sampler dispatches on', () => {
+  it('samples every declared family and refuses everything else', () => {
+    // The list is what `TRAFFIC_PARAMETERS` declares to an optimizer, so a name on it the sampler
+    // cannot draw is a search space with a hole in it, and a name off it that the sampler *can*
+    // draw is a capability nothing can find.
+    const curveFor = (distribution: string): Parameters<typeof drawBatchSize>[1] =>
+      distribution === 'explicit'
+        ? { distribution, weights: [1, 1] }
+        : { distribution, mean: 2 };
+    for (const distribution of SUPPORTED_BATCH_DISTRIBUTIONS) {
+      expect(drawBatchSize(rng(4), curveFor(distribution)), distribution).toBeGreaterThanOrEqual(1);
+    }
+    expect(() => drawBatchSize(rng(1), curveFor('binomial'))).toThrow(
+      /Unsupported batch size distribution "binomial"/,
+    );
+  });
+});
+
 
 describe('non-homogeneous batch arrivals', () => {
   const flat = (): number => 1;

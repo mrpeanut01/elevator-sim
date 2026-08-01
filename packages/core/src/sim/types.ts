@@ -51,10 +51,12 @@ import type { RunComparability } from '../metrics/comparability.js';
 import type { SummarizeOptions, WindowSelection } from '../metrics/summarize.js';
 import type { ReportWindow, RunRecord, RunSummary } from '../metrics/types.js';
 import type {
+  BatchSizeCurve,
   CredentialAssignment,
   DemandLevel,
   DemandTemplateId,
   InterfloorWeighting,
+  PassengerMassOverride,
   PassengerTrace,
   ResolvedDemandTemplate,
   TrafficModelVersion,
@@ -305,6 +307,34 @@ export interface SimulationDemandOptions {
    * beside any result measured under a varying mix.
    */
   readonly mixAmplitude?: number | undefined;
+
+  /* ---- docs/14 §§ 2.1–2.2, traffic variance ---- */
+
+  /**
+   * Override every profile's group-size curve with one curve. docs/14 § 2.2.
+   *
+   * Unset means each floor keeps the curve `data/traffic-profiles.json` authors for it, which is
+   * what every published figure was measured under. Three families: `geometric` (today's, and
+   * preserved exactly), `zeroTruncatedPoisson` (tighter clustering at the same mean) and
+   * `explicit` (an authored weight vector over group sizes `1..n`).
+   *
+   * The mean is what the batch rate divides by, and `explicit` **derives** it from its own weights
+   * rather than carrying one beside them — see `meanBatchSizeOf`. Two curves sharing a mean share
+   * the batch arrival process exactly, which is what separates group *shape* from demand *level*.
+   */
+  readonly batchSize?: BatchSizeCurve | undefined;
+  /**
+   * Override the body-mass distribution the trace draws from. docs/14 § 2.1.
+   *
+   * Unset means `data/traffic-profiles.json`'s `passengerMass` block, byte for byte. Set, it
+   * replaces the whole block — and **both truncation bounds are required**, because an
+   * untruncated normal eventually draws a negative mass and the load sensor would report it three
+   * layers from the cause.
+   *
+   * Mass is drawn from its own stream in final trace order, so this changes what the cars can do
+   * with the crowd rather than which crowd turns up.
+   */
+  readonly passengerMass?: PassengerMassOverride | undefined;
 }
 
 /** What to do when the drain deadline fires with passengers still in the system. */
