@@ -889,3 +889,75 @@ was a formality — each caught something the lane's own report did not.
 | F2 | The `v1`/`v2` pairing prohibition is a **sentence** where `metrics/comparability.ts` exists to carry it as data — whose own docstring argues such a rule must be carried on the run rather than written where the code cannot check it | medium |
 | F3 | The § 0 correction is **unpinned**: the overstated paragraph and its rebuttal can be edited back to the false version with a green suite. `validation/documentation.test.ts` is the established mechanism and was not used | medium-low |
 | F4 | Four low findings against T0 — a raw-`skyFloors` divergence between mirror and advisory, an unreachable refusal branch, a seed label that outlives its seed, and an above-6-m EN 115-1 branch that is wrong but unreachable | low |
+
+## Wave 13 — all six behaviour steps merged, 2026-07-31
+
+**`integration/wave-13` at `88756c6`.** Serial suite on a quiet machine: **272 files / 5 077 tests,
+5 067 passed, 0 failed, 10 skipped**, `tsc -b` clean, `review-gates` green over 594 files, all 981
+pins and both identity digests reproducing.
+
+| Measurement | Files | Tests | Passed | Failed | Skipped |
+|---|---|---|---|---|---|
+| Baseline `866e6a1` | 263 | 4 896 | 4 886 | 0 | **10** |
+| + T2 | 264 | 4 907 | 4 897 | 0 | **10** |
+| + T0 | 264 | 4 924 | 4 914 | 0 | **10** |
+| + F1 | 265 | 4 940 | 4 930 | 0 | **10** |
+| + I1 + T3 + T5 | 271 | 5 043 | 5 033 | 0 | **10** |
+| + F-lane + T4 | 272 | 5 077 | 5 067 | 0 | **10** |
+
+**The skip column never moved.** That is the number to read: a wave that quietly skips a test to go
+green moves it, and 4 896 rising to 5 077 says nothing on its own.
+
+### Steps
+
+| Step | State |
+|---|---|
+| 0 — sky-lobby / escalator authoring | ✅ `cab33d0` — 205 lift legs become 154; 51 became escalator hops |
+| 1 — traffic seed separation | ✅ `d52f347` (pre-wave) |
+| 2 — `trafficModel: 'v2'` | ✅ `81c1859` — [§ D203](DECISIONS.md), **criterion corrected, not met** |
+| 3 — mass control, group-size curve | ✅ `36beae6` — three review rounds |
+| 4 — day variation | ✅ `88756c6` — [§ D206](DECISIONS.md), **criterion met after a refusal was refuted** |
+| 5 — patience, crowding, stairs | ✅ `9733f7a` — [§ D205](DECISIONS.md), gaps named in the verdict |
+| 6 — teaching surface | 🔄 open; a fourth refusal is a permitted outcome |
+| F1 replay gap · I1 Azure Phase A · F3/F9/F10 | ✅ merged |
+
+### What the review loop was worth
+
+**Every feature lane was sent back at least once, and no review was a formality.** Findings the
+lanes' own reports did not contain:
+
+| Lane | What review found |
+|---|---|
+| T2 | Settled the criterion question by **diffing § 5** and finding it byte-identical; proved the identity digests *can* fail under three mutations (3, 28 and 16 failures) |
+| T0 | Built the negative control the lane had not — strip `transportModes` and the run returns **bit-identical**; **refuted** the losslessness claim (`name`/`$comment` dropped, and the test projected through the surviving fields so it could not see it) |
+| T3 | The lane's own mutation-7 remediation **did not kill mutation 7**; then its fix introduced a fail-silent regression of the same class |
+| T5 | The wave's signature defect — two fields nothing could set — **and the precedent invoked to excuse it was a field that is driven** |
+| T4 | A pre-registered criterion declared unsatisfiable on evidence that **reversed on a seed change**; the criterion was met under the contract's own reading |
+| I1 | Four of its own mutants passing spuriously, and `__ADMIN_USERNAME__` never substituted |
+
+### The three criterion judgements, and why two are not the same
+
+- **[§ D203](DECISIONS.md) — a correct refusal.** The claim was **provably false from the code as it
+  stood**: `drawGeometricBatchSize`'s docstring stated the fact that killed it, three files from the
+  document asserting the opposite.
+- **[§ D206](DECISIONS.md) — an incorrect refusal, caught.** A decomposition missing its load-bearing
+  premise, an attribution to a term measured at 1–2 % of the total, and six ratios that were **one
+  seed set iterated six times**. Re-run on eight fresh sets the pinned inequality **failed four
+  times**. The criterion was **met** under § 2.3's own reading — evidence the lane already had.
+- **[§ D205](DECISIONS.md) — a contract correction with its measurement attached.** § 3.3's reach
+  condition withdrawn because a pair-connected mode fixes its own span, confirmed by a bit-identical
+  result when zeroing an array index nothing reads.
+
+**`docs/14` § 5 is byte-identical to base in all three cases, verified by blob hash.** That is the
+check that separates a correction from a weakening, and it is the reason these can be told apart.
+
+### Open findings — 13, none blocking
+
+`F2` pairing prohibition unmechanised · `F4` T0 low findings · `F5` golden harness does not reach the
+replay fields · **`F6` invariant 5's persistence layer has no non-test caller** · `F7` deleting `v1`
+misreplays history · `F8` T3 low findings · `F11` developer prose reaches Basic mode verbatim ·
+`F12` two § D203 sites unguarded · **`F13` the Azure expected-cost figure does not reproduce from the
+template — provisioning declined on it**
+
+F6 is the one to read first: it is the condition that made three of this wave's invariant-5 defects
+possible, and it is not closed by any of them.
