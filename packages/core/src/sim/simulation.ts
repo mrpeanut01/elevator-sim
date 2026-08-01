@@ -2336,10 +2336,16 @@ export class Simulation {
        * The busier of the two landings on a paired double-deck stop, by the rule the dwell above
        * already follows: the decks open on one interlock and the stop takes the slower of them.
        *
-       * Read only by `DoorConfig.crowding`, so on a run that declares none the door normalizes it
-       * to a factor of exactly 1 and this argument changes nothing.
+       * **Omitted entirely when the run declares no crowding term.** It was populated
+       * unconditionally at first, on the argument that the door normalizes an unread field to a
+       * factor of exactly 1 — and `sameStopReason` compares it, so a stop reason could in
+       * principle compare unequal where it used to compare equal. Measured leg-by-leg across 18
+       * cells that came out at 0 differing cells, which is *inert in practice* rather than
+       * *inert*. Spreading it away makes it the second, at the cost of one branch.
        */
-      lobbyOccupancy: busiestLandingOf(floors),
+      ...(this.#options.lobbyCrowding === undefined
+        ? {}
+        : { lobbyOccupancy: busiestLandingOf(floors) }),
     });
     if (car.isDoubleDeck) {
       this.#doubleDeckStops += 1;
@@ -2659,8 +2665,11 @@ export class Simulation {
       hallQueueLength: holdCohort,
       transferSeconds: holdCohort * car.passengerTransferS,
       // The same landing, still as crowded: a courtesy hold re-grants the *hold's own* cohort,
-      // and the crowd it has to move through is unchanged by the door reversing.
-      lobbyOccupancy: busiestLandingOf(floors),
+      // and the crowd it has to move through is unchanged by the door reversing. Omitted with no
+      // declared term, for the reason `#beginStop` gives.
+      ...(this.#options.lobbyCrowding === undefined
+        ? {}
+        : { lobbyOccupancy: busiestLandingOf(floors) }),
     });
     // Refused — the profile declined the courtesy hold, or the stop's reopen budget is spent.
     // The door carries on closing and the passenger waits for the next car, which is the
@@ -3563,6 +3572,7 @@ export class Simulation {
 
   #finish(endReason: RunEndReason): SimulationResult {
     this.#diagnoseStuckCalls();
+    this.#disclosePopulationChange();
 
     const demandEndedAt = this.#trace.durationS;
     const endedAt = Math.max(this.#recorder.lastEventAt, demandEndedAt);
@@ -3667,6 +3677,46 @@ export class Simulation {
       );
     }
     return result;
+  }
+
+  /**
+   * **Say, in the record, that this run's per-leg figures describe a different population.**
+   *
+   * A disclaimer rather than an advisory, and by `#disclaimers`' own test: it does not qualify a
+   * number, it says the *model* is not what a reader would assume. Both behaviours below remove
+   * people from the lift system, so AWT, WT95, TTD, the served-leg count and the over-horizon
+   * count are all taken over a smaller cohort than `generated` — and abandonment improves every
+   * one of them **by construction**, because the riders it removes are the ones who waited
+   * longest. That is `DECISIONS.md` § D106's rule (*a configuration that spends less by serving
+   * fewer people has not saved anything*) on two more axes.
+   *
+   * ## Why it is here and not only on the summary
+   *
+   * `RunSummary.abandonment` and `ConservationAudit.abandoned` are the figures, and a consumer
+   * that reads them is fine. The disclaimer exists for the consumers that do **not** yet:
+   * `viz/src/record/recordRun.ts` copies `generated`/`delivered`/`undelivered` into `VizSummary`
+   * and carries neither new term, and `viz/src/shift/goals.ts` reads
+   * `serviceLevel.overHorizonCount` — which abandonment improves by construction, since a rider
+   * who left cannot wait past the horizon. Warnings travel with the record
+   * (`RunRecord.warnings`), are ordered disclaimers-first, and every consumer that truncates has
+   * to keep them, so this reaches those surfaces without this lane guessing at a schema it does
+   * not own. **It is a stopgap that names a gap, not a substitute for projecting the figures.**
+   *
+   * Silent on every run that declares neither behaviour, which is every run this repository has
+   * published — so no pinned record acquires a key or a line.
+   */
+  #disclosePopulationChange(): void {
+    const abandoned = this.#abandonedLegs.size;
+    if (abandoned > 0) {
+      this.#disclaimers.push(
+        `${abandoned} leg(s) were abandoned: their rider's declared patience (sim.patience) ran out and they left the landing, so they are neither delivered nor waiting. Every per-leg figure this run reports — AWT, WT95, time to destination, the served-leg count and serviceLevel.overHorizonCount — is taken over the riders who stayed, and abandonment improves all of them by construction because the waits it removes are the longest ones. Read summary.abandonment beside the mean (DECISIONS.md § D106's rule, one axis over), and note that a comparison against a run with different abandonment compares different populations.`,
+      );
+    }
+    if (this.#stairsTaken.size > 0) {
+      this.#disclaimers.push(
+        `${this.#stairsTaken.size} journey(s) took a declared stairs mode and never entered the lift system, so they appear in conservation.delivered and in no wait, ride or time-to-destination figure at all. The served-leg count is correspondingly lower; read conservation.stairsJourneys and stairsTransitS beside it, and treat any comparison against a run with different stair uptake as a comparison of different populations (docs/14 § 3.3).`,
+      );
+    }
   }
 
   /**
