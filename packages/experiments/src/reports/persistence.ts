@@ -706,6 +706,7 @@ function parseDemandOptions(value: unknown, path: Path): StoredDemandOptions {
     'mixAmplitude',
     'batchSize',
     'passengerMass',
+    'dayVariation',
   ]);
 
   const batchSize = readOptional(object, 'batchSize', path, (entry, entryPath) => {
@@ -739,6 +740,20 @@ function parseDemandOptions(value: unknown, path: Path): StoredDemandOptions {
       stdDevKg: expectNumber(inner['stdDevKg'], [...entryPath, 'stdDevKg']),
       minKg: expectNumber(inner['minKg'], [...entryPath, 'minKg']),
       maxKg: expectNumber(inner['maxKg'], [...entryPath, 'maxKg']),
+    });
+  });
+
+  const dayVariation = readOptional(object, 'dayVariation', path, (entry, entryPath) => {
+    const inner = expectObject(entry, entryPath);
+    rejectUnknownKeys(inner, entryPath, ['minDemandFactor', 'maxDemandFactor', 'peakShiftS']);
+    // Both bounds required on the way back in, exactly as the override type requires them on the
+    // way out: a stored block missing one would replay an unbounded multiplier, which docs/14
+    // § 2.3 makes a refusal rather than a default. `peakShiftS` is genuinely optional, and its
+    // absence means the peak keeps the template's own timing.
+    return Object.freeze({
+      minDemandFactor: expectNumber(inner['minDemandFactor'], [...entryPath, 'minDemandFactor']),
+      maxDemandFactor: expectNumber(inner['maxDemandFactor'], [...entryPath, 'maxDemandFactor']),
+      ...spread('peakShiftS', readOptional(inner, 'peakShiftS', entryPath, expectNumber)),
     });
   });
 
@@ -790,6 +805,7 @@ function parseDemandOptions(value: unknown, path: Path): StoredDemandOptions {
     ...spread('mixAmplitude', readOptional(object, 'mixAmplitude', path, expectNumber)),
     ...spread('batchSize', batchSize),
     ...spread('passengerMass', passengerMass),
+    ...spread('dayVariation', dayVariation),
   });
 }
 
@@ -1032,6 +1048,10 @@ function demandOptionsOf(demand: NonNullable<SimulationConfig['demand']>): Store
     // cannot be forgotten the same way.
     ...spread('batchSize', demand.batchSize),
     ...spread('passengerMass', demand.passengerMass),
+    // docs/14 § 2.3, and the same argument once more: a record that dropped this replays at
+    // demandFactor 1 with the `dayVariation` stream never consumed — a different crowd, reported
+    // as the same run.
+    ...spread('dayVariation', demand.dayVariation),
   });
 }
 

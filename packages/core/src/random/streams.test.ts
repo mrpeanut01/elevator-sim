@@ -29,6 +29,7 @@ describe('StreamSet — required streams', () => {
       'batchSize',
       'patience',
       'modeChoice',
+      'dayVariation',
     ]);
   });
 
@@ -46,6 +47,9 @@ describe('StreamSet — required streams', () => {
     expect(set.stream('doorObstruction')).toBe(set.doorObstruction);
     expect(set.stream('policyNoise')).toBe(set.policyNoise);
     expect(set.stream('batchSize')).toBe(set.batchSize);
+    expect(set.stream('patience')).toBe(set.patience);
+    expect(set.stream('modeChoice')).toBe(set.modeChoice);
+    expect(set.stream('dayVariation')).toBe(set.dayVariation);
   });
 
   it('keeps the seed available for the run record', () => {
@@ -365,6 +369,22 @@ const GOLDEN_STREAMS: Readonly<Record<StreamName, GoldenVector>> = {
     initSeq: 4920448037779798214n,
     firstDraws: [238409173, 3289634889, 937522763, 3447560127],
   },
+  /*
+   * Added with the stream itself (docs/14 § 2.3), by the same independent BigInt program and under
+   * the same rule as the three above it: it was required to reproduce **all ten** vectors already
+   * pinned in this file — the nine streams and the ad-hoc one — plus all three edge seeds, before
+   * this eleventh was taken from it. It did, thirteen for thirteen.
+   *
+   * That the ten above are untouched is again the measurement rather than the assumption. A name
+   * appended to `STREAM_NAMES` cannot move an existing stream's parameters, because
+   * `deriveStreamSeed` hashes the **spelling** and not the position; this table is where that
+   * survives a third appending.
+   */
+  dayVariation: {
+    initState: 8223398147818347272n,
+    initSeq: 8791436940513750610n,
+    firstDraws: [626451509, 78136351, 4266053562, 1214740073],
+  },
 };
 
 /** An ad-hoc stream, pinned too: `derive()` outputs are just as persisted as the required six. */
@@ -549,7 +569,16 @@ describe('a separate traffic seed splits who turns up from how the machine behav
    * about the machine, so a traffic seed that re-rolled who turns up and when but left every group
    * the same size would be re-rolling half a Tuesday.
    */
-  const DEMAND = ['arrivals', 'origins', 'destinations', 'passengerMass', 'batchSize'] as const;
+  const DEMAND = [
+    'arrivals',
+    'origins',
+    'destinations',
+    'passengerMass',
+    'batchSize',
+    // Which Tuesday this is, and how late its peak runs (docs/14 § 2.3). The most purely
+    // crowd-side draw on the list: it scales how many people walk in and touches no car.
+    'dayVariation',
+  ] as const;
   const MACHINE = ['doorObstruction', 'policyNoise'] as const;
 
   const firstDraws = (set: StreamSet, name: StreamName, count = 8): readonly number[] =>

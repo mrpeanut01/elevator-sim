@@ -68,6 +68,9 @@ const DEMAND_JSON = {
   mixAmplitude: 0.5,
   batchSize: { distribution: 'explicit', weights: [0, 0, 0, 1] },
   passengerMass: { distribution: 'lognormal', meanKg: 110, stdDevKg: 15, minKg: 40, maxKg: 200 },
+  // docs/14 § 2.3, with the optional inner field set: a parser that read the two bounds and
+  // dropped `peakShiftS` would accept a spec that asked for a moving peak and run a fixed one.
+  dayVariation: { minDemandFactor: 0.8, maxDemandFactor: 1.25, peakShiftS: 120 },
 } as const satisfies Record<keyof SimulationDemandOptions, unknown>;
 
 describe('parseExperimentSpec reads every demand key it accepts', () => {

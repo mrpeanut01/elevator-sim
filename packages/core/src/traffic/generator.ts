@@ -121,7 +121,9 @@ import type { Rng } from '../random/index.js';
 import {
   expectedPassengers as expectedPassengersOver,
   intensityAt,
+  requirePeakShiftFits,
   resolveDemandTemplate,
+  shiftTemplatePeak,
   splitAt,
 } from './demandTemplate.js';
 import {
@@ -138,6 +140,7 @@ import {
   type ArrivalEvent,
   type BatchSizeCurve,
   type CredentialAssignment,
+  type DayVariationConfig,
   type DemandLevel,
   type DemandSource,
   type DestinationWeight,
@@ -145,6 +148,7 @@ import {
   type GeneratedPassenger,
   type InterfloorWeighting,
   type PassengerTrace,
+  type ResolvedDayVariation,
   type ResolvedDemandTemplate,
   type TraceLeg,
   type TraceTransportHop,
@@ -394,6 +398,85 @@ function resolvePassengerMass(config: DemandConfig): PassengerMassConfig {
   return override;
 }
 
+/* -------------------------------------------------------------------------- *
+ * Inter-day variability (docs/14 § 2.3)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Check a {@link DayVariationConfig}'s bounds, whether or not a draw is about to be taken.
+ *
+ * Runtime-checked for {@link resolvePassengerMass}'s reason: `TrafficConfig` crosses a package
+ * boundary, and a JavaScript caller or a JSON round trip can hand over a partial object the
+ * compiler never saw. Both bounds are required by the type and neither has a default here — a
+ * multiplier this module invented would be a demand level nobody declared.
+ */
+function requireDayVariationBounds(config: DayVariationConfig): void {
+  for (const [name, value] of [
+    ['minDemandFactor', config.minDemandFactor],
+    ['maxDemandFactor', config.maxDemandFactor],
+  ] as const) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new TrafficError(
+        `dayVariation.${name} must be a finite number; received ${String(value)}. Both bounds are required whenever the block is declared at all (docs/14 § 2.3), for the reason both mass truncation bounds are: an unbounded demand multiplier is a run whose saturation state nobody declared, reported beside a mean that may or may not be valid.`,
+      );
+    }
+  }
+  if (config.minDemandFactor <= 0 || config.maxDemandFactor < config.minDemandFactor) {
+    throw new TrafficError(
+      `dayVariation needs 0 < minDemandFactor <= maxDemandFactor; received minDemandFactor=${config.minDemandFactor}, maxDemandFactor=${config.maxDemandFactor}. A factor of zero is a building nobody entered, and a negative one is not a day.`,
+    );
+  }
+}
+
+/**
+ * Draw this run's day: how busy it is, and how late its peak runs. docs/14 § 2.3.
+ *
+ * **The factor must be invariant to `peakShiftS`** — two arms of a study differing only in the
+ * shift bound must not silently be running at different demand levels. This code holds that two
+ * ways over, and the relationship between them was got wrong twice before it was measured:
+ *
+ * - the factor is drawn **first**, so it is draw 1 whatever the bound does; **or**
+ * - the count is **fixed at two**, so the factor is at a fixed offset whatever the order.
+ *
+ * Either alone is sufficient and neither is necessary, which is why the mutants settle it rather
+ * than the argument. Reversing the order while keeping two draws leaves the factor invariant
+ * (mutation survives); keeping the order while skipping the second draw at a zero bound also
+ * leaves it invariant; **breaking both together is what moves it**, and only then. An earlier
+ * version of this comment credited the count alone and adversarial review credited the order
+ * alone; both were half right.
+ *
+ * The fixed count buys one further thing on its own: this stream's position after the draw is a
+ * function of the seed and the block's *presence* rather than of its contents, so anything that
+ * ever draws from `dayVariation` after this point — nothing does today — could not be displaced
+ * by a bound changing. `dayVariationSeam.test.ts` asserts order and count separately at the
+ * stream's own state, because neither is visible in a trace: with no second consumer, a one-draw
+ * variant produces byte-identical runs and survived every other test in the tree.
+ *
+ * Both draws are uniform. Bounded by construction rather than by rejection, so the draw count
+ * cannot depend on the values drawn — the property `DECISIONS.md` § D203 records as the one a
+ * sampler in this generator may not break.
+ */
+function drawDayVariation(config: DayVariationConfig, rng: Rng): ResolvedDayVariation {
+  requireDayVariationBounds(config);
+  const shiftBoundS = config.peakShiftS ?? 0;
+
+  const demandFactor =
+    config.minDemandFactor +
+    rng.nextFloat() * (config.maxDemandFactor - config.minDemandFactor);
+  /*
+   * `-0` is normalized away, and it is not cosmetic. With a zero bound the product is `-0`
+   * whenever the draw lands below the midpoint, so *the same no-op day* would report `-0` at one
+   * seed and `+0` at another — `Object.is` and `toEqual` both separate them, while
+   * `JSON.stringify` does not, so it is exactly the kind of difference that shows up in one guard
+   * and not another. Found by the no-op-day test in `sim/dayVariationSeam.test.ts`, which is what
+   * that test is for. Normalized by comparison rather than by skipping the draw: the draw count
+   * has to stay constant, or turning the shift on would move the demand factor.
+   */
+  const drawnShiftS = (rng.nextFloat() * 2 - 1) * shiftBoundS;
+
+  return Object.freeze({ demandFactor, peakShiftS: drawnShiftS === 0 ? 0 : drawnShiftS });
+}
+
 /**
  * Validate an explicit directional split and rescale it to sum to 1.
  *
@@ -451,11 +534,22 @@ function profileResolver(
 /**
  * Compute rates, sources and destination tables. Pure: no draws, no simulation state.
  *
+ * `day` is this run's already-drawn inter-day variation (docs/14 § 2.3), or `undefined` for the
+ * average day, which is every run this repository has published. **It is a parameter rather than
+ * a config field precisely to keep the sentence above true**: the draw belongs to the streams and
+ * this function has none. Omitting it on a config that declares `dayVariation` is legal and gives
+ * the plan the configuration *expects* — the bounds are still validated, so a nonsense block is
+ * still refused — which is what a caller wanting the nominal plan of a varying study wants.
+ *
  * @throws TrafficError for an unsupported arrival process, an unknown traffic profile, an
- *   entrance weight naming a floor that is not an entrance, or a building with demand but no
- *   entrance to route it through.
+ *   entrance weight naming a floor that is not an entrance, a building with demand but no
+ *   entrance to route it through, or a `dayVariation` block whose bounds this template cannot
+ *   absorb.
  */
-export function planDemand(config: DemandConfig): DemandPlan {
+export function planDemand(
+  config: DemandConfig,
+  day?: ResolvedDayVariation | undefined,
+): DemandPlan {
   const { building, profiles } = config;
   if (profiles.arrivalProcess.type !== SUPPORTED_ARRIVAL_PROCESS) {
     throw new TrafficError(
@@ -464,16 +558,41 @@ export function planDemand(config: DemandConfig): DemandPlan {
   }
 
   const options = resolveOptions(config);
-  const template = resolveDemandTemplate(
+  const authoredTemplate = resolveDemandTemplate(
     config.template ?? TRAFFIC_DEFAULTS.templateId,
     profiles.demandTemplates,
     config.templateOverrides,
   );
+
+  /*
+   * docs/14 § 2.3, both halves.
+   *
+   * The **declared bound** is checked against this template every time the block is present, not
+   * only the shift that was drawn. A bound of 900 s on a template that can absorb 750 s would
+   * otherwise run at one seed and throw at another, which turns a configuration error into a coin
+   * flip; `requirePeakShiftFits` is where that is refused.
+   *
+   * The **drawn** shift then moves the peak. The demand factor is applied one line down, at
+   * `rateOf`, which is the single place every source's rate comes through — so the multiplier
+   * reaches the plan's headline rate, each source's own rate, the expected-passenger figures and
+   * every warning that quotes one, and there is no second expression to keep in step with it.
+   */
+  if (config.dayVariation !== undefined) {
+    requireDayVariationBounds(config.dayVariation);
+    requirePeakShiftFits(authoredTemplate, config.dayVariation.peakShiftS ?? 0);
+  }
+  const template =
+    day === undefined || day.peakShiftS === 0
+      ? authoredTemplate
+      : shiftTemplatePeak(authoredTemplate, day.peakShiftS);
+  const dayDemandFactor = day?.demandFactor ?? 1;
+
   const profileFor = profileResolver(building, profiles);
   const warnings: string[] = [];
 
   const rateOf = (profile: TrafficProfile): number =>
-    config.arrivalRatePctPop5min ?? profile.arrivalRatePctPop5min[options.demandLevel];
+    (config.arrivalRatePctPop5min ?? profile.arrivalRatePctPop5min[options.demandLevel]) *
+    dayDemandFactor;
 
   // A template that varies the mix states the mix, so it takes precedence over every floor's
   // profile — the same relationship `config.directionalSplit` already has, one level up. Combining
@@ -1028,7 +1147,18 @@ interface RawBatch {
 export function generateTrace(config: TrafficConfig): PassengerTrace {
   const { building, streams } = config;
   const options = resolveOptions(config);
-  const plan = planDemand(config);
+  /*
+   * docs/14 § 2.3. **Drawn before anything else in this function**, which is the whole of the
+   * criterion-3 guarantee: the day is a function of the seed and the configuration alone, taken
+   * before a single arrival instant exists and long before a car moves, so two arms of a paired
+   * comparison handed the same seed see the same Monday. Its own stream, so asking for it moves
+   * no other draw.
+   */
+  const day =
+    config.dayVariation === undefined
+      ? undefined
+      : drawDayVariation(config.dayVariation, streams.dayVariation);
+  const plan = planDemand(config, day);
   const { template } = plan;
   /*
    * **The mass block comes off the plan, not off this function's own `resolveOptions` result.**
@@ -1270,6 +1400,10 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
     sources: plan.sources,
     peakPassengersPerSecond: plan.peakPassengersPerSecond,
     expectedPassengers: plan.expectedPassengers,
+    // Spread-or-omit, never `?? { demandFactor: 1, peakShiftS: 0 }`: a trace from a run that did
+    // not ask for a particular day must be the object it was before days could vary, so that the
+    // identity guards can hold a whole trace to a digest rather than to a field list.
+    ...(day === undefined ? {} : { dayVariation: day }),
     // Every diagnostic worth raising is raised while planning: sampling adds no new ones,
     // because a trace that samples something the plan did not allow for is a bug, not a warning.
     warnings: plan.warnings,

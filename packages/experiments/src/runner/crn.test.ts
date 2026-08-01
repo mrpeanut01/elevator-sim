@@ -216,6 +216,14 @@ describe('traceKeyOf', () => {
           maxKg: 200,
         },
       },
+      /*
+       * docs/14 § 2.3, and **in** the key rather than out of it. It is the field the docstring on
+       * `traceKeyOf` reasons about against `patience` rather than by analogy to it: both draw from
+       * a demand-side stream, and only this one draws *before* the trace exists and multiplies the
+       * rate the trace is generated at. Two cells differing in it see a different number of people
+       * arriving at different times, so pairing them would be arithmetic across two Mondays.
+       */
+      dayVariation: { dayVariation: { minDemandFactor: 0.8, maxDemandFactor: 1.25 } },
     } as const satisfies Record<keyof SimulationDemandOptions, SimulationDemandOptions>;
 
     const keyFor = (demand: SimulationDemandOptions | undefined): string | undefined =>

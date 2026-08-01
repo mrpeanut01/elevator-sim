@@ -32,6 +32,7 @@ import {
 import type {
   BatchSizeCurve,
   CredentialAssignment,
+  DayVariationConfig,
   DemandLevel,
   DemandTemplateId,
   DirectionalSplit,
@@ -190,6 +191,25 @@ function parsePassengerMass(value: unknown, path: string): PassengerMassOverride
   };
 }
 
+/** A day-variation block as a spec author writes it. Both bounds required. docs/14 § 2.3. */
+function parseDayVariation(value: unknown, path: string): DayVariationConfig {
+  const record = asRecord(value, path);
+  rejectUnknown(record, ['minDemandFactor', 'maxDemandFactor', 'peakShiftS'], path);
+  return {
+    // Both bounds required on the way in, exactly as `parsePassengerMass` requires both truncation
+    // bounds: a one-sided bound reaching the generator is an unbounded demand multiplier, and
+    // docs/14 § 2.3 makes that a refusal rather than a default. A spec is the one door where they
+    // could arrive half-written.
+    minDemandFactor: asFiniteNumber(record['minDemandFactor'], `${path}.minDemandFactor`),
+    maxDemandFactor: asFiniteNumber(record['maxDemandFactor'], `${path}.maxDemandFactor`),
+    // Genuinely optional: absent means the peak keeps the timing the template gives it, which is
+    // a different statement from an absent block and is why it is spread rather than defaulted.
+    ...(present(record, 'peakShiftS')
+      ? { peakShiftS: asFiniteNumber(record['peakShiftS'], `${path}.peakShiftS`) }
+      : {}),
+  };
+}
+
 /**
  * **One parser per field of `SimulationDemandOptions`, and the allow-list is derived from it.**
  *
@@ -233,6 +253,7 @@ const DEMAND_PARSERS: DemandParsers = {
   mixAmplitude: asFiniteNumber,
   batchSize: parseBatchSize,
   passengerMass: parsePassengerMass,
+  dayVariation: parseDayVariation,
 };
 
 /** The accepted key set, derived rather than restated. See {@link DEMAND_PARSERS}. */

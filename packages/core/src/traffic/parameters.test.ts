@@ -27,7 +27,12 @@ import { StreamSet } from '../random/index.js';
 
 import { intensityAt, splitAt } from './demandTemplate.js';
 import { planDemand, generateTrace } from './generator.js';
-import { TRAFFIC_DEFAULTS, TRAFFIC_PARAMETERS, type TrafficConfig } from './types.js';
+import {
+  TRAFFIC_DEFAULTS,
+  TRAFFIC_PARAMETERS,
+  type ResolvedDayVariation,
+  type TrafficConfig,
+} from './types.js';
 
 const REAL_DATA_DIR = fileURLToPath(new URL('../../../../data', import.meta.url));
 
@@ -114,6 +119,11 @@ const PARAMETERS_BY_CONFIG_FIELD = {
     'traffic.passengerMass.minKg',
     'traffic.passengerMass.maxKg',
   ],
+  dayVariation: [
+    'traffic.dayVariation.minDemandFactor',
+    'traffic.dayVariation.maxDemandFactor',
+    'traffic.dayVariation.peakShiftS',
+  ],
 } satisfies Record<keyof TrafficConfig, readonly string[] | null>;
 
 describe('traffic tunables declare their schema', () => {
@@ -163,7 +173,7 @@ describe('traffic tunables declare their schema', () => {
     // Pinned as a count as well as a set, because `TRAFFIC_PARAMETERS`' own docstring quotes this
     // number in prose and said "two" while four were declared. A sentence nothing checks goes
     // stale; this is what makes the next edit to it fail rather than drift.
-    expect(nullDefaults.length).toBe(12);
+    expect(nullDefaults.length).toBe(15);
     expect(new Set(nullDefaults)).toEqual(
       new Set([
         'traffic.arrivalRatePctPop5min',
@@ -183,6 +193,13 @@ describe('traffic tunables declare their schema', () => {
         'traffic.passengerMass.stdDevKg',
         'traffic.passengerMass.minKg',
         'traffic.passengerMass.maxKg',
+        // docs/14 § 2.3, and null for a neighbouring reason rather than that one: there is no
+        // reference file to defer to here. *No day variation at all* is the only default that
+        // leaves every published figure standing, and a multiplier declared here would silently
+        // make every run in the repository a different Tuesday.
+        'traffic.dayVariation.minDemandFactor',
+        'traffic.dayVariation.maxDemandFactor',
+        'traffic.dayVariation.peakShiftS',
       ]),
     );
 
@@ -595,7 +612,72 @@ const PROBES: readonly Probe[] = [
       Math.max(...generateTrace(config).passengers.map((passenger) => passenger.massKg)),
     expected: 75.5,
   },
+
+  /* ---- docs/14 § 2.3 — inter-day variability ------------------------------ */
+
+  {
+    /*
+     * A degenerate band — `min === max` — is what makes the multiplier *observable* rather than
+     * merely present: the draw is then a constant, so the plan's headline rate is the profile's
+     * own rate times exactly 1.6 and the assertion is arithmetic rather than a range check.
+     * Observed on the plan's rate, which is what `batchesPerSecond` and every expected-passenger
+     * figure are computed from, not on the field the option was written into. `midtown-office`'s
+     * office-standard profile runs 12 %/5 min over 1 710 people; 1.6x is 19.2 %.
+     *
+     * The band's two ends are separated by the probe below, so this row and that one together
+     * cover both ids without either being an echo of the other.
+     */
+    ids: ['traffic.dayVariation.minDemandFactor'],
+    buildingId: 'midtown-office',
+    probe: { dayVariation: { minDemandFactor: 1.6, maxDemandFactor: 1.6 } },
+    observe: (config) =>
+      Number((planDemand(config, drawDayFor(config)).peakPassengersPerSecond * 300).toPrecision(9)),
+    expected: Number(((19.2 / 100) * 1710).toPrecision(9)),
+  },
+  {
+    /*
+     * The upper end moved on its own, with the lower end held at the row above's value. A
+     * resolver that read only `minDemandFactor` — or that averaged the two — produces 1.6 here.
+     * `nextFloat()` on this seed's `dayVariation` stream is a fixed number in `[0, 1)`, so the
+     * drawn factor is a deterministic point strictly inside the band and strictly above its
+     * lower end, which is all this probe needs to assert.
+     */
+    ids: ['traffic.dayVariation.maxDemandFactor'],
+    buildingId: 'midtown-office',
+    probe: { dayVariation: { minDemandFactor: 1.6, maxDemandFactor: 2.6 } },
+    observe: (config) => planDemand(config, drawDayFor(config)).peakPassengersPerSecond > 1.6 * BASE_MIDTOWN_RATE,
+    expected: true,
+  },
+  {
+    /*
+     * Observed on the template's geometry rather than on the option, for
+     * `traffic.lunchTwoWay.mixAmplitude`'s reason: a resolver that stored the bound and never
+     * shifted anything would pass a read-back. A non-zero bound moves the measurement window off
+     * the 750 s the un-shifted rise-and-fall puts it at, and the shift is signed, so the
+     * assertion is that it moved rather than which way.
+     */
+    ids: ['traffic.dayVariation.peakShiftS'],
+    buildingId: 'midtown-office',
+    probe: { dayVariation: { minDemandFactor: 1, maxDemandFactor: 1, peakShiftS: 200 } },
+    observe: (config) => planDemand(config, drawDayFor(config)).template.reportWindowStartS !== 750,
+    expected: true,
+  },
 ];
+
+/** `midtown-office`'s own peak rate, passengers/second, with no day variation applied. */
+const BASE_MIDTOWN_RATE = (12 / 100) * 1710 / 300;
+
+/**
+ * The day this config's seed draws, taken through the shipped path rather than recomputed.
+ *
+ * `drawDayVariation` is module-private in `generator.ts` — deliberately, since `generateTrace` is
+ * its only caller and an exported draw helper would be a seam nothing calls. So the probe reaches
+ * it the way a run does: generate the trace and read back what the run recorded it drew. That also
+ * makes these three rows assertions about `generateTrace`'s wiring and not only about `planDemand`.
+ */
+function drawDayFor(config: TrafficConfig): ResolvedDayVariation | undefined {
+  return generateTrace(config).dayVariation;
+}
 
 describe('every declared traffic tunable is read from the config surface', () => {
   it('covers every declared id with a probe', () => {

@@ -57,6 +57,7 @@ export type {
   ArrivalEvent,
   BatchSizeCurve,
   CredentialAssignment,
+  DayVariationConfig,
   DemandLevel,
   DemandPhase,
   DemandSource,
@@ -69,6 +70,7 @@ export type {
   InterfloorWeighting,
   PassengerMassOverride,
   PassengerTrace,
+  ResolvedDayVariation,
   ResolvedDemandTemplate,
   TraceLeg,
   TrafficConfig,
@@ -109,8 +111,11 @@ export {
   integratedIntensityS,
   intensityAt,
   lunchTwoWayTemplate,
+  maxPeakShiftS,
+  requirePeakShiftFits,
   resolveDemandTemplate,
   riseAndFallTemplate,
+  shiftTemplatePeak,
   splitAt,
 } from './demandTemplate.js';
 
