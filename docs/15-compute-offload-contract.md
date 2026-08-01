@@ -4,8 +4,31 @@
 
 | Phase | State |
 |---|---|
-| A — self-hosted CI runners | **built, inert, unprovisioned** — see [`infra/README.md`](../infra/README.md) |
-| B — measurement fan-out | designed |
+| A — self-hosted CI runners | **built, inert, and deliberately not provisioned** (2026-07-31, project owner) — see [`infra/README.md`](../infra/README.md) |
+| B — measurement fan-out | designed, not started |
+
+> **Provisioning was declined, and the reason is a finding rather than a change of mind.** § 6's
+> expected cost of ~$5/month assumes **34 runner-hours**, i.e. billing only while a job executes.
+> The template does not do that: `main.bicep` sets `capacity: runnerCount` with **no autoscale
+> resource**, `orchestrationMode: 'Uniform'`, and ephemerality is per-job **reimage rather than
+> deallocation** — the runbook's own verification step confirms the instances sit *"idle"* and
+> running. Two VMs therefore bill 730 hours each, so **≈ $212/month is the expected bill, not the
+> ceiling**, and the $250 figure is a budget *alert* — § 6 says correctly in one paragraph that
+> Azure budgets notify and do not stop spend, then contradicts it in the next.
+>
+> **This is a published number that does not reproduce from the code that produced it**, which is
+> the defect class this repository has a standing rule about. It is not a reason the design is
+> wrong — inertness, the two-OS matrix guard and the x86-64 constraint were all proven by mutation —
+> but it is a reason not to run it yet.
+>
+> **What would make it worth turning on:** `runnerCount: 0` at rest with a manual scale either side
+> of a wave (one parameter, one command), deploy-per-wave with the teardown in `infra/README.md`
+> § 7, or Actions Runner Controller on AKS scaling from zero on queue depth — the only one of the
+> three that genuinely delivers per-job billing.
+>
+> **A criterion this contract should have had, and did not:** criterion 7 requires a *ceiling*
+> declared before the first fan-out. It should also require the **expected** figure to be
+> reproducible from the template, because the ceiling was right and the expectation was not.
 
 **What "built, inert, unprovisioned" means, said precisely, because two of those three words are the
 kind that get rounded up.** The infrastructure exists as code (`infra/azure/`, Bicep, compiles clean
