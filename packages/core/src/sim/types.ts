@@ -61,6 +61,8 @@ import type {
   ResolvedDemandTemplate,
   TrafficModelVersion,
 } from '../traffic/types.js';
+import type { DoorCrowdingConfig } from '../physics/doors/types.js';
+import type { PatienceConfig } from './patience.js';
 
 /* -------------------------------------------------------------------------- *
  * Errors
@@ -483,6 +485,31 @@ export interface SimulationConfig {
   readonly queueSampleCount?: number | undefined;
   readonly doorObstructionProbability?: number | undefined;
   readonly maxEvents?: number | undefined;
+  /**
+   * How long riders will stand at a landing before giving up (docs/14 § 3.1).
+   *
+   * **Absent means nobody ever leaves**, which is every run this repository has produced. Present,
+   * and the run models abandonment — at which point `RunSummary.abandonment` is published beside
+   * AWT and may not be read without it, because abandonment *improves* AWT by construction. See
+   * `sim/patience.ts`.
+   */
+  readonly patience?: PatienceConfig | undefined;
+  /**
+   * How much a crowded landing slows boarding (docs/14 § 3.2).
+   *
+   * **Absent means a lobby's size does not affect how fast it loads**, which is what every run
+   * this repository has published assumed. Present, and per-passenger transfer time rises with
+   * the number of people standing there, bounded — one monotone term on the existing dwell model
+   * (`physics/doors`), not a spatial crowd simulation.
+   *
+   * It is a property of the **building and its demand**, which is why it lives here and not in a
+   * dispatcher profile's `answer` stage: see `DoorConfigOverrides.crowding`.
+   *
+   * **Being a feedback loop, it can destabilise a run that was stable.** Slow boarding lengthens
+   * the queue and a longer queue slows boarding. That is a finding to be read off
+   * `RunSummary.saturation`, not a defect — the detector exists for exactly this.
+   */
+  readonly lobbyCrowding?: DoorCrowdingConfig | undefined;
   /** `throw` (default) or `report`. See {@link SimulationError}. */
   readonly onTimeout?: TimeoutPolicy | undefined;
 }
@@ -621,7 +648,74 @@ export interface ConservationAudit {
    */
   readonly promisesRevoked: number;
 
-  /** `generated === delivered + undelivered && legsCreated === legsRecorded`. */
+  /**
+   * Journeys whose rider **gave up and left** before a car reached them (docs/14 § 3.1).
+   *
+   * **Absent, not `0`, on every run that declares no `sim.patience`** — so a run that did not ask
+   * for abandonment carries the audit object it carried before this field existed, which is what
+   * `traffic/transportIdentity.test.ts` holds the whole `SimulationResult` to. Present and `0`
+   * means the run modelled patience and nobody's ran out, which is a different claim from "the
+   * question was never asked" and is worth being able to tell apart.
+   *
+   * These journeys are neither {@link delivered} nor {@link undelivered}: they are not in the
+   * system, and they did not arrive. The balance is
+   * `generated === delivered + undelivered + abandoned`.
+   *
+   * **It is a published figure, not a diagnostic.** Abandonment removes the longest waits from the
+   * sample, so a configuration that abandons a third of its riders posts a superb AWT — the same
+   * trap `workPerServedLegKJ` sits beside the raw energy figure for (§ D106), on a different axis.
+   * `RunSummary.abandonment` is the window-scoped half that a report shows beside AWT; this is the
+   * whole-run count, and `awtIsValid`'s fifth ground is what stops the mean being quoted at all
+   * once the rate passes its declared threshold.
+   */
+  readonly abandoned?: number;
+  /**
+   * Hall calls **taken back** because everybody who had pressed the button walked away.
+   *
+   * Absent on a run that declares no `sim.patience`, by {@link abandoned}'s rule and for the same
+   * reason. Present and `0` would mean riders left but never emptied a landing.
+   *
+   * It is counted rather than assumed because the withdrawal is a real behaviour with a measured
+   * effect and not an obvious one. Removing it does **not** strand anybody — a car sent to an
+   * empty landing declines to stop and `#reofferCall` clears the call on arrival — so a reader
+   * could reasonably conclude the whole path is redundant. Measured on `midtown-office` under
+   * `nearest-car` at 12 % arrivals with a 60 s mean patience, it is not: withdrawing the call
+   * boards **258** legs against **251**, abandons **437** against **444**, and drives **3 323 m**
+   * against **3 409 m**. The difference is a car released to work that still exists instead of
+   * committed to a landing nobody is standing on.
+   */
+  readonly callsWithdrawn?: number;
+
+  /**
+   * Journeys that **took the stairs** and never joined a lift queue (docs/14 § 3.3).
+   *
+   * Absent — not `0` — on every building that declares no `kind: 'stairs'` mode, which is every
+   * building this repository ships.
+   *
+   * **A published figure, for `abandoned`'s reason and § D106's.** A stairs rider leaves the lift
+   * system entirely: no leg, no hall call, no wait, nothing in `record.passengers`. So the
+   * served-leg count falls, and any comparison across configurations with different stair uptake
+   * **compares different populations**. Without this count that shortfall reads as a building
+   * that got better at serving people, when what happened is that some of them walked.
+   *
+   * Counted in {@link delivered} — they reached their destination — and in
+   * {@link transportHops}, which is the same accounting an escalator hop gets.
+   */
+  readonly stairsJourneys?: number;
+  /**
+   * Seconds those riders spent on the stairs, summed. Absent with {@link stairsJourneys}.
+   *
+   * The **only** observable consequence of `traversalTimeS: { upS, downS }`, and therefore the
+   * thing docs/14 § 5 criterion 2 is checked on for that knob: a stairs rider contributes to no
+   * wait, ride or time-to-destination statistic, so a directional traversal time that moved
+   * nothing else would move this. It is also where the physical asymmetry becomes visible — an
+   * up-peak's stair seconds and a down-peak's differ at the same headcount.
+   */
+  readonly stairsTransitS?: number;
+
+  /**
+   * `generated === delivered + undelivered + (abandoned ?? 0) && legsCreated === legsRecorded`.
+   */
   readonly balanced: boolean;
 }
 

@@ -79,6 +79,14 @@ export type {
  * -------------------------------------------------------------------------- */
 
 export {
+  PATIENCE_DISTRIBUTIONS,
+  PATIENCE_PARAMETERS,
+  drawPatienceSeconds,
+} from './patience.js';
+
+export type { PatienceConfig, PatienceDistribution } from './patience.js';
+
+export {
   SIMULATION_STATUSES,
   SIM_DEFAULTS,
   SIM_PARAMETERS,

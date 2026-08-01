@@ -26,6 +26,7 @@ import {
   DEMAND_LEVELS,
   DEMAND_TEMPLATE_IDS,
   INTERFLOOR_WEIGHTINGS,
+  PATIENCE_DISTRIBUTIONS,
 } from '@elevator-sim/core';
 
 import type {
@@ -35,8 +36,10 @@ import type {
   DemandTemplateId,
   DirectionalSplit,
   DispatchPolicyOptions,
+  DoorCrowdingConfig,
   InterfloorWeighting,
   PassengerMassOverride,
+  PatienceConfig,
   ReportWindow,
   SimulationDemandOptions,
   SummarizeOptions,
@@ -381,6 +384,42 @@ function parseParallel(value: unknown, path: string): ParallelSpec {
   };
 }
 
+/**
+ * A declared patience curve, from a spec file (docs/14 § 3.1).
+ *
+ * Shape only. The *values* are validated by `core`'s `requireValidPatience` at run construction,
+ * which is where the bound that matters lives — a mean of zero abandons everybody at the instant
+ * they arrive. Re-checking it here would be a second opinion about the same number.
+ */
+function parsePatience(value: unknown, path: string): PatienceConfig {
+  const record = asRecord(value, path);
+  rejectUnknown(record, ['distribution', 'meanS', 'spreadS', 'minS'], path);
+  const distribution = asMember(
+    record['distribution'],
+    PATIENCE_DISTRIBUTIONS,
+    `${path}.distribution`,
+  );
+  return {
+    distribution,
+    meanS: asFiniteNumber(record['meanS'], `${path}.meanS`),
+    ...(present(record, 'spreadS')
+      ? { spreadS: asFiniteNumber(record['spreadS'], `${path}.spreadS`) }
+      : {}),
+    ...(present(record, 'minS') ? { minS: asFiniteNumber(record['minS'], `${path}.minS`) } : {}),
+  };
+}
+
+/** A declared lobby-crowding term, from a spec file (docs/14 § 3.2). See {@link parsePatience}. */
+function parseLobbyCrowding(value: unknown, path: string): DoorCrowdingConfig {
+  const record = asRecord(value, path);
+  rejectUnknown(record, ['thresholdPersons', 'factorPerPerson', 'maxFactor'], path);
+  return {
+    thresholdPersons: asFiniteNumber(record['thresholdPersons'], `${path}.thresholdPersons`),
+    factorPerPerson: asFiniteNumber(record['factorPerPerson'], `${path}.factorPerPerson`),
+    maxFactor: asFiniteNumber(record['maxFactor'], `${path}.maxFactor`),
+  };
+}
+
 function parseSimulationOverrides(value: unknown, path: string): SimulationOverridesSpec {
   const record = asRecord(value, path);
   const numeric = [
@@ -391,13 +430,19 @@ function parseSimulationOverrides(value: unknown, path: string): SimulationOverr
     'doorObstructionProbability',
     'maxEvents',
   ] as const;
-  rejectUnknown(record, ['onTimeout', ...numeric, 'summarize'], path);
+  rejectUnknown(record, ['onTimeout', ...numeric, 'patience', 'lobbyCrowding', 'summarize'], path);
   const out: Record<string, unknown> = {};
   if (present(record, 'onTimeout')) {
     out['onTimeout'] = asMember(record['onTimeout'], ['throw', 'report'] as const, `${path}.onTimeout`);
   }
   for (const key of numeric) {
     if (present(record, key)) out[key] = asFiniteNumber(record[key], `${path}.${key}`);
+  }
+  if (present(record, 'patience')) {
+    out['patience'] = parsePatience(record['patience'], `${path}.patience`);
+  }
+  if (present(record, 'lobbyCrowding')) {
+    out['lobbyCrowding'] = parseLobbyCrowding(record['lobbyCrowding'], `${path}.lobbyCrowding`);
   }
   if (present(record, 'summarize')) {
     const summarize = asRecord(record['summarize'], `${path}.summarize`);
@@ -669,6 +714,13 @@ export function planExperiment(
             ? {}
             : { doorObstructionProbability: overrides.doorObstructionProbability }),
           ...(overrides.maxEvents === undefined ? {} : { maxEvents: overrides.maxEvents }),
+          // docs/14 § 3.1 and § 3.2. Spread-or-omit, so a spec that names neither builds the
+          // `SimulationConfig` it built before they existed — which is what keeps every pinned
+          // figure in `benchmark/published.ts` reproducing.
+          ...(overrides.patience === undefined ? {} : { patience: overrides.patience }),
+          ...(overrides.lobbyCrowding === undefined
+            ? {}
+            : { lobbyCrowding: overrides.lobbyCrowding }),
           ...(overrides.summarize === undefined ? {} : { summarize: overrides.summarize }),
           metadata: Object.freeze({
             experimentId: spec.id,

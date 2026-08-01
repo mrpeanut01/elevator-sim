@@ -268,6 +268,78 @@ describe('RUNNER_PARAMETERS', () => {
  * Planning
  * -------------------------------------------------------------------------- */
 
+/**
+ * **The non-test caller docs/14 § 5 criterion 6 requires, and the whole reason these two fields
+ * exist here.**
+ *
+ * `SimulationConfig.patience` and `SimulationConfig.lobbyCrowding` were, on landing, configurable,
+ * unit-tested in isolation and set by **nothing** in `cli/`, `viz/` or `experiments/` — verbatim
+ * the shape `docs/05` § *Standing requirement* names, in the wave whose governing rule is that a
+ * control failing it is deleted rather than documented. The comparator invoked for them at the
+ * time, `doorObstructionProbability`, does not hold: that field *is* driven from shipped paths, as
+ * a `SimulationOverridesSpec` field here and from `fuzz/generate.ts`.
+ *
+ * This is the fix, and this suite is what stops it silently regressing: a spec file names them,
+ * `parseExperimentSpec` accepts them, and `planExperiment` puts them on the `SimulationConfig`
+ * every replication is run from. Delete either line in `experiment.ts` and this goes red.
+ */
+describe('the passenger-behaviour overrides reach a planned cell', () => {
+  it('parses from a spec file and lands on every cell', () => {
+    const spec = parseExperimentSpec({
+      ...VALID_JSON,
+      simulation: {
+        onTimeout: 'report',
+        patience: { distribution: 'uniform', meanS: 90, spreadS: 30, minS: 5 },
+        lobbyCrowding: { thresholdPersons: 6, factorPerPerson: 0.07, maxFactor: 2.5 },
+      },
+    });
+    expect(spec.simulation?.patience?.meanS).toBe(90);
+
+    const plan = planExperiment(
+      { ...spec, buildings: ['midtown-office'], dispatchers: ['collective'], traffic: [MIDTOWN_UP_PEAK] },
+      config,
+    );
+    expect(plan.cells.length).toBeGreaterThan(0);
+    for (const cell of plan.cells) {
+      expect(cell.simulation.patience).toEqual({
+        distribution: 'uniform',
+        meanS: 90,
+        spreadS: 30,
+        minS: 5,
+      });
+      expect(cell.simulation.lobbyCrowding).toEqual({
+        thresholdPersons: 6,
+        factorPerPerson: 0.07,
+        maxFactor: 2.5,
+      });
+    }
+  });
+
+  /* Absent is absent: a spec naming neither builds the config it built before they existed. */
+  it('puts no key on a cell whose spec names neither', () => {
+    const plan = planExperiment(specOf({ id: 'quiet' }), config);
+    for (const cell of plan.cells) {
+      expect(Object.keys(cell.simulation)).not.toContain('patience');
+      expect(Object.keys(cell.simulation)).not.toContain('lobbyCrowding');
+    }
+  });
+
+  it('refuses a curve it does not recognise rather than dropping it', () => {
+    expect(() =>
+      parseExperimentSpec({
+        ...VALID_JSON,
+        simulation: { patience: { distribution: 'poisson', meanS: 30 } },
+      }),
+    ).toThrow(/distribution/);
+    expect(() =>
+      parseExperimentSpec({
+        ...VALID_JSON,
+        simulation: { patience: { distribution: 'exponential', meanS: 30, reach: 4 } },
+      }),
+    ).toThrow(/reach/);
+  });
+});
+
 describe('planExperiment', () => {
   it('expands the cross product with the dispatcher innermost', () => {
     const plan = planExperiment(

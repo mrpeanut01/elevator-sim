@@ -101,7 +101,16 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
 'metrics/METRICS_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
 'car/CAR_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
 'doors/DOOR_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
+// Its own table rather than three more `answer.*` rows, because the ids are `sim.*` on purpose:
+// how crowded a lobby gets is a property of the building and its demand, and a dispatcher that
+// could author it could tune away the cost of the queues it produces.
+'doors/CROWDING_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
 'sim/SIM_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
+// Its own schema rather than four more rows on `SIM_PARAMETERS`, because that table's ids are
+// flat `sim.<key>` names bound one-for-one to `SIM_DEFAULTS`, and a patience curve has no scalar
+// default — the absent block *is* the default. Discovered by `experiments`' parameter-schema
+// walk exactly as the ten schemas above are, by the `_PARAMETERS` suffix.
+'sim/PATIENCE_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
 'traffic/TRAFFIC_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
 
 // -- Geometry and state accessors. Each reads a value object the run already has.
@@ -115,10 +124,11 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
 'traffic/inReportWindow': 'reads a template and an instant',
 
 // -- Documented constants. `CLOSED_FORM_*` are the Barney/CIBSE assumptions and the comparison rule
-// the oracle is judged by; `AWT_INVALID_GROUNDS` is the four-ground list § D108 fixed.
+// the oracle is judged by; `AWT_INVALID_GROUNDS` is the suppression-ground list § D108 fixed at
+// four and docs/14 § 3.1 widened to five.
 'analytical/CLOSED_FORM_ASSUMPTIONS': 'the oracle contract, quoted by docs and asserted by tests',
 'analytical/CLOSED_FORM_COMPARISON_RULE': 'the oracle contract, quoted by docs and asserted by tests',
-'metrics/AWT_INVALID_GROUNDS': 'the four suppression grounds; consumed as a set by guards',
+'metrics/AWT_INVALID_GROUNDS': 'the suppression grounds; consumed as a set by guards',
 
   // -- Stage 5 result accessors. The monitor returns a CapacityReassignmentResult; these read it.
   // The simulation counts crossings/migrations/held itself off the same result, so it needs none

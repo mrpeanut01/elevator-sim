@@ -459,10 +459,33 @@ export function printRunReport(out: Output, plan: RunPlan, result: SimulationRes
   );
 
   heading(out, 'Passengers');
+  /*
+   * **The whole balance, or the reader is handed three numbers that do not add up.**
+   *
+   * `generated === delivered + undelivered` was the identity for the life of this line. It is now
+   * `generated === delivered + undelivered + abandoned` (docs/14 § 3.1), and the two extra terms
+   * are printed **only when they are non-zero** — which is every run that declares no
+   * `sim.patience` and no stair, so the line is byte-identical on everything this repository has
+   * published. A run where riders walked out and the line still said three numbers would be a
+   * subtraction the reader would do and get wrong.
+   *
+   * Stairs riders are inside `delivered` — they reached their destination — and are called out
+   * beside it because they reached it **without a lift**, so every per-leg figure above describes
+   * a smaller population than `delivered` suggests (docs/14 § 5 criterion 4).
+   */
+  const { abandoned, stairsJourneys } = result.conservation;
   field(
     out,
     'whole run',
-    `${count(result.conservation.generated)} generated · ${count(result.conservation.delivered)} delivered · ${count(result.conservation.undelivered)} undelivered`,
+    [
+      `${count(result.conservation.generated)} generated`,
+      `${count(result.conservation.delivered)} delivered`,
+      `${count(result.conservation.undelivered)} undelivered`,
+      ...(abandoned === undefined || abandoned === 0 ? [] : [`${count(abandoned)} gave up`]),
+      ...(stairsJourneys === undefined || stairsJourneys === 0
+        ? []
+        : [`${count(stairsJourneys)} took the stairs`]),
+    ].join(' · '),
     24,
   );
   field(

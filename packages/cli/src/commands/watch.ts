@@ -640,9 +640,14 @@ function playPlain(
   }
   queues.advanceTo(endS);
   out.line();
+  // The two behavioural terms are appended only when non-zero, so this line is byte-identical on
+  // every run that declares neither — and never states a delivery rate a reader would misread as
+  // the whole story. See `run.ts`'s longer note on the same identity.
+  const gaveUp = result.conservation.abandoned ?? 0;
+  const walked = result.conservation.stairsJourneys ?? 0;
   out.line(
     dim(
-      `  ${count(result.conservation.generated)} passengers generated, ${count(result.conservation.delivered)} delivered.`,
+      `  ${count(result.conservation.generated)} passengers generated, ${count(result.conservation.delivered)} delivered${gaveUp === 0 ? '' : `, ${count(gaveUp)} gave up`}${walked === 0 ? '' : `, ${count(walked)} took the stairs`}.`,
     ),
   );
 }

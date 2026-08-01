@@ -54,7 +54,9 @@ import type {
   DispatchPolicyOptions,
   DispatcherProfile,
   DispatcherProfiles,
+  DoorCrowdingConfig,
   ElevatorSpecs,
+  PatienceConfig,
   ResolvedBuilding,
   RunRecord,
   RunSummary,
@@ -421,6 +423,33 @@ export interface SimulationOverridesSpec {
   readonly queueSampleCount?: number | undefined;
   readonly doorObstructionProbability?: number | undefined;
   readonly maxEvents?: number | undefined;
+  /**
+   * How long riders will stand at a landing before giving up (docs/14 § 3.1).
+   *
+   * **This field is what makes patience a behaviour rather than an accessor.** Declared here for
+   * the reason `doorObstructionProbability` is: a passenger-model term nothing in a shipped path
+   * can vary is the dead seam `docs/05` § *Standing requirement* names, and the seam test one
+   * package over does not count — *"name the non-test caller"*. This is it, and it is the one
+   * `elevator-sim compare` reads out of a spec file.
+   *
+   * Absent means nobody abandons, which is every experiment in `benchmark/` and every pinned
+   * figure. An experiment that sets it must read `summary.abandonment` beside AWT, because
+   * abandonment improves the mean by construction (§ D106's rule, one axis over).
+   */
+  readonly patience?: PatienceConfig | undefined;
+  /**
+   * How much a crowded landing slows boarding (docs/14 § 3.2). Absent means it does not.
+   *
+   * Here for {@link patience}'s reason. It is deliberately **not** authorable in a dispatcher
+   * profile — a dispatcher that could tune the cost of the queues it produces could tune away its
+   * own cost — so an experiment spec is the right place for it and the only one.
+   *
+   * **It is a feedback loop and can destabilise a run that was stable**: measured, four of nine
+   * arrival rates in [6.1, 6.9] % on `midtown-office`/`eta` flip `stable` to `diverging-queue`.
+   * A sweep that sets it must read `summary.saturation` per cell rather than assuming the arm is
+   * comparable with its control.
+   */
+  readonly lobbyCrowding?: DoorCrowdingConfig | undefined;
   /** Extra summary options. The window comes from the traffic arm. */
   readonly summarize?: Omit<SummarizeOptions, 'window'> | undefined;
 }

@@ -199,6 +199,23 @@ function canonicalize(value: unknown): unknown {
  * | `reportWindow`, `summarize` | **no** | post-hoc windowing of an already-generated run |
  * | `transferWalkS`, `drainGraceS`, `maxEvents`, `onTimeout` | **no** | run-loop mechanics |
  * | `doorObstructionProbability` | **no** | draws from `doorObstruction`, not from the trace streams |
+ * | `patience` | **no** | draws from `patience`, its own stream, **after** the trace is generated |
+ * | `lobbyCrowding` | **no** | a term on the dwell; it draws nothing at all |
+ *
+ * **The two new omissions are worth reading twice, because one of them is a trap.**
+ * `patience` draws from a *demand-side* stream (`TRAFFIC_STREAM_NAMES`), which makes it look like
+ * it belongs in the key. It does not: the trace is generated in full before the patience table is
+ * drawn, and the draws come from a separate stream, so they cannot displace a single arrival
+ * instant. Two cells differing only in patience see **exactly the same passengers**, which is
+ * precisely the pairing common random numbers exists to give.
+ *
+ * What they do *not* see is the same **served population** — a rider who gives up in one arm and
+ * boards in the other is one passenger in two states, and every window statistic is then taken
+ * over two different cohorts. That is a comparability question rather than a trace question, and
+ * it is answered where comparability is answered: `RunSummary.abandonment` beside the mean, and
+ * `awtIsValid`'s fifth ground refusing the mean outright past the declared rate. Putting patience
+ * in the trace key would not have helped and would have destroyed the pairing that makes the
+ * comparison possible at all.
  *
  * The building is keyed by **id** rather than by content, which is safe here because
  * {@link ExperimentResources} is experiment-wide: every cell resolves an id through the same map,

@@ -249,6 +249,36 @@ describe('traceKeyOf', () => {
     ).cells[0];
     expect(traceKeyOf(plain!.simulation)).toBe(traceKeyOf(tweaked!.simulation));
   });
+
+  /**
+   * **Patience and lobby crowding are outside the trace key, and patience is the one that looks
+   * like it should not be** (docs/14 §§ 3.1–3.2).
+   *
+   * `patience` draws from a *demand-side* stream, so a reader could reasonably expect it in the
+   * key. The trace is generated in full before the patience table is drawn and the draws come
+   * from a separate stream, so they displace no arrival instant: two cells differing only in
+   * patience see exactly the same passengers, which is the pairing CRN exists to give. What they
+   * do not share is the *served* population, and that is answered by `summary.abandonment` and
+   * `awtIsValid`'s fifth ground rather than by refusing to pair them.
+   */
+  it('does not react to patience or lobby crowding', () => {
+    const base = specOf({ id: 'behaviour' });
+    const plain = planExperiment(base, config).cells[0];
+    const tweaked = planExperiment(
+      {
+        ...base,
+        simulation: {
+          patience: { distribution: 'exponential', meanS: 45 },
+          lobbyCrowding: { thresholdPersons: 4, factorPerPerson: 0.08, maxFactor: 3 },
+        },
+      },
+      config,
+    ).cells[0];
+    expect(traceKeyOf(plain!.simulation)).toBe(traceKeyOf(tweaked!.simulation));
+    // …and they really did reach the cell, or the line above is true for the wrong reason.
+    expect(tweaked?.simulation.patience?.meanS).toBe(45);
+    expect(tweaked?.simulation.lobbyCrowding?.maxFactor).toBe(3);
+  });
 });
 
 describe('crnCohortsOf', () => {

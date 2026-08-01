@@ -1,5 +1,5 @@
 /**
- * The eight things that can happen in a run, as kernel events.
+ * The nine things that can happen in a run, as kernel events.
  *
  * The whole simulation is these and nothing else. There is no tick, no polling loop and no
  * "advance by dt": the clock jumps from one of these to the next, which is what makes a
@@ -16,6 +16,7 @@
  * | `sim.carDoor` | the door's next automatic transition is due | runs the door forward; transfers passengers when it reaches open |
  * | `sim.queueSample` | a sample point on the demand horizon | records the building-wide queue length |
  * | `sim.serviceChange` | a `serviceEvents` entry's time comes | changes a car's service mode and re-offers whatever it had to drop |
+ * | `sim.abandonment` | a waiting leg's drawn patience runs out | the rider leaves the landing, and the call goes with them if nobody else holds it |
  *
  * ## Why the payloads are ids and not objects
  *
@@ -50,6 +51,7 @@ export const SIM_EVENT_TYPES = Object.freeze({
   carDoor: 'sim.carDoor',
   queueSample: 'sim.queueSample',
   serviceChange: 'sim.serviceChange',
+  abandonment: 'sim.abandonment',
 } as const);
 
 export type SimEventType = (typeof SIM_EVENT_TYPES)[keyof typeof SIM_EVENT_TYPES];
@@ -132,6 +134,19 @@ export interface ServiceChangePayload {
   readonly index: number;
 }
 
+/**
+ * A waiting leg's patience running out (docs/14 § 3.1).
+ *
+ * Names the **leg** by id rather than carrying the `Passenger`, for the reason at the head of
+ * this module: between scheduling and firing the rider may have boarded, alighted, or had their
+ * whole journey end, and a payload holding the object would describe a landing they left minutes
+ * ago. The handler looks the leg up and does nothing at all unless it is still standing there.
+ */
+export interface AbandonmentPayload {
+  /** Id of the waiting leg whose patience has expired. */
+  readonly legId: string;
+}
+
 /* -------------------------------------------------------------------------- *
  * Constructors
  * -------------------------------------------------------------------------- */
@@ -210,4 +225,19 @@ export function serviceChangeEvent(
   handler: EventHandler<ServiceChangePayload>,
 ): SimEvent<ServiceChangePayload> {
   return createEvent(SIM_EVENT_TYPES.serviceChange, payload, handler);
+}
+
+/**
+ * A waiting rider's patience running out, so they leave (docs/14 § 3.1).
+ *
+ * Scheduled at `admit` time from a value drawn **before the run started**, in trace order, so
+ * that who gives up is a property of the crowd rather than of the dispatcher — see
+ * `sim/patience.ts` for why the draw cannot be taken here. Never scheduled at all on a run that
+ * declares no `sim.patience`, which is every run this repository has published.
+ */
+export function abandonmentEvent(
+  payload: AbandonmentPayload,
+  handler: EventHandler<AbandonmentPayload>,
+): SimEvent<AbandonmentPayload> {
+  return createEvent(SIM_EVENT_TYPES.abandonment, payload, handler);
 }
