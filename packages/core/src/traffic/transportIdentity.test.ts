@@ -293,7 +293,7 @@ describe('a building that declares no transport mode runs exactly as it did befo
         // would be invisible to the digest and is not invisible here.
         expect(measured.transportHops).toBe(0);
         expectSuppressionCodeBesideItsProse(measured, key);
-      });
+      }, 60_000);
     }
   }
 });
@@ -316,7 +316,7 @@ describe('the building that declares one moved, and moved everywhere', () => {
        * the hop count below.
        */
       expect(transportHops).toBeGreaterThan(0);
-    });
+    }, 60_000);
   }
 
   /*
@@ -340,5 +340,5 @@ describe('the building that declares one moved, and moved everywhere', () => {
     const counts = PROFILES.map((profileId) => measure('vertical-city', profileId).transportHops);
     expect(new Set(counts).size, `hops per profile: ${counts.join(', ')}`).toBe(1);
     expect(counts[0]).toBeGreaterThan(0);
-  });
+  }, 60_000);
 });

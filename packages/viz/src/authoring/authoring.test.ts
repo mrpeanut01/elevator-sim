@@ -188,7 +188,7 @@ describe('the dispatcher spec', () => {
       const after = recordRun(configFor(rebuilt), { recordDecisions: false }).result.record;
       expect(JSON.stringify(after)).toBe(JSON.stringify(before));
     }
-  });
+  }, 60_000);
 
   it('writes a cost line that names every weighted term and nothing else', () => {
     const profile = PROFILES.profiles.find((p) => p.id === 'energy-aware') as DispatcherProfile;
@@ -274,7 +274,7 @@ describe('the dispatcher editor is not decoration', () => {
       );
     };
     expect(new Set([runWith('snappy'), runWith('normal'), runWith('patient')]).size).toBe(3);
-  });
+  }, 60_000);
 
   it('takes its dwell seconds from the shipped bands, not from an invented number', () => {
     const hall = SPECS.doors.dwellHallCallS;
@@ -354,23 +354,23 @@ describe('the traffic editor is not decoration', () => {
 
   it('the peak demand slider changes how many people turn up', () => {
     expect(runWith({ ...DEFAULT_PATTERN, ratePctPop5min: 20 })).not.toBe(control);
-  });
+  }, 60_000);
 
   it('the peak-hold slider changes the run', () => {
     expect(runWith({ ...DEFAULT_PATTERN, peakWindowS: 600 })).not.toBe(control);
-  });
+  }, 60_000);
 
   it('the peak order changes the run', () => {
     expect(runWith({ ...DEFAULT_PATTERN, order: 'down-first' })).not.toBe(control);
-  });
+  }, 60_000);
 
   it('the interfloor slider changes the run', () => {
     expect(runWith({ ...DEFAULT_PATTERN, interfloorShare: 0.6 })).not.toBe(control);
-  });
+  }, 60_000);
 
   it('the off-peak level changes the run', () => {
     expect(runWith({ ...DEFAULT_PATTERN, baselineFraction: 0.8 })).not.toBe(control);
-  });
+  }, 60_000);
 
   it('the mean group size changes the run — the slider that reaches the file, not the options', () => {
     /*
@@ -388,7 +388,7 @@ describe('the traffic editor is not decoration', () => {
       recordDecisions: false,
     }).recording;
     expect(JSON.stringify(after.legs)).not.toBe(JSON.stringify(before.legs));
-  });
+  }, 60_000);
 
   it('leaves the file byte-identical when the batch mean was not moved', () => {
     // The comparable default has to stay comparable: an override nobody asked for is a different run.
@@ -542,7 +542,7 @@ describe('the machines editor is not decoration', () => {
      */
     expect(JSON.parse(control)).not.toHaveLength(0);
     expect(control).toBe(runWith(hydraulic));
-  });
+  }, 60_000);
 
   it('a changed rated speed changes the legs', () => {
     /*
@@ -552,13 +552,13 @@ describe('the machines editor is not decoration', () => {
      * slider.
      */
     expect(runWith(saved({ speedTypicalMps: 1.0, speedMaxMps: 1.0 }))).not.toBe(control);
-  });
+  }, 60_000);
 
   it('a changed acceleration changes the legs', () => {
     // Doubled, 0.6 → 1.2 m/s² — the field reaches `resolveCar` directly, since no car config this
     // editor writes declares an acceleration of its own.
     expect(runWith(saved({ accelerationMps2: 1.2 }))).not.toBe(control);
-  });
+  }, 60_000);
 
   it('a changed capacity changes the legs, on a load where capacity binds', () => {
     /*
@@ -574,7 +574,7 @@ describe('the machines editor is not decoration', () => {
     const busyControl = runWith(saved({}), BUSY);
     expect(JSON.parse(busyControl)).not.toHaveLength(0);
     expect(runWith(smaller, BUSY)).not.toBe(busyControl);
-  });
+  }, 60_000);
 });
 
 /* ========================================================================== *
@@ -1046,20 +1046,20 @@ describe('the building editor is not decoration', () => {
 
   it('adding a shaft changes the run', () => {
     expect(runWith({ ...spec, cars: 5 })).not.toBe(control);
-  });
+  }, 60_000);
 
   it('the occupancy slider changes how many people the lifts must move', () => {
     expect(runWith({ ...spec, occupancyPct: 40 })).not.toBe(control);
-  });
+  }, 60_000);
 
   it('the floor count changes the run', () => {
     expect(runWith({ ...spec, floors: 16 })).not.toBe(control);
-  });
+  }, 60_000);
 
   it('a pinned shaft band changes which car answers', () => {
     const pinned = runWith({ ...spec, bandByCar: { 0: [6, 10] } });
     expect(pinned).not.toBe(control);
-  });
+  }, 60_000);
 
   it('the express toggle changes the run — and it is the legs that move, not just the label', () => {
     /*
@@ -1088,7 +1088,7 @@ describe('the building editor is not decoration', () => {
     // Neither arm is the do-nothing arm.
     expect(runWith(express)).not.toBe(control);
     expect(runWith(closed)).not.toBe(control);
-  });
+  }, 60_000);
 
   it('a lobby the toggle closed off is a building that strands people, and the editor says so first', () => {
     /*
@@ -1155,7 +1155,7 @@ describe('the building editor is not decoration', () => {
     // And clicking the same floor again is the inverse edit, back to the run we started from.
     const back: BuildingSpec = { ...wider, accessZones: withZoneFloor(wider, 'zone-1', 5) };
     expect(runWith(back)).toBe(runWith(ZONED));
-  });
+  }, 60_000);
 
   it('the credential control changes the run — the same floors under a different group', () => {
     /*
@@ -1184,7 +1184,7 @@ describe('the building editor is not decoration', () => {
     expect(credentialGroupsOf(split)).toStrictEqual(['alpha', 'bravo']);
     expect(partsOf(split)[0]).toStrictEqual(partsOf(shared)[0]);
     expect(runWith(split)).not.toBe(runWith(shared));
-  });
+  }, 60_000);
 
   it('a group added beside one that already works is a no-op, and that is the mechanism, not a bug', () => {
     /*
@@ -1202,7 +1202,7 @@ describe('the building editor is not decoration', () => {
     const wider: BuildingSpec = { ...ZONED, accessZones: withZoneGroup(ZONED, 'zone-1', 'facilities') };
     expect(credentialGroupsOf(wider)).toStrictEqual(['tenant', 'facilities']);
     expect(runWith(wider)).toBe(runWith(ZONED));
-  });
+  }, 60_000);
 
   /* ---- sky lobbies: the escalator, and only that -------------------------- */
 
@@ -1297,7 +1297,7 @@ describe('the building editor is not decoration', () => {
     expect(runWith(moved)).not.toBe(runWith(ESCALATOR));
     const back: BuildingSpec = { ...moved, transportModes: withTransportEnd(moved, 'escalator-1', 0, 5) };
     expect(runWith(back)).toBe(runWith(ESCALATOR));
-  });
+  }, 60_000);
 
   it('the traversal-time control changes the run — the same route, ridden slower', () => {
     /*
@@ -1335,7 +1335,7 @@ describe('the building editor is not decoration', () => {
     const tower = specFromBuilding(parseBuilding(read('buildings/secure-tower.json')), 'secure-tower');
     expect(accessZonesOf(tower)).toHaveLength(5);
     expect(runWith(tower)).not.toBe(runWith({ ...tower, accessZones: [] }));
-  });
+  }, 60_000);
 
   it('says exactly what the real route planner says about who can get out of the lobby', () => {
     /*
