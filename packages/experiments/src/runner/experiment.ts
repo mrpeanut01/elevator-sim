@@ -152,6 +152,12 @@ const DEMAND_KEYS = [
   'maxLegs',
   'peakWindowS',
   'baselineFraction',
+  // `mixAmplitude` was live on the demand surface and unreachable from a spec; the two below are
+  // docs/14 §§ 2.1-2.2. A knob `rejectUnknown` refuses here is a knob no experiment can sweep,
+  // which is the quieter half of the same drift `crn.ts` records.
+  'mixAmplitude',
+  'batchSize',
+  'passengerMass',
 ] as const;
 
 function parseDirectionalSplit(value: unknown, path: string): DirectionalSplit {

@@ -160,6 +160,10 @@ describe('traffic tunables declare their schema', () => {
     const nullDefaults = TRAFFIC_PARAMETERS.filter((parameter) => parameter.default === null).map(
       (parameter) => parameter.id,
     );
+    // Pinned as a count as well as a set, because `TRAFFIC_PARAMETERS`' own docstring quotes this
+    // number in prose and said "two" while four were declared. A sentence nothing checks goes
+    // stale; this is what makes the next edit to it fail rather than drift.
+    expect(nullDefaults.length).toBe(12);
     expect(new Set(nullDefaults)).toEqual(
       new Set([
         'traffic.arrivalRatePctPop5min',

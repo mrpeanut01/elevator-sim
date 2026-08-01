@@ -45,7 +45,7 @@ import { load } from '../sim/fixtures.test-helper.js';
 import { runSimulation } from '../sim/simulation.js';
 import type { SimulationDemandOptions, SimulationResult } from '../sim/types.js';
 
-import { planDemand } from './generator.js';
+import { generateTrace, planDemand } from './generator.js';
 
 const SEED = 20_260_731;
 const BUILDING_ID = 'midtown-office';
@@ -190,6 +190,50 @@ describe('the traffic-variance controls reach a run', () => {
     expect(plan.passengerMass.maxKg).toBeUndefined();
   }, TIMEOUT_MS);
 
+  /**
+   * **The other half of the same hole: what an absent `maxKg` is allowed to mean.**
+   *
+   * The guard above pins the resolved *block*. It does not pin what the samplers do with a block
+   * whose upper bound is absent — and adversarial review showed that mattered: moving the invented
+   * bound one line down, from `resolvePassengerMass` into `drawMass`'s
+   * `config.maxKg ?? Number.POSITIVE_INFINITY`, passed all 686 tests in `traffic`, `config` and
+   * `model`. The identified hole had been narrowed, not closed.
+   *
+   * Closed here, and deliberately **not** by sampling the shipped 75/15 block and hoping for a
+   * heavy passenger — `normal(75, 15)` clears 140 kg about seven times in a million, so that test
+   * would be a coin toss dressed as an assertion. Instead the distribution is placed where any
+   * finite invented bound must show: a population at 5 000 kg with a spread of 1. Nobody weighs
+   * that, which is the point — it is a probe of the *semantics of an absent bound*, not of a
+   * plausible building. Under `?? Number.POSITIVE_INFINITY` every draw is ~5 000; under any
+   * invented ceiling every draw is that ceiling.
+   *
+   * Both samplers are checked, because the clamping rule is deliberately duplicated across them.
+   */
+  it('treats an absent upper bound as unbounded, in both samplers', async () => {
+    const UNBOUNDED = { distribution: 'normal', meanKg: 5000, stdDevKg: 1, minKg: 1 } as const;
+    const config = await load();
+    const building = config.buildingsById.get(BUILDING_ID);
+    if (building === undefined) throw new Error('fixtures');
+
+    // `traffic/generator.ts`'s `drawMass`, reached the only way an absent `maxKg` can be: through
+    // the profiles block, since the run-level override requires both bounds.
+    const trace = generateTrace({
+      building,
+      profiles: { ...config.trafficProfiles, passengerMass: UNBOUNDED },
+      streams: new StreamSet(SEED),
+    });
+    expect(trace.passengers.length).toBeGreaterThan(0);
+    for (const passenger of trace.passengers) {
+      expect(passenger.massKg).toBeGreaterThan(4900);
+    }
+
+    // `model/passenger.ts`'s `drawPassengerMass`, which carries the same `?? POSITIVE_INFINITY`.
+    const stream = new StreamSet(SEED).passengerMass;
+    for (let i = 0; i < 200; i += 1) {
+      expect(drawPassengerMass(stream, UNBOUNDED)).toBeGreaterThan(4900);
+    }
+  }, TIMEOUT_MS);
+
   /* ---------------------------------------------------------------------- *
    * § 2.2 — the group-size curve
    * ---------------------------------------------------------------------- */
@@ -266,6 +310,28 @@ describe('the traffic-variance controls reach a run', () => {
     expect(new Set(fours.trace.sources.map((source) => source.meanBatchSize))).toEqual(new Set([4]));
     expect(new Set(base.trace.sources.map((source) => source.meanBatchSize))).toEqual(new Set([1.4]));
 
+    /*
+     * **And the rate is checked against the mean, not merely beside it.**
+     *
+     * The assertion above reads `meanBatchSize`, which is what a source *reports*.
+     * `peakBatchesPerSecond` is what it is actually sampled at, and the two used to be two
+     * expressions — so a rate left on the profile's own mean passed the reported-mean check
+     * completely and survived on a 1.7 % margin in the ratio bands below. Adversarial review
+     * found that; this is the assertion that closes it.
+     *
+     * `batchesPerSecond` is defined as `passengerRate / E[B]`, so `batches · E[B] === passengers`
+     * is an identity every source must satisfy whatever curve it is running. A rate computed from
+     * a different mean than the one reported breaks it by exactly the ratio of the two.
+     */
+    for (const result of [base, fours]) {
+      for (const source of result.trace.sources) {
+        expect(
+          source.peakBatchesPerSecond * source.meanBatchSize,
+          `${source.id}: batch rate must divide the passenger rate by the mean it reports`,
+        ).toBeCloseTo(source.peakPassengersPerSecond, 12);
+      }
+    }
+
     expect(fours.trace.expectedPassengers).toBeCloseTo(base.trace.expectedPassengers, 6);
     expect(fours.trace.passengerCount / base.trace.passengerCount).toBeGreaterThan(0.85);
     expect(fours.trace.passengerCount / base.trace.passengerCount).toBeLessThan(1.15);
@@ -292,8 +358,14 @@ describe('the traffic-variance controls reach a run', () => {
    * The mechanism is then named and measured. `Simulation.#boardFrom` boards while
    * `loadSensor.massKg < designLoadKg` and applies **no head-count clause at all**, so the ceiling
    * a car hits is a mass and the number of people that reaches it falls as the population gets
-   * heavier. `capacityPersons` — the count axis — is a property of the car and does not move,
-   * which is what makes "it starts binding on a different axis" falsifiable rather than decorative.
+   * heavier.
+   *
+   * An earlier version of this docstring added *"`capacityPersons` — the count axis — does not
+   * move"*. Nothing below asserted it, and adversarial review was right to call it: the cars are
+   * the same `ResolvedCar` objects in both arms, so asserting it would have been true by identity
+   * and worth nothing. The claim is dropped rather than dressed up. What **is** measured is the
+   * pair below — peak occupants down, and both arms still crossing the design-load line — which
+   * is the whole of what "it binds on mass, not on headcount" can be shown to mean here.
    */
   it('makes a heavier population fill cars by weight, without changing who turned up', async () => {
     const light = await run();
@@ -309,9 +381,21 @@ describe('the traffic-variance controls reach a run', () => {
 
     // The mechanism, on the load cell's own samples.
     expect(peakOccupants(heavy)).toBeLessThan(peakOccupants(light));
-    // Both arms still fill to the same *mass* ceiling: it is the count that moved, not the rule.
+
+    /*
+     * Both arms cross the same design-load **line** — 0.8 of rated — which is the rule that did
+     * not move. They do **not** land on the same load factor, and an earlier comment here said
+     * they did: measured, `light` peaks at 0.877 and `heavy` at 0.919.
+     *
+     * The gap is not noise, it is the boarding rule. `#boardFrom` stops *after* somebody steps in
+     * — its own docstring calls crossing by one person deliberate, because that is what a real car
+     * does — so the overshoot past 0.8 is the mass of whoever boarded last. A heavier population
+     * overshoots further, necessarily. Asserted in that direction rather than pinned to the two
+     * measured numbers, which would be a pin on this seed rather than on the mechanism.
+     */
     expect(peakLoadFactor(heavy)).toBeGreaterThan(0.8);
     expect(peakLoadFactor(light)).toBeGreaterThan(0.8);
+    expect(peakLoadFactor(heavy)).toBeGreaterThan(peakLoadFactor(light));
   }, TIMEOUT_MS);
 
   /**

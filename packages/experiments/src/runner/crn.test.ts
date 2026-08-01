@@ -1,7 +1,12 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { Simulation } from '@elevator-sim/core';
-import type { GeneratedPassenger, LoadedConfig, PassengerTrace } from '@elevator-sim/core';
+import type {
+  GeneratedPassenger,
+  LoadedConfig,
+  PassengerTrace,
+  SimulationDemandOptions,
+} from '@elevator-sim/core';
 
 import {
   assertCrnAligned,
@@ -168,6 +173,70 @@ describe('traceKeyOf', () => {
       config,
     ).cells;
     expect(a?.traceKey).toBe(b?.traceKey);
+  });
+
+  /**
+   * **Every field of the demand surface separates a cohort, and the list is derived from the type.**
+   *
+   * `traceKeyOf` is a hand-written mirror of core's `traceConfigFor`, and a field missing from it
+   * does not fail — it *merges two cohorts*. Two cells running different populations are then
+   * declared trace-equivalent, handed the same seeds, and paired. That is arithmetic across
+   * unrelated populations, which is the one thing this module exists to prevent.
+   *
+   * Found by adversarial review of wave 13's T3: the two docs/14 §§ 2.1-2.2 knobs were omitted, and
+   * so was `mixAmplitude` — the flat-mix negative control § D162 condition 5 requires, which would
+   * have been cohorted *with the treatment it is the control for*.
+   *
+   * `satisfies Record<keyof SimulationDemandOptions, ...>` is what stops the next one: a field
+   * added to the demand surface without a row here fails to compile. `verifyCrnAlignment` compares
+   * `traceDigest` and would surface a mis-merged cohort after the fact, but a detector that reports
+   * a broken experiment once it has run is not a substitute for a key that does not merge it.
+   */
+  it('separates a cohort on every field the demand surface declares', () => {
+    const VARIANTS = {
+      demandLevel: { demandLevel: 'max' },
+      arrivalRatePctPop5min: { arrivalRatePctPop5min: 9 },
+      directionalSplit: { directionalSplit: { incoming: 1, outgoing: 0, interfloor: 0 } },
+      batchSharesDestination: { batchSharesDestination: true },
+      entranceWeights: { entranceWeights: { G: 1 } },
+      interfloorWeighting: { interfloorWeighting: 'uniform' },
+      credentialAssignment: { credentialAssignment: 'none' },
+      maxLegs: { maxLegs: 4 },
+      peakWindowS: { peakWindowS: 420 },
+      baselineFraction: { baselineFraction: 0.25 },
+      mixAmplitude: { mixAmplitude: 0.5 },
+      batchSize: { batchSize: { distribution: 'explicit', weights: [0, 0, 0, 1] } },
+      passengerMass: {
+        passengerMass: {
+          distribution: 'lognormal',
+          meanKg: 110,
+          stdDevKg: 15,
+          minKg: 40,
+          maxKg: 200,
+        },
+      },
+    } as const satisfies Record<keyof SimulationDemandOptions, SimulationDemandOptions>;
+
+    const keyFor = (demand: SimulationDemandOptions | undefined): string | undefined =>
+      planExperiment(
+        specOf({
+          id: 'per-field',
+          traffic: [{ id: 't', ...(demand === undefined ? {} : { demand }) }],
+        }),
+        config,
+      ).cells[0]?.traceKey;
+
+    const bare = keyFor(undefined);
+    expect(bare).toBeDefined();
+    for (const [field, demand] of Object.entries(VARIANTS)) {
+      expect(
+        keyFor(demand as SimulationDemandOptions),
+        `demand.${field} must change the CRN key; cells that differ in it are not paired`,
+      ).not.toBe(bare);
+    }
+    // And every variant is distinct from every other, so no two fields collapse onto one key.
+    const keys = Object.values(VARIANTS).map((d) => keyFor(d as SimulationDemandOptions));
+    expect(new Set(keys).size).toBe(Object.keys(VARIANTS).length);
   });
 
   it('does not react to run-loop mechanics', () => {

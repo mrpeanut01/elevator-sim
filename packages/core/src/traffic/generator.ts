@@ -250,12 +250,18 @@ export interface DemandPlan {
   /** Expected passengers arriving inside the measurement window. */
   readonly expectedPassengersInReportWindow: number;
   /**
-   * The body-mass distribution this plan's trace will draw from. docs/14 § 2.1.
+   * The body-mass distribution this plan's trace draws from. docs/14 § 2.1.
    *
-   * `TrafficConfig.passengerMass` when the run overrode it, `profiles.passengerMass` otherwise —
-   * resolved once, here, and read by `generateTrace`'s `drawMass` rather than re-resolved at the
-   * draw. A declared knob whose resolution happens twice is a knob that can be honoured in one
-   * place and forgotten in the other.
+   * `TrafficConfig.passengerMass` when the run overrode it, `profiles.passengerMass` otherwise.
+   * **`generateTrace` draws from this field**, so it is the population the run had rather than a
+   * report of the option it was given — which is what lets `parameters.test.ts` probe the five
+   * declared `traffic.passengerMass.*` ids here without the probes becoming assertions about an
+   * echo.
+   *
+   * It is **not** true that the block is resolved only once per trace: `resolveOptions` runs in
+   * `planDemand` and again in `generateTrace`, as it does for every other resolved option. The
+   * two agree because both derive from the same `TrafficConfig` by the same pure function; the
+   * guarantee this field carries is the narrower and checkable one above.
    *
    * On the **plan**, deliberately, and not on `DemandSource` or the trace: `PassengerTrace` is
    * `JSON.stringify`d whole by `structuralDigestOfResult`, so a new key there would move every
@@ -720,14 +726,19 @@ export function planDemand(config: DemandConfig): DemandPlan {
     const rate = destinations.reduce((sum, destination) => sum + destination.weight, 0);
     if (rate <= 0) continue;
 
+    // One resolution, used twice, so the rate and the figure the source *reports* cannot
+    // disagree. Written as two expressions it was possible to mutate one and leave the other —
+    // and an assertion on the reported mean then passed while the rate divided by a different
+    // number, which is the shape of a demand-level error that changes no group.
+    const meanBatchSize = meanBatchSizeOf(options.batchSize ?? profile.batchSize);
     sources.push({
       id: `resident:${floor.id}`,
       kind: 'resident',
       originFloorId: floor.id,
       profileId: profile.id,
       peakPassengersPerSecond: rate,
-      peakBatchesPerSecond: batchesPerSecond(rate, meanBatchSizeOf(options.batchSize ?? profile.batchSize)),
-      meanBatchSize: meanBatchSizeOf(options.batchSize ?? profile.batchSize),
+      peakBatchesPerSecond: batchesPerSecond(rate, meanBatchSize),
+      meanBatchSize,
       destinations,
       ...withCategoryRates(categoryRatesOf(destinations)),
     });
@@ -1019,6 +1030,19 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
   const options = resolveOptions(config);
   const plan = planDemand(config);
   const { template } = plan;
+  /*
+   * **The mass block comes off the plan, not off this function's own `resolveOptions` result.**
+   *
+   * Both would hold the same value, so this is not about correctness of the draw — it is about
+   * what `DemandPlan.passengerMass` *means*. A field a caller can read that no draw consults is a
+   * field that can drift from the run while still looking authoritative, and `parameters.test.ts`
+   * probes the declared `traffic.passengerMass.*` ids through exactly that field. Reading it here
+   * is what makes those probes statements about the population rather than about an echo of the
+   * option.
+   *
+   * Bound before the batch loop because a `RoutePlan` named `plan` shadows this one inside it.
+   */
+  const massConfig = plan.passengerMass;
 
   const floorsById = building.floorsById;
   const requireFloor = (floorId: string): FloorConfig => {
@@ -1209,7 +1233,7 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
         ...(hops.length === 0 ? {} : { transportHops: Object.freeze(hops) }),
         // Mass is drawn here, in final trace order, so the mass column is a function of the
         // sorted trace rather than of the order the sources happened to be sampled in.
-        massKg: drawMass(streams.passengerMass, options.passengerMass),
+        massKg: drawMass(streams.passengerMass, massConfig),
         credentialGroup: credentialGroupFor(route),
         category: pick.category,
         demandFloorId: pick.demandFloorId,
