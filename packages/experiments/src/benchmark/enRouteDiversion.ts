@@ -73,7 +73,9 @@ function downPeakAt(point: DiversionPoint): TrafficArmSpec {
 }
 
 /** The baseline arm: conventional collective, exactly as shipped. */
-export const BASELINE_ID = 'collective';
+export const SOURCE_ID = 'collective';
+/** The reference arm's id. Derived from {@link SOURCE_ID}; see `measureDiversionAt`. */
+export const BASELINE_ID = 'collective-reference';
 /** The candidate arm: the same profile with the one field flipped. */
 export const CANDIDATE_ID = 'collective-enroute';
 
@@ -102,12 +104,22 @@ export function midtownDownPeakAt(arrivalRatePctPop5min: number): TrafficArmSpec
  * One building is a measurement of one building. `garden-apartments` is the second because it is
  * the shipped building least like Midtown Office — six floors against twenty-one, two cars against
  * six, residential traffic — so agreement between them is evidence about the *mechanism* rather
- * than about a tower. It also carries no access zoning, so both arms run the shipped `up-down-buttons`
- * call type and the comparison needs no `withCallType` override to change alongside the setting.
+ * than about a tower.
  */
 export interface DiversionPoint {
   readonly building: string;
   readonly rate: number;
+  /**
+   * The call type both arms run, for a building whose access-restricted landings are unservable
+   * under the shipped `up-down-buttons` default — a landing call carries no credential, so every
+   * car reports `accessDenied` and the call is unassignable.
+   *
+   * Applied to **both** arms, which is what keeps the contrast controlled: the passenger model
+   * moves together and only `eligibility.enRouteDiversion` differs. It does make the cell
+   * uncomparable with an up/down-button cell — `metrics/comparability.ts`'s point — so cells are
+   * read down their own column, never across.
+   */
+  readonly callType?: 'destination-entry' | 'mobile-credential' | undefined;
 }
 
 export interface DiversionCell {
@@ -147,15 +159,28 @@ export async function measureDiversionAt(
   config?: LoadedConfig | undefined,
 ): Promise<DiversionCell> {
   const loaded = config ?? (await loadResources());
-  const baseline = loaded.dispatcherProfilesById.get(BASELINE_ID);
-  if (baseline === undefined) throw new Error(`no dispatcher profile "${BASELINE_ID}"`);
+  const baseline = loaded.dispatcherProfilesById.get(SOURCE_ID);
+  if (baseline === undefined) throw new Error(`no dispatcher profile "${SOURCE_ID}"`);
 
   // Derived rather than read from `data/`, so the study is a controlled contrast even if the
   // shipped `collective-enroute` profile is later retuned: this arm is `collective` plus one
   // field and nothing else, by construction.
-  const candidate: DispatcherProfile = derivedProfile(baseline, CANDIDATE_ID, {
-    eligibility: { ...baseline.eligibility, enRouteDiversion: true },
-  } as Partial<Omit<DispatcherProfile, 'id'>>);
+  // **Both arms are derived, even when the call type is untouched.** The baseline could have been
+  // the shipped `collective` id, and was: the cost is that a cell needing a call-type override has
+  // to change one arm and not the other, which is the one thing a controlled contrast may not do.
+  // Deriving both keeps every cell the same shape — one profile, one field apart.
+  const withType = (patch: Partial<Omit<DispatcherProfile, 'id'>>): Partial<Omit<DispatcherProfile, 'id'>> =>
+    point.callType === undefined
+      ? patch
+      : { ...patch, dispatch: { ...baseline.dispatch, callType: point.callType } };
+  const reference: DispatcherProfile = derivedProfile(baseline, BASELINE_ID, withType({}));
+  const candidate: DispatcherProfile = derivedProfile(
+    baseline,
+    CANDIDATE_ID,
+    withType({ eligibility: { ...baseline.eligibility, enRouteDiversion: true } }) as Partial<
+      Omit<DispatcherProfile, 'id'>
+    >,
+  );
 
   const result = await runGateExperiment({
     id: `en-route-diversion-${point.building}-${point.rate}`,
@@ -164,7 +189,7 @@ export async function measureDiversionAt(
     dispatchers: [BASELINE_ID, CANDIDATE_ID],
     traffic: downPeakAt(point),
     replications,
-    resources: withProfiles(loaded, [candidate]),
+    resources: withProfiles(loaded, [reference, candidate]),
   });
 
   const compare = (metric: ReplicationMetric): PairedComparison =>

@@ -12210,8 +12210,57 @@ in all three places rather than rediscovered a fourth time.
 **One measured aside worth not burying:** `collective-enroute` is **bit-identical to `collective` at
 both up-peak cells of the benchmark gate** and separates only at `garden-residential`
 (ΔAWT −1.360 against −1.269, both relative to `nearest-car`). Pure up-peak is the pattern that least
-exercises en-route pickup, which is exactly what the down-peak study says; the arm is in the gate
-because every shipped profile must face it, not because the gate is where its case is made.
+exercises en-route pickup, which is what the down-peak study says; the arm is in the gate because
+every shipped profile must face it, not because the gate is where its case is made.
+
+**Widened to five buildings at n = 200, and the widening changed the claim.** § D205 originally read
+as an improvement measured on one building. Swept down-peak over every shipped building — the three
+access-controlled ones with `mobile-credential` applied to **both** arms so the passenger model moves
+together — paired-t 95 %, verified common random numbers:
+
+| building | rate | ΔAWT | ΔTTD | AWT quotable |
+|---|---|---|---|---|
+| midtown-office | 1 % | **−1.033 [−1.262, −0.804]** | **+0.555 [+0.190, +0.920]** | yes |
+| midtown-office | 2 % | −3.041 [−3.586, −2.495] | −1.867 [−2.698, −1.036] | no |
+| garden-apartments | 10 % | **−0.431 [−0.615, −0.247]** | −0.177 [−0.498, +0.144] | yes |
+| garden-apartments | 14 % | −1.010 [−1.449, −0.572] | −0.795 [−1.403, −0.187] | no |
+| secure-tower | 2 % | **−0.363 [−0.490, −0.235]** | **+0.215 [+0.043, +0.388]** | yes |
+| secure-tower | 4 % | **−0.968 [−1.179, −0.757]** | −0.245 [−0.502, +0.013] | yes |
+| mixed-use-high-rise | 2 % | **−0.517 [−0.654, −0.379]** | **+1.186 [+0.862, +1.511]** | yes |
+| mixed-use-high-rise | 4 % | −1.112 [−1.310, −0.914] | +0.625 [+0.091, +1.159] | no |
+| vertical-city | 2 % | −0.119 [−0.219, −0.020] | +1.986 [+1.707, +2.265] | no |
+| vertical-city | 4 % | **+0.762 [+0.485, +1.039]** | **+4.591 [+3.949, +5.234]** | no |
+
+**Three findings, and the first two were invisible on one building.**
+
+**1. It is a trade, not an improvement.** ΔAWT excludes zero and is negative at all five quotable
+cells. ΔTTD is significantly *worse* at three of them, null at two, better at none. The mechanism is
+doing exactly what it was built to do and the cost is legible: a diverted car makes a stop it was not
+going to make, which shortens somebody's wait and lengthens the ride of everybody already aboard.
+Same shape as the energy axis — **report it beside AWT, never fold it into a grade** — and the
+profile's own `$comment` now leads with it, because the person choosing a profile reads the profile.
+
+**2. `vertical-city` refuses it outright**, and is the only building that does: ΔTTD `+4.591` and
+ΔAWT `+0.762` at 4 %, both excluding zero, both against. It is also the only building with a
+double-deck shuttle and sky-lobby transfers, where an extra stop is charged to a whole shuttle load
+and a lengthened first leg delays a second leg that has not started. Neither cell is quotable, so
+this is a direction rather than a figure — but it would have stayed invisible on Midtown Office
+alone, and it answers *"should `collective` carry this by default?"*: not until that is understood.
+
+**3. Quotability is a property of the cell *and* of `n`.** A cell is unquotable when *any*
+replication saturates, so raising `n` can only lose validity. Five of the ten cells lose it at 200 —
+including `midtown-office` 2 %, which produced this decision's original headline
+`−3.002 [−3.878, −2.125]` at n = 50. That figure was not wrong at n = 50; it is not quotable at the
+budget a decision should rest on. It is **dropped from the suite rather than kept at the smaller
+budget that flattered it**, and the suite's cells are now the five that survive at 200.
+
+**The mechanism itself is sound on every building.** `sim/diversionBuildings.test.ts` runs all five
+under the diverting profile: conservation balances everywhere, nobody is lost, the control diverts
+zero times, and the **double-deck branch is exercised for the first time** — `divertFrontier` walks
+`stopFloorsOf(shaft)` and `divertTo` normalises through `stopFloorFor`, both written against
+`vertical-city`'s `shuttle` bank and never run there until now. A deck-normalisation bug would not
+have thrown; it would have parked a car at a position it cannot stand at, and the conservation audit
+would have been the first thing to notice. It did not fire.
 
 **The gap is named rather than disguised.** `Simulation.#considerDiversion` fires only from tests and
 from `benchmark/livenessSuite.ts` — precisely the shape docs/05-roadmap.md's standing requirement

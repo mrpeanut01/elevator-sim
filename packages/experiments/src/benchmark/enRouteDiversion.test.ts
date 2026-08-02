@@ -43,9 +43,10 @@ beforeAll(async () => {
  */
 const POINTS: readonly DiversionPoint[] = Object.freeze([
   { building: 'midtown-office', rate: 1 },
-  { building: 'midtown-office', rate: 2 },
   { building: 'garden-apartments', rate: 10 },
-  { building: 'garden-apartments', rate: 14 },
+  { building: 'secure-tower', rate: 2, callType: 'mobile-credential' },
+  { building: 'secure-tower', rate: 4, callType: 'mobile-credential' },
+  { building: 'mixed-use-high-rise', rate: 2, callType: 'mobile-credential' },
 ]);
 const REPLICATIONS = 50;
 
