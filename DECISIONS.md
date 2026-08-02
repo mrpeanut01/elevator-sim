@@ -12399,3 +12399,44 @@ releases. The durable half is driven at the policy, because the two cases differ
 snapshot: a withdrawn car **loses** its call and is refused `serviceMode`, while a car merely
 pointing the wrong way **keeps** it and is refused `noDirectionReversal`. Asserting only the first
 would have passed before the change; asserting only the second would trade a thrash for a stranding.
+
+**And the combination it unblocks buys nothing, which is worth recording so nobody retries it.**
+§ D205's original note said reassignment capped what diversion could recover — a call frozen on the
+wrong car can never move to the car that later flies past — so with `until-commitment` now usable
+under a hard constraint, `collective-enroute` + `until-commitment` was the obvious next arm.
+Measured **directly against `collective-enroute`**, n = 50, paired-t 95 %, verified CRN:
+
+| cell | ΔAWT | ΔTTD |
+|---|---|---|
+| midtown-office 1 % | −0.024 [−0.064, +0.016] | −0.004 [−0.354, +0.345] |
+| garden-apartments 10 % | −0.095 [−0.285, +0.096] | −0.093 [−0.281, +0.094] |
+| secure-tower 2 % | −0.034 [−0.103, +0.035] | −0.072 [−0.218, +0.073] |
+| secure-tower 4 % | −0.119 [−0.294, +0.055] | **−0.252 [−0.473, −0.031]** |
+| mixed-use-high-rise 2 % | −0.006 [−0.018, +0.006] | −0.014 [−0.043, +0.014] |
+| vertical-city 4 % | +0.020 [−0.159, +0.199] | −0.217 [−0.639, +0.204] |
+
+**AWT contains zero at all six cells.** One TTD cell excludes it, by a quarter of a second. So
+reassignment is *not* what was capping diversion, and the shipped profile does not take it.
+
+**The first reading of this was wrong and the discipline caught it.** Measured against shipped
+`collective` instead, the combination looked slightly better than diversion alone at five of six
+cells — but those are two intervals sharing a baseline, and concluding from their separation is the
+overlap fallacy CLAUDE.md § *Statistical discipline* names outright. The direct pairing above
+refutes it. The § D206 fix is still worth having: it turns a configuration that **saturated** into
+one that merely does nothing, which matters to anyone authoring it and to an optimizer searching the
+space.
+
+**The reported symptom is reduced, not eliminated — and pass-by rate was never the right target.**
+Re-running the census that opened § D205, on Midtown Office down-peak:
+
+| | 3 % | 5 % |
+|---|---|---|
+| `collective`, as reported | 67.0 % passed, AWT 32.3 | 63.2 % passed, AWT 91.5 |
+| `collective-enroute` | 66.0 %, AWT 31.9 | **51.4 %**, AWT **61.2** |
+
+At the heavier load the rate falls by twelve points and AWT by a third; at the lighter one the rate
+barely moves while AWT does. That is the honest shape of it: **a car with room passing a landing is
+not by itself a fault.** Most pass-bys are a correct decision — the call belongs to a nearer car that
+will arrive sooner — and the original census was good evidence that something was *structurally
+impossible* (58.2 % with every car having room, and the refusal reproduced in one call) but is a poor
+measure of success. The paired AWT interval is the measure; the census was the diagnosis.
