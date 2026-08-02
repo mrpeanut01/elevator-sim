@@ -17,6 +17,7 @@ import { loadResources } from '../validation/harness.js';
 
 import {
   measureDiversionAt,
+  measureShippedAt,
   type DiversionCell,
   type DiversionPoint,
 } from './enRouteDiversion.js';
@@ -91,4 +92,48 @@ describe('en-route diversion, paired against conventional collective', () => {
       expect(cell.awtIsValid).toBe(true);
     }
   }, 600_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * The profile as shipped — the question an operator actually asks
+ * -------------------------------------------------------------------------- */
+
+describe('collective-enroute, as shipped, against collective', () => {
+  it('is better or null on both metrics everywhere, and worse on neither', async () => {
+    const cells: DiversionCell[] = [];
+    for (const point of [...POINTS, { building: 'vertical-city', rate: 4, callType: 'mobile-credential' } as const]) {
+      cells.push(await measureShippedAt(point, REPLICATIONS, config));
+    }
+
+    process.stdout.write(
+      `\nShipped collective-enroute − collective, down-peak, paired-t 95 %.\n` +
+        cells.map(line).join('\n') +
+        '\n\n',
+    );
+
+    for (const cell of cells) {
+      expect(cell.commonRandomNumbers).toBe(true);
+      expect(cell.live).toBe(true);
+
+      // **The guard on `detourPenalty`.** The weight is what turns the mechanism from a trade into
+      // a dominance: without it, TTD is significantly worse at three of these cells and worse on
+      // *both* metrics at vertical-city, where a diverted first leg delays a sky-lobby transfer
+      // (`DECISIONS.md` § D205 — single-leg ΔTTD -0.188, transferring +6.763). Removing the weight
+      // from `data/dispatcher-profiles.json` fails here rather than quietly restoring the
+      // regression, which is the only reason a reader can trust the profile's own comment.
+      //
+      // "Not significantly worse" is `lower <= 0` — the interval reaches zero or sits below it.
+      // Asserting `upper < 0` instead would demand a significant *gain* on both metrics at every
+      // cell, which is a stronger claim than the measurement supports and than the profile makes.
+      const label = `${cell.building}@${String(cell.rate)}%`;
+      expect(cell.waiting.estimate.lower, `${label} AWT is significantly worse`).toBeLessThanOrEqual(0);
+      expect(
+        cell.timeToDestination.estimate.lower,
+        `${label} TTD is significantly worse — has detourPenalty been dropped from collective-enroute?`,
+      ).toBeLessThanOrEqual(0);
+    }
+
+    // And it is not merely "not worse": the wait gain is real somewhere, or the profile is pointless.
+    expect(cells.filter((cell) => cell.waiting.significant).length).toBeGreaterThanOrEqual(4);
+  }, 900_000);
 });

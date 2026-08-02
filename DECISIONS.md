@@ -12254,6 +12254,66 @@ including `midtown-office` 2 %, which produced this decision's original headline
 budget a decision should rest on. It is **dropped from the suite rather than kept at the smaller
 budget that flattered it**, and the suite's cells are now the five that survive at 200.
 
+**`vertical-city`'s refusal was decomposed, and it is a transfer effect.** Splitting its journeys
+by whether they cross a sky lobby, at 8 seeds under common random numbers:
+
+| journeys | ΔTTD |
+|---|---|
+| single-leg (n = 1 306) | **−0.188** |
+| transferring (n = 1 827) | **+6.763** |
+
+Single-leg journeys *improve*. The whole of the harm is in journeys that transfer: a diversion on
+leg one delays arrival at the sky lobby, the passenger queues again for the shuttle, and a stop
+costing a few seconds becomes seven seconds of journey. It was **not** load — mean load factor at
+diversion is 0.10–0.13 on every building, `vertical-city` included, so the "diverting a full car"
+hypothesis was measured and discarded.
+
+**And it is fixable by configuration, which makes it a profile defect rather than a mechanism
+defect.** `collective` weights `waitTime` alone, so *nothing priced the harm a diversion does to
+the people already aboard* — and `detourPenalty` is exactly that term ("Added delay imposed on
+already-onboard passengers"). Swept on `vertical-city` 4 %, n = 50:
+
+| `detourPenalty` | ΔAWT | ΔTTD |
+|---|---|---|
+| 0.0 | **+0.715 [+0.229, +1.202]** | **+4.305 [+3.062, +5.548]** |
+| 0.2 | **−0.454 [−0.739, −0.168]** | −0.033 [−0.611, +0.544] |
+| 0.5 | −0.379 [−0.627, −0.132] | −0.353 [−0.834, +0.129] |
+| 1.0 | −0.248 [−0.467, −0.028] | −0.124 [−0.584, +0.335] |
+
+At 0.2 the weight keeps **every** AWT gain across all six cells, removes the TTD regression at four
+of the five cells that had one, halves it at the fifth, and turns `vertical-city` from worse-on-both
+into better-on-wait, null-on-journey.
+
+**So the shipped profile carries `detourPenalty: 0.2`, and the trade disappears.** Measured as an
+operator would actually choose it — shipped `collective-enroute` against shipped `collective`, both
+metrics, n = 50, paired-t 95 %, verified CRN:
+
+| building | rate | ΔAWT | ΔTTD |
+|---|---|---|---|
+| midtown-office | 1 % | **−0.936 [−1.398, −0.474]** | −0.326 [−0.934, +0.282] |
+| garden-apartments | 10 % | −0.199 [−0.834, +0.435] | −0.346 [−1.215, +0.522] |
+| secure-tower | 2 % | **−0.234 [−0.424, −0.044]** | −0.141 [−0.375, +0.093] |
+| secure-tower | 4 % | **−0.707 [−1.286, −0.127]** | **−0.739 [−1.397, −0.080]** |
+| mixed-use-high-rise | 2 % | **−0.428 [−0.634, −0.221]** | −0.025 [−0.457, +0.408] |
+| vertical-city | 4 % | **−0.705 [−1.047, −0.364]** | **−1.783 [−2.495, −1.071]** |
+
+**Better or null on both metrics at every cell, worse on neither.** The trade was never a property
+of en-route pickup; it was the cost of shipping a mechanism without pricing what it costs.
+
+**Both measurements are kept, because they answer different questions and gave different answers.**
+`measureDiversionAt` isolates the mechanism — one authored field apart — and says *trade*.
+`measureShippedAt` compares the profiles an operator picks between and says *dominance*. Measuring
+only the first would have shipped a regression; measuring only the second would have hidden what the
+mechanism does. `enRouteDiversion.test.ts` asserts the second at every cell, so **deleting
+`detourPenalty` from the profile fails a test** rather than quietly restoring the trade.
+
+**A default a second caller can miss is not a default.** `referenceCandidates` was first defaulted
+in `runWeightSetSelectionStudy`, and `lunchTwoWaySelection.ts` calls `censusSelectionPoint`
+*directly* — so the guard was absent on exactly one of two paths, and both lunch cells silently
+elected `collective-enroute` as reference the moment the profile got good enough to win. The default
+now lives on the primitive, where neither caller can miss it, and `null` is how a caller asks for an
+open election. The pinned counts caught it; the wrapper's own tests could not have.
+
 **The mechanism itself is sound on every building.** `sim/diversionBuildings.test.ts` runs all five
 under the diverting profile: conservation balances everywhere, nobody is lost, the control diverts
 zero times, and the **double-deck branch is exercised for the first time** — `divertFrontier` walks

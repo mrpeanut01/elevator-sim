@@ -40,7 +40,7 @@
 
 import { measureAuctionAggregation, measureMultiRoundReachability } from './auctionAggregation.js';
 import { measureDestinationLiveness } from './destinationLiveness.js';
-import { measureDiversionAt } from './enRouteDiversion.js';
+import { measureDiversionAt, measureShippedAt } from './enRouteDiversion.js';
 import { measureEnergyLiveness } from './energyLiveness.js';
 import { formatLunchTwoWayMix, measureLunchTwoWayMix } from './lunchTwoWay.js';
 import { measurePredictorLag } from './predictorLag.js';
@@ -98,6 +98,8 @@ export interface LivenessSuiteResult {
    * `eligibility.enRouteDiversion` on a shipped profile is what would move it to the other half.
    */
   readonly enRouteDiversion: readonly DiversionCell[];
+  /** The same cells, comparing the profile **as shipped** rather than the isolated mechanism. */
+  readonly shippedDiversion: readonly DiversionCell[];
 }
 
 export interface LivenessSuiteOptions {
@@ -160,6 +162,15 @@ export async function runLivenessSuite(
   ]) {
     enRouteDiversion.push(await measureDiversionAt(point, options.fastOnly === true ? 8 : 50));
   }
+  // The deployment contrast beside the mechanism one. Both, because they gave different answers:
+  // isolated, diversion is a trade; as shipped, with `detourPenalty` pricing it, it is not.
+  const shippedDiversion: DiversionCell[] = [];
+  for (const point of [
+    { building: 'midtown-office', rate: 1 },
+    { building: 'vertical-city', rate: 4, callType: 'mobile-credential' as const },
+  ]) {
+    shippedDiversion.push(await measureShippedAt(point, options.fastOnly === true ? 8 : 50));
+  }
 
   return Object.freeze({
     predictorLag,
@@ -171,6 +182,7 @@ export async function runLivenessSuite(
     deadband,
     lunchTwoWayMix,
     enRouteDiversion: Object.freeze(enRouteDiversion),
+    shippedDiversion: Object.freeze(shippedDiversion),
   });
 }
 
@@ -285,7 +297,7 @@ export function formatLivenessSuite(result: LivenessSuiteResult): string {
   lines.push(...formatLunchTwoWayMix(result.lunchTwoWayMix));
 
   lines.push('', 'en-route diversion (enRouteDiversion.ts) — collective-enroute − collective, paired-t 95 %');
-  for (const cell of result.enRouteDiversion) {
+  for (const cell of [...result.enRouteDiversion, ...result.shippedDiversion]) {
     lines.push(
       `  ${cell.building} ${String(cell.rate)}% n=${String(cell.waiting.n)} ` +
         `ΔAWT=${cell.waiting.estimate.mean.toFixed(3)} ` +

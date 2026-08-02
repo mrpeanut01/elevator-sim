@@ -59,6 +59,72 @@ import type { DispatcherProfile, LoadedConfig } from '@elevator-sim/core';
 import type { ReplicationMetric } from '../runner/metrics.js';
 import type { TrafficArmSpec } from '../runner/types.js';
 
+/**
+ * The **shipped** `collective-enroute` against **shipped** `collective`, at one point.
+ *
+ * A different question from {@link measureDiversionAt}, and both are needed. That one isolates the
+ * mechanism — one authored field apart — and answers *"what does diversion do?"*. This one answers
+ * *"what does choosing this profile do?"*, which is the question an operator actually asks, and it
+ * moves the `detourPenalty` weight along with the setting because that is what choosing the profile
+ * does.
+ *
+ * The two gave different answers, which is the whole reason this exists. Isolated, diversion is a
+ * **trade**: AWT better everywhere, TTD significantly worse at three of five quotable cells. Chosen
+ * as shipped, it is not a trade at all — better or null on both metrics at every cell — because the
+ * profile prices the detour the mechanism causes. Measuring only the first would have shipped a
+ * regression; measuring only the second would have hidden what the mechanism does.
+ */
+export async function measureShippedAt(
+  point: DiversionPoint,
+  replications: number,
+  config?: LoadedConfig | undefined,
+): Promise<DiversionCell> {
+  const loaded = config ?? (await loadResources());
+  const control = loaded.dispatcherProfilesById.get(SOURCE_ID);
+  const shipped = loaded.dispatcherProfilesById.get('collective-enroute');
+  if (control === undefined || shipped === undefined) throw new Error('missing shipped profile');
+
+  const dispatch =
+    point.callType === undefined
+      ? undefined
+      : { callType: point.callType };
+  const reference = derivedProfile(control, BASELINE_ID, {
+    ...(dispatch === undefined ? {} : { dispatch: { ...control.dispatch, ...dispatch } }),
+  } as Partial<Omit<DispatcherProfile, 'id'>>);
+  const candidate = derivedProfile(shipped, CANDIDATE_ID, {
+    ...(dispatch === undefined ? {} : { dispatch: { ...shipped.dispatch, ...dispatch } }),
+  } as Partial<Omit<DispatcherProfile, 'id'>>);
+
+  const result = await runGateExperiment({
+    id: `shipped-diversion-${point.building}-${point.rate}`,
+    seed: 20_260_801,
+    building: point.building,
+    dispatchers: [BASELINE_ID, CANDIDATE_ID],
+    traffic: downPeakAt(point),
+    replications,
+    resources: withProfiles(loaded, [reference, candidate]),
+  });
+
+  const compare = (metric: ReplicationMetric): PairedComparison =>
+    comparePaired(metric, samplesOf(result, CANDIDATE_ID, metric), samplesOf(result, BASELINE_ID, metric));
+  const waiting = compare('awtS');
+  const baselineDigests = digestsOf(result, BASELINE_ID);
+  const candidateDigests = digestsOf(result, CANDIDATE_ID);
+
+  return Object.freeze({
+    building: point.building,
+    rate: point.rate,
+    waiting,
+    timeToDestination: compare('ttdMeanS'),
+    live: waiting.maxAbsDifference > 0,
+    commonRandomNumbers:
+      baselineDigests.length === candidateDigests.length &&
+      baselineDigests.every((digest, index) => digest === candidateDigests[index]),
+    awtIsValid:
+      cellOf(result, BASELINE_ID).aggregate.awtIsValid && cellOf(result, CANDIDATE_ID).aggregate.awtIsValid,
+  });
+}
+
 /** Down-peak at one point. Garden Apartments has one entrance, so it needs no entrance weights. */
 function downPeakAt(point: DiversionPoint): TrafficArmSpec {
   return Object.freeze({

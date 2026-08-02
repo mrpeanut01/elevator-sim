@@ -984,12 +984,20 @@ export async function censusSelectionPoint(input: {
    * rather than hidden by it. It just cannot re-baseline a pre-registered comparison as a side
    * effect of being added.
    */
-  readonly referenceCandidates?: readonly string[] | undefined;
+  readonly referenceCandidates?: readonly string[] | null | undefined;
 }): Promise<SelectionCensus> {
   const cell = input.cell ?? SELECTION_CELL;
   const excluded = new Set(input.ceilingExcludedArms ?? []);
+  // **Defaulted on the primitive, not on the wrapper.** It was defaulted in
+  // `runWeightSetSelectionStudy` first, and `lunchTwoWaySelection.ts` calls *this* function
+  // directly — so the guard was absent on exactly one of the two paths, and the reference arm at
+  // both lunch cells silently became `collective-enroute` the moment that profile got good enough
+  // to win. A default that a second caller can miss is not a default; it is a convention.
+  // `null` is how a caller asks for an open election, and saying so is the point.
   const candidates =
-    input.referenceCandidates === undefined ? undefined : new Set(input.referenceCandidates);
+    input.referenceCandidates === null
+      ? undefined
+      : new Set(input.referenceCandidates ?? PRE_REGISTERED_REFERENCE_CANDIDATES);
   const profileIds = [...input.resources.dispatcherProfilesById.keys()];
   const experiment = await runGateExperiment({
     id: `phase6c/census/${cell.id}`,
@@ -1201,13 +1209,10 @@ export async function runWeightSetSelectionStudy(
     ...(options.ceilingExcludedArms === undefined
       ? {}
       : { ceilingExcludedArms: options.ceilingExcludedArms }),
-    // Defaulted, not optional. A caller that forgets this re-baselines a pre-registered
-    // comparison by omission, which is the failure `DECISIONS.md` § D205 records; opting *out*
-    // has to be explicit, so `null` is the way to ask for "any shipped profile".
-    referenceCandidates:
-      options.referenceCandidates === null
-        ? undefined
-        : (options.referenceCandidates ?? PRE_REGISTERED_REFERENCE_CANDIDATES),
+    // Passed straight through: `censusSelectionPoint` owns the default, so both callers get it.
+    ...(options.referenceCandidates === undefined
+      ? {}
+      : { referenceCandidates: options.referenceCandidates }),
   });
 
   // The budget: the criterion's 50–200 band, clamped by the **declared arm set's** own census
