@@ -45,7 +45,6 @@
  */
 
 import {
-  GATE_BUILDING,
   cellOf,
   comparePaired,
   derivedProfile,
@@ -59,6 +58,19 @@ import {
 import type { DispatcherProfile, LoadedConfig } from '@elevator-sim/core';
 import type { ReplicationMetric } from '../runner/metrics.js';
 import type { TrafficArmSpec } from '../runner/types.js';
+
+/** Down-peak at one point. Garden Apartments has one entrance, so it needs no entrance weights. */
+function downPeakAt(point: DiversionPoint): TrafficArmSpec {
+  return Object.freeze({
+    id: `${point.building}-down-peak-${point.rate}`,
+    durationS: 900,
+    demand: Object.freeze({
+      directionalSplit: Object.freeze({ incoming: 0, outgoing: 1, interfloor: 0 }),
+      arrivalRatePctPop5min: point.rate,
+      peakWindowS: 300,
+    }),
+  });
+}
 
 /** The baseline arm: conventional collective, exactly as shipped. */
 export const BASELINE_ID = 'collective';
@@ -84,7 +96,22 @@ export function midtownDownPeakAt(arrivalRatePctPop5min: number): TrafficArmSpec
   });
 }
 
+/**
+ * A cell: which building, at which rate.
+ *
+ * One building is a measurement of one building. `garden-apartments` is the second because it is
+ * the shipped building least like Midtown Office — six floors against twenty-one, two cars against
+ * six, residential traffic — so agreement between them is evidence about the *mechanism* rather
+ * than about a tower. It also carries no access zoning, so both arms run the shipped `up-down-buttons`
+ * call type and the comparison needs no `withCallType` override to change alongside the setting.
+ */
+export interface DiversionPoint {
+  readonly building: string;
+  readonly rate: number;
+}
+
 export interface DiversionCell {
+  readonly building: string;
   readonly rate: number;
   /** Paired difference, candidate − baseline. Negative is an improvement. */
   readonly waiting: PairedComparison;
@@ -115,7 +142,7 @@ export interface DiversionCell {
  * rather than reporting an interval that is not paired.
  */
 export async function measureDiversionAt(
-  rate: number,
+  point: DiversionPoint,
   replications: number,
   config?: LoadedConfig | undefined,
 ): Promise<DiversionCell> {
@@ -131,11 +158,11 @@ export async function measureDiversionAt(
   } as Partial<Omit<DispatcherProfile, 'id'>>);
 
   const result = await runGateExperiment({
-    id: `en-route-diversion-${rate}`,
+    id: `en-route-diversion-${point.building}-${point.rate}`,
     seed: 20_260_801,
-    building: GATE_BUILDING,
+    building: point.building,
     dispatchers: [BASELINE_ID, CANDIDATE_ID],
-    traffic: midtownDownPeakAt(rate),
+    traffic: downPeakAt(point),
     replications,
     resources: withProfiles(loaded, [candidate]),
   });
@@ -149,7 +176,8 @@ export async function measureDiversionAt(
   const candidateDigests = digestsOf(result, CANDIDATE_ID);
 
   return Object.freeze({
-    rate,
+    building: point.building,
+    rate: point.rate,
     waiting,
     timeToDestination: compare('ttdMeanS'),
     live: waiting.maxAbsDifference > 0,

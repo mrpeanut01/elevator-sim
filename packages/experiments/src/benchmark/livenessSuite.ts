@@ -152,8 +152,13 @@ export async function runLivenessSuite(
   // dropping the cells — the same rule the rest of this driver follows. A narrowed run still
   // populates every field, and `live` is still measured rather than assumed.
   const enRouteDiversion: DiversionCell[] = [];
-  for (const rate of [1, 2]) {
-    enRouteDiversion.push(await measureDiversionAt(rate, options.fastOnly === true ? 8 : 50));
+  for (const point of [
+    { building: 'midtown-office', rate: 1 },
+    { building: 'midtown-office', rate: 2 },
+    { building: 'garden-apartments', rate: 10 },
+    { building: 'garden-apartments', rate: 14 },
+  ]) {
+    enRouteDiversion.push(await measureDiversionAt(point, options.fastOnly === true ? 8 : 50));
   }
 
   return Object.freeze({
@@ -282,7 +287,7 @@ export function formatLivenessSuite(result: LivenessSuiteResult): string {
   lines.push('', 'en-route diversion (enRouteDiversion.ts) — collective-enroute − collective, paired-t 95 %');
   for (const cell of result.enRouteDiversion) {
     lines.push(
-      `  ${String(cell.rate)}% n=${String(cell.waiting.n)} ` +
+      `  ${cell.building} ${String(cell.rate)}% n=${String(cell.waiting.n)} ` +
         `ΔAWT=${cell.waiting.estimate.mean.toFixed(3)} ` +
         `[${cell.waiting.estimate.lower.toFixed(3)}, ${cell.waiting.estimate.upper.toFixed(3)}] ` +
         `excludesZero=${String(cell.waiting.significant)} ` +

@@ -15,7 +15,11 @@ import type { LoadedConfig } from '@elevator-sim/core';
 
 import { loadResources } from '../validation/harness.js';
 
-import { measureDiversionAt, type DiversionCell } from './enRouteDiversion.js';
+import {
+  measureDiversionAt,
+  type DiversionCell,
+  type DiversionPoint,
+} from './enRouteDiversion.js';
 
 let config: LoadedConfig;
 
@@ -37,7 +41,12 @@ beforeAll(async () => {
  * 50 replications is the floor CLAUDE.md § Statistical discipline permits, taken because this
  * runs in the ordinary suite; a figure a decision rests on should be re-measured at 200.
  */
-const RATES = [1, 2] as const;
+const POINTS: readonly DiversionPoint[] = Object.freeze([
+  { building: 'midtown-office', rate: 1 },
+  { building: 'midtown-office', rate: 2 },
+  { building: 'garden-apartments', rate: 10 },
+  { building: 'garden-apartments', rate: 14 },
+]);
 const REPLICATIONS = 50;
 
 function line(cell: DiversionCell): string {
@@ -46,7 +55,7 @@ function line(cell: DiversionCell): string {
     `[${comparison.estimate.lower.toFixed(3)}, ${comparison.estimate.upper.toFixed(3)}]` +
     `${comparison.significant ? ' *' : ''}`;
   return (
-    `  ${String(cell.rate).padStart(2)}%  n=${String(cell.waiting.n)}  ` +
+    `  ${cell.building.padEnd(18)} ${String(cell.rate).padStart(2)}%  n=${String(cell.waiting.n)}  ` +
     `AWT ${fmt(cell.waiting).padEnd(34)}  TTD ${fmt(cell.timeToDestination).padEnd(34)}  ` +
     `live=${String(cell.live)} crn=${String(cell.commonRandomNumbers)} awtValid=${String(cell.awtIsValid)}`
   );
@@ -55,12 +64,12 @@ function line(cell: DiversionCell): string {
 describe('en-route diversion, paired against conventional collective', () => {
   it('measures the difference under common random numbers and reports the interval', async () => {
     const cells: DiversionCell[] = [];
-    for (const rate of RATES) {
-      cells.push(await measureDiversionAt(rate, REPLICATIONS, config));
+    for (const point of POINTS) {
+      cells.push(await measureDiversionAt(point, REPLICATIONS, config));
     }
 
     process.stdout.write(
-      `\nMidtown Office, down-peak. collective-enroute − collective, paired-t 95 %.\n` +
+      `\nDown-peak. collective-enroute − collective, paired-t 95 %.\n` +
         `Negative is an improvement; * marks an interval excluding zero.\n` +
         cells.map(line).join('\n') +
         '\n\n',
