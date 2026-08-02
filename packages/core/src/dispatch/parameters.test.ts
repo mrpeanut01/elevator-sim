@@ -101,6 +101,7 @@ const PROBE_PROFILE: DispatcherProfileSource = {
   },
   eligibility: {
     allowOppositeDirectionPickup: false,
+    enRouteDiversion: true,
     maxLoadFactorForAssignment: 0.65,
   },
   answer: { allowBypassIfSoleEligibleCar: true },
@@ -178,6 +179,10 @@ const PROBE_VALUES: ReadonlyMap<string, number | string | boolean> = new Map<
   ['dispatch.reassignmentHysteresisS', 11.5],
   ['dispatch.maxReassignmentsPerCall', 6],
   ['eligibility.allowOppositeDirectionPickup', false],
+  // `true`, against a `false` default: the probe has to differ from the default or the assertion
+  // that the value travelled from the profile to the field the engine reads would pass on a
+  // profile that was never consulted at all.
+  ['eligibility.enRouteDiversion', true],
   ['eligibility.maxLoadFactorForAssignment', 0.65],
   ['answer.allowBypassIfSoleEligibleCar', true],
   ['idle.parkingStrategy', 'zone-center'],

@@ -285,6 +285,10 @@ export function resolveDispatchConfig(
         options.eligibility?.allowOppositeDirectionPickup ??
         eligibility?.allowOppositeDirectionPickup ??
         DISPATCH_DEFAULTS.allowOppositeDirectionPickup,
+      enRouteDiversion:
+        options.eligibility?.enRouteDiversion ??
+        eligibility?.enRouteDiversion ??
+        DISPATCH_DEFAULTS.enRouteDiversion,
       maxLoadFactorForAssignment: nonNegative(
         options.eligibility?.maxLoadFactorForAssignment ??
           eligibility?.maxLoadFactorForAssignment ??

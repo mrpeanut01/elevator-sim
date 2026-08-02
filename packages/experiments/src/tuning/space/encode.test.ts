@@ -137,11 +137,16 @@ describe('a candidate survives the trip to a profile and back, exactly', () => {
 
     // Seven today, and the count is pinned beside the space's own. § D146 is the reason: when
     // `selection` was missing from the hand-written list the space was 49 instead of 56 and no
-    // test anywhere said so. `collect.test.ts` pins 56 and the 106 declared rows behind it; this
-    // pins the section count those two are a function of, so a section that silently vanishes
-    // fails here first and with a message that names the cause.
+    // test anywhere said so. `collect.test.ts` pins the space and the declared rows behind it;
+    // this pins the section count those two are a function of, so a section that silently
+    // vanishes fails here first and with a message that names the cause.
+    //
+    // The **space** moved to 57 with `eligibility.enRouteDiversion` (`DECISIONS.md` § D205) while
+    // the **section count** did not: the new tunable joins a section that already existed. That is
+    // the relationship this pair exists to distinguish — a space that grows without a section
+    // growing is a new knob, and a section count that moves on its own is a schema change.
     expect(PROFILE_OBJECT_SECTIONS.length).toBe(7);
-    expect(SPACE.parameters.length).toBe(56);
+    expect(SPACE.parameters.length).toBe(57);
     expect(new Set(SPACE.parameters.map((parameter) => parameter.section))).toStrictEqual(
       new Set(['weights', 'constraints', ...PROFILE_OBJECT_SECTIONS]),
     );
@@ -365,7 +370,14 @@ describe('a decoded candidate is a profile loadConfig accepts and a policy build
     // Nothing was lost on the way through JSON and the parser.
     expect(candidatesEqual(encodeCandidate(SPACE, fromDisk), candidate)).toBe(true);
 
-    const policy = createPolicyFor(fromDisk);
+    // The weight-set library, for exactly the reason the sibling test above gives: it is a **run
+    // input, not a profile field**, and `core` refuses a profile that declares
+    // `selection.policy: "contextual"` with nothing to select between. This call omitted it and
+    // passed only because the sampled winner happened never to draw `contextual` — a latent
+    // fragility, surfaced when `eligibility.enRouteDiversion` (`DECISIONS.md` § D205) added a
+    // dimension and shifted the draw. Supplying the library is what the assertion always meant:
+    // "the profile builds a working policy", not "the profile never asks for a selector".
+    const policy = createPolicyFor(fromDisk, { weightSets: PROBE_WEIGHT_SETS });
     expect(policy.engine).toBe('weighted-cost');
     expect(policy.id).toBe('tuned-winner');
     expect(policy.parameters.length).toBeGreaterThan(0);
@@ -379,6 +391,11 @@ describe('a decoded candidate is a profile loadConfig accepts and a policy build
       dispatcherProfile: fromDisk,
       trafficProfiles: reloaded.trafficProfiles,
       elevatorSpecs: reloaded.elevatorSpecs,
+      // The file-level `patternSwitching` block, the same run input `createPolicyFor` was handed
+      // above. `Simulation` derives the weight-set library from it, so passing the whole loaded
+      // file is how a shipped run supplies one — and a winner that draws `selection.policy:
+      // "contextual"` needs it here for the same reason it needed it there.
+      dispatcherProfiles: reloaded.dispatcherProfiles,
       seed: SEED,
       durationS: 300,
     });

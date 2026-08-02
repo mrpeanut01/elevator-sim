@@ -85,6 +85,7 @@ import { MATRIX_CELLS } from './matrix.js';
 import { BENCHMARK_SEED } from './suite.js';
 import {
   CENSUS_REPLICATIONS,
+  PRE_REGISTERED_REFERENCE_CANDIDATES,
   SEARCH_CANDIDATES,
   SEARCH_REPLICATIONS,
   SELECTION_GATE,
@@ -99,6 +100,12 @@ import {
   weightSetLibrary,
   type DeadbandKnownAnswer,
 } from './weightSetSelection.js';
+
+// Re-exported where the pre-registered cells live: the candidate set is a fact about § D151's
+// pre-registration, and a reader who finds `preRegisteredReference` here should find the set it
+// must belong to here too. Defined in `weightSetSelection.ts` because that is where the census
+// that reads it lives, and the dependency runs that way.
+export { PRE_REGISTERED_REFERENCE_CANDIDATES };
 
 /* -------------------------------------------------------------------------- *
  * The cell set — § D151 § 1, and not one line of it is this module's choice
@@ -1139,6 +1146,7 @@ export async function runSelectionSweep(
       resources,
       cell,
       ceilingExcludedArms: cell.ceilingExcludedArms,
+      referenceCandidates: PRE_REGISTERED_REFERENCE_CANDIDATES,
       replications: cell.replications,
       censusReplications: options.censusReplications ?? CENSUS_REPLICATIONS,
       searchCandidates: options.searchCandidates ?? SEARCH_CANDIDATES,

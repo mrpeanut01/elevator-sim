@@ -414,6 +414,60 @@ export function travelTime(distanceM: number, constraints: MotionConstraints): n
   return 4 * jerkTime + 2 * accelTime + cruiseTime;
 }
 
+/**
+ * How long two profiles describe the **same** trajectory before they part company.
+ *
+ * This is what makes a mid-flight diversion exact rather than approximate. A car flying
+ * `flown` can be relabelled onto `candidate` — same start, nearer target — at any instant
+ * within the returned window, because up to that instant the two profiles prescribe
+ * bit-identical position, velocity and acceleration. The car has *already* flown a trajectory
+ * consistent with both, so nothing has to be re-solved from a non-zero initial velocity and
+ * no comfort limit is violated. Past that instant the shorter profile would already have
+ * begun braking, and relabelling would teleport the car onto a trajectory it is not on.
+ *
+ * The window is real and usually large. Two `speedLimited` profiles under one envelope have
+ * identical `jerkTime` and `accelTime` — both are functions of the constraints alone (see
+ * `solveDurations`) — and differ *only* in `cruiseTime`, so they agree from rest right up to
+ * the shorter one's `jerkToDecel`. A car crossing twenty floors to the lobby can therefore
+ * accept a stop most of the way down. Two `jerkLimited` profiles, by contrast, differ in
+ * their very first phase and agree only at `t = 0`: a short hop is all ramp and cannot be
+ * cut. That asymmetry is the physics, not a policy — and it is why this returns a time rather
+ * than a boolean.
+ *
+ * Conservative by construction. Phase start states are compared for **exact** equality, and
+ * any mismatch ends the window immediately, so floating-point drift can only ever shorten the
+ * window and refuse a legal diversion — never permit an illegal one. Under one envelope the
+ * shared phases come from identical arithmetic on identical inputs, so exact equality is what
+ * actually holds; the tolerance would be the thing that lied.
+ *
+ * Pure. Returns `0` for profiles that diverge at once, including opposite directions.
+ */
+export function sharedPrefixSeconds(candidate: MotionProfile, flown: MotionProfile): number {
+  if (candidate.direction !== flown.direction) return 0;
+
+  let shared = 0;
+  for (let index = 0; index < candidate.phases.length; index += 1) {
+    const a = candidate.phases[index];
+    const b = flown.phases[index];
+    /* c8 ignore next -- both are `MotionPhases`, which is a seven-tuple. */
+    if (a === undefined || b === undefined) return shared;
+    // Same state entering the phase and the same jerk through it means the same cubic, so the
+    // two agree for as long as both remain in it.
+    if (
+      a.startTime !== b.startTime ||
+      a.startDistance !== b.startDistance ||
+      a.startSpeed !== b.startSpeed ||
+      a.startAcceleration !== b.startAcceleration ||
+      a.jerk !== b.jerk
+    ) {
+      return shared;
+    }
+    shared = Math.min(a.endTime, b.endTime);
+    if (a.duration !== b.duration) return shared;
+  }
+  return Math.min(candidate.duration, flown.duration);
+}
+
 /* -------------------------------------------------------------------------- *
  * Evaluation
  * -------------------------------------------------------------------------- */

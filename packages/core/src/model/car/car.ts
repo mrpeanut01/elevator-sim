@@ -74,6 +74,7 @@ import {
   buildProfile,
   kinematicsAt as profileKinematicsAt,
   positionAt as profilePositionAt,
+  sharedPrefixSeconds,
   velocityAt as profileVelocityAt,
   type Kinematics,
   type MotionConstraints,
@@ -109,6 +110,7 @@ import {
   floorIdsServedAt,
   shaftFloor,
   stopFloorIdOf,
+  stopFloorsOf,
   type CarClock,
   type CarMotion,
   type CarParameterSpec,
@@ -120,6 +122,7 @@ import {
   type DeckStopSplit,
   type RouteStop,
   type ServedFloor,
+  type SnapshotOptions,
 } from './types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -286,6 +289,7 @@ export class Car implements CarLike {
   #passengers: Passenger[] = [];
   #distanceTravelledM = 0;
   #departures = 0;
+  #diversions = 0;
   #stopsServed = 0;
 
   constructor(init: CarInit) {
@@ -647,6 +651,111 @@ export class Car implements CarLike {
     this.#direction = motion.direction;
     this.#departures += 1;
     return motion;
+  }
+
+  /* ---------------------------------------------------------------- *
+   * En-route diversion
+   * ---------------------------------------------------------------- */
+
+  /**
+   * The nearest floor ahead of a moving car that it can **still** be stopped at.
+   *
+   * This is the commit point, and it is the one number that makes collective control
+   * expressible in this model. Without it a car in flight is committed to its destination and
+   * nothing else: `departFor` refuses a second move and the kernel holds exactly one arrival
+   * event, so a down call on a floor the car is about to fly through cannot be taken however
+   * cheap it looks. With it, "where is the car free to act from" stops being the destination
+   * and becomes this — which is why {@link assessDirectionReversal} reads it rather than
+   * `motion.toFloorIndex` when a profile allows diversion.
+   *
+   * Monotone, which is what lets a single index stand for a whole set: a farther floor shares
+   * a longer prefix with the flown profile than a nearer one, so the stoppable floors are
+   * exactly this one and everything beyond it up to the destination. There is no need to ask
+   * per floor.
+   *
+   * Returns `undefined` for a standing car (it has no run to divert), and when the car is
+   * already past the last chance to stop short — on a jerk-limited hop, immediately.
+   *
+   * **Pure.** No mutation, safe inside `estimateCost` (CLAUDE.md invariant 1).
+   */
+  divertFrontier(at: SimTime = this.now()): ServedFloor | undefined {
+    const motion = this.#motion;
+    if (motion === undefined) return undefined;
+    const elapsed = Math.max(0, at - motion.startedAt);
+    const sign = motion.direction === 'up' ? 1 : -1;
+
+    // Ascending in travel order: the first candidate that is still reachable is the frontier,
+    // and by monotonicity every later one is reachable too.
+    const stops = stopFloorsOf(this.shaft);
+    const ordered = sign > 0 ? stops : [...stops].reverse();
+    for (const floor of ordered) {
+      // Strictly between where the run began and where it ends: the destination is not a
+      // diversion, and a floor already behind the start was never on this run.
+      if (sign * (floor.index - motion.fromFloorIndex) <= 0) continue;
+      if (sign * (floor.index - motion.toFloorIndex) >= 0) continue;
+      const candidate = buildProfile(floor.heightM - motion.fromHeightM, this.constraints);
+      if (elapsed <= sharedPrefixSeconds(candidate, motion.profile)) return floor;
+    }
+    return undefined;
+  }
+
+  /**
+   * Cut the run short at a floor the car has not yet committed past.
+   *
+   * The move is **not** re-planned: `sharedPrefixSeconds` has established that the trajectory
+   * flown so far is bit-identical under both profiles, so this swaps which profile the car is
+   * understood to be on and changes nothing about where it has been or how fast it is going.
+   * That is the whole reason the commit point is computed from the profiles rather than from a
+   * braking-distance approximation — an approximate answer here would be a car that arrives at
+   * a speed the comfort envelope forbids, and the energy proxy and the ride-quality numbers
+   * would both quietly absorb it.
+   *
+   * `startedAt` and `commandedAt` are preserved, so the run keeps its identity and its
+   * accounting; only the target and the arrival time move earlier. The caller owns the kernel
+   * and **must** cancel the arrival event it scheduled for the old `arrivesAt` and schedule
+   * one for the new — see `Simulation.#divert`.
+   *
+   * @throws ModelError if the car is not moving, the shaft does not serve `floorId`, or the
+   *   car is already past the point where it could stop there. The last is not a tolerable
+   *   condition to round off: a diversion granted after the commit point is a physically
+   *   impossible stop, and returning silently would let a caller believe it had one.
+   */
+  divertTo(floorId: string, at: SimTime = this.now()): CarMotion {
+    const motion = this.#motion;
+    if (motion === undefined) {
+      throw new ModelError(`Car "${this.id}" is not moving and has no run to divert.`);
+    }
+    const target = shaftFloor(this.shaft, this.stopFloorFor(floorId));
+    if (target === undefined) {
+      throw new ModelError(
+        `Car "${this.id}" cannot divert to "${floorId}": its shaft does not serve that floor.`,
+      );
+    }
+    const frontier = this.divertFrontier(at);
+    const sign = motion.direction === 'up' ? 1 : -1;
+    if (frontier === undefined || sign * (target.index - frontier.index) < 0) {
+      throw new ModelError(
+        `Car "${this.id}" is travelling to "${motion.toFloorId}" and is already past the last point at which it could stop at "${floorId}".`,
+      );
+    }
+
+    const profile = buildProfile(target.heightM - motion.fromHeightM, this.constraints);
+    const diverted: CarMotion = Object.freeze({
+      ...motion,
+      profile,
+      toFloorId: target.id,
+      toFloorIndex: target.index,
+      toHeightM: target.heightM,
+      arrivesAt: motion.startedAt + profile.duration + this.spec.levelingSettleS,
+    });
+    this.#motion = diverted;
+    this.#diversions += 1;
+    return diverted;
+  }
+
+  /** Runs cut short en route since the last reset. Diagnostic; see {@link divertTo}. */
+  get diversions(): number {
+    return this.#diversions;
   }
 
   /**
@@ -1124,7 +1233,7 @@ export class Car implements CarLike {
    * only the committed stops are recomputed — which is what makes ten thousand hypothetical
    * evaluations per dispatch decision affordable.
    */
-  snapshot(at: SimTime = this.now()): CarSnapshot {
+  snapshot(at: SimTime = this.now(), options: SnapshotOptions = {}): CarSnapshot {
     return Object.freeze({
       carId: this.id,
       bankId: this.bankId,
@@ -1135,6 +1244,7 @@ export class Car implements CarLike {
       heightM: this.positionAt(at),
       direction: this.#direction,
       motion: this.#motion,
+      divertFrontierIndex: options.enRouteDiversion === true ? this.divertFrontier(at)?.index : undefined,
       door: this.#door,
       doorConfig: this.doorConfig,
       constraints: this.constraints,
@@ -1375,6 +1485,7 @@ export class Car implements CarLike {
       loadFactor: this.loadSensor.loadFactor,
       distanceTravelledM: this.#distanceTravelledM,
       departures: this.#departures,
+      diversions: this.#diversions,
       stopsServed: this.#stopsServed,
     };
   }
@@ -1399,6 +1510,7 @@ export class Car implements CarLike {
     this.loadSensor.reset();
     this.#distanceTravelledM = 0;
     this.#departures = 0;
+    this.#diversions = 0;
     this.#stopsServed = 0;
   }
 
@@ -1653,6 +1765,7 @@ export interface CarRecord {
   readonly loadFactor: number;
   readonly distanceTravelledM: number;
   readonly departures: number;
+  readonly diversions: number;
   readonly stopsServed: number;
 }
 

@@ -675,6 +675,8 @@ export interface RepositionContext {
 export interface EligibilityStageConfig {
   /** Whether a car may take a call it will arrive at facing the wrong way. */
   readonly allowOppositeDirectionPickup?: boolean | undefined;
+  /** Whether a moving car may be cut short at a floor it has not yet committed past. */
+  readonly enRouteDiversion?: boolean | undefined;
   /** Refuse assignment when the projected load on arrival would exceed this. */
   readonly maxLoadFactorForAssignment?: number | undefined;
 }
@@ -698,6 +700,7 @@ export interface ResolvedDispatchStage {
 /** Stage 2 settings, resolved. */
 export interface ResolvedEligibilityStage {
   readonly allowOppositeDirectionPickup: boolean;
+  readonly enRouteDiversion: boolean;
   readonly maxLoadFactorForAssignment: number;
 }
 

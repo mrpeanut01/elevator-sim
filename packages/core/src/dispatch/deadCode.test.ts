@@ -453,7 +453,11 @@ const DEAD_CANDIDATES: Readonly<Record<string, string>> = Object.freeze({
   'metrics/legDurations': 'no reference outside its own file',
   'sim/SIM_EVENT_TYPE_IDS': 'no reference outside its own file',
   'config/configError': 'no reference outside its own file',
-  'car/stopFloorsOf': 'reads a car snapshot; only its own test calls it',
+  // `car/stopFloorsOf` was here — "reads a car snapshot; only its own test calls it" — until
+  // `Car.divertFrontier` needed the shaft's route nodes in travel order to find a commit point
+  // (`DECISIONS.md` § D205). It now has a non-test caller on the shipped path, so the entry is
+  // deleted rather than reworded: an allowlist that keeps entries after their reason lapses is
+  // where dead code goes to be forgotten, and this file's own assertion says so.
 });
 
 /* -------------------------------------------------------------------------- *
@@ -490,13 +494,17 @@ describe('every export of the fourteen audited core modules has a caller or a st
 
   /*
    * The register is a finding list, so it must be *visible* rather than merely tolerated. This
-   * asserts its exact size: closing one without editing this number fails, and so does adding an
-   * eighth silently. The number goes down, or it goes up with a reason — it does not drift.
+   * asserts its exact size: closing one without editing this number fails, and so does adding a
+   * seventh silently. The number goes down, or it goes up with a reason — it does not drift.
+   *
+   * **7 → 6**, and this is the direction the comment above hopes for: `car/stopFloorsOf` acquired
+   * a non-test caller when `Car.divertFrontier` needed the shaft's route nodes in travel order
+   * (`DECISIONS.md` § D205). Closed by being used, not by being deleted or re-argued.
    */
   it('names every dead candidate, and the count is the one recorded', () => {
     const open = uncalled.filter((symbol) => symbol.key in DEAD_CANDIDATES);
     expect(open.map((symbol) => symbol.key).sort()).toEqual(Object.keys(DEAD_CANDIDATES).sort());
-    expect(open.length, 'dispose a candidate and lower this number; never raise it silently').toBe(7);
+    expect(open.length, 'dispose a candidate and lower this number; never raise it silently').toBe(6);
   });
 
   it('keeps the allowlist honest: no entry may outlive the condition that justified it', () => {

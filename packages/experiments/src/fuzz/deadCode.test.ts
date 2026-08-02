@@ -69,6 +69,23 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
     'the vitest tier’s own switch; § D118 refused to let the CLI read ELEVATOR_SIM_FUZZ',
 
   /*
+   * -- The dispatcher axis a *recorded* case was indexed against. Its consumers are reproductions,
+   * which are tests by construction — the same shape `benchmark/published.ts` records for its pin
+   * tables, and the inverse of the defect this file exists for rather than an instance of it.
+   *
+   * A shipped caller would be wrong. The campaign must fuzz the library as it *ships*, or a profile
+   * added tomorrow is never searched; only the pinned reproductions need a frozen axis, because a
+   * fuzz seed is an index into an option space whose dispatcher dimension is the profile list.
+   * Shipping `collective-enroute` re-mapped every seed and detached `fuzz-1001074` and
+   * `fuzz-1000384` from the runs they documented — `deep.test.ts` reproduced a *different* case at
+   * the same seed and said so by failing (`DECISIONS.md` § D205). So the constant's only correct
+   * callers are the two reproduction suites, and the staleness assertion below is what forces this
+   * to be re-argued if a shipped path ever imports it.
+   */
+  'fuzz/CORPUS_DISPATCHER_PROFILE_IDS':
+    'the frozen dispatcher axis of the recorded corpus; a shipped caller would freeze the search too',
+
+  /*
    * -- The seven fault injectors, whose only legitimate caller is the suite that proves each
    * property can fail. This is not the "every caller was a test" defect but its inverse: a fault
    * injector *called from shipped code* would be the defect. § D118 refused a `--break-dispatch`

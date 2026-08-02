@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest';
 
 import { checkPinned, describeMismatches, selectionSweepFigures } from './published.js';
 import {
+  PRE_REGISTERED_REFERENCE_CANDIDATES,
   PRIMARY_CELLS,
   REGIME_SHARE_FLOOR,
   SECONDARY_CELLS,
@@ -44,6 +45,50 @@ const sweep = async (): Promise<SelectionSweep> => {
   cached ??= runSelectionSweep();
   return await cached;
 };
+
+/* -------------------------------------------------------------------------- *
+ * Reference-arm candidacy — the arm set the pre-registration was made against
+ * -------------------------------------------------------------------------- */
+
+describe('the reference arm is elected from a declared set, not from whatever ships', () => {
+  it('names only profiles the project actually ships', async () => {
+    // The failure this catches is a profile *removed* from `data/` while its name lingers here:
+    // candidacy would then silently narrow, and a narrowed election is a different baseline
+    // wearing the same list.
+    const config = await loadResources();
+    for (const id of PRE_REGISTERED_REFERENCE_CANDIDATES) {
+      expect(
+        config.dispatcherProfilesById.has(id),
+        `PRE_REGISTERED_REFERENCE_CANDIDATES names "${id}", which data/dispatcher-profiles.json does not declare.`,
+      ).toBe(true);
+    }
+  });
+
+  it('contains every cell’s pre-registered reference', () => {
+    // Otherwise a cell could pre-register an arm the census is forbidden to elect, and the
+    // mismatch would be reported as a finding rather than as the configuration error it is.
+    for (const cell of SWEEP_CELLS) {
+      expect(
+        PRE_REGISTERED_REFERENCE_CANDIDATES,
+        `cell "${cell.id}" pre-registers reference "${cell.preRegisteredReference}", which is not a candidate.`,
+      ).toContain(cell.preRegisteredReference);
+    }
+  });
+
+  it('does not admit a profile that post-dates the pre-registration', async () => {
+    // The guard that makes the set a *record* rather than a mirror. `collective-enroute` beats
+    // `collective` on TTD at `midtown-office@hotel` and would be elected on merit (DECISIONS.md
+    // § D205); it is excluded because § D151 was pre-registered without it, not because it lost.
+    // Adding it here is a decision to re-baseline, and must move this line deliberately.
+    const config = await loadResources();
+    const shipped = [...config.dispatcherProfilesById.keys()];
+    const uncontested = shipped.filter((id) => !PRE_REGISTERED_REFERENCE_CANDIDATES.includes(id));
+    expect(
+      uncontested,
+      'a shipped profile outside the candidate set is expected and fine — this assertion exists to make the list visible when it changes, so update it together with DECISIONS.md § D205.',
+    ).toEqual(['collective-enroute']);
+  });
+});
 
 /* -------------------------------------------------------------------------- *
  * The cell set — fixed before any ΔTTD existed
@@ -411,11 +456,29 @@ describe('the sweep, run at the pre-registered budget', () => {
       const reference = row.study.census.rows.find(
         (candidate) => candidate.profileId === row.study.census.referenceProfileId,
       );
+      // The reference is the best among **candidates**, which is three exclusions and not two:
+      // its ceiling (§ D147), its quotability, and whether it was in the arm set the cell was
+      // pre-registered against (§ D205). A profile that post-dates the pre-registration can beat
+      // the reference and must not become it.
       for (const candidate of row.study.census.rows) {
-        if (!candidate.quotable || candidate.ceilingExcluded) continue;
+        if (!candidate.quotable || candidate.ceilingExcluded || !candidate.referenceCandidate) {
+          continue;
+        }
         expect(candidate.meanTtdS, `${row.cell.id}/${candidate.profileId}`).toBeGreaterThanOrEqual(
           reference?.meanTtdS ?? 0,
         );
+      }
+
+      // **And the exclusion is observable, not silent.** Every non-candidate still has a census
+      // row with a real mean, so a reader can see that `collective-enroute` beats the baseline at
+      // this cell rather than having to infer it from an absence. An exclusion that also hid the
+      // number would be indistinguishable from never having measured it.
+      for (const candidate of row.study.census.rows) {
+        if (candidate.referenceCandidate) continue;
+        expect(
+          Number.isFinite(candidate.meanTtdS) || !candidate.quotable,
+          `${row.cell.id}/${candidate.profileId} is excluded from candidacy and must still publish its mean`,
+        ).toBe(true);
       }
     }
   }, TIMEOUT_MS);

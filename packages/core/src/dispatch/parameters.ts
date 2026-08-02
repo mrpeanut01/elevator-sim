@@ -108,6 +108,11 @@ export const DISPATCH_DEFAULTS = Object.freeze({
   maxReassignmentsPerCall: 3,
   /** A car may take a call it will arrive at facing the wrong way, unless a profile forbids it. */
   allowOppositeDirectionPickup: true,
+  /**
+   * Off, so that every run measured before diversion existed replays bit-identically. This is
+   * the switch, not the mechanism: turning it on is what makes a moving car reachable.
+   */
+  enRouteDiversion: false,
   /** Inert at 1.0: the load cell's own bypass has already filtered anything fuller. */
   maxLoadFactorForAssignment: 1,
   /** Off: overriding a full car's bypass is a starvation guard a profile opts into. */
@@ -378,6 +383,13 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     default: DISPATCH_DEFAULTS.allowOppositeDirectionPickup,
     description:
       'Whether a car may take a call it will arrive at facing the wrong way — a down-travelling car answering an up call. Off is one half of conventional collective behaviour; the other half is constraints.noDirectionReversal.',
+  },
+  {
+    id: 'eligibility.enRouteDiversion',
+    type: 'boolean',
+    default: DISPATCH_DEFAULTS.enRouteDiversion,
+    description:
+      'Whether a car already in motion may have its run cut short to take a call on a floor it has not yet committed past. Off, a car is reachable only where it is already going, so a call raised on a floor it is about to fly through costs it a full reversal and conventional collective behaviour refuses it outright. On, the car is judged from its commit point — the last floor it can still decelerate into — and the kernel actually diverts it there.',
   },
   {
     id: 'eligibility.maxLoadFactorForAssignment',

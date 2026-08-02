@@ -300,8 +300,16 @@ describe('every parameter core declares is accounted for', () => {
     // at. The second is the one that matters, because it is the flat-mix negative control
     // `DECISIONS.md` § D162 condition 5 requires — a control an arm could set for itself would
     // not be one.
-    expect(rows).toBe(108);
-    expect(SPACE.parameters.length).toBe(56);
+    //
+    // **108 → 109 and 56 → 57 in the en-route-diversion fix**, the two moving together again, and
+    // for the same reason `selection.*` did: the one new row is `DISPATCH_PARAMETERS`'
+    // `eligibility.enRouteDiversion`, and it is authorable in a profile because *whether a car may
+    // be cut short en route to take a call it is about to fly past* is a dispatcher dimension in
+    // exactly the way `eligibility.allowOppositeDirectionPickup` beside it already is. It is a
+    // boolean, so an optimizer searching the space now searches both halves of collective
+    // behaviour — the turn it will not make, and the stop it will. See `DECISIONS.md` § D205.
+    expect(rows).toBe(109);
+    expect(SPACE.parameters.length).toBe(57);
     // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
     // always said `false` would satisfy the biconditional above only by accident.
     expect(authorable).toBeGreaterThan(0);

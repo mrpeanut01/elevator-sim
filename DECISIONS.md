@@ -12021,3 +12021,202 @@ EN 115-1 derivation lives. The test could not see it because it projected the ex
 same three surviving fields — where the access-zone precedent it was modelled on compares raw. **A
 test written so it cannot fail on the loss it exists to prevent is worse than no test**, and the
 asymmetry against its own precedent is the tell.
+
+## D205 — a car in flight was unreachable, and the repair is a commit point rather than a relaxed constraint
+
+**Date: 2026-08-01 · Reported from observed behaviour: riders waiting to go down were being passed by
+cars returning to the lobby.**
+
+The report was right and the dispatcher was not the cause. A car in motion was judged from its
+**destination**, because that was the only place the kernel could stop it: `Car.departFor` throws
+while `#motion` is set, nothing cancelled a motion, and `Simulation.#depart` scheduled exactly one
+arrival event per run, at the target. There was no floor-crossing event in the model at all. So
+`assessDirectionReversal` measured "behind" from `motion.toFloorIndex`, and a **down** call on a
+floor between a descending car and the lobby came back `reversesToReach=true`,
+`opposesCallDirection=true`, `reversals=2` — the worst the term can return. `collective` declares
+`noDirectionReversal`, so the one car in the building already heading there, facing the right way,
+with room aboard, was **structurally ineligible**.
+
+**The arithmetic was never wrong.** Given a car that cannot stop short of its target, two reversals
+is the correct count, which is why every existing test passed. The defect was one level down:
+commitment granularity equalled hop granularity, and the longest hops in the building are the empty
+return-to-lobby runs stage 7 commands.
+
+**The census, before any fix.** Midtown Office, counting legs whose waiter was physically driven past
+by a car moving in *their* direction while they stood there:
+
+| profile | pattern | rate | legs | passed | AWT | of those pass-bys, cars with room |
+|---|---|---|---|---|---|---|
+| `collective` | down-peak | 3 % | 182 | **106 (58.2 %)** | 35.4 s | **143 / 143** |
+| `collective` | down-peak | 5 % | 340 | 178 (52.4 %) | 106.3 s | 358 / 397 |
+| `predictive-balanced` | down-peak | 5 % | 340 | 251 (73.8 %) | 48.2 s | 296 / 388 |
+
+The 3 % row is the one that decides it: AWT 35.4 s is nowhere near saturation, and **every** car that
+drove past a waiting rider had spare capacity. Not queueing, not capacity bypass — the direction
+assessment.
+
+**What was rejected.** Changing `fromIndex` to `car.floorIndex` and leaving the kernel alone. That
+makes eligibility optimistic about a stop the physics still refuses; calls would be assigned to cars
+that sail past them and have to come back, which is worse than the behaviour it replaces, and it is
+the disagreement `terms/directionReversal.ts` already warned about.
+
+**What was built.** A commit point, and a kernel that honours it.
+
+1. `sharedPrefixSeconds` (`physics/motion/sCurve.ts`) — how long two profiles describe the *same*
+   trajectory. Two `speedLimited` profiles under one envelope have identical `jerkTime` and
+   `accelTime` (functions of the constraints alone) and differ only in `cruiseTime`, so they agree
+   from rest until the shorter one brakes. A diversion inside that window is **exact**: the car has
+   already flown a trajectory consistent with both, so nothing is re-solved from a non-zero initial
+   velocity and no comfort limit is touched. Phase start states are compared for exact equality, so
+   drift can only ever *shorten* the window.
+2. `Car.divertFrontier` / `Car.divertTo` — the nearest floor still stoppable, and the relabelling.
+   `divertTo` **throws** past the commit point rather than rounding off; a granted-but-impossible
+   stop is a car arriving at a speed the envelope forbids.
+3. `Simulation.#considerDiversion` — cancels the superseded arrival and schedules the new one. The
+   kernel's `cancel` preserves the cancelled slot's `(time, sequence)`, so a diverting run fires
+   every surviving event in the order a run that never scheduled it would (invariant 4). Its
+   docstring already named this case — *"hall-call reassignment superseding a committed arrival"* —
+   and nothing in the tree called it. A twelfth dead seam, closed by using it.
+4. `eligibility.enRouteDiversion`, declared in `DISPATCH_PARAMETERS` with type and default
+   (invariant 8), **off** by default so every run measured before this replays bit-identically.
+
+**Presence is permission, and that is the design.** `CarSnapshot.divertFrontierIndex` is populated
+only when the runner passes `enRouteDiversion` to `Car.snapshot`, which `Simulation.#snapshots` does
+from the resolved profile. Eligibility, every cost term and `projectRoute` then read **one field**
+and need no configuration of their own. The alternative was threading a flag through nine call sites
+and hoping nobody added a tenth that forgot it.
+
+**The first draft was inert, and the liveness check is in the study because of it.** The eligibility
+half landed without the cost half: `projectRoute` still started a moving car's route at its
+destination, so the right car became legal and stayed permanently uncompetitive — its ETA was "fly to
+the lobby, turn round, come back up". Diversions: **0**, output bit-identical to baseline. A paired
+interval containing zero has two readings, *"the effect is small"* and *"the switch does nothing"*,
+and only the second is a bug. `DiversionCell.live` separates them: under CRN two arms that behave
+identically produce bit-identical samples, so a non-zero largest paired difference is proof the
+mechanism fired.
+
+**The measurement.** `benchmark/enRouteDiversion.ts`, Midtown Office down-peak, `collective` against
+itself with the one field flipped, paired-t at 95 % under verified common random numbers, n = 50:
+
+| rate | ΔAWT | ΔTTD | AWT quotable |
+|---|---|---|---|
+| 1 % | **−1.052 [−1.481, −0.623]** | +0.323 [−0.201, +0.847] | yes |
+| 2 % | **−3.002 [−3.878, −2.125]** | **−1.687 [−3.145, −0.229]** | yes |
+| 3 % | −3.325 [−4.980, −1.670] | −2.557 [−4.942, −0.173] | **no — not quoted** |
+
+Both quotable cells exclude zero on AWT. **3 % is measured and deliberately not asserted on**: it is
+where the census was taken and its difference is the largest of the three, but at n = 50 at least one
+replication saturates and `awtIsValid` goes false, and docs/03 forbids reporting a mean for a system
+whose queues grow without bound. Quoting the biggest number in the study from the one cell whose
+interval the project's own rules suppress is the reasoning this repository exists to avoid.
+
+**What is *not* in the arm, and why.** `dispatch.reassignmentPolicy: 'until-commitment'`. A call is
+frozen on its car at assignment under every shipped profile, so a call given to a distant car before
+a nearer one began descending can never move to the car that later flies past — which caps what
+diversion alone recovers, and is why the pass-by rate falls much less than AWT does. Turning
+reassignment on is the obvious companion change and it **drives `collective` into saturation** on
+this building: AWT above 850 s at every rate tried, with `diversions` still zero, so it is not
+diversion doing it. That is a pre-existing pathology in the reassignment path, it is unrelated to
+this defect, and bundling it in would have made a working mechanism look like a broken one. It wants
+its own investigation.
+
+**Adoption was attempted and is blocked by a leak this work found, not by a preference.**
+
+The first attempt shipped `collective-enroute` with `role: "baseline"`. That was a mislabel — `role`
+is a *derivation key*, and `doubleDeck.ts` and `mixedUseHighRise.ts` build their arm lists from it, so
+the profile enrolled itself in the double-deck comparison and produced twenty unpinned figures for a
+question with nothing to do with diversion. Dropping the role fixed that cleanly: **no existing pin
+moved**, and every one of those failures was a new arm rather than a changed number.
+
+**Two studies then failed in a way a new arm cannot explain, and the cause is now known.**
+`selection-sweep` and `weight-set-selection` each reported **40 mismatches, all of them values** — no
+missing keys, no unpinned keys. `midtown-hotel-1.5pct/fuzzy/cost/awtS` moved from `0.357` to `0.403`,
+**bit-identically across runs and across two differently-named profiles at different positions in the
+file**, so it was deterministic rather than the environment-dependent pin noise § D201 documents.
+
+Four mechanisms were measured and eliminated, each with a direct probe rather than an argument:
+the **simulation** (same experiment with and without the extra profile — identical AWT samples and
+identical trace digests, on the failing cell's own derived building `midtown-office@hotel`, not a
+convenient one); **cross-arm contamination** (adding or reordering an unrelated arm leaves `fuzzy`'s
+samples bit-identical, so CRN is not leaking between arms); the **search space** (`searchSpace()`
+reads `DISPATCH_PARAMETERS`, never `data/`); and the **learned winner** (`learnSelectionPolicy`
+returns the same four gains to the last digit either way).
+
+**The cause is `censusSelectionPoint`, and it is the study working as designed.** It runs *every
+shipped profile* as a census arm and elects the reference as the one with the lowest mean TTD:
+
+```ts
+const profileIds = [...input.resources.dispatcherProfilesById.keys()];
+for (const row of quotable) if (row.meanTtdS < best.meanTtdS) best = row;
+referenceProfileId: best.profileId,
+```
+
+At `midtown-office@hotel` 1.5 %, seed 20260726: without the profile the reference is `collective` at
+**54.4459 s**; with it the reference becomes the diversion profile at **54.0100 s**. Every `gate` and
+`cost` figure in both studies is a *paired difference against the reference arm*, so electing a
+better reference moves all forty. That also explains why every simulation probe came back identical —
+nothing about any run changed; **which run the others are measured against** changed.
+
+So the three earlier observations were all consistent with one rule and none of them with a leak: a
+profile with no `eligibility` block is behaviourally identical to `collective` and does not beat it;
+a profile at `waitTime: 0.99` does not beat it; a profile that actually diverts does.
+
+**There was nothing to fix and one thing to decide, and the decision was taken.** The setting does
+not leak across profiles — it is resolved per profile and reaches the model only through
+`Simulation.#snapshots`, exactly as designed. What the census does is elect a baseline, and electing
+one *on merit, continuously* is right the first time and wrong every time after: § D151 fixed this
+sweep's protocol before any ΔTTD existed, and § D156, § D162 and § D200 rest on figures measured
+against the arm it elected.
+
+**So candidacy is now declared and measurement is not.** `censusSelectionPoint` takes
+`referenceCandidates`, defaulting to `PRE_REGISTERED_REFERENCE_CANDIDATES` — the twelve profiles
+§ D151 was pre-registered against. Every shipped profile still runs, still gets a census row and
+still publishes its mean, so a later profile that beats the baseline is **visible in the census
+rather than hidden by it**; `CensusRow.referenceCandidate` says why it was not eligible. That is the
+same split `ceilingExcludedArms` already makes, for the same reason, and opting out is explicit
+(`referenceCandidates: null`) so a caller cannot re-baseline by omission.
+
+The evidence that it worked is that nothing moved: **`selection-sweep` and `weight-set-selection`
+reproduce their original pins unchanged**, `lunchTwoWaySelection`'s two `reference` pins are still
+`auction-multi-round` and its verdict is still NOT ACCEPTED, while
+`treatment/quotable-census-arms` moved 12 → 13 — measured, not elected, which is the distinction
+stated as a number.
+
+**`collective-enroute` therefore ships.** Two things about it are load-bearing and easy to undo by
+accident, and both are recorded in the profile's own `$comment`: it declares **no `role`**, because
+`role: "baseline"` is a derivation key that `doubleDeck.ts` and `mixedUseHighRise.ts` build arm lists
+from — labelling it baseline enrolled it in the double-deck comparison and produced twenty unpinned
+figures for an unrelated question — and it is deliberately **absent from
+`PRE_REGISTERED_REFERENCE_CANDIDATES`**, because it beats `collective` on TTD at
+`midtown-office@hotel` and would be elected on merit.
+
+**The same lesson then landed a third time, in `fuzz/`.** A fuzz case is a seed decoded against an
+option space whose dispatcher dimension is the shipped profile list, so a thirteenth profile re-maps
+every seed: `caseFromSeed(1_001_074, …)` stopped naming the eleven-floor single-car building whose
+922.7 s wait closed `fuzz-1001074` and named something else, reproducing a *different* run under the
+same seed. Nothing failed loudly — the reproduction simply reproduced the wrong thing, and
+`deep.test.ts` caught it only because it asserts the run's numbers rather than merely that it ran.
+`CORPUS_DISPATCHER_PROFILE_IDS` freezes the axis for the **recorded** reproductions; the campaign
+keeps fuzzing the library as it ships, because a profile nobody searches is a profile nobody tests.
+The corpus censuses that legitimately track `data/` moved with it and say so (539 → 571, 93 → 95,
+27 → 36).
+
+**Three instances of one defect, in one change.** `role: "baseline"`, the census reference, and the
+fuzz seed axis are all *"derive it from the shipped profile list"*, and all three turned a list into
+a silent input to a published number. Deriving is right where the answer should track `data/` and
+wrong wherever a figure was measured once and is quoted since. That distinction is now written down
+in all three places rather than rediscovered a fourth time.
+
+**One measured aside worth not burying:** `collective-enroute` is **bit-identical to `collective` at
+both up-peak cells of the benchmark gate** and separates only at `garden-residential`
+(ΔAWT −1.360 against −1.269, both relative to `nearest-car`). Pure up-peak is the pattern that least
+exercises en-route pickup, which is exactly what the down-peak study says; the arm is in the gate
+because every shipped profile must face it, not because the gate is where its case is made.
+
+**The gap is named rather than disguised.** `Simulation.#considerDiversion` fires only from tests and
+from `benchmark/livenessSuite.ts` — precisely the shape docs/05-roadmap.md's standing requirement
+distrusts, and the standing requirement is what caught the study half of it (`src/index.test.ts`
+failed with *"has at least one non-test, non-barrel caller of measureDiversionAt"*). What remains is
+whether `collective` itself should carry the setting — expensive, because every published
+`collective` figure would be invalidated — and that wants the study re-run at n = 200 across more
+than one building first.

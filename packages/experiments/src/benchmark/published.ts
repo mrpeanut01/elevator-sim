@@ -907,6 +907,16 @@ export const STUDY_ENTRY_POINTS: Readonly<Record<string, PublishedStudyId | 'no-
     // no standard error anywhere in it — the claim is that two sequences differ, not by how much —
     // so `livenessSuite.ts` is its driver rather than the pin table.
     measureWeightSetSelectionLiveness: 'no-intervals',
+    // Structural, not pinned. `measureDiversionAt` computes paired intervals and
+    // `enRouteDiversion.test.ts` prints them, but every assertion it makes is about the
+    // *apparatus* rather than the value: the arms were paired (identical trace digests), the
+    // mechanism fired (a non-zero paired difference under CRN, which is what separates "small
+    // effect" from "inert switch"), and the AWT interval is quotable at all. No figure from it is
+    // asserted anywhere, so there is nothing for a pin to hold — and correspondingly nothing in
+    // this repository claims a number it would have to regenerate. If `eligibility.enRouteDiversion`
+    // is ever adopted on a shipped profile, that changes: the study becomes a published figure and
+    // needs an id and a pin like any other. See `DECISIONS.md` § D205.
+    measureDiversionAt: 'no-intervals',
     // Double-deck operation against the single-deck arm the retired `doubleDeckNotSimulated`
     // disclaimer described, at two censused operating points on `vertical-city`. Publishes
     // paired-t intervals on ten metrics, so `regeneratePins.ts` is its non-test caller.
@@ -965,6 +975,10 @@ export const PINNED_ESTIMATES: Readonly<
     "garden-residential/collective/pctOverLongWait": { n: 500, mean: -0.3800200933573363, standardError: 0.09945119433554514, lower: -0.575414777837209, upper: -0.1846254088774636 },
     "garden-residential/collective/ttdMeanS": { n: 500, mean: -3.680868462083656, standardError: 0.2187148183926376, lower: -4.110583894024203, upper: -3.251153030143109 },
     "garden-residential/collective/wt95S": { n: 500, mean: -3.84425954987177, standardError: 0.36006176277132784, lower: -4.55168347775943, upper: -3.1368356219841096 },
+    "garden-residential/collective-enroute/awtS": { n: 500, mean: -1.3597301020309005, standardError: 0.12291254652879081, lower: -1.6012199947171561, upper: -1.1182402093446449 },
+    "garden-residential/collective-enroute/pctOverLongWait": { n: 500, mean: -0.4175200933573363, standardError: 0.11035874031439895, lower: -0.6343451540054125, upper: -0.20069503270926012 },
+    "garden-residential/collective-enroute/ttdMeanS": { n: 500, mean: -3.663370830616216, standardError: 0.21924701464808113, lower: -4.094131884181606, upper: -3.232609777050825 },
+    "garden-residential/collective-enroute/wt95S": { n: 500, mean: -3.9654499090994415, standardError: 0.3656965370315812, lower: -4.683944643587802, upper: -3.2469551746110805 },
     "garden-residential/destination-eta/awtS": { n: 500, mean: -1.274923328413108, standardError: 0.10772512295373383, lower: -1.48657404362807, upper: -1.063272613198146 },
     "garden-residential/destination-eta/pctOverLongWait": { n: 500, mean: -0.43764204457684847, standardError: 0.11226717559957262, lower: -0.6582166641205034, upper: -0.2170674250331936 },
     "garden-residential/destination-eta/ttdMeanS": { n: 500, mean: -1.9040621129723294, standardError: 0.139158587845912, lower: -2.177471080521533, upper: -1.6306531454231257 },
@@ -1017,6 +1031,10 @@ export const PINNED_ESTIMATES: Readonly<
     "midtown-up-peak/collective/pctOverLongWait": { n: 250, mean: -7.3548065155836895, standardError: 0.6564266605502094, lower: -8.647663024439378, upper: -6.061950006728002 },
     "midtown-up-peak/collective/ttdMeanS": { n: 250, mean: -10.356236682593348, standardError: 0.7097713429914008, lower: -11.75415751020953, upper: -8.958315854977165 },
     "midtown-up-peak/collective/wt95S": { n: 250, mean: -23.370313169992823, standardError: 1.4241136950429996, lower: -26.175157596091566, upper: -20.56546874389408 },
+    "midtown-up-peak/collective-enroute/awtS": { n: 250, mean: -6.814796943474347, standardError: 0.460185037829568, lower: -7.72114834141616, upper: -5.908445545532534 },
+    "midtown-up-peak/collective-enroute/pctOverLongWait": { n: 250, mean: -7.3548065155836895, standardError: 0.6564266605502094, lower: -8.647663024439378, upper: -6.061950006728002 },
+    "midtown-up-peak/collective-enroute/ttdMeanS": { n: 250, mean: -10.356236682593348, standardError: 0.7097713429914008, lower: -11.75415751020953, upper: -8.958315854977165 },
+    "midtown-up-peak/collective-enroute/wt95S": { n: 250, mean: -23.370313169992823, standardError: 1.4241136950429996, lower: -26.175157596091566, upper: -20.56546874389408 },
     "midtown-up-peak/destination-eta/awtS": { n: 250, mean: -6.710757196838767, standardError: 0.45493663261868494, lower: -7.606771667221429, upper: -5.814742726456104 },
     "midtown-up-peak/destination-eta/pctOverLongWait": { n: 250, mean: -7.3548065155836895, standardError: 0.6564266605502094, lower: -8.647663024439378, upper: -6.061950006728002 },
     "midtown-up-peak/destination-eta/ttdMeanS": { n: 250, mean: -10.23022352397853, standardError: 0.7116260010897452, lower: -11.63179716909627, upper: -8.82864987886079 },
@@ -1069,6 +1087,10 @@ export const PINNED_ESTIMATES: Readonly<
     "secure-up-peak/collective/pctOverLongWait": { n: 150, mean: -4.429925122305146, standardError: 0.5119325885714427, lower: -5.441510663410848, upper: -3.4183395811994446 },
     "secure-up-peak/collective/ttdMeanS": { n: 150, mean: -7.18550512270792, standardError: 0.5406776492236365, lower: -8.253891282455832, upper: -6.117118962960009 },
     "secure-up-peak/collective/wt95S": { n: 150, mean: -19.52395099275389, standardError: 1.4781496981897648, lower: -22.444794274974143, upper: -16.603107710533635 },
+    "secure-up-peak/collective-enroute/awtS": { n: 150, mean: -5.7661346897783226, standardError: 0.39189227767384754, lower: -6.540518994696471, upper: -4.9917503848601745 },
+    "secure-up-peak/collective-enroute/pctOverLongWait": { n: 150, mean: -4.429925122305146, standardError: 0.5119325885714427, lower: -5.441510663410848, upper: -3.4183395811994446 },
+    "secure-up-peak/collective-enroute/ttdMeanS": { n: 150, mean: -7.18550512270792, standardError: 0.5406776492236365, lower: -8.253891282455832, upper: -6.117118962960009 },
+    "secure-up-peak/collective-enroute/wt95S": { n: 150, mean: -19.52395099275389, standardError: 1.4781496981897648, lower: -22.444794274974143, upper: -16.603107710533635 },
     "secure-up-peak/destination-eta/awtS": { n: 150, mean: -5.637664867537945, standardError: 0.40080077717569446, lower: -6.42965248486518, upper: -4.845677250210709 },
     "secure-up-peak/destination-eta/pctOverLongWait": { n: 150, mean: -4.429925122305146, standardError: 0.5119325885714427, lower: -5.441510663410848, upper: -3.4183395811994446 },
     "secure-up-peak/destination-eta/ttdMeanS": { n: 150, mean: -7.219781850690365, standardError: 0.5438528486520514, lower: -8.294442246350615, upper: -6.1451214550301145 },

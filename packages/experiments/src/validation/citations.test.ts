@@ -59,6 +59,15 @@ const SKIP_DIRS: ReadonlySet<string> = new Set([
   'coverage',
   '.vite',
   '.turbo',
+  // **A git worktree is a different checkout, not authored content of this one.** `.worktrees/`
+  // is gitignored and holds full trees of other branches; walking into them makes this guard
+  // report *this* branch as broken because a document on *another* branch cites a path that
+  // exists there and not here. That is exactly what happened: seventeen of the failures were
+  // `.worktrees/w13-*/docs/15-compute-offload-contract.md → infra/README.md`, a contract and an
+  // `infra/` directory that live on a branch this tree has never had. Every one of those
+  // documents is already checked by this same test when its own branch runs it, so skipping is
+  // not a coverage loss — it is the difference between auditing a tree and auditing the disk.
+  '.worktrees',
 ]);
 
 function markdownFiles(dir: string, acc: string[] = []): string[] {
