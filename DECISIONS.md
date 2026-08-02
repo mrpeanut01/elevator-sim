@@ -12329,3 +12329,73 @@ failed with *"has at least one non-test, non-barrel caller of measureDiversionAt
 whether `collective` itself should carry the setting — expensive, because every published
 `collective` figure would be invalidated — and that wants the study re-run at n = 200 across more
 than one building first.
+
+## D206 — a direction refusal is transient, and treating it like a durable one saturated a bank
+
+**Date: 2026-08-02 · Found while investigating why `reassignmentPolicy: 'until-commitment'` capped
+what [§ D205](DECISIONS.md)'s en-route diversion could recover.**
+
+`collective` under `until-commitment` reported **AWT 332.2 s against a 32.3 s control** on Midtown
+Office down-peak at 3 %, with the saturation flag set and a longest wait of 876 s. It was noticed as
+a side observation — `diversions` was zero, so it plainly was not § D205's mechanism — and it turned
+out to be a live defect in stage 5.
+
+**The shipped profiles are fine, which is why nobody had seen it.** `fairness-first` (35.7 s) and
+`capacity-aware` (34.0 s) both declare `until-commitment` and both sit beside the 32.3 s control.
+`collective` is the only shipped profile declaring a **hard constraint**, and the pathology needs
+both. Removing just the constraint: **332.2 → 36.9**.
+
+**The mechanism, counted rather than reasoned about.** Stage 5 takes a call off its incumbent
+*without hysteresis* when that car is no longer eligible, because *"holding a call on an ineligible
+car is how a floor starves"*. Instrumenting every decision of a run:
+
+| | reassignments | via ineligible incumbent | via cheaper rival | held by hysteresis |
+|---|---|---|---|---|
+| `collective` + `until-commitment` | 11 | **8** | 3 | 3 |
+| the same without the hard constraint | 3 | **0** | 3 | 21 |
+
+Eight of eleven reassignments took the escape hatch, and hysteresis — the thing that exists to stop
+exactly this thrash — held three calls against twenty-one.
+
+**Why the escape hatch is wrong here.** It is right for a car that filled up or left service: those
+cannot serve the call at all, and the call must move. `noDirectionReversal` refuses a car for **where
+it is pointing right now**, which is the one thing about it guaranteed to change — it is on its way
+somewhere and settles its direction on arrival, and it was chosen in the first place because it is
+the car that should serve this landing. Yanking the call restarts its clock, and the car it moves to
+is under the same constraint and becomes ineligible in its turn.
+
+**So the fix is a distinction, not a knob.** `TRANSIENT_INELIGIBILITY` is `hardConstraint` and
+`oppositeDirection` — the two geometric refusals — and an incumbent refused for either keeps
+defending its call like any other. Everything else surrenders it as before. This is deliberately
+**not** a tunable: *"may a call be taken from the car that is on its way to it, because that car is
+momentarily pointing the wrong way"* has one defensible answer.
+
+It is also deliberately **not** the same set as `Simulation`'s `STRUCTURAL_INELIGIBILITY`, which
+answers a different question — *"will retrying this call ever help?"*, where access and service
+zoning are permanent and a load ceiling is not. This axis is *"will this car's own answer change on
+its own?"*, where the load ceiling is durable enough to surrender a call over and the direction is
+not. Two sets, two questions; collapsing them would be wrong in both places.
+
+| | before | after |
+|---|---|---|
+| `collective` + `until-commitment` | 332.2 s, **saturated**, max 876 s | **34.0 s**, not saturated, max 75 s |
+| ” + `continuous` | 302.9 s, saturated | 34.0 s |
+| ” + `commitmentPoint: on-door-open` | 302.9 s, saturated | 34.0 s |
+| ” + `reassignmentHysteresisS: 0` / `30` | 114.7 s / 279.3 s | 34.8 s / 34.8 s |
+| reassignments via ineligible incumbent | 8 | **0** |
+| held by hysteresis | 3 | **66** |
+
+The hysteresis figures are the tell: before the fix the knob barely mattered because the path that
+bypassed it carried most of the traffic, and `0` outperformed `5`, which is not a thing a working
+hysteresis does.
+
+**Nothing shipped moved.** `collective`, `eta`, `fairness-first` and `capacity-aware` are unchanged
+to the digit, and the full suite passes with **no pinned figure regenerated** — the change can only
+reach a profile that combines a direction constraint with reassignment, and no shipped profile does.
+
+**Both halves are guarded** (`dispatch/transientIneligibility.test.ts`). The transient half is the
+run: no saturation, no reassignment via an ineligible incumbent, and hysteresis holding more than it
+releases. The durable half is driven at the policy, because the two cases differ by one field on one
+snapshot: a withdrawn car **loses** its call and is refused `serviceMode`, while a car merely
+pointing the wrong way **keeps** it and is refused `noDirectionReversal`. Asserting only the first
+would have passed before the change; asserting only the second would trade a thrash for a stranding.
