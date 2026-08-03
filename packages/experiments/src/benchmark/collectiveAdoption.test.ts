@@ -42,6 +42,7 @@ import {
   type UpPeakCheck,
 } from './collectiveAdoption.js';
 import type { DiversionCell } from './enRouteDiversion.js';
+import { PINNED_ESTIMATES } from './published.js';
 
 const DEEP = process.env['ELEVATOR_SIM_DEEP'] === '1';
 
@@ -149,6 +150,7 @@ function upPeakPass(caseId: string): UpPeakCheck {
     caseId,
     waiting: comparison(0, 0, 0),
     timeToDestination: comparison(0, 0, 0),
+    awtIsValid: true,
     identical: true,
     commonRandomNumbers: true,
   };
@@ -172,6 +174,7 @@ function passingStudy(): AdoptionStudy {
     ladders: [],
     cells,
     upPeak: UP_PEAK_CASE_IDS.map(upPeakPass),
+    decomposition: [],
   };
 }
 
@@ -258,13 +261,31 @@ describe('§ D209 § 3 — the decision rule', () => {
     expect(adoptionVerdict({ ...study, cells }).betterOutOfSample).toBe(false);
   });
 
+  it('refuses an up-peak cell whose AWT the project forbids quoting', () => {
+    // The half of clause 5 that says *stays quotable*. A refusal drawn from a saturated cell is
+    // still a mean this project does not allow itself to read, and arriving at it from the
+    // conservative direction does not make it sound.
+    const study = passingStudy();
+    const upPeak = [...study.upPeak];
+    const first = upPeak[0];
+    if (first === undefined) throw new Error('no up-peak cells');
+    upPeak[0] = { ...first, awtIsValid: false };
+    const verdict = adoptionVerdict({ ...study, upPeak });
+    expect(verdict.upPeakHolds).toBe(false);
+    // And it says which half failed, because "cannot see the cell" and "can see it, and the
+    // answer is no" call for different follow-up work.
+    expect(verdict.failures.join(' ')).toContain('not quotable');
+  });
+
   it('refuses an up-peak regression, and refuses an up-peak cell that was never run', () => {
     const regressed = passingStudy();
     const upPeak = [...regressed.upPeak];
     const first = upPeak[0];
     if (first === undefined) throw new Error('no up-peak cells');
     upPeak[0] = { ...first, waiting: comparison(0.9, 0.3, 1.5), identical: false };
-    expect(adoptionVerdict({ ...regressed, upPeak }).upPeakHolds).toBe(false);
+    const verdict = adoptionVerdict({ ...regressed, upPeak });
+    expect(verdict.upPeakHolds).toBe(false);
+    expect(verdict.failures.join(' ')).toContain('significantly worse');
 
     expect(adoptionVerdict({ ...passingStudy(), upPeak: [] }).upPeakHolds).toBe(false);
   });
@@ -277,9 +298,59 @@ describe('§ D209 § 3 — the decision rule', () => {
       ladders: [],
       cells: [],
       upPeak: [],
+      decomposition: [],
     };
     expect(formatAdoptionStudy(empty, adoptionVerdict(empty))).toContain('DO NOT ADOPT');
   });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The correction — a published claim this repository's own pins refute
+ * -------------------------------------------------------------------------- */
+
+/**
+ * § D205 and `arms.ts` both asserted that `collective-enroute` is **bit-identical** to `collective`
+ * at the two pure up-peak cells, and that *"every pinned figure for the two arms matches to the last
+ * digit"*. Six of the eight pinned figures at those cells do not match, and the pin table has said
+ * so since the day the arm landed. Nothing could fail on it: the claim is prose about numbers, and
+ * no test read the numbers.
+ *
+ * The half of the explanation that was right is that **the mechanism is inert here** — under pure
+ * up-peak cars run to the lobby empty and climb full, so there is almost nothing to divert *for*,
+ * and `stageActivity.diversions` is 0. The half that was wrong is the conclusion: the arms differ by
+ * `detourPenalty: 0.2` as well as by the setting, and a weight does not need a diversion to fire in
+ * order to re-order which car takes a call.
+ *
+ * So this asserts the pins rather than the prose, in both directions — the metrics that differ must
+ * keep differing, and `pctOverLongWait`, which really does match, must keep matching. A future
+ * change that made the arms genuinely identical would fail here and have to say why, which is the
+ * point: the claim was never checked, and now it cannot go stale in silence.
+ */
+describe('the up-peak arms are not bit-identical, whatever the docs used to say', () => {
+  const benchmark = PINNED_ESTIMATES.benchmark;
+  const figure = (key: string): number => {
+    const pin = benchmark[key];
+    if (pin === undefined) throw new Error(`no pin "${key}"`);
+    return pin.mean;
+  };
+
+  for (const caseId of UP_PEAK_CASE_IDS) {
+    it(`${caseId}: the wait-sensitive metrics differ between collective and collective-enroute`, () => {
+      for (const metric of ['awtS', 'ttdMeanS', 'wt95S']) {
+        expect(
+          figure(`${caseId}/collective-enroute/${metric}`),
+          `${caseId}/${metric} — if these are now equal, the mechanism or the weight changed and ` +
+            `§ D210's correction has to be re-derived rather than deleted`,
+        ).not.toBe(figure(`${caseId}/collective/${metric}`));
+      }
+    });
+
+    it(`${caseId}: pctOverLongWait really does match, which is where the claim came from`, () => {
+      expect(figure(`${caseId}/collective-enroute/pctOverLongWait`)).toBe(
+        figure(`${caseId}/collective/pctOverLongWait`),
+      );
+    });
+  }
 });
 
 /* -------------------------------------------------------------------------- *

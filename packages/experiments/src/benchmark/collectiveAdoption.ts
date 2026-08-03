@@ -47,13 +47,23 @@
  * stops a descending ladder being a way of shopping for a cell.
  */
 
-import type { LoadedConfig } from '@elevator-sim/core';
+import type { DispatcherProfile, LoadedConfig } from '@elevator-sim/core';
 
-import { comparePaired, digestsOf, loadResources, runGateExperiment, samplesOf } from '../validation/harness.js';
+import {
+  cellOf,
+  comparePaired,
+  derivedProfile,
+  digestsOf,
+  loadResources,
+  runGateExperiment,
+  samplesOf,
+  withProfiles,
+} from '../validation/harness.js';
 import type { PairedComparison } from '../validation/harness.js';
 import type { ReplicationMetric } from '../runner/metrics.js';
 
 import { BENCHMARK_CASES, type BenchmarkCase } from './arms.js';
+import { BENCHMARK_SEED } from './suite.js';
 import {
   CANDIDATE_ID,
   DIVERSION_SEED,
@@ -181,6 +191,16 @@ export interface UpPeakCheck {
   readonly caseId: string;
   readonly waiting: PairedComparison;
   readonly timeToDestination: PairedComparison;
+  /**
+   * Whether either arm suppressed its AWT interval on any replication.
+   *
+   * Clause 5 says *stays quotable* **and** *not significantly worse*, and the two halves are not
+   * interchangeable: a mean this project forbids quoting cannot refuse adoption any more than it
+   * can grant it. Refusing on an interval drawn from a saturated cell would be the exact reasoning
+   * docs/03 § Saturation detection exists to prevent, arriving from the conservative direction —
+   * which does not make it sound.
+   */
+  readonly awtIsValid: boolean;
   readonly identical: boolean;
   readonly commonRandomNumbers: boolean;
 }
@@ -192,6 +212,14 @@ export interface AdoptionStudy {
   readonly ladders: readonly ResolvedLadder[];
   readonly cells: readonly AdoptionCell[];
   readonly upPeak: readonly UpPeakCheck[];
+  /**
+   * Why up-peak does what it does, whichever way it goes.
+   *
+   * Measured unconditionally rather than only on a failure, because "the clause passed" and "the
+   * clause passed for the reason we think" are different claims, and a decomposition run only when
+   * the answer is inconvenient is a decomposition nobody can calibrate.
+   */
+  readonly decomposition: readonly Decomposition[];
 }
 
 /** § D209 § 3, clause by clause. `accepted` is the conjunction and nothing else. */
@@ -274,10 +302,139 @@ export async function checkUpPeak(
     caseId: benchmark.id,
     waiting,
     timeToDestination,
+    awtIsValid:
+      cellOf(result, SOURCE_ID).aggregate.awtIsValid && cellOf(result, CANDIDATE_ID).aggregate.awtIsValid,
     // § D205's "bit-identical at both up-peak cells", re-derived rather than quoted.
     identical: waiting.maxAbsDifference === 0 && timeToDestination.maxAbsDifference === 0,
     commonRandomNumbers:
       baseline.length === candidate.length && baseline.every((digest, index) => digest === candidate[index]),
+  });
+}
+
+/* -------------------------------------------------------------------------- *
+ * The decomposition — is it the weight, or is it the mechanism?
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Three arms at one cell, so the two halves of adoption can be told apart.
+ *
+ * Adoption ships **two** authored changes together — `eligibility.enRouteDiversion: true` and
+ * `detourPenalty: 0.2` — and a two-arm contrast cannot say which one moved a number. That is not a
+ * hypothetical worry here: § D205 records the profile's whole history as a sequence of exactly this
+ * confusion being resolved, and § D206 opens by naming the same shape (*"`collective-enroute`
+ * differs from `collective` in two authored things … so 'the profile is better' leaves open which
+ * one is doing it"*).
+ *
+ * - `classic` — shipped `collective`.
+ * - `weightOnly` — plus `detourPenalty: 0.2`, diversion still **off**.
+ * - `shipped` — plus both. Identical to what adoption would make `collective`.
+ *
+ * `weightOnly − classic` is what the price tag costs. `shipped − weightOnly` is what the mechanism
+ * buys. Their sum is what adoption does, so a decomposition that does not add up is a bug in the
+ * arms rather than a finding.
+ */
+export interface Decomposition {
+  readonly caseId: string;
+  readonly building: string;
+  readonly replications: number;
+  readonly seed: number;
+  /** `weightOnly − classic`: the cost of pricing the detour. */
+  readonly weightWaiting: PairedComparison;
+  readonly weightTimeToDestination: PairedComparison;
+  /** `shipped − weightOnly`: what the mechanism itself does, with the weight held fixed. */
+  readonly mechanismWaiting: PairedComparison;
+  readonly mechanismTimeToDestination: PairedComparison;
+  /** `shipped − classic`: what adoption does. */
+  readonly adoptionWaiting: PairedComparison;
+  readonly adoptionTimeToDestination: PairedComparison;
+  /**
+   * Whether the mechanism moved anything at all here.
+   *
+   * Under CRN two arms that behave identically are bit-identical, so a zero `maxAbsDifference`
+   * between `shipped` and `weightOnly` is proof the diversion never fired — the direct reading of
+   * `stageActivity.diversions == 0`, obtained without instrumenting the run.
+   */
+  readonly mechanismInert: boolean;
+  readonly commonRandomNumbers: boolean;
+  readonly awtIsValid: boolean;
+}
+
+const CLASSIC_ARM = 'adoption-classic';
+const WEIGHT_ONLY_ARM = 'adoption-weight-only';
+const SHIPPED_ARM = 'adoption-shipped';
+
+/** The three arms, all derived from shipped `collective` so the contrast is one change at a time. */
+function decompositionArms(base: DispatcherProfile): readonly DispatcherProfile[] {
+  const priced = Object.freeze({ ...base.weights, detourPenalty: DETOUR_PENALTY });
+  return Object.freeze([
+    derivedProfile(base, CLASSIC_ARM, {
+      eligibility: { ...base.eligibility, enRouteDiversion: false },
+    } as Partial<Omit<DispatcherProfile, 'id'>>),
+    derivedProfile(base, WEIGHT_ONLY_ARM, {
+      weights: priced,
+      eligibility: { ...base.eligibility, enRouteDiversion: false },
+    } as Partial<Omit<DispatcherProfile, 'id'>>),
+    derivedProfile(base, SHIPPED_ARM, {
+      weights: priced,
+      eligibility: { ...base.eligibility, enRouteDiversion: true },
+    } as Partial<Omit<DispatcherProfile, 'id'>>),
+  ]);
+}
+
+/**
+ * The weight the shipped diverting profile carries.
+ *
+ * Declared here rather than read from `collective-enroute` because the decomposition has to keep
+ * working after a verdict either way: if `collective` adopts, that profile is gone, and if it does
+ * not, this module still has to be able to re-derive why.
+ */
+export const DETOUR_PENALTY = 0.2;
+
+/** Run the three-arm decomposition at one benchmark gate case. */
+export async function decomposeAt(
+  benchmark: BenchmarkCase,
+  config: LoadedConfig,
+  seed: number,
+): Promise<Decomposition> {
+  const base = config.dispatcherProfilesById.get(SOURCE_ID);
+  if (base === undefined) throw new Error(`no dispatcher profile "${SOURCE_ID}"`);
+  const arms = decompositionArms(base);
+
+  const result = await runGateExperiment({
+    id: `adoption-decomposition-${benchmark.id}-${seed}`,
+    seed,
+    building: benchmark.building,
+    dispatchers: [CLASSIC_ARM, WEIGHT_ONLY_ARM, SHIPPED_ARM],
+    traffic: benchmark.traffic,
+    replications: benchmark.replications,
+    resources: withProfiles(config, arms),
+  });
+
+  const between = (candidate: string, baseline: string, metric: ReplicationMetric): PairedComparison =>
+    comparePaired(metric, samplesOf(result, candidate, metric), samplesOf(result, baseline, metric));
+  const digests = [CLASSIC_ARM, WEIGHT_ONLY_ARM, SHIPPED_ARM].map((id) => digestsOf(result, id));
+  const mechanismWaiting = between(SHIPPED_ARM, WEIGHT_ONLY_ARM, 'awtS');
+  const mechanismTimeToDestination = between(SHIPPED_ARM, WEIGHT_ONLY_ARM, 'ttdMeanS');
+
+  return Object.freeze({
+    caseId: benchmark.id,
+    building: benchmark.building,
+    replications: benchmark.replications,
+    seed,
+    weightWaiting: between(WEIGHT_ONLY_ARM, CLASSIC_ARM, 'awtS'),
+    weightTimeToDestination: between(WEIGHT_ONLY_ARM, CLASSIC_ARM, 'ttdMeanS'),
+    mechanismWaiting,
+    mechanismTimeToDestination,
+    adoptionWaiting: between(SHIPPED_ARM, CLASSIC_ARM, 'awtS'),
+    adoptionTimeToDestination: between(SHIPPED_ARM, CLASSIC_ARM, 'ttdMeanS'),
+    mechanismInert:
+      mechanismWaiting.maxAbsDifference === 0 && mechanismTimeToDestination.maxAbsDifference === 0,
+    commonRandomNumbers: (digests[0] ?? []).every(
+      (digest, index) => digest === digests[1]?.[index] && digest === digests[2]?.[index],
+    ),
+    awtIsValid: [CLASSIC_ARM, WEIGHT_ONLY_ARM, SHIPPED_ARM].every(
+      (id) => cellOf(result, id).aggregate.awtIsValid,
+    ),
   });
 }
 
@@ -332,10 +489,18 @@ export async function runCollectiveAdoptionStudy(
   }
 
   const upPeak: UpPeakCheck[] = [];
+  const decomposition: Decomposition[] = [];
   for (const caseId of UP_PEAK_CASE_IDS) {
     const benchmark = BENCHMARK_CASES.find((entry) => entry.id === caseId);
     if (benchmark === undefined) throw new Error(`no benchmark case "${caseId}"`);
     upPeak.push(await checkUpPeak(benchmark, config, ADOPTION_HOLDOUT_SEED));
+    // Both seeds. The verdict is taken at the holdout seed alone — clause 5 named the cells and not
+    // a seed, and the implementation chose one before any number existed — but the gate's own seed
+    // is where this repository's pinned up-peak figures live, so it is measured and reported
+    // beside it rather than left to be wondered about.
+    for (const seed of [ADOPTION_HOLDOUT_SEED, BENCHMARK_SEED]) {
+      decomposition.push(await decomposeAt(benchmark, config, seed));
+    }
     say(`  up-peak ${caseId} done`);
   }
 
@@ -346,6 +511,7 @@ export async function runCollectiveAdoptionStudy(
     ladders: Object.freeze(ladders),
     cells: Object.freeze(cells),
     upPeak: Object.freeze(upPeak),
+    decomposition: Object.freeze(decomposition),
   });
 }
 
@@ -422,18 +588,39 @@ export function adoptionVerdict(study: AdoptionStudy): AdoptionVerdict {
     );
   }
 
-  const upPeakFailures = study.upPeak.filter(
+  // Clause 5's two halves are reported apart, because they mean different things. "Not quotable"
+  // says the apparatus cannot see the cell; "regressed" says it can, and the answer is no.
+  const unquotable = study.upPeak.filter((check) => !check.awtIsValid || !check.commonRandomNumbers);
+  const regressed = study.upPeak.filter(
     (check) =>
-      !check.commonRandomNumbers ||
-      check.waiting.estimate.lower > 0 ||
-      check.timeToDestination.estimate.lower > 0,
+      check.awtIsValid &&
+      check.commonRandomNumbers &&
+      (check.waiting.estimate.lower > 0 || check.timeToDestination.estimate.lower > 0),
   );
-  const upPeakHolds = upPeakFailures.length === 0 && study.upPeak.length === UP_PEAK_CASE_IDS.length;
+  const upPeakHolds =
+    unquotable.length === 0 && regressed.length === 0 && study.upPeak.length === UP_PEAK_CASE_IDS.length;
   if (!upPeakHolds) {
-    failures.push(
-      `clause 5 — up-peak regressed or was not measured at ` +
-        `${upPeakFailures.map((check) => check.caseId).join(', ') || 'a missing cell'}`,
-    );
+    const reasons: string[] = [];
+    if (unquotable.length > 0) {
+      reasons.push(`not quotable at ${unquotable.map((check) => check.caseId).join(', ')}`);
+    }
+    if (regressed.length > 0) {
+      reasons.push(
+        `significantly worse at ${regressed
+          .map(
+            (check) =>
+              `${check.caseId} (${
+                [
+                  ...(check.waiting.estimate.lower > 0 ? ['AWT'] : []),
+                  ...(check.timeToDestination.estimate.lower > 0 ? ['TTD'] : []),
+                ].join(' and ')
+              })`,
+          )
+          .join(', ')}`,
+      );
+    }
+    if (study.upPeak.length !== UP_PEAK_CASE_IDS.length) reasons.push('an up-peak cell was not measured');
+    failures.push(`clause 5 — up-peak ${reasons.join('; ')}`);
   }
 
   return Object.freeze({
@@ -489,8 +676,20 @@ export function formatAdoptionStudy(study: AdoptionStudy, verdict: AdoptionVerdi
   for (const check of study.upPeak) {
     lines.push(
       `    ${check.caseId.padEnd(20)} AWT ${interval(check.waiting).padEnd(28)} ` +
-        `TTD ${interval(check.timeToDestination).padEnd(28)} bit-identical=${String(check.identical)}`,
+        `TTD ${interval(check.timeToDestination).padEnd(28)} ` +
+        `awtValid=${String(check.awtIsValid)} bit-identical=${String(check.identical)}`,
     );
+  }
+  if (study.decomposition.length > 0) {
+    lines.push(``, `  up-peak decomposed — the weight, then the mechanism on top of it:`);
+    for (const part of study.decomposition) {
+      lines.push(
+        `    ${part.caseId.padEnd(18)} seed ${String(part.seed)}  ` +
+          `weight ${interval(part.weightWaiting).padEnd(28)} ` +
+          `mechanism ${interval(part.mechanismWaiting).padEnd(28)} ` +
+          `inert=${String(part.mechanismInert)}`,
+      );
+    }
   }
   lines.push(
     ``,
