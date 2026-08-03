@@ -13009,3 +13009,126 @@ term, which invariant 7 permits only for a genuinely new term and which would ne
 criterion, written first. Neither is attempted here. **§ D209's clause 6 — the re-baselining is paid
 in full — was never reached**, so no pin was regenerated, no phase verdict was re-derived, and
 `PRE_REGISTERED_REFERENCE_CANDIDATES` still means exactly what § D151 registered.
+
+
+## D211 — the criterion for a diversion-conditional detour term, and why § D209's clause 5 is replaced rather than relaxed
+
+**Date: 2026-08-03 · Pre-registration, written before the term exists.**
+[§ D210](DECISIONS.md) refused adoption and named the cause precisely: at up-peak the diversion
+mechanism fires **zero** times, the paired contrast between "diversion off" and "diversion on" is
+exactly `[0.000, 0.000]`, and the whole of the regression is `detourPenalty: 0.2` — a constant
+weight re-ordering car choices to pay for a mechanism that is not running. This is the criterion for
+the fix § D210 § 4 named first, and it is filed before a line of the term is written.
+
+### 0. The premise was measured, and it came back half true
+
+The obvious design is *"charge the detour only where a diversion happens"*. That is only worth
+building if the weight's value **is** diversion-conditional, so it was measured rather than assumed
+— four arms under CRN at `vertical-city` down-peak 2 %, n = 60, every arm quotable:
+
+| contrast | AWT | TTD |
+|---|---|---|
+| weight alone, diversion **off** | −0.048 [−0.149, +0.053] | **−0.930 [−1.263, −0.598]** |
+| diversion alone, no weight | −0.149 [−0.342, +0.044] | **+1.818 [+1.331, +2.304]** |
+| the repair, weight on top of diversion | −0.131 [−0.285, +0.023] | **−2.597 [−3.069, −2.125]** |
+
+**About a third of the weight's TTD work survives with the mechanism switched off.** `detourPenalty`
+is not only paying for diversion; it is also doing ordinary detour pricing that `collective`'s
+`waitTime`-only scoring otherwise lacks, and a strictly conditional term **forfeits that third by
+construction**. That is a real cost of the design and it is recorded here, before the study, so it
+cannot be discovered later and presented as a surprise.
+
+It is accepted for one reason: **a conditional term's weight is free in a way a constant's is
+not.** The constant cannot be raised without buying more up-peak damage — that is § D210's whole
+finding. A term that is identically zero wherever no diversion occurs can be weighted as hard as the
+harm requires and still cost **exactly nothing** everywhere else. The design trades a third of the
+benefit for the right to tune the remaining two thirds without a budget.
+
+These figures are a **design input, not a verdict**: n = 60, and measured at 20 261 612, a seed
+§ D209 and § D210 have already spent. Nothing below rests on them.
+
+### 1. What is built
+
+`diversionDetour` — a new cost term, and new **code**, which CLAUDE.md invariant 7 permits only for
+a genuinely new cost term. It is one:
+
+```
+raw = (serving this call would cut the car's current run short) ? detourPassengerSeconds : 0
+```
+
+`detourPenalty` measures added onboard delay **however the car reaches the call**.
+`diversionDetour` measures it **only when the assignment truncates a committed run**, and is
+identically zero for a stationary car, for a profile with `enRouteDiversion` off, and for any call
+the car was going to pass anyway. The two are not expressible as weights on one another — which is
+invariant 7's actual test — because no weight on `detourPenalty` can be zero at up-peak and non-zero
+at down-peak.
+
+It declares `activeWhen: { 'eligibility.enRouteDiversion': ['true'] }`, so a generic optimizer skips
+the dimension where it is dead (invariant 8), exactly as `rideTime` declares its call types.
+`detourPenalty` is **not** modified, gated, or deprecated: `predictive-balanced` weights it at 0.4
+with no diversion and legitimately wants general detour pricing.
+
+### 2. Clause 5 is replaced, and the replacement is stricter
+
+§ D209 clause 5 read *"not significantly worse at up-peak"*. That was the right question for a
+constant weight, where the only issue is how much collateral damage the price tag does. For a
+conditional term it is the **wrong** question, and too weak: a correctly scoped term contributes
+exactly zero where the mechanism is inert, so the right clause is categorical rather than
+statistical.
+
+> **Clause 5′ — inert where the mechanism is inert.** At every cell where the run reports
+> `stageActivity.diversions == 0`, the candidate profile must be **bit-identical** to shipped
+> `collective`: a zero largest paired difference on both metrics, not an interval containing zero.
+
+This is a strengthening in three ways. It is exact rather than statistical, so no `n` can hide a
+failure. It cannot be passed by a small effect. And it is checked at **every** such cell rather than
+at the two up-peak cases § D209 named.
+
+**A criterion that only got stricter would still be a bad trade if it opened a hole, and this one
+does.** A term that is *always* zero passes clause 5′ trivially and perfectly. That is not a
+hypothetical failure mode in this repository — it is § D205's own first draft, which was inert,
+reported bit-identical output, and produced exactly the zeros a successful null result would. So
+clause 5′ arrives with its own counterweight:
+
+> **Clause 6′ — the term is live where the mechanism is live.** At every quotable down-peak cell the
+> study measures, the run must report `diversions > 0`, the term must return a **non-zero raw value**
+> on at least one evaluation, and it must **separate two candidate cars** — the standard
+> `terms/liveness.test.ts` already holds every registered term to. A term that cannot change an
+> `argmin` is worse than no term: a Phase 7 optimizer would spend real replications on its weight.
+
+### 3. What carries over from § D209 unchanged
+
+Clauses 1–4 are re-used verbatim, because nothing about the architecture change touches them:
+paired and live at every quotable cell; all five buildings contribute a quotable cell; worse on
+neither metric anywhere on either seed; and ΔAWT excluding zero and negative at **at least three**
+holdout cells. The § D209 § 2 ladders are re-used unchanged, and the cell is still the highest rung
+whose `awtIsValid` holds on both arms at n = 200.
+
+### 4. A third seed, because two are now spent
+
+`detourPenalty: 0.2` was fitted at **20 260 801**. § D209 took its verdict at **20 261 612**, and
+§ 0 above has now looked at that seed again. Both are burned.
+
+- The new weight is searched at **20 260 801**, the seed the original weight was fitted at — so the
+  two designs are tuned on the same traffic and the comparison is not a seed effect.
+- The verdict is taken at **20 262 423** (`20 260 801 + 2 × 811`), disjoint from both, and unlooked
+  at until the study runs.
+
+**The search is a declared grid, not a search.** Weights `{0.2, 0.5, 1.0, 2.0}` on
+`diversionDetour`, chosen before any of them is run, and the winner is the one minimising ΔTTD at
+`vertical-city` down-peak on the **tuning** seed. Four points, declared here, so that "we tried
+until it worked" is not available as a description of what happened.
+
+### 5. What refusal looks like, and what it would mean
+
+If the study refuses, `collective` keeps `enRouteDiversion` off, `collective-enroute` stays the
+opt-in profile, and the term is **still kept** if clause 6′ passes — a live, correctly-scoped term
+that does not happen to earn a default is a library entry, not a mistake, and `predictive-balanced`
+and the Phase 7 search space can both use it. If clause 6′ *fails* — if the term is inert — the term
+is deleted rather than shipped, because that is the one outcome this repository has learned to
+delete rather than explain.
+
+**And § D209 clause 6 still stands unpaid.** Adoption, if it comes, still owes the full
+re-baselining: every moved pin regenerated and read, and Phase 6c's refusal re-derived against the
+new reference rather than assumed. Passing the criterion below earns the right to start that work,
+not the right to skip it.
