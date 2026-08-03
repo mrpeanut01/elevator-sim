@@ -34,6 +34,7 @@ export {
   advanceDoor,
   applyDoorCommand,
   createDoorState,
+  crowdingFactorFor,
   doorAccountingAt,
   doorOpenFractionAt,
   dwellSecondsFor,
@@ -46,6 +47,7 @@ export {
 } from './doorMachine.js';
 
 export {
+  CROWDING_PARAMETERS,
   DOOR_DEFAULTS,
   DOOR_EVENT_TYPES,
   DOOR_OPEN_DECLINES,
@@ -60,6 +62,7 @@ export type {
   DoorCommand,
   DoorConfig,
   DoorConfigOverrides,
+  DoorCrowdingConfig,
   DoorEvent,
   DoorEventType,
   DoorMachineState,

@@ -138,6 +138,9 @@ function cleanEvidence(overrides: Partial<AwtValidityEvidence> = {}): AwtValidit
     windowSeconds: 300,
     maxUnservedFraction: 0.05,
     unservedFraction: 0.05,
+    abandonedCount: 0,
+    abandonmentFraction: 0,
+    maxAbandonmentFraction: 0.02,
     ...overrides,
   };
 }
@@ -188,6 +191,18 @@ const CASES: Readonly<Record<AwtInvalidGround, GroundCase>> = {
       'passengers who waited least, so the reported mean is biased low by an unknown amount and ' +
       'its confidence interval must be suppressed.',
   },
+  abandoned: {
+    evidence: cleanEvidence({
+      abandonedCount: 4,
+      abandonmentFraction: 0.2,
+    }),
+    reason:
+      '4 of 20 arrivals in the reporting window (20.0%) gave up and left before a car reached ' +
+      'them, above the 2.0% abandonment limit. Every one of those waits was longer than the ones ' +
+      'the mean is taken over, so abandonment lowers AWT by construction and the reported mean of ' +
+      '42.5 s describes the riders who stayed rather than the service they were offered; its ' +
+      'confidence interval must be suppressed.',
+  },
   starved: {
     evidence: cleanEvidence({
       serviceLevel: serviceLevel({
@@ -212,7 +227,7 @@ describe('every ground is enumerated, reachable, and worded', () => {
     // which the type cannot see. A ground deleted from the spec table leaves an orphan here.
     expect([...Object.keys(CASES)].sort()).toEqual([...AWT_INVALID_GROUNDS].sort());
     // Not vacuous: an emptied enumeration would satisfy the line above against an emptied map.
-    expect(AWT_INVALID_GROUNDS.length).toBeGreaterThan(3);
+    expect(AWT_INVALID_GROUNDS.length).toBeGreaterThan(4);
   });
 
   it('the codes are distinct, so no two grounds are indistinguishable to a consumer', () => {

@@ -175,6 +175,122 @@ function finish(
 }
 
 /* -------------------------------------------------------------------------- *
+ * Moving the peak (docs/14 § 2.3)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * How far this template's peak can move in either direction, seconds. `0` means it cannot.
+ *
+ * The movable knots are the phase boundaries strictly inside `(0, durationS)`. The run's start and
+ * end are fixed — a shift is *when the busy part happens*, not a shorter or longer day — so the
+ * limit is whichever endpoint the outermost interior knot reaches first.
+ *
+ * **`constant-iso` returns 0, and that is the answer rather than a limitation.** It has one phase
+ * and no interior boundary, so it has no peak to move; shifting only its report window would
+ * change which passengers were measured without changing a single one of them, which is noise
+ * dressed as a model. {@link shiftTemplatePeak} refuses a nonzero shift here rather than silently
+ * doing nothing, because a control that silently does nothing is the defect docs/14 § 5
+ * criterion 2 exists to catch.
+ */
+export function maxPeakShiftS(template: ResolvedDemandTemplate): number {
+  let earliest = Number.POSITIVE_INFINITY;
+  let latest = Number.NEGATIVE_INFINITY;
+  for (const phase of template.phases) {
+    for (const knot of [phase.startS, phase.endS]) {
+      if (knot <= 0 || knot >= template.durationS) continue;
+      if (knot < earliest) earliest = knot;
+      if (knot > latest) latest = knot;
+    }
+  }
+  if (!Number.isFinite(earliest)) return 0;
+  return Math.max(0, Math.min(earliest, template.durationS - latest));
+}
+
+/**
+ * Refuse a peak-shift **bound** this template cannot absorb, before anything is drawn from it.
+ *
+ * Called on the declared `dayVariation.peakShiftS` and not only on the value drawn, which is the
+ * whole point: a bound of 900 s on a template that can take 750 s would otherwise run fine on
+ * every draw inside 750 and throw on the rest, so the same configuration would pass at one seed
+ * and fail at another. A configuration error must not be a coin flip.
+ *
+ * @throws TrafficError with the template's own limit in the message.
+ */
+export function requirePeakShiftFits(
+  template: ResolvedDemandTemplate,
+  magnitudeS: number,
+): void {
+  if (!Number.isFinite(magnitudeS) || magnitudeS < 0) {
+    throw new TrafficError(
+      `dayVariation.peakShiftS must be a finite, non-negative number of seconds; received ${magnitudeS}. It is the largest shift in *either* direction, so a negative bound is not a shift the other way.`,
+    );
+  }
+  if (magnitudeS === 0) return;
+
+  const limit = maxPeakShiftS(template);
+  if (limit <= 0) {
+    throw new TrafficError(
+      `Demand template "${template.id}" has no interior phase boundary, so it has no peak to move; a ${magnitudeS} s dayVariation.peakShiftS cannot be applied to it. Its intensity is flat, and shifting only its measurement window would change which passengers were counted without changing a single arrival.`,
+    );
+  }
+  if (magnitudeS > limit) {
+    throw new TrafficError(
+      `A ${magnitudeS} s peak shift does not fit inside demand template "${template.id}": its outermost phase boundary is ${limit} s from an end of the ${template.durationS} s run. Shorten dayVariation.peakShiftS or lengthen the run.`,
+    );
+  }
+}
+
+/**
+ * The same template with its peak `shiftS` seconds later (or earlier, for a negative value).
+ *
+ * **Total demand is conserved exactly, not approximately.** Every interior knot moves by the same
+ * amount and the two endpoints are pinned, so the up-ramp lengthens by precisely as much as the
+ * down-ramp shortens and `∫ intensity dt` is unchanged — which is what makes this knob orthogonal
+ * to {@link DayVariationConfig.minDemandFactor}: one moves *when* people arrive, the other moves
+ * *how many*. `demandTemplate.test.ts` asserts the integral rather than assuming the algebra.
+ *
+ * The measurement window travels with the peak. It has to: the window exists to measure the busy
+ * part, and a window that stayed put while the hold moved out from under it would report a slice
+ * of a ramp — the defect {@link riseAndFallTemplate} centres its window to avoid.
+ *
+ * **A mix-varying template's period mean moves slightly, and that is a modelled consequence.**
+ * Each phase keeps its own endpoint mixes and changes span, so `meanDirectionalSplit` — a
+ * *time*-weighted average — shifts: a later peak spends longer in the early, outgoing-dominant
+ * part of a `lunch-two-way` arc. That is what a late lunch is. It is recomputed by {@link finish}
+ * from the shifted phases rather than carried over, so the template cannot disagree with itself.
+ *
+ * @throws TrafficError for a template with no interior phase boundary, or a shift larger than
+ *   {@link maxPeakShiftS}.
+ */
+export function shiftTemplatePeak(
+  template: ResolvedDemandTemplate,
+  shiftS: number,
+): ResolvedDemandTemplate {
+  if (!Number.isFinite(shiftS)) {
+    throw new TrafficError(`Peak shift must be a finite number of seconds; received ${shiftS}`);
+  }
+  if (shiftS === 0) return template;
+  requirePeakShiftFits(template, Math.abs(shiftS));
+
+  const move = (timeS: number): number =>
+    timeS <= 0 || timeS >= template.durationS ? timeS : timeS + shiftS;
+
+  return finish({
+    id: template.id,
+    name: template.name,
+    recommended: template.recommended,
+    durationS: template.durationS,
+    phases: template.phases.map((phase) => ({
+      ...phase,
+      startS: move(phase.startS),
+      endS: move(phase.endS),
+    })),
+    reportWindowStartS: move(template.reportWindowStartS),
+    reportWindowEndS: move(template.reportWindowEndS),
+  });
+}
+
+/* -------------------------------------------------------------------------- *
  * Rise and fall (CIBSE Guide D) — the recommended template
  * -------------------------------------------------------------------------- */
 

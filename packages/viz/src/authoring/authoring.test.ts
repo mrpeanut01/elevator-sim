@@ -20,6 +20,7 @@ import {
   parseElevatorSpecs,
   parseTrafficProfiles,
   resolveBuilding,
+  type ConservationAudit,
   type DispatcherProfile,
   type ElevatorSpecs,
   type SimulationConfig,
@@ -36,7 +37,9 @@ import {
   buildingFromSpec,
   canExpress,
   credentialGroupsOf,
+  escalatorSecondsFor,
   floorIdOf,
+  nextTransportModeId,
   nextZoneId,
   occupancyLine,
   orphanFloors,
@@ -45,8 +48,11 @@ import {
   specFromBuilding,
   specIsDirty as buildingSpecIsDirty,
   totalPopulation,
+  transportModesOf,
   unreachableFloors,
   validateSpec,
+  withTransportEnd,
+  withTransportSeconds,
   withZoneFloor,
   withZoneGroup,
   zoneFloorsOf,
@@ -182,7 +188,7 @@ describe('the dispatcher spec', () => {
       const after = recordRun(configFor(rebuilt), { recordDecisions: false }).result.record;
       expect(JSON.stringify(after)).toBe(JSON.stringify(before));
     }
-  });
+  }, 60_000);
 
   it('writes a cost line that names every weighted term and nothing else', () => {
     const profile = PROFILES.profiles.find((p) => p.id === 'energy-aware') as DispatcherProfile;
@@ -268,7 +274,7 @@ describe('the dispatcher editor is not decoration', () => {
       );
     };
     expect(new Set([runWith('snappy'), runWith('normal'), runWith('patient')]).size).toBe(3);
-  });
+  }, 60_000);
 
   it('takes its dwell seconds from the shipped bands, not from an invented number', () => {
     const hall = SPECS.doors.dwellHallCallS;
@@ -348,23 +354,23 @@ describe('the traffic editor is not decoration', () => {
 
   it('the peak demand slider changes how many people turn up', () => {
     expect(runWith({ ...DEFAULT_PATTERN, ratePctPop5min: 20 })).not.toBe(control);
-  });
+  }, 60_000);
 
   it('the peak-hold slider changes the run', () => {
     expect(runWith({ ...DEFAULT_PATTERN, peakWindowS: 600 })).not.toBe(control);
-  });
+  }, 60_000);
 
   it('the peak order changes the run', () => {
     expect(runWith({ ...DEFAULT_PATTERN, order: 'down-first' })).not.toBe(control);
-  });
+  }, 60_000);
 
   it('the interfloor slider changes the run', () => {
     expect(runWith({ ...DEFAULT_PATTERN, interfloorShare: 0.6 })).not.toBe(control);
-  });
+  }, 60_000);
 
   it('the off-peak level changes the run', () => {
     expect(runWith({ ...DEFAULT_PATTERN, baselineFraction: 0.8 })).not.toBe(control);
-  });
+  }, 60_000);
 
   it('the mean group size changes the run — the slider that reaches the file, not the options', () => {
     /*
@@ -382,7 +388,7 @@ describe('the traffic editor is not decoration', () => {
       recordDecisions: false,
     }).recording;
     expect(JSON.stringify(after.legs)).not.toBe(JSON.stringify(before.legs));
-  });
+  }, 60_000);
 
   it('leaves the file byte-identical when the batch mean was not moved', () => {
     // The comparable default has to stay comparable: an override nobody asked for is a different run.
@@ -536,7 +542,7 @@ describe('the machines editor is not decoration', () => {
      */
     expect(JSON.parse(control)).not.toHaveLength(0);
     expect(control).toBe(runWith(hydraulic));
-  });
+  }, 60_000);
 
   it('a changed rated speed changes the legs', () => {
     /*
@@ -546,13 +552,13 @@ describe('the machines editor is not decoration', () => {
      * slider.
      */
     expect(runWith(saved({ speedTypicalMps: 1.0, speedMaxMps: 1.0 }))).not.toBe(control);
-  });
+  }, 60_000);
 
   it('a changed acceleration changes the legs', () => {
     // Doubled, 0.6 → 1.2 m/s² — the field reaches `resolveCar` directly, since no car config this
     // editor writes declares an acceleration of its own.
     expect(runWith(saved({ accelerationMps2: 1.2 }))).not.toBe(control);
-  });
+  }, 60_000);
 
   it('a changed capacity changes the legs, on a load where capacity binds', () => {
     /*
@@ -568,7 +574,7 @@ describe('the machines editor is not decoration', () => {
     const busyControl = runWith(saved({}), BUSY);
     expect(JSON.parse(busyControl)).not.toHaveLength(0);
     expect(runWith(smaller, BUSY)).not.toBe(busyControl);
-  });
+  }, 60_000);
 });
 
 /* ========================================================================== *
@@ -676,6 +682,277 @@ describe('the building spec', () => {
     }
   });
 
+  it('carries Vertical City’s four escalators through the round trip it used to drop', () => {
+    /*
+     * The same destructive silence access zoning had, one field over, and found the same way.
+     * `specFromBuilding` never looked at `transportModes`, so opening the one shipped building
+     * with sky lobbies and saving it untouched produced a tower whose four two-level lobbies had
+     * lost their escalators — every lobby-level crossing charged back to a lift, which is the
+     * **110 of 593 journeys** § D147 § 6 measured before the field existed at all.
+     *
+     * Asserted over all five buildings rather than the one, because the four that declare none are
+     * the arms that would keep passing if the field were dropped again — and the key must stay
+     * absent on them, not become `[]`, so a download still reads like the document it came from.
+     */
+    for (const id of BUILDING_IDS) {
+      const config = parseBuilding(read(`buildings/${id}.json`));
+      const rebuilt = buildingFromSpec(specFromBuilding(config, id), { specs: SPECS });
+      const source = config.transportModes ?? [];
+      const written = rebuilt.transportModes ?? [];
+      if (source.length === 0) {
+        expect(Object.hasOwn(rebuilt, 'transportModes'), id).toBe(false);
+        continue;
+      }
+      /*
+       * **Raw, with no projection.** An earlier version of this loop mapped the expectation
+       * through the same three fields `specFromBuilding` carries, which made it structurally
+       * incapable of failing on a dropped field — it was defending a claim stronger than the one
+       * that holds. The key set is asserted exactly instead, so a field that starts or stops
+       * surviving turns this red and forces the docstring to be rewritten with it.
+       */
+      for (const mode of written) {
+        expect(Object.keys(mode).sort(), id).toStrictEqual([
+          '$comment',
+          'connects',
+          'id',
+          'traversalTimeS',
+        ]);
+      }
+      expect(written.map((mode) => mode.id), id).toStrictEqual(source.map((mode) => mode.id));
+      expect(written.map((mode) => mode.connects), id).toStrictEqual(
+        source.map((mode) => mode.connects),
+      );
+      expect(written.map((mode) => mode.traversalTimeS), id).toStrictEqual(
+        source.map((mode) => mode.traversalTimeS),
+      );
+      /*
+       * The two fields that do **not** survive, asserted as losses rather than projected away.
+       * The source really does declare both on every machine, so these are live assertions and
+       * not a description of an empty set.
+       */
+      expect(source.every((mode) => mode.name !== undefined), id).toBe(true);
+      expect(written.every((mode) => mode.name === undefined), id).toBe(true);
+      expect(source.every((mode) => mode.$comment !== undefined), id).toBe(true);
+      expect(
+        written.every((mode, index) => mode.$comment !== source[index]?.$comment),
+        id,
+      ).toBe(true);
+      /*
+       * And what replaces the dropped citation is the honest one. `specFromBuilding` cannot
+       * preserve an uneven floor pitch, so 21.2 s is not what this spec's geometry gives — and
+       * the emitted comment says so rather than reprinting a derivation that no longer holds.
+       */
+      for (const mode of written) {
+        expect(mode.$comment, id).toMatch(/SET BY HAND and NOT cited/);
+      }
+    }
+    const tower = specFromBuilding(parseBuilding(read('buildings/vertical-city.json')), 'vertical-city');
+    expect(tower.transportModes).toHaveLength(4);
+    expect(tower.transportModes.map((mode) => mode.connects)).toStrictEqual([
+      [0, 1],
+      [25, 26],
+      [50, 51],
+      [75, 76],
+    ]);
+  });
+
+  it('seeds a new escalator from the rise, by the derivation Vertical City performs by hand', () => {
+    /*
+     * `vertical-city`'s four `$comment`s derive 21.2 s from a 4.5 m rise — 30° inclination (the
+     * only angle BS EN 115-1 permits above a 6 m rise), 0.5 m/s nominal, two flat steps of 0.40 m
+     * at each landing. The seed here is that arithmetic, so a machine a reader adds is not a
+     * guessed constant, and this pins it to the shipped figure rather than to itself.
+     */
+    const spec: BuildingSpec = { ...BLANK_SPEC, floorHeightM: 4.5 };
+    expect(escalatorSecondsFor(spec, [0, 1])).toBe(21.2);
+    for (const mode of (parseBuilding(read('buildings/vertical-city.json')).transportModes ?? [])) {
+      expect(mode.traversalTimeS).toBe(21.2);
+    }
+    // And it moves with the geometry, which is why it is derived rather than a constant.
+    expect(escalatorSecondsFor({ ...spec, floorHeightM: 3.6 }, [0, 1])).toBe(17.6);
+  });
+
+  it('cites the traversal time it emits, and says so plainly when the number is not derived', () => {
+    /*
+     * `TransportModeConfig.traversalTimeS` is a **reference value**, and its own contract requires
+     * the declaring building's `$comment` to cite it. A designer emitting the number bare would
+     * put *a guess wearing a number* into `data/buildings/` with nothing to notice — this
+     * repository's own phrase for the defect, and its reference-data rule forbids it.
+     *
+     * Computed rather than carried, so it cannot go stale: it is re-derived from the current spec
+     * on every emit. The two branches are the whole of why that is safe.
+     */
+    const spec: BuildingSpec = { ...BLANK_SPEC, floorHeightM: 4.5 };
+    const seeded: BuildingSpec = {
+      ...spec,
+      transportModes: [
+        { id: 'escalator-1', connects: [0, 1], traversalTimeS: escalatorSecondsFor(spec, [0, 1]) },
+      ],
+    };
+    const derived = transportModesOf(seeded)[0]?.$comment ?? '';
+    expect(derived).toMatch(/DERIVED by the building designer/);
+    // The arithmetic is in the comment, with this building's own numbers rather than a template.
+    expect(derived).toMatch(/rise 4\.50 m/);
+    expect(derived).toMatch(/4\.50 \/ sin 30 = 9\.00 m at 0\.5 m\/s = 18\.0 s/);
+    expect(derived).toMatch(/Total landing to landing 21\.2 s/);
+    expect(derived).toMatch(/docs\/02-elevator-reference\.md/);
+
+    // A hand-set figure is labelled the author's and is **not** claimed to be cited. Writing the
+    // derivation beside a number it does not produce is the stale-citation defect itself.
+    const byHand: BuildingSpec = {
+      ...seeded,
+      transportModes: withTransportSeconds(seeded, 'escalator-1', 30),
+    };
+    const hand = transportModesOf(byHand)[0]?.$comment ?? '';
+    expect(hand).toMatch(/SET BY HAND and NOT cited: 30\.0 s/);
+    expect(hand).toMatch(/derives 21\.2 s by the EN 115-1 method/);
+    expect(hand).not.toMatch(/DERIVED by the building designer/);
+
+    // And the clause that does not travel is named where it stops holding, rather than left to be
+    // read as a citation: EN 115-1 states the two-flat-step allowance for a rise of 6 m or less.
+    const tall: BuildingSpec = {
+      ...spec,
+      transportModes: [
+        { id: 'escalator-1', connects: [0, 3], traversalTimeS: escalatorSecondsFor(spec, [0, 3]) },
+      ],
+    };
+    expect(transportModesOf(tall)[0]?.$comment ?? '').toMatch(/above 6 m, where the two-flat-step/);
+    expect(derived).not.toMatch(/above 6 m/);
+
+    // The comment is a real document field, so the loader has to take it.
+    expect(() =>
+      resolveBuilding(parseBuilding(buildingFromSpec(seeded, { specs: SPECS }) as unknown), SPECS),
+    ).not.toThrow();
+  });
+
+  it('mints an escalator id that never collides with one the reader kept', () => {
+    expect(nextTransportModeId(BLANK_SPEC)).toBe('escalator-1');
+    const one: BuildingSpec = {
+      ...BLANK_SPEC,
+      transportModes: [{ id: 'escalator-1', connects: [0, 1], traversalTimeS: 21.2 }],
+    };
+    expect(nextTransportModeId(one)).toBe('escalator-2');
+    // A gap left by a removal is filled rather than skipped, exactly as `nextZoneId` fills one.
+    const gapped: BuildingSpec = {
+      ...one,
+      transportModes: [{ id: 'escalator-2', connects: [0, 1], traversalTimeS: 21.2 }],
+    };
+    expect(nextTransportModeId(gapped)).toBe('escalator-1');
+  });
+
+  it('says, at the control, each of the three states the loader would refuse', () => {
+    /*
+     * *A designer that can produce a config the loader rejects is worse than one that cannot
+     * produce it at all* (`docs/14` § 5a). `transportModeSchema` refuses two things and
+     * `config/parse.ts` refuses a third, so each is said here in the editor's own words — and each
+     * assertion below is paired with what the loader actually does, so none of the three sentences
+     * can drift into a false claim about a mechanism.
+     */
+    const base: BuildingSpec = { ...BLANK_SPEC, floors: 20, skyFloors: [6] };
+
+    // 1. An end this tower no longer has. Omitted whole — `connects` is a pair, so there is
+    //    nothing to narrow the way a zone narrows its floor list — and the document still loads.
+    const tall: BuildingSpec = {
+      ...base,
+      transportModes: [{ id: 'escalator-1', connects: [6, 18], traversalTimeS: 21.2 }],
+    };
+    expect(transportModesOf(tall)).toHaveLength(1);
+    const short: BuildingSpec = { ...tall, floors: 8 };
+    expect(transportModesOf(short)).toStrictEqual([]);
+    expect(validateSpec(short, undefined).join(' ')).toMatch(/A connection is a pair of floors/);
+    expect(() =>
+      resolveBuilding(parseBuilding(buildingFromSpec(short, { specs: SPECS }) as unknown), SPECS),
+    ).not.toThrow();
+
+    // 2. Both ends on one floor — `transportModeSchema`'s own refusal, quoted by its effect.
+    const selfJoined: BuildingSpec = {
+      ...base,
+      transportModes: [{ id: 'escalator-1', connects: [6, 6], traversalTimeS: 21.2 }],
+    };
+    expect(transportModesOf(selfJoined)).toStrictEqual([]);
+    expect(validateSpec(selfJoined, undefined).join(' ')).toMatch(/starts and ends on floor 7/);
+    expect(() =>
+      parseBuilding({
+        ...(buildingFromSpec(selfJoined, { specs: SPECS }) as unknown as Record<string, unknown>),
+        transportModes: [{ id: 'escalator-1', connects: ['7', '7'], traversalTimeS: 21.2 }],
+      } as unknown),
+    ).toThrow(/two different floors/);
+
+    // 3. A traversal time the schema's `positive` refuses. **Written** rather than omitted, and
+    //    the message says the building will not build — so the loader must really refuse it.
+    const still: BuildingSpec = {
+      ...base,
+      transportModes: [{ id: 'escalator-1', connects: [6, 7], traversalTimeS: 0 }],
+    };
+    expect(transportModesOf(still)).toHaveLength(1);
+    expect(validateSpec(still, undefined).join(' ')).toMatch(/will not build until it is raised/);
+    expect(() => parseBuilding(buildingFromSpec(still, { specs: SPECS }) as unknown)).toThrow();
+  });
+
+  it('says when an escalator is not a way through, and does not call that a refusal', () => {
+    /*
+     * The advisory, and the one sentence in this block that is about `route.ts` rather than about
+     * the schema. A floor reached over a transport edge only re-enters the search when it is a
+     * transfer floor, so a machine touching none of them carries exactly the people who start on
+     * one of its two floors and finish on the other. That is a building somebody may mean, so the
+     * loader builds it without a word and the editor must not claim otherwise.
+     */
+    const stranded: BuildingSpec = {
+      ...BLANK_SPEC,
+      floors: 10,
+      cars: 3,
+      skyFloors: [5, 6],
+      bandByCar: { 0: [0, 5], 1: [5, 6], 2: [6, 10] },
+      noLobby: { 1: true, 2: true },
+      transportModes: [{ id: 'escalator-1', connects: [2, 3], traversalTimeS: 21.2 }],
+    };
+    const said = validateSpec(stranded, undefined).join(' ');
+    expect(said).toMatch(/neither is a transfer level/);
+    expect(said).not.toMatch(/loader refuses/);
+    const resolved = resolveBuilding(
+      parseBuilding(buildingFromSpec(stranded, { specs: SPECS }) as unknown),
+      SPECS,
+    );
+    expect(resolved.warnings).toStrictEqual([]);
+    // The claim, checked against the planner: the edge carries `3 → 4` and nothing longer.
+    const planner = RoutePlanner.forBuilding(resolved);
+    expect(planner.plan('3', '4')?.transportHopCount).toBe(1);
+    expect(planner.plan('G', '4')?.transportHopCount).toBe(0);
+
+    // And the same machine on a transfer level is not reported, because then it *is* a way through.
+    const through: BuildingSpec = {
+      ...stranded,
+      transportModes: [{ id: 'escalator-1', connects: [5, 6], traversalTimeS: 21.2 }],
+    };
+    expect(validateSpec(through, undefined).join(' ')).not.toMatch(/neither is a transfer level/);
+  });
+
+  it('reports dirty when an escalator changes, and not when one nothing writes is edited', () => {
+    const base: BuildingSpec = {
+      ...BLANK_SPEC,
+      transportModes: [{ id: 'escalator-1', connects: [0, 1], traversalTimeS: 21.2 }],
+    };
+    expect(buildingSpecIsDirty(base, base)).toBe(false);
+    expect(
+      buildingSpecIsDirty({ ...base, transportModes: withTransportSeconds(base, 'escalator-1', 30) }, base),
+    ).toBe(true);
+    expect(
+      buildingSpecIsDirty({ ...base, transportModes: withTransportEnd(base, 'escalator-1', 1, 2) }, base),
+    ).toBe(true);
+    // A machine above the roof is never written, so editing it is not a building that saves
+    // differently — the rule `accessZones` already follows in `normalize`.
+    const offTower: BuildingSpec = {
+      ...base,
+      transportModes: [{ id: 'escalator-1', connects: [40, 41], traversalTimeS: 21.2 }],
+    };
+    expect(
+      buildingSpecIsDirty(
+        { ...offTower, transportModes: withTransportSeconds(offTower, 'escalator-1', 30) },
+        offTower,
+      ),
+    ).toBe(false);
+  });
+
   it('writes only the zone floors this tower has, and says what it left out', () => {
     /*
      * The floor slider and the zones are the same building, so shortening the tower has to do
@@ -769,20 +1046,20 @@ describe('the building editor is not decoration', () => {
 
   it('adding a shaft changes the run', () => {
     expect(runWith({ ...spec, cars: 5 })).not.toBe(control);
-  });
+  }, 60_000);
 
   it('the occupancy slider changes how many people the lifts must move', () => {
     expect(runWith({ ...spec, occupancyPct: 40 })).not.toBe(control);
-  });
+  }, 60_000);
 
   it('the floor count changes the run', () => {
     expect(runWith({ ...spec, floors: 16 })).not.toBe(control);
-  });
+  }, 60_000);
 
   it('a pinned shaft band changes which car answers', () => {
     const pinned = runWith({ ...spec, bandByCar: { 0: [6, 10] } });
     expect(pinned).not.toBe(control);
-  });
+  }, 60_000);
 
   it('the express toggle changes the run — and it is the legs that move, not just the label', () => {
     /*
@@ -811,7 +1088,7 @@ describe('the building editor is not decoration', () => {
     // Neither arm is the do-nothing arm.
     expect(runWith(express)).not.toBe(control);
     expect(runWith(closed)).not.toBe(control);
-  });
+  }, 60_000);
 
   it('a lobby the toggle closed off is a building that strands people, and the editor says so first', () => {
     /*
@@ -878,7 +1155,7 @@ describe('the building editor is not decoration', () => {
     // And clicking the same floor again is the inverse edit, back to the run we started from.
     const back: BuildingSpec = { ...wider, accessZones: withZoneFloor(wider, 'zone-1', 5) };
     expect(runWith(back)).toBe(runWith(ZONED));
-  });
+  }, 60_000);
 
   it('the credential control changes the run — the same floors under a different group', () => {
     /*
@@ -907,7 +1184,7 @@ describe('the building editor is not decoration', () => {
     expect(credentialGroupsOf(split)).toStrictEqual(['alpha', 'bravo']);
     expect(partsOf(split)[0]).toStrictEqual(partsOf(shared)[0]);
     expect(runWith(split)).not.toBe(runWith(shared));
-  });
+  }, 60_000);
 
   it('a group added beside one that already works is a no-op, and that is the mechanism, not a bug', () => {
     /*
@@ -925,6 +1202,128 @@ describe('the building editor is not decoration', () => {
     const wider: BuildingSpec = { ...ZONED, accessZones: withZoneGroup(ZONED, 'zone-1', 'facilities') };
     expect(credentialGroupsOf(wider)).toStrictEqual(['tenant', 'facilities']);
     expect(runWith(wider)).toBe(runWith(ZONED));
+  }, 60_000);
+
+  /* ---- sky lobbies: the escalator, and only that -------------------------- */
+
+  /*
+   * A two-level sky lobby, small enough to run in a test and shaped like the thing the feature is
+   * for. Three banks: `G–6` off the ground, a two-floor shuttle `6–7` closed inside itself, and
+   * `7–11` closed inside itself, with both lobby levels marked transfer floors.
+   *
+   * Both arms of every comparison below are **buildings the loader builds and the router routes**
+   * — no floor is stranded either way. That is deliberate: proving the escalator by breaking the
+   * control arm would prove the sky floors, not the machine. What it changes is the *route*, and
+   * measured at this seed it is 205 lift legs without the escalator and 154 with it, over the same
+   * demand and the same three banks.
+   */
+  const SKY: BuildingSpec = {
+    ...spec,
+    skyFloors: [5, 6],
+    bandByCar: { 0: [0, 5], 1: [5, 6], 2: [6, 10] },
+    noLobby: { 1: true, 2: true },
+  };
+  const ESCALATOR: BuildingSpec = {
+    ...SKY,
+    transportModes: [{ id: 'escalator-1', connects: [5, 6], traversalTimeS: 21.2 }],
+  };
+  const plannerFor = (of: BuildingSpec): RoutePlanner =>
+    RoutePlanner.forBuilding(
+      resolveBuilding(parseBuilding(buildingFromSpec(of, { specs: SPECS }) as unknown), SPECS),
+    );
+  /** The books for one arm — `runWith`'s run, read for conservation rather than for the legs. */
+  const auditOf = (of: BuildingSpec): ConservationAudit => {
+    const building = resolveBuilding(
+      parseBuilding(buildingFromSpec(of, { specs: SPECS }) as unknown),
+      SPECS,
+    );
+    return recordRun(configFor(eta, { building }), { recordDecisions: false }).result.conservation;
+  };
+
+  it('an escalator changes the run — the same shafts, and a lift leg the passengers stop riding', () => {
+    /*
+     * `docs/14 § 5` criterion 2, pointed at the sky-lobby control: move it and require the run to
+     * change, **on the legs**. The split is the access-zoning block's, for the same reason — adding
+     * an escalator is not a bank edit, so `servedFloorIds` must be byte-identical, and the legs
+     * must not be. A control that emitted a `transportModes` entry the router ignored would pass
+     * the first assertion and fail the second, which is the failure this test exists to produce.
+     */
+    expect(partsOf(ESCALATOR)[0]).toStrictEqual(partsOf(SKY)[0]);
+    expect(JSON.stringify(partsOf(ESCALATOR)[1])).not.toBe(JSON.stringify(partsOf(SKY)[1]));
+
+    // And the direction is the one claimed: the machine takes a leg off the lifts, it does not
+    // merely reshuffle them. Pinned as an inequality on the counts, not on the two numbers.
+    const legsOf = (of: BuildingSpec): number => (partsOf(of)[1] as unknown[]).length;
+    expect(legsOf(ESCALATOR)).toBeLessThan(legsOf(SKY));
+
+    /*
+     * The inequality alone is not enough, and this is the hole it leaves: a future change that
+     * **stranded** floors in the escalator arm would satisfy it too, because demand to an
+     * unreachable floor is never generated and the leg count falls. So the books are balanced.
+     *
+     * Same journeys in both arms — nobody was lost — and every lift leg that disappeared became
+     * exactly one escalator hop. That is § D147 § 6's mechanism stated as an equation rather than
+     * inferred from a total.
+     */
+    const before = auditOf(SKY);
+    const after = auditOf(ESCALATOR);
+    expect(after.generated).toBe(before.generated);
+    expect(after.undelivered).toBe(before.undelivered);
+    expect(before.transportHops).toBe(0);
+    expect(after.transportHops).toBeGreaterThan(0);
+    expect(before.legsCreated - after.legsCreated).toBe(after.transportHops);
+
+    // The mechanism, said by the real planner rather than inferred from the counts.
+    expect(plannerFor(SKY).plan('G', '9')?.elevatorLegCount).toBe(3);
+    const planned = plannerFor(ESCALATOR).plan('G', '9');
+    expect(planned?.elevatorLegCount).toBe(2);
+    expect(planned?.transportHopCount).toBe(1);
+    expect(planned?.floors).toStrictEqual(['G', '6', '7', '9']);
+  });
+
+  it('the landing picker changes the run — one end moved off the transfer level', () => {
+    /*
+     * The two floor pickers are the control, and `withTransportEnd` is the edit their click makes.
+     * Dragging the lower landing down to floor 4 — a floor no sky chip has marked — leaves the
+     * machine declared and takes it out of every route, because `traffic/route.ts` only lets a
+     * journey change onto a lift at a transfer level. So the run must move, and moving the end
+     * back must return the run we started from.
+     */
+    const moved: BuildingSpec = {
+      ...ESCALATOR,
+      transportModes: withTransportEnd(ESCALATOR, 'escalator-1', 0, 4),
+    };
+    expect(moved.transportModes[0]?.connects).toStrictEqual([4, 6]);
+    expect(runWith(moved)).not.toBe(runWith(ESCALATOR));
+    const back: BuildingSpec = { ...moved, transportModes: withTransportEnd(moved, 'escalator-1', 0, 5) };
+    expect(runWith(back)).toBe(runWith(ESCALATOR));
+  }, 60_000);
+
+  it('the traversal-time control changes the run — the same route, ridden slower', () => {
+    /*
+     * The one control here whose effect is purely on the clock. The route is identical in both
+     * arms — same banks, same landings, same hop — so the leg *count* must not move and the leg
+     * *times* must, because the passenger reaches the upper landing later and boards a car that has
+     * moved on. A seconds field the runtime never read would leave the two arms identical.
+     */
+    const slow: BuildingSpec = {
+      ...ESCALATOR,
+      transportModes: withTransportSeconds(ESCALATOR, 'escalator-1', 60),
+    };
+    expect(slow.transportModes[0]?.traversalTimeS).toBe(60);
+    expect(partsOf(slow)[0]).toStrictEqual(partsOf(ESCALATOR)[0]);
+    expect((partsOf(slow)[1] as unknown[]).length).toBe((partsOf(ESCALATOR)[1] as unknown[]).length);
+    expect(JSON.stringify(partsOf(slow)[1])).not.toBe(JSON.stringify(partsOf(ESCALATOR)[1]));
+  });
+
+  it('refuses the one pair the loader will not take, at the control rather than on save', () => {
+    // Both landings on one floor. `withTransportEnd` declines the click, so the state is not
+    // reachable by pressing the picker — § 10.2's *"the control should make it unreachable"*.
+    const same = withTransportEnd(ESCALATOR, 'escalator-1', 1, 5);
+    expect(same[0]?.connects).toStrictEqual([5, 6]);
+    // And the seconds control cannot write a time `transportModeSchema`'s `positive` refuses.
+    expect(withTransportSeconds(ESCALATOR, 'escalator-1', 0)[0]?.traversalTimeS).toBe(0.1);
+    expect(withTransportSeconds(ESCALATOR, 'escalator-1', -12)[0]?.traversalTimeS).toBe(0.1);
   });
 
   it('the access zones the round trip used to drop change the run on Secure Tower', () => {
@@ -936,7 +1335,7 @@ describe('the building editor is not decoration', () => {
     const tower = specFromBuilding(parseBuilding(read('buildings/secure-tower.json')), 'secure-tower');
     expect(accessZonesOf(tower)).toHaveLength(5);
     expect(runWith(tower)).not.toBe(runWith({ ...tower, accessZones: [] }));
-  });
+  }, 60_000);
 
   it('says exactly what the real route planner says about who can get out of the lobby', () => {
     /*
@@ -953,6 +1352,35 @@ describe('the building editor is not decoration', () => {
       { ...spec, cars: 2, skyFloors: [6], bandByCar: { 0: [0, 6], 1: [6, 10] }, noLobby: { 1: true } },
       { ...spec, cars: 1, bandByCar: { 0: [0, 6] } },
       { ...spec, cars: 3, skyFloors: [4, 7], noLobby: { 1: true, 2: true } },
+      /*
+       * And the states an escalator reaches, because a transport mode is a **second kind of edge**
+       * in the same graph. A mirror that knew only about banks would have called the upper half of
+       * this tower stranded while the run happily served it — a false refusal, which is worse than
+       * a missing one because the reader would go and fix a building that was not broken.
+       */
+      SKY,
+      ESCALATOR,
+      // The machine moved off the transfer level: declared, and inert for everything but `6 → 7`.
+      { ...ESCALATOR, transportModes: withTransportEnd(ESCALATOR, 'escalator-1', 0, 4) },
+      // A tower shortened under a machine, so the omitted-mode branch is mirrored too.
+      { ...ESCALATOR, floors: 6, bandByCar: { 0: [0, 5], 1: [5, 6], 2: [5, 6] } },
+      // The one case where the escalator is the **only** way in: no bank spans the two lobby
+      // levels, so without the edge floors 7–11 are stranded and with it they are not.
+      {
+        ...spec,
+        cars: 2,
+        skyFloors: [5, 6],
+        bandByCar: { 0: [0, 5], 1: [6, 10] },
+        noLobby: { 1: true },
+        transportModes: [{ id: 'escalator-1', connects: [5, 6], traversalTimeS: 21.2 }],
+      },
+      {
+        ...spec,
+        cars: 2,
+        skyFloors: [5, 6],
+        bandByCar: { 0: [0, 5], 1: [6, 10] },
+        noLobby: { 1: true },
+      },
     ];
     for (const candidate of cases) {
       const resolved = resolveBuilding(

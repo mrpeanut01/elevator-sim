@@ -32,6 +32,10 @@
 import type { DirectionalSplit, ResolvedBuilding, TrafficProfiles } from '../config/types.js';
 import type { SimTime } from '../kernel/index.js';
 import type { CredentialGroup } from '../model/index.js';
+// A *value* import, and the narrow path rather than the barrel: `TRAFFIC_PARAMETERS` declares the
+// mass families an optimizer may sample, and a declared list that could drift from the sampler's
+// own is worse than no declaration. `model/` imports nothing from `traffic/`, so this is a leaf.
+import { SUPPORTED_MASS_DISTRIBUTIONS } from '../model/passenger.js';
 import type { StreamSet } from '../random/index.js';
 
 /* -------------------------------------------------------------------------- *
@@ -393,6 +397,20 @@ export interface PassengerTrace {
   readonly peakPassengersPerSecond: number;
   /** Analytic expectation `peakPassengersPerSecond * template.intensityIntegralS`. */
   readonly expectedPassengers: number;
+  /**
+   * The day this trace turned out to be — **present only when the run asked for one**
+   * (docs/14 § 2.3).
+   *
+   * Absent, not `{ demandFactor: 1, peakShiftS: 0 }`, when the run declared no
+   * {@link DayVariationConfig}: a run that did not ask for a particular day *is* the run that
+   * predates the feature, and `identity.test-helper.ts`'s structural digest hashes a key's
+   * presence. The same reasoning `SimulationResult.trafficModel` records for `v1`.
+   *
+   * Reported rather than re-derivable by eye: {@link peakPassengersPerSecond} above already has
+   * the multiplier in it, so a reader comparing two traces needs this to know whether the
+   * difference was the building or the day.
+   */
+  readonly dayVariation?: ResolvedDayVariation;
   /** Non-fatal diagnostics: a populated floor with no demand, an entrance with no weight. */
   readonly warnings: readonly string[];
 }
@@ -400,6 +418,80 @@ export interface PassengerTrace {
 /* -------------------------------------------------------------------------- *
  * Generator configuration
  * -------------------------------------------------------------------------- */
+
+/**
+ * Batch-size distributions `drawBatchSize` knows how to sample. docs/14 § 2.2.
+ *
+ * All three are distributions over the integers `{1, 2, 3, ...}` — a batch contains at least one
+ * passenger — and **all three consume exactly one draw per call, for every parameter**. That is
+ * not an implementation detail: `DECISIONS.md` § D203 records that a sampler whose draw count
+ * depends on its parameters desynchronizes common random numbers between two configurations that
+ * differ in it, and that the strong form of the cross-source coupling `trafficModel: 'v2'` exists
+ * to remove *returns* the moment one appears. Keeping the property is what makes these families
+ * usable under `v1` as well as `v2`; a rejection loop or a Knuth-style Poisson sampler would not
+ * be, and would have had to be gated behind the flag instead.
+ *
+ * | Family | Shape | Reads as |
+ * |---|---|---|
+ * | `geometric` | mean | the curve every published figure was measured under, unchanged |
+ * | `zeroTruncatedPoisson` | mean | tighter clustering around the mean |
+ * | `explicit` | a weight vector over sizes 1..n | authored — "this hotel arrives in fours" |
+ *
+ * Lives here rather than in `poissonBatch.ts` so {@link TRAFFIC_PARAMETERS} can declare the same
+ * list the sampler dispatches on: a schema whose `values` could drift from the code is worse than
+ * no schema, and `poissonBatch.ts` already imports this module for `TrafficError`.
+ */
+export const SUPPORTED_BATCH_DISTRIBUTIONS = [
+  'geometric',
+  'zeroTruncatedPoisson',
+  'explicit',
+] as const;
+
+/**
+ * A group-size curve, as either reference data or a run-level override supplies it.
+ *
+ * `TrafficProfile.batchSize` (a `BatchSizeConfig`, which always carries a `mean`) is assignable
+ * to this; so is a run override that names only a weight vector, because `explicit` **derives**
+ * its mean rather than carrying one. `meanBatchSizeOf` is the single place that resolves the
+ * difference, and it is the number `batchesPerSecond` divides by — see docs/14 § 2.2's rate-
+ * coupling warning, which is the way this feature would otherwise change total demand silently.
+ */
+export interface BatchSizeCurve {
+  /** One of {@link SUPPORTED_BATCH_DISTRIBUTIONS}. A string, so an unknown name fails at the draw. */
+  readonly distribution: string;
+  /** Mean group size, at least 1. Required by every family except `explicit`, which derives it. */
+  readonly mean?: number | undefined;
+  /** Relative likelihood of group sizes `1..n`. `explicit` only; normalized when sampled. */
+  readonly weights?: readonly number[] | undefined;
+}
+
+/**
+ * A body-mass distribution, as a run supplies it. docs/14 § 2.1.
+ *
+ * Mass was already a distribution (`drawMass`, `profiles.passengerMass`) — the modelling rule was
+ * met. What this adds is **control**: the shape was fixed in reference data and could not be
+ * varied per building or per run.
+ *
+ * **Both truncation bounds are required, and that is the one place this type is stricter than the
+ * data it overrides.** `PassengerMassConfig.maxKg` is optional and every shipped profile omits it,
+ * which `drawMass` reads as `+Infinity`; an untruncated normal eventually draws a negative mass,
+ * and a load sensor reading a negative passenger surfaces three layers away as a strange capacity
+ * result rather than as an error. A caller reaching for this knob is asking for a different
+ * population, so it is exactly the moment to make them say where it stops.
+ *
+ * Assignable to `PassengerMassConfig`, so the resolved value can be handed straight to the
+ * samplers in `traffic/generator.ts` and `model/passenger.ts` without a second shape.
+ */
+export interface PassengerMassOverride {
+  /** `normal` or `lognormal`. A string, so an unknown name fails at the draw rather than silently. */
+  readonly distribution: string;
+  readonly meanKg: number;
+  readonly stdDevKg: number;
+  /** Lower truncation, kilograms. Required. */
+  readonly minKg: number;
+  /** Upper truncation, kilograms. Required — see the type docstring. */
+  readonly maxKg: number;
+}
 
 /** Which point of a profile's `arrivalRatePctPop5min` range to run at. */
 export const DEMAND_LEVELS = ['min', 'typical', 'max'] as const;
@@ -483,6 +575,35 @@ export interface DemandTemplateOverrides {
   readonly mixAmplitude?: number | undefined;
 }
 
+/**
+ * Which draw ordering the generator uses. docs/14 § 1.3.
+ *
+ * Not a tunable and not a knob an optimizer may sample: it names *which simulator* produced a
+ * number, the way a file-format version names which writer produced a file.
+ *
+ * - `v1` — the ordering every figure in this repository was measured under. `drawBatchSize` draws
+ *   from `arrivals`, so group size and arrival instants share a sequence.
+ * - `v2` — group size draws from its own `batchSize` stream. The two become independent, which is
+ *   what makes a group-size study readable at all: under `v1`, any change to the group-size curve
+ *   — even one that preserves the mean — consumes a different number of draws from `arrivals` and
+ *   shifts every subsequent arrival instant, so the two effects can never be told apart.
+ *
+ * `v1` is the default and is deleted only when the last figure depending on it has been re-derived
+ * under `v2` **and** the re-derivation has been published as a comparison — not before.
+ */
+export type TrafficModelVersion = (typeof TRAFFIC_MODEL_VERSIONS)[number];
+
+/**
+ * Every draw ordering this build can run, as data — see {@link TrafficModelVersion}.
+ *
+ * A runtime list rather than only a type, because the version has to survive a round trip through
+ * disk: `metrics/serialization.ts` validates a stored `RunRecord` against it and
+ * `experiments/reports/persistence.ts` validates the envelope beside it. A version a reader cannot
+ * name is a version a reader will silently drop, and a dropped version replays as `v1` — a
+ * different trace at the same seed, which is exactly what CLAUDE.md invariant 5 forbids.
+ */
+export const TRAFFIC_MODEL_VERSIONS = ['v1', 'v2'] as const;
+
 /** Everything {@link generateTrace} needs. Only `building`, `profiles` and `streams` are required. */
 export interface TrafficConfig {
   /** The building, floors expanded and cross-references checked. */
@@ -490,11 +611,19 @@ export interface TrafficConfig {
   /** The whole of `data/traffic-profiles.json`: profiles, templates and the mass distribution. */
   readonly profiles: TrafficProfiles;
   /**
-   * This replication's streams. Arrival times and batch sizes come from `arrivals`, origins
-   * from `origins`, destinations from `destinations`, mass from `passengerMass`. `doorObstruction`
-   * and `policyNoise` are never touched here, and `generator.test.ts` asserts it.
+   * This replication's streams. Arrival times come from `arrivals`, origins from `origins`,
+   * destinations from `destinations`, mass from `passengerMass`. Batch sizes come from `arrivals`
+   * under {@link trafficModel} `v1` and from `batchSize` under `v2`. `doorObstruction` and
+   * `policyNoise` are never touched here, and `generator.test.ts` asserts it.
    */
   readonly streams: StreamSet;
+  /**
+   * Which draw ordering to use. Default `v1`, which is every figure this repository publishes.
+   *
+   * See {@link TrafficModelVersion}. This is a version, not a tunable: it is `null` in
+   * `parameters.test.ts`'s map for the same reason `building` is.
+   */
+  readonly trafficModel?: TrafficModelVersion | undefined;
   /**
    * Demand shape. A {@link DemandTemplateId} is looked up in `profiles.demandTemplates`; a
    * {@link ResolvedDemandTemplate} is used as given. Defaults to `rise-and-fall`.
@@ -532,6 +661,33 @@ export interface TrafficConfig {
    * them independently in `[0, 1]`. At least one must be positive.
    */
   readonly directionalSplit?: DirectionalSplit | undefined;
+  /**
+   * Override every profile's group-size curve with one curve. docs/14 § 2.2.
+   *
+   * Unset means each floor uses its own profile's `batchSize`, which is the normal case and the
+   * one every published figure was measured under. The same kind of override as
+   * {@link arrivalRatePctPop5min}, and for the same reason: a study of group *shape* wants to hold
+   * the building fixed and move one curve, not to edit reference data per arm.
+   *
+   * **The mean is what `batchesPerSecond` divides by**, so a curve with a different mean is also a
+   * different batch arrival process at the same passenger rate — bigger groups mean fewer, larger
+   * batches. Two curves sharing a mean share the batch process exactly, which is what makes shape
+   * separable from rate.
+   */
+  readonly batchSize?: BatchSizeCurve | undefined;
+  /**
+   * Override the reference data's body-mass distribution. docs/14 § 2.1.
+   *
+   * Unset means `profiles.passengerMass`, byte for byte. Set, it replaces the whole block — family,
+   * mean, spread and **both** truncation bounds, which are required rather than optional; see
+   * {@link PassengerMassOverride}.
+   *
+   * Mass is drawn from its own stream in final trace order, so moving this changes *what the cars
+   * can do with the crowd* and not *which crowd turns up*: the arrival instants, the group sizes
+   * and the planned legs are untouched, and `traffic/varianceControls.test.ts` asserts that
+   * alongside the change it does make.
+   */
+  readonly passengerMass?: PassengerMassOverride | undefined;
   /**
    * Whether everyone in a batch shares a destination. Default `false`.
    *
@@ -573,6 +729,89 @@ export interface TrafficConfig {
   readonly journeyIdPrefix?: string | undefined;
   /** Prefix for generated batch ids. Default `b`. */
   readonly batchIdPrefix?: string | undefined;
+  /**
+   * Make this run a *particular day* rather than the average one. docs/14 § 2.3.
+   *
+   * Unset means what every published figure was measured under: a template is deterministic given
+   * its seed, and Tuesday is a copy of Monday. See {@link DayVariationConfig}.
+   */
+  readonly dayVariation?: DayVariationConfig | undefined;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Inter-day variability (docs/14 § 2.3)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * How much one day may differ from the average one: a bounded multiplier on total demand and a
+ * bounded shift on when the peak happens, both drawn once per run from the `dayVariation` stream.
+ *
+ * ## What this is for, and what it deliberately is not
+ *
+ * It answers one question: *is this dispatcher robust to a 15 % heavier Monday, or is its win an
+ * artefact of one demand level?* — the question a learned dispatcher must not be allowed to
+ * overfit. It is **not** a random walk across days and **not** a calendar; a richer model can come
+ * later with a reason, and today there is none.
+ *
+ * ## Two knobs that do not overlap, and the arithmetic says so
+ *
+ * - {@link minDemandFactor}/{@link maxDemandFactor} change **how many people** arrive and not
+ *   when: every source's rate is multiplied, the template's shape is untouched.
+ * - {@link peakShiftS} changes **when** they arrive and not how many: the shift moves the interior
+ *   phase boundaries, and the up-ramp lengthens by exactly as much as the down-ramp shortens, so
+ *   `intensityIntegralS` is conserved *exactly*. See `shiftTemplatePeak`.
+ *
+ * ## Both bounds are required by the type, and that follows a precedent rather than a taste
+ *
+ * `PassengerMassOverride` requires both truncation bounds because an untruncated draw surfaces
+ * three layers from its cause (docs/14 § 2.1). The same argument applies harder here: an
+ * unbounded demand multiplier is a run whose saturation state nobody declared, reported beside a
+ * mean that may or may not be valid.
+ *
+ * ## The statistical hazard, which is the whole reason § 5 criterion 3 exists
+ *
+ * Day variation adds a variance component *between* replications. Under common random numbers both
+ * arms of a comparison must see the **same** Monday, or the paired standard error rises and the
+ * 5–20× the CRN design buys is spent on nothing. That is delivered structurally rather than by
+ * convention: the draws come from a stream of the injected {@link StreamSet}, before a car moves,
+ * so two arms handed the same seed draw the same day — and this block is in
+ * `runner/crn.ts`'s `traceKeyOf`, so two cells that *disagree* about it are never paired at all.
+ */
+export interface DayVariationConfig {
+  /** Lower bound of the demand multiplier, drawn uniformly. Must be > 0 and <= the upper bound. */
+  readonly minDemandFactor: number;
+  /** Upper bound of the demand multiplier, drawn uniformly. */
+  readonly maxDemandFactor: number;
+  /**
+   * Largest peak shift in either direction, seconds. Default 0 — the peak stays where the template
+   * puts it. The shift itself is drawn uniformly from `[-peakShiftS, +peakShiftS]`.
+   *
+   * Refused above what the template can absorb, and refused outright for a template with no
+   * interior phase boundary to move: `constant-iso` is flat, so "when the peak happens" is not a
+   * question it can be asked. Shifting only its report window would move which passengers were
+   * measured without moving any of them, which is noise dressed as a model.
+   */
+  readonly peakShiftS?: number | undefined;
+}
+
+/**
+ * What a run actually drew for its day. Reported, never authored.
+ *
+ * Present on {@link PassengerTrace} **only** when the run declared a {@link DayVariationConfig} —
+ * spread-or-omit, because `structuralDigestOfResult` hashes a key's presence as well as its value,
+ * so a key on the default path moves 981 pins to say nothing.
+ *
+ * **On the trace and nowhere else.** A `SimulationResult` reaches it through `result.trace`, and
+ * there is deliberately no second copy beside `trafficSeed` and `trafficModel`: those two are
+ * *provenance carried from `RunRecord`* and this is a *drawn outcome of the trace*, so a copy on
+ * the result would be two places one draw could be read from and one of them could go stale. This
+ * docstring claimed the field was on `SimulationResult` until adversarial review read it.
+ */
+export interface ResolvedDayVariation {
+  /** The multiplier applied to every source's rate. 1 means the average day. */
+  readonly demandFactor: number;
+  /** Seconds the peak was moved by. Positive is later. 0 means the template's own timing. */
+  readonly peakShiftS: number;
 }
 
 /**
@@ -580,6 +819,13 @@ export interface TrafficConfig {
  * repeat them — a declared schema that disagrees with the resolver is worse than none.
  */
 export const TRAFFIC_DEFAULTS = Object.freeze({
+  /**
+   * The draw ordering every published figure was measured under. See {@link TrafficModelVersion}.
+   *
+   * A default that is not `'v1'` re-derives 981 pinned estimates and both identity digests in one
+   * edit, which is precisely the failure docs/14 § 0 exists to prevent.
+   */
+  trafficModel: 'v1',
   templateId: 'rise-and-fall',
   demandLevel: 'typical',
   batchSharesDestination: false,
@@ -609,6 +855,7 @@ export const TRAFFIC_DEFAULTS = Object.freeze({
   /** Full authored arc. See {@link DemandTemplateOverrides.mixAmplitude}. */
   mixAmplitude: 1,
 } as const satisfies {
+  readonly trafficModel: TrafficModelVersion;
   readonly templateId: DemandTemplateId;
   readonly demandLevel: DemandLevel;
   readonly batchSharesDestination: boolean;
@@ -678,14 +925,30 @@ export interface TrafficParameterSpec {
 /**
  * Every demand tunable this module honours.
  *
- * Two entries carry `default: null`, meaning "unset, and unset is meaningful".
+ * **Fifteen entries carry `default: null`**, meaning "unset, and unset is meaningful" — the count is
+ * asserted in `parameters.test.ts` rather than only stated here, because this sentence said "two"
+ * while four were declared and would otherwise still say it now there are fifteen.
+ *
  * `traffic.arrivalRatePctPop5min` unset means "use the profile's own number for the selected
  * `demandLevel`", which is not a number this schema can name — naming one would silently run
  * every building at it. Its range spans the union of the shipped profiles' ranges
  * (residential 3% to prestige office 17%) with headroom above, because pushing demand past
  * handling capacity to exercise saturation detection is a legitimate experiment. The three
  * `traffic.directionalSplit.*` entries are the same: unset means each floor keeps its own
- * profile's mix, and they are set together or not at all.
+ * profile's mix, and they are set together or not at all. The three `traffic.batchSize.*` and
+ * five `traffic.passengerMass.*` entries (docs/14 §§ 2.1-2.2) are the same again: the curve and
+ * the population live in `data/traffic-profiles.json`, and a number here would be a second source
+ * of truth for one the reference file already states. The three `traffic.dayVariation.*` entries
+ * (docs/14 § 2.3) are null for the neighbouring reason rather than that one — there is no
+ * reference file to defer to, and *no day variation at all* is the only default that leaves every
+ * published figure standing, so a number here would silently make every run a different Tuesday.
+ *
+ * **What `default: null` costs, said plainly rather than implied.** `collectSearchSpace` classifies
+ * a null-default row as *unsearchable* — "a search needs a point it can start from" — so all
+ * twelve are declared, typed, ranged and **excluded from the space a generic optimizer walks**.
+ * These rows satisfy invariant 8's *declaration* requirement and not its *searchability* purpose,
+ * and calling them "searchable tunables" would overstate what shipped. Making them searchable means
+ * giving the collector a per-building origin to start from, which is a different piece of work.
  *
  * What is deliberately *not* here: `idPrefix`, `journeyIdPrefix` and `batchIdPrefix` (labels
  * on the output, which cannot move a metric) and `building`, `profiles` and `streams` (the
@@ -871,5 +1134,140 @@ export const TRAFFIC_PARAMETERS: readonly TrafficParameterSpec[] = [
     description:
       "How much of the authored mix arc to keep. 1 is the arc as authored — outgoing-dominant early, incoming-dominant late; 0 collapses it to a flat run at the period's own mean mix with the total demand unchanged, which is the negative control any mix-varying result must be measured against.",
     activeWhen: { 'traffic.template': ['lunch-two-way'] },
+  },
+
+  /* ---- docs/14 § 2.2 — the group-size curve ------------------------------- */
+
+  {
+    id: 'traffic.batchSize.distribution',
+    type: 'categorical',
+    values: [...SUPPORTED_BATCH_DISTRIBUTIONS],
+    default: null,
+    description:
+      "Group-size family, overriding every profile's own curve. Unset (the default) means each floor keeps the curve data/traffic-profiles.json authors for it, which is what every published figure was measured under. geometric is that curve's family; zeroTruncatedPoisson clusters more tightly around the same mean; explicit takes an authored weight vector over sizes 1..n, which is the only one of the three that can say 'this hotel arrives in fours'.",
+  },
+  {
+    id: 'traffic.batchSize.mean',
+    type: 'continuous',
+    // Lower bound is the model's own: a batch contains at least one passenger. Upper bound is a
+    // **search bound, not a measurement** — the shipped profiles run 1.4 to 2.0 and no CIBSE or
+    // ISO table gives a group-size ceiling, so 12 is headroom chosen to admit a tour party and
+    // refuse a typo, and is labelled as such rather than presented as reference data.
+    range: [1, 12],
+    scale: 'linear',
+    default: null,
+    unit: 'passengers',
+    description:
+      "Mean group size, overriding every profile's own. Unset means the profile decides, which is the only honest default: 2.0 is a hotel number and would run an office at 1.4x its group size. Total passenger demand is held fixed, so raising the mean lowers the batch rate rather than adding people.",
+    activeWhen: {
+      'traffic.batchSize.distribution': ['geometric', 'zeroTruncatedPoisson'],
+    },
+  },
+  {
+    id: 'traffic.batchSize.weight',
+    type: 'continuous',
+    range: [0, 1],
+    scale: 'linear',
+    default: null,
+    perMemberOf: 'traffic.batchSize.sizes',
+    description:
+      'Relative likelihood of one group size, supplied once per size from 1 upwards and normalized across them — so [0, 1] per size spans every distinct curve, and the vector length is the largest group the building produces. Declared once for however many sizes the curve names, the way traffic.entranceWeight is declared once for however many entrances a building has. The mean is DERIVED from this vector, never authored beside it, because the batch rate divides by it and a mean that drifted from its own weights would change total demand silently.',
+    activeWhen: { 'traffic.batchSize.distribution': ['explicit'] },
+  },
+
+  /* ---- docs/14 § 2.1 — body mass ----------------------------------------- */
+
+  {
+    id: 'traffic.passengerMass.distribution',
+    type: 'categorical',
+    values: [...SUPPORTED_MASS_DISTRIBUTIONS],
+    default: null,
+    description:
+      "Body-mass family, overriding data/traffic-profiles.json's passengerMass block. Unset means the reference block, which is normal. lognormal is right-skewed and strictly positive, which is the shape a measured population has; normal is what the shipped data declares and what every published figure was measured under. The five passengerMass parameters are set together or left together: a partial override is refused, because both truncation bounds are required.",
+  },
+  {
+    id: 'traffic.passengerMass.meanKg',
+    type: 'continuous',
+    // The shipped block is 75 kg, which is also EN 81's nominal passenger mass (see
+    // `LOAD_SENSOR_DEFAULTS.nominalPassengerMassKg`, cited in docs/02-elevator-reference.md).
+    // The range around it is a **search bound, not a measurement**: no reference in this project
+    // gives a population mean outside it, and nothing here claims one does.
+    range: [40, 140],
+    scale: 'linear',
+    default: null,
+    unit: 'kg',
+    description:
+      'Mean body mass. Unset means the reference block (75 kg, EN 81 nominal). A heavier population fills cars by weight sooner: boarding stops at design load in kilograms and there is no head-count clause, so the number of people a car takes falls as the population gets heavier.',
+  },
+  {
+    id: 'traffic.passengerMass.stdDevKg',
+    type: 'continuous',
+    // 0 is admissible and is the degenerate case — every passenger identical — which the load
+    // sensor exists to make impossible in *data* (schema.ts refuses it there) but which is a
+    // legitimate control arm for an experiment measuring what the spread is worth.
+    range: [0, 40],
+    scale: 'linear',
+    default: null,
+    unit: 'kg',
+    description:
+      'Standard deviation of body mass. Unset means the reference block (15 kg). Zero makes every passenger identical, which is the control arm for measuring what the distribution buys — never a default, because a load sensor reading a constant has nothing to measure.',
+  },
+  {
+    id: 'traffic.passengerMass.minKg',
+    type: 'continuous',
+    range: [1, 120],
+    scale: 'linear',
+    default: null,
+    unit: 'kg',
+    description:
+      'Lower truncation. Required whenever the block is overridden at all: the normal distribution runs to minus infinity, and a load sensor reading a negative passenger surfaces three layers away as a strange capacity result rather than as an error. Draws below it are clamped, never re-drawn, so the draw count stays independent of the values drawn.',
+  },
+  {
+    id: 'traffic.passengerMass.maxKg',
+    type: 'continuous',
+    range: [40, 400],
+    scale: 'linear',
+    default: null,
+    unit: 'kg',
+    description:
+      'Upper truncation. Required whenever the block is overridden at all, for the symmetric reason: the tails of both families run to infinity and neither is a person. Draws above it are clamped, never re-drawn.',
+  },
+
+  /* ---- docs/14 § 2.3 — inter-day variability ------------------------------ */
+
+  {
+    id: 'traffic.dayVariation.minDemandFactor',
+    type: 'continuous',
+    // A **search bound, not a measurement**. No reference in this project gives a distribution of
+    // day-to-day demand, and none is invented here: 0.25 is a quiet day rather than a public
+    // holiday, and 4 is past every shipped building's handling capacity, so the interval admits
+    // the question docs/14 § 2.3 asks and refuses a typo. Labelled as such rather than cited.
+    range: [0.25, 4],
+    scale: 'linear',
+    default: null,
+    description:
+      "Lower bound of the per-run multiplier on total demand, drawn uniformly. Unset (the default) means Tuesday is a copy of Monday, which is what every published figure was measured under. Set together with maxDemandFactor or not at all: a one-sided bound is an unbounded demand multiplier, and that is a run whose saturation state nobody declared. It scales how many people arrive and not when — the peak keeps the shape and the position the template gives it.",
+  },
+  {
+    id: 'traffic.dayVariation.maxDemandFactor',
+    type: 'continuous',
+    range: [0.25, 4],
+    scale: 'linear',
+    default: null,
+    description:
+      "Upper bound of the per-run demand multiplier. Required whenever the block is declared at all, for the reason both mass truncation bounds are. min == max is legal and is the useful degenerate case: a fixed multiplier, which is a demand level rather than a variability, and it is the control arm for measuring what the variability itself costs.",
+  },
+  {
+    id: 'traffic.dayVariation.peakShiftS',
+    type: 'continuous',
+    // Bounded above by what the shipped template can absorb rather than by taste: the 30-minute
+    // rise-and-fall's outermost interior knot is 750 s from an end, so 600 leaves headroom under
+    // it. A shorter run absorbs less and the generator refuses the excess by name.
+    range: [0, 600],
+    scale: 'linear',
+    default: null,
+    unit: 's',
+    description:
+      "Largest shift of the peak in either direction, seconds; the shift itself is drawn uniformly from [-peakShiftS, +peakShiftS]. Unset means the peak stays where the template puts it, and unset is also what an author means by declaring the block without this field. It moves when people arrive and not how many: the up-ramp lengthens by exactly as much as the down-ramp shortens, so the intensity integral is conserved exactly. Refused outright on constant-iso, which is flat and therefore has no peak to move.",
   },
 ];

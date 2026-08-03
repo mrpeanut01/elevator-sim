@@ -44,6 +44,7 @@
 
 import type { SimTime } from '../kernel/types.js';
 import type { CredentialGroup, Direction } from '../model/types.js';
+import type { TrafficModelVersion } from '../traffic/types.js';
 
 import type { AwtInvalidGround } from './awtValidity.js';
 import type { PassengerModel } from './comparability.js';
@@ -252,6 +253,21 @@ export interface PassengerRecord {
   readonly boardedAt?: SimTime | undefined;
   /** When the passenger left the car, or absent if they never boarded or never arrived. */
   readonly alightedAt?: SimTime | undefined;
+  /**
+   * When the passenger **gave up and left the landing**, on a run that declares `sim.patience`
+   * (docs/14 § 3.1).
+   *
+   * **Absent on every leg that did not abandon**, which is every leg of every run that declares no
+   * patience — so such a record is the object it was before this field existed. Never present
+   * beside {@link boardedAt}: a passenger who boarded did not abandon, and the recorder refuses
+   * the combination rather than storing it.
+   *
+   * A leg carrying this is **not served and not censored** — it is a third outcome. AWT averages
+   * the legs that boarded, and an abandoned leg is one whose long wait has been deleted from that
+   * average by the passenger walking away, which is why `RunSummary.abandonment` has to be read
+   * beside the mean and why `awtIsValid` refuses the mean outright once the rate is high enough.
+   */
+  readonly abandonedAt?: SimTime | undefined;
   /** The car that served this leg, when known. */
   readonly carId?: string | undefined;
   /** The bank that served this leg, when known. */
@@ -633,6 +649,15 @@ export interface CarTimings {
  * The seed is a **decimal string** because it is a 64-bit unsigned value: `bigint` does not
  * survive `JSON.stringify`, and `number` silently loses precision above 2^53. `runSeed()`
  * converts it back.
+ *
+ * **The seed alone stopped being sufficient in wave 13, and this type says so rather than
+ * assuming it.** A run may now separate the crowd from the machine ({@link trafficSeed}) and may
+ * declare which draw ordering produced it ({@link trafficModel}); both are inputs to the trace, so
+ * a record that omitted either would still replay *deterministically* — to a different answer, off
+ * a different set of passengers. That is the failure `experiments/reports/replay.ts` exists to
+ * catch, and the reason both fields are stamped here rather than only on `SimulationResult`, which
+ * dies with the process. Neither is *required*, because absence is the pre-flag default and has to
+ * stay byte-identical to it; both are read back by `replaySimulationConfig`.
  */
 export interface RunRecord {
   readonly schemaVersion: number;
@@ -650,6 +675,46 @@ export interface RunRecord {
   readonly runId: string;
   /** The `StreamSet` master seed, as a decimal string. Invariant 5. */
   readonly seed: string;
+  /**
+   * The demand seed, as a decimal string — present only when the run was given one.
+   *
+   * The second half of invariant 5 on a run that separated the crowd from the machine (docs/14
+   * § 1.1). {@link seed} alone does not reproduce such a run: the demand streams were derived from
+   * *this* value, so a record carrying only the master seed replays a different crowd through the
+   * same building.
+   *
+   * **Absent, never equal to {@link seed}, when the run was given none — and that records the
+   * caller's intent, not a behavioural difference.** A traffic seed equal to the run seed produces
+   * *the same run*: `StreamSet.#seedFor` hands the demand streams a bigint of the same value either
+   * way, and `random/streams.test.ts` asserts it stream by stream ("is the identity when it equals
+   * the run seed"). Measured end to end on garden-apartments at seed 20260731: 23 legs either way,
+   * the passenger records equal, the whole record equal once this key is removed.
+   *
+   * So the key is provenance — *this run was authored as a crowd/machine split* — and it is kept
+   * because it costs nothing: absent when unused, so a default run's record is byte-identical to
+   * one written before the field existed. It is **not** kept because omitting it would replay a
+   * different crowd; at a coinciding seed it would not. Where the seed differs from the run seed —
+   * the case this field exists for — dropping it does replay a different crowd, and that is
+   * measured in `experiments/reports/trafficModelReplay.test.ts`.
+   */
+  readonly trafficSeed?: string | undefined;
+  /**
+   * Which traffic draw ordering produced this run — **present only when it was not `v1`**.
+   *
+   * Recorded for the reason {@link passengerModel} is: a stored record outlives the build that
+   * wrote it, and this one names *which simulator* the dataset came from. It is not a tunable. A
+   * replay that dropped it would re-run the same building at the same seed against a different
+   * trace — more than half the legs, measured — and report the divergence as a determinism failure
+   * in `core` rather than as the incomplete record it is.
+   *
+   * Absent rather than `'v1'`, and that is a claim rather than a convenience: a `v1` run *is* the
+   * run this repository produced before the option existed, same draws and same record, so
+   * announcing `'v1'` would assert a distinction that does not exist and would add a key to every
+   * pinned record to say nothing. Note this is the **opposite** boundary to {@link trafficSeed}'s,
+   * which is omitted only when it was never given — the two are reasoned separately rather than by
+   * analogy.
+   */
+  readonly trafficModel?: TrafficModelVersion | undefined;
   readonly buildingId?: string | undefined;
   readonly dispatcherProfileId?: string | undefined;
   readonly trafficProfileId?: string | undefined;
@@ -968,6 +1033,37 @@ export const SERVICE_LEVEL_VERDICTS = [
 ] as const;
 
 export type ServiceLevelVerdict = (typeof SERVICE_LEVEL_VERDICTS)[number];
+
+/**
+ * **How many riders gave up, beside the average of the ones who did not** (docs/14 § 3.1).
+ *
+ * This is `EnergyStatistics.workPerServedLegKJ`'s rule on a second axis, and the sentence
+ * `DECISIONS.md` § D106 wrote for energy transfers word for word: *a configuration that spends
+ * less by serving fewer people has not saved anything*. Abandonment is the version of that trap
+ * that improves the headline metric directly — the passengers it removes from the AWT sample are,
+ * by construction, exactly the ones who waited longest — so a mean that falls while this count
+ * rises is not an improvement and must never be shown as one.
+ *
+ * `RunSummary.abandonment` is therefore **present exactly when somebody left**. A consumer that
+ * shows AWT must show this beside it whenever it is present; a consumer that finds it absent is
+ * looking at a run in which nobody abandoned, which is every run that declares no `sim.patience`.
+ *
+ * Window-scoped, like every other cohort statistic on a summary: a leg is counted here when its
+ * `arrivedAt` falls in the reporting window, the same membership key AWT uses, so the count and
+ * the mean describe the same cohort and the ratio between them means something.
+ */
+export interface AbandonmentStatistics {
+  /** Legs in the window whose rider left before a car reached them. Never `0` when present. */
+  readonly count: number;
+  /** Legs that arrived in the window — the denominator, and the same one `WaitStatistics` uses. */
+  readonly arrivalCount: number;
+  /** `count / arrivalCount`, or `0` when the window held no arrivals. */
+  readonly fraction: number;
+  /** Mean seconds an abandoning rider stood there before leaving. `NaN` never appears: count > 0. */
+  readonly meanWaitBeforeLeavingS: number;
+  /** The longest any of them stood there. */
+  readonly maxWaitBeforeLeavingS: number;
+}
 
 /**
  * How long one passenger waited, and whether that alone makes the mean unquotable.
@@ -1350,6 +1446,20 @@ export interface RunSummary {
    * second. See {@link ServiceLevelDiagnosis}.
    */
   readonly serviceLevel: ServiceLevelDiagnosis;
+  /**
+   * **How many riders left rather than waiting — the figure that goes beside {@link waiting}.**
+   *
+   * Present exactly when somebody abandoned in the window, and therefore absent on every run that
+   * declares no `sim.patience` — which keeps such a summary byte-identical to one produced before
+   * patience existed (docs/14 § 0, § 5 criterion 1).
+   *
+   * It is on the same footing `EnergyStatistics.workPerServedLegKJ` is on beside the raw energy
+   * figure (`DECISIONS.md` § D106) and for the identical reason: abandonment *improves* AWT by
+   * construction, because the waits it removes from the sample are the longest ones. A report that
+   * shows {@link waiting} without showing this when it is present is showing an average of the
+   * survivors and calling it the wait. See {@link AbandonmentStatistics}.
+   */
+  readonly abandonment?: AbandonmentStatistics | undefined;
 
   /**
    * Whether {@link waiting}'s mean may carry a confidence interval.

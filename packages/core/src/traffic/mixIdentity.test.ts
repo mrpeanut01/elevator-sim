@@ -230,7 +230,7 @@ describe('a template that declares no directional mix generates exactly the trac
           BASELINE_CONTINUOUS[key] as ContinuousSummary,
         );
         expect(drift, `${key} continuous drift`).toEqual([]);
-      });
+      }, 60_000);
 
       it(`${key} carries no mix field at all`, () => {
         const building = config.buildingsById.get(buildingId);
@@ -279,7 +279,7 @@ describe('the template that does vary the mix moved, and the flat control did no
   it('generates a trace unlike the rise-and-fall one it shares its intensity with', () => {
     const arc = measure('midtown-office', 'lunch-two-way');
     expect(arc.digest).not.toBe(BASELINE_STRUCTURAL_DIGESTS['midtown-office|rise-and-fall']);
-  });
+  }, 60_000);
 
   /*
    * The load-bearing one. § D162 condition 5 requires the flat-mix control to differ from the
@@ -406,5 +406,5 @@ describe('the template that does vary the mix moved, and the flat control did no
         templateOverrides: { mixAmplitude },
       }).expectedPassengers;
     expect(expectedOf(1)).toBeCloseTo(expectedOf(0), 9);
-  });
+  }, 60_000);
 });

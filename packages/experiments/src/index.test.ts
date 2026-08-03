@@ -23,6 +23,7 @@ import * as oracleModule from './oracle/index.js';
 import * as reportsModule from './reports/index.js';
 import * as runnerModule from './runner/index.js';
 import * as statsModule from './reports/statistics.js';
+import * as teachingModule from './teaching/index.js';
 import * as tuningModule from './tuning/index.js';
 import { STUDY_ENTRY_POINTS } from './benchmark/published.js';
 import {
@@ -41,6 +42,7 @@ const submodules = {
   oracle: oracleModule,
   benchmark: benchmarkModule,
   tuning: tuningModule,
+  teaching: teachingModule,
   fuzz: fuzzModule,
 } satisfies Record<string, Record<string, unknown>>;
 

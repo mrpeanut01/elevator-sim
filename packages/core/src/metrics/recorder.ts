@@ -41,6 +41,9 @@
 import type { SimTime } from '../kernel/types.js';
 import type { PassengerModel } from './comparability.js';
 import type { CredentialGroup, Direction } from '../model/types.js';
+// The default is read, not repeated: a declared default that disagrees with the resolver is worse
+// than none, which is the argument `TRAFFIC_DEFAULTS`'s own docstring makes.
+import { TRAFFIC_DEFAULTS, type TrafficModelVersion } from '../traffic/types.js';
 
 import {
   METRICS_SCHEMA_VERSION,
@@ -92,6 +95,16 @@ export interface RecordablePassenger {
 /** Anything carrying the master seed. `StreamSet` satisfies it. */
 export interface SeedSource {
   readonly masterSeed: bigint;
+  /**
+   * The demand seed, when the set was built with one — `StreamSet.trafficSeed`.
+   *
+   * Read off the same object as {@link masterSeed} on purpose. Both halves of invariant 5 then come
+   * from the generator that actually filled the run, and the record cannot carry one seed while the
+   * streams were derived from another. Absent when there was none — which is a statement about how
+   * the run was *authored*, not about its trace: a traffic seed equal to the master seed derives
+   * the same streams. See `RunRecord.trafficSeed`.
+   */
+  readonly trafficSeed?: bigint | undefined;
 }
 
 /** Which car served a leg. Both fields optional: a bare simulation may not track banks. */
@@ -110,11 +123,21 @@ export interface MetricsRecorderOptions {
   /**
    * The seed that produced this run (CLAUDE.md invariant 5).
    *
-   * Pass the run's `StreamSet` — `{ masterSeed }` — and the record cannot disagree with the
-   * generator that filled it. A `bigint`, a safe-integer `number` or a decimal string are
-   * also accepted for tests and for replays loaded from disk.
+   * Pass the run's `StreamSet` — `{ masterSeed, trafficSeed }` — and the record cannot disagree
+   * with the generator that filled it. A `bigint`, a safe-integer `number` or a decimal string are
+   * also accepted for tests and for replays loaded from disk; those forms carry no traffic seed,
+   * which is correct, because a run described by a bare number never had one.
    */
   readonly seed: bigint | number | string | SeedSource;
+  /**
+   * Which traffic draw ordering produced this run — see `RunRecord.trafficModel`.
+   *
+   * Omitted for `v1`, so a record written by a default run is byte-identical to one written before
+   * the option existed and every pinned record still reproduces. Unlike the traffic seed this
+   * cannot be read off the `StreamSet`: the streams are materialized either way and it is the
+   * *generator* that decides which one the batch draw comes from, so the caller has to say.
+   */
+  readonly trafficModel?: TrafficModelVersion | undefined;
   /** Identity of this replication. Defaults to `run`. */
   readonly runId?: string | undefined;
   readonly buildingId?: string | undefined;
@@ -182,6 +205,7 @@ interface LegState {
     readonly egressTransitSeconds: number;
     boardedAt: SimTime | undefined;
     alightedAt: SimTime | undefined;
+    abandonedAt: SimTime | undefined;
     carId: string | undefined;
     bankId: string | undefined;
     assignedCarId: string | undefined;
@@ -199,6 +223,8 @@ interface LegState {
  */
 export class MetricsRecorder {
   readonly #seed: string;
+  readonly #trafficSeed: string | undefined;
+  readonly #trafficModel: TrafficModelVersion | undefined;
   readonly #runId: string;
   readonly #buildingId: string | undefined;
   readonly #dispatcherProfileId: string | undefined;
@@ -223,10 +249,16 @@ export class MetricsRecorder {
   #assignedCount = 0;
   #releasedCount = 0;
   #alightedCount = 0;
+  #abandonedCount = 0;
   #finishedAt: SimTime | undefined;
 
   constructor(options: MetricsRecorderOptions) {
     this.#seed = normalizeSeedString(options.seed);
+    this.#trafficSeed = normalizeTrafficSeedString(options.seed);
+    // Kept as given rather than resolved to the default: the record reports it by *presence*, so
+    // resolving here would lose the only distinction the record needs to make. See
+    // `RunRecord.trafficModel`.
+    this.#trafficModel = options.trafficModel;
     this.#runId = options.runId ?? 'run';
     if (this.#runId.length === 0) {
       throw new MetricsError('Run id must not be empty; it is how a stored record is addressed.');
@@ -291,6 +323,14 @@ export class MetricsRecorder {
     return this.#alightedCount;
   }
 
+  /**
+   * Legs whose rider gave up and left the landing. `0` under every run that declares no
+   * `sim.patience`. See {@link recordAbandonment}.
+   */
+  get abandonedCount(): number {
+    return this.#abandonedCount;
+  }
+
   /** Latest simulated time handed to any method. `finish` must not precede it. */
   get lastEventAt(): SimTime {
     return this.#lastEventAt;
@@ -351,6 +391,7 @@ export class MetricsRecorder {
         egressTransitSeconds: passenger.egressTransitS ?? 0,
         boardedAt: undefined,
         alightedAt: undefined,
+        abandonedAt: undefined,
         carId: undefined,
         bankId: undefined,
         assignedCarId: undefined,
@@ -463,6 +504,55 @@ export class MetricsRecorder {
     leg.record.carId = details.carId;
     leg.record.bankId = details.bankId;
     this.#boardedCount += 1;
+    this.#observe(at);
+  }
+
+  /**
+   * Record a passenger **giving up and leaving the landing** (docs/14 § 3.1).
+   *
+   * The third way a wait can end, beside boarding and the run stopping, and it is recorded here —
+   * rather than being left as "a leg that never boarded" — because the two are different facts
+   * that produce the same silence. A leg still standing there when the run ends is a *censored*
+   * observation, and `awtIsValid`'s censoring ground already accounts for it. A leg whose rider
+   * walked out is not censored: nothing was going to serve it, and the longest wait in the cohort
+   * has been removed from the sample by the person themselves. Filing the second as the first
+   * would let a configuration abandon a third of its riders and report an improved mean over a
+   * window that looks fully served.
+   *
+   * @throws MetricsError if the leg never arrived, has already boarded, has already abandoned, or
+   *   abandons before it arrived. Boarding and abandoning are mutually exclusive by construction —
+   *   a rider who got in did not leave — and the recorder refuses the pair rather than storing it,
+   *   because a record carrying both would make every wait derived from it ambiguous.
+   */
+  recordAbandonment(passenger: RecordablePassenger | string, at: SimTime): void {
+    this.#assertOpen('recordAbandonment');
+    const id = typeof passenger === 'string' ? passenger : passenger.id;
+    const leg = this.#require(id, 'abandon');
+    if (leg.record.boardedAt !== undefined) {
+      throw new MetricsError(
+        `Leg "${id}" boarded at t=${leg.record.boardedAt} and cannot abandon at t=${at}: a rider who got into the car did not walk out of the lobby.`,
+      );
+    }
+    if (leg.record.abandonedAt !== undefined) {
+      throw new MetricsError(
+        `Leg "${id}" abandoned at t=${leg.record.abandonedAt} and cannot abandon again at t=${at}.`,
+      );
+    }
+    if (!Number.isFinite(at) || at < leg.record.arrivedAt) {
+      throw new MetricsError(
+        `Leg "${id}" cannot abandon at t=${at}: it arrived at t=${leg.record.arrivedAt}.`,
+      );
+    }
+    leg.record.abandonedAt = at;
+    // A promise the rider is no longer there to take. Cleared here rather than by a second call
+    // at the abandonment site, so a record can never claim a car was holding itself for somebody
+    // who had already gone home.
+    if (leg.record.assignedCarId !== undefined) {
+      leg.record.assignedCarId = undefined;
+      leg.record.assignedAt = undefined;
+      this.#releasedCount += 1;
+    }
+    this.#abandonedCount += 1;
     this.#observe(at);
   }
 
@@ -660,6 +750,25 @@ export class MetricsRecorder {
       schemaVersion: METRICS_SCHEMA_VERSION,
       runId: this.#runId,
       seed: this.#seed,
+      /*
+       * Both halves of invariant 5, spread-or-omitted rather than written as `undefined` — under
+       * `exactOptionalPropertyTypes` those are different types, and an absent key and a present
+       * `undefined` are different claims about what was stored.
+       *
+       * The two omit on **different** boundaries, and only one of the two boundaries is
+       * behavioural. `trafficModel` is omitted at the default *however it was reached*, and that
+       * one matters: a run at the default is byte-identical to one predating the option, so a key
+       * saying otherwise would move every pinned record and both identity digests to assert
+       * nothing. `trafficSeed` is omitted only when it was never given — but a traffic seed equal
+       * to the run seed produces *the same run*, measured and asserted in `random/streams.test.ts`
+       * ("is the identity when it equals the run seed"), so that boundary records the caller's
+       * intent rather than a difference in the trace. It is free: absent when unused.
+       */
+      ...(this.#trafficSeed === undefined ? {} : { trafficSeed: this.#trafficSeed }),
+      ...(this.#trafficModel === undefined ||
+      this.#trafficModel === TRAFFIC_DEFAULTS.trafficModel
+        ? {}
+        : { trafficModel: this.#trafficModel }),
       ...(this.#buildingId === undefined ? {} : { buildingId: this.#buildingId }),
       ...(this.#dispatcherProfileId === undefined
         ? {}
@@ -738,6 +847,10 @@ function freezeLeg(leg: LegState): PassengerRecord {
       : { egressTransitSeconds: source.egressTransitSeconds }),
     ...(source.boardedAt === undefined ? {} : { boardedAt: source.boardedAt }),
     ...(source.alightedAt === undefined ? {} : { alightedAt: source.alightedAt }),
+    // Omitted on every leg that did not abandon, by the rule the two keys above and the four
+    // below follow: a run that declared no patience writes the record it wrote before this
+    // field existed.
+    ...(source.abandonedAt === undefined ? {} : { abandonedAt: source.abandonedAt }),
     ...(source.carId === undefined ? {} : { carId: source.carId }),
     ...(source.bankId === undefined ? {} : { bankId: source.bankId }),
     // Omitted, not `undefined`, so a conventional run's record is byte-identical to one written
@@ -774,6 +887,20 @@ function normalizeSeedString(seed: bigint | number | string | SeedSource): strin
     return seed;
   }
   return assertNonNegative(seed.masterSeed);
+}
+
+/**
+ * The demand seed a `StreamSet` was built with, as the decimal string a record stores.
+ *
+ * `undefined` for every other accepted seed form, and that is the honest answer rather than a
+ * fallback: a run described by a bare seed was not given a separate crowd, so the record must say
+ * nothing rather than repeat the master seed. See `RunRecord.trafficSeed`.
+ */
+function normalizeTrafficSeedString(
+  seed: bigint | number | string | SeedSource,
+): string | undefined {
+  if (typeof seed !== 'object') return undefined;
+  return seed.trafficSeed === undefined ? undefined : assertNonNegative(seed.trafficSeed);
 }
 
 function assertNonNegative(seed: bigint): string {

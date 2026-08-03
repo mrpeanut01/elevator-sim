@@ -174,8 +174,33 @@ interface StreamSet {
   passengerMass: RNG;    // body weight, drives the load sensor
   doorObstruction: RNG;  // door reopen events
   policyNoise: RNG;      // stochastic dispatcher exploration
+  batchSize: RNG;        // group size — consumed only under `trafficModel: 'v2'`
+  patience: RNG;         // abandonment tolerance — consumed only when a run declares `sim.patience`
+  modeChoice: RNG;       // stairs versus lift — consumed only for a journey offered a stairs mode
+  dayVariation: RNG;     // the per-run day — consumed only when a run declares `demand.dayVariation`
 }
 ```
+
+**The last four are conditional, and every one of them is materialized and never consumed unless a
+run asks for it** — which is what keeps every published figure reproducing byte for byte. Under the
+default `trafficModel: 'v1'` the group-size draw stays on `arrivals`, exactly where it has always
+been ([docs/14 § 1.3](14-building-behaviour-contract.md)); nobody abandons unless `sim.patience` is
+declared ([§ 3.1](14-building-behaviour-contract.md)); no shipped building declares a stairs edge
+([§ 3.3](14-building-behaviour-contract.md)); and a template is a copy of the average day unless
+`demand.dayVariation` is declared ([§ 2.3](14-building-behaviour-contract.md)).
+
+**This list was three streams stale when `dayVariation` was added, and the three that were missing
+had all shipped.** `random/streams.ts` names this section as where its stream list comes from, so a
+list here that is shorter than `STREAM_NAMES` is the *"a stated mechanism goes stale"* failure
+`CLAUDE.md` describes, pointed at the invariant it is the reference for. Nothing mechanises the
+agreement: `streams.test.ts` pins the names and their derived parameters, and no test reads this
+file.
+
+**`dayVariation` is the one whose placement is a statistical decision rather than a modelling one.**
+It draws **before the trace exists** and multiplies the rate the trace is generated at, so two cells
+that disagree about it see different people — which is why `runner/crn.ts`'s `traceKeyOf` carries it
+while `patience`, drawn *after* the trace from a stream in the same demand-side set, is deliberately
+left out.
 
 This matters more than it looks. With a single global RNG, if dispatcher B causes one
 extra door reopen, **every subsequent draw shifts** and the two runs diverge into entirely
@@ -254,6 +279,7 @@ packages/
 │   │   ├── space/         — the self-describing search space, sampling, encoding
 │   │   ├── search/        — random search, successive halving, sep-CMA-ES, the objective
 │   │   └── report/        — Pareto fronts, the held-out validation round
+│   ├── teaching/          — docs/14 § 4.2: the declared training configuration, and the round that judges a policy on traffic it has never seen
 │   ├── fuzz/              — Phase 8: randomized buildings, the six properties, shrinking
 │   └── validation/        — the Phase 3 acceptance gate
 ├── viz/                   — web visualization, consumes core                    (Phase 4 complete)

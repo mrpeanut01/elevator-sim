@@ -56,6 +56,45 @@ export const STREAM_NAMES = [
   'passengerMass',
   'doorObstruction',
   'policyNoise',
+  /**
+   * Group size (docs/14 § 1.2). Appended rather than filed next to `arrivals`, because a name's
+   * *spelling* decides its parameters and its *position* decides nothing — so appending is the
+   * edit that cannot disturb the six above.
+   *
+   * Drawn from only under `trafficModel: 'v2'`. Under `v1` the batch draw stays on `arrivals`
+   * exactly as it always has, this stream is materialized and never consumed, and every published
+   * figure reproduces (docs/14 § 1.3).
+   */
+  'batchSize',
+  /**
+   * Per-passenger abandonment tolerance (docs/14 § 3.1). Appended for `batchSize`'s reason: the
+   * spelling decides the parameters and the position decides nothing.
+   *
+   * Drawn from only when a run declares `sim.patience`. A run that does not materializes the
+   * stream and consumes nothing from it, which leaves every other stream exactly where it was —
+   * the independence guarantee at the head of this module, asserted in both directions by
+   * `streams.test.ts`.
+   */
+  'patience',
+  /**
+   * The stairs-versus-lift decision (docs/14 § 3.3).
+   *
+   * Drawn from only for a journey that is *offered* a stairs mode — the floors are joined by a
+   * declared `kind: 'stairs'` edge and the journey is within its reach. No shipped building
+   * declares one, so no shipped run draws from it.
+   */
+  'modeChoice',
+  /**
+   * The per-run inter-day multipliers (docs/14 § 2.3). Appended for `batchSize`'s reason: the
+   * spelling decides the parameters and the position decides nothing.
+   *
+   * Drawn from only when a run declares `demand.dayVariation`, and then **exactly twice, before a
+   * single arrival instant exists** — a demand factor and a peak shift, in that order. Two draws
+   * rather than one-when-shifting so that turning the shift on cannot move the factor; and on this
+   * stream rather than on `arrivals` so that turning day variation on cannot move any *other*
+   * draw either. What it does move is the demand the trace is generated at, deliberately.
+   */
+  'dayVariation',
 ] as const;
 
 export type StreamName = (typeof STREAM_NAMES)[number];
@@ -73,9 +112,12 @@ export interface StreamSetSnapshot {
   /**
    * Decimal string, present only when the set was built with one.
    *
-   * Absent rather than equal to `masterSeed` when unset: "there was no traffic seed" and "the
-   * traffic seed happened to match the run seed" are different runs, and a snapshot that conflated
-   * them would replay one as the other.
+   * Absent rather than equal to `masterSeed` when unset — a record of how the set was *built*, not
+   * of a difference in what it produces. A traffic seed equal to the master seed derives every
+   * stream from the same value; {@link StreamSet.#seedFor} returns the coinciding bigint either
+   * way and `streams.test.ts` asserts the identity stream by stream ("is the identity when it
+   * equals the run seed"). A snapshot that conflated the two would *not* replay one as the other,
+   * and this docstring said it would until wave 13 measured it.
    */
   readonly trafficSeed?: string;
   readonly streams: Readonly<Record<string, RngState>>;
@@ -139,7 +181,7 @@ export function deriveStreamSeed(masterSeed: number | bigint, streamName: string
 /**
  * The streams that describe **who turns up**, as opposed to how the machine behaves.
  *
- * The split is the whole content of {@link StreamSetOptions.trafficSeed}: give these four a
+ * The split is the whole content of {@link StreamSetOptions.trafficSeed}: give these five a
  * separate seed and you can re-roll the crowd while the building, the doors and the dispatcher's
  * own noise stay exactly where they were — or hold the crowd and change the machine, which is
  * common random numbers expressed as a knob rather than as a convention.
@@ -147,12 +189,44 @@ export function deriveStreamSeed(masterSeed: number | bigint, streamName: string
  * `doorObstruction` is deliberately **not** here. An obstruction is a property of the door and the
  * moment, not of the person: putting it on the traffic seed would mean "the same crowd" also meant
  * "the same doors jamming", and the two questions would stop being separable.
+ *
+ * `batchSize` **is** here, by that same test read the other way: how many people walk in together
+ * is a fact about the crowd and nothing about the machine. A traffic seed that re-rolled who turns
+ * up and when, but left every group the same size, would be re-rolling half a Tuesday.
+ *
+ * `patience` and `modeChoice` are here for that same reason, and the `doorObstruction` test is
+ * applied to each explicitly rather than by analogy:
+ *
+ * - **`patience`** — how long a person will stand at a landing before giving up is a property of
+ *   *that person*, not of the door or the dispatcher. Two arms of a comparison that were handed
+ *   "the same crowd" and then disagreed about who was willing to wait would not be the same crowd,
+ *   and the abandonment counts they publish beside their AWTs would not be comparable.
+ * - **`modeChoice`** — whether a rider takes the stairs is the same kind of fact: a disposition
+ *   they walked in with. Seeding it off the run seed would mean re-rolling the machine silently
+ *   changed *which people left the lift system*, so two arms would be measured over different
+ *   populations — the very thing docs/14 § 5 criterion 4 exists to keep visible.
+ * - **`dayVariation`** — *which Tuesday this is* is the most purely crowd-side fact on the list:
+ *   it scales how many people walk in and moves when they do it, and it touches no car. Off the
+ *   traffic seed it would be the machine deciding how busy the day was, and re-rolling a
+ *   dispatcher would silently re-roll the demand level it was measured at. This is also the one
+ *   whose misplacement is a *statistical* fault rather than only a modelling one: two arms of a
+ *   paired comparison must see the same Monday, and docs/14 § 5 criterion 3 is written for
+ *   exactly that.
+ *
+ * The contrast is exact: an obstruction is a property of the door and the moment, so putting it on
+ * the traffic seed would make "the same crowd" also mean "the same doors jamming". Willingness to
+ * wait and willingness to climb are properties of the person, so leaving *them* off it would make
+ * "the same crowd" mean two different crowds.
  */
 const TRAFFIC_STREAM_NAMES: ReadonlySet<string> = new Set([
   'arrivals',
   'origins',
   'destinations',
   'passengerMass',
+  'batchSize',
+  'patience',
+  'modeChoice',
+  'dayVariation',
 ]);
 
 /** Optional second seed, for separating demand from machine. See {@link StreamSet}. */
@@ -168,8 +242,8 @@ export interface StreamSetOptions {
 }
 
 /**
- * The six named streams required by the architecture, plus on-demand derivation for any
- * additional source.
+ * The named streams required by the architecture — {@link STREAM_NAMES}, materialized one
+ * property each — plus on-demand derivation for any additional source.
  *
  * Construct one per replication and inject it. Never create generators inline in simulation
  * code, and never share a stream between two sources.
@@ -222,6 +296,35 @@ export class StreamSet {
   readonly doorObstruction: Rng;
   /** Stochastic dispatcher exploration. */
   readonly policyNoise: Rng;
+  /**
+   * How many people walk in together. Consumed only under `trafficModel: 'v2'` (docs/14 § 1.3).
+   *
+   * Materialized here with the rest rather than derived lazily, because a name in
+   * {@link STREAM_NAMES} without a property beside it is a source the architecture declares and
+   * the type does not. Materializing costs one derivation and consumes nothing: a stream nobody
+   * draws from leaves every other stream exactly where it was, which is the independence
+   * guarantee this whole module is built on and what `streams.test.ts` asserts in both directions.
+   */
+  readonly batchSize: Rng;
+  /**
+   * How long a person will stand at a landing before leaving. Consumed only when a run declares
+   * `sim.patience` (docs/14 § 3.1).
+   *
+   * Materialized here for {@link batchSize}'s reason — a name in {@link STREAM_NAMES} without a
+   * property beside it is a source the architecture declares and the type does not.
+   */
+  readonly patience: Rng;
+  /** Stairs versus lift. Consumed only for a journey a stairs mode is offered to (docs/14 § 3.3). */
+  readonly modeChoice: Rng;
+  /**
+   * How busy this particular day is, and how late its peak runs (docs/14 § 2.3).
+   *
+   * Consumed only when a run declares `demand.dayVariation`, and then exactly twice, before the
+   * trace exists. Materialized here for {@link batchSize}'s reason — a name in
+   * {@link STREAM_NAMES} without a property beside it is a source the architecture declares and
+   * the type does not.
+   */
+  readonly dayVariation: Rng;
 
   readonly #streams = new Map<string, Pcg32>();
 
@@ -236,6 +339,10 @@ export class StreamSet {
     this.passengerMass = this.#derive('passengerMass');
     this.doorObstruction = this.#derive('doorObstruction');
     this.policyNoise = this.#derive('policyNoise');
+    this.batchSize = this.#derive('batchSize');
+    this.patience = this.#derive('patience');
+    this.modeChoice = this.#derive('modeChoice');
+    this.dayVariation = this.#derive('dayVariation');
   }
 
   /** Typed accessor for the required streams. Returns the same instance as the property. */
@@ -244,7 +351,7 @@ export class StreamSet {
   }
 
   /**
-   * Get (creating on first use) a stream for a source outside the required six.
+   * Get (creating on first use) a stream for a source outside the required seven.
    *
    * Memoized, so repeated calls with the same name return the same generator rather than
    * restarting the sequence. Prefer adding the name to {@link STREAM_NAMES} once a source is

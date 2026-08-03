@@ -129,6 +129,7 @@ import {
   elevationRowsOf,
   specRowsOf,
   speedChipsOf,
+  transportNoteOf,
   zoneChoicesOf,
 } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
@@ -2040,6 +2041,27 @@ const AUTHORING: SurfaceAdapter = {
         label: 'orphaned-band',
         spec: { ...BLANK_SPEC, floors: 20, cars: 1, bandByCar: { 0: [0, 4] as readonly [number, number] } },
       },
+      /*
+       * All four escalator states at once — an end the tower no longer has, both ends on one
+       * floor, a traversal time the loader refuses, and a machine that lands on no transfer
+       * level. Each is a distinct sentence in `validateSpec`, and three of the four are claims
+       * about what the loader does, which is exactly the class `documentation.test.ts` catches
+       * one level up and this sweep catches at the control.
+       */
+      {
+        label: 'escalators',
+        spec: {
+          ...BLANK_SPEC,
+          skyFloors: [6],
+          transportModes: [
+            { id: 'escalator-1', connects: [6, 7] as readonly [number, number], traversalTimeS: 21.2 },
+            { id: 'escalator-2', connects: [2, 3] as readonly [number, number], traversalTimeS: 21.2 },
+            { id: 'escalator-3', connects: [4, 4] as readonly [number, number], traversalTimeS: 21.2 },
+            { id: 'escalator-4', connects: [1, 40] as readonly [number, number], traversalTimeS: 21.2 },
+            { id: 'escalator-5', connects: [8, 9] as readonly [number, number], traversalTimeS: 0 },
+          ],
+        },
+      },
     ];
     for (const { label, spec } of specs) {
       seeds.push({ field: `buildingSummary(${label})`, text: buildingSummary(spec), role: 'observation' });
@@ -2723,6 +2745,7 @@ const EDITOR_PANELS: SurfaceAdapter = {
     'dev/buildingEditor.ts#elevationRowsOf',
     'dev/buildingEditor.ts#elevationCarsOf',
     'dev/buildingEditor.ts#elevationNoteOf',
+    'dev/buildingEditor.ts#transportNoteOf',
     'dev/buildingEditor.ts#checkBuilding',
     'dev/dispatcherEditor.ts#termRowsOf',
     'dev/dispatcherEditor.ts#flagRowsOf',
@@ -2752,6 +2775,22 @@ const EDITOR_PANELS: SurfaceAdapter = {
       { label: 'blank', spec: BLANK_SPEC },
       // Let past design capacity, which is the one row that swaps its sub-line for a sentence.
       { label: 'over-capacity', spec: { ...BLANK_SPEC, occupancyPct: 115 } },
+      /*
+       * A two-level lobby joined by an escalator, and a second machine joining two ordinary
+       * floors — the state `transportNoteOf` exists to say something about, and the one a reader
+       * reaches by pressing *+ escalator* twice. Both halves of its sentence are seeded at once.
+       */
+      {
+        label: 'sky-lobby',
+        spec: {
+          ...BLANK_SPEC,
+          skyFloors: [6],
+          transportModes: [
+            { id: 'escalator-1', connects: [6, 7] as readonly [number, number], traversalTimeS: 21.2 },
+            { id: 'escalator-2', connects: [2, 3] as readonly [number, number], traversalTimeS: 21.2 },
+          ],
+        },
+      },
     ];
     for (const { label, spec } of buildingSpecs) {
       for (const view of specRowsOf(spec)) {
@@ -2771,6 +2810,11 @@ const EDITOR_PANELS: SurfaceAdapter = {
       seeds.push({
         field: `elevationNoteOf(${label})`,
         text: elevationNoteOf(spec),
+        role: 'prose',
+      });
+      seeds.push({
+        field: `transportNoteOf(${label})`,
+        text: transportNoteOf(spec),
         role: 'prose',
       });
       for (const row of elevationRowsOf(spec)) {

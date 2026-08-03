@@ -64,6 +64,8 @@ import {
   METRICS_SCHEMA_VERSION,
   PERCENTILE_METHODS,
   TIMEOUT_POLICIES,
+  TRAFFIC_DEFAULTS,
+  TRAFFIC_MODEL_VERSIONS,
   WEIGHT_SET_POLICIES,
   normalizeSeed,
   parseRunRecord,
@@ -200,6 +202,20 @@ export function createStoredRun(input: CreateStoredRunInput): StoredRunRecord {
   const sim = simOptionsOf(config);
   const storedConfig: StoredRunConfig = Object.freeze({
     seed,
+    /*
+     * Copied from the **record**, not from `config`, and that is the one place this function reads
+     * the result instead of the configuration. Both fields are already normalized there — the
+     * traffic seed to a decimal string by the `StreamSet` that produced it, the model version to
+     * "present iff not v1" — so taking them from the record means the envelope cannot claim a
+     * different simulator or a different crowd from the dataset sitting beside it. `parseStoredRun`
+     * enforces that agreement on the way back in.
+     */
+    ...(result.record.trafficSeed === undefined
+      ? {}
+      : { trafficSeed: result.record.trafficSeed }),
+    ...(result.record.trafficModel === undefined
+      ? {}
+      : { trafficModel: result.record.trafficModel }),
     buildingId: config.building.id,
     dispatcherProfileId: config.dispatcherProfile.id,
     trafficProfileId: config.building.trafficProfile,
@@ -431,6 +447,26 @@ export function parseStoredRun(input: string | unknown): StoredRunRecord {
       `Stored run "${record.runId}" carries seed ${config.seed} on its configuration and ${record.seed} on its record. One of the two did not produce the other, so the run is neither replayable nor comparable (CLAUDE.md invariant 5)`,
     );
   }
+  /*
+   * The same check for the other two halves of the run's identity, and it is a check rather than a
+   * preference for one side. The envelope is what the replay rebuilds a `SimulationConfig` from and
+   * the record is what the replay is compared against; if they disagree the replay runs one crowd
+   * and grades it against another, and reports the mismatch as a determinism failure in `core`.
+   * Both are written from the record by `createStoredRun`, so a disagreement means the file was
+   * edited or assembled by hand.
+   */
+  if (config.trafficSeed !== record.trafficSeed) {
+    throw new ReportsError(
+      `Stored run "${record.runId}" carries traffic seed ${config.trafficSeed ?? '(none)'} on its configuration and ${record.trafficSeed ?? '(none)'} on its record. The demand streams were derived from one of the two, so a replay would run a different crowd through the same building and call the divergence a determinism failure (CLAUDE.md invariant 5)`,
+    );
+  }
+  if (config.trafficModel !== record.trafficModel) {
+    const named = (version: string | undefined): string =>
+      version ?? `${TRAFFIC_DEFAULTS.trafficModel} (absent)`;
+    throw new ReportsError(
+      `Stored run "${record.runId}" was produced by traffic model ${named(record.trafficModel)} according to its record and ${named(config.trafficModel)} according to its configuration. Those are two different simulators, and a replay would rebuild the wrong one: the group-size draw moves to its own stream at v2, so the same seed yields a different trace rather than a different answer (CLAUDE.md invariant 5)`,
+    );
+  }
 
   const summaryFingerprintText = readOptional(root, 'summaryFingerprint', [], expectString);
   const metadata = readOptional(root, 'metadata', [], expectMetadata);
@@ -549,6 +585,8 @@ function parseStoredRunConfig(value: unknown, path: Path): StoredRunConfig {
   const object = expectObject(value, path);
   rejectUnknownKeys(object, path, [
     'seed',
+    'trafficSeed',
+    'trafficModel',
     'buildingId',
     'dispatcherProfileId',
     'trafficProfileId',
@@ -564,6 +602,13 @@ function parseStoredRunConfig(value: unknown, path: Path): StoredRunConfig {
 
   return Object.freeze({
     seed: expectSeed(object['seed'], [...path, 'seed']),
+    ...spread('trafficSeed', readOptional(object, 'trafficSeed', path, expectSeed)),
+    ...spread(
+      'trafficModel',
+      readOptional(object, 'trafficModel', path, (value, at) =>
+        expectEnum(value, at, TRAFFIC_MODEL_VERSIONS),
+      ),
+    ),
     buildingId: expectString(object['buildingId'], [...path, 'buildingId']),
     dispatcherProfileId: expectString(object['dispatcherProfileId'], [
       ...path,
@@ -658,7 +703,59 @@ function parseDemandOptions(value: unknown, path: Path): StoredDemandOptions {
     'maxLegs',
     'peakWindowS',
     'baselineFraction',
+    'mixAmplitude',
+    'batchSize',
+    'passengerMass',
+    'dayVariation',
   ]);
+
+  const batchSize = readOptional(object, 'batchSize', path, (entry, entryPath) => {
+    const inner = expectObject(entry, entryPath);
+    rejectUnknownKeys(inner, entryPath, ['distribution', 'mean', 'weights']);
+    return Object.freeze({
+      distribution: expectString(inner['distribution'], [...entryPath, 'distribution']),
+      ...spread('mean', readOptional(inner, 'mean', entryPath, expectNumber)),
+      ...spread(
+        'weights',
+        readOptional(inner, 'weights', entryPath, expectNumberArray),
+      ),
+    });
+  });
+
+  const passengerMass = readOptional(object, 'passengerMass', path, (entry, entryPath) => {
+    const inner = expectObject(entry, entryPath);
+    rejectUnknownKeys(inner, entryPath, [
+      'distribution',
+      'meanKg',
+      'stdDevKg',
+      'minKg',
+      'maxKg',
+    ]);
+    // All five required on the way back in, exactly as the override type requires them on the way
+    // out: a stored block missing a truncation bound would replay an unbounded population, which
+    // is the failure docs/14 § 2.1 makes the bounds mandatory to prevent.
+    return Object.freeze({
+      distribution: expectString(inner['distribution'], [...entryPath, 'distribution']),
+      meanKg: expectNumber(inner['meanKg'], [...entryPath, 'meanKg']),
+      stdDevKg: expectNumber(inner['stdDevKg'], [...entryPath, 'stdDevKg']),
+      minKg: expectNumber(inner['minKg'], [...entryPath, 'minKg']),
+      maxKg: expectNumber(inner['maxKg'], [...entryPath, 'maxKg']),
+    });
+  });
+
+  const dayVariation = readOptional(object, 'dayVariation', path, (entry, entryPath) => {
+    const inner = expectObject(entry, entryPath);
+    rejectUnknownKeys(inner, entryPath, ['minDemandFactor', 'maxDemandFactor', 'peakShiftS']);
+    // Both bounds required on the way back in, exactly as the override type requires them on the
+    // way out: a stored block missing one would replay an unbounded multiplier, which docs/14
+    // § 2.3 makes a refusal rather than a default. `peakShiftS` is genuinely optional, and its
+    // absence means the peak keeps the template's own timing.
+    return Object.freeze({
+      minDemandFactor: expectNumber(inner['minDemandFactor'], [...entryPath, 'minDemandFactor']),
+      maxDemandFactor: expectNumber(inner['maxDemandFactor'], [...entryPath, 'maxDemandFactor']),
+      ...spread('peakShiftS', readOptional(inner, 'peakShiftS', entryPath, expectNumber)),
+    });
+  });
 
   const split = readOptional(object, 'directionalSplit', path, (entry, entryPath) => {
     const inner = expectObject(entry, entryPath);
@@ -705,6 +802,10 @@ function parseDemandOptions(value: unknown, path: Path): StoredDemandOptions {
     ...spread('maxLegs', readOptional(object, 'maxLegs', path, expectNumber)),
     ...spread('peakWindowS', readOptional(object, 'peakWindowS', path, expectNumber)),
     ...spread('baselineFraction', readOptional(object, 'baselineFraction', path, expectNumber)),
+    ...spread('mixAmplitude', readOptional(object, 'mixAmplitude', path, expectNumber)),
+    ...spread('batchSize', batchSize),
+    ...spread('passengerMass', passengerMass),
+    ...spread('dayVariation', dayVariation),
   });
 }
 
@@ -937,6 +1038,20 @@ function demandOptionsOf(demand: NonNullable<SimulationConfig['demand']>): Store
     ...spread('maxLegs', demand.maxLegs),
     ...spread('peakWindowS', demand.peakWindowS),
     ...spread('baselineFraction', demand.baselineFraction),
+    // Pre-existing, and the same defect class: live in `benchmark/lunchTwoWaySelection.ts` and
+    // dropped here since it landed. See `StoredDemandOptions.mixAmplitude`.
+    ...spread('mixAmplitude', demand.mixAmplitude),
+    // docs/14 §§ 2.1-2.2, and they are here for the reason `dispatcherOptionsOf` records beside
+    // `selection`: a hand-written projection that omits a reachable override stores the run as a
+    // run without it, and the replay then succeeds against **a different crowd**. `demandKeyRound
+    // Trip.test.ts` derives this list from `SimulationDemandOptions` itself so the next field
+    // cannot be forgotten the same way.
+    ...spread('batchSize', demand.batchSize),
+    ...spread('passengerMass', demand.passengerMass),
+    // docs/14 § 2.3, and the same argument once more: a record that dropped this replays at
+    // demandFactor 1 with the `dayVariation` stream never consumed — a different crowd, reported
+    // as the same run.
+    ...spread('dayVariation', demand.dayVariation),
   });
 }
 

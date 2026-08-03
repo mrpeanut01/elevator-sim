@@ -183,7 +183,12 @@ function canonicalize(value: unknown): unknown {
  * The CRN equivalence class of a cell: everything the passenger trace is a function of, apart
  * from the seed.
  *
- * The field list mirrors core's `traceConfigFor` exactly, and the omissions are the point:
+ * The field list mirrors core's `traceConfigFor`, and the omissions below the `demand.*` row are
+ * the point. **That mirroring is maintained by hand and has drifted before**: the two docs/14
+ * §§ 2.1-2.2 knobs and `mixAmplitude` were all absent from this key while being live on the demand
+ * surface, so two cells running different populations shared a cohort and were paired. A field
+ * missing here does not fail — it *merges*, which is why `crn.test.ts` now derives the field list
+ * from `keyof SimulationDemandOptions` with a `satisfies` rather than trusting this sentence.
  *
  * | Field | In the key? | Why |
  * |---|---|---|
@@ -194,6 +199,41 @@ function canonicalize(value: unknown): unknown {
  * | `reportWindow`, `summarize` | **no** | post-hoc windowing of an already-generated run |
  * | `transferWalkS`, `drainGraceS`, `maxEvents`, `onTimeout` | **no** | run-loop mechanics |
  * | `doorObstructionProbability` | **no** | draws from `doorObstruction`, not from the trace streams |
+ * | `patience` | **no** | draws from `patience`, its own stream, **after** the trace is generated |
+ * | `lobbyCrowding` | **no** | a term on the dwell; it draws nothing at all |
+ * | `demand.dayVariation` | **yes** | draws *before* the trace and scales the rate it is generated at |
+ *
+ * **`dayVariation` and `patience` are the pair to compare, and they land on opposite sides.**
+ * Both draw from a stream in `TRAFFIC_STREAM_NAMES`, so stream membership decides nothing. What
+ * decides it is *when* the draw happens relative to the trace. `patience` is drawn after the trace
+ * exists and displaces no arrival instant, so two cells differing in it see the same passengers
+ * and must be paired. `dayVariation` is drawn before anything else in `generateTrace` and its
+ * multiplier goes through `planDemand`'s `rateOf`, so two cells differing in it see a different
+ * number of people arriving at different times — a *different Monday*. Pairing those would be the
+ * arithmetic-across-unrelated-populations this module exists to refuse.
+ *
+ * **Being in the key is also what makes docs/14 § 5 criterion 3 achievable rather than lucky.**
+ * The criterion is that a paired comparison under day variation shows variance no larger than the
+ * same comparison without it. Two cells that share a `dayVariation` block share a cohort, are
+ * handed the same replication seeds, and therefore draw the *same* factor and the same peak shift:
+ * the day is common to both arms and cancels out of every paired difference. A `dayVariation`
+ * left out of this key would put a varying cell and a non-varying cell in one cohort, and the
+ * difference would carry the day's variance — the exact silent inflation the criterion tests for.
+ *
+ * **The two older omissions are worth reading twice, because one of them is a trap.**
+ * `patience` draws from a *demand-side* stream (`TRAFFIC_STREAM_NAMES`), which makes it look like
+ * it belongs in the key. It does not: the trace is generated in full before the patience table is
+ * drawn, and the draws come from a separate stream, so they cannot displace a single arrival
+ * instant. Two cells differing only in patience see **exactly the same passengers**, which is
+ * precisely the pairing common random numbers exists to give.
+ *
+ * What they do *not* see is the same **served population** — a rider who gives up in one arm and
+ * boards in the other is one passenger in two states, and every window statistic is then taken
+ * over two different cohorts. That is a comparability question rather than a trace question, and
+ * it is answered where comparability is answered: `RunSummary.abandonment` beside the mean, and
+ * `awtIsValid`'s fifth ground refusing the mean outright past the declared rate. Putting patience
+ * in the trace key would not have helped and would have destroyed the pairing that makes the
+ * comparison possible at all.
  *
  * The building is keyed by **id** rather than by content, which is safe here because
  * {@link ExperimentResources} is experiment-wide: every cell resolves an id through the same map,
@@ -216,6 +256,17 @@ export function traceKeyOf(simulation: CellSimulationConfig): string {
     maxLegs: demand.maxLegs,
     peakWindowS: demand.peakWindowS,
     baselineFraction: demand.baselineFraction,
+    // `canonicalize` drops `undefined` entries, so a cell that sets none of these three produces
+    // exactly the key it produced before they existed — no cohort in any existing experiment moves.
+    mixAmplitude: demand.mixAmplitude,
+    batchSize: demand.batchSize,
+    passengerMass: demand.passengerMass,
+    // docs/14 § 2.3. **In**, and this is the field the docstring above says to reason about
+    // rather than to file by analogy. It draws from a demand-side stream exactly as `patience`
+    // does — and unlike `patience` it draws *before* the trace exists and multiplies the rate the
+    // trace is generated at, so two cells differing in it see different people. Measured, not
+    // argued: `core/src/sim/dayVariationSeam.test.ts` compares the two structural trace digests.
+    dayVariation: demand.dayVariation,
   });
 }
 

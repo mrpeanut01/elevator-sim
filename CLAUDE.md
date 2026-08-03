@@ -199,12 +199,23 @@ average waiting time*, because the real difference is smaller than the noise.
 - Always feed **the same passenger traces** to every alternative under comparison (common
   random numbers). It is worth 5–20× in required run count.
 - If a configuration saturates, **flag it and suppress the AWT interval**. Do not report a
-  mean for a system whose queues grow without bound. **Saturation is one of four grounds**, not the
+  mean for a system whose queues grow without bound. **Saturation is one of five grounds**, not the
   whole rule: `awtIsValid` also fails on an empty window, on censoring above the unserved limit, and
   — since Phase 8 found a run publishing a mean beside a **922.7 s** wait — on a leg past the 900 s
   abandonment horizon. The trend test sees a queue still growing at the horizon and the censoring
   test sees one that has not cleared by it; **neither sees a queue that grew enormously and drained
-  just in time.** See [`docs/03` § Saturation detection](docs/03-traffic-and-statistics.md).
+  just in time.**
+  **The fifth landed with wave 13's patience feature, and it sits above censoring rather than
+  below it.** Once riders actually leave, an abandonment rate above 2 % suppresses the mean outright
+  — because abandonment *improves* AWT by construction, removing the longest waits from the sample:
+  at `midtown-office` 6 % with a 120 s mean patience, AWT goes **61.9 s → 23.3 s** with fifty-one
+  riders gone. The ordering is by cause and was moved by measurement: drafted below `censored`, the
+  first run that abandoned anyone reported *"too many arrivals were never served"* about a window
+  whose queue had drained perfectly — true, and useless, since it sends a reader hunting a backlog
+  that went home. **Abandonment and stairs uptake are published beside AWT, never folded into it**,
+  on exactly the footing `workPerServedLegKJ` sits beside raw energy ([§ D106](DECISIONS.md)): a
+  configuration that improves its wait by serving fewer people has not improved anything.
+  See [`docs/03` § Saturation detection](docs/03-traffic-and-statistics.md).
 
 Full detail in [`docs/03-traffic-and-statistics.md`](docs/03-traffic-and-statistics.md).
 

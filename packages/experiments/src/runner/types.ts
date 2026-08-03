@@ -54,7 +54,9 @@ import type {
   DispatchPolicyOptions,
   DispatcherProfile,
   DispatcherProfiles,
+  DoorCrowdingConfig,
   ElevatorSpecs,
+  PatienceConfig,
   ResolvedBuilding,
   RunRecord,
   RunSummary,
@@ -421,6 +423,33 @@ export interface SimulationOverridesSpec {
   readonly queueSampleCount?: number | undefined;
   readonly doorObstructionProbability?: number | undefined;
   readonly maxEvents?: number | undefined;
+  /**
+   * How long riders will stand at a landing before giving up (docs/14 § 3.1).
+   *
+   * **This field is what makes patience a behaviour rather than an accessor.** Declared here for
+   * the reason `doorObstructionProbability` is: a passenger-model term nothing in a shipped path
+   * can vary is the dead seam `docs/05` § *Standing requirement* names, and the seam test one
+   * package over does not count — *"name the non-test caller"*. This is it, and it is the one
+   * `elevator-sim compare` reads out of a spec file.
+   *
+   * Absent means nobody abandons, which is every experiment in `benchmark/` and every pinned
+   * figure. An experiment that sets it must read `summary.abandonment` beside AWT, because
+   * abandonment improves the mean by construction (§ D106's rule, one axis over).
+   */
+  readonly patience?: PatienceConfig | undefined;
+  /**
+   * How much a crowded landing slows boarding (docs/14 § 3.2). Absent means it does not.
+   *
+   * Here for {@link patience}'s reason. It is deliberately **not** authorable in a dispatcher
+   * profile — a dispatcher that could tune the cost of the queues it produces could tune away its
+   * own cost — so an experiment spec is the right place for it and the only one.
+   *
+   * **It is a feedback loop and can destabilise a run that was stable**: measured, four of nine
+   * arrival rates in [6.1, 6.9] % on `midtown-office`/`eta` flip `stable` to `diverging-queue`.
+   * A sweep that sets it must read `summary.saturation` per cell rather than assuming the arm is
+   * comparable with its control.
+   */
+  readonly lobbyCrowding?: DoorCrowdingConfig | undefined;
   /** Extra summary options. The window comes from the traffic arm. */
   readonly summarize?: Omit<SummarizeOptions, 'window'> | undefined;
 }
@@ -454,6 +483,27 @@ export interface ExperimentSpec {
    * spec with the same value reproduces every number in the result.
    */
   readonly seed: number | string;
+  /**
+   * **The crowd, seeded separately from the machine** — docs/14 § 1.1.
+   *
+   * Optional, and omitting it is what every experiment in this repository does: the plan then
+   * carries no traffic seed, no `SimulationConfig` gains a `trafficSeed` key, and every pinned
+   * figure reproduces. Supplying it seeds the five demand-side streams
+   * (`TRAFFIC_STREAM_NAMES`) from `(trafficSeed, replicationIndex)` while `doorObstruction` and
+   * `policyNoise` keep deriving from {@link seed}.
+   *
+   * Two runs sharing {@link seed} and differing here are *the same building on a different
+   * Tuesday*; two sharing this and differing in {@link seed} are *the same Tuesday against a
+   * different machine*. The second is common random numbers expressed as a knob; the first is
+   * what a held-out traffic set is, and it is what makes `teaching/`'s holdout disjoint by
+   * construction rather than by a convention someone maintains.
+   *
+   * It is **experiment-wide, never per traffic arm**. A per-arm seed would put two cells running
+   * different populations into one CRN cohort — `traceKeyOf` is computed from the trace's
+   * configuration and would not see it — and the paired difference would then be arithmetic
+   * across unrelated crowds, which is the one thing `crn.ts` exists to refuse.
+   */
+  readonly trafficSeed?: number | string | undefined;
   /** Building ids, looked up in {@link ExperimentResources.buildingsById}. */
   readonly buildings: readonly string[];
   /** Dispatcher arms. A bare string is the unmodified profile of that id. */
@@ -561,6 +611,16 @@ export interface ExperimentPlan {
   readonly experimentId: string;
   /** Normalized to 64 bits, as a `bigint`. */
   readonly experimentSeed: bigint;
+  /**
+   * docs/14 § 1.1's demand seed, normalized, or absent when the spec declared none.
+   *
+   * Absent is not the same as equal to {@link experimentSeed} in the type, and is exactly the
+   * same in the run: `StreamSet` routes a traffic stream to `trafficSeed` when it has one, so a
+   * traffic seed equal to the master seed selects the same five streams it already had. Both
+   * facts are asserted in `crn.test.ts` rather than argued here, because the second is what makes
+   * "absent means byte-identical" checkable instead of assumed.
+   */
+  readonly experimentTrafficSeed?: bigint | undefined;
   readonly cells: readonly ExperimentCell[];
   readonly cohorts: readonly CrnCohort[];
   readonly policy: ResolvedReplicationPolicy;
@@ -583,6 +643,16 @@ export interface ReplicationTask {
   readonly replication: number;
   /** Derived from `(experimentSeed, replication)` only. */
   readonly seed: bigint;
+  /**
+   * Derived from `(experimentTrafficSeed, replication)` only, and **absent** when the spec
+   * declared no traffic seed — which is every experiment written before docs/14 § 1.1.
+   *
+   * Carried on the task rather than derived inside `replication.ts` for that file's own import
+   * rule: a worker entry is loaded by Node, its sibling imports are `import type` only, and
+   * `replicationSeed` lives in `crn.ts`. Re-deriving it there would be a second copy of the one
+   * mapping between a seed and a number, which is the thing `crn.ts` says must not exist twice.
+   */
+  readonly trafficSeed?: bigint | undefined;
 }
 
 /** An exception, flattened so it survives a `postMessage`. */
@@ -912,6 +982,14 @@ export interface ExperimentResult {
   readonly experimentId: string;
   /** Decimal string. Re-running with this value reproduces every number below. */
   readonly experimentSeed: string;
+  /**
+   * The demand seed as a decimal string, when the spec declared one (docs/14 § 1.1).
+   *
+   * Absent rather than defaulted, for invariant 5's reason read the strict way: a record that
+   * printed a traffic seed the run did not have would claim a replay needs a value it does not,
+   * and one that omitted a seed the run *did* have would not replay at all.
+   */
+  readonly experimentTrafficSeed?: string | undefined;
   readonly plan: ExperimentPlan;
   readonly cells: readonly CellResult[];
   readonly cohorts: readonly CrnCohort[];

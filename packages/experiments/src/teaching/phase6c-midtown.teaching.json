@@ -1,0 +1,97 @@
+{
+  "$comment": [
+    "PRE-REGISTRATION — docs/14 § 5 criterion 5, written and committed before any ΔTTD from it exists.",
+    "Read it the way DECISIONS.md § D151's PRIMARY_CELLS is read: the point of the file is that it was",
+    "fixed first. § D139's bad-criterion list names choosing the reference arm, the budget or the cell",
+    "set after seeing a result, and § D151 § 8 names adding a cell after seeing one; this file is what",
+    "makes both checkable rather than promised.",
+    "",
+    "The two cells are one declared Holm family and are NOT pooled with § D151's PRIMARY or SECONDARY",
+    "families, which § D151 § 3 forbids enlarging. `midtown-interfloor-1.5pct` is § D145's own operating",
+    "point and `lunch-two-way-1.5pct` is § D200's, so both refusals are directly comparable with what",
+    "this measures. Neither of those two entries is superseded by anything measured here.",
+    "",
+    "What is new, and it is the honest reason to teach now rather than earlier: `demand.dayVariation`.",
+    "§ D156 found that the policy learned a busy/idle schedule because the shipped demand template",
+    "varied the level and never the directional split — it had nothing else to discriminate on. Cell 1",
+    "now varies the level BETWEEN runs (docs/14 § 2.3, wave 13 step 4) and cell 2 varies the mix WITHIN",
+    "a run as well (§ D169). Under the traffic-seed split every replication of both arms sees the same",
+    "day, so the day is common to the paired difference and cancels out of it (§ D206).",
+    "",
+    "The budget is 200 — the top of CLAUDE.md's 50–200 band — and is NOT lowered if a census reveals a",
+    "ceiling under it. `benchmark/doubleDeck.ts` is the shipped precedent: a re-census dropped that",
+    "point's ceiling from 386 to 90, the pre-registered 200 was left at 200, and the point was published",
+    "UNQUOTABLE, because a budget chosen after seeing the answer is what a pre-registration exists to",
+    "prevent.",
+    "",
+    "The two seeds are the repository's own, and that is deliberate rather than incidental. The run",
+    "seed and the training traffic seed are both BENCHMARK_SEED 20260726 — and a traffic seed equal to",
+    "the run seed selects exactly the streams the run already had, so the training traffic here IS the",
+    "traffic every published Midtown figure was measured on, byte for byte. The holdout traffic seed",
+    "20261537 is the disjoint holdout § D145, § D156 and § D200 each validated against. So the crowd",
+    "this policy is judged on is the crowd those three verdicts were taken on, and the run seed is held",
+    "across both, which is the thing docs/14 § 1.1 buys and none of the three had.",
+    "",
+    "Reproduce with: elevator-sim tune --teaching packages/experiments/src/teaching/phase6c-midtown.teaching.json"
+  ],
+  "id": "phase6c-midtown-teaching",
+  "building": "midtown-office",
+  "traffic": [
+    {
+      "id": "interfloor-mix-1.5pct",
+      "durationS": 1800,
+      "reportWindow": "full-run",
+      "demand": {
+        "directionalSplit": { "incoming": 0.4, "outgoing": 0.3, "interfloor": 0.3 },
+        "entranceWeights": { "G": 1 },
+        "arrivalRatePctPop5min": 1.5,
+        "peakWindowS": 300,
+        "dayVariation": { "minDemandFactor": 0.85, "maxDemandFactor": 1.15 }
+      }
+    },
+    {
+      "id": "lunch-two-way-1.5pct",
+      "demandTemplate": "lunch-two-way",
+      "durationS": 1800,
+      "reportWindow": "full-run",
+      "demand": {
+        "entranceWeights": { "G": 1, "P1": 0 },
+        "arrivalRatePctPop5min": 1.5,
+        "peakWindowS": 300,
+        "dayVariation": { "minDemandFactor": 0.85, "maxDemandFactor": 1.15 }
+      }
+    }
+  ],
+  "observations": [
+    { "id": "lobbyArrivalRate", "causality": "trailing-window" },
+    { "id": "interfloorRate", "causality": "trailing-window" },
+    { "id": "downPeakRate", "causality": "trailing-window" }
+  ],
+  "action": {
+    "kind": "weight-set-selection",
+    "parameterIds": [
+      "selection.lobbyArrivalRateGain",
+      "selection.interfloorRateGain",
+      "selection.downPeakRateGain",
+      "selection.switchMargin"
+    ]
+  },
+  "objective": {
+    "gate": "ttdMeanS",
+    "direction": "lower-is-better",
+    "costs": ["awtS", "wt95S", "energyKJ", "energyPerServedLegKJ"],
+    "referenceArm": "census"
+  },
+  "budget": {
+    "censusReplications": 200,
+    "searchCandidates": 64,
+    "searchReplications": 40,
+    "resolutionReplications": 200,
+    "verdictReplications": 200
+  },
+  "seeds": {
+    "runSeed": 20260726,
+    "trainingTrafficSeed": 20260726,
+    "holdoutTrafficSeed": 20261537
+  }
+}

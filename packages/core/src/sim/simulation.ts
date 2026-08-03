@@ -159,6 +159,7 @@ import {
   type Floor,
   type HallCall,
 } from '../model/index.js';
+import type { DoorCrowdingConfig } from '../physics/doors/index.js';
 import { travelTime } from '../physics/motion/index.js';
 import { StreamSet } from '../random/index.js';
 import {
@@ -173,9 +174,11 @@ import type {
   PassengerTrace,
   TraceTransportHop,
   TrafficConfig,
+  TrafficModelVersion,
 } from '../traffic/types.js';
 
 import {
+  abandonmentEvent,
   batchArrivalEvent,
   carArrivedEvent,
   carDoorEvent,
@@ -185,6 +188,17 @@ import {
   transferArrivalEvent,
   transportArrivalEvent,
 } from './events.js';
+import {
+  drawStairsChoices,
+  stairsIndexOf,
+  type StairsOffer,
+} from './stairs.js';
+import {
+  drawPatienceTable,
+  patienceKeyOf,
+  requireValidPatience,
+  type PatienceConfig,
+} from './patience.js';
 import {
   SIM_DEFAULTS,
   SimulationError,
@@ -324,6 +338,13 @@ interface ResolvedOptions {
   readonly doorObstructionProbability: number;
   readonly maxEvents: number;
   readonly onTimeout: 'throw' | 'report';
+  /**
+   * The declared patience curve, or `undefined` when the run models none — which is every run
+   * this repository has published (docs/14 § 3.1).
+   */
+  readonly patience: PatienceConfig | undefined;
+  /** The lobby-crowding term, or `undefined` when the run models none (docs/14 § 3.2). */
+  readonly lobbyCrowding: DoorCrowdingConfig | undefined;
 }
 
 /**
@@ -443,6 +464,14 @@ export class Simulation {
    */
   readonly #panelAssigns: boolean;
   readonly #passengerModel: PassengerModel;
+  /**
+   * The traffic draw ordering this run asked for, or `undefined` for the default.
+   *
+   * Kept as the caller gave it rather than resolved to `'v1'`, because the result reports it by
+   * *presence* and resolving here would lose the only distinction the result needs to make. See
+   * {@link SimulationResult.trafficModel}.
+   */
+  readonly #trafficModel: TrafficModelVersion | undefined;
   readonly #runId: string;
   readonly #reportWindow: ReportWindow;
   readonly #summarizeOptions: SimulationConfig['summarize'];
@@ -533,6 +562,47 @@ export class Simulation {
   /** Runs cut short en route. Zero under every profile leaving `enRouteDiversion` off. */
   #diversions = 0;
 
+  /* ---- patience and abandonment (docs/14 § 3.1) ---- */
+
+  /**
+   * One patience value per **planned** leg, drawn before the run started and keyed by
+   * `patienceKeyOf(journeyId, legIndex)`.
+   *
+   * Empty on every run that declares no `sim.patience`, and the `patience` stream is then never
+   * drawn from at all — which is what makes such a run byte-identical to one produced before this
+   * feature existed. See `sim/patience.ts` for why the draw is taken in trace order rather than
+   * as legs reach landings.
+   */
+  readonly #patienceByLeg: ReadonlyMap<string, SimTime>;
+  /** Leg ids whose rider gave up and walked out. See {@link #abandon}. */
+  readonly #abandonedLegs = new Set<string>();
+  /** Journeys ended by an abandonment. See {@link ConservationAudit.abandoned}. */
+  readonly #abandonedJourneys = new Set<string>();
+  /** Calls taken back because their landing emptied. See {@link ConservationAudit.callsWithdrawn}. */
+  #callsWithdrawn = 0;
+  /**
+   * Promises voided because the rider they named walked out.
+   *
+   * Counted apart from {@link #promisesRevoked}, which is the group taking a promise back from a
+   * car that left service. These two look identical in the record — an assignment cleared — and
+   * are opposite events: one is the *machine* withdrawing, the other the *person*. Merging them
+   * would put a car's service change and a rider's patience into one number, and
+   * `ConservationAudit.promisesRevoked`'s whole point is that it is not that number.
+   */
+  #promisesAbandoned = 0;
+
+  /* ---- stairs (docs/14 § 3.3) ---- */
+
+  /**
+   * Journeys that took the stairs instead of a lift, decided in trace order before the run.
+   *
+   * Empty on every building that declares no `kind: 'stairs'` mode, which is every building this
+   * repository ships — and the `modeChoice` stream is then never drawn from at all.
+   */
+  readonly #stairsTaken: ReadonlyMap<string, StairsOffer>;
+  /** Seconds spent on stairs, summed. See {@link ConservationAudit.stairsTransitS}. */
+  #stairsTransitS = 0;
+
   /* ---- double-deck operation, counted rather than asserted ---- */
 
   /** Stops begun by a double-deck car, whether or not both decks had a floor to open onto. */
@@ -579,6 +649,7 @@ export class Simulation {
       config.trafficSeed === undefined ? {} : { trafficSeed: config.trafficSeed },
     );
     this.#kernel = new SimKernel({ maxEventsPerRun: this.#options.maxEvents });
+    this.#trafficModel = config.trafficModel;
     this.#resolved = config.building;
 
     /* ---- the trace, before anything moves (common random numbers) ---- */
@@ -588,6 +659,32 @@ export class Simulation {
       this.#recordIndexById.set(record.id, index);
     }
     this.#warnings.push(...this.#trace.warnings);
+
+    /*
+     * **Patience, drawn here or not at all.** In trace order, one value per planned leg, before
+     * any car has moved — so who gives up is a property of the crowd and not of the dispatcher,
+     * and two arms of a paired comparison lose the same people. `sim/patience.ts` states the
+     * argument in full. With no declared curve this is an empty map and the `patience` stream is
+     * never touched, which is the whole of docs/14 § 0 for this feature.
+     */
+    this.#patienceByLeg =
+      this.#options.patience === undefined
+        ? new Map()
+        : drawPatienceTable(this.#streams.patience, this.#options.patience, this.#trace.passengers);
+
+    /*
+     * **Who takes the stairs, offered here and decided before anything moves** (docs/14 § 3.3).
+     *
+     * `routeTopologyOf` has already refused to plan any journey over a stair, so every record in
+     * the trace is routed as though the stair did not exist. This asks each rider whether they
+     * would rather walk. A building declaring none produces an empty index, `drawStairsChoices`
+     * returns without touching `modeChoice`, and the run is the run it was.
+     */
+    this.#stairsTaken = drawStairsChoices(
+      this.#streams.modeChoice,
+      stairsIndexOf(this.#resolved),
+      this.#trace.passengers,
+    );
 
     /* ---- the building, with real cars ---- */
     const profile = config.dispatcherProfile;
@@ -662,6 +759,7 @@ export class Simulation {
       );
     }
 
+    const crowding = this.#options.lobbyCrowding;
     this.#building = createBuilding<Car>(resolved, {
       createCar: (spec, context) => {
         const passengerTransferS = spec.passengerTransferS ?? typeTransferS;
@@ -680,6 +778,15 @@ export class Simulation {
           ...(answer === undefined ? {} : { answer }),
           ...(loadSensorSpec === undefined ? {} : { loadSensorSpec }),
           ...(passengerTransferS === undefined ? {} : { passengerTransferS }),
+          /*
+           * **The non-test caller `CarInit.doorOverrides` did not have.** It has been declared,
+           * typed and read by `resolveDoorConfig` since the door machine landed, and nothing in a
+           * shipped path ever supplied one — the shape docs/05's standing requirement names. The
+           * lobby-crowding term is what it now carries, and it carries nothing when the run
+           * declares none, so a run that does not ask for crowding hands the same `undefined` the
+           * constructor has always received.
+           */
+          ...(crowding === undefined ? {} : { doorOverrides: { crowding } }),
         });
       },
     });
@@ -764,6 +871,24 @@ export class Simulation {
 
     this.#factory = new PassengerFactory({
       streams: this.#streams,
+      /*
+       * **The reference block, not the run's `demand.passengerMass` override — and that is a
+       * decision, not an oversight.**
+       *
+       * Wave 13's T3 briefly resolved the override here so the factory and the trace could not
+       * draw from two different populations. Adversarial review pointed out the cost: reverting it
+       * passed every test in `traffic`, `sim` and `model`, because **nothing reaches it**.
+       * `PassengerFactory.arrive` has no caller outside its own docstring — `toPassengerInit`
+       * bypasses the factory for every first leg and `transfer` reuses the mass it already drew —
+       * so the line was an untested behaviour guarding a path that does not exist, which is the
+       * defect this repository's standing requirement names rather than a defence against it.
+       *
+       * **The obligation it was carrying is real and is recorded here instead.** The moment
+       * `arrive` gains a shipped caller, this argument must become
+       * `config.demand?.passengerMass ?? config.trafficProfiles.passengerMass` and that wiring must
+       * be tested on the legs, or a run with a mass override will create arrivals from the
+       * reference population while its trace uses the overridden one.
+       */
       massConfig: config.trafficProfiles.passengerMass,
       topology: this.#building,
       // Distinct from the trace's `p...` ids, so a leg id can never collide with a journey's
@@ -810,7 +935,14 @@ export class Simulation {
     }
 
     this.#recorder = new MetricsRecorder({
+      // The `StreamSet`, not `config.seed`: it carries the traffic seed as well, so both halves of
+      // invariant 5 reach the record from the generator that filled the run rather than from a
+      // second copy of the caller's intent.
       seed: this.#streams,
+      // Passed through unresolved; the recorder omits `v1` however it was reached. The run seed and
+      // the traffic seed are enough to replay a `v1` run, and are not enough to replay a `v2` one —
+      // which is the whole reason this field is on the record and not only on the result.
+      ...(this.#trafficModel === undefined ? {} : { trafficModel: this.#trafficModel }),
       ...(this.#passengerModel === 'conventional'
         ? {}
         : { passengerModel: this.#passengerModel }),
@@ -1257,6 +1389,18 @@ export class Simulation {
     }
 
     for (const record of batch.passengers) {
+      /*
+       * **The rider who walks.** They never join a lift queue, so no leg is created, no hall call
+       * is pressed and no statistic derived from `record.passengers` describes them — which is
+       * exactly the honesty problem docs/14 § 5 criterion 4 exists for, and why the count and the
+       * seconds are published on the audit rather than left to be inferred from a shortfall.
+       */
+      const stairs = this.#stairsTaken.get(record.journeyId);
+      if (stairs !== undefined) {
+        this.#transportHops += 1;
+        this.#stairsTransitS += stairs.transitS;
+        continue;
+      }
       // A journey that opens on the building's escalator is not standing at a lift landing yet.
       // Its leg 0 is admitted when the hop finishes; until then it is neither waiting nor
       // visible to a dispatcher, which is the whole difference between a hop and a leg.
@@ -1339,6 +1483,119 @@ export class Simulation {
     this.#recorder.recordArrival(passenger);
     this.#observeArrival(passenger);
     this.#building.requireFloor(passenger.originFloorId).addWaiting(passenger);
+    this.#armPatience(passenger);
+  }
+
+  /**
+   * Start this leg's patience clock, if the run declared one.
+   *
+   * The value was drawn before the run started; all that happens here is the scheduling. A leg
+   * whose key is absent — every leg of every run with no `sim.patience`, and any leg the trace did
+   * not plan — is left alone, so this is a no-op on the shipped path rather than a branch that
+   * merely evaluates to nothing.
+   *
+   * **A timer past the drain deadline is not scheduled, and is not counted as truncated work.**
+   * `#deadlineTruncations` is the evidence `#timeoutDiagnosis` uses to tell a genuine drain
+   * timeout from a run that simply ran out of events, and a patience timer beyond the deadline is
+   * neither: the run stops before it, so it could not have fired whether or not it was queued.
+   * Counting it would send a reader to `sim.drainGraceS` for a run the deadline never touched.
+   */
+  #armPatience(passenger: Passenger): void {
+    // The empty-map check comes first so the shipped path — no declared patience — does not build
+    // a key string per leg. It is one branch against an allocation on every arrival in the run.
+    if (this.#patienceByLeg.size === 0) return;
+    const patienceS = this.#patienceByLeg.get(
+      patienceKeyOf(passenger.journeyId, passenger.legIndex),
+    );
+    if (patienceS === undefined) return;
+    const leavesAt = passenger.arrivedAt + patienceS;
+    if (leavesAt > this.#deadlineS) return;
+    this.#kernel.schedule(
+      leavesAt,
+      abandonmentEvent({ legId: passenger.id }, (payload, context) => {
+        this.#onPatienceExpired(payload.legId, context.time);
+      }),
+    );
+  }
+
+  /**
+   * A drawn patience running out. **Almost always a no-op**, and that is the design.
+   *
+   * The timer is armed when the leg reaches the landing and is never cancelled, because the
+   * kernel has no cancel and adding one to support this would put a mutable index of pending
+   * events beside the queue — the sort of structure invariant 4 exists to keep out. So the guard
+   * is here instead: a leg that has boarded, has already abandoned, or is no longer on its floor
+   * simply has nothing to do. Cheaper than cancellation and impossible to get out of step with.
+   */
+  #onPatienceExpired(legId: string, at: SimTime): void {
+    const passenger = this.#legs.get(legId);
+    if (passenger === undefined) return;
+    if (passenger.hasBoarded || this.#abandonedLegs.has(legId)) return;
+    this.#abandon(passenger, at);
+  }
+
+  /**
+   * A rider giving up: off the landing, out of the books as neither served nor waiting, and the
+   * call withdrawn behind them if nobody else is holding it (docs/14 § 3.1).
+   *
+   * The order matters and is not arbitrary. The passenger leaves the floor **first**, so every
+   * predicate downstream — `#eligibleWaiting`, `#syncButton`, the next dispatch pass — sees a
+   * landing that no longer contains them. Withdrawing the call before removing the rider would
+   * ask "is anybody still here?" of a queue they were still in.
+   *
+   * **`cancel`, not `complete`.** The policy lifecycle has two exits and they mean different
+   * things: `complete` says the landing was collected, `cancel` says the work went away. A
+   * withdrawn call was not served, and filing it as served would put a phantom collection into
+   * every stage-5 statistic the policy keeps about its own hit rate.
+   */
+  #abandon(passenger: Passenger, at: SimTime): void {
+    const floor = this.#building.requireFloor(passenger.originFloorId);
+    floor.removeWaiting(passenger);
+    this.#abandonedLegs.add(passenger.id);
+    this.#abandonedJourneys.add(passenger.journeyId);
+    // The recorder clears any promise the rider was holding, so the record can never show a car
+    // reserving itself for somebody who had already left.
+    if (passenger.assignedCarId !== undefined) this.#promisesAbandoned += 1;
+    this.#recorder.recordAbandonment(passenger, at);
+    passenger.releasePromise(at);
+
+    for (const active of this.#callsAtFloor(passenger.originFloorId)) {
+      const bank = this.#building.bankById(active.bankId);
+      if (bank === undefined) continue;
+      if (this.#eligibleWaiting(bank, active).count > 0) continue;
+      this.#withdrawCall(active, at);
+    }
+    this.#syncButton(passenger.originFloorId, passenger.direction);
+  }
+
+  /** Every live call at a floor, whichever bank or direction it belongs to. */
+  #callsAtFloor(floorId: string): readonly ActiveCall[] {
+    const found: ActiveCall[] = [];
+    for (const active of this.#activeCalls.values()) {
+      if (active.floorId === floorId) found.push(active);
+    }
+    return found;
+  }
+
+  /**
+   * Take a call back because the people who pressed the button have gone.
+   *
+   * The mirror image of {@link #completeCall}: the same teardown, through the lifecycle's other
+   * exit. See {@link #abandon} for why the difference between the two is load-bearing rather than
+   * cosmetic.
+   */
+  #withdrawCall(active: ActiveCall, at: SimTime): void {
+    this.#callsWithdrawn += 1;
+    this.#unservable.delete(active.id);
+    this.#refusals.delete(active.id);
+    this.#policies.get(active.bankId)?.cancel(active.id);
+    for (const carId of active.carIds) this.#carsById.get(carId)?.releaseHallCall(active.id);
+    active.carIds = Object.freeze([]);
+    this.#activeCalls.delete(active.id);
+    this.#syncButton(active.floorId, active.direction);
+    // A car standing idle for a call that has just evaporated should be told, or it waits for a
+    // landing nobody is on until the next tick happens to fire.
+    this.#scheduleTick(active.bankId, at);
   }
 
   /**
@@ -2099,6 +2356,28 @@ export class Simulation {
       hallCall: served.length > 0 || boarding > 0,
       hallQueueLength: car.isDoubleDeck ? Math.max(deckBoarding[0], deckBoarding[1]) : boarding,
       transferSeconds: movers * car.passengerTransferS,
+      /*
+       * **Everybody standing here, not everybody boarding here** (docs/14 § 3.2).
+       *
+       * `hallQueueLength` above is the boarding cohort — the people this car is about to take.
+       * This is the whole landing, in both directions, including the riders going the other way
+       * and the ones this car has no room for. That is the number a crowd is: the people you have
+       * to get past to reach the doorway do not stop being in the way because they are waiting
+       * for a different car.
+       *
+       * The busier of the two landings on a paired double-deck stop, by the rule the dwell above
+       * already follows: the decks open on one interlock and the stop takes the slower of them.
+       *
+       * **Omitted entirely when the run declares no crowding term.** It was populated
+       * unconditionally at first, on the argument that the door normalizes an unread field to a
+       * factor of exactly 1 — and `sameStopReason` compares it, so a stop reason could in
+       * principle compare unequal where it used to compare equal. Measured leg-by-leg across 18
+       * cells that came out at 0 differing cells, which is *inert in practice* rather than
+       * *inert*. Spreading it away makes it the second, at the cost of one branch.
+       */
+      ...(this.#options.lobbyCrowding === undefined
+        ? {}
+        : { lobbyOccupancy: busiestLandingOf(floors) }),
     });
     if (car.isDoubleDeck) {
       this.#doubleDeckStops += 1;
@@ -2417,6 +2696,12 @@ export class Simulation {
       hallCall: true,
       hallQueueLength: holdCohort,
       transferSeconds: holdCohort * car.passengerTransferS,
+      // The same landing, still as crowded: a courtesy hold re-grants the *hold's own* cohort,
+      // and the crowd it has to move through is unchanged by the door reversing. Omitted with no
+      // declared term, for the reason `#beginStop` gives.
+      ...(this.#options.lobbyCrowding === undefined
+        ? {}
+        : { lobbyOccupancy: busiestLandingOf(floors) }),
     });
     // Refused — the profile declined the courtesy hold, or the stop's reopen budget is spent.
     // The door carries on closing and the passenger waits for the next car, which is the
@@ -3403,6 +3688,7 @@ export class Simulation {
 
   #finish(endReason: RunEndReason): SimulationResult {
     this.#diagnoseStuckCalls();
+    this.#disclosePopulationChange();
 
     const demandEndedAt = this.#trace.durationS;
     const endedAt = Math.max(this.#recorder.lastEventAt, demandEndedAt);
@@ -3451,14 +3737,19 @@ export class Simulation {
       runId: this.#runId,
       seed: record.seed,
       /*
+       * Read off the record, exactly as `seed` is, rather than re-derived from the streams and the
+       * config. The record is what is persisted and what invariant 5 lives on; a result that
+       * computed the same two fields a second way could disagree with the thing a replay reads,
+       * and the disagreement would be invisible in memory and fatal on disk.
+       *
        * Spread-or-omit rather than `trafficSeed: x ?? undefined`: under `exactOptionalPropertyTypes`
        * those are different types, and more importantly they are different *claims*. An absent key
        * says the run had no traffic seed; a present `undefined` says it had one that is missing.
-       * Invariant 5 cares about the difference — only the first replays from `seed` alone.
+       * The record omits each on its own boundary — see `MetricsRecorder.finish` — and this
+       * inherits both.
        */
-      ...(this.#streams.trafficSeed === undefined
-        ? {}
-        : { trafficSeed: this.#streams.trafficSeed.toString() }),
+      ...(record.trafficSeed === undefined ? {} : { trafficSeed: record.trafficSeed }),
+      ...(record.trafficModel === undefined ? {} : { trafficModel: record.trafficModel }),
       buildingId: this.#resolved.id,
       dispatcherProfileId: this.#profileId,
       trace: this.#trace,
@@ -3502,6 +3793,46 @@ export class Simulation {
       );
     }
     return result;
+  }
+
+  /**
+   * **Say, in the record, that this run's per-leg figures describe a different population.**
+   *
+   * A disclaimer rather than an advisory, and by `#disclaimers`' own test: it does not qualify a
+   * number, it says the *model* is not what a reader would assume. Both behaviours below remove
+   * people from the lift system, so AWT, WT95, TTD, the served-leg count and the over-horizon
+   * count are all taken over a smaller cohort than `generated` — and abandonment improves every
+   * one of them **by construction**, because the riders it removes are the ones who waited
+   * longest. That is `DECISIONS.md` § D106's rule (*a configuration that spends less by serving
+   * fewer people has not saved anything*) on two more axes.
+   *
+   * ## Why it is here and not only on the summary
+   *
+   * `RunSummary.abandonment` and `ConservationAudit.abandoned` are the figures, and a consumer
+   * that reads them is fine. The disclaimer exists for the consumers that do **not** yet:
+   * `viz/src/record/recordRun.ts` copies `generated`/`delivered`/`undelivered` into `VizSummary`
+   * and carries neither new term, and `viz/src/shift/goals.ts` reads
+   * `serviceLevel.overHorizonCount` — which abandonment improves by construction, since a rider
+   * who left cannot wait past the horizon. Warnings travel with the record
+   * (`RunRecord.warnings`), are ordered disclaimers-first, and every consumer that truncates has
+   * to keep them, so this reaches those surfaces without this lane guessing at a schema it does
+   * not own. **It is a stopgap that names a gap, not a substitute for projecting the figures.**
+   *
+   * Silent on every run that declares neither behaviour, which is every run this repository has
+   * published — so no pinned record acquires a key or a line.
+   */
+  #disclosePopulationChange(): void {
+    const abandoned = this.#abandonedLegs.size;
+    if (abandoned > 0) {
+      this.#disclaimers.push(
+        `${abandoned} leg(s) were abandoned: their rider's declared patience (sim.patience) ran out and they left the landing, so they are neither delivered nor waiting. Every per-leg figure this run reports — AWT, WT95, time to destination, the served-leg count and serviceLevel.overHorizonCount — is taken over the riders who stayed, and abandonment improves all of them by construction because the waits it removes are the longest ones. Read summary.abandonment beside the mean (DECISIONS.md § D106's rule, one axis over), and note that a comparison against a run with different abandonment compares different populations.`,
+      );
+    }
+    if (this.#stairsTaken.size > 0) {
+      this.#disclaimers.push(
+        `${this.#stairsTaken.size} journey(s) took a declared stairs mode and never entered the lift system, so they appear in conservation.delivered and in no wait, ride or time-to-destination figure at all. The served-leg count is correspondingly lower; read conservation.stairsJourneys and stairsTransitS beside it, and treat any comparison against a run with different stair uptake as a comparison of different populations (docs/14 § 3.3).`,
+      );
+    }
   }
 
   /**
@@ -3599,6 +3930,7 @@ export class Simulation {
     const problems: string[] = [];
     const undelivered: UndeliveredJourney[] = [];
     let delivered = 0;
+    let abandoned = 0;
 
     // Which car took each leg, so an undelivered rider can be named with the car it is in.
     const carOfLeg = new Map<string, string>();
@@ -3607,6 +3939,16 @@ export class Simulation {
     }
 
     for (const record of this.#trace.passengers) {
+      /*
+       * A journey that walked is **delivered**, and has no leg to check it against. Counted here,
+       * before the missing-leg problem below, because "never materialized a leg" is otherwise the
+       * exact symptom of the catastrophic failure this audit exists to catch — a passenger who
+       * quietly stopped existing. The two are told apart by the run knowing it made the offer.
+       */
+      if (this.#stairsTaken.has(record.journeyId)) {
+        delivered += 1;
+        continue;
+      }
       const legs = this.#legsByJourney.get(record.journeyId) ?? [];
       if (legs.length === 0) {
         problems.push(
@@ -3658,6 +4000,21 @@ export class Simulation {
         continue;
       }
 
+      /*
+       * **A rider who walked out is a third outcome, not a slow delivery** (docs/14 § 3.1).
+       *
+       * They are not `undelivered`: that list is *"who is still in the system"*, and it is what
+       * decides whether the run reports `timed-out`. Somebody who went home is in no queue and no
+       * car, so filing them there would report a run as having failed to drain when it drained
+       * perfectly — and would hide the reason it drained, which is that a third of the demand
+       * left. They are counted here instead and published as `ConservationAudit.abandoned`,
+       * beside the AWT their departure improved.
+       */
+      if (this.#abandonedLegs.has(last.id)) {
+        abandoned += 1;
+        continue;
+      }
+
       const reason: UndeliveredReason = last.hasAlighted
         ? 'transferring'
         : last.hasBoarded
@@ -3688,9 +4045,9 @@ export class Simulation {
         `${legsCreated} legs were created but ${legsRecorded} reached the recorder; the difference is invisible to every metric`,
       );
     }
-    if (delivered + undelivered.length !== generated) {
+    if (delivered + undelivered.length + abandoned !== generated) {
       problems.push(
-        `${generated} journeys were generated but ${delivered} were delivered and ${undelivered.length} accounted for as undelivered`,
+        `${generated} journeys were generated but ${delivered} were delivered, ${undelivered.length} accounted for as undelivered and ${abandoned} as abandoned`,
       );
     }
 
@@ -3735,9 +4092,11 @@ export class Simulation {
         `${this.#legsAssigned} landing-panel assignments were made but ${this.#recorder.assignedCount} reached the recorder; a promise the record does not carry cannot be audited from the record`,
       );
     }
-    if (this.#promisesRevoked !== this.#recorder.releasedCount) {
+    // Both ways a promise can be cleared, summed, because the recorder counts both on one
+    // counter: the group revoking it and the rider walking out from under it.
+    if (this.#promisesRevoked + this.#promisesAbandoned !== this.#recorder.releasedCount) {
       problems.push(
-        `${this.#promisesRevoked} landing-panel promises were revoked but ${this.#recorder.releasedCount} reached the recorder; a record still naming a car the group took the passenger back off is a promise no reader could audit`,
+        `${this.#promisesRevoked} landing-panel promises were revoked and ${this.#promisesAbandoned} voided by abandonment, but ${this.#recorder.releasedCount} releases reached the recorder; a record still naming a car the group took the passenger back off is a promise no reader could audit`,
       );
     }
     /*
@@ -3749,10 +4108,23 @@ export class Simulation {
      * event count instead would fail every run with a mid-run service change in it, which is the
      * shape this arithmetic exists to survive.
      */
-    const promisesInForce = this.#legsAssigned - this.#promisesRevoked;
-    if (this.#panelAssigns && undelivered.length === 0 && promisesInForce !== legsCreated) {
+    const promisesInForce =
+      this.#legsAssigned - this.#promisesRevoked - this.#promisesAbandoned;
+    /*
+     * **A leg whose rider walked out holds no promise, and never boarded to need one.**
+     *
+     * `recordAbandonment` clears the assignment — a record that showed a car reserving itself for
+     * somebody who had gone home would be a false record — so an abandoned leg is `legsCreated`
+     * without being a promise in force, and the identity below has to net it out. Without this
+     * term the first destination-dispatch run with `sim.patience` on it would fail its own
+     * conservation audit for a reason that is not a defect. Zero on every run that declares no
+     * patience, which is every run this repository has published.
+     */
+    const abandonedLegs = this.#abandonedLegs.size;
+    const promisableLegs = legsCreated - abandonedLegs;
+    if (this.#panelAssigns && undelivered.length === 0 && promisesInForce !== promisableLegs) {
       problems.push(
-        `${legsCreated} legs were created and every journey was delivered, but ${promisesInForce} promises were in force at the end (${this.#legsAssigned} made, ${this.#promisesRevoked} revoked); ${legsCreated - promisesInForce} boarded without being promised anything`,
+        `${promisableLegs} legs were created and not abandoned and every journey was delivered, but ${promisesInForce} promises were in force at the end (${this.#legsAssigned} made, ${this.#promisesRevoked} revoked, ${this.#promisesAbandoned} voided by abandonment); ${promisableLegs - promisesInForce} boarded without being promised anything`,
       );
     }
 
@@ -3770,11 +4142,36 @@ export class Simulation {
       wrongCarBoardings: this.#wrongCarBoardings,
       brokenPromises: this.#brokenPromises,
       promisesRevoked: this.#promisesRevoked,
+      /*
+       * Present when the run modelled patience, absent when it did not — never `0` on a run that
+       * never asked the question. A key that appeared on every run would move
+       * `structuralDigestOfResult`, which hashes every key whatever its value, and with it every
+       * pinned figure (docs/14 § 5 criterion 1). Present and `0` is the different, useful claim:
+       * riders *could* have left and none did.
+       */
+      ...(this.#options.patience === undefined
+        ? {}
+        : { abandoned, callsWithdrawn: this.#callsWithdrawn }),
+      /*
+       * Present only when somebody actually walked — absent, not `0`, on every building that
+       * declares no stair, so a run that has none carries the audit object it always did.
+       *
+       * **These are docs/14 § 5 criterion 4's figures for stairs**, and they are on the audit for
+       * the same reason `abandoned` is: a stairs rider leaves the lift system, so the served-leg
+       * count falls and any comparison across configurations with different uptake compares
+       * different populations. Without the count that shortfall reads as a better building.
+       */
+      ...(this.#stairsTaken.size === 0
+        ? {}
+        : {
+            stairsJourneys: this.#stairsTaken.size,
+            stairsTransitS: this.#stairsTransitS,
+          }),
       balanced:
         problems.length === 0 &&
         legsCreated === legsRecorded &&
         this.#wrongCarBoardings === 0 &&
-        delivered + undelivered.length === generated,
+        delivered + undelivered.length + abandoned === generated,
     });
 
     return { audit, undelivered, problems };
@@ -3831,7 +4228,32 @@ function resolveOptions(config: SimulationConfig): ResolvedOptions {
     ),
     maxEvents: positive(config.maxEvents ?? SIM_DEFAULTS.maxEvents, 'maxEvents'),
     onTimeout: config.onTimeout ?? 'throw',
+    // Validated here rather than at first use: a mean patience of zero abandons everybody at the
+    // instant they arrive, and a run that discovered that a thousand events in would report an
+    // AWT over nobody rather than a configuration error.
+    patience: config.patience === undefined ? undefined : requireValidPatience(config.patience),
+    // Validated by `resolveDoorConfig`, where the bound it has to satisfy lives; passed straight
+    // through so the runner has exactly one opinion about it and the door module has the other.
+    lobbyCrowding: config.lobbyCrowding,
   });
+}
+
+/**
+ * The fullest of the landings a stop opens onto — one for a single-deck car, two for a paired
+ * double-deck stop.
+ *
+ * A loop rather than `Math.max(...floors.map(...))` because this runs at **every stop of every
+ * run**, including the overwhelming majority that declare no crowding term and never read the
+ * result: the spread form allocates an array and an argument list per stop, and it measurably
+ * lengthened the identity suite before it was written this way.
+ */
+function busiestLandingOf(floors: readonly Floor[]): number {
+  let busiest = 0;
+  for (const floor of floors) {
+    const queued = floor.queueLength();
+    if (queued > busiest) busiest = queued;
+  }
+  return busiest;
 }
 
 function nonNegative(value: number, id: string): number {
@@ -3878,6 +4300,7 @@ function traceConfigFor(config: SimulationConfig, streams: StreamSet): TrafficCo
     building: config.building,
     profiles: config.trafficProfiles,
     streams,
+    ...(config.trafficModel === undefined ? {} : { trafficModel: config.trafficModel }),
     ...(config.demandTemplate === undefined ? {} : { template: config.demandTemplate }),
     // `generateTrace` rejects overrides against an already-resolved template, which carries its
     // own geometry; passing an empty record would trip that check for no benefit.
@@ -3900,6 +4323,14 @@ function traceConfigFor(config: SimulationConfig, streams: StreamSet): TrafficCo
       ? {}
       : { credentialAssignment: demand.credentialAssignment }),
     ...(demand.maxLegs === undefined ? {} : { maxLegs: demand.maxLegs }),
+    // docs/14 §§ 2.1-2.2. Spread-or-omit, never `?? <a default of this file's own>`: unset means
+    // the reference data decides, and a default invented here would be a second source of truth
+    // for a number `data/traffic-profiles.json` already states.
+    ...(demand.batchSize === undefined ? {} : { batchSize: demand.batchSize }),
+    ...(demand.passengerMass === undefined ? {} : { passengerMass: demand.passengerMass }),
+    // docs/14 § 2.3. Spread-or-omit for the same reason, one step further: a run that declares no
+    // day is the run that predates the feature, and the trace it generates must be that object.
+    ...(demand.dayVariation === undefined ? {} : { dayVariation: demand.dayVariation }),
   };
 }
 

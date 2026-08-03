@@ -105,6 +105,7 @@ export type {
   TravelReading,
   TravelSample,
   ServiceLevelVerdict,
+  AbandonmentStatistics,
   WaitStatistics,
 } from './types.js';
 
@@ -152,6 +153,7 @@ export {
   FALLBACK_DEPARTURE_GAP_S,
   DEFAULT_LOAD_FACTOR_EDGES,
   DEFAULT_LONG_WAIT_THRESHOLD_S,
+  DEFAULT_MAX_ABANDONMENT_FRACTION,
   DEFAULT_MAX_UNSERVED_FRACTION,
   DEFAULT_MAX_WAIT_HORIZON_S,
   DEFAULT_QUEUE_SAMPLE_COUNT,
@@ -177,6 +179,7 @@ export {
   selectJourneysInWindow,
   selectLegsInWindow,
   summarizeRun,
+  summarizeAbandonment,
   summarizeWaiting,
   waitPercentile,
 } from './summarize.js';

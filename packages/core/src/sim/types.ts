@@ -51,13 +51,20 @@ import type { RunComparability } from '../metrics/comparability.js';
 import type { SummarizeOptions, WindowSelection } from '../metrics/summarize.js';
 import type { ReportWindow, RunRecord, RunSummary } from '../metrics/types.js';
 import type {
+  BatchSizeCurve,
   CredentialAssignment,
+  DayVariationConfig,
   DemandLevel,
   DemandTemplateId,
   InterfloorWeighting,
+  PassengerMassOverride,
   PassengerTrace,
+  ResolvedDayVariation,
   ResolvedDemandTemplate,
+  TrafficModelVersion,
 } from '../traffic/types.js';
+import type { DoorCrowdingConfig } from '../physics/doors/types.js';
+import type { PatienceConfig } from './patience.js';
 
 /* -------------------------------------------------------------------------- *
  * Errors
@@ -304,6 +311,52 @@ export interface SimulationDemandOptions {
    * beside any result measured under a varying mix.
    */
   readonly mixAmplitude?: number | undefined;
+
+  /* ---- docs/14 §§ 2.1–2.2, traffic variance ---- */
+
+  /**
+   * Override every profile's group-size curve with one curve. docs/14 § 2.2.
+   *
+   * Unset means each floor keeps the curve `data/traffic-profiles.json` authors for it, which is
+   * what every published figure was measured under. Three families: `geometric` (today's, and
+   * preserved exactly), `zeroTruncatedPoisson` (tighter clustering at the same mean) and
+   * `explicit` (an authored weight vector over group sizes `1..n`).
+   *
+   * The mean is what the batch rate divides by, and `explicit` **derives** it from its own weights
+   * rather than carrying one beside them — see `meanBatchSizeOf`. Two curves sharing a mean share
+   * the batch arrival process exactly, which is what separates group *shape* from demand *level*.
+   */
+  readonly batchSize?: BatchSizeCurve | undefined;
+  /**
+   * Override the body-mass distribution the trace draws from. docs/14 § 2.1.
+   *
+   * Unset means `data/traffic-profiles.json`'s `passengerMass` block, byte for byte. Set, it
+   * replaces the whole block — and **both truncation bounds are required**, because an
+   * untruncated normal eventually draws a negative mass and the load sensor would report it three
+   * layers from the cause.
+   *
+   * Mass is drawn from its own stream in final trace order, so this changes what the cars can do
+   * with the crowd rather than which crowd turns up.
+   */
+  readonly passengerMass?: PassengerMassOverride | undefined;
+
+  /* ---- docs/14 § 2.3, inter-day variability ---- */
+
+  /**
+   * Make this run a *particular day* rather than the average one. docs/14 § 2.3.
+   *
+   * **Absent means Tuesday is a copy of Monday**, which is every run this repository has
+   * published: a template is deterministic given its seed. Present, and one bounded multiplier on
+   * total demand and one bounded shift on peak timing are drawn per run from the `dayVariation`
+   * stream, before a car moves.
+   *
+   * It lives on the **demand** surface and not beside `patience` on the runner's, and that
+   * placement is the load-bearing part rather than a filing decision: it changes what the trace
+   * generator produces, so it is in `runner/crn.ts`'s `traceKeyOf` and two cells that disagree
+   * about it are never paired. `patience` is the exact contrast — a demand-side *stream*, drawn
+   * after the trace exists, deliberately out of that key.
+   */
+  readonly dayVariation?: DayVariationConfig | undefined;
 }
 
 /** What to do when the drain deadline fires with passengers still in the system. */
@@ -368,6 +421,19 @@ export interface SimulationConfig {
    * the run, so {@link SimulationResult.trafficSeed} reports it and the caller must persist it.
    */
   readonly trafficSeed?: number | bigint | undefined;
+  /**
+   * Which traffic draw ordering to run. Default `v1` (docs/14 § 1.3).
+   *
+   * `v1` is the ordering every published figure in this repository was measured under, and a run
+   * that leaves this unset is byte-identical to the run before the option existed. `v2` moves the
+   * group-size draw onto its own stream, which is what makes group size and arrival instants
+   * separable — and is therefore a **different run at the same seed**, deliberately.
+   *
+   * It is a model version, not a tunable: it says which simulator produced a number, so a study
+   * comparing a `v1` arm against a `v2` arm is comparing two simulators and is not a paired
+   * comparison of anything. See {@link SimulationResult.trafficModel} for how a run reports it.
+   */
+  readonly trafficModel?: TrafficModelVersion | undefined;
   /** `rise-and-fall` (default), `constant-iso`, or an already-resolved template. */
   readonly demandTemplate?: DemandTemplateId | ResolvedDemandTemplate | undefined;
   /**
@@ -439,6 +505,31 @@ export interface SimulationConfig {
   readonly queueSampleCount?: number | undefined;
   readonly doorObstructionProbability?: number | undefined;
   readonly maxEvents?: number | undefined;
+  /**
+   * How long riders will stand at a landing before giving up (docs/14 § 3.1).
+   *
+   * **Absent means nobody ever leaves**, which is every run this repository has produced. Present,
+   * and the run models abandonment — at which point `RunSummary.abandonment` is published beside
+   * AWT and may not be read without it, because abandonment *improves* AWT by construction. See
+   * `sim/patience.ts`.
+   */
+  readonly patience?: PatienceConfig | undefined;
+  /**
+   * How much a crowded landing slows boarding (docs/14 § 3.2).
+   *
+   * **Absent means a lobby's size does not affect how fast it loads**, which is what every run
+   * this repository has published assumed. Present, and per-passenger transfer time rises with
+   * the number of people standing there, bounded — one monotone term on the existing dwell model
+   * (`physics/doors`), not a spatial crowd simulation.
+   *
+   * It is a property of the **building and its demand**, which is why it lives here and not in a
+   * dispatcher profile's `answer` stage: see `DoorConfigOverrides.crowding`.
+   *
+   * **Being a feedback loop, it can destabilise a run that was stable.** Slow boarding lengthens
+   * the queue and a longer queue slows boarding. That is a finding to be read off
+   * `RunSummary.saturation`, not a defect — the detector exists for exactly this.
+   */
+  readonly lobbyCrowding?: DoorCrowdingConfig | undefined;
   /** `throw` (default) or `report`. See {@link SimulationError}. */
   readonly onTimeout?: TimeoutPolicy | undefined;
 }
@@ -577,7 +668,74 @@ export interface ConservationAudit {
    */
   readonly promisesRevoked: number;
 
-  /** `generated === delivered + undelivered && legsCreated === legsRecorded`. */
+  /**
+   * Journeys whose rider **gave up and left** before a car reached them (docs/14 § 3.1).
+   *
+   * **Absent, not `0`, on every run that declares no `sim.patience`** — so a run that did not ask
+   * for abandonment carries the audit object it carried before this field existed, which is what
+   * `traffic/transportIdentity.test.ts` holds the whole `SimulationResult` to. Present and `0`
+   * means the run modelled patience and nobody's ran out, which is a different claim from "the
+   * question was never asked" and is worth being able to tell apart.
+   *
+   * These journeys are neither {@link delivered} nor {@link undelivered}: they are not in the
+   * system, and they did not arrive. The balance is
+   * `generated === delivered + undelivered + abandoned`.
+   *
+   * **It is a published figure, not a diagnostic.** Abandonment removes the longest waits from the
+   * sample, so a configuration that abandons a third of its riders posts a superb AWT — the same
+   * trap `workPerServedLegKJ` sits beside the raw energy figure for (§ D106), on a different axis.
+   * `RunSummary.abandonment` is the window-scoped half that a report shows beside AWT; this is the
+   * whole-run count, and `awtIsValid`'s fifth ground is what stops the mean being quoted at all
+   * once the rate passes its declared threshold.
+   */
+  readonly abandoned?: number;
+  /**
+   * Hall calls **taken back** because everybody who had pressed the button walked away.
+   *
+   * Absent on a run that declares no `sim.patience`, by {@link abandoned}'s rule and for the same
+   * reason. Present and `0` would mean riders left but never emptied a landing.
+   *
+   * It is counted rather than assumed because the withdrawal is a real behaviour with a measured
+   * effect and not an obvious one. Removing it does **not** strand anybody — a car sent to an
+   * empty landing declines to stop and `#reofferCall` clears the call on arrival — so a reader
+   * could reasonably conclude the whole path is redundant. Measured on `midtown-office` under
+   * `nearest-car` at 12 % arrivals with a 60 s mean patience, it is not: withdrawing the call
+   * boards **258** legs against **251**, abandons **437** against **444**, and drives **3 323 m**
+   * against **3 409 m**. The difference is a car released to work that still exists instead of
+   * committed to a landing nobody is standing on.
+   */
+  readonly callsWithdrawn?: number;
+
+  /**
+   * Journeys that **took the stairs** and never joined a lift queue (docs/14 § 3.3).
+   *
+   * Absent — not `0` — on every building that declares no `kind: 'stairs'` mode, which is every
+   * building this repository ships.
+   *
+   * **A published figure, for `abandoned`'s reason and § D106's.** A stairs rider leaves the lift
+   * system entirely: no leg, no hall call, no wait, nothing in `record.passengers`. So the
+   * served-leg count falls, and any comparison across configurations with different stair uptake
+   * **compares different populations**. Without this count that shortfall reads as a building
+   * that got better at serving people, when what happened is that some of them walked.
+   *
+   * Counted in {@link delivered} — they reached their destination — and in
+   * {@link transportHops}, which is the same accounting an escalator hop gets.
+   */
+  readonly stairsJourneys?: number;
+  /**
+   * Seconds those riders spent on the stairs, summed. Absent with {@link stairsJourneys}.
+   *
+   * The **only** observable consequence of `traversalTimeS: { upS, downS }`, and therefore the
+   * thing docs/14 § 5 criterion 2 is checked on for that knob: a stairs rider contributes to no
+   * wait, ride or time-to-destination statistic, so a directional traversal time that moved
+   * nothing else would move this. It is also where the physical asymmetry becomes visible — an
+   * up-peak's stair seconds and a down-peak's differ at the same headcount.
+   */
+  readonly stairsTransitS?: number;
+
+  /**
+   * `generated === delivered + undelivered + (abandoned ?? 0) && legsCreated === legsRecorded`.
+   */
   readonly balanced: boolean;
 }
 
@@ -767,10 +925,38 @@ export interface SimulationResult {
   /**
    * The demand seed as a decimal string, present only when the run was given one.
    *
-   * Absent — not equal to {@link seed} — when unset, because "there was no traffic seed" and "the
-   * traffic seed matched the run seed" are different runs that must not replay as one another.
+   * Absent — not equal to {@link seed} — when unset. That records how the run was authored rather
+   * than a difference in its trace: a traffic seed equal to the run seed derives the same demand
+   * streams and produces the same legs, measured on garden-apartments and asserted stream by
+   * stream in `random/streams.test.ts`. This docstring claimed the two "must not replay as one
+   * another" until wave 13 measured it; they replay alike, and the key is kept because it is
+   * provenance and costs nothing.
+   *
+   * Copied from `RunRecord.trafficSeed` rather than re-derived, exactly as {@link seed} is copied
+   * from `record.seed`. The record is what gets persisted and what a replay reads; a result that
+   * computed this a second way could disagree with the dataset beside it.
    */
   readonly trafficSeed?: string;
+  /**
+   * The traffic draw ordering this run used — **present only when it was not `v1`**.
+   *
+   * Absent rather than `'v1'`, and that is a claim rather than a convenience. A `v1` run is
+   * byte-identical to every run this repository produced before the option existed: the draws, the
+   * trace and the record are the same objects they always were. A result that announced `'v1'`
+   * would assert a distinction that does not exist, and it would differ — key for key — from the
+   * pinned results it is supposed to equal, because `structuralDigestOfResult` hashes every key
+   * whatever its value. So "there was no traffic model" and "the traffic model was v1" are the
+   * *same* run here, which is the opposite of {@link trafficSeed}'s case and is why the two are
+   * reasoned separately rather than by analogy.
+   *
+   * Present and `'v2'` means the group-size draw came from the `batchSize` stream, and this result
+   * may not be paired against one that does not say so.
+   *
+   * Copied from `RunRecord.trafficModel`, which is where it has to live for a stored `v2` run to
+   * replay as one: a result dies with the process, and a replay rebuilt without this re-runs under
+   * `v1` — a different trace at the same seed rather than a different answer.
+   */
+  readonly trafficModel?: TrafficModelVersion;
   readonly buildingId: string;
   readonly dispatcherProfileId: string;
   /** The trace this run was driven by. Replayable from {@link seed} — and {@link trafficSeed}, when the run carries one. */

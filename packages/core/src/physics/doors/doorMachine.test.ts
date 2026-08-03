@@ -460,13 +460,29 @@ describe('dwell depends on why the car stopped', () => {
       hallCall: true,
       hallQueueLength: 0,
       transferSeconds: 0,
+      lobbyOccupancy: 0,
     });
+    // The crowd merges by the same rule as the queue and the transfer — the larger of the two —
+    // and an undeclared occupancy normalizes to 0, so a caller written before the field existed
+    // merges to a reason the crowding term reads as an empty landing.
     expect(
       mergeStopReasons(
         { carCall: true, hallCall: false, hallQueueLength: 2, transferSeconds: 4 },
         { carCall: false, hallCall: true, hallQueueLength: 7, transferSeconds: 9 },
       ),
-    ).toEqual({ carCall: true, hallCall: true, hallQueueLength: 7, transferSeconds: 9 });
+    ).toEqual({
+      carCall: true,
+      hallCall: true,
+      hallQueueLength: 7,
+      transferSeconds: 9,
+      lobbyOccupancy: 0,
+    });
+    expect(
+      mergeStopReasons(
+        { carCall: true, hallCall: false, hallQueueLength: 2, lobbyOccupancy: 31 },
+        { carCall: false, hallCall: true, hallQueueLength: 7, lobbyOccupancy: 4 },
+      ).lobbyOccupancy,
+    ).toBe(31);
   });
 
   it('lets a hall call registered while the door is opening lengthen the dwell', () => {

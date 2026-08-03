@@ -41,6 +41,7 @@ import {
   type ServiceEventConfig,
   type TrafficProfile,
   type TrafficProfiles,
+  TRANSPORT_MODE_KINDS,
   type TransportModeConfig,
 } from './types.js';
 
@@ -394,6 +395,74 @@ const directionalSplitSchema = z
     { message: 'incoming + outgoing + interfloor must sum to 1' },
   );
 
+/** How close an authored `mean` must sit to the mean its own weight vector implies. */
+const BATCH_MEAN_TOLERANCE = 1e-9;
+
+/**
+ * A profile's group-size curve. docs/14 § 2.2.
+ *
+ * Three families, one of which takes a vector instead of a moment. The refinements are the whole
+ * point of declaring it separately: an `explicit` curve without weights, or a weight vector on a
+ * family that cannot read one, is schema-valid under a looser object and fails much later — at the
+ * first draw, a thousand batches into a trace, or not at all if the family name is what was
+ * mistyped.
+ *
+ * An unknown `distribution` is deliberately **not** refused here. `drawBatchSize` throws for it by
+ * name, listing what it supports, and that error is more useful than a schema path; tightening
+ * this to an enum would move the failure earlier and make it less legible.
+ */
+const batchSizeSchema = z
+  .strictObject({
+    $comment: comment,
+    distribution: z.string().min(1),
+    mean: z.number().gte(1, 'a batch contains at least one passenger'),
+    /** Relative likelihood of group sizes 1..n. `explicit` only; normalized when sampled. */
+    weights: z
+      .array(nonNegative)
+      .min(1, 'a weight vector needs at least one group size')
+      .optional(),
+  })
+  .superRefine((batch, ctx) => {
+    if (batch.distribution === 'explicit') {
+      if (batch.weights === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['weights'],
+          message:
+            'an explicit batch size distribution needs a weights vector over group sizes 1..n; weights[0] is the relative likelihood of a lone passenger',
+        });
+        return;
+      }
+      const total = batch.weights.reduce((sum, weight) => sum + weight, 0);
+      if (total <= 0) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['weights'],
+          message:
+            'at least one group size needs a positive weight; all zero is a building nobody arrives at rather than a group-size curve',
+        });
+        return;
+      }
+      const derived =
+        batch.weights.reduce((sum, weight, index) => sum + (index + 1) * weight, 0) / total;
+      if (Math.abs(derived - batch.mean) > BATCH_MEAN_TOLERANCE) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['mean'],
+          message: `mean must equal the mean these weights imply, ${derived}; the batch rate divides by it, so a mean that drifts from its own vector changes total demand without changing any group`,
+        });
+      }
+      return;
+    }
+    if (batch.weights !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['weights'],
+        message: `weights are read only by the explicit distribution; "${batch.distribution}" takes a mean, and a vector it ignores is a curve nobody is drawing from`,
+      });
+    }
+  });
+
 export const trafficProfileSchema = z.strictObject({
   $comment: comment,
   id: identifier,
@@ -412,11 +481,13 @@ export const trafficProfileSchema = z.strictObject({
   arrivalRatePctPop5min: valueRangeSchema,
   targetIntervalS: positive,
   targetAvgWaitS: positive,
-  batchSize: z.strictObject({
-    $comment: comment,
-    distribution: z.string().min(1),
-    mean: z.number().gte(1, 'a batch contains at least one passenger'),
-  }),
+  // docs/14 § 2.2. `mean` stays required for every family, `explicit` included, and `weights` is
+  // cross-checked against it below: the sampler *derives* the mean from the vector, so a carried
+  // mean that disagreed with its own weights would make `batchesPerSecond` divide by a number the
+  // draws do not produce and change total demand silently. Carried and validated rather than
+  // omitted because `mean` is on the published surface — `cli list` and the viewer's traffic panel
+  // both read it — and a `number | undefined` there would be a display bug in three places.
+  batchSize: batchSizeSchema,
   directionalSplit: directionalSplitSchema,
 });
 
@@ -872,13 +943,73 @@ export const transportModeSchema = z
     $comment: comment,
     id: identifier,
     name: z.string().min(1).optional(),
+    kind: z.enum(TRANSPORT_MODE_KINDS).optional(),
     connects: z.tuple([identifier, identifier]),
-    traversalTimeS: positive,
+    traversalTimeS: z.union([
+      positive,
+      z.strictObject({ upS: positive, downS: positive }),
+    ]),
+    // Two numbers, not two curves. `connects` is a pair, so the span is already declared and an
+    // array indexed by flight count would be dead in every entry but its last — measured, and
+    // recorded on {@link StairsUseConfig}.
+    use: z.strictObject({ up: fraction, down: fraction }).optional(),
   })
   .refine((mode) => mode.connects[0] !== mode.connects[1], {
     message:
       'connects must name two different floors; a transport mode that starts and ends on the same floor moves nobody',
     path: ['connects'],
+  })
+  /*
+   * **The asymmetry is required, not defaulted** (docs/14 § 3.3).
+   *
+   * A `stairs` mode declaring a scalar traversal time is refused here rather than symmetrised,
+   * because the difference between climbing and descending *is* the modelling content and a model
+   * that silently discards it is the failure this section exists to avoid. The converse is refused
+   * too: an escalator carries you at one speed, so a directional pair on one is a claim about
+   * hardware that does not exist.
+   */
+  .superRefine((mode, ctx) => {
+    const kind = mode.kind ?? 'escalator';
+    const directional = typeof mode.traversalTimeS !== 'number';
+    if (kind === 'stairs' && !directional) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['traversalTimeS'],
+        message:
+          'a stairs mode must declare traversalTimeS as { upS, downS }: climbing a flight costs more than descending it, and a single number would symmetrise the one thing a stair models that an escalator does not. See docs/14 § 3.3.',
+      });
+    }
+    if (kind === 'escalator' && directional) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['traversalTimeS'],
+        message:
+          'an escalator carries you at one speed, so traversalTimeS is a single number. Declare kind "stairs" if the two directions really differ.',
+      });
+    }
+    if (kind === 'stairs' && mode.use === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['use'],
+        message:
+          'a stairs mode must declare "use": { up, down } — stairs are chosen rather than structural, so without a propensity nobody would ever take them and the mode would be inert. The pair is per building and its source belongs in $comment.',
+      });
+    }
+    if (kind === 'escalator' && mode.use !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['use'],
+        message:
+          'an escalator is structural — the router sends journeys over it because the geometry connects those floors — so there is no choice to model and "use" would never be read.',
+      });
+    }
+    if (typeof mode.traversalTimeS !== 'number' && mode.traversalTimeS.upS < mode.traversalTimeS.downS) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['traversalTimeS', 'upS'],
+        message: `climbing (${mode.traversalTimeS.upS} s) is declared faster than descending (${mode.traversalTimeS.downS} s), which inverts the asymmetry rather than declaring one. If that is really the machine, it is not a stair.`,
+      });
+    }
   });
 
 export const accessZoneSchema = z.strictObject({

@@ -956,6 +956,13 @@ export const PRE_REGISTERED_REFERENCE_CANDIDATES: readonly string[] = Object.fre
 
 export async function censusSelectionPoint(input: {
   readonly seed: number;
+  /**
+   * The demand seed the census is taken at (docs/14 § 1.1). Omitted by every study that produced a
+   * pinned figure, and omitting it leaves the census the run it was. `teaching/` supplies its
+   * **training** traffic seed here, so the reference arm is chosen on the traffic the policy will
+   * be fitted against rather than on a crowd nothing in the round ever sees.
+   */
+  readonly trafficSeed?: number | string | undefined;
   readonly replications: number;
   readonly resources: ExperimentResources;
   readonly cell?: SelectionCell | undefined;
@@ -1002,6 +1009,7 @@ export async function censusSelectionPoint(input: {
   const experiment = await runGateExperiment({
     id: `phase6c/census/${cell.id}`,
     seed: input.seed,
+    ...(input.trafficSeed === undefined ? {} : { trafficSeed: input.trafficSeed }),
     building: cell.building,
     dispatchers: profileIds,
     traffic: cell.point,

@@ -143,6 +143,82 @@ export interface DoorStopReason {
    * seconds rather than counts also keeps this module free of any opinion about who boards.
    */
   readonly transferSeconds?: number | undefined;
+  /**
+   * **How many people are standing on the landing** when the door opened — not how many are
+   * about to board (docs/14 § 3.2).
+   *
+   * The difference is the whole content of the field, and it is the gap this closes. Until it
+   * existed, a stop's length depended on how many people *moved through the doorway*
+   * ({@link transferSeconds}) and how many were queued *for this car*
+   * ({@link hallQueueLength}); it did not depend on the crowd. A lobby with forty people in it
+   * loaded exactly as fast per passenger as a lobby with four, which is not how a lobby works and
+   * is why the model's failure mode under up-peak is too graceful — queues grow linearly where a
+   * real one goes non-linear.
+   *
+   * Read by {@link DoorConfig.crowding} and by nothing else. Omitted or `0` leaves the crowding
+   * term at a factor of exactly 1, so a run that declares no crowding is the run it was before
+   * this field existed.
+   */
+  readonly lobbyOccupancy?: number | undefined;
+}
+
+/**
+ * **The crowding term: one monotone function of how many people are standing there.**
+ *
+ * ## What it is
+ *
+ * Above {@link thresholdPersons} on the landing, per-passenger transfer time rises by
+ * {@link factorPerPerson} for each extra person, bounded at {@link maxFactor}:
+ *
+ * ```
+ * factor = clamp(1 + factorPerPerson * max(0, occupancy - thresholdPersons), 1, maxFactor)
+ * ```
+ *
+ * It multiplies {@link DoorStopReason.transferSeconds} *before* the
+ * {@link DoorConfig.maxTransferSeconds} clamp, so `maxStopSeconds` is unchanged and a stop is
+ * still bounded in closed form. That ordering is deliberate: a crowding factor applied after the
+ * clamp would be an unbounded stop wearing a bound's clothes.
+ *
+ * ## What it deliberately is not
+ *
+ * **Not a spatial crowd simulation.** No pathfinding, no jostling, no personal-space model, no
+ * per-person position. One number in, one factor out, monotone non-decreasing. Saying so here
+ * matters more than usual, because "lift-lobby crowd flow" names a whole literature this is a
+ * single term from.
+ *
+ * ## Why it earns a term at all
+ *
+ * It closes a **feedback loop the simulator did not have**. Slow boarding lengthens the queue,
+ * and a longer queue slows boarding. That is the mechanism behind real up-peak collapse, and
+ * being a feedback loop it can genuinely destabilise a run that was stable — which is a *finding*
+ * to be reported through the saturation detector, not a bug to be tuned away.
+ *
+ * ## Where the numbers come from
+ *
+ * The **shape** is one this module chooses and does not attribute: transfer time rises linearly
+ * with occupancy above a free-flow threshold, and is bounded. A first draft said that Fruin's
+ * level-of-service bands and CIBSE Guide D's lift-lobby queueing areas were "both built on" that
+ * relation. That is a claim about two documents neither of which was opened, so it is gone —
+ * along with the § reference beside it that a review caught first. **This module cites nothing,
+ * and says so**, which is the only honest state for a term whose provenance is a modelling choice.
+ *
+ * **The numbers are not calibrated either.** No value here is calibrated against a cited source, and this docstring
+ * deliberately does not name a clause it has not checked: this repository's reference-data rule
+ * says a figure carries its citation, and a plausible-looking section number is exactly the kind
+ * of claim that goes stale without anything noticing. So there is **no default term at all** —
+ * absent means no crowding — and a study that switches it on states its own three numbers and
+ * their provenance. What is offered here is a mechanism, not a calibration.
+ */
+export interface DoorCrowdingConfig {
+  /** People on the landing below which nothing happens. The free-flow band. */
+  readonly thresholdPersons: number;
+  /** Fractional rise in per-passenger transfer time per person above the threshold. */
+  readonly factorPerPerson: number;
+  /**
+   * Ceiling on the factor. `1` disables the term while leaving it declared, which is a useful
+   * negative control and is why the bound is a declared number rather than an implicit infinity.
+   */
+  readonly maxFactor: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -193,6 +269,11 @@ export interface DoorConfig {
    * disables reopening entirely.
    */
   readonly maxReopensPerStop: number;
+  /**
+   * The lobby-crowding term, or `undefined` when the run models none — which is every run this
+   * repository has published (docs/14 § 3.2). See {@link DoorCrowdingConfig}.
+   */
+  readonly crowding?: DoorCrowdingConfig | undefined;
 }
 
 /**
@@ -239,6 +320,17 @@ export interface DoorAnswerSource {
  * `overrides` > `answer` > `car` > {@link DOOR_DEFAULTS}.
  */
 export interface DoorConfigOverrides {
+  /**
+   * The lobby-crowding term (docs/14 § 3.2).
+   *
+   * **Here and deliberately not on {@link DoorAnswerSource}.** How crowded a lobby gets is a
+   * property of the *building and its demand*, not a control setting, and a dispatcher profile
+   * that could author it could tune away the cost of the queues it creates — which is
+   * `sim.assignedWalkS`'s argument exactly (*"a dispatcher that could tune its own walk distance
+   * could tune away its own cost, and the Pareto front would be a lie"*). It reaches a run from
+   * `SimulationConfig.lobbyCrowding`, through `CarInit.doorOverrides`.
+   */
+  readonly crowding?: DoorCrowdingConfig | undefined;
   readonly openS?: number | undefined;
   readonly closeS?: number | undefined;
   readonly dwellCarCallS?: number | undefined;
@@ -655,5 +747,51 @@ export const DOOR_PARAMETERS: readonly DoorParameterSpec[] = [
     unit: 's',
     description:
       'Ceiling on the transfer-driven dwell — the per-stop form of the RTT term 2*P*tp, which the caller supplies as DoorStopReason.transferSeconds. Bounds the worst-case stop; 0 makes the dwell purely a policy decision again.',
+  },
+];
+
+/**
+ * The schema for the lobby-crowding term (CLAUDE.md invariant 8, docs/14 § 3.2).
+ *
+ * **Its own table rather than three more rows on {@link DOOR_PARAMETERS}**, and the ids are
+ * `sim.*` rather than `answer.*`, because the two say different things about who owns the number.
+ * A `answer.*` row is authorable in a dispatcher profile; these must not be. How crowded a lobby
+ * gets is a property of the building and its demand, and a dispatcher that could author the term
+ * could tune away the cost of the queues it produces — `sim.assignedWalkS`'s argument, one axis
+ * over.
+ *
+ * Every row's `default` is the value that makes the term **inert**, and there is no default block:
+ * absent means no crowding at all, which is what keeps every published stop length the number it
+ * already was. The defaults exist so a generic sampler has a floor to start from, not so a run
+ * silently acquires one.
+ */
+export const CROWDING_PARAMETERS: readonly DoorParameterSpec[] = [
+  {
+    id: 'sim.lobbyCrowding.thresholdPersons',
+    type: 'continuous',
+    range: [0, 200],
+    scale: 'linear',
+    default: 0,
+    unit: 'persons',
+    description:
+      'People standing on the landing below which boarding is unaffected — the free-flow band of the pedestrian speed-density relation. Below it the crowding factor is exactly 1 and the stop is the stop it was. The default of 0 is the value that makes the term inert, not a calibrated threshold: a study that switches crowding on states its own three numbers and where they came from.',
+  },
+  {
+    id: 'sim.lobbyCrowding.factorPerPerson',
+    type: 'continuous',
+    range: [0, 1],
+    scale: 'linear',
+    default: 0,
+    description:
+      'Fractional rise in per-passenger transfer time for each person on the landing above the threshold. This is the feedback loop: slow boarding lengthens the queue and a longer queue slows boarding, which is the mechanism behind real up-peak collapse. 0 leaves the term declared and inert, which is the negative control.',
+  },
+  {
+    id: 'sim.lobbyCrowding.maxFactor',
+    type: 'continuous',
+    range: [1, 5],
+    scale: 'linear',
+    default: 1,
+    description:
+      'Ceiling on the crowding factor. Bounded rather than open-ended because the transfer term is what makes a stop finite in closed form (see maxStopSeconds); 1 disables the term while leaving it declared. Below 1 is refused: a crowded lobby that boards faster than an empty one inverts the loop this exists to model.',
   },
 ];

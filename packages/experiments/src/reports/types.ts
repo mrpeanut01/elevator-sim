@@ -60,13 +60,16 @@
  */
 
 import type {
+  BatchSizeCurve,
   CredentialAssignment,
+  DayVariationConfig,
   DemandLevel,
   DemandTemplateId,
   DirectionalSplit,
   EligibilityStageConfig,
   InterfloorWeighting,
   ResolvedNormalization,
+  PassengerMassOverride,
   PercentileMethod,
   ReportWindow,
   ResolvedDemandTemplate,
@@ -75,6 +78,7 @@ import type {
   SaturationThresholds,
   SimulationResult,
   TimeoutPolicy,
+  TrafficModelVersion,
 } from '@elevator-sim/core';
 
 /* -------------------------------------------------------------------------- *
@@ -122,6 +126,46 @@ export interface StoredDemandOptions {
   readonly maxLegs?: number | undefined;
   readonly peakWindowS?: number | undefined;
   readonly baselineFraction?: number | undefined;
+  /**
+   * How much of a mix-varying template's authored arc the run kept.
+   *
+   * **Found missing by wave 13's T3 while adding the two fields below.** § D162 condition 5 makes
+   * `0` the flat-mix negative control every mix-varying result must be measured against, and
+   * `TRAFFIC_DEFAULTS.mixAmplitude` is `1` — so a stored control that lost this field would rebuild
+   * at the full authored arc, the control carrying its treatment's mix.
+   *
+   * **Latent rather than realised**: `createStoredRun` has no non-test caller, so no shipped study
+   * has been stored through this path and no published figure is in question. It is recorded as the
+   * more serious of the three omissions all the same, because it predates the branch that found it
+   * and sits under a published negative control.
+   */
+  readonly mixAmplitude?: number | undefined;
+  /**
+   * The group-size curve and the body-mass block, docs/14 §§ 2.1-2.2.
+   *
+   * These joined the list the moment they became reachable from `runSimulation`, and the reason is
+   * the one `dispatcherOptionsOf` records beside `selection`: a field this projection drops is a
+   * field the record does not carry, and a record that stores an override as nothing **replays as
+   * the default**. For a group-size curve that is a different crowd; for a mass block it is a
+   * different population in the same crowd. Either way it is an invariant-5 violation — the run
+   * cannot be reproduced from its own record — and it is silent, because the replay succeeds.
+   *
+   * Both are plain JSON: `BatchSizeCurve` is a string, an optional number and an optional number
+   * array; `PassengerMassOverride` is a string and four numbers.
+   */
+  readonly batchSize?: BatchSizeCurve | undefined;
+  readonly passengerMass?: PassengerMassOverride | undefined;
+  /**
+   * The day this run was made a particular one, docs/14 § 2.3.
+   *
+   * Here for {@link batchSize}'s reason, and it is the sharpest instance of it yet: the block is
+   * what the `dayVariation` stream is *drawn against*, so a record that lost it replays at
+   * `demandFactor: 1` with the stream never consumed — a different number of people, arriving at
+   * different times, reported as a faithful reproduction. The **configuration** is stored and not
+   * the drawn factor: the draw is a function of the seed and the block, so storing the block is
+   * what makes it reproducible, and storing the outcome instead would let the two disagree.
+   */
+  readonly dayVariation?: DayVariationConfig | undefined;
 }
 
 /**
@@ -211,6 +255,36 @@ export interface StoredRunConfig {
    * two different seeds on one record is an unreplayable record.
    */
   readonly seed: string;
+  /**
+   * The demand seed, as a decimal string — present only when the run was given one.
+   *
+   * The other half of invariant 5 on a run that separated the crowd from the machine. A replay
+   * given only {@link seed} would rebuild the same building and drive it with a different crowd,
+   * and the record it produced would diverge on every leg while looking like a determinism failure
+   * in `core`.
+   *
+   * Absent, never equal to {@link seed}, when the run was given none — which records how the run
+   * was authored rather than a difference in its trace. A traffic seed equal to the run seed
+   * derives the same demand streams and produces the same legs; `random/streams.test.ts` asserts
+   * that stream by stream, and it was measured end to end on garden-apartments. The field earns
+   * its place on the case it exists for — a seed that *differs* from the run seed, where dropping
+   * it replays a different crowd — and costs nothing on the case it does not.
+   *
+   * Mirrors `RunRecord.trafficSeed` and is cross-checked against it on parse.
+   */
+  readonly trafficSeed?: string | undefined;
+  /**
+   * Which traffic draw ordering produced the run — present only when it was not `v1`.
+   *
+   * Not a tunable: it names *which simulator* wrote the dataset. Stored because the replay has to
+   * ask for it back — a stored `v2` run rebuilt without it re-runs under `v1`, which is a different
+   * trace at the same seed rather than a slightly different answer.
+   *
+   * Absent at `v1` however it was reached, because a `v1` run is the run this repository produced
+   * before the option existed. Mirrors `RunRecord.trafficModel` and is cross-checked against it on
+   * parse: two statements about which simulator ran is one statement too many unless they agree.
+   */
+  readonly trafficModel?: TrafficModelVersion | undefined;
   readonly buildingId: string;
   readonly dispatcherProfileId: string;
   /**

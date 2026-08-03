@@ -109,22 +109,27 @@ import type {
   AccessZone,
   DirectionalSplit,
   FloorConfig,
+  PassengerMassConfig,
   ResolvedBuilding,
   TrafficProfile,
   TrafficProfiles,
 } from '../config/types.js';
 import type { CredentialGroup, PassengerInit } from '../model/index.js';
+import { SUPPORTED_MASS_DISTRIBUTIONS } from '../model/passenger.js';
 import type { Rng } from '../random/index.js';
 
 import {
   expectedPassengers as expectedPassengersOver,
   intensityAt,
+  requirePeakShiftFits,
   resolveDemandTemplate,
+  shiftTemplatePeak,
   splitAt,
 } from './demandTemplate.js';
 import {
   batchesPerSecond,
   drawBatchSize,
+  meanBatchSizeOf,
   passengersPerSecond,
   sampleBatchArrivalTimes,
 } from './poissonBatch.js';
@@ -133,7 +138,9 @@ import {
   TRAFFIC_DEFAULTS,
   TrafficError,
   type ArrivalEvent,
+  type BatchSizeCurve,
   type CredentialAssignment,
+  type DayVariationConfig,
   type DemandLevel,
   type DemandSource,
   type DestinationWeight,
@@ -141,10 +148,12 @@ import {
   type GeneratedPassenger,
   type InterfloorWeighting,
   type PassengerTrace,
+  type ResolvedDayVariation,
   type ResolvedDemandTemplate,
   type TraceLeg,
   type TraceTransportHop,
   type TrafficConfig,
+  type TrafficModelVersion,
 } from './types.js';
 
 /** The arrival process this module implements. Anything else in the data is a hard error. */
@@ -244,6 +253,25 @@ export interface DemandPlan {
   readonly expectedPassengers: number;
   /** Expected passengers arriving inside the measurement window. */
   readonly expectedPassengersInReportWindow: number;
+  /**
+   * The body-mass distribution this plan's trace draws from. docs/14 § 2.1.
+   *
+   * `TrafficConfig.passengerMass` when the run overrode it, `profiles.passengerMass` otherwise.
+   * **`generateTrace` draws from this field**, so it is the population the run had rather than a
+   * report of the option it was given — which is what lets `parameters.test.ts` probe the five
+   * declared `traffic.passengerMass.*` ids here without the probes becoming assertions about an
+   * echo.
+   *
+   * It is **not** true that the block is resolved only once per trace: `resolveOptions` runs in
+   * `planDemand` and again in `generateTrace`, as it does for every other resolved option. The
+   * two agree because both derive from the same `TrafficConfig` by the same pure function; the
+   * guarantee this field carries is the narrower and checkable one above.
+   *
+   * On the **plan**, deliberately, and not on `DemandSource` or the trace: `PassengerTrace` is
+   * `JSON.stringify`d whole by `structuralDigestOfResult`, so a new key there would move every
+   * identity digest to say nothing. The plan is not part of any result.
+   */
+  readonly passengerMass: PassengerMassConfig;
   readonly warnings: readonly string[];
 }
 
@@ -303,6 +331,11 @@ interface ResolvedOptions {
   readonly idPrefix: string;
   readonly journeyIdPrefix: string;
   readonly batchIdPrefix: string;
+  readonly trafficModel: TrafficModelVersion;
+  /** `undefined` means every floor keeps its own profile's group-size curve. docs/14 § 2.2. */
+  readonly batchSize: BatchSizeCurve | undefined;
+  /** The resolved body-mass block: the override when one was given, the data otherwise. */
+  readonly passengerMass: PassengerMassConfig;
 }
 
 function resolveOptions(config: DemandConfig): ResolvedOptions {
@@ -310,6 +343,10 @@ function resolveOptions(config: DemandConfig): ResolvedOptions {
   if (!Number.isInteger(maxLegs) || maxLegs < 1) {
     throw new TrafficError(`maxLegs must be a positive integer; received ${maxLegs}`);
   }
+  // Validated here rather than at the first draw, so a mis-specified curve fails while the plan is
+  // being built instead of a thousand batches into a trace. `meanBatchSizeOf` is the whole check:
+  // every family has to expose a mean, because the batch rate divides by it.
+  if (config.batchSize !== undefined) meanBatchSizeOf(config.batchSize);
   return {
     demandLevel: config.demandLevel ?? TRAFFIC_DEFAULTS.demandLevel,
     interfloorWeighting: config.interfloorWeighting ?? TRAFFIC_DEFAULTS.interfloorWeighting,
@@ -320,7 +357,124 @@ function resolveOptions(config: DemandConfig): ResolvedOptions {
     idPrefix: config.idPrefix ?? 'p',
     journeyIdPrefix: config.journeyIdPrefix ?? 'j',
     batchIdPrefix: config.batchIdPrefix ?? 'b',
+    trafficModel: config.trafficModel ?? TRAFFIC_DEFAULTS.trafficModel,
+    batchSize: config.batchSize,
+    // No `?? { ... }` of this module's own: unset means *the data decides*, and the only honest
+    // resolution is the block `data/traffic-profiles.json` authored. A default invented here would
+    // be a second source of truth for a number the reference file already states.
+    passengerMass: resolvePassengerMass(config),
   };
+}
+
+/**
+ * The body-mass block a run will draw from: the override, or the reference data.
+ *
+ * The override's bounds are **required by the type** (`PassengerMassOverride`); this re-checks
+ * them at runtime because `TrafficConfig` crosses a package boundary and a JavaScript caller — or
+ * a JSON round trip — can hand over a partial object the compiler never saw. An untruncated
+ * normal eventually draws a negative mass; the load sensor would then report a car getting
+ * *lighter* as it filled, three layers from the cause.
+ */
+function resolvePassengerMass(config: DemandConfig): PassengerMassConfig {
+  const override = config.passengerMass;
+  if (override === undefined) return config.profiles.passengerMass;
+  for (const [name, value] of [
+    ['meanKg', override.meanKg],
+    ['stdDevKg', override.stdDevKg],
+    ['minKg', override.minKg],
+    ['maxKg', override.maxKg],
+  ] as const) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new TrafficError(
+        `passengerMass.${name} must be a finite number; received ${String(value)}. Both truncation bounds are required when the mass distribution is overridden at all (docs/14 § 2.1).`,
+      );
+    }
+  }
+  if (override.minKg <= 0 || override.maxKg <= override.minKg) {
+    throw new TrafficError(
+      `passengerMass needs 0 < minKg < maxKg; received minKg=${override.minKg}, maxKg=${override.maxKg}. A load sensor reading a negative or unbounded passenger is a capacity result nobody can explain.`,
+    );
+  }
+  return override;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Inter-day variability (docs/14 § 2.3)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Check a {@link DayVariationConfig}'s bounds, whether or not a draw is about to be taken.
+ *
+ * Runtime-checked for {@link resolvePassengerMass}'s reason: `TrafficConfig` crosses a package
+ * boundary, and a JavaScript caller or a JSON round trip can hand over a partial object the
+ * compiler never saw. Both bounds are required by the type and neither has a default here — a
+ * multiplier this module invented would be a demand level nobody declared.
+ */
+function requireDayVariationBounds(config: DayVariationConfig): void {
+  for (const [name, value] of [
+    ['minDemandFactor', config.minDemandFactor],
+    ['maxDemandFactor', config.maxDemandFactor],
+  ] as const) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new TrafficError(
+        `dayVariation.${name} must be a finite number; received ${String(value)}. Both bounds are required whenever the block is declared at all (docs/14 § 2.3), for the reason both mass truncation bounds are: an unbounded demand multiplier is a run whose saturation state nobody declared, reported beside a mean that may or may not be valid.`,
+      );
+    }
+  }
+  if (config.minDemandFactor <= 0 || config.maxDemandFactor < config.minDemandFactor) {
+    throw new TrafficError(
+      `dayVariation needs 0 < minDemandFactor <= maxDemandFactor; received minDemandFactor=${config.minDemandFactor}, maxDemandFactor=${config.maxDemandFactor}. A factor of zero is a building nobody entered, and a negative one is not a day.`,
+    );
+  }
+}
+
+/**
+ * Draw this run's day: how busy it is, and how late its peak runs. docs/14 § 2.3.
+ *
+ * **The factor must be invariant to `peakShiftS`** — two arms of a study differing only in the
+ * shift bound must not silently be running at different demand levels. This code holds that two
+ * ways over, and the relationship between them was got wrong twice before it was measured:
+ *
+ * - the factor is drawn **first**, so it is draw 1 whatever the bound does; **or**
+ * - the count is **fixed at two**, so the factor is at a fixed offset whatever the order.
+ *
+ * Either alone is sufficient and neither is necessary, which is why the mutants settle it rather
+ * than the argument. Reversing the order while keeping two draws leaves the factor invariant
+ * (mutation survives); keeping the order while skipping the second draw at a zero bound also
+ * leaves it invariant; **breaking both together is what moves it**, and only then. An earlier
+ * version of this comment credited the count alone and adversarial review credited the order
+ * alone; both were half right.
+ *
+ * The fixed count buys one further thing on its own: this stream's position after the draw is a
+ * function of the seed and the block's *presence* rather than of its contents, so anything that
+ * ever draws from `dayVariation` after this point — nothing does today — could not be displaced
+ * by a bound changing. `dayVariationSeam.test.ts` asserts order and count separately at the
+ * stream's own state, because neither is visible in a trace: with no second consumer, a one-draw
+ * variant produces byte-identical runs and survived every other test in the tree.
+ *
+ * Both draws are uniform. Bounded by construction rather than by rejection, so the draw count
+ * cannot depend on the values drawn — the property `DECISIONS.md` § D203 records as the one a
+ * sampler in this generator may not break.
+ */
+function drawDayVariation(config: DayVariationConfig, rng: Rng): ResolvedDayVariation {
+  requireDayVariationBounds(config);
+  const shiftBoundS = config.peakShiftS ?? 0;
+
+  const demandFactor =
+    config.minDemandFactor +
+    rng.nextFloat() * (config.maxDemandFactor - config.minDemandFactor);
+  /*
+   * `-0` is normalized away, and it is not cosmetic. With a zero bound the product is `-0`
+   * whenever the draw lands below the midpoint, so *the same no-op day* would report `-0` at one
+   * seed and `+0` at another — `Object.is` and `toEqual` both separate them, while
+   * `JSON.stringify` does not, so it is exactly the kind of difference that shows up in one guard
+   * and not another. Found by the no-op-day test in `sim/dayVariationSeam.test.ts`, which is what
+   * that test is for. Normalized by comparison rather than by skipping the draw: the draw count
+   * has to stay constant, or turning the shift on would move the demand factor.
+   */
+  const drawnShiftS = (rng.nextFloat() * 2 - 1) * shiftBoundS;
+
+  return Object.freeze({ demandFactor, peakShiftS: drawnShiftS === 0 ? 0 : drawnShiftS });
 }
 
 /**
@@ -380,11 +534,22 @@ function profileResolver(
 /**
  * Compute rates, sources and destination tables. Pure: no draws, no simulation state.
  *
+ * `day` is this run's already-drawn inter-day variation (docs/14 § 2.3), or `undefined` for the
+ * average day, which is every run this repository has published. **It is a parameter rather than
+ * a config field precisely to keep the sentence above true**: the draw belongs to the streams and
+ * this function has none. Omitting it on a config that declares `dayVariation` is legal and gives
+ * the plan the configuration *expects* — the bounds are still validated, so a nonsense block is
+ * still refused — which is what a caller wanting the nominal plan of a varying study wants.
+ *
  * @throws TrafficError for an unsupported arrival process, an unknown traffic profile, an
- *   entrance weight naming a floor that is not an entrance, or a building with demand but no
- *   entrance to route it through.
+ *   entrance weight naming a floor that is not an entrance, a building with demand but no
+ *   entrance to route it through, or a `dayVariation` block whose bounds this template cannot
+ *   absorb.
  */
-export function planDemand(config: DemandConfig): DemandPlan {
+export function planDemand(
+  config: DemandConfig,
+  day?: ResolvedDayVariation | undefined,
+): DemandPlan {
   const { building, profiles } = config;
   if (profiles.arrivalProcess.type !== SUPPORTED_ARRIVAL_PROCESS) {
     throw new TrafficError(
@@ -393,16 +558,41 @@ export function planDemand(config: DemandConfig): DemandPlan {
   }
 
   const options = resolveOptions(config);
-  const template = resolveDemandTemplate(
+  const authoredTemplate = resolveDemandTemplate(
     config.template ?? TRAFFIC_DEFAULTS.templateId,
     profiles.demandTemplates,
     config.templateOverrides,
   );
+
+  /*
+   * docs/14 § 2.3, both halves.
+   *
+   * The **declared bound** is checked against this template every time the block is present, not
+   * only the shift that was drawn. A bound of 900 s on a template that can absorb 750 s would
+   * otherwise run at one seed and throw at another, which turns a configuration error into a coin
+   * flip; `requirePeakShiftFits` is where that is refused.
+   *
+   * The **drawn** shift then moves the peak. The demand factor is applied one line down, at
+   * `rateOf`, which is the single place every source's rate comes through — so the multiplier
+   * reaches the plan's headline rate, each source's own rate, the expected-passenger figures and
+   * every warning that quotes one, and there is no second expression to keep in step with it.
+   */
+  if (config.dayVariation !== undefined) {
+    requireDayVariationBounds(config.dayVariation);
+    requirePeakShiftFits(authoredTemplate, config.dayVariation.peakShiftS ?? 0);
+  }
+  const template =
+    day === undefined || day.peakShiftS === 0
+      ? authoredTemplate
+      : shiftTemplatePeak(authoredTemplate, day.peakShiftS);
+  const dayDemandFactor = day?.demandFactor ?? 1;
+
   const profileFor = profileResolver(building, profiles);
   const warnings: string[] = [];
 
   const rateOf = (profile: TrafficProfile): number =>
-    config.arrivalRatePctPop5min ?? profile.arrivalRatePctPop5min[options.demandLevel];
+    (config.arrivalRatePctPop5min ?? profile.arrivalRatePctPop5min[options.demandLevel]) *
+    dayDemandFactor;
 
   // A template that varies the mix states the mix, so it takes precedence over every floor's
   // profile — the same relationship `config.directionalSplit` already has, one level up. Combining
@@ -462,7 +652,7 @@ export function planDemand(config: DemandConfig): DemandPlan {
     floorId: floor.id,
     floorIndex: floor.index,
     weight: entranceWeightTotal > 0 ? (rawEntranceWeights[index] ?? 0) / entranceWeightTotal : 0,
-    meanBatchSize: profileFor(floor).batchSize.mean,
+    meanBatchSize: meanBatchSizeOf(options.batchSize ?? profileFor(floor).batchSize),
   }));
 
   /* ---- feasibility of an (origin, destination) pair ---------------------- */
@@ -655,14 +845,19 @@ export function planDemand(config: DemandConfig): DemandPlan {
     const rate = destinations.reduce((sum, destination) => sum + destination.weight, 0);
     if (rate <= 0) continue;
 
+    // One resolution, used twice, so the rate and the figure the source *reports* cannot
+    // disagree. Written as two expressions it was possible to mutate one and leave the other —
+    // and an assertion on the reported mean then passed while the rate divided by a different
+    // number, which is the shape of a demand-level error that changes no group.
+    const meanBatchSize = meanBatchSizeOf(options.batchSize ?? profile.batchSize);
     sources.push({
       id: `resident:${floor.id}`,
       kind: 'resident',
       originFloorId: floor.id,
       profileId: profile.id,
       peakPassengersPerSecond: rate,
-      peakBatchesPerSecond: batchesPerSecond(rate, profile.batchSize.mean),
-      meanBatchSize: profile.batchSize.mean,
+      peakBatchesPerSecond: batchesPerSecond(rate, meanBatchSize),
+      meanBatchSize,
       destinations,
       ...withCategoryRates(categoryRatesOf(destinations)),
     });
@@ -721,6 +916,7 @@ export function planDemand(config: DemandConfig): DemandPlan {
       template.reportWindowStartS,
       template.reportWindowEndS,
     ),
+    passengerMass: options.passengerMass,
     warnings: Object.freeze(warnings),
   });
 }
@@ -951,8 +1147,32 @@ interface RawBatch {
 export function generateTrace(config: TrafficConfig): PassengerTrace {
   const { building, streams } = config;
   const options = resolveOptions(config);
-  const plan = planDemand(config);
+  /*
+   * docs/14 § 2.3. **Drawn before anything else in this function**, which is the whole of the
+   * criterion-3 guarantee: the day is a function of the seed and the configuration alone, taken
+   * before a single arrival instant exists and long before a car moves, so two arms of a paired
+   * comparison handed the same seed see the same Monday. Its own stream, so asking for it moves
+   * no other draw.
+   */
+  const day =
+    config.dayVariation === undefined
+      ? undefined
+      : drawDayVariation(config.dayVariation, streams.dayVariation);
+  const plan = planDemand(config, day);
   const { template } = plan;
+  /*
+   * **The mass block comes off the plan, not off this function's own `resolveOptions` result.**
+   *
+   * Both would hold the same value, so this is not about correctness of the draw — it is about
+   * what `DemandPlan.passengerMass` *means*. A field a caller can read that no draw consults is a
+   * field that can drift from the run while still looking authoritative, and `parameters.test.ts`
+   * probes the declared `traffic.passengerMass.*` ids through exactly that field. Reading it here
+   * is what makes those probes statements about the population rather than about an echo of the
+   * option.
+   *
+   * Bound before the batch loop because a `RoutePlan` named `plan` shadows this one inside it.
+   */
+  const massConfig = plan.passengerMass;
 
   const floorsById = building.floorsById;
   const requireFloor = (floorId: string): FloorConfig => {
@@ -1000,10 +1220,29 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
     const fixedOrigin =
       source.originFloorId === undefined ? undefined : requireFloor(source.originFloorId);
 
+    // Which stream the group-size draw comes from — the whole of docs/14 § 1.3, and the one
+    // trace-moving change in the building-behaviour program.
+    //
+    // Under `v1` it is `arrivals`, so group size and arrival instants share a sequence and any
+    // change to the group-size curve — even one preserving the mean — consumes a different number
+    // of draws and shifts every subsequent arrival instant. That is the ordering all 981 pinned
+    // estimates and both identity digests were measured under, and it is the default: a run that
+    // does not ask for `v2` is byte-identical to the run before this branch existed.
+    //
+    // Under `v2` it is `batchSize`, and the two become independent. Resolved once per source
+    // rather than per batch because it cannot change within a run.
+    const batchSizeStream =
+      options.trafficModel === 'v2' ? streams.batchSize : streams.arrivals;
+
     // Pass B: per batch, its origin (entrance sources only), its size, its destinations.
     for (const timeS of times) {
       const originFloor = fixedOrigin ?? entranceTable.pick(streams.origins);
-      const size = drawBatchSize(streams.arrivals, profileFor(originFloor).batchSize);
+      // The run's own curve when it declared one, the origin floor's profile otherwise. Every
+      // family here draws exactly once, so which one is selected never moves a later draw.
+      const size = drawBatchSize(
+        batchSizeStream,
+        options.batchSize ?? profileFor(originFloor).batchSize,
+      );
       // Under a mix arc the table is the batch's own: the same destinations, reweighted by the
       // directional mix at the instant the batch appears. Rebuilt rather than mutated so that
       // `pick` stays one uniform draw whatever the weights are — a rejection scheme here would
@@ -1124,7 +1363,7 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
         ...(hops.length === 0 ? {} : { transportHops: Object.freeze(hops) }),
         // Mass is drawn here, in final trace order, so the mass column is a function of the
         // sorted trace rather than of the order the sources happened to be sampled in.
-        massKg: drawMass(streams.passengerMass, config.profiles),
+        massKg: drawMass(streams.passengerMass, massConfig),
         credentialGroup: credentialGroupFor(route),
         category: pick.category,
         demandFloorId: pick.demandFloorId,
@@ -1161,6 +1400,10 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
     sources: plan.sources,
     peakPassengersPerSecond: plan.peakPassengersPerSecond,
     expectedPassengers: plan.expectedPassengers,
+    // Spread-or-omit, never `?? { demandFactor: 1, peakShiftS: 0 }`: a trace from a run that did
+    // not ask for a particular day must be the object it was before days could vary, so that the
+    // identity guards can hold a whole trace to a digest rather than to a field list.
+    ...(day === undefined ? {} : { dayVariation: day }),
     // Every diagnostic worth raising is raised while planning: sampling adds no new ones,
     // because a trace that samples something the plan did not allow for is a bug, not a warning.
     warnings: plan.warnings,
@@ -1175,15 +1418,30 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
  * so the clamping rule (one draw per call, tails clamped rather than rejected) is stated
  * where the trace is built. A rejection loop here would make the `passengerMass` draw count
  * depend on the values drawn.
+ *
+ * The mirror is asserted rather than trusted: `traffic/varianceControls.test.ts` requires the two
+ * to produce identical sequences from the same stream for both families, so the duplication
+ * cannot drift into two different populations.
+ *
+ * Takes the **resolved** block — `TrafficConfig.passengerMass` when the run supplied one, and
+ * `profiles.passengerMass` otherwise — rather than the whole profiles object, so there is exactly
+ * one place the override can be forgotten and it is `planDemand`.
  */
-function drawMass(rng: Rng, profiles: TrafficProfiles): number {
-  const config = profiles.passengerMass;
-  if (config.distribution !== 'normal') {
+function drawMass(rng: Rng, config: PassengerMassConfig): number {
+  if (config.distribution !== 'normal' && config.distribution !== 'lognormal') {
     throw new TrafficError(
-      `Unsupported passenger mass distribution "${config.distribution}". Supported: normal.`,
+      `Unsupported passenger mass distribution "${config.distribution}". Supported: ${SUPPORTED_MASS_DISTRIBUTIONS.join(', ')}.`,
     );
   }
-  const draw = rng.normal(config.meanKg, config.stdDevKg);
+  let draw: number;
+  if (config.distribution === 'lognormal') {
+    // Moments of the *mass*, not of its logarithm: `sigma^2 = ln(1 + s^2/m^2)`,
+    // `mu = ln(m) - sigma^2/2`. One `normal` call, exactly as the `normal` branch takes one.
+    const variance = Math.log1p((config.stdDevKg * config.stdDevKg) / (config.meanKg * config.meanKg));
+    draw = Math.exp(rng.normal(Math.log(config.meanKg) - variance / 2, Math.sqrt(variance)));
+  } else {
+    draw = rng.normal(config.meanKg, config.stdDevKg);
+  }
   return Math.min(Math.max(draw, config.minKg), config.maxKg ?? Number.POSITIVE_INFINITY);
 }
 

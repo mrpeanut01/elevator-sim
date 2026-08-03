@@ -66,6 +66,7 @@ try {
           task.replication,
           task.seed,
           init.keepRecords,
+          task.trafficSeed,
         ),
       });
     } catch (error) {

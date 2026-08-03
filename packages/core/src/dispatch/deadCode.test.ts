@@ -39,7 +39,8 @@
  * to catch.
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -101,7 +102,16 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
 'metrics/METRICS_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
 'car/CAR_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
 'doors/DOOR_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
+// Its own table rather than three more `answer.*` rows, because the ids are `sim.*` on purpose:
+// how crowded a lobby gets is a property of the building and its demand, and a dispatcher that
+// could author it could tune away the cost of the queues it produces.
+'doors/CROWDING_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
 'sim/SIM_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
+// Its own schema rather than four more rows on `SIM_PARAMETERS`, because that table's ids are
+// flat `sim.<key>` names bound one-for-one to `SIM_DEFAULTS`, and a patience curve has no scalar
+// default — the absent block *is* the default. Discovered by `experiments`' parameter-schema
+// walk exactly as the ten schemas above are, by the `_PARAMETERS` suffix.
+'sim/PATIENCE_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
 'traffic/TRAFFIC_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
 
 // -- Geometry and state accessors. Each reads a value object the run already has.
@@ -115,10 +125,11 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
 'traffic/inReportWindow': 'reads a template and an instant',
 
 // -- Documented constants. `CLOSED_FORM_*` are the Barney/CIBSE assumptions and the comparison rule
-// the oracle is judged by; `AWT_INVALID_GROUNDS` is the four-ground list § D108 fixed.
+// the oracle is judged by; `AWT_INVALID_GROUNDS` is the suppression-ground list § D108 fixed at
+// four and docs/14 § 3.1 widened to five.
 'analytical/CLOSED_FORM_ASSUMPTIONS': 'the oracle contract, quoted by docs and asserted by tests',
 'analytical/CLOSED_FORM_COMPARISON_RULE': 'the oracle contract, quoted by docs and asserted by tests',
-'metrics/AWT_INVALID_GROUNDS': 'the four suppression grounds; consumed as a set by guards',
+'metrics/AWT_INVALID_GROUNDS': 'the suppression grounds; consumed as a set by guards',
 
   // -- Stage 5 result accessors. The monitor returns a CapacityReassignmentResult; these read it.
   // The simulation counts crossings/migrations/held itself off the same result, so it needs none
@@ -166,6 +177,57 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
 /* -------------------------------------------------------------------------- *
  * Scanning
  * -------------------------------------------------------------------------- */
+
+/** Refuses to decode silently; an invalid byte sequence throws rather than yielding U+FFFD. */
+const utf8 = new TextDecoder('utf-8', { fatal: true });
+
+/**
+ * The file's text, or a loud failure. **Never a silent skip and never a silent mangle (R24).**
+ *
+ * This audit read with `readFileSync(path, 'utf8')` until wave 13, and that is a silent
+ * instrument in two distinct ways, both measured on scratch files before this function existed:
+ *
+ * 1. **A raw NUL byte decodes fine here and blinds every other tool.** The repository's `grep`
+ *    wraps `ugrep -I`, which skips a file it deems binary by printing *nothing* and exiting 1 —
+ *    indistinguishable from a genuine miss. Five source files carried NUL bytes until `f78dc42`,
+ *    and wave 13's `sim/stairs.ts` used `\0` as a floor-pair separator and did it again. This
+ *    audit is one of the few instruments in the tree that reads bytes rather than shelling out to
+ *    `grep`, so it is where the tripwire belongs: a *clean sweep* reported over a file nothing
+ *    else can search is an endorsement the audit has no grounds to give.
+ * 2. **An invalid UTF-8 sequence is replaced by U+FFFD and the symbol is simply never scanned.**
+ *    Measured: `export` + `0xFF 0xFE 0x80` + `const scratchProbeB = 1;` in `core/src/metrics`
+ *    left this suite **fully green at 8 passed**, because U+FFFD is not whitespace, so
+ *    {@link EXPORTED} no longer matched the line and a caller-less export was classified by
+ *    omission. The audit passed by not looking, which is the exact shape it exists to catch.
+ *
+ * **Mirrored from `packages/viz/src/deadCode.test-helper.ts` rather than shared, and the grounds
+ * are structural rather than stylistic.** Invariant 6 forbids `core` depending on `viz`, so the
+ * fifth audit's copy is unreachable from here; `core`'s `package.json` declares no workspace
+ * dependency at all, so `experiments/src/tuning/callers.test-helper.ts` — the original — is
+ * equally unreachable; and a cross-package relative import is outside `rootDir: "src"` and breaks
+ * `tsc -b` under project references. Hoisting it into a non-test `core` module would put a
+ * `node:fs` reader on the package's own published surface, which this very audit would then have
+ * to allowlist. So: a fifth site, stated here so a future consolidation knows where they all are.
+ */
+function readSource(path: string): string {
+  const bytes = readFileSync(path);
+  if (bytes.includes(0)) {
+    throw new Error(
+      `deadCode audit: ${path} contains a raw NUL byte. Refusing to scan it, because the last ` +
+        'time NUL-carrying sources existed (fixed in f78dc42, and again in wave 13) the ' +
+        'repository grep skipped them silently and every negative finding over them was ' +
+        'worthless. Fix the file, then re-run.',
+    );
+  }
+  try {
+    return utf8.decode(bytes);
+  } catch {
+    throw new Error(
+      `deadCode audit: ${path} is not valid UTF-8. Refusing to scan a mangled decoding of it — ` +
+        'a symbol name split by a replacement character reads as absent, and absent reads as dead.',
+    );
+  }
+}
 
 function sourceFiles(root: string): readonly string[] {
   const out: string[] = [];
@@ -377,7 +439,7 @@ interface Audit {
 
 function audit(): Audit {
   const all = sourceFiles(PACKAGES_DIR).filter((path) => path.includes(`${'/'}src${'/'}`));
-  const sources = new Map(all.map((path) => [path, readFileSync(path, 'utf8')]));
+  const sources = new Map(all.map((path) => [path, readSource(path)]));
   const bindings = new Map(
     all.map((path) => [path, boundNames(sources.get(path) ?? '')] as const),
   );
@@ -597,8 +659,49 @@ describe('the scanner cannot silently stop looking', () => {
 
   it('still finds a real use, so the strip is not simply deleting the file', () => {
     // Both directions. A scanner that returned the empty string would pass every assertion above.
-    const stripped = code(readFileSync(join(PACKAGES_DIR, 'core/src/dispatch/policies/registry.ts'), 'utf8'));
+    const stripped = code(readSource(join(PACKAGES_DIR, 'core/src/dispatch/policies/registry.ts')));
     expect(stripped.length).toBeGreaterThan(200);
     expect(stripped).toContain('createPolicyFor');
+  });
+
+  /*
+   * **The reader is the third way this scanner used to stop looking silently, and the only one
+   * that was still open after § D114.** The two above are pattern holes; this one is a byte hole.
+   *
+   * Both halves were watched failing before {@link readSource} existed, with the probes written
+   * into `core/src/metrics` — an audited directory — and this suite run against them:
+   *
+   * - `export const scratchProbeA = […].join("\0")`, self-used so it classifies live: **8
+   *   passed**, a clean sweep, while `grep -c scratchProbeA` over that same file printed nothing
+   *   and exited 1. That is the wave-13 `sim/stairs.ts` incident reproduced exactly.
+   * - `export` + `0xFF 0xFE 0x80` + `const scratchProbeB = 1;`, a caller-less export: **8
+   *   passed** again, because `readFileSync(path, 'utf8')` turned the invalid sequence into
+   *   U+FFFD, which is not whitespace, so {@link EXPORTED} never matched the line and the symbol
+   *   was never scanned at all.
+   *
+   * With the reader in place the same two files stop the run with the messages asserted below.
+   * `packages/viz/src/deadCode.test.ts` has carried this control since wave 12 and it is what
+   * caught the `stairs.ts` NUL; `core`'s audit reaching the same bytes without the same refusal
+   * is the gap this closes.
+   */
+  it('positive control: unreadable input throws — it never skips (R24)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'core-deadcode-'));
+    try {
+      const nulFile = join(dir, 'nul.ts');
+      writeFileSync(nulFile, Buffer.from([0x65, 0x00, 0x66]));
+      expect(() => readSource(nulFile)).toThrow(/NUL/);
+
+      const mangledFile = join(dir, 'mangled.ts');
+      writeFileSync(mangledFile, Buffer.from([0xff, 0xfe, 0x80]));
+      expect(() => readSource(mangledFile)).toThrow(/UTF-8/);
+
+      // Both directions: a file that is neither must still be read, or the guard would be
+      // satisfied by a reader that refused everything.
+      const cleanFile = join(dir, 'clean.ts');
+      writeFileSync(cleanFile, 'export const clean = "é";\n', 'utf8');
+      expect(readSource(cleanFile)).toContain('export const clean');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

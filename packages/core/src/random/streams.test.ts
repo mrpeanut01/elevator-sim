@@ -16,7 +16,7 @@ const others = (name: StreamName): readonly StreamName[] =>
   STREAM_NAMES.filter((candidate) => candidate !== name);
 
 describe('StreamSet — required streams', () => {
-  it('exposes exactly the six sources named in the architecture', () => {
+  it('exposes exactly the sources named in the architecture', () => {
     expect([...STREAM_NAMES]).toEqual([
       'arrivals',
       'origins',
@@ -24,10 +24,16 @@ describe('StreamSet — required streams', () => {
       'passengerMass',
       'doorObstruction',
       'policyNoise',
+      // Appended, never inserted: a name's spelling decides its PCG parameters, so the six above
+      // keep theirs. See the COMPATIBILITY LOCK below.
+      'batchSize',
+      'patience',
+      'modeChoice',
+      'dayVariation',
     ]);
   });
 
-  it('materializes all six on construction', () => {
+  it('materializes every one of them on construction', () => {
     const set = new StreamSet(MASTER_SEED);
     expect(set.streamNames()).toEqual([...STREAM_NAMES]);
   });
@@ -40,6 +46,10 @@ describe('StreamSet — required streams', () => {
     expect(set.stream('passengerMass')).toBe(set.passengerMass);
     expect(set.stream('doorObstruction')).toBe(set.doorObstruction);
     expect(set.stream('policyNoise')).toBe(set.policyNoise);
+    expect(set.stream('batchSize')).toBe(set.batchSize);
+    expect(set.stream('patience')).toBe(set.patience);
+    expect(set.stream('modeChoice')).toBe(set.modeChoice);
+    expect(set.stream('dayVariation')).toBe(set.dayVariation);
   });
 
   it('keeps the seed available for the run record', () => {
@@ -324,6 +334,57 @@ const GOLDEN_STREAMS: Readonly<Record<StreamName, GoldenVector>> = {
     initSeq: 5524437755935699479n,
     firstDraws: [3214590096, 3644864734, 3822589677, 2368049409],
   },
+  /*
+   * Added with the stream itself (docs/14 § 1.3), and produced the same way the six above were:
+   * by an independent BigInt implementation of FNV-1a-64, SplitMix64 and
+   * `pcg_setseq_64_xsh_rr_32` written from the algorithm specifications, which was first required
+   * to reproduce all six of them and the ad-hoc vector below before this seventh was taken from it.
+   *
+   * That order matters. A value read out of `streams.ts` would pin the code to itself and prove
+   * nothing; a value from a program that independently agrees on seven of seven pins the *scheme*.
+   */
+  batchSize: {
+    initState: 10950848240609012255n,
+    initSeq: 11551578178733633914n,
+    firstDraws: [2215659223, 3273889632, 4109878313, 4090393260],
+  },
+  /*
+   * Added with the streams themselves (docs/14 § 3.1 and § 3.3), and produced by the same
+   * independent BigInt program, run under the same rule: it was required to reproduce **all
+   * eight** vectors already pinned above — the seven streams and the ad-hoc one — before either
+   * of these two was taken from it. It did.
+   *
+   * That the seven above are untouched is the measurement, not an assumption:
+   * `deriveStreamSeed` hashes the stream's **name**, so a name appended to `STREAM_NAMES` cannot
+   * move an existing stream's parameters by position. This table is where that claim is checked
+   * rather than asserted — every earlier row still holds with two new names in the list.
+   */
+  patience: {
+    initState: 2723526455862252969n,
+    initSeq: 7952846625298762981n,
+    firstDraws: [1106427436, 3028617148, 1717110874, 4003086497],
+  },
+  modeChoice: {
+    initState: 8546373963621181858n,
+    initSeq: 4920448037779798214n,
+    firstDraws: [238409173, 3289634889, 937522763, 3447560127],
+  },
+  /*
+   * Added with the stream itself (docs/14 § 2.3), by the same independent BigInt program and under
+   * the same rule as the three above it: it was required to reproduce **all ten** vectors already
+   * pinned in this file — the nine streams and the ad-hoc one — plus all three edge seeds, before
+   * this eleventh was taken from it. It did, thirteen for thirteen.
+   *
+   * That the ten above are untouched is again the measurement rather than the assumption. A name
+   * appended to `STREAM_NAMES` cannot move an existing stream's parameters, because
+   * `deriveStreamSeed` hashes the **spelling** and not the position; this table is where that
+   * survives a third appending.
+   */
+  dayVariation: {
+    initState: 8223398147818347272n,
+    initSeq: 8791436940513750610n,
+    firstDraws: [626451509, 78136351, 4266053562, 1214740073],
+  },
 };
 
 /** An ad-hoc stream, pinned too: `derive()` outputs are just as persisted as the required six. */
@@ -503,7 +564,21 @@ describe('StreamSet — statistical sanity through the named streams', () => {
  * -------------------------------------------------------------------------- */
 
 describe('a separate traffic seed splits who turns up from how the machine behaves', () => {
-  const DEMAND = ['arrivals', 'origins', 'destinations', 'passengerMass'] as const;
+  /*
+   * `batchSize` is demand: how many people walk in together is a fact about the crowd and nothing
+   * about the machine, so a traffic seed that re-rolled who turns up and when but left every group
+   * the same size would be re-rolling half a Tuesday.
+   */
+  const DEMAND = [
+    'arrivals',
+    'origins',
+    'destinations',
+    'passengerMass',
+    'batchSize',
+    // Which Tuesday this is, and how late its peak runs (docs/14 § 2.3). The most purely
+    // crowd-side draw on the list: it scales how many people walk in and touches no car.
+    'dayVariation',
+  ] as const;
   const MACHINE = ['doorObstruction', 'policyNoise'] as const;
 
   const firstDraws = (set: StreamSet, name: StreamName, count = 8): readonly number[] =>

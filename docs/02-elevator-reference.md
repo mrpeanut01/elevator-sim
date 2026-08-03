@@ -259,11 +259,78 @@ directions in `traffic/transportRoute.test.ts`. Sky lobby A is the one that matt
 interchangeable, and joining them took a cross-lobby interfloor journey from **four lift legs to
 two**.
 
-**Three things the model deliberately does not have**, each because nothing would read them:
-a `kind` enum (nothing branches on escalator-versus-stair), a direction (a one-way escalator is a
-real configuration and is not expressible), and a capacity or headway (an escalator's handling
-capacity dwarfs a lift's, and modelling it would put a queue on the one edge that exists to remove
-one). See `packages/core/src/config/types.ts`.
+### Stairs — this section carries no calibrated figure, and none has been invented
+
+`packages/core/src/config/types.ts` tells the author of a transport mode that `traversalTimeS` is a
+**reference value and must be cited** in the declaring building's `$comment`, and points here. For
+an escalator that pointer is good: the table above is a derivation from BS EN 115-1's own limits,
+and every step of it is checkable. **For a stairs mode this document has nothing to give you, and
+this subsection exists to say so rather than to let the pointer read as coverage.**
+
+A stairs mode declares two things an escalator does not, and neither is derivable the way 21.2 s
+was:
+
+| field | what kind of number it is | why the escalator derivation does not transfer |
+|---|---|---|
+| `traversalTimeS: { upS, downS }` | a **human** ascent and descent time over a known rise | EN 115-1 fixes an *escalator's* angle, nominal speed and flat-step count, so its traversal time is geometry. A stair standard governs the stair's geometry — going, riser, width — and says nothing about the speed of the person on it, still less about how much slower that person climbs than descends |
+| `use: { up, down }` | a **behavioural** probability, per building | `StairsUseConfig` requires it per building precisely because it is not a constant: a hotel's guests, an office tower's staff and a hospital's do not behave alike. There is no default in code for the same reason — a default would put an uncited behavioural claim into every study that declared a stair |
+
+**Nothing here has been consulted.** No CIBSE Guide D page, no ISO 8100-32 clause, and no
+lift-engineering paper on stair uptake was opened while this subsection was written, so no figure
+is quoted and no source is named as though one had been. That is a deliberate outcome and not an
+oversight: this repository retracted **two** escalator/lobby citations in a single wave for exactly
+the fault of naming a document nobody had read (`DECISIONS.md` § D205), and the same wave's
+crowding term now cites nothing and says so. A stated *"we have no calibrated figure for this"* is
+a fact a reader can act on. A plausible number beside a plausible source is not.
+
+**What an author of the first stairs mode must do.** In order, and all four:
+
+1. **Open a document and record which one**, in the declaring building's `$comment`: title,
+   edition or year, and the clause, table or figure the number comes from. Not "CIBSE Guide D" —
+   the part of it you read.
+2. **Say what population it was measured on.** `use` is population-specific by construction, so a
+   figure with no stated population cannot be checked against the building it is authored on.
+3. **Show the arithmetic if the figure is derived** rather than quoted, the way the `G ↔ 2` table
+   above shows every step from inclination to landing-to-landing seconds. A derived number whose
+   derivation is not written down is a quoted number with the source removed.
+4. **If no citable figure can be found, do not declare the stair.** A building with no stairs mode
+   is a stated absence and costs nothing; a stairs mode carrying invented numbers is a fabricated
+   result that every run will happily average and no test will question.
+
+**What the loader will and will not do for you.** `config/schema.ts` refuses a scalar
+`traversalTimeS` on a stairs mode, refuses a directional pair on an escalator, requires `use` on a
+stairs mode, refuses `use` on an escalator, and refuses `upS < downS` as an inverted asymmetry
+rather than a declared one. Every one of those is an **internal-consistency** check. A pair of
+invented numbers that happen to satisfy `upS >= downS` passes all five, which is the whole reason
+this subsection is written as a citation requirement and not as a schema note.
+
+**Where to look, offered as leads and explicitly not as citations.**
+`docs/14-building-behaviour-contract.md` § 3.3's closing note names CIBSE Guide D (stair usage by
+floor delta, lobby densities) and ISO 8100-32 (transfer times under crowding) as the documents to
+start from. Neither has been consulted for this section, so neither appears in § Sources below on
+its account. Whoever does consult one should replace this subsection with a derivation table in the
+shape of the escalator's, add the entry to § Sources, and say which of the two fields it calibrates
+— a source for `upS`/`downS` is not a source for `up`/`down`.
+
+**Nothing in this repository depends on a stair figure today.** No shipped building in
+`data/buildings/` declares a `stairs` mode; `vertical-city` is the only building with
+`transportModes` at all, and all four of them omit `kind`, which is `escalator`. The routing and
+uptake code is exercised from test fixtures. So this is a gap in front of the first author, not
+underneath a published number.
+
+### Two things the model deliberately does not have
+
+Each because nothing would read them: a direction (a one-way escalator is a real configuration and
+is not expressible), and a capacity or headway (an escalator's handling capacity dwarfs a lift's,
+and modelling it would put a queue on the one edge that exists to remove one). See
+`packages/core/src/config/types.ts`.
+
+*This list said **three** until the stairs work landed, and the third was "a `kind` enum — nothing
+branches on escalator-versus-stair". That is no longer true: `TRANSPORT_MODE_KINDS` ships,
+`transportModeSchema` branches on it four times, `traffic/route.ts` filters `stairs` out of the
+edge set it plans over, and `packages/core/src/sim/stairs.ts` selects on it to decide which modes
+are offered at the landing. The sentence is corrected here rather than deleted, because a reader
+who remembers the old one should be able to see what moved.*
 
 ## Sources
 

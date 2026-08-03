@@ -53,6 +53,9 @@ import {
   roundSeed,
   runExperiment,
   runHoldoutRound,
+  TeachingError,
+  formatTeachingRound,
+  runTeachingRound,
   runnerObjective,
   searchSpace,
   sepCmaEs,
@@ -71,10 +74,13 @@ import {
   type SearchMethodId,
   type SearchResult,
   type SearchSpace,
+  type TeachingSpec,
   type TrafficArmSpec,
   type TuningArm,
 } from '@elevator-sim/experiments';
 import type { LoadedConfig } from '@elevator-sim/core';
+
+import { readFile } from 'node:fs/promises';
 
 import {
   booleanFlag,
@@ -149,7 +155,13 @@ export const TUNE_FLAGS: readonly FlagSpec[] = [
     kind: 'string',
     placeholder: '<id>',
     summary: 'which building to tune on; the optimum is per building',
-    required: true,
+    /*
+     * Required for a search, and **not** for `--teaching`: a teaching spec names its own building,
+     * and a flag that had to be passed and then ignored would be a second place for the two to
+     * disagree. `runTune` asks for it through `requiredStringFlag`, which refuses by the same name
+     * and the same exit code, so nothing about the search path's error moved.
+     */
+    defaultText: 'required, except under --teaching, where the spec names it',
   },
   {
     name: 'base',
@@ -285,6 +297,12 @@ export const TUNE_FLAGS: readonly FlagSpec[] = [
     max: 0.9999,
     defaultValue: 0.95,
   },
+  {
+    name: 'teaching',
+    kind: 'string',
+    placeholder: '<file>',
+    summary: 'run a docs/14 § 4.2 teaching spec; the verdict is on held-out traffic and only there',
+  },
   { name: 'serial', kind: 'boolean', summary: 'never use worker threads' },
   { name: 'data', kind: 'string', placeholder: '<dir>', summary: 'data directory to read' },
   { name: 'no-color', kind: 'boolean', summary: 'never emit ANSI colour' },
@@ -325,7 +343,74 @@ export async function tuneCommand(out: Output, argv: readonly string[]): Promise
     return 0;
   }
   const config = await loadData(resolveDataDir(stringFlag(parsed, 'data')));
+  const teachingPath = stringFlag(parsed, 'teaching');
+  if (teachingPath !== undefined) return await runTeaching(out, config, teachingPath);
   return await runTune(out, config, parsed);
+}
+
+/* -------------------------------------------------------------------------- *
+ * --teaching — docs/14 § 4.2
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **This function is `experiments/teaching`'s named non-test caller.**
+ *
+ * `docs/05-roadmap.md` § *Standing requirement* has been paid eleven times: a behaviour that is
+ * configurable, unit-tested in isolation and called from no shipped path passes every other check
+ * this repository runs. A barrel re-export and a `{@link}` tag look exactly like a caller and are
+ * not one. So the teaching surface is reached from something a person types, and this is it — the
+ * same answer, for the same reason, that this file already is for Phase 7's `tuning/`.
+ *
+ * It prints the round and nothing else. In particular it does **not** print, offer, or compute a
+ * comparison on the traffic the policy trained on: `runTeachingRound` measures every interval on
+ * the holdout traffic, and there is no flag here that could ask it for the other one. docs/14
+ * § 4.3 requires the honest comparison to be the easy one to run and the dishonest one awkward;
+ * the awkwardness is that the dishonest one is not expressible.
+ */
+export async function runTeaching(out: Output, config: LoadedConfig, path: string): Promise<number> {
+  const { bold, dim } = out.palette;
+  let raw: string;
+  try {
+    raw = await readFile(path, 'utf8');
+  } catch (error) {
+    throw new UsageError(
+      `cannot read teaching spec "${path}": ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  let spec: TeachingSpec;
+  try {
+    spec = JSON.parse(raw) as TeachingSpec;
+  } catch (error) {
+    throw new UsageError(
+      `teaching spec "${path}" is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  let round;
+  try {
+    round = await runTeachingRound({ spec, config, resources: config });
+  } catch (error) {
+    /* A refused spec is a usage error, not a crash: every clause `parseTeachingSpec` enforces is
+       something the author wrote, and the message already names the clause and the reason. */
+    if (error instanceof TeachingError) throw new UsageError(error.message);
+    throw error;
+  }
+
+  out.line(bold(`teaching round "${round.spec.id}" — judged on ${round.measuredOn}`));
+  out.line('');
+  for (const line of formatTeachingRound(round).split('\n').slice(2)) out.line(line);
+  out.line('');
+  out.line(
+    dim(
+      'The training-side number is a bare mean with no interval, deliberately: a policy that beats ' +
+        'the baseline on the traffic it trained on is the definition of overfitting (docs/14 § 4.3).',
+    ),
+  );
+  /* A refusal exits 0. `NOT ACCEPTED` is a *result* — docs/14 § 5 criterion 5 says so in as many
+     words, and three of them are already on the record — and a non-zero exit would make a correct
+     measurement look like a broken command. Only a refused *spec* is an error, and that path
+     throws above. */
+  return 0;
 }
 
 /* -------------------------------------------------------------------------- *

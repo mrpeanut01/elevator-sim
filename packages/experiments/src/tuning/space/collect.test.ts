@@ -301,16 +301,59 @@ describe('every parameter core declares is accounted for', () => {
     // `DECISIONS.md` § D162 condition 5 requires — a control an arm could set for itself would
     // not be one.
     //
-    // **108 → 109 and 56 → 57 in the en-route-diversion fix**, the two moving together again, and
-    // for the same reason `selection.*` did: the one new row is `DISPATCH_PARAMETERS`'
-    // `eligibility.enRouteDiversion`, and it is authorable in a profile because *whether a car may
-    // be cut short en route to take a call it is about to fly past* is a dispatcher dimension in
-    // exactly the way `eligibility.allowOppositeDirectionPickup` beside it already is. It is a
-    // boolean, so an optimizer searching the space now searches both halves of collective
-    // behaviour — the turn it will not make, and the stop it will. See `DECISIONS.md` § D205.
-    expect(rows).toBe(109);
-    expect(SPACE.parameters.length).toBe(57);
-    // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
+    // **108 → 124 and the space unmoved at 56 in wave 13**, which is the wave-9 relationship a
+    // third time and for the same reason. Sixteen rows landed across two lanes that never saw each
+    // other's, and the arithmetic is worth stating because each lane correctly computed a total
+    // that the merge made wrong: T3 measured 108 → 116 and T5 measured 108 → 113 → 116, and both
+    // were right about their own branch and wrong about the tree. The number below is re-derived
+    // from the merged spaces, not added up from two reports.
+    //
+    // **Eight from docs/14 §§ 2.1–2.2**, all `TRAFFIC_PARAMETERS`' — three for the group-size curve
+    // (`traffic.batchSize.distribution` / `.mean` / `.weight`) and five for the body-mass
+    // distribution (`traffic.passengerMass.distribution` / `.meanKg` / `.stdDevKg` / `.minKg` /
+    // `.maxKg`). None is authorable in a dispatcher profile, correctly: they describe *the crowd a
+    // dispatcher is measured against*, and a dispatcher that could make its passengers lighter or
+    // its groups smaller would be tuning away the traffic it is bad at. `traffic.batchSize.weight`
+    // is the second row in the repository to declare `perMemberOf`, after `traffic.entranceWeight`.
+    //
+    // **Five from docs/14 § 3.1**, patience and abandonment: four in a new `PATIENCE_PARAMETERS`
+    // schema in `core/src/sim` (`sim.patience.distribution`, `.meanS`, `.spreadS`, `.minS`) and
+    // `metrics.maxAbandonmentFraction`, the rate above which a run refuses its own mean. A
+    // dispatcher that could tune how long riders are willing to wait — or the rate at which their
+    // leaving stops being reportable — could tune away the evidence of its own queues. That is
+    // `metrics.maxWaitHorizonS`'s argument exactly, one axis over.
+    //
+    // They are their own schema rather than four more on `SIM_PARAMETERS` because that table's ids
+    // are flat `sim.<key>` names bound one-for-one to `SIM_DEFAULTS`, and a patience curve has no
+    // scalar default: the absent block *is* the default, which is what keeps a run that declares
+    // none byte-identical to one produced before the feature existed.
+    //
+    // **Three from docs/14 § 3.2**, the lobby-crowding term: `sim.lobbyCrowding.thresholdPersons`,
+    // `.factorPerPerson` and `.maxFactor`, declared as `CROWDING_PARAMETERS` in
+    // `core/src/physics/doors`. The ids are `sim.*` rather than `answer.*` deliberately, and that
+    // is the whole reason they are a separate table from `DOOR_PARAMETERS`: how crowded a lobby
+    // gets is a property of the building and its demand, and a dispatcher that could author the
+    // term could tune away the cost of the queues it produces.
+    //
+    // **Three from docs/14 § 2.3**, inter-day variability:
+    // `traffic.dayVariation.minDemandFactor`, `.maxDemandFactor` and `.peakShiftS`, on
+    // `TRAFFIC_PARAMETERS` beside the other demand knobs. All three carry `default: null`, so all
+    // three land in `space.unsearchable` — they satisfy invariant 8's *declaration* requirement
+    // and not its *searchability* purpose, exactly as the twelve null-default rows before them do.
+    // Null is the only honest default here: a multiplier declared as a number would silently make
+    // every run in this repository a different Tuesday.
+    //
+    // **This is a count of declared rows, not a published estimate.** Nothing in `published.ts`
+    // moved and neither identity digest moved; all nineteen tunables are absent from every default
+    // run by construction, which is docs/14 § 5 criterion 1.
+    //
+    // **And one more from the merge into `main`**: `eligibility.enRouteDiversion`
+    // (`DECISIONS.md` § D205), the one row of the three landing here that a dispatcher profile
+    // can actually author — so it moves the space as well as the row count, which is the
+    // relationship neither wave-13 lane had. The totals below are re-derived from the merged
+    // registries for exactly the reason stated above: each branch was right about itself.
+    expect(rows).toBe(128);
+    expect(SPACE.parameters.length).toBe(57);    // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
     // always said `false` would satisfy the biconditional above only by accident.
     expect(authorable).toBeGreaterThan(0);
     expect(authorable).toBeLessThan(rows);

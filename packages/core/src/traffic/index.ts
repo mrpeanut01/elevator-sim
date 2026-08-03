@@ -46,14 +46,18 @@ export {
   DEMAND_TEMPLATE_IDS,
   DIRECTION_CATEGORIES,
   INTERFLOOR_WEIGHTINGS,
+  SUPPORTED_BATCH_DISTRIBUTIONS,
   TRAFFIC_DEFAULTS,
+  TRAFFIC_MODEL_VERSIONS,
   TRAFFIC_PARAMETERS,
   TrafficError,
 } from './types.js';
 
 export type {
   ArrivalEvent,
+  BatchSizeCurve,
   CredentialAssignment,
+  DayVariationConfig,
   DemandLevel,
   DemandPhase,
   DemandSource,
@@ -64,10 +68,13 @@ export type {
   DirectionCategory,
   GeneratedPassenger,
   InterfloorWeighting,
+  PassengerMassOverride,
   PassengerTrace,
+  ResolvedDayVariation,
   ResolvedDemandTemplate,
   TraceLeg,
   TrafficConfig,
+  TrafficModelVersion,
   TrafficParameterSpec,
   TrafficParameterType,
 } from './types.js';
@@ -78,10 +85,12 @@ export type {
 
 export {
   SECONDS_PER_5MIN,
-  SUPPORTED_BATCH_DISTRIBUTIONS,
   batchesPerSecond,
   drawBatchSize,
+  drawExplicitBatchSize,
   drawGeometricBatchSize,
+  drawZeroTruncatedPoissonBatchSize,
+  meanBatchSizeOf,
   passengersPer5Min,
   passengersPerSecond,
   sampleBatchArrivalTimes,
@@ -102,8 +111,11 @@ export {
   integratedIntensityS,
   intensityAt,
   lunchTwoWayTemplate,
+  maxPeakShiftS,
+  requirePeakShiftFits,
   resolveDemandTemplate,
   riseAndFallTemplate,
+  shiftTemplatePeak,
   splitAt,
 } from './demandTemplate.js';
 

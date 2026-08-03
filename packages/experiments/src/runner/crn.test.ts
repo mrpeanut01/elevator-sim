@@ -1,7 +1,12 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { Simulation } from '@elevator-sim/core';
-import type { GeneratedPassenger, LoadedConfig, PassengerTrace } from '@elevator-sim/core';
+import type {
+  GeneratedPassenger,
+  LoadedConfig,
+  PassengerTrace,
+  SimulationDemandOptions,
+} from '@elevator-sim/core';
 
 import {
   assertCrnAligned,
@@ -170,6 +175,79 @@ describe('traceKeyOf', () => {
     expect(a?.traceKey).toBe(b?.traceKey);
   });
 
+  /**
+   * **Every field of the demand surface separates a cohort, and the list is derived from the type.**
+   *
+   * `traceKeyOf` is a hand-written mirror of core's `traceConfigFor`, and a field missing from it
+   * does not fail — it *merges two cohorts*. Two cells running different populations are then
+   * declared trace-equivalent, handed the same seeds, and paired. That is arithmetic across
+   * unrelated populations, which is the one thing this module exists to prevent.
+   *
+   * Found by adversarial review of wave 13's T3: the two docs/14 §§ 2.1-2.2 knobs were omitted, and
+   * so was `mixAmplitude` — the flat-mix negative control § D162 condition 5 requires, which would
+   * have been cohorted *with the treatment it is the control for*. No shipped experiment sets it,
+   * so this is a cohort that could have merged rather than one that did.
+   *
+   * `satisfies Record<keyof SimulationDemandOptions, ...>` is what stops the next one: a field
+   * added to the demand surface without a row here fails to compile. `verifyCrnAlignment` compares
+   * `traceDigest` and would surface a mis-merged cohort after the fact, but a detector that reports
+   * a broken experiment once it has run is not a substitute for a key that does not merge it.
+   */
+  it('separates a cohort on every field the demand surface declares', () => {
+    const VARIANTS = {
+      demandLevel: { demandLevel: 'max' },
+      arrivalRatePctPop5min: { arrivalRatePctPop5min: 9 },
+      directionalSplit: { directionalSplit: { incoming: 1, outgoing: 0, interfloor: 0 } },
+      batchSharesDestination: { batchSharesDestination: true },
+      entranceWeights: { entranceWeights: { G: 1 } },
+      interfloorWeighting: { interfloorWeighting: 'uniform' },
+      credentialAssignment: { credentialAssignment: 'none' },
+      maxLegs: { maxLegs: 4 },
+      peakWindowS: { peakWindowS: 420 },
+      baselineFraction: { baselineFraction: 0.25 },
+      mixAmplitude: { mixAmplitude: 0.5 },
+      batchSize: { batchSize: { distribution: 'explicit', weights: [0, 0, 0, 1] } },
+      passengerMass: {
+        passengerMass: {
+          distribution: 'lognormal',
+          meanKg: 110,
+          stdDevKg: 15,
+          minKg: 40,
+          maxKg: 200,
+        },
+      },
+      /*
+       * docs/14 § 2.3, and **in** the key rather than out of it. It is the field the docstring on
+       * `traceKeyOf` reasons about against `patience` rather than by analogy to it: both draw from
+       * a demand-side stream, and only this one draws *before* the trace exists and multiplies the
+       * rate the trace is generated at. Two cells differing in it see a different number of people
+       * arriving at different times, so pairing them would be arithmetic across two Mondays.
+       */
+      dayVariation: { dayVariation: { minDemandFactor: 0.8, maxDemandFactor: 1.25 } },
+    } as const satisfies Record<keyof SimulationDemandOptions, SimulationDemandOptions>;
+
+    const keyFor = (demand: SimulationDemandOptions | undefined): string | undefined =>
+      planExperiment(
+        specOf({
+          id: 'per-field',
+          traffic: [{ id: 't', ...(demand === undefined ? {} : { demand }) }],
+        }),
+        config,
+      ).cells[0]?.traceKey;
+
+    const bare = keyFor(undefined);
+    expect(bare).toBeDefined();
+    for (const [field, demand] of Object.entries(VARIANTS)) {
+      expect(
+        keyFor(demand as SimulationDemandOptions),
+        `demand.${field} must change the CRN key; cells that differ in it are not paired`,
+      ).not.toBe(bare);
+    }
+    // And every variant is distinct from every other, so no two fields collapse onto one key.
+    const keys = Object.values(VARIANTS).map((d) => keyFor(d as SimulationDemandOptions));
+    expect(new Set(keys).size).toBe(Object.keys(VARIANTS).length);
+  });
+
   it('does not react to run-loop mechanics', () => {
     const base = specOf({ id: 'mechanics' });
     const plain = planExperiment(base, config).cells[0];
@@ -178,6 +256,36 @@ describe('traceKeyOf', () => {
       config,
     ).cells[0];
     expect(traceKeyOf(plain!.simulation)).toBe(traceKeyOf(tweaked!.simulation));
+  });
+
+  /**
+   * **Patience and lobby crowding are outside the trace key, and patience is the one that looks
+   * like it should not be** (docs/14 §§ 3.1–3.2).
+   *
+   * `patience` draws from a *demand-side* stream, so a reader could reasonably expect it in the
+   * key. The trace is generated in full before the patience table is drawn and the draws come
+   * from a separate stream, so they displace no arrival instant: two cells differing only in
+   * patience see exactly the same passengers, which is the pairing CRN exists to give. What they
+   * do not share is the *served* population, and that is answered by `summary.abandonment` and
+   * `awtIsValid`'s fifth ground rather than by refusing to pair them.
+   */
+  it('does not react to patience or lobby crowding', () => {
+    const base = specOf({ id: 'behaviour' });
+    const plain = planExperiment(base, config).cells[0];
+    const tweaked = planExperiment(
+      {
+        ...base,
+        simulation: {
+          patience: { distribution: 'exponential', meanS: 45 },
+          lobbyCrowding: { thresholdPersons: 4, factorPerPerson: 0.08, maxFactor: 3 },
+        },
+      },
+      config,
+    ).cells[0];
+    expect(traceKeyOf(plain!.simulation)).toBe(traceKeyOf(tweaked!.simulation));
+    // …and they really did reach the cell, or the line above is true for the wrong reason.
+    expect(tweaked?.simulation.patience?.meanS).toBe(45);
+    expect(tweaked?.simulation.lobbyCrowding?.maxFactor).toBe(3);
   });
 });
 
