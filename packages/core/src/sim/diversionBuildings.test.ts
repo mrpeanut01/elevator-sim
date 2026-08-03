@@ -26,7 +26,7 @@ import type { DispatcherProfile, LoadedConfig } from '../config/types.js';
 import { Car } from '../model/car/index.js';
 
 import { BUILDING_IDS, load, withCallType } from './fixtures.test-helper.js';
-import { runSimulation } from './simulation.js';
+import { Simulation } from './simulation.js';
 import type { SimulationResult } from './types.js';
 
 let config: LoadedConfig;
@@ -45,7 +45,11 @@ const NEEDS_CREDENTIAL = new Set(['mixed-use-high-rise', 'secure-tower', 'vertic
  * that also wants to descend. Garden Apartments is run harder because at 2 % it generates two
  * passengers, and a run with two passengers cannot show a mechanism firing or failing to.
  */
-function runOn(buildingId: string, profileId: string): SimulationResult {
+function simulationFor(
+  buildingId: string,
+  profileId: string,
+  reportWindow?: 'full-run',
+): Simulation {
   const building = config.buildingsById.get(buildingId);
   const base = config.dispatcherProfilesById.get(profileId);
   if (building === undefined) throw new Error(`no building "${buildingId}"`);
@@ -53,7 +57,7 @@ function runOn(buildingId: string, profileId: string): SimulationResult {
   const dispatcherProfile: DispatcherProfile = NEEDS_CREDENTIAL.has(buildingId)
     ? withCallType(base, 'mobile-credential')
     : base;
-  return runSimulation({
+  return new Simulation({
     building,
     dispatcherProfile,
     trafficProfiles: config.trafficProfiles,
@@ -64,7 +68,12 @@ function runOn(buildingId: string, profileId: string): SimulationResult {
       directionalSplit: { incoming: 0.15, outgoing: 0.55, interfloor: 0.3 },
       arrivalRatePctPop5min: buildingId === 'garden-apartments' ? 12 : 2,
     },
+    ...(reportWindow === undefined ? {} : { reportWindow }),
   });
+}
+
+function runOn(buildingId: string, profileId: string): SimulationResult {
+  return simulationFor(buildingId, profileId).run();
 }
 
 describe('the diverting profile runs every shipped building without losing anybody', () => {
@@ -130,4 +139,42 @@ describe('the double-deck shaft, which is the only geometry that normalises', ()
     expect(result.conservation.balanced).toBe(true);
     expect(result.conservation.delivered).toBe(result.conservation.generated);
   });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The energy axis, which a shortened run could falsify without failing
+ * -------------------------------------------------------------------------- */
+
+describe('a diverted run is charged for the distance it actually drove', () => {
+  for (const buildingId of BUILDING_IDS) {
+    it(`${buildingId}: the energy proxy matches the fleet's own odometers`, () => {
+      // `Simulation.#depart` schedules one arrival and `#scheduleArrival` takes the travel sample
+      // when it fires — so a diversion, which **cancels that arrival and schedules another**, is
+      // the one operation that could make the two disagree. Two ways to be wrong and neither
+      // throws: sample the original hop and charge the fleet for distance nobody drove, or fire
+      // both arrivals and charge it twice.
+      //
+      // The odometer is the independent witness. `Car.completeArrival` adds
+      // `motion.profile.distanceM` for whichever motion actually completed, and the recorder sums
+      // the samples it was handed; they agree only if exactly one arrival fired per departure and
+      // it carried the diverted profile.
+      // **Over the whole run, not the default peak window.** The first draft of this compared
+      // `summary.energy.distanceM` against the odometer under the default `peak-5min` window and
+      // reported a threefold mismatch on every building — which the *control* immediately
+      // explained: `collective`, which diverts nothing, showed the same ratio. The two quantities
+      // were measuring different spans, not disagreeing. Kept as a note because the failure looked
+      // exactly like the bug this test is for.
+      const simulation = simulationFor(buildingId, 'collective-enroute', 'full-run');
+      const result = simulation.run();
+
+      const odometer = simulation.building.cars.reduce(
+        (total, car) => total + car.distanceTravelledM,
+        0,
+      );
+      expect(result.summary.energy.measured, buildingId).toBe(true);
+      expect(result.summary.energy.distanceM, buildingId).toBeCloseTo(odometer, 6);
+      expect(odometer, buildingId).toBeGreaterThan(0);
+      expect(result.stageActivity.diversions, buildingId).toBeGreaterThanOrEqual(0);
+    });
+  }
 });
