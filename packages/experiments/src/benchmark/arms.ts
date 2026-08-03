@@ -56,7 +56,10 @@
  * fail against.
  *
  * `data/dispatcher-profiles.json` ships **two** auction profiles, and that is one of the two
- * reasons {@link ARM_PROFILES} has eleven entries rather than nine — the other being that it ships
+ * reasons {@link ARM_PROFILES} has twelve entries rather than nine — the third is
+ * `collective-enroute`, `collective` plus `eligibility.enRouteDiversion` (`DECISIONS.md` § D205),
+ * which is a *mechanism* rather than a weight and so cannot be an arm by weight vector alone — the
+ * other being that it ships
  * **two** destination profiles, Phase 6a's Level-0 `destination-eta` and Phase 6b's Level-1
  * `destination-panel`, which are different *systems* rather than different weights (docs/09 § 1.1).
  * `config/schema.ts` carries an `auction` section and
@@ -99,9 +102,23 @@ export const DESTINATION_DISPATCH_PROFILE = 'destination-panel';
  * Not filtered, not reordered, and nothing dropped for losing. A profile that fails to beat the
  * baseline is a result about that profile.
  */
+/*
+ * **`collective-enroute` is bit-identical to `collective` at two of the three cells**, and that is
+ * the honest reading rather than a defect. `midtown-up-peak` and `secure-up-peak` are pure up-peak:
+ * cars run to the lobby empty and climb full, so a landing call in the direction a car is already
+ * travelling past is rare, and every pinned figure for the two arms matches to the last digit.
+ * `garden-residential` has mixed traffic and the arm separates there — ΔAWT −1.360 against
+ * `collective`'s −1.269, both relative to `nearest-car`.
+ *
+ * So this gate does not measure what the arm is for. `benchmark/enRouteDiversion.ts` does, on
+ * down-peak, where `DECISIONS.md` § D205 measured 58.2 % of down-travelling legs being driven past.
+ * The arm is here because every shipped profile must face the gate, not because the gate is where
+ * its case is made.
+ */
 export const ARM_PROFILES: readonly string[] = Object.freeze([
   'eta',
   'collective',
+  'collective-enroute',
   'energy-aware',
   'fairness-first',
   'capacity-aware',

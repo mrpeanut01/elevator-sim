@@ -45,9 +45,21 @@ pnpm-debug.log*
 .worktrees/
 
 # Finder / file-sync duplicates. A sync client on at least one dev machine creates
-# "name 2.ts" copies of every file during a large checkout. They are untracked, but the
-# vitest globs match them, so a polluted working tree produces a red suite that has
-# nothing to do with the code. Ignore them so `git status` stays readable; delete them
-# with:  git clean -n '* 2.*'   then   git clean -f '* 2.*'
+# "name 2.ts" copies of every file during a large checkout.
+#
+# They do NOT reach vitest: its glob is `src/**/*.test.ts`, and `week.test 2.ts` does not
+# match it. What they reach is everything that walks the tree itself — `tsc`'s
+# `include: ["src/**/*.ts"]`, the dead-code audits, `boundaries.test.ts`, `derive.test.ts`,
+# `documentation.test.ts`. On 2026-07-31 a polluted tree produced 21 failures with nothing
+# wrong in the code, and `dist/` copies made `process.test.ts` spawn a stale CLI for 5 more.
+#
+# Deleting them needs -x. These patterns make the files *ignored*, and `git clean` skips
+# ignored files unless told otherwise, so the obvious `git clean -f '* 2.*'` is a silent
+# no-op — it reports nothing and removes nothing. Preview, then delete:
+#
+#   git clean -nxd '* 2.*' '* 2'
+#   git clean -fxd '* 2.*' '* 2'
+#
+# `npm run review` fails when any are present, so CI says so before a confusing red suite does.
 * 2.*
 * 2

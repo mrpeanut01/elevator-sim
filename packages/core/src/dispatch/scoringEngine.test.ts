@@ -100,7 +100,14 @@ const SCALES = resolveNormalization();
 function contextFor(car: CarSnapshot, subject: DispatchCall): TermContext {
   const observation = observationFor(subject);
   const request = costRequestFor(subject, CONFIG, observation);
-  return { car, call: subject, request, estimate: estimateCost(car, request), at: 0, observation };
+  return {
+    car,
+    call: subject,
+    request,
+    estimate: estimateCost(car, request),
+    at: 0,
+    observation,
+  };
 }
 
 function fakeScore(carId: string, cost: number): CarScore {

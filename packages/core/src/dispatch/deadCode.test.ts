@@ -49,7 +49,12 @@ import { describe, expect, it } from 'vitest';
 const PACKAGES_DIR = fileURLToPath(new URL('../../../', import.meta.url));
 
 /** The modules audited. Both are Phase 5's, and both are where the four dead behaviours lived. */
-const AUDITED_MODULES = ['core/src/dispatch/policies', 'core/src/dispatch/predictor'] as const;
+const AUDITED_MODULES = [
+  'core/src/dispatch/policies', 'core/src/dispatch/predictor',
+  'core/src/analytical', 'core/src/config', 'core/src/dispatch/terms', 'core/src/kernel',
+  'core/src/metrics', 'core/src/model', 'core/src/model/car', 'core/src/physics/doors',
+  'core/src/physics/motion', 'core/src/random', 'core/src/sim', 'core/src/traffic',
+] as const;
 
 /**
  * Exports with no caller anywhere, each with the reason that is correct rather than a defect.
@@ -59,6 +64,62 @@ const AUDITED_MODULES = ['core/src/dispatch/policies', 'core/src/dispatch/predic
  * claim that it is unimportant.
  */
 const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
+/* ---- Added 2026-07-31, when the audit was extended from two directories to fourteen ---- */
+
+/*
+ * **`core` is a library, and that changes what "no caller" proves.**
+ *
+ * `viz` is an application: an export nothing there reaches is dead, full stop. `core` is imported
+ * by `experiments`, `cli` and `viz`, and its published surface is legitimately wider than any one
+ * consumer uses. So the entries below are claims that a symbol is **surface** — reachable, typed,
+ * and meant to be called from outside — and each is a claim a reader can check, not a shrug.
+ *
+ * What none of them may be is the Phase 5 defect: a *behaviour* that changes a run, wired to
+ * nothing. Every entry here is an accessor, a schema declaration or a formatter — none of them
+ * alters a simulation. A behavioural export with no caller belongs in DEAD_CANDIDATES below.
+ */
+
+// -- Motion introspection. `travelTime` is the term the cost query calls; these four expose the
+// S-curve's interior for plotting and for the oracle's own checks. Surface, not behaviour.
+'motion/profileDuration': 'S-curve introspection for plots and the closed-form oracle',
+'motion/distanceTravelledAt': 'S-curve introspection for plots and the closed-form oracle',
+'motion/speedAt': 'S-curve introspection for plots and the closed-form oracle',
+'motion/accelerationAt': 'S-curve introspection for plots and the closed-form oracle',
+
+// -- Distribution helpers. `summarize.ts` computes the reported percentiles through
+// `percentileOfSorted`; these are the ergonomic forms a report or a notebook reaches for.
+'metrics/median': 'distribution helper on the published surface',
+'metrics/percentiles': 'distribution helper on the published surface',
+'metrics/fractionAbove': 'distribution helper on the published surface',
+'metrics/waitPercentile': 'distribution helper on the published surface',
+
+// -- Invariant 8 schema declarations. Each package declares its tunables so a generic optimizer can
+// search without elevator knowledge. `DISPATCH_PARAMETERS` is the one the tuner consumes today;
+// the rest are the same contract for parameters no shipped search varies yet. They are data about
+// code, and a consumer outside this repository is exactly who they are for.
+'analytical/ANALYTICAL_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
+'metrics/METRICS_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
+'car/CAR_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
+'doors/DOOR_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
+'sim/SIM_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
+'traffic/TRAFFIC_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
+
+// -- Geometry and state accessors. Each reads a value object the run already has.
+'model/directionBetween': 'accessor over two floor indices',
+'car/totalMassKg': 'reads a load-sensor reading',
+'car/shaftServes': 'reads a car snapshot',
+'doors/maxStopSeconds': 'reads a door config',
+'doors/doorAccountingAt': 'reads a door machine state',
+'traffic/transferFloorsOf': 'reads a building',
+'traffic/passengersPer5Min': 'converts a rate; the handling-capacity unit CIBSE reports in',
+'traffic/inReportWindow': 'reads a template and an instant',
+
+// -- Documented constants. `CLOSED_FORM_*` are the Barney/CIBSE assumptions and the comparison rule
+// the oracle is judged by; `AWT_INVALID_GROUNDS` is the four-ground list § D108 fixed.
+'analytical/CLOSED_FORM_ASSUMPTIONS': 'the oracle contract, quoted by docs and asserted by tests',
+'analytical/CLOSED_FORM_COMPARISON_RULE': 'the oracle contract, quoted by docs and asserted by tests',
+'metrics/AWT_INVALID_GROUNDS': 'the four suppression grounds; consumed as a set by guards',
+
   // -- Stage 5 result accessors. The monitor returns a CapacityReassignmentResult; these read it.
   // The simulation counts crossings/migrations/held itself off the same result, so it needs none
   // of them, but a report or a Phase 7 objective over stage 5 does.
@@ -141,6 +202,30 @@ const isTest = (path: string): boolean =>
  */
 const isBarrel = (path: string): boolean =>
   basename(path) === 'index.ts' || path.replace(/\\/g, '/').endsWith('core/src/browser.ts');
+
+/**
+ * Does `source` *use* `name` as a value, rather than only passing it through?
+ *
+ * The refinement that separates a **registry** from a **barrel**, which sharing the filename
+ * `index.ts` had collapsed. `dispatch/terms/index.ts` imports all twelve cost terms and puts them
+ * in `COST_TERMS`, the array `policy.ts` and `parameters.ts` iterate — the single place the engine
+ * learns which terms exist. Excluding it wholesale for being called `index.ts` reported the entire
+ * shipped cost-term library as uncalled, which is the opposite of the truth and would have been
+ * "fixed" by writing twelve false entries into the allowlist.
+ *
+ * The original rule is kept exactly where it earned its place: a re-export is still not a caller.
+ * So both forms are stripped before looking — `export … from './x.js'` and the bare `export { x }`
+ * clause that a two-statement re-export uses — along with the `import` that created the binding.
+ * What is left is the file's own code, and a name surviving there is a use.
+ */
+const usesAsValue = (source: string, name: string): boolean => {
+  const body = code(source)
+    .replace(/export\s*\{[^}]*\}\s*from\s*['"][^'"]*['"]\s*;?/g, ' ')
+    .replace(/export\s*\{[^}]*\}\s*;?/g, ' ')
+    .replace(/export\s+\*\s*(?:as\s+\w+\s*)?from\s*['"][^'"]*['"]\s*;?/g, ' ')
+    .replace(/import\s+[^;]*?from\s*['"][^'"]*['"]\s*;?/g, ' ');
+  return new RegExp(`\\b${name}\\b`).test(body);
+};
 
 /** Named bindings a file imports, or re-exports from elsewhere. Never a bare textual match. */
 function boundNames(source: string): ReadonlySet<string> {
@@ -321,31 +406,84 @@ function audit(): Audit {
       .length;
     if (selfUses > 1) return false;
     return !all.some((path) => {
-      if (path === own || isTest(path) || isBarrel(path)) return false;
-      return bindings.get(path)?.has(symbol.name) === true;
+      if (path === own || isTest(path)) return false;
+      if (bindings.get(path)?.has(symbol.name) !== true) return false;
+      // A barrel counts only when it uses the symbol in its own code — see `usesAsValue`.
+      return !isBarrel(path) || usesAsValue(sources.get(path) ?? '', symbol.name);
     });
   });
 
   return { symbols, uncalled };
 }
 
+
+/**
+ * **Findings, not absolutions — the register the 2026-07-31 extension opened.**
+ *
+ * Extending this audit from two directories to fourteen surfaced 46 uncalled exports. Twelve were a
+ * scanner defect and were fixed rather than allowlisted (see `usesAsValue`: `terms/index.ts` is a
+ * *registry*, not a barrel, and reporting the entire shipped cost-term library as uncalled was the
+ * opposite of the truth). Twenty-seven are public surface, recorded above with the reason each is
+ * surface rather than behaviour.
+ *
+ * These seven are neither. Each is exported, each has a test, and **none has a caller in any
+ * shipped path** — the exact shape CLAUDE.md's standing requirement describes, and the shape that
+ * has landed eleven times here. They are listed rather than deleted because disposition is a
+ * decision per symbol — wire it, or delete it with its test — and this audit's deliverable is the
+ * classification. `viz`'s fifth audit worked the same way: it classified eight, and a later lane
+ * closed all eight.
+ *
+ * The sharpest is the replay pair. CLAUDE.md invariant 5 is *"every persisted run record carries
+ * its seed, so any run replays exactly"*, and `metrics/index.ts` documents the round trip in a
+ * worked example — `writeFileSync(path, serializeRunRecord(record))` then
+ * `new StreamSet(runSeed(parseRunRecord(...)))`. **`parseRunRecord` has a real caller and the other
+ * two do not**: `experiments/reports/persistence.ts` writes through `serializeRunSet`, and the
+ * singular-record writer it superseded is reachable only from its own tests. The reader half of a
+ * documented round trip is wired and the writer half is not.
+ *
+ * Four more have no reference anywhere outside their own file — not even a test that is not their
+ * own: `DEFAULT_DEPARTURE_GAP_S`, `legDurations`, `SIM_EVENT_TYPE_IDS`, `configError`.
+ */
+const DEAD_CANDIDATES: Readonly<Record<string, string>> = Object.freeze({
+  'metrics/serializeRunRecord':
+    'the writer half of the documented replay round trip; persistence.ts writes through serializeRunSet instead',
+  'metrics/runSeed':
+    'turns a stored seed back into the bigint StreamSet wants; named in the round-trip example, called by no shipped path',
+  'metrics/DEFAULT_DEPARTURE_GAP_S': 'no reference outside its own file',
+  'metrics/legDurations': 'no reference outside its own file',
+  'sim/SIM_EVENT_TYPE_IDS': 'no reference outside its own file',
+  'config/configError': 'no reference outside its own file',
+  // `car/stopFloorsOf` was here — "reads a car snapshot; only its own test calls it" — until
+  // `Car.divertFrontier` needed the shaft's route nodes in travel order to find a commit point
+  // (`DECISIONS.md` § D205). It now has a non-test caller on the shipped path, so the entry is
+  // deleted rather than reworded: an allowlist that keeps entries after their reason lapses is
+  // where dead code goes to be forgotten, and this file's own assertion says so.
+});
+
 /* -------------------------------------------------------------------------- *
  * The assertions
  * -------------------------------------------------------------------------- */
 
-describe('every export of dispatch/policies and dispatch/predictor has a caller or a stated reason', () => {
+describe('every export of the fourteen audited core modules has a caller or a stated reason', () => {
   const { symbols, uncalled } = audit();
 
-  it('scans both modules and finds the exports it is supposed to be auditing', () => {
+  it('scans every audited module and finds the exports it is supposed to be auditing', () => {
     // A scanner that silently matched nothing would pass every assertion below. These two names
     // are the modules' load-bearing entry points and their absence means the walk broke.
-    expect(symbols.length).toBeGreaterThan(40);
+    // 14 directories, not the original 2: a walk that silently reverted to the old scope would
+    // still clear 40, so the floor moves with the coverage it is guarding.
+    expect(symbols.length).toBeGreaterThan(400);
     expect(symbols.map((symbol) => symbol.key)).toContain('policies/createPolicyFor');
     expect(symbols.map((symbol) => symbol.key)).toContain('predictor/createArrivalModel');
+    // One load-bearing entry point from the newly-audited half, for the same reason.
+    expect(symbols.map((symbol) => symbol.key)).toContain('traffic/generateTrace');
+    expect(symbols.map((symbol) => symbol.key)).toContain('metrics/summarizeRun');
   });
 
   it('has no export that is dead — no caller and no recorded reason to have none', () => {
-    const unexplained = uncalled.filter((symbol) => !(symbol.key in PUBLIC_API_ONLY));
+    const unexplained = uncalled.filter(
+      (symbol) => !(symbol.key in PUBLIC_API_ONLY) && !(symbol.key in DEAD_CANDIDATES),
+    );
     expect(
       unexplained.map((symbol) => `${symbol.key} (${symbol.file})`),
       'these exports have no importer anywhere and no entry in PUBLIC_API_ONLY. Either something ' +
@@ -354,10 +492,27 @@ describe('every export of dispatch/policies and dispatch/predictor has a caller 
     ).toEqual([]);
   });
 
+  /*
+   * The register is a finding list, so it must be *visible* rather than merely tolerated. This
+   * asserts its exact size: closing one without editing this number fails, and so does adding a
+   * seventh silently. The number goes down, or it goes up with a reason — it does not drift.
+   *
+   * **7 → 6**, and this is the direction the comment above hopes for: `car/stopFloorsOf` acquired
+   * a non-test caller when `Car.divertFrontier` needed the shaft's route nodes in travel order
+   * (`DECISIONS.md` § D205). Closed by being used, not by being deleted or re-argued.
+   */
+  it('names every dead candidate, and the count is the one recorded', () => {
+    const open = uncalled.filter((symbol) => symbol.key in DEAD_CANDIDATES);
+    expect(open.map((symbol) => symbol.key).sort()).toEqual(Object.keys(DEAD_CANDIDATES).sort());
+    expect(open.length, 'dispose a candidate and lower this number; never raise it silently').toBe(6);
+  });
+
   it('keeps the allowlist honest: no entry may outlive the condition that justified it', () => {
     const uncalledKeys = new Set(uncalled.map((symbol) => symbol.key));
     const known = new Set(symbols.map((symbol) => symbol.key));
-    const stale = Object.keys(PUBLIC_API_ONLY).filter((key) => !uncalledKeys.has(key));
+    const stale = [...Object.keys(PUBLIC_API_ONLY), ...Object.keys(DEAD_CANDIDATES)].filter(
+      (key) => !uncalledKeys.has(key),
+    );
     expect(
       stale.map((key) => `${key} — ${known.has(key) ? 'now has a caller' : 'no longer exists'}`),
       'an allowlist that keeps entries after their reason lapses is where dead code goes to be ' +

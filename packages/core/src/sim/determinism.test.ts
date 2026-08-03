@@ -70,6 +70,74 @@ describe('the same seed and config replay exactly', () => {
     }
   }, 60_000);
 
+  /*
+   * **The diverting profile, which the two tests above do not reach.** `collective` and `eta` never
+   * cut a run short, so every replay assertion in this file was made against a kernel that
+   * schedules exactly one arrival per departure and never cancels one.
+   *
+   * `eligibility.enRouteDiversion` (`DECISIONS.md` § D205) breaks both of those: it replaces a
+   * car's motion mid-flight and **cancels the arrival event it supersedes**. Cancellation is
+   * exactly the operation that could reorder the queue — the kernel's contract is that a cancelled
+   * slot keeps its `(time, sequence)` position so the surviving events fire in the order a run that
+   * never scheduled it would (invariant 4), and that contract had no test behind it from this side.
+   *
+   * If it did not hold, nothing would crash. Runs would differ slightly between replications, every
+   * paired-t interval § D205 publishes would be measuring noise it created itself, and invariant 5
+   * — a seed replays a run exactly — would be quietly false for one profile.
+   */
+  it('is bit-identical across twelve runs of a profile that diverts mid-flight', () => {
+    const request = run('midtown-office', 'collective-enroute', 20260726, {
+      demand: {
+        directionalSplit: { incoming: 0, outgoing: 1, interfloor: 0 },
+        arrivalRatePctPop5min: 5,
+        peakWindowS: 300,
+      },
+      durationS: 900,
+    });
+
+    // A determinism test on a profile that never diverted would pass without exercising anything.
+    const first = runSimulation(request);
+    expect(
+      first.stageActivity.diversions,
+      'no run was cut short, so this asserts nothing about diversion',
+    ).toBeGreaterThan(0);
+
+    const expected = fingerprint(first);
+    for (let replication = 0; replication < 11; replication += 1) {
+      const repeat = runSimulation(request);
+      expect(fingerprint(repeat)).toBe(expected);
+      // The count too, not just the outcome: a run that diverted a different number of times and
+      // happened to land on the same fingerprint would be a different run reported as the same one.
+      expect(repeat.stageActivity.diversions).toBe(first.stageActivity.diversions);
+    }
+  }, 60_000);
+
+  it('is bit-identical when the diverting car is double-deck', () => {
+    // `vertical-city`'s `shuttle` is the only shipped bank with `servesFloorPairs`, so this is the
+    // only place `divertTo`'s stop-position normalisation runs at all — and it runs *inside* the
+    // cancel-and-reschedule path. Single-deck determinism would not cover it.
+    const profile = config.dispatcherProfilesById.get('collective-enroute');
+    expect(profile).toBeDefined();
+    if (profile === undefined) return;
+
+    const request = run('vertical-city', 'collective-enroute', 20260802, {
+      dispatcherProfile: withCallType(profile, 'mobile-credential'),
+      demand: {
+        directionalSplit: { incoming: 0, outgoing: 1, interfloor: 0 },
+        arrivalRatePctPop5min: 4,
+        peakWindowS: 300,
+      },
+      durationS: 900,
+    });
+
+    const first = runSimulation(request);
+    expect(first.stageActivity.diversions).toBeGreaterThan(0);
+    const expected = fingerprint(first);
+    for (let replication = 0; replication < 5; replication += 1) {
+      expect(fingerprint(runSimulation(request))).toBe(expected);
+    }
+  }, 120_000);
+
   it('is bit-identical on a multi-bank building with sky-lobby transfers', () => {
     const profile = config.dispatcherProfilesById.get('eta');
     expect(profile).toBeDefined();

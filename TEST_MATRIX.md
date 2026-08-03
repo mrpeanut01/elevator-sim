@@ -1,5 +1,28 @@
 # Test matrix
 
+> ## ↩️ Wave 13 — the coverage shape a behaviour needs, which is not the shape a feature needs
+>
+> Wave 13's coverage lands lane by lane in [`WAVE13_PLAN.md`](WAVE13_PLAN.md). One rule belongs
+> *here*, because it is about what this table can claim.
+>
+> **A row for a tunable is closed by a run, not by a control.** Every feature in
+> `docs/14` §§ 2–3 is a knob, and a knob is the exact shape this repository's dominant defect
+> takes: authored, schema-valid, unit-tested in isolation, and consulted by nothing. Such a knob
+> passes a component test, passes a schema test, passes a round-trip test, and does nothing. The
+> eleven instances in code all had tests.
+>
+> So a wave-13 row is closed only by a test that **moves the control and requires the run to
+> change, compared on the legs** — not on the emitted config, and not on a window statistic. A
+> window statistic is the weaker half of this: two runs can post the same AWT and route different
+> people to different floors, which is why [§ D170](DECISIONS.md) counted *26 journeys routed over
+> different floors* rather than a mean.
+>
+> This is the same rule as the wave-11 opening below, one level stricter. Wave 11 learned that a
+> fixture-only row is not a covered row, because a fixture proves the mechanism is correct and
+> cannot prove it is reached. Wave 13's addition: **a control-only row is not a covered row
+> either**, because a control proves the value arrives at the config and cannot prove it arrives at
+> the simulation.
+
 > ## ↩️ Wave 11 — coverage added, and the two shapes it found that a matrix row cannot express
 >
 > Wave 11's coverage is in [`WAVE11_PLAN.md`](WAVE11_PLAN.md) § 4 lane by lane. Two findings belong
@@ -323,3 +346,38 @@ behaviour — are what the sixteen surfaces enumerate, one cycle each.
 | The refuted mechanism is pinned by a test | the seven mechanism sites stay corrected | ✅ **built** — `validation/documentation.test.ts`, three ways: a claim with no refutation within 400 chars fails, a deleted correction fails, and `estimateCost.ts`'s exclusion is asserted in both directions. All three watched failing. **C23 closed** |
 | **The criterion measured on the building it names** | Phase 6's gate on `mixed-use-high-rise`, which § D27 dropped and § D99 owned | ✅ `benchmark/mixedUseHighRise.test.ts` + `saturationCensus.test.ts`, 72 pins. **Met by Level 0** (ΔTTD −21.239 / −2.072 / −2.116, all BETTER); **not met by Level 1** at any measured point |
 | The building's own scenario admits no paired comparison | mixed 40/30/30, every `role:"baseline"` profile 0/30 quotable, unserved **rising** as load falls | ✅ measured, reported as counts and never as an interval |
+
+## 6. Wave 13 — the building-behaviour program
+
+**Baseline confirmed 2026-07-31 at `866e6a1`**, on the relocated tree: **263 files / 4 896 tests,
+4 886 passed, 0 failed, 10 skipped**, 703.81 s, `tsc -b` clean, `review-gates` green across 583
+source files, all 981 pins and both identity digests reproducing. Confirmed rather than inherited —
+the figure it reproduces was measured while a sync client was rewriting the tree, which is a
+different claim from the same number measured on a stable one. **The skip count is 10 and has not
+moved**, which is the number to watch: a wave that quietly skips a test to go green moves it.
+
+**The rule every row below is judged by** is `docs/14` § 5 criterion 2, the roadmap's standing
+requirement pointed at a knob: **move the control and require the run to change, compared on the
+legs and never on a window statistic.** A control that fails this is deleted, not documented.
+Asserting on emitted config is not this test; asserting on a mean is not this test.
+
+| Step | Feature / control | Scenario that decides it | Status |
+|---|---|---|---|
+| T1 | Traffic seed separation (§ 1.1) | absent → byte-identical; present → crowd re-rolls while the machine holds; both seeds reported | ✅ landed `d52f347` — `sim/trafficSeedSeam.test.ts`, driven through `runSimulation` and compared on the legs |
+| T0 | Sky-lobby / escalator authoring (§ 5a) | adding a transport mode leaves every shaft's `servedFloorIds` **unchanged** and makes `recording.legs` **differ** — the split assertion `authoring.test.ts:858` already uses for access zones | 🔄 in lane |
+| T0 | `specFromBuilding` round trip | a building authoring `transportModes` survives spec → building → spec without losing them | 🔄 in lane — the loss is **verified**: `buildingFromSpec` emits no `transportModes` key at all |
+| T0 | Designer refuses what the loader refuses | every `transportModeSchema` violation (`connects` not two *different* declared floors, non-positive `traversalTimeS`, duplicate id) is refused **in the designer**, naming the field | 🔄 in lane — *a designer that can produce a config the loader rejects is worse than one that cannot produce it at all* |
+| T2 | **Byte-identity under `'v1'`** | all 981 pins and both identity digests unchanged with the flag absent | 🔄 in lane — **blocking; not negotiable and not weakened** |
+| T2 | The flag buys what it claims | under `v1` a group-size mean change shifts arrival *instants*; under `v2` it leaves them untouched and changes only group sizes. **Both directions, one test** | 🔄 in lane — written first and watched failing, per § 3 of the resume brief |
+| T2 | The model version is reported | `trafficModel` present on `SimulationResult` at `v2`, **absent** at `v1` | 🔄 in lane — absent-not-`undefined`, because `transportIdentity.test.ts` digests the whole result and any always-present key would move every digest. The `d52f347` precedent, verified rather than assumed |
+| T3–T6 | mass, group-size curve, day variation, patience, crowding, stairs, teaching surface | one criterion-2 test per knob; day variation additionally inside the CRN pairing (paired SE must not rise); abandonment and stairs reported **beside** AWT, never folded into it | ⬜ blocked on T2 |
+
+### Standing traps this wave's rows exist to catch
+
+| Trap | Why a normal green suite would miss it |
+|---|---|
+| A tunable authored, schema-valid, unit-tested and consulted by nothing | The eleven-times-shipped defect. It passes every other check this repository runs — which is why the criterion is a *run*, on the legs |
+| A pin edited to fit a changed tree | Both trees look green. § D196/§ D201 cost a wave to unpick exactly this, and neither pin set was recoverable afterwards |
+| Abandonment flattering AWT | It removes the longest waits from the sample, so AWT *improves* while fewer people are served. § D106's energy rule on a second axis (R27) |
+| Day variation leaking outside the shared trace | Paired variance inflates and the power CRN buys is destroyed — **while every test still passes** (R28) |
+| A fixture-only suite | It cannot distinguish *the mechanism is correct* from *the mechanism is reached* (R26). At least one case per surface must originate in a real run |

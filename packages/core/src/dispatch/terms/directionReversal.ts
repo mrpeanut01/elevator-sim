@@ -68,7 +68,7 @@ export function assessDirectionReversal(
   call: Pick<DispatchCall, 'floorId' | 'direction'>,
 ): ReversalAssessment {
   const direction = car.motion?.direction ?? car.direction;
-  const fromIndex = car.motion === undefined ? car.floorIndex : car.motion.toFloorIndex;
+  const fromIndex = referenceIndexOf(car);
   const target = car.shaft.floorsById.get(call.floorId);
 
   if (direction === undefined || target === undefined) {
@@ -94,7 +94,33 @@ export function assessDirectionReversal(
   });
 }
 
-/** The direction changes the call forces, `0`–`2`. */
+/**
+ * Where the car is free to act **from**.
+ *
+ * A standing car acts from where it stands. A moving car normally acts from its destination,
+ * because it cannot stop short of it — `Car.departFor` refuses a second move and the kernel
+ * holds exactly one arrival event per run. When the snapshot carries a commit point it acts
+ * from **that** instead: the nearest floor ahead it can still decelerate into, which
+ * `Car.divertFrontier` computes from the two motion profiles and
+ * `Simulation.#considerDiversion` then actually delivers.
+ *
+ * The fallback when a moving car has no frontier is the destination, not the current floor.
+ * That matters: a car mid-hop with nowhere left to stop short really is committed, and
+ * pretending otherwise is exactly the disagreement between eligibility and physics this
+ * module's header warns about — the cheaper of two inconsistent answers wins every time.
+ */
+function referenceIndexOf(car: CarSnapshot): number {
+  if (car.motion === undefined) return car.floorIndex;
+  return car.divertFrontierIndex ?? car.motion.toFloorIndex;
+}
+
+/**
+ * The direction changes the call forces, `0`–`2`.
+ *
+ * Reads nothing but the snapshot, so the weighted term and the hard constraint measure the
+ * same geometry as each other and as `projectRoute`. Whether diversion is permitted is already
+ * baked into `car.divertFrontierIndex` by the runner — see `CarSnapshot`.
+ */
 export function directionReversals(context: TermContext): number {
   return assessDirectionReversal(context.car, context.call).reversals;
 }

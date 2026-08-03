@@ -285,6 +285,10 @@ export function resolveDispatchConfig(
         options.eligibility?.allowOppositeDirectionPickup ??
         eligibility?.allowOppositeDirectionPickup ??
         DISPATCH_DEFAULTS.allowOppositeDirectionPickup,
+      enRouteDiversion:
+        options.eligibility?.enRouteDiversion ??
+        eligibility?.enRouteDiversion ??
+        DISPATCH_DEFAULTS.enRouteDiversion,
       maxLoadFactorForAssignment: nonNegative(
         options.eligibility?.maxLoadFactorForAssignment ??
           eligibility?.maxLoadFactorForAssignment ??
@@ -409,6 +413,33 @@ export function weightSetSourceFrom(
     weightsByProfileId.set(profile.id, resolveWeights(profile.weights, profile.id).weights);
   }
   return Object.freeze({ patternSwitching, weightsByProfileId });
+}
+
+/**
+ * Reasons a car is refused *for now* rather than *at all*.
+ *
+ * Both are geometry: `hardConstraint` here is `noDirectionReversal`, and `oppositeDirection` is the
+ * softer filter over the same question. A car refused for either is refused for the direction it
+ * happens to be pointing, which changes every time it arrives somewhere. Everything else in
+ * `INELIGIBILITY_REASONS` — service mode, service zone, access, overload, bypass, the load ceiling
+ * — is a fact about what the car *can* do, and a call held by such a car really is stranded.
+ *
+ * Deliberately **not** the same set as `Simulation`'s `STRUCTURAL_INELIGIBILITY`, which answers a
+ * different question: that one is "will retrying this call ever help?", where access and service
+ * zoning are permanent and a load ceiling is not. Here the axis is "will this car's own answer
+ * change on its own?", where the load ceiling is durable enough to surrender a call over and the
+ * direction is not. Two sets, two questions, and collapsing them would be wrong in both places.
+ */
+const TRANSIENT_INELIGIBILITY: ReadonlySet<string> = new Set(['hardConstraint', 'oppositeDirection']);
+
+/** Whether the incumbent was refused for a reason that will change as it moves. */
+function isTransientlyIneligible(
+  rejected: readonly EligibilityVerdict[],
+  incumbentId: string | undefined,
+): boolean {
+  if (incumbentId === undefined) return false;
+  const verdict = rejected.find((entry) => entry.carId === incumbentId);
+  return verdict?.reason !== undefined && TRANSIENT_INELIGIBILITY.has(verdict.reason);
 }
 
 function isHardConstraintId(id: string): id is HardConstraintId {
@@ -936,22 +967,43 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
       }
 
       const incumbent = scores.find((score) => score.carId === incumbentId);
-      // An incumbent that is no longer eligible at all — it filled up, went out of service, or
-      // a hard constraint now rejects it — has nothing to defend, so the hysteresis does not
-      // apply and the call moves. Holding a call on an ineligible car is how a floor starves.
+      // An incumbent that is no longer eligible has nothing to defend, so the hysteresis does not
+      // apply and the call moves — holding a call on an ineligible car is how a floor starves.
+      //
+      // **But "ineligible" is two different things, and treating them alike saturated a bank.**
+      // A car that filled up or left service cannot serve this call at all, and the call must
+      // move. A car refused by `noDirectionReversal` is refused for *where it is pointing right
+      // now*, which is the one thing about it that is guaranteed to change: it is on its way
+      // somewhere, it will settle its direction on arrival, and it was chosen because it is the
+      // car that should serve this landing. Yanking the call restarts the clock, and the car it
+      // moves to is under exactly the same constraint and becomes ineligible in its turn.
+      //
+      // Measured on Midtown Office down-peak at 3 %, `collective` — the one shipped profile
+      // declaring the constraint — under `until-commitment`: **8 of 11 reassignments took this
+      // escape hatch**, hysteresis held only 3 calls, and AWT went from 32.3 s to 332.2 s with the
+      // saturation flag set. Without the hard constraint the same profile reassigns 3 times, none
+      // of them this way, holds 21 by hysteresis, and lands at 36.9 s. See `DECISIONS.md` § D206.
+      //
+      // So a *transient* refusal defends its call like any other incumbent, and only a durable one
+      // surrenders it. This is not a tunable: "may a call be taken from the car that is on its way
+      // to it, because that car is momentarily pointing the wrong way" has one defensible answer.
+      const stillDefending =
+        incumbent === undefined && isTransientlyIneligible(rejected, incumbentId);
       const holds =
-        incumbent !== undefined &&
+        stillDefending ||
+        (incumbent !== undefined &&
         !clearsHysteresis(
           incumbent.cost,
           incumbent.estimate.etaSeconds,
           best.cost,
           best.estimate.etaSeconds,
           this.config.dispatch.reassignmentHysteresisS,
-        );
+        ));
       if (holds) {
         return this.#record(lifecycle, 'retained', 'below-hysteresis', at, scores, rejected, 'reassignment', {
-          cost: incumbent.cost,
-          etaSeconds: incumbent.estimate.etaSeconds,
+          ...(incumbent === undefined
+            ? {}
+            : { cost: incumbent.cost, etaSeconds: incumbent.estimate.etaSeconds }),
         });
       }
 

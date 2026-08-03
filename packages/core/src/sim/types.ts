@@ -356,6 +356,18 @@ export interface SimulationConfig {
   readonly dispatcherProfiles?: DispatcherProfiles | undefined;
   /** Master seed. Persisted with the record, and the whole of invariant 5. */
   readonly seed: number | bigint;
+  /**
+   * Optional second seed for the demand streams — *who turns up*, as opposed to how the machine
+   * behaves (docs/14 § 1.1).
+   *
+   * Omit it and every stream derives from {@link seed} exactly as before, byte for byte. Supply it
+   * and the crowd can be re-rolled with the building held fixed, or held fixed while the building
+   * changes — the second being common random numbers as a knob rather than as a convention.
+   *
+   * **Invariant 5 takes both.** When this is set, a record carrying only {@link seed} cannot replay
+   * the run, so {@link SimulationResult.trafficSeed} reports it and the caller must persist it.
+   */
+  readonly trafficSeed?: number | bigint | undefined;
   /** `rise-and-fall` (default), `constant-iso`, or an already-resolved template. */
   readonly demandTemplate?: DemandTemplateId | ResolvedDemandTemplate | undefined;
   /**
@@ -595,6 +607,16 @@ export interface StageActivity {
   readonly capacityCrossings: number;
   /** Calls stage 5 moved off a car that had just filled up. */
   readonly capacityMigrations: number;
+  /**
+   * Runs cut short en route under `eligibility.enRouteDiversion` — a moving car given a stop
+   * at a floor it had not yet committed past.
+   *
+   * Zero under every profile that leaves the setting off, which is every profile the project
+   * measured before diversion existed. A non-zero count is the only evidence from outside the
+   * model that the setting is doing something, and it is on the *result* for the reason the
+   * rest of {@link StageActivity} is: `runSimulation` discards the instance.
+   */
+  readonly diversions: number;
   /** Calls it looked at and left where they were, with a gate that kept them. */
   readonly capacityHeld: number;
   /**
@@ -742,9 +764,16 @@ export interface SimulationResult {
   readonly runId: string;
   /** Master seed as a decimal string, matching `record.seed`. */
   readonly seed: string;
+  /**
+   * The demand seed as a decimal string, present only when the run was given one.
+   *
+   * Absent — not equal to {@link seed} — when unset, because "there was no traffic seed" and "the
+   * traffic seed matched the run seed" are different runs that must not replay as one another.
+   */
+  readonly trafficSeed?: string;
   readonly buildingId: string;
   readonly dispatcherProfileId: string;
-  /** The trace this run was driven by. Replayable from {@link seed} alone. */
+  /** The trace this run was driven by. Replayable from {@link seed} — and {@link trafficSeed}, when the run carries one. */
   readonly trace: PassengerTrace;
   readonly record: RunRecord;
   readonly summary: RunSummary;

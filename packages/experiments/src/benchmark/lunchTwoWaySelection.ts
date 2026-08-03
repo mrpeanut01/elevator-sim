@@ -636,7 +636,13 @@ export async function runLunchTwoWaySelectionStudy(
 export const PINNED_LUNCH_COUNTS: Readonly<Record<string, number | string | boolean>> =
   Object.freeze({
     'treatment/reference': 'auction-multi-round',
-    'treatment/quotable-census-arms': 12,
+    // 12 → 13 when `collective-enroute` shipped (`DECISIONS.md` § D205). The count is of arms the
+    // census **measures**, and the census still measures every shipped profile; what § D205
+    // restricted is which of them may be *elected* reference. That both `reference` pins below are
+    // unchanged at `auction-multi-round`, and the verdict with them, is the evidence that the
+    // restriction did its job: a profile that beats the baseline is now visible in the census
+    // without silently becoming it.
+    'treatment/quotable-census-arms': 13,
     'treatment/regime-count': 3,
     'treatment/preference-changes': 21,
     'treatment/learned-identical-replications': 2,
@@ -644,7 +650,7 @@ export const PINNED_LUNCH_COUNTS: Readonly<Record<string, number | string | bool
     'treatment/learned-pattern-changes': 8,
     'treatment/no-op-weight-sets': 0,
     'control/reference': 'auction-multi-round',
-    'control/quotable-census-arms': 12,
+    'control/quotable-census-arms': 13,
     'control/regime-count': 3,
     'control/preference-changes': 30,
     'control/learned-identical-replications': 0,

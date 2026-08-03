@@ -1,19 +1,37 @@
 # elevator-sim
 
-A configurable elevator traffic simulator for designing and benchmarking **smart dispatch algorithms**.
+**A tower-management sim with a real engine underneath.**
 
-Build a building — floors, elevator banks, security zones — generate realistic passenger
-traffic, and race dispatch strategies against each other under statistically valid conditions.
+Design a building — floors, elevator banks, security zones — fill it with people who have
+somewhere to be, and watch the morning rush hit. Then change something and find out whether it
+actually helped.
 
-## Why
+The twist is that nothing here is faked for effect. The cars obey jerk and acceleration limits, the
+crowds arrive in batches with weights the load sensor can feel, and when you ask *"did that help?"*
+the answer comes back with a confidence interval — or an honest refusal, if the run cannot support
+one. **It plays like a game and it measures like an instrument.**
 
-Elevator group control is a genuinely hard scheduling problem: continuous state space,
-partially observable, non-stationary demand, and hard physical constraints. It is also
-one where the "obvious" improvements frequently fail to show up in the data — a faster
-elevator can measurably *increase* average waiting time if the gain is smaller than the
-statistical noise.
+## The loop
 
-This project exists to make those comparisons rigorous.
+1. **Build** — pick a tower or author your own: floors, banks, car specs, service and access zones.
+2. **Populate** — choose a traffic pattern. Morning up-peak, lunch two-way, evening down-peak, or
+   your own demand template.
+3. **Run the day** — watch cars fill, doors dwell, queues build on the floors that are struggling.
+4. **Change one thing** — a dispatcher, a weight, an extra car, a faster motor.
+5. **Race them** — the same passengers, to the second, against both configurations. The simulator
+   tells you whether the difference is real or whether you are looking at noise.
+
+Step 5 is the whole point, and it is where most tower sims quietly cheat.
+
+## Why it is a hard game to build honestly
+
+Elevator group control is a genuinely hard scheduling problem: continuous state space, partially
+observable, non-stationary demand, hard physical constraints. It is also one where the *obvious*
+improvement frequently fails to show up in the data — **a faster elevator can measurably increase
+average waiting time** if the gain is smaller than the statistical noise. Buy the upgrade, watch the
+number get worse, conclude something false.
+
+A sim that wants to be satisfying will round that away and give you the win. This one will not.
 
 ## How much you can trust the numbers
 
@@ -22,6 +40,8 @@ writing it. Most of the engineering effort here has gone into *refusing to say t
 aren't supported* rather than into producing more output. If you have ever been handed a
 traffic study whose conclusion evaporated when someone re-ran it, this section is about why
 that is difficult to do here.
+
+Read it as the rules of the game. They are unusually strict, and the strictness is the feature.
 
 ### 1. It declines to answer when it can't answer honestly
 
@@ -176,19 +196,45 @@ Neither change fixed a bug. Both removed a way for the *next* person to introduc
 
 ### What this does not claim
 
-It is a simulation, not a building. It does not model passenger psychology, lift-lobby crowd
-flow, or anyone deciding to take the stairs. Where a limitation is known it is written down in
-[`docs/07-handoff.md`](docs/07-handoff.md) § 8 with its measurement rather than left for you to
-discover — including the ones that are inconvenient.
+It is a simulation, not a building. The people in it are demand, not characters: they arrive, they
+wait, they board, they leave. **Today it does not model passenger psychology, lift-lobby crowd flow,
+or anyone deciding to take the stairs** — a rider will queue for twenty minutes without ever
+glancing at the stairwell, which no real person does.
+
+That gap is the difference between a good engine and a building you believe in, and closing it is
+active work rather than an aspiration — see [Goals](#goals). The constraint it has to respect is the
+one that governs every model change here: **new behaviour arrives opt-in and off by default, so a
+run that does not ask for it is bit-identical to the run before it existed.** A traffic-model change
+that silently moved a published figure would invalidate far more than the feature was worth.
+
+Where a limitation is known it is written down in [`docs/07-handoff.md`](docs/07-handoff.md) § 8
+with its measurement rather than left for you to discover — including the ones that are
+inconvenient.
 
 ## Goals
+
+**Shipped:**
 
 - **Configurable buildings** — arbitrary floors, multiple banks, service zones, access-control zones
 - **Realistic physics** — S-curve motion profiles with acceleration and jerk limits, door timing, load weighing
 - **Realistic traffic** — office / residential / hotel / mixed-use arrival profiles with peak templates
 - **Pluggable dispatchers** — nearest-car, ETA, zoned, auction-based and destination-dispatch, all
-  as weight vectors in `data/`, not classes. A *learned* dispatcher is deferred scope, not shipped
+  as weight vectors in `data/`, not classes
 - **Statistically valid results** — multi-replication runs, common random numbers, sequential confidence-interval stopping
+
+**In design — the building-behaviour program.** These are what turn a correct engine into a tower
+you believe in, and each is scoped to arrive opt-in and off by default so no shipped figure moves:
+
+- **Richer traffic variance** — an independent traffic seed so demand can be re-rolled without
+  disturbing anything else, an authored body-mass distribution, a group-size curve you can shape,
+  and day-to-day variability so Tuesday is not a copy of Monday
+- **Passenger behaviour** — patience and abandonment, lift-lobby crowding that slows boarding when a
+  lobby is packed, and stair-taking with the asymmetry real people have (a flight down is cheap, a
+  flight up is not)
+- **A learned dispatcher you can teach** — the surface for training a policy against your own
+  building and traffic, with the same acceptance bar every other dispatcher faces. Measured three
+  times so far and refused three times ([§ D145](DECISIONS.md), [§ D156](DECISIONS.md),
+  [§ D200](DECISIONS.md)) — the refusals are published above the wins
 
 ## Target smart behaviors
 
@@ -217,6 +263,7 @@ discover — including the ones that are inconvenient.
 | [Experience layer contract](docs/10-experience-layer-contract.md) | Phase 9's design: the rules that keep a gamified surface honest, novice/expert modes, a schema-generated dispatcher and traffic editor, and access-zone credentials |
 | [TWIN shaft contract](docs/11-twin-shaft-contract.md) | Two independently driven cars in one shaft, designed and not built: the shaft model, the speed-dependent separation constraint, the deadlock invariant and the property that catches it, and an acceptance criterion written before the implementation |
 | [Design handoff](docs/12-design-handoff.md) | The Claude Design handoff the viewer is built to, the requirements checklist extracted from it, the gap analysis against the shipped viewer, the backend changes the front end required, and every deviation with the constraint that forced it |
+| [Building behaviour contract](docs/14-building-behaviour-contract.md) | The designed-not-built program that makes the sim read as a building: an independent traffic seed, body-mass and group-size distributions you can shape, day-to-day variability, passenger patience and abandonment, lift-lobby crowding, stairs with the up/down asymmetry real people have, and the surface for teaching a learned dispatcher. Every feature opt-in and byte-identical when unused, with the acceptance criteria written before the implementation and the sequencing forced by what can move a published number |
 | [Phase 6c re-measurement handover](docs/13-phase-6c-handover.md) | The pre-registered § D162 protocol, written to be executed cold in its own session: the five conditions and which already hold, the gate itemised, the saturation census that must come first because no budget may be inherited, and what an acceptance would and would not be allowed to say. A third refusal is a permitted outcome — and is now the recorded one (`benchmark/lunchTwoWaySelection.ts`) |
 
 Machine-readable configuration lives in [`data/`](data/), and the design the viewer is built to is

@@ -63,13 +63,63 @@ export interface RunOptions {
 }
 
 /** `GenerateOptions` derived from a loaded config, so ids stay data (CLAUDE.md invariant 7). */
+/**
+ * The dispatcher profiles the **recorded** corpus is indexed against.
+ *
+ * A fuzz case is a seed decoded against an option space, and the dispatcher axis of that space is
+ * the shipped profile list. So adding a profile to `data/dispatcher-profiles.json` re-maps every
+ * seed: `caseFromSeed(1_001_074, …)` stops naming the eleven-floor single-car building whose
+ * 922.7 s wait closed `fuzz-1001074` and names something else instead, with the same seed and a
+ * different meaning. Nothing fails loudly — the reproduction simply reproduces a different run.
+ *
+ * That is a **regression record losing its subject**, so the record declares its own axis. Frozen
+ * at the twelve profiles shipped when the deep-tier findings were recorded (`DECISIONS.md` § D205
+ * added the thirteenth); a case recorded against a later library declares its own list beside it.
+ *
+ * The *campaign* deliberately does not use this — new profiles should be fuzzed, and a seed that
+ * re-maps in a search is a seed doing its job. Only the pinned reproductions need stable identity.
+ */
+export const CORPUS_DISPATCHER_PROFILE_IDS: readonly string[] = Object.freeze([
+  'nearest-car',
+  'eta',
+  'collective',
+  'energy-aware',
+  'fairness-first',
+  'capacity-aware',
+  'predictive-balanced',
+  'auction',
+  'auction-multi-round',
+  'zoned-uppeak',
+  'destination-eta',
+  'destination-panel',
+]);
+
 export function generateOptionsFrom(
   config: LoadedConfig,
   space?: GenerateOptions['space'],
+  /**
+   * The dispatcher axis, by id and in this order. Defaults to every shipped profile — the right
+   * behaviour for a search. Pass {@link CORPUS_DISPATCHER_PROFILE_IDS} to reproduce a recorded
+   * case, whose seed only means what it meant against the library it was found under.
+   */
+  profileIds?: readonly string[],
 ): GenerateOptions {
+  const byId = new Map(config.dispatcherProfiles.profiles.map((profile) => [profile.id, profile]));
+  const profiles =
+    profileIds === undefined
+      ? config.dispatcherProfiles.profiles
+      : profileIds.map((id) => {
+          const profile = byId.get(id);
+          if (profile === undefined) {
+            throw new Error(
+              `Fuzz option space asks for dispatcher profile "${id}", which data/dispatcher-profiles.json does not declare. A corpus indexed against a profile that no longer ships cannot reproduce the case it recorded.`,
+            );
+          }
+          return profile;
+        });
   return {
     elevatorSpecs: config.elevatorSpecs,
-    dispatcherProfiles: config.dispatcherProfiles.profiles,
+    dispatcherProfiles: profiles,
     trafficProfileIds: config.trafficProfiles.profiles.map((profile) => profile.id),
     ...(space === undefined ? {} : { space }),
   };

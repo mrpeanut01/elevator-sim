@@ -284,10 +284,20 @@ describe('Phase 6c, measured against the criterion written before it', () => {
     const reference = result.census.rows.find(
       (row) => row.profileId === result.census.referenceProfileId,
     );
+    // Best among **candidates**. `collective-enroute` beats the reference here (53.506 s against
+    // 53.742 s) and is deliberately not eligible to become it: it post-dates the pre-registration
+    // this cell's figures were measured under. `DECISIONS.md` § D205; the exclusion is
+    // `PRE_REGISTERED_REFERENCE_CANDIDATES`, and the row is still measured and still published.
     for (const row of result.census.rows) {
-      if (!row.quotable) continue;
+      if (!row.quotable || !row.referenceCandidate) continue;
       expect(row.meanTtdS, row.profileId).toBeGreaterThanOrEqual(reference?.meanTtdS ?? 0);
     }
+
+    // The excluded profile is visible rather than absent: a reader can see that it wins, which is
+    // the whole difference between "not eligible" and "not measured".
+    const outside = result.census.rows.filter((row) => !row.referenceCandidate);
+    expect(outside.map((row) => row.profileId)).toEqual(['collective-enroute']);
+    expect(outside.every((row) => Number.isFinite(row.meanTtdS) || !row.quotable)).toBe(true);
   }, TIMEOUT_MS);
 
   it('budgets inside the 50–200 band and never above its own census ceiling', async () => {

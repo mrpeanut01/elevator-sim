@@ -76,22 +76,37 @@ import {
  * Regenerated on this tree, because the digest is a different function and an inherited value would
  * be meaningless. What makes them trustworthy is that **both CI platforms reproduce them**.
  */
+/**
+ * **Re-pinned for `stageActivity.diversions`, and the delta was proved rather than assumed.**
+ *
+ * `structuralDigestOfResult` hashes the whole `SimulationResult`, so it moves when the result
+ * grows a *field* just as surely as when a run changes. `eligibility.enRouteDiversion`
+ * (`DECISIONS.md` § D205) added one always-zero counter to `StageActivity`, and all fifteen
+ * digests below moved on that alone.
+ *
+ * The claim that nothing else moved is checked, not asserted: deleting `stageActivity.diversions`
+ * from the cloned result before hashing reproduces **every** superseded digest exactly — for
+ * example `garden-apartments|nearest-car` returns to `80247759f477…` and `midtown-office|collective`
+ * to `3bd0fa8bc0a8…`. `headlineDrift` below is the standing check on the same question in units an
+ * engineer can read, and it is empty for all fifteen. So these buildings still run exactly as they
+ * did; the record describing the run is one key wider.
+ */
 const BASELINE_STRUCTURAL: Readonly<Record<string, string>> = {
   'garden-apartments|nearest-car':
-    '80247759f477adbf1b462a3a5729f2e3287b459a910281c20c6c5c8578832f46',
-  'garden-apartments|eta': '29971d4d1f911b8293f33fb4da2f09f63b66da61033ac37dc527326e0999696b',
-  'garden-apartments|collective': '6c65bfdc0def833da5b85054aba3bdb5ff303e34cc34d44c25f1cbb509e11b95',
-  'midtown-office|nearest-car': '6586eda16839a18e64fecc1bff1a658eb925c8e83e304e2ea59efb3f95eb02aa',
-  'midtown-office|eta': 'b861089efbfc5c9106980ab06196279f2bc1c181e9102f4450ea56bfd8d713f4',
-  'midtown-office|collective': '3bd0fa8bc0a8428cbe601c1ce1bd2735c9fa407d639ce3f4ef9e641ec60f03c7',
+    '63a070bcc4e255ff0034744cb11f633e5c8b4fb55f1bb87efd4f5fce11ef4706',
+  'garden-apartments|eta': '515017af532ab0927f67718044c9d1b822c448bc4bb3e53ebeb93301fd05e444',
+  'garden-apartments|collective': '954516d3e35e14e306852fb30a53d1e091f01c7f08c387a11be2d8213c0bfb1d',
+  'midtown-office|nearest-car': '726a75c4127cefaaa755de5be9f76445230d3cb109c60e9d7bc1090d80c16add',
+  'midtown-office|eta': '7a26950af349e3f7573bfc0a63ff11efac034fbbfdf617a822dbc4500c9b852c',
+  'midtown-office|collective': '1387235946badd1db220427c45e166a6aa4b1c6bc241696fad602e9000f13b71',
   'mixed-use-high-rise|nearest-car':
-    '7f0e53938cbf82355ab887c73e81cdb67a59d71823b2ab4e9305849e4711d5ae',
-  'mixed-use-high-rise|eta': '3434557bb0a40088c63b0751b9950de395d7218278bf30fb6871b9fa79eecfc3',
+    'faa196eed76f6dce35c66cb5fcd558013434444d5edef6592b3c7ba2545a8160',
+  'mixed-use-high-rise|eta': 'de9175e1234aa8b59147d4d9a7a1cbf50377eb3e8589c590af1f8a5b25b77dae',
   'mixed-use-high-rise|collective':
-    'aae8df80f22c6d791186360cca6311d584d39296f54f14c56874bf7805ea42a7',
-  'secure-tower|nearest-car': 'f65085fb01dc47bab3ca522c179e497a794e86eae40c84325c0f8defe21ac362',
-  'secure-tower|eta': '5cb5101eeb3b0dc9e3779cdb11a2fa6aa68f6285f08a10b041a2589f47eac66e',
-  'secure-tower|collective': 'e20c72cbfe1981e1a0329f8be27a21b078cc7181ea232f6714ed922720f5d5c9',
+    '475da70ec7d63c70e6c295613a5bcf5c84f6aa2b6b75bc12fe9b4ec3bb4c9029',
+  'secure-tower|nearest-car': 'b9e84186667c2d36b66ad5f0780cd8c5182a54ac50e55c0a042160de5127b133',
+  'secure-tower|eta': '80355745cc6cf5f44b0f76c644ec79ef2777ce4308418cc11ef1a6570bc80e28',
+  'secure-tower|collective': '6cc88ec607ffddaac4d923aa177794147d7a7bfd19a59cac99c83644ca8d590e',
 };
 
 /**
@@ -103,9 +118,9 @@ const BASELINE_STRUCTURAL: Readonly<Record<string, string>> = {
  * list of tests that cannot fail.
  */
 const MOVED_STRUCTURAL: Readonly<Record<string, string>> = {
-  'vertical-city|nearest-car': 'a7c09984f2f2d050df7e1a470c4f5217da44922c37579bc40907c07778eaba34',
-  'vertical-city|eta': '409eae733a067b212269fd4bca5af26c0d5c42b9a3a0af2f646caefe96d5adbb',
-  'vertical-city|collective': '66654ec2533bffe860511e9e8d97fbd6dc970d4d1b07caac8bbe24cb763cf8b1',
+  'vertical-city|nearest-car': '7be18e22844a6e82588f3949b302b21610a0fd5ce299734f8ff682f36f780055',
+  'vertical-city|eta': 'db9695ba7c6e35976101fda19bf1a337b496afc4a8f683f9106b258f2be0be02',
+  'vertical-city|collective': '611deab45802ff9cbef16f611a07b0ccfcbe4844b454af95f37b8aeddb8a3078',
 };
 
 /**

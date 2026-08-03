@@ -721,3 +721,170 @@ defect fixes, the dead-candidate dispositions and the Phase 6c measurement — *
 tests, 4 873 passed, 10 skipped**, `tsc -b` clean, 1 918 s, Node v26.5.1, serial on an idle
 machine, **on the pushed tree at `a8acf65`**. Every task on the wave board is landed; the wave's
 verdicts are § D187–§ D200, and no phase marker moved in either direction.
+
+---
+
+# Wave 13 — 2026-07-31
+
+**Scope:** the building-behaviour program, `docs/14-building-behaviour-contract.md` steps 0–6 —
+richer traffic variance, passenger behaviour, and a learned dispatcher that can be taught. Board:
+[`WAVE13_PLAN.md`](WAVE13_PLAN.md).
+
+**What makes this wave different from 1–12:** those closed findings, built a design handoff, and
+audited what already existed. This one **adds behaviour**, which is the thing this repository is
+worst at adding safely — the signature defect has landed eleven times in code and once in `data/`,
+and §§ 2–3 of the contract are almost entirely new tunables. The wave's rule is therefore
+`docs/14 § 5` criterion 2: **move the control and require the run to change, on the legs.**
+
+| ID | Unit | Branch | Depends | Status |
+|---|---|---|---|---|
+| T1 | Traffic seed separation (§ 1.1) | — | — | ✅ landed `d52f347` — `StreamSet(seed, { trafficSeed })` reaching `runSimulation` and reported on the result; 4 885 → 4 896 tests, no existing figure moved |
+| T0 | Sky-lobby / escalator authoring in the designer (§ 5a) | `feat/w13-sky-lobby-authoring` | — | 🔄 **open** — halt lifted 2026-07-31, see *Environment — closed* below |
+| T2 | `trafficModel: 'v2'` + `batchSize` stream (§ 1.3) | `feat/w13-traffic-model-v2` | — | 🔄 **open** — halt lifted 2026-07-31, see *Environment — closed* below |
+| T3 | Mass control, group-size curve (§ 2.1–2.2) | `feat/w13-traffic-variance` | T2 | ⬜ blocked |
+| T4 | Day variation (§ 2.3) | `feat/w13-day-variation` | T3 | ⬜ blocked |
+| T5 | Patience, lobby crowding, stairs (§ 3) | `feat/w13-passenger-behaviour` | T2 | ⬜ blocked |
+| T6 | Learned-dispatcher teaching surface (§ 4) | `feat/w13-teaching-surface` | T3, T4 | ⬜ blocked |
+
+**Baseline at open:** `d52f347` — **4 896 tests, 4 886 passed, 0 failed, 10 skipped**, `tsc -b`
+clean, `review-gates` green, all 981 pins and both identity digests reproducing.
+
+## Environment — the wave's first finding, and it is not about the code
+
+**Both lanes were halted within minutes of opening, because the working tree is not stable.** The
+repository lives under `~/Documents/`, and **Dropbox and OneDrive are both running against it**.
+Observed inside a four-minute window, all of it while two agents held open worktrees:
+
+| Observed | Evidence |
+|---|---|
+| An untracked file deleted seconds after it was written | `WAVE13_PLAN.md` written, confirmed, then absent |
+| A tracked file's staged modification reverted | the wave-13 append to this file, lost and re-applied |
+| `.worktrees/` deleted whole, with two live agents inside it | `ls: .worktrees/: No such file or directory` |
+| `node_modules/` replaced by a dangling symlink, then restored | `readlink` → `../../node_modules`, target absent; a real directory again two minutes later |
+| A `git checkout` silently reverted | `integration/wave-13` checked out; `HEAD` back on `fix/repin-to-reproducible-values` |
+| Every file's mtime rewritten wholesale | uniform `11:51` across the tree |
+
+**This is the same client that already cost this repository a wave.** `scripts/review-gates.mjs`
+gates on `name 2.ts` copies for exactly this reason, and its docstring records what they did: *"they
+produced **21** failures that had nothing to do with the code"*. `GAPS 3.md` — a third-generation
+conflict copy — was present, absent and present again during this session. The gate treats the
+symptom; the cause is that a sync client is a second writer to the tree.
+
+**Why this halts the wave rather than merely annoying it.** Every acceptance criterion in `docs/14`
+is *a run, not an argument*, and the blocking one is byte-identity across 981 pins. A suite result
+from a tree a second process is rewriting is not evidence of anything — green or red. That is
+precisely the failure mode [§ D196](DECISIONS.md)/[§ D201](DECISIONS.md) cost a wave to unpick: a
+pin correct on one tree and wrong on another, with no way to tell which was right. Running lanes
+here would manufacture that condition deliberately.
+
+`git fsck` is clean — no object corruption, only the dangling objects expected after worktree
+removal. **Nothing is lost**, and both agents were stopped before either wrote a file.
+
+## Environment — closed 2026-07-31, by a run rather than by an argument
+
+**The repository was relocated to `~/Development/04-personal-projects/elevator-sim`** — a real local
+directory on the data volume, outside `~/Documents`, `~/Desktop`, `~/Library/CloudStorage/*`,
+`~/Dropbox` and `~/OneDrive`. **Both sync clients are still running**, and that is the point worth
+stating precisely: the precondition was never *"kill the client"*, it was *"the client cannot see the
+tree"*. Checked rather than assumed:
+
+| Check | Result |
+|---|---|
+| `git rev-parse --show-toplevel`, `realpath`, `df` | a real local path on `/System/Volumes/Data`, no symlink, no cloud-storage ancestor |
+| 30-second write-and-wait probe | **passed** — the untracked file survived and `git status` stayed clean. The same sequence previously lost the file, reverted a staged edit, and reverted a `git checkout` |
+| Conflict copies | `GAPS 3.md` removed. It was **not** a byte-copy of `GAPS.md` — 41 lines were unique to it, a superseded wave-11 generation — so it was preserved outside the repository before deletion rather than discarded |
+
+**Baseline re-established on the relocated tree, at `866e6a1`:**
+
+```
+Test Files  263 passed (263)
+     Tests  4886 passed | 10 skipped (4896)
+  Duration  703.81s
+```
+
+`tsc -b` clean; `review-gates` scanned 583 source files and **all blocking gates pass**; all 981 pins
+and both identity digests reproduce. This matches § 1's inherited figure exactly — 4 896 / 4 886 / 0
+/ 10 — so it is now **confirmed rather than inherited**, which was the whole reason for re-running
+it.
+
+**The skip count is 10 and still has not moved.** That is the number [`GAPS.md`](GAPS.md) says to
+watch, because a wave that quietly skips a test to go green moves it and a growing test count says
+nothing on its own.
+
+**[§ D201](DECISIONS.md)'s platform hazard did not bite, and it was the live risk here.** That
+decision found this suite's *pass/fail split* to be platform-dependent — the § D196 re-pin inverts
+between Linux and darwin/arm64 — while the **totals** reproduce across both. This run is
+darwin/arm64 and the totals reproduce, so the deviation § D201 predicts is absent and no finding is
+outstanding. A suite figure is a claim about a machine as well as a commit, and this one now names
+both.
+
+## Lanes — opened 2026-07-31 against the confirmed baseline
+
+One worktree per lane, one branch per worktree, one agent per branch — R25's remedy, followed this
+time rather than adopted after the fact. Both lane branches and `integration/wave-13` were moved from
+`d52f347` to `866e6a1`, the tree the baseline was actually measured on.
+
+| Lane | Worktree | Branch | Scope |
+|---|---|---|---|
+| **T0** | `.worktrees/w13-t0-sky-lobby` | `feat/w13-sky-lobby-authoring` | `packages/viz` only; moves no draw |
+| **T2** | `.worktrees/w13-t2-traffic-model` | `feat/w13-traffic-model-v2` | `packages/core`; forbidden `published.ts` |
+
+**Worktrees were given a real `npm ci` rather than the symlinked `node_modules` of
+`.worktree-setup.sh`.** That script exists because the naive symlink resolves to its realpath in the
+main checkout, so `@elevator-sim/*` points at the wrong tree and built-artifact evidence is about
+code you did not write. Verified by `realpath` that each worktree's `@elevator-sim/core` resolves
+into **its own** `packages/core`, which is the property the script was hand-rolling and which npm
+workspaces provides directly.
+
+## Wave 13 — cycle 2, both opening lanes merged and reviewed
+
+**`integration/wave-13` at `cab33d0`.** Suite on the merged tree: **264 files / 4 924 tests, 4 914
+passed, 0 failed, 10 skipped**, `tsc -b` clean, `review-gates` green over 584 files.
+
+| Tree | Files | Tests | Passed | Failed | Skipped |
+|---|---|---|---|---|---|
+| Baseline `866e6a1` | 263 | 4 896 | 4 886 | 0 | **10** |
+| + T2 | 264 | 4 907 | 4 897 | 0 | **10** |
+| + T2 + T0 | 264 | 4 924 | 4 914 | 0 | **10** |
+
+**The skip count did not move once.** That is the column to read: a wave that quietly skips a test
+to go green moves it, and a rising test count says nothing on its own.
+
+### What independent review was worth
+
+Both lanes were reviewed by agents instructed to **refute rather than approve**, and neither review
+was a formality — each caught something the lane's own report did not.
+
+- **T2.** The reviewer settled the question that mattered by *diffing* rather than reasoning:
+  `docs/14` § 5, the pre-registered acceptance criteria, is **byte-identical to base**. It then
+  mutated the implementation three ways — forcing the draw back onto `arrivals` (3 failures),
+  forcing `v1` onto `batchSize` (28, including every identity cell), replacing spread-or-omit with
+  `?? 'v1'` (16) — so the identity digests are **demonstrably able to fail**, and their passing is
+  evidence rather than absence of evidence. The new golden vector was reproduced from a third
+  implementation written from the FNV-1a-64 / SplitMix64 / PCG specs.
+- **T0.** The reviewer built the negative control the lane had not: strip `transportModes` from the
+  emitted document before `parseBuilding`, and the run returns **bit-identical** to the control arm.
+  That converts *"the legs differ"* from a correlation into a mechanism. It also **refuted** the
+  lane's losslessness claim — `name` and `$comment` were being dropped, and the test could not see
+  it because it projected the expectation through the same three surviving fields. The tell was that
+  the access-zone precedent it was modelled on compares **raw**.
+
+### Two findings that would have survived a green suite
+
+1. **Two sentences in `index.html` stated a mechanism the code contradicts** — a picker called
+   *multi-select* that is single-select, a floor called *not offered* that is offered disabled. This
+   is the failure `CLAUDE.md` opens with, landing in the one prose location this repository does not
+   sweep. Fixed and pinned in both directions; the rest of that file's control copy is now **named as
+   a gap** rather than implied to be covered.
+2. **The criterion-2 inequality was insufficient on its own.** Stranding the escalator arm leaves
+   `legsOf(ESCALATOR) < legsOf(SKY)` passing while `generated` falls 114 → 64. Conservation is now
+   pinned, and a mutation demonstrates the hole is closed.
+
+### Open, and the first one blocks step 3
+
+| # | Finding | Severity |
+|---|---|---|
+| **F1** | **A `v2` run cannot be replayed from its persisted record.** `RunRecord` does not carry `trafficModel` and `replaySimulationConfig` rebuilds by explicit field enumeration, so a stored `v2` run replays as `v1` — **a different trace at the same seed**, which is invariant 5's exact hazard. Harmless today because no shipped path sets `v2`; **step 3 is the step that will.** | medium-high, **blocks T3** |
+| F2 | The `v1`/`v2` pairing prohibition is a **sentence** where `metrics/comparability.ts` exists to carry it as data — whose own docstring argues such a rule must be carried on the run rather than written where the code cannot check it | medium |
+| F3 | The § 0 correction is **unpinned**: the overstated paragraph and its rebuttal can be edited back to the false version with a green suite. `validation/documentation.test.ts` is the established mechanism and was not used | medium-low |
+| F4 | Four low findings against T0 — a raw-`skyFloors` divergence between mirror and advisory, an unreachable refusal branch, a seed label that outlives its seed, and an above-6-m EN 115-1 branch that is wrong but unreachable | low |

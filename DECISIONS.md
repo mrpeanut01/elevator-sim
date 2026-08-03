@@ -11910,3 +11910,557 @@ it measured as the simulator changes.
 **Impact.** No phase verdict moves. The standing rule this leaves: *a pin is a claim about a
 machine as well as a commit — so pin decisions exactly, magnitudes within a band you can defend in
 both directions, and never a hash of a real number.*
+
+## D203 — the group-size coupling was overstated, and step 2's criterion was corrected rather than met
+
+**Date: 2026-07-31 · Wave 13 step 2 (`docs/14` § 1.3). The criterion was pre-registered; the run
+refused it; the criterion was wrong.**
+
+`trafficModel: 'v1' | 'v2'` ships, `batchSize` is a named stream in both `STREAM_NAMES` and
+`TRAFFIC_STREAM_NAMES`, and the flag is reported on `SimulationResult`. `v1` is byte-identical:
+**264 files / 4 907 tests, 4 897 passed, 0 failed, 10 skipped**, all 981 pins and both identity
+digests unmoved, `review-gates` green over 584 files.
+
+**What was measured, and what it refused.** `docs/14` § 0 stated, as motivation, that *any* change to
+the group-size curve — even one preserving the mean — consumes a different number of draws and
+shifts every subsequent arrival instant. The pre-registered test made that falsifiable: under `v1` a
+mean change shifts the instants, under `v2` it leaves them untouched. It was written first, watched
+failing, and **its second half then failed on the finished implementation.** Two reasons, both
+properties of the model rather than defects in the wiring:
+
+1. `batchesPerSecond` is `passengerRate / meanBatchSize` (`traffic/poissonBatch.ts:93-102`). Total
+   *passenger* demand is held fixed, so the *batch* rate is a function of the mean by construction.
+   No stream separation can make the batch arrival process invariant to it, and one that did would
+   describe a building where larger groups meant more people.
+2. `drawGeometricBatchSize` consumes exactly one draw per call for every mean, including the
+   degenerate `mean === 1`, which returns after drawing rather than short-circuiting.
+
+**The second point is why this is a correction and not a concession.** That property is stated in the
+function's own docstring, and **the docstring predates the sentence that contradicted it** — three
+files from the design document asserting the opposite. The claim was refutable from the repository
+as it stood on the day it was written.
+
+**What replaced it is sharper, because it is true.** The coupling that exists runs *across* demand
+sources rather than within one: `generateTrace` walks `plan.sources` in order, drawing each source's
+arrival times and then its group sizes from the same stream, so under `v1` **source *k*'s group sizes
+displace source *k+1*'s arrival instants.** Measured at one fixed configuration and seed on
+`midtown-office`: `v1` and `v2` agree exactly on the **first** source's instants — drawn before any
+group-size draw exists — and disagree on **all nineteen** later ones. The agreeing source is pinned
+by name and the count is derived (`one.size - 1`), not written down.
+
+**This narrows the flag's justification rather than widening it, and that is the tell.** The strong
+form of the coupling returns at § 2.2, when a group-size *curve* — a table, a truncated Poisson,
+anything but today's one-parameter geometric — makes the draw count depend on the parameters. Under
+`v2` it cannot bite. The flag is insurance bought before the risk arrives, which is the only time it
+is available.
+
+**`docs/14` § 5, the pre-registered acceptance criteria, is byte-identical to base.** The edit is to
+§ 0's motivation prose and a new § 1.3 subsection; criterion 1, the blocking one, is untouched. The
+overstated paragraph is left standing with the refutation beneath it rather than deleted, matching
+how this repository has filed corrections before. **This is not the rule against weakening a
+criterion being bent** — it is the rule *"either measure it or say it is unmeasured"* being applied
+to a sentence that had never been measured.
+
+**`trafficModel` is absent at `'v1'`, not reported as `'v1'`.** `structuralDigestOfResult`
+`JSON.stringify`s the whole result, so a key present on the default path moves every digest — but the
+substantive reason is stronger: a `v1` run *is* the run that predates the flag, and announcing it
+would claim a distinction that does not exist. This is deliberately **not** § D-step-1's reasoning
+for `trafficSeed`, where a seed equal to the run seed is still a different statement.
+
+**Adversarial review confirmed all six claims and could not break the blocking one.** Mutations
+forcing the draw back onto `arrivals` (3 failures), forcing `v1` onto `batchSize` (28, including
+every `mixIdentity` and `transportIdentity` cell) and replacing spread-or-omit with `?? 'v1'` (16)
+were each caught by a test that already existed — so the digests' passing is evidence rather than
+absence of evidence. The new golden vector was reproduced from a third implementation written from
+the FNV-1a-64 / SplitMix64 / PCG specs, required first to reproduce an existing pin.
+
+**Open, and blocking step 3.** `RunRecord` does not carry `trafficModel`, and
+`replaySimulationConfig` rebuilds by explicit field enumeration, so **a stored `v2` run replays as
+`v1` — a different trace at the same seed.** That is invariant 5's exact hazard. It is harmless today
+because no shipped path sets `v2`; step 3 is the step that will. Nothing may be published under `v2`
+until it is closed.
+
+## D204 — sky lobbies are authored independently of transfer flags, and the traversal time is carried rather than derived
+
+**Date: 2026-07-31 · Wave 13 step 0 (`docs/14` § 5a). The inverse of this repository's usual defect:
+the engine was complete and the authoring surface was missing.**
+
+The building designer can now author `transportModes`. Three decisions were taken deliberately rather
+than discovered.
+
+**1. `skyFloors` and `transportModes` are independent, and cross-stated rather than cross-derived.**
+`skyFloors` sets `isTransferFloor`, which is *bank segmentation* — it decides where `defaultBandOf`
+cuts the tower. A transport mode is an edge outside every bank. Deriving a transfer flag from an
+escalator would silently re-deal every car's default band the moment a reader added a machine;
+deriving an escalator from a transfer flag would author hardware nobody asked for. `vertical-city`
+declares both separately for all four lobbies. What *is* stated at the control is the interaction a
+reader cannot see: `route.ts` re-enters its search only at a transfer floor, so a machine touching
+none of them carries exactly the people who start on one of its two floors and finish on the other.
+That is an **advisory**, and the test asserts the message does *not* say the loader refuses — because
+it does not.
+
+**2. Shrinking `floors` below a connected floor omits the whole machine.** `connects` is a pair, so
+there is nothing to narrow: a pair with one end removed is not a connection. This follows
+`accessZonesOf`'s narrow-and-omit with the one deviation the shape forces, and the selector keeps
+drawing the row as *unwritten* so the reader can move the landing back.
+
+**3. `traversalTimeS` is carried in the spec, not derived.** Deriving it from floor height would keep
+it honest under the height slider but make `specFromBuilding` lossy on any unevenly pitched document
+— and `vertical-city`, the only document with escalators, is exactly that. The derivation seeds a
+*new* machine and never overwrites a loaded one. Losslessness was the stated deliverable, so it won.
+
+**The criterion-2 evidence is a mechanism, not a correlation.** Adversarial review built the negative
+control the lane had not: strip `transportModes` from the emitted document before `parseBuilding`,
+and the run returns **bit-identically** to the control arm — 205 legs both — so a router that ignored
+the field fails the test. Conservation confirms it: the same 114 journeys generated and delivered in
+both arms, with exactly **51 lift legs becoming 51 escalator hops**.
+
+**One claim was refuted and is recorded as refuted.** The round trip is **not** lossless: `name` and
+`$comment` are dropped from all four `vertical-city` escalators, and the `$comment` is where the
+EN 115-1 derivation lives. The test could not see it because it projected the expectation through the
+same three surviving fields — where the access-zone precedent it was modelled on compares raw. **A
+test written so it cannot fail on the loss it exists to prevent is worse than no test**, and the
+asymmetry against its own precedent is the tell.
+
+## D205 — a car in flight was unreachable, and the repair is a commit point rather than a relaxed constraint
+
+**Date: 2026-08-01 · Reported from observed behaviour: riders waiting to go down were being passed by
+cars returning to the lobby.**
+
+The report was right and the dispatcher was not the cause. A car in motion was judged from its
+**destination**, because that was the only place the kernel could stop it: `Car.departFor` throws
+while `#motion` is set, nothing cancelled a motion, and `Simulation.#depart` scheduled exactly one
+arrival event per run, at the target. There was no floor-crossing event in the model at all. So
+`assessDirectionReversal` measured "behind" from `motion.toFloorIndex`, and a **down** call on a
+floor between a descending car and the lobby came back `reversesToReach=true`,
+`opposesCallDirection=true`, `reversals=2` — the worst the term can return. `collective` declares
+`noDirectionReversal`, so the one car in the building already heading there, facing the right way,
+with room aboard, was **structurally ineligible**.
+
+**The arithmetic was never wrong.** Given a car that cannot stop short of its target, two reversals
+is the correct count, which is why every existing test passed. The defect was one level down:
+commitment granularity equalled hop granularity, and the longest hops in the building are the empty
+return-to-lobby runs stage 7 commands.
+
+**The census, before any fix.** Midtown Office, counting legs whose waiter was physically driven past
+by a car moving in *their* direction while they stood there:
+
+| profile | pattern | rate | legs | passed | AWT | of those pass-bys, cars with room |
+|---|---|---|---|---|---|---|
+| `collective` | down-peak | 3 % | 182 | **106 (58.2 %)** | 35.4 s | **143 / 143** |
+| `collective` | down-peak | 5 % | 340 | 178 (52.4 %) | 106.3 s | 358 / 397 |
+| `predictive-balanced` | down-peak | 5 % | 340 | 251 (73.8 %) | 48.2 s | 296 / 388 |
+
+The 3 % row is the one that decides it: AWT 35.4 s is nowhere near saturation, and **every** car that
+drove past a waiting rider had spare capacity. Not queueing, not capacity bypass — the direction
+assessment.
+
+**What was rejected.** Changing `fromIndex` to `car.floorIndex` and leaving the kernel alone. That
+makes eligibility optimistic about a stop the physics still refuses; calls would be assigned to cars
+that sail past them and have to come back, which is worse than the behaviour it replaces, and it is
+the disagreement `terms/directionReversal.ts` already warned about.
+
+**What was built.** A commit point, and a kernel that honours it.
+
+1. `sharedPrefixSeconds` (`physics/motion/sCurve.ts`) — how long two profiles describe the *same*
+   trajectory. Two `speedLimited` profiles under one envelope have identical `jerkTime` and
+   `accelTime` (functions of the constraints alone) and differ only in `cruiseTime`, so they agree
+   from rest until the shorter one brakes. A diversion inside that window is **exact**: the car has
+   already flown a trajectory consistent with both, so nothing is re-solved from a non-zero initial
+   velocity and no comfort limit is touched. Phase start states are compared for exact equality, so
+   drift can only ever *shorten* the window.
+2. `Car.divertFrontier` / `Car.divertTo` — the nearest floor still stoppable, and the relabelling.
+   `divertTo` **throws** past the commit point rather than rounding off; a granted-but-impossible
+   stop is a car arriving at a speed the envelope forbids.
+3. `Simulation.#considerDiversion` — cancels the superseded arrival and schedules the new one. The
+   kernel's `cancel` preserves the cancelled slot's `(time, sequence)`, so a diverting run fires
+   every surviving event in the order a run that never scheduled it would (invariant 4). Its
+   docstring already named this case — *"hall-call reassignment superseding a committed arrival"* —
+   and nothing in the tree called it. A twelfth dead seam, closed by using it.
+4. `eligibility.enRouteDiversion`, declared in `DISPATCH_PARAMETERS` with type and default
+   (invariant 8), **off** by default so every run measured before this replays bit-identically.
+
+**Presence is permission, and that is the design.** `CarSnapshot.divertFrontierIndex` is populated
+only when the runner passes `enRouteDiversion` to `Car.snapshot`, which `Simulation.#snapshots` does
+from the resolved profile. Eligibility, every cost term and `projectRoute` then read **one field**
+and need no configuration of their own. The alternative was threading a flag through nine call sites
+and hoping nobody added a tenth that forgot it.
+
+**The first draft was inert, and the liveness check is in the study because of it.** The eligibility
+half landed without the cost half: `projectRoute` still started a moving car's route at its
+destination, so the right car became legal and stayed permanently uncompetitive — its ETA was "fly to
+the lobby, turn round, come back up". Diversions: **0**, output bit-identical to baseline. A paired
+interval containing zero has two readings, *"the effect is small"* and *"the switch does nothing"*,
+and only the second is a bug. `DiversionCell.live` separates them: under CRN two arms that behave
+identically produce bit-identical samples, so a non-zero largest paired difference is proof the
+mechanism fired.
+
+**The measurement.** `benchmark/enRouteDiversion.ts`, Midtown Office down-peak, `collective` against
+itself with the one field flipped, paired-t at 95 % under verified common random numbers, n = 50:
+
+| rate | ΔAWT | ΔTTD | AWT quotable |
+|---|---|---|---|
+| 1 % | **−1.052 [−1.481, −0.623]** | +0.323 [−0.201, +0.847] | yes |
+| 2 % | **−3.002 [−3.878, −2.125]** | **−1.687 [−3.145, −0.229]** | yes |
+| 3 % | −3.325 [−4.980, −1.670] | −2.557 [−4.942, −0.173] | **no — not quoted** |
+
+Both quotable cells exclude zero on AWT. **3 % is measured and deliberately not asserted on**: it is
+where the census was taken and its difference is the largest of the three, but at n = 50 at least one
+replication saturates and `awtIsValid` goes false, and docs/03 forbids reporting a mean for a system
+whose queues grow without bound. Quoting the biggest number in the study from the one cell whose
+interval the project's own rules suppress is the reasoning this repository exists to avoid.
+
+**What is *not* in the arm, and why.** `dispatch.reassignmentPolicy: 'until-commitment'`. A call is
+frozen on its car at assignment under every shipped profile, so a call given to a distant car before
+a nearer one began descending can never move to the car that later flies past — which caps what
+diversion alone recovers, and is why the pass-by rate falls much less than AWT does. Turning
+reassignment on is the obvious companion change and it **drives `collective` into saturation** on
+this building: AWT above 850 s at every rate tried, with `diversions` still zero, so it is not
+diversion doing it. That is a pre-existing pathology in the reassignment path, it is unrelated to
+this defect, and bundling it in would have made a working mechanism look like a broken one. It wants
+its own investigation.
+
+**Adoption was attempted and is blocked by a leak this work found, not by a preference.**
+
+The first attempt shipped `collective-enroute` with `role: "baseline"`. That was a mislabel — `role`
+is a *derivation key*, and `doubleDeck.ts` and `mixedUseHighRise.ts` build their arm lists from it, so
+the profile enrolled itself in the double-deck comparison and produced twenty unpinned figures for a
+question with nothing to do with diversion. Dropping the role fixed that cleanly: **no existing pin
+moved**, and every one of those failures was a new arm rather than a changed number.
+
+**Two studies then failed in a way a new arm cannot explain, and the cause is now known.**
+`selection-sweep` and `weight-set-selection` each reported **40 mismatches, all of them values** — no
+missing keys, no unpinned keys. `midtown-hotel-1.5pct/fuzzy/cost/awtS` moved from `0.357` to `0.403`,
+**bit-identically across runs and across two differently-named profiles at different positions in the
+file**, so it was deterministic rather than the environment-dependent pin noise § D201 documents.
+
+Four mechanisms were measured and eliminated, each with a direct probe rather than an argument:
+the **simulation** (same experiment with and without the extra profile — identical AWT samples and
+identical trace digests, on the failing cell's own derived building `midtown-office@hotel`, not a
+convenient one); **cross-arm contamination** (adding or reordering an unrelated arm leaves `fuzzy`'s
+samples bit-identical, so CRN is not leaking between arms); the **search space** (`searchSpace()`
+reads `DISPATCH_PARAMETERS`, never `data/`); and the **learned winner** (`learnSelectionPolicy`
+returns the same four gains to the last digit either way).
+
+**The cause is `censusSelectionPoint`, and it is the study working as designed.** It runs *every
+shipped profile* as a census arm and elects the reference as the one with the lowest mean TTD:
+
+```ts
+const profileIds = [...input.resources.dispatcherProfilesById.keys()];
+for (const row of quotable) if (row.meanTtdS < best.meanTtdS) best = row;
+referenceProfileId: best.profileId,
+```
+
+At `midtown-office@hotel` 1.5 %, seed 20260726: without the profile the reference is `collective` at
+**54.4459 s**; with it the reference becomes the diversion profile at **54.0100 s**. Every `gate` and
+`cost` figure in both studies is a *paired difference against the reference arm*, so electing a
+better reference moves all forty. That also explains why every simulation probe came back identical —
+nothing about any run changed; **which run the others are measured against** changed.
+
+So the three earlier observations were all consistent with one rule and none of them with a leak: a
+profile with no `eligibility` block is behaviourally identical to `collective` and does not beat it;
+a profile at `waitTime: 0.99` does not beat it; a profile that actually diverts does.
+
+**There was nothing to fix and one thing to decide, and the decision was taken.** The setting does
+not leak across profiles — it is resolved per profile and reaches the model only through
+`Simulation.#snapshots`, exactly as designed. What the census does is elect a baseline, and electing
+one *on merit, continuously* is right the first time and wrong every time after: § D151 fixed this
+sweep's protocol before any ΔTTD existed, and § D156, § D162 and § D200 rest on figures measured
+against the arm it elected.
+
+**So candidacy is now declared and measurement is not.** `censusSelectionPoint` takes
+`referenceCandidates`, defaulting to `PRE_REGISTERED_REFERENCE_CANDIDATES` — the twelve profiles
+§ D151 was pre-registered against. Every shipped profile still runs, still gets a census row and
+still publishes its mean, so a later profile that beats the baseline is **visible in the census
+rather than hidden by it**; `CensusRow.referenceCandidate` says why it was not eligible. That is the
+same split `ceilingExcludedArms` already makes, for the same reason, and opting out is explicit
+(`referenceCandidates: null`) so a caller cannot re-baseline by omission.
+
+The evidence that it worked is that nothing moved: **`selection-sweep` and `weight-set-selection`
+reproduce their original pins unchanged**, `lunchTwoWaySelection`'s two `reference` pins are still
+`auction-multi-round` and its verdict is still NOT ACCEPTED, while
+`treatment/quotable-census-arms` moved 12 → 13 — measured, not elected, which is the distinction
+stated as a number.
+
+**`collective-enroute` therefore ships.** Two things about it are load-bearing and easy to undo by
+accident, and both are recorded in the profile's own `$comment`: it declares **no `role`**, because
+`role: "baseline"` is a derivation key that `doubleDeck.ts` and `mixedUseHighRise.ts` build arm lists
+from — labelling it baseline enrolled it in the double-deck comparison and produced twenty unpinned
+figures for an unrelated question — and it is deliberately **absent from
+`PRE_REGISTERED_REFERENCE_CANDIDATES`**, because it beats `collective` on TTD at
+`midtown-office@hotel` and would be elected on merit.
+
+**The same lesson then landed a third time, in `fuzz/`.** A fuzz case is a seed decoded against an
+option space whose dispatcher dimension is the shipped profile list, so a thirteenth profile re-maps
+every seed: `caseFromSeed(1_001_074, …)` stopped naming the eleven-floor single-car building whose
+922.7 s wait closed `fuzz-1001074` and named something else, reproducing a *different* run under the
+same seed. Nothing failed loudly — the reproduction simply reproduced the wrong thing, and
+`deep.test.ts` caught it only because it asserts the run's numbers rather than merely that it ran.
+`CORPUS_DISPATCHER_PROFILE_IDS` freezes the axis for the **recorded** reproductions; the campaign
+keeps fuzzing the library as it ships, because a profile nobody searches is a profile nobody tests.
+The corpus censuses that legitimately track `data/` moved with it and say so (539 → 571, 93 → 95,
+27 → 36).
+
+**Three instances of one defect, in one change.** `role: "baseline"`, the census reference, and the
+fuzz seed axis are all *"derive it from the shipped profile list"*, and all three turned a list into
+a silent input to a published number. Deriving is right where the answer should track `data/` and
+wrong wherever a figure was measured once and is quoted since. That distinction is now written down
+in all three places rather than rediscovered a fourth time.
+
+**One measured aside worth not burying:** `collective-enroute` is **bit-identical to `collective` at
+both up-peak cells of the benchmark gate** and separates only at `garden-residential`
+(ΔAWT −1.360 against −1.269, both relative to `nearest-car`). Pure up-peak is the pattern that least
+exercises en-route pickup, which is what the down-peak study says; the arm is in the gate because
+every shipped profile must face it, not because the gate is where its case is made.
+
+**Widened to five buildings at n = 200, and the widening changed the claim.** § D205 originally read
+as an improvement measured on one building. Swept down-peak over every shipped building — the three
+access-controlled ones with `mobile-credential` applied to **both** arms so the passenger model moves
+together — paired-t 95 %, verified common random numbers:
+
+| building | rate | ΔAWT | ΔTTD | AWT quotable |
+|---|---|---|---|---|
+| midtown-office | 1 % | **−1.033 [−1.262, −0.804]** | **+0.555 [+0.190, +0.920]** | yes |
+| midtown-office | 2 % | −3.041 [−3.586, −2.495] | −1.867 [−2.698, −1.036] | no |
+| garden-apartments | 10 % | **−0.431 [−0.615, −0.247]** | −0.177 [−0.498, +0.144] | yes |
+| garden-apartments | 14 % | −1.010 [−1.449, −0.572] | −0.795 [−1.403, −0.187] | no |
+| secure-tower | 2 % | **−0.363 [−0.490, −0.235]** | **+0.215 [+0.043, +0.388]** | yes |
+| secure-tower | 4 % | **−0.968 [−1.179, −0.757]** | −0.245 [−0.502, +0.013] | yes |
+| mixed-use-high-rise | 2 % | **−0.517 [−0.654, −0.379]** | **+1.186 [+0.862, +1.511]** | yes |
+| mixed-use-high-rise | 4 % | −1.112 [−1.310, −0.914] | +0.625 [+0.091, +1.159] | no |
+| vertical-city | 2 % | −0.119 [−0.219, −0.020] | +1.986 [+1.707, +2.265] | no |
+| vertical-city | 4 % | **+0.762 [+0.485, +1.039]** | **+4.591 [+3.949, +5.234]** | no |
+
+**Three findings, and the first two were invisible on one building.**
+
+**1. It is a trade, not an improvement.** ΔAWT excludes zero and is negative at all five quotable
+cells. ΔTTD is significantly *worse* at three of them, null at two, better at none. The mechanism is
+doing exactly what it was built to do and the cost is legible: a diverted car makes a stop it was not
+going to make, which shortens somebody's wait and lengthens the ride of everybody already aboard.
+Same shape as the energy axis — **report it beside AWT, never fold it into a grade** — and the
+profile's own `$comment` now leads with it, because the person choosing a profile reads the profile.
+
+**2. `vertical-city` refuses it outright**, and is the only building that does: ΔTTD `+4.591` and
+ΔAWT `+0.762` at 4 %, both excluding zero, both against. It is also the only building with a
+double-deck shuttle and sky-lobby transfers, where an extra stop is charged to a whole shuttle load
+and a lengthened first leg delays a second leg that has not started. Neither cell is quotable, so
+this is a direction rather than a figure — but it would have stayed invisible on Midtown Office
+alone, and it answers *"should `collective` carry this by default?"*: not until that is understood.
+
+**3. Quotability is a property of the cell *and* of `n`.** A cell is unquotable when *any*
+replication saturates, so raising `n` can only lose validity. Five of the ten cells lose it at 200 —
+including `midtown-office` 2 %, which produced this decision's original headline
+`−3.002 [−3.878, −2.125]` at n = 50. That figure was not wrong at n = 50; it is not quotable at the
+budget a decision should rest on. It is **dropped from the suite rather than kept at the smaller
+budget that flattered it**, and the suite's cells are now the five that survive at 200.
+
+**`vertical-city`'s refusal was decomposed, and it is a transfer effect.** Splitting its journeys
+by whether they cross a sky lobby, at 8 seeds under common random numbers:
+
+| journeys | ΔTTD |
+|---|---|
+| single-leg (n = 1 306) | **−0.188** |
+| transferring (n = 1 827) | **+6.763** |
+
+Single-leg journeys *improve*. The whole of the harm is in journeys that transfer: a diversion on
+leg one delays arrival at the sky lobby, the passenger queues again for the shuttle, and a stop
+costing a few seconds becomes seven seconds of journey. It was **not** load — mean load factor at
+diversion is 0.10–0.13 on every building, `vertical-city` included, so the "diverting a full car"
+hypothesis was measured and discarded.
+
+**And it is fixable by configuration, which makes it a profile defect rather than a mechanism
+defect.** `collective` weights `waitTime` alone, so *nothing priced the harm a diversion does to
+the people already aboard* — and `detourPenalty` is exactly that term ("Added delay imposed on
+already-onboard passengers"). Swept on `vertical-city` 4 %, n = 50:
+
+| `detourPenalty` | ΔAWT | ΔTTD |
+|---|---|---|
+| 0.0 | **+0.715 [+0.229, +1.202]** | **+4.305 [+3.062, +5.548]** |
+| 0.2 | **−0.454 [−0.739, −0.168]** | −0.033 [−0.611, +0.544] |
+| 0.5 | −0.379 [−0.627, −0.132] | −0.353 [−0.834, +0.129] |
+| 1.0 | −0.248 [−0.467, −0.028] | −0.124 [−0.584, +0.335] |
+
+At 0.2 the weight keeps **every** AWT gain across all six cells, removes the TTD regression at four
+of the five cells that had one, halves it at the fifth, and turns `vertical-city` from worse-on-both
+into better-on-wait, null-on-journey.
+
+**So the shipped profile carries `detourPenalty: 0.2`, and the trade disappears.** Measured as an
+operator would actually choose it — shipped `collective-enroute` against shipped `collective`, both
+metrics, n = 50, paired-t 95 %, verified CRN:
+
+| building | rate | ΔAWT | ΔTTD |
+|---|---|---|---|
+| midtown-office | 1 % | **−0.936 [−1.398, −0.474]** | −0.326 [−0.934, +0.282] |
+| garden-apartments | 10 % | −0.199 [−0.834, +0.435] | −0.346 [−1.215, +0.522] |
+| secure-tower | 2 % | **−0.234 [−0.424, −0.044]** | −0.141 [−0.375, +0.093] |
+| secure-tower | 4 % | **−0.707 [−1.286, −0.127]** | **−0.739 [−1.397, −0.080]** |
+| mixed-use-high-rise | 2 % | **−0.428 [−0.634, −0.221]** | −0.025 [−0.457, +0.408] |
+| vertical-city | 4 % | **−0.705 [−1.047, −0.364]** | **−1.783 [−2.495, −1.071]** |
+
+**Better or null on both metrics at every cell, worse on neither.** The trade was never a property
+of en-route pickup; it was the cost of shipping a mechanism without pricing what it costs.
+
+**Both measurements are kept, because they answer different questions and gave different answers.**
+`measureDiversionAt` isolates the mechanism — one authored field apart — and says *trade*.
+`measureShippedAt` compares the profiles an operator picks between and says *dominance*. Measuring
+only the first would have shipped a regression; measuring only the second would have hidden what the
+mechanism does. `enRouteDiversion.test.ts` asserts the second at every cell, so **deleting
+`detourPenalty` from the profile fails a test** rather than quietly restoring the trade.
+
+**A default a second caller can miss is not a default.** `referenceCandidates` was first defaulted
+in `runWeightSetSelectionStudy`, and `lunchTwoWaySelection.ts` calls `censusSelectionPoint`
+*directly* — so the guard was absent on exactly one of two paths, and both lunch cells silently
+elected `collective-enroute` as reference the moment the profile got good enough to win. The default
+now lives on the primitive, where neither caller can miss it, and `null` is how a caller asks for an
+open election. The pinned counts caught it; the wrapper's own tests could not have.
+
+**The mechanism itself is sound on every building.** `sim/diversionBuildings.test.ts` runs all five
+under the diverting profile: conservation balances everywhere, nobody is lost, the control diverts
+zero times, and the **double-deck branch is exercised for the first time** — `divertFrontier` walks
+`stopFloorsOf(shaft)` and `divertTo` normalises through `stopFloorFor`, both written against
+`vertical-city`'s `shuttle` bank and never run there until now. A deck-normalisation bug would not
+have thrown; it would have parked a car at a position it cannot stand at, and the conservation audit
+would have been the first thing to notice. It did not fire.
+
+**The gap is named rather than disguised.** `Simulation.#considerDiversion` fires only from tests and
+from `benchmark/livenessSuite.ts` — precisely the shape docs/05-roadmap.md's standing requirement
+distrusts, and the standing requirement is what caught the study half of it (`src/index.test.ts`
+failed with *"has at least one non-test, non-barrel caller of measureDiversionAt"*). What remains is
+whether `collective` itself should carry the setting — expensive, because every published
+`collective` figure would be invalidated — and that wants the study re-run at n = 200 across more
+than one building first.
+
+## D206 — a direction refusal is transient, and treating it like a durable one saturated a bank
+
+**Date: 2026-08-02 · Found while investigating why `reassignmentPolicy: 'until-commitment'` capped
+what [§ D205](DECISIONS.md)'s en-route diversion could recover.**
+
+`collective` under `until-commitment` reported **AWT 332.2 s against a 32.3 s control** on Midtown
+Office down-peak at 3 %, with the saturation flag set and a longest wait of 876 s. It was noticed as
+a side observation — `diversions` was zero, so it plainly was not § D205's mechanism — and it turned
+out to be a live defect in stage 5.
+
+**The shipped profiles are fine, which is why nobody had seen it.** `fairness-first` (35.7 s) and
+`capacity-aware` (34.0 s) both declare `until-commitment` and both sit beside the 32.3 s control.
+`collective` is the only shipped profile declaring a **hard constraint**, and the pathology needs
+both. Removing just the constraint: **332.2 → 36.9**.
+
+**The mechanism, counted rather than reasoned about.** Stage 5 takes a call off its incumbent
+*without hysteresis* when that car is no longer eligible, because *"holding a call on an ineligible
+car is how a floor starves"*. Instrumenting every decision of a run:
+
+| | reassignments | via ineligible incumbent | via cheaper rival | held by hysteresis |
+|---|---|---|---|---|
+| `collective` + `until-commitment` | 11 | **8** | 3 | 3 |
+| the same without the hard constraint | 3 | **0** | 3 | 21 |
+
+Eight of eleven reassignments took the escape hatch, and hysteresis — the thing that exists to stop
+exactly this thrash — held three calls against twenty-one.
+
+**Why the escape hatch is wrong here.** It is right for a car that filled up or left service: those
+cannot serve the call at all, and the call must move. `noDirectionReversal` refuses a car for **where
+it is pointing right now**, which is the one thing about it guaranteed to change — it is on its way
+somewhere and settles its direction on arrival, and it was chosen in the first place because it is
+the car that should serve this landing. Yanking the call restarts its clock, and the car it moves to
+is under the same constraint and becomes ineligible in its turn.
+
+**So the fix is a distinction, not a knob.** `TRANSIENT_INELIGIBILITY` is `hardConstraint` and
+`oppositeDirection` — the two geometric refusals — and an incumbent refused for either keeps
+defending its call like any other. Everything else surrenders it as before. This is deliberately
+**not** a tunable: *"may a call be taken from the car that is on its way to it, because that car is
+momentarily pointing the wrong way"* has one defensible answer.
+
+It is also deliberately **not** the same set as `Simulation`'s `STRUCTURAL_INELIGIBILITY`, which
+answers a different question — *"will retrying this call ever help?"*, where access and service
+zoning are permanent and a load ceiling is not. This axis is *"will this car's own answer change on
+its own?"*, where the load ceiling is durable enough to surrender a call over and the direction is
+not. Two sets, two questions; collapsing them would be wrong in both places.
+
+| | before | after |
+|---|---|---|
+| `collective` + `until-commitment` | 332.2 s, **saturated**, max 876 s | **34.0 s**, not saturated, max 75 s |
+| ” + `continuous` | 302.9 s, saturated | 34.0 s |
+| ” + `commitmentPoint: on-door-open` | 302.9 s, saturated | 34.0 s |
+| ” + `reassignmentHysteresisS: 0` / `30` | 114.7 s / 279.3 s | 34.8 s / 34.8 s |
+| reassignments via ineligible incumbent | 8 | **0** |
+| held by hysteresis | 3 | **66** |
+
+The hysteresis figures are the tell: before the fix the knob barely mattered because the path that
+bypassed it carried most of the traffic, and `0` outperformed `5`, which is not a thing a working
+hysteresis does.
+
+**Nothing shipped moved.** `collective`, `eta`, `fairness-first` and `capacity-aware` are unchanged
+to the digit, and the full suite passes with **no pinned figure regenerated** — the change can only
+reach a profile that combines a direction constraint with reassignment, and no shipped profile does.
+
+**Both halves are guarded** (`dispatch/transientIneligibility.test.ts`). The transient half is the
+run: no saturation, no reassignment via an ineligible incumbent, and hysteresis holding more than it
+releases. The durable half is driven at the policy, because the two cases differ by one field on one
+snapshot: a withdrawn car **loses** its call and is refused `serviceMode`, while a car merely
+pointing the wrong way **keeps** it and is refused `noDirectionReversal`. Asserting only the first
+would have passed before the change; asserting only the second would trade a thrash for a stranding.
+
+**And the combination it unblocks buys nothing, which is worth recording so nobody retries it.**
+§ D205's original note said reassignment capped what diversion could recover — a call frozen on the
+wrong car can never move to the car that later flies past — so with `until-commitment` now usable
+under a hard constraint, `collective-enroute` + `until-commitment` was the obvious next arm.
+Measured **directly against `collective-enroute`**, n = 50, paired-t 95 %, verified CRN:
+
+| cell | ΔAWT | ΔTTD |
+|---|---|---|
+| midtown-office 1 % | −0.024 [−0.064, +0.016] | −0.004 [−0.354, +0.345] |
+| garden-apartments 10 % | −0.095 [−0.285, +0.096] | −0.093 [−0.281, +0.094] |
+| secure-tower 2 % | −0.034 [−0.103, +0.035] | −0.072 [−0.218, +0.073] |
+| secure-tower 4 % | −0.119 [−0.294, +0.055] | **−0.252 [−0.473, −0.031]** |
+| mixed-use-high-rise 2 % | −0.006 [−0.018, +0.006] | −0.014 [−0.043, +0.014] |
+| vertical-city 4 % | +0.020 [−0.159, +0.199] | −0.217 [−0.639, +0.204] |
+
+**AWT contains zero at all six cells.** One TTD cell excludes it, by a quarter of a second. So
+reassignment is *not* what was capping diversion, and the shipped profile does not take it.
+
+**The first reading of this was wrong and the discipline caught it.** Measured against shipped
+`collective` instead, the combination looked slightly better than diversion alone at five of six
+cells — but those are two intervals sharing a baseline, and concluding from their separation is the
+overlap fallacy CLAUDE.md § *Statistical discipline* names outright. The direct pairing above
+refutes it. The § D206 fix is still worth having: it turns a configuration that **saturated** into
+one that merely does nothing, which matters to anyone authoring it and to an optimizer searching the
+space.
+
+**The reported symptom is reduced, not eliminated — and pass-by rate was never the right target.**
+Re-running the census that opened § D205, on Midtown Office down-peak:
+
+| | 3 % | 5 % |
+|---|---|---|
+| `collective`, as reported | 67.0 % passed, AWT 32.3 | 63.2 % passed, AWT 91.5 |
+| `collective-enroute` | 66.0 %, AWT 31.9 | **51.4 %**, AWT **61.2** |
+
+At the heavier load the rate falls by twelve points and AWT by a third; at the lighter one the rate
+barely moves while AWT does. That is the honest shape of it: **a car with room passing a landing is
+not by itself a fault.** Most pass-bys are a correct decision — the call belongs to a nearer car that
+will arrive sooner — and the original census was good evidence that something was *structurally
+impossible* (58.2 % with every car having room, and the refusal reproduced in one call) but is a poor
+measure of success. The paired AWT interval is the measure; the census was the diagnosis.
+
+**The weight and the mechanism were decomposed, because the shipped profile changes both.**
+`collective-enroute` differs from `collective` in two authored things — `detourPenalty: 0.2` and
+`eligibility.enRouteDiversion` — so "the profile is better" leaves open which one is doing it. Three
+arms in one experiment, n = 50, paired-t 95 %, verified CRN, each contrast measured **directly**:
+
+| cell | weight alone, ΔAWT | mechanism given the weight, ΔAWT | weight alone, ΔTTD |
+|---|---|---|---|
+| midtown-office 1 % | **+0.074 [+0.004, +0.144]** | **−1.010 [−1.468, −0.552]** | −0.257 [−0.519, +0.005] |
+| garden-apartments 10 % | +0.452 [−0.341, +1.245] | **−0.652 [−1.121, −0.182]** | +0.396 [−0.340, +1.132] |
+| secure-tower 4 % | **+0.230 [+0.088, +0.371]** | **−0.936 [−1.477, −0.395]** | −0.169 [−0.384, +0.046] |
+| mixed-use-high-rise 2 % | −0.001 [−0.082, +0.079] | **−0.426 [−0.615, −0.238]** | **−0.456 [−0.697, −0.216]** |
+| vertical-city 4 % | **−0.252 [−0.500, −0.003]** | **−0.454 [−0.739, −0.168]** | **−1.749 [−2.244, −1.255]** |
+
+**The wait gain is the mechanism, and none of it is the weight.** `detourPenalty` alone is neutral to
+*significantly worse* on AWT — it is a cost term that makes the dispatcher decline stops, which is
+not how waiting time improves — while diversion delivers the whole AWT improvement at all five cells
+with every interval excluding zero.
+
+**And the weight is what protects the journey.** Its own benefit is in TTD, largest at
+`vertical-city` (`−1.749`), the building where the extra stop is charged to a whole shuttle load.
+So the two are not redundant and neither is decoration: **diversion buys the wait, the detour weight
+pays for it**, and shipping either alone is worse than shipping both — which is exactly why the
+profile carries both and why a test asserts the pair rather than the parts.

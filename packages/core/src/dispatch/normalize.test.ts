@@ -521,7 +521,14 @@ function contextFor(
     demandForecast: options.demandForecast,
   });
   const request = costRequestFor(subject, config, observation);
-  return { car, call: subject, request, estimate: estimateCost(car, request), at, observation };
+  return {
+    car,
+    call: subject,
+    request,
+    estimate: estimateCost(car, request),
+    at,
+    observation,
+  };
 }
 
 /** Type-level guard: `termReferenceScale` really does describe a `CostTermDefinition`. */

@@ -1,5 +1,21 @@
 # Risk register
 
+> ## ↩️ Reopened 2026-07-31 for **wave 13** — the building-behaviour program.
+>
+> Wave 13's six task-specific risks are in [`WAVE13_PLAN.md`](WAVE13_PLAN.md) § 5. Three belong
+> here, because they are properties of *this simulator's measurements* rather than of one wave's
+> tasks, and each names a way the wave could produce a confident number that is wrong.
+>
+> | # | Risk | State |
+> |---|---|---|
+> | **R27** | **Abandonment flatters average waiting time by construction.** A passenger who gives up is removed from the sample, and the ones who give up are the ones who waited longest. A configuration that abandons 30 % of its riders posts a superb AWT and has served nobody. | **Anticipated, not yet realised** — `docs/14 § 3.1` states it before the code exists. This is [§ D106](DECISIONS.md)'s energy rule arriving on a second axis: *a configuration that spends less by serving fewer people has not saved anything*, with `abandoned` in place of `workPerServedLegKJ`. **Mitigation:** the abandonment count is published beside AWT and never folded into it; `awtIsValid` gains a fifth ground for an abandonment rate above a declared threshold. **Escalation:** any AWT improvement co-occurring with a served-leg fall that is not shown. |
+> | **R28** | **A variance component that leaks outside the shared trace destroys the power common random numbers buy.** Day variation adds variance *between* replications; if both arms of a paired comparison do not see the same Monday, the paired standard error rises and every interval widens — while every test still passes. | **Anticipated.** Named in `docs/14 § 2.3` as *the easiest way to get this feature wrong*. **Mitigation:** criterion 3 measures exactly it — a paired comparison under day variation must show variance no larger than the same comparison without it. **Escalation:** paired SE rising when day variation is enabled. |
+> | **R29** | **Two traffic models is a fork that never converges.** `v1` exists so 981 pins keep reproducing; the failure is that it outlives that reason and every later feature is written twice, or worse, once — on the branch nobody measures. | **Live for the duration of the wave.** **Mitigation:** `v1` is deleted when the last figure depending on it has been re-derived under `v2` **and the re-derivation published as a comparison** — not before, because the pins' whole value is the sentence *"this figure has not moved since Phase 5"*. **Escalation:** a third model version, or any feature available on only one branch. |
+>
+> **R1, R5, R7 and R10 below remain live and permanent**, and R24, R25 and R26 from wave 11 are
+> carried into this wave. **R25 is answered structurally this time** — one worktree per lane from
+> the open, rather than as a correction after a commit described one lane and contained three.
+
 > ## ↩️ Reopened 2026-07-30 for **wave 11**. Three risks were realised that this register had no row
 > ## for, and all three are properties of *how the work is done* rather than of the simulator.
 >

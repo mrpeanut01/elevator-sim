@@ -615,6 +615,17 @@ export interface CarLoadSnapshot {
  * which is what keeps building a snapshot cheap enough to do ten thousand times in one
  * dispatch decision.
  */
+/** What the *runner* knows that the car does not: whether this profile permits diversion. */
+export interface SnapshotOptions {
+  /**
+   * Resolved `eligibility.enRouteDiversion`. When `true`, the snapshot carries the car's
+   * commit point in {@link CarSnapshot.divertFrontierIndex}; when absent or `false` it does
+   * not, and every consumer falls back to today's behaviour — a moving car is committed to
+   * its destination.
+   */
+  readonly enRouteDiversion?: boolean | undefined;
+}
+
 export interface CarSnapshot {
   readonly carId: string;
   readonly bankId: string;
@@ -631,6 +642,26 @@ export interface CarSnapshot {
   readonly direction: Direction | undefined;
   /** The move in progress, or `undefined` when the car is standing. */
   readonly motion: CarMotion | undefined;
+  /**
+   * Shaft index of the nearest floor ahead this car can **still** be stopped at — its commit
+   * point — or `undefined` when nothing may divert it.
+   *
+   * **Presence is permission**, and that is the whole design. `Car.divertFrontier` answers a
+   * question of physics (where could this car still stop?); whether anything is *allowed* to
+   * act on the answer is a question of dispatcher configuration, and only the runner knows
+   * both. So the runner passes `enRouteDiversion` to `Car.snapshot` and this field is simply
+   * absent under a profile that forbids diversion.
+   *
+   * Everything downstream — `assessDirectionReversal`, `projectRoute`, and every cost term
+   * built on them — then reads one field and needs no configuration of its own. That is what
+   * keeps eligibility, cost and the kernel on the same map: the alternative was threading a
+   * flag through nine call sites and *hoping* nobody added a tenth that forgot it, and the
+   * cheaper of two inconsistent answers wins every time (`terms/directionReversal.ts`).
+   *
+   * `undefined` also for a standing car, and for a moving one already past its last chance to
+   * stop short — immediately, on a jerk-limited hop.
+   */
+  readonly divertFrontierIndex: number | undefined;
 
   readonly door: DoorMachineState;
   readonly doorConfig: DoorConfig;

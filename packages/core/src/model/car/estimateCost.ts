@@ -77,6 +77,7 @@ import {
   isAccessPermitted,
   shaftFloor,
   stopFloorIdOf,
+  type CarMotion,
   type CarSnapshot,
   type CommittedStop,
   type CostEstimate,
@@ -84,6 +85,7 @@ import {
   type DeckStopSplit,
   type InfeasibilityReason,
   type RouteStop,
+  type ServedFloor,
 } from './types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -423,6 +425,27 @@ function remainingDoorSeconds(
 }
 
 /**
+ * The first stop of a route, if the car can really be cut short at it.
+ *
+ * "Really" is the whole point: at or beyond the commit point in the direction of travel, and
+ * strictly short of where the car is already going. A stop at the destination is not a
+ * diversion, and one behind the commit point is a stop the kernel would refuse — `Car.divertTo`
+ * throws for exactly this case rather than rounding it off, so pricing one here would be
+ * pricing a journey no car can make.
+ */
+function divertibleTo(
+  first: CommittedStop | undefined,
+  motion: CarMotion,
+  frontier: ServedFloor,
+): CommittedStop | undefined {
+  if (first === undefined) return undefined;
+  const sign = motion.direction === 'up' ? 1 : -1;
+  if (sign * (first.floorIndex - frontier.index) < 0) return undefined;
+  if (sign * (first.floorIndex - motion.toFloorIndex) >= 0) return undefined;
+  return first;
+}
+
+/**
  * Walk the car's route and time every stop on it.
  *
  * Pass `extra` to price a hypothetical: the stop is folded into the committed set (merging if
@@ -442,10 +465,25 @@ export function projectRoute(
   const motion = snapshot.motion;
   const moving = motion !== undefined;
 
-  // Where the route starts. A car in flight is committed to its destination: it cannot stop
-  // short, so that floor is where the sequencing question is asked from.
-  const startIndex = moving ? motion.toFloorIndex : snapshot.floorIndex;
-  const startHeightM = moving ? motion.toHeightM : snapshot.heightM;
+  // Where the route starts — the floor the sequencing question is asked from.
+  //
+  // A car in flight is normally committed to its destination: it cannot stop short, so that is
+  // where its route begins however far away it is. Under `eligibility.enRouteDiversion` the
+  // snapshot carries a **commit point** instead (`divertFrontierIndex`, absent when the
+  // profile forbids diversion), and the route begins there, because `Simulation.#considerDiversion`
+  // will really cut the run short at the first committed stop beyond it.
+  //
+  // Both halves are needed and only one would be worse than neither. An eligibility filter
+  // that admits an en-route stop while this function still prices it as "fly to the lobby,
+  // turn round, come back up" makes the right car eligible and permanently uncompetitive — the
+  // call is legal for it and always cheaper for somebody else, so the behaviour never appears
+  // and the setting looks inert.
+  const frontier =
+    moving && snapshot.divertFrontierIndex !== undefined
+      ? snapshot.shaft.floorsByIndex.get(snapshot.divertFrontierIndex)
+      : undefined;
+  const startIndex = moving ? (frontier?.index ?? motion.toFloorIndex) : snapshot.floorIndex;
+  const startHeightM = moving ? (frontier?.heightM ?? motion.toHeightM) : snapshot.heightM;
   const direction =
     (moving ? motion.direction : snapshot.direction) ??
     directionTowardNearestStop(stops, startIndex, startHeightM);
@@ -459,8 +497,29 @@ export function projectRoute(
   let servingHere = false;
 
   if (moving) {
-    seconds = Math.max(0, motion.arrivesAt - snapshot.at);
-    heightM = motion.toHeightM;
+    // Where the run actually ends, which is the first committed stop it can be cut short at
+    // rather than the floor it was last commanded to. `divertibleTo` is `undefined` when
+    // nothing on the route is reachable en route, and the run then plays out in full.
+    const cutShortAt = frontier === undefined ? undefined : divertibleTo(ordered[0], motion, frontier);
+    if (cutShortAt === undefined) {
+      seconds = Math.max(0, motion.arrivesAt - snapshot.at);
+      heightM = motion.toHeightM;
+    } else {
+      // Exactly `Car.divertTo`'s arithmetic, and exactly `departFor`'s: the diverted run keeps
+      // its `startedAt`, so its arrival is that instant plus the *shorter* profile's duration
+      // plus the levelling settle. Reconstructed here rather than shared because this is a
+      // hypothetical — the car has not been diverted and must not be.
+      seconds = Math.max(
+        0,
+        motion.startedAt +
+          travelTime(cutShortAt.heightM - motion.fromHeightM, snapshot.constraints) +
+          snapshot.levelingSettleS -
+          snapshot.at,
+      );
+      // The loop below charges `stop.heightM - heightM`, so arriving here makes the first leg
+      // free rather than double-charged.
+      heightM = cutShortAt.heightM;
+    }
   } else if (snapshot.door.state !== 'closed') {
     seconds = remainingDoorSeconds(snapshot.door, snapshot.at, snapshot.doorConfig);
     servingHere = true;

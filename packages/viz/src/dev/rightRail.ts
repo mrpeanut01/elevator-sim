@@ -193,6 +193,15 @@ function mechanismClausesOf(profile: DispatcherProfile): readonly string[] {
       `${auction.aggregation ?? 'central-argmin'} over ${String(rounds)} bidding round${rounds === 1 ? '' : 's'}`,
     );
   }
+  // **The clause that keeps `collective` and `collective-enroute` distinguishable.** The two are
+  // the same weight vector under the same hard constraint and differ only in whether a moving car
+  // may be cut short to take a call it is about to fly past (`DECISIONS.md` § D205) — so without
+  // this the rail printed one sentence for two dispatchers, and `rightRail.test.ts`'s "tells every
+  // shipped profile apart" is what said so. A behaviour a weight vector cannot carry is exactly
+  // what this function is for.
+  if (profile.eligibility?.enRouteDiversion === true) {
+    clauses.push('stops en route for calls it passes');
+  }
   return clauses;
 }
 

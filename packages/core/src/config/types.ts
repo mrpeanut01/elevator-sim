@@ -426,6 +426,7 @@ export interface DispatchStageConfig extends Commented {
 export interface ProfileEligibilityConfig extends Commented {
   /** Whether a car may take a call it will arrive at facing the wrong way. */
   readonly allowOppositeDirectionPickup?: boolean | undefined;
+  readonly enRouteDiversion?: boolean | undefined;
   /** Refuse assignment when the projected load on arrival would exceed this fraction. */
   readonly maxLoadFactorForAssignment?: number | undefined;
 }

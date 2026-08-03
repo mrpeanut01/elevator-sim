@@ -497,3 +497,102 @@ describe('StreamSet — statistical sanity through the named streams', () => {
     }
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * The traffic seed — docs/14 § 1.1
+ * -------------------------------------------------------------------------- */
+
+describe('a separate traffic seed splits who turns up from how the machine behaves', () => {
+  const DEMAND = ['arrivals', 'origins', 'destinations', 'passengerMass'] as const;
+  const MACHINE = ['doorObstruction', 'policyNoise'] as const;
+
+  const firstDraws = (set: StreamSet, name: StreamName, count = 8): readonly number[] =>
+    Array.from({ length: count }, () => set.stream(name).nextUint32());
+
+  /**
+   * The blocking criterion of docs/14 § 5, at the smallest scale it can be stated.
+   *
+   * Every feature in that program is allowed to exist only because a run that does not ask for it
+   * is unchanged. If this fails, 981 pinned estimates and both identity digests are wrong, and no
+   * amount of the rest being correct would rescue it.
+   */
+  it('changes nothing at all when it is absent', () => {
+    for (const name of STREAM_NAMES) {
+      expect(firstDraws(new StreamSet(20_260_726), name), name).toEqual(
+        firstDraws(new StreamSet(20_260_726, {}), name),
+      );
+    }
+  });
+
+  it('re-rolls the crowd while the machine stays put', () => {
+    const monday = new StreamSet(7, { trafficSeed: 1 });
+    const tuesday = new StreamSet(7, { trafficSeed: 2 });
+
+    for (const name of DEMAND) {
+      expect(firstDraws(monday, name), `${name} should differ`).not.toEqual(
+        firstDraws(tuesday, name),
+      );
+    }
+    for (const name of MACHINE) {
+      expect(firstDraws(monday, name), `${name} should not move`).toEqual(
+        firstDraws(tuesday, name),
+      );
+    }
+  });
+
+  /*
+   * The other direction, and the one common random numbers actually needs: hold the crowd, change
+   * the machine. Two dispatchers meeting the same people is the comparison this project is built
+   * on, and until now it could only be had by holding *everything* fixed.
+   */
+  it('holds the crowd while the machine changes', () => {
+    const armA = new StreamSet(11, { trafficSeed: 99 });
+    const armB = new StreamSet(22, { trafficSeed: 99 });
+
+    for (const name of DEMAND) {
+      expect(firstDraws(armA, name), `${name} should not move`).toEqual(firstDraws(armB, name));
+    }
+    for (const name of MACHINE) {
+      expect(firstDraws(armA, name), `${name} should differ`).not.toEqual(firstDraws(armB, name));
+    }
+  });
+
+  /*
+   * A traffic seed equal to the run seed must reproduce the no-traffic-seed run exactly. It is the
+   * boundary between the two branches of `#seedFor`, and the place an off-by-one in that predicate
+   * would hide.
+   */
+  it('is the identity when it equals the run seed', () => {
+    for (const name of STREAM_NAMES) {
+      expect(firstDraws(new StreamSet(4242), name), name).toEqual(
+        firstDraws(new StreamSet(4242, { trafficSeed: 4242 }), name),
+      );
+    }
+  });
+
+  it('carries both seeds through a clone, so a branched run keeps its crowd', () => {
+    const original = new StreamSet(5, { trafficSeed: 6 });
+    original.arrivals.nextUint32();
+    const copy = original.clone();
+
+    expect(copy.masterSeed).toBe(original.masterSeed);
+    expect(copy.trafficSeed).toBe(original.trafficSeed);
+    // The clone resumes where the original stood, and on the original's crowd. A copy that lost
+    // the traffic seed would silently re-derive `arrivals` from the master seed and branch into a
+    // different population — which is the one failure a clone must not have.
+    expect(copy.arrivals.nextUint32()).toBe(original.arrivals.nextUint32());
+  });
+
+  /* Invariant 5: a record that cannot name both seeds cannot replay the run. */
+  it('reports the traffic seed in a snapshot, and omits it when there is none', () => {
+    expect(new StreamSet(5, { trafficSeed: 6 }).snapshot().trafficSeed).toBe('6');
+    expect(new StreamSet(5).snapshot().trafficSeed).toBeUndefined();
+    expect('trafficSeed' in new StreamSet(5).snapshot()).toBe(false);
+  });
+
+  it('normalizes a traffic seed the way it normalizes a master seed', () => {
+    expect(new StreamSet(1, { trafficSeed: -1 }).trafficSeed).toBe(
+      BigInt.asUintN(64, -1n),
+    );
+  });
+});
