@@ -56,7 +56,7 @@
  * 4. **The six ratios quoted as six confirmations were one seed set wearing six hats.**
  *
  * The old pin is replaced by one that states what is true — the two seed sets straddle 1 — and is
- * explicitly not a criterion. Filed the § D203 way, in `DECISIONS.md` § D206 rather than only in a
+ * explicitly not a criterion. Filed the § D203 way, in `DECISIONS.md` § D208 rather than only in a
  * docstring, because that is where a criterion judgement belongs. `docs/14` § 5 is byte-identical:
  * a criterion is neither weakened nor refused to make a step pass.
  *
@@ -460,7 +460,7 @@ describe('criterion 3 — day variation is inside the CRN pairing', () => {
    * Twenty replications each is below `CLAUDE.md`'s 50–200 budget **for publishing a result**, and
    * nothing here is published. The effect the gate detects is a factor of 3 to 8; it was also
    * measured at n = 100 and n = 200 while this file was being written, and is recorded in
-   * `DECISIONS.md` § D206 with those figures.
+   * `DECISIONS.md` § D208 with those figures.
    */
   const SEED_SETS: readonly (readonly [string, readonly number[]])[] = [
     ['900000+7919i', Array.from({ length: 20 }, (_, i) => 900_000 + i * 7919)],
@@ -660,7 +660,7 @@ describe('criterion 3 — day variation is inside the CRN pairing', () => {
    * sides of 1.** A future change that made them agree would mean something real had changed about
    * the roughness of `Var(D | f)`, and it should be looked at rather than pass silently. This is
    * deliberately *not* a criterion — criterion 3 is met above, under the reading docs/14 § 2.3's
-   * own body supplies. See `DECISIONS.md` § D206.
+   * own body supplies. See `DECISIONS.md` § D208.
    */
   it(
     'the day-versus-no-day direction is decided by the seed set, which is why it is not the gate',
