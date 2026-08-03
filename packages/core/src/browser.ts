@@ -600,6 +600,7 @@ export {
   demandMisalignmentM,
   detourPassengerSeconds,
   detourPenaltyTerm,
+  diversionDetourTerm,
   directionReversalTerm,
   directionReversals,
   dispatchParameter,

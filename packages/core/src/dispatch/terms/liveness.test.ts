@@ -66,6 +66,7 @@ const EVERY_TERM: DispatcherProfileSource = {
   name: 'Every term weighted',
   weights: Object.fromEntries(COST_TERMS.map((term) => [term.id, 1])),
   dispatch: { callType: 'destination-entry' },
+  eligibility: { enRouteDiversion: true },
 };
 
 /** What the group controller owns, in the shape `groupContext` hands over. */
@@ -112,7 +113,7 @@ interface Liveness {
 }
 
 describe('every term in the registry can change a decision through the real engine', () => {
-  it('scores non-zero, and differently between two candidate cars, for all twelve', async () => {
+  it('scores non-zero, and differently between two candidate cars, for all thirteen', async () => {
     const config = await loadConfig(DATA_DIR);
     const building = config.buildingsById.get('midtown-office');
     const shipped = config.dispatcherProfilesById.get('predictive-balanced');
@@ -146,7 +147,15 @@ describe('every term in the registry can change a decision through the real engi
       }
 
       const at = Math.max(...simulation.building.cars.map((car) => car.snapshot().at));
-      const snapshots = simulation.building.cars.map((car) => car.snapshot(at));
+      // **`enRouteDiversion` on the snapshot, for the same reason `EVERY_TERM` sets a call type
+      // that carries a destination.** Presence is permission (`DECISIONS.md` § D205): a snapshot
+      // taken without it has no `divertFrontierIndex`, so `diversionDetour` reads zero for every
+      // car and would fail below as inert — not because the term is dead, but because the fixture
+      // put it outside its own declared `activeWhen`. The point of this suite is that a term
+      // discriminates *somewhere in the engine's configuration space*.
+      const snapshots = simulation.building.cars.map((car) =>
+        car.snapshot(at, { enRouteDiversion: true }),
+      );
       carsCarryingPassengers += snapshots.filter((snapshot) => snapshot.load.occupants > 0).length;
       carsHoldingCalls += snapshots.filter((snapshot) => snapshot.stops.length > 0).length;
 
@@ -183,20 +192,43 @@ describe('every term in the registry can change a decision through the real engi
       }
     }
 
+    if (process.env['LIVENESS_REPORT'] === '1') {
+      for (const term of COST_TERMS) {
+        const t = liveness.get(term.id) as Liveness;
+        process.stdout.write(
+          `LIVE ${term.id} ${((100 * t.nonZero) / t.evaluations).toFixed(1)}% spread=${t.maxSpread.toFixed(4)} evals=${String(t.evaluations)}\n`,
+        );
+      }
+    }
     // Guards against the assertions below passing on an empty sample.
     expect(scoredCars).toBeGreaterThan(1000);
     expect(carsCarryingPassengers).toBeGreaterThan(2);
     expect(carsHoldingCalls).toBeGreaterThan(2);
 
-    // Measured at the time of writing, over 3240 (car, call) evaluations per term — percentage
-    // with a non-zero raw, and the largest spread seen between two candidate cars:
+    // Measured over 4320 (car, call) evaluations per term — percentage with a non-zero raw, and
+    // the largest spread seen between two candidate cars. Regenerate with
+    // `LIVENESS_REPORT=1 npx vitest run` on this file rather than editing by hand; a table nobody
+    // can re-derive is the shape `benchmark/published.ts` exists to stop.
     //
-    //   waitTime 97.8% / 137.4 s      rideTime 100.0% / 125.6 s     detourPenalty 44.5% / 135.3 p·s
-    //   existingCallDelay 87.2% / 101.9 s   directionReversal 81.6% / 2   loadFactor 100.0% / 0.64
-    //   stopCount 83.7% / 2           distanceTravelled 11.3% / 73.1 m   starvation 80.4% / 48072 s
-    //   zoneAffinity 76.3% / 69.3 m   predictedDemand 100.0% / 44.3 m    crowding 35.3% / 0.50
+    //   waitTime 97.6% / 158.8 s      rideTime 100.0% / 140.7 s     detourPenalty 34.3% / 144.8 p·s
+    //   diversionDetour 1.7% / 42.5 p·s     existingCallDelay 69.9% / 144.8 s
+    //   directionReversal 77.4% / 2   loadFactor 100.0% / 0.72      stopCount 88.2% / 2
+    //   distanceTravelled 37.9% / 138.6 m   starvation 69.1% / 59212 s
+    //   zoneAffinity 75.0% / 69.3 m   predictedDemand 100.0% / 44.3 m    crowding 34.2% / 0.75
     //
-    // The three that used to read 0.0% and spread 0.0000 are `rideTime`, `zoneAffinity` and
+    // **Every number above moved when `diversionDetour` landed, and none of it is that term's
+    // arithmetic.** Taking the snapshots with `enRouteDiversion` makes a moving car's route project
+    // from its commit point instead of its destination, so every route-derived term is now priced
+    // on a different set of routes — `detourPenalty` 44.5% → 34.3%, `distanceTravelled` 11.3% →
+    // 37.9%, and the evaluation count 3240 → 4320. The configuration changed, not the terms.
+    //
+    // **`diversionDetour`'s 1.7% is the point rather than a weakness.** A diversion is rare among
+    // all (car, call) pairs, and a term that charged the detour on a third of them would be
+    // `detourPenalty` under another name — which is the whole finding of `DECISIONS.md` § D210.
+    // What matters is that it is non-zero *and* separates two cars by 42.5 passenger-seconds, so
+    // it can move an `argmin`.
+    //
+    // The three that once read 0.0% and spread 0.0000 are `rideTime`, `zoneAffinity` and
     // `predictedDemand`. The assertions below are deliberately weak — non-zero, and any spread —
     // because the strong forms belong in each term's own file; this one exists to catch death.
     for (const term of COST_TERMS) {

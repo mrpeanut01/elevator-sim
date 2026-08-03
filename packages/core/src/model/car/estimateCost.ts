@@ -446,6 +446,57 @@ function divertibleTo(
 }
 
 /**
+ * Where a car in flight would really end this run, given the stops it would then be holding.
+ *
+ * `undefined` in three distinct cases, and all three mean "no diversion": the car is not moving;
+ * the profile forbids diversion, so the snapshot carries no `divertFrontierIndex` at all
+ * (*presence is permission* — [`DECISIONS.md` § D205](../../../../../DECISIONS.md)); or nothing on
+ * the route is reachable before the floor the car is already committed to. Otherwise it is the
+ * first committed stop the kernel would actually cut the run short at, which is exactly what
+ * `Simulation.#considerDiversion` will do.
+ *
+ * ## Why this is exported
+ *
+ * So `terms/diversionDetour.ts` can ask *"would serving this call truncate the run?"* against the
+ * **same arithmetic the projection uses**. A term that priced a diversion `projectRoute` does not
+ * make — or missed one it does — would be charging for a journey no car takes, and the resulting
+ * weight would be tuned against a fiction.
+ *
+ * ## Why it re-derives rather than sharing {@link projectRoute}'s locals
+ *
+ * `projectRoute` has already computed the ordered stop list by the time it needs this answer, and
+ * having it call this function instead would double `withStop` and `orderStops` on a path
+ * `Car.estimateCost` runs thousands of times per decision. So the *decision rule* is shared — both
+ * end in the same `divertibleTo` — and only the cheap setup is repeated.
+ *
+ * That duplication is a real risk of drift, so it is not left to inspection:
+ * `estimateCost.test.ts` asserts the two agree on real snapshots, in both directions.
+ *
+ * Pure. Reads the snapshot; mutates nothing.
+ */
+export function runCutShortAt(
+  snapshot: CarSnapshot,
+  extra?: CommittedStop | undefined,
+): CommittedStop | undefined {
+  const motion = snapshot.motion;
+  if (motion === undefined) return undefined;
+  const frontier =
+    snapshot.divertFrontierIndex === undefined
+      ? undefined
+      : snapshot.shaft.floorsByIndex.get(snapshot.divertFrontierIndex);
+  if (frontier === undefined) return undefined;
+
+  const stops = withStop(snapshot.stops, extra);
+  if (stops.length === 0) return undefined;
+
+  // Exactly `projectRoute`'s start-of-route for a moving car with a commit point: the route begins
+  // at the frontier, headed the way the car is already going.
+  const direction =
+    motion.direction ?? directionTowardNearestStop(stops, frontier.index, frontier.heightM);
+  return divertibleTo(orderStops(stops, frontier.index, direction)[0], motion, frontier);
+}
+
+/**
  * Walk the car's route and time every stop on it.
  *
  * Pass `extra` to price a hypothetical: the stop is folded into the committed set (merging if

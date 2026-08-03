@@ -5,6 +5,7 @@
     { "id": "waitTime", "measures": "Estimated wait for the new passenger", "serves": "AWT" },
     { "id": "rideTime", "measures": "Estimated in-car time for the new passenger", "serves": "TTD" },
     { "id": "detourPenalty", "measures": "Added delay imposed on already-onboard passengers", "serves": "Fairness to boarded" },
+    { "id": "diversionDetour", "measures": "Added delay imposed on already-onboard passengers, when the call diverts the car", "serves": "Fairness to boarded, without taxing traffic the diversion never touches" },
     { "id": "existingCallDelay", "measures": "Added delay to other already-assigned calls", "serves": "Global optimality" },
     { "id": "directionReversal", "measures": "Penalty for reversing travel direction", "serves": "Collective behavior" },
     { "id": "loadFactor", "measures": "Penalty rising as the car approaches capacity", "serves": "Capacity awareness" },

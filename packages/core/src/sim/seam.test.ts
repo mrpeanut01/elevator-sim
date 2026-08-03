@@ -520,18 +520,28 @@ function counting(inner: DispatchPolicy, into: TermTally): DispatchPolicy {
 
 describe('every weighted cost term prices something through the shipped engine', () => {
   /**
-   * Every implemented term at weight 1, and the one stage setting `rideTime` needs.
+   * Every implemented term at weight 1, and the two stage settings the gated terms need.
    *
-   * `destination-entry` is not a thumb on the scale: it is the configuration under which `rideTime`
-   * is declared live (`rideTimeTerm.activeWhen`), and the runner supplies the head-of-queue
-   * passenger's destination on the call exactly as it already supplies their credential — gated by
+   * Neither is a thumb on the scale: each is the configuration under which its term is *declared*
+   * live, so this suite measures whether a term can discriminate somewhere in the engine's
+   * configuration space rather than whether it happens to under one default.
+   *
+   * `destination-entry` is `rideTimeTerm.activeWhen` — the runner supplies the head-of-queue
+   * passenger's destination on the call exactly as it already supplies their credential, gated by
    * `costRequestFor`, so no `up-down-buttons` profile can see it.
+   *
+   * `eligibility.enRouteDiversion` is `diversionDetourTerm.activeWhen`, and it is what makes
+   * `Simulation.#snapshots` populate `divertFrontierIndex` at all — *presence is permission*
+   * (`DECISIONS.md` § D205). Without it that term reads zero for every car of every run, which is
+   * the exact state this suite exists to catch, arrived at from the fixture rather than from the
+   * term.
    */
   const EVERY_TERM: DispatcherProfile = {
     id: 'seam-every-term',
     name: 'Every implemented term weighted',
     weights: Object.fromEntries(COST_TERMS.map((term) => [term.id, 1])),
     dispatch: { callType: 'destination-entry' },
+    eligibility: { enRouteDiversion: true },
   };
 
   it('evaluates every term to a non-zero value, with spread across candidate cars', async () => {
