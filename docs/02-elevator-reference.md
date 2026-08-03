@@ -279,7 +279,7 @@ was:
 lift-engineering paper on stair uptake was opened while this subsection was written, so no figure
 is quoted and no source is named as though one had been. That is a deliberate outcome and not an
 oversight: this repository retracted **two** escalator/lobby citations in a single wave for exactly
-the fault of naming a document nobody had read (`DECISIONS.md` § D205), and the same wave's
+the fault of naming a document nobody had read (`DECISIONS.md` § D207), and the same wave's
 crowding term now cites nothing and says so. A stated *"we have no calibrated figure for this"* is
 a fact a reader can act on. A plausible number beside a plausible source is not.
 

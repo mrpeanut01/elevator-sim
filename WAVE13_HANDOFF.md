@@ -18,8 +18,8 @@ This file is only what you need to **restart**.
 | Suite on it | **272 files / 5 077 tests, 5 067 passed, 0 failed, 10 skipped**, `tsc -b` clean, `review-gates` green over 594 files, all 981 pins and both identity digests reproducing |
 | Measured | Serially, on an idle machine, per `GAPS.md`'s own rule |
 
-**Steps 0, 1, 2, 3, 4 and 5 are merged.** Decisions [§ D203](DECISIONS.md), [§ D205](DECISIONS.md),
-[§ D206](DECISIONS.md) carry the criterion judgements; `AGENT_STATUS.md` § *Wave 13 — all six
+**Steps 0, 1, 2, 3, 4 and 5 are merged.** Decisions [§ D203](DECISIONS.md), [§ D207](DECISIONS.md),
+[§ D208](DECISIONS.md) carry the criterion judgements; `AGENT_STATUS.md` § *Wave 13 — all six
 behaviour steps merged* carries the per-measurement table.
 
 **The skip count is 10 and did not move across six measurements.** That is the column to read.
@@ -56,7 +56,7 @@ subtracts from it.*
 Costs reported beside, never folded in: AWT **+0.580 / +0.409 WORSE**, WT95 +2.245 WORSE /
 indistinguishable, energy worse on the raw figure and per served leg.
 
-**It survives a seed change** — § D206's lesson applied by the lane to itself. Six cells across three
+**It survives a seed change** — § D208's lesson applied by the lane to itself. Six cells across three
 seed configurations: switching premium **WORSE at three, indistinguishable at three, favouring the
 policy at none.** Notably the *taught* arm's own ΔTTD is **not** stable (above its limit at four
 cells, below at two) while the static vector beats the census's pick at all six.

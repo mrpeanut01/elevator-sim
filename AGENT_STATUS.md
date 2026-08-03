@@ -916,8 +916,8 @@ green moves it, and 4 896 rising to 5 077 says nothing on its own.
 | 1 — traffic seed separation | ✅ `d52f347` (pre-wave) |
 | 2 — `trafficModel: 'v2'` | ✅ `81c1859` — [§ D203](DECISIONS.md), **criterion corrected, not met** |
 | 3 — mass control, group-size curve | ✅ `36beae6` — three review rounds |
-| 4 — day variation | ✅ `88756c6` — [§ D206](DECISIONS.md), **criterion met after a refusal was refuted** |
-| 5 — patience, crowding, stairs | ✅ `9733f7a` — [§ D205](DECISIONS.md), gaps named in the verdict |
+| 4 — day variation | ✅ `88756c6` — [§ D208](DECISIONS.md), **criterion met after a refusal was refuted** |
+| 5 — patience, crowding, stairs | ✅ `9733f7a` — [§ D207](DECISIONS.md), gaps named in the verdict |
 | 6 — teaching surface | 🔄 open; a fourth refusal is a permitted outcome |
 | F1 replay gap · I1 Azure Phase A · F3/F9/F10 | ✅ merged |
 
@@ -940,11 +940,11 @@ lanes' own reports did not contain:
 - **[§ D203](DECISIONS.md) — a correct refusal.** The claim was **provably false from the code as it
   stood**: `drawGeometricBatchSize`'s docstring stated the fact that killed it, three files from the
   document asserting the opposite.
-- **[§ D206](DECISIONS.md) — an incorrect refusal, caught.** A decomposition missing its load-bearing
+- **[§ D208](DECISIONS.md) — an incorrect refusal, caught.** A decomposition missing its load-bearing
   premise, an attribution to a term measured at 1–2 % of the total, and six ratios that were **one
   seed set iterated six times**. Re-run on eight fresh sets the pinned inequality **failed four
   times**. The criterion was **met** under § 2.3's own reading — evidence the lane already had.
-- **[§ D205](DECISIONS.md) — a contract correction with its measurement attached.** § 3.3's reach
+- **[§ D207](DECISIONS.md) — a contract correction with its measurement attached.** § 3.3's reach
   condition withdrawn because a pair-connected mode fixes its own span, confirmed by a bit-identical
   result when zeroing an array index nothing reads.
 
