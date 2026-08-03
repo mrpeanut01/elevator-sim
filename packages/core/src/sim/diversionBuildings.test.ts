@@ -25,6 +25,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { DispatcherProfile, LoadedConfig } from '../config/types.js';
 import { Car } from '../model/car/index.js';
 
+import { parseBuilding, resolveBuilding } from '../config/parse.js';
+
 import { BUILDING_IDS, load, withCallType } from './fixtures.test-helper.js';
 import { Simulation } from './simulation.js';
 import type { SimulationResult } from './types.js';
@@ -177,4 +179,145 @@ describe('a diverted run is charged for the distance it actually drove', () => {
       expect(result.stageActivity.diversions, buildingId).toBeGreaterThanOrEqual(0);
     });
   }
+});
+
+/* -------------------------------------------------------------------------- *
+ * A car withdrawn while it is mid-flight
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Fifteen floors and three cars, with one car withdrawn partway through.
+ *
+ * Tall on purpose: the shipped `serviceMode` fixture is a three-floor walk-up, where every hop is
+ * jerk-limited and nothing is ever cut short, so a diversion test built on it would assert nothing.
+ */
+function withdrawalTower(): Record<string, unknown> {
+  const car = (id: string): Record<string, unknown> => ({
+    id,
+    spec: 'geared-traction',
+    ratedSpeedMps: 1.6,
+    doorType: 'centerOpening',
+    ratedLoadLb: 2500,
+  });
+  const floors = Array.from({ length: 15 }, (_, index) => ({
+    id: index === 0 ? 'G' : String(index + 1),
+    index,
+    heightM: index * 3.6,
+    population: index === 0 ? 0 : 60,
+    isEntrance: index === 0,
+  }));
+  return {
+    id: 'withdrawal-tower',
+    name: 'Withdrawal tower',
+    type: 'office',
+    trafficProfile: 'office-standard',
+    floors,
+    totalPopulation: 840,
+    banks: [
+      {
+        id: 'main',
+        servesFloors: floors.map((floor) => floor.id),
+        cars: [car('A'), car('B'), car('C'), car('D')],
+      },
+    ],
+    accessZones: [],
+    // Two withdrawals, well inside the run, so at least one lands while a car is in flight.
+    serviceEvents: [
+      { atS: 180, carId: 'A', mode: 'independent' },
+      { atS: 300, carId: 'B', mode: 'out-of-service' },
+    ],
+  };
+}
+
+describe('a car taken out of service while it is being diverted', () => {
+  it('still delivers everybody, and diversion keeps happening around it', async () => {
+    const loaded = await load();
+    const building = resolveBuilding(
+      parseBuilding(withdrawalTower(), 'withdrawal-tower.json'),
+      loaded.elevatorSpecs,
+      {
+        file: 'withdrawal-tower.json',
+        trafficProfileIds: new Set(loaded.trafficProfiles.profiles.map((profile) => profile.id)),
+      },
+    );
+
+    // What `#considerDiversion` did to a car the group may no longer allocate to, and *why* it was
+    // allowed to. This is the asymmetry with `#park`, which refuses outright for a car that does
+    // not accept hall calls — "a car the group may not allocate to is not the group's to place".
+    //
+    // Diversion is deliberately not gated the same way, and the distinction is the *reason for the
+    // stop*. `Car.setMode` strips a withdrawn car's hall calls, so its committed stops are its own
+    // car calls — the people already aboard, pressing the buttons for where they are going. Cutting
+    // its run short at one of those is the car finishing its own work, not the group placing a
+    // fleet it no longer commands. A guard copied from `#park` would strand those passengers past
+    // their floor for no stated reason.
+    //
+    // Asserted rather than argued: every diversion of a non-allocatable car serves a car call.
+    const offDuty: string[] = [];
+    let diverted = 0;
+    const original = Car.prototype.divertTo;
+    Car.prototype.divertTo = function (this: Car, floorId: string, at?: number) {
+      diverted += 1;
+      if (!this.acceptsHallCalls) {
+        offDuty.push(
+          `${this.id}->${floorId} carCall=${String(this.hasCarCall(floorId))} hallCalls=${String(this.assignedHallCalls.length)}`,
+        );
+      }
+      return (original as (this: Car, f: string, a?: number) => ReturnType<typeof original>).call(
+        this,
+        floorId,
+        at,
+      );
+    } as typeof Car.prototype.divertTo;
+
+    let result: SimulationResult;
+    try {
+      result = new Simulation({
+        building,
+        dispatcherProfile: loaded.dispatcherProfilesById.get(
+          'collective-enroute',
+        ) as DispatcherProfile,
+        trafficProfiles: loaded.trafficProfiles,
+        elevatorSpecs: loaded.elevatorSpecs,
+        seed: 20260802,
+        onTimeout: 'report',
+        durationS: 900,
+        reportWindow: 'full-run',
+        demand: {
+          directionalSplit: { incoming: 0, outgoing: 1, interfloor: 0 },
+          arrivalRatePctPop5min: 9,
+          peakWindowS: 300,
+        },
+      }).run();
+    } finally {
+      Car.prototype.divertTo = original;
+    }
+
+    // Not vacuous: cars really were withdrawn and runs really were cut short.
+    expect(diverted, 'no run was cut short, so this asserts nothing').toBeGreaterThan(0);
+
+    // The books balance with a third of the fleet leaving service mid-run.
+    expect(result.conservation.balanced).toBe(true);
+    expect(result.conservation.delivered).toBe(result.conservation.generated);
+    expect(result.undelivered).toEqual([]);
+
+    // **The asymmetry turns out to be inert, and that is the honest finding rather than a pass.**
+    // In this configuration `offDuty` comes back **empty**: no car outside group control is ever
+    // diverted at all. The reason is structural rather than lucky — a diversion needs *new* work to
+    // arrive while the car is in flight, and new work reaches a car from the group. A car that no
+    // longer accepts hall calls stops receiving any, and its own car calls were committed before it
+    // left service, so `#nextStopFloorId` is already pointing at the nearest of them and nothing
+    // lies between the commit point and the target.
+    //
+    // So this loop asserts nothing today, and it is left here deliberately: it is the check that
+    // fires *if* the case ever becomes reachable — a withdrawn car cut short for a hall call would
+    // mean the group had steered a car it may not allocate to. Asserting `offDuty.length === 0`
+    // instead would pin an accident of the current routing as though it were a guarantee.
+    for (const entry of offDuty) {
+      expect(entry, 'a withdrawn car was diverted for something other than a car call').toContain(
+        'carCall=true',
+      );
+      expect(entry).toContain('hallCalls=0');
+    }
+  });
 });
