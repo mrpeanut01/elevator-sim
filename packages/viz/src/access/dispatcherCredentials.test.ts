@@ -50,8 +50,10 @@ describe('which shipped profiles can read a credential — measured', () => {
   it('is exactly the two `docs/10` § 2.8 names, and the rest read nothing', () => {
     const aware = credentialAwareProfileIds(profiles);
     expect(aware).toEqual(['destination-eta', 'destination-panel']);
-    // The denominator too, so *"ten of twelve"* is a derived statement here rather than a claim.
-    expect(profiles.length - aware.length).toBe(10);
+    // The denominator too, so *"eleven of thirteen"* is a derived statement here rather than a
+    // claim. 10 → 11 with `collective-enroute` (`DECISIONS.md` § D205), which reads no credential:
+    // it is `collective` plus an eligibility setting, and eligibility is not a call type.
+    expect(profiles.length - aware.length).toBe(11);
   });
 
   it('reads it through the call type, not through a list of profile names', () => {
@@ -90,7 +92,7 @@ describe('Secure Tower, before Run', () => {
 
   it('names the alternatives, and the count comes from the profile list', () => {
     const warning = checkAccessCompatibility(secureTowerInput('nearest-car')).warning ?? '';
-    expect(warning).toContain('2 of the 12 dispatchers loaded here do read a credential');
+    expect(warning).toContain('2 of the 13 dispatchers loaded here do read a credential');
     expect(warning).toContain('destination-eta, destination-panel');
   });
 
@@ -137,7 +139,7 @@ describe('Secure Tower, before Run', () => {
 });
 
 describe('the message is derived from the profile list — W8’s liveness evidence', () => {
-  it('changes when a thirteenth, credential-aware profile is added', () => {
+  it('changes when a fourteenth, credential-aware profile is added', () => {
     const before = checkAccessCompatibility(secureTowerInput('nearest-car')).warning ?? '';
     const extra: DispatcherProfile = {
       id: 'badge-reader',
@@ -151,7 +153,7 @@ describe('the message is derived from the profile list — W8’s liveness evide
         profiles: [...profiles, extra],
       }).warning ?? '';
     expect(after).not.toBe(before);
-    expect(after).toContain('3 of the 13 dispatchers loaded here do read a credential');
+    expect(after).toContain('3 of the 14 dispatchers loaded here do read a credential');
     expect(after).toContain('badge-reader');
   });
 

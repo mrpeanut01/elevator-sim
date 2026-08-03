@@ -189,7 +189,7 @@ describe('the browser viewer can enable a weight-set selector', () => {
     for (const profile of shipped.dispatcherProfiles.profiles) {
       expect(profile.selection?.policy ?? 'off', `profile "${profile.id}"`).toBe('off');
     }
-    expect(shipped.dispatcherProfiles.profiles).toHaveLength(12);
+    expect(shipped.dispatcherProfiles.profiles).toHaveLength(13);
   });
 
   it('is byte-identical to a configuration that never carried the file', () => {

@@ -36,7 +36,12 @@ import {
   resolveCase,
   STANDARD_SPACE,
 } from './generate.js';
-import { assertCarriesCallType, generateOptionsFrom, withCallType } from './run.js';
+import {
+  CORPUS_DISPATCHER_PROFILE_IDS,
+  assertCarriesCallType,
+  generateOptionsFrom,
+  withCallType,
+} from './run.js';
 import { FUZZ_TOPOLOGIES, type FuzzCase } from './types.js';
 
 const DATA_DIR = fileURLToPath(new URL('../../../../data', import.meta.url));
@@ -394,11 +399,14 @@ describe('what the generator draws (C32)', () => {
         'up-down-buttons',
       ]);
     }
-    // Measured on this tree, so the widening cannot quietly narrow back: 539 of 2 064 cases name
-    // the middle rung. Pinned as a floor rather than an equality, because the number is a property
-    // of `data/` (which profiles can carry which rung) and is expected to move when a profile does.
+    // Measured on this tree, so the widening cannot quietly narrow back. **539 → 571 when
+    // `collective-enroute` shipped** (`DECISIONS.md` § D205): the dispatcher axis gained a member,
+    // so every seed re-draws and more of them land on a profile that can carry the middle rung.
+    // That is the move the note above anticipated — the number is a property of `data/`, and this
+    // assertion tracks the corpus **as shipped**, unlike the § D126 record below, which pins the
+    // library it was measured against so its seeds keep their meaning.
     const middle = [...corpus, ...deep].filter((entry) => entry.callType === 'destination-entry');
-    expect(middle.length).toBe(539);
+    expect(middle.length).toBe(571);
   }, 120_000);
 
   it('makes the access-zone arm three-way, and the third arm depends on the profile', () => {
@@ -424,8 +432,11 @@ describe('what the generator draws (C32)', () => {
     const lockedOut = zonedMiddle.filter((entry) => entry.tags.includes('access-lockout'));
     const authorized = zonedMiddle.filter((entry) => !entry.tags.includes('access-lockout'));
 
-    expect(lockedOut.length).toBe(93);
-    expect(authorized.length).toBe(27);
+    // 93 → 95 with the thirteenth profile, for the same re-draw reason as the middle-rung count.
+    expect(lockedOut.length).toBe(95);
+    // 27 → 36, the same re-draw. The split below is what this test is really about, and it is
+    // asserted structurally rather than by count in both directions.
+    expect(authorized.length).toBe(36);
     // The split is the *profile's*, not the draw's, so it is asserted as one: every authorized case
     // is a panel, and no locked-out case is.
     const profiles = new Map(config.dispatcherProfiles.profiles.map((p) => [p.id, p]));
@@ -440,6 +451,14 @@ describe('what the generator draws (C32)', () => {
   }, 120_000);
 
   it('pins what widening the ladder moved, and what it did not (§ D126)', () => {
+    // **This one is a record, so it declares its own dispatcher axis.** Every number below —
+    // seed 118's draw, 900 of 2 064, the twelve new lockouts — was measured against the twelve
+    // profiles shipped at § D126. A fuzz seed is an index into an option space whose dispatcher
+    // dimension is the profile list, so shipping a thirteenth re-maps it: seed 118 drew
+    // `destination-panel` then and draws `auction` now, with nothing about § D126 having changed.
+    // Pinning the axis keeps the record about what it says it is about. `DECISIONS.md` § D205.
+    const pinnedOptions = generateOptionsFrom(config, undefined, CORPUS_DISPATCHER_PROFILE_IDS);
+    const corpus = STANDARD_CORPUS.map((seed) => caseFromSeed(seed, pinnedOptions));
     /*
      * `fuzz-118` carried C32's whole blast radius on the pinned corpus and now carries this one's.
      * It draws `destination-panel` beside an access-restricted building; C32 moved it from an

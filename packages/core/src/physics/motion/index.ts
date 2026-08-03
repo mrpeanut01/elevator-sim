@@ -37,6 +37,7 @@ export {
   phaseByName,
   positionAt,
   profileDuration,
+  sharedPrefixSeconds,
   speedAt,
   travelTime,
   velocityAt,

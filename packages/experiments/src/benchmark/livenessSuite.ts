@@ -40,6 +40,7 @@
 
 import { measureAuctionAggregation, measureMultiRoundReachability } from './auctionAggregation.js';
 import { measureDestinationLiveness } from './destinationLiveness.js';
+import { measureDiversionAt, measureShippedAt } from './enRouteDiversion.js';
 import { measureEnergyLiveness } from './energyLiveness.js';
 import { formatLunchTwoWayMix, measureLunchTwoWayMix } from './lunchTwoWay.js';
 import { measurePredictorLag } from './predictorLag.js';
@@ -50,6 +51,7 @@ import {
 
 import type { AuctionEnsembleResult, MultiRoundReachability } from './auctionAggregation.js';
 import type { DestinationLiveness } from './destinationLiveness.js';
+import type { DiversionCell } from './enRouteDiversion.js';
 import type { EnergyLivenessStudy } from './energyLiveness.js';
 import type { LunchTwoWayMixStudy } from './lunchTwoWay.js';
 import type { PredictorLagStudy } from './predictorLag.js';
@@ -85,6 +87,19 @@ export interface LivenessSuiteResult {
    * forbids a selector result in the commit that adds the template — so it costs seconds.
    */
   readonly lunchTwoWayMix: LunchTwoWayMixStudy;
+  /**
+   * What en-route diversion is worth, at the two rates whose AWT interval is quotable.
+   *
+   * The odd one out here, and deliberately so: it is the only member that *computes* confidence
+   * intervals. It is categorical anyway because nothing in the repository asserts its values —
+   * `enRouteDiversion.test.ts` asserts the apparatus (paired, live, quotable) and prints the
+   * numbers. So there is no pin for `regeneratePins.ts` to regenerate, and the study belongs to
+   * the half of `benchmark/` this module drives. `DECISIONS.md` § D205 records that adopting
+   * `eligibility.enRouteDiversion` on a shipped profile is what would move it to the other half.
+   */
+  readonly enRouteDiversion: readonly DiversionCell[];
+  /** The same cells, comparing the profile **as shipped** rather than the isolated mechanism. */
+  readonly shippedDiversion: readonly DiversionCell[];
 }
 
 export interface LivenessSuiteOptions {
@@ -135,6 +150,28 @@ export async function runLivenessSuite(
     ...(options.fastOnly === true ? { replications: 8 } : {}),
   });
 
+  // Two paired experiments at 50 replications each, so `fastOnly` narrows the budget rather than
+  // dropping the cells — the same rule the rest of this driver follows. A narrowed run still
+  // populates every field, and `live` is still measured rather than assumed.
+  const enRouteDiversion: DiversionCell[] = [];
+  for (const point of [
+    { building: 'midtown-office', rate: 1 },
+    { building: 'midtown-office', rate: 2 },
+    { building: 'garden-apartments', rate: 10 },
+    { building: 'garden-apartments', rate: 14 },
+  ]) {
+    enRouteDiversion.push(await measureDiversionAt(point, options.fastOnly === true ? 8 : 50));
+  }
+  // The deployment contrast beside the mechanism one. Both, because they gave different answers:
+  // isolated, diversion is a trade; as shipped, with `detourPenalty` pricing it, it is not.
+  const shippedDiversion: DiversionCell[] = [];
+  for (const point of [
+    { building: 'midtown-office', rate: 1 },
+    { building: 'vertical-city', rate: 4, callType: 'mobile-credential' as const },
+  ]) {
+    shippedDiversion.push(await measureShippedAt(point, options.fastOnly === true ? 8 : 50));
+  }
+
   return Object.freeze({
     predictorLag,
     auctionAggregation,
@@ -144,6 +181,8 @@ export async function runLivenessSuite(
     weightSets,
     deadband,
     lunchTwoWayMix,
+    enRouteDiversion: Object.freeze(enRouteDiversion),
+    shippedDiversion: Object.freeze(shippedDiversion),
   });
 }
 
@@ -256,6 +295,18 @@ export function formatLivenessSuite(result: LivenessSuiteResult): string {
 
   lines.push('', 'lunch two-way mix (lunchTwoWay.ts)');
   lines.push(...formatLunchTwoWayMix(result.lunchTwoWayMix));
+
+  lines.push('', 'en-route diversion (enRouteDiversion.ts) — collective-enroute − collective, paired-t 95 %');
+  for (const cell of [...result.enRouteDiversion, ...result.shippedDiversion]) {
+    lines.push(
+      `  ${cell.building} ${String(cell.rate)}% n=${String(cell.waiting.n)} ` +
+        `ΔAWT=${cell.waiting.estimate.mean.toFixed(3)} ` +
+        `[${cell.waiting.estimate.lower.toFixed(3)}, ${cell.waiting.estimate.upper.toFixed(3)}] ` +
+        `excludesZero=${String(cell.waiting.significant)} ` +
+        `live=${String(cell.live)} crn=${String(cell.commonRandomNumbers)} ` +
+        `awtValid=${String(cell.awtIsValid)}`,
+    );
+  }
 
   return lines.join('\n');
 }

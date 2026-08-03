@@ -596,6 +596,7 @@ const dispatchStageSchema = z.strictObject({
 const eligibilityStageSchema = z.strictObject({
   $comment: comment,
   allowOppositeDirectionPickup: z.boolean().optional(),
+  enRouteDiversion: z.boolean().optional(),
   // Not `fraction`: the declared range is [0, 1.2], because a projected load *on arrival* may
   // legitimately exceed rated load and a profile must be able to say it will still assign.
   maxLoadFactorForAssignment: nonNegative.max(1.2).optional(),

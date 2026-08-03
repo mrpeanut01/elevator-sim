@@ -59,6 +59,7 @@ How a call enters the system, and what information exists at that moment.
 | Parameter | Values | Notes |
 |---|---|---|
 | `callType` | `up-down-buttons` \| `destination-entry` \| `mobile-credential` | Determines whether destination is known at call time |
+| `passengerAssignment` | `none` \| `panel` | Whether the landing panel names a car for each passenger (`panel`) or the landing keeps its up/down button (`none`) |
 | `batchWindowS` | 0–5 | Group near-simultaneous calls at one floor before scoring |
 
 Destination entry is not merely a UI change — it moves information *earlier*, which is the
@@ -74,11 +75,26 @@ Hard constraints. Not costs — a car either can serve the call or cannot.
 | access zoning | from credential | Is this passenger permitted |
 | `carMode` | in-service, independent, fire-recall, out-of-service | Car-owned state |
 | `allowOppositeDirectionPickup` | bool | Whether a down-travelling car may take an up call |
+| `enRouteDiversion` | bool, default `false` | Whether a car already in motion may be cut short at a floor it has not yet committed past. Off, a moving car is judged from its **destination** — the only place the kernel could stop it — so a call on a floor it is about to fly through costs it a full reversal. On, it is judged from its **commit point**, the last floor it can still decelerate into, and the runner really diverts it there. See [DECISIONS.md § D205](../DECISIONS.md) |
 | `maxLoadFactorForAssignment` | 0.0–1.0 | Refuse assignment above this, distinct from bypass |
 
 ### Stage 3: Scoring
 
 The weighted cost function. See [Layer 3](#layer-3--the-dispatch-cost-function) below.
+
+**Weight-set selection** — whether the vector may change *during* the run. Off in every shipped
+profile, so a run selects nothing unless a profile asks it to; the arms are the file-level
+`patternSwitching` block, and a profile declaring a policy with no library to select from is
+refused rather than run.
+
+| Parameter | Values | Notes |
+|---|---|---|
+| `selection.policy` | `off` \| `fuzzy` \| `contextual` | Whether the weight vector may change during the run, and by what rule |
+| `selection.observationWindowS` | 30–1800 | Trailing window the three traffic rates are counted over. Too short and the detector tracks batches rather than patterns |
+| `selection.lobbyArrivalRateGain` | 0–4, inert at 1 | Gain on the lobby arrival rate before its memberships are evaluated |
+| `selection.interfloorRateGain` | 0–4, inert at 1 | Gain on the interfloor arrival rate |
+| `selection.downPeakRateGain` | 0–4, inert at 1 | Gain on the down-travelling arrival rate |
+| `selection.switchMargin` | 0–1 | Membership a challenger must exceed the incumbent's by before it takes the run, on top of the dwell hysteresis |
 
 ### Stage 4: Assignment
 

@@ -128,7 +128,7 @@ import {
   type DispatchPolicy,
   type GroupObservationContext,
 } from '../dispatch/index.js';
-import { SimKernel, type SimTime } from '../kernel/index.js';
+import { SimKernel, type ScheduledEvent, type SimTime } from '../kernel/index.js';
 import {
   comparabilityDisclaimer,
   comparabilityOf,
@@ -146,6 +146,7 @@ import {
   isAccessPermitted,
   shaftForBank,
   type CarSnapshot,
+  type CommittedStop,
 } from '../model/car/index.js';
 import {
   DIRECTIONS,
@@ -497,6 +498,11 @@ export class Simulation {
   /** Bank id to its load-sensor comparator, the rising edge that triggers stage 5. */
   readonly #capacityMonitors = new Map<string, CapacityReassignmentMonitor>();
   readonly #carsById = new Map<string, Car>();
+  /**
+   * Car id to the one arrival event its current run will produce, so a diversion can cancel
+   * the arrival it supersedes. Deleted when the arrival fires. See {@link #considerDiversion}.
+   */
+  readonly #carArrivals = new Map<string, ScheduledEvent<{ carId: string }>>();
   readonly #activeCalls = new Map<string, ActiveCall>();
   /** Every leg ever materialized, by leg id. The denominator of the conservation audit. */
   readonly #legs = new Map<string, Passenger>();
@@ -553,6 +559,8 @@ export class Simulation {
   #lateArrivalHoldMaxCohort = 0;
   /** How often the drain deadline refused to schedule something. `> 0` means it really bit. */
   #deadlineTruncations = 0;
+  /** Runs cut short en route. Zero under every profile leaving `enRouteDiversion` off. */
+  #diversions = 0;
 
   /* ---- patience and abandonment (docs/14 § 3.1) ---- */
 
@@ -1066,6 +1074,7 @@ export class Simulation {
       predictorObservations,
       capacityCrossings: this.#capacityCrossings,
       capacityMigrations: this.#capacityMigrations,
+      diversions: this.#diversions,
       capacityHeld: this.#capacityHeld,
       lateArrivalHoldsRequested: this.#lateArrivalHoldsRequested,
       lateArrivalHoldsGranted: this.#lateArrivalHoldsGranted,
@@ -1813,7 +1822,12 @@ export class Simulation {
           }
         }
 
-        for (const car of bank.cars) this.#stepCar(car, at);
+        for (const car of bank.cars) {
+          // Before the step, not after: a car that can still be cut short is a car whose
+          // arrival time is about to change, and `#stepCar` only ever acts on a standing one.
+          this.#considerDiversion(car, at);
+          this.#stepCar(car, at);
+        }
 
         if (retry) this.#scheduleTick(bankId, at + this.#options.dispatchRetryS);
       } while (this.#dirtyBanks.has(bankId) && passes < MAX_DISPATCH_PASSES);
@@ -2920,23 +2934,96 @@ export class Simulation {
     if (!car.canStart || car.floorId === target) return;
 
     const motion = car.departFor(target, at);
-    this.#kernel.schedule(
-      motion.arrivesAt,
-      carArrivedEvent({ carId: car.id }, (payload, context) => {
-        const arriving = this.#carsById.get(payload.carId);
-        /* c8 ignore next -- arrivals are only scheduled for cars in this building. */
-        if (arriving === undefined) return;
-        // **The energy axis's integration seam.** This is the only place in the shipped path
-        // where a completed move is observable — `completeArrival` clears `#motion` — and it is
-        // therefore the only place a per-move travel sample can be taken. Every car move goes
-        // through `#depart`, including stage 7's repositioning, which is the whole point: an
-        // energy proxy reconstructed from passenger records would be blind to the empty-car
-        // driving that pre-positioning does. `benchmark/energyLiveness.test.ts` counts the
-        // samples against the fleet's own odometers rather than trusting this comment.
-        this.#recorder.sampleTravel(context.time, arriving.id, arriving.completeArrival(context.time));
-        this.#stepCar(arriving, context.time);
-      }),
+    this.#scheduleArrival(car, motion.arrivesAt);
+  }
+
+  /**
+   * Hold the one arrival this car's current run will produce.
+   *
+   * Kept on {@link #carArrivals} rather than fired and forgotten, because a diverted run's old
+   * arrival must be *cancelled* — the kernel's `cancel` preserves the cancelled slot's
+   * `(time, sequence)` position, so a run that diverts fires every surviving event in exactly
+   * the order a run that never scheduled it would (invariant 4). Letting the stale arrival
+   * fire and no-op would have been the cheaper fix and the wrong one: it would leave a
+   * phantom event in `eventCount()` and make the event budget depend on how often cars
+   * diverted.
+   */
+  #scheduleArrival(car: Car, arrivesAt: SimTime): void {
+    this.#carArrivals.set(
+      car.id,
+      this.#kernel.schedule(
+        arrivesAt,
+        carArrivedEvent({ carId: car.id }, (payload, context) => {
+          const arriving = this.#carsById.get(payload.carId);
+          /* c8 ignore next -- arrivals are only scheduled for cars in this building. */
+          if (arriving === undefined) return;
+          this.#carArrivals.delete(payload.carId);
+          // **The energy axis's integration seam.** This is the only place in the shipped path
+          // where a completed move is observable — `completeArrival` clears `#motion` — and it is
+          // therefore the only place a per-move travel sample can be taken. Every car move goes
+          // through `#depart`, including stage 7's repositioning, which is the whole point: an
+          // energy proxy reconstructed from passenger records would be blind to the empty-car
+          // driving that pre-positioning does. `benchmark/energyLiveness.test.ts` counts the
+          // samples against the fleet's own odometers rather than trusting this comment.
+          // A diverted run arrives **once**, at the floor it was cut short at, so the sample is
+          // the distance actually driven and the odometer check still balances.
+          this.#recorder.sampleTravel(
+            context.time,
+            arriving.id,
+            arriving.completeArrival(context.time),
+          );
+          this.#stepCar(arriving, context.time);
+        }),
+      ),
     );
+  }
+
+  /**
+   * Cut a moving car's run short at the nearest committed stop it has not yet driven past.
+   *
+   * This is the other half of `eligibility.enRouteDiversion`, and the half without which the
+   * first is a lie. `assessDirectionReversal` judges a car from its commit point under that
+   * setting; if the kernel could not then *deliver* a stop at the commit point, eligibility
+   * would be admitting stops the physics refuses — the precise disagreement
+   * `terms/directionReversal.ts` warns about, and worse than the behaviour it replaces,
+   * because a call would be assigned to a car that sails past it and has to come back.
+   *
+   * Only committed stops, and only ones already ahead of the commit point. The car is never
+   * sent somewhere it was not going anyway; a diversion shortens a run, it does not invent
+   * one. So the route order is unchanged, `#settleDirection` still sees the same remaining
+   * work, and a car that diverts serves strictly more of its own commitments per pass.
+   *
+   * Inert under every profile that leaves the setting off, which is every profile measured
+   * before it existed.
+   */
+  #considerDiversion(car: Car, at: SimTime): void {
+    if (!car.isMoving) return;
+    const policy = this.#policies.get(car.bankId);
+    if (policy === undefined || !policy.config.eligibility.enRouteDiversion) return;
+
+    const frontier = car.divertFrontier(at);
+    if (frontier === undefined) return;
+    const motion = car.snapshot(at).motion;
+    /* c8 ignore next -- `car.isMoving` is exactly "this car has a motion". */
+    if (motion === undefined) return;
+    const sign = motion.direction === 'up' ? 1 : -1;
+
+    let best: CommittedStop | undefined;
+    for (const stop of car.committedStops()) {
+      // Reachable: at or beyond the last floor the car can still decelerate into, and short of
+      // where it is already going.
+      if (sign * (stop.floorIndex - frontier.index) < 0) continue;
+      if (sign * (stop.floorIndex - motion.toFloorIndex) >= 0) continue;
+      if (best === undefined || sign * (stop.floorIndex - best.floorIndex) < 0) best = stop;
+    }
+    if (best === undefined) return;
+
+    const pending = this.#carArrivals.get(car.id);
+    if (pending !== undefined) this.#kernel.cancel(pending);
+    this.#carArrivals.delete(car.id);
+    const diverted = car.divertTo(best.floorId, at);
+    this.#diversions += 1;
+    this.#scheduleArrival(car, diverted.arrivesAt);
   }
 
   /**
@@ -3193,8 +3280,19 @@ export class Simulation {
     return policy;
   }
 
+  /**
+   * The bank's cars as the group controller sees them, at one instant.
+   *
+   * The single place `enRouteDiversion` enters the model. Every snapshot the dispatcher ever
+   * scores comes from here, so gating the commit point on the resolved profile here is what
+   * makes eligibility, every cost term and `projectRoute` agree without any of them reading a
+   * configuration: under a profile that leaves the setting off, `divertFrontierIndex` is
+   * simply absent and all three fall back to "a moving car is committed to its destination".
+   */
   #snapshots(bank: Bank<Car>, at: SimTime): readonly CarSnapshot[] {
-    return bank.cars.map((car) => car.snapshot(at));
+    const enRouteDiversion =
+      this.#policies.get(bank.id)?.config.eligibility.enRouteDiversion ?? false;
+    return bank.cars.map((car) => car.snapshot(at, { enRouteDiversion }));
   }
 
   /**

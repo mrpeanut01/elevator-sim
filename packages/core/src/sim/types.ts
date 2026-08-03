@@ -765,6 +765,16 @@ export interface StageActivity {
   readonly capacityCrossings: number;
   /** Calls stage 5 moved off a car that had just filled up. */
   readonly capacityMigrations: number;
+  /**
+   * Runs cut short en route under `eligibility.enRouteDiversion` — a moving car given a stop
+   * at a floor it had not yet committed past.
+   *
+   * Zero under every profile that leaves the setting off, which is every profile the project
+   * measured before diversion existed. A non-zero count is the only evidence from outside the
+   * model that the setting is doing something, and it is on the *result* for the reason the
+   * rest of {@link StageActivity} is: `runSimulation` discards the instance.
+   */
+  readonly diversions: number;
   /** Calls it looked at and left where they were, with a gate that kept them. */
   readonly capacityHeld: number;
   /**

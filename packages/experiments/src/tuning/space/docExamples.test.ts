@@ -39,6 +39,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   COST_TERMS_BY_ID,
+  DISPATCH_PARAMETERS,
   parseDispatcherProfiles,
   resolveDispatchConfig,
   type DispatcherProfile,
@@ -235,5 +236,51 @@ describe('docs/06 § JSON examples', () => {
         }
       }
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * § The parameter tables — declared against documented, not eyeballed
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Every dispatch tunable the engine declares must appear in this document.
+ *
+ * The suite above checks the *fenced examples*; the stage tables beside them were hand-written and
+ * checked by nobody, so they drifted exactly the way this repository's hand-written lists always
+ * do. Measured when the guard was added: **8 of 40 declared dispatch tunables were undocumented** —
+ * `eligibility.enRouteDiversion` (`DECISIONS.md` § D205, which is what exposed the gap),
+ * `dispatch.passengerAssignment` from Phase 6b, and all six `selection.*` parameters from wave 6.
+ * Seven of the eight predated the change that found them.
+ *
+ * That is the same defect as `PROFILE_OBJECT_SECTIONS` before § D146 and the census reference arm
+ * before § D205: a list somebody has to remember to update. Invariant 8 says every tunable declares
+ * its schema so a generic optimizer can search it — but a human choosing a profile reads the
+ * document, and an undocumented knob is one nobody turns.
+ *
+ * Matched on the **leaf** name in backticks rather than the dotted id, because the tables are
+ * grouped by stage and name the field the way a profile authors it. That is looser than matching
+ * the full id and it is the looseness the document's own shape asks for; it still fails on a
+ * tunable nobody mentioned at all, which is the failure that actually happens.
+ */
+describe('docs/06 § the stage tables', () => {
+  const doc = readFileSync(DOC, 'utf8');
+
+  it('documents every dispatch tunable the engine declares', () => {
+    const undocumented = DISPATCH_PARAMETERS.map((spec) => spec.id).filter((id) => {
+      const leaf = id.split('.').pop() as string;
+      return !doc.includes(`\`${leaf}\``) && !doc.includes(`\`${id}\``);
+    });
+    expect(
+      undocumented,
+      'a tunable an optimizer can search and a reader cannot find. Add a row to the stage table it belongs to — see DECISIONS.md § D205.',
+    ).toEqual([]);
+  });
+
+  it('finds enough of them to be checking something', () => {
+    // The negative control the assertion above needs: a doc read that silently returned nothing,
+    // or a `DISPATCH_PARAMETERS` import that came back empty, would satisfy it vacuously.
+    expect(DISPATCH_PARAMETERS.length).toBeGreaterThanOrEqual(40);
+    expect(doc.length).toBeGreaterThan(10_000);
   });
 });

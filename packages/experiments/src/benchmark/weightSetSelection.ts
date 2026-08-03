@@ -877,6 +877,15 @@ export interface CensusRow {
   readonly quotable: boolean;
   /** Measured and published, but not a candidate for the reference arm. § D147's device. */
   readonly ceilingExcluded: boolean;
+  /**
+   * Whether this profile was eligible to *become* the reference arm.
+   *
+   * `false` for a profile that landed after the cell was pre-registered. Measured and published
+   * either way — the same rule {@link ceilingExcluded} follows, and for the same reason: a reader
+   * must be able to see what was left out of candidacy and why. See
+   * {@link PRE_REGISTERED_REFERENCE_CANDIDATES}.
+   */
+  readonly referenceCandidate: boolean;
   readonly meanTtdS: number;
   readonly firstInvalidReplication: number | undefined;
 }
@@ -905,6 +914,46 @@ export interface SelectionCensus {
  * is built, on the shipped library alone, which is what stops it being chosen after seeing the
  * result — the failure § D126 names explicitly as making the criterion a bad one.
  */
+/**
+ * The profiles eligible to be **elected** the reference arm of a selection cell.
+ *
+ * § D151 pre-registered these cells, and § D156, § D162 and § D200 are built on figures measured
+ * against the arm the census elected from this set. The census elects the best shipped profile on
+ * the gate metric, which is the right way to *choose* a baseline once and the wrong way to *keep*
+ * one: a profile added to `data/dispatcher-profiles.json` afterwards would silently become the new
+ * baseline and move every paired figure in the study.
+ *
+ * That is not hypothetical. Shipping `collective-enroute` did exactly it (`DECISIONS.md` § D205):
+ * forty figures moved, bit-identically across runs, with **no simulation having changed** — at
+ * `midtown-office@hotel` 1.5 % the elected reference went from `collective` at 54.4459 s to the
+ * diverting profile at 54.0100 s, and every `cost` estimate is a paired difference against it.
+ * Four other mechanisms were measured and eliminated before this one was found, which is the
+ * argument for writing the arm set down rather than deriving it.
+ *
+ * **Candidacy is declared; measurement is not.** Every shipped profile still runs in the census,
+ * still gets a row and still publishes its mean, so a newer profile that beats the baseline is
+ * *visible* — `CensusRow.referenceCandidate` says why it was not eligible. That is the same
+ * split `ceilingExcludedArms` already makes, for the same reason.
+ *
+ * A profile belongs here only by a decision to re-baseline the pre-registered comparison, taken
+ * deliberately and recorded. `selectionSweep.test.ts` pins the set both ways: every id must be a
+ * shipped profile, and every cell's `preRegisteredReference` must be in it.
+ */
+export const PRE_REGISTERED_REFERENCE_CANDIDATES: readonly string[] = Object.freeze([
+  'nearest-car',
+  'eta',
+  'collective',
+  'energy-aware',
+  'fairness-first',
+  'capacity-aware',
+  'predictive-balanced',
+  'auction',
+  'auction-multi-round',
+  'zoned-uppeak',
+  'destination-eta',
+  'destination-panel',
+]);
+
 export async function censusSelectionPoint(input: {
   readonly seed: number;
   readonly replications: number;
@@ -918,9 +967,37 @@ export async function censusSelectionPoint(input: {
    * published — the exclusion is from *candidacy*, so a reader sees what was left out and why.
    */
   readonly ceilingExcludedArms?: readonly string[] | undefined;
+  /**
+   * The profiles that may be *elected* reference arm, or `undefined` for "any shipped profile".
+   *
+   * **Why this exists.** The census surveys every shipped profile and elects the best on the gate
+   * metric. That is the right way to choose a baseline the first time and the wrong way to keep
+   * one: § D151 pre-registered these cells, and § D156, § D162 and § D200 are built on figures
+   * measured against the arm it elected. A profile added to `data/dispatcher-profiles.json`
+   * afterwards would silently become the new baseline and move every paired figure in the study —
+   * which is exactly what happened when `collective-enroute` was first shipped (`DECISIONS.md`
+   * § D205): forty figures moved, deterministically, with no run having changed. Nothing about
+   * any simulation was different; **what the others were measured against** was.
+   *
+   * So candidacy is declared and measurement is not. Every profile still runs, still gets a row,
+   * still publishes its mean — a later profile that beats the baseline is visible in the census
+   * rather than hidden by it. It just cannot re-baseline a pre-registered comparison as a side
+   * effect of being added.
+   */
+  readonly referenceCandidates?: readonly string[] | null | undefined;
 }): Promise<SelectionCensus> {
   const cell = input.cell ?? SELECTION_CELL;
   const excluded = new Set(input.ceilingExcludedArms ?? []);
+  // **Defaulted on the primitive, not on the wrapper.** It was defaulted in
+  // `runWeightSetSelectionStudy` first, and `lunchTwoWaySelection.ts` calls *this* function
+  // directly — so the guard was absent on exactly one of the two paths, and the reference arm at
+  // both lunch cells silently became `collective-enroute` the moment that profile got good enough
+  // to win. A default that a second caller can miss is not a default; it is a convention.
+  // `null` is how a caller asks for an open election, and saying so is the point.
+  const candidates =
+    input.referenceCandidates === null
+      ? undefined
+      : new Set(input.referenceCandidates ?? PRE_REGISTERED_REFERENCE_CANDIDATES);
   const profileIds = [...input.resources.dispatcherProfilesById.keys()];
   const experiment = await runGateExperiment({
     id: `phase6c/census/${cell.id}`,
@@ -941,17 +1018,22 @@ export async function censusSelectionPoint(input: {
       profileId,
       quotable: armCell.aggregate.awtIsValid,
       ceilingExcluded: excluded.has(profileId),
+      referenceCandidate: candidates === undefined || candidates.has(profileId),
       meanTtdS: mean,
       firstInvalidReplication: firstInvalidOf(armCell.replications),
     });
   });
 
   const quotable = rows.filter(
-    (row) => row.quotable && !row.ceilingExcluded && Number.isFinite(row.meanTtdS),
+    (row) =>
+      row.quotable &&
+      !row.ceilingExcluded &&
+      row.referenceCandidate &&
+      Number.isFinite(row.meanTtdS),
   );
   if (quotable.length === 0) {
     throw new Error(
-      `No shipped profile has a quotable AWT at ${cell.building}/${cell.point.id} at seed ${String(input.seed)}; there is no reference arm and therefore no comparison.`,
+      `No eligible profile has a quotable AWT at ${cell.building}/${cell.point.id} at seed ${String(input.seed)}; there is no reference arm and therefore no comparison. Candidacy is ${candidates === undefined ? 'every shipped profile' : `restricted to ${[...candidates].join(', ')}`}.`,
     );
   }
   let best = quotable[0] as CensusRow;
@@ -1079,6 +1161,14 @@ export interface SelectionStudyOptions {
   /** Arms excluded from reference-arm candidacy by their ceiling. § D147's device. */
   readonly ceilingExcludedArms?: readonly string[] | undefined;
   /**
+   * Profiles eligible to be *elected* reference arm.
+   *
+   * Defaults to {@link PRE_REGISTERED_REFERENCE_CANDIDATES}. Pass `null` for "any shipped
+   * profile" — the pre-§ D205 behaviour, which is correct when choosing a baseline for a *new*
+   * study and wrong for every study already pre-registered against one.
+   */
+  readonly referenceCandidates?: readonly string[] | null | undefined;
+  /**
    * Measure this cell's own TTD resolution limits, **after** the census fixes the reference arm
    * and **before** any ΔTTD is graded against them. § D151 § 3. Omitted, § 4's inherited pair
    * stands and the study is § D145's exactly.
@@ -1119,6 +1209,10 @@ export async function runWeightSetSelectionStudy(
     ...(options.ceilingExcludedArms === undefined
       ? {}
       : { ceilingExcludedArms: options.ceilingExcludedArms }),
+    // Passed straight through: `censusSelectionPoint` owns the default, so both callers get it.
+    ...(options.referenceCandidates === undefined
+      ? {}
+      : { referenceCandidates: options.referenceCandidates }),
   });
 
   // The budget: the criterion's 50–200 band, clamped by the **declared arm set's** own census
