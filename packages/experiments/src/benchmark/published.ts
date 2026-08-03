@@ -930,6 +930,14 @@ export const STUDY_ENTRY_POINTS: Readonly<Record<string, PublishedStudyId | 'no-
     // n = 200 across five buildings and two seeds, which is minutes of simulation per cell and
     // belongs in neither `regeneratePins.ts` nor `livenessSuite.ts`.
     runCollectiveAdoptionStudy: 'no-intervals',
+    // § D211's study, classified for the same reason as the two above: it computes intervals, and
+    // the assertions on it are structural — the ladders are derived, the criterion can refuse, and
+    // clause 5′ is an exact bit-identity rather than an interval. Its non-test caller is `main` in
+    // its own module, the command § D211's numbers came from.
+    runDiversionDetourStudy: 'no-intervals',
+    // The per-cell primitive `runDiversionDetourStudy` is built from, classified alongside it for
+    // the same reason `measureDiversionAt` and `measureShippedAt` are.
+    measureDetourAt: 'no-intervals',
     // Double-deck operation against the single-deck arm the retired `doubleDeckNotSimulated`
     // disclaimer described, at two censused operating points on `vertical-city`. Publishes
     // paired-t intervals on ten metrics, so `regeneratePins.ts` is its non-test caller.
