@@ -12719,3 +12719,147 @@ inconsistency against its own neighbour rather than a considered scope, now clos
 shipped in step 5 and never reached the section `random/streams.ts` names as the source of its own
 list. All four conditional streams are now there. Nothing mechanises that agreement: `streams.test.ts`
 pins the names and their derived parameters, and no test reads that file.
+
+## D209 — the criterion for `collective` itself carrying en-route diversion, written before the study
+
+**Date: 2026-08-03 · Pre-registration.** [§ D205](DECISIONS.md) closed with the question and
+deliberately refused to answer it: *"what remains is whether `collective` itself should carry the
+setting — expensive, because every published `collective` figure would be invalidated — and that
+wants the study re-run at n = 200 across more than one building first."* This is the criterion that
+decides it, and it is committed **before** the n = 200 study exists, on the pattern
+[§ D139](DECISIONS.md) and [§ D151](DECISIONS.md) set: a criterion dated after the number it judges
+is not a criterion.
+
+### 0. Two arguments point at adoption, and only one of them is allowed to decide
+
+**The mechanism is arguably the definition.** Collective control, as the trade builds it, *is* the
+discipline of stopping for landing calls a car passes travelling in their direction. § D205
+established that the absence of that behaviour here was a **model limitation and not a dispatch
+choice**: `Car.departFor` refused a second move, nothing cancelled a motion, and one arrival event
+was scheduled per run, so a car in flight was judged from its destination and **58.2 % of
+down-travelling legs at `midtown-office` 3 % were physically driven past by a car moving in their own
+direction, every one of which had room aboard**. Under that reading `enRouteDiversion: false` makes
+`collective` a model of something that is not conventional collective control, and the default is
+wrong whatever it measures.
+
+**That argument decides nothing here.** It is written down because it is why the question is worth
+its expense, and because if the measurement refuses adoption it is the thing left to explain. This
+project has a documented failure mode of a mechanism that is *obviously* right and measures as a
+trade — § D205 is itself an instance, and shipping diversion on `waitTime` alone made
+`vertical-city` worse on **both** metrics.
+
+**And `detourPenalty: 0.2` is emphatically not part of that argument.** Adoption ships the weight
+along with the setting, because § D205 showed the setting without the weight is a regression. A
+weight is a tuning artifact — there is no sense in which conventional collective control "prices the
+detour at 0.2" — so the whole of the weight has to be earned by measurement, on traffic it was not
+chosen against.
+
+### 1. The contrast, the seed, and why the seed is a raise
+
+**The contrast is `measureShippedAt`, unchanged**: shipped `collective-enroute` against shipped
+`collective`, down-peak, paired-t at 95 %, common random numbers **verified** per replication by
+trace digest rather than requested. That contrast *is* the adoption question — post-adoption
+`collective` against pre-adoption `collective`, weight and setting moving together, which is what an
+operator would actually receive. `measureDiversionAt`'s one-field contrast answers *"what does
+diversion do?"* and does not decide this.
+
+**n = 200**, the top of the budget CLAUDE.md § Statistical discipline permits, because § D205's
+figures are at n = 50 and it says itself that *a figure a decision rests on should be re-measured at
+200*.
+
+**On a seed disjoint from the study seed, and that is a raise rather than a formality.**
+`detourPenalty: 0.2` was **chosen** by a four-point sweep (0.0, 0.2, 0.5, 1.0) on `vertical-city` 4 %
+at seed 20 260 801, and § D205's shipped-profile table is measured at that same seed. Judging the
+weight there is validating it on the traffic it was fitted to, which is the exact failure
+CLAUDE.md § Tuning discipline names: *hold out traffic seeds, or the gain vanishes on new traffic*.
+So the verdict is taken at **20 261 612** — the study seed plus 811, the offset
+`SWEEP_HOLDOUT_SEED` already uses — and the study seed is reported beside it as the in-sample
+figure. A gap between the two is itself a result.
+
+### 2. The cells, chosen by a ladder declared here
+
+Five buildings, every shipped one. Quotability is a property of the cell **and of `n`** (§ D205
+finding 3: five of ten cells lost `awtIsValid` between n = 50 and n = 200, including the cell that
+produced § D205's original headline), so no single rate can be fixed in advance. Each building
+therefore declares a **descending rate ladder**, and the cell measured is **the highest rung whose
+`awtIsValid` holds on both arms at n = 200 on the holdout seed**:
+
+| building | call type | ladder |
+|---|---|---|
+| `midtown-office` | up/down buttons | 2 %, 1 %, 0.5 % |
+| `garden-apartments` | up/down buttons | 14 %, 10 %, 6 % |
+| `secure-tower` | `mobile-credential` | 4 %, 2 %, 1 % |
+| `mixed-use-high-rise` | `mobile-credential` | 4 %, 2 %, 1 % |
+| `vertical-city` | `mobile-credential` | 4 %, 2 %, 1 % |
+
+The ladder is resolved by `awtIsValid` **alone**. It is written down here so that the rung cannot be
+moved by a ΔAWT anybody has seen — which is the only thing that would make a descending ladder a
+way of shopping for a cell.
+
+**`vertical-city` must produce a quotable rung, or the criterion is not met.** It is the one
+building that refused the mechanism outright (§ D205: ΔTTD `+4.591`, ΔAWT `+0.762`, both excluding
+zero and both against, before the weight existed), it is the only one with a double-deck shuttle and
+sky-lobby transfers, and its refusal is what the `detourPenalty` weight was invented to answer. An
+adoption criterion that structurally excludes the single building that objected is a criterion
+designed to pass. If no rung of its ladder is quotable at n = 200, adoption is **refused for want of
+evidence** — not granted for want of a counterexample.
+
+### 3. The decision rule
+
+Adoption is **ACCEPTED** only if all six hold.
+
+1. **Paired and live at every quotable cell.** `commonRandomNumbers` true and `live` true. Under CRN
+   two arms that behave identically are bit-identical, so `live` is what separates *"the effect is
+   small"* from *"the switch did nothing"* — the state § D205's first draft was actually in.
+2. **All five buildings contribute a quotable cell.** Fewer than five and the criterion is not met.
+   Invalidating every published `collective` figure may not rest on the buildings that happened to
+   stay valid.
+3. **Worse on neither metric anywhere.** At every quotable cell, ΔAWT `lower ≤ 0` **and** ΔTTD
+   `lower ≤ 0`, on **both** seeds. One interval excluding zero on the wrong side, on either metric,
+   at any cell, on either seed, refuses adoption.
+4. **Better somewhere that counts, out of sample.** ΔAWT excludes zero and is negative at **at least
+   three** quotable cells **on the holdout seed**. "Not worse" is not a reason to re-baseline the
+   whole benchmark; the mechanism has to buy something at the budget a decision rests on, on traffic
+   the weight was not fitted to.
+5. **Up-peak does not regress.** `collective` at the benchmark gate's two pure up-peak cells stays
+   quotable and not significantly worse on AWT or TTD. § D205 measured the two arms **bit-identical**
+   there, so this clause is free if that survives adoption and is a live finding if it does not:
+   up-peak is the pattern that least exercises en-route pickup, and a change appearing there is a
+   change the down-peak study never saw.
+6. **The re-baselining is paid in full before the verdict is written** — § 4.
+
+### 4. What adoption costs, and what may not be paid with it
+
+Adoption does not add a profile; it changes what an existing one **means**. Every study holding
+`collective` fixed is re-baselined by it: `MATRIX_BASELINE`, `ARM_PROFILES`, the elected reference of
+`censusSelectionPoint`, and `SweepCell.preRegisteredReference` at all eight § D151 cells. That is not
+hypothetical — shipping `collective-enroute` as a *new* profile moved forty figures
+bit-identically with no simulation having changed (§ D205), and the whole of
+`PRE_REGISTERED_REFERENCE_CANDIDATES` exists because of it. Its docstring says a profile joins that
+set *"only by a decision to re-baseline the pre-registered comparison, taken deliberately and
+recorded"*. **Adoption is that decision, taken on a profile already in the set**, and these are its
+terms:
+
+- **Every moved pin is regenerated and read, not regenerated and pasted.** A moved pin asks *which
+  of the two numbers is right*, and only a human answers that (`regeneratePins.ts`'s own rule).
+- **No phase verdict may move as a side effect.** Phase 6c's refusal (§ D145, § D156, § D200) is a
+  ΔTTD measured **against `collective`**, and a reference that got better changes every one of those
+  differences. They are **re-derived, not assumed to hold**. If the numbers now clear § D139's gate,
+  that is a result which gets its own decision and its own status row — adoption is not a vehicle
+  for a quiet acceptance, and equally not one for a quiet refusal.
+- **`collective-enroute` is deleted on adoption.** It becomes a byte-duplicate of `collective`;
+  keeping it would publish two identical arms in the benchmark gate and leave two ids for one
+  dispatcher.
+- **The contrast has to survive its own success.** `measureDiversionAt` derives its reference arm
+  *from* `collective`, so after adoption both arms would carry diversion, the study would compare a
+  profile with itself, and `live` would go false. Its reference must declare
+  `enRouteDiversion: false` explicitly. A guard that cannot fail has stopped being a guard, and this
+  one is the only thing in the tree that measures what the mechanism does.
+
+### 5. What refusal looks like
+
+`collective` keeps `enRouteDiversion` off by default, `collective-enroute` stays the variant an
+operator opts into, and § D205's closing question is answered **no, at this budget, on this
+evidence** — with the failing clause, the ladder rung and the seed named, in the same way § D145
+refused 6c. A refusal here is not a statement that the mechanism is bad; § D205 already measured
+what it does. It is a statement about a **default**.
