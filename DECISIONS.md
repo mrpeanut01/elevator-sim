@@ -12213,6 +12213,23 @@ both up-peak cells of the benchmark gate** and separates only at `garden-residen
 exercises en-route pickup, which is what the down-peak study says; the arm is in the gate because
 every shipped profile must face it, not because the gate is where its case is made.
 
+> **REFUTED by [§ D210](DECISIONS.md), and this paragraph is left standing as the record of it.**
+> The two arms are **not** bit-identical at the up-peak cells, and this repository's own pin table
+> said so the day the arm landed: `midtown-up-peak` AWT is −6.8148 for `collective` against −6.7504
+> for `collective-enroute`, `secure-up-peak` −5.7661 against −5.5767, and six of the eight pinned
+> figures at the two cells differ. Only `pctOverLongWait` matches to the last digit, which is where
+> the impression came from. The `garden-residential` figure quoted above is also off: the pin is
+> −1.3572, not −1.360.
+>
+> **The reasoning was half right, and the right half is stronger than what was claimed.** Under
+> common random numbers, holding `detourPenalty` fixed and flipping only `enRouteDiversion` gives a
+> paired difference of exactly `[0.000, 0.000]` on both metrics at both cells at two seeds, with
+> `stageActivity.diversions == 0`: the mechanism is not *rare* at up-peak, it is **inert**. What did
+> not follow is the conclusion, because the arms differ by a weight as well as by a setting, and a
+> weight changes decisions whether or not a diversion ever fires. Nothing could fail on the claim —
+> it is prose about numbers, and no test read the numbers — so `collectiveAdoption.test.ts` now
+> asserts the pins in both directions.
+
 **Widened to five buildings at n = 200, and the widening changed the claim.** § D205 originally read
 as an improvement measured on one building. Swept down-peak over every shipped building — the three
 access-controlled ones with `mobile-credential` applied to **both** arms so the passenger model moves
@@ -12719,3 +12736,276 @@ inconsistency against its own neighbour rather than a considered scope, now clos
 shipped in step 5 and never reached the section `random/streams.ts` names as the source of its own
 list. All four conditional streams are now there. Nothing mechanises that agreement: `streams.test.ts`
 pins the names and their derived parameters, and no test reads that file.
+
+## D209 — the criterion for `collective` itself carrying en-route diversion, written before the study
+
+**Date: 2026-08-03 · Pre-registration.** [§ D205](DECISIONS.md) closed with the question and
+deliberately refused to answer it: *"what remains is whether `collective` itself should carry the
+setting — expensive, because every published `collective` figure would be invalidated — and that
+wants the study re-run at n = 200 across more than one building first."* This is the criterion that
+decides it, and it is committed **before** the n = 200 study exists, on the pattern
+[§ D139](DECISIONS.md) and [§ D151](DECISIONS.md) set: a criterion dated after the number it judges
+is not a criterion.
+
+### 0. Two arguments point at adoption, and only one of them is allowed to decide
+
+**The mechanism is arguably the definition.** Collective control, as the trade builds it, *is* the
+discipline of stopping for landing calls a car passes travelling in their direction. § D205
+established that the absence of that behaviour here was a **model limitation and not a dispatch
+choice**: `Car.departFor` refused a second move, nothing cancelled a motion, and one arrival event
+was scheduled per run, so a car in flight was judged from its destination and **58.2 % of
+down-travelling legs at `midtown-office` 3 % were physically driven past by a car moving in their own
+direction, every one of which had room aboard**. Under that reading `enRouteDiversion: false` makes
+`collective` a model of something that is not conventional collective control, and the default is
+wrong whatever it measures.
+
+**That argument decides nothing here.** It is written down because it is why the question is worth
+its expense, and because if the measurement refuses adoption it is the thing left to explain. This
+project has a documented failure mode of a mechanism that is *obviously* right and measures as a
+trade — § D205 is itself an instance, and shipping diversion on `waitTime` alone made
+`vertical-city` worse on **both** metrics.
+
+**And `detourPenalty: 0.2` is emphatically not part of that argument.** Adoption ships the weight
+along with the setting, because § D205 showed the setting without the weight is a regression. A
+weight is a tuning artifact — there is no sense in which conventional collective control "prices the
+detour at 0.2" — so the whole of the weight has to be earned by measurement, on traffic it was not
+chosen against.
+
+### 1. The contrast, the seed, and why the seed is a raise
+
+**The contrast is `measureShippedAt`, unchanged**: shipped `collective-enroute` against shipped
+`collective`, down-peak, paired-t at 95 %, common random numbers **verified** per replication by
+trace digest rather than requested. That contrast *is* the adoption question — post-adoption
+`collective` against pre-adoption `collective`, weight and setting moving together, which is what an
+operator would actually receive. `measureDiversionAt`'s one-field contrast answers *"what does
+diversion do?"* and does not decide this.
+
+**n = 200**, the top of the budget CLAUDE.md § Statistical discipline permits, because § D205's
+figures are at n = 50 and it says itself that *a figure a decision rests on should be re-measured at
+200*.
+
+**On a seed disjoint from the study seed, and that is a raise rather than a formality.**
+`detourPenalty: 0.2` was **chosen** by a four-point sweep (0.0, 0.2, 0.5, 1.0) on `vertical-city` 4 %
+at seed 20 260 801, and § D205's shipped-profile table is measured at that same seed. Judging the
+weight there is validating it on the traffic it was fitted to, which is the exact failure
+CLAUDE.md § Tuning discipline names: *hold out traffic seeds, or the gain vanishes on new traffic*.
+So the verdict is taken at **20 261 612** — the study seed plus 811, the offset
+`SWEEP_HOLDOUT_SEED` already uses — and the study seed is reported beside it as the in-sample
+figure. A gap between the two is itself a result.
+
+### 2. The cells, chosen by a ladder declared here
+
+Five buildings, every shipped one. Quotability is a property of the cell **and of `n`** (§ D205
+finding 3: five of ten cells lost `awtIsValid` between n = 50 and n = 200, including the cell that
+produced § D205's original headline), so no single rate can be fixed in advance. Each building
+therefore declares a **descending rate ladder**, and the cell measured is **the highest rung whose
+`awtIsValid` holds on both arms at n = 200 on the holdout seed**:
+
+| building | call type | ladder |
+|---|---|---|
+| `midtown-office` | up/down buttons | 2 %, 1 %, 0.5 % |
+| `garden-apartments` | up/down buttons | 14 %, 10 %, 6 % |
+| `secure-tower` | `mobile-credential` | 4 %, 2 %, 1 % |
+| `mixed-use-high-rise` | `mobile-credential` | 4 %, 2 %, 1 % |
+| `vertical-city` | `mobile-credential` | 4 %, 2 %, 1 % |
+
+The ladder is resolved by `awtIsValid` **alone**. It is written down here so that the rung cannot be
+moved by a ΔAWT anybody has seen — which is the only thing that would make a descending ladder a
+way of shopping for a cell.
+
+**`vertical-city` must produce a quotable rung, or the criterion is not met.** It is the one
+building that refused the mechanism outright (§ D205: ΔTTD `+4.591`, ΔAWT `+0.762`, both excluding
+zero and both against, before the weight existed), it is the only one with a double-deck shuttle and
+sky-lobby transfers, and its refusal is what the `detourPenalty` weight was invented to answer. An
+adoption criterion that structurally excludes the single building that objected is a criterion
+designed to pass. If no rung of its ladder is quotable at n = 200, adoption is **refused for want of
+evidence** — not granted for want of a counterexample.
+
+### 3. The decision rule
+
+Adoption is **ACCEPTED** only if all six hold.
+
+1. **Paired and live at every quotable cell.** `commonRandomNumbers` true and `live` true. Under CRN
+   two arms that behave identically are bit-identical, so `live` is what separates *"the effect is
+   small"* from *"the switch did nothing"* — the state § D205's first draft was actually in.
+2. **All five buildings contribute a quotable cell.** Fewer than five and the criterion is not met.
+   Invalidating every published `collective` figure may not rest on the buildings that happened to
+   stay valid.
+3. **Worse on neither metric anywhere.** At every quotable cell, ΔAWT `lower ≤ 0` **and** ΔTTD
+   `lower ≤ 0`, on **both** seeds. One interval excluding zero on the wrong side, on either metric,
+   at any cell, on either seed, refuses adoption.
+4. **Better somewhere that counts, out of sample.** ΔAWT excludes zero and is negative at **at least
+   three** quotable cells **on the holdout seed**. "Not worse" is not a reason to re-baseline the
+   whole benchmark; the mechanism has to buy something at the budget a decision rests on, on traffic
+   the weight was not fitted to.
+5. **Up-peak does not regress.** `collective` at the benchmark gate's two pure up-peak cells stays
+   quotable and not significantly worse on AWT or TTD. § D205 measured the two arms **bit-identical**
+   there, so this clause is free if that survives adoption and is a live finding if it does not:
+   up-peak is the pattern that least exercises en-route pickup, and a change appearing there is a
+   change the down-peak study never saw.
+6. **The re-baselining is paid in full before the verdict is written** — § 4.
+
+### 4. What adoption costs, and what may not be paid with it
+
+Adoption does not add a profile; it changes what an existing one **means**. Every study holding
+`collective` fixed is re-baselined by it: `MATRIX_BASELINE`, `ARM_PROFILES`, the elected reference of
+`censusSelectionPoint`, and `SweepCell.preRegisteredReference` at all eight § D151 cells. That is not
+hypothetical — shipping `collective-enroute` as a *new* profile moved forty figures
+bit-identically with no simulation having changed (§ D205), and the whole of
+`PRE_REGISTERED_REFERENCE_CANDIDATES` exists because of it. Its docstring says a profile joins that
+set *"only by a decision to re-baseline the pre-registered comparison, taken deliberately and
+recorded"*. **Adoption is that decision, taken on a profile already in the set**, and these are its
+terms:
+
+- **Every moved pin is regenerated and read, not regenerated and pasted.** A moved pin asks *which
+  of the two numbers is right*, and only a human answers that (`regeneratePins.ts`'s own rule).
+- **No phase verdict may move as a side effect.** Phase 6c's refusal (§ D145, § D156, § D200) is a
+  ΔTTD measured **against `collective`**, and a reference that got better changes every one of those
+  differences. They are **re-derived, not assumed to hold**. If the numbers now clear § D139's gate,
+  that is a result which gets its own decision and its own status row — adoption is not a vehicle
+  for a quiet acceptance, and equally not one for a quiet refusal.
+- **`collective-enroute` is deleted on adoption.** It becomes a byte-duplicate of `collective`;
+  keeping it would publish two identical arms in the benchmark gate and leave two ids for one
+  dispatcher.
+- **The contrast has to survive its own success.** `measureDiversionAt` derives its reference arm
+  *from* `collective`, so after adoption both arms would carry diversion, the study would compare a
+  profile with itself, and `live` would go false. Its reference must declare
+  `enRouteDiversion: false` explicitly. A guard that cannot fail has stopped being a guard, and this
+  one is the only thing in the tree that measures what the mechanism does.
+
+### 5. What refusal looks like
+
+`collective` keeps `enRouteDiversion` off by default, `collective-enroute` stays the variant an
+operator opts into, and § D205's closing question is answered **no, at this budget, on this
+evidence** — with the failing clause, the ladder rung and the seed named, in the same way § D145
+refused 6c. A refusal here is not a statement that the mechanism is bad; § D205 already measured
+what it does. It is a statement about a **default**.
+
+
+## D210 — `collective` does not adopt en-route diversion, and what refuses it is the price tag rather than the mechanism
+
+**Date: 2026-08-03 · The verdict against [§ D209](DECISIONS.md), whose criterion was committed in
+`734fdd7` before this study existed.** [§ D205](DECISIONS.md) asked whether `collective` itself
+should carry `eligibility.enRouteDiversion` and declined to answer without a five-building study at
+n = 200. That study has now run.
+
+**NOT ADOPTED.** Clauses 1–4 pass at every cell, on both seeds. **Clause 5 fails**, and it fails for
+a reason the down-peak study could not have seen.
+
+### 1. Down-peak: the mechanism does everything § D205 said it does, out of sample
+
+Shipped diverting profile − shipped `collective`, down-peak, paired-t 95 %, n = 200, verified CRN.
+Verdict seed 20 261 612, disjoint from the seed `detourPenalty: 0.2` was fitted at; the fitted seed
+is reported beside it.
+
+| building | rate | ΔAWT holdout | ΔTTD holdout | ΔAWT in-sample | ΔTTD in-sample |
+|---|---|---|---|---|---|
+| `midtown-office` | 1 % | **−0.797 [−1.029, −0.565]** | −0.299 [−0.621, +0.024] | **−1.007 [−1.249, −0.765]** | −0.273 [−0.596, +0.049] |
+| `garden-apartments` | 14 % | **−1.486 [−1.952, −1.020]** | **−1.311 [−1.851, −0.771]** | **−0.880 [−1.332, −0.428]** | **−0.714 [−1.315, −0.114]** |
+| `secure-tower` | 4 % | **−0.580 [−0.801, −0.358]** | **−0.483 [−0.777, −0.190]** | **−0.802 [−1.025, −0.580]** | **−0.844 [−1.102, −0.585]** |
+| `mixed-use-high-rise` | 2 % | **−0.474 [−0.591, −0.357]** | −0.253 [−0.528, +0.023] | **−0.555 [−0.685, −0.426]** | −0.137 [−0.379, +0.105] |
+| `vertical-city` | 2 % | **−0.346 [−0.445, −0.247]** | **−0.589 [−0.832, −0.346]** | **−0.327 [−0.439, −0.215]** | **−0.557 [−0.815, −0.299]** |
+
+**Five buildings of five, ΔAWT excluding zero and negative at every one, on both seeds. ΔTTD is
+significantly better at three and null at two, and worse at none.** Clause 4 asked for three
+significant AWT gains on the holdout seed and got five. This is a stronger result than § D205's
+n = 50 table, and it is the first one measured on traffic the weight was not fitted to —
+`vertical-city`, the building that refused the mechanism outright before the weight existed, is now
+better on **both** metrics out of sample.
+
+**The ladders did real work.** Three of the five buildings lost their top rung to saturation at
+n = 200 — `midtown-office` 2 %, `mixed-use-high-rise` 4 %, `vertical-city` 4 % — exactly the effect
+§ D205 finding 3 named, and the reason the rung had to be chosen by `awtIsValid` rather than fixed
+in advance. Note that `vertical-city` 4 %, the cell § D205's whole `detourPenalty` sweep was run at,
+is **not quotable at this budget**; the verdict rests on 2 %.
+
+### 2. Clause 5: up-peak regresses, and the regression is entirely the weight
+
+| cell | ΔAWT | ΔTTD | quotable |
+|---|---|---|---|
+| `midtown-up-peak` | +0.034 [−0.013, +0.081] | −0.113 [−0.234, +0.009] | yes |
+| `secure-up-peak` | **+0.261 [+0.118, +0.404]** | **+0.199 [+0.041, +0.357]** | yes |
+
+`secure-up-peak` is significantly worse on **both** metrics. Clause 5 refuses adoption on it.
+
+**Then it was decomposed rather than filed**, because adoption ships two authored changes together
+and a two-arm contrast cannot say which one moved the number — the objection § D206 already raised
+about this exact profile. Three arms under CRN: `classic` (shipped `collective`), `weightOnly`
+(plus `detourPenalty: 0.2`, diversion **off**), `shipped` (plus both).
+
+| cell | seed | weight `B − A` | mechanism `C − B` | diversions |
+|---|---|---|---|---|
+| `midtown-up-peak` | 20 261 612 | +0.034 [−0.013, +0.081] | **+0.000 [0.000, 0.000]** | **0** |
+| `secure-up-peak` | 20 261 612 | **+0.261 [+0.118, +0.404]** | **+0.000 [0.000, 0.000]** | **0** |
+| `midtown-up-peak` | 20 260 726 | **+0.064 [+0.001, +0.128]** | **+0.000 [0.000, 0.000]** | **0** |
+| `secure-up-peak` | 20 260 726 | **+0.189 [+0.073, +0.306]** | **+0.000 [0.000, 0.000]** | **0** |
+
+**The mechanism is exactly inert at up-peak and the whole of the regression is the weight.**
+`C − B` is `[0.000, 0.000]` with a zero largest paired difference — under CRN, proof the arms are
+bit-identical, which is the same fact `stageActivity.diversions == 0` states from inside the model.
+`B − A` and `C − A` agree to every digit.
+
+**So what refuses adoption is a constant price for a mechanism that is not running.**
+`detourPenalty: 0.2` was fitted on `vertical-city` down-peak to repair a sky-lobby transfer effect
+(§ D205: single-leg ΔTTD −0.188, transferring +6.763). It is a **weight, not a trigger**: the
+scoring engine does not renormalize weights and applies every term on every evaluation, so under
+pure up-peak — where cars run to the lobby empty and climb full, and there is almost nothing to
+divert *for* — the term still re-orders which car takes a call, and pays for nothing. `collective`'s
+`waitTime`-only scoring is simply better there.
+
+That is a coherent thing for a criterion to refuse. `collective` is a **default**, and a default is
+charged on every traffic pattern a building sees, not only the one the mechanism was measured on.
+
+**The second seed is corroboration, not part of the verdict.** § D209 clause 5 named the cells and
+not a seed, and the implementation fixed the holdout seed before any number existed. The benchmark
+gate's own seed is measured and printed because that is where this repository's pinned up-peak
+figures live — and it makes the refusal stronger rather than weaker: at 20 260 726 **both** up-peak
+cells regress significantly on AWT, not one.
+
+### 3. A published claim this repository's own pins refute
+
+§ D205 and `benchmark/arms.ts` both state that `collective-enroute` is **bit-identical** to
+`collective` at the two up-peak cells, and that *"every pinned figure for the two arms matches to
+the last digit"*. **It is false, and `PINNED_ESTIMATES` has said so since the arm landed:**
+
+| figure | `collective` | `collective-enroute` | Δ |
+|---|---|---|---|
+| `midtown-up-peak/…/awtS` | −6.814796943474347 | −6.7504396546033085 | +0.0644 |
+| `secure-up-peak/…/awtS` | −5.7661346897783226 | −5.576747973225097 | +0.1894 |
+
+Six of the eight pinned figures at those two cells differ. The measured `B − A` above reproduces
+both deltas to three decimal places, which identifies the cause: the **weight**, not the mechanism.
+
+**The half of the explanation that was right was the interesting half.** The published reasoning —
+*pure up-peak, so a landing call in the direction a car is already travelling past is rare* — is
+correct, and § 2 proves it in the strongest form available: the mechanism is not merely rare, it is
+**exactly zero**. What did not follow was the conclusion. The two arms differ by a weight as well as
+by a setting, and a weight does not need a diversion to fire in order to change a decision.
+
+**Nothing could have failed on it**, because it is prose about numbers and no test read the numbers
+— the shape [§ D112](DECISIONS.md) and this file's *"a published number goes stale the same way"*
+rule already name. `collectiveAdoption.test.ts` now asserts the pins in **both** directions: the
+three wait-sensitive metrics must keep differing, and `pctOverLongWait` — which genuinely does match
+at both cells, and is where the impression came from — must keep matching. Both statements are
+corrected at source.
+
+### 4. What is not concluded
+
+**This is not a finding against en-route diversion.** § 1 is the strongest evidence the mechanism has
+ever had: five buildings, n = 200, out of sample, better on wait everywhere and worse on nothing.
+`collective-enroute` remains shipped and remains the profile to choose for a building whose traffic
+looks like § 1's, and § D205's verdict on it is untouched.
+
+**And it is not a finding that the weight is wrong.** On down-peak the weight is what turns the
+mechanism from a trade into a dominance; § D205 measured that and this study confirms it out of
+sample. The weight is wrong *as a constant on a default*, which is a different claim and a narrower
+one.
+
+**What would move this.** A `detourPenalty` that is not charged where diversion cannot fire —
+either a term that reads the diversion frontier, or a per-pattern weight. The second is
+`patternSwitching`, and this project has refused mid-run weight-set selection three times on its own
+evidence (§ D145, § D156, § D200), so it is not a free move; the first is new code and a new cost
+term, which invariant 7 permits only for a genuinely new term and which would need its own
+criterion, written first. Neither is attempted here. **§ D209's clause 6 — the re-baselining is paid
+in full — was never reached**, so no pin was regenerated, no phase verdict was re-derived, and
+`PRE_REGISTERED_REFERENCE_CANDIDATES` still means exactly what § D151 registered.

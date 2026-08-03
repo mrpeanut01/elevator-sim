@@ -920,6 +920,16 @@ export const STUDY_ENTRY_POINTS: Readonly<Record<string, PublishedStudyId | 'no-
     // Same classification and the same reason: the assertions are structural (paired, live, and
     // neither metric significantly worse), and no figure it produces is quoted anywhere.
     measureShippedAt: 'no-intervals',
+    // § D209's adoption study, and the entry above is why it is classified this way rather than
+    // pinned. `measureDiversionAt`'s note predicted that adopting `eligibility.enRouteDiversion` on
+    // a shipped profile would move both to the pinned half — **and § D210 refused adoption**, so
+    // the prediction stands unexercised and the classification does not move. The study computes
+    // intervals and `collectiveAdoption.test.ts` asserts only the apparatus: the ladders are
+    // derived from `data/buildings/`, and every clause of the criterion can be driven to a refusal.
+    // Its non-test caller is `main` in its own module — the command § D210 was produced by, run at
+    // n = 200 across five buildings and two seeds, which is minutes of simulation per cell and
+    // belongs in neither `regeneratePins.ts` nor `livenessSuite.ts`.
+    runCollectiveAdoptionStudy: 'no-intervals',
     // Double-deck operation against the single-deck arm the retired `doubleDeckNotSimulated`
     // disclaimer described, at two censused operating points on `vertical-city`. Publishes
     // paired-t intervals on ten metrics, so `regeneratePins.ts` is its non-test caller.
