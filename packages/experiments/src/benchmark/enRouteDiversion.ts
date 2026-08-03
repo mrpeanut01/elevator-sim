@@ -78,6 +78,7 @@ export async function measureShippedAt(
   point: DiversionPoint,
   replications: number,
   config?: LoadedConfig | undefined,
+  seed: number = DIVERSION_SEED,
 ): Promise<DiversionCell> {
   const loaded = config ?? (await loadResources());
   const control = loaded.dispatcherProfilesById.get(SOURCE_ID);
@@ -96,8 +97,8 @@ export async function measureShippedAt(
   } as Partial<Omit<DispatcherProfile, 'id'>>);
 
   const result = await runGateExperiment({
-    id: `shipped-diversion-${point.building}-${point.rate}`,
-    seed: 20_260_801,
+    id: `shipped-diversion-${point.building}-${point.rate}-${seed}`,
+    seed,
     building: point.building,
     dispatchers: [BASELINE_ID, CANDIDATE_ID],
     traffic: downPeakAt(point),
@@ -137,6 +138,16 @@ function downPeakAt(point: DiversionPoint): TrafficArmSpec {
     }),
   });
 }
+
+/**
+ * The seed both studies run at unless a caller names another.
+ *
+ * Named rather than inlined because [`DECISIONS.md` § D209](../../../../DECISIONS.md) § 1 turns the
+ * seed into a load-bearing choice: `detourPenalty: 0.2` was *fitted* on this seed, so the adoption
+ * verdict is taken on a disjoint one and this becomes the in-sample figure reported beside it. A
+ * seed that appears twice as a literal is a seed that can be changed in one place.
+ */
+export const DIVERSION_SEED = 20_260_801;
 
 /** The baseline arm: conventional collective, exactly as shipped. */
 export const SOURCE_ID = 'collective';
@@ -223,6 +234,7 @@ export async function measureDiversionAt(
   point: DiversionPoint,
   replications: number,
   config?: LoadedConfig | undefined,
+  seed: number = DIVERSION_SEED,
 ): Promise<DiversionCell> {
   const loaded = config ?? (await loadResources());
   const baseline = loaded.dispatcherProfilesById.get(SOURCE_ID);
@@ -249,8 +261,8 @@ export async function measureDiversionAt(
   );
 
   const result = await runGateExperiment({
-    id: `en-route-diversion-${point.building}-${point.rate}`,
-    seed: 20_260_801,
+    id: `en-route-diversion-${point.building}-${point.rate}-${seed}`,
+    seed,
     building: point.building,
     dispatchers: [BASELINE_ID, CANDIDATE_ID],
     traffic: downPeakAt(point),
