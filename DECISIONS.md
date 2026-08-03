@@ -13132,3 +13132,121 @@ delete rather than explain.
 re-baselining: every moved pin regenerated and read, and Phase 6c's refusal re-derived against the
 new reference rather than assumed. Passing the criterion below earns the right to start that work,
 not the right to skip it.
+
+
+## D212 — the conditional term fixes what § D210 refused, and is refused anyway by a building the apparatus cannot see
+
+**Date: 2026-08-03 · The verdict against [§ D211](DECISIONS.md), whose criterion was committed in
+`7b3a37e` before the term existed.**
+
+**NOT ADOPTED**, on clause 2. And the shape of this refusal is different from § D210's in a way that
+matters: § D210 refused because the candidate *did something wrong*. This refuses because one of the
+five buildings could not be measured at all — **and the arm that made it unmeasurable is the
+reference, not the candidate.**
+
+### 1. Clause 5′ passes exactly, at every weight in the grid
+
+The thing § D211 was built to fix is fixed, and not approximately:
+
+| cell | ΔAWT | bit-identical |
+|---|---|---|
+| `midtown-up-peak` | `+0.000 [0.000, 0.000]` | **true** |
+| `secure-up-peak` | `+0.000 [0.000, 0.000]` | **true** |
+
+At **all four** grid weights, on both metrics. § D210's refusal was AWT `+0.261 [+0.118, +0.404]`
+and TTD `+0.199 [+0.041, +0.357]` at `secure-up-peak` from a constant `detourPenalty: 0.2`; the
+conditional term reduces that to a zero largest paired difference, which under common random numbers
+is proof rather than evidence. The up-peak cost is not smaller. It is **gone**, by construction, and
+it stays gone however hard the term is weighted — which is the property § D211 § 0 traded a third of
+the benefit for.
+
+### 2. Four of five buildings, out of sample, are the best numbers this mechanism has produced
+
+n = 200, paired-t 95 %, verified CRN, verdict seed 20 262 423 — disjoint from the seed the weight
+was searched at and from the two § D209/§ D210 spent.
+
+**At `diversionDetour: 0.2`:**
+
+| building | rate | ΔAWT | ΔTTD |
+|---|---|---|---|
+| `midtown-office` | 1 % | **−0.944 [−1.137, −0.751]** | +0.014 [−0.267, +0.296] |
+| `garden-apartments` | 14 % | **−1.257 [−1.702, −0.811]** | **−0.980 [−1.466, −0.494]** |
+| `secure-tower` | 4 % | **−1.004 [−1.247, −0.760]** | **−0.478 [−0.751, −0.205]** |
+| `mixed-use-high-rise` | 4 % | **−1.012 [−1.178, −0.846]** | −0.213 [−0.600, +0.175] |
+
+**At `diversionDetour: 2.0`,** the weight § D211 § 4's rule selected:
+
+| building | rate | ΔAWT | ΔTTD |
+|---|---|---|---|
+| `midtown-office` | 1 % | **−0.224 [−0.326, −0.121]** | −0.070 [−0.185, +0.045] |
+| `garden-apartments` | 14 % | **−0.984 [−1.425, −0.543]** | **−0.925 [−1.416, −0.434]** |
+| `secure-tower` | 4 % | **−0.478 [−0.620, −0.336]** | **−0.263 [−0.442, −0.083]** |
+| `mixed-use-high-rise` | 4 % | **−0.269 [−0.380, −0.158]** | **−0.481 [−0.750, −0.212]** |
+
+Significantly better on wait at every measured cell, at both weights, and significantly worse on
+nothing anywhere. Clauses 1, 3 and 4 all pass.
+
+### 3. `vertical-city` dropped out, and the reference arm is why
+
+Clause 2 requires a quotable cell from all five buildings, and § D209 § 2 — carried into § D211 —
+says what happens when the required building does not produce one: *refused for want of evidence,
+not granted for want of a counterexample.* No rung of `vertical-city`'s declared ladder was quotable.
+
+**Which arm failed was then measured rather than assumed**, because "the candidate saturates that
+building" and "the apparatus cannot see that building" are opposite findings:
+
+| rung | reference saturated | candidate saturated | quotable |
+|---|---|---|---|
+| 4 % | **4 / 200** | 4 / 200 | neither |
+| 2 % | **1 / 200** | **0 / 200** | **candidate only** |
+| 1 % | **1 / 200** | 1 / 200 | neither |
+
+**The reference — shipped `collective` — is what fails, at every rung.** At 2 % the *candidate* is
+clean at 0 of 200 and the reference is not, so the building is lost to a defect in the arm the
+candidate is being compared against. A single saturating replication in 200 invalidates a cell, and
+that is § D205 finding 3 in its sharpest form: *a cell is unquotable when **any** replication
+saturates, so raising `n` can only lose validity* — at n = 200 there are two hundred chances to draw
+the bad one.
+
+**This is absence of evidence and is recorded as such.** It is not a measurement that the term harms
+`vertical-city`; the one number pointing anywhere points the other way, and cannot be quoted.
+
+### 4. Two things about § D211 that were wrong, recorded rather than quietly fixed
+
+**§ D211 § 4's selection rule is badly written, and the holdout proves it.** *"Minimise ΔTTD at
+`vertical-city` on the tuning seed"* selects the largest weight, because a big enough conditional
+weight suppresses every diversion and drives both differences to zero — on the tuning seed, 2.0 gave
+ΔAWT `−0.005` and ΔTTD `+0.009`, which is a profile doing nothing at all. Out of sample it is
+comfortably the worse of the two: −0.224 against −0.944 on `midtown-office`, −0.478 against −1.004
+on `secure-tower`. The rule should have read *"minimise ΔTTD **subject to** ΔAWT remaining
+significantly negative"*. It was followed as written and both weights were reported, because
+substituting a better rule after seeing the numbers is the thing pre-registration exists to prevent.
+
+**Clause 2 cannot distinguish the two ways a building can fail to appear.** A candidate that
+saturates a building and an apparatus that cannot resolve one are both "no quotable cell", and they
+call for opposite responses. § D211 inherited that from § D209 and neither noticed until it bit.
+**It is not amended here.** Rewriting the clause that just refused, immediately after it refused,
+is weakening a criterion to make something pass — CLAUDE.md's one explicit prohibition — and the
+fact that the amendment would be *correct* is exactly what makes it dangerous. A future
+pre-registration should separate *unmeasurable* from *failed*, declare it before running, and take
+its verdict on a fourth seed.
+
+### 5. What is kept, and what is not
+
+**The term ships.** § D211 § 5 said it would if clause 6′ passed, and clause 6′ passed on a run
+rather than an argument: `terms/liveness.test.ts` and `sim/seam.test.ts` both drive
+`diversionDetour` through the shipped engine and find a non-zero raw with a spread between candidate
+cars — 1.7 % of 4 320 evaluations, spread 42.5 passenger-seconds. A live, correctly-scoped library
+entry that has not yet earned a default is a library entry, not a mistake; `predictive-balanced` and
+the Phase 7 search space can both reach it, and its `activeWhen` keeps an optimizer from searching it
+where it is dead.
+
+**`collective` is unchanged**, `collective-enroute` remains the opt-in profile, and § D209 clause 6
+— the full re-baselining — is still unpaid and still owed by any future adoption. No pin moved, no
+phase verdict was re-derived, and `PRE_REGISTERED_REFERENCE_CANDIDATES` still means what § D151
+registered.
+
+**What is now known that was not.** The up-peak objection § D210 raised against adoption is
+answerable, and answered: a conditional term removes it exactly. What stands between this mechanism
+and a default is no longer a design problem but a measurement one — a single building whose
+reference arm saturates once in two hundred replications at every rate anybody has declared.
