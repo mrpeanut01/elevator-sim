@@ -103,17 +103,33 @@ export const DESTINATION_DISPATCH_PROFILE = 'destination-panel';
  * baseline is a result about that profile.
  */
 /*
- * **`collective-enroute` is bit-identical to `collective` at two of the three cells**, and that is
- * the honest reading rather than a defect. `midtown-up-peak` and `secure-up-peak` are pure up-peak:
- * cars run to the lobby empty and climb full, so a landing call in the direction a car is already
- * travelling past is rare, and every pinned figure for the two arms matches to the last digit.
- * `garden-residential` has mixed traffic and the arm separates there — ΔAWT −1.360 against
- * `collective`'s −1.269, both relative to `nearest-car`.
+ * **This comment used to say `collective-enroute` is bit-identical to `collective` at the two
+ * up-peak cells, and that every pinned figure for the two arms matches to the last digit. That was
+ * false, and `published.ts` had said so since the arm landed** — six of the eight pinned figures at
+ * those cells differ. Nothing could fail on it: the claim was prose about numbers, and no test read
+ * the numbers. `DECISIONS.md` § D210 is the correction, and `collectiveAdoption.test.ts` now asserts
+ * the pins in both directions so it cannot go stale again.
+ *
+ * What was right was the *mechanism* half. `midtown-up-peak` and `secure-up-peak` are pure up-peak:
+ * cars run to the lobby empty and climb full, so there is almost nothing to divert for — and § D210
+ * proves it in the strongest available form rather than calling it rare. Under common random
+ * numbers, holding `detourPenalty` fixed and flipping only the setting gives a paired difference of
+ * **exactly `[0.000, 0.000]`** on both metrics at both cells and both seeds, and
+ * `stageActivity.diversions` is **0**. The mechanism is not merely quiet here; it is inert.
+ *
+ * What did not follow is the conclusion. The two arms differ by `detourPenalty: 0.2` **as well as**
+ * by the setting, and a weight does not need a diversion to fire in order to re-order which car
+ * takes a call. The whole of the separation at these cells is the weight: `collective` −6.8148
+ * against `collective-enroute` −6.7504 on `midtown-up-peak` AWT, −5.7661 against −5.5767 on
+ * `secure-up-peak`. `pctOverLongWait` does match to the last digit at both, which is where the
+ * impression came from. `garden-residential` has mixed traffic and separates there too — pinned
+ * ΔAWT −1.3572 against `collective`'s −1.2689, both relative to `nearest-car`.
  *
  * So this gate does not measure what the arm is for. `benchmark/enRouteDiversion.ts` does, on
- * down-peak, where `DECISIONS.md` § D205 measured 58.2 % of down-travelling legs being driven past.
- * The arm is here because every shipped profile must face the gate, not because the gate is where
- * its case is made.
+ * down-peak, where § D205 measured 58.2 % of down-travelling legs being driven past. The arm is
+ * here because every shipped profile must face the gate, not because the gate is where its case is
+ * made — and § D210 is why that distinction has teeth: the gate is exactly where adoption was
+ * refused, on a cost the down-peak study could not see.
  */
 export const ARM_PROFILES: readonly string[] = Object.freeze([
   'eta',
