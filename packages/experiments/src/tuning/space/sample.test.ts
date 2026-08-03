@@ -293,9 +293,21 @@ describe('a validated draw is one core will build', () => {
 
   it('gives up with the reason rather than looping forever', () => {
     const rng = policyNoiseStream(SEED);
+    // **Which** reason lands is a coin flip, and asserting the caller's was a latent flake.
+    // `rejection` is `space.validate(values) ?? options.feasible?.(values)`, so the caller's oracle
+    // is consulted only on a draw core already accepted — and the message reports the *last*
+    // rejection, whichever that was. The shipped schema rejects about one draw in eight
+    // (destination entry cannot defer), so roughly one seed in eight would have reported core's
+    // reason instead. This test passed on that coin until `weights.diversionDetour` added a
+    // dimension, shifted the draw stream, and flipped it.
+    //
+    // So what is asserted is what is actually guaranteed: it stops, it says how many draws it
+    // made, and it names the rejection it last saw. That the caller's oracle is honoured at all is
+    // proved deterministically by the test directly above, which draws 40 candidates and finds the
+    // oracle's constraint satisfied by every one.
     expect(() =>
       sampleCandidate(SPACE, rng, { feasible: () => 'nothing here is ever acceptable' }),
-    ).toThrow(/no feasible candidate in 64 draws.*nothing here is ever acceptable/s);
+    ).toThrow(/no feasible candidate in 64 draws\. Last rejection: .+/s);
     expect(() => sampleCandidate(SPACE, rng, { maxAttempts: 0 })).toThrow(SearchSpaceError);
     expect(() => sampleCandidates(SPACE, rng, -1)).toThrow(SearchSpaceError);
   });
