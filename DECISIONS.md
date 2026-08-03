@@ -12440,3 +12440,27 @@ not by itself a fault.** Most pass-bys are a correct decision — the call belon
 will arrive sooner — and the original census was good evidence that something was *structurally
 impossible* (58.2 % with every car having room, and the refusal reproduced in one call) but is a poor
 measure of success. The paired AWT interval is the measure; the census was the diagnosis.
+
+**The weight and the mechanism were decomposed, because the shipped profile changes both.**
+`collective-enroute` differs from `collective` in two authored things — `detourPenalty: 0.2` and
+`eligibility.enRouteDiversion` — so "the profile is better" leaves open which one is doing it. Three
+arms in one experiment, n = 50, paired-t 95 %, verified CRN, each contrast measured **directly**:
+
+| cell | weight alone, ΔAWT | mechanism given the weight, ΔAWT | weight alone, ΔTTD |
+|---|---|---|---|
+| midtown-office 1 % | **+0.074 [+0.004, +0.144]** | **−1.010 [−1.468, −0.552]** | −0.257 [−0.519, +0.005] |
+| garden-apartments 10 % | +0.452 [−0.341, +1.245] | **−0.652 [−1.121, −0.182]** | +0.396 [−0.340, +1.132] |
+| secure-tower 4 % | **+0.230 [+0.088, +0.371]** | **−0.936 [−1.477, −0.395]** | −0.169 [−0.384, +0.046] |
+| mixed-use-high-rise 2 % | −0.001 [−0.082, +0.079] | **−0.426 [−0.615, −0.238]** | **−0.456 [−0.697, −0.216]** |
+| vertical-city 4 % | **−0.252 [−0.500, −0.003]** | **−0.454 [−0.739, −0.168]** | **−1.749 [−2.244, −1.255]** |
+
+**The wait gain is the mechanism, and none of it is the weight.** `detourPenalty` alone is neutral to
+*significantly worse* on AWT — it is a cost term that makes the dispatcher decline stops, which is
+not how waiting time improves — while diversion delivers the whole AWT improvement at all five cells
+with every interval excluding zero.
+
+**And the weight is what protects the journey.** Its own benefit is in TTD, largest at
+`vertical-city` (`−1.749`), the building where the extra stop is charged to a whole shuttle load.
+So the two are not redundant and neither is decoration: **diversion buys the wait, the detour weight
+pays for it**, and shipping either alone is worse than shipping both — which is exactly why the
+profile carries both and why a test asserts the pair rather than the parts.
