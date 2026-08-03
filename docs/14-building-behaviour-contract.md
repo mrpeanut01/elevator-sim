@@ -1,7 +1,9 @@
 # Building behaviour — the contract
 
-**Status: designed; steps 0, 1 and 2 built. Criteria written before the implementation, which is the
-point — and step 2's criterion is the first one measurement sent back for correction.**
+**Status: designed; steps 0, 1, 2, 3, 5 and 6 built. Criteria written before the implementation,
+which is the point — step 2's criterion is the first one measurement sent back for correction, and
+step 6's is the first one measurement sent back with an answer nobody wanted to publish and a gate
+that had to be raised before it could be.**
 
 | Step | State |
 |---|---|
@@ -10,7 +12,8 @@ point — and step 2's criterion is the first one measurement sent back for corr
 | **2 — `trafficModel: 'v2'` + `batchSize` stream (§ 1.3)** | **built** — `batchSize` in `STREAM_NAMES` and `TRAFFIC_STREAM_NAMES`, `trafficModel` on the run config and reported on the result when it is not `v1`; `sim/trafficModelSeam.test.ts` drives it end to end. **§ 1.3's stated consequence was wrong and is corrected below.** |
 | **3 — mass control, group-size curve (§§ 2.1–2.2)** | **built** — three group-size families and a schema-bearing mass block with required truncation bounds, all five samplers one-draw-per-call so none is gated to `v2`; `traffic/varianceControls.test.ts` drives each on the legs |
 | **5 — patience, lobby crowding, stairs (§ 3)** | **built, and the gaps are part of the verdict** — abandonment with a fifth `awtIsValid` ground above censoring, a crowding term that **destabilises four of nine measured cells** (a finding, not a bug), and stairs with both asymmetries. **§ 3.3's condition 2 is withdrawn**, below. Criterion 4 is met inside `core` and **not** at the renderer the way [§ D106](../DECISIONS.md)'s rule is — `viz/shift/goals.ts`'s horizon goal is still improved by abandonment with no figure beside it, bridged by a run-record disclaimer and not closed. **That is the clause to distrust first.** |
-| 4, 6 | designed |
+| **6 — the teaching surface (§ 4)** | **built, and § 5 criterion 5 answers with a fourth refusal** — a declared `TeachingSpec` whose four rules are refusals, `tune --teaching` as its named non-test caller, and a pre-registered spec measured at n = 200 on held-out traffic. **The gate was raised while it ran**: the first run cleared all four of the criterion's clauses at both cells, and § D200's static-hybrid control — promoted here from a follow-up to a gate clause — refuses both. Say it in the same breath as the intervals, below |
+| 4 | designed |
 
 **Step 0's criterion is met by a run, not an argument.** Three banks, both lobby levels marked
 transfer, and the escalator the only difference between the arms: `servedFloorIds` byte-identical,
@@ -383,13 +386,60 @@ criterion 4 exists to keep that honest.
 
 ### 4.1 What already exists, and what the record says
 
-A learned dispatcher is **implemented, measured, and NOT ACCEPTED — three times**:
+A learned dispatcher is **implemented, measured, and NOT ACCEPTED — four times**:
 
 | Verdict | What was measured |
 |---|---|
 | [§ D145](../DECISIONS.md) | ΔTTD `−0.213 [−0.440, +0.014]` at n = 200 on a disjoint seed — interval contains zero |
 | [§ D156](../DECISIONS.md) | Swept over eight pre-registered operating points; refused at all five PRIMARY cells under Holm–Bonferroni |
 | [§ D200](../DECISIONS.md) | Re-measured on `lunch-two-way` against § D162 — refused again |
+| step 6, this document | Taught over two points under day-to-day demand variation, n = 200, held-out **traffic** with the machine held. **The interval excluded zero on the better side at both cells and the phase is still refused** — see below |
+
+**The fourth refusal is a different shape from the first three, and the difference is the point.**
+§ D145, § D156 and § D200 refused on the *interval* — it contained zero, or the effect was below what
+the apparatus could resolve. Step 6's arm clears both of those at both cells: ΔTTD
+`−0.957 [−1.277, −0.636]` at `interfloor-mix` and `−0.714 [−0.961, −0.466]` at `lunch-two-way`, each
+above that cell's own TTD-measured limit, both surviving Holm within a family declared before any
+ΔTTD, both generalizing in sign from the training traffic. It is refused by the clause § D200's
+finding forced into the gate: **pin the weight vector the policy spent most of its time in, run it
+for the whole run with no selector, and the policy must beat that.** It does not. The static
+`predictive-balanced` hybrid alone is `−1.207 [−1.535, −0.879]` and `−0.731 [−0.983, −0.479]`, and
+the taught arm against it is `+0.250 [+0.093, +0.407]` **WORSE** and `+0.017 [−0.023, +0.058]`
+indistinguishable. § D200's sentence reproduces on two cells it was not measured on: *the advantage
+is static, and the switching subtracts from it.*
+
+So what these two cells demonstrate is a fact about `data/` and not about learning — the shipped
+`auction-multi-round` and `collective` vectors are not TTD-optimal at their own census's point, and
+one already-authored vector beats them there. That is § D200's *"a finding about `data/`, not about
+learning"*, now at two more points, and it is the same shape as [§ D112](../DECISIONS.md).
+
+**And the costs go beside it, never folded in.** Every better-on-TTD figure above is **worse on
+AWT** (`+0.580` and `+0.409`), worse or indistinguishable on WT95, and worse on energy on both the
+raw figure and per served leg — which is the honest direction and the one § D106 exists to keep
+visible.
+
+**The refusal was then re-run on seeds it was not measured on, because a verdict that turns on one
+seed set is what [§ D206](../DECISIONS.md) was corrected for.** Two further seed configurations —
+one moving only the holdout traffic, one moving the run seed and both traffic seeds — give six cells
+in all, and the switching premium is **WORSE at three and indistinguishable at three, favouring the
+policy at none**:
+
+| seeds (run / training / holdout) | cell | taught ΔTTD | static hybrid ΔTTD | taught − static |
+|---|---|---|---|---|
+| 20260726 / 20260726 / **20261537** *(pre-registered)* | interfloor-mix | −0.957 | **−1.207** | `+0.250 [+0.093, +0.407]` WORSE |
+| | lunch-two-way | −0.714 | **−0.731** | `+0.017 [−0.023, +0.058]` INDIST. |
+| 20260726 / 20260726 / **20261538** | interfloor-mix | −0.532 | **−0.882** | `+0.350 [+0.184, +0.516]` WORSE |
+| | lunch-two-way | −0.586 | **−0.667** | `+0.082 [−0.016, +0.179]` INDIST. |
+| **20260728 / 20260728 / 20261539** | interfloor-mix | −0.207 *(below limit)* | **−0.306** | `+0.099 [−0.062, +0.260]` INDIST. |
+| | lunch-two-way | −0.322 *(below limit)* | **−0.928** | `+0.606 [+0.439, +0.773]` WORSE |
+
+The two extra rows are a check on a **refusal** and are reported whole rather than quoted from; they
+also show two things the single pre-registered run could not. The taught arm's own ΔTTD is not
+stable — it is above the cell's limit at four cells and below it at two — while the *static* vector
+beats the census's pick at all six. And the census's own pick moves with the seed: `collective` at
+`interfloor-mix` on the third configuration where the first two returned `auction-multi-round`, and
+`auction-multi-round` at `lunch-two-way` where they returned `collective`. A reference arm is a
+property of a `(building, traffic, seed)`, which `docs/07` § 4 already says twice.
 
 **This is the most important context for the feature, and it points at the design.** § D156 found
 that what the policy learned was a *busy/idle schedule* rather than a traffic-pattern selection —
@@ -424,6 +474,15 @@ A learned dispatcher that beats the baseline **on the traffic it trained on** is
 the definition of overfitting, and this repository's tuning discipline names it. The surface must
 make the honest comparison the easy one to run, and the dishonest one awkward — the same principle
 `§ D177`'s inert-control tests apply to the viewer.
+
+**Built, and the awkwardness is that the dishonest comparison is not expressible.** Every interval
+`runTeachingRound` produces is measured on the holdout traffic seed; there is no parameter, flag or
+field that asks for one on the training traffic. The training-side number survives as a **bare
+mean** — no interval, no verdict, no p-value — because those are the shapes a reader quotes. A spec
+whose two traffic seeds are equal is refused before anything runs, so the cheapest route to a
+training-set win is an error message. And the two seeds are driven rather than described: moving the
+holdout seed must move the published interval and leave the policy alone, and the round's own mean
+is re-derived from a fresh experiment at the holdout seed.
 
 ---
 

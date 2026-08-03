@@ -99,13 +99,39 @@ import { RunnerError } from './types.js';
  * @throws RunnerError if the replication threw. Unlike the batch path there is no policy to apply:
  *   a caller asking for one replication wants it or wants the exception.
  */
+/**
+ * Replication `i`'s **demand** seed, or `undefined` when the plan declared none.
+ *
+ * Derived through the same {@link replicationSeed} the master seed goes through, on purpose and
+ * with a consequence worth stating: a plan whose traffic seed equals its master seed produces
+ * `trafficSeed_i === seed_i` at every index, and `StreamSet` then routes the five demand streams
+ * to a value they already had. So `trafficSeed: seed` is byte-identical to no traffic seed at
+ * all — which is the check that says this seam adds a *choice* rather than a second derivation.
+ *
+ * Per replication and never once per experiment. One traffic seed shared by every replication
+ * would hand the whole experiment a single crowd, and every demand-side variance in it would
+ * collapse to zero while every interval kept printing.
+ */
+export function trafficSeedFor(plan: ExperimentPlan, replication: number): bigint | undefined {
+  return plan.experimentTrafficSeed === undefined
+    ? undefined
+    : replicationSeed(plan.experimentTrafficSeed, replication);
+}
+
 export function runReplication(
   plan: ExperimentPlan,
   cell: ExperimentCell,
   replication: number,
 ): ReplicationRecord {
   const seed = replicationSeed(plan.experimentSeed, replication);
-  const outcome = runOneReplication(plan.experimentId, cell, replication, seed, plan.keepRecords);
+  const outcome = runOneReplication(
+    plan.experimentId,
+    cell,
+    replication,
+    seed,
+    plan.keepRecords,
+    trafficSeedFor(plan, replication),
+  );
   if (!outcome.ok) {
     throw new RunnerError(
       `Replication ${replication} of cell "${cell.cellId}" (seed ${outcome.seed}) failed: ${outcome.error.message}`,
@@ -289,6 +315,9 @@ export async function runPlan(
             cellIndex: state.cell.index,
             replication,
             seed: replicationSeed(plan.experimentSeed, replication),
+            ...(plan.experimentTrafficSeed === undefined
+              ? {}
+              : { trafficSeed: trafficSeedFor(plan, replication) }),
           });
         }
         state.issued += take;
@@ -366,6 +395,9 @@ export async function runPlan(
   return {
     experimentId: plan.experimentId,
     experimentSeed: plan.experimentSeed.toString(),
+    ...(plan.experimentTrafficSeed === undefined
+      ? {}
+      : { experimentTrafficSeed: plan.experimentTrafficSeed.toString() }),
     plan,
     cells: Object.freeze(cells),
     cohorts: plan.cohorts,
@@ -514,6 +546,9 @@ export function fingerprintExperiment(result: ExperimentResult): string {
   return canonicalJson({
     experimentId: result.experimentId,
     experimentSeed: result.experimentSeed,
+    // `canonicalize` drops an `undefined` entry, so an experiment with no traffic seed
+    // fingerprints to exactly the string it did before this key existed.
+    experimentTrafficSeed: result.experimentTrafficSeed,
     policy: result.plan.policy,
     keepRecords: result.plan.keepRecords,
     onReplicationError: result.plan.onReplicationError,

@@ -487,13 +487,25 @@ export function parseExperimentSpec(value: unknown, path = 'spec'): ExperimentSp
   const record = asRecord(value, path);
   rejectUnknown(
     record,
-    ['id', 'description', 'seed', 'buildings', 'dispatchers', 'traffic', 'replication', 'parallel', 'simulation'],
+    ['id', 'description', 'seed', 'trafficSeed', 'buildings', 'dispatchers', 'traffic', 'replication', 'parallel', 'simulation'],
     path,
   );
 
   const seedValue = record['seed'];
   if (typeof seedValue !== 'number' && typeof seedValue !== 'string') {
     fail(`${path}.seed`, `expected a number or a decimal string, received ${describe(seedValue)}`);
+  }
+
+  const trafficSeedValue = record['trafficSeed'];
+  if (
+    present(record, 'trafficSeed') &&
+    typeof trafficSeedValue !== 'number' &&
+    typeof trafficSeedValue !== 'string'
+  ) {
+    fail(
+      `${path}.trafficSeed`,
+      `expected a number or a decimal string, received ${describe(trafficSeedValue)}`,
+    );
   }
 
   if (!Array.isArray(record['dispatchers'])) {
@@ -509,6 +521,12 @@ export function parseExperimentSpec(value: unknown, path = 'spec'): ExperimentSp
       ? { description: asString(record['description'], `${path}.description`) }
       : {}),
     seed: seedValue as number | string,
+    // Spread-or-omit, never `?? undefined`: a spec that never declared a traffic seed must be
+    // the object it was before the field existed, so that `canonicalJson` — which drops
+    // `undefined` but not an explicit key — produces the same string.
+    ...(present(record, 'trafficSeed')
+      ? { trafficSeed: trafficSeedValue as number | string }
+      : {}),
     buildings: asStringArray(record['buildings'], `${path}.buildings`),
     dispatchers: (record['dispatchers'] as unknown[]).map((entry, index) =>
       parseDispatcherArm(entry, `${path}.dispatchers[${index}]`),
@@ -774,6 +792,9 @@ export function planExperiment(
   return {
     experimentId: spec.id,
     experimentSeed: normalizeExperimentSeed(spec.seed),
+    ...(spec.trafficSeed === undefined
+      ? {}
+      : { experimentTrafficSeed: normalizeExperimentSeed(spec.trafficSeed) }),
     cells: Object.freeze(cells),
     cohorts,
     policy,

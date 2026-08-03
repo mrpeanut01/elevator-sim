@@ -106,6 +106,7 @@ export function createSerialExecutor(plan: ExperimentPlan): ReplicationExecutor 
             task.replication,
             task.seed,
             plan.keepRecords,
+            task.trafficSeed,
           ),
         ),
       ),
