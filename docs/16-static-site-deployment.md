@@ -158,6 +158,35 @@ No SSH key, no PAT, no secret of any kind. There is nothing to hold.
 
 ## 3. Deploy
 
+### The one-command form
+
+```sh
+cp infra/azure/swa/main.parameters.example.json infra/azure/swa/main.parameters.json
+$EDITOR infra/azure/swa/main.parameters.json        # githubRepository: OWNER/elevator-sim
+
+./infra/azure/swa/provision.sh                      # provision, then arm
+./infra/azure/swa/provision.sh --deploy-now         # ...and deploy this branch immediately
+```
+
+It is idempotent — `az group create` and an incremental deployment both are, and `gh variable set`
+overwrites — so re-running it is how you apply a parameter change.
+
+**Two things it enforces rather than describes**, both because they fail later and more confusingly
+than they need to:
+
+- **The arming variable is set last.** `AZURE_SWA_NAME` is the switch (§ 0), and setting it before
+  `AZURE_RESOURCE_GROUP` exists produces a first deploy that fails on a null resource group, with an
+  error naming neither the cause nor the fix.
+- **`githubRepository` is checked against the actual checkout.** That value becomes the federated
+  credential's subject. A wrong one is not caught by the deployment — it is caught by Entra refusing
+  the token exchange on the first deploy, as `AADSTS70021`, which reads like an Azure problem and is
+  a typo in a JSON file. The script compares it with `gh repo view` and refuses to continue.
+
+The steps below are what it runs. Read them before running it — the script does not excuse you from
+the what-if, which it still shows and still waits on.
+
+### The long form
+
 ```sh
 # 1. Its own resource group, separate from the CI-runner lane. Teardown is then one command.
 az group create --name elevator-sim-viz --location eastus2
@@ -415,6 +444,17 @@ are predictions.
    credential, no workflow run against a real subscription. Everything in § 3, § 5 and § 7 is a
    prediction from documented behaviour. **This is the most important limitation on the page**, and
    it is the same one `infra/README.md` § 8.1 opens with, for the same reason.
+
+   It is worth being exact about *why*, because "not yet done" and "cannot be done from here" are
+   different claims. The session that wrote this had **no `az` CLI, no Azure credential of any kind,
+   and no route to the control plane** — the environment's egress policy answers
+   `CONNECT management.azure.com:443` with **403**. Provisioning is not a step that was skipped; it
+   is a step that must run on a machine with a subscription. `provision.sh` exists because that
+   machine is not this one.
+
+   What **was** exercised of `provision.sh`: every preflight guard, driven with stubbed `az` and
+   `gh` — missing parameter file, unedited placeholder, repository mismatch, and the happy path
+   through to the confirmation summary. What was not: everything after the first real `az` call.
 2. **The federated credential has never been exchanged.** The subject strings are constructed from
    GitHub's documented claim format; a typo in one surfaces as `AADSTS70021` on the first armed run
    and nothing here would have caught it.
