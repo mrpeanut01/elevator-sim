@@ -292,6 +292,30 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
       (s) => ({ ...s, levers: { ...DEFAULT_LEVERS, express: true } }),
     ],
   },
+  'viewer.selectorSpec': {
+    /*
+     * On Midtown Office, for the same measured reason `viewer.outOfServiceCarIds` is: Garden
+     * Apartments is a residential trickle, and a trickle keeps the pattern detector in one arm all
+     * day — so a policy that switches between arms has nothing to switch between and the probe
+     * would report a live control dead.
+     *
+     * `off` against `fuzzy` rather than two arm maps, because it is the contrast the control's own
+     * first row makes and the one that cannot be quiet: with no policy, `resolveWeightSets` returns
+     * nothing and the driving weights never move.
+     */
+    states: [
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        selectorSpec: { ...s.selectorSpec, policy: 'off' },
+      }),
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        selectorSpec: { ...s.selectorSpec, policy: 'fuzzy' },
+      }),
+    ],
+  },
   'viewer.outOfServiceCarIds': {
     /*
      * On Midtown Office, not Garden Apartments — and the reason is a measured fact about the probe

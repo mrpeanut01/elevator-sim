@@ -152,6 +152,14 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
     'The group levers — parking, express, dwell — applied over a shipped profile without forking it. ' +
       'Moving one re-runs the day, and a run carrying moved levers cannot be reproduced from a CLI line.',
   ),
+  'viewer.selectorSpec': control(
+    'within-day',
+    'The weight-set selector: which policy adapts the dispatcher mid-run, how long it dwells, and ' +
+      'which weight vector each detected traffic pattern gets. It is the product’s one genuine ' +
+      'mid-day mechanism, and it is within-day rather than presentation because the player is ' +
+      'configuring an automatic policy in advance rather than intervening — the run still has to be ' +
+      'simulated again to see it.',
+  ),
   'viewer.outOfServiceCarIds': control(
     'within-day',
     'Cars the reader took out of service by clicking a badge. Re-runs the day; the CLI has no flag ' +

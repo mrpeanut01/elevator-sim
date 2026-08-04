@@ -682,6 +682,24 @@
       .toggle-label { font-size: 12.5px; font-weight: 600; flex: 1; }
       .toggle-state { font: 600 10px var(--mono); flex: none; }
       .toggle-hint { font-size: 11.5px; color: var(--dim); line-height: 1.4; margin-top: 2px; }
+      /* The weight-set selector's arm rows — docs/17 § 5 finding 6. One card per traffic pattern,
+         in the detector's own declaration order, which is the order selectWeightSet breaks a tie
+         in. `data-live` rather than a class: the panel writes it from the model's own `live`, and
+         the dimming is the second signal beside the refusal, never the only one (KB-15). */
+      .selector-line { font: 500 11px var(--mono); color: var(--accent-soft); line-height: 1.6; margin-top: 8px; }
+      .selector-note { font-size: 12px; color: #a6b2c1; line-height: 1.5; margin: 0; }
+      .selector-refusal { font: 500 10.5px var(--mono); color: var(--warn); line-height: 1.5; margin-top: 6px; }
+      .selector-refusal[hidden] { display: none; }
+      .selector-arm { border: 1px solid var(--edge); border-radius: var(--r-card); background: var(--panel); padding: 9px 11px; }
+      .selector-arm + .selector-arm { margin-top: 7px; }
+      .selector-arm-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+      .selector-arm-name { font: 600 11px var(--mono); letter-spacing: 0.06em; }
+      .selector-arm[data-live='false'] .selector-arm-name { color: var(--dimmer); }
+      .selector-arm-line { font-size: 11.5px; color: var(--dim); line-height: 1.45; margin-top: 3px; }
+      .selector-arm-signature { font: 500 10px var(--mono); color: var(--faint); line-height: 1.5; margin-top: 4px; }
+      .selector-arm-signature[hidden] { display: none; }
+      .selector-arm .field { margin-top: 7px; }
+
       .editor-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
       .dirty { font: 500 10.5px var(--mono); color: var(--warn); }
       .dirty[hidden] { display: none; }
@@ -1319,6 +1337,27 @@
                                style="font-size: 12.5px; font-weight: 600; display: inline-block">Door dwell</div>
                           <div class="chip-row" style="margin-top: 6px" id="dwell-chips"></div>
                           <div style="font-size: 11.5px; color: var(--dim); line-height: 1.4; margin-top: 4px" id="dwell-hint"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- The weight-set selector — docs/17 § 5 finding 6. Beside the group levers
+                         because it is one: applied to whoever is driving, never a fork of them.
+                         Every node below is written by dev/selectorEditor.ts; the only static text
+                         is the heading and the button, because everything else is either core's own
+                         parameter copy or a refusal the model raised. -->
+                    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #1c2532">
+                      <div class="eyebrow" style="margin-bottom: 9px">Traffic-pattern switching — the one thing that changes mid-shift</div>
+                      <p class="selector-note" id="selector-unavailable" hidden></p>
+                      <div id="selector-controls">
+                        <div class="chip-row" id="selector-policy"></div>
+                        <div class="selector-line" id="selector-line"></div>
+                        <div class="selector-refusal" id="selector-policy-issue" hidden></div>
+                        <div style="display: grid; gap: 9px; margin-top: 12px" id="selector-scalars"></div>
+                        <div style="margin-top: 12px" id="selector-patterns"></div>
+                        <div class="selector-refusal" id="selector-map-issue" hidden></div>
+                        <div class="editor-actions">
+                          <button type="button" class="chip" id="selector-reset">Back to the shipped switching</button>
+                          <span class="dirty" id="selector-changed" hidden></span>
                         </div>
                       </div>
                     </div>

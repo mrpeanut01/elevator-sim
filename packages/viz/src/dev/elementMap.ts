@@ -288,6 +288,36 @@ export interface DispatcherEditorElements {
   readonly yours: HTMLElement;
 }
 
+/**
+ * The weight-set selector's panel — `docs/17` § 5 finding 6, and the product's one genuine mid-run
+ * mechanism.
+ *
+ * It lives **inside** the dispatcher surface rather than behind a tab of its own, because it is a
+ * group lever in exactly the sense `group-levers` is: applied on top of whichever dispatcher is
+ * driving, never a fork of one. An eleventh tab would also be an eleventh entry in {@link TABS},
+ * which the rail, the deep link and the surface machinery all key on — a lot of machinery for a
+ * block that belongs beside the door dwell.
+ *
+ * `controls` is the whole block and is hidden when the loaded file declares no patterns
+ * (`docs/16` S7); `unavailable` sits outside it and carries the reason, so an absent panel is never
+ * indistinguishable from an oversight.
+ */
+export interface SelectorEditorElements {
+  /** Everything that is offered. Hidden when there is no pattern library to switch between. */
+  readonly controls: HTMLElement;
+  /** Why the panel is not offered. Hidden when it is. */
+  readonly unavailable: HTMLElement;
+  readonly policy: HTMLElement;
+  readonly policyIssue: HTMLElement;
+  readonly line: HTMLElement;
+  readonly scalars: HTMLElement;
+  readonly patterns: HTMLElement;
+  /** Refusals about the arm map as a whole, rather than about one pattern. */
+  readonly mapIssue: HTMLElement;
+  readonly reset: HTMLButtonElement;
+  readonly changed: HTMLElement;
+}
+
 /** § 1.3 M9 — the traffic editor. */
 export interface TrafficEditorElements {
   readonly editing: HTMLElement;
@@ -448,6 +478,8 @@ export interface Elements {
   /** § 1.3 M7 — where the five scenario cards go. */
   readonly scenarioList: HTMLElement;
   readonly dispatcherEditor: DispatcherEditorElements;
+  /** The weight-set selector, drawn inside the dispatcher surface. */
+  readonly selectorEditor: SelectorEditorElements;
   readonly trafficEditor: TrafficEditorElements;
   readonly machinesEditor: MachinesEditorElements;
   readonly buildingEditor: BuildingEditorElements;
@@ -608,6 +640,18 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     dirty: 'dispatcher-dirty',
     error: 'dispatcher-error',
     yours: 'dispatcher-yours',
+  }),
+  selectorEditor: Object.freeze({
+    controls: 'selector-controls',
+    unavailable: 'selector-unavailable',
+    policy: 'selector-policy',
+    policyIssue: 'selector-policy-issue',
+    line: 'selector-line',
+    scalars: 'selector-scalars',
+    patterns: 'selector-patterns',
+    mapIssue: 'selector-map-issue',
+    reset: 'selector-reset',
+    changed: 'selector-changed',
   }),
   trafficEditor: Object.freeze({
     editing: 'traffic-editing',

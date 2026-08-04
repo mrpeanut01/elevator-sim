@@ -27,6 +27,7 @@ import {
   resolveBuilding,
   type BuildingConfig,
   type DispatcherProfile,
+  type DispatcherProfiles,
   type ElevatorSpecs,
   type ResolvedBuilding,
   type SimulationConfig,
@@ -61,6 +62,15 @@ import {
   trafficProfilesWithPattern,
   type PatternSpec,
 } from '../authoring/patternSpec.js';
+import {
+  patternSwitchingWithSelector,
+  profileWithSelector,
+  selectorContextFrom,
+  // `dispatcherSpec.ts` exports a `specFromProfile` over a different shape, imported above. The
+  // two are aliased at every site that needs both — see `selectorSpec.ts`'s own naming hazard.
+  specFromProfile as selectorSpecFromProfile,
+  type SelectorSpec,
+} from '../authoring/selectorSpec.js';
 import type { VizRecording } from '../contract/types.js';
 import type { DisclosureMode } from '../live/types.js';
 import type { ViewMode } from '../mode/types.js';
@@ -201,6 +211,31 @@ export interface ViewerState {
   /** Cars the reader took out of service by clicking a badge under a shaft. § 1.5 B7. */
   readonly outOfServiceCarIds: readonly string[];
   readonly levers: GroupLevers;
+  /**
+   * The weight-set selector's configuration — `docs/17` § 5 finding 6, given a surface.
+   *
+   * ## Why it sits beside {@link ViewerState.levers} rather than inside `dispatcherSpec`
+   *
+   * For the reason `GroupLevers` sits there: it is applied **on top of whichever dispatcher is
+   * driving**, including a shipped one nobody has edited, so folding it into the dispatcher's
+   * working copy would mean that switching the selector on silently forked the profile named in
+   * the rail. `dispatcherSpec` is a document being edited and saved; this is a lever being pulled.
+   *
+   * ## Why one field and not two, when the write side is two documents
+   *
+   * `selection` is per profile and `patternSwitching` is file-level (`selectorSpec.ts`'s *"two
+   * documents, not one"*), and {@link shiftRunConfigOf} writes both — through
+   * `profileWithSelector` and {@link dispatcherProfilesWithSelector} respectively. But they are
+   * one *decision*: a player who binds `up-peak` to `capacity-aware` and never chooses a policy has
+   * configured nothing, and a state that could hold half of that is a state two panels can
+   * disagree about. The split belongs to the loader, not to the reader.
+   *
+   * At its seeded value — every scalar at `DISPATCH_PARAMETERS`' default, `policy: 'off'`, and the
+   * file's own arm map copied verbatim — the run it produces is **byte-identical** to the run built
+   * before this field existed. That is asserted rather than asserted-in-prose; see
+   * `selectorEditor.test.ts`.
+   */
+  readonly selectorSpec: SelectorSpec;
 
   /* --- the week ----------------------------------------------------------- */
   readonly week: WeekState;
@@ -311,6 +346,14 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
     seed,
     outOfServiceCarIds: [],
     levers: DEFAULT_LEVERS,
+    /*
+     * Seeded from the opening dispatcher and the loaded file, not from a blank: every shipped
+     * profile authors no `selection` at all, so this is the declared defaults plus the file's own
+     * five bindings — the configuration a reader is already running, drawn rather than invented.
+     * An editor that opened on an empty arm map would make a player author five bindings before
+     * they could see what the mechanism is.
+     */
+    selectorSpec: selectorSpecFromProfile(profile, selectorContextFrom(resources.dispatcherProfiles)),
     week: openWeek(contractForBuilding(buildingId)?.id),
     savedDispatchers: [],
     savedPatterns: [],
@@ -461,13 +504,31 @@ export function shiftRunConfigOf(
   const grown = withDoorTiming(grownBuilding(authored, state.week.day), doorTimingFor(state.levers));
   const building = resolveBuilding(parseBuilding(grown as unknown), specs);
 
-  // 3 — the dispatcher, plus the levers.
+  // 3 — the dispatcher, plus the levers, plus the weight-set selector.
   const base = profileById(resources, state.savedDispatchers, state.dispatcherId);
-  const dispatcherProfile = profileFromSpec(specFromProfile(base, base.name), {
-    id: base.id,
-    base,
-    levers: state.levers,
-  });
+  /*
+   * The selector is written **last**, over the profile the levers already produced, because it is
+   * the reader's most explicit statement about how the dispatcher should behave *during* the run
+   * and because `profileFromSpec` carries the base profile's own `selection` through its spread —
+   * so writing it first would leave the working copy losing to a field it was seeded from.
+   *
+   * Both halves of the selector are written here, and it has to be both: `selection` is a fact
+   * about the profile and `patternSwitching` is a fact about the file, and a run carrying one
+   * without the other is either a dispatcher declaring a rule with no arms (refused by name in
+   * `resolveWeightSets`) or an arm map nothing consults.
+   */
+  const dispatcherProfile = profileWithSelector(
+    profileFromSpec(specFromProfile(base, base.name), {
+      id: base.id,
+      base,
+      levers: state.levers,
+    }),
+    state.selectorSpec,
+  );
+  const dispatcherProfiles = dispatcherProfilesWithSelector(
+    resources.dispatcherProfiles,
+    state.selectorSpec,
+  );
 
   // 4 — the demand, then the day's event over it.
   const event = eventFor(state.week.day, state.week.dayIdx);
@@ -535,7 +596,7 @@ export function shiftRunConfigOf(
       dispatcherProfile,
       trafficProfiles,
       elevatorSpecs: specs,
-      dispatcherProfiles: resources.dispatcherProfiles,
+      dispatcherProfiles,
       seed: state.seed,
       durationS: state.shiftLengthS,
       demandTemplate,
@@ -552,6 +613,53 @@ export function shiftRunConfigOf(
       onTimeout: 'report',
     },
   };
+}
+
+/**
+ * The dispatcher-profile **file** the run resolves its weight-set arms from, with the reader's arm
+ * map written into it.
+ *
+ * `SimulationConfig.dispatcherProfiles` is what `weightSetSourceFrom` turns into the arm library,
+ * and the block it reads is file-level — so an editor that bound `up-peak` to a different weight
+ * set and wrote it only onto a profile would have edited a field the loader has nowhere to put.
+ * This is the other half of `selectorSpec.ts`'s *"two documents, not one"*, and it is the half that
+ * had **no seam at all** before this lane: `shiftRunConfigOf` passed `resources.dispatcherProfiles`
+ * straight through, so `patternSwitching` was loadable (§ D153's limitation, closed) and
+ * unwritable.
+ *
+ * ## The identity return is the point, not an optimisation
+ *
+ * When the reader's map is the file's own map, **the file object itself comes back** — not a copy
+ * that happens to be equal. `viewerSelector.test.ts`'s § D153 acceptance evidence asserts
+ * `configFrom(shipped).dispatcherProfiles` **is** the loaded file, and the criterion behind that
+ * assertion is the one worth keeping: closing a seam must cost nothing while nothing opts in.
+ *
+ * Arms may only name profiles the **file** declares, because that is the set
+ * `weightSetSourceFrom` builds `weightsByProfileId` from; a dispatcher the reader saved is not in
+ * it. The editor therefore offers only those (`docs/16` S7 — a control that cannot be honoured is
+ * not offered), rather than offering a saved dispatcher and refusing it at Run.
+ */
+export function dispatcherProfilesWithSelector(
+  file: DispatcherProfiles,
+  spec: SelectorSpec,
+): DispatcherProfiles {
+  const next = patternSwitchingWithSelector(spec, selectorContextFrom(file));
+  const before = file.patternSwitching;
+  if (next === undefined || before === undefined) return file;
+  if (sameArmMap(before.weightSetsByPattern, next.weightSetsByPattern)) return file;
+  return { ...file, patternSwitching: next };
+}
+
+/** Two arm maps binding the same patterns to the same weight sets. Key order is not a difference. */
+function sameArmMap(
+  a: Readonly<Record<string, string>>,
+  b: Readonly<Record<string, string>>,
+): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of keys) {
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
 }
 
 /**

@@ -212,6 +212,22 @@ import {
   type ShiftGoal,
   type WeekState,
 } from '../shift/types.js';
+import {
+  patternLine,
+  policyLine,
+  selectorContextFrom,
+  selectorIssues,
+  specFromProfile as selectorSpecFromProfile,
+  type SelectorSpec,
+} from '../authoring/selectorSpec.js';
+import {
+  armOptionsOf,
+  armRowsOf,
+  changedNoteOf,
+  policyChipsOf,
+  scalarRowsOf,
+  selectorAvailability,
+} from '../dev/selectorEditor.js';
 import { restoreNoticeFor } from '../persist/notice.js';
 import { loadSession } from '../persist/session.js';
 import { SESSION_SCHEMA_VERSION, type SessionRestoreFailure, type SessionStore } from '../persist/types.js';
@@ -3509,6 +3525,166 @@ const RESTORE_NOTICE: SurfaceAdapter = {
   },
 };
 
+/**
+ * The weight-set selector — the product's one genuine mid-run mechanism, and its first surface.
+ *
+ * ## Why every string here needs the sweep more than most
+ *
+ * The learned selector has been refused **three times** — § D145, § D156, § D169 — and the last
+ * refusal closed the mix-varying question in the refusing direction. The hand-authored selector is
+ * shipped and works; what nobody has measured is that switching *helps* on any configuration a
+ * player will run. So a label reading *"switches to the faster weights during the morning peak"*
+ * would be an unmeasured comparative on the exact question three studies declined to answer, and it
+ * would read as a finding because it sits on a control.
+ *
+ * The authoring module already scans its own prose for a comparative vocabulary. This adapter is the
+ * generic half: the same strings go through R2, R3, R10 and R13 with everything else.
+ *
+ * ## Driven on four contexts, because the refusals are where the prose is
+ *
+ * The shipped library with a policy on; the same with the policy `off` (six refusals plus the map);
+ * a spec bound to a pattern the detector does not declare — § D112's shape in a new field, resolved
+ * cleanly and read by nobody; and a **library with no `patternSwitching` at all**, which is the one
+ * that produces `selectorAvailability`'s note. The last is not reachable from `data/` today and is
+ * constructed, which is stated rather than smoothed over.
+ */
+const SELECTOR: SurfaceAdapter = {
+  id: 'dev/selectorEditor.ts#mountSelectorEditor',
+  covers: [
+    'dev/selectorEditor.ts#mountSelectorEditor',
+    'dev/selectorEditor.ts#selectorAvailability',
+    'dev/selectorEditor.ts#POLICY_HINTS',
+    'dev/selectorEditor.ts#policyChipsOf',
+    'dev/selectorEditor.ts#SCALAR_LABELS',
+    'dev/selectorEditor.ts#scalarRowsOf',
+    'dev/selectorEditor.ts#armRowsOf',
+    'dev/selectorEditor.ts#armOptionsOf',
+    'dev/selectorEditor.ts#changedNoteOf',
+    'authoring/selectorSpec.ts#PATTERN_LINES',
+    'authoring/selectorSpec.ts#INPUT_PHRASES',
+    'authoring/selectorSpec.ts#patternLine',
+    'authoring/selectorSpec.ts#signatureLine',
+    'authoring/selectorSpec.ts#policyLine',
+    'authoring/selectorSpec.ts#patternCards',
+    'authoring/selectorSpec.ts#selectorIssues',
+    'authoring/selectorSpec.ts#helpFor',
+    'authoring/selectorSpec.ts#rangeFor',
+    'authoring/selectorSpec.ts#defaultSelectorSpec',
+    'authoring/selectorSpec.ts#specFromProfile',
+    'authoring/selectorSpec.ts#specIsDirty',
+    'authoring/selectorSpec.ts#profileWithSelector',
+  ],
+  render(this: SurfaceAdapter, context) {
+    const seeds: TextSeed[] = [];
+    const file = context.dispatcherProfiles;
+    if (file === undefined) return singleRun(this.id, seeds);
+
+    const selectorContext = selectorContextFrom(file, 900);
+    const profile = file.profiles[0];
+    if (profile === undefined) return singleRun(this.id, seeds);
+
+    const base = selectorSpecFromProfile(profile, selectorContext);
+    const patterns = file.patternSwitching?.patternDetector.patterns ?? [];
+    const firstPattern = patterns[0] ?? 'up-peak';
+
+    const arms: readonly (readonly [string, SelectorSpec])[] = [
+      ['on', { ...base, policy: 'fuzzy' }],
+      // Every control refused at once — the arm that carries six sentences and the map's own.
+      ['off', { ...base, policy: 'off' }],
+      /*
+       * A binding for a pattern the detector does not declare. The resolver iterates the detector's
+       * own patterns, so this entry resolves cleanly and is read by nobody — § D112's defect in a
+       * new field, and the refusal is the only thing that makes it visible.
+       */
+      [
+        'stray-binding',
+        {
+          ...base,
+          policy: 'fuzzy',
+          weightSetsByPattern: { ...base.weightSetsByPattern, 'no-such-pattern': profile.id },
+        },
+      ],
+    ];
+
+    for (const [name, spec] of arms) {
+      const issues = selectorIssues(spec, selectorContext);
+      seeds.push({
+        field: `${name}.policyLine`,
+        text: policyLine(spec, selectorContext),
+        role: 'label',
+      });
+      seeds.push({
+        field: `${name}.changedNote`,
+        text: changedNoteOf(spec, profile, selectorContext),
+        role: 'label',
+      });
+      for (const [index, issue] of issues.entries()) {
+        seeds.push({ field: `${name}.issue[${String(index)}]`, text: issue.message, role: 'reason' });
+      }
+      for (const chip of policyChipsOf(spec)) {
+        seeds.push({ field: `${name}.policy.${chip.policy}.label`, text: chip.label, role: 'label' });
+        seeds.push({ field: `${name}.policy.${chip.policy}.hint`, text: chip.hint, role: 'prose' });
+      }
+      for (const row of scalarRowsOf(spec, issues)) {
+        seeds.push({ field: `${name}.scalar.${row.field}.label`, text: row.label, role: 'label' });
+        seeds.push({ field: `${name}.scalar.${row.field}.help`, text: row.help, role: 'prose' });
+        // The number beside the thumb. An `observation` because it is a value the run will read.
+        seeds.push({
+          field: `${name}.scalar.${row.field}.value`,
+          text: `${row.label}: ${row.valueText}`,
+          role: 'observation',
+        });
+        seeds.push({ field: `${name}.scalar.${row.field}.refusal`, text: row.refusal, role: 'reason' });
+      }
+      for (const row of armRowsOf(spec, selectorContext, issues)) {
+        seeds.push({ field: `${name}.arm.${row.patternId}.line`, text: row.line, role: 'prose' });
+        /*
+         * The derived one. `signatureLine` reads the authored membership ramps and says what the
+         * detector matches on — so it is a **claim about the configuration**, and a wrong one would
+         * describe a regime the run never enters.
+         */
+        seeds.push({
+          field: `${name}.arm.${row.patternId}.signature`,
+          text: row.signature,
+          role: 'observation',
+        });
+        seeds.push({
+          field: `${name}.arm.${row.patternId}.weightSet`,
+          text: row.weightSetName,
+          role: 'label',
+        });
+        seeds.push({ field: `${name}.arm.${row.patternId}.refusal`, text: row.refusal, role: 'reason' });
+      }
+    }
+
+    for (const option of armOptionsOf(selectorContext, profile.id)) {
+      seeds.push({ field: `option.${option.value}`, text: option.label, role: 'label' });
+    }
+    seeds.push({
+      field: 'availability.offered',
+      text: selectorAvailability(selectorContext).note,
+      role: 'reason',
+    });
+    /*
+     * The unavailable note, on a library that declares no patterns. No shipped `data/` reaches it —
+     * so it is constructed here rather than left unswept, and that difference is said rather than
+     * hidden behind an arm that looks driven.
+     */
+    seeds.push({
+      field: 'availability.absent',
+      text: selectorAvailability({ profiles: file.profiles, patternSwitching: undefined }).note,
+      role: 'reason',
+    });
+    seeds.push({
+      field: `patternLine(${firstPattern})`,
+      text: patternLine(firstPattern) ?? '',
+      role: 'prose',
+    });
+
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -3541,6 +3717,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   EDITOR_PANELS,
   MENU,
   RESTORE_NOTICE,
+  SELECTOR,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

@@ -124,6 +124,7 @@ import {
 import { mountEditor } from './editor.js';
 import { mountBuildingEditor } from './buildingEditor.js';
 import { mountDispatcherEditor } from './dispatcherEditor.js';
+import { mountSelectorEditor } from './selectorEditor.js';
 import { mountLeftRail } from './leftRail.js';
 import { mountMachinesEditor } from './machinesEditor.js';
 import { mountParameterForm } from './parameterForm.js';
@@ -783,6 +784,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
   const reportPanel = mountReport(ui.report, context);
   const scenariosPanel = mountScenarios(ui.scenarioList, context);
   const dispatcherEditor = mountDispatcherEditor(ui.dispatcherEditor, context);
+  /*
+   * The weight-set selector, mounted beneath the dispatcher's own controls — `docs/17` § 5 clause 6.
+   *
+   * `selection.policy` over `patternSwitching` is the simulator's **one genuine mid-run adaptation**,
+   * and it was reachable from no screen: the product's only real within-day mechanism was invisible
+   * to the player it was built for. It follows `dispatcherEditor` in every respect, including that
+   * an edit takes effect on the next Run rather than re-running under the reader.
+   */
+  const selectorEditor = mountSelectorEditor(ui.selectorEditor, context);
   const trafficEditor = mountTrafficEditor(ui.trafficEditor, context);
   const machinesEditor = mountMachinesEditor(ui.machinesEditor, context);
   const buildingEditor = mountBuildingEditor(ui.buildingEditor, context);
@@ -791,6 +801,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     reportPanel,
     scenariosPanel,
     dispatcherEditor,
+    selectorEditor,
     trafficEditor,
     machinesEditor,
     buildingEditor,

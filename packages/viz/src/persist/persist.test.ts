@@ -277,6 +277,8 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = Object.freeze({
     'a car held out of service is a within-day attempt, not a saved game, and nothing in a selection holds one — enterFreePlay clears it for exactly that reason',
   'viewer.levers':
     'the group levers are the same case: moved off their defaults they make a run unreproducible elsewhere, and a reload is not the moment to inherit that silently',
+  'viewer.selectorSpec':
+    'the weight-set selector is a group lever by another name — applied on top of whoever is driving — and off its seeded value it writes a selection block and an arm map no shipped profile carries, so a restored one would be a run nobody selected wearing the shipped dispatcher’s name',
 
   /* --- the reader’s library ---------------------------------------------- */
   'viewer.savedDispatchers':
