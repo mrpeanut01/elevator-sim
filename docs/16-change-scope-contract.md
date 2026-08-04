@@ -1,7 +1,13 @@
 # Change scope — the contract
 
-**Status: designed. The criteria are written before the implementation, and the clauses that decide
-this contract are ones the shipped product does not satisfy today.** That last half is
+**Status: designed, and seven of its eight failing clauses are now closed.** The verdict is
+[`DECISIONS.md`](../DECISIONS.md) § D217; the mode-by-mode analysis this contract was written for is
+[`docs/17-play-experience-audit.md`](17-play-experience-audit.md). The eighth — two of the four
+settings still reaching nothing — is carried in a register with a staleness assertion rather than
+absorbed, so it cannot quietly become permanent.
+
+**The criteria below are written before the implementation, and the clauses that decide this contract
+are ones the shipped product did not satisfy when they were written.** That last half is
 [`DECISIONS.md`](../DECISIONS.md) § D163's rule applied to itself: *a criterion whose every clause is
 already met is a description, not a gate.* § 5 lists the failing clauses by name so this document
 cannot later be read as having been fitted to the fix.

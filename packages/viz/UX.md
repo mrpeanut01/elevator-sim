@@ -653,6 +653,47 @@ placeholder rows waiting for exactly this. **Every scenario below carries an id*
 `PB-…`, `ED-…`); copy the id into the test matrix so a scenario and its test can be traced to
 each other in both directions.
 
+## 27. The main menu — `MU-`, `FP-`, `LB-`, `AC-`
+
+**Added 2026-08-04 ([§ D217](../../DECISIONS.md)).** The menu, Free Play, the leaderboard and the
+account screens shipped in § D214 and were in **no ledger section at all** — 220 rows over 24
+surfaces, and none of them covered the screen a player now meets first.
+
+**Marks discipline for this whole section.** There is still no browser, so nothing here is `✅ run`
+and nothing here may become `✅ run` without one ([`docs/16`](../../docs/16-change-scope-contract.md)
+S10). The *decisions* are driven through `menu/screens.ts#screenOf`, which is a **model walk** —
+stronger than the static sweep, weaker than a drive, and S9 forbids citing it as either. The
+*mounts* are `⚠️` and say so.
+
+| # | Surface | Requirement | State |
+|---|---|---|---|
+| MU-01 | Main menu | Five destinations, each with a line saying what it is | ✅ test (`screenOf`, driven per screen in the honesty sweep) · ⚠️ mount |
+| MU-02 | Main menu | Every screen offers a way back, and `back` from anywhere reaches the root | ✅ test (`menu.test.ts`, and the reducer's history is a stack) |
+| MU-03 | Main menu | The menu can be **re-entered** after Start or Campaign | ✅ test (`#open-menu` exists and `ELEMENT_IDS` requires it) · ⚠️ the click path |
+| MU-04 | Main menu | It is drawn as an overlay above the drawer, and scrolls on a short viewport | ✅ test (every emitted class has a rule; `z-index` > the drawer's) · ⚠️ appearance |
+| MU-05 | Campaign screen | Says which of the two things called Campaign this is, and selects the surface | ✅ test · ⚠️ mount |
+| FP-01 | Free play | Six axes, every one derived from `data/` rather than listed | ✅ test (`catalogue.test.ts`, both directions) |
+| FP-02 | Free play | Start is disabled **and explained** on a broken selection, with every reason at once | ✅ test (`freePlayIssues`, driven whole and broken in the honesty sweep) |
+| FP-03 | Free play | Start actually runs the selection | ✅ test (`enterFreePlay.test.ts`, compared on the legs) |
+| FP-04 | Free play | The run is day one — no tenant growth, no scheduled event, no inherited held car | ✅ test (legs identical whatever week it was entered from, with the negative control) |
+| FP-05 | Free play | The screen says so, rather than leaving a reader to assume it | ✅ test (the notice is driven by the honesty sweep) |
+| FP-06 | Free play | Every axis moves the legs | ✅ test (`state.freePlay.test.ts`, `scope.test.ts`) |
+| LB-01 | Leaderboard | All four metrics on every row, never combined, with the seed | ✅ test · ⚠️ mount |
+| LB-02 | Leaderboard | The server's own ranking note is printed **verbatim** | ✅ test |
+| LB-03 | Leaderboard | The screen says what a board *is* — one configuration across seeds | ✅ test (driven) · **⚠️ and see `GAPS.md` § 3: this is a mitigation, not a fix** |
+| LB-04 | Leaderboard | *Post this run* is refused with a reason, and the reason distinguishes *not signed in* from *this run cannot be ranked* | ✅ test (`runIdentity.test.ts`; the two are never collapsed) · ⚠️ mount |
+| LB-05 | Leaderboard | An empty board says so in words rather than drawing an empty table | ✅ test |
+| AC-01 | Account | A wrong password and an unknown address give the **same** sentence | ✅ test (`client.test.ts`, against the server's own source text) |
+| AC-02 | Account | An unconfirmed account is shown as playable, with what is still gated | ✅ test (`postingRefusal`, both arms driven) |
+| AC-03 | Account | The password is a real `password` input, cleared on mode change, never in `localStorage` | ✅ test (`account.ts`) · ⚠️ the input type |
+| AC-04 | Account | With no server configured, the screen says there is none rather than drawing a dead form | ✅ test |
+
+**What this section does not yet cover, said rather than left to be noticed:** focus order within a
+screen, the appearance of a disabled row's reason, and whether the overlay traps focus. All three
+need a browser, and all three belong to § 26's list the day one exists.
+
+---
+
 ## How the marks are used — read this before trusting one *(retired copy; the live one is at the top of this file)*
 
 Wave 1 shipped three `✅` marks that were false and a reviewer caught them (`DECISIONS.md` D18).

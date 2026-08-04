@@ -13721,3 +13721,125 @@ They are named here because § D163's defence of a criterion is structural: *the
 this must be ones the shipped product does not currently satisfy.* Seven of the eight were found by
 walking the seam rather than by reading it, which is the same method that produced the two honesty
 violations § D186 calls the most valuable result its phase could have had.
+
+
+## D217 — what the walk found, and what it did not close
+
+**Date: 2026-08-04 · Written after the code, and says so.** § D216 is the contract, dated before any
+of it existed and naming eight clauses the shipped product failed. This section records which of them
+closed, what closing them cost, and — the useful half — the things the walk found that the contract
+did not anticipate. [`docs/17-play-experience-audit.md`](docs/17-play-experience-audit.md) is the
+mode-by-mode analysis; this is the verdict.
+
+### 1. Seven of the eight closed. The eighth is registered, not absorbed
+
+Closed: a contract could be cleared without advancing a day; Start did not run the selection; Start
+did not reset the week; nothing reopened the menu; the campaign screen had no content; the menu had
+no stylesheet; `client.submit` had no non-test caller.
+
+**Open:** the four `Settings` still reach nothing. They are in `scope/probes.test-helper.ts`'s
+`SINK_MISSING` with a reason each and a **staleness assertion** — a registered control that acquires
+a sink turns the suite red until the entry is deleted, so this cannot quietly become permanent. That
+is `deadCode.test.ts`'s `DEAD_CANDIDATES` idiom, and it is used here for the same reason: the suite
+stays green while the register carries the defect, and the register is the thing somebody has to
+answer for.
+
+### 2. The worst finding was a game rule, not a bug
+
+A contract could be cleared **without the doors ever opening on the next day**. `closeDay` had no
+same-day guard and `closeShift`'s only guard is the recording's id — which a re-run defeats by
+construction, and re-running is what every control in the shell does when it is moved. Move a slider,
+re-close, repeat: `needClean: 3` cleared on Monday.
+
+It survived because nothing modelled the retry, and nothing modelled the retry because the retry is
+invisible in the architecture. `Simulation.run()` returns when the replication is over, so a control
+cannot steer a day — it discards one and simulates a different one. That is the product's most-used
+verb and it had no name.
+
+**The fix refuses the exploit without refusing the recovery.** A retry replays the day from a snapshot
+taken before it was first closed, so missed → clean banks one, clean → clean changes nothing, and
+clean → missed takes the credit back. The third row is why the snapshot has to exist: a rule that
+could only ever add would let a player bank a clean run and keep the credit while re-running until
+the picture was prettier.
+
+### 3. The instrument found three bugs in itself and none in the product, and one of them matters
+
+Writing `scope.test.ts` produced three failures, all mine. `GroupLevers.parking` is a boolean and not
+a strategy name. Garden Apartments at a residential trickle has `main-A` answer everything, so
+holding `main-B` genuinely is byte-identical there and the probe had to move to a building where four
+cars carry 1 710 people.
+
+The third is the one worth recording: **`legsOf` dropped `outOfServiceCarIds`**, because
+`shiftRunConfigOf` returns it *beside* `config` and `runShift` passes the two to `recordRun`
+separately. So the instrument reported a live seam dead. An instrument that does not reproduce the
+shipped call path measures the instrument, and the failure mode is the worst available here — a false
+accusation of inertness against a control that works, in a suite whose whole purpose is finding
+controls that do not.
+
+### 4. The dead-code audit caught this wave's own directory on its first run
+
+`viz/deadCode.test.ts` reported three exports of `scope/` with no non-test caller — in the directory
+whose entire subject is that defect, on the run it landed. `refusalFor`, `permittedScopes` and
+`reproducesFromSelection` were **deleted rather than allowlisted**, which is the roadmap's own
+prescription: the fix is a caller. They arrive with theirs.
+
+The fourth, `runIdentityIssues`, got its caller immediately and that is the more interesting one —
+see § 5.
+
+### 5. `provenanceLineOf` had already written the `ranked` scope out by hand
+
+The predicate *"can this run be reproduced elsewhere from its own selection?"* existed in
+`dev/main.ts` as six refusals: an unshipped building, an unshipped dispatcher, a saved pattern, a
+`week.day` that is not 1, a held car, a moved lever. The leaderboard's submit path was about to
+enumerate it a second time.
+
+Two answers to that question is the one disagreement a replay-verified board cannot survive, and it
+is asymmetric in an ugly way. A client **stricter** than the server refuses a run the server would
+have taken and nobody finds out. A client **looser** posts a run the server cannot reproduce, and the
+server rejects it **as a forgery** — spending the one accusation this product makes on a client bug,
+against an honest player.
+
+Derived once in `scope/runIdentity.ts`, consumed by both. The matrix test asserts the two agree on
+every state *and on the number of reasons*, because a predicate that collapsed three refusals into
+one would agree on every boolean and still tell a player less than the control beside it does.
+
+### 6. Two clauses were one usability failure
+
+The menu had **no stylesheet** — twenty-nine class names, zero rules, on markup appended after a
+`100vh` shell that does not scroll — and **no way back into it** once left. Neither is visible in a
+screenshot of the game, which is why both survived: the game looked right, and the menu was below the
+fold.
+
+The class-coverage test derives the class list by reading `menuPanel.ts`. A listed one would have
+been the sixth hand-maintained list in this branch and would have failed in the worst direction, by
+quietly checking fewer names than the panel emits.
+
+### 7. What the contract did not anticipate
+
+- **`free-play` permits `within-day`, so S6 does not require the levers or held cars to be reset.**
+  What requires it is the *selection*: neither is one of the six axes the menu offered, so inheriting
+  Thursday's held car makes the run not the run the screen described. The rule that applies is about
+  the selection, not the scope, and § D216 § 2 did not distinguish them.
+- **A third entry kind was needed.** `control` and `output` could not describe the four editor working
+  copies: `dispatcherSpec` is written by a slider a player drags, so it is not an output, and moving
+  it changes no leg because `shiftRunConfigOf` never reads it. Declaring it `presentation` would have
+  been false in the way that matters — it is not that it *cannot* change a run, it is that it changes
+  one later, through a save and a select. `latent` carries the field that realises it, so the claim is
+  checkable rather than a shrug.
+- **The honesty sweep gained the menu's whole screen set for no simulations.** The menu's strings need
+  no run, so the adapter enumerates every screen per existing case rather than widening `HonestySpace`
+  with a fifth axis, which would have multiplied the case count. Three arms — whole, broken, and a run
+  that cannot be ranked — because the sentence beside a disabled *Post this run* is a claim about why
+  somebody's score is not going up.
+
+### 8. Evidence tier, stated rather than implied
+
+This wave earned `✅ test` and nothing above it. There is still no browser — `docs/05` says *"no
+Playwright, no Puppeteer, no jsdom"* — so the decisions are driven and the mounts are not, and the
+class-coverage assertion reads `index.html` as text rather than rendering it. § D216 § 6's ladder
+applies: `static sweep < model walk < document recorder < browser`, and no `UX.md` row gains `✅ run`
+from anything here.
+
+The four modes `docs/17` § 4 designs — incidents and maintenance, the calendar, the daily challenge,
+commissioning — are **designed and not built**, and the seven open findings in § 5 of that document
+are open. Naming them is the point of writing them down.
