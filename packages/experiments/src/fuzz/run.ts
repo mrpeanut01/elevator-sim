@@ -94,6 +94,29 @@ export const CORPUS_DISPATCHER_PROFILE_IDS: readonly string[] = Object.freeze([
   'destination-panel',
 ]);
 
+/**
+ * The **traffic** profiles the recorded corpus is indexed against — the same defect as
+ * {@link CORPUS_DISPATCHER_PROFILE_IDS}, one field over, and unfixed until now.
+ *
+ * `generateBuilding` picks a generated building's `trafficProfile` from this axis, so adding a
+ * profile to `data/traffic-profiles.json` re-maps every seed exactly as adding a dispatcher does.
+ * § D205 found three instances of *"derive it from the shipped profile list"* turning a list into a
+ * silent input to a published number, fixed the dispatcher axis here, and did not look one line
+ * down at this one. Adding the `hospital` profile moved `fuzz-1001074`'s arrival count from 177 to
+ * 188 — the recorded case still ran, still reported cleanly, and was **no longer the case the
+ * record describes**.
+ *
+ * Frozen at the four profiles shipped when the deep-tier findings were recorded. As above, the
+ * *campaign* does not use this: a new profile should be fuzzed, and a seed that re-maps in a search
+ * is a seed doing its job. Only the pinned reproductions need a stable identity.
+ */
+export const CORPUS_TRAFFIC_PROFILE_IDS: readonly string[] = Object.freeze([
+  'office-prestige',
+  'office-standard',
+  'residential',
+  'hotel',
+]);
+
 export function generateOptionsFrom(
   config: LoadedConfig,
   space?: GenerateOptions['space'],
@@ -103,6 +126,11 @@ export function generateOptionsFrom(
    * case, whose seed only means what it meant against the library it was found under.
    */
   profileIds?: readonly string[],
+  /**
+   * The traffic axis, by id and in this order. Same contract as `profileIds`: defaults to every
+   * shipped profile, and a recorded case passes {@link CORPUS_TRAFFIC_PROFILE_IDS}.
+   */
+  trafficProfileIds?: readonly string[],
 ): GenerateOptions {
   const byId = new Map(config.dispatcherProfiles.profiles.map((profile) => [profile.id, profile]));
   const profiles =
@@ -120,9 +148,33 @@ export function generateOptionsFrom(
   return {
     elevatorSpecs: config.elevatorSpecs,
     dispatcherProfiles: profiles,
-    trafficProfileIds: config.trafficProfiles.profiles.map((profile) => profile.id),
+    trafficProfileIds: resolveTrafficAxis(config, trafficProfileIds),
     ...(space === undefined ? {} : { space }),
   };
+}
+
+/**
+ * The traffic axis, checked against what ships.
+ *
+ * A missing id throws with the same message shape the dispatcher axis uses, and for the same
+ * reason: a corpus indexed against a profile that no longer ships cannot reproduce the case it
+ * recorded, and silently picking from a shorter list would reproduce a *different* case.
+ */
+function resolveTrafficAxis(
+  config: LoadedConfig,
+  requested: readonly string[] | undefined,
+): readonly string[] {
+  const shipped = config.trafficProfiles.profiles.map((profile) => profile.id);
+  if (requested === undefined) return shipped;
+  const available = new Set(shipped);
+  for (const id of requested) {
+    if (!available.has(id)) {
+      throw new Error(
+        `Fuzz option space asks for traffic profile "${id}", which data/traffic-profiles.json does not declare. A corpus indexed against a profile that no longer ships cannot reproduce the case it recorded.`,
+      );
+    }
+  }
+  return requested;
 }
 
 /**

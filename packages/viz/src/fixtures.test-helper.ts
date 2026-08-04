@@ -76,10 +76,13 @@ export const PANEL_DISPATCHER_ID = 'destination-panel';
  * disagree, so a new building cannot arrive without the breadth suites covering it.
  */
 export const BUILDING_IDS = [
+  'chancery-house',
+  'crown-hotel',
   'garden-apartments',
   'midtown-office',
   'mixed-use-high-rise',
   'secure-tower',
+  'st-jude-hospital',
   'vertical-city',
 ] as const;
 

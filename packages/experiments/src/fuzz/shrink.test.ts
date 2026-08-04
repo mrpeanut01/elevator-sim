@@ -15,7 +15,14 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { STANDARD_CORPUS } from './campaign.js';
 import { stallingAfter } from './faults.js';
 import { caseFromSeed, resolveCase } from './generate.js';
-import { evaluateCase, generateOptionsFrom, isFailure, type RunOptions } from './run.js';
+import {
+  CORPUS_DISPATCHER_PROFILE_IDS,
+  CORPUS_TRAFFIC_PROFILE_IDS,
+  evaluateCase,
+  generateOptionsFrom,
+  isFailure,
+  type RunOptions,
+} from './run.js';
 import { formatFuzzCase, formatOutcome, shrinkCase } from './shrink.js';
 import type { FuzzCase } from './types.js';
 
@@ -34,7 +41,14 @@ function sizeOf(fuzzCase: FuzzCase): number {
 
 beforeAll(async () => {
   config = await loadConfig(DATA_DIR);
-  const options = generateOptionsFrom(config);
+// The frozen axes: this suite shrinks a **recorded** counterexample, and a seed only means what it
+// meant against the library it was found under. See `CORPUS_TRAFFIC_PROFILE_IDS`.
+  const options = generateOptionsFrom(
+    config,
+    undefined,
+    CORPUS_DISPATCHER_PROFILE_IDS,
+    CORPUS_TRAFFIC_PROFILE_IDS,
+  );
   for (const seed of STANDARD_CORPUS) {
     const candidate = caseFromSeed(seed, options);
     const floors = (candidate.building.floors ?? []).length;
@@ -74,7 +88,7 @@ describe('shrinking a real counterexample', () => {
 
     // Every reducer re-validates through `parseBuilding`; this asserts the *result* does too,
     // so a minimal counterexample can be pasted into `data/buildings/` and loaded.
-    expect(() => resolveCase(shrunk.minimal.case, generateOptionsFrom(config))).not.toThrow();
+    expect(() => resolveCase(shrunk.minimal.case, generateOptionsFrom(config, undefined, CORPUS_DISPATCHER_PROFILE_IDS, CORPUS_TRAFFIC_PROFILE_IDS))).not.toThrow();
 
     // Replay: the same case, run again, gives the same verdict. A finding nobody can reproduce
     // is a rumour, and a shrunk case is not seed-derivable — the printed config is the record.
