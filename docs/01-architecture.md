@@ -302,6 +302,7 @@ packages/
 │   ├── mode/              — Phase 9 W6: Basic and Advanced, and the derived mode-parity check
 │   ├── menu/              — § D214: the shell's screens, settings, and the free-play selection
 │   ├── scope/             — § D216: what a control may move and when, derived from the state's own keys
+│   ├── playthrough/       — § D217: the walk over the menu graph — every screen, every affordance
 │   └── dev/               — the Vite dev entry points, viewer and editor (dev-only)
 ├── server/                — § D214: accounts, email confirmation, and a verified leaderboard
 │   ├── accounts/          — password hashing, signed confirmation tokens, session tokens

@@ -13846,7 +13846,26 @@ quietly checking fewer names than the panel emits.
   that cannot be ranked — because the sentence beside a disabled *Post this run* is a claim about why
   somebody's score is not going up.
 
-### 8. Evidence tier, stated rather than implied
+### 8. The walk, and the one assertion that was mutation-checked
+
+`playthrough/walk.test.ts` drives `screenOf` and `applyIntent` over the whole reachable graph, in
+three arms — signed in with a postable run, signed out with nothing run, and signed in with a run
+that cannot be ranked — because the interesting refusals live in the states where something is
+wrong, and a walk driven only on the happy path leaves every error path unvisited.
+
+**A test that has never been red proves nothing**, and this one passed on its first run because the
+defect it is for had already been fixed. So it was mutation-checked: `campaignRows()` returning `[]`
+turns *"offers a way forward from every screen, not only a way back"* red with the message
+*"campaign (signed in, a postable run on screen) offers nothing but Back"*, which is § 5 clause 6
+exactly. Recorded because the alternative — a green walk nobody has seen fail — is a suite that
+covers less than it claims.
+
+**What it deliberately does not claim.** Clauses 2 and 3 are `enterFreePlay.test.ts`'s, compared on
+the legs, because *what a run is* is not a question a navigation walk can answer. Clauses 5 and 7 are
+DOM facts and are asserted by reading `index.html`. Saying which instrument caught which clause is
+the whole of S9's discipline.
+
+### 9. Evidence tier, stated rather than implied
 
 This wave earned `✅ test` and nothing above it. There is still no browser — `docs/05` says *"no
 Playwright, no Puppeteer, no jsdom"* — so the decisions are driven and the mounts are not, and the

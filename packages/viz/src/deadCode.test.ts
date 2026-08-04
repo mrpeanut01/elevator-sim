@@ -103,6 +103,7 @@ const AUDITED_MODULES = [
   'viz/src/menu',
   'viz/src/mode',
   'viz/src/playback',
+  'viz/src/playthrough',
   'viz/src/record',
   'viz/src/render',
   'viz/src/replay',
