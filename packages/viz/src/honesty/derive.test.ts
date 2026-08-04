@@ -124,6 +124,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'are derived only because the two-adjacent-words scanner reads hyphenated ids ' +
         '(`garden-apartments`, `lunch-two-way`) as prose.',
       ids: [
+        /*
+         * `shift/incidents.ts` is the same false positive one directory over. It returns
+         * `ServiceEventConfig` values — an `atS`, a car id and a `mode` — and authors no sentence at
+         * all; it is derived only because `'out-of-service'` and `'in-service'` are hyphenated ids
+         * that the two-adjacent-words scanner reads as prose. The *player-facing* half of an
+         * incident is its event's `note`, which `SHIFT_EVENTS` owns and `RAIL_VIEW` drives, and the
+         * refusals it can produce are `ShiftRunPatch.withheld`'s, authored in `events.ts`.
+         */
+        'shift/incidents.ts#serviceEventsFor',
+        'shift/incidents.ts#withIncidents',
         'dev/surfaces.ts#applyDrawerState',
         'dev/surfaces.ts#applyRailState',
         'dev/surfaces.ts#applySurfaceState',

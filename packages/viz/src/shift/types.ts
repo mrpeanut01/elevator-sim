@@ -189,6 +189,26 @@ export interface EventEffect {
   /** How many cars stand out of service for the whole shift. `0` on four of the five. */
   readonly carsOutOfService: number;
   /**
+   * A car away for **part** of the run, and back before it ends — or `null`.
+   *
+   * The distinction from {@link carsOutOfService} is the whole of what an incident is. A car held for
+   * the whole shift is *not in the building today*; a car that leaves and returns is a loss the group
+   * has to absorb and then re-balance around, which is a different problem to dispatch and the one a
+   * player can actually plan for.
+   *
+   * Expressed as fractions of the run rather than as a clock time, because a shift is 15 to 120
+   * minutes from a 06:00 start and the design's own *"until 11:30"* names an hour no shipped shift
+   * length contains — the same correction § D175 made to the fire drill's *"14:00"*.
+   *
+   * Reaches the engine as `BuildingConfig.serviceEvents` through `shift/incidents.ts`, which is that
+   * field's first non-test caller anywhere in this repository.
+   */
+  readonly derate: {
+    readonly cars: number;
+    readonly fromFraction: number;
+    readonly toFraction: number;
+  } | null;
+  /**
    * The engine fields this effect writes, by name, for the tooltip the coach ribbon shows and for
    * `events.test.ts`'s cross-check that the struct and the patch agree. Empty for `ordinary`.
    */

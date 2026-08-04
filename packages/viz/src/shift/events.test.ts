@@ -38,6 +38,7 @@ import {
   eventFor,
   shiftRunPatch,
 } from './events.js';
+import { serviceEventsFor, type Incident } from './incidents.js';
 import { SHIFT_EVENT_IDS, type ShiftEventId } from './types.js';
 
 const BUILDING_ID = 'midtown-office';
@@ -60,15 +61,23 @@ function runWith(eventId: ShiftEventId | null): VizRecording {
   const demandBase = base();
   const patch =
     eventId === null
-      ? { demand: {}, outOfServiceCarIds: [] as readonly string[] }
+      ? { demand: {}, outOfServiceCarIds: [] as readonly string[], incidents: [] as readonly Incident[] }
       : shiftRunPatch({ event: SHIFT_EVENTS[eventId], building, base: demandBase });
 
+  const fixture = fixtureConfig(config, {
+    buildingId: BUILDING_ID,
+    durationS: DURATION_S,
+    onTimeout: 'report',
+  });
+  /*
+   * The incidents go onto the **building**, not beside the config, because `serviceEvents` is read
+   * by the kernel during the run rather than by `recordRun` before it. `dev/state.ts` does the same
+   * thing at the same point; a fixture that skipped it would be testing a run the shell never
+   * builds — the shape that reported a live seam dead in `scope/probes.test-helper.ts`.
+   */
   const simulationConfig: SimulationConfig = {
-    ...fixtureConfig(config, {
-      buildingId: BUILDING_ID,
-      durationS: DURATION_S,
-      onTimeout: 'report',
-    }),
+    ...fixture,
+    building: withIncidentsOnResolved(fixture.building, patch.incidents),
     demand: {
       arrivalRatePctPop5min: demandBase.ratePctPop5min,
       directionalSplit: demandBase.split,
@@ -79,6 +88,35 @@ function runWith(eventId: ShiftEventId | null): VizRecording {
     recordDecisions: false,
     outOfServiceCarIds: patch.outOfServiceCarIds,
   }).recording;
+}
+
+/**
+ * Attach service events to an already-resolved building.
+ *
+ * The shipped path re-parses (`dev/state.ts` puts the edited config back through
+ * `parseBuilding`/`resolveBuilding`, so an incident naming an unknown car is refused by `core`'s own
+ * issue codes). This fixture is handed a `ResolvedBuilding` and has no config to go back to, so it
+ * writes the resolved form directly — which is why the *validation* half is asserted in
+ * `incidents.test.ts` against the real path and not here.
+ */
+function withIncidentsOnResolved(
+  building: SimulationConfig['building'],
+  incidents: readonly Incident[],
+): SimulationConfig['building'] {
+  const events = serviceEventsFor(incidents, DURATION_S);
+  if (events.length === 0) return building;
+  return {
+    ...building,
+    serviceEvents: [
+      ...(building.serviceEvents ?? []),
+      ...events.map((event) => ({
+        atS: event.atS,
+        bankId: event.bankId ?? '',
+        carId: event.carId,
+        mode: event.mode,
+      })),
+    ],
+  };
 }
 
 /** `incoming` / `outgoing` / `interfloor`, classified the way `core`'s generator classifies them. */
@@ -146,6 +184,10 @@ describe('the patch and the effect agree about what is written', () => {
     const written = [
       ...Object.keys(patch.demand).map((key) => `demand.${key}`),
       ...(patch.outOfServiceCarIds.length > 0 ? ['outOfServiceCarIds'] : []),
+      // `serviceEvents` is the third place an effect can write, and it goes onto the building
+      // rather than beside the config. An event declaring it and producing no incident — or the
+      // reverse — is exactly the caption-without-a-mechanism this cross-check exists for.
+      ...(patch.incidents.length > 0 ? ['serviceEvents'] : []),
     ].sort((a, b) => a.localeCompare(b));
     expect(written).toEqual([...SHIFT_EVENTS[id].effect.writes].sort((a, b) => a.localeCompare(b)));
     expect(patch.withheld).toEqual([]);
@@ -179,17 +221,41 @@ describe('the patch and the effect agree about what is written', () => {
 });
 
 describe('every event reaches the simulator', () => {
-  it('move-in genuinely takes a car out of service', () => {
+  it('move-in stands a car down for the window it names, and gives it back', () => {
+    /*
+     * The event's mechanism changed and this assertion changed with it. It used to hold the car for
+     * the whole run through `outOfServiceCarIds`, because the shift layer did not own the building
+     * and could not say *until*. It now writes two `serviceEvents` through `shift/incidents.ts`, so
+     * the claim to check is the harder one: idle inside the window, **working after it**.
+     *
+     * A test that only asserted "the car was idle at some point" would pass on the old mechanism,
+     * on the new one, and on a car that simply had nothing to do — which is why the control below
+     * is still here and why the after-the-window clause is the load-bearing half.
+     */
     const run = runWith('move-in');
-    expect(run.outOfServiceCarIds).toHaveLength(1);
-    const heldId = run.outOfServiceCarIds[0] ?? '';
+    const patch = shiftRunPatch({
+      event: SHIFT_EVENTS['move-in'],
+      building: requireBuilding(config, BUILDING_ID),
+      base: base(),
+    });
+    expect(patch.outOfServiceCarIds).toHaveLength(0);
+    expect(patch.incidents).toHaveLength(1);
+
+    const incident = patch.incidents[0];
+    expect(incident).toBeDefined();
+    if (incident === undefined) return;
+    const heldId = `${incident.car.bankId}-${incident.car.carId}`;
+    const backAtS = Math.round(incident.toFraction * DURATION_S);
 
     const held = run.shafts.find((shaft) => shaft.carId === heldId);
     expect(held, `${heldId} is missing from the recording`).toBeDefined();
-    // The whole claim: the car did not move. `Car.setMode('out-of-service')` makes
-    // `estimateCost` refuse it with `infeasibleReason: 'serviceMode'`, so the group dispatches
-    // around it and it is never commanded anywhere.
-    expect(held?.motions ?? []).toHaveLength(0);
+    // `Car.setMode('out-of-service')` makes `estimateCost` refuse the car with
+    // `infeasibleReason: 'serviceMode'`, so the group dispatches around it while it is out.
+    const duringWindow = (held?.motions ?? []).filter((motion) => motion.startedAt < backAtS);
+    expect(duringWindow, `${heldId} moved while it was out of service`).toHaveLength(0);
+    // …and it came back, which is the whole point of a window rather than a hold.
+    const afterWindow = (held?.motions ?? []).filter((motion) => motion.startedAt >= backAtS);
+    expect(afterWindow.length, `${heldId} never returned to service`).toBeGreaterThan(0);
 
     // …and it is not simply a car that had nothing to do: the same car worked in the control.
     const inControl = control.shafts.find((shaft) => shaft.carId === heldId);

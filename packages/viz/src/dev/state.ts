@@ -67,6 +67,7 @@ import type { ViewMode } from '../mode/types.js';
 import { contractForBuilding, CONTRACTS } from '../shift/contracts.js';
 import { eventFor, shiftRunPatch, baseDemandOf } from '../shift/events.js';
 import { grownBuilding } from '../shift/growth.js';
+import { withIncidents } from '../shift/incidents.js';
 import { openWeek, takeContract } from '../shift/week.js';
 import type { DayReport, ShiftEvent, WeekState } from '../shift/types.js';
 
@@ -480,13 +481,31 @@ export function shiftRunConfigOf(
     ...new Set([...state.outOfServiceCarIds, ...patch.outOfServiceCarIds]),
   ].sort((a, b) => a.localeCompare(b));
 
+  /*
+   * 5 — the day's incidents, written onto the building as `serviceEvents`.
+   *
+   * **After** the patch and before the second resolve, because the incident has to be part of the
+   * building document the kernel is handed: `serviceEvents` is read by `sim/events.ts` during the
+   * run, not by `recordRun` before it, so unlike `outOfServiceCarIds` it cannot travel beside the
+   * config. This is `BuildingConfig.serviceEvents`' first non-test caller anywhere in the repository
+   * — see `shift/incidents.ts` for what it was and why that mattered.
+   *
+   * The building is re-parsed and re-resolved rather than patched in place, so an incident naming a
+   * car no bank declares is refused by `core`'s own four service-event issue codes rather than by a
+   * check written here. `grownBuilding` already established that pattern: a building edit goes back
+   * through the loader like any other.
+   */
+  const withEvents = withIncidents(grown, patch.incidents, state.shiftLengthS);
+  const finalBuilding =
+    withEvents === grown ? building : resolveBuilding(parseBuilding(withEvents as unknown), specs);
+
   return {
-    building,
+    building: finalBuilding,
     event,
     outOfServiceCarIds,
     withheld: patch.withheld,
     config: {
-      building,
+      building: finalBuilding,
       dispatcherProfile,
       trafficProfiles,
       elevatorSpecs: specs,
