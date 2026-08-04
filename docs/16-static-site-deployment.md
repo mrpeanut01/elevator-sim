@@ -528,7 +528,11 @@ against `main` as it now stands rather than adjusted — and the +6 became +7 be
 also what made the CSP guard in § 1 necessary.
 
 A table like this cannot name the commit that contains it — writing the id in changes the id —
-which is why every figure names its *run* instead.
+which is why every figure names its *run* instead, and why the bound below matters more than the
+commit id does. **Re-confirmed at `67a23b8`: 293 files, 5 482 passed, 11 skipped, both legs**
+([run 30956811999](https://github.com/mrpeanut01/elevator-sim/actions/runs/30956811999)). Every
+commit after `d3668f7` on this branch changes `docs/16-static-site-deployment.md` and nothing else —
+not compiled, not tested — so the counts hold to the merge unless a later commit says otherwise.
 
 Two notes on how these numbers were obtained, because this repository has been bitten by the
 alternative:
