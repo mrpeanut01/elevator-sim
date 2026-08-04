@@ -449,6 +449,48 @@ describe('the rest of the sheet', () => {
     expect(report.metaLines[1]).not.toContain('22:00');
   });
 
+  it('names what was booked against today, and does not confuse it with tomorrow', () => {
+    /*
+     * `DayReportInput.event` had no reader at all. The forecast card names *tomorrow's* event,
+     * derived independently through `eventFor(day + 1, …)`, and today's appeared nowhere — so a
+     * sheet for a move-in day described the figures and never mentioned the derated car that shaped
+     * them. Every line was true and the account was missing its subject.
+     */
+    const report = weekDay(
+      dayReportOf({
+        recording: clean,
+        observations: observationsOfRun(clean),
+        goals: goalsForDay(4),
+        week: { ...openWeek('c2'), day: 4, dayIdx: 3 },
+        contract: contractById('c2'),
+        event: SHIFT_EVENTS['move-in'],
+        subject: { kind: 'week-day' },
+      }),
+    );
+    const meta = report.metaLines.join('\n');
+    expect(meta).toContain(SHIFT_EVENTS['move-in'].name);
+    expect(meta).toContain(SHIFT_EVENTS['move-in'].note);
+    // The negative control that makes the assertion mean something: the field is *read*, not a
+    // second derivation of the same schedule. Day 4's own `eventFor` is not move-in, so a sheet
+    // that recomputed instead of reading would show a different event here.
+    expect(SHIFT_EVENTS['move-in'].name).not.toBe(report.forecast.name);
+  });
+
+  it('books nothing against a single run, because there is no week to book it against', () => {
+    // A single-run sheet naming an event would be claiming the run had one — and `enterFreePlay`
+    // resets the week precisely so it does not.
+    const meta = dayReportOf({
+      recording: clean,
+      observations: observationsOfRun(clean),
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS['move-in'],
+      subject: { kind: 'single-run', selection: SELECTION },
+    }).metaLines.join('\n');
+    expect(meta).not.toContain(SHIFT_EVENTS['move-in'].name);
+  });
+
   it('clears the shift when every goal was met', () => {
     const report = reportOf(clean);
     expect(report.goals.every((reading) => reading.state === 'met')).toBe(true);

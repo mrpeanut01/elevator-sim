@@ -103,6 +103,7 @@ import { shiftObservationsOf } from '../shift/observations.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { dayReportOf } from '../shift/report.js';
 import { closeDay, outcomeOf } from '../shift/week.js';
+import { coachWeekLines } from '../shift/weekLabel.js';
 import { weekdayOf } from '../shift/types.js';
 
 import { mountBatchPanel } from './batchPanel.js';
@@ -1233,18 +1234,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
       String(state.shiftLengthS),
     );
 
-    const contract = state.week.contractId;
-    setText(ui.coach.label, contract === undefined ? 'Sandbox' : `Scenario · day ${String(state.week.day)}`);
+    /*
+     * Both lines from one decision, and the decision is not here — see `shift/weekLabel.ts`.
+     *
+     * What was here tested `state.week.contractId === undefined` on a field typed `string`, so the
+     * *Sandbox* eyebrow and the *free play* progress line were **unreachable**: a reader's own
+     * building was labelled *Scenario · day 4* and told how many clean shifts it had banked toward
+     * nothing. TypeScript does not object to `string === undefined`, which is why a strict build
+     * carried it.
+     */
+    const coach = coachWeekLines(state.week, state.shiftLengthS);
+    setText(ui.coach.label, coach.label);
     setText(ui.coach.title, buildingNameOf(resources, state.savedBuildings, state.buildingId));
-    setText(ui.coach.progress, coachProgress());
+    setText(ui.coach.progress, coach.progress);
     setText(ui.coach.hint, coachHint(view));
-  }
-
-  function coachProgress(): string {
-    if (state.week.contractId === undefined) {
-      return `${String(Math.round(state.shiftLengthS / 60))} min of demand · free play`;
-    }
-    return `${String(state.week.cleanRun)} clean shift${state.week.cleanRun === 1 ? '' : 's'} banked`;
   }
 
   function coachHint(view: ViewAt): string {

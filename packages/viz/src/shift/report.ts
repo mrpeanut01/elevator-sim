@@ -210,6 +210,12 @@ export interface DayReportInput {
   readonly week: WeekState;
   /** `undefined` for a building the reader built, which is graded but belongs to no scenario. */
   readonly contract: ScenarioContract | undefined;
+  /**
+   * What was booked against **today** — not tomorrow, which the forecast card derives itself.
+   *
+   * Read by {@link bookedLine}, and for a long time by nothing at all: see that function for what
+   * the sheet was missing while this field sat unread.
+   */
   readonly event: ShiftEvent;
   /**
    * Whether this run is a day of a week or a run on its own. **Required** — see the module
@@ -263,8 +269,42 @@ function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: 
     `${recording.buildingName} · ${dispatcherName}`,
     `seed ${recording.seed} · ${clockRange(recording.startedAt, recording.endedAt, dayStartS)} · one replication`,
     ...(subject.kind === 'single-run' ? selectionLines(subject.selection) : []),
+    ...bookedLine(input.event, subject),
     ...attemptLine(subject, week.attempt),
   ];
+}
+
+/**
+ * What was booked against today — {@link DayReportInput.event}'s first reader.
+ *
+ * ## The finding this closes
+ *
+ * The field was destructured and read by **nothing**. The forecast card names *tomorrow's* event,
+ * derived independently through `eventFor(day + 1, …)`, and the sheet named today's nowhere — so a
+ * player who had just run a move-in day, with a car derated to two thirds for the whole shift, read
+ * a sheet that described the day's figures and never mentioned the thing that shaped them. Every
+ * line was individually true and the account was missing its subject.
+ *
+ * `GAPS.md` filed it as *a dead input*, which is the smaller half: an input with no reader is one
+ * edit away from acquiring a wrong one, and this repository has shipped that eleven times. The
+ * larger half is that the sheet was an account of a day with the day's own event left out.
+ *
+ * ## Why it is a meta line and not a card
+ *
+ * It sits beside the building, the dispatcher and the seed because it is **identity** — part of
+ * *what this is a run of* — rather than a reading. The forecast card is a different thing: it is a
+ * claim about tomorrow, and it belongs where a reader looks for what to do next.
+ *
+ * Absent on a single run, because there is no week to book anything against. That is not tidiness:
+ * a single-run sheet that named an event would be claiming the run had one, and `enterFreePlay`
+ * resets the week precisely so it does not.
+ */
+function bookedLine(event: ShiftEvent, subject: ReportSubject): readonly string[] {
+  if (subject.kind !== 'week-day') return [];
+  // Printed on an ordinary day too. *"Nothing booked"* is an answer to the question, and a line that
+  // appeared only on eventful days would make its absence mean two things at once — no event, or a
+  // sheet built before this line existed.
+  return [`${event.name} — ${event.note}`];
 }
 
 /** The rest of what it takes to run this again, and the statement that it stands alone. */

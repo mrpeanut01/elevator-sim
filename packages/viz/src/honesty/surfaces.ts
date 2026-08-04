@@ -212,7 +212,8 @@ import {
   type ShiftGoal,
   type WeekState,
 } from '../shift/types.js';
-import { closeDay, openWeek, outcomeOf } from '../shift/week.js';
+import { closeDay, openEndless, openWeek, outcomeOf } from '../shift/week.js';
+import { coachWeekLines } from '../shift/weekLabel.js';
 
 import type { HonestyCase, RenderedText, TextProvenance, TextRole } from './types.js';
 
@@ -1783,6 +1784,7 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/contracts.ts#contractForBuilding',
     'shift/contracts.ts#nextContract',
     'shift/contracts.ts#statLineOf',
+    'shift/weekLabel.ts#coachWeekLines',
   ],
   render(context) {
     const { recording } = context;
@@ -1930,6 +1932,35 @@ const SHIFT_REPORT: SurfaceAdapter = {
       countShown: /(\d[\d,]*)/.test(wait.note),
       gated: true,
     });
+    /* ---- the coach ribbon's two lines, on all three kinds of week ---- */
+    /*
+     * Driven over the three cases rather than one, because the defect `weekLabel.ts` closes was that
+     * **two of the three branches were unreachable** — the predicate tested a `string` against
+     * `undefined`, so *Sandbox* and *free play* had never been printed at all. A sweep that drove
+     * the common case would have swept the one branch that worked.
+     *
+     * `openWeek('no-such-contract')` is the reader's own building, and it is spelled as an id no
+     * contract answers to rather than as a flag, because that is exactly how the shell reaches it.
+     */
+    for (const [name, week] of [
+      ['scenario', { ...openWeek('c2'), day: 4, cleanRun: 1 }],
+      ['endless', { ...openEndless(), day: 12, cleanRun: 5 }],
+      ['sandbox', openWeek('no-such-contract')],
+    ] as const) {
+      const lines = coachWeekLines(week, 1800);
+      seeds.push({ field: `coachWeekLines(${name}).label`, text: lines.label, role: 'label' });
+      /*
+       * `observation` rather than `label`: two of the three progress lines carry a **count** — clean
+       * shifts banked, clean days run — and a count on a surface is the thing R13's clauses are
+       * about. Classifying it `label` would exempt exactly the half of the line worth checking.
+       */
+      seeds.push({
+        field: `coachWeekLines(${name}).progress`,
+        text: lines.progress,
+        role: 'observation',
+      });
+    }
+
     seeds.push({ field: 'NOT_RECORDED', text: NOT_RECORDED, role: 'label' });
     seeds.push({
       field: 'clockRange',
