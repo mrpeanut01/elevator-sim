@@ -78,7 +78,13 @@ export class TrafficError extends Error {
  * as they return. Its intensity geometry is `rise-and-fall`'s, unchanged, so the only thing it
  * adds is the mix arc — see {@link DemandPhase.startSplit}.
  */
-export const DEMAND_TEMPLATE_IDS = ['rise-and-fall', 'constant-iso', 'lunch-two-way'] as const;
+export const DEMAND_TEMPLATE_IDS = [
+  'rise-and-fall',
+  'constant-iso',
+  'lunch-two-way',
+  'shift-change',
+  'evening-egress',
+] as const;
 
 export type DemandTemplateId = (typeof DEMAND_TEMPLATE_IDS)[number];
 
@@ -550,9 +556,21 @@ export type CredentialAssignment = (typeof CREDENTIAL_ASSIGNMENTS)[number];
 export interface DemandTemplateOverrides {
   /** Length of one replication, seconds. Read by both shapes. */
   readonly durationS?: number | undefined;
-  /** How long demand holds at peak, which is also the reported window. `rise-and-fall` only. */
+  /**
+   * How long demand holds at peak. `rise-and-fall` and `shift-change`.
+   *
+   * On `rise-and-fall` it is also the reported window; on `shift-change` it is the length of *each*
+   * of the two holds and the report window is the whole run. Shared rather than duplicated under a
+   * second name because it means the same thing on both shapes, and a second name for one quantity
+   * is how a search space grows a dimension nobody meant to add.
+   */
   readonly peakWindowS?: number | undefined;
-  /** Intensity at both ends as a fraction of peak. `rise-and-fall` only. */
+  /**
+   * Intensity at both ends as a fraction of peak. `rise-and-fall` and `evening-egress`.
+   *
+   * On `rise-and-fall` it is both ends of the ramp; on `evening-egress` it is the trickle before
+   * the doors open and the level the decay returns to.
+   */
   readonly baselineFraction?: number | undefined;
   /** Warm-up discarded before measurement, seconds. `constant-iso` only. */
   readonly discardFirstS?: number | undefined;
@@ -573,6 +591,18 @@ export interface DemandTemplateOverrides {
    * differ from the treatment in the mean mix as well as in its variation.
    */
   readonly mixAmplitude?: number | undefined;
+  /**
+   * Intensity between the two peaks as a fraction of peak, `(0, 1)`. `shift-change` only.
+   *
+   * The template's defining number. Zero is refused rather than clamped: it would make the shape
+   * two separate rise-and-falls with a dead period between them, and the fact a shift change turns
+   * on is that the building is still occupied and still being served while it happens.
+   */
+  readonly troughFraction?: number | undefined;
+  /** Seconds from the baseline to full flow. `evening-egress` only — the step that makes it one. */
+  readonly stepS?: number | undefined;
+  /** Seconds of sustained full flow before the decay begins. `evening-egress` only. */
+  readonly holdS?: number | undefined;
 }
 
 /**
@@ -854,6 +884,31 @@ export const TRAFFIC_DEFAULTS = Object.freeze({
   lunchTwoWayDurationS: 1800,
   /** Full authored arc. See {@link DemandTemplateOverrides.mixAmplitude}. */
   mixAmplitude: 1,
+  /**
+   * The shift-change period's length, seconds. Inherited from {@link riseAndFallDurationS} for the
+   * reason {@link lunchTwoWayDurationS} is: no table gives a shift-change *period* in minutes, so
+   * the template borrows the shipped terminating run's horizon and adds no uncited duration.
+   */
+  shiftChangeDurationS: 1800,
+  /**
+   * Intensity in the trough between the two shift-change peaks, as a fraction of peak.
+   *
+   * **The defining number of the template, and an assumption rather than a citation.** A shift
+   * change is two peaks with the building still occupied between them; a trough of 0 would be two
+   * separate rise-and-falls with a dead period, which is a different building. 0.35 keeps the
+   * trough clearly below the peaks and clearly above the zero baseline `rise-and-fall` uses.
+   */
+  shiftChangeTroughFraction: 0.35,
+  /** Length of each of the two shift-change peak holds, seconds. The rise-and-fall hold, unchanged. */
+  shiftChangePeakWindowS: 300,
+  /** The event-egress run length, seconds. Shorter than the others: an egress is over sooner. */
+  eveningEgressDurationS: 1200,
+  /** How long the egress takes to reach full flow, seconds. The step, and what makes it an egress. */
+  eveningEgressStepS: 60,
+  /** How long full flow is sustained before it decays, seconds. */
+  eveningEgressHoldS: 300,
+  /** Intensity before the doors open, as a fraction of peak. Not zero: the venue is not empty. */
+  eveningEgressBaselineFraction: 0.05,
 } as const satisfies {
   readonly trafficModel: TrafficModelVersion;
   readonly templateId: DemandTemplateId;
@@ -870,6 +925,13 @@ export const TRAFFIC_DEFAULTS = Object.freeze({
   readonly constantDiscardLastS: number;
   readonly lunchTwoWayDurationS: number;
   readonly mixAmplitude: number;
+  readonly shiftChangeDurationS: number;
+  readonly shiftChangeTroughFraction: number;
+  readonly shiftChangePeakWindowS: number;
+  readonly eveningEgressDurationS: number;
+  readonly eveningEgressStepS: number;
+  readonly eveningEgressHoldS: number;
+  readonly eveningEgressBaselineFraction: number;
 });
 
 /* -------------------------------------------------------------------------- *

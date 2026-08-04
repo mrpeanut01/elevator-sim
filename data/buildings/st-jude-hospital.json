@@ -1,0 +1,214 @@
+{
+  "$comment": "The building that never has an off-peak, and the only shipped one whose worst case is a bed. A hospital's demand is two-way for eighteen hours a day and its peaks are SHIFT CHANGES rather than a morning arrival, which is why it ships with a `hospital` traffic profile and is meant to be run against the `shift-change` demand template rather than an office's rise-and-fall. Three things here exist nowhere else in data/buildings/. The bank holds FIVE UNLIKE CARS: three public cars at 3500 lb and 2.5 m/s beside two bed cars at 5000 lb, 1.6 m/s, side-opening, with a 3.0 s passenger transfer -- a trolley with an attendant and a drip stand is not a person stepping in, and CIBSE Guide D prices a bed transfer at roughly twice a passenger's. It is ONE bank because both kinds of car really do serve every floor; a second bank would make every floor a floor served by two banks, and `isTransferFloor` means sky lobby. It is the first shipped building to declare a `stairs` transport mode, so the asymmetric-propensity model of docs/14 SS 3.3 finally has a caller in data/ rather than only in a test fixture. And the entrance is not the only crowd source: Outpatients on floor 1 holds 180 people, so a clinic ending sends a burst DOWNWARD from an intermediate floor, which is a shape neither an office up-peak nor a residential down-peak produces.",
+  "id": "st-jude-hospital",
+  "name": "St Jude Hospital",
+  "type": "hospital",
+  "trafficProfile": "hospital",
+  "floors": [
+    {
+      "id": "LG",
+      "index": -1,
+      "heightM": -4.0,
+      "population": 70,
+      "label": "Imaging, pathology and mortuary"
+    },
+    {
+      "id": "G",
+      "index": 0,
+      "heightM": 0.0,
+      "population": 0,
+      "isEntrance": true,
+      "label": "Main entrance and A&E"
+    },
+    {
+      "id": "1",
+      "index": 1,
+      "heightM": 4.0,
+      "population": 180,
+      "label": "Outpatients"
+    },
+    {
+      "id": "2",
+      "index": 2,
+      "heightM": 8.0,
+      "population": 90,
+      "label": "Theatres and recovery"
+    },
+    {
+      "id": "3",
+      "index": 3,
+      "heightM": 12.0,
+      "population": 70,
+      "label": "Critical care"
+    },
+    {
+      "id": "4",
+      "index": 4,
+      "heightM": 16.0,
+      "population": 64,
+      "label": "Ward"
+    },
+    {
+      "id": "5",
+      "index": 5,
+      "heightM": 20.0,
+      "population": 64,
+      "label": "Ward"
+    },
+    {
+      "id": "6",
+      "index": 6,
+      "heightM": 24.0,
+      "population": 64,
+      "label": "Ward"
+    },
+    {
+      "id": "7",
+      "index": 7,
+      "heightM": 28.0,
+      "population": 64,
+      "label": "Ward"
+    },
+    {
+      "id": "8",
+      "index": 8,
+      "heightM": 32.0,
+      "population": 64,
+      "label": "Ward"
+    },
+    {
+      "id": "9",
+      "index": 9,
+      "heightM": 36.0,
+      "population": 64,
+      "label": "Ward"
+    },
+    {
+      "id": "10",
+      "index": 10,
+      "heightM": 40.0,
+      "population": 64,
+      "label": "Ward"
+    },
+    {
+      "id": "11",
+      "index": 11,
+      "heightM": 44.0,
+      "population": 64,
+      "label": "Ward"
+    }
+  ],
+  "totalPopulation": 922,
+  "banks": [
+    {
+      "id": "main",
+      "name": "Main bank",
+      "servesFloors": [
+        "LG",
+        "G",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11"
+      ],
+      "cars": [
+        {
+          "id": "A",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 2.5,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening"
+        },
+        {
+          "id": "B",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 2.5,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening"
+        },
+        {
+          "id": "C",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 2.5,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening"
+        },
+        {
+          "id": "D",
+          "spec": "geared-traction",
+          "ratedSpeedMps": 1.75,
+          "ratedLoadLb": 4000,
+          "doorType": "sideOpening"
+        },
+        {
+          "id": "E",
+          "spec": "geared-traction",
+          "ratedSpeedMps": 1.75,
+          "ratedLoadLb": 4000,
+          "doorType": "sideOpening"
+        }
+      ]
+    }
+  ],
+  "accessZones": [
+    {
+      "id": "clinical",
+      "floors": [
+        "2",
+        "3"
+      ],
+      "credentialGroups": [
+        "clinical",
+        "portering",
+        "security"
+      ]
+    },
+    {
+      "id": "diagnostics",
+      "floors": [
+        "LG"
+      ],
+      "credentialGroups": [
+        "clinical",
+        "portering",
+        "security",
+        "mortuary"
+      ]
+    }
+  ],
+  "transportModes": [
+    {
+      "id": "main-stair",
+      "name": "Main stair, ground to outpatients",
+      "kind": "stairs",
+      "connects": [
+        "G",
+        "1"
+      ],
+      "traversalTimeS": {
+        "upS": 26.0,
+        "downS": 19.0
+      },
+      "use": {
+        "up": 0.35,
+        "down": 0.55
+      },
+      "$comment": "CITED: the 4.0 m rise is this building's own floor-to-floor. Fruin's stair-flow work gives 0.15-0.20 m/s vertical climbing speed on a normal stair and roughly 1.35x that descending; at 0.155 m/s up and 0.21 m/s down a 4.0 m rise is 25.8 s and 19.0 s, rounded here to 26.0 and 19.0. DERIVED, not cited: the `use` pair. There is no published propensity for this building, so it is stated as an assumption rather than a measurement -- more people walk DOWN one floor than up, which is the asymmetry docs/14 SS 3.3 requires a stairs mode to express, and the magnitudes are chosen so the stair carries a visible but minority share. LIMITATION: a single flight between two adjacent floors is the only stair a low-rise hospital's occupants would reliably choose, so no ward-to-ward stair is declared; if one were, its measured hop count belongs beside it per data/buildings/README.md."
+    }
+  ],
+  "notes": [
+    "One bank, five unlike cars. The two bed cars are the right car for a trolley and the wrong one for a visitor, and nothing in the config says so -- the dispatcher has only their speed, their capacity and their transfer time to go on. Whether it learns to leave them alone for ordinary hall calls is a measurable property, and no other shipped building can ask it.",
+    "Population 986 with only 70 of it below ground and NONE at the entrance. Unlike every office here, the entrance floor holds nobody: A&E arrivals are incoming traffic, not a resident population.",
+    "The clinical access zone covers theatres and critical care, and diagnostics covers the lower ground. Visitors hold neither credential, so a visitor calling from G can be carried to a ward and cannot be carried to a theatre -- access zoning does the work service zoning does elsewhere.",
+    "Floor-to-floor is 4.0 m throughout, deeper than an office, because hospital floors carry services and must clear a bed being wheeled under them.",
+    "The bed cars are 4000 lb, which is the largest capacity data/elevator-specs.json carries -- its table stops at 'Service / high-rise'. A real bed lift is larger, and the honest move was to take the reference data's ceiling rather than to invent a class for this building: the 3500 lb row is already labelled 'ADA stretcher', so a stretcher-capable car is inside the shipped data and a 2500 kg bed lift is not. If a bed-lift class is ever added it needs its own citation.",
+    "NAMED LIMITATION: the bed cars carry no per-car passengerTransferS. The hospital building-type default of 2.5 s applies to all five, and a bed car's authored 3.0 s was removed rather than kept, because the model has no notion of a bed as a UNIT: every derived bound that reads a car's transfer time multiplies it by the car's full person count, so a 26-person bed lift at 3.0 s produces an 84.5 s loading bound describing 26 people boarding one at a time -- a journey no bed lift makes. The heterogeneity that IS modelled is speed and capacity, which the engine reads honestly. Modelling a bed as an indivisible load is real work and is not done here."
+  ]
+}

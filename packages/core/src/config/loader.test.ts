@@ -141,6 +141,7 @@ describe('loadConfig against the real data/ directory', () => {
       'office-standard',
       'residential',
       'hotel',
+      'hospital',
     ]);
     expect(config.costTermsById.size).toBe(13);
     expect(config.costTermsById.get('waitTime')?.serves).toBe('AWT');
@@ -159,10 +160,13 @@ describe('loadConfig against the real data/ directory', () => {
 
   it('loads every shipped building, in filename order', () => {
     expect(config.buildings.map((building) => building.id)).toEqual([
+      'chancery-house',
+      'crown-hotel',
       'garden-apartments',
       'midtown-office',
       'mixed-use-high-rise',
       'secure-tower',
+      'st-jude-hospital',
       'vertical-city',
     ]);
   });

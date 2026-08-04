@@ -338,6 +338,7 @@ export const elevatorSpecsSchema = z
         $comment: comment,
         office: positive,
         residential: positive,
+        hospital: positive,
         hotel: positive,
       }),
     }),

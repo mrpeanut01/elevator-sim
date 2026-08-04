@@ -44,15 +44,18 @@ function requireBank<TCar extends CarLike>(building: Building<TCar>, bankId: str
 
 /** What `data/buildings/` actually contains, pinned so a config edit cannot pass silently. */
 const EXPECTED = [
+  { id: 'chancery-house', type: 'office', floors: 19, banks: 1, cars: 6, entrances: ['G'], transfers: [], zones: 0, population: 612 },
+  { id: 'crown-hotel', type: 'hotel', floors: 24, banks: 1, cars: 5, entrances: ['G'], transfers: [], zones: 1, population: 866 },
   { id: 'garden-apartments', type: 'residential', floors: 6, banks: 1, cars: 2, entrances: ['G'], transfers: [], zones: 0, population: 120 },
   { id: 'midtown-office', type: 'office', floors: 21, banks: 1, cars: 4, entrances: ['P1', 'G'], transfers: [], zones: 0, population: 1710 },
   { id: 'mixed-use-high-rise', type: 'mixed-use', floors: 60, banks: 3, cars: 16, entrances: ['G'], transfers: ['G', '31'], zones: 2, population: 2276 },
   { id: 'secure-tower', type: 'office', floors: 30, banks: 2, cars: 6, entrances: ['G'], transfers: ['G'], zones: 5, population: 992 },
+  { id: 'st-jude-hospital', type: 'hospital', floors: 13, banks: 1, cars: 5, entrances: ['G'], transfers: [], zones: 2, population: 922 },
   { id: 'vertical-city', type: 'mixed-use', floors: 100, banks: 7, cars: 35, entrances: ['G'], transfers: ['G', '2', '26', '27', '51', '52', '76', '77'], zones: 2, population: 4887 },
 ] as const;
 
 describe('createBuilding over the shipped buildings', () => {
-  it('builds all five', () => {
+  it('builds all eight', () => {
     expect(config.buildings.map((b) => b.id)).toEqual(EXPECTED.map((e) => e.id));
   });
 

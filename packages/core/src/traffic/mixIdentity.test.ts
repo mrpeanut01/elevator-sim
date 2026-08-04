@@ -208,7 +208,24 @@ describe('a template that declares no directional mix generates exactly the trac
    * quietly covering two of four and reporting green.
    */
   it('exactly one shipped template varies the mix, and it is the one added for it', () => {
-    expect([...DEMAND_TEMPLATE_IDS]).toEqual([...SHIPPED_BEFORE, 'lunch-two-way']);
+    // **Derived from the records, not from a list with a hard-coded tail.** The previous form was
+    // `toEqual([...SHIPPED_BEFORE, 'lunch-two-way'])`, which named the mix-varying template only by
+    // being last — so `shift-change` and `evening-egress` failed it merely by existing, while a
+    // fourth template that really did vary the mix could have been appended and passed. The comment
+    // above asks for the partition; this computes it.
+    const varying = config.trafficProfiles.demandTemplates
+      .filter((entry) => entry.directionalSplitAtStart !== undefined || entry.directionalSplitAtEnd !== undefined)
+      .map((entry) => entry.id);
+    expect(varying).toEqual(['lunch-two-way']);
+
+    // Every shipped id has a record, and every record is a shipped id: the two lists cannot drift
+    // apart without this failing, which is what makes the filter above trustworthy.
+    expect(config.trafficProfiles.demandTemplates.map((entry) => entry.id).sort()).toEqual(
+      [...DEMAND_TEMPLATE_IDS].sort(),
+    );
+
+    // And the templates whose traces are pinned below still declare no mix, which is the property
+    // those pins depend on.
     for (const id of SHIPPED_BEFORE) {
       const record = config.trafficProfiles.demandTemplates.find((entry) => entry.id === id);
       expect(record?.directionalSplitAtStart, id).toBeUndefined();

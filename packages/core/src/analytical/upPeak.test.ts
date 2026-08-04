@@ -853,9 +853,11 @@ describe('every shipped building is either analysable or explicit about why not'
     }
 
     // The sweep must not pass vacuously by refusing everything. As of the shipped data,
-    // 13 of the 14 banks are analysable; only Vertical City's double-deck shuttle between
-    // unpopulated sky lobbies is not.
-    expect(analysed).toBe(13);
+    // 16 of the 17 banks are analysable; only Vertical City's double-deck shuttle between
+    // unpopulated sky lobbies is not. The three new members are the three single-bank
+    // buildings — Chancery House, Crown Hotel and St Jude Hospital — and all three analyse,
+    // including the two whose banks hold cars of unlike speed and capacity.
+    expect(analysed).toBe(16);
     expect(refused).toBe(1);
     // Exactly one bank exceeds the sanity bound on the default population: Mixed-Use
     // High-Rise's shuttle, whose U is the sky lobby's own 260 rather than the 1014 it

@@ -11,33 +11,66 @@
       "name": "Prestige office",
       "blurb": "The morning crush at a headline address: nearly everyone pours in through the lobby at once, and the bank is judged on how fast that queue clears.",
       "governingPeak": "up-peak",
-      "arrivalRatePctPop5min": { "min": 15, "max": 17, "typical": 16 },
+      "arrivalRatePctPop5min": {
+        "min": 15,
+        "max": 17,
+        "typical": 16
+      },
       "targetIntervalS": 25,
       "targetAvgWaitS": 20,
-      "batchSize": { "distribution": "geometric", "mean": 1.4 },
-      "directionalSplit": { "incoming": 0.85, "outgoing": 0.05, "interfloor": 0.10 }
+      "batchSize": {
+        "distribution": "geometric",
+        "mean": 1.4
+      },
+      "directionalSplit": {
+        "incoming": 0.85,
+        "outgoing": 0.05,
+        "interfloor": 0.1
+      }
     },
     {
       "id": "office-standard",
       "name": "Standard office",
       "blurb": "An ordinary office morning: a steady stream in through the lobby, with light floor-to-floor errands once people are at their desks.",
       "governingPeak": "up-peak",
-      "arrivalRatePctPop5min": { "min": 11, "max": 15, "typical": 12 },
+      "arrivalRatePctPop5min": {
+        "min": 11,
+        "max": 15,
+        "typical": 12
+      },
       "targetIntervalS": 30,
       "targetAvgWaitS": 25,
-      "batchSize": { "distribution": "geometric", "mean": 1.4 },
-      "directionalSplit": { "incoming": 0.85, "outgoing": 0.05, "interfloor": 0.10 }
+      "batchSize": {
+        "distribution": "geometric",
+        "mean": 1.4
+      },
+      "directionalSplit": {
+        "incoming": 0.85,
+        "outgoing": 0.05,
+        "interfloor": 0.1
+      }
     },
     {
       "id": "residential",
       "name": "Residential",
       "blurb": "Apartment mornings run downward — residents leave through the lobby, and families ride together, so groups are larger. Evenings invert to an up-peak.",
       "governingPeak": "down-peak-am",
-      "arrivalRatePctPop5min": { "min": 3, "max": 7, "typical": 5 },
+      "arrivalRatePctPop5min": {
+        "min": 3,
+        "max": 7,
+        "typical": 5
+      },
       "targetIntervalS": 70,
       "targetAvgWaitS": 55,
-      "batchSize": { "distribution": "geometric", "mean": 1.8 },
-      "directionalSplit": { "incoming": 0.15, "outgoing": 0.75, "interfloor": 0.10 },
+      "batchSize": {
+        "distribution": "geometric",
+        "mean": 1.8
+      },
+      "directionalSplit": {
+        "incoming": 0.15,
+        "outgoing": 0.75,
+        "interfloor": 0.1
+      },
       "$comment": "PM inverts to up-peak. Larger batches: families travel together."
     },
     {
@@ -45,11 +78,45 @@
       "name": "Hotel",
       "blurb": "Hotel demand runs both ways all day: guests come and go while housekeeping and room service move between floors, with no single dominant direction.",
       "governingPeak": "two-way",
-      "arrivalRatePctPop5min": { "min": 10, "max": 15, "typical": 12 },
+      "arrivalRatePctPop5min": {
+        "min": 10,
+        "max": 15,
+        "typical": 12
+      },
       "targetIntervalS": 40,
       "targetAvgWaitS": 35,
-      "batchSize": { "distribution": "geometric", "mean": 2.0 },
-      "directionalSplit": { "incoming": 0.40, "outgoing": 0.40, "interfloor": 0.20 }
+      "batchSize": {
+        "distribution": "geometric",
+        "mean": 2.0
+      },
+      "directionalSplit": {
+        "incoming": 0.4,
+        "outgoing": 0.4,
+        "interfloor": 0.2
+      }
+    },
+    {
+      "id": "hospital",
+      "name": "Hospital",
+      "blurb": "A hospital never empties. People move both ways all day, the busiest moments are shift changes rather than a morning rush, and a bed needs a car of its own.",
+      "governingPeak": "two-way",
+      "arrivalRatePctPop5min": {
+        "min": 6,
+        "max": 11,
+        "typical": 8
+      },
+      "targetIntervalS": 50,
+      "targetAvgWaitS": 45,
+      "batchSize": {
+        "distribution": "geometric",
+        "mean": 1.6
+      },
+      "directionalSplit": {
+        "incoming": 0.35,
+        "outgoing": 0.35,
+        "interfloor": 0.3
+      },
+      "$comment": "CITED: CIBSE Guide D groups hospitals with the buildings whose demand is two-way and whose quality-of-service target is looser than an office's -- Guide D's recommended interval band for hospital passenger lifts is 40-60 s against 25-30 s for offices, and 50 s is the middle of it. DERIVED, not quoted from a table: arrivalRatePctPop5min. Guide D gives hospital handling capacity in beds and departments rather than as a percentage of an occupant population, so the 6-11% band is set from this project's own convention -- below an office's 11-15% because a hospital's peak is a shift change involving staff rather than the whole building arriving, and above residential's 3-7% because the building is busy all day rather than twice. NOT CITED, and stated as an assumption: the 35/35/30 split. The interfloor share is the highest of any profile here because porters, clinicians and diagnostics traffic move between floors without touching the entrance, and that is the characteristic this profile exists to express; it is the number most worth measuring against a real building. LIMITATION: one profile cannot express that a bed journey and a visitor journey have different service expectations. The building distinguishes them by BANK (st-jude-hospital's bed bank carries 5000 lb cars at a 3.0 s transfer), not here."
     }
   ],
   "demandTemplates": [
@@ -78,9 +145,35 @@
       "durationMin": 30,
       "reportWindow": "full-run",
       "shape": "the rise-and-fall intensity, with the directional mix swinging from outgoing-dominant to incoming-dominant across the period",
-      "directionalSplitAtStart": { "incoming": 0.0, "outgoing": 0.9, "interfloor": 0.1 },
-      "directionalSplitAtEnd": { "incoming": 0.9, "outgoing": 0.0, "interfloor": 0.1 },
+      "directionalSplitAtStart": {
+        "incoming": 0.0,
+        "outgoing": 0.9,
+        "interfloor": 0.1
+      },
+      "directionalSplitAtEnd": {
+        "incoming": 0.9,
+        "outgoing": 0.0,
+        "interfloor": 0.1
+      },
       "$comment": "The lunch mixed peak: occupants ride down to the terminal to leave the building, and later ride up again on their return, so the SAME period is outgoing-dominant early and incoming-dominant late. CITED: the period's mix is 45% incoming / 45% outgoing / 10% interfloor (CIBSE Guide D, 2010, carried into 2020; the same split is what BCO Guide to Specification 2014 pairs with a 13%/5min lunchtime two-way demand). Alternatives in the literature are 40/40/20 (Barney 2003a) and 42/42/16 (BCO 2009); the CIBSE figure is taken because Guide D is this project's primary reference. DERIVED, and not quoted from any table: the two endpoints. At the instant the period opens nobody has returned yet, so incoming is 0; interfloor is held at the cited 10% throughout; the mix is linear in time and symmetric about the midpoint, so its time-average is (start+end)/2 = 45/45/10 exactly -- the cited figure is REPRODUCED by the endpoints rather than assumed beside them. NOT CITED, and inherited rather than invented: every geometric number here. durationMin, the 5-minute hold and the zero baseline are the rise-and-fall record's own, so this template adds no uncited duration. LIMITATION: an endpoint of exactly 0 incoming is the widest arc consistent with the cited mean, and a measured building's arc is smoother at its ends; `traffic.lunchTwoWay.mixAmplitude` scales the arc about that mean, and 0 collapses it to a flat 45/45/10 at identical total demand."
+    },
+    {
+      "id": "shift-change",
+      "name": "Shift-change template",
+      "recommended": false,
+      "durationMin": 30,
+      "reportWindow": "full-run",
+      "shape": "two interior peaks separated by a trough, with demand never reaching zero",
+      "$comment": "The pattern a hospital, a factory or a call centre actually runs, and the one shape no existing template can express: TWO peaks inside one period. `rise-and-fall` has a single interior maximum and `constant-iso` has none, so a run that wants 'the outgoing shift leaves while the incoming shift arrives, twice' had to be approximated by a wider single peak, which is a different question -- it spreads the same demand instead of concentrating it twice. DERIVED, not cited: the geometry. The 30-minute duration and the full-run report window are `lunch-two-way`'s, inherited so this template adds no uncited duration; the two peaks sit at 1/4 and 3/4 of the period and the trough between them holds at a NON-ZERO baseline, because the defining fact about a shift change is that the building is still occupied between them. NOT CITED: the peak-to-trough ratio. There is no Guide D table for it, and it is stated as an assumption rather than a measurement. LIMITATION: the two peaks are equal. A real shift change is asymmetric -- more people leave at the end of a day shift than arrive for a night one -- and expressing that needs a directional arc like `lunch-two-way`'s, which this template deliberately does not carry so that the two features can be measured apart."
+    },
+    {
+      "id": "evening-egress",
+      "name": "Event egress template",
+      "recommended": false,
+      "durationMin": 20,
+      "reportWindow": "peak-5min",
+      "shape": "near-zero baseline, then a step to a sustained one-way maximum, then decay",
+      "$comment": "A ballroom emptying, a cinema turning out, a floor of a conference breaking at once. The shape differs from `rise-and-fall` in its LEADING EDGE rather than its magnitude: a rise-and-fall ramps, and an egress steps -- the doors open and the whole population is on the landing within a minute. That is the case a batch-window or deferred-assignment setting is decided by, and no shipped template produces it. DERIVED, not cited: the 20-minute duration, shorter than the other templates' 30 because an egress is over sooner and a longer window would dilute the peak the report is taken on. `peak-5min` is `rise-and-fall`'s own report window and is inherited. NOT CITED: the step's steepness and the decay rate; both are assumptions. LIMITATION: this template expresses the INTENSITY of an egress and not its ORIGIN. A real event egress leaves from one or two floors, and the directional split is a building-level property here rather than a per-floor one -- crown-hotel's 120-person ballroom is the concentration this template is meant to be run against, and pairing them is the caller's job."
     }
   ],
   "passengerMass": {

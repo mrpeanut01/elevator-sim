@@ -103,7 +103,7 @@ describe('Phase 0 is usable through the barrel alone', () => {
 
   it('loads the shipped data directory', async () => {
     const config = await barrel.loadConfig(REAL_DATA_DIR);
-    expect(config.buildings).toHaveLength(5);
+    expect(config.buildings).toHaveLength(8);
     expect(config.buildingsById.get('midtown-office')).toBeDefined();
   });
 
