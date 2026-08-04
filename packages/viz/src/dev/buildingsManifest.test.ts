@@ -210,4 +210,57 @@ describe('the hosting configuration that ships with the artifact', () => {
     expect(exclude, 'the hashed bundle and worker chunks').toContain('/assets/*');
     expect(exclude, 'data/buildings/, copied wholesale by publicDir').toContain('/buildings/*');
   });
+
+  /**
+   * The account/leaderboard server and the content security policy, tied together.
+   *
+   * `dev/main.ts` builds its {@link createClient} only when the page declares an API origin:
+   *
+   * ```html
+   * <meta name="elevator-sim-api" content="https://…">
+   * ```
+   *
+   * and it has **no default origin** on purpose — its own docstring says a client falling back to
+   * the page's own origin *"would work in development and fail in a build served from a CDN"*. So
+   * the origin is expected to differ from the site's.
+   *
+   * Which is exactly what `connect-src 'self'` forbids. The two files were written by different
+   * lanes, neither imports the other, and the failure is silent in the worst way: the browser
+   * blocks the request, the client's own error path reports it as a server that cannot be reached,
+   * and a reader goes looking for a server outage that never happened.
+   *
+   * Nothing in either file can see the other, so this does. It is **inert today** — `index.html`
+   * declares no tag, which is why the deployed site boots clean — and it fails the moment someone
+   * adds one without widening the policy.
+   */
+  it('permits the API origin the page declares, and no origin it does not', async () => {
+    const html = await readFile(`${VIZ_DIR}index.html`, 'utf8');
+    const declared = /<meta\s+name=["']elevator-sim-api["']\s+content=["']([^"']*)["']/i
+      .exec(html)?.[1]
+      ?.trim();
+
+    const config = JSON.parse(await readFile(HOST_CONFIG, 'utf8')) as {
+      globalHeaders: Record<string, string>;
+    };
+    const csp = config.globalHeaders['Content-Security-Policy'] ?? '';
+    const connectSrc = (/connect-src ([^;]*)/.exec(csp)?.[1] ?? '').trim().split(/\s+/);
+
+    if (declared === undefined || declared === '') {
+      // Asserted in the other direction too: an origin permitted here that no page ever contacts
+      // is dead configuration, and dead configuration is what this repository keeps finding.
+      expect(
+        connectSrc,
+        'no API origin is declared, so the policy should permit no other origin',
+      ).toEqual(["'self'"]);
+      return;
+    }
+
+    const origin = new URL(declared).origin;
+    expect(
+      connectSrc.some((source) => source === origin || source === declared),
+      `index.html declares the API at ${origin}, so connect-src must permit it — ` +
+        `otherwise the browser blocks every account and leaderboard request and the ` +
+        `client reports it as a server that is down. connect-src is currently: ${connectSrc.join(' ')}`,
+    ).toBe(true);
+  });
 });

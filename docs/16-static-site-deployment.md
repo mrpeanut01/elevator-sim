@@ -96,11 +96,19 @@ The verdict "static host" holds exactly as long as the viewer keeps running its 
 stops holding the day something needs a server: a shared recording store, a hosted batch runner for
 the Phase B measurement fan-out, an authenticated API.
 
-**One of those is reportedly being built right now.** A concurrent lane is implementing a SQL Server
-database and a login framework. **This is second-hand and unverified** — it was not on `main` and no
-part of it was visible in this tree when this document was written, so nothing below is a reading of
-that design. It is recorded here because whoever lands it will hit this file, and the collisions are
-cheaper to name now than to debug later.
+**One of those has now landed.** PR #10 merged `packages/server` — accounts, passwords, signed
+confirmation tokens, a leaderboard verified by replay — plus the account and leaderboard screens in
+`viz`. This section was originally written from a second-hand report, before any of it was visible;
+it is now written from the code, and **three of the four things it warned about were wrong**. The
+corrections are kept rather than quietly replaced, because the wrong version was specific enough to
+have been acted on:
+
+| Warned | Actually |
+|---|---|
+| `form-action 'none'` blocks the login form | **No.** The client POSTs with `fetch`, not a form submission. `form-action` governs submissions, so it never fires. |
+| `script-src 'self'` blocks a CDN auth SDK | **No.** There is no third-party SDK; the client is 40 lines over an injected transport. |
+| The "socket" needs `connect-src ws:` | **No.** `serve.ts`'s *"socket"* is a bound TCP port. The wire is plain HTTP + JSON (§ D214 § 6). |
+| `connect-src 'self'` blocks a cross-origin API | **Yes — and it is the one that matters.** |
 
 **What does not change.** The viewer is still static, and a static host is still the right way to
 serve it. The build, the manifest fix and the artifact guard are orthogonal to whether a database
@@ -117,17 +125,27 @@ exists.
    Free. **Linked ("bring your own") backends are a Standard-plan feature**, so pointing the site at
    a separately deployed App Service or Functions app moves this off Free. Which one applies depends
    on the shape of their API, which is not visible from here.
-3. **Three lines of `staticwebapp.config.json` will actively break a login flow**, and they are the
-   most likely thing to cost someone an afternoon. All three are in the CSP:
-   - `form-action 'none'` — blocks **every** form submission. A POST login form fails outright.
-   - `connect-src 'self'` — blocks `fetch`/XHR to any other origin. A same-origin `/api/*` backend
-     is fine; an API on its own hostname is blocked by the browser.
-   - `script-src 'self'` — blocks a third-party auth SDK loaded from a CDN (MSAL, for instance).
+3. **`connect-src 'self'` will block the API, and the failure will not look like a policy failure.**
+   This is the one real collision, and it is now **mechanised rather than described**.
 
-   These were chosen for a page that talks to nobody, and they were **measured** rather than
-   guessed — § 4 records `worker-src` being tightened after a browser run proved the hedge
-   unnecessary. Widening them for an auth flow is legitimate; widening them *by guess* is not. Drive
-   the flow and open only what it actually requires.
+   `dev/main.ts` constructs its client only when the page declares an origin —
+   `<meta name="elevator-sim-api" content="https://…">` — and it has **no default origin** on
+   purpose. Its own docstring is the reason this matters here: a client falling back to the page's
+   own origin *"would work in development and fail in a build served from a CDN, which is the class
+   of bug that only reproduces where it cannot be debugged."* **The API origin is therefore expected
+   to differ from the site's** — which is precisely what `connect-src 'self'` forbids.
+
+   The failure mode is the nasty kind: the browser blocks the request, the client's own error path
+   reports it as a server that cannot be reached, and a reader goes hunting an outage that never
+   happened.
+
+   **`index.html` declares no tag today**, which is why the deployed site boots clean and why this
+   is a latent collision rather than a live one. `buildingsManifest.test.ts` now asserts the
+   coupling in both directions: a declared origin must appear in `connect-src`, and with no tag
+   declared `connect-src` must permit nothing but `'self'` — because an origin permitted here that
+   no page ever contacts is dead configuration, which is the defect this repository keeps finding.
+   Verified by mutation: adding the meta tag without widening the policy fails the suite with a
+   message naming both files.
 4. **`navigationFallback.exclude` has no API prefix.** Static Web Apps routes `/api/*` ahead of the
    fallback, so a managed backend is unaffected — but an API on any other prefix would have its 404s
    answered with `index.html` and a **200**, which is precisely the silent failure § 4 exists to
