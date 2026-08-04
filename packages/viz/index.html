@@ -1069,7 +1069,14 @@
             <div class="tabs-right">
               <button type="button" id="drawer-toggle" aria-expanded="false" aria-controls="rail-right">Controls ▸</button>
               <button role="tab" class="tab-secondary" id="tab-compare" aria-selected="false" aria-controls="panel-compare" tabindex="-1">Compare</button>
-              <button role="tab" class="tab-secondary" id="tab-campaign" aria-selected="false" aria-controls="panel-campaign" tabindex="-1">Campaign</button>
+              <!-- Labelled "Lab", not "Campaign" — docs/17 § 3.3. Two unrelated modes wore that
+                   word: the contract week in shift/ (days, growth, events, banked shifts) and
+                   these batch-judged stages from data/campaign.json, which are the only surface
+                   in the product where docs/10 R2 can be discharged at all because they are the
+                   only one that runs a replication batch. The element id stays `tab-campaign`
+                   so every deep link, every ELEMENT_IDS entry and every test that names the
+                   surface keeps working; what changed is the word a player reads. -->
+              <button role="tab" class="tab-secondary" id="tab-campaign" aria-selected="false" aria-controls="panel-campaign" tabindex="-1">Lab</button>
               <button role="tab" class="tab-secondary" id="tab-parameters" aria-selected="false" aria-controls="panel-parameters" tabindex="-1">Parameters</button>
             </div>
           </div>

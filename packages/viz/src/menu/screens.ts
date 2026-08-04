@@ -253,7 +253,7 @@ function mainRows(): readonly MenuAffordance[] {
     intent: { kind: 'navigate', to: target },
   });
   return Object.freeze([
-    to('main.campaign', 'Campaign', 'The scenarios in order, each teaching one thing', 'campaign'),
+    to('main.campaign', 'Campaign', 'A week on one building — it grows, and the bar rises', 'campaign'),
     to('main.free-play', 'Free play', 'Any building, any dispatcher, any traffic', 'free-play'),
     to('main.leaderboard', 'Leaderboard', 'Verified scores, by configuration', 'leaderboard'),
     to('main.account', 'Account', 'Sign in to post a score', 'account'),
@@ -421,7 +421,8 @@ function settingsRows(settings: Settings): readonly MenuAffordance[] {
  */
 const CAMPAIGN_NOTE =
   'A week on one building: each day the tenants grow, something is booked against you, and the ' +
-  'bars rise. Clean shifts bank toward clearing the scenario.';
+  'bars rise. Clean shifts bank toward clearing the scenario. The Lab tab is a different thing — ' +
+  'it judges a dispatcher over a batch of replications rather than over a day.';
 
 function campaignRows(): readonly MenuAffordance[] {
   return Object.freeze([
