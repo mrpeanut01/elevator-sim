@@ -56,6 +56,8 @@ import type { ControlValues } from '../controls/types.js';
 import { renderControls, renderUnsearchable, type ControlNode } from '../controls/render.js';
 import { disclosureItems } from '../mode/disclosure.js';
 import { parityRefusal, parityViolations } from '../mode/parity.js';
+import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
+import { canStart, freePlayIssues } from '../menu/menu.js';
 import { itemsIn, VIEW_MODES, type DisclosureOrigin } from '../mode/types.js';
 import { OPERATIONAL_ZONING_NOTE } from '../editor/editorEdits.js';
 import { previewGeometry } from '../editor/editorPreview.js';
@@ -3141,6 +3143,81 @@ const EDITOR_PANELS: SurfaceAdapter = {
  * The order is the order a reader meets them: the run, the picture, the panel, the batch, the
  * campaign. Nothing branches on it.
  */
+
+/**
+ * The menu — § D214 § 2's free-play selection and the catalogue behind it.
+ *
+ * Driven rather than excluded, because **`buildingDetail` puts numbers on a player surface**:
+ * `21 floors · 1,710 people · 4 cars` is three figures a reader will believe, and the honesty
+ * property exists for exactly that. `freePlayIssues` is driven on a **broken** selection as well as
+ * a whole one, because its whole job is the words shown when something is wrong — a surface only
+ * ever driven with valid input has left its error path unswept, which is where careless prose
+ * actually lives.
+ */
+const MENU: SurfaceAdapter = {
+  id: 'menu/menu.ts#freePlayIssues',
+  covers: [
+    'menu/menu.ts#freePlayIssues',
+    'menu/menu.ts#canStart',
+    'menu/catalogue.ts#catalogueOf',
+    'menu/catalogue.ts#buildingDetail',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    // Assembled from what the context already carries rather than from a second load: the menu's
+    // whole claim is that it derives from the loaded configuration, and a search that handed it a
+    // separately-built list would be checking a different catalogue than the page shows.
+    const catalogue = catalogueOf({
+      buildings: context.buildings as unknown as CatalogueSource['buildings'],
+      dispatcherProfiles: context.dispatcherProfiles,
+      trafficProfiles: context.trafficProfiles,
+    });
+
+    for (const entry of catalogue.buildings) {
+      seeds.push({ field: `building.${entry.id}.name`, text: entry.name, role: 'label' });
+      // `observation` and not `label`: this is a count of real things, and a wrong one is the
+      // failure mode the sweep is for.
+      seeds.push({
+        field: `building.${entry.id}.detail`,
+        text: entry.detail ?? '',
+        role: 'observation',
+      });
+    }
+    for (const entry of catalogue.demandTemplates) {
+      seeds.push({ field: `template.${entry.id}.detail`, text: entry.detail ?? '', role: 'label' });
+    }
+
+    const whole = {
+      buildingId: catalogue.buildings[0]?.id ?? '',
+      dispatcherProfileId: catalogue.dispatchers[0]?.id ?? '',
+      demandTemplateId: catalogue.demandTemplates[0]?.id ?? '',
+      arrivalRatePctPop5min: null,
+      durationS: 900,
+      seed: '20260804',
+    };
+    const broken = { ...whole, buildingId: 'demolished', seed: 'not-a-seed', durationS: 7 };
+
+    for (const [label, selection] of [
+      ['whole', whole],
+      ['broken', broken],
+    ] as const) {
+      for (const [index, issue] of freePlayIssues(selection, catalogue).entries()) {
+        seeds.push({
+          field: `${label}.issue.${String(index)}.${issue.field}`,
+          text: issue.message,
+          role: 'reason',
+        });
+      }
+      seeds.push({
+        field: `${label}.canStart`,
+        text: canStart(selection, catalogue) ? 'Start' : 'Start is unavailable',
+        role: 'label',
+      });
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -3171,6 +3248,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   REPORT_PANEL,
   SCENARIOS,
   EDITOR_PANELS,
+  MENU,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

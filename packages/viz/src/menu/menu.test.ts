@@ -220,7 +220,7 @@ describe('the catalogue is derived from data/, in both directions', () => {
     // Both directions. A building that lands and a building that leaves are each a failure here,
     // which is the whole reason the menu derives rather than lists (§ D213).
     expect(catalogue.buildings.map((entry) => entry.id).sort()).toEqual(
-      [...config.buildingsById.keys()].sort(),
+      config.buildings.map((building) => building.id).sort(),
     );
     expect(catalogue.dispatchers.map((entry) => entry.id)).toEqual(
       config.dispatcherProfiles.profiles.map((profile) => profile.id),

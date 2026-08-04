@@ -79,6 +79,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * without a document.
          */
         'dev/dispatcherEditor.ts#sliderHandlesOf',
+        /*
+         * § D214 § 2's menu. Same split as the design refactor's three mounts above, and the same
+         * honest accounting: the parts of the menu that *say something about a run* are pure and
+         * are driven — `MENU` renders `catalogueOf`'s building details, every `freePlayIssues`
+         * refusal and `canStart`'s label, on a whole selection and a deliberately broken one. What
+         * is left here is the row copy and the settings note, authored inline, reaching only the
+         * static sweep below. That is weaker than driving them and is stated as a limitation.
+         */
+        'dev/menuPanel.ts#renderMenu',
       ],
     },
     {
@@ -234,6 +243,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'scenario/goals.ts#isPerReplicationGoal',
         'scenario/candidates.ts#CANDIDATE_GOALS',
         'scenario/candidates.ts#CANDIDATE_SCENARIOS',
+        /*
+         * The six menu screen ids the `MenuScreen` union is derived from — `main`, `campaign`,
+         * `free-play`, … — derived here only because `free-play` reads as two adjacent words. What
+         * a player sees is `titleOf`'s heading, authored in `menuPanel.ts` and swept statically
+         * with the rest of that mount's copy.
+         */
+        'menu/types.ts#MENU_SCREENS',
       ],
     },
     {

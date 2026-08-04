@@ -27,7 +27,12 @@ import type { CatalogueEntry, MenuCatalogue } from './types.js';
  * is an id and a label, and the type says so.
  */
 export interface CatalogueSource {
-  readonly buildingsById: ReadonlyMap<string, CatalogueBuilding>;
+  /**
+   * An array rather than the `buildingsById` map, so the one derivation serves both callers:
+   * `LoadedConfig` (the server and the tests) and `BrowserResources` (the shell). Two adapters for
+   * one list is how the menu and the runner would come to disagree about what ships.
+   */
+  readonly buildings: readonly CatalogueBuilding[];
   readonly dispatcherProfiles: { readonly profiles: readonly CatalogueProfile[] };
   readonly trafficProfiles: { readonly demandTemplates: readonly CatalogueTemplate[] };
 }
@@ -80,7 +85,7 @@ export function buildingDetail(building: CatalogueBuilding): string {
  * Order is the configuration's own, so the menu reads in the same order as the files it came from.
  */
 export function catalogueOf(source: CatalogueSource): MenuCatalogue {
-  const buildings: CatalogueEntry[] = [...source.buildingsById.values()].map((building) => ({
+  const buildings: CatalogueEntry[] = source.buildings.map((building) => ({
     id: building.id,
     name: building.name,
     detail: buildingDetail(building),

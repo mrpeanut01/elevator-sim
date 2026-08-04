@@ -40,6 +40,10 @@
 
 import { SimulationError, type BuildingConfig } from '@elevator-sim/core/browser';
 
+import { catalogueOf } from '../menu/catalogue.js';
+import { initialMenuState, navigate } from '../menu/menu.js';
+import type { MenuState } from '../menu/types.js';
+import { renderMenu, type MenuPanelHost } from './menuPanel.js';
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
 import { restrictedFloorIds } from '../access/zoning.js';
@@ -298,6 +302,59 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   let carBadgeHits: readonly CarBadgeHit[] = [];
   let bankFilter = '';
+
+  /* ---------------------------------------------------------------------- *
+   * The menu — § D214 § 2, and the non-test caller of `menu/`
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * The shell opens on the menu, over the viewer.
+   *
+   * An overlay rather than a route, deliberately: the viewer behind it is already loaded and
+   * running, so **Back** and **Campaign** are instant and nothing is torn down to show a list of
+   * five rows. It also keeps `index.html` untouched, which matters because `elementMap.test.ts`
+   * asserts that page's shape and a new required container would be a change to the contract for
+   * a screen that is chrome.
+   */
+  const menuRoot = el(document, 'div', { className: 'menu-overlay' });
+  document.body.append(menuRoot);
+  let menuState: MenuState = initialMenuState(catalogueOf(resources));
+
+  const menuHost: MenuPanelHost = {
+    doc: document,
+    catalogue: catalogueOf(resources),
+    state: () => menuState,
+    update: (next) => {
+      menuState = next;
+      drawMenu();
+    },
+    start: (selection) => {
+      // Free Play applies what the viewer already models — the building, the dispatcher and the
+      // seed — and then gets out of the way. The traffic template, rate and duration are carried on
+      // the selection and are **not** yet applied: `shiftRunConfigOf` owns what a run is, and
+      // wiring a second path into it is exactly the drift § D214 § 2 refuses. Stated here rather
+      // than implied by silence.
+      state = withBuilding(state, resources, selection.buildingId);
+      state = { ...state, dispatcherId: selection.dispatcherProfileId, seed: BigInt(selection.seed) };
+      menuState = navigate(menuState, 'main');
+      closeMenu();
+      renderAll();
+    },
+    openCampaign: () => {
+      closeMenu();
+    },
+  };
+
+  function drawMenu(): void {
+    renderMenu(menuRoot, menuHost);
+  }
+
+  function closeMenu(): void {
+    menuRoot.hidden = true;
+  }
+
+  drawMenu();
+
   /**
    * Whether the transport restarts at the end.
    *

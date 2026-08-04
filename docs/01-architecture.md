@@ -300,10 +300,22 @@ packages/
 │   ├── campaign/          — Phase 9 W5: the scenario schema, the seven stages, the four fail states
 │   ├── honesty/           — Phase 9 § D163 clause 1: the generated search over every player-facing string
 │   ├── mode/              — Phase 9 W6: Basic and Advanced, and the derived mode-parity check
+│   ├── menu/              — § D214: the shell's screens, settings, and the free-play selection
 │   └── dev/               — the Vite dev entry points, viewer and editor (dev-only)
+├── server/                — § D214: accounts, email confirmation, and a verified leaderboard
+│   ├── accounts/          — password hashing, signed confirmation tokens, session tokens
+│   ├── mail/              — the one-method Mailer, and the dev driver that writes an outbox
+│   └── leaderboard/       — the submission shape, its board hash, and verification by replay
 └── cli/                   — headless batch entry point
     └── commands/          — list, run, compare, tune, watch
 ```
+
+> **Layout note — `server/` is the only package allowed a socket, a database and a wall clock.**
+> Invariant 3 forbids `core/` all three and invariant 6 forbids `core → viz`; nothing forbids
+> `server → core`, and the leaderboard depends on it completely. Verification re-runs a submitted
+> seed through the same kernel every study drives (§ D214 § 3), so the guarantee that makes the
+> board trustworthy is the one invariant 5 already provides: *every persisted run record carries
+> its seed, so any run replays exactly.*
 
 > **Layout note — `viz/editor/` exists, and the reason it took two attempts is worth keeping.**
 > `packages/core/src/sim/moduleTree.test.ts` compares this tree against the directories under
