@@ -498,26 +498,29 @@ are predictions.
 
 | | Test files | Tests | Duration | Run |
 |---|---|---|---|---|
-| **Before** — `16cbb7ab`, linux | 282 | 5 188 passed, 11 skipped (5 199) | 2 067 s | [30853493920](https://github.com/mrpeanut01/elevator-sim/actions/runs/30853493920) |
-| **Before** — `16cbb7ab`, macos | 282 | 5 188 passed, 11 skipped (5 199) | 1 591 s | [30853493920](https://github.com/mrpeanut01/elevator-sim/actions/runs/30853493920) |
-| **After** — `bd76872`, linux | 283 | 5 194 passed, 11 skipped (5 205) | 2 338 s | [30921086880](https://github.com/mrpeanut01/elevator-sim/actions/runs/30921086880) |
-| **After** — `bd76872`, macos | 283 | 5 194 passed, 11 skipped (5 205) | 1 974 s | [30921086880](https://github.com/mrpeanut01/elevator-sim/actions/runs/30921086880) |
+| **Before** — `a21420b` (`main` at merge), linux | 292 | 5 475 passed, 11 skipped (5 486) | 2 365 s | [30931178679](https://github.com/mrpeanut01/elevator-sim/actions/runs/30931178679) |
+| **Before** — `a21420b`, macos | 292 | 5 475 passed, 11 skipped (5 486) | 1 579 s | [30931178679](https://github.com/mrpeanut01/elevator-sim/actions/runs/30931178679) |
+| **After** — `d3668f7` (this branch, `main` merged in), linux | 293 | 5 482 passed, 11 skipped (5 493) | 2 290 s | [30951134861](https://github.com/mrpeanut01/elevator-sim/actions/runs/30951134861) |
+| **After** — `d3668f7`, macos | 293 | 5 482 passed, 11 skipped (5 493) | 2 085 s | [30951134861](https://github.com/mrpeanut01/elevator-sim/actions/runs/30951134861) |
 
-**+1 file, +6 tests, 0 failures, and the skip count does not move.** The six are
+**+1 file, +7 tests, 0 failures, and the skip count does not move.** The seven are
 `packages/viz/src/dev/buildingsManifest.test.ts`; no existing test changed, which is the claim this
-table exists to support rather than assert. `16cbb7ab` is this branch's merge-base, so the two sides
-differ by exactly this work.
+table exists to support rather than assert.
 
 **Both legs agree on both sides**, which is the property the two-OS matrix exists to measure
 (`ci.yml`'s header, § D196/§ D201). Only the durations differ, and duration is not a pin.
 
-**Re-confirmed at `e91db73`** — 283 files, 5 194 passed, 11 skipped, both legs
-([run 30926989525](https://github.com/mrpeanut01/elevator-sim/actions/runs/30926989525)) — so the
-figures hold at the branch head and not only at the commit they were taken on. A table like this
-cannot name the commit that contains it, which is why it names the run that produced each figure
-instead; every commit after `bd76872` on this branch touches only documentation and a provisioning
-shell script, neither of which is compiled or tested, so the counts are expected to hold through
-the merge.
+**The baseline moved once, and that is worth recording rather than smoothing over.** This table
+first compared `16cbb7ab` — 282 files, 5 188 tests — against this branch, and reported +1 file and
++6 tests. PR #10 then merged 23 commits to `main` (`packages/server`, three buildings, a thirteenth
+cost term) and this branch merged that in. Held against the old base, the arithmetic would still
+have been *correct* and the comparison would have credited this lane with **11 files and 288 tests
+it did not write**. **The baseline of a comparison is part of the comparison**, so it was re-taken
+against `main` as it now stands rather than adjusted — and the +6 became +7 because the merge is
+also what made the CSP guard in § 1 necessary.
+
+A table like this cannot name the commit that contains it — writing the id in changes the id —
+which is why every figure names its *run* instead.
 
 Two notes on how these numbers were obtained, because this repository has been bitten by the
 alternative:
