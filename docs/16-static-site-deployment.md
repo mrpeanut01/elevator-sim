@@ -40,11 +40,19 @@ failure mode a `workflow_dispatch`-only job would have had.
 
 ### What is actually being hosted
 
-`packages/viz` has **no server half** — *as of this commit*, and the qualifier is load-bearing: a
-concurrent lane is reportedly adding a database and a login framework, which is the premise below
-expiring rather than a detail. Read "What would change the answer" at the end of this section before
-quoting anything here. For the tree as it stands, the claim is a property of the codebase rather
-than a simplification made here:
+**`packages/viz` still has no server half — but the product now does.** PR #10 landed
+`packages/server`, and the viewer ships account and leaderboard screens that talk to it. The
+distinction is the whole of why this lane's verdict survives that, so it is stated precisely rather
+than glossed:
+
+- **The viewer is still a static bundle.** It contacts a server only when the page declares one
+  (§ 1's *"What would change the answer"*), and `index.html` declares none. Everything below about
+  *hosting the viewer* holds unchanged.
+- **The system is no longer free.** A database and a server are not hosted by this document, and the
+  `$0` in the table below is the price of serving the bundle, not of running the product.
+
+Read that section before quoting anything from this one. For the bundle itself, the claim is a
+property of the codebase rather than a simplification made here:
 
 - `core` publishes a `browser` export condition resolving to `core/src/browser.ts`, an fs-free
   barrel, and `core/src/browser.test.ts` walks its transitive import graph and fails if a `node:`
@@ -53,7 +61,7 @@ than a simplification made here:
 - The reference data is five JSON files plus `data/buildings/`, copied into the output by Vite's
   `publicDir`.
 
-So `npm run build:web` produces the entire product: **1.6 MB on disk, 283.3 KiB transferred on a
+So `npm run build:web` produces the entire product: **1.7 MB on disk, 296.8 KiB transferred on a
 cold load** (measured — § 9). Nothing needs to execute on a server to serve it.
 
 That collapses the platform question. Every compute-bearing Azure service is priced for a process
@@ -69,10 +77,10 @@ files that a static host hands back for nothing.
 | Option | Monthly | Why not |
 |---|---|---|
 | **Static Web Apps, Free** | **$0** | — **chosen** |
-| Blob Storage static website | ~$0 alone | Storage for 1.6 MB rounds to nothing, but **custom-domain HTTPS requires Front Door or CDN in front** (Front Door Standard ≈ $35/month base). No preview environments, no managed certificate, no SPA fallback without writing one. Cheaper only if you never want a domain. |
+| Blob Storage static website | ~$0 alone | Storage for 1.7 MB rounds to nothing, but **custom-domain HTTPS requires Front Door or CDN in front** (Front Door Standard ≈ $35/month base). No preview environments, no managed certificate, no SPA fallback without writing one. Cheaper only if you never want a domain. |
 | App Service, Free F1 | $0 | 60 CPU-minutes/day, the app sleeps, and **Free tier has no custom-domain TLS at all**. You are also running a web server process to serve static files. Worse on every axis that matters here. |
 | Container Apps, consumption | low, not $0 | Scale-to-zero still means cold starts, a container image to build and store, and per-request billing — to serve a directory. It buys a server this product does not have. |
-| VM (as the CI lane uses) | ≈ $330 | `D8ds_v5` at ≈ $0.452/h. Correct for a CI runner that needs 8 cores; absurd for 1.6 MB of static files. |
+| VM (as the CI lane uses) | ≈ $330 | `D8ds_v5` at ≈ $0.452/h. Correct for a CI runner that needs 8 cores; absurd for 1.7 MB of static files. |
 
 ### What the Free plan includes
 
@@ -80,9 +88,9 @@ Free hosting, a **managed TLS certificate**, **2 custom domains per app**, **100
 month**, **3 concurrent pre-production (preview) environments**, and global distribution.
 Storage is capped at **250 MB per app** and 500 MB across all environments.
 
-Two of those numbers are worth holding against the measurements in § 9: the artifact is **1.6 MB
-against a 250 MB cap** (0.6 %), and a cold load is **283.3 KiB against 100 GB/month**, which is
-**≈ 370 000 cold loads per month** before the free egress is spent.
+Two of those numbers are worth holding against the measurements in § 9: the artifact is **1.7 MB
+against a 250 MB cap** (0.7 %), and a cold load is **296.8 KiB against 100 GB/month**, which is
+**≈ 353 000 cold loads per month** before the free egress is spent.
 
 **The Free plan carries no SLA**, and when the bandwidth quota is exhausted **the site stops being
 served** rather than being billed for overage. For a project viewer that is the right failure — it
@@ -282,7 +290,7 @@ is the list of `data/buildings/*.json` — HTTP has no directory listing — and
 `vite dev` middleware and by nothing else**.
 
 That was correct while the package had no production build, and wrong the instant it had one:
-`vite build` copies all five buildings into the output and then the viewer asks for the manifest
+`vite build` copies all eight buildings into the output and then the viewer asks for the manifest
 tying them together, gets the SPA fallback, and dies in `fetchJson` with *"did not parse as JSON"*.
 Every asset present, page blank, no failing status code anywhere.
 
@@ -446,9 +454,9 @@ are predictions.
 
 | Claim | Evidence |
 |---|---|
-| The site builds | `npm run build:web` → 1.6 MB, 5 buildings, exit 0 |
+| The site builds | `npm run build:web` → 1.7 MB, 8 buildings, exit 0 |
 | The artifact is complete | The `build` job's check, executed locally: all 8 required files non-empty, `data/` and the manifest agree at 5 |
-| **It boots** | Served under its own `staticwebapp.config.json` (CSP, fallback and all) and driven in Chromium: building name resolved to *Garden Apartments*, all five buildings in the selector, a simulation ran, **zero console errors, zero page errors, zero fallbacks, zero 404s** |
+| **It boots** | Served under its own `staticwebapp.config.json` (CSP, fallback and all) and driven in Chromium: building name resolved to *Garden Apartments*, all eight buildings in the selector, a simulation ran, **zero console errors, zero page errors, zero fallbacks, zero 404s** |
 | The Web Worker loads under the CSP | `Run batch` in the Compare drawer spawned `assets/batchWorker-*.js`, no CSP violation — which is what allowed `worker-src` to be tightened from `'self' blob:` to `'self'` |
 | The manifest guard bites | Four mutants, each caught: emitter unregistered in `vite.config.ts` → 1 fail; build path pretty-printed → 2; manifest silently drops a building → 1; SPA fallback exclusion removed → 1. Clean tree: 6 pass |
 | The tree still typechecks | `tsc -b`, exit 0 — and it is what rejected the first draft of the test, § 4 |
@@ -482,7 +490,7 @@ are predictions.
    record, not a quiet edit.
 4. **The cost figures are list-price arithmetic**, and the Free plan's $0 is the only one of them
    that cannot be wrong by a factor.
-5. **The 283.3 KiB cold load is `gzip -9` on this machine**, not what Azure's edge negotiates. Real
+5. **The 296.8 KiB cold load is `gzip -9` on this machine**, not what Azure's edge negotiates. Real
    transfer will differ — Brotli would be smaller, a warm cache much smaller — so treat it as the
    right order of magnitude for § 1's egress arithmetic and not as a measurement of the CDN.
 6. **`chunkSizeWarningLimit` is raised to 900 kB.** The main chunk is ~780 kB raw / ~244 kB
