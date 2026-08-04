@@ -436,15 +436,36 @@ are predictions.
 
 ## 10. Effect on the existing suite
 
-**⚠ NOT YET MEASURED — a full `npm test` had not completed when this landed.**
+**Measured. Both platforms, both sides, each figure pinned to the run that produced it.**
 
-Stated that way on purpose. An earlier draft of this section carried a before/after test count that
-was written from arithmetic rather than from a run, which is the defect
-[`CLAUDE.md` § Statistical discipline](../CLAUDE.md) and the three stale published figures in this
-repository's history are about. A number with no run behind it is worse than no number, because it
-reads exactly like one that has been checked. So it is removed rather than rounded.
+| | Test files | Tests | Duration | Run |
+|---|---|---|---|---|
+| **Before** — `16cbb7ab`, linux | 282 | 5 188 passed, 11 skipped (5 199) | 2 067 s | [30853493920](https://github.com/mrpeanut01/elevator-sim/actions/runs/30853493920) |
+| **Before** — `16cbb7ab`, macos | 282 | 5 188 passed, 11 skipped (5 199) | 1 591 s | [30853493920](https://github.com/mrpeanut01/elevator-sim/actions/runs/30853493920) |
+| **After** — `bd76872`, linux | 283 | 5 194 passed, 11 skipped (5 205) | 2 338 s | [30921086880](https://github.com/mrpeanut01/elevator-sim/actions/runs/30921086880) |
+| **After** — `bd76872`, macos | 283 | 5 194 passed, 11 skipped (5 205) | 1 974 s | [30921086880](https://github.com/mrpeanut01/elevator-sim/actions/runs/30921086880) |
 
-What **is** measured, and by what:
+**+1 file, +6 tests, 0 failures, and the skip count does not move.** The six are
+`packages/viz/src/dev/buildingsManifest.test.ts`; no existing test changed, which is the claim this
+table exists to support rather than assert. `16cbb7ab` is this branch's merge-base, so the two sides
+differ by exactly this work.
+
+**Both legs agree on both sides**, which is the property the two-OS matrix exists to measure
+(`ci.yml`'s header, § D196/§ D201). Only the durations differ, and duration is not a pin.
+
+Two notes on how these numbers were obtained, because this repository has been bitten by the
+alternative:
+
+- **They come from CI, not from a laptop.** Clean checkout, `npm ci` from the lockfile, Node pinned
+  to 26 — and citable. A local run was started and deliberately killed once CI proved the better
+  source; it never printed a summary, so **no local figure is quoted here** and none exists.
+- **An earlier draft of this section carried a before/after count written from arithmetic rather
+  than from a run — 254 files and 4 731 tests, against a real 282 and 5 188.** It was wrong by 28
+  files and 457 tests and would have read exactly like a checked figure. That is the defect the
+  three stale published figures in this repository's history are about, and it is why the numbers
+  above name their runs.
+
+What **else** is measured, and by what:
 
 - `packages/viz/src/dev/buildingsManifest.test.ts` — **6 tests, all passing**, and each of the four
   mutants in § 9 fails it.
@@ -454,15 +475,13 @@ What **is** measured, and by what:
 - A full `tsc -b --clean && tsc -b` emits no stray files, confirming `vite.config.ts` is still
   outside the TypeScript project after this change.
 
-What is expected but unconfirmed: that no existing test changes. The reasoning is that this work
-adds files and touches no runtime source — the only edited runtime-adjacent file is
+The prediction this table was written to check, now confirmed: no existing test changes, because the
+work adds files and touches no runtime source — the only edited runtime-adjacent file is
 `vite.config.ts`, which nothing under `packages/*/src` imports. In particular
-`packages/viz/src/deadCode.test.ts` (the § D192 audit deriving 19 directories from disk) should be
+`packages/viz/src/deadCode.test.ts` (the § D192 audit deriving 19 directories from disk) is
 untouched, because `buildingsManifest.mjs` sits beside `vite.config.ts` **outside `src/`** for the
 reason that file gives — no directory was added under `viz/src`, only a file in the existing
-`src/dev/`.
-
-**Replace this section with the run.** `npm test`, both counts, from one invocation.
+`src/dev/`. Had that been wrong, the file count would have moved by more than one.
 
 ---
 
