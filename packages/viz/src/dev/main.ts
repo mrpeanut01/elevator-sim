@@ -328,7 +328,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   const menuRoot = el(document, 'div', { className: 'menu-overlay' });
   document.body.append(menuRoot);
-  let menuState: MenuState = initialMenuState(catalogueOf(resources));
+  // Derived once. Two calls would be two catalogues, and a panel drawing one while the reducer
+  // validated against the other is the kind of disagreement that only shows up as a Start button
+  // that refuses something the list offered.
+  const menuCatalogue = catalogueOf(resources);
+  let menuState: MenuState = initialMenuState(menuCatalogue);
 
   /**
    * The account and leaderboard screens, and the one place a request is started.
@@ -380,7 +384,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   const menuHost: MenuPanelHost = {
     doc: document,
-    catalogue: catalogueOf(resources),
+    catalogue: menuCatalogue,
     state: () => menuState,
     update: (next) => {
       const arrived = next.screen === 'leaderboard' && menuState.screen !== 'leaderboard';
