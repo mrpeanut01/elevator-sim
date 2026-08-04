@@ -13404,3 +13404,98 @@ the departure-gap survey went from fourteen rows to seventeen and its worst reop
 39.8 s shuttle to `st-jude-hospital`'s 56.5 s, widening rather than complicating its claim that no
 single constant is safe on every bank. Both are re-derived from disk, so the buildings pay their
 cost there whether or not anyone runs a study on them.
+
+
+## D214 — the menu shell, free play, and a leaderboard that cannot be lied to
+
+**Date: 2026-08-04 · Architecture, written before the code.** The product grows a main menu with
+**Settings**, **Campaign** and **Free Play**, and gains accounts, email confirmation and a shared
+leaderboard. That last part is the first network, the first secret and the first wall-clock this
+repository has ever had, so the shape is recorded before any of it is built.
+
+### 1. What already exists, and what does not
+
+`packages/viz` is a **static Vite app** whose only dependencies are `@elevator-sim/core`,
+`@elevator-sim/experiments` and `vite`. There is no server, no database, no session, no mail. The
+whole repository has **four** runtime dependencies. Nothing here is a refactor of an existing
+backend; it is the first one.
+
+The campaign already exists as `shift/contracts.ts` (eight scenarios) and `data/campaign.json` (ten
+stages). What is missing is a **way in**: `dev/main.ts` boots straight into a running simulation, so
+Campaign is the only thing the product can do and Free Play has nowhere to be chosen from.
+
+### 2. The menu is a pure state machine, and the DOM is downstream of it
+
+`menu/` holds a screen union and a reducer, with no `document` in it, for the reason
+`dev/state.ts` exists and `dev/runConfig.ts` did before it: *a decision made inside a click handler
+needs a document, a canvas and a click to reach, so it cannot be tested and it drifts.* The panel
+that draws it is separate and dumb.
+
+Screens: `main`, `campaign`, `free-play`, `settings`, `leaderboard`, `account`. **Free Play** is a
+selection over the shipped data — building × traffic template × arrival rate × dispatcher × duration
+× seed — and every axis of it is **derived from `data/`** rather than listed, because a list is what
+this branch has already had to widen five times (§ D213).
+
+### 3. The leaderboard is verified by replay, and that is the whole design
+
+A client-reported score measures willingness to cheat. This project cannot host one, and it does not
+have to, because **invariant 5 already guarantees the fix**: *every persisted run record carries its
+seed, so any run replays exactly.*
+
+So a submission carries the **seed and the resolved configuration**, not just a number. The server
+**re-runs the simulation** through the same `@elevator-sim/core` the client used and accepts the
+score only if it reproduces. A forged score is rejected because it does not replay; an honest score
+is accepted because it does. The client is never trusted, and no anti-cheat heuristics are needed —
+determinism does the work.
+
+**This is also why the server must own the sim rather than proxy a number.** `packages/server`
+depends on `core`, which is allowed (invariant 6 forbids `core → viz`, nothing else), and the
+verification path uses the same seeded `StreamSet` every study does.
+
+### 4. A board is partitioned by a content hash of what it measures
+
+**This is the part that would be wrong by default, and this branch has just paid for the lesson
+twice.** § D205 found a recorded fuzz case losing its subject when a profile was added; § D213 found
+it again one field over, moving `fuzz-1001074`'s arrival count from 177 to 188 while the case still
+ran and still reported cleanly.
+
+A leaderboard has exactly that shape. A score is *"this seed on this building under this dispatcher
+scored X"*, and every one of those nouns lives in `data/`. Change `midtown-office`'s population and
+every stored score silently stops describing the run it names — and, worse, **stops re-verifying**,
+so honest old entries start failing the check that exists to catch forgeries.
+
+So a board is keyed by a **`configHash`**: a stable digest over the fully-resolved inputs the run
+depended on — building, dispatcher profile, traffic, duration, and the engine's own model version.
+A `data/` change does not corrupt an old board; it **starts a new one**, and the old board stays
+readable and stays verifiable against the data it was set on. Boards name their hash, and the UI
+says which one a player is looking at.
+
+### 5. Accounts, and the smallest thing that is not negligent
+
+- **Passwords** are hashed with `scrypt` from `node:crypto`, per-user random salt, never stored or
+  logged in the clear. No password ever appears in a response body.
+- **Email confirmation** is a signed, expiring token — HMAC over `(userId, email, expiry)` with a
+  server secret from the environment. Unconfirmed accounts may log in but **may not post a score**,
+  which is the only privilege that needs gating, and it keeps a leaderboard from being farmable with
+  throwaway addresses.
+- **The secret comes from the environment and has no default.** A server started without one
+  refuses to boot rather than signing with a placeholder that would ship to production.
+- **Mail is an interface with a dev driver.** `Mailer` has one method; the dev driver appends to an
+  outbox file so the flow is testable end to end with no network, and an SMTP driver drops in behind
+  the same interface when there is a domain to send from. **No credential is committed.**
+- **Sessions** are opaque random tokens in a table, not JWTs: revocation is a `DELETE`, and this
+  product has no need for stateless verification.
+
+### 6. What is deliberately not built
+
+**Real-time multiplayer.** Two players dispatching one building live needs tick synchronisation and
+a conflict rule for simultaneous assignment, and it would put a network clock next to a kernel whose
+first invariant is that time comes from the kernel. Asynchronous competition gets the leaderboard
+that was actually asked for without any of it. The transport is plain HTTP + JSON, so nothing here
+forecloses adding it later.
+
+**Scores as a single number.** The project's own rule is that energy is an axis and never a score
+(§ D106), and that a mean over a saturated run may not be reported at all. A board therefore ranks
+on a **declared metric** and shows the others beside it, and a submission whose run has
+`awtIsValid: false` is **rejected on entry** rather than ranked — the same suppression the rest of
+the project applies, at the one surface where a player is motivated to ignore it.
