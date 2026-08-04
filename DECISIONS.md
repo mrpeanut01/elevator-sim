@@ -13250,3 +13250,145 @@ registered.
 answerable, and answered: a conditional term removes it exactly. What stands between this mechanism
 and a default is no longer a design problem but a measurement one — a single building whose
 reference arm saturates once in two hundred replications at every rate anybody has declared.
+
+
+## D213 — three buildings, a profile with no caller, and a recorded corpus that lost its subject
+
+**Date: 2026-08-04 · Variety work: the shipped set goes from five buildings to eight, and gains a
+traffic profile and two demand templates.** Recorded because two of the things it found are defects
+this repository already has names for, and one of them was in a criterion decided a day earlier.
+
+### 1. `office-prestige` was declared in Phase 1 and called by nothing
+
+`data/traffic-profiles.json` has shipped five profiles and `data/buildings/` used four of them.
+`office-prestige` — a complete, schema-valid record with its own arrival band, target interval,
+target wait and directional split — was referenced by **no building, no study and no scenario**.
+
+That is [§ D112](DECISIONS.md)'s `destination-eta` exactly, one level up: *"two authored fields, a
+schema-valid profile, its own tests… so the destination reached `estimateCost` and changed no
+decision"*. Invariant 7 makes strategy data; it does not make data exempt from having a caller, and
+`data/` has now produced this shape twice.
+
+**`chancery-house` is the caller.** It is deliberately not a big tower — the profile asks for a
+*harder service level on a smaller population* (16 % of population per 5 min against Midtown's 12, a
+25 s target interval against 30) — so the building is 19 floors, 612 people and six fast cars, and
+the question it poses is whether a dispatcher holds a 25 s interval *while it has spare cars*.
+
+### 2. Two more callers that did not exist, and one that was a stratum
+
+**`hotel` reached the simulator only through one floor range of `vertical-city`.** Every hotel figure
+this project has published therefore describes a hotel *inside an office tower* rather than a hotel.
+`crown-hotel` declares it at the building level, and brings the first shipped demand with **no
+dominant direction** — `two-way`, 40/40/20, mean group size 2.0 against the offices' 1.4. That is
+the traffic `collective`'s `noDirectionReversal` is least suited to, and no gate cell has ever said
+so.
+
+**The `stairs` transport-mode kind had no `data/` caller at all.** It shipped in wave 13 with an
+asymmetric traversal time and an asymmetric propensity, and `sim/stairsSeam.test.ts` says in as many
+words why it stayed out of shipped buildings: *"adding a stair to a shipped document would change
+that building's runs and every pinned estimate taken on it"*. That argument is sound and does not
+cover a **new** building, which has no pins to move. `st-jude-hospital` declares the first one.
+
+### 3. Two modelling decisions taken against an invariant rather than around it
+
+**Unlike cars live in one bank, not two.** Both new buildings wanted a slow, large service or bed car
+beside fast passenger cars. Modelled as two banks, every guest floor and every ward becomes *a floor
+served by two banks*, and `buildingConnectivity.test.ts` requires such a floor to be
+`isTransferFloor` — which means **sky lobby**, and re-injects a passenger as a new arrival. A hotel
+bedroom corridor is not a sky lobby. The invariant is an over-approximation (two banks with
+identical service zoning need no transfer at all), and the honest move was to satisfy it rather than
+to weaken it: one bank, five unlike cars. That is also the better model, and it is the first time
+any shipped bank has held cars that differ in speed and capacity.
+
+**The reference data set the hotel's height.** `crown-hotel`'s service car is geared traction
+because that is the class whose speed range reaches down to 1.75 m/s. Geared traction is
+reference-rated to a 76 m rise, so the guest stack stops at floor 23. The alternative was a gearless
+service car at 2.5 m/s — which would have erased the very speed contrast the building exists to
+pose. The building was shortened to fit the data rather than the data widened to fit the building.
+
+**And a limitation is named rather than papered over.** Neither new building authors a per-car
+`passengerTransferS`. The model has no notion of a bed or a trolley as an **indivisible load**, so
+every derived bound multiplies a car's transfer time by its full person count: a 26-person bed lift
+at an authored 3.0 s produces an **84.5 s** loading bound describing 26 people boarding one at a
+time, a journey no bed lift makes. The heterogeneity that *is* modelled — speed and capacity — the
+engine reads honestly. Modelling an indivisible load is real work and is not done here.
+
+### 4. A demand template in `data/` alone would have been inert
+
+`traffic/demandTemplate.ts` resolves a template by **id**, and its own error message says so:
+*"Adding one is a new shape in `traffic/demandTemplate.ts`, not a new branch at a call site."* A
+record added to `data/traffic-profiles.json` without a shape would have been a declared, documented,
+schema-valid template that no run could ever use — the defect in § 1, committed while fixing it. Both
+new templates are implemented:
+
+- **`shift-change`** — the first shape with **two interior peaks**. `rise-and-fall` has one interior
+  maximum and `constant-iso` has none, so *"the outgoing shift leaves while the incoming shift
+  arrives, twice"* previously had to be approximated by a wider single peak, which spreads the same
+  demand instead of concentrating it twice. Its trough is **required** to be non-zero: a zero trough
+  is two rise-and-falls with a dead period, and the fact a shift change turns on is that the
+  building is still occupied while it happens.
+- **`evening-egress`** — differs from `rise-and-fall` in its **leading edge** rather than its
+  magnitude. A rise-and-fall ramps over minutes; an egress steps. That is the case a batch window or
+  a deferred-assignment setting is decided by.
+
+### 5. The recorded fuzz corpus lost its subject, and § D205 had already fixed the other half
+
+A fuzz case is a **seed decoded against an option space**, and one axis of that space is the shipped
+traffic-profile list. § D205 recorded this defect precisely — *"three instances of one defect, in one
+change… all three turned a list into a silent input to a published number"* — fixed the **dispatcher**
+axis with a frozen `CORPUS_DISPATCHER_PROFILE_IDS`, and did not look one line down at the traffic
+axis, which stayed derived from `data/`.
+
+Adding the `hospital` profile therefore re-mapped every recorded seed. `fuzz-1001074`'s arrival count
+moved from **177 to 188**: the case still ran, still reported cleanly, and was **no longer the case
+the record describes**. That is a regression record losing its subject, and nothing failed loudly —
+the reproduction simply reproduced a different run, which is the failure mode § D205's own docstring
+predicts in as many words.
+
+`CORPUS_TRAFFIC_PROFILE_IDS` mirrors the dispatcher fix exactly: frozen at the four profiles shipped
+when the deep-tier findings were recorded, with the same *"a corpus indexed against a profile that no
+longer ships cannot reproduce the case it recorded"* error for a missing id. Five pinned
+reproductions across two packages now declare both axes. The **campaign** deliberately declares
+neither — a new profile should be fuzzed, and a seed that re-maps during a search is a seed doing its
+job.
+
+### 6. Three guards that were weaker than they read
+
+**`docs/10` § M30's row matcher was `/^\| \*\*[1-7] /`.** The bound was the stage count on the day
+it was written, so stages 8, 9 and 10 were skipped in silence and only a length assertion noticed
+that the documented table and the measured one had different sizes. Generalised to any stage number.
+
+**`mixIdentity.test.ts` named its mix-varying template by position.** It asserted
+`DEMAND_TEMPLATE_IDS` equals `[...SHIPPED_BEFORE, 'lunch-two-way']` — so a template that varied the
+mix could have been appended and passed, while two that do not varied nothing and failed merely by
+existing. Its own comment above it asked for the partition (*"add a fourth template and this
+assertion names it"*); it now computes it, from the records.
+
+**`collectiveAdoption.test.ts` derived § D209's building set from disk, and that is the serious
+one.** § D209's criterion was pre-registered over the buildings shipped on 2026-08-03, and
+[§ D210](DECISIONS.md) and [§ D212](DECISIONS.md) were both decided against it. Deriving the ladders
+from `data/buildings/` means **a building added afterwards silently widens a criterion that has
+already been decided**: clause 2 would begin demanding a quotable cell from a building that did not
+exist when the clause was written, and three recorded verdicts would quietly come to mean something
+else.
+
+That is [§ D151](DECISIONS.md)'s `PRE_REGISTERED_REFERENCE_CANDIDATES` lesson with a **building**
+instead of a profile — *"a profile added afterwards would silently become the new baseline and move
+every paired figure in the study"*. The set is now declared, and asserted in both directions: every
+id in it still exists on disk, and the buildings outside it are **named** so a reader can see the
+exclusion is a decision. A future criterion that wants them pre-registers them itself, before it
+measures anything.
+
+### 7. What this does not claim
+
+**No verdict moved and no pin was regenerated by the buildings themselves.** The new buildings are in
+no benchmark cell, no matrix cell, no sweep cell and no pre-registered criterion. They are in the
+scenario set — the game's stages — and in the always-on validation that iterates `data/buildings/`,
+which is where their cost is paid and where a config error in them will surface.
+
+**Where their arrival IS load-bearing is the always-on validation that iterates `data/buildings/`.**
+The analytical up-peak census went from fourteen banks to seventeen and all three new banks analyse;
+the departure-gap survey went from fourteen rows to seventeen and its worst reopen moved from a
+39.8 s shuttle to `st-jude-hospital`'s 56.5 s, widening rather than complicating its claim that no
+single constant is safe on every bank. Both are re-derived from disk, so the buildings pay their
+cost there whether or not anyone runs a study on them.
