@@ -56,7 +56,9 @@ import type { ControlValues } from '../controls/types.js';
 import { renderControls, renderUnsearchable, type ControlNode } from '../controls/render.js';
 import { disclosureItems } from '../mode/disclosure.js';
 import { parityRefusal, parityViolations } from '../mode/parity.js';
+import { SIGNED_OUT, formIssues, postingRefusal, signedIn, updateForm } from '../menu/account.js';
 import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
+import { CLIENT_FAILURES } from '../menu/client.js';
 import { canStart, freePlayIssues } from '../menu/menu.js';
 import { itemsIn, VIEW_MODES, type DisclosureOrigin } from '../mode/types.js';
 import { OPERATIONAL_ZONING_NOTE } from '../editor/editorEdits.js';
@@ -3161,6 +3163,10 @@ const MENU: SurfaceAdapter = {
     'menu/menu.ts#canStart',
     'menu/catalogue.ts#catalogueOf',
     'menu/catalogue.ts#buildingDetail',
+    'menu/account.ts#formIssues',
+    'menu/account.ts#postingRefusal',
+    'menu/account.ts#signedIn',
+    'menu/client.ts#CLIENT_FAILURES',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -3214,6 +3220,44 @@ const MENU: SurfaceAdapter = {
         role: 'label',
       });
     }
+
+    /*
+     * The account screen's own prose.
+     *
+     * Driven for the same reason the broken selection above is: every sentence here is one a
+     * player only ever meets when something has gone wrong, which is where careless wording
+     * actually lives. `postingRefusal` gets **both** of its arms — signed out, and signed in but
+     * unconfirmed — because collapsing them is the specific mistake it exists to avoid.
+     */
+    const account = updateForm(SIGNED_OUT, { mode: 'register', email: 'nope', password: 'short' });
+    for (const [index, issue] of formIssues(account.form).entries()) {
+      seeds.push({
+        field: `account.issue.${String(index)}.${issue.field}`,
+        text: issue.message,
+        role: 'reason',
+      });
+    }
+    const player = { id: 'u1', email: 'p@example.test', displayName: 'A player', confirmed: false };
+    for (const [label, state] of [
+      ['signed-out', SIGNED_OUT],
+      ['unconfirmed', signedIn(SIGNED_OUT, 'token', player)],
+      ['confirmed', signedIn(SIGNED_OUT, 'token', { ...player, confirmed: true })],
+    ] as const) {
+      const refusal = postingRefusal(state);
+      if (refusal !== undefined) {
+        seeds.push({ field: `account.${label}.refusal`, text: refusal, role: 'reason' });
+      }
+      if (state.notice !== undefined) {
+        seeds.push({ field: `account.${label}.notice`, text: state.notice, role: 'prose' });
+      }
+    }
+
+    // The three sentences the client authors when there is no server answer to carry. `reason`
+    // rather than `prose`: each one explains a refusal a player is looking at.
+    for (const [code, text] of Object.entries(CLIENT_FAILURES)) {
+      seeds.push({ field: `client.${code}`, text, role: 'reason' });
+    }
+
     return singleRun(this.id, seeds);
   },
 };

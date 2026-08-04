@@ -250,6 +250,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * with the rest of that mount's copy.
          */
         'menu/types.ts#MENU_SCREENS',
+        /*
+         * The account screen's *shape*, not its sentences. `EMPTY_FORM` and `SIGNED_OUT` are blank
+         * records whose only string is the mode id `sign-in`, which the two-adjacent-words scanner
+         * reads as prose; `MAX_DISPLAY_NAME` is the integer 32. Every sentence these records ever
+         * carry comes from `formIssues`, `postingRefusal` or `signedIn`, and `MENU` drives all
+         * three — including `postingRefusal`'s two arms, which is the distinction it exists for.
+         */
+        'menu/account.ts#EMPTY_FORM',
+        'menu/account.ts#SIGNED_OUT',
+        'menu/account.ts#MAX_DISPLAY_NAME',
       ],
     },
     {
@@ -315,6 +325,23 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'record/document.ts#readRecordingDocument',
         'editor/editorEdits.ts#blankBuilding',
         'editor/editorEdits.ts#serializeBuilding',
+        /*
+         * Returns a boolean, or a record whose prose came from somewhere already driven.
+         * `canSubmitForm` answers *may this be sent* and is derived only through `formIssues`,
+         * which `MENU` drives directly. `signedOut` passes the **caller's** notice through
+         * unchanged and authors nothing — its one literal is the empty state it copies.
+         */
+        'menu/account.ts#canSubmitForm',
+        'menu/account.ts#signedOut',
+        /*
+         * Transport plumbing. `createClient` no longer authors a sentence — its three own wordings
+         * moved to `CLIENT_FAILURES`, which `MENU` drives — and everything else it carries is the
+         * *server's* prose, unrewritten on purpose: a rejection is not an accusation and the server
+         * is the one place that decides how one is worded. `fetchTransport` builds a request and
+         * has no string in it but header names.
+         */
+        'menu/client.ts#createClient',
+        'menu/client.ts#fetchTransport',
       ],
     },
     /*

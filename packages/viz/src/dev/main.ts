@@ -40,10 +40,20 @@
 
 import { SimulationError, type BuildingConfig } from '@elevator-sim/core/browser';
 
+import {
+  SIGNED_OUT,
+  busy,
+  signedIn,
+  signedOut,
+  updateForm,
+  withNotice,
+  type AccountState,
+} from '../menu/account.js';
 import { catalogueOf } from '../menu/catalogue.js';
+import { createClient, fetchTransport } from '../menu/client.js';
 import { initialMenuState, navigate } from '../menu/menu.js';
 import type { MenuState } from '../menu/types.js';
-import { renderMenu, type MenuPanelHost } from './menuPanel.js';
+import { renderMenu, type LeaderboardView, type MenuPanelHost } from './menuPanel.js';
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
 import { restrictedFloorIds } from '../access/zoning.js';
@@ -320,13 +330,66 @@ function boot(ui: Elements, resources: BrowserResources): void {
   document.body.append(menuRoot);
   let menuState: MenuState = initialMenuState(catalogueOf(resources));
 
+  /**
+   * The account and leaderboard screens, and the one place a request is started.
+   *
+   * `client` is `undefined` unless the page declares a server, with
+   * `<meta name="elevator-sim-api" content="https://…">`. There is **no default origin**: a client
+   * that fell back to the page's own origin would work in development and fail in a build served
+   * from a CDN, which is the class of bug that only reproduces where it cannot be debugged. With no
+   * client the two screens say so plainly rather than drawing a form whose button can never do
+   * anything.
+   *
+   * A `<meta>` rather than a build-time constant, because the same built bundle is served from more
+   * than one place and baking the origin in would need a rebuild per deployment. The tag is
+   * optional, so `index.html` is unchanged and `elementMap.test.ts`'s contract is untouched.
+   */
+  const apiOrigin =
+    document.querySelector('meta[name="elevator-sim-api"]')?.getAttribute('content')?.trim() ?? '';
+  const client = apiOrigin === '' ? undefined : createClient(apiOrigin, fetchTransport(fetch));
+
+  let accountState: AccountState = SIGNED_OUT;
+  let boardView: LeaderboardView = {
+    boards: [],
+    selected: undefined,
+    page: undefined,
+    notice:
+      client === undefined
+        ? 'This build was not compiled against a leaderboard server, so there are no boards to show.'
+        : undefined,
+  };
+  /** Requests are started here and never from a render — a render that fetched would loop. */
+  let boardsRequested = false;
+
+  async function loadBoards(): Promise<void> {
+    if (client === undefined || boardsRequested) return;
+    boardsRequested = true;
+    boardView = { ...boardView, notice: 'Loading boards…' };
+    drawMenu();
+    const result = await client.boards();
+    boardView = result.ok
+      ? {
+          boards: result.value.map((board) => ({ configHash: board.configHash, entries: board.entries })),
+          selected: undefined,
+          page: undefined,
+          notice: result.value.length === 0 ? 'No scores have been posted yet.' : undefined,
+        }
+      : { ...boardView, notice: result.detail };
+    drawMenu();
+  }
+
   const menuHost: MenuPanelHost = {
     doc: document,
     catalogue: catalogueOf(resources),
     state: () => menuState,
     update: (next) => {
+      const arrived = next.screen === 'leaderboard' && menuState.screen !== 'leaderboard';
       menuState = next;
       drawMenu();
+      // Started on **arrival**, once, and never from inside a render: a render that fetched would
+      // fetch again on every state change its own response caused, and each render would look
+      // correct on its own.
+      if (arrived) void loadBoards();
     },
     start: (selection) => {
       // Free Play applies what the viewer already models — the building, the dispatcher and the
@@ -342,6 +405,60 @@ function boot(ui: Elements, resources: BrowserResources): void {
     },
     openCampaign: () => {
       closeMenu();
+    },
+
+    account: () => accountState,
+    updateAccountForm: (patch) => {
+      accountState = updateForm(accountState, patch);
+      drawMenu();
+    },
+    submitAccountForm: () => {
+      if (client === undefined) {
+        accountState = withNotice(
+          accountState,
+          'This build was not compiled against a server, so there is nowhere to sign in.',
+        );
+        drawMenu();
+        return;
+      }
+      const form = accountState.form;
+      accountState = busy(accountState, true);
+      drawMenu();
+      const request =
+        form.mode === 'register'
+          ? client.register({
+              email: form.email.trim(),
+              displayName: form.displayName.trim(),
+              password: form.password,
+            })
+          : client.login({ email: form.email.trim(), password: form.password });
+      void request.then((result) => {
+        accountState = result.ok
+          ? signedIn(accountState, result.value.token, result.value.user)
+          : withNotice(accountState, result.detail);
+        drawMenu();
+      });
+    },
+    signOut: () => {
+      const token = accountState.token;
+      accountState = signedOut('Signed out.');
+      drawMenu();
+      // The local state is cleared first and the server is told second. A sign-out that waited for
+      // the network would leave a player looking signed in while their connection was down.
+      if (client !== undefined && token !== undefined) void client.logout(token);
+    },
+
+    leaderboard: () => boardView,
+    openBoard: (configHash) => {
+      if (client === undefined) return;
+      boardView = { ...boardView, selected: configHash, page: undefined, notice: 'Loading…' };
+      drawMenu();
+      void client.board(configHash, 'awtS').then((result) => {
+        boardView = result.ok
+          ? { ...boardView, selected: configHash, page: result.value, notice: undefined }
+          : { ...boardView, selected: configHash, page: undefined, notice: result.detail };
+        drawMenu();
+      });
     },
   };
 

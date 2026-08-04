@@ -13499,3 +13499,92 @@ forecloses adding it later.
 on a **declared metric** and shows the others beside it, and a submission whose run has
 `awtIsValid: false` is **rejected on entry** rather than ranked — the same suppression the rest of
 the project applies, at the one surface where a player is motivated to ignore it.
+
+---
+
+## D215 — what § D214 became, and the six choices it did not cover
+
+**Date: 2026-08-04 · Written after the code, and says so.** § D214 is the architecture, dated before
+any of it existed. This section records what shipped, and — the useful half — the decisions the
+architecture did **not** anticipate, each with the alternative that was rejected.
+
+### 1. It is built, and the flow is driven end to end
+
+`packages/server` is a workspace member with **one** dependency, `@elevator-sim/core`, and its
+runtime is `node:sqlite`, `node:crypto` and `node:http`. The repository's dependency count is
+unchanged.
+
+`http/api.test.ts` drives register → read the outbox → confirm → sign in → forge → refuse → submit →
+rank, against the **real `data/` and the real kernel** with no socket bound. Every security claim in
+§ D214 § 5 has a test that breaks it: an unconfirmed account posting, a wrong password, an unknown
+address, a tampered link, a logged-out token, an expired session. The forgery is a quarter of a
+second — small enough that no plausibility bound would catch it, which is the point: there are no
+plausibility bounds, only replay.
+
+Two bootstrap refusals are tested rather than promised. **No secret, no server.** And **the outbox
+mailer is refused under `NODE_ENV=production`**, because the dev driver writes confirmation links to
+a file in the clear and each one is an account-takeover link for anyone who can read the disk.
+`mail/mailer.ts` promised that refusal in a docstring; a docstring is not a refusal.
+
+### 2. A board lists a player once, at their best
+
+Not every entry. A board that listed them all would rank **persistence**: a player who submitted a
+hundred seeds would hold the top hundred places, and the board would stop being a comparison between
+players. Re-submitting the same seed **replaces** rather than appends, because a deterministic replay
+of the same seed is the same run and counting a refresh as an achievement is farming with extra
+steps.
+
+### 3. The client's rules are a courtesy, and the risk is one-directional
+
+`viz/src/menu/account.ts` mirrors the server's password and display-name bounds so a player is told
+what is wrong without a round trip. The server checks anyway — the client is not trusted with
+anything. What makes the duplication safe is that its failure is asymmetric: a client rule *looser*
+than the server's costs a wasted round trip and a clear refusal, while a client rule *stricter*
+refuses something the server would have accepted and **nobody ever finds out**, because the request
+that would have proved it is the one the client never sent. So `client.test.ts` asserts the
+constants against the server's own **source text** — `viz` may not depend on `server`, so it reads
+the file, which is `validation/documentation.test.ts`'s method used for the same reason.
+
+### 4. The API origin is a `<meta>` tag, and has no default
+
+`<meta name="elevator-sim-api" content="…">`. A client that fell back to the page's own origin would
+work in development and fail in a build served from a CDN — the class of bug that only reproduces
+where it cannot be debugged. A `<meta>` rather than a build-time constant because one built bundle
+is served from more than one place; the tag is optional, so `index.html` is unchanged and
+`elementMap.test.ts`'s contract is untouched. With no tag, the account and leaderboard screens say
+there is no server rather than drawing a form whose button can never do anything.
+
+### 5. The session token is held in memory and never in `localStorage`
+
+The whole benefit of persisting it is not retyping a password; the cost is a bearer token readable
+by every script on the origin, for thirty days. Not worth it for a game.
+
+### 6. Two things the architecture got wrong by omission, corrected here
+
+**The clock is injected.** § D214 said this package is the first with a wall clock and stopped
+there. A *test* that reads the real clock is a test that fails at midnight, so `Store` and the API
+take `now()` as a parameter and the tests pass a counter. That is invariant 3's spirit applied where
+its letter does not reach.
+
+**Abandonment is not a `ClaimedMetrics` field.** The four ranked metrics are wait, WT95, TTD and
+percentage over the long-wait threshold. Abandonment and stairs uptake are *published beside* AWT
+and never folded into it (`CLAUDE.md` § Statistical discipline), and a board that ranked on a
+composite would be the one surface where that rule is worth the most to break. The board's own
+response carries the sentence — *"Ranked on the named metric alone. The others are shown beside it
+and never combined."* — on the wire, so a client cannot draw a composite with nothing on screen
+saying it should not.
+
+### 7. The dead-code audit landed with the package, and the scanner is now four copies
+
+`server/src/deadCode.test.ts` was written in the same change as the code: **61 exports scanned, 0
+uncalled**, and the wiring from `main.ts` down to the security model pinned link by link — including
+the two intra-file links no importer query can see. It is there on day one because four commits
+earlier in this same branch `viz/src/menu` shipped eight tested, exported, entirely uncalled
+functions and the existing viz audit caught it on the next run. A package with a database, a socket
+and an authorization check is the worst place to find that out a fortnight later.
+
+The scanner is now inlined in **four** places — `experiments/src/tuning/`, `core/src/dispatch/`,
+`viz/src/`, and `server/src/`. That is past the point where duplication is cheaper than
+consolidation, and the fix is a small `dev-audit` workspace package every audit devDepends on. Not
+done here, because this branch is already adding one package and a second one to hold a scanner is
+scope this change did not ask for. Recorded so a consolidation knows all four sites.
