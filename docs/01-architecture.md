@@ -305,7 +305,9 @@ packages/
 ├── server/                — § D214: accounts, email confirmation, and a verified leaderboard
 │   ├── accounts/          — password hashing, signed confirmation tokens, session tokens
 │   ├── mail/              — the one-method Mailer, and the dev driver that writes an outbox
-│   └── leaderboard/       — the submission shape, its board hash, and verification by replay
+│   ├── leaderboard/       — the submission shape, its board hash, and verification by replay
+│   ├── store/             — the SQLite schema: users, sessions, entries; the clock is injected
+│   └── http/              — the API as a pure request→response function, and the socket above it
 └── cli/                   — headless batch entry point
     └── commands/          — list, run, compare, tune, watch
 ```

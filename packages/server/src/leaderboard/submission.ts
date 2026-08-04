@@ -150,7 +150,7 @@ export function digestOf(value: unknown): string {
  * -------------------------------------------------------------------------- */
 
 /** Run lengths the server will simulate. Bounded because a submission commands server CPU. */
-export const ACCEPTED_DURATIONS_S: readonly number[] = Object.freeze([300, 900, 1800, 3600]);
+export const ACCEPTED_DURATIONS_S: readonly number[] = Object.freeze([300, 900, 1800, 3600, 7200]);
 
 /**
  * Everything structurally wrong with a submission, or an empty array.

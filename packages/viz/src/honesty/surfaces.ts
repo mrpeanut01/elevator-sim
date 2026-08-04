@@ -3202,10 +3202,21 @@ const MENU: SurfaceAdapter = {
       seed: '20260804',
     };
     const broken = { ...whole, buildingId: 'demolished', seed: 'not-a-seed', durationS: 7 };
+    /*
+     * A third selection, valid in every field and refused on a **cross-field** rule: the longest
+     * template's own period against the shortest offered run. Driven separately because its
+     * sentence carries two numbers a reader will act on, and a wrong one sends them to change the
+     * axis that was already right.
+     */
+    const longest = [...catalogue.demandTemplates].sort(
+      (left, right) => (right.minimumDurationS ?? 0) - (left.minimumDurationS ?? 0),
+    )[0];
+    const tooShort = { ...whole, demandTemplateId: longest?.id ?? whole.demandTemplateId, durationS: 300 };
 
     for (const [label, selection] of [
       ['whole', whole],
       ['broken', broken],
+      ['too-short', tooShort],
     ] as const) {
       for (const [index, issue] of freePlayIssues(selection, catalogue).entries()) {
         seeds.push({

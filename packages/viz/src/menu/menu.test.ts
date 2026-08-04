@@ -196,6 +196,45 @@ describe('the free-play selection', () => {
     }
   });
 
+  it('refuses a template whose own period is longer than the run, and says both numbers', () => {
+    // The kernel throws *"leaves no measurement window"* for `constant-iso` under two hours. That
+    // is correct and it is said in a place a player cannot act on, so the menu refuses the
+    // combination first — with the template's minimum and the player's choice both in the sentence.
+    const withIso: MenuCatalogue = {
+      ...CATALOGUE,
+      demandTemplates: [
+        { id: 'rise-and-fall', name: 'Rise and fall' },
+        { id: 'constant-iso', name: 'Constant (ISO)', minimumDurationS: 7200 },
+      ],
+    };
+    const short = updateFreePlay(initialMenuState(withIso), {
+      demandTemplateId: 'constant-iso',
+      durationS: 900,
+    });
+    const [issue] = freePlayIssues(short.freePlay, withIso);
+    expect(issue?.field).toBe('durationS');
+    expect(issue?.message).toContain('Constant (ISO)');
+    expect(issue?.message).toContain('120 minutes');
+    expect(issue?.message).toContain('15-minute');
+
+    // ...and it is accepted at a length that reaches the period.
+    const long = updateFreePlay(short, { durationS: 7200 });
+    expect(freePlayIssues(long.freePlay, withIso)).toEqual([]);
+  });
+
+  it('every shipped template can be run at some offered length', async () => {
+    // Both directions again, and derived from `data/`. A template that ships and fits inside none
+    // of the offered run lengths would be listed in the menu and unstartable at every one of them.
+    const config = await loadConfig(DATA_DIR);
+    const catalogue = catalogueOf(config as unknown as CatalogueSource);
+    for (const template of catalogue.demandTemplates) {
+      const workable = FREE_PLAY_DURATIONS_S.filter(
+        (durationS) => durationS >= (template.minimumDurationS ?? 0),
+      );
+      expect(workable.length, template.id).toBeGreaterThan(0);
+    }
+  });
+
   it('accepts every offered duration and rate', () => {
     for (const durationS of FREE_PLAY_DURATIONS_S) {
       const state = updateFreePlay(initialMenuState(CATALOGUE), { durationS });

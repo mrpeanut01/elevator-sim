@@ -401,11 +401,20 @@ to make a phase pass.
 ### Standing dead-code audit
 
 For every exported symbol in `dispatch/policies/`, `dispatch/predictor/`, `experiments/tuning/`,
-`experiments/runner/` and `experiments/fuzz/`, count callers outside its own module and tests. Every
+`experiments/runner/`, `experiments/fuzz/`, every directory of `packages/viz/src` and every
+directory of `packages/server/src`, count callers outside its own module and tests. Every
 zero must be classified as dead or as deliberate public API. Do this each phase. **All of it is
-mechanised** — four copies of one audit now, over one scanner (`auditModules` in
-`tuning/callers.test-helper.ts`), not four scanners; when this section was first written the second
-copy did not exist and the sentence was read as though it did. *A standing requirement stated in
+mechanised** — six copies of one audit now, over one scanner (`auditModules` in
+`tuning/callers.test-helper.ts`), not six scanners; when this section was first written the second
+copy did not exist and the sentence was read as though it did.
+
+**The sixth copy landed with the package it audits, and that is the point of it.** `server/` was
+written and audited in the same change — 61 exports scanned, 0 uncalled — four commits after
+`viz/src/menu` shipped **eight exports with eight uncalled callers** and was caught by the viz audit
+on the very next run ([§ D215 § 8](../DECISIONS.md)). Writing the audit with the code is what turns
+this section from a thing to remember into a thing that cannot be forgotten. The scanner is now
+**inlined in four places**, which is past the point where duplication is cheaper than consolidation;
+the named fix is a small `dev-audit` workspace package, deferred with its four sites recorded. *A standing requirement stated in
 prose is not a standing requirement.* **Each new copy has found something in the directory nobody
 had audited**: `runner/` gave 7 uncalled of 86, `fuzz/` 8 of 63, and both shared blind spot is
 stated in their headers — a symbol used twice inside its own file reads as live regardless of who

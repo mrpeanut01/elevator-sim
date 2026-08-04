@@ -101,8 +101,14 @@ export interface FreePlaySelection {
   readonly seed: string;
 }
 
-/** Run lengths Free Play offers, seconds. 15 minutes is the shipped studies' own horizon. */
-export const FREE_PLAY_DURATIONS_S: readonly number[] = Object.freeze([300, 900, 1800, 3600]);
+/**
+ * Run lengths Free Play offers, seconds. 15 minutes is the shipped studies' own horizon.
+ *
+ * Two hours is here for one reason and it is a `data/` fact rather than a taste: `constant-iso`
+ * declares `durationMin: 120`, and without a length that reaches it the template would be listed
+ * in the menu and unusable at every length beside it.
+ */
+export const FREE_PLAY_DURATIONS_S: readonly number[] = Object.freeze([300, 900, 1800, 3600, 7200]);
 
 /* -------------------------------------------------------------------------- *
  * The catalogue — what there is to choose from
@@ -120,6 +126,15 @@ export interface CatalogueEntry {
   readonly name: string;
   /** A short line the panel may show under the name. Never required to be present. */
   readonly detail?: string | undefined;
+  /**
+   * The shortest run this entry can be used for, seconds. Templates only.
+   *
+   * Carried because a demand template's own record declares a `durationMin` and the kernel
+   * **throws** below it — `constant-iso` discards 15 minutes of warm-up and 5 of cool-down, so a
+   * 15-minute run leaves no measurement window at all. Offering the template and refusing the
+   * combination at Start would move an explainable error to the one place with no words for it.
+   */
+  readonly minimumDurationS?: number | undefined;
 }
 
 /**

@@ -194,6 +194,26 @@ export function freePlayIssues(
       message: `A ${String(selection.durationS)} s run is not one of the offered lengths.`,
     });
   }
+  /*
+   * The one cross-field rule, and the reason it is here rather than discovered at Start.
+   *
+   * A demand template declares its own period. `constant-iso` is 120 minutes and discards 15 of
+   * warm-up and 5 of cool-down; run it for 15 and the kernel throws *"leaves no measurement
+   * window"* — correct, and said in a place a player cannot act on. Refused here, in words, with
+   * both numbers in them.
+   */
+  const template = catalogue.demandTemplates.find((entry) => entry.id === selection.demandTemplateId);
+  const minimum = template?.minimumDurationS;
+  if (minimum !== undefined && selection.durationS < minimum) {
+    issues.push({
+      field: 'durationS',
+      message:
+        `${template?.name ?? selection.demandTemplateId} needs at least ` +
+        `${String(Math.round(minimum / 60))} minutes — it discards a warm-up and a cool-down, and a ` +
+        `${String(Math.round(selection.durationS / 60))}-minute run leaves nothing to measure.`,
+    });
+  }
+
   const rate = selection.arrivalRatePctPop5min;
   if (rate !== null && (!Number.isFinite(rate) || rate <= 0)) {
     issues.push({

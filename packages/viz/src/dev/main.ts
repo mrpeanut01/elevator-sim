@@ -392,13 +392,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
       if (arrived) void loadBoards();
     },
     start: (selection) => {
-      // Free Play applies what the viewer already models — the building, the dispatcher and the
-      // seed — and then gets out of the way. The traffic template, rate and duration are carried on
-      // the selection and are **not** yet applied: `shiftRunConfigOf` owns what a run is, and
-      // wiring a second path into it is exactly the drift § D214 § 2 refuses. Stated here rather
-      // than implied by silence.
+      // **Every axis the menu offered is applied.** `shiftRunConfigOf` still owns what a run is —
+      // the template and the rate travel as `ViewerState.freePlay` and are read there, not built
+      // into a second config here, which is the drift § D214 § 2 refuses. A selection axis that
+      // reached nothing would be § D177's inert control with a label on it, and
+      // `state.freePlay.test.ts` is the standing requirement pointed at all three.
       state = withBuilding(state, resources, selection.buildingId);
-      state = { ...state, dispatcherId: selection.dispatcherProfileId, seed: BigInt(selection.seed) };
+      state = {
+        ...state,
+        dispatcherId: selection.dispatcherProfileId,
+        seed: BigInt(selection.seed),
+        shiftLengthS: selection.durationS,
+        freePlay: {
+          demandTemplateId: selection.demandTemplateId,
+          arrivalRatePctPop5min: selection.arrivalRatePctPop5min,
+        },
+      };
       menuState = navigate(menuState, 'main');
       closeMenu();
       renderAll();

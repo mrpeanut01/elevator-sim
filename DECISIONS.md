@@ -13574,7 +13574,30 @@ response carries the sentence — *"Ranked on the named metric alone. The others
 and never combined."* — on the wire, so a client cannot draw a composite with nothing on screen
 saying it should not.
 
-### 7. The dead-code audit landed with the package, and the scanner is now four copies
+### 7. Free Play's axes all reach the run, and finding that out cost a template
+
+`ViewerState` gains `freePlay` — the demand template and the arrival rate, applied in
+`shiftRunConfigOf` over whatever the pattern select left. It is there because the menu was offering
+three axes and applying one: the building, dispatcher and seed reached the run, and the template,
+rate and length did not. § D177's rule is **move the control and require the run to change**, and
+`dev/state.freePlay.test.ts` is that rule pointed at all three, compared on the legs. Its negative
+control is the load-bearing one: `freePlay: undefined` must be byte-identical to the state that
+predates the field, or every figure measured before it silently moved.
+
+Writing the test found a real defect one layer down. `constant-iso` declares `durationMin: 120` and
+discards 15 minutes of warm-up and 5 of cool-down, so the kernel throws *"leaves no measurement
+window"* for any run under two hours — and the menu was offering it beside a 5-minute run length.
+Correct error, wrong place: a player would meet it at Start, which is the one moment with no words
+for it. Two changes, both small: `FREE_PLAY_DURATIONS_S` and `ACCEPTED_DURATIONS_S` gain 7 200 s so
+the template is playable at all, and `freePlayIssues` grew its one cross-field rule, refusing the
+combination with the template's minimum and the player's choice both in the sentence.
+
+`menu.test.ts` then asserts the *general* form of it, derived from `data/` rather than about
+`constant-iso`: **every shipped template must fit inside some offered run length.** A template that
+shipped and fitted none of them would be listed in the menu and unstartable at all of them, which is
+§ D213's shape again — the hand-maintained list that stopped tracking the data it was built from.
+
+### 8. The dead-code audit landed with the package, and the scanner is now four copies
 
 `server/src/deadCode.test.ts` was written in the same change as the code: **61 exports scanned, 0
 uncalled**, and the wiring from `main.ts` down to the security model pinned link by link — including

@@ -56,6 +56,8 @@ export interface CatalogueTemplate {
   readonly id: string;
   readonly name: string;
   readonly recommended?: boolean | undefined;
+  /** The template record's own minimum period, minutes. Surfaced, because the kernel enforces it. */
+  readonly durationMin?: number | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -105,6 +107,9 @@ export function catalogueOf(source: CatalogueSource): MenuCatalogue {
     // because a player choosing `constant-iso` for a scored run should be told it is a
     // cross-checking shape before the board tells them afterwards.
     ...(template.recommended === true ? { detail: 'recommended' } : { detail: 'cross-checking' }),
+    // Carried through rather than dropped: the kernel throws for a run shorter than the template's
+    // own period, so a menu that did not know this number could only find out at Start.
+    ...(template.durationMin === undefined ? {} : { minimumDurationS: template.durationMin * 60 }),
   }));
 
   return Object.freeze({
