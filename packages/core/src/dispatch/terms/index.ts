@@ -17,7 +17,7 @@
  *
  * ## The library is now complete
  *
- * `data/dispatcher-profiles.json → terms` declares twelve terms and all twelve are implemented,
+ * `data/dispatcher-profiles.json → terms` declares thirteen terms and all thirteen are implemented,
  * so {@link IMPLEMENTED_TERM_IDS} and {@link DECLARED_TERM_IDS} name the same set and
  * `ResolvedDispatchConfig.pendingWeights` is empty for every profile the file ships.
  *
@@ -60,6 +60,7 @@ import type { CostTermDefinition } from '../types.js';
 
 import { crowdingTerm } from './crowding.js';
 import { detourPenaltyTerm } from './detourPenalty.js';
+import { diversionDetourTerm } from './diversionDetour.js';
 import { directionReversalTerm } from './directionReversal.js';
 import { distanceTravelledTerm } from './distanceTravelled.js';
 import { existingCallDelayTerm } from './existingCallDelay.js';
@@ -74,13 +75,14 @@ import { zoneAffinityTerm } from './zoneAffinity.js';
 /**
  * Every implemented cost term, in the order `data/dispatcher-profiles.json` declares them.
  *
- * All twelve of docs/06-parameterization-and-tuning.md § Term library: the three Phase 2 owed
+ * All thirteen of docs/06-parameterization-and-tuning.md § Term library: the three Phase 2 owed
  * (the AWT term, the energy proxy, the collective-behaviour term) and the nine Phase 5 owed.
  */
 export const COST_TERMS: readonly CostTermDefinition[] = Object.freeze([
   waitTimeTerm,
   rideTimeTerm,
   detourPenaltyTerm,
+  diversionDetourTerm,
   existingCallDelayTerm,
   directionReversalTerm,
   loadFactorTerm,
@@ -93,7 +95,7 @@ export const COST_TERMS: readonly CostTermDefinition[] = Object.freeze([
 ]);
 
 /**
- * Every term id the library declares, implemented or not — the twelve rows of
+ * Every term id the library declares, implemented or not — the thirteen rows of
  * `data/dispatcher-profiles.json → terms`, in file order.
  *
  * The vocabulary a profile may weight. A weight on anything else is a typo, and a typo is not a
@@ -112,6 +114,7 @@ export const DECLARED_TERM_IDS: readonly string[] = Object.freeze([
   'waitTime',
   'rideTime',
   'detourPenalty',
+  'diversionDetour',
   'existingCallDelay',
   'directionReversal',
   'loadFactor',
@@ -157,6 +160,11 @@ export function isImplementedTerm(id: string): boolean {
 export { crowdingTerm, spareSeatsOnArrival, unservedQueueFraction } from './crowding.js';
 
 export { detourPassengerSeconds, detourPenaltyTerm } from './detourPenalty.js';
+export {
+  callCausesDiversion,
+  diversionDetourPassengerSeconds,
+  diversionDetourTerm,
+} from './diversionDetour.js';
 
 export {
   assessDirectionReversal,

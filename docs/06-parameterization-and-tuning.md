@@ -75,7 +75,7 @@ Hard constraints. Not costs — a car either can serve the call or cannot.
 | access zoning | from credential | Is this passenger permitted |
 | `carMode` | in-service, independent, fire-recall, out-of-service | Car-owned state |
 | `allowOppositeDirectionPickup` | bool | Whether a down-travelling car may take an up call |
-| `enRouteDiversion` | bool, default `false` | Whether a car already in motion may be cut short at a floor it has not yet committed past. Off, a moving car is judged from its **destination** — the only place the kernel could stop it — so a call on a floor it is about to fly through costs it a full reversal. On, it is judged from its **commit point**, the last floor it can still decelerate into, and the runner really diverts it there. See [DECISIONS.md § D205](../DECISIONS.md). **The default stays `false` by measurement, not by inertia**: [§ D210](../DECISIONS.md) asked whether `collective` should carry it, found the mechanism better on wait at all five shipped buildings at n = 200 on a held-out seed and worse on nothing — and still refused, because adoption also ships `detourPenalty: 0.2`, and under pure up-peak that weight costs AWT while the mechanism fires **zero** times |
+| `enRouteDiversion` | bool, default `false` | Whether a car already in motion may be cut short at a floor it has not yet committed past. Off, a moving car is judged from its **destination** — the only place the kernel could stop it — so a call on a floor it is about to fly through costs it a full reversal. On, it is judged from its **commit point**, the last floor it can still decelerate into, and the runner really diverts it there. See [DECISIONS.md § D205](../DECISIONS.md). **The default stays `false` by measurement, not by inertia**: [§ D210](../DECISIONS.md) asked whether `collective` should carry it, found the mechanism better on wait at all five shipped buildings at n = 200 on a held-out seed and worse on nothing — and still refused, because adoption also ships `detourPenalty: 0.2`, and under pure up-peak that weight costs AWT while the mechanism fires **zero** times. The `diversionDetour` term removes that objection exactly — bit-identical at both up-peak cells, at every weight tried — and [§ D212](../DECISIONS.md) still refused adoption, on a building whose *reference* arm saturates once in 200 replications at every declared rate |
 | `maxLoadFactorForAssignment` | 0.0–1.0 | Refuse assignment above this, distinct from bypass |
 
 ### Stage 3: Scoring
@@ -222,6 +222,7 @@ The dispatcher assigns the call to the eligible car with the lowest cost.
 | `waitTime` | Estimated wait for the new passenger | AWT |
 | `rideTime` | Estimated in-car time for the new passenger | TTD |
 | `detourPenalty` | Added delay imposed on already-onboard passengers | Fairness to boarded |
+| `diversionDetour` | The same passenger-seconds, charged **only** when the call cuts a moving car's run short | Fairness to boarded, without taxing traffic the diversion never touches ([§ D211](../DECISIONS.md)) |
 | `existingCallDelay` | Added delay to other already-assigned calls | Global optimality |
 | `directionReversal` | Penalty for reversing travel direction | Conventional collective behavior |
 | `loadFactor` | Penalty rising as the car approaches capacity | Capacity awareness |

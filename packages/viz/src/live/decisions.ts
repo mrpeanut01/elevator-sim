@@ -86,6 +86,10 @@ export const TERM_PHRASES: Readonly<Record<string, { readonly measures: string; 
       measures: 'added delay imposed on already-onboard passengers',
       serves: 'Fairness to boarded',
     },
+    diversionDetour: {
+      measures: 'added delay imposed on already-onboard passengers, when the call diverts the car',
+      serves: 'Fairness to boarded, without taxing traffic the diversion never touches',
+    },
     existingCallDelay: {
       measures: 'added delay to other already-assigned calls',
       serves: 'Global optimality',

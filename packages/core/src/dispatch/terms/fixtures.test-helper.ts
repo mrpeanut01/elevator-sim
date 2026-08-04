@@ -62,7 +62,7 @@ export const REFERENCE_SPECS: ElevatorSpecs = {
   timing: {
     motorStartDelayS: 0.5,
     levelingSettleS: { min: 0.5, max: 1.0, typical: 0.5 },
-    passengerTransferS: { office: 1.2, residential: 1.75, hotel: 1.5 },
+    passengerTransferS: { office: 1.2, residential: 1.75, hotel: 1.5, hospital: 2.5 },
   },
   loadSensor: { hallCallBypassThreshold: 0.8, overloadAlarmThreshold: 1.1 },
   realWorldAnchors: [],

@@ -77,6 +77,8 @@ export function passengerTransferSecondsFor(
       return table.residential;
     case 'hotel':
       return table.hotel;
+    case 'hospital':
+      return table.hospital;
     case 'mixed-use':
       return undefined;
   }

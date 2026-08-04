@@ -268,6 +268,29 @@ point, same `needClean`. Where a handoff stat line disagrees with the file (Gard
 6 floors in both; Midtown Office is 21 floors in both; Vertical City is 101 in both), the file wins
 and the line is generated from it.
 
+### 4.7 The campaign is eight scenarios, and the handoff specifies five
+
+§ 4.4 fixes the campaign at the five buildings shipped when the design was written. Three more
+buildings landed afterwards — `chancery-house`, `crown-hotel` and `st-jude-hospital`
+([`DECISIONS.md` § D213](../DECISIONS.md)) — and a shipped building with **no contract is a scenario
+the reader can never take**, which is the thing § 4.4's own coverage rule exists to prevent.
+
+**The handoff's five are unchanged**: same ids `c1`–`c5`, same order, same teaching points, same
+`needClean`. The three new contracts are appended as `c6`–`c8`, and the constraint that shaped them
+is the campaign's own progression rule — `needClean` is non-decreasing, so a contract following the
+handoff's finale may not ask for **less** than it did. All three ask for 3.
+
+**What this deviation does not do** is move the finale's reward. `c5` still grants endless mode where
+the handoff put it, rather than being rewritten so the last contract in the list carries it: the
+handoff wins every disagreement about what the screen looks like, and *"which contract unlocks
+endless mode"* is a disagreement it already settled. The three appended scenarios are additional
+work after the designed arc, not a re-cut of it.
+
+The same reasoning added three stages to `data/campaign.json` and three to `CANDIDATE_SCENARIOS`,
+whose goal pass rates are measured over both 50-replication seed sets and published in
+`data/scenario-goals.json` like every other stage's — R12 applies to a scenario the design did not
+specify exactly as it applies to one it did.
+
 ### 4.6 Four corrections to the prototype, found by implementing it
 
 The handoff is a working prototype, and four things in it do not survive being built against a real

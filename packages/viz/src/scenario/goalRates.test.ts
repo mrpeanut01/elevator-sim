@@ -171,7 +171,11 @@ describe('the table printed in docs/10 § M30 is the table in data/scenario-goal
     const markdown = await readFile(DOCS_10_PATH, 'utf8');
     const rows = markdown
       .split('\n')
-      .filter((line) => /^\| \*\*[1-7] /u.test(line))
+      // Any stage number, not `[1-7]`. The bound was the stage count at the time of writing, so
+      // stages 8, 9 and 10 were silently skipped and the length check below was the only thing that
+      // noticed — the same "a list that should track the data" shape this file's own § M30 note is
+      // about.
+      .filter((line) => /^\| \*\*\d+ /u.test(line))
       .map((line) => line.split('|').slice(1, -1));
     // Non-vacuous: a table that stopped matching the row pattern would otherwise pass silently.
     expect(rows).toHaveLength(table.scenarios.length);

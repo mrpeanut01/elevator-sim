@@ -13009,3 +13009,618 @@ term, which invariant 7 permits only for a genuinely new term and which would ne
 criterion, written first. Neither is attempted here. **§ D209's clause 6 — the re-baselining is paid
 in full — was never reached**, so no pin was regenerated, no phase verdict was re-derived, and
 `PRE_REGISTERED_REFERENCE_CANDIDATES` still means exactly what § D151 registered.
+
+
+## D211 — the criterion for a diversion-conditional detour term, and why § D209's clause 5 is replaced rather than relaxed
+
+**Date: 2026-08-03 · Pre-registration, written before the term exists.**
+[§ D210](DECISIONS.md) refused adoption and named the cause precisely: at up-peak the diversion
+mechanism fires **zero** times, the paired contrast between "diversion off" and "diversion on" is
+exactly `[0.000, 0.000]`, and the whole of the regression is `detourPenalty: 0.2` — a constant
+weight re-ordering car choices to pay for a mechanism that is not running. This is the criterion for
+the fix § D210 § 4 named first, and it is filed before a line of the term is written.
+
+### 0. The premise was measured, and it came back half true
+
+The obvious design is *"charge the detour only where a diversion happens"*. That is only worth
+building if the weight's value **is** diversion-conditional, so it was measured rather than assumed
+— four arms under CRN at `vertical-city` down-peak 2 %, n = 60, every arm quotable:
+
+| contrast | AWT | TTD |
+|---|---|---|
+| weight alone, diversion **off** | −0.048 [−0.149, +0.053] | **−0.930 [−1.263, −0.598]** |
+| diversion alone, no weight | −0.149 [−0.342, +0.044] | **+1.818 [+1.331, +2.304]** |
+| the repair, weight on top of diversion | −0.131 [−0.285, +0.023] | **−2.597 [−3.069, −2.125]** |
+
+**About a third of the weight's TTD work survives with the mechanism switched off.** `detourPenalty`
+is not only paying for diversion; it is also doing ordinary detour pricing that `collective`'s
+`waitTime`-only scoring otherwise lacks, and a strictly conditional term **forfeits that third by
+construction**. That is a real cost of the design and it is recorded here, before the study, so it
+cannot be discovered later and presented as a surprise.
+
+It is accepted for one reason: **a conditional term's weight is free in a way a constant's is
+not.** The constant cannot be raised without buying more up-peak damage — that is § D210's whole
+finding. A term that is identically zero wherever no diversion occurs can be weighted as hard as the
+harm requires and still cost **exactly nothing** everywhere else. The design trades a third of the
+benefit for the right to tune the remaining two thirds without a budget.
+
+These figures are a **design input, not a verdict**: n = 60, and measured at 20 261 612, a seed
+§ D209 and § D210 have already spent. Nothing below rests on them.
+
+### 1. What is built
+
+`diversionDetour` — a new cost term, and new **code**, which CLAUDE.md invariant 7 permits only for
+a genuinely new cost term. It is one:
+
+```
+raw = (serving this call would cut the car's current run short) ? detourPassengerSeconds : 0
+```
+
+`detourPenalty` measures added onboard delay **however the car reaches the call**.
+`diversionDetour` measures it **only when the assignment truncates a committed run**, and is
+identically zero for a stationary car, for a profile with `enRouteDiversion` off, and for any call
+the car was going to pass anyway. The two are not expressible as weights on one another — which is
+invariant 7's actual test — because no weight on `detourPenalty` can be zero at up-peak and non-zero
+at down-peak.
+
+It declares `activeWhen: { 'eligibility.enRouteDiversion': ['true'] }`, so a generic optimizer skips
+the dimension where it is dead (invariant 8), exactly as `rideTime` declares its call types.
+`detourPenalty` is **not** modified, gated, or deprecated: `predictive-balanced` weights it at 0.4
+with no diversion and legitimately wants general detour pricing.
+
+### 2. Clause 5 is replaced, and the replacement is stricter
+
+§ D209 clause 5 read *"not significantly worse at up-peak"*. That was the right question for a
+constant weight, where the only issue is how much collateral damage the price tag does. For a
+conditional term it is the **wrong** question, and too weak: a correctly scoped term contributes
+exactly zero where the mechanism is inert, so the right clause is categorical rather than
+statistical.
+
+> **Clause 5′ — inert where the mechanism is inert.** At every cell where the run reports
+> `stageActivity.diversions == 0`, the candidate profile must be **bit-identical** to shipped
+> `collective`: a zero largest paired difference on both metrics, not an interval containing zero.
+
+This is a strengthening in three ways. It is exact rather than statistical, so no `n` can hide a
+failure. It cannot be passed by a small effect. And it is checked at **every** such cell rather than
+at the two up-peak cases § D209 named.
+
+**A criterion that only got stricter would still be a bad trade if it opened a hole, and this one
+does.** A term that is *always* zero passes clause 5′ trivially and perfectly. That is not a
+hypothetical failure mode in this repository — it is § D205's own first draft, which was inert,
+reported bit-identical output, and produced exactly the zeros a successful null result would. So
+clause 5′ arrives with its own counterweight:
+
+> **Clause 6′ — the term is live where the mechanism is live.** At every quotable down-peak cell the
+> study measures, the run must report `diversions > 0`, the term must return a **non-zero raw value**
+> on at least one evaluation, and it must **separate two candidate cars** — the standard
+> `terms/liveness.test.ts` already holds every registered term to. A term that cannot change an
+> `argmin` is worse than no term: a Phase 7 optimizer would spend real replications on its weight.
+
+### 3. What carries over from § D209 unchanged
+
+Clauses 1–4 are re-used verbatim, because nothing about the architecture change touches them:
+paired and live at every quotable cell; all five buildings contribute a quotable cell; worse on
+neither metric anywhere on either seed; and ΔAWT excluding zero and negative at **at least three**
+holdout cells. The § D209 § 2 ladders are re-used unchanged, and the cell is still the highest rung
+whose `awtIsValid` holds on both arms at n = 200.
+
+### 4. A third seed, because two are now spent
+
+`detourPenalty: 0.2` was fitted at **20 260 801**. § D209 took its verdict at **20 261 612**, and
+§ 0 above has now looked at that seed again. Both are burned.
+
+- The new weight is searched at **20 260 801**, the seed the original weight was fitted at — so the
+  two designs are tuned on the same traffic and the comparison is not a seed effect.
+- The verdict is taken at **20 262 423** (`20 260 801 + 2 × 811`), disjoint from both, and unlooked
+  at until the study runs.
+
+**The search is a declared grid, not a search.** Weights `{0.2, 0.5, 1.0, 2.0}` on
+`diversionDetour`, chosen before any of them is run, and the winner is the one minimising ΔTTD at
+`vertical-city` down-peak on the **tuning** seed. Four points, declared here, so that "we tried
+until it worked" is not available as a description of what happened.
+
+### 5. What refusal looks like, and what it would mean
+
+If the study refuses, `collective` keeps `enRouteDiversion` off, `collective-enroute` stays the
+opt-in profile, and the term is **still kept** if clause 6′ passes — a live, correctly-scoped term
+that does not happen to earn a default is a library entry, not a mistake, and `predictive-balanced`
+and the Phase 7 search space can both use it. If clause 6′ *fails* — if the term is inert — the term
+is deleted rather than shipped, because that is the one outcome this repository has learned to
+delete rather than explain.
+
+**And § D209 clause 6 still stands unpaid.** Adoption, if it comes, still owes the full
+re-baselining: every moved pin regenerated and read, and Phase 6c's refusal re-derived against the
+new reference rather than assumed. Passing the criterion below earns the right to start that work,
+not the right to skip it.
+
+
+## D212 — the conditional term fixes what § D210 refused, and is refused anyway by a building the apparatus cannot see
+
+**Date: 2026-08-03 · The verdict against [§ D211](DECISIONS.md), whose criterion was committed in
+`7b3a37e` before the term existed.**
+
+**NOT ADOPTED**, on clause 2. And the shape of this refusal is different from § D210's in a way that
+matters: § D210 refused because the candidate *did something wrong*. This refuses because one of the
+five buildings could not be measured at all — **and the arm that made it unmeasurable is the
+reference, not the candidate.**
+
+### 1. Clause 5′ passes exactly, at every weight in the grid
+
+The thing § D211 was built to fix is fixed, and not approximately:
+
+| cell | ΔAWT | bit-identical |
+|---|---|---|
+| `midtown-up-peak` | `+0.000 [0.000, 0.000]` | **true** |
+| `secure-up-peak` | `+0.000 [0.000, 0.000]` | **true** |
+
+At **all four** grid weights, on both metrics. § D210's refusal was AWT `+0.261 [+0.118, +0.404]`
+and TTD `+0.199 [+0.041, +0.357]` at `secure-up-peak` from a constant `detourPenalty: 0.2`; the
+conditional term reduces that to a zero largest paired difference, which under common random numbers
+is proof rather than evidence. The up-peak cost is not smaller. It is **gone**, by construction, and
+it stays gone however hard the term is weighted — which is the property § D211 § 0 traded a third of
+the benefit for.
+
+### 2. Four of five buildings, out of sample, are the best numbers this mechanism has produced
+
+n = 200, paired-t 95 %, verified CRN, verdict seed 20 262 423 — disjoint from the seed the weight
+was searched at and from the two § D209/§ D210 spent.
+
+**At `diversionDetour: 0.2`:**
+
+| building | rate | ΔAWT | ΔTTD |
+|---|---|---|---|
+| `midtown-office` | 1 % | **−0.944 [−1.137, −0.751]** | +0.014 [−0.267, +0.296] |
+| `garden-apartments` | 14 % | **−1.257 [−1.702, −0.811]** | **−0.980 [−1.466, −0.494]** |
+| `secure-tower` | 4 % | **−1.004 [−1.247, −0.760]** | **−0.478 [−0.751, −0.205]** |
+| `mixed-use-high-rise` | 4 % | **−1.012 [−1.178, −0.846]** | −0.213 [−0.600, +0.175] |
+
+**At `diversionDetour: 2.0`,** the weight § D211 § 4's rule selected:
+
+| building | rate | ΔAWT | ΔTTD |
+|---|---|---|---|
+| `midtown-office` | 1 % | **−0.224 [−0.326, −0.121]** | −0.070 [−0.185, +0.045] |
+| `garden-apartments` | 14 % | **−0.984 [−1.425, −0.543]** | **−0.925 [−1.416, −0.434]** |
+| `secure-tower` | 4 % | **−0.478 [−0.620, −0.336]** | **−0.263 [−0.442, −0.083]** |
+| `mixed-use-high-rise` | 4 % | **−0.269 [−0.380, −0.158]** | **−0.481 [−0.750, −0.212]** |
+
+Significantly better on wait at every measured cell, at both weights, and significantly worse on
+nothing anywhere. Clauses 1, 3 and 4 all pass.
+
+### 3. `vertical-city` dropped out, and the reference arm is why
+
+Clause 2 requires a quotable cell from all five buildings, and § D209 § 2 — carried into § D211 —
+says what happens when the required building does not produce one: *refused for want of evidence,
+not granted for want of a counterexample.* No rung of `vertical-city`'s declared ladder was quotable.
+
+**Which arm failed was then measured rather than assumed**, because "the candidate saturates that
+building" and "the apparatus cannot see that building" are opposite findings:
+
+| rung | reference saturated | candidate saturated | quotable |
+|---|---|---|---|
+| 4 % | **4 / 200** | 4 / 200 | neither |
+| 2 % | **1 / 200** | **0 / 200** | **candidate only** |
+| 1 % | **1 / 200** | 1 / 200 | neither |
+
+**The reference — shipped `collective` — is what fails, at every rung.** At 2 % the *candidate* is
+clean at 0 of 200 and the reference is not, so the building is lost to a defect in the arm the
+candidate is being compared against. A single saturating replication in 200 invalidates a cell, and
+that is § D205 finding 3 in its sharpest form: *a cell is unquotable when **any** replication
+saturates, so raising `n` can only lose validity* — at n = 200 there are two hundred chances to draw
+the bad one.
+
+**This is absence of evidence and is recorded as such.** It is not a measurement that the term harms
+`vertical-city`; the one number pointing anywhere points the other way, and cannot be quoted.
+
+### 4. Two things about § D211 that were wrong, recorded rather than quietly fixed
+
+**§ D211 § 4's selection rule is badly written, and the holdout proves it.** *"Minimise ΔTTD at
+`vertical-city` on the tuning seed"* selects the largest weight, because a big enough conditional
+weight suppresses every diversion and drives both differences to zero — on the tuning seed, 2.0 gave
+ΔAWT `−0.005` and ΔTTD `+0.009`, which is a profile doing nothing at all. Out of sample it is
+comfortably the worse of the two: −0.224 against −0.944 on `midtown-office`, −0.478 against −1.004
+on `secure-tower`. The rule should have read *"minimise ΔTTD **subject to** ΔAWT remaining
+significantly negative"*. It was followed as written and both weights were reported, because
+substituting a better rule after seeing the numbers is the thing pre-registration exists to prevent.
+
+**Clause 2 cannot distinguish the two ways a building can fail to appear.** A candidate that
+saturates a building and an apparatus that cannot resolve one are both "no quotable cell", and they
+call for opposite responses. § D211 inherited that from § D209 and neither noticed until it bit.
+**It is not amended here.** Rewriting the clause that just refused, immediately after it refused,
+is weakening a criterion to make something pass — CLAUDE.md's one explicit prohibition — and the
+fact that the amendment would be *correct* is exactly what makes it dangerous. A future
+pre-registration should separate *unmeasurable* from *failed*, declare it before running, and take
+its verdict on a fourth seed.
+
+### 5. What is kept, and what is not
+
+**The term ships.** § D211 § 5 said it would if clause 6′ passed, and clause 6′ passed on a run
+rather than an argument: `terms/liveness.test.ts` and `sim/seam.test.ts` both drive
+`diversionDetour` through the shipped engine and find a non-zero raw with a spread between candidate
+cars — 1.7 % of 4 320 evaluations, spread 42.5 passenger-seconds. A live, correctly-scoped library
+entry that has not yet earned a default is a library entry, not a mistake; `predictive-balanced` and
+the Phase 7 search space can both reach it, and its `activeWhen` keeps an optimizer from searching it
+where it is dead.
+
+**`collective` is unchanged**, `collective-enroute` remains the opt-in profile, and § D209 clause 6
+— the full re-baselining — is still unpaid and still owed by any future adoption. No pin moved, no
+phase verdict was re-derived, and `PRE_REGISTERED_REFERENCE_CANDIDATES` still means what § D151
+registered.
+
+**What is now known that was not.** The up-peak objection § D210 raised against adoption is
+answerable, and answered: a conditional term removes it exactly. What stands between this mechanism
+and a default is no longer a design problem but a measurement one — a single building whose
+reference arm saturates once in two hundred replications at every rate anybody has declared.
+
+
+## D213 — three buildings, a profile with no caller, and a recorded corpus that lost its subject
+
+**Date: 2026-08-04 · Variety work: the shipped set goes from five buildings to eight, and gains a
+traffic profile and two demand templates.** Recorded because two of the things it found are defects
+this repository already has names for, and one of them was in a criterion decided a day earlier.
+
+### 1. `office-prestige` was declared in Phase 1 and called by nothing
+
+`data/traffic-profiles.json` has shipped five profiles and `data/buildings/` used four of them.
+`office-prestige` — a complete, schema-valid record with its own arrival band, target interval,
+target wait and directional split — was referenced by **no building, no study and no scenario**.
+
+That is [§ D112](DECISIONS.md)'s `destination-eta` exactly, one level up: *"two authored fields, a
+schema-valid profile, its own tests… so the destination reached `estimateCost` and changed no
+decision"*. Invariant 7 makes strategy data; it does not make data exempt from having a caller, and
+`data/` has now produced this shape twice.
+
+**`chancery-house` is the caller.** It is deliberately not a big tower — the profile asks for a
+*harder service level on a smaller population* (16 % of population per 5 min against Midtown's 12, a
+25 s target interval against 30) — so the building is 19 floors, 612 people and six fast cars, and
+the question it poses is whether a dispatcher holds a 25 s interval *while it has spare cars*.
+
+### 2. Two more callers that did not exist, and one that was a stratum
+
+**`hotel` reached the simulator only through one floor range of `vertical-city`.** Every hotel figure
+this project has published therefore describes a hotel *inside an office tower* rather than a hotel.
+`crown-hotel` declares it at the building level, and brings the first shipped demand with **no
+dominant direction** — `two-way`, 40/40/20, mean group size 2.0 against the offices' 1.4. That is
+the traffic `collective`'s `noDirectionReversal` is least suited to, and no gate cell has ever said
+so.
+
+**The `stairs` transport-mode kind had no `data/` caller at all.** It shipped in wave 13 with an
+asymmetric traversal time and an asymmetric propensity, and `sim/stairsSeam.test.ts` says in as many
+words why it stayed out of shipped buildings: *"adding a stair to a shipped document would change
+that building's runs and every pinned estimate taken on it"*. That argument is sound and does not
+cover a **new** building, which has no pins to move. `st-jude-hospital` declares the first one.
+
+### 3. Two modelling decisions taken against an invariant rather than around it
+
+**Unlike cars live in one bank, not two.** Both new buildings wanted a slow, large service or bed car
+beside fast passenger cars. Modelled as two banks, every guest floor and every ward becomes *a floor
+served by two banks*, and `buildingConnectivity.test.ts` requires such a floor to be
+`isTransferFloor` — which means **sky lobby**, and re-injects a passenger as a new arrival. A hotel
+bedroom corridor is not a sky lobby. The invariant is an over-approximation (two banks with
+identical service zoning need no transfer at all), and the honest move was to satisfy it rather than
+to weaken it: one bank, five unlike cars. That is also the better model, and it is the first time
+any shipped bank has held cars that differ in speed and capacity.
+
+**The reference data set the hotel's height.** `crown-hotel`'s service car is geared traction
+because that is the class whose speed range reaches down to 1.75 m/s. Geared traction is
+reference-rated to a 76 m rise, so the guest stack stops at floor 23. The alternative was a gearless
+service car at 2.5 m/s — which would have erased the very speed contrast the building exists to
+pose. The building was shortened to fit the data rather than the data widened to fit the building.
+
+**And a limitation is named rather than papered over.** Neither new building authors a per-car
+`passengerTransferS`. The model has no notion of a bed or a trolley as an **indivisible load**, so
+every derived bound multiplies a car's transfer time by its full person count: a 26-person bed lift
+at an authored 3.0 s produces an **84.5 s** loading bound describing 26 people boarding one at a
+time, a journey no bed lift makes. The heterogeneity that *is* modelled — speed and capacity — the
+engine reads honestly. Modelling an indivisible load is real work and is not done here.
+
+### 4. A demand template in `data/` alone would have been inert
+
+`traffic/demandTemplate.ts` resolves a template by **id**, and its own error message says so:
+*"Adding one is a new shape in `traffic/demandTemplate.ts`, not a new branch at a call site."* A
+record added to `data/traffic-profiles.json` without a shape would have been a declared, documented,
+schema-valid template that no run could ever use — the defect in § 1, committed while fixing it. Both
+new templates are implemented:
+
+- **`shift-change`** — the first shape with **two interior peaks**. `rise-and-fall` has one interior
+  maximum and `constant-iso` has none, so *"the outgoing shift leaves while the incoming shift
+  arrives, twice"* previously had to be approximated by a wider single peak, which spreads the same
+  demand instead of concentrating it twice. Its trough is **required** to be non-zero: a zero trough
+  is two rise-and-falls with a dead period, and the fact a shift change turns on is that the
+  building is still occupied while it happens.
+- **`evening-egress`** — differs from `rise-and-fall` in its **leading edge** rather than its
+  magnitude. A rise-and-fall ramps over minutes; an egress steps. That is the case a batch window or
+  a deferred-assignment setting is decided by.
+
+### 5. The recorded fuzz corpus lost its subject, and § D205 had already fixed the other half
+
+A fuzz case is a **seed decoded against an option space**, and one axis of that space is the shipped
+traffic-profile list. § D205 recorded this defect precisely — *"three instances of one defect, in one
+change… all three turned a list into a silent input to a published number"* — fixed the **dispatcher**
+axis with a frozen `CORPUS_DISPATCHER_PROFILE_IDS`, and did not look one line down at the traffic
+axis, which stayed derived from `data/`.
+
+Adding the `hospital` profile therefore re-mapped every recorded seed. `fuzz-1001074`'s arrival count
+moved from **177 to 188**: the case still ran, still reported cleanly, and was **no longer the case
+the record describes**. That is a regression record losing its subject, and nothing failed loudly —
+the reproduction simply reproduced a different run, which is the failure mode § D205's own docstring
+predicts in as many words.
+
+`CORPUS_TRAFFIC_PROFILE_IDS` mirrors the dispatcher fix exactly: frozen at the four profiles shipped
+when the deep-tier findings were recorded, with the same *"a corpus indexed against a profile that no
+longer ships cannot reproduce the case it recorded"* error for a missing id. Five pinned
+reproductions across two packages now declare both axes. The **campaign** deliberately declares
+neither — a new profile should be fuzzed, and a seed that re-maps during a search is a seed doing its
+job.
+
+### 6. Three guards that were weaker than they read
+
+**`docs/10` § M30's row matcher was `/^\| \*\*[1-7] /`.** The bound was the stage count on the day
+it was written, so stages 8, 9 and 10 were skipped in silence and only a length assertion noticed
+that the documented table and the measured one had different sizes. Generalised to any stage number.
+
+**`mixIdentity.test.ts` named its mix-varying template by position.** It asserted
+`DEMAND_TEMPLATE_IDS` equals `[...SHIPPED_BEFORE, 'lunch-two-way']` — so a template that varied the
+mix could have been appended and passed, while two that do not varied nothing and failed merely by
+existing. Its own comment above it asked for the partition (*"add a fourth template and this
+assertion names it"*); it now computes it, from the records.
+
+**`collectiveAdoption.test.ts` derived § D209's building set from disk, and that is the serious
+one.** § D209's criterion was pre-registered over the buildings shipped on 2026-08-03, and
+[§ D210](DECISIONS.md) and [§ D212](DECISIONS.md) were both decided against it. Deriving the ladders
+from `data/buildings/` means **a building added afterwards silently widens a criterion that has
+already been decided**: clause 2 would begin demanding a quotable cell from a building that did not
+exist when the clause was written, and three recorded verdicts would quietly come to mean something
+else.
+
+That is [§ D151](DECISIONS.md)'s `PRE_REGISTERED_REFERENCE_CANDIDATES` lesson with a **building**
+instead of a profile — *"a profile added afterwards would silently become the new baseline and move
+every paired figure in the study"*. The set is now declared, and asserted in both directions: every
+id in it still exists on disk, and the buildings outside it are **named** so a reader can see the
+exclusion is a decision. A future criterion that wants them pre-registers them itself, before it
+measures anything.
+
+### 7. What this does not claim
+
+**No verdict moved and no pin was regenerated by the buildings themselves.** The new buildings are in
+no benchmark cell, no matrix cell, no sweep cell and no pre-registered criterion. They are in the
+scenario set — the game's stages — and in the always-on validation that iterates `data/buildings/`,
+which is where their cost is paid and where a config error in them will surface.
+
+**The correctness oracle does not reach them, and its own guard could not say so.**
+`oracle/fiveBuildings.test.ts` has a test whose entire job is *naming every bank the table does not
+cover* — and it computed that list over banks of buildings **already in** `PRINCIPAL_BANKS`, so a
+building the table never mentions could not be named by the check for buildings the table misses.
+Three arrived and were invisible to it. The guard now names absent buildings, and separates the two
+reasons, because *not covered* and *not coverable* are different statements: `crown-hotel` and
+`st-jude-hospital` hold cars that differ in speed and capacity on purpose, and the Barney/CIBSE
+round-trip-time calculation assumes one car specification per bank — a closed form that averages a
+3.0 m/s guest car with a 1.75 m/s service car is a different calculation wearing its name.
+`chancery-house` is six identical cars and **is** coverable; it is an owed measurement rather than a
+modelling limit, and both claims are checked against the configs rather than asserted.
+
+**Where their arrival IS load-bearing is the always-on validation that iterates `data/buildings/`.**
+The analytical up-peak census went from fourteen banks to seventeen and all three new banks analyse;
+the departure-gap survey went from fourteen rows to seventeen and its worst reopen moved from a
+39.8 s shuttle to `st-jude-hospital`'s 56.5 s, widening rather than complicating its claim that no
+single constant is safe on every bank. Both are re-derived from disk, so the buildings pay their
+cost there whether or not anyone runs a study on them.
+
+
+## D214 — the menu shell, free play, and a leaderboard that cannot be lied to
+
+**Date: 2026-08-04 · Architecture, written before the code.** The product grows a main menu with
+**Settings**, **Campaign** and **Free Play**, and gains accounts, email confirmation and a shared
+leaderboard. That last part is the first network, the first secret and the first wall-clock this
+repository has ever had, so the shape is recorded before any of it is built.
+
+### 1. What already exists, and what does not
+
+`packages/viz` is a **static Vite app** whose only dependencies are `@elevator-sim/core`,
+`@elevator-sim/experiments` and `vite`. There is no server, no database, no session, no mail. The
+whole repository has **four** runtime dependencies. Nothing here is a refactor of an existing
+backend; it is the first one.
+
+The campaign already exists as `shift/contracts.ts` (eight scenarios) and `data/campaign.json` (ten
+stages). What is missing is a **way in**: `dev/main.ts` boots straight into a running simulation, so
+Campaign is the only thing the product can do and Free Play has nowhere to be chosen from.
+
+### 2. The menu is a pure state machine, and the DOM is downstream of it
+
+`menu/` holds a screen union and a reducer, with no `document` in it, for the reason
+`dev/state.ts` exists and `dev/runConfig.ts` did before it: *a decision made inside a click handler
+needs a document, a canvas and a click to reach, so it cannot be tested and it drifts.* The panel
+that draws it is separate and dumb.
+
+Screens: `main`, `campaign`, `free-play`, `settings`, `leaderboard`, `account`. **Free Play** is a
+selection over the shipped data — building × traffic template × arrival rate × dispatcher × duration
+× seed — and every axis of it is **derived from `data/`** rather than listed, because a list is what
+this branch has already had to widen five times (§ D213).
+
+### 3. The leaderboard is verified by replay, and that is the whole design
+
+A client-reported score measures willingness to cheat. This project cannot host one, and it does not
+have to, because **invariant 5 already guarantees the fix**: *every persisted run record carries its
+seed, so any run replays exactly.*
+
+So a submission carries the **seed and the resolved configuration**, not just a number. The server
+**re-runs the simulation** through the same `@elevator-sim/core` the client used and accepts the
+score only if it reproduces. A forged score is rejected because it does not replay; an honest score
+is accepted because it does. The client is never trusted, and no anti-cheat heuristics are needed —
+determinism does the work.
+
+**This is also why the server must own the sim rather than proxy a number.** `packages/server`
+depends on `core`, which is allowed (invariant 6 forbids `core → viz`, nothing else), and the
+verification path uses the same seeded `StreamSet` every study does.
+
+### 4. A board is partitioned by a content hash of what it measures
+
+**This is the part that would be wrong by default, and this branch has just paid for the lesson
+twice.** § D205 found a recorded fuzz case losing its subject when a profile was added; § D213 found
+it again one field over, moving `fuzz-1001074`'s arrival count from 177 to 188 while the case still
+ran and still reported cleanly.
+
+A leaderboard has exactly that shape. A score is *"this seed on this building under this dispatcher
+scored X"*, and every one of those nouns lives in `data/`. Change `midtown-office`'s population and
+every stored score silently stops describing the run it names — and, worse, **stops re-verifying**,
+so honest old entries start failing the check that exists to catch forgeries.
+
+So a board is keyed by a **`configHash`**: a stable digest over the fully-resolved inputs the run
+depended on — building, dispatcher profile, traffic, duration, and the engine's own model version.
+A `data/` change does not corrupt an old board; it **starts a new one**, and the old board stays
+readable and stays verifiable against the data it was set on. Boards name their hash, and the UI
+says which one a player is looking at.
+
+### 5. Accounts, and the smallest thing that is not negligent
+
+- **Passwords** are hashed with `scrypt` from `node:crypto`, per-user random salt, never stored or
+  logged in the clear. No password ever appears in a response body.
+- **Email confirmation** is a signed, expiring token — HMAC over `(userId, email, expiry)` with a
+  server secret from the environment. Unconfirmed accounts may log in but **may not post a score**,
+  which is the only privilege that needs gating, and it keeps a leaderboard from being farmable with
+  throwaway addresses.
+- **The secret comes from the environment and has no default.** A server started without one
+  refuses to boot rather than signing with a placeholder that would ship to production.
+- **Mail is an interface with a dev driver.** `Mailer` has one method; the dev driver appends to an
+  outbox file so the flow is testable end to end with no network, and an SMTP driver drops in behind
+  the same interface when there is a domain to send from. **No credential is committed.**
+- **Sessions** are opaque random tokens in a table, not JWTs: revocation is a `DELETE`, and this
+  product has no need for stateless verification.
+
+### 6. What is deliberately not built
+
+**Real-time multiplayer.** Two players dispatching one building live needs tick synchronisation and
+a conflict rule for simultaneous assignment, and it would put a network clock next to a kernel whose
+first invariant is that time comes from the kernel. Asynchronous competition gets the leaderboard
+that was actually asked for without any of it. The transport is plain HTTP + JSON, so nothing here
+forecloses adding it later.
+
+**Scores as a single number.** The project's own rule is that energy is an axis and never a score
+(§ D106), and that a mean over a saturated run may not be reported at all. A board therefore ranks
+on a **declared metric** and shows the others beside it, and a submission whose run has
+`awtIsValid: false` is **rejected on entry** rather than ranked — the same suppression the rest of
+the project applies, at the one surface where a player is motivated to ignore it.
+
+---
+
+## D215 — what § D214 became, and the six choices it did not cover
+
+**Date: 2026-08-04 · Written after the code, and says so.** § D214 is the architecture, dated before
+any of it existed. This section records what shipped, and — the useful half — the decisions the
+architecture did **not** anticipate, each with the alternative that was rejected.
+
+### 1. It is built, and the flow is driven end to end
+
+`packages/server` is a workspace member with **one** dependency, `@elevator-sim/core`, and its
+runtime is `node:sqlite`, `node:crypto` and `node:http`. The repository's dependency count is
+unchanged.
+
+`http/api.test.ts` drives register → read the outbox → confirm → sign in → forge → refuse → submit →
+rank, against the **real `data/` and the real kernel** with no socket bound. Every security claim in
+§ D214 § 5 has a test that breaks it: an unconfirmed account posting, a wrong password, an unknown
+address, a tampered link, a logged-out token, an expired session. The forgery is a quarter of a
+second — small enough that no plausibility bound would catch it, which is the point: there are no
+plausibility bounds, only replay.
+
+Two bootstrap refusals are tested rather than promised. **No secret, no server.** And **the outbox
+mailer is refused under `NODE_ENV=production`**, because the dev driver writes confirmation links to
+a file in the clear and each one is an account-takeover link for anyone who can read the disk.
+`mail/mailer.ts` promised that refusal in a docstring; a docstring is not a refusal.
+
+### 2. A board lists a player once, at their best
+
+Not every entry. A board that listed them all would rank **persistence**: a player who submitted a
+hundred seeds would hold the top hundred places, and the board would stop being a comparison between
+players. Re-submitting the same seed **replaces** rather than appends, because a deterministic replay
+of the same seed is the same run and counting a refresh as an achievement is farming with extra
+steps.
+
+### 3. The client's rules are a courtesy, and the risk is one-directional
+
+`viz/src/menu/account.ts` mirrors the server's password and display-name bounds so a player is told
+what is wrong without a round trip. The server checks anyway — the client is not trusted with
+anything. What makes the duplication safe is that its failure is asymmetric: a client rule *looser*
+than the server's costs a wasted round trip and a clear refusal, while a client rule *stricter*
+refuses something the server would have accepted and **nobody ever finds out**, because the request
+that would have proved it is the one the client never sent. So `client.test.ts` asserts the
+constants against the server's own **source text** — `viz` may not depend on `server`, so it reads
+the file, which is `validation/documentation.test.ts`'s method used for the same reason.
+
+### 4. The API origin is a `<meta>` tag, and has no default
+
+`<meta name="elevator-sim-api" content="…">`. A client that fell back to the page's own origin would
+work in development and fail in a build served from a CDN — the class of bug that only reproduces
+where it cannot be debugged. A `<meta>` rather than a build-time constant because one built bundle
+is served from more than one place; the tag is optional, so `index.html` is unchanged and
+`elementMap.test.ts`'s contract is untouched. With no tag, the account and leaderboard screens say
+there is no server rather than drawing a form whose button can never do anything.
+
+### 5. The session token is held in memory and never in `localStorage`
+
+The whole benefit of persisting it is not retyping a password; the cost is a bearer token readable
+by every script on the origin, for thirty days. Not worth it for a game.
+
+### 6. Two things the architecture got wrong by omission, corrected here
+
+**The clock is injected.** § D214 said this package is the first with a wall clock and stopped
+there. A *test* that reads the real clock is a test that fails at midnight, so `Store` and the API
+take `now()` as a parameter and the tests pass a counter. That is invariant 3's spirit applied where
+its letter does not reach.
+
+**Abandonment is not a `ClaimedMetrics` field.** The four ranked metrics are wait, WT95, TTD and
+percentage over the long-wait threshold. Abandonment and stairs uptake are *published beside* AWT
+and never folded into it (`CLAUDE.md` § Statistical discipline), and a board that ranked on a
+composite would be the one surface where that rule is worth the most to break. The board's own
+response carries the sentence — *"Ranked on the named metric alone. The others are shown beside it
+and never combined."* — on the wire, so a client cannot draw a composite with nothing on screen
+saying it should not.
+
+### 7. A verification is a whole simulation, so the authenticated side is bounded too
+
+`submissionIssues` already keeps an *unauthenticated* shape error from commanding a run. The
+authenticated counterpart is needed for the same reason at a larger size: at the longest accepted
+length a verification is a **7 200-second simulation**, so one confirmed account submitting in a
+loop is a CPU denial of service wearing a valid session. `MIN_SUBMIT_INTERVAL_MS` is five seconds —
+far below any honest play rate, since a player has to watch a run before posting it, and far above
+the cost of one replay. Held in memory rather than in the database: it bounds *this process*, which
+is the thing being protected, and a restart resetting it costs one extra replay.
+
+It is checked **after** the cheap shape gate, so a player whose submission is malformed is told
+that, rather than told to wait and then told it was malformed anyway.
+
+### 8. Free Play's axes all reach the run, and finding that out cost a template
+
+`ViewerState` gains `freePlay` — the demand template and the arrival rate, applied in
+`shiftRunConfigOf` over whatever the pattern select left. It is there because the menu was offering
+three axes and applying one: the building, dispatcher and seed reached the run, and the template,
+rate and length did not. § D177's rule is **move the control and require the run to change**, and
+`dev/state.freePlay.test.ts` is that rule pointed at all three, compared on the legs. Its negative
+control is the load-bearing one: `freePlay: undefined` must be byte-identical to the state that
+predates the field, or every figure measured before it silently moved.
+
+Writing the test found a real defect one layer down. `constant-iso` declares `durationMin: 120` and
+discards 15 minutes of warm-up and 5 of cool-down, so the kernel throws *"leaves no measurement
+window"* for any run under two hours — and the menu was offering it beside a 5-minute run length.
+Correct error, wrong place: a player would meet it at Start, which is the one moment with no words
+for it. Two changes, both small: `FREE_PLAY_DURATIONS_S` and `ACCEPTED_DURATIONS_S` gain 7 200 s so
+the template is playable at all, and `freePlayIssues` grew its one cross-field rule, refusing the
+combination with the template's minimum and the player's choice both in the sentence.
+
+`menu.test.ts` then asserts the *general* form of it, derived from `data/` rather than about
+`constant-iso`: **every shipped template must fit inside some offered run length.** A template that
+shipped and fitted none of them would be listed in the menu and unstartable at all of them, which is
+§ D213's shape again — the hand-maintained list that stopped tracking the data it was built from.
+
+### 9. The dead-code audit landed with the package, and the scanner is now four copies
+
+`server/src/deadCode.test.ts` was written in the same change as the code: **61 exports scanned, 0
+uncalled**, and the wiring from `main.ts` down to the security model pinned link by link — including
+the two intra-file links no importer query can see. It is there on day one because four commits
+earlier in this same branch `viz/src/menu` shipped eight tested, exported, entirely uncalled
+functions and the existing viz audit caught it on the next run. A package with a database, a socket
+and an authorization check is the worst place to find that out a fortnight later.
+
+The scanner is now inlined in **four** places — `experiments/src/tuning/`, `core/src/dispatch/`,
+`viz/src/`, and `server/src/`. That is past the point where duplication is cheaper than
+consolidation, and the fix is a small `dev-audit` workspace package every audit devDepends on. Not
+done here, because this branch is already adding one package and a second one to hold a scanner is
+scope this change did not ask for. Recorded so a consolidation knows all four sites.

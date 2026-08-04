@@ -79,6 +79,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * without a document.
          */
         'dev/dispatcherEditor.ts#sliderHandlesOf',
+        /*
+         * § D214 § 2's menu. Same split as the design refactor's three mounts above, and the same
+         * honest accounting: the parts of the menu that *say something about a run* are pure and
+         * are driven — `MENU` renders `catalogueOf`'s building details, every `freePlayIssues`
+         * refusal and `canStart`'s label, on a whole selection and a deliberately broken one. What
+         * is left here is the row copy and the settings note, authored inline, reaching only the
+         * static sweep below. That is weaker than driving them and is stated as a limitation.
+         */
+        'dev/menuPanel.ts#renderMenu',
       ],
     },
     {
@@ -234,6 +243,23 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'scenario/goals.ts#isPerReplicationGoal',
         'scenario/candidates.ts#CANDIDATE_GOALS',
         'scenario/candidates.ts#CANDIDATE_SCENARIOS',
+        /*
+         * The six menu screen ids the `MenuScreen` union is derived from — `main`, `campaign`,
+         * `free-play`, … — derived here only because `free-play` reads as two adjacent words. What
+         * a player sees is `titleOf`'s heading, authored in `menuPanel.ts` and swept statically
+         * with the rest of that mount's copy.
+         */
+        'menu/types.ts#MENU_SCREENS',
+        /*
+         * The account screen's *shape*, not its sentences. `EMPTY_FORM` and `SIGNED_OUT` are blank
+         * records whose only string is the mode id `sign-in`, which the two-adjacent-words scanner
+         * reads as prose; `MAX_DISPLAY_NAME` is the integer 32. Every sentence these records ever
+         * carry comes from `formIssues`, `postingRefusal` or `signedIn`, and `MENU` drives all
+         * three — including `postingRefusal`'s two arms, which is the distinction it exists for.
+         */
+        'menu/account.ts#EMPTY_FORM',
+        'menu/account.ts#SIGNED_OUT',
+        'menu/account.ts#MAX_DISPLAY_NAME',
       ],
     },
     {
@@ -299,6 +325,23 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'record/document.ts#readRecordingDocument',
         'editor/editorEdits.ts#blankBuilding',
         'editor/editorEdits.ts#serializeBuilding',
+        /*
+         * Returns a boolean, or a record whose prose came from somewhere already driven.
+         * `canSubmitForm` answers *may this be sent* and is derived only through `formIssues`,
+         * which `MENU` drives directly. `signedOut` passes the **caller's** notice through
+         * unchanged and authors nothing — its one literal is the empty state it copies.
+         */
+        'menu/account.ts#canSubmitForm',
+        'menu/account.ts#signedOut',
+        /*
+         * Transport plumbing. `createClient` no longer authors a sentence — its three own wordings
+         * moved to `CLIENT_FAILURES`, which `MENU` drives — and everything else it carries is the
+         * *server's* prose, unrewritten on purpose: a rejection is not an accusation and the server
+         * is the one place that decides how one is worded. `fetchTransport` builds a request and
+         * has no string in it but header names.
+         */
+        'menu/client.ts#createClient',
+        'menu/client.ts#fetchTransport',
       ],
     },
     /*

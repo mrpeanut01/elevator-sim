@@ -1,7 +1,7 @@
 /**
  * What a Phase 5 term needs to know about the wider system, and where it comes from.
  *
- * Three of the twelve terms price something neither the car nor the call can answer:
+ * Three of the thirteen terms price something neither the car nor the call can answer:
  *
  * | Term | Fact it needs | Who owns it |
  * |---|---|---|

@@ -532,11 +532,18 @@ describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracke
     // read as the answer, and it cannot be satisfied by moving the constant.
     //
     // **These assertions rest entirely on the authored transfer times**, so the exact figures are
-    // pinned rather than left implicit. At the uniform office 1.2 s the worst reopen across all
-    // fourteen banks is 28.8 s against a 29.0 s minimum ceiling — a constant *would* be safe
-    // everywhere by 0.2 s, no bracket would be empty, and every claim below would be false. The
-    // difference is that the shuttles and the residential banks are authored at 1.75 s and the
+    // pinned rather than left implicit. At the uniform office 1.2 s the worst reopen across the
+    // original fourteen banks was 28.8 s against a 29.0 s minimum ceiling — a constant *would* be
+    // safe everywhere by 0.2 s, no bracket would be empty, and every claim below would be false.
+    // The difference is that the shuttles and the residential banks are authored at 1.75 s and the
     // hotel zone at 1.5 s. `transferOf` reads those values; it does not supply them.
+    //
+    // **The survey grew from fourteen banks to seventeen, and the headline moved with it.** The
+    // worst reopen is no longer a shuttle: `st-jude-hospital`'s bank is 26-person cars at the
+    // hospital transfer time of 2.5 s, so a full load takes 56.5 s to board — half again the
+    // 39.8 s shuttle that used to be the extreme. That building strengthens the claim rather than
+    // complicating it: the spread between the worst reopen and the tightest ceiling is now nearly
+    // 2:1, and no constant is safe by a wider margin than before.
     const rows = everyBankBracket();
     const detail = rows
       .map((row) => `${row.id} (${row.maxReopenS.toFixed(1)}, ${row.minRoundTripS?.toFixed(1) ?? 'empty'})`)
@@ -546,21 +553,25 @@ describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracke
       .filter((value): value is number => value !== undefined);
 
     // The survey is the whole shipped set, not a subset that happens to prove the point.
-    expect(rows.length, detail).toBe(14);
+    expect(rows.length, detail).toBe(17);
 
-    // 39.8 s — a 20-person shuttle at 1.75 s — against a 29.0 s floor on Midtown Office.
-    expect(Math.max(...rows.map((row) => row.maxReopenS)), detail).toBeCloseTo(39.8, 6);
+    // 56.5 s — a 26-person hospital car at 2.5 s — against a 29.0 s floor on Midtown Office.
+    expect(Math.max(...rows.map((row) => row.maxReopenS)), detail).toBeCloseTo(56.5, 6);
     expect(Math.min(...ceilings), detail).toBeCloseTo(29.0, 1);
     expect(Math.max(...rows.map((row) => row.maxReopenS)), detail).toBeGreaterThan(
       Math.min(...ceilings),
     );
 
-    // Five of the fourteen sit at or above the fallback, so on those it would split one loading
-    // into two departures — the original defect, in the banks the fallback does not cover.
+    // Seven of the seventeen sit at or above the fallback, so on those it would split one loading
+    // into two departures — the original defect, in the banks the fallback does not cover. The two
+    // new members are the two new buildings with an unlike car in the bank: a bank is as slow to
+    // load as its slowest car, and both of these hold one deliberately.
     const unsafe = rows.filter((row) => FALLBACK_DEPARTURE_GAP_S <= row.maxReopenS);
     expect(unsafe.map((row) => row.id).sort(), detail).toEqual([
+      'crown-hotel/main',
       'mixed-use-high-rise/residential-local',
       'mixed-use-high-rise/shuttle',
+      'st-jude-hospital/main',
       'vertical-city/shuttle',
       'vertical-city/zone-5-local',
       'vertical-city/zone-6-local',
@@ -576,7 +587,9 @@ describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracke
       rows.filter((row) => row.minRoundTripS === undefined).map((row) => row.id).sort(),
       detail,
     ).toEqual([
+      'crown-hotel/main',
       'mixed-use-high-rise/residential-local',
+      'st-jude-hospital/main',
       'vertical-city/shuttle',
       'vertical-city/zone-6-local',
     ]);

@@ -93,7 +93,17 @@ function stage(
 }
 
 /**
- * The seven stages of § 5.4, as configurations.
+ * The ten stages, as configurations: § 5.4's original seven, and three that came with the
+ * buildings added afterwards.
+ *
+ * The three new ones exist because the original seven could not pose their questions at all.
+ * **8 — The headline address** is the first stage on `office-prestige`, a profile that had been
+ * declared since Phase 1 and used by no building; the bank is deliberately oversupplied, so the
+ * lesson is that spare cars do not by themselves hold a 25 s interval. **9 — Both ways at once**
+ * is the first stage whose demand has no dominant direction, which is the traffic
+ * `noDirectionReversal` is least suited to. **10 — The bed and the visitor** is the first stage
+ * whose bank holds cars of unlike speed and capacity, so it asks whether a dispatcher notices that
+ * two of its five cars are the wrong car for an ordinary hall call.
  *
  * `collective` throughout rather than the viewer's default: `docs/07` § 4 calls `nearest-car`
  * *"a poor reference arm — the only profile that saturates"* at the benchmark operating points,
@@ -109,4 +119,7 @@ export const CANDIDATE_SCENARIOS: readonly GoalScenario[] = [
   stage('stage-5-credentials', 'Credentials', 'secure-tower', 'collective', null),
   stage('stage-6-the-tall-one', 'The tall one', 'vertical-city', 'collective', 0.5),
   stage('stage-7-prove-it', 'Tune it', 'midtown-office', 'collective', 1.5),
+  stage('stage-8-the-headline-address', 'The headline address', 'chancery-house', 'collective', 3),
+  stage('stage-9-both-ways-at-once', 'Both ways at once', 'crown-hotel', 'collective', 2.5),
+  stage('stage-10-the-bed-and-the-visitor', 'The bed and the visitor', 'st-jude-hospital', 'collective', 2),
 ];

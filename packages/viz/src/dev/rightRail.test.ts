@@ -91,10 +91,13 @@ describe('dispatcherPlateOf', () => {
     ]);
   });
 
-  it('counts weighted terms against the library rather than a literal twelve', () => {
-    expect(valueOf(dispatcherPlateOf(profile('collective')), 'terms weighted')).toBe('1 of 12');
+  it('counts weighted terms against the library rather than a literal thirteen', () => {
+    // The denominator tracks `data/`'s term list, which is the point of the test's name: it moved
+    // from twelve to thirteen when `diversionDetour` landed (`DECISIONS.md` § D211) and the plate
+    // followed without a code change, which a literal would not have.
+    expect(valueOf(dispatcherPlateOf(profile('collective')), 'terms weighted')).toBe('1 of 13');
     expect(valueOf(dispatcherPlateOf(profile('predictive-balanced')), 'terms weighted')).toBe(
-      '10 of 12',
+      '10 of 13',
     );
   });
 
@@ -207,7 +210,7 @@ describe('the dispatcher list’s words', () => {
     const collective = profile('collective');
     expect(collective.$comment).toBeUndefined();
     const blurb = dispatcherBlurbOf(collective);
-    expect(blurb).toContain('1 of 12 terms weighted');
+    expect(blurb).toContain('1 of 13 terms weighted');
     expect(blurb).toContain('waitTime 1.00');
   });
 

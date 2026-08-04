@@ -2,9 +2,9 @@
  * § D209's criterion, checked as a criterion.
  *
  * The always-on tier asserts nothing about how good en-route diversion is. It asserts the two
- * things that make the verdict mean anything — that the cell set is derived from the shipped
- * buildings rather than hand-picked, and that {@link adoptionVerdict} can actually **refuse** —
- * and leaves the measurement to the opt-in tier, which costs hours.
+ * things that make the verdict mean anything — that the cell set is exactly the one § D209
+ * pre-registered, neither widened nor rotted, and that {@link adoptionVerdict} can actually
+ * **refuse** — and leaves the measurement to the opt-in tier, which costs hours.
  *
  * ```
  * ELEVATOR_SIM_DEEP=1 npx vitest run --testTimeout=14400000 \
@@ -50,15 +50,53 @@ const DEEP = process.env['ELEVATOR_SIM_DEEP'] === '1';
  * The cell set — derived, not hand-picked
  * -------------------------------------------------------------------------- */
 
+/**
+ * The five buildings § D209 § 2 pre-registered, frozen.
+ *
+ * **This used to be derived from `data/buildings/`, and that was a latent defect of exactly the
+ * kind § D151 exists to prevent.** § D209's criterion was written over the buildings shipped on
+ * 2026-08-03, and § D210 and § D212 were both decided against it. Deriving the ladder set from disk
+ * means a building added afterwards silently **widens a criterion that has already been decided** —
+ * clause 2 would start demanding a quotable cell from a building that did not exist when the clause
+ * was written, and three recorded verdicts would quietly come to mean something else.
+ *
+ * That is the `PRE_REGISTERED_REFERENCE_CANDIDATES` lesson one level up: *"a profile added to
+ * `data/dispatcher-profiles.json` afterwards would silently become the new baseline and move every
+ * paired figure in the study"*. Same failure, with a building instead of a profile.
+ *
+ * So the set is **declared**, and the test below asserts two things instead of one: every id here
+ * still exists on disk (a frozen list may not rot), and any building NOT here is deliberately out
+ * of § D209's scope rather than forgotten. A future criterion that wants the new buildings
+ * pre-registers them itself, before it measures anything.
+ */
+const D209_BUILDINGS: readonly string[] = Object.freeze([
+  'garden-apartments',
+  'midtown-office',
+  'mixed-use-high-rise',
+  'secure-tower',
+  'vertical-city',
+]);
+
 describe('§ D209 § 2 — the ladders', () => {
-  it('covers every shipped building, derived from disk in both directions', async () => {
+  it('covers exactly the buildings § D209 pre-registered, and every one still exists', async () => {
     const config: LoadedConfig = await loadResources();
-    const shipped = [...config.buildingsById.keys()].sort();
+    const shipped = new Set(config.buildingsById.keys());
     const laddered = ADOPTION_LADDERS.map((ladder) => ladder[0]?.building ?? '').sort();
-    // Both directions. A building added to `data/buildings/` and left off a ladder would otherwise
-    // reduce the criterion's coverage without changing a line of it — which is the shape
-    // § D205's `role: "baseline"` leak had, one level up.
-    expect(laddered).toEqual(shipped);
+
+    expect(laddered).toEqual([...D209_BUILDINGS].sort());
+    // A frozen list may not rot: an id removed from `data/buildings/` must fail here rather than
+    // leave the criterion referring to a building nobody can run.
+    for (const id of D209_BUILDINGS) expect(shipped.has(id), `${id} has left data/buildings/`).toBe(true);
+  });
+
+  it('leaves buildings that landed after § D209 out of its scope, deliberately', async () => {
+    const config: LoadedConfig = await loadResources();
+    const later = [...config.buildingsById.keys()].filter((id) => !D209_BUILDINGS.includes(id)).sort();
+    // Named rather than merely counted. These exist and are NOT in the criterion, and a reader has
+    // to be able to see that it is a decision. Widening § D209 to include them retroactively would
+    // change what § D210 and § D212 were decided against, which is the one thing a pre-registration
+    // is for.
+    expect(later).toEqual(['chancery-house', 'crown-hotel', 'st-jude-hospital']);
   });
 
   it('descends, and never changes building within a ladder', () => {

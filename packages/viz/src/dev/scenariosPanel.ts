@@ -68,6 +68,13 @@ export const SCENARIO_ART: Readonly<Record<string, string>> = Object.freeze({
   'secure-tower': 'linear-gradient(180deg,#2a2230,#131924 70%)',
   'mixed-use-high-rise': 'linear-gradient(180deg,#1b2a33,#131924 70%)',
   'vertical-city': 'linear-gradient(180deg,#241f33,#131924 70%)',
+  // The three buildings that landed after the handoff was drawn (`docs/12` § 4.7). The design has
+  // no swatch for them, so these are authored in its idiom rather than copied from it: the same
+  // `#131924` base at 70 %, a hue that reads as the building's character, and no second layer —
+  // Midtown Office's window stripe is the design's own and is not imitated here.
+  'chancery-house': 'linear-gradient(180deg,#2e2a1d,#131924 70%)',
+  'crown-hotel': 'linear-gradient(180deg,#2b2027,#131924 70%)',
+  'st-jude-hospital': 'linear-gradient(180deg,#1d2f2c,#131924 70%)',
 });
 
 /** The *build your own* swatch, and the swatch for any building the design never drew. */

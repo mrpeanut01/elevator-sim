@@ -5,13 +5,20 @@ each building and what it is designed to stress.
 
 ## Status
 
+**This table was three buildings stale**: Secure Tower, Mixed-Use High-Rise and Vertical City were
+listed as unbuilt Phase 1 deliverables long after they shipped, and nothing failed, because no test
+reads it. It is now a list of what is on disk, which is checkable by looking.
+
 | Building | Config | Notes |
 |---|---|---|
 | Garden Apartments | [`garden-apartments.json`](garden-apartments.json) | Complete |
 | Midtown Office | [`midtown-office.json`](midtown-office.json) | Complete — primary validation building |
-| Secure Tower | — | **Phase 1 deliverable** |
-| Mixed-Use High-Rise | — | **Phase 1 deliverable** |
-| Vertical City | — | **Phase 1 deliverable** (may defer past v1) |
+| Secure Tower | [`secure-tower.json`](secure-tower.json) | Complete — access control × dispatch |
+| Mixed-Use High-Rise | [`mixed-use-high-rise.json`](mixed-use-high-rise.json) | Complete — sky lobby, transfer modelling |
+| Vertical City | [`vertical-city.json`](vertical-city.json) | Complete — double-deck, three sky lobbies |
+| Chancery House | [`chancery-house.json`](chancery-house.json) | Complete — the only `office-prestige` caller |
+| Crown Hotel | [`crown-hotel.json`](crown-hotel.json) | Complete — two-way demand, unlike cars |
+| St Jude Hospital | [`st-jude-hospital.json`](st-jude-hospital.json) | Complete — `hospital` profile, first shipped stair |
 
 ## Schema
 

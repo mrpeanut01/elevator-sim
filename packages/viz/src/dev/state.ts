@@ -124,6 +124,13 @@ export interface SavedBuilding {
  */
 export type PatternSelection = 'building' | string;
 
+/** The two Free Play axes the pattern editor's vocabulary cannot express. See {@link ViewerState.freePlay}. */
+export interface FreePlayOverride {
+  readonly demandTemplateId: string;
+  /** `null` is the building's own profile — a distinct selection, not a missing one. */
+  readonly arrivalRatePctPop5min: number | null;
+}
+
 export interface ViewerState {
   /* --- disclosure --------------------------------------------------------- */
   readonly mode: ViewMode;
@@ -149,6 +156,21 @@ export interface ViewerState {
   readonly dispatcherId: string;
   readonly pattern: PatternSelection;
   readonly shiftLengthS: number;
+  /**
+   * What Free Play asked for, over and above the pattern select — or `undefined`, which is the
+   * campaign's state and every published figure's.
+   *
+   * Two axes the pattern editor cannot express, and that is why they are here rather than folded
+   * into a `PatternSpec`. The editor's demand template is *derived* from its peak order
+   * (`PEAK_ORDER_INFO`), which reaches two of the shipped templates; Free Play offers all of them,
+   * because `constant-iso` and `shift-change` are real shapes to play against and a menu that
+   * listed them and then ran `rise-and-fall` would be § D177's inert control with a label on it.
+   *
+   * `arrivalRatePctPop5min: null` is *the building's own profile* and is expressed by passing **no
+   * override at all**, the same way `selectedPatternSpec` expresses `'building'`. Reconstructing
+   * the profile's rate and passing it back in would be a different run wearing the same name.
+   */
+  readonly freePlay: FreePlayOverride | undefined;
   readonly seed: bigint;
   /** Cars the reader took out of service by clicking a badge under a shaft. § 1.5 B7. */
   readonly outOfServiceCarIds: readonly string[];
@@ -256,6 +278,9 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
     dispatcherId,
     pattern: 'building',
     shiftLengthS: DEFAULT_SHIFT_LENGTH_S,
+    // `undefined`, not a default template. The campaign owns the run until Free Play says
+    // otherwise, and every published figure in this repository was measured with no override.
+    freePlay: undefined,
     seed,
     outOfServiceCarIds: [],
     levers: DEFAULT_LEVERS,
@@ -421,7 +446,20 @@ export function shiftRunConfigOf(
   const event = eventFor(state.week.day, state.week.dayIdx);
   const spec = selectedPatternSpec(resources, state, authored);
   const pattern = spec === undefined ? { demandTemplate: 'rise-and-fall' as const, demand: {} } : demandFromSpec(spec);
-  const { demandTemplate, demand } = pattern;
+  /*
+   * Free Play's two axes, applied **over** the pattern's — § D215. Last rather than first, because
+   * they are the reader's most recent and most explicit statement about what to run: a player who
+   * picked `constant-iso` in the menu picked it after whatever the pattern select was left on.
+   *
+   * A `null` rate passes nothing, which is what makes "the building's own profile" a real
+   * selection rather than a reconstruction of one.
+   */
+  const demandTemplate = (state.freePlay?.demandTemplateId ?? pattern.demandTemplate) as typeof pattern.demandTemplate;
+  const rate = state.freePlay?.arrivalRatePctPop5min;
+  const demand =
+    rate === undefined || rate === null
+      ? pattern.demand
+      : { ...pattern.demand, arrivalRatePctPop5min: rate };
   /*
    * Mean group size is not a `demand` option — it lives on the traffic profile, so a pattern that
    * moved it widens the file the run resolves against. See `patternSpec.ts`'s

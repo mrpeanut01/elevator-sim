@@ -696,6 +696,51 @@ describe('the banks that cannot be reconciled, and the mechanism for each', () =
     ).toThrow(/no clustering threshold|not shorter than/i);
   });
 
+  it('names every building the table does not reach, so a new one cannot arrive uncovered', () => {
+    // **The filter below used to hide this case.** `uncovered` was computed over banks of buildings
+    // *already in* `PRINCIPAL_BANKS`, so a building the table never mentions could not be named by
+    // the guard whose whole job is naming what the table misses — the gap concealed by the check
+    // for it. Three buildings landed after this table was written and were invisible here.
+    const named = new Set(PRINCIPAL_BANKS.map((bank) => bank.buildingId));
+    const absent = [...config.buildingsById.keys()].filter((id) => !named.has(id)).sort();
+    expect(absent).toEqual(['chancery-house', 'crown-hotel', 'st-jude-hospital']);
+
+    // And why each is absent, because "not covered" and "not coverable" are different statements.
+    //
+    // `crown-hotel` and `st-jude-hospital` are **not coverable by this oracle at all**: the
+    // Barney/CIBSE round-trip-time calculation assumes one car specification per bank, and both
+    // hold cars that differ in speed and capacity on purpose (`DECISIONS.md` § D213). A closed form
+    // that averages a 3.0 m/s guest car with a 1.75 m/s service car is not the closed form; it is a
+    // different calculation wearing its name.
+    //
+    // `chancery-house` IS coverable — six identical cars, one bank, no zoning — and is simply not
+    // measured yet. That is an owed measurement rather than a modelling limit, and stating it here
+    // is what stops it being forgotten.
+    const coverable = ['chancery-house'];
+    const notCoverable = ['crown-hotel', 'st-jude-hospital'];
+    expect([...coverable, ...notCoverable].sort()).toEqual(absent);
+    for (const id of notCoverable) {
+      const building = config.buildingsById.get(id);
+      expect(building, id).toBeDefined();
+      const specs = new Set(
+        (building?.banks ?? []).flatMap((bank) =>
+          bank.cars.map((car) => `${String(car.ratedSpeedMps)}/${String(car.ratedLoadLb)}`),
+        ),
+      );
+      // The claim is checked, not asserted: these buildings really do hold unlike cars.
+      expect(specs.size, `${id} is uniform after all — it may now be coverable`).toBeGreaterThan(1);
+    }
+    for (const id of coverable) {
+      const building = config.buildingsById.get(id);
+      const specs = new Set(
+        (building?.banks ?? []).flatMap((bank) =>
+          bank.cars.map((car) => `${String(car.ratedSpeedMps)}/${String(car.ratedLoadLb)}`),
+        ),
+      );
+      expect(specs.size, `${id} is no longer uniform — it may have stopped being coverable`).toBe(1);
+    }
+  });
+
   it('names every bank the table does not cover, so the gap is stated rather than implied', () => {
     const covered = new Set(PRINCIPAL_BANKS.map((bank) => `${bank.buildingId}/${bank.bankId}`));
     const all = [...config.buildingsById.values()]

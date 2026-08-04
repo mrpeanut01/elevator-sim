@@ -76,6 +76,11 @@ export function findPassengerTransferS(
       return table.residential;
     case 'hotel':
       return table.hotel;
+    case 'hospital':
+      // Longest of the four, and the only one whose population is not all ambulant: a trolley with
+      // an attendant is not a person stepping in. `st-jude-hospital`'s bed bank overrides it again
+      // per car, which is how a building says its two banks carry different traffic.
+      return table.hospital;
     case 'mixed-use':
       return undefined;
   }

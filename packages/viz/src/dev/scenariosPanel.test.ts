@@ -34,7 +34,7 @@ const weekOn = (contractId: string, patch: Partial<WeekState> = {}): WeekState =
   ...patch,
 });
 
-describe('the five contracts name five buildings that are actually loaded', () => {
+describe('every contract names a building that is actually loaded', () => {
   it('resolves every contract’s building against data/buildings/', () => {
     for (const contract of CONTRACTS) {
       expect(
@@ -44,10 +44,13 @@ describe('the five contracts name five buildings that are actually loaded', () =
     }
   });
 
-  it('draws five cards, in the handoff’s order, every one resolved', () => {
+  it('draws one card per contract, in order, every one resolved', () => {
     const cards = scenarioCardsOf(CONTRACTS, weekOn('c1'), buildings);
-    expect(cards).toHaveLength(5);
-    expect(cards.map((card) => card.contractId)).toEqual(['c1', 'c2', 'c3', 'c4', 'c5']);
+    // Derived from the contract list. It was `5`, which became the length of the handoff's prefix
+    // rather than of the campaign when three contracts were appended (`docs/12` § 4.7).
+    expect(cards).toHaveLength(CONTRACTS.length);
+    expect(cards.map((card) => card.contractId)).toEqual(CONTRACTS.map((c) => c.id));
+    expect(cards.slice(0, 5).map((card) => card.contractId)).toEqual(['c1', 'c2', 'c3', 'c4', 'c5']);
     for (const card of cards) expect(card.resolved, card.contractId).toBe(true);
   });
 });
@@ -174,7 +177,7 @@ describe('the prose is the handoff’s and the art is the handoff’s', () => {
     }
   });
 
-  it('has one of the design’s five swatches for every scenario, and a fallback for anything else', () => {
+  it('has a swatch for every scenario, and a fallback for anything else', () => {
     for (const card of scenarioCardsOf(CONTRACTS, weekOn('c1'), buildings)) {
       expect(card.art, card.buildingId).toBe(SCENARIO_ART[card.buildingId]);
       expect(card.art).not.toBe(FALLBACK_ART);

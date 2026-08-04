@@ -32,7 +32,13 @@ import {
   checkMonotonicTime,
   type PropertyContext,
 } from './properties.js';
-import { evaluateCase, generateOptionsFrom, fuzzSimulationConfigFor } from './run.js';
+import {
+  CORPUS_DISPATCHER_PROFILE_IDS,
+  CORPUS_TRAFFIC_PROFILE_IDS,
+  evaluateCase,
+  generateOptionsFrom,
+  fuzzSimulationConfigFor,
+} from './run.js';
 import { PROPERTY_BOUNDS, type FuzzCase, type Violation } from './types.js';
 
 const DATA_DIR = fileURLToPath(new URL('../../../../data', import.meta.url));
@@ -51,7 +57,16 @@ function show(label: string, violations: readonly Violation[]): void {
 
 beforeAll(async () => {
   config = await loadConfig(DATA_DIR);
-  const options = generateOptionsFrom(config);
+// **The frozen axes, because these seeds are recorded rather than searched.** `generateOptionsFrom`
+// defaults to every shipped profile, which is right for a campaign and wrong here: a fuzz case is a
+// seed decoded against an option space, so a profile added to `data/` re-maps the seed and the
+// "real counterexample" below silently becomes a different run. See `CORPUS_TRAFFIC_PROFILE_IDS`.
+  const options = generateOptionsFrom(
+    config,
+    undefined,
+    CORPUS_DISPATCHER_PROFILE_IDS,
+    CORPUS_TRAFFIC_PROFILE_IDS,
+  );
 
   // The first corpus case that delivered a decent population without timing out. Chosen by a
   // stated rule rather than a magic seed, so a generator change moves the fixture instead of
@@ -185,7 +200,7 @@ describe('the two behavioural properties fail on a real run with a faulty contro
     let starved = '';
 
     search: for (const seed of STANDARD_CORPUS) {
-      const candidate = caseFromSeed(seed, generateOptionsFrom(config));
+      const candidate = caseFromSeed(seed, generateOptionsFrom(config, undefined, CORPUS_DISPATCHER_PROFILE_IDS, CORPUS_TRAFFIC_PROFILE_IDS));
       const releaseAtS = candidate.durationS + PROPERTY_BOUNDS.starvationBoundS + 120;
       const relaxed: FuzzCase = { ...candidate, drainGraceS: releaseAtS + 1200 };
       for (const floor of (candidate.building.floors ?? []).filter((entry) => entry.population > 0)) {

@@ -38,6 +38,7 @@ import {
 } from './generate.js';
 import {
   CORPUS_DISPATCHER_PROFILE_IDS,
+  CORPUS_TRAFFIC_PROFILE_IDS,
   assertCarriesCallType,
   generateOptionsFrom,
   withCallType,
@@ -457,7 +458,7 @@ describe('what the generator draws (C32)', () => {
     // dimension is the profile list, so shipping a thirteenth re-maps it: seed 118 drew
     // `destination-panel` then and draws `auction` now, with nothing about § D126 having changed.
     // Pinning the axis keeps the record about what it says it is about. `DECISIONS.md` § D205.
-    const pinnedOptions = generateOptionsFrom(config, undefined, CORPUS_DISPATCHER_PROFILE_IDS);
+    const pinnedOptions = generateOptionsFrom(config, undefined, CORPUS_DISPATCHER_PROFILE_IDS, CORPUS_TRAFFIC_PROFILE_IDS);
     const corpus = STANDARD_CORPUS.map((seed) => caseFromSeed(seed, pinnedOptions));
     /*
      * `fuzz-118` carried C32's whole blast radius on the pinned corpus and now carries this one's.

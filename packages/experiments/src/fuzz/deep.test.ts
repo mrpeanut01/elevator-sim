@@ -52,6 +52,7 @@ import {
 import { caseFromSeed, reparse } from './generate.js';
 import {
   CORPUS_DISPATCHER_PROFILE_IDS,
+  CORPUS_TRAFFIC_PROFILE_IDS,
   evaluateCase,
   fuzzSimulationConfigFor,
   generateOptionsFrom,
@@ -103,7 +104,7 @@ describe.skipIf(!deepCampaignRequested())('the deep campaign', () => {
 /**
  * **CLOSED (T21).** Widening the generator to emit service modes turned up one counterexample in
  * 2 000 deep cases, and it was **not** a service-mode bug. Reproduce the parent with
- * `caseFromSeed(1001074, generateOptionsFrom(config, DEEP_SPACE, CORPUS_DISPATCHER_PROFILE_IDS))`:
+ * `caseFromSeed(1001074, generateOptionsFrom(config, DEEP_SPACE, CORPUS_DISPATCHER_PROFILE_IDS, CORPUS_TRAFFIC_PROFILE_IDS))`:
  *
  * ```
  * case      fuzz-1001074      simSeed 2110294577
@@ -152,7 +153,7 @@ describe('deep campaign counterexample fuzz-1001074 (starvation vs. a "stable" v
   }, 60_000);
 
   it('reproduces, and no longer publishes a quotable AWT beside a 922.7 s wait', () => {
-    const options = generateOptionsFrom(localConfig, DEEP_SPACE, CORPUS_DISPATCHER_PROFILE_IDS);
+    const options = generateOptionsFrom(localConfig, DEEP_SPACE, CORPUS_DISPATCHER_PROFILE_IDS, CORPUS_TRAFFIC_PROFILE_IDS);
     const fuzzCase = caseFromSeed(1_001_074, options);
     const result = runSimulation(fuzzSimulationConfigFor(fuzzCase, { config: localConfig }));
     const summary = result.summary;
@@ -186,7 +187,7 @@ describe('deep campaign counterexample fuzz-1001074 (starvation vs. a "stable" v
   }, 120_000);
 
   it('still fails P6 if the gate is turned off, so the case is a live regression rather than a fixture', () => {
-    const options = generateOptionsFrom(localConfig, DEEP_SPACE, CORPUS_DISPATCHER_PROFILE_IDS);
+    const options = generateOptionsFrom(localConfig, DEEP_SPACE, CORPUS_DISPATCHER_PROFILE_IDS, CORPUS_TRAFFIC_PROFILE_IDS);
     const fuzzCase = caseFromSeed(1_001_074, options);
     const config = fuzzSimulationConfigFor(fuzzCase, { config: localConfig });
     // A horizon past the run's own length is the gate's own off switch, and it restores the
@@ -206,7 +207,7 @@ describe('deep campaign counterexample fuzz-1001074 (starvation vs. a "stable" v
 /**
  * **CLOSED (T22).** The one P5 failure in 2 000 deep cases, and unlike `fuzz-1001074` above it was
  * a genuine liveness defect in `sim/` rather than a reporting one. Reproduce the parent with
- * `caseFromSeed(1000384, generateOptionsFrom(config, DEEP_SPACE, CORPUS_DISPATCHER_PROFILE_IDS))`:
+ * `caseFromSeed(1000384, generateOptionsFrom(config, DEEP_SPACE, CORPUS_DISPATCHER_PROFILE_IDS, CORPUS_TRAFFIC_PROFILE_IDS))`:
  *
  * ```
  * case      fuzz-1000384      simSeed 205687583
@@ -316,7 +317,7 @@ describe('deep campaign counterexample fuzz-1000384 (a recalled car stranding it
   }, 60_000);
 
   it('reproduces, and the fleet now works to its deadline instead of idling for 1 694 s', () => {
-    const options = generateOptionsFrom(localConfig, DEEP_SPACE, CORPUS_DISPATCHER_PROFILE_IDS);
+    const options = generateOptionsFrom(localConfig, DEEP_SPACE, CORPUS_DISPATCHER_PROFILE_IDS, CORPUS_TRAFFIC_PROFILE_IDS);
     const fuzzCase = caseFromSeed(1_000_384, options);
     const outcome = evaluateCase(fuzzCase, { config: localConfig });
 
@@ -372,7 +373,7 @@ describe('deep campaign counterexample fuzz-1000384 (a recalled car stranding it
        from `fuzzSeed` — `caseFromSeed` gives back the unshrunk parent — so the building is carried
        in full, which is what `shrink.ts` means by "a counterexample nobody can replay is a rumour".
        The scalars are the parent's. */
-    const options = generateOptionsFrom(localConfig, DEEP_SPACE, CORPUS_DISPATCHER_PROFILE_IDS);
+    const options = generateOptionsFrom(localConfig, DEEP_SPACE, CORPUS_DISPATCHER_PROFILE_IDS, CORPUS_TRAFFIC_PROFILE_IDS);
     const parent = caseFromSeed(1_000_384, options);
     const minimal = {
       ...parent,
