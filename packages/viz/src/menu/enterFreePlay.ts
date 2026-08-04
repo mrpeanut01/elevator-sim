@@ -65,6 +65,12 @@ export function enterFreePlay(
 
   return {
     ...withNewBuilding,
+    /*
+     * Named, not inferred. The week this returns keeps the building's contract id — `openWeek`
+     * below — so *"no contract"* has never meant *"no week"*, and the report's own defect was
+     * exactly that inference. `docs/16` S1.
+     */
+    playMode: 'free-play',
     dispatcherId: selection.dispatcherProfileId,
     seed: BigInt(selection.seed),
     shiftLengthS: selection.durationS,

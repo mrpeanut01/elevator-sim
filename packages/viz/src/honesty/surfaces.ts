@@ -193,7 +193,14 @@ import { CONTRACTS, contractById, contractForBuilding, nextContract, statLineOf 
 import { baseDemandOf, eventFor, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
 import { bestLineFor, goalsForDay, readGoal, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
-import { averageWaitFigure, clockRange, dayReportOf, NOT_RECORDED } from '../shift/report.js';
+import {
+  averageWaitFigure,
+  clockRange,
+  dayReportOf,
+  NOT_RECORDED,
+  type SingleRunReport,
+  type WeekDayReport,
+} from '../shift/report.js';
 import {
   DAY_START_S,
   type DayReport,
@@ -1615,7 +1622,10 @@ interface ShiftDay {
   readonly week: WeekState;
   /** The same day closed on a week already at `needClean`, so the award banner renders. */
   readonly banked: WeekState;
-  readonly report: DayReport;
+  /** The week-day sheet. */
+  readonly report: WeekDayReport;
+  /** The same day shaped as a single run — `docs/17` § 3.2. Both shapes ship; both are swept. */
+  readonly singleRunReport: SingleRunReport;
 }
 
 interface ShiftBundle {
@@ -1669,7 +1679,7 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       { ...opened, cleanRun: contractById(contractId)?.needClean ?? 1 },
       outcome,
     );
-    const report = dayReportOf({
+    const common = {
       recording,
       observations,
       goals,
@@ -1679,8 +1689,25 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       event,
       dispatcherName,
       dayStartS: DAY_START_S,
-    });
-    return { day, dayIdx, contract, event, goals, readings, week, banked, report };
+    };
+    const report = dayReportOf({ ...common, subject: { kind: 'week-day' } }) as WeekDayReport;
+    /*
+     * The **same day, shaped as a single run** — driven beside the week-day sheet rather than
+     * instead of it.
+     *
+     * A Free Play sheet is not a week-day sheet with six lines removed: it has a title of its own,
+     * two meta lines the week never prints, an attempt line worded *at this selection*, and a
+     * pointer at Compare. None of those strings entered the honesty sweep at all until this arm,
+     * because the adapter drove one shape and the product ships two.
+     */
+    const singleRunReport = dayReportOf({
+      ...common,
+      subject: {
+        kind: 'single-run',
+        selection: { demandTemplateId: 'rise-and-fall', arrivalRatePctPop5min: null, durationS: 1800 },
+      },
+    }) as SingleRunReport;
+    return { day, dayIdx, contract, event, goals, readings, week, banked, report, singleRunReport };
   });
 
   const bundle: ShiftBundle = { observations, dispatcherName, days };
@@ -2405,8 +2432,15 @@ const REPORT_PANEL: SurfaceAdapter = {
     const bundle = shiftBundleOf(context);
 
     for (const entry of bundle.days) {
-      const at = `day${String(entry.day)}`;
-      const view = reportViewOf(entry.report);
+      /*
+       * Both shapes of the sheet, per day. `docs/17` § 3.2: a Free Play sheet is not a week-day
+       * sheet with six lines deleted — it has its own title, two meta lines the week never prints,
+       * and a pointer at Compare — and until this loop the adapter drove one shape while the
+       * product shipped two.
+       */
+      for (const shaped of [entry.report, entry.singleRunReport]) {
+      const at = `day${String(entry.day)}.${shaped.of}`;
+      const view = reportViewOf(shaped);
       seeds.push({ field: `${at}.title`, text: view.title, role: 'label' });
       seeds.push({ field: `${at}.lede`, text: view.lede, role: 'observation' });
       for (const [index, cell] of view.figures.entries()) {
@@ -2451,14 +2485,33 @@ const REPORT_PANEL: SurfaceAdapter = {
         seeds.push({ field: `${at}.levers(${lever.title})`, text: lever.body, role: 'prose' });
       }
       seeds.push({ field: `${at}.verdictLine`, text: view.verdictLine, role: 'observation' });
-      seeds.push({ field: `${at}.streakLine`, text: view.streakLine, role: 'prose' });
-      seeds.push({ field: `${at}.contractLine`, text: view.contractLine, role: 'label' });
-      if (view.cleared !== null) {
-        seeds.push({ field: `${at}.cleared.note`, text: view.cleared.note, role: 'label' });
+      /*
+       * The meta block, swept for the first time.
+       *
+       * Found while reshaping the sheet: the adapter drove the title, the lede, the figures, the
+       * goals, the diagnosis, the levers, the verdict, the streak, the contract line, the banner,
+       * *what this taught*, the small print and the next-day label — and never `metaLines`. So the
+       * seed, the clock span, the replication count and the attempt line have never been in the
+       * corpus, on a block whose whole job is to say what the figures above it are figures *of*.
+       */
+      for (const [index, line] of view.metaLines.entries()) {
+        seeds.push({ field: `${at}.metaLines[${String(index)}]`, text: line, role: 'observation' });
       }
-      seeds.push({ field: `${at}.taught`, text: view.taught, role: 'prose' });
+      if (view.framing.kind === 'week-day') {
+        seeds.push({ field: `${at}.streakLine`, text: view.framing.streakLine, role: 'prose' });
+        seeds.push({ field: `${at}.contractLine`, text: view.framing.contractLine, role: 'label' });
+        if (view.framing.cleared !== null) {
+          seeds.push({ field: `${at}.cleared.note`, text: view.framing.cleared.note, role: 'label' });
+        }
+        seeds.push({ field: `${at}.taught`, text: view.framing.taught, role: 'prose' });
+        seeds.push({ field: `${at}.nextDayLabel`, text: view.framing.nextDayLabel, role: 'label' });
+      } else {
+        // The single run's own two strings. `why` is the sentence that sends a reader to the one
+        // surface allowed to answer *"is this better?"*, so it is `prose` a property can judge.
+        seeds.push({ field: `${at}.nextStep.label`, text: view.framing.nextStep.label, role: 'label' });
+        seeds.push({ field: `${at}.nextStep.why`, text: view.framing.nextStep.why, role: 'prose' });
+      }
       seeds.push({ field: `${at}.smallPrint`, text: view.smallPrint, role: 'reason' });
-      seeds.push({ field: `${at}.nextDayLabel`, text: view.nextDayLabel, role: 'label' });
 
       /* The two row builders, driven on their own so the coverage claim names what it calls. */
       const firstReading = entry.readings[0];
@@ -2482,13 +2535,16 @@ const REPORT_PANEL: SurfaceAdapter = {
           role: 'observation',
         });
       }
+      }
     }
 
     /* The empty sheet, which is drawn rather than hidden — § 2.2. */
     const empty = emptyReportView();
     seeds.push({ field: 'emptyReportView.title', text: empty.title, role: 'label' });
     seeds.push({ field: 'emptyReportView.lede', text: empty.lede, role: 'prose' });
-    seeds.push({ field: 'emptyReportView.nextDayLabel', text: empty.nextDayLabel, role: 'label' });
+    if (empty.framing.kind === 'week-day') {
+      seeds.push({ field: 'emptyReportView.nextDayLabel', text: empty.framing.nextDayLabel, role: 'label' });
+    }
 
     return singleRun(this.id, seeds);
   },

@@ -93,6 +93,25 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Diagnostics for a failed restore, and **nothing shows them**. `persist/` refuses a stored ' +
+        'session that this build cannot read — a wrong schema version, an unknown key, a seed that ' +
+        'would not survive the trip back to a bigint, a contract `data/` no longer ships — and each ' +
+        'refusal carries a sentence naming the field and the reason. `dev/main.ts` reads the ' +
+        'discriminated failure, clears the unreadable slot and starts fresh; it does not print the ' +
+        'sentence. So these are developer diagnostics on the same footing as `SCOPE_OF`’s `why`, ' +
+        'and the *player-facing* consequence — that a dropped week is not explained to the player ' +
+        'who lost it — is filed in `GAPS.md` § 3 rather than answered by an adapter here. The day ' +
+        'that sentence reaches a screen it stops being excludable, and this reason stops being true.',
+      ids: [
+        'persist/jsonSafety.ts#jsonRoundTripIssue',
+        'persist/session.ts#loadSession',
+        'persist/session.ts#saveSession',
+        'persist/types.ts#SESSION_KEY',
+        'persist/validate.ts#snapshotIssue',
+      ],
+    },
+    {
+      reason:
         'A component factory. `dev/dom.ts` produces no sentence of its own — every string it puts ' +
         'on the page is one it was handed by a caller, and every one of those callers is either ' +
         'driven here or excluded above. Its own literals are class names, ARIA attribute values ' +
@@ -150,6 +169,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * reader actually sees, is driven by the `RUN_SUMMARY` adapter as it always has been.
          */
         'render/runSummary.ts#summaryFigureIds',
+        /*
+         * `menu/enterFreePlay.ts` joined this list the moment it gained `playMode: 'free-play'` —
+         * a hyphenated id, read by the two-adjacent-words scanner as prose. It returns a
+         * `ViewerState` and authors no sentence; the refusal a player actually sees when a
+         * selection cannot start is `freePlayIssues`', which `MENU` drives on a broken selection.
+         */
+        'menu/enterFreePlay.ts#enterFreePlay',
         'dev/surfaces.ts#applyDrawerState',
         'dev/surfaces.ts#applyRailState',
         'dev/surfaces.ts#applySurfaceState',

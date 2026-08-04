@@ -54,9 +54,11 @@
  *    that it is not an export, so this audit's silence about it is never read as coverage.
  * 3. **Two-hop liveness** is inherited from the shared scanner (§ D125): a dead symbol calling a
  *    live-looking sibling keeps the sibling alive at one hop. Stated, not fixed.
- * 4. **Non-TypeScript callers.** `index.html`'s stylesheet consumes `render/CARD_RAISED` and
- *    `render/TEXT_MUTED`; the corpus is `.ts` files, so those two are allowlisted with the test
- *    that pins the stylesheet to them rather than read as dead.
+ * 4. **Non-TypeScript callers.** `index.html`'s stylesheet consumes tokens the `.ts` corpus cannot
+ *    see, so such a token is allowlisted with the test that pins the stylesheet to it rather than
+ *    read as dead. **The list is currently empty**: `CARD_RAISED` and `TEXT_MUTED` were its two
+ *    members and both acquired a TypeScript caller when `render/theme.ts` began reading
+ *    `render/tokens.ts` for the dark palette. The staleness assertion is what said so.
  * 5. **`viz/src` itself audits to zero symbols by construction** — its only non-directory
  *    entries are `index.ts` (barrel), `boundaries.test.ts`, `fixtures.test-helper.ts` and this
  *    audit's two files (tests). It is named in `AUDITED_MODULES` anyway, so a runtime file
@@ -102,6 +104,7 @@ const AUDITED_MODULES = [
   'viz/src/live',
   'viz/src/menu',
   'viz/src/mode',
+  'viz/src/persist',
   'viz/src/playback',
   'viz/src/playthrough',
   'viz/src/record',
@@ -266,8 +269,14 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
    * one-source-of-truth argument of tokens.ts's header. The other thirty-eight palette tokens
    * read live through canvas.ts's namespace import; these two are the stylesheet's alone.
    */
-  'render/CARD_RAISED': 'a stylesheet token; index.html consumes it, dev/tokens.test.ts:59 pins it',
-  'render/TEXT_MUTED': 'a stylesheet token; index.html consumes it, dev/tokens.test.ts:63 pins it',
+  /*
+   * -- CARD_RAISED and TEXT_MUTED were allowlisted here as tokens whose only consumer was
+   * index.html's stylesheet, which this scanner's `.ts` corpus cannot see. They now have a
+   * TypeScript caller too: `render/theme.ts` reads `render/tokens.ts` to build the dark palette
+   * rather than retyping seventeen hex values into a fourth copy of it. The staleness assertion is
+   * what noticed — an allowlist entry that has acquired a caller is a claim about nothing, and
+   * `dev/tokens.test.ts` still pins the stylesheet to them independently.
+   */
 });
 
 /* -------------------------------------------------------------------------- *

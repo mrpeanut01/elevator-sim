@@ -60,6 +60,27 @@ const output = (why: string): ScopeEntry => Object.freeze({ kind: 'output' as co
  * *"is this field scoped?"* looks it up the way they know it.
  */
 export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze({
+  /* -------------------------------------------------- viewer: which game this is */
+  /*
+   * An **output**, and the classification is worth arguing because the first attempt got it wrong.
+   *
+   * It was declared `between-games`, which reads correctly — a mode is chosen when a game starts and
+   * not during one — and `scope.test.ts` immediately refused it: S3 requires a non-`presentation`
+   * control to move the legs, and this moves none, because `shiftRunConfigOf` never reads it. The
+   * run is the same run either way, which is exactly the property that lets a free-play sheet be
+   * compared with the week-day sheet of the same day.
+   *
+   * The resolution is that **no control writes this field**. A player enters a mode by pressing
+   * Start or Campaign, and those affordances carry the scope; this is what the shell writes down
+   * afterwards, on the same footing as `recording` and `report`. Declaring it a control would have
+   * put a scope on a consequence and then demanded the consequence behave like a cause.
+   */
+  'viewer.playMode': output(
+    'Which play mode this state belongs to, written when one is entered. Named rather than inferred: ' +
+      'the shell’s only signal was freePlay !== undefined, and “no contract” never meant “no week” — ' +
+      'a free-play run keeps its building’s contract id, which is how the sheet came to bank nothing.',
+  ),
+
   /* ------------------------------------------------------- viewer: disclosure */
   'viewer.mode': control(
     'presentation',

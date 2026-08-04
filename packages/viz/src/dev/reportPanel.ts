@@ -40,10 +40,26 @@
  * repository (`vitest.config.ts` is `environment: 'node'` for every project), so a decision left
  * inside a mount is a decision no test can reach. {@link reportViewOf} is therefore the whole of
  * this surface's judgement — including the empty state — and {@link mountReport} writes it.
+ *
+ * ## A slot with nothing to say is hidden, not emptied
+ *
+ * A sheet arrives here of one of two shapes (`shift/report.ts`'s `ShapedDayReport`), and on a
+ * single run five of the week's statements do not exist. This module draws that as **absence**:
+ * {@link ReportView.framing} carries no key for them at all, and the render hides the streak span,
+ * the contract span, the cleared banner, the *Tomorrow* card, the *What this taught* card and the
+ * *Open the doors on…* button. Writing `''` into each would leave a captioned empty box — `docs/10`
+ * R3's *blank where a number should be*, at the layout's scale — and a reader cannot tell that from
+ * a surface that failed to load.
+ *
+ * Two of those are **cards whose caption is a sibling of the field**: `index.html` gives the id to
+ * `#report-forecast-name` and `#report-taught`, not to the box drawn around them, so hiding the
+ * field alone would leave the words *Tomorrow* and *What this taught* standing over nothing. Until
+ * the markup carries an id of its own, {@link cardOf} climbs one level, and it climbs exactly one.
  */
 
 import { GOAL_GLYPHS } from '../shift/goals.js';
 import { contractById } from '../shift/contracts.js';
+import type { ReportNextStep, ShapedDayReport } from '../shift/report.js';
 import type {
   ClearedAward,
   DayReport,
@@ -119,6 +135,41 @@ export interface ForecastView {
   readonly demand: string;
 }
 
+/**
+ * The half of the sheet that is a statement about a **week**, present only when there is one.
+ *
+ * A single run's view does not carry these keys with empty values — it does not carry them. See the
+ * module docstring.
+ */
+export interface WeekFramingView {
+  readonly kind: 'week-day';
+  readonly streakLine: string;
+  readonly contractLine: string;
+  readonly cleared: ClearedBannerView | null;
+  readonly forecast: ForecastView;
+  readonly taught: string;
+  /** `Open the doors on Wednesday`. */
+  readonly nextDayLabel: string;
+  /** Whether the two CTAs do anything. Nothing to advance from before a day has been filed. */
+  readonly canAdvance: boolean;
+}
+
+/**
+ * The half that is a statement about **one run**: where to take the question this sheet may not
+ * answer.
+ *
+ * The strings are `shift/report.ts`'s, unread and unedited. A pointer at Compare composed here
+ * would be this module deciding what the product's only comparison surface is for, which is a
+ * decision — and every decision on this surface lives in a pure module that a test can reach.
+ */
+export interface SingleRunFramingView {
+  readonly kind: 'single-run';
+  readonly nextStep: ReportNextStep;
+}
+
+/** Which shape of sheet this is. Exhaustive: a third member is a compile error at every branch. */
+export type FramingView = WeekFramingView | SingleRunFramingView;
+
 /** Everything the sheet shows, in one value. The empty state is a member of this type, not a hole. */
 export interface ReportView {
   /** `false` before any shift has been closed. The sheet is drawn either way — it is never hidden. */
@@ -129,19 +180,12 @@ export interface ReportView {
   readonly figures: readonly FigureView[];
   readonly verdictLine: string;
   readonly verdictColour: string;
-  readonly streakLine: string;
-  readonly contractLine: string;
-  readonly cleared: ClearedBannerView | null;
   readonly goals: readonly GoalRowView[];
   readonly diagnosis: readonly DiagnosisRowView[];
   readonly levers: readonly LeverRowView[];
-  readonly forecast: ForecastView;
-  readonly taught: string;
   readonly smallPrint: string;
-  /** `Open the doors on Wednesday`. */
-  readonly nextDayLabel: string;
-  /** Whether the two CTAs do anything. Nothing to advance from before a day has been filed. */
-  readonly canAdvance: boolean;
+  /** What this is a sheet **of** — and the whole of what differs between the two shapes. */
+  readonly framing: FramingView;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -273,6 +317,19 @@ export function leverRowsOf(levers: readonly ReportLever[]): readonly LeverRowVi
   return levers.map((lever) => ({ title: lever.title, body: lever.body }));
 }
 
+/**
+ * The card drawn around a field, or the field itself when there is no card.
+ *
+ * One level, never a walk. `index.html` puts the eyebrow (*Tomorrow*, *What this taught*) beside
+ * the field rather than inside it, so hiding the field alone leaves its caption standing over an
+ * empty box — the failure this whole change is about, reproduced one element down. The fallback is
+ * the node itself so a markup change that removes the wrapper degrades to *hide the words* rather
+ * than to a thrown handler in a render loop.
+ */
+function cardOf(node: HTMLElement): HTMLElement {
+  return node.parentElement ?? node;
+}
+
 function clearedBannerOf(award: ClearedAward | null): ClearedBannerView | null {
   if (award === null) return null;
   return {
@@ -307,43 +364,79 @@ export function emptyReportView(): ReportView {
     figures: [],
     verdictLine: '',
     verdictColour: 'var(--dim)',
-    streakLine: '',
-    contractLine: '',
-    cleared: null,
     goals: [],
     diagnosis: [],
     levers: [],
-    forecast: { name: '', note: '', demand: '' },
-    taught: '',
     smallPrint: '',
-    // No weekday is named, because no day has been closed and tomorrow is not yet a fact.
-    nextDayLabel: 'Open the doors on tomorrow',
-    canAdvance: false,
+    /*
+     * Week-shaped, and deliberately so: nothing has been filed, so the shell is still standing in
+     * the week it opens on, and the disabled *Open the doors on tomorrow* is the handoff's own
+     * empty case (§ 2.2) rather than a slot reserved for a statement that will never arrive. The
+     * blanks here mean *not yet*; the absences on a single run's sheet mean *never*, which is why
+     * they are drawn differently.
+     */
+    framing: {
+      kind: 'week-day',
+      streakLine: '',
+      contractLine: '',
+      cleared: null,
+      forecast: { name: '', note: '', demand: '' },
+      taught: '',
+      // No weekday is named, because no day has been closed and tomorrow is not yet a fact.
+      nextDayLabel: 'Open the doors on tomorrow',
+      canAdvance: false,
+    },
   };
 }
 
-/** The whole sheet, filed or not. The only decision this surface makes. */
-export function reportViewOf(report: DayReport | undefined): ReportView {
-  if (report === undefined) return emptyReportView();
+/**
+ * The framing, which is the only place the two shapes differ.
+ *
+ * Exhaustive over `of`: a third shape of sheet is a compile error here rather than a card that
+ * silently keeps drawing a week's forecast.
+ */
+function framingOf(report: ShapedDayReport): FramingView {
+  if (report.of === 'single-run') {
+    return { kind: 'single-run', nextStep: report.nextStep };
+  }
   return {
-    filed: true,
-    title: report.title,
-    metaLines: report.metaLines,
-    lede: report.lede,
-    figures: report.figures.map(figureViewOf),
-    verdictLine: report.verdictLine,
-    verdictColour: report.verdict === 'cleared' ? 'var(--ok)' : 'var(--warn)',
+    kind: 'week-day',
     streakLine: report.streakLine,
     contractLine: report.contractLine,
     cleared: clearedBannerOf(report.cleared),
-    goals: report.goals.map(goalRowViewOf),
-    diagnosis: diagnosisRowsOf(report.diagnosis),
-    levers: leverRowsOf(report.levers),
     forecast: report.forecast,
     taught: report.taught,
-    smallPrint: report.smallPrint,
     nextDayLabel: `Open the doors on ${report.nextDayName}`,
     canAdvance: true,
+  };
+}
+
+/**
+ * The whole sheet, filed or not. The only decision this surface makes.
+ *
+ * **The bare `DayReport` arm is a transition, and it is not a guess.** `types.ts`'s `DayReport` is
+ * by construction the week-day sheet — it declares `streakLine`, `contractLine`, `forecast` and
+ * `nextDayName` as required fields — so a caller still holding one is holding a day of a week and
+ * is read as such. It is here so this panel compiles against a `ViewerState.report` that has not
+ * yet been widened to `ShapedDayReport`; when it is, this arm and the `'of' in report` test both
+ * go, and nothing else in the function changes.
+ */
+export function reportViewOf(report: ShapedDayReport | DayReport | undefined): ReportView {
+  if (report === undefined) return emptyReportView();
+  const shaped: ShapedDayReport = 'of' in report ? report : { ...report, of: 'week-day' };
+  return {
+    filed: true,
+    title: shaped.title,
+    metaLines: shaped.metaLines,
+    lede: shaped.lede,
+    figures: shaped.figures.map(figureViewOf),
+    verdictLine: shaped.verdictLine,
+    verdictColour: shaped.verdict === 'cleared' ? 'var(--ok)' : 'var(--warn)',
+    goals: shaped.goals.map(goalRowViewOf),
+    diagnosis: diagnosisRowsOf(shaped.diagnosis),
+    levers: leverRowsOf(shaped.levers),
+    smallPrint: shaped.smallPrint,
+    framing: framingOf(shaped),
   };
 }
 
@@ -374,8 +467,14 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
    */
   ui.takeNext.addEventListener('click', () => {
     const view = latest;
-    const award = view?.state.report?.cleared ?? null;
-    const nextId = award?.nextContractId ?? null;
+    /*
+     * Read through the view rather than off the report. The banner belongs to the week-day framing,
+     * so asking the drawn view for it is the one question that stays correct whichever shape of
+     * sheet the state is holding — and a single run has no award to take by construction.
+     */
+    const framing = view === undefined ? undefined : reportViewOf(view.state.report).framing;
+    const nextId =
+      framing?.kind === 'week-day' ? (framing.cleared?.nextContractId ?? null) : null;
     if (view !== undefined && nextId !== null) {
       const contract = contractById(nextId);
       context.update({
@@ -506,10 +605,34 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
     );
   }
 
+  /*
+   * *Take it to Compare* — the one block `index.html` has no slot for.
+   *
+   * Built here rather than authored in the markup because the markup is the handoff's, and the
+   * handoff drew a week's sheet only; the lane that owns `index.html` gives this an id and a
+   * stylesheet. It sits directly under the small print, which is where the question it answers is
+   * raised: the small print says this run *cannot* tell you one dispatcher beat another, and this
+   * says where that can be settled. Both strings come from `shift/report.ts` — nothing here
+   * composes them, and the surface to navigate to is `framing.nextStep.surface` on the view.
+   */
+  const nextStepLabel = el(doc, 'div', {
+    style: { 'font-size': '13px', 'font-weight': '600', 'margin-top': '10px' },
+  });
+  const nextStepWhy = el(doc, 'p', { className: 'figure-note' });
+  const nextStepBox = el(doc, 'div', { children: [nextStepLabel, nextStepWhy] });
+  ui.smallPrint.insertAdjacentElement('afterend', nextStepBox);
+
   return {
     render(view: ViewAt): void {
       latest = view;
       const drawn = reportViewOf(view.state.report);
+      /*
+       * One `null` per shape, read once. Every week-shaped slot below is written *and* hidden from
+       * the same value, so a slot can never be left showing yesterday's sentence on a sheet that
+       * has no week — which is the bug this arrangement replaces, one indirection down.
+       */
+      const week = drawn.framing.kind === 'week-day' ? drawn.framing : null;
+      const single = drawn.framing.kind === 'single-run' ? drawn.framing : null;
 
       setText(ui.title, drawn.title);
       fill(ui.meta, ...drawn.metaLines.map((line) => el(doc, 'div', { text: line })));
@@ -518,24 +641,34 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
 
       setText(ui.verdict, drawn.verdictLine);
       setStyle(ui.verdict, 'color', drawn.verdictColour);
-      setText(ui.streak, drawn.streakLine);
-      setText(ui.contract, drawn.contractLine);
+      setText(ui.streak, week?.streakLine ?? '');
+      setHidden(ui.streak, week === null);
+      setText(ui.contract, week?.contractLine ?? '');
+      setHidden(ui.contract, week === null);
 
-      setHidden(ui.cleared, drawn.cleared === null);
-      setText(ui.clearedNote, drawn.cleared?.note ?? '');
+      setHidden(ui.cleared, (week?.cleared ?? null) === null);
+      setText(ui.clearedNote, week?.cleared?.note ?? '');
 
       drawGoals(drawn);
       drawDiagnosis(drawn);
       drawLevers(drawn);
 
-      setText(ui.forecastName, drawn.forecast.name);
-      setText(ui.forecastNote, drawn.forecast.note);
-      setText(ui.forecastDemand, drawn.forecast.demand);
-      setText(ui.taught, drawn.taught);
+      setText(ui.forecastName, week?.forecast.name ?? '');
+      setText(ui.forecastNote, week?.forecast.note ?? '');
+      setText(ui.forecastDemand, week?.forecast.demand ?? '');
+      setHidden(cardOf(ui.forecastName), week === null);
+      setText(ui.taught, week?.taught ?? '');
+      setHidden(cardOf(ui.taught), week === null);
       setText(ui.smallPrint, drawn.smallPrint);
 
-      setText(ui.nextDay, drawn.nextDayLabel);
-      ui.nextDay.disabled = !drawn.canAdvance;
+      setText(nextStepLabel, single?.nextStep.label ?? '');
+      setText(nextStepWhy, single?.nextStep.why ?? '');
+      setHidden(nextStepBox, single === null);
+
+      setText(ui.nextDay, week?.nextDayLabel ?? '');
+      ui.nextDay.disabled = !(week?.canAdvance ?? false);
+      // No tomorrow to open the doors on. The Back button is the whole of a single run's CTA row.
+      setHidden(ui.nextDay, week === null);
     },
   };
 }

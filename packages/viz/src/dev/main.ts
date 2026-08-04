@@ -131,6 +131,8 @@ import { mountScenarios } from './scenariosPanel.js';
 import { mountTrafficEditor } from './trafficEditor.js';
 import { playbackRateFor, shouldAutoplayWith } from './motion.js';
 import { themeFor } from '../render/theme.js';
+import { clearSession, loadSession, saveSession } from '../persist/session.js';
+import type { SessionStore } from '../persist/types.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
 import {
   DEFAULT_SHIFT_LENGTH_S,
@@ -388,6 +390,71 @@ function boot(ui: Elements, resources: BrowserResources): void {
   }
 
   /**
+   * The one place this build touches `localStorage` for a session — `persist/` decides, this reads.
+   *
+   * The account token is deliberately **not** here and never will be: `menu/account.ts` holds it in
+   * memory on purpose, and a persistence layer that quietly widened that decision would be
+   * overruling a security choice from a directory that does not own it.
+   */
+  const sessionStore: SessionStore = {
+    read: (key) => window.localStorage.getItem(key),
+    write: (key, value) => {
+      window.localStorage.setItem(key, value);
+    },
+    remove: (key) => {
+      window.localStorage.removeItem(key);
+    },
+  };
+
+  /**
+   * Bring back the week, the settings and the Free Play selection.
+   *
+   * ## Why a failed restore *clears* the slot
+   *
+   * `clearSession`'s only caller, and it is a necessary one rather than a tidy one. A snapshot that
+   * fails validation fails **deterministically** — a version this build cannot read, a shape it does
+   * not recognise, a contract `data/` no longer ships — so leaving it in place means re-reading and
+   * re-rejecting the same bytes on every load, forever, while every subsequent save is written over
+   * a slot the player can never get value from again. Clearing it costs a week that was already
+   * unreadable and gives the next save somewhere to live.
+   *
+   * `absent` is not a failure and is not cleared: it is an ordinary first visit.
+   *
+   * ## What a player is not told, stated rather than hidden
+   *
+   * The failure carries a reason and **nothing shows it**. A player whose week is dropped sees a
+   * fresh one and no explanation, which is a real gap and is filed as one in `GAPS.md` § 3 rather
+   * than papered over here — putting the sentence on screen makes it a player-facing string, and it
+   * would then owe the honesty sweep an adapter, which is a lane of its own.
+   */
+  function restoreSession(): void {
+    const restored = loadSession(sessionStore);
+    if (!restored.ok) {
+      if (restored.failure.kind !== 'absent') clearSession(sessionStore);
+      return;
+    }
+    menuState = {
+      ...menuState,
+      settings: restored.snapshot.settings,
+      freePlay: restored.snapshot.freePlay,
+    };
+    state = { ...state, week: restored.snapshot.week };
+    /*
+     * The building follows the week rather than being persisted beside it. `persist/` excludes
+     * `buildingId` deliberately: a contract names its building, so storing both would be two
+     * sources of truth for exactly the mismatch `withBuilding` exists to prevent — a sheet headed
+     * one building and footed another, which this repository has already shipped once.
+     */
+    const contract = contractById(restored.snapshot.week.contractId);
+    if (contract !== undefined) state = withBuilding(state, resources, contract.buildingId);
+  }
+
+  /** Write the session back. Cheap, total, and never throws — a refusing browser is not an error. */
+  function saveSessionNow(): void {
+    saveSession(sessionStore, state, menuState);
+  }
+
+  /**
    * Everything the menu asks for, in one exhaustive switch.
    *
    * ## Why a switch and not eight methods
@@ -426,6 +493,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
           // nudged — `renderAll` is the chokepoint every state change already goes through.
           if (intent.field === 'showEnergyAxis') renderAll();
           drawTransportChrome(viewAt());
+          saveSessionNow();
         }
         drawMenu();
         // Started on **arrival**, once, and never from inside a render: a render that fetched would
@@ -774,6 +842,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       applyNavigation();
     });
 
+  restoreSession();
   applyTheme();
   renderAll();
   runShift();
@@ -1318,6 +1387,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
       // *your own building — nothing is being banked* on the same day the banner cleared a
       // scenario and the rail counted the shift as banked: three panels, two answers.
       contract: contractById(state.week.contractId),
+      /*
+       * The sheet's shape follows the mode, and the mode is a field rather than a guess — see
+       * `ViewerState.playMode`. A Free Play run's sheet drops the week-shaped lines entirely
+       * (streak, banked count, tomorrow's forecast) rather than blanking them, because an empty slot
+       * the layout still reserves is `docs/10` R3's "blank where a number should be", one layer up.
+       */
+      subject:
+        state.playMode === 'free-play'
+          ? {
+              kind: 'single-run' as const,
+              selection: {
+                demandTemplateId: menuState.freePlay.demandTemplateId,
+                arrivalRatePctPop5min: menuState.freePlay.arrivalRatePctPop5min,
+                durationS: state.shiftLengthS,
+              },
+            }
+          : { kind: 'week-day' as const },
       event,
       dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
       dayStartS: DAY_START_S,
@@ -1330,6 +1416,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     state = { ...state, week, report };
     if (state.tab !== 'report') state = { ...state, tab: 'report' };
+    // A closed day is the thing a player would most mind losing to a reload, so it is the moment
+    // the session is written. `nextDay` goes through here on its way to the next sheet.
+    saveSessionNow();
     renderAll();
   }
 

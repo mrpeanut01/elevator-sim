@@ -34,8 +34,15 @@ import { contractById } from '../shift/contracts.js';
 import { SHIFT_EVENTS } from '../shift/events.js';
 import { GOAL_GLYPHS, goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
-import { WITHHELD, clockOf, dayReportOf } from '../shift/report.js';
-import type { DayReport, GoalReading, ReportFigure } from '../shift/types.js';
+import {
+  WITHHELD,
+  clockOf,
+  dayReportOf,
+  type ReportSubject,
+  type ShapedDayReport,
+  type WeekDayReport,
+} from '../shift/report.js';
+import type { GoalReading, ReportFigure } from '../shift/types.js';
 import { closeDay, openWeek, outcomeOf } from '../shift/week.js';
 
 import {
@@ -48,6 +55,7 @@ import {
   toneColourOf,
   type FigureView,
   type ReportView,
+  type WeekFramingView,
 } from './reportPanel.js';
 
 let config: LoadedConfig;
@@ -65,7 +73,11 @@ function runOf(buildingId: string, arrivalRatePctPop5min: number, durationS: num
 }
 
 /** The same fixture path `shift/report.test.ts` takes: one real run, folded at its own end. */
-function reportOf(recording: VizRecording, day = 4): DayReport {
+function reportOf(
+  recording: VizRecording,
+  day = 4,
+  subject: ReportSubject = { kind: 'week-day' },
+): ShapedDayReport {
   const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
   const goals = goalsForDay(day);
   const opened = { ...openWeek('c2'), day, dayIdx: (day - 1) % 7 };
@@ -88,8 +100,34 @@ function reportOf(recording: VizRecording, day = 4): DayReport {
     week,
     contract: contractById('c2'),
     event: SHIFT_EVENTS.ordinary,
+    subject,
   });
 }
+
+/**
+ * The week-shaped half of a drawn sheet, narrowed — and the narrowing is an assertion.
+ *
+ * Every suite outside the shape suite draws a day of a week, so a change that quietly framed
+ * everything as a single run would fail here by name rather than as a missing property.
+ */
+function weekFraming(view: ReportView): WeekFramingView {
+  if (view.framing.kind !== 'week-day') {
+    throw new Error(`expected a week-day framing, got "${view.framing.kind}"`);
+  }
+  return view.framing;
+}
+
+/** The week-day sheet, narrowed. Same rule as {@link weekFraming}, one layer up. */
+function weekDayReport(report: ShapedDayReport): WeekDayReport {
+  if (report.of !== 'week-day') throw new Error(`expected a week-day sheet, got "${report.of}"`);
+  return report;
+}
+
+/** The Free Play selection the shape suite runs from. */
+const SINGLE: ReportSubject = {
+  kind: 'single-run',
+  selection: { demandTemplateId: 'rise-and-fall', arrivalRatePctPop5min: 12, durationS: 900 },
+};
 
 function viewOf(recording: VizRecording, day = 4): ReportView {
   return reportViewOf(reportOf(recording, day));
@@ -117,18 +155,25 @@ function cell(view: ReportView, label: string): FigureView {
  * the list below and is held to the rule without exception.
  */
 function everyString(view: ReportView): readonly string[] {
+  const framing = view.framing;
   const out: string[] = [
     view.title,
     ...view.metaLines,
     view.lede,
     view.verdictLine,
-    view.streakLine,
-    view.contractLine,
-    view.cleared?.note ?? '',
-    view.forecast.demand,
-    view.taught,
     view.smallPrint,
-    view.nextDayLabel,
+    // The framing, whichever it is. A shape whose strings this walk did not reach would be a hole
+    // in every rule below — so both arms are listed and neither may be dropped.
+    ...(framing.kind === 'week-day'
+      ? [
+          framing.streakLine,
+          framing.contractLine,
+          framing.cleared?.note ?? '',
+          framing.forecast.demand,
+          framing.taught,
+          framing.nextDayLabel,
+        ]
+      : [framing.nextStep.label, framing.nextStep.why]),
   ];
   for (const figure of view.figures) out.push(figure.label, figure.value, figure.note);
   for (const goal of view.goals) out.push(goal.label, goal.display, goal.help);
@@ -284,13 +329,10 @@ describe('no clock time the run did not have', () => {
       const view = reportViewOf(reportOf(recording));
       const levers = view.levers.filter((lever) => /\d{2}:\d{2}/.test(lever.body));
       expect(levers.map((lever) => lever.title)).toEqual([]);
-      expect(/\d{2}:\d{2}/.test(view.forecast.name)).toBe(false);
-      expect(/\d{2}:\d{2}/.test(view.forecast.note)).toBe(false);
-      for (const text of [
-        ...view.levers.map((lever) => lever.body),
-        view.forecast.name,
-        view.forecast.note,
-      ]) {
+      const forecast = weekFraming(view).forecast;
+      expect(/\d{2}:\d{2}/.test(forecast.name)).toBe(false);
+      expect(/\d{2}:\d{2}/.test(forecast.note)).toBe(false);
+      for (const text of [...view.levers.map((lever) => lever.body), forecast.name, forecast.note]) {
         expect(text).not.toContain('17:20');
       }
     }
@@ -319,12 +361,12 @@ describe('the empty state, which is drawn rather than hidden', () => {
     expect(empty.goals).toEqual([]);
     expect(empty.diagnosis).toEqual([]);
     expect(empty.levers).toEqual([]);
-    expect(empty.cleared).toBeNull();
-    expect(empty.canAdvance).toBe(false);
+    expect(weekFraming(empty).cleared).toBeNull();
+    expect(weekFraming(empty).canAdvance).toBe(false);
   });
 
   it('names no weekday it has not earned', () => {
-    expect(emptyReportView().nextDayLabel).toBe('Open the doors on tomorrow');
+    expect(weekFraming(emptyReportView()).nextDayLabel).toBe('Open the doors on tomorrow');
   });
 });
 
@@ -336,8 +378,10 @@ describe('the rest of the sheet', () => {
     expect(view.metaLines).toEqual(report.metaLines);
     expect(view.verdictLine).toBe(report.verdictLine);
     expect(view.smallPrint).toBe(report.smallPrint);
-    expect(view.nextDayLabel).toBe(`Open the doors on ${report.nextDayName}`);
-    expect(view.canAdvance).toBe(true);
+    expect(weekFraming(view).nextDayLabel).toBe(
+      `Open the doors on ${weekDayReport(report).nextDayName}`,
+    );
+    expect(weekFraming(view).canAdvance).toBe(true);
   });
 
   it('colours a cleared verdict green and a missed one amber, never red', () => {
@@ -349,10 +393,10 @@ describe('the rest of the sheet', () => {
 
   it('shows the cleared banner only when a day banked the last clean shift', () => {
     // Garden Apartments at a gentle rate clears `c2`'s single day; the saturated run does not.
-    expect(reportViewOf(reportOf(saturated)).cleared).toBeNull();
-    const report = reportOf(clean);
+    expect(weekFraming(reportViewOf(reportOf(saturated))).cleared).toBeNull();
+    const report = weekDayReport(reportOf(clean));
     if (report.cleared !== null) {
-      const banner = reportViewOf(report).cleared;
+      const banner = weekFraming(reportViewOf(report)).cleared;
       expect(banner?.note).toContain(report.cleared.reward);
       expect(banner?.note).toContain(report.cleared.nextTitle);
       expect(banner?.nextContractId).toBe(report.cleared.nextContractId);
@@ -376,6 +420,81 @@ describe('the rest of the sheet', () => {
     ]);
     expect(rows[0]?.accent).toBe('var(--edge-strong)');
     expect(rows[1]?.accent).toBe('var(--bad)');
+  });
+});
+
+describe('a week’s slots are absent, not blank, on a run that has no week', () => {
+  /*
+   * Both directions, on the same recording and the same closed week — see `shift/report.test.ts`'s
+   * own note. The view is where the finding would survive a fixed shift layer: a panel that read
+   * `framing.streakLine ?? ''` and drew it anyway would put an empty span back into the layout,
+   * which is `docs/10` R3's blank-where-a-number-should-be one level up from a figure.
+   */
+  it('draws the week’s lines when the sheet is a day of a week', () => {
+    const framing = weekFraming(reportViewOf(reportOf(clean)));
+    expect(framing.kind).toBe('week-day');
+    expect(framing.contractLine.length).toBeGreaterThan(0);
+    expect(framing.streakLine.length).toBeGreaterThan(0);
+    expect(framing.taught.length).toBeGreaterThan(0);
+    expect(framing.forecast.demand.length).toBeGreaterThan(0);
+    expect(framing.nextDayLabel).toContain('Open the doors on');
+    expect(framing.canAdvance).toBe(true);
+  });
+
+  it('carries no key for any of them on a single run', () => {
+    const framing = reportViewOf(reportOf(clean, 4, SINGLE)).framing;
+    expect(framing.kind).toBe('single-run');
+    for (const field of [
+      'streakLine',
+      'contractLine',
+      'cleared',
+      'forecast',
+      'taught',
+      'nextDayLabel',
+      'canAdvance',
+    ]) {
+      expect(field in framing, `${field} is still on a single run's framing`).toBe(false);
+    }
+  });
+
+  it('passes the next step through untouched, and composes none of it here', () => {
+    // The panel may not decide what Compare is for. Identity, not equality: the value is the shift
+    // layer's own, so a string edited on the way to the screen fails.
+    const report = reportOf(clean, 4, SINGLE);
+    if (report.of !== 'single-run') throw new Error('expected a single-run sheet');
+    const framing = reportViewOf(report).framing;
+    expect(framing.kind === 'single-run' && framing.nextStep).toBe(report.nextStep);
+  });
+
+  it('draws the same figures, goals, diagnosis and levers on either shape', () => {
+    const week = reportViewOf(reportOf(clean));
+    const single = reportViewOf(reportOf(clean, 4, SINGLE));
+    expect(single.figures).toEqual(week.figures);
+    expect(single.goals).toEqual(week.goals);
+    expect(single.diagnosis).toEqual(week.diagnosis);
+    expect(single.levers).toEqual(week.levers);
+    expect(single.smallPrint).toBe(week.smallPrint);
+    expect(single.verdictColour).toBe(week.verdictColour);
+  });
+
+  it('holds every rule of this suite on a single run’s sheet too', () => {
+    // The clock rule and the no-digit rule are properties of the *sheet*, not of the week-shaped
+    // half of it. Re-run over the shape this change introduced, so a new string cannot arrive
+    // exempt from the rules every other string here obeys.
+    for (const recording of [clean, saturated]) {
+      const view = reportViewOf(reportOf(recording, 4, SINGLE));
+      const inside = new Set<string>();
+      for (let t = recording.startedAt; t <= recording.endedAt; t += 30) inside.add(clockOf(t));
+      inside.add(clockOf(recording.endedAt));
+      for (const text of everyString(view)) {
+        for (const found of text.match(/\d{2}:\d{2}/g) ?? []) {
+          expect(inside.has(found), `${found} in "${text}" is outside the run`).toBe(true);
+        }
+      }
+    }
+    expect(cell(reportViewOf(reportOf(saturated, 4, SINGLE)), 'AVERAGE WAIT').value).not.toMatch(
+      /\d/,
+    );
   });
 });
 
@@ -456,6 +575,45 @@ describe('the sheet’s buttons have one owner — DR-13', () => {
       (source.match(/week:\s*nextDay\(/g) ?? []).length;
     expect(applications(panel)).toBe(1);
     expect(applications(shell)).toBe(0);
+  });
+});
+
+describe('the mount hides a slot it has nothing to put in', () => {
+  /*
+   * There is no jsdom here, so the *drawing* half of "absent, not blanked" cannot be observed the
+   * way the view half can — and it is the half a reader actually sees. Pinned at the source, in the
+   * idiom the DR-13 suite above already uses for the same reason: the decision is in the view and
+   * asserted properly; this only checks that the render acts on it for every week-shaped slot
+   * rather than writing `''` into six elements the layout keeps reserving.
+   */
+  const slots = [
+    'setHidden(ui.streak',
+    'setHidden(ui.contract',
+    'setHidden(ui.cleared',
+    'setHidden(cardOf(ui.forecastName)',
+    'setHidden(cardOf(ui.taught)',
+    'setHidden(ui.nextDay',
+  ] as const;
+
+  it('hides every one of the week’s slots, the two cards by their card', async () => {
+    const panel = await readFile(fileURLToPath(new URL('./reportPanel.ts', import.meta.url)), 'utf8');
+    for (const call of slots) {
+      expect(panel.includes(call), `${call} — the slot is emptied but never hidden`).toBe(true);
+    }
+    // `#report-forecast-name` and `#report-taught` are fields inside captioned cards, and the
+    // caption is their sibling. Hiding the field alone leaves *Tomorrow* over an empty box.
+    expect(panel).not.toContain('setHidden(ui.forecastName');
+    expect(panel).not.toContain('setHidden(ui.taught');
+  });
+
+  it('still does no arithmetic anywhere in the file', async () => {
+    // The property the module docstring rests on, re-asserted because this change added a branch
+    // to the render: a renderer that cannot compute a mean cannot compute one wrongly.
+    const panel = await readFile(fileURLToPath(new URL('./reportPanel.ts', import.meta.url)), 'utf8');
+    const body = panel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    for (const forbidden of ['toFixed(', 'Math.round(', 'Math.min(', 'Math.max(']) {
+      expect(body, forbidden).not.toContain(forbidden);
+    }
   });
 });
 

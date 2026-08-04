@@ -13,6 +13,11 @@
  *    both are always present or both absent, and no other figure carries an energy unit.
  * 4. **It may not print a clock time the run did not have.** Every `when` on the diagnosis rows is
  *    inside the run's own span or is the em dash.
+ * 5. **It may not be shaped like a week when it is a report of one run.** `docs/17` § 5 clause 1.
+ *    Asserted in **both** directions on the same recording and the same week — the week-shaped
+ *    lines are present under `week-day` and *absent as keys* under `single-run` — because either
+ *    half alone proves nothing: a suite that only checked the absences would pass against a sheet
+ *    that had lost those lines everywhere.
  */
 
 import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
@@ -37,10 +42,44 @@ import { shiftObservationsOf } from './observations.js';
  */
 const observationsOfRun = (recording: Parameters<typeof observationsAt>[0]) =>
   shiftObservationsOf(observationsAt(recording, recording.endedAt));
-import { NOT_RECORDED, WITHHELD, averageWaitFigure, clockOf, dayReportOf } from './report.js';
+import {
+  NOT_RECORDED,
+  WITHHELD,
+  averageWaitFigure,
+  clockOf,
+  dayReportOf,
+  type ReportSubject,
+  type ShapedDayReport,
+  type SingleRunReport,
+  type WeekDayReport,
+} from './report.js';
 import { closeDay, openWeek, outcomeOf } from './week.js';
-import { DAY_START_S, type DayReport, type Observations } from './types.js';
+import { DAY_START_S, WEEKDAYS, type Observations } from './types.js';
 import { readGoals } from './goals.js';
+
+/**
+ * The week-day sheet, narrowed — and the narrowing is an assertion, not a cast.
+ *
+ * Every suite below except the shape suite is about figures, and a figure is the same value on
+ * either sheet. Reaching those figures through a checked narrowing means a change that quietly
+ * turned every sheet into a single run would fail here loudly rather than by a missing property.
+ */
+function weekDay(report: ShapedDayReport): WeekDayReport {
+  if (report.of !== 'week-day') throw new Error(`expected a week-day sheet, got "${report.of}"`);
+  return report;
+}
+
+function singleRun(report: ShapedDayReport): SingleRunReport {
+  if (report.of !== 'single-run') throw new Error(`expected a single-run sheet, got "${report.of}"`);
+  return report;
+}
+
+/** The one selection the shape suite runs from. Free Play's own six axes, minus what the recording carries. */
+const SELECTION = {
+  demandTemplateId: 'rise-and-fall',
+  arrivalRatePctPop5min: 12,
+  durationS: 900,
+} as const;
 
 let config: LoadedConfig;
 let clean: VizRecording;
@@ -57,7 +96,7 @@ function runOf(buildingId: string, arrivalRatePctPop5min: number, durationS: num
 }
 
 /** A report over a real recording, with the week already closed on it. */
-function reportOf(recording: VizRecording, day = 4): DayReport {
+function reportOf(recording: VizRecording, day = 4): WeekDayReport {
   const observations = observationsOfRun(recording);
   const goals = goalsForDay(day);
   const opened = { ...openWeek('c2'), day, dayIdx: (day - 1) % 7 };
@@ -73,17 +112,23 @@ function reportOf(recording: VizRecording, day = 4): DayReport {
       readings: readGoals(goals, observations),
     }),
   );
-  return dayReportOf({
-    recording,
-    observations,
-    goals,
-    week,
-    contract: contractById('c2'),
-    event: SHIFT_EVENTS.ordinary,
-  });
+  return weekDay(
+    dayReportOf({
+      recording,
+      observations,
+      goals,
+      week,
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      subject: { kind: 'week-day' },
+    }),
+  );
 }
 
-function figure(report: DayReport, id: string): { value: string; note: string; tone: string; axisOnly: boolean } {
+function figure(
+  report: ShapedDayReport,
+  id: string,
+): { value: string; note: string; tone: string; axisOnly: boolean } {
   const found = report.figures.find((candidate) => candidate.id === id);
   if (found === undefined) throw new Error(`no figure "${id}" on the sheet`);
   return found;
@@ -203,6 +248,7 @@ describe('the observations, which are never suppressed', () => {
       week: openWeek('c2'),
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
+      subject: { kind: 'week-day' },
     });
     expect(figure(report, 'deepest-queue').note).toBe('never more than a handful');
     expect(report.diagnosis[0]?.when).toBe('—');
@@ -236,6 +282,7 @@ describe('WORST WAIT states its censoring', () => {
       week: openWeek('c2'),
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
+      subject: { kind: 'week-day' },
     });
     const worst = figure(report, 'worst-wait');
     expect(worst.value).toBe('at least 640 s');
@@ -261,6 +308,7 @@ describe('WORST WAIT states its censoring', () => {
         week: openWeek('c2'),
         contract: contractById('c2'),
         event: SHIFT_EVENTS.ordinary,
+        subject: { kind: 'week-day' },
       }).figures.find((cell) => cell.id === 'worst-wait')?.value,
     ).toBe(NOT_RECORDED);
   });
@@ -317,6 +365,7 @@ describe('energy is an axis, never a score — § D106', () => {
       week: openWeek('c2'),
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
+      subject: { kind: 'week-day' },
     });
     expect(figure(report, 'energy-work').value).toBe(NOT_RECORDED);
     expect(figure(report, 'energy-per-leg').value).toBe(NOT_RECORDED);
@@ -368,6 +417,7 @@ describe('where it went wrong is derived from the run', () => {
       week: openWeek('c2'),
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
+      subject: { kind: 'week-day' },
     });
     const phaseRow = report.diagnosis.find((row) => row.id === 'peak-phase');
     expect(phaseRow?.when).toBe('—');
@@ -451,29 +501,194 @@ describe('the rest of the sheet', () => {
   it('never claims more banked than the contract asks — SC-05/DR-09', () => {
     // Driven 2026-07-30 (§ D198): cleanRun keeps counting on a contract already cleared, so the
     // sheet could read "2 of 1 clean shifts banked". Display clamp only; the week keeps its count.
-    const report = dayReportOf({
-      recording: clean,
-      observations: observationsOfRun(clean),
-      goals: goalsForDay(4),
-      week: { ...openWeek('c2'), cleanRun: 5 },
-      contract: contractById('c2'),
-      event: SHIFT_EVENTS.ordinary,
-    });
+    const report = weekDay(
+      dayReportOf({
+        recording: clean,
+        observations: observationsOfRun(clean),
+        goals: goalsForDay(4),
+        week: { ...openWeek('c2'), cleanRun: 5 },
+        contract: contractById('c2'),
+        event: SHIFT_EVENTS.ordinary,
+        subject: { kind: 'week-day' },
+      }),
+    );
     expect(report.contractLine).toContain('2 of 2 clean shifts banked');
     expect(report.contractLine).not.toContain('5 of');
   });
 
   it('grades a reader’s own building without pretending it banks anything', () => {
-    const report = dayReportOf({
+    const report = weekDay(
+      dayReportOf({
+        recording: clean,
+        observations: observationsOfRun(clean),
+        goals: goalsForDay(4),
+        week: openWeek('c2'),
+        contract: undefined,
+        event: SHIFT_EVENTS.ordinary,
+        subject: { kind: 'week-day' },
+      }),
+    );
+    expect(report.contractLine).toContain('nothing is being banked');
+    expect(report.taught).toContain('Nothing banks here');
+  });
+});
+
+describe('what the sheet is a report of — docs/17 § 5 clause 1', () => {
+  /**
+   * The week that made the finding: day 4 of `c2`, a streak running and one shift banked.
+   *
+   * Both shapes are built from **this same week**, this same recording and this same contract, so
+   * the only thing that differs between the two sheets below is the subject. A single-run sheet
+   * built from a fresh `openWeek()` would prove nothing — it would have had nothing to say about a
+   * week even if it wanted to, which is precisely the inference this change refuses to make.
+   */
+  const SHAPE_WEEK = { ...openWeek('c2'), day: 4, dayIdx: 3, streak: 2, cleanRun: 1 };
+
+  function sheetOf(subject: ReportSubject, week = SHAPE_WEEK): ShapedDayReport {
+    return dayReportOf({
       recording: clean,
       observations: observationsOfRun(clean),
       goals: goalsForDay(4),
-      week: openWeek('c2'),
-      contract: undefined,
+      week,
+      contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
+      subject,
     });
-    expect(report.contractLine).toContain('nothing is being banked');
-    expect(report.taught).toContain('Nothing banks here');
+  }
+
+  const SINGLE: ReportSubject = { kind: 'single-run', selection: SELECTION };
+
+  /** Every string a single-run sheet will show. The framing is the only place a week could hide. */
+  function everyString(report: SingleRunReport): readonly string[] {
+    return [
+      report.title,
+      ...report.metaLines,
+      report.lede,
+      report.verdictLine,
+      report.smallPrint,
+      report.nextStep.label,
+      report.nextStep.why,
+      ...report.figures.flatMap((cell) => [cell.label, cell.value, cell.note]),
+      ...report.goals.map((reading) => reading.goal.label),
+      ...report.diagnosis.flatMap((row) => [row.when, row.what, row.why]),
+      ...report.levers.flatMap((lever) => [lever.title, lever.body]),
+    ];
+  }
+
+  it('says the week’s five things when the run is a day of a week', () => {
+    // The positive control. Without it the absences below would pass against a sheet that had
+    // simply lost these lines for everybody.
+    const report = weekDay(sheetOf({ kind: 'week-day' }));
+    expect(report.of).toBe('week-day');
+    expect(report.title).toBe('Thursday — day 4');
+    expect(report.contractLine).toContain('Scenario 2 — The morning rush');
+    expect(report.contractLine).toContain('clean shifts banked');
+    expect(report.streakLine).toContain('clean days in a row');
+    expect(report.forecast.demand).toContain('more tenants than today');
+    expect(report.taught).toContain('Bank');
+    expect(WEEKDAYS).toContain(report.nextDayName);
+  });
+
+  it('does not carry them at all on one run — absent keys, not empty strings', () => {
+    /*
+     * `in`, not `=== ''`. A slot the layout still reserves and fills with nothing is `docs/10` R3's
+     * blank-where-a-number-should-be at the sheet's scale, and it is indistinguishable from a
+     * surface that failed to load. The panel can only omit what it is not given.
+     */
+    const report = singleRun(sheetOf(SINGLE));
+    expect(report.of).toBe('single-run');
+    for (const field of [
+      'streakLine',
+      'contractLine',
+      'cleared',
+      'forecast',
+      'taught',
+      'nextDayName',
+    ]) {
+      expect(field in report, `${field} is still on a single run's sheet`).toBe(false);
+      expect(Object.keys(report), field).not.toContain(field);
+    }
+  });
+
+  it('names no scenario and counts nothing banked, on the very week that would have', () => {
+    // The finding, verbatim: *"Scenario 2 — The morning rush · 1 of 2 clean shifts banked"* on a
+    // run that banks nothing. Swept over every string the sheet will show, not only the two lines.
+    const report = singleRun(sheetOf(SINGLE));
+    for (const text of everyString(report)) {
+      expect(text, text).not.toContain('Scenario');
+      expect(text, text).not.toContain('clean shift');
+      expect(text, text).not.toContain('clean days in a row');
+      expect(text.toLowerCase(), text).not.toContain('streak');
+      expect(text.toLowerCase(), text).not.toContain('tomorrow');
+    }
+    expect(weekDay(sheetOf({ kind: 'week-day' })).contractLine).toContain('Scenario');
+  });
+
+  it('names no weekday, and titles the run by what it is a run of', () => {
+    const report = singleRun(sheetOf(SINGLE));
+    expect(report.title).toContain(clean.buildingName);
+    for (const text of everyString(report)) {
+      for (const day of WEEKDAYS) expect(text, `${day} in "${text}"`).not.toContain(day);
+    }
+  });
+
+  it('carries the seed and the selection, because reproducing it is the whole value', () => {
+    const meta = singleRun(sheetOf(SINGLE)).metaLines.join('\n');
+    expect(meta).toContain(`seed ${clean.seed}`);
+    expect(meta).toContain(clean.buildingName);
+    expect(meta).toContain(SELECTION.demandTemplateId);
+    expect(meta).toContain('12.0 %pop/5min');
+    expect(meta).toContain('15 min selected');
+    expect(meta).toContain('not part of a week');
+  });
+
+  it('says whose rate it was rather than printing a number nobody chose', () => {
+    // R3 again: `null` means *the building's own traffic profile*, which is a different selection
+    // from any particular figure and may not be resolved into one on the way to a reader.
+    const meta = singleRun(
+      sheetOf({ kind: 'single-run', selection: { ...SELECTION, arrivalRatePctPop5min: null } }),
+    ).metaLines.join('\n');
+    expect(meta).toContain('the building’s own rate');
+    expect(meta).not.toContain('%pop/5min');
+    expect(meta).not.toContain('0.0');
+  });
+
+  it('points at Compare as data, and says why — and a week-day sheet does not', () => {
+    const step = singleRun(sheetOf(SINGLE)).nextStep;
+    expect(step.surface).toBe('compare');
+    expect(step.label.length).toBeGreaterThan(0);
+    // The two halves of docs/12 § 2.3: the same passengers, and the answer when it cannot tell.
+    expect(step.why).toContain('same passengers');
+    expect(step.why).toContain('indistinguishable');
+    expect(step.why).toContain('interval contains zero');
+    expect('nextStep' in weekDay(sheetOf({ kind: 'week-day' }))).toBe(false);
+  });
+
+  it('counts attempts on both shapes, each in its own words', () => {
+    // The attempt is an observation about a retry, and a retry happens in either mode — docs/16
+    // § 6. What changes is what was retried: a day, or a selection.
+    const retried = { ...SHAPE_WEEK, attempt: 3 };
+    expect(sheetOf({ kind: 'week-day' }, retried).metaLines).toContain('attempt 3 at this day');
+    expect(sheetOf(SINGLE, retried).metaLines).toContain('attempt 3 at this selection');
+    expect(sheetOf(SINGLE).metaLines.some((line) => line.startsWith('attempt'))).toBe(false);
+  });
+
+  it('changes nothing about the figures, the diagnosis, the levers or the small print', () => {
+    /*
+     * The other half of the fix, and the half a reviewer should distrust first: § D106's two
+     * `unranked` energy cells, the `WITHHELD` gate and `docs/10` R3/R11 govern the figure grid and
+     * they are correct. The sheet's *shape* changed; nothing it publishes did.
+     */
+    const week = weekDay(sheetOf({ kind: 'week-day' }));
+    const single = singleRun(sheetOf(SINGLE));
+    expect(single.figures).toEqual(week.figures);
+    expect(single.diagnosis).toEqual(week.diagnosis);
+    expect(single.levers).toEqual(week.levers);
+    expect(single.goals).toEqual(week.goals);
+    expect(single.lede).toBe(week.lede);
+    expect(single.verdict).toBe(week.verdict);
+    expect(single.verdictLine).toBe(week.verdictLine);
+    expect(single.smallPrint).toBe(week.smallPrint);
   });
 });
 

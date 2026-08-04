@@ -69,7 +69,9 @@ import { eventFor, shiftRunPatch, baseDemandOf } from '../shift/events.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
 import { openWeek, takeContract } from '../shift/week.js';
-import type { DayReport, ShiftEvent, WeekState } from '../shift/types.js';
+import type { ShiftEvent, WeekState } from '../shift/types.js';
+import type { ShapedDayReport } from '../shift/report.js';
+import type { PlayMode } from '../scope/types.js';
 
 import type { BrowserResources } from './data.js';
 import { PREFERRED_VIEWER_DISPATCHERS, preferredDispatcherId } from './defaults.js';
@@ -133,6 +135,29 @@ export interface FreePlayOverride {
 }
 
 export interface ViewerState {
+  /* --- which game is being played ----------------------------------------- */
+  /**
+   * Which play mode this state belongs to — `docs/16` § 3, and `scope/types.ts`'s `PlayMode`.
+   *
+   * ## Why this is a field and not an inference
+   *
+   * The shell had exactly one signal for *"is this a week or a single run?"*: `freePlay !==
+   * undefined`. That happens to be true today, because `enterFreePlay` is the only writer of
+   * `freePlay` and the campaign never sets it — and it is the shape of fact that stops being true
+   * the day somebody adds a second writer, silently, in a sheet that has already been wrong about
+   * this once.
+   *
+   * It also could not be inferred the obvious other way. A Free Play run on `midtown-office` keeps
+   * that building's **contract id** on its fresh week, because `enterFreePlay` calls
+   * `openWeek(contractForBuilding(id)?.id)` to keep the scenario label honest — so *"no contract"*
+   * never meant *"no week"*, and that is precisely the mechanism by which the report came to print
+   * *"Scenario 2 · 1 of 2 clean shifts banked"* over a run banking nothing.
+   *
+   * `docs/16` S1: an absence indistinguishable from an oversight is not a declaration. So the mode
+   * is named.
+   */
+  readonly playMode: PlayMode;
+
   /* --- disclosure --------------------------------------------------------- */
   readonly mode: ViewMode;
   /**
@@ -198,7 +223,7 @@ export interface ViewerState {
 
   /* --- the run ------------------------------------------------------------ */
   readonly recording: VizRecording | undefined;
-  readonly report: DayReport | undefined;
+  readonly report: ShapedDayReport | undefined;
   /** What the last run refused to configure, from `shiftRunPatch`. Shown, never swallowed. */
   readonly withheld: readonly string[];
 }
@@ -269,6 +294,7 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
   const classes = classesFromSpecs(resources.elevatorSpecs);
   const building = buildingConfigOf(resources, [], buildingId);
   return {
+    playMode: 'shift-week',
     mode: 'basic',
     showMaths: true,
     tab: 'run',

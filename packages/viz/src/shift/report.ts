@@ -47,6 +47,41 @@
  * {@link Observations} the live layer folded out of the recording. This module formats and
  * refuses; it does not measure. That is the same division `campaign/judge.ts` states for the
  * batch — *"nothing statistical is computed here"*.
+ *
+ * ## The sheet knows what it is a report **of** — and it is told, never guessed
+ *
+ * `docs/17` § 5 clause 1: the sheet named a scenario and printed *"1 of 2 clean shifts banked"* on a
+ * Free Play run that banks nothing and belongs to no week. Every line was individually honest —
+ * `contractLineFor` answers correctly when there is no contract — and the *sheet* was still the
+ * wrong shape, because five of its statements (`streakLine`, `contractLine`, the cleared banner,
+ * tomorrow's forecast, *What this taught* and *Open the doors on Wednesday*) are claims about a
+ * **week**, and a single run has none.
+ *
+ * So {@link DayReportInput} carries a **named** {@link ReportSubject} and the result is a
+ * discriminated union: {@link WeekDayReport} keeps types.ts's {@link DayReport} whole, and
+ * {@link SingleRunReport} does not have those fields **at all**. Not blanked — absent. An empty
+ * string in a slot the layout still reserves is `docs/10` R3's *blank where a number should be*,
+ * one layer up: the reader sees a caption over a hole and cannot tell a missing statement from a
+ * broken one.
+ *
+ * **Why a named subject rather than a derived one.** It *is* derivable today — `enterFreePlay`
+ * opens on `openWeek()`, so a Free Play run is exactly *no contract, day 1, empty history, streak
+ * zero* — and deriving it would have been wrong twice over. First, the inference is false on its
+ * face: `openWeek(contractForBuilding(...)?.id)` means a Free Play run on `midtown-office` **has**
+ * a contract id, which is how the defect reads *"Scenario 2 — The morning rush"* in the first
+ * place. Second, and this is the general rule: `docs/16` S1 refuses an absence that is
+ * indistinguishable from an oversight, and the defect being fixed here *is* an omission — a caller
+ * that forgot to say what its run was. A required field cannot be forgotten by the next mode that
+ * arrives; a default named `week-day` would let the same bug ship again in silence.
+ *
+ * **What replaces the week on a single run.** Two things, because a single run's whole value is
+ * that somebody else can run it again and that this sheet may not settle anything on its own:
+ * the selection — seed, building, dispatcher, template, rate, length — in the meta block beside the
+ * seed that is already there; and {@link ReportNextStep}, which names **Compare**. `docs/17` § 3.4
+ * records Compare as unreachable from the moment a player wants it, and `docs/12` § 2.3 makes it
+ * the only surface in the product allowed to say one dispatcher beat another. The pointer is
+ * **data on the report**, not a string in the panel, so the surface it names is a value a shell can
+ * navigate on rather than prose a reader has to act on themselves.
  */
 
 import type { SimTime } from '@elevator-sim/core/browser';
@@ -83,6 +118,87 @@ export const WITHHELD = 'withheld';
 /** What an unmeasured quantity reads. Never `0`, never a dash. `docs/10` R3/R11. */
 export const NOT_RECORDED = 'not recorded';
 
+/**
+ * What a single run was started from — everything the CLI would need to run it again, and nothing
+ * the recording can already answer.
+ *
+ * The building, the dispatcher and the **seed** are not here: `VizRecording` carries all three, and
+ * a second copy of a fact the recording already holds is a second source of truth about the run's
+ * identity — the disagreement `docs/16` S5 exists to prevent. What is left is the three axes the
+ * recording genuinely cannot answer.
+ *
+ * `arrivalRatePctPop5min` is `null` for *"whatever this building's own traffic profile says"*, which
+ * is a different selection from any particular number and is printed as one. `durationS` is the
+ * **selected** length rather than `endedAt − startedAt`: a run that stopped early still reproduces
+ * from the length that was asked for, and the span it actually had is already on the line above.
+ */
+export interface SingleRunSelection {
+  readonly demandTemplateId: string;
+  readonly arrivalRatePctPop5min: number | null;
+  readonly durationS: number;
+}
+
+/**
+ * What this sheet is a report **of**. Named by the caller; never inferred from the week's shape.
+ *
+ * Two members, and a third would be a compile error at every exhaustive branch below — the split
+ * `mode/types.ts` states and `docs/16` S4 requires of scope and mode: *the categories are named by
+ * the criterion itself, the members of those sets are derived*. See the module docstring for why
+ * this is a required field rather than a default.
+ */
+export type ReportSubject =
+  | { readonly kind: 'week-day' }
+  | { readonly kind: 'single-run'; readonly selection: SingleRunSelection };
+
+/**
+ * Where a reader goes when this sheet cannot answer their question — as a value, not as prose.
+ *
+ * `surface` is a named member so a shell can navigate on it; `label` and `why` are the words. The
+ * pointer exists because the question a single run provokes — *is this better?* — is the one
+ * question this sheet is forbidden to answer, and `docs/17` § 3.4 found the only surface that may
+ * answer it reachable from nowhere the player is standing when they ask.
+ */
+export interface ReportNextStep {
+  readonly surface: 'compare';
+  readonly label: string;
+  readonly why: string;
+}
+
+/**
+ * The half of the sheet that is true of **any** run — derived from {@link DayReport} by removing
+ * the week-shaped fields rather than restated, so a field added to `DayReport` cannot silently miss
+ * the single-run sheet.
+ */
+export type ReportCore = Omit<DayReport, WeekShapedField>;
+
+/**
+ * The five statements that need a week to be true — and `taught` is the one worth arguing.
+ *
+ * Its branches are *"Cleared: `<reward>`"* and *"Bank N more clean shifts and the next assignment
+ * opens"*; even the no-contract branch — *"nothing banks here"* — answers *what did today bank?*.
+ * That question is not asked of a run that belongs to no week, and answering an unasked question in
+ * a card captioned **What this taught** is how a sheet ends up shaped like something it is not.
+ */
+type WeekShapedField = 'streakLine' | 'contractLine' | 'cleared' | 'forecast' | 'taught' | 'nextDayName';
+
+/** A day of a week: types.ts's {@link DayReport} exactly, plus the discriminator. */
+export interface WeekDayReport extends DayReport {
+  readonly of: 'week-day';
+}
+
+/**
+ * One run, belonging to no week — the same figures, the same diagnosis, the same levers and the
+ * same small print, with the week's five statements **absent** and two single-run ones in their
+ * place. See the module docstring.
+ */
+export interface SingleRunReport extends ReportCore {
+  readonly of: 'single-run';
+  readonly nextStep: ReportNextStep;
+}
+
+/** A filed sheet, of either shape. Narrow on {@link WeekDayReport.of}. */
+export type ShapedDayReport = WeekDayReport | SingleRunReport;
+
 export interface DayReportInput {
   readonly recording: VizRecording;
   /** From `packages/viz/src/live/`. See `types.ts` — this layer never folds a recording itself. */
@@ -94,18 +210,17 @@ export interface DayReportInput {
   /** `undefined` for a building the reader built, which is graded but belongs to no scenario. */
   readonly contract: ScenarioContract | undefined;
   readonly event: ShiftEvent;
+  /**
+   * Whether this run is a day of a week or a run on its own. **Required** — see the module
+   * docstring: the defect this field closes was a caller that forgot to say.
+   */
+  readonly subject: ReportSubject;
   /** The dispatcher's display name. Defaults to the recording's profile id. */
   readonly dispatcherName?: string | undefined;
   /** The simulated second the shift clock calls 06:00. See {@link DAY_START_S}. */
   readonly dayStartS?: SimTime | undefined;
 }
 
-/**
- * Build the day's observation sheet.
- *
- * Pure: no clock, no RNG, no simulation. The run already happened and the observations were already
- * folded; this arranges them and refuses what may not be said.
- */
 /**
  * *Attempt 3* — said, once there has been more than one.
  *
@@ -125,39 +240,116 @@ export interface DayReportInput {
  * Absent on the first, because *"attempt 1"* on every sheet is noise that trains a reader to stop
  * reading the line — and the line only means anything by contrast.
  */
-function attemptLine(attempt: number): readonly string[] {
-  return attempt > 1 ? [`attempt ${String(attempt)} at this day`] : [];
+function attemptLine(subject: ReportSubject, attempt: number): readonly string[] {
+  if (attempt <= 1) return [];
+  // *at this day* is a week's phrasing. A single run re-rolls a selection, not a Tuesday.
+  const what = subject.kind === 'week-day' ? 'at this day' : 'at this selection';
+  return [`attempt ${String(attempt)} ${what}`];
 }
 
-export function dayReportOf(input: DayReportInput): DayReport {
-  const { recording, observations, week, contract, event } = input;
+/**
+ * The identity block — and the two lines a single run adds to it.
+ *
+ * The seed is already here, which is half of *somebody else can run this again*; the other half is
+ * the three axes the recording does not carry, so they go on the line under it rather than into a
+ * block of their own. The second added line says the run is not part of a week, because a reader
+ * who knows the campaign sheet will otherwise read the missing streak as a missing **number**
+ * rather than as a missing **question** — which is the same R3 confusion the absent lines avoid.
+ */
+function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: SimTime): readonly string[] {
+  const { recording, subject, week } = input;
+  return [
+    `${recording.buildingName} · ${dispatcherName}`,
+    `seed ${recording.seed} · ${clockRange(recording.startedAt, recording.endedAt, dayStartS)} · one replication`,
+    ...(subject.kind === 'single-run' ? selectionLines(subject.selection) : []),
+    ...attemptLine(subject, week.attempt),
+  ];
+}
+
+/** The rest of what it takes to run this again, and the statement that it stands alone. */
+function selectionLines(selection: SingleRunSelection): readonly string[] {
+  const rate =
+    selection.arrivalRatePctPop5min === null
+      ? 'the building’s own rate'
+      : `${selection.arrivalRatePctPop5min.toFixed(1)} %pop/5min`;
+  return [
+    `${selection.demandTemplateId} · ${rate} · ${String(Math.round(selection.durationS / 60))} min selected`,
+    'one run, not part of a week — nothing is banked',
+  ];
+}
+
+/**
+ * Where to take the question this sheet may not answer.
+ *
+ * Frozen and shared: it is a fact about the product's surfaces, not a reading of this run, and a
+ * per-run copy would invite somebody to make it one. The wording answers the small print's own
+ * *"it cannot tell you that X is better than anything"* with the surface that can — `docs/12`
+ * § 2.3 — including the answer it gives when the interval contains zero, so a reader is not sent
+ * off expecting a winner.
+ */
+const COMPARE_NEXT_STEP: ReportNextStep = Object.freeze({
+  surface: 'compare',
+  label: 'Take it to Compare',
+  why:
+    'One run cannot tell you a dispatcher is better. Compare runs the alternatives against the ' +
+    'same passengers, fifty or more times each, and reports the paired interval — it is the only ' +
+    'surface here allowed to say one beat the other, and it answers “indistinguishable” when the ' +
+    'interval contains zero.',
+});
+
+/**
+ * Build the observation sheet — of a day of a week, or of one run.
+ *
+ * Pure: no clock, no RNG, no simulation. The run already happened and the observations were already
+ * folded; this arranges them and refuses what may not be said.
+ *
+ * The shared half is built once, as {@link ReportCore}, and the branch adds one framing or the
+ * other. Written that way so the figure grid, the diagnosis, the levers and the small print are
+ * *the same values* on both sheets rather than two lists that agree today: the finding this
+ * function answers is about the sheet's shape, and nothing about which figures it publishes or
+ * which of them may be refused changes with the subject.
+ */
+export function dayReportOf(input: DayReportInput): ShapedDayReport {
+  const { recording, observations, week, contract, subject } = input;
   const { summary } = recording;
   const dayStartS = input.dayStartS ?? DAY_START_S;
   const dispatcherName = input.dispatcherName ?? recording.dispatcherProfileId;
   const readings = readGoals(input.goals, observations);
   const allMet = readings.length > 0 && readings.every((reading) => reading.state === 'met');
-  const nextIdx = (week.dayIdx + 1) % 7;
 
-  return {
-    title: `${weekdayOf(week.dayIdx)} — day ${String(week.day)}`,
-    metaLines: [
-      `${recording.buildingName} · ${dispatcherName}`,
-      `seed ${recording.seed} · ${clockRange(recording.startedAt, recording.endedAt, dayStartS)} · one replication`,
-      ...attemptLine(week.attempt),
-    ],
+  const core: ReportCore = {
+    /*
+     * *Tuesday — day 2* is a week's title: it names a weekday the run does not have and a position
+     * in a sequence it is not in. A single run is titled by what it is a run of.
+     */
+    title:
+      subject.kind === 'week-day'
+        ? `${weekdayOf(week.dayIdx)} — day ${String(week.day)}`
+        : `One run — ${recording.buildingName}`,
+    metaLines: metaLinesFor(input, dispatcherName, dayStartS),
     lede: ledeFor(summary, observations),
     figures: figuresFor(summary, observations, dayStartS),
     verdict: allMet ? 'cleared' : 'missed',
     verdictLine: allMet ? 'Shift cleared' : 'Shift missed',
-    streakLine: streakLineFor(allMet, week.streak),
-    contractLine: contractLineFor(contract, week),
-    cleared: week.cleared,
     goals: readings,
     diagnosis: diagnosisFor(recording, observations, dayStartS),
     levers: LEVERS,
+    smallPrint: smallPrintFor(dispatcherName),
+  };
+
+  if (subject.kind === 'single-run') {
+    return { ...core, of: 'single-run', nextStep: COMPARE_NEXT_STEP };
+  }
+
+  const nextIdx = (week.dayIdx + 1) % 7;
+  return {
+    ...core,
+    of: 'week-day',
+    streakLine: streakLineFor(allMet, week.streak),
+    contractLine: contractLineFor(contract, week),
+    cleared: week.cleared,
     forecast: forecastFor(week.day, nextIdx),
     taught: taughtFor(contract, week),
-    smallPrint: smallPrintFor(dispatcherName),
     nextDayName: weekdayOf(nextIdx),
   };
 }
