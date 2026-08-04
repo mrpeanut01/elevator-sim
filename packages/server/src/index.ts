@@ -19,6 +19,47 @@ export {
 } from './leaderboard/submission.js';
 
 export {
+  UnsafeConfigurationError,
+  bootstrap,
+  factsResolver,
+  type BootstrapOptions,
+  type Server,
+} from './bootstrap.js';
+
+export {
+  CONFIRMATION_TTL_MS,
+  MissingSecretError,
+  SCRYPT_PARAMS,
+  constantTimeEquals,
+  hashPassword,
+  newSessionToken,
+  passwordIssues,
+  passwordMatches,
+  requireSecret,
+  signConfirmation,
+  verifyConfirmation,
+  type PasswordHash,
+} from './accounts/credentials.js';
+
+export { OutboxMailer, confirmationMessage, type Mailer, type Message } from './mail/mailer.js';
+
+export {
+  BOARD_METRICS,
+  SESSION_TTL_MS,
+  Store,
+  normaliseEmail,
+  type BoardMetric,
+  type EntryRow,
+  type SessionRow,
+  type StoreOptions,
+  type UserRow,
+} from './store/store.js';
+
+export { createApi, type Api, type ApiDeps, type ApiRequest, type ApiResponse } from './http/api.js';
+export { MAX_BODY_BYTES, bearerOf, serve, type ServeOptions } from './http/serve.js';
+export { main } from './main.js';
+
+export {
   METRIC_EPSILON,
   configFor,
   metricsAgree,
