@@ -9,6 +9,12 @@ build/
 out/
 *.tsbuildinfo
 
+# The bundled static site (`npm run build:web`). Deliberately NOT `dist/`, which is `tsc -b`'s
+# output for the same package — a bundle written over the compiled surface is the same
+# stale-artifact confusion the "polluted tree" note further down already records the cost of
+# (`dist/` copies making `process.test.ts` spawn a stale CLI). See docs/16-static-site-deployment.md.
+dist-web/
+
 # Test / coverage
 coverage/
 .nyc_output/

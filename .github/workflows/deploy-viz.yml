@@ -1,0 +1,263 @@
+# Publish the viewer to Azure Static Web Apps.
+#
+# The runbook, the priced platform comparison and the limitations are
+# `docs/16-static-site-deployment.md`. Read § 6 before arming this on a public repository.
+#
+# ## Nothing here is switched on
+#
+# Every deploying job is guarded by `if: vars.AZURE_SWA_NAME != ''`, and **unset is the shipped
+# state**. With no repository variable, this workflow still runs on every push and pull request,
+# still builds the site, and still uploads it as a build artifact — and deploys nothing, because
+# there is nowhere to deploy to. Merging this changes what CI *checks* (the viewer now has to
+# build) and does not change what CI *does*.
+#
+# That split is deliberate, and it is the same shape `infra/README.md` § 0 uses for the compute
+# offload: the useful half is on from the first commit, the half that spends money and touches an
+# external system waits for a human to provision it. It also means the build is exercised on every
+# pull request from the day this lands, so the deploy path cannot rot unnoticed while unarmed —
+# which is the failure mode a `workflow_dispatch`-only deploy job would have.
+#
+# Arm it:    gh variable set AZURE_SWA_NAME --body "<name>"     (plus the four in § 3)
+# Disarm it: gh variable delete AZURE_SWA_NAME                  (instant, and this is the rollback)
+#
+# ## There is no secret in this repository
+#
+# Authentication is a GitHub OIDC token exchanged for an Azure one against a federated credential
+# on a user-assigned managed identity (`infra/azure/swa/main.bicep`). No `AZURE_CREDENTIALS`, no
+# client secret, and — the part that is not the default for Static Web Apps — no stored deployment
+# token either.
+#
+# `Azure/static-web-apps-deploy@v1` cannot use a federated credential (Azure/static-web-apps#1304,
+# open since 2023); it takes a deployment token and only a deployment token. The usual answer is to
+# paste that token into a repository secret, where it sits, long-lived, valid until someone
+# remembers to rotate it. Instead the token is *fetched* at run time with the OIDC identity, whose
+# entire permission is to read it, and passed to the action through a masked step output. It exists
+# for the length of one job. Rotating it is a no-op here and revocation is deleting one federated
+# credential in Azure — neither requires touching this repository.
+#
+# The residual exposure is stated rather than implied: for the seconds it is in flight the token is
+# in the job's memory and in the action's container environment. Anything that can execute in that
+# job can read it. That is a smaller window than a stored secret and it is not zero, and the control
+# that actually matters for the fork case is the repository setting named in `docs/16` § 6.
+
+name: Deploy viewer
+
+on:
+  push:
+    branches: [main]
+    # The site is `packages/viz` plus the reference data it copies at build time plus the workspace
+    # it imports. A docs-only commit does not change a byte of the artifact, and deploying one
+    # would burn a preview environment and a deployment for nothing.
+    paths:
+      - 'packages/**'
+      - 'data/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/deploy-viz.yml'
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - 'packages/**'
+      - 'data/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/deploy-viz.yml'
+  workflow_dispatch:
+
+concurrency:
+  # Matches ci.yml's shape. Deployments are not cancelled mid-flight for the production branch —
+  # a half-uploaded site is worse than a slightly stale one — but superseded pull request builds
+  # are, because only the newest preview is of any use.
+  group: deploy-viz-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build. Runs always, arms nothing, and is the reason this file is useful unarmed.
+  # ---------------------------------------------------------------------------
+  build:
+    name: build site
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # The floor package.json declares, and the same single value ci.yml pins. This job makes
+          # no measurement, so it needs no matrix — but it must not disagree with the suite about
+          # which Node the tree is built with.
+          node-version: '26'
+          cache: npm
+
+      - run: npm ci
+
+      # `tsc -b` first, and not as a formality: `@elevator-sim/core`'s exports map resolves the
+      # browser condition to `./dist/browser.js`, so Vite has nothing to bundle until the workspace
+      # has been compiled. Skipping this fails at resolution with a message about a missing file
+      # rather than about a missing build.
+      - name: Compile the workspace
+        run: npm run build
+
+      - name: Build the static site
+        run: npm run build:web
+
+      # The guard from `packages/viz/src/dev/buildingsManifest.test.ts` proves the emitter and the
+      # dev middleware agree. This proves the emitter ran *in this build*, on this runner, against
+      # this checkout — the artifact is checked rather than the configuration that produces it.
+      # Without `__buildings.json` the site deploys, loads, and dies in `fetchJson`, which is a
+      # failure no HTTP status and no build log would have reported.
+      - name: The artifact is complete
+        run: |
+          cd packages/viz/dist-web
+          for required in index.html __buildings.json staticwebapp.config.json \
+                          elevator-specs.json traffic-profiles.json dispatcher-profiles.json \
+                          campaign.json scenario-goals.json; do
+            test -s "$required" || { echo "::error::$required missing or empty from the build output"; exit 1; }
+          done
+          # Every building in data/ reached the manifest. A silently shorter manifest is the
+          # failure mode publicDir cannot have and the emitter can.
+          on_disk=$(ls ../../../data/buildings/*.json | wc -l)
+          in_manifest=$(node -e "process.stdout.write(String(JSON.parse(require('fs').readFileSync('__buildings.json','utf8')).files.length))")
+          test "$on_disk" -eq "$in_manifest" || {
+            echo "::error::data/ has $on_disk buildings, the manifest names $in_manifest"; exit 1; }
+          echo "artifact complete: $in_manifest buildings, $(du -sh . | cut -f1) total"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: viz-site
+          path: packages/viz/dist-web
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Deploy. Skipped entirely until the repository variables exist.
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: deploy
+    needs: build
+    if: >-
+      github.event.action != 'closed' &&
+      vars.AZURE_SWA_NAME != '' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+    # A pull request from a fork is excluded above by its head repository, and not as belt-and-
+    # braces: GitHub does not issue an OIDC token to a workflow triggered by a fork's
+    # `pull_request`, so this job cannot authenticate there and would fail on every external
+    # contribution — a permanently red check that means nothing. Excluding it is what makes the
+    # red legs honest. `docs/16` § 6 covers what to do if fork previews are actually wanted.
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # the OIDC token. The whole authentication story.
+      contents: read
+      pull-requests: write # the preview URL comment on the pull request
+    environment:
+      name: ${{ github.event_name == 'pull_request' && 'viz-preview' || 'viz-production' }}
+      url: ${{ steps.deploy.outputs.static_web_app_url }}
+    steps:
+      # The artifact is what ships — this checkout is not built and not uploaded. It is here
+      # because `Azure/static-web-apps-deploy` runs as a container action against the workspace
+      # and is documented against workflows that have checked out; running it in a bare workspace
+      # is untested ground for the sake of saving three seconds. `clean: true` is the default, so
+      # this must come BEFORE the download or it would wipe it.
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: viz-site
+          path: dist-web
+
+      # None of these three is a secret. A client id, a tenant id and a subscription id are
+      # identifiers, useless without the federated trust relationship that names this repository
+      # and this branch. They are repository *variables* rather than secrets so that a reader of a
+      # failed run can see which identity it tried to be — a masked value here buys nothing and
+      # costs every future debugging session.
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Read the deployment token with the federated identity
+        id: token
+        run: |
+          set -euo pipefail
+          token=$(az staticwebapp secrets list \
+            --name "${{ vars.AZURE_SWA_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query "properties.apiKey" -o tsv)
+          # Masked BEFORE it is written anywhere. `add-mask` is what stops it appearing in this
+          # log, in the next step's log, or in an error message from the action; the order matters
+          # because a value echoed before being masked is already public.
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Static Web Apps
+        id: deploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.token.outputs.token }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          # The site was built in the `build` job, from a lockfile install, on a pinned Node. Left
+          # to itself this action runs its own Oryx build inside its own container with its own
+          # toolchain — a second build of the same commit that nothing in this repository controls
+          # or has ever tested. `skip_app_build` makes the thing that was checked the thing that
+          # ships.
+          skip_app_build: true
+          skip_api_build: true
+          app_location: dist-web
+          # Empty, and deliberately: there is no API. `core` has no server half and adding one here
+          # would be the first compute this deployment paid for.
+          api_location: ''
+          output_location: ''
+          production_branch: main
+
+      - name: Where it went
+        run: |
+          echo "url: ${{ steps.deploy.outputs.static_web_app_url }}"
+
+  # ---------------------------------------------------------------------------
+  # Tear down the preview when the pull request closes.
+  # ---------------------------------------------------------------------------
+  close-preview:
+    name: close preview environment
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      vars.AZURE_SWA_NAME != '' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      # Free allows three concurrent preview environments. Without this job the fourth open pull
+      # request fails to deploy with a quota error naming neither the three that are holding the
+      # slots nor the fact that they belong to merged work. Closing them on `closed` — which fires
+      # for merged pull requests too — is what keeps that quota a non-event.
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Read the deployment token with the federated identity
+        id: token
+        run: |
+          set -euo pipefail
+          token=$(az staticwebapp secrets list \
+            --name "${{ vars.AZURE_SWA_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query "properties.apiKey" -o tsv)
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.token.outputs.token }}
+          action: close
+          app_location: .

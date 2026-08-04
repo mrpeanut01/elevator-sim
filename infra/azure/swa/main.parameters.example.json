@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "_comment": {
+      "value": [
+        "Copy to main.parameters.json and fill in githubRepository. That copy is gitignored.",
+        "Nothing in this file is a secret — there is no secret in this lane at all, which is the",
+        "point of the federated credential. It is gitignored because the repository owner's own",
+        "org/repo is their business, not because it is sensitive.",
+        "Deployment instructions: docs/16-static-site-deployment.md § 3."
+      ]
+    },
+    "githubRepository": {
+      "value": "OWNER/elevator-sim"
+    },
+    "productionBranch": {
+      "value": "main"
+    },
+    "location": {
+      "value": "eastus2"
+    },
+    "siteName": {
+      "value": "elevator-sim-viz"
+    }
+  }
+}

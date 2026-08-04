@@ -16,6 +16,7 @@
   ],
   "scripts": {
     "build": "tsc -b",
+    "build:web": "npm run build:web -w @elevator-sim/viz",
     "typecheck": "tsc -b",
     "clean": "tsc -b --clean",
     "rebuild": "tsc -b --clean && tsc -b",
