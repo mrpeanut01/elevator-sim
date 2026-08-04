@@ -13624,3 +13624,100 @@ The scanner is now inlined in **four** places — `experiments/src/tuning/`, `co
 consolidation, and the fix is a small `dev-audit` workspace package every audit devDepends on. Not
 done here, because this branch is already adding one package and a second one to hold a scanner is
 scope this change did not ask for. Recorded so a consolidation knows all four sites.
+
+
+## D216 — change scope: what a control is allowed to move, and when
+
+**Date: 2026-08-04 · Architecture, written before the code.** The product has a main menu (§ D214),
+a day loop, a batch campaign and a leaderboard, and no statement anywhere of **which controls may
+move at which point in a game**. This section records the model before it is built, and names the
+clauses the shipped product fails, so it cannot later be read as a description of whatever got
+written. [`docs/16-change-scope-contract.md`](docs/16-change-scope-contract.md) is the contract; this
+is why it exists and what it is allowed to cost.
+
+### 1. The structural fact, because every other decision here follows from it
+
+`Simulation.run()` returns when the replication is over, and CLAUDE.md invariant 3 keeps the wall
+clock out of `core/`, so there is no instant inside a run at which a player could intervene. The
+viewer runs the day first and plays the recording back.
+
+**So a control does not steer a day. It discards one and simulates a different one.** `dev/main.ts`
+already behaves that way — every state changer calls `runShift()` — and no surface says so. The
+product's most-used verb is an unlimited, free, unrecorded retry, and nothing in the tree models it.
+That is not a bug to fix; it is the mechanic to name.
+
+The one genuine mid-run adaptation the simulator has is the weight-set selector — `selection.policy`
+over `patternSwitching`'s five patterns. Which means the player's real within-day lever is
+*configuring an automatic policy in advance*, and that is a better game idea than a slider. It is
+currently reachable from no mode's own surface.
+
+### 2. Four scopes, named; the controls under them, derived
+
+`presentation`, `within-day`, `between-days`, `between-games`. The **categories** are named by the
+criterion, so a fifth is a compile error at every exhaustive switch; the **members** are derived from
+the state's own keys and asserted in both directions, so a new field with no scope is a red suite
+rather than a silent omission. That split is `mode/types.ts`'s, restated for a different quantity,
+and it is § D213's rule: five hand-written lists in one branch had to be widened by hand when three
+buildings landed, and two of them were guards that could no longer see what they were guarding.
+
+A field the shell writes and no player controls — `recording`, `report`, `withheld` — is declared an
+**output** with its reason rather than left out. An absence is indistinguishable from an oversight,
+which is § D106's argument about `measured: false` against `0`, pointed at a control instead of a
+quantity.
+
+### 3. `presentation` is the row worth the most, because it is already promised in prose
+
+`menu/types.ts` states it today: *"a setting that altered the simulation would make two players'
+scores incomparable while both looked valid, and the leaderboard verifies a submission by replaying
+its seed."* A promise with no test is how this repository shipped ten dead seams, and the four
+settings that promise covers reach **nothing at all** — so the prose is currently protecting a claim
+that has no way to be false and no way to be true.
+
+The rule is therefore two-sided and both sides are asserted: a presentation control must leave the
+legs **byte-identical**, and must observably move a declared sink. The first clause is the inverse of
+§ D177 and catches a setting that secretly changes a run; the second is § D177 itself and catches a
+setting that is decoration. One of them is red today on all four settings.
+
+### 4. The `ranked` row already exists, written by hand, and that is the argument for deriving it
+
+`dev/main.ts#provenanceLineOf` refuses to emit a CLI line for a run whose building, dispatcher or
+pattern is not shipped, whose `week.day !== 1`, whose event changes anything, which holds a car out
+of service, or whose group levers have moved. **That is the set of state a run may not carry if
+somebody else is to reproduce it from its selection** — which is exactly what the leaderboard's
+server does when it replays a submission, and exactly what a `ranked` play mode must forbid.
+
+So it is derived once, in `scope/runIdentity.ts`, and consumed twice: by the copy-a-CLI-line control
+and by the submit path. Two implementations of *"can this run be reproduced elsewhere?"* is how the
+client and the server come to disagree about what a selection meant, and a board verified by replay
+cannot survive that disagreement — it would reject honest entries as forgeries, which is the failure
+mode the design is least able to detect from the outside.
+
+### 5. What this is allowed to cost, stated before it is spent
+
+The suite is 262 files and roughly 1 918 s, and the deep honesty tier alone is 398.7 s. The
+play-through walk simulates, because comparing on the legs is the only comparison § D177 accepts. So
+the always-on walk is bounded to the two buildings `dev/state.freePlay.test.ts` already uses, the
+exhaustive walk sits behind the same opt-in switch the honesty tiers use, and **the added seconds are
+measured and published in § D217 rather than absorbed**. A wave that quietly slows the suite is how
+the suite stops being run.
+
+### 6. Evidence tiers, named, because this one is easy to overclaim
+
+`static sweep < model walk < document recorder < browser`. This repository has no browser and
+[`docs/05`](docs/05-roadmap.md) says so in terms. The walk introduced here drives the **decisions** —
+navigation, affordances, scope, the run a selection produces — and does not drive a document, so it
+earns `✅ test` on a decision and `⚠️` on a mount, and `UX.md` gains no `✅ run` row from it. The
+ledger has three false green marks in its history and says so at its own head; a fourth earned by
+calling a model walk a drive would be worse than the gap it papered over.
+
+### 7. The clauses the product fails today
+
+Eight, listed in `docs/16` § 5 and each reducible to a run: a contract clears without advancing a day;
+Start does not run the selection; Start does not reset the week, so growth and today's event ride
+along unnamed; four settings reach nothing; nothing reopens the menu; the campaign screen has no
+content; the menu has no stylesheet; and `client.submit` has no non-test caller.
+
+They are named here because § D163's defence of a criterion is structural: *the clauses that decide
+this must be ones the shipped product does not currently satisfy.* Seven of the eight were found by
+walking the seam rather than by reading it, which is the same method that produced the two honesty
+violations § D186 calls the most valuable result its phase could have had.
