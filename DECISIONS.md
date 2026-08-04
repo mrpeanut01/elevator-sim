@@ -13876,3 +13876,72 @@ from anything here.
 The four modes `docs/17` § 4 designs — incidents and maintenance, the calendar, the daily challenge,
 commissioning — are **designed and not built**, and the seven open findings in § 5 of that document
 are open. Naming them is the point of writing them down.
+
+
+## D218 — a challenge board, and the prohibition it has to survive
+
+**Date: 2026-08-04 · Architecture, written before the code.** § D217 left the leaderboard's central
+defect described and unfixed: a board is keyed by a digest that **includes the dispatcher and
+excludes the seed**, so every entry on one board is the same configuration on a different seed, and
+choosing a better dispatcher does not beat anybody — it moves you to a different board. The
+competitive axis is luck and the skill axis forks the leaderboard.
+
+This records what would fix it and, more importantly, the rule it has to survive. It is written
+before the server changes because the rule is the hard part and a fix that quietly broke it would be
+worse than the defect.
+
+### 1. The prohibition, quoted rather than paraphrased
+
+[`docs/10`](docs/10-experience-layer-contract.md) § 5.5, *What must never be built*:
+
+> A leaderboard ranking dispatchers from single runs (R2).
+
+R2 is *"a score is a property of a run, never of a dispatcher"*, and § 5.2's evidence is **M7**: a
+single-run saturation verdict on Secure Tower flips 6 of 20. So the obvious fix — take the dispatcher
+out of the board key so players compete on it — walks straight into the ban. It would produce
+precisely the surface § 5.5 names.
+
+### 2. What a challenge is, so that it does not
+
+**A fixed set of seeds, not one.** The server already re-runs a submission to verify it (§ D214 § 3),
+so running the five seeds a challenge names instead of the one a player picked costs a little CPU and
+buys the difference between a run and a sample. Every row carries its `n`, per R13, and the four
+metrics stay unblended beside each other, per § D106.
+
+**It still does not say a dispatcher is better.** A challenge board says *"these players, on these
+five seeds, in this order"*. That is a fact about submissions. It is not a paired comparison, it has
+no interval, and it may not be worded as though it had one — **Compare remains the only surface in
+this product allowed to say one dispatcher beats another**, because it is the only one that runs
+common random numbers and reports an interval that can contain zero.
+
+The distinction is thin enough to be worth a mechanism rather than a promise: the challenge board's
+own copy is driven by the honesty search like every other player-facing string, and R2's
+`unresolved-comparison` property is what would catch a sentence that crossed the line.
+
+### 3. The clock is the server's, and that is not a detail
+
+`core/` may not read a wall clock (invariant 3) and a client's clock is not trustworthy in a
+competition. The server is already this repository's first wall clock (§ D214), so a challenge is
+**issued as data** — an id, a resolved configuration, a seed set, an opens-at and a closes-at — and
+the client never computes which challenge today is. A client that did would be a second answer to a
+question the server has already answered, which is the failure § D217 § 5 describes with a victim.
+
+### 4. What this does not do
+
+It does not remove the existing config board. That board is a real thing — *one configuration across
+seeds* — and it is now labelled as one on screen. What it was never entitled to be is the product's
+answer to *"who is best at this"*, and the challenge board is that answer instead.
+
+### 5. The criterion
+
+Written before the code, and chosen so the shipped product fails it today:
+
+1. A challenge board's rows are a **sample**, and every row shows the count it was computed over.
+2. No string on that surface orders two dispatchers. The honesty search drives the surface, and
+   `unresolved-comparison` is red if one does.
+3. The client never decides which challenge is current, and a test proves it by advancing the
+   client's clock and requiring the answer not to move.
+4. A submission is verified by replaying **every** seed in the set, and a score that reproduces on
+   four of five is rejected — partial reproduction is not reproduction.
+5. `Compare` is reachable from the challenge surface, because the honest answer to *"is my dispatcher
+   better"* lives there and nowhere else.
