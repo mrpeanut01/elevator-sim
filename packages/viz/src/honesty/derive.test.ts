@@ -93,18 +93,18 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
-        'Diagnostics for a failed restore, and **nothing shows them**. `persist/` refuses a stored ' +
-        'session that this build cannot read — a wrong schema version, an unknown key, a seed that ' +
-        'would not survive the trip back to a bigint, a contract `data/` no longer ships — and each ' +
-        'refusal carries a sentence naming the field and the reason. `dev/main.ts` reads the ' +
-        'discriminated failure, clears the unreadable slot and starts fresh; it does not print the ' +
-        'sentence. So these are developer diagnostics on the same footing as `SCOPE_OF`’s `why`, ' +
-        'and the *player-facing* consequence — that a dropped week is not explained to the player ' +
-        'who lost it — is filed in `GAPS.md` § 3 rather than answered by an adapter here. The day ' +
-        'that sentence reaches a screen it stops being excludable, and this reason stops being true.',
+        'Diagnostics for a failed **save**, and for the shape check beneath a failed restore — ' +
+        'developer strings on the same footing as `SCOPE_OF`’s `why`. Nothing puts one on a screen: ' +
+        '`saveSession` refuses in a value the shell drops, `jsonRoundTripIssue` and `snapshotIssue` ' +
+        'name a path inside an envelope, and `SESSION_KEY` is a storage key. ' +
+        '**`loadSession` is deliberately no longer in this list.** Its sentences now reach a player, ' +
+        'quoted by `persist/notice.ts#restoreNoticeFor` on the `parse` and `shape` arms, and the ' +
+        '`RESTORE_NOTICE` adapter drives it through three broken stores for exactly that reason. ' +
+        'This entry’s previous reason ended *“the day that sentence reaches a screen it stops being ' +
+        'excludable, and this reason stops being true”* — that day arrived with the notice, and the ' +
+        'narrowing above is what it cost.',
       ids: [
         'persist/jsonSafety.ts#jsonRoundTripIssue',
-        'persist/session.ts#loadSession',
         'persist/session.ts#saveSession',
         'persist/types.ts#SESSION_KEY',
         'persist/validate.ts#snapshotIssue',

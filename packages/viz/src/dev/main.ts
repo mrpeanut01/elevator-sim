@@ -133,6 +133,7 @@ import { mountScenarios } from './scenariosPanel.js';
 import { mountTrafficEditor } from './trafficEditor.js';
 import { playbackRateFor, shouldAutoplayWith } from './motion.js';
 import { themeFor } from '../render/theme.js';
+import { restoreNoticeFor } from '../persist/notice.js';
 import { clearSession, loadSession, saveSession } from '../persist/session.js';
 import type { SessionStore } from '../persist/types.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
@@ -429,9 +430,29 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * than papered over here — putting the sentence on screen makes it a player-facing string, and it
    * would then owe the honesty sweep an adapter, which is a lane of its own.
    */
+  /**
+   * A one-time line about a session that could not be restored — `undefined` when there is nothing
+   * to say, which is the ordinary case and the whole of a first visit.
+   *
+   * It lives in the coach ribbon's hint, and that is a **compromise stated rather than hidden**: the
+   * hint is advice about the run, and this is news about the save. It goes there because the ribbon
+   * already gives refusals priority over advice (`state.withheld` does exactly this), and because a
+   * slot of its own is markup this lane does not own. A dedicated line is the better home.
+   *
+   * It is cleared the moment the player does anything, because by then it is describing something
+   * two actions ago and the hint has advice to give again.
+   */
+  let restoreNotice: string | undefined;
+
   function restoreSession(): void {
     const restored = loadSession(sessionStore);
     if (!restored.ok) {
+      /*
+       * Told, not swallowed. This branch cleared the unreadable slot and started fresh in silence,
+       * so a player who lost a week got a new one and no explanation — and the failure carried a
+       * precise reason the whole way here before being dropped on the floor.
+       */
+      restoreNotice = restoreNoticeFor(restored.failure);
       if (restored.failure.kind !== 'absent') clearSession(sessionStore);
       return;
     }
@@ -1251,6 +1272,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
   }
 
   function coachHint(view: ViewAt): string {
+    // Ahead of the withheld refusals: those are about the run on screen, and this is about whether
+    // the run on screen is the one the player left. Both outrank advice.
+    if (restoreNotice !== undefined) return restoreNotice;
     if (state.withheld.length > 0) return state.withheld.join(' ');
     if (view.recording === undefined) {
       return 'Press play and watch a call appear, a car answer it, and the wait end. That is the whole simulator in one move.';
@@ -1271,6 +1295,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   function runShift(): void {
     setText(ui.transport.error, '');
+    /*
+     * The restore notice survives boot's own run and nothing after it.
+     *
+     * `urlWritable` is `false` for exactly the boot sequence and `true` from the first real state
+     * change onward, which is the same *"is this the reader doing something?"* question this needs —
+     * so it is reused rather than answered twice. A second flag would be a second thing to keep in
+     * step with the boot order.
+     */
+    if (urlWritable) restoreNotice = undefined;
     try {
       const plan = shiftRunConfigOf(resources, state);
       building = plan.building;

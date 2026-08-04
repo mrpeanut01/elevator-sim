@@ -212,6 +212,9 @@ import {
   type ShiftGoal,
   type WeekState,
 } from '../shift/types.js';
+import { restoreNoticeFor } from '../persist/notice.js';
+import { loadSession } from '../persist/session.js';
+import { SESSION_SCHEMA_VERSION, type SessionRestoreFailure, type SessionStore } from '../persist/types.js';
 import { closeDay, openEndless, openWeek, outcomeOf } from '../shift/week.js';
 import { coachWeekLines } from '../shift/weekLabel.js';
 
@@ -3421,6 +3424,86 @@ const MENU: SurfaceAdapter = {
   },
 };
 
+/**
+ * The one persistence string a player ever reads — and the reason it stopped being excludable.
+ *
+ * `derive.test.ts` used to exclude the whole of `persist/` with a reason that ended: *"The day that
+ * sentence reaches a screen it stops being excludable, and this reason stops being true."* That day
+ * is this adapter. `persist/notice.ts#restoreNoticeFor` turns a discriminated restore failure into a
+ * line the coach ribbon shows, so it is a player-facing claim about what happened to their week.
+ *
+ * ## Driven through `loadSession`, not around it
+ *
+ * Two of the six arms **quote the diagnostic** — the `parse` and `shape` messages name a field and
+ * are worth carrying — so a sweep that invented those messages would check wording nobody ships.
+ * The three broken stores below are read through the real `loadSession`, which is why it moves out
+ * of the exclusion list and into `covers`: its sentences now reach a screen, through this quotation
+ * and only through it.
+ *
+ * The remaining three arms cannot be produced from bytes — `unavailable` needs a throwing store,
+ * `version` needs an envelope from another build, `stale` needs `data/` to have lost something — so
+ * they are seeded from constructed failures, and that difference is stated rather than smoothed
+ * over.
+ *
+ * ## Roles
+ *
+ * `reason`, all of them. Each is a refusal that names what it refused and what happens instead,
+ * which is exactly what that role is for — and it is the role that exempts a string from being read
+ * as a claim about a *run*, which none of these is.
+ */
+const RESTORE_NOTICE: SurfaceAdapter = {
+  id: 'persist/notice.ts#restoreNoticeFor',
+  covers: ['persist/notice.ts#restoreNoticeFor', 'persist/session.ts#loadSession'],
+  render(this: SurfaceAdapter) {
+    const seeds: TextSeed[] = [];
+
+    /* ---- the arms a real store can produce, read through the real loader ---- */
+    const stored = (value: string | null): SessionStore => ({
+      read: () => value,
+      write: () => undefined,
+      remove: () => undefined,
+    });
+    const bytes: readonly (readonly [string, string | null])[] = [
+      ['absent', null],
+      ['parse', '{not json'],
+      ['shape', JSON.stringify({ version: SESSION_SCHEMA_VERSION, week: { day: 'Tuesday' } })],
+    ];
+    for (const [name, value] of bytes) {
+      const restored = loadSession(stored(value));
+      if (restored.ok) continue;
+      seeds.push({
+        field: `loadSession(${name}).message`,
+        text: restored.failure.message,
+        role: 'reason',
+      });
+      const notice = restoreNoticeFor(restored.failure);
+      if (notice !== undefined) {
+        seeds.push({ field: `restoreNoticeFor(${name})`, text: notice, role: 'reason' });
+      }
+    }
+
+    /* ---- the three a store cannot reach from bytes alone ---- */
+    const constructed: readonly SessionRestoreFailure[] = [
+      { kind: 'unavailable', message: 'The browser refused to read site data.' },
+      {
+        kind: 'version',
+        message: 'Written by a different build.',
+        found: SESSION_SCHEMA_VERSION + 1,
+        supported: SESSION_SCHEMA_VERSION,
+      },
+      { kind: 'stale', message: 'Names things this build no longer ships.', missing: ['c9'] },
+    ];
+    for (const failure of constructed) {
+      const notice = restoreNoticeFor(failure);
+      if (notice !== undefined) {
+        seeds.push({ field: `restoreNoticeFor(${failure.kind})`, text: notice, role: 'reason' });
+      }
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -3452,6 +3535,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   SCENARIOS,
   EDITOR_PANELS,
   MENU,
+  RESTORE_NOTICE,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */
