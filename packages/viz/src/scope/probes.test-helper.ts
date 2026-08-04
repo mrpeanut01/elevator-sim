@@ -1,0 +1,378 @@
+/**
+ * The instrument every scope declaration is judged by — two arms per control.
+ *
+ * A test helper rather than a production module, deliberately. These closures load `data/`, build
+ * states and run simulations; shipping them in the bundle to satisfy a table would be an instrument
+ * with no caller, which is the defect the whole `scope/` directory exists to catch. `.test-helper.ts`
+ * is treated as a test by both dead-code scanners, so this file owes no non-test caller and says so
+ * here rather than leaving a reader to infer it.
+ *
+ * ## What the two arms mean
+ *
+ * `states` is a pair differing in **exactly one field**, and `scope.test.ts` compares the legs:
+ *
+ * | declared scope | required of the legs |
+ * |---|---|
+ * | anything but `presentation` | they **differ** — otherwise the control is inert (`docs/12` § 5 clause 9) |
+ * | `presentation` | they are **byte-identical** — otherwise a display setting is silently changing a run |
+ *
+ * `sink` is a pair of calls into whatever the control is *for*, and their results must differ. It is
+ * required on `presentation` rows because identical legs alone cannot tell *"this cannot change a
+ * run"* from *"this does nothing at all"*, and the second is exactly what four shipped settings turn
+ * out to be.
+ *
+ * ## Why some presentation rows have no sink here
+ *
+ * Two reasons, and they are kept apart because only one of them is a defect.
+ *
+ * - **{@link SINK_IS_A_MOUNT}** — the control's only consumer is a DOM mount, and `docs/16` S9 says
+ *   a model walk may not claim to have driven one. A registered reason, not a finding.
+ * - **{@link SINK_MISSING}** — the control reaches nothing at all. A **recorded finding**, kept here
+ *   so the suite is green while the register carries the defect, in `deadCode.test.ts`'s idiom.
+ *   `scope.test.ts` asserts the register is not stale, so an entry cannot outlive the bug.
+ */
+
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+import {
+  parseBuilding,
+  parseDispatcherProfiles,
+  parseElevatorSpecs,
+  parseTrafficProfiles,
+  resolveBuilding,
+} from '@elevator-sim/core/browser';
+
+import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
+import { classesFromSpecs, type MachineClass } from '../authoring/machineSpec.js';
+import type { BrowserResources } from '../dev/data.js';
+import { disclosureOf, initialState, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
+import { mathsDisclosureOf } from '../dev/leftRail.js';
+import { drawerStateFor, railStateFor, surfaceStateFor } from '../dev/surfaces.js';
+import type { TabName } from '../dev/elementMap.js';
+import type { HonestyCard } from '../live/types.js';
+import { navigate } from '../menu/menu.js';
+import { initialMenuState } from '../menu/menu.js';
+import { catalogueOf } from '../menu/catalogue.js';
+import { recordRun } from '../record/recordRun.js';
+import { nextDay } from '../shift/week.js';
+
+import type { SurfaceKey } from './types.js';
+
+/* -------------------------------------------------------------------------- *
+ * Resources — two buildings, the same pair `state.freePlay.test.ts` uses
+ * -------------------------------------------------------------------------- */
+
+const DATA = new URL('../../../../data/', import.meta.url);
+const read = (path: string): unknown =>
+  JSON.parse(readFileSync(fileURLToPath(new URL(path, DATA)), 'utf8')) as unknown;
+
+/**
+ * Two buildings, not eight.
+ *
+ * § D216 § 5 bounds this deliberately: the walk simulates, because comparing on the legs is the
+ * only comparison § D177 accepts, and the suite is already 1 918 s. Garden Apartments is small
+ * enough to run in milliseconds and Midtown Office is the second arm every `buildingId` probe needs.
+ */
+const BUILDING_IDS = ['garden-apartments', 'midtown-office'] as const;
+
+export function resourcesOf(): BrowserResources {
+  const elevatorSpecs = parseElevatorSpecs(read('elevator-specs.json'));
+  const entries = BUILDING_IDS.map((id) => {
+    const config = parseBuilding(read(`buildings/${id}.json`));
+    return { file: `${id}.json`, config, resolved: resolveBuilding(config, elevatorSpecs) };
+  });
+  const trafficProfiles = parseTrafficProfiles(read('traffic-profiles.json'));
+  return {
+    elevatorSpecs,
+    trafficProfiles,
+    dispatcherProfiles: parseDispatcherProfiles(read('dispatcher-profiles.json')),
+    buildings: entries.map((entry) => entry.resolved),
+    entries,
+    trafficProfileIds: new Set(trafficProfiles.profiles.map((profile) => profile.id)),
+    warnings: [],
+  };
+}
+
+export const RESOURCES = resourcesOf();
+
+/** The state every probe starts from. Garden Apartments at 900 s — small, and quick to simulate. */
+export function baseState(): ViewerState {
+  return {
+    ...initialState(RESOURCES, 20260804n),
+    buildingId: 'garden-apartments',
+    shiftLengthS: 900,
+  };
+}
+
+/**
+ * The legs of the run a state produces, as a comparable string.
+ *
+ * Legs, never a window statistic. § D177's own words: *a mean can be unchanged for a run that is
+ * entirely different, and a mean can move because the window moved.*
+ *
+ * ## It builds the run the way `runShift` builds it, and that is not a detail
+ *
+ * `shiftRunConfigOf` returns `outOfServiceCarIds` **beside** `config` rather than inside it, and
+ * `dev/main.ts#runShift` passes the two to `recordRun` separately. A helper that destructured only
+ * `config` therefore drops every held car — and it reported `viewer.outOfServiceCarIds` as an inert
+ * control on a building where four cars carry 1 710 people, which is exactly the false accusation an
+ * instrument like this one is most dangerous for. An instrument that does not reproduce the shipped
+ * call path measures the instrument.
+ */
+export function legsOf(state: ViewerState): string {
+  const plan = shiftRunConfigOf(RESOURCES, state);
+  return JSON.stringify(
+    recordRun(plan.config, {
+      recordDecisions: false,
+      outOfServiceCarIds: plan.outOfServiceCarIds,
+    }).recording.legs.map((leg) => [leg.passengerId, leg.carId ?? '', leg.boardedAt ?? -1]),
+  );
+}
+
+/* -------------------------------------------------------------------------- *
+ * The probes
+ * -------------------------------------------------------------------------- */
+
+export interface ScopeProbe {
+  /** Two states differing in exactly one field. */
+  readonly states?: readonly [(s: ViewerState) => ViewerState, (s: ViewerState) => ViewerState];
+  /** Two calls into what the control is for. Their results must differ. */
+  readonly sink?: readonly [() => unknown, () => unknown];
+}
+
+const card = (hasMaths: boolean): HonestyCard => ({
+  glyph: '✓',
+  title: 'title',
+  plain: 'plain',
+  hasMaths,
+  maths: 'the maths',
+  bg: '#000',
+  edge: '#111',
+  warning: false,
+  suppressed: false,
+  fallingBehind: false,
+});
+
+const CATALOGUE = catalogueOf(RESOURCES);
+
+/**
+ * `hydraulic` re-saved with a gentler acceleration — and the field is chosen rather than convenient.
+ *
+ * It has to be the class Garden Apartments' cars actually declare, or `specsWithClass` widens an
+ * `ElevatorSpecs` nothing resolves against and the probe proves nothing. And it has to be a field
+ * those cars do **not** override: they declare `ratedSpeedMps`, `ratedLoadLb` and `doorType`
+ * inline, so a class with a different rated speed reaches `resolveBuilding` and loses to the car —
+ * correct behaviour, and a probe that moved the speed would have reported the seam dead.
+ *
+ * `acceleration` is not overridden, so it comes from the class, and halving it lengthens every
+ * short hop. That is also the modelling rule this simulator is built around: short hops never reach
+ * rated speed, so acceleration is what a six-floor building's journey times are actually made of.
+ */
+const GENTLER_HYDRAULIC: MachineClass = Object.freeze({
+  ...(classesFromSpecs(RESOURCES.elevatorSpecs).find((entry) => entry.id === 'hydraulic') as MachineClass),
+  accelerationMps2: 0.4,
+  yours: true,
+});
+
+/**
+ * A probe for every `control` row in `SCOPE_OF`. `surface.test.ts` asserts that in both directions,
+ * so a control added without one is red rather than unscoped-in-practice.
+ */
+export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
+  /* --------------------------------------------------------- presentation: viewer */
+  'viewer.mode': {
+    states: [(s) => ({ ...s, mode: 'basic' }), (s) => ({ ...s, mode: 'advanced' })],
+    sink: [() => disclosureOf('basic'), () => disclosureOf('advanced')],
+  },
+  'viewer.showMaths': {
+    states: [(s) => ({ ...s, showMaths: true }), (s) => ({ ...s, showMaths: false })],
+    sink: [
+      () => mathsDisclosureOf(card(true), true, 'engineer'),
+      () => mathsDisclosureOf(card(true), false, 'engineer'),
+    ],
+  },
+  'viewer.tab': {
+    states: [(s) => ({ ...s, tab: 'run' }), (s) => ({ ...s, tab: 'report' })],
+    sink: [
+      () => surfaceStateFor('run', new Set<TabName>()),
+      () => surfaceStateFor('report', new Set<TabName>()),
+    ],
+  },
+  'viewer.revealedTabs': {
+    states: [
+      (s) => ({ ...s, revealedTabs: new Set<TabName>() }),
+      (s) => ({ ...s, revealedTabs: new Set<TabName>(['traffic']) }),
+    ],
+    sink: [
+      () => surfaceStateFor('run', new Set<TabName>()),
+      () => surfaceStateFor('run', new Set<TabName>(['traffic'])),
+    ],
+  },
+  'viewer.railSegment': {
+    states: [(s) => ({ ...s, railSegment: 'dispatcher' }), (s) => ({ ...s, railSegment: 'traffic' })],
+    sink: [() => railStateFor('dispatcher'), () => railStateFor('traffic')],
+  },
+  'viewer.drawerOpen': {
+    states: [(s) => ({ ...s, drawerOpen: false }), (s) => ({ ...s, drawerOpen: true })],
+    sink: [() => drawerStateFor(1000, false), () => drawerStateFor(1000, true)],
+  },
+  'viewer.editingDispatcherId': {
+    states: [
+      (s) => ({ ...s, editingDispatcherId: 'collective' }),
+      (s) => ({ ...s, editingDispatcherId: 'eta' }),
+    ],
+  },
+  'viewer.editingPatternId': {
+    states: [(s) => ({ ...s, editingPatternId: 'building' }), (s) => ({ ...s, editingPatternId: 'office-standard' })],
+  },
+  'viewer.editingClassId': {
+    states: [
+      (s) => ({ ...s, editingClassId: 'geared-traction' }),
+      (s) => ({ ...s, editingClassId: 'hydraulic' }),
+    ],
+  },
+  'viewer.editingBuildingId': {
+    states: [
+      (s) => ({ ...s, editingBuildingId: 'garden-apartments' }),
+      (s) => ({ ...s, editingBuildingId: 'midtown-office' }),
+    ],
+  },
+
+  /* ------------------------------------------------------ between-games: the run */
+  'viewer.buildingId': {
+    states: [(s) => ({ ...s, buildingId: 'garden-apartments' }), (s) => ({ ...s, buildingId: 'midtown-office' })],
+  },
+  'viewer.dispatcherId': {
+    states: [(s) => ({ ...s, dispatcherId: 'collective' }), (s) => ({ ...s, dispatcherId: 'nearest-car' })],
+  },
+  'viewer.pattern': {
+    states: [(s) => ({ ...s, pattern: 'building' }), (s) => ({ ...s, pattern: 'office-standard' })],
+  },
+  'viewer.shiftLengthS': {
+    states: [(s) => ({ ...s, shiftLengthS: 900 }), (s) => ({ ...s, shiftLengthS: 1800 })],
+  },
+  'viewer.freePlay': {
+    states: [
+      (s) => ({ ...s, freePlay: { demandTemplateId: 'rise-and-fall', arrivalRatePctPop5min: 3 } }),
+      (s) => ({ ...s, freePlay: { demandTemplateId: 'rise-and-fall', arrivalRatePctPop5min: 12 } }),
+    ],
+  },
+  'viewer.seed': {
+    states: [(s) => ({ ...s, seed: 1n }), (s) => ({ ...s, seed: 999n })],
+  },
+
+  /* ------------------------------------------------------- within-day: re-runs today */
+  'viewer.levers': {
+    states: [
+      (s) => ({ ...s, levers: DEFAULT_LEVERS }),
+      (s) => ({ ...s, levers: { ...DEFAULT_LEVERS, express: true } }),
+    ],
+  },
+  'viewer.outOfServiceCarIds': {
+    /*
+     * On Midtown Office, not Garden Apartments — and the reason is a measured fact about the probe
+     * rather than a preference.
+     *
+     * Garden Apartments is six floors and two hydraulic cars at a residential trickle, and at that
+     * demand **`main-A` answers everything on its own**: holding `main-B` produces a byte-identical
+     * set of legs, so the arm reported this control inert when the control is fine and the building
+     * is idle. A probe has to be run on a building where the thing it is probing matters.
+     *
+     * Midtown Office is four cars and 1 710 people. Holding one leaves three, which is also what
+     * `shift/events.ts#carsToHold` guarantees — a bank with no in-service car is a set of floors
+     * nobody can reach, which is a different scenario rather than a busier one.
+     */
+    states: [
+      (s) => ({ ...s, buildingId: 'midtown-office', outOfServiceCarIds: [] }),
+      (s) => ({ ...s, buildingId: 'midtown-office', outOfServiceCarIds: ['main-D'] }),
+    ],
+  },
+  'viewer.savedClasses': {
+    // A saved class widens the specs the building resolves against with no further selection, which
+    // is why this one is a `control` and the other three saves are `latent`. The arm re-saves the
+    // class Garden Apartments' own cars declare — `hydraulic` — at a different rated speed, because
+    // a class the building does not use would be carried into `ElevatorSpecs` and change no leg.
+    states: [(s) => ({ ...s, savedClasses: [] }), (s) => ({ ...s, savedClasses: [GENTLER_HYDRAULIC] })],
+  },
+
+  /* ---------------------------------------------------- between-days: the boundary */
+  'viewer.week': {
+    states: [(s) => s, (s) => ({ ...s, week: nextDay(nextDay(s.week)) })],
+  },
+
+  /* ------------------------------------------------------------------- settings */
+  'settings.reduceMotion': {},
+  'settings.showEnergyAxis': {},
+  'settings.playbackSpeed': {},
+  'settings.theme': {},
+
+  /* ------------------------------------------------------------------ free play */
+  'free-play.buildingId': {
+    states: [(s) => ({ ...s, buildingId: 'garden-apartments' }), (s) => ({ ...s, buildingId: 'midtown-office' })],
+  },
+  'free-play.dispatcherProfileId': {
+    states: [(s) => ({ ...s, dispatcherId: 'collective' }), (s) => ({ ...s, dispatcherId: 'nearest-car' })],
+  },
+  'free-play.demandTemplateId': {
+    states: [
+      (s) => ({ ...s, shiftLengthS: 7200, freePlay: { demandTemplateId: 'rise-and-fall', arrivalRatePctPop5min: 6 } }),
+      (s) => ({ ...s, shiftLengthS: 7200, freePlay: { demandTemplateId: 'constant-iso', arrivalRatePctPop5min: 6 } }),
+    ],
+  },
+  'free-play.arrivalRatePctPop5min': {
+    states: [
+      (s) => ({ ...s, freePlay: { demandTemplateId: 'rise-and-fall', arrivalRatePctPop5min: 3 } }),
+      (s) => ({ ...s, freePlay: { demandTemplateId: 'rise-and-fall', arrivalRatePctPop5min: 12 } }),
+    ],
+  },
+  'free-play.durationS': {
+    states: [(s) => ({ ...s, shiftLengthS: 300 }), (s) => ({ ...s, shiftLengthS: 1800 })],
+  },
+  'free-play.seed': {
+    states: [(s) => ({ ...s, seed: 1n }), (s) => ({ ...s, seed: 999n })],
+  },
+
+  /* ----------------------------------------------------------------- menu shell */
+  'menu.screen': {
+    sink: [
+      () => initialMenuState(CATALOGUE).screen,
+      () => navigate(initialMenuState(CATALOGUE), 'settings').screen,
+    ],
+  },
+});
+
+/* -------------------------------------------------------------------------- *
+ * The two registers
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Presentation controls whose only consumer is a DOM mount.
+ *
+ * `docs/16` S9: a model walk may not be cited as having driven a document. These four name which
+ * artifact an editor is pointed at, and the only thing that reads them is the mount that draws its
+ * title — so the honest statement is *"unreachable at this evidence tier"*, not *"inert"*.
+ */
+export const SINK_IS_A_MOUNT: Readonly<Record<string, string>> = Object.freeze({
+  'viewer.editingDispatcherId': 'read by mountDispatcherEditor to title its own panel; no pure sink exists to call',
+  'viewer.editingPatternId': 'read by mountTrafficEditor to title its own panel; no pure sink exists to call',
+  'viewer.editingClassId': 'read by mountMachinesEditor to title its own panel; no pure sink exists to call',
+  'viewer.editingBuildingId': 'read by mountBuildingEditor, and by withBuilding’s pristine check, which is not a display',
+});
+
+/**
+ * Presentation controls that reach **nothing at all** — a recorded finding, not an exemption.
+ *
+ * `docs/16` § 5 clause 4 and § D216 § 3. Each of these is a switch a player can flip in a shipped
+ * menu that changes no pixel and no number, and `menu/types.ts` carries a paragraph explaining a
+ * restriction on them that has never had a way to be true or false.
+ *
+ * Kept here so the suite is green while the register carries the defect — `deadCode.test.ts`'s
+ * `DEAD_CANDIDATES` idiom — and `scope.test.ts` asserts an entry cannot outlive its bug.
+ */
+export const SINK_MISSING: Readonly<Record<string, string>> = Object.freeze({
+  'settings.reduceMotion': 'dev/motion.ts answers prefers-reduced-motion from matchMedia and never consults this field',
+  'settings.showEnergyAxis': 'render/runSummary.ts draws the energy figures unconditionally; nothing reads this field',
+  'settings.playbackSpeed': 'dev/main.ts has its own SPEEDS ladder and Playback is constructed from it, not from this',
+  'settings.theme': 'no theme switch exists anywhere in the package; the stylesheet has one palette',
+});

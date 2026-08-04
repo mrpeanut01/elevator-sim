@@ -165,6 +165,33 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The change-scope model (`docs/16`, § D216). `CHANGE_SCOPES` and `PLAY_MODES` are the two ' +
+        'id tuples every exhaustive switch in `scope/` walks — the same id-table case as ' +
+        '`campaign/types.ts#FAIL_STATES`. `SCOPE_OF`’s `why` field is **developer** prose: it is ' +
+        'the argument for a field’s scope, addressed to whoever changes that field, and it reaches ' +
+        'no screen — `surface.test.ts` asserts every row carries one and `scope.test.ts` decides ' +
+        'whether the row is true by running both arms, which is a stronger check than a string ' +
+        'search over a sentence no player reads. `permits` returns a boolean and authors nothing.',
+      ids: [
+        'scope/types.ts#CHANGE_SCOPES',
+        'scope/types.ts#PLAY_MODES',
+        'scope/surface.ts#SCOPE_OF',
+        'scope/permits.ts#permits',
+      ],
+    },
+    {
+      reason:
+        'The refusal sentences `provenanceLineOf` used to author itself, moved one layer down by ' +
+        '`docs/16` S5 so the leaderboard’s submit path cannot grow a second copy of them. They ' +
+        'reach `#status` through `copyProvenance` exactly as before, so this inherits the exclusion ' +
+        'directly above it and inherits its limitation too: swept statically, not driven, which is ' +
+        'weaker and is said rather than dressed up. What changed is that the better fix got ' +
+        'cheaper — these sentences are now produced by a pure function of a state and the loaded ' +
+        'resources, so the adapter that exclusion has been asking for no longer needs a document.',
+      ids: ['scope/runIdentity.ts#runIdentityIssues'],
+    },
+    {
+      reason:
         'A vocabulary or a schema, not prose. `GOAL_OBSERVATION_IDS` and `SHIFT_EVENT_IDS` are the ' +
         'id tuples the two shift unions are derived from — the same id-table case as ' +
         '`campaign/types.ts#FAIL_STATES` above — and every event a reader sees is its ' +

@@ -91,6 +91,7 @@ import { disclosureItems } from '../mode/disclosure.js';
 import { parityRefusal } from '../mode/parity.js';
 import { isViewMode, itemsIn, type DisclosureItem, type ViewMode } from '../mode/types.js';
 import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
+import { runIdentityIssues } from '../scope/runIdentity.js';
 import { demandFromSpec, specFromTrafficProfile } from '../authoring/patternSpec.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
 import { eventFor } from '../shift/events.js';
@@ -1677,47 +1678,29 @@ export type Provenance =
  * Pure, so the claim *this line is this run* is testable without a clipboard.
  */
 export function provenanceLineOf(state: ViewerState, resources: BrowserResources): Provenance {
-  const reasons: string[] = [];
+  /*
+   * The refusals are `scope/runIdentity.ts`'s, not this function's — `docs/16` S5.
+   *
+   * They were written out here, and the leaderboard's submit path was about to write them out
+   * again. *"Can this run be reproduced elsewhere from its own selection?"* is one question, and two
+   * answers to it is the single disagreement a replay-verified board cannot survive: a client
+   * stricter than the server refuses a run the server would have taken, and a client looser than it
+   * posts a run the server rejects **as a forgery** — the one place this product accuses somebody of
+   * cheating, spending that accusation on a client bug.
+   *
+   * What stays here is the half that is genuinely about the CLI: which flags spell this run.
+   */
+  const reasons = runIdentityIssues(state, resources, 'ranked').map((issue) => issue.message);
   const flags: string[] = [`--building ${state.buildingId}`, `--dispatcher ${state.dispatcherId}`];
-
-  if (!resources.entries.some((entry) => entry.config.id === state.buildingId)) {
-    reasons.push(`the building “${state.buildingId}” is yours alone and data/buildings/ does not ship it`);
-  }
-  if (!resources.dispatcherProfiles.profiles.some((profile) => profile.id === state.dispatcherId)) {
-    reasons.push(
-      `the dispatcher “${state.dispatcherId}” is yours alone and data/dispatcher-profiles.json does not ship it`,
-    );
-  }
 
   let template: string | undefined;
   if (state.pattern !== 'building') {
     const shipped = resources.trafficProfiles.profiles.find((profile) => profile.id === state.pattern);
-    if (shipped === undefined) {
-      reasons.push(`the pattern “${state.pattern}” is yours alone and the CLI has no flag that loads a saved pattern`);
-    } else {
+    if (shipped !== undefined) {
       flags.push(`--traffic ${shipped.id}`);
       const demand = demandFromSpec(specFromTrafficProfile(resources.trafficProfiles, shipped.id));
       if (demand.demandTemplate !== 'rise-and-fall') template = demand.demandTemplate;
     }
-  }
-
-  const event = eventFor(state.week.day, state.week.dayIdx);
-  if (state.week.day !== 1 || !event.effect.changesNothing) {
-    reasons.push(
-      `day ${String(state.week.day)} grows the building and schedules “${event.name}”, and the CLI has no --day`,
-    );
-  }
-  if (state.outOfServiceCarIds.length > 0) {
-    reasons.push(
-      `${String(state.outOfServiceCarIds.length)} car(s) are held out of service and the CLI has no flag to hold one`,
-    );
-  }
-  if (
-    state.levers.parking !== DEFAULT_LEVERS.parking ||
-    state.levers.express !== DEFAULT_LEVERS.express ||
-    state.levers.dwell !== DEFAULT_LEVERS.dwell
-  ) {
-    reasons.push('the group levers are moved off their defaults and the CLI has no lever flags');
   }
 
   if (reasons.length > 0) return { ok: false, reasons };

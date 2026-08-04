@@ -107,6 +107,7 @@ const AUDITED_MODULES = [
   'viz/src/render',
   'viz/src/replay',
   'viz/src/scenario',
+  'viz/src/scope',
   'viz/src/shift',
 ] as const;
 
