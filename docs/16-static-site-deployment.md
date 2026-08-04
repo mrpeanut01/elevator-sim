@@ -40,8 +40,11 @@ failure mode a `workflow_dispatch`-only job would have had.
 
 ### What is actually being hosted
 
-`packages/viz` has **no server half**, and that is a property of the codebase rather than a
-simplification made here:
+`packages/viz` has **no server half** — *as of this commit*, and the qualifier is load-bearing: a
+concurrent lane is reportedly adding a database and a login framework, which is the premise below
+expiring rather than a detail. Read "What would change the answer" at the end of this section before
+quoting anything here. For the tree as it stands, the claim is a property of the codebase rather
+than a simplification made here:
 
 - `core` publishes a `browser` export condition resolving to `core/src/browser.ts`, an fs-free
   barrel, and `core/src/browser.test.ts` walks its transitive import graph and fails if a `node:`
@@ -87,13 +90,57 @@ cannot produce a surprise invoice. If this ever needs an SLA, a fourth custom do
 three previews at once, the answer is the Standard plan and this document's § 1 needs re-running,
 not patching.
 
-### What would change the answer
+### What would change the answer — and something already is
 
-Stated now so a later reader does not have to reverse-engineer it. The verdict "static host" holds
-exactly as long as the viewer keeps running its own simulation. It stops holding the day something
-needs a server — a shared recording store, a hosted batch runner for the Phase B measurement
-fan-out, an authenticated API. None of those exist, and the first one that does makes this a
-Container Apps or Functions question again.
+The verdict "static host" holds exactly as long as the viewer keeps running its own simulation. It
+stops holding the day something needs a server: a shared recording store, a hosted batch runner for
+the Phase B measurement fan-out, an authenticated API.
+
+**One of those is reportedly being built right now.** A concurrent lane is implementing a SQL Server
+database and a login framework. **This is second-hand and unverified** — it was not on `main` and no
+part of it was visible in this tree when this document was written, so nothing below is a reading of
+that design. It is recorded here because whoever lands it will hit this file, and the collisions are
+cheaper to name now than to debug later.
+
+**What does not change.** The viewer is still static, and a static host is still the right way to
+serve it. The build, the manifest fix and the artifact guard are orthogonal to whether a database
+exists.
+
+**What does change, specifically:**
+
+1. **The `$0` headline stops being true of the system.** It remains true of *hosting the viewer*.
+   Azure SQL Database is not free — serverless has a monthly free vCore-second allowance and the
+   cheapest provisioned tiers are a few dollars a month, and a SQL Server *instance* (rather than
+   Azure SQL Database) is materially more than that. § 1's table prices a static site; it does not
+   price a database, and it must not be quoted as if it did.
+2. **Free plan or Standard becomes a real question.** A managed Azure Functions API is supported on
+   Free. **Linked ("bring your own") backends are a Standard-plan feature**, so pointing the site at
+   a separately deployed App Service or Functions app moves this off Free. Which one applies depends
+   on the shape of their API, which is not visible from here.
+3. **Three lines of `staticwebapp.config.json` will actively break a login flow**, and they are the
+   most likely thing to cost someone an afternoon. All three are in the CSP:
+   - `form-action 'none'` — blocks **every** form submission. A POST login form fails outright.
+   - `connect-src 'self'` — blocks `fetch`/XHR to any other origin. A same-origin `/api/*` backend
+     is fine; an API on its own hostname is blocked by the browser.
+   - `script-src 'self'` — blocks a third-party auth SDK loaded from a CDN (MSAL, for instance).
+
+   These were chosen for a page that talks to nobody, and they were **measured** rather than
+   guessed — § 4 records `worker-src` being tightened after a browser run proved the hedge
+   unnecessary. Widening them for an auth flow is legitimate; widening them *by guess* is not. Drive
+   the flow and open only what it actually requires.
+4. **`navigationFallback.exclude` has no API prefix.** Static Web Apps routes `/api/*` ahead of the
+   fallback, so a managed backend is unaffected — but an API on any other prefix would have its 404s
+   answered with `index.html` and a **200**, which is precisely the silent failure § 4 exists to
+   describe. If the prefix is not `/api`, add it to the exclusion list and the guard in
+   `buildingsManifest.test.ts`.
+5. **Static Web Apps already has authentication**, via `/.auth/*` with Entra ID/GitHub providers and
+   role-based routing in `staticwebapp.config.json`. That may make a hand-rolled login framework
+   partly redundant, or may conflict with it. Worth one look before the two are wired together.
+
+**None of this is a reason to hold this lane.** Everything here is inert (§ 0) and the viewer's
+hosting is decided independently of whether a database exists. But the *system's* platform answer is
+no longer the viewer's platform answer, and whoever owns the database gets to make it — with § 1's
+table as an input rather than as the verdict.
 
 ---
 
