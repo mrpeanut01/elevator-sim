@@ -1,7 +1,11 @@
 # Test Buildings
 
-Five reference buildings, each chosen to stress a different aspect of the dispatcher.
+Eight reference buildings, each chosen to stress a different aspect of the dispatcher.
 Machine-readable configs in [`data/buildings/`](../data/buildings/).
+
+The first five are the original set. The last three were added later and each closes a gap the
+first five could not pose: a traffic profile with no building, a demand with no dominant direction,
+and a bank whose cars are not alike.
 
 | Name | Floors | Bank config | Zones | Stress case |
 |---|---|---|---|---|
@@ -10,6 +14,9 @@ Machine-readable configs in [`data/buildings/`](../data/buildings/).
 | Secure Tower | 30 | 6 × gearless, 4 m/s, 3,000 lb; low 1–15 / high 1, 16–30 | 4 tenant zones + exec | Access control × dispatch interaction |
 | Mixed-Use High-Rise | 60 | 4 shuttle @ 8 m/s → sky lobby 31; 2 local banks | retail 1–5, office 6–30, resi 32–60 | Overlapping peaks, transfer modeling |
 | Vertical City | 100 | Double-deck shuttles, 3 sky lobbies | 6 zones | Double-deck, even/odd assignment |
+| Chancery House | 19 | 6 × gearless, 5 m/s, 3,000 lb | none | Prestige service level on an oversupplied bank |
+| Crown Hotel | 24 | 4 × gearless 3 m/s + 1 × geared 1.75 m/s service | back of house | Two-way demand, unlike cars, a single-floor crowd |
+| St Jude Hospital | 13 | 3 × gearless 2.5 m/s + 2 × geared 1.75 m/s bed | clinical + diagnostics | Never off-peak, bed cars, the first shipped stair |
 
 ---
 
@@ -109,3 +116,68 @@ ground.
 - **Transfer floors** (sky lobbies) require passengers to be re-injected as new arrivals
   at the transfer floor while retaining their original journey identity, so
   time-to-destination can be measured end to end.
+
+---
+
+## 6. Chancery House
+
+Nineteen floors, six fast cars, no zoning, and 612 people — the smallest population of any office
+here on the most demanding service level. It exists because **`office-prestige` was declared in
+[`data/traffic-profiles.json`](../data/traffic-profiles.json) from Phase 1 and used by no shipped
+building**: a schema-valid profile reachable from nothing, which is the shape
+[`DECISIONS.md` § D112](../DECISIONS.md) found in `destination-eta`, one level up in `data/`.
+Invariant 7 makes strategy data; it does not exempt data from having a caller.
+
+What the profile asks for is the inverse of Midtown Office: 16 % of population per five minutes
+against 12, a 25 s target interval against 30, a 20 s target wait against 25 — a **harder service
+level on a smaller population**. The bank is oversupplied on purpose. The interesting question at a
+headline address is not whether the lifts cope but whether a dispatcher can hold a 25 s interval
+*while it has spare cars*, which is decided in stage 7 (repositioning) rather than stage 2.
+
+**Watch for:** whether spare capacity is parked where the next burst will be, and what it costs in
+energy to keep it there.
+
+## 7. Crown Hotel
+
+Twenty-four floors over a back-of-house basement, and the first shipped building to declare `hotel`
+at the **building** level — until now the profile reached the simulator only through one floor range
+of Vertical City, so every hotel figure this project had published described a hotel *stratum inside
+an office tower*.
+
+Two things here exist nowhere else. Its demand has **no dominant direction** — `governingPeak:
+two-way`, a 40/40/20 split, and a mean group size of 2.0 against the offices' 1.4 — which is the
+traffic `collective`'s `noDirectionReversal` hard constraint is least suited to, and the benchmark
+gate has never had a cell that says so. And its bank holds **five unlike cars**: four guest cars at
+3,000 lb and 3.0 m/s beside one service car at 4,000 lb and 1.75 m/s.
+
+The 120-person ballroom on floor 2 is a deliberate single-floor crowd source — an office down-peak
+arrives from everywhere, and a conference breaking arrives from one landing. Pair it with the
+`evening-egress` demand template, which steps rather than ramps.
+
+**Watch for:** whether a direction-constrained dispatcher is worse than an unconstrained one here,
+and whether the slow service car gets sent to hall calls it should not.
+
+## 8. St Jude Hospital
+
+Thirteen floors and 986 people, and the only building here that never has an off-peak. Its demand is
+two-way for eighteen hours a day and its peaks are **shift changes** rather than a morning arrival,
+so it ships with its own `hospital` traffic profile and is meant to be run against the
+`shift-change` template — the only one with two interior peaks and a trough the building never
+empties into.
+
+Three firsts. The bank holds **two bed cars** at 4,000 lb and 1.75 m/s beside three public cars at
+3,500 lb and 2.5 m/s, so a dispatcher has only speed, capacity and transfer time to tell them apart
+— whether it learns to leave them alone for an ordinary hall call is measurable, and no other
+building can ask it. It is the **first shipped building to declare a `stairs` transport mode**, so
+the asymmetric-propensity model of [`docs/14` § 3.3](14-building-behaviour-contract.md) finally has
+a caller in `data/` rather than only in a test fixture. And the entrance is **not** the only crowd
+source: Outpatients on floor 1 holds 180 people, so a clinic ending sends a burst *downward from an
+intermediate floor*, a shape neither an office up-peak nor a residential down-peak produces.
+
+**Named limitation:** the bed cars carry no per-car transfer time. The model has no notion of a bed
+as an indivisible unit, so every derived bound multiplies a car's transfer time by its full person
+count — a 26-person bed lift at an authored 3.0 s produces an 84.5 s loading bound describing a
+journey no bed lift makes. The heterogeneity that *is* modelled is speed and capacity.
+
+**Watch for:** whether the bed cars are wasted on visitor traffic, and how much load the single
+stair takes off the lifts.

@@ -11,6 +11,7 @@
   "workspaces": [
     "packages/core",
     "packages/experiments",
+    "packages/server",
     "packages/cli",
     "packages/viz"
   ],

@@ -69,6 +69,7 @@
  * | `waitTime` | s | saturating `waitTimeS` | 60 s | never |
  * | `rideTime` | s | saturating `waitTimeS` | 60 s | never |
  * | `detourPenalty` | passenger·s | saturating `waitTimeS` | 60 passenger·s | never |
+ * | `diversionDetour` | passenger·s | saturating `waitTimeS` | 60 passenger·s | never |
  * | `existingCallDelay` | s | saturating `waitTimeS` | 60 s | never |
  * | `directionReversal` | — | bounded 2 | 1 reversal | 2 reversals |
  * | `loadFactor` | fraction | bounded 1 | 0.5 of rated | rated load |
@@ -82,7 +83,7 @@
  * Three things about that table are worth stating rather than leaving to be inferred.
  *
  * **The passenger-time family shares one reference.** `waitTime`, `rideTime`,
- * `existingCallDelay`, `detourPenalty` and `starvation` all normalize on `waitTimeS`, because
+ * `existingCallDelay`, `detourPenalty`, `diversionDetour` and `starvation` all normalize on `waitTimeS`, because
  * all five are seconds of passenger time and the project's own threshold for "too long" is one
  * number. The cost is that Phase 7 cannot move one of the five half-cost points without moving
  * all five; the benefit is that a second of ride time and a second of wait are the same second,
@@ -209,6 +210,8 @@ export const TERM_SCALE_NOTES: Readonly<Record<string, string>> = Object.freeze(
     'Seconds aboard. Shares waitTimeS with the wait: a second of ride time and a second of wait are the same second, which is the honest default.',
   detourPenalty:
     'Passenger-seconds of delay to those already aboard. Reads waitTimeS as a product — 60 is six people delayed ten seconds each, and the term claims that equals one person delayed sixty.',
+  diversionDetour:
+    'The same passenger-seconds as detourPenalty and deliberately the same reference, so the two weights are directly comparable — it charges only when the call cuts a run short, so the difference between them is a gate rather than a scale.',
   existingCallDelay:
     'Seconds of added delay summed over the calls the car already holds. Same passenger-time reference as the wait it delays.',
   directionReversal:

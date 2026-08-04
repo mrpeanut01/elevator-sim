@@ -1,0 +1,249 @@
+{
+  "$comment": "Two-way demand all day, and the first shipped building to declare `hotel` at the BUILDING level. Until now the profile reached the simulator only through one floor range of `vertical-city`, so every hotel figure this project has published is a hotel *stratum inside an office tower* rather than a hotel. What that profile asks for is unlike every other shipped building: governingPeak `two-way`, a 40/40/20 directional split, and a mean group size of 2.0 against the offices' 1.4 -- guests travel in pairs and families. A building whose demand has NO dominant direction is the case `directionReversal` and `noDirectionReversal` are least suited to, which is the point of shipping it: `collective`'s hard constraint is close to a liability here, and the benchmark gate has never had a cell that says so. ONE bank with FIVE UNLIKE CARS, and that is the second reason it ships. Four guest cars at 3000 lb and 3.0 m/s share a shaft group with one service car at 4000 lb and 1.6 m/s whose passengerTransferS is 2.4 s because it is loaded with trolleys rather than walked into. Every other shipped building's bank is uniform, so no shipped cell has ever asked whether a dispatcher notices that one of its cars is half the speed of the others -- `estimateCost` prices the difference and nothing has ever checked that it is priced WELL. Modelled as one bank rather than two because a second bank serving the same floors would make every guest floor a floor served by two banks, and `isTransferFloor` means sky lobby; a hotel bedroom corridor is not one.",
+  "id": "crown-hotel",
+  "name": "Crown Hotel",
+  "type": "hotel",
+  "trafficProfile": "hotel",
+  "floors": [
+    {
+      "id": "B1",
+      "index": -1,
+      "heightM": -3.6,
+      "population": 26,
+      "label": "Back of house"
+    },
+    {
+      "id": "G",
+      "index": 0,
+      "heightM": 0.0,
+      "population": 0,
+      "isEntrance": true,
+      "label": "Reception"
+    },
+    {
+      "id": "2",
+      "index": 2,
+      "heightM": 4.8,
+      "population": 120,
+      "label": "Ballroom and conference"
+    },
+    {
+      "id": "3",
+      "index": 3,
+      "heightM": 7.9,
+      "population": 40,
+      "label": "Restaurant and spa"
+    },
+    {
+      "id": "4",
+      "index": 4,
+      "heightM": 11.0,
+      "population": 34
+    },
+    {
+      "id": "5",
+      "index": 5,
+      "heightM": 14.1,
+      "population": 34
+    },
+    {
+      "id": "6",
+      "index": 6,
+      "heightM": 17.2,
+      "population": 34
+    },
+    {
+      "id": "7",
+      "index": 7,
+      "heightM": 20.3,
+      "population": 34
+    },
+    {
+      "id": "8",
+      "index": 8,
+      "heightM": 23.4,
+      "population": 34
+    },
+    {
+      "id": "9",
+      "index": 9,
+      "heightM": 26.5,
+      "population": 34
+    },
+    {
+      "id": "10",
+      "index": 10,
+      "heightM": 29.6,
+      "population": 34
+    },
+    {
+      "id": "11",
+      "index": 11,
+      "heightM": 32.7,
+      "population": 34
+    },
+    {
+      "id": "12",
+      "index": 12,
+      "heightM": 35.8,
+      "population": 34
+    },
+    {
+      "id": "13",
+      "index": 13,
+      "heightM": 38.9,
+      "population": 34
+    },
+    {
+      "id": "14",
+      "index": 14,
+      "heightM": 42.0,
+      "population": 34
+    },
+    {
+      "id": "15",
+      "index": 15,
+      "heightM": 45.1,
+      "population": 34
+    },
+    {
+      "id": "16",
+      "index": 16,
+      "heightM": 48.2,
+      "population": 34
+    },
+    {
+      "id": "17",
+      "index": 17,
+      "heightM": 51.3,
+      "population": 34
+    },
+    {
+      "id": "18",
+      "index": 18,
+      "heightM": 54.4,
+      "population": 34
+    },
+    {
+      "id": "19",
+      "index": 19,
+      "heightM": 57.5,
+      "population": 34
+    },
+    {
+      "id": "20",
+      "index": 20,
+      "heightM": 60.6,
+      "population": 34
+    },
+    {
+      "id": "21",
+      "index": 21,
+      "heightM": 63.7,
+      "population": 34
+    },
+    {
+      "id": "22",
+      "index": 22,
+      "heightM": 66.8,
+      "population": 34
+    },
+    {
+      "id": "23",
+      "index": 23,
+      "heightM": 69.9,
+      "population": 34
+    }
+  ],
+  "totalPopulation": 866,
+  "banks": [
+    {
+      "id": "main",
+      "name": "Main bank",
+      "servesFloors": [
+        "B1",
+        "G",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "21",
+        "22",
+        "23"
+      ],
+      "cars": [
+        {
+          "id": "A",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 3.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening"
+        },
+        {
+          "id": "B",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 3.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening"
+        },
+        {
+          "id": "C",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 3.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening"
+        },
+        {
+          "id": "D",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 3.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening"
+        },
+        {
+          "id": "S",
+          "spec": "geared-traction",
+          "ratedSpeedMps": 1.75,
+          "ratedLoadLb": 4000,
+          "doorType": "sideOpening"
+        }
+      ]
+    }
+  ],
+  "accessZones": [
+    {
+      "id": "back-of-house",
+      "floors": [
+        "B1"
+      ],
+      "credentialGroups": [
+        "housekeeping",
+        "engineering",
+        "security"
+      ]
+    }
+  ],
+  "notes": [
+    "One bank serves every floor from B1 to 27. Back of house is kept from guests by ACCESS zoning, not by service zoning -- B1's credential group is housekeeping, engineering and security. That is the honest split: the service car can physically reach every guest floor, and a guest cannot reach the laundry.",
+    "Ballroom population 120 on one floor is a deliberate crowd source. A conference breaking is the hotel equivalent of an office down-peak but from a SINGLE intermediate floor, which is the case `assignmentMode: split-demand` and `splitThresholdPassengers` exist for, and which no other shipped building raises at this concentration. Pair it with the `evening-egress` demand template.",
+    "Guest floor-to-floor is 3.1 m against the offices' 3.9-4.2: bedroom floors need no raised floor or deep ceiling void. The whole 24-floor guest stack rises 74.4 m, so a 3.0 m/s car is ample and the building is NOT a speed problem -- it is a direction problem.",
+    "Mean group size 2.0 comes from the profile, not from here. It is what makes the 3000 lb car fill in roughly half the hall calls an office car would need, and capacity-aware dispatch has a visibly different job as a result.",
+    "The guest stack stops at 23 so the bank's rise stays inside geared-traction's 76 m limit: the service car is a geared machine because that is the class whose speed range reaches down to 1.75 m/s, and a taller tower would have forced it to be gearless at 2.5 m/s -- which would have erased the very speed contrast this building exists to pose. The reference data set the height, not the other way round.",
+    "NAMED LIMITATION: the service car carries no per-car passengerTransferS, for the reason st-jude-hospital's bed cars do not -- a trolley is not 26 people boarding one at a time, and every derived bound that reads transfer time would treat it as though it were. The hotel building-type default of 1.5 s applies to all five cars; the car differs in speed and capacity, which the engine reads without that distortion."
+  ]
+}

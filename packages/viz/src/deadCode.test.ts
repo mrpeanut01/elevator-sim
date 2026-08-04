@@ -100,6 +100,7 @@ const AUDITED_MODULES = [
   'viz/src/frame',
   'viz/src/honesty',
   'viz/src/live',
+  'viz/src/menu',
   'viz/src/mode',
   'viz/src/playback',
   'viz/src/record',

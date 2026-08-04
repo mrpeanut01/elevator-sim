@@ -20,6 +20,8 @@
 
 import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import {
+  CORPUS_DISPATCHER_PROFILE_IDS,
+  CORPUS_TRAFFIC_PROFILE_IDS,
   STANDARD_CORPUS,
   STANDARD_SPACE,
   caseFromSeed,
@@ -179,7 +181,16 @@ describe('a property violation is impossible to miss', () => {
     /* A real run of a real generated case, with a real fault: stages 2–5 refuse every call from
        t = 60, which is `fuzz/faults.test.ts`'s own P5 demonstration. Nothing is hand-built —
        `evaluateCase` produces the outcome the campaign would produce, violations and all. */
-    const options = generateOptionsFrom(config, STANDARD_SPACE);
+    /* The frozen axes. This fixture pins a SEED, and a fuzz case is a seed decoded against an
+       option space — so a profile added to `data/` re-maps it and the "real generated case with a
+       real fault" quietly becomes a different run that the fault no longer breaks. Adding the
+       `hospital` traffic profile did exactly that. See `fuzz/CORPUS_TRAFFIC_PROFILE_IDS`. */
+    const options = generateOptionsFrom(
+      config,
+      STANDARD_SPACE,
+      CORPUS_DISPATCHER_PROFILE_IDS,
+      CORPUS_TRAFFIC_PROFILE_IDS,
+    );
     const fuzzCase = caseFromSeed(STANDARD_CORPUS[0] ?? 101, options);
     failing = evaluateCase(fuzzCase, { config, createPolicy: stallingAfter(60) });
   }, 120_000);

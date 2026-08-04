@@ -25,6 +25,7 @@ const alias = {
     new URL('./packages/experiments/src/browser.ts', import.meta.url),
   ),
   '@elevator-sim/experiments': src('experiments'),
+  '@elevator-sim/server': src('server'),
   '@elevator-sim/cli': src('cli'),
   '@elevator-sim/viz': src('viz'),
 };
@@ -45,6 +46,12 @@ export default defineConfig({
   resolve: { alias },
   test: {
     passWithNoTests: true,
-    projects: [project('core'), project('experiments'), project('cli'), project('viz')],
+    projects: [
+      project('core'),
+      project('experiments'),
+      project('server'),
+      project('cli'),
+      project('viz'),
+    ],
   },
 });

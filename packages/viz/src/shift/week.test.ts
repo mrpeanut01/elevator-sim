@@ -13,6 +13,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { CONTRACTS } from './contracts.js';
 import { readGoals } from './goals.js';
 import { goalsForDay } from './goals.js';
 import {
@@ -156,8 +157,11 @@ describe('banking a scenario', () => {
     expect(week.cleared).toBeNull();
   });
 
-  it('says so, rather than promising a sixth scenario, at the end of the list', () => {
-    let week = { ...openWeek('c5'), cleanRun: 2 };
+  it('says so, rather than promising another scenario, at the end of the list', () => {
+    // The LAST contract, derived — the campaign grew from five to eight and this had pinned `c5`,
+    // which is now the middle of it.
+    const last = CONTRACTS[CONTRACTS.length - 1]?.id ?? '';
+    let week = { ...openWeek(last), cleanRun: 2 };
     week = closeDay(week, day(week, 'met'));
     expect(week.cleared?.nextContractId).toBeNull();
     expect(week.cleared?.nextTitle).toBe('any scenario you like — they are all open');

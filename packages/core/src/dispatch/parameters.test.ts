@@ -67,14 +67,16 @@ const declared = (id: string): DispatchParameterSpec | undefined =>
 const PROBE_PROFILE: DispatcherProfileSource = {
   id: 'probe',
   name: 'Probe',
-  // All twelve, each a different value: the schema derives one row per implemented term, and a
+  // All thirteen, each a different value: the schema derives one row per implemented term, and a
   // probe that skipped a term would not notice a row wired to the wrong weight. `callType` below
   // is `mobile-credential` deliberately — it is what makes `weights.rideTime`'s `activeWhen`
-  // satisfied, so the probe is taken in the configuration where every weight is live.
+  // satisfied — and `eligibility.enRouteDiversion` does the same for `weights.diversionDetour`, so
+  // the probe is taken in the configuration where every weight is live.
   weights: {
     waitTime: 0.55,
     rideTime: 0.35,
     detourPenalty: 0.45,
+    diversionDetour: 0.15,
     existingCallDelay: 0.65,
     directionReversal: 0.2,
     loadFactor: 0.75,
@@ -155,6 +157,7 @@ const PROBE_VALUES: ReadonlyMap<string, number | string | boolean> = new Map<
   ['weights.waitTime', 0.55],
   ['weights.rideTime', 0.35],
   ['weights.detourPenalty', 0.45],
+  ['weights.diversionDetour', 0.15],
   ['weights.existingCallDelay', 0.65],
   ['weights.directionReversal', 0.2],
   ['weights.loadFactor', 0.75],
@@ -283,15 +286,21 @@ describe('the parameter schema is well formed', () => {
           continue;
         }
 
-        expect(gate?.type, where).toBe('categorical');
+        // The value-list form gates a **categorical or a boolean**. A boolean is a categorical
+        // with two values that the schema does not bother to enumerate — `weights.diversionDetour`
+        // gates on `eligibility.enRouteDiversion`, and `activeWhenSatisfied` already compares
+        // `String(value)`, so the only thing missing was the admissible set. Supplying it here
+        // keeps both properties below meaningful rather than exempting the boolean case.
+        expect(gate?.type, where).toMatch(/^(?:categorical|boolean)$/);
+        const admissible = gate?.type === 'boolean' ? ['true', 'false'] : (gate?.values ?? []);
         expect(condition.length, where).toBeGreaterThan(0);
         for (const value of condition) {
-          expect(gate?.values, `${where}=${value}`).toContain(value);
+          expect(admissible, `${where}=${value}`).toContain(value);
           expect(activeWhenSatisfied(condition, value), `${where}=${value}`).toBe(true);
         }
         // And it does gate: a value the gate admits that this condition does not must exist, or
         // the condition is satisfied by every configuration and is not a condition.
-        const excluded = (gate?.values ?? []).filter((value) => !condition.includes(value));
+        const excluded = admissible.filter((value) => !condition.includes(value));
         expect(excluded.length, `${where} admits every value the gate can take`).toBeGreaterThan(0);
       }
     }
@@ -437,12 +446,16 @@ describe('the schema and the engine agree about what is tunable', () => {
     });
     expect(row?.activeWhen).toEqual(costTerm('rideTime')?.activeWhen);
 
-    // And it is the only one: every other term prices something a bare up/down button already
-    // knows, so withholding or gating it would hide a live dimension.
+    // And it is one of exactly two. Every other term prices something a bare up/down button
+    // already knows, so withholding or gating it would hide a live dimension. The second is
+    // `weights.diversionDetour`, gated on `eligibility.enRouteDiversion` for the same reason in a
+    // different stage: with diversion off, no snapshot carries a commit point, the term is zero
+    // for every car, and its weight is a dimension an optimizer would search for nothing
+    // (`DECISIONS.md` § D210, § D211).
     const gated = DISPATCH_PARAMETERS.filter(
       (parameter) => parameter.id.startsWith('weights.') && parameter.activeWhen !== undefined,
     ).map((parameter) => parameter.id);
-    expect(gated).toEqual(['weights.rideTime']);
+    expect(gated).toEqual(['weights.rideTime', 'weights.diversionDetour']);
   });
 
   it('carries a partly-conditional term’s condition into its weight’s description', () => {
@@ -566,7 +579,13 @@ function profileWith(id: string, probe: number | string | boolean): Record<strin
     const gateSection = gateId.slice(0, gateDot);
     const gateKey = gateId.slice(gateDot + 1);
     if (gateSection === 'weights' || gateSection === 'constraints') continue;
-    base[gateSection] = { ...((base[gateSection] ?? {}) as object), [gateKey]: value };
+    // A condition is a list of **strings** whatever the gate's runtime type, because
+    // `activeWhenSatisfied` compares `String(value)`. Authoring `"true"` into a boolean field
+    // would be a profile the real schema rejects, so the string is turned back into the value the
+    // gate actually holds — the round trip this function exists to test is the authored one.
+    const gateType = EVERY_PARAMETER.find((parameter) => parameter.id === gateId)?.type;
+    const authored: string | boolean = gateType === 'boolean' ? value === 'true' : value;
+    base[gateSection] = { ...((base[gateSection] ?? {}) as object), [gateKey]: authored };
   }
   const dot = id.indexOf('.');
   const section = id.slice(0, dot);

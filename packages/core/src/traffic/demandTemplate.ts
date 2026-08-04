@@ -591,6 +591,165 @@ export function lunchTwoWayTemplate(options: LunchTwoWayOptions = {}): ResolvedD
 }
 
 /* -------------------------------------------------------------------------- *
+ * Shift change — the only shipped template with two interior peaks
+ * -------------------------------------------------------------------------- */
+
+/** Overrides for {@link shiftChangeTemplate}. */
+export interface ShiftChangeOptions {
+  readonly durationS?: number | undefined;
+  /** Length of each peak hold, seconds. */
+  readonly peakWindowS?: number | undefined;
+  /** Intensity between the two peaks, as a fraction of peak. Must lie in `(0, 1)` — see below. */
+  readonly troughFraction?: number | undefined;
+  readonly id?: string | undefined;
+  readonly name?: string | undefined;
+}
+
+/**
+ * Two peaks separated by a trough the building never empties into.
+ *
+ * The shape a hospital, a factory or a call centre actually runs, and the one no existing template
+ * could express: `rise-and-fall` has a single interior maximum and `constant-iso` has none, so
+ * *"the outgoing shift leaves while the incoming shift arrives, twice"* had to be approximated by a
+ * **wider single peak** — which spreads the same demand instead of concentrating it twice, and is a
+ * different question.
+ *
+ * Six phases, symmetric about the midpoint: rise to the first peak, hold, fall to the trough, rise
+ * to the second peak, hold, fall away. The peaks are centred on 1/4 and 3/4 of the period.
+ *
+ * **The trough is required to be non-zero**, and that is the template's defining constraint rather
+ * than a validation nicety. A trough of zero is two separate rise-and-falls with a dead period
+ * between them, which is a different building — the fact a shift change turns on is that the place
+ * is still occupied and still being served while the changeover happens.
+ *
+ * The report window is the **whole run**, for the reason `lunch-two-way`'s is: the quantity of
+ * interest spans both peaks and the trough, and reporting one peak would measure a rise-and-fall
+ * with extra steps.
+ *
+ * @throws TrafficError if the trough is not in `(0, 1)`, or if the two holds do not fit.
+ */
+export function shiftChangeTemplate(options: ShiftChangeOptions = {}): ResolvedDemandTemplate {
+  const durationS = requirePositive(
+    options.durationS ?? TRAFFIC_DEFAULTS.shiftChangeDurationS,
+    'durationS',
+  );
+  const peakWindowS = requirePositive(
+    options.peakWindowS ?? TRAFFIC_DEFAULTS.shiftChangePeakWindowS,
+    'peakWindowS',
+  );
+  const troughFraction = options.troughFraction ?? TRAFFIC_DEFAULTS.shiftChangeTroughFraction;
+  if (!Number.isFinite(troughFraction) || troughFraction <= 0 || troughFraction >= 1) {
+    throw new TrafficError(
+      `shift-change troughFraction must lie in (0, 1); received ${troughFraction}. Zero would make this two separate rise-and-falls with a dead period between them, and the fact a shift change turns on is that the building is still occupied while it happens; one would make it constant.`,
+    );
+  }
+  if (2 * peakWindowS >= durationS) {
+    throw new TrafficError(
+      `Two ${peakWindowS} s peak holds do not fit inside a ${durationS} s run with ramps between them. Shorten the window or lengthen the run.`,
+    );
+  }
+
+  const half = peakWindowS / 2;
+  const firstHoldStartS = durationS / 4 - half;
+  const firstHoldEndS = durationS / 4 + half;
+  const secondHoldStartS = (3 * durationS) / 4 - half;
+  const secondHoldEndS = (3 * durationS) / 4 + half;
+
+  const phases: DemandPhase[] = [
+    { startS: 0, endS: firstHoldStartS, startIntensity: troughFraction, endIntensity: 1 },
+    { startS: firstHoldStartS, endS: firstHoldEndS, startIntensity: 1, endIntensity: 1 },
+    { startS: firstHoldEndS, endS: durationS / 2, startIntensity: 1, endIntensity: troughFraction },
+    { startS: durationS / 2, endS: secondHoldStartS, startIntensity: troughFraction, endIntensity: 1 },
+    { startS: secondHoldStartS, endS: secondHoldEndS, startIntensity: 1, endIntensity: 1 },
+    { startS: secondHoldEndS, endS: durationS, startIntensity: 1, endIntensity: troughFraction },
+  ];
+
+  return finish({
+    id: options.id ?? 'shift-change',
+    name: options.name ?? 'Shift-change template',
+    recommended: false,
+    durationS,
+    phases,
+    reportWindowStartS: 0,
+    reportWindowEndS: durationS,
+  });
+}
+
+/* -------------------------------------------------------------------------- *
+ * Event egress — the template whose leading edge is the point
+ * -------------------------------------------------------------------------- */
+
+/** Overrides for {@link eveningEgressTemplate}. */
+export interface EveningEgressOptions {
+  readonly durationS?: number | undefined;
+  /** Seconds from the baseline to full flow. The step. */
+  readonly stepS?: number | undefined;
+  /** Seconds of sustained full flow before the decay begins. */
+  readonly holdS?: number | undefined;
+  /** Intensity before the doors open, as a fraction of peak. */
+  readonly baselineFraction?: number | undefined;
+  readonly id?: string | undefined;
+  readonly name?: string | undefined;
+}
+
+/**
+ * A near-flat baseline, a **step** to full flow, a sustained maximum, then a decay.
+ *
+ * A ballroom emptying, a cinema turning out, a conference floor breaking at once. It differs from
+ * `rise-and-fall` in its **leading edge** rather than its magnitude: a rise-and-fall ramps over
+ * minutes, and an egress steps — the doors open and the whole population is on the landing inside a
+ * minute. That is the case a batch window or a deferred-assignment setting is decided by, and no
+ * other shipped template produces it.
+ *
+ * The baseline is deliberately **not zero**: a venue before its doors open still has staff and
+ * stragglers moving, and a zero baseline would make the run's first arrival coincide exactly with
+ * the step, which is a coincidence rather than a building.
+ *
+ * @throws TrafficError if the step and hold leave no decay, or the baseline is outside `[0, 1)`.
+ */
+export function eveningEgressTemplate(options: EveningEgressOptions = {}): ResolvedDemandTemplate {
+  const durationS = requirePositive(
+    options.durationS ?? TRAFFIC_DEFAULTS.eveningEgressDurationS,
+    'durationS',
+  );
+  const stepS = requirePositive(options.stepS ?? TRAFFIC_DEFAULTS.eveningEgressStepS, 'stepS');
+  const holdS = requirePositive(options.holdS ?? TRAFFIC_DEFAULTS.eveningEgressHoldS, 'holdS');
+  const baselineFraction =
+    options.baselineFraction ?? TRAFFIC_DEFAULTS.eveningEgressBaselineFraction;
+  if (!Number.isFinite(baselineFraction) || baselineFraction < 0 || baselineFraction >= 1) {
+    throw new TrafficError(
+      `evening-egress baselineFraction must lie in [0, 1); received ${baselineFraction}. It is the trickle before the doors open, as a fraction of the peak that follows, so it cannot equal or exceed it.`,
+    );
+  }
+
+  const quietS = durationS / 4;
+  const stepEndS = quietS + stepS;
+  const holdEndS = stepEndS + holdS;
+  if (holdEndS >= durationS) {
+    throw new TrafficError(
+      `A ${stepS} s step and a ${holdS} s hold beginning at ${quietS} s do not fit inside a ${durationS} s run with any decay left. Shorten them or lengthen the run.`,
+    );
+  }
+
+  const phases: DemandPhase[] = [
+    { startS: 0, endS: quietS, startIntensity: baselineFraction, endIntensity: baselineFraction },
+    { startS: quietS, endS: stepEndS, startIntensity: baselineFraction, endIntensity: 1 },
+    { startS: stepEndS, endS: holdEndS, startIntensity: 1, endIntensity: 1 },
+    { startS: holdEndS, endS: durationS, startIntensity: 1, endIntensity: baselineFraction },
+  ];
+
+  return finish({
+    id: options.id ?? 'evening-egress',
+    name: options.name ?? 'Event egress template',
+    recommended: false,
+    durationS,
+    phases,
+    reportWindowStartS: stepEndS,
+    reportWindowEndS: holdEndS,
+  });
+}
+
+/* -------------------------------------------------------------------------- *
  * Resolution from config
  * -------------------------------------------------------------------------- */
 
@@ -647,6 +806,8 @@ export function resolveDemandTemplate(
   if (spec === 'rise-and-fall') return riseAndFall(overrides);
   if (spec === 'constant-iso') return constant(overrides);
   if (spec === 'lunch-two-way') return lunchTwoWay(overrides);
+  if (spec === 'shift-change') return shiftChange(overrides);
+  if (spec === 'evening-egress') return eveningEgress(overrides);
   throw new TrafficError(
     `Unknown demand template "${spec}". Supported: ${DEMAND_TEMPLATE_IDS.join(', ')}. Declare it in data/traffic-profiles.json and add its shape in traffic/demandTemplate.ts.`,
   );
@@ -721,6 +882,43 @@ function lunchTwoWay(
   });
 }
 
+/** The shift-change shape, with `overrides` beating the record value and then the default. */
+function shiftChange(
+  overrides: DemandTemplateOverrides | undefined,
+  recordDurationS?: number,
+  id?: string,
+  name?: string,
+): ResolvedDemandTemplate {
+  return shiftChangeTemplate({
+    durationS: overrides?.durationS ?? recordDurationS ?? TRAFFIC_DEFAULTS.shiftChangeDurationS,
+    // `peakWindowS` is shared with rise-and-fall's override of the same name, deliberately: it
+    // means the same thing on both shapes — how long the peak is held — and a second name for one
+    // quantity is how a search space grows a dimension nobody meant to add.
+    peakWindowS: overrides?.peakWindowS ?? TRAFFIC_DEFAULTS.shiftChangePeakWindowS,
+    troughFraction: overrides?.troughFraction ?? TRAFFIC_DEFAULTS.shiftChangeTroughFraction,
+    ...(id === undefined ? {} : { id }),
+    ...(name === undefined ? {} : { name }),
+  });
+}
+
+/** The event-egress shape, with `overrides` beating the record value and then the default. */
+function eveningEgress(
+  overrides: DemandTemplateOverrides | undefined,
+  recordDurationS?: number,
+  id?: string,
+  name?: string,
+): ResolvedDemandTemplate {
+  return eveningEgressTemplate({
+    durationS: overrides?.durationS ?? recordDurationS ?? TRAFFIC_DEFAULTS.eveningEgressDurationS,
+    stepS: overrides?.stepS ?? TRAFFIC_DEFAULTS.eveningEgressStepS,
+    holdS: overrides?.holdS ?? TRAFFIC_DEFAULTS.eveningEgressHoldS,
+    baselineFraction:
+      overrides?.baselineFraction ?? TRAFFIC_DEFAULTS.eveningEgressBaselineFraction,
+    ...(id === undefined ? {} : { id }),
+    ...(name === undefined ? {} : { name }),
+  });
+}
+
 function fromRecord(
   record: DemandTemplate,
   overrides?: DemandTemplateOverrides | undefined,
@@ -751,6 +949,12 @@ function fromRecord(
       record.id,
       record.name,
     );
+  }
+  if (record.id === 'shift-change') {
+    return shiftChange(overrides, durationS, record.id, record.name);
+  }
+  if (record.id === 'evening-egress') {
+    return eveningEgress(overrides, durationS, record.id, record.name);
   }
   throw new TrafficError(
     `Demand template "${record.id}" has no shape in this module. Supported: ${DEMAND_TEMPLATE_IDS.join(', ')}. Adding one is a new shape in traffic/demandTemplate.ts, not a new branch at a call site.`,

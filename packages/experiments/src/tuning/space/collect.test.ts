@@ -352,8 +352,8 @@ describe('every parameter core declares is accounted for', () => {
     // can actually author — so it moves the space as well as the row count, which is the
     // relationship neither wave-13 lane had. The totals below are re-derived from the merged
     // registries for exactly the reason stated above: each branch was right about itself.
-    expect(rows).toBe(128);
-    expect(SPACE.parameters.length).toBe(57);    // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
+    expect(rows).toBe(129);
+    expect(SPACE.parameters.length).toBe(58);    // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
     // always said `false` would satisfy the biconditional above only by accident.
     expect(authorable).toBeGreaterThan(0);
     expect(authorable).toBeLessThan(rows);

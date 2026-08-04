@@ -141,6 +141,14 @@ export interface PassengerTransferTimes extends Commented {
   readonly office: number;
   readonly residential: number;
   readonly hotel: number;
+  /**
+   * The longest of the four, and the only one whose population is not all ambulant.
+   *
+   * A hospital car carries visitors, staff and attended trolleys, and a trolley with a drip stand
+   * is not a person stepping in. This is the **building-type default**; a building whose banks
+   * carry different traffic overrides it per car, which `st-jude-hospital`'s bed bank does.
+   */
+  readonly hospital: number;
 }
 
 /** Fixed time costs that are not part of the motion profile. */
@@ -616,7 +624,7 @@ export interface DispatcherProfiles extends Commented {
 // data/buildings/*.json
 // ---------------------------------------------------------------------------
 
-export const BUILDING_TYPES = ['office', 'residential', 'hotel', 'mixed-use'] as const;
+export const BUILDING_TYPES = ['office', 'residential', 'hotel', 'hospital', 'mixed-use'] as const;
 export type BuildingType = (typeof BUILDING_TYPES)[number];
 
 /** One floor. `id` is the display label and the key every reference uses. */

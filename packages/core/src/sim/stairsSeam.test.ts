@@ -140,14 +140,37 @@ const servedLegsOf = (result: SimulationResult): number =>
 describe('stairs are offered, not routed', () => {
   /* ---- criterion 1 ---- */
 
-  it('leaves every shipped building alone, because an absent kind means escalator', async () => {
+  it('leaves every building that carries a pin alone, and names the one that declares a stair', async () => {
+    // **This used to assert that NO shipped building declares a stair**, which was true and was the
+    // whole of criterion 1: the module header explains that the fixture stair is authored here
+    // rather than in `data/buildings/` because adding one to a shipped document would move every
+    // pinned estimate taken on that building.
+    //
+    // `st-jude-hospital` is the case that argument does not cover. It is a **new** building, so it
+    // carries no pin to move, and it is the first `data/` caller the `stairs` kind has ever had —
+    // until now the asymmetric-propensity model of docs/14 § 3.3 was exercised only by the fixture
+    // below, which is the *"configurable, unit-tested in isolation, dead in the shipped path"*
+    // shape docs/05-roadmap.md's standing requirement exists to catch, one level up in data/.
+    //
+    // So the claim is split rather than deleted: exactly one shipped building declares a stair, it
+    // is the one with no pins, and every other shipped mode is still an escalator by absence.
     const config = await load();
-    for (const building of config.buildingsById.values()) {
+    const withStairs: string[] = [];
+    for (const [id, building] of config.buildingsById) {
       for (const mode of building.transportModes ?? []) {
-        expect(mode.kind).toBeUndefined();
-        expect(typeof mode.traversalTimeS).toBe('number');
+        if (mode.kind === 'stairs') {
+          withStairs.push(id);
+          // A stair is asymmetric in both ways the schema requires, on real data and not only in a
+          // fixture: two traversal times and two propensities.
+          expect(typeof mode.traversalTimeS, id).toBe('object');
+          expect(mode.use, id).toBeDefined();
+          continue;
+        }
+        expect(mode.kind, id).toBeUndefined();
+        expect(typeof mode.traversalTimeS, id).toBe('number');
       }
     }
+    expect([...new Set(withStairs)]).toEqual(['st-jude-hospital']);
   }, 300_000);
 
   it('adds no key to a run on a building with no stair', async () => {

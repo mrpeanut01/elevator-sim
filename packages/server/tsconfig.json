@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    // Like `cli`, this package is allowed to touch the process — and unlike every other package
+    // here it is also allowed a socket, a database and a wall clock. `core` needs none of that
+    // (invariant 3), which is why the ambient types are declared per package rather than shared.
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../core" }]
+}

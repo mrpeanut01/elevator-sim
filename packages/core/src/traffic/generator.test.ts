@@ -1071,12 +1071,15 @@ describe('access credentials', () => {
  * -------------------------------------------------------------------------- */
 
 describe('every shipped building generates a well-formed trace', () => {
-  it('covers all five buildings', () => {
+  it('covers all eight buildings', () => {
     expect(config.buildings.map((b) => b.id).sort()).toEqual([
+      'chancery-house',
+      'crown-hotel',
       'garden-apartments',
       'midtown-office',
       'mixed-use-high-rise',
       'secure-tower',
+      'st-jude-hospital',
       'vertical-city',
     ]);
   });

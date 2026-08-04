@@ -84,6 +84,10 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
    */
   'fuzz/CORPUS_DISPATCHER_PROFILE_IDS':
     'the frozen dispatcher axis of the recorded corpus; a shipped caller would freeze the search too',
+  'fuzz/CORPUS_TRAFFIC_PROFILE_IDS':
+    'the frozen traffic axis of the recorded corpus, and the same argument one field over — § D205 ' +
+    'fixed the dispatcher axis and left this one derived, so adding the hospital profile re-mapped ' +
+    'every recorded seed. A shipped caller would freeze the search too',
 
   /*
    * -- The seven fault injectors, whose only legitimate caller is the suite that proves each

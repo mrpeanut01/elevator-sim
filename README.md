@@ -349,6 +349,22 @@ guard cannot tell a raised criterion from a weakened one. See [`docs/07` § 8](d
 The browser viewer and building editor live in `packages/viz` and are dev-served with Vite;
 `packages/core` exposes a `./browser` subpath so nothing pulls `node:fs` into a bundle.
 
+**The menu, accounts and the leaderboard** ([`DECISIONS.md` § D214](DECISIONS.md), § D215). The shell
+opens on a main menu — Campaign, Free Play, Leaderboard, Account, Settings — whose state is a pure
+reducer with no `document` in it, and whose Free Play axes are **derived from `data/`** rather than
+listed. `packages/server` is the first server this repository has had: accounts with `scrypt`
+hashing, email confirmation behind a signed expiring token, opaque session tokens in a table, and a
+leaderboard whose **entries are verified by replaying their seed**. That last part is the whole
+anti-cheat design and there is no other part to it — a client-reported score measures willingness to
+cheat, and invariant 5 already guarantees the fix, so the server re-runs the submission through the
+same kernel every study drives and accepts the score only if it reproduces. A board is keyed by a
+content hash of what it measured, so a `data/` change **starts a new board** rather than silently
+invalidating an old one, and it ranks on **one declared metric** with the others beside it — never a
+composite, for the reason [§ D106](DECISIONS.md) gives about energy. Its dependencies are
+`node:sqlite`, `node:crypto` and `node:http`; the repository's runtime dependency count is
+unchanged. The signing secret comes from the environment and **has no default**: a server started
+without one refuses to boot.
+
 **Replacing the front end.** The layers under the viewer are designed to outlive it: the recording
 contract, the frame producer, the metric overlays and every layout planner are pure functions of
 `(recording, time)` with no DOM anywhere near them, and the two functions that turn a time into a

@@ -35,11 +35,12 @@ const SCALES = resolveNormalization();
  * -------------------------------------------------------------------------- */
 
 describe('the cost-term registry', () => {
-  it('implements all twelve terms of the library, in the order the data file declares them', () => {
+  it('implements all thirteen terms of the library, in the order the data file declares them', () => {
     expect(IMPLEMENTED_TERM_IDS).toEqual([
       'waitTime',
       'rideTime',
       'detourPenalty',
+      'diversionDetour',
       'existingCallDelay',
       'directionReversal',
       'loadFactor',

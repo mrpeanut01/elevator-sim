@@ -79,7 +79,15 @@ export {
 } from './properties.js';
 export type { PropertyContext } from './properties.js';
 
-export { evaluateCase, fuzzSimulationConfigFor, generateOptionsFrom, isFailure, withCallType } from './run.js';
+export {
+  CORPUS_DISPATCHER_PROFILE_IDS,
+  CORPUS_TRAFFIC_PROFILE_IDS,
+  evaluateCase,
+  fuzzSimulationConfigFor,
+  generateOptionsFrom,
+  isFailure,
+  withCallType,
+} from './run.js';
 export type { RunOptions } from './run.js';
 
 export { formatFuzzCase, formatOutcome, shrinkCase } from './shrink.js';

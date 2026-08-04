@@ -1,0 +1,202 @@
+{
+  "$comment": "The prestige case, and the building that closes a dead seam in this directory. `office-prestige` has been declared in data/traffic-profiles.json since Phase 1 and was used by NO shipped building -- a schema-valid profile reachable from nothing, which is exactly the shape DECISIONS.md SS D112 found in `destination-eta` and SS D114 in `measureEnergyLiveness`, one level up in data/. Invariant 7 makes strategy data; it does not make data exempt from having a caller. What the profile asks for is the opposite of Midtown Office: 16% of population per 5 min against 12, a 25 s target interval against 30, and a 20 s target wait against 25 -- a HARDER service level on a SMALLER population. So this building is deliberately not a big tower: 18 occupied floors at prestige density (34/floor, CIBSE Guide D 1 person per 12-15 m2 against a standard 1 per 8-10), 612 people, and six fast cars. The bank is oversupplied on purpose -- the interesting question at a headline address is not whether the lifts cope but whether a dispatcher can hold a 25 s interval when it has spare cars and a violent single-direction burst, which is where parking policy and pre-positioning are decided rather than capacity.",
+  "id": "chancery-house",
+  "name": "Chancery House",
+  "type": "office",
+  "trafficProfile": "office-prestige",
+  "floors": [
+    {
+      "id": "G",
+      "index": 0,
+      "heightM": 0.0,
+      "population": 0,
+      "isEntrance": true,
+      "label": "Lobby"
+    },
+    {
+      "id": "2",
+      "index": 2,
+      "heightM": 4.2,
+      "population": 34
+    },
+    {
+      "id": "3",
+      "index": 3,
+      "heightM": 8.4,
+      "population": 34
+    },
+    {
+      "id": "4",
+      "index": 4,
+      "heightM": 12.6,
+      "population": 34
+    },
+    {
+      "id": "5",
+      "index": 5,
+      "heightM": 16.8,
+      "population": 34
+    },
+    {
+      "id": "6",
+      "index": 6,
+      "heightM": 21.0,
+      "population": 34
+    },
+    {
+      "id": "7",
+      "index": 7,
+      "heightM": 25.2,
+      "population": 34
+    },
+    {
+      "id": "8",
+      "index": 8,
+      "heightM": 29.4,
+      "population": 34
+    },
+    {
+      "id": "9",
+      "index": 9,
+      "heightM": 33.6,
+      "population": 34
+    },
+    {
+      "id": "10",
+      "index": 10,
+      "heightM": 37.8,
+      "population": 34
+    },
+    {
+      "id": "11",
+      "index": 11,
+      "heightM": 42.0,
+      "population": 34
+    },
+    {
+      "id": "12",
+      "index": 12,
+      "heightM": 46.2,
+      "population": 34
+    },
+    {
+      "id": "13",
+      "index": 13,
+      "heightM": 50.4,
+      "population": 34
+    },
+    {
+      "id": "14",
+      "index": 14,
+      "heightM": 54.6,
+      "population": 34
+    },
+    {
+      "id": "15",
+      "index": 15,
+      "heightM": 58.8,
+      "population": 34
+    },
+    {
+      "id": "16",
+      "index": 16,
+      "heightM": 63.0,
+      "population": 34
+    },
+    {
+      "id": "17",
+      "index": 17,
+      "heightM": 67.2,
+      "population": 34
+    },
+    {
+      "id": "18",
+      "index": 18,
+      "heightM": 71.4,
+      "population": 34
+    },
+    {
+      "id": "19",
+      "index": 19,
+      "heightM": 75.6,
+      "population": 34
+    }
+  ],
+  "totalPopulation": 612,
+  "banks": [
+    {
+      "id": "main",
+      "name": "Main bank",
+      "servesFloors": [
+        "G",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19"
+      ],
+      "cars": [
+        {
+          "id": "A",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening"
+        },
+        {
+          "id": "B",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening"
+        },
+        {
+          "id": "C",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening"
+        },
+        {
+          "id": "D",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening"
+        },
+        {
+          "id": "E",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening"
+        },
+        {
+          "id": "F",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening"
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "Single bank, no zoning. At 18 floors a 5.0 m/s car reaches the top express in well under the time a second bank would save, and splitting six cars into two threes would halve the pooling benefit that makes the 25 s interval reachable at all. The building stresses stage 7 (repositioning) and stage 3 (scoring) rather than stage 2.",
+    "Cars are 2500 lb / 5.0 m/s gearless. CIBSE Guide D's code-minimum speed for a 76 m rise is well under this; the overspecification is the prestige brief and is the point -- it is what makes energy a live axis here, since a fast car that drives more to hold an interval spends more.",
+    "Population 612 over 18 floors. The whole building fits inside roughly four car-loads at 80% of rated capacity, so a single up-peak batch is a bank-scale event rather than a car-scale one."
+  ]
+}

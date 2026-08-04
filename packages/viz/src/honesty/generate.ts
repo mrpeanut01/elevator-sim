@@ -158,6 +158,9 @@ export const DEEP_SPACE: HonestySpace = Object.freeze({
     { id: 'stage-5-credentials', buildingId: 'secure-tower' },
     { id: 'stage-6-the-tall-one', buildingId: 'vertical-city' },
     { id: 'stage-7-prove-it', buildingId: 'midtown-office' },
+    { id: 'stage-8-the-headline-address', buildingId: 'chancery-house' },
+    { id: 'stage-9-both-ways-at-once', buildingId: 'crown-hotel' },
+    { id: 'stage-10-the-bed-and-the-visitor', buildingId: 'st-jude-hospital' },
   ] as HonestyStageRef[]),
 });
 
