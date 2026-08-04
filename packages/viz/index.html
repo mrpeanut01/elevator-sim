@@ -835,6 +835,84 @@
         .sheet { padding: 16px 14px; }
         .editor-grid { grid-template-columns: minmax(0, 1fr); }
       }
+
+      /* ------------------------------------------------------------------ *
+         The main menu — DECISIONS.md § D214, and docs/16 § 5 clause 7.
+
+         The menu shipped with **no CSS at all**: twenty-nine class names emitted
+         by `dev/menuPanel.ts` and not one rule anywhere, appended after a
+         `100vh` shell that does not scroll. So it was not an overlay lying over
+         the game — it was unstyled markup below the fold, which is why nothing
+         about it looked broken in a screenshot.
+
+         It is a real overlay here: fixed, above the drawer's `z-index: 20`, and
+         scrollable in its own right, because Free Play is seven rows plus a list
+         of refusals and a phone in landscape does not have room for it.
+         `surfaces.test.ts`'s sibling assertion is what stops the class list and
+         these rules drifting apart again.
+       * ------------------------------------------------------------------ */
+      .menu-overlay {
+        position: fixed; inset: 0; z-index: 40; overflow-y: auto;
+        background: var(--bg); padding: 32px 20px 48px;
+        display: flex; flex-direction: column; align-items: center;
+      }
+      .menu-overlay[hidden] { display: none; }
+      .menu-title {
+        font: 600 26px/1.2 var(--sans); color: var(--text);
+        margin: 8px 0 18px; width: min(560px, 100%);
+      }
+      .menu-list { display: grid; gap: 10px; width: min(560px, 100%); }
+      .menu-row, .menu-start, .menu-back, .menu-signout, .menu-account-mode {
+        display: grid; gap: 3px; text-align: left; width: 100%;
+        padding: 12px 14px; border-radius: var(--r-card);
+        border: 1px solid var(--edge-strong); background: var(--card);
+        color: var(--text); font: 500 14px var(--sans); cursor: pointer;
+      }
+      .menu-row:hover, .menu-start:hover, .menu-back:hover { border-color: var(--accent); }
+      .menu-row:focus-visible, .menu-start:focus-visible, .menu-back:focus-visible,
+      .menu-select select:focus-visible, .menu-text input:focus-visible,
+      .menu-toggle input:focus-visible {
+        outline: 2px solid var(--accent); outline-offset: 2px;
+      }
+      /* Disabled **and explained** — the detail line under the label carries the
+         reason, so this must not hide it. Dimmed, never removed. */
+      .menu-row[disabled], .menu-start[disabled] { opacity: 0.55; cursor: not-allowed; }
+      .menu-row-name { font-weight: 600; }
+      .menu-row-detail { font: 400 12px/1.45 var(--sans); color: var(--dim); }
+      .menu-start { background: var(--accent); border-color: var(--accent); color: #06121f; }
+      .menu-back { background: transparent; margin-top: 4px; }
+      .menu-select, .menu-text, .menu-seed, .menu-toggle {
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        width: 100%; padding: 9px 14px; border-radius: var(--r-card);
+        border: 1px solid var(--edge); background: var(--panel);
+        font: 500 13px var(--sans); color: var(--text);
+      }
+      .menu-select select, .menu-text input, .menu-seed input {
+        min-width: 0; flex: 1 1 55%; padding: 5px 8px; border-radius: 8px;
+        border: 1px solid var(--edge-strong); background: var(--card);
+        color: var(--text); font: 500 12px var(--sans);
+      }
+      .menu-toggle input { flex: 0 0 auto; }
+      .menu-issues {
+        width: min(560px, 100%); margin: 12px 0 0; padding: 10px 14px 10px 30px;
+        border: 1px solid var(--warn, var(--edge-strong)); border-radius: var(--r-card);
+        background: var(--panel); color: var(--text);
+        font: 400 12px/1.5 var(--sans);
+      }
+      .menu-issues li { margin: 3px 0; }
+      .menu-note, .menu-notice {
+        width: min(560px, 100%); margin: 10px 0 6px;
+        font: 400 12px/1.55 var(--sans); color: var(--dim);
+      }
+      .menu-account, .menu-leaderboard, .menu-freeplay, .menu-settings, .menu-placeholder {
+        display: grid; gap: 10px; width: min(560px, 100%);
+      }
+      .menu-account-who { font: 500 14px var(--sans); color: var(--text); }
+      .menu-board { display: grid; gap: 6px; width: 100%; margin: 6px 0 0; padding-left: 22px; }
+      .menu-board-row { display: grid; gap: 2px; padding: 6px 0; border-bottom: 1px solid var(--edge); }
+      .menu-board-name { font: 600 13px var(--sans); color: var(--text); }
+      .menu-board-figures { font: 400 11px var(--mono); color: var(--dim); }
+      .menu-board-seed { font: 400 11px var(--mono); color: var(--dim); }
     </style>
   </head>
   <body>
@@ -851,6 +929,11 @@
             <div class="brand-name">Elevator Sim</div>
             <div class="brand-mode">SHIFT MODE</div>
           </div>
+          <!-- docs/16 § 5 clause 5. `closeMenu()` only ever wrote `hidden = true`
+               and nothing anywhere wrote `false`, so once a player pressed Start
+               or Campaign the menu was gone for the session: no button, no key,
+               and no `screen` among the seven fields `applyDeepLink` reads. -->
+          <button id="open-menu" class="chip" type="button" title="Main menu">Menu</button>
         </div>
 
         <div class="topbar-building">

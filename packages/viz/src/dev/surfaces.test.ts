@@ -5,12 +5,13 @@
  * whole reason they were extracted out of the old `boot()`.
  */
 
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { CONTEXTUAL_TABS, RAIL_SEGMENTS, TABS, type TabName } from './elementMap.js';
+import { CONTEXTUAL_TABS, ELEMENT_IDS, RAIL_SEGMENTS, TABS, type TabName } from './elementMap.js';
 import {
   DRAWER_BREAKPOINT_PX,
   drawerStateFor,
@@ -239,5 +240,70 @@ describe('the stacked layout below 768 px — RX-03', () => {
     expect(block).toMatch(/\.stage-wrap\s*\{[^}]*min-height:\s*60vh/);
     // The left rail reads as a stacked section rather than a column.
     expect(block).toMatch(/\.rail-l\s*\{[^}]*border-top/);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The menu has a stylesheet — `docs/16` § 5 clause 7
+ * -------------------------------------------------------------------------- */
+
+describe('every class the menu emits has a rule', () => {
+  /**
+   * The class names `menuPanel.ts` actually writes, derived from its source rather than listed.
+   *
+   * Listed, this test would be the sixth hand-maintained list in a branch that has already had to
+   * widen five by hand (§ D213) — and it would fail in the worst direction, quietly checking fewer
+   * class names than the panel emits. Derived, a class added tomorrow is red the same day.
+   */
+  function emittedClasses(): readonly string[] {
+    const source = readFileSync(new URL('./menuPanel.ts', import.meta.url), 'utf8');
+    const found = new Set<string>();
+    for (const match of source.matchAll(/className:\s*'([a-z-]+)'/gu)) {
+      const name = match[1];
+      if (name !== undefined && name.startsWith('menu-')) found.add(name);
+    }
+    // Written as a conditional expression rather than a literal, so the three the affordance
+    // renderer picks between are seen too.
+    for (const match of source.matchAll(/'(menu-[a-z-]+)'/gu)) {
+      const name = match[1];
+      if (name !== undefined) found.add(name);
+    }
+    return [...found].sort((a, b) => a.localeCompare(b));
+  }
+
+  it('finds the class names by reading the panel', () => {
+    // A negative control on the derivation itself: if the regex stopped matching, the assertion
+    // below would pass over an empty set and report a stylesheet that covers nothing.
+    expect(emittedClasses().length).toBeGreaterThanOrEqual(12);
+  });
+
+  it('has a rule in index.html for each of them', async () => {
+    /*
+     * The clause. Twenty-nine class names shipped with **zero** rules anywhere, on markup appended
+     * after a `100vh` shell that does not scroll — so the menu was not an overlay over the game, it
+     * was unstyled markup below the fold. Nothing about that looks broken in a screenshot of the
+     * game, which is why it survived a review.
+     */
+    const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+    const missing = emittedClasses().filter((name) => !html.includes(`.${name}`));
+    expect(missing, 'class names the panel emits and the stylesheet never mentions').toEqual([]);
+  });
+
+  it('puts the overlay above the drawer', async () => {
+    // The drawer is `z-index: 20` and is an overlay itself below 1340 px. A menu that shared or
+    // undercut that would open *behind* the rail on a narrow window, which reads as not opening.
+    const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+    const block = html.slice(html.indexOf('.menu-overlay {'));
+    const zIndex = /z-index:\s*(\d+)/u.exec(block.slice(0, 400))?.[1];
+    expect(zIndex).toBeDefined();
+    expect(Number(zIndex)).toBeGreaterThan(20);
+  });
+
+  it('offers a way back to it', async () => {
+    // Clause 5's other half: the button exists in the markup, and `elementMap.ts` requires it, so a
+    // build that dropped it fails at `resolveElements` rather than silently losing the menu again.
+    const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+    expect(html).toContain('id="open-menu"');
+    expect(ELEMENT_IDS.header.openMenu).toBe('open-menu');
   });
 });

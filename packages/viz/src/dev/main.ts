@@ -952,6 +952,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * ---------------------------------------------------------------------- */
 
   function wireHeaderAndFooter(): void {
+    /*
+     * `docs/16` § 5 clause 5 — the way back in.
+     *
+     * The menu is a place the player leaves and has reason to return to: to change building, to
+     * read a board, to sign in. It had no way back at all, so every one of those meant reloading
+     * the page and losing the week. One button, and the `reopen` intent it dispatches is the same
+     * one `?screen=` uses, so there is one answer to *what does re-opening the menu do*.
+     */
+    ui.header.openMenu.addEventListener('click', () => {
+      dispatchMenu({ kind: 'reopen' });
+    });
     ui.header.viewMode.addEventListener('change', () => {
       const value = ui.header.viewMode.value;
       if (!isViewMode(value)) return;

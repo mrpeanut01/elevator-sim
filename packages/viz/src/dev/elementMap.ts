@@ -127,6 +127,14 @@ export interface HeaderElements {
   readonly banner: HTMLElement;
   /** The container the narrow-viewport rule steps aside — § 1.1 S5. */
   readonly right: HTMLElement;
+  /**
+   * The way back to the main menu — `docs/16` § 5 clause 5.
+   *
+   * There was none. `closeMenu()` only ever wrote `hidden = true`, nothing anywhere wrote `false`,
+   * and `applyDeepLink` read seven fields of which none was the screen — so pressing Start or
+   * Campaign ended the menu for the session.
+   */
+  readonly openMenu: HTMLButtonElement;
 }
 
 /** § 1.2 L1–L3 — the mood card and the four live stats. */
@@ -490,6 +498,7 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     modeParity: 'mode-parity',
     banner: 'banner',
     right: 'topbar-right',
+    openMenu: 'open-menu',
   }),
   mood: Object.freeze({
     face: 'mood-face',
