@@ -13386,6 +13386,18 @@ no benchmark cell, no matrix cell, no sweep cell and no pre-registered criterion
 scenario set — the game's stages — and in the always-on validation that iterates `data/buildings/`,
 which is where their cost is paid and where a config error in them will surface.
 
+**The correctness oracle does not reach them, and its own guard could not say so.**
+`oracle/fiveBuildings.test.ts` has a test whose entire job is *naming every bank the table does not
+cover* — and it computed that list over banks of buildings **already in** `PRINCIPAL_BANKS`, so a
+building the table never mentions could not be named by the check for buildings the table misses.
+Three arrived and were invisible to it. The guard now names absent buildings, and separates the two
+reasons, because *not covered* and *not coverable* are different statements: `crown-hotel` and
+`st-jude-hospital` hold cars that differ in speed and capacity on purpose, and the Barney/CIBSE
+round-trip-time calculation assumes one car specification per bank — a closed form that averages a
+3.0 m/s guest car with a 1.75 m/s service car is a different calculation wearing its name.
+`chancery-house` is six identical cars and **is** coverable; it is an owed measurement rather than a
+modelling limit, and both claims are checked against the configs rather than asserted.
+
 **Where their arrival IS load-bearing is the always-on validation that iterates `data/buildings/`.**
 The analytical up-peak census went from fourteen banks to seventeen and all three new banks analyse;
 the departure-gap survey went from fourteen rows to seventeen and its worst reopen moved from a
