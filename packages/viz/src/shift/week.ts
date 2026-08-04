@@ -62,6 +62,9 @@ export function openWeek(contractId: string = FIRST_CONTRACT_ID): WeekState {
     completed: [],
     history: [],
     cleared: null,
+    attempt: 0,
+    closedDay: null,
+    banked: null,
   };
 }
 
@@ -109,15 +112,46 @@ export function outcomeOf(input: DayOutcomeInput): DayOutcome {
  * this was an assignment for"*.
  */
 export function closeDay(week: WeekState, outcome: DayOutcome): WeekState {
-  const streak = outcome.allMet ? week.streak + 1 : 0;
+  /*
+   * ## A day banks once, and a retry replays it rather than adding to it
+   *
+   * `docs/16` § 5 clause 1. Before this, closing the same day twice ran the arithmetic twice: a
+   * clean Monday closed three times banked three clean shifts and cleared a contract that needs
+   * three, without the doors ever opening on Tuesday. Nothing guarded it — `closeShift`'s only
+   * guard is the recording's id, and a re-run has a new one by construction, which is exactly what
+   * every control in the shell does when it is moved.
+   *
+   * The fix is not to refuse the second close. A player who misses a day and re-runs it **should**
+   * be able to recover — the design is explicit that *"nothing here is a game over"* — and refusing
+   * would also make the sheet disagree with the run on screen. So the day's contribution is
+   * recomputed from {@link WeekState.banked}, the snapshot taken before the day was first closed.
+   * Re-closing therefore *replaces* the day's effect:
+   *
+   * | first attempt | this attempt | banked count |
+   * |---|---|---|
+   * | missed | clean | goes up by one — the recovery the design asks for |
+   * | clean | clean | unchanged — the exploit |
+   * | clean | missed | comes back down, because the day it was banked for is not clean any more |
+   *
+   * The third row is the one that needs `banked` to exist at all: without a snapshot there is no
+   * way to un-bank, and a rule that could only ever add would let a player bank a clean run and
+   * then keep the credit while re-running until the *picture* was prettier.
+   */
+  const retry = week.closedDay === outcome.day;
+  const base =
+    retry && week.banked !== null
+      ? week.banked
+      : { streak: week.streak, cleanRun: week.cleanRun, completed: week.completed };
+
+  const streak = outcome.allMet ? base.streak + 1 : 0;
   // The banked count survives a missed day. See the module docstring, rule 1.
-  const cleanRun = outcome.allMet ? week.cleanRun + 1 : week.cleanRun;
+  const cleanRun = outcome.allMet ? base.cleanRun + 1 : base.cleanRun;
   const contract = contractById(week.contractId);
 
   const clears =
     contract !== undefined &&
     cleanRun >= contract.needClean &&
-    !week.completed.includes(contract.id);
+    !base.completed.includes(contract.id);
 
   const cleared: ClearedAward | null =
     clears && contract !== undefined ? awardFor(contract.id, contract.reward) : null;
@@ -127,11 +161,24 @@ export function closeDay(week: WeekState, outcome: DayOutcome): WeekState {
     day: week.day,
     dayIdx: week.dayIdx,
     streak,
+    /*
+     * `bestMinutePct` is a **high-water mark and stays one**, measured against the week rather than
+     * the attempt. It is an observation about what this building has been seen to do, not a reward
+     * for the current attempt, and rolling it back would mean a player's best day disappeared
+     * because they re-ran a later one.
+     */
     bestMinutePct: Math.max(week.bestMinutePct, outcome.minutePct),
     cleanRun,
-    completed: clears && contract !== undefined ? [...week.completed, contract.id] : week.completed,
-    history: [...week.history, outcome].slice(-HISTORY_DAYS),
+    completed: clears && contract !== undefined ? [...base.completed, contract.id] : base.completed,
+    // A retry replaces the day it re-ran rather than appending a second entry for it — otherwise the
+    // seven-day sparkline would show Monday twice and the week would look a day longer than it is.
+    history: retry
+      ? [...week.history.slice(0, -1), outcome]
+      : [...week.history, outcome].slice(-HISTORY_DAYS),
     cleared,
+    attempt: retry ? week.attempt + 1 : 1,
+    closedDay: outcome.day,
+    banked: base,
   };
 }
 
@@ -148,6 +195,11 @@ export function nextDay(week: WeekState): WeekState {
     day: week.day + 1,
     dayIdx: (week.dayIdx + 1) % 7,
     cleared: null,
+    // Tomorrow has not been attempted, and yesterday's snapshot is spent: once the doors open on
+    // the next day, the previous one is banked for good and there is nothing left to replay.
+    attempt: 0,
+    closedDay: null,
+    banked: null,
   };
 }
 

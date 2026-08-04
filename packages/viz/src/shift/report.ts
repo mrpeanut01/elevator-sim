@@ -106,6 +106,29 @@ export interface DayReportInput {
  * Pure: no clock, no RNG, no simulation. The run already happened and the observations were already
  * folded; this arranges them and refuses what may not be said.
  */
+/**
+ * *Attempt 3* — said, once there has been more than one.
+ *
+ * ## Why the sheet has to say this
+ *
+ * The simulator runs a whole day and plays it back, so moving any control does not steer the day —
+ * it discards it and simulates a different one (`docs/16` § 1). The retry is the product's
+ * most-used verb, and a sheet that read identically on the first attempt and the fourth would be
+ * quietly answering *"how did you do?"* with *"how many times did you ask?"*.
+ *
+ * ## Published beside, never folded in
+ *
+ * The attempt count changes no figure and enters no verdict. It sits in the meta block on exactly
+ * the footing abandonment sits beside AWT and `workPerServedLegKJ` beside raw energy (§ D106): a
+ * day cleared on the fourth attempt **is cleared**, and a reader is told which attempt it was.
+ *
+ * Absent on the first, because *"attempt 1"* on every sheet is noise that trains a reader to stop
+ * reading the line — and the line only means anything by contrast.
+ */
+function attemptLine(attempt: number): readonly string[] {
+  return attempt > 1 ? [`attempt ${String(attempt)} at this day`] : [];
+}
+
 export function dayReportOf(input: DayReportInput): DayReport {
   const { recording, observations, week, contract, event } = input;
   const { summary } = recording;
@@ -120,6 +143,7 @@ export function dayReportOf(input: DayReportInput): DayReport {
     metaLines: [
       `${recording.buildingName} · ${dispatcherName}`,
       `seed ${recording.seed} · ${clockRange(recording.startedAt, recording.endedAt, dayStartS)} · one replication`,
+      ...attemptLine(week.attempt),
     ],
     lede: ledeFor(summary, observations),
     figures: figuresFor(summary, observations, dayStartS),

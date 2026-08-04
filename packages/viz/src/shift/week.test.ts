@@ -73,6 +73,9 @@ describe('opening a week', () => {
       completed: [],
       history: [],
       cleared: null,
+      attempt: 0,
+      closedDay: null,
+      banked: null,
     });
   });
 });
@@ -242,5 +245,107 @@ describe('purity', () => {
     nextDay(week);
     takeContract(week, 'c5');
     expect(JSON.stringify(week)).toBe(before);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * A day banks once — `docs/16` § 5 clause 1
+ * -------------------------------------------------------------------------- */
+
+describe('re-closing the same day replays it rather than adding to it', () => {
+  const cleanDay = (day: number): DayOutcome =>
+    outcomeOf({
+      day,
+      dayIdx: 0,
+      eventId: 'ordinary',
+      readings: readings(day, 'met'),
+      minutePct: 90,
+      carried: 100,
+      arrived: 100,
+    });
+  const missedDay = (day: number): DayOutcome =>
+    outcomeOf({
+      day,
+      dayIdx: 0,
+      eventId: 'ordinary',
+      readings: readings(day, 'missed'),
+      minutePct: 40,
+      carried: 60,
+      arrived: 100,
+    });
+
+  it('does not bank a second clean shift for the same day — the exploit', () => {
+    /*
+     * The whole finding. Every control in the shell re-runs the day when it is moved, and a re-run
+     * has a new recording id, which is the only thing `closeShift` was guarding on. So this was
+     * reachable by moving a slider three times: `needClean` 3 cleared on Monday.
+     */
+    let week = openWeek('c1');
+    week = closeDay(week, cleanDay(1));
+    expect(week.cleanRun).toBe(1);
+    week = closeDay(week, cleanDay(1));
+    week = closeDay(week, cleanDay(1));
+    expect(week.cleanRun).toBe(1);
+    expect(week.streak).toBe(1);
+    expect(week.attempt).toBe(3);
+  });
+
+  it('shows the day once in the history however many times it was run', () => {
+    // Otherwise the seven-day sparkline draws Monday three times and the week looks a day longer
+    // than it is.
+    let week = openWeek('c1');
+    for (let attempt = 0; attempt < 3; attempt += 1) week = closeDay(week, cleanDay(1));
+    expect(week.history.length).toBe(1);
+    expect(week.history[0]?.day).toBe(1);
+  });
+
+  it('still lets a missed day be recovered — the design’s “nothing here is a game over”', () => {
+    let week = openWeek('c1');
+    week = closeDay(week, missedDay(1));
+    expect(week.cleanRun).toBe(0);
+    expect(week.streak).toBe(0);
+    week = closeDay(week, cleanDay(1));
+    expect(week.cleanRun).toBe(1);
+    expect(week.streak).toBe(1);
+  });
+
+  it('takes the credit back when a re-run turns a clean day into a missed one', () => {
+    // The row that needs the snapshot to exist. A rule that could only ever add would let a player
+    // bank a clean run and keep the credit while re-running until the picture was prettier.
+    let week = openWeek('c1');
+    week = closeDay(week, cleanDay(1));
+    expect(week.cleanRun).toBe(1);
+    week = closeDay(week, missedDay(1));
+    expect(week.cleanRun).toBe(0);
+    expect(week.streak).toBe(0);
+  });
+
+  it('keeps the best day as a high-water mark across attempts', () => {
+    // An observation about what the building has been seen to do, not a reward for this attempt.
+    let week = openWeek('c1');
+    week = closeDay(week, cleanDay(1));
+    week = closeDay(week, missedDay(1));
+    expect(week.bestMinutePct).toBe(90);
+  });
+
+  it('banks for good once the doors open on tomorrow', () => {
+    let week = openWeek('c1');
+    week = closeDay(week, cleanDay(1));
+    week = nextDay(week);
+    expect(week.attempt).toBe(0);
+    expect(week.closedDay).toBeNull();
+    week = closeDay(week, cleanDay(2));
+    expect(week.cleanRun).toBe(2);
+  });
+
+  it('does not clear a contract on one day, however many times it is run', () => {
+    // `c1` needs one clean shift, so the check that matters is a contract needing more than one.
+    const needsThree = CONTRACTS.find((entry) => entry.needClean >= 3);
+    expect(needsThree).toBeDefined();
+    if (needsThree === undefined) return;
+    let week = openWeek(needsThree.id);
+    for (let attempt = 0; attempt < 5; attempt += 1) week = closeDay(week, cleanDay(1));
+    expect(week.completed).toEqual([]);
+    expect(week.cleared).toBeNull();
   });
 });
