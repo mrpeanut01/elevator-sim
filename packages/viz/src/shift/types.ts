@@ -490,9 +490,30 @@ export interface ReportForecast {
 }
 
 /** The whole observation sheet, as one value. `design.html` :237–381. */
+/**
+ * Where a reader goes when this sheet cannot answer their question — as a value, not as prose.
+ *
+ * `surface` is a named member so a shell can navigate on it; `label` and `why` are the words. The
+ * pointer exists because the question a run provokes — *is this better?* — is the one question this
+ * sheet is forbidden to answer, and `docs/17` § 5 clause 7 found the only surface that may answer it
+ * reachable from nowhere the player is standing when they ask.
+ *
+ * It lives on {@link DayReport} rather than on the single-run shape alone, which is a correction: a
+ * player finishes a *campaign day*, reads the levers card saying **try a different dispatcher — a
+ * smarter one is free**, and is standing in exactly the spot the finding describes. Restricting the
+ * pointer to Free Play answered the finding for the mode that provokes the question least.
+ */
+export interface ReportNextStep {
+  readonly surface: 'compare';
+  readonly label: string;
+  readonly why: string;
+}
+
 export interface DayReport {
   /** `Tuesday — day 2`. */
   readonly title: string;
+  /** Where the question this sheet may not answer is answered. See {@link ReportNextStep}. */
+  readonly nextStep: ReportNextStep;
   /** The right-aligned meta block, one string per line. */
   readonly metaLines: readonly string[];
   readonly lede: string;

@@ -2539,11 +2539,16 @@ const REPORT_PANEL: SurfaceAdapter = {
         }
         seeds.push({ field: `${at}.taught`, text: view.framing.taught, role: 'prose' });
         seeds.push({ field: `${at}.nextDayLabel`, text: view.framing.nextDayLabel, role: 'label' });
-      } else {
-        // The single run's own two strings. `why` is the sentence that sends a reader to the one
-        // surface allowed to answer *"is this better?"*, so it is `prose` a property can judge.
-        seeds.push({ field: `${at}.nextStep.label`, text: view.framing.nextStep.label, role: 'label' });
-        seeds.push({ field: `${at}.nextStep.why`, text: view.framing.nextStep.why, role: 'prose' });
+      }
+      /*
+       * Driven on **both** shapes, because both now carry it. `why` is the sentence that sends a
+       * reader to the one surface allowed to answer *"is this better?"*, so it is `prose` a property
+       * can judge — and it is the sentence most at risk of drifting into a claim that Compare will
+       * find a winner.
+       */
+      if (view.nextStep !== undefined) {
+        seeds.push({ field: `${at}.nextStep.label`, text: view.nextStep.label, role: 'label' });
+        seeds.push({ field: `${at}.nextStep.why`, text: view.nextStep.why, role: 'prose' });
       }
       seeds.push({ field: `${at}.smallPrint`, text: view.smallPrint, role: 'reason' });
 

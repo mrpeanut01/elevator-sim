@@ -302,7 +302,7 @@ Each is a real thing found by walking the product, left with an owner rather tha
 5. **Sandbox is a string with no feature behind it.** Endless is built — § 3.6.
 6. **The weight-set selector has no surface**, so the product's one genuine mid-run mechanism is
    invisible to the player it was built for.
-7. **Compare is unreachable from the moment a player wants it** — the report never points at it.
+7. ~~**Compare is unreachable from the moment a player wants it** — the report never points at it.~~ **Closed.** `ReportNextStep` is on `DayReport`, so *both* sheets carry it: the pointer was first built for the Free Play sheet alone, which answered the finding for the mode that provokes the question least. A player finishing a campaign day has just read a levers card saying *try a different dispatcher — a smarter one is free*, and the sheet's own small print refuses to answer it.
 
 ---
 

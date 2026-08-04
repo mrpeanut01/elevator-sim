@@ -721,7 +721,7 @@ describe('what the sheet is a report of — docs/17 § 5 clause 1', () => {
     expect(meta).not.toContain('0.0');
   });
 
-  it('points at Compare as data, and says why — and a week-day sheet does not', () => {
+  it('points at Compare as data, and says why — on both shapes', () => {
     const step = singleRun(sheetOf(SINGLE)).nextStep;
     expect(step.surface).toBe('compare');
     expect(step.label.length).toBeGreaterThan(0);
@@ -729,7 +729,17 @@ describe('what the sheet is a report of — docs/17 § 5 clause 1', () => {
     expect(step.why).toContain('same passengers');
     expect(step.why).toContain('indistinguishable');
     expect(step.why).toContain('interval contains zero');
-    expect('nextStep' in weekDay(sheetOf({ kind: 'week-day' }))).toBe(false);
+    /*
+     * **Both**, and this assertion was the inverse until `docs/17` § 5 clause 7 was read properly.
+     * The clause is *the report never points at Compare*; answering it on the Free Play sheet alone
+     * answered it for the mode that provokes the question least. A player finishing a campaign day
+     * has just read a levers card saying *try a different dispatcher — a smarter one is free*, which
+     * is the question in as many words, and the sheet's own small print refuses to answer it.
+     *
+     * Identity, not equality: the same value on both sheets, so a second pointer composed for the
+     * week would fail rather than merely read alike.
+     */
+    expect(weekDay(sheetOf({ kind: 'week-day' })).nextStep).toBe(step);
   });
 
   it('counts attempts on both shapes, each in its own words', () => {

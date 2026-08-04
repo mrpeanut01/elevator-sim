@@ -100,6 +100,7 @@ import {
   type ReportDiagnosis,
   type ReportFigure,
   type ReportForecast,
+  type ReportNextStep,
   type ReportLever,
   type ScenarioContract,
   type ShiftEvent,
@@ -152,20 +153,6 @@ export type ReportSubject =
   | { readonly kind: 'single-run'; readonly selection: SingleRunSelection };
 
 /**
- * Where a reader goes when this sheet cannot answer their question — as a value, not as prose.
- *
- * `surface` is a named member so a shell can navigate on it; `label` and `why` are the words. The
- * pointer exists because the question a single run provokes — *is this better?* — is the one
- * question this sheet is forbidden to answer, and `docs/17` § 3.4 found the only surface that may
- * answer it reachable from nowhere the player is standing when they ask.
- */
-export interface ReportNextStep {
-  readonly surface: 'compare';
-  readonly label: string;
-  readonly why: string;
-}
-
-/**
  * The half of the sheet that is true of **any** run — derived from {@link DayReport} by removing
  * the week-shaped fields rather than restated, so a field added to `DayReport` cannot silently miss
  * the single-run sheet.
@@ -194,8 +181,9 @@ export interface WeekDayReport extends DayReport {
  */
 export interface SingleRunReport extends ReportCore {
   readonly of: 'single-run';
-  readonly nextStep: ReportNextStep;
 }
+
+export type { ReportNextStep };
 
 /** A filed sheet, of either shape. Narrow on {@link WeekDayReport.of}. */
 export type ShapedDayReport = WeekDayReport | SingleRunReport;
@@ -360,6 +348,13 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
 
   const core: ReportCore = {
     /*
+     * On both sheets. `docs/17` § 5 clause 7 is *the report never points at Compare*, and pointing
+     * only from the Free Play sheet answered it for the mode that provokes the question least: a
+     * player finishing a campaign day has just read a levers card saying *try a different
+     * dispatcher — a smarter one is free*, which is the question in as many words.
+     */
+    nextStep: COMPARE_NEXT_STEP,
+    /*
      * *Tuesday — day 2* is a week's title: it names a weekday the run does not have and a position
      * in a sequence it is not in. A single run is titled by what it is a run of.
      */
@@ -379,7 +374,7 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
   };
 
   if (subject.kind === 'single-run') {
-    return { ...core, of: 'single-run', nextStep: COMPARE_NEXT_STEP };
+    return { ...core, of: 'single-run' };
   }
 
   const nextIdx = (week.dayIdx + 1) % 7;

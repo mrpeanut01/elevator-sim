@@ -173,7 +173,9 @@ function everyString(view: ReportView): readonly string[] {
           framing.taught,
           framing.nextDayLabel,
         ]
-      : [framing.nextStep.label, framing.nextStep.why]),
+      : []),
+    view.nextStep?.label ?? '',
+    view.nextStep?.why ?? '',
   ];
   for (const figure of view.figures) out.push(figure.label, figure.value, figure.note);
   for (const goal of view.goals) out.push(goal.label, goal.display, goal.help);
@@ -462,8 +464,7 @@ describe('a week’s slots are absent, not blank, on a run that has no week', ()
     // layer's own, so a string edited on the way to the screen fails.
     const report = reportOf(clean, 4, SINGLE);
     if (report.of !== 'single-run') throw new Error('expected a single-run sheet');
-    const framing = reportViewOf(report).framing;
-    expect(framing.kind === 'single-run' && framing.nextStep).toBe(report.nextStep);
+    expect(reportViewOf(report).nextStep).toBe(report.nextStep);
   });
 
   it('draws the same figures, goals, diagnosis and levers on either shape', () => {

@@ -155,16 +155,16 @@ export interface WeekFramingView {
 }
 
 /**
- * The half that is a statement about **one run**: where to take the question this sheet may not
- * answer.
+ * The half that is a statement about **one run** — and it is now only the discriminator.
  *
- * The strings are `shift/report.ts`'s, unread and unedited. A pointer at Compare composed here
- * would be this module deciding what the product's only comparison surface is for, which is a
- * decision — and every decision on this surface lives in a pure module that a test can reach.
+ * `nextStep` used to live here, which made *where to take this question* a property of the Free Play
+ * sheet. It is a property of **both**: `docs/17` § 5 clause 7 is *the report never points at
+ * Compare*, and a player finishing a campaign day has just read a levers card saying *try a
+ * different dispatcher — a smarter one is free*, which is the question in as many words. It moved to
+ * {@link ReportView}.
  */
 export interface SingleRunFramingView {
   readonly kind: 'single-run';
-  readonly nextStep: ReportNextStep;
 }
 
 /** Which shape of sheet this is. Exhaustive: a third member is a compile error at every branch. */
@@ -174,6 +174,17 @@ export type FramingView = WeekFramingView | SingleRunFramingView;
 export interface ReportView {
   /** `false` before any shift has been closed. The sheet is drawn either way — it is never hidden. */
   readonly filed: boolean;
+  /**
+   * Where the question this sheet may not answer is answered — on **both** shapes of sheet.
+   *
+   * The strings are `shift/report.ts`'s, unread and unedited. A pointer at Compare composed here
+   * would be this module deciding what the product's only comparison surface is for, which is a
+   * decision — and every decision on this surface lives in a pure module that a test can reach.
+   *
+   * `undefined` on the empty sheet, and only there: nothing has been run, so there is no question
+   * yet to send anywhere.
+   */
+  readonly nextStep: ReportNextStep | undefined;
   readonly title: string;
   readonly metaLines: readonly string[];
   readonly lede: string;
@@ -368,6 +379,8 @@ export function emptyReportView(): ReportView {
     diagnosis: [],
     levers: [],
     smallPrint: '',
+    // Nothing has been run, so there is no question to take anywhere yet.
+    nextStep: undefined,
     /*
      * Week-shaped, and deliberately so: nothing has been filed, so the shell is still standing in
      * the week it opens on, and the disabled *Open the doors on tomorrow* is the handoff's own
@@ -397,7 +410,7 @@ export function emptyReportView(): ReportView {
  */
 function framingOf(report: ShapedDayReport): FramingView {
   if (report.of === 'single-run') {
-    return { kind: 'single-run', nextStep: report.nextStep };
+    return { kind: 'single-run' };
   }
   return {
     kind: 'week-day',
@@ -426,6 +439,8 @@ export function reportViewOf(report: ShapedDayReport | DayReport | undefined): R
   const shaped: ShapedDayReport = 'of' in report ? report : { ...report, of: 'week-day' };
   return {
     filed: true,
+    // Both shapes carry it — see {@link SingleRunFramingView}.
+    nextStep: shaped.nextStep,
     title: shaped.title,
     metaLines: shaped.metaLines,
     lede: shaped.lede,
@@ -661,9 +676,11 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
       setHidden(cardOf(ui.taught), week === null);
       setText(ui.smallPrint, drawn.smallPrint);
 
-      setText(nextStepLabel, single?.nextStep.label ?? '');
-      setText(nextStepWhy, single?.nextStep.why ?? '');
-      setHidden(nextStepBox, single === null);
+      // Drawn on both shapes now — see `SingleRunFramingView`. Hidden only on the empty sheet,
+      // where there is no run and therefore no question.
+      setText(nextStepLabel, drawn.nextStep?.label ?? '');
+      setText(nextStepWhy, drawn.nextStep?.why ?? '');
+      setHidden(nextStepBox, drawn.nextStep === undefined);
 
       setText(ui.nextDay, week?.nextDayLabel ?? '');
       ui.nextDay.disabled = !(week?.canAdvance ?? false);
