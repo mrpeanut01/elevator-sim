@@ -162,11 +162,16 @@ describe('the shipped campaign', () => {
     expect(validateCampaign(campaign, context)).toEqual([]);
   });
 
-  it('is the seven stages of § 5.4, in order, one per measured scenario', () => {
+  it('is one stage per measured scenario, in order', () => {
+    // Derived from the goal table, which is the point: a stage without a measured pass rate is a
+    // level shipped on a goal nobody has taken a rate of, and R12 forbids it. The length is checked
+    // against the table rather than against a literal, which had been `7` and is now the campaign's
+    // to grow.
     expect(campaign.stages.map((stage) => stage.id)).toEqual(
       published.scenarios.map((scenario) => scenario.id),
     );
-    expect(campaign.stages).toHaveLength(7);
+    expect(campaign.stages).toHaveLength(published.scenarios.length);
+    expect(campaign.stages.length).toBeGreaterThanOrEqual(7);
   });
 
   it('starts from a goal table that is itself valid', () => {

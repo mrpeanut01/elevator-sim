@@ -12,7 +12,9 @@
         "Nothing here is hard. The stage exists so that the next six have something to be different from."
       ],
       "building": "garden-apartments",
-      "traffic": { "arrivalRatePctPop5min": null },
+      "traffic": {
+        "arrivalRatePctPop5min": null
+      },
       "durationS": 900,
       "dispatcher": {
         "startingProfileId": "collective",
@@ -25,12 +27,26 @@
           ]
         }
       },
-      "seeds": { "name": "tuning-20260730", "seed": "20260730", "replications": 50 },
-      "holdoutSeeds": { "name": "holdout-20260731", "seed": "20260731", "replications": 50 },
+      "seeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
       "replications": 50,
       "goals": [
-        { "kind": "answer-the-demand", "threshold": null },
-        { "kind": "beat-the-baseline", "threshold": null }
+        {
+          "kind": "answer-the-demand",
+          "threshold": null
+        },
+        {
+          "kind": "beat-the-baseline",
+          "threshold": null
+        }
       ],
       "levers": {
         "overwhelmed": "weights.waitTime",
@@ -49,7 +65,9 @@
         "This is the first stage where a number changes when you change a dial."
       ],
       "building": "midtown-office",
-      "traffic": { "arrivalRatePctPop5min": 2.5 },
+      "traffic": {
+        "arrivalRatePctPop5min": 2.5
+      },
       "durationS": 900,
       "dispatcher": {
         "startingProfileId": "collective",
@@ -75,13 +93,30 @@
           ]
         }
       },
-      "seeds": { "name": "tuning-20260730", "seed": "20260730", "replications": 50 },
-      "holdoutSeeds": { "name": "holdout-20260731", "seed": "20260731", "replications": 50 },
+      "seeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
       "replications": 50,
       "goals": [
-        { "kind": "answer-the-demand", "threshold": null },
-        { "kind": "long-waits-under", "threshold": 10 },
-        { "kind": "beat-the-baseline", "threshold": null }
+        {
+          "kind": "answer-the-demand",
+          "threshold": null
+        },
+        {
+          "kind": "long-waits-under",
+          "threshold": 10
+        },
+        {
+          "kind": "beat-the-baseline",
+          "threshold": null
+        }
       ],
       "levers": {
         "overwhelmed": "dispatch.assignmentMode",
@@ -100,7 +135,9 @@
         "Your job here is to read the refusal and say where the building broke, not to beat it."
       ],
       "building": "midtown-office",
-      "traffic": { "arrivalRatePctPop5min": null },
+      "traffic": {
+        "arrivalRatePctPop5min": null
+      },
       "durationS": 900,
       "dispatcher": {
         "startingProfileId": "collective",
@@ -126,12 +163,26 @@
           ]
         }
       },
-      "seeds": { "name": "tuning-20260730", "seed": "20260730", "replications": 50 },
-      "holdoutSeeds": { "name": "holdout-20260731", "seed": "20260731", "replications": 50 },
+      "seeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
       "replications": 50,
       "goals": [
-        { "kind": "nobody-abandoned", "threshold": null },
-        { "kind": "beat-the-baseline", "threshold": null }
+        {
+          "kind": "nobody-abandoned",
+          "threshold": null
+        },
+        {
+          "kind": "beat-the-baseline",
+          "threshold": null
+        }
       ],
       "levers": {
         "overwhelmed": "dispatch.assignmentMode",
@@ -150,7 +201,9 @@
         "Keep the queues from running away while you learn to tell them apart."
       ],
       "building": "mixed-use-high-rise",
-      "traffic": { "arrivalRatePctPop5min": 1.5 },
+      "traffic": {
+        "arrivalRatePctPop5min": 1.5
+      },
       "durationS": 900,
       "dispatcher": {
         "startingProfileId": "collective",
@@ -183,13 +236,30 @@
           ]
         }
       },
-      "seeds": { "name": "tuning-20260730", "seed": "20260730", "replications": 50 },
-      "holdoutSeeds": { "name": "holdout-20260731", "seed": "20260731", "replications": 50 },
+      "seeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
       "replications": 50,
       "goals": [
-        { "kind": "no-divergence", "threshold": null },
-        { "kind": "long-waits-under", "threshold": 10 },
-        { "kind": "beat-the-baseline", "threshold": null }
+        {
+          "kind": "no-divergence",
+          "threshold": null
+        },
+        {
+          "kind": "long-waits-under",
+          "threshold": 10
+        },
+        {
+          "kind": "beat-the-baseline",
+          "threshold": null
+        }
       ],
       "levers": {
         "overwhelmed": "dispatch.assignmentMode",
@@ -208,7 +278,9 @@
         "Change what the call carries, and watch the locked-out landings clear."
       ],
       "building": "secure-tower",
-      "traffic": { "arrivalRatePctPop5min": null },
+      "traffic": {
+        "arrivalRatePctPop5min": null
+      },
       "durationS": 900,
       "dispatcher": {
         "startingProfileId": "collective",
@@ -224,14 +296,34 @@
           ]
         }
       },
-      "seeds": { "name": "tuning-20260730", "seed": "20260730", "replications": 50 },
-      "holdoutSeeds": { "name": "holdout-20260731", "seed": "20260731", "replications": 50 },
+      "seeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
       "replications": 50,
       "goals": [
-        { "kind": "no-divergence", "threshold": null },
-        { "kind": "answer-the-demand", "threshold": null },
-        { "kind": "long-waits-under", "threshold": 10 },
-        { "kind": "beat-the-baseline", "threshold": null }
+        {
+          "kind": "no-divergence",
+          "threshold": null
+        },
+        {
+          "kind": "answer-the-demand",
+          "threshold": null
+        },
+        {
+          "kind": "long-waits-under",
+          "threshold": 10
+        },
+        {
+          "kind": "beat-the-baseline",
+          "threshold": null
+        }
       ],
       "levers": {
         "overwhelmed": "weights.waitTime",
@@ -250,7 +342,9 @@
         "Everything the other stages opened is open here. See how far the dials get you."
       ],
       "building": "vertical-city",
-      "traffic": { "arrivalRatePctPop5min": 0.5 },
+      "traffic": {
+        "arrivalRatePctPop5min": 0.5
+      },
       "durationS": 900,
       "dispatcher": {
         "startingProfileId": "collective",
@@ -295,14 +389,34 @@
           ]
         }
       },
-      "seeds": { "name": "tuning-20260730", "seed": "20260730", "replications": 50 },
-      "holdoutSeeds": { "name": "holdout-20260731", "seed": "20260731", "replications": 50 },
+      "seeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
       "replications": 50,
       "goals": [
-        { "kind": "deliver-everyone", "threshold": null },
-        { "kind": "no-divergence", "threshold": null },
-        { "kind": "answer-the-demand", "threshold": null },
-        { "kind": "beat-the-baseline", "threshold": null }
+        {
+          "kind": "deliver-everyone",
+          "threshold": null
+        },
+        {
+          "kind": "no-divergence",
+          "threshold": null
+        },
+        {
+          "kind": "answer-the-demand",
+          "threshold": null
+        },
+        {
+          "kind": "beat-the-baseline",
+          "threshold": null
+        }
       ],
       "levers": {
         "overwhelmed": "idle.parkingStrategy",
@@ -321,24 +435,232 @@
         "Tune on the seeds you are given. The holdout set exists so that a gain living only in these passenger traces has somewhere to fail."
       ],
       "building": "midtown-office",
-      "traffic": { "arrivalRatePctPop5min": 1.5 },
+      "traffic": {
+        "arrivalRatePctPop5min": 1.5
+      },
       "durationS": 900,
       "dispatcher": {
         "startingProfileId": "collective",
-        "editable": { "mode": "every-declared-dimension" }
+        "editable": {
+          "mode": "every-declared-dimension"
+        }
       },
-      "seeds": { "name": "tuning-20260730", "seed": "20260730", "replications": 50 },
-      "holdoutSeeds": { "name": "holdout-20260731", "seed": "20260731", "replications": 50 },
+      "seeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
       "replications": 50,
       "goals": [
-        { "kind": "answer-the-demand", "threshold": null },
-        { "kind": "beat-the-baseline", "threshold": null }
+        {
+          "kind": "answer-the-demand",
+          "threshold": null
+        },
+        {
+          "kind": "beat-the-baseline",
+          "threshold": null
+        }
       ],
       "levers": {
         "overwhelmed": "dispatch.assignmentMode",
         "abandoned": "weights.starvation",
         "stranded": "answer.allowBypassIfSoleEligibleCar",
         "locked-out": null
+      }
+    },
+    {
+      "id": "stage-8-the-headline-address",
+      "name": "The headline address",
+      "teaches": "that spare cars are not the same as a short interval",
+      "brief": [
+        "Nineteen floors, 612 people, six cars at 5 m/s — the smallest crowd in the campaign on the tightest promise.",
+        "This is the only building here with more lift than it needs, and it still has to earn a 25 s interval. Capacity is not the constraint; where the spare cars wait between bursts is.",
+        "Watch the energy figure beside the wait. A car that drives more to be in the right place has spent something, and this is the stage where that trade is visible."
+      ],
+      "building": "chancery-house",
+      "traffic": {
+        "arrivalRatePctPop5min": 3
+      },
+      "durationS": 900,
+      "dispatcher": {
+        "startingProfileId": "collective",
+        "editable": {
+          "mode": "listed",
+          "ids": [
+            "weights.waitTime",
+            "weights.distanceTravelled",
+            "weights.stopCount",
+            "weights.starvation",
+            "answer.allowBypassIfSoleEligibleCar",
+            "idle.parkingStrategy",
+            "idle.repositionThresholdS",
+            "idle.repositionEnergyWeight"
+          ]
+        }
+      },
+      "seeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
+      "replications": 50,
+      "goals": [
+        {
+          "kind": "answer-the-demand",
+          "threshold": null
+        },
+        {
+          "kind": "beat-the-baseline",
+          "threshold": null
+        }
+      ],
+      "levers": {
+        "overwhelmed": "idle.parkingStrategy",
+        "abandoned": "weights.starvation",
+        "stranded": "answer.allowBypassIfSoleEligibleCar",
+        "locked-out": null
+      }
+    },
+    {
+      "id": "stage-9-both-ways-at-once",
+      "name": "Both ways at once",
+      "teaches": "demand with no dominant direction, and a car unlike its neighbours",
+      "brief": [
+        "Guests arrive and leave all day, so there is no rush hour to point a dispatcher at — the traffic is two-way from the first minute to the last.",
+        "Four guest cars share the bank with one service lift at 1.75 m/s, less than two thirds their speed. Nothing in the configuration says it is the wrong car for a guest; only its speed and its capacity do.",
+        "A hard rule against reversing direction is worth less here than anywhere else in the campaign. It is on by default, and it is yours to turn off."
+      ],
+      "building": "crown-hotel",
+      "traffic": {
+        "arrivalRatePctPop5min": 2.5
+      },
+      "durationS": 900,
+      "dispatcher": {
+        "startingProfileId": "collective",
+        "editable": {
+          "mode": "listed",
+          "ids": [
+            "weights.waitTime",
+            "weights.directionReversal",
+            "weights.loadFactor",
+            "weights.starvation",
+            "constraints.noDirectionReversal",
+            "dispatch.callType",
+            "dispatch.assignmentMode",
+            "dispatch.splitThresholdPassengers"
+          ]
+        }
+      },
+      "seeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
+      "replications": 50,
+      "goals": [
+        {
+          "kind": "deliver-everyone",
+          "threshold": null
+        },
+        {
+          "kind": "answer-the-demand",
+          "threshold": null
+        },
+        {
+          "kind": "beat-the-baseline",
+          "threshold": null
+        }
+      ],
+      "levers": {
+        "overwhelmed": "dispatch.assignmentMode",
+        "abandoned": "weights.starvation",
+        "stranded": "constraints.noDirectionReversal",
+        "locked-out": "dispatch.callType"
+      }
+    },
+    {
+      "id": "stage-10-the-bed-and-the-visitor",
+      "name": "The bed and the visitor",
+      "teaches": "that two cars in one bank can be the wrong car",
+      "brief": [
+        "A hospital never empties, and its busiest moments are shift changes rather than a morning arrival.",
+        "Two of the five cars are bed lifts: bigger, slower, and the wrong answer to an ordinary hall call. They are in the same bank as the other three and the dispatcher has only their speed, capacity and transfer time to tell them apart.",
+        "Outpatients on floor 1 holds 180 people. When a clinic ends it empties downward — a crowd from the middle of the building rather than from the lobby, which is a shape no earlier stage produces."
+      ],
+      "building": "st-jude-hospital",
+      "traffic": {
+        "arrivalRatePctPop5min": 2
+      },
+      "durationS": 900,
+      "dispatcher": {
+        "startingProfileId": "collective",
+        "editable": {
+          "mode": "listed",
+          "ids": [
+            "weights.waitTime",
+            "weights.loadFactor",
+            "weights.crowding",
+            "weights.starvation",
+            "dispatch.callType",
+            "dispatch.assignmentMode",
+            "dispatch.splitThresholdPassengers",
+            "answer.allowBypassIfSoleEligibleCar"
+          ]
+        }
+      },
+      "seeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
+      "replications": 50,
+      "goals": [
+        {
+          "kind": "deliver-everyone",
+          "threshold": null
+        },
+        {
+          "kind": "no-divergence",
+          "threshold": null
+        },
+        {
+          "kind": "answer-the-demand",
+          "threshold": null
+        },
+        {
+          "kind": "long-waits-under",
+          "threshold": 10
+        },
+        {
+          "kind": "beat-the-baseline",
+          "threshold": null
+        }
+      ],
+      "levers": {
+        "overwhelmed": "dispatch.assignmentMode",
+        "abandoned": "weights.starvation",
+        "stranded": "answer.allowBypassIfSoleEligibleCar",
+        "locked-out": "dispatch.callType"
       }
     }
   ]

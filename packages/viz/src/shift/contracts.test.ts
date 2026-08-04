@@ -27,7 +27,7 @@ beforeAll(async () => {
   config = await loadConfig(DATA_DIR);
 });
 
-describe('the five scenarios are the five shipped buildings', () => {
+describe('the scenarios are the shipped buildings, one contract each', () => {
   it('names a building that resolves, for every contract', () => {
     for (const contract of CONTRACTS) {
       const building = config.buildingsById.get(contract.buildingId);
@@ -37,8 +37,10 @@ describe('the five scenarios are the five shipped buildings', () => {
 
   it('covers every shipped building exactly once', () => {
     // Both directions. A contract for a building that does not ship is the first suite's
-    // failure; a shipped building with no contract is a scenario the reader can never take, and
-    // `docs/12` § 4.4 says the set is the five, not a subset of them.
+    // failure; a shipped building with no contract is a scenario the reader can never take.
+    // `docs/12` § 4.4 said the set is the FIVE, not a subset of them — and three buildings landed
+    // after the handoff was written, so the campaign is eight and the deviation is recorded in
+    // `docs/12` § 4.7. The rule the guard enforces is unchanged: coverage, in both directions.
     //
     // Compared as sets, not as sequences: the handoff's teaching order puts Secure Tower before
     // Mixed-Use High-Rise (zoning before transfers), which is not `data/buildings/`'s
@@ -49,27 +51,46 @@ describe('the five scenarios are the five shipped buildings', () => {
   });
 
   it('teaches zoning before transfers, which is the handoff’s order and not the filesystem’s', () => {
-    expect(CONTRACTS.map((contract) => contract.buildingId)).toEqual([
+    // The handoff's five, in the handoff's teaching order, followed by the three that landed
+    // after it was written. The prefix is asserted separately from the tail so a change to the
+    // designed curriculum fails distinctly from a change to the extension.
+    expect(CONTRACTS.slice(0, 5).map((contract) => contract.buildingId)).toEqual([
       'garden-apartments',
       'midtown-office',
       'secure-tower',
       'mixed-use-high-rise',
       'vertical-city',
     ]);
+    expect(CONTRACTS.slice(5).map((contract) => contract.buildingId)).toEqual([
+      'chancery-house',
+      'crown-hotel',
+      'st-jude-hospital',
+    ]);
   });
 
   it('asks for between one and three clean shifts, rising', () => {
-    expect(CONTRACTS.map((contract) => contract.needClean)).toEqual([1, 2, 2, 2, 3]);
+    // Non-decreasing, and the three appended contracts may not ask for LESS than the arc they
+    // follow — a campaign that gets easier after its finale is a campaign with two finales.
+    expect(CONTRACTS.map((contract) => contract.needClean)).toEqual([1, 2, 2, 2, 3, 3, 3, 3]);
+    for (let index = 1; index < CONTRACTS.length; index += 1) {
+      const previous = CONTRACTS[index - 1]?.needClean ?? 0;
+      expect(CONTRACTS[index]?.needClean ?? 0).toBeGreaterThanOrEqual(previous);
+    }
   });
 
   it('keeps the handoff’s own ids and labels', () => {
-    expect(CONTRACTS.map((contract) => contract.id)).toEqual(['c1', 'c2', 'c3', 'c4', 'c5']);
+    expect(CONTRACTS.map((contract) => contract.id)).toEqual([
+      'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8',
+    ]);
     expect(CONTRACTS.map((contract) => contract.label)).toEqual([
       'Scenario 1',
       'Scenario 2',
       'Scenario 3',
       'Scenario 4',
       'Scenario 5',
+      'Scenario 6',
+      'Scenario 7',
+      'Scenario 8',
     ]);
   });
 
@@ -94,8 +115,14 @@ describe('lookup', () => {
   });
 
   it('runs out at the end of the list rather than wrapping', () => {
-    expect(nextContract('c4')?.id).toBe('c5');
-    expect(nextContract('c5')).toBeUndefined();
+    // Derived from the list rather than naming its last member, so appending a contract does not
+    // silently turn this into an assertion about the middle of the campaign.
+    const last = CONTRACTS[CONTRACTS.length - 1];
+    const penultimate = CONTRACTS[CONTRACTS.length - 2];
+    expect(last).toBeDefined();
+    expect(penultimate).toBeDefined();
+    expect(nextContract(penultimate?.id ?? '')?.id).toBe(last?.id);
+    expect(nextContract(last?.id ?? '')).toBeUndefined();
   });
 });
 

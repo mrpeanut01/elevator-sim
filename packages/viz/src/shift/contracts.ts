@@ -51,6 +51,14 @@ import type { ContractStatus, ScenarioContract, WeekState } from './types.js';
  * than a parameter an optimizer could search. A `data/` file for five frozen sentences would add a
  * schema, a parser and a loader to protect nothing.
  */
+/**
+ * **Eight contracts, and the handoff specifies five.** `docs/12` § 4.4 fixes the campaign at the
+ * five buildings shipped when the design was written; three more buildings landed afterwards, and a
+ * shipped building with no contract is a scenario the reader can never take. The deviation is
+ * recorded in `docs/12` § 4.7 rather than absorbed, which is the rule the handoff itself sets: it
+ * wins every disagreement about what the screen looks like, and a disagreement it does not cover is
+ * a decision to be written down.
+ */
 export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
   Object.freeze({
     id: 'c1',
@@ -106,6 +114,39 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
       'A hundred and one floors, 4,887 occupants, six local zones hanging off three two-level sky lobbies, and eight double-deck shuttles at 10 m/s. Every journey above floor 25 is two legs — three when the destination zone is anchored to the far lobby level. Clear three shifts here and the week simply keeps going.',
     needClean: 3,
     reward: 'Multi-round auction · Landing-panel destination dispatch · endless mode',
+  }),
+  Object.freeze({
+    id: 'c6',
+    buildingId: 'chancery-house',
+    label: 'Scenario 6',
+    title: 'The headline address',
+    teaches: 'that spare cars are not the same as a short interval',
+    brief:
+      'Nineteen floors, 612 people and six cars at 5 m/s — the smallest crowd in the week on the tightest promise: a 25 s interval and a 20 s wait. You have more lift than you need and it still is not free. Where the spare cars wait between bursts is the whole of this one.',
+    needClean: 3,
+    reward: 'Pre-positioning · Energy aware · one spare shaft',
+  }),
+  Object.freeze({
+    id: 'c7',
+    buildingId: 'crown-hotel',
+    label: 'Scenario 7',
+    title: 'Both ways at once',
+    teaches: 'demand with no dominant direction, and a car unlike its neighbours',
+    brief:
+      'Guests arrive and leave all day, so there is no rush hour to point a dispatcher at. Four guest cars share the shaft group with one service lift at 1.75 m/s — less than two thirds their speed. Send it to the wrong call and the guest waits for the slowest car in the building.',
+    needClean: 3,
+    reward: 'Split demand · Capacity aware · one spare shaft',
+  }),
+  Object.freeze({
+    id: 'c8',
+    buildingId: 'st-jude-hospital',
+    label: 'Scenario 8',
+    title: 'The bed and the visitor',
+    teaches: 'that two cars in one bank can be the wrong car',
+    brief:
+      'A hospital never empties. Two of the five cars are bed lifts — bigger, slower, and the wrong answer to an ordinary hall call — and nothing in the configuration says so. Outpatients on floor 1 empties downward when a clinic ends, which is a crowd from the middle of the building rather than the lobby.',
+    needClean: 3,
+    reward: 'Destination dispatch · Fairness first · endless mode',
   }),
 ]);
 

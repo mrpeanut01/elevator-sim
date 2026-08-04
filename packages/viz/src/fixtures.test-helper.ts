@@ -223,16 +223,51 @@ export function fixtureConfig(config: LoadedConfig, options: FixtureOptions = {}
   };
 }
 
+/**
+ * Demand the breadth fixture must state rather than inherit, because the building's own profile
+ * leaves nothing on a landing to draw.
+ *
+ * The breadth suites exercise **pictures** — landing assignments, queue bands, overlays — and a
+ * picture of an empty landing exercises nothing. Five of the eight shipped buildings queue at their
+ * own profile's rate and are left alone, so their recordings stay bit-identical. The three that do
+ * not are the ones added later, and in each case it is a property of the building rather than an
+ * accident:
+ *
+ * - `chancery-house` is **oversupplied on purpose** — six fast cars for 612 people is the prestige
+ *   brief, so at any instant the landings are clear and `landingAssignmentsAt` returns nothing.
+ * - `crown-hotel` and `st-jude-hospital` are small populations against five cars, so two riders
+ *   rarely wait at one landing with different arrival times, which is the identity `queueAt`'s
+ *   acceptance test is about.
+ *
+ * Raising the rate for these three is the honest fix: the alternative is to weaken the assertions
+ * to "at least zero", which is the shape of a test that cannot fail.
+ *
+ * **These are fixture rates, not operating points, and `chancery-house`'s is deliberately absurd.**
+ * 30 % of population per five minutes is nearly double what `office-prestige` itself calls a peak.
+ * It was measured up to, not guessed: at 12 % and at 20 % the building still never had two riders
+ * waiting at one landing with different arrival times, because six 5 m/s cars answer a 612-person
+ * building faster than a second rider turns up. No figure is published from these runs — they exist
+ * to make a picture that has something in it — so the rate is chosen for coverage rather than for
+ * realism, and saying so is the difference between a fixture and a claim.
+ */
+const BREADTH_DEMAND_BY_BUILDING: Readonly<Record<string, number>> = Object.freeze({
+  'chancery-house': 30,
+  'crown-hotel': 10,
+  'st-jude-hospital': 10,
+});
+
 /** Every shipped building, recorded over {@link BREADTH_DURATION_S}. See {@link FixtureOptions.onTimeout}. */
 export function breadthConfig(
   config: LoadedConfig,
   buildingId: string,
   options: FixtureOptions = {},
 ): SimulationConfig {
-  return fixtureConfig(config, {
+  const rate = BREADTH_DEMAND_BY_BUILDING[buildingId];
+  const base = fixtureConfig(config, {
     ...options,
     buildingId,
     durationS: options.durationS ?? BREADTH_DURATION_S,
     onTimeout: options.onTimeout ?? 'report',
   });
+  return rate === undefined ? base : { ...base, demand: { arrivalRatePctPop5min: rate } };
 }
