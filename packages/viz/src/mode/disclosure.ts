@@ -149,6 +149,27 @@ export interface DisclosureInput {
   readonly failStates?: readonly FailStateDisclosure[] | undefined;
   /** § 10.4's locked-out landings, from the caller that knows this run's access zoning. */
   readonly lockedOut?: readonly LockedOutLanding[] | undefined;
+  /**
+   * Whether the player asked to see the energy axis — `Settings.showEnergyAxis`, `docs/16` § 5
+   * clause 4.
+   *
+   * ## Two gates on one row, and why they are not the same gate
+   *
+   * {@link BASIC_HIDES} already withholds the energy figures from a Basic reader, and that is a
+   * **disclosure** decision: R11's axis *may* be displayed and is never required to be, and a Basic
+   * reader who cannot see it cannot mistake it for a score. This flag is a **preference**, and it
+   * decides the same row for a reader who is already in Advanced.
+   *
+   * Stacking them would make the setting inert in Basic — a control a player can flip with nothing
+   * moving, which is the defect `scope/` exists to catch. So the menu does not *offer* the row in
+   * Basic (`docs/16` S7: not offered, rather than offered and refused), and this flag is the
+   * Advanced-side answer only.
+   *
+   * Optional and defaulting to shown, because every non-player caller — the honesty sweep, the
+   * acceptance tests, `runSummary`'s own default — is describing a run rather than serving a reader
+   * with a preference.
+   */
+  readonly showEnergyAxis?: boolean | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -295,7 +316,9 @@ export function disclosureItems(input: DisclosureInput): readonly DisclosureItem
   const { summary } = recording;
   const items: DisclosureItem[] = [];
 
-  for (const figure of runSummaryFigures(recording)) {
+  for (const figure of runSummaryFigures(recording, {
+    showEnergyAxis: input.showEnergyAxis ?? true,
+  })) {
     items.push(itemForFigure(figure, input));
   }
 

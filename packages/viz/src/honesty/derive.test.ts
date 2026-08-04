@@ -134,6 +134,22 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'shift/incidents.ts#serviceEventsFor',
         'shift/incidents.ts#withIncidents',
+        /*
+         * `render/theme.ts` is the same false positive again, and the most clear-cut instance of it:
+         * it returns a record of CSS custom-property names to hex values — `--edge-mid` to
+         * `#26303d` — and the scanner reads the hyphenated token names as adjacent words. There is
+         * no sentence in the module and no figure; the palette is asserted against `index.html`'s
+         * own `:root` in both directions by `theme.test.ts`, which is a stronger check than a string
+         * search over something no reader reads.
+         */
+        'render/theme.ts#themeFor',
+        /*
+         * `summaryFigureIds` is the *order* the figures are drawn in, not the figures. It returns an
+         * array of ids — `long-waits`, `energy` — and is derived only because those ids are
+         * hyphenated. Its sibling `runSummaryFigures`, which produces the labels, values and notes a
+         * reader actually sees, is driven by the `RUN_SUMMARY` adapter as it always has been.
+         */
+        'render/runSummary.ts#summaryFigureIds',
         'dev/surfaces.ts#applyDrawerState',
         'dev/surfaces.ts#applyRailState',
         'dev/surfaces.ts#applySurfaceState',

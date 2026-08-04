@@ -30,6 +30,11 @@
  * - **{@link SINK_MISSING}** — the control reaches nothing at all. A **recorded finding**, kept here
  *   so the suite is green while the register carries the defect, in `deadCode.test.ts`'s idiom.
  *   `scope.test.ts` asserts the register is not stale, so an entry cannot outlive the bug.
+ *
+ * {@link SINK_MISSING} is **empty**, and it is kept rather than deleted. All four settings began in
+ * it — `docs/16` § 5 clause 4 — and all four now reach the thing they name. An empty register is the
+ * honest end state of one that carried findings: deleting it would delete the mechanism that made
+ * the next inert control visible, and the assertion that pins its contents is what would notice.
  */
 
 import { readFileSync } from 'node:fs';
@@ -50,6 +55,8 @@ import { disclosureOf, initialState, shiftRunConfigOf, type ViewerState } from '
 import { mathsDisclosureOf } from '../dev/leftRail.js';
 import { playbackRateFor, shouldAutoplayWith } from '../dev/motion.js';
 import { drawerStateFor, railStateFor, surfaceStateFor } from '../dev/surfaces.js';
+import { summaryFigureIds } from '../render/runSummary.js';
+import { themeFor } from '../render/theme.js';
 import type { TabName } from '../dev/elementMap.js';
 import type { HonestyCard } from '../live/types.js';
 import { navigate } from '../menu/menu.js';
@@ -336,8 +343,23 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
     // not the setting echoed back.
     sink: [() => playbackSpeedFor(1), () => playbackSpeedFor(4)],
   },
-  'settings.showEnergyAxis': {},
-  'settings.theme': {},
+  'settings.showEnergyAxis': {
+    // The shipped decision, not a restatement: `runSummaryFigures` is what the panel renders, and
+    // `summaryFigureIds` is the id list it produces. A probe that counted figures itself would pass
+    // on a disconnected control.
+    sink: [
+      () => summaryFigureIds({ showEnergyAxis: true }),
+      () => summaryFigureIds({ showEnergyAxis: false }),
+    ],
+  },
+  'settings.theme': {
+    // `themeFor` is the function `dev/main.ts#applyTheme` calls, probed with a fixed
+    // `prefers-color-scheme` so `system` is not what is being measured here.
+    sink: [
+      () => themeFor('dark', () => ({ matches: false })),
+      () => themeFor('light', () => ({ matches: false })),
+    ],
+  },
 
   /* ------------------------------------------------------------------ free play */
   'free-play.buildingId': {
@@ -402,8 +424,4 @@ export const SINK_IS_A_MOUNT: Readonly<Record<string, string>> = Object.freeze({
  * Kept here so the suite is green while the register carries the defect — `deadCode.test.ts`'s
  * `DEAD_CANDIDATES` idiom — and `scope.test.ts` asserts an entry cannot outlive its bug.
  */
-export const SINK_MISSING: Readonly<Record<string, string>> = Object.freeze({
-  'settings.showEnergyAxis': 'render/runSummary.ts draws the energy figures unconditionally; nothing reads this field',
-  'settings.theme': 'no theme switch exists anywhere in the package; the stylesheet has one palette, so this is the ' +
-    'one of the four whose sink would have to be built rather than merely connected',
-});
+export const SINK_MISSING: Readonly<Record<string, string>> = Object.freeze({});

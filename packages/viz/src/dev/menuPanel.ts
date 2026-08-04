@@ -67,6 +67,8 @@ export interface MenuPanelHost {
   leaderboard(): LeaderboardView;
   /** What only the shell knows: whether a run is on screen, and whether it may be ranked. */
   runState(): { readonly hasRun: boolean; readonly rankingRefusal: string | undefined };
+  /** The reader's disclosure level, for the one settings row Basic cannot honour — `docs/16` S7. */
+  viewMode(): 'basic' | 'advanced';
 }
 
 /* -------------------------------------------------------------------------- *
@@ -95,6 +97,7 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
     hasRun: run.hasRun,
     rankingRefusal: run.rankingRefusal,
     boards: board.boards,
+    viewMode: host.viewMode(),
   });
 
   const children: Node[] = [];

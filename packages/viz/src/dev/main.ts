@@ -130,6 +130,7 @@ import { mountRightRail } from './rightRail.js';
 import { mountScenarios } from './scenariosPanel.js';
 import { mountTrafficEditor } from './trafficEditor.js';
 import { playbackRateFor, shouldAutoplayWith } from './motion.js';
+import { themeFor } from '../render/theme.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
 import {
   DEFAULT_SHIFT_LENGTH_S,
@@ -419,7 +420,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
          */
         if (intent.kind === 'set-setting') {
           applyPlaybackSpeed();
+          applyTheme();
           if (menuState.settings.reduceMotion) playback?.pause();
+          // The energy axis is a figure on a panel, so the panel has to be redrawn rather than
+          // nudged — `renderAll` is the chokepoint every state change already goes through.
+          if (intent.field === 'showEnergyAxis') renderAll();
           drawTransportChrome(viewAt());
         }
         drawMenu();
@@ -597,6 +602,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     dispatch: dispatchMenu,
     account: () => accountState,
     leaderboard: () => boardView,
+    viewMode: () => state.mode,
     runState: () => {
       const issues = runIdentityIssues(state, resources, 'ranked');
       return {
@@ -768,6 +774,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       applyNavigation();
     });
 
+  applyTheme();
   renderAll();
   runShift();
   urlWritable = true;
@@ -1084,6 +1091,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       recording,
       dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
       lockedOut: lockedOutAt(recording, recording.endedAt),
+      showEnergyAxis: menuState.settings.showEnergyAxis,
     });
     setText(ui.header.modeParity, parityRefusal(items) ?? '');
     void itemsIn;
@@ -1228,6 +1236,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * run being watched, and the thing `×900` means. The setting is *how fast this player likes to
    * watch*, and it should survive changing the chip.
    */
+  /**
+   * Paint the player's chosen palette onto the document — `docs/16` § 5 clause 4's last setting.
+   *
+   * `themeFor` decides and this writes, which is the split the rest of `dev/` keeps. `color-scheme`
+   * is set alongside the tokens and is not polish: without it a light palette gets dark native
+   * scrollbars and `<select>` popups, and no token assertion would catch that because no token is
+   * involved.
+   *
+   * **A stated limitation.** `render/canvas.ts`'s own `DEFAULT_THEME` derives from
+   * `render/tokens.ts`, which is dark-only, so a reader on `light` currently gets a light shell
+   * around a dark stage. Named here rather than discovered: repainting the canvas is a separate
+   * seam and this control is honest about reaching the shell and not the stage.
+   */
+  function applyTheme(): void {
+    const theme = themeFor(menuState.settings.theme, (query) => window.matchMedia(query));
+    const root = document.documentElement;
+    for (const [name, value] of Object.entries(theme.tokens)) root.style.setProperty(name, value);
+    root.style.setProperty('color-scheme', theme.colorScheme);
+  }
+
   function applyPlaybackSpeed(): void {
     playback?.setSpeed(playbackRateFor(baseSpeed, menuState.settings.playbackSpeed));
   }

@@ -155,6 +155,20 @@ export interface MenuViewInput {
    */
   readonly rankingRefusal?: string | undefined;
   readonly boards?: readonly { readonly configHash: string; readonly entries: number }[] | undefined;
+  /**
+   * The reader's disclosure level — `mode/types.ts`'s `ViewMode`, taken as a string so this module
+   * does not depend on the disclosure layer to draw a menu.
+   *
+   * Needed for exactly one row, and the reason is `docs/16` S7. `mode/disclosure.ts`'s `BASIC_HIDES`
+   * already withholds the energy figures from a Basic reader — a disclosure decision, because R11's
+   * axis *may* be shown and is never required to be. So a Basic reader who flipped *Show the energy
+   * axis* would see nothing move: a control offered and unable to be honoured, which is the state
+   * this whole directory exists to end.
+   *
+   * S7's answer is that such a control is **not offered**, rather than offered and refused. Defaults
+   * to `advanced`, so a caller that does not care gets the whole settings screen.
+   */
+  readonly viewMode?: 'basic' | 'advanced' | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -225,7 +239,11 @@ function bodyOf(input: MenuViewInput, screen: MenuScreen): Body {
     case 'free-play':
       return freePlayBody(input);
     case 'settings':
-      return { ...empty, rows: settingsRows(input.state.settings), notices: [SETTINGS_NOTE] };
+      return {
+        ...empty,
+        rows: settingsRows(input.state.settings, input.viewMode ?? 'advanced'),
+        notices: [SETTINGS_NOTE],
+      };
     case 'campaign':
       return { ...empty, rows: campaignRows(), notices: [CAMPAIGN_NOTE] };
     case 'leaderboard':
@@ -370,7 +388,7 @@ const SETTINGS_NOTE =
   'These change how the simulation is drawn, never what it computes — so they cannot move a score ' +
   'or make two runs incomparable.';
 
-function settingsRows(settings: Settings): readonly MenuAffordance[] {
+function settingsRows(settings: Settings, viewMode: 'basic' | 'advanced'): readonly MenuAffordance[] {
   const toggle = (id: string, label: string, field: keyof Settings, value: boolean): MenuAffordance => ({
     id,
     label,
@@ -384,7 +402,14 @@ function settingsRows(settings: Settings): readonly MenuAffordance[] {
   });
   return Object.freeze([
     toggle('settings.reduce-motion', 'Reduce motion', 'reduceMotion', settings.reduceMotion),
-    toggle('settings.energy-axis', 'Show the energy axis', 'showEnergyAxis', settings.showEnergyAxis),
+    /*
+     * Absent in Basic — S7, and see {@link MenuViewInput.viewMode}. Basic withholds the energy
+     * figures already, so this row could not be honoured there, and a control that cannot be
+     * honoured is not offered.
+     */
+    ...(viewMode === 'basic'
+      ? []
+      : [toggle('settings.energy-axis', 'Show the energy axis', 'showEnergyAxis', settings.showEnergyAxis)]),
     {
       id: 'settings.playback-speed',
       label: 'Playback speed',

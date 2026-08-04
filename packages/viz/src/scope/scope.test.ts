@@ -98,10 +98,14 @@ describe('the missing-sink register is a finding and not an exemption', () => {
     }
   });
 
-  it('is the two settings still unwired, and says which', () => {
-    // Pinned rather than merely non-empty, so closing one of the two cannot leave the register
-    // looking healthy — and so the count in docs/16, GAPS.md and § D217 has something to disagree
-    // with. It was four; `reduceMotion` and `playbackSpeed` have sinks now.
-    expect(Object.keys(SINK_MISSING).sort()).toEqual(['settings.showEnergyAxis', 'settings.theme']);
+  it('is empty, because all four settings now reach something', () => {
+    /*
+     * `docs/16` § 5 clause 4, closed. It was four, then two, and is now none.
+     *
+     * Pinned as **empty** rather than deleted along with the register. The register is the mechanism
+     * that makes the next inert control visible, and this assertion is what would notice a new entry
+     * arriving quietly — an empty list that nothing checks is how a list stops being read.
+     */
+    expect(Object.keys(SINK_MISSING)).toEqual([]);
   });
 });
