@@ -37,9 +37,17 @@ import { CHANGE_SCOPES, type ChangeScope, type PlayMode } from './types.js';
 export function permits(mode: PlayMode, scope: ChangeScope): boolean {
   switch (mode) {
     case 'shift-week':
+    case 'endless':
     case 'incidents':
     case 'calendar':
-      // The day loop and its two variants. Every scope, because the week *is* the between-days axis.
+      /*
+       * The day loop and its variants. Every scope, because the week *is* the between-days axis.
+       *
+       * `endless` is here rather than in a row of its own because it *is* the day loop — the same
+       * days, the same growth, the same events, the same goals that harden. What it does not have
+       * is a contract, so nothing is banked and nothing clears. A mode that restricted a scope the
+       * week it copies permits would be a different game wearing the same loop.
+       */
       return true;
     case 'free-play':
       return scope !== 'between-days';

@@ -88,6 +88,12 @@ export type MenuIntent =
   /** Commit the Free Play selection. The shell resets the week and runs it. */
   | { readonly kind: 'start' }
   | { readonly kind: 'open-campaign' }
+  /**
+   * Open a week with no assignment — the *endless mode* `c5` and `c8` promise in their rewards and
+   * nothing implemented. `menu/enterEndless.ts` is the decision; this member is what makes the
+   * shell's switch fail to compile until something performs it.
+   */
+  | { readonly kind: 'start-endless' }
   | { readonly kind: 'open-board'; readonly configHash: string }
   | { readonly kind: 'account-form'; readonly patch: Record<string, string> }
   | { readonly kind: 'account-submit' }
@@ -460,6 +466,20 @@ function campaignRows(): readonly MenuAffordance[] {
       enabled: true,
       intent: { kind: 'open-campaign' },
     },
+    {
+      id: 'campaign.endless',
+      label: 'Keep going',
+      detail: 'The same week with no assignment: it grows, nothing is banked, nothing clears',
+      kind: 'commit',
+      /*
+       * `between-games`, because it starts one. It sits on this screen rather than on `main` because
+       * it is the contract week minus its contract, and offering it as a peer of Campaign would put
+       * two rows on the root that differ in one field a player cannot see from there.
+       */
+      scope: 'between-games',
+      enabled: true,
+      intent: { kind: 'start-endless' },
+    },
   ]);
 }
 
@@ -582,6 +602,7 @@ export function applyIntent(state: MenuState, intent: MenuIntent): MenuState {
     case 'reopen':
     case 'start':
     case 'open-campaign':
+    case 'start-endless':
     case 'open-board':
     case 'account-form':
     case 'account-submit':

@@ -67,6 +67,7 @@ export type ChangeScope = (typeof CHANGE_SCOPES)[number];
  */
 export const PLAY_MODES = [
   'shift-week',
+  'endless',
   'free-play',
   'stage-campaign',
   'ranked',

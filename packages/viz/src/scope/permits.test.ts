@@ -15,8 +15,15 @@ import { describe, expect, it } from 'vitest';
 import { permits } from './permits.js';
 import { CHANGE_SCOPES, PLAY_MODES, type ChangeScope, type PlayMode } from './types.js';
 
-/** The three that permit everything, named once so the assertions below can subtract them. */
-const UNRESTRICTED: readonly PlayMode[] = ['shift-week', 'incidents', 'calendar'];
+/**
+ * The four that permit everything, named once so the assertions below can subtract them.
+ *
+ * `endless` is here for the same reason the other three are: it **is** the day loop, so it has the
+ * between-days axis by construction. Adding a mode to this list is how a mode stops being checked
+ * for restricting anything, which is why it is a hand-written list and not derived — somebody has to
+ * write the name down and say why.
+ */
+const UNRESTRICTED: readonly PlayMode[] = ['shift-week', 'endless', 'incidents', 'calendar'];
 
 describe('the matrix is total', () => {
   it('answers for every mode and every scope', () => {
@@ -52,8 +59,8 @@ describe('the matrix discriminates', () => {
     }
   });
 
-  it('leaves the day loop and its two variants unrestricted, deliberately', () => {
-    // Stated rather than left to be noticed: these three *are* the between-days axis, so a
+  it('leaves the day loop and its variants unrestricted, deliberately', () => {
+    // Stated rather than left to be noticed: these four *are* the between-days axis, so a
     // restriction on them would be a restriction on the thing they exist to be.
     for (const mode of UNRESTRICTED) {
       expect(CHANGE_SCOPES.every((scope) => permits(mode, scope)), mode).toBe(true);

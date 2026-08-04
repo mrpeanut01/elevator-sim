@@ -159,11 +159,34 @@ is a mitigation, not a fix. § 4.3 is the fix.
 
 ### 3.6 Endless, and Sandbox
 
-Both are strings. `c5`'s reward promises *endless mode* and nothing implements it; `Sandbox` appears
-in the coach ribbon when the building has no contract and no mode sits behind it. Two labels that
-describe features. **They should be built or the strings should go**, and the first is better: an
-endless week is `nextDay` with no contract and a growth curve that keeps going, which is close to
+Both were strings. `c5`'s reward promised *endless mode* and nothing implemented it; `Sandbox`
+appears in the coach ribbon when the building has no contract and no mode sits behind it. Two labels
+that describe features. **They should be built or the strings should go**, and the first is better:
+an endless week is `nextDay` with no contract and a growth curve that keeps going, which is close to
 free.
+
+**Endless is now built, and it is the smallest mode in the product on purpose.** `shift/week.ts`'s
+`openEndless` opens a week carrying a contract id no contract answers to, and every consumer already
+handled that — `contractById` returns `undefined` *"rather than a throw"*, `closeDay` banks the day
+and clears nothing, and the report has a no-contract line. So the mode needed a *value*, not a
+branch, and `menu/enterEndless.ts` is nine lines. If it were larger, that would be the signal that
+endless had become a second day loop maintained beside the first one.
+
+Two things it deliberately does not do. It does **not** re-pick the building: *keep going* means the
+tower you have been learning, and a mode that re-selected would be Free Play with a different label.
+And it does **not** clear the held cars or the levers, which `enterFreePlay` does — the argument
+there was never S6 (`free-play` permits `within-day` too) but that the Free Play *screen* had just
+described the run in six axes and a held car was not one of them. This screen describes nothing of
+the sort.
+
+One thing it did force. The no-contract report line read *"Your own building — nothing is being
+banked"*, and endless reuses that path, so a player who pressed **Keep going** on Midtown Office
+would have been told they were on their own building — false in the one way a reader acts on, since
+they would go looking for the scenario they think they lost. Reusing the path is right; reusing the
+wording is the cost of it, and the two sentences are now separate.
+
+Sandbox stays open, and it is a different shape: endless was a missing *mode*, Sandbox is a missing
+*meaning*. Nobody has decided what it is, and building the wrong thing is worse than the label.
 
 ---
 
@@ -276,7 +299,7 @@ Each is a real thing found by walking the product, left with an owner rather tha
 3. **The leaderboard's competitive axis is the seed.** Mitigated by saying so; fixed by § 4.3.
 4. **`showEnergyAxis` and `theme` reach nothing**, and are carried in a register with a staleness
    assertion so an entry cannot outlive its bug.
-5. **Endless mode and Sandbox are strings with no feature behind them.**
+5. **Sandbox is a string with no feature behind it.** Endless is built — § 3.6.
 6. **The weight-set selector has no surface**, so the product's one genuine mid-run mechanism is
    invisible to the player it was built for.
 7. **Compare is unreachable from the moment a player wants it** — the report never points at it.

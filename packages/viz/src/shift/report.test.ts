@@ -53,7 +53,7 @@ import {
   type SingleRunReport,
   type WeekDayReport,
 } from './report.js';
-import { closeDay, openWeek, outcomeOf } from './week.js';
+import { closeDay, openEndless, openWeek, outcomeOf } from './week.js';
 import { DAY_START_S, WEEKDAYS, type Observations } from './types.js';
 import { readGoals } from './goals.js';
 
@@ -530,6 +530,32 @@ describe('the rest of the sheet', () => {
     );
     expect(report.contractLine).toContain('nothing is being banked');
     expect(report.taught).toContain('Nothing banks here');
+  });
+
+  it('does not call an endless week the reader’s own building', () => {
+    /*
+     * Two ways to have no contract, one code path, two sentences.
+     *
+     * `openEndless` reuses the unknown-contract path deliberately — a sentinel id rather than a type
+     * change, so no consumer needed a new branch. Reusing the *wording* would have been the cost of
+     * that: a player who pressed **Keep going** on Midtown Office told they are on their own
+     * building, which is false in the one way a reader acts on — they go looking for the scenario
+     * they think they lost.
+     */
+    const report = weekDay(
+      dayReportOf({
+        recording: clean,
+        observations: observationsOfRun(clean),
+        goals: goalsForDay(4),
+        week: openEndless(),
+        contract: undefined,
+        event: SHIFT_EVENTS.ordinary,
+        subject: { kind: 'week-day' },
+      }),
+    );
+    expect(report.contractLine).toContain('Endless');
+    expect(report.contractLine).toContain('nothing is banked');
+    expect(report.contractLine).not.toContain('Your own building');
   });
 });
 

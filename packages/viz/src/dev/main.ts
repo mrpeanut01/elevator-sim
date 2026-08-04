@@ -53,6 +53,7 @@ import {
 import { catalogueOf } from '../menu/catalogue.js';
 import { createClient, fetchTransport } from '../menu/client.js';
 import { initialMenuState, navigate } from '../menu/menu.js';
+import { enterEndless } from '../menu/enterEndless.js';
 import { enterFreePlay } from '../menu/enterFreePlay.js';
 import { applyIntent, type MenuIntent } from '../menu/screens.js';
 import type { MenuState } from '../menu/types.js';
@@ -535,6 +536,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
         state = { ...state, tab: 'scenarios' };
         closeMenu();
         renderAll();
+        return;
+
+      case 'start-endless':
+        /*
+         * The one arm that both closes the menu **and** runs, because *keep going* is an answer
+         * about the week rather than about a screen: `openEndless` puts the player on day one of a
+         * building they are already looking at, and leaving the previous day's recording up would
+         * show a sheet headed day 1 over legs simulated on some other day.
+         *
+         * `runShift` is what every state changer in this file calls, and § 5 clause 2 is what
+         * happens when one of them forgets.
+         */
+        state = enterEndless(state);
+        menuState = navigate(menuState, 'main');
+        closeMenu();
+        runShift();
         return;
 
       case 'reopen':

@@ -91,6 +91,7 @@ import type { VizRecording, VizSummary } from '../contract/types.js';
 import { eventFor } from './events.js';
 import { readGoals } from './goals.js';
 import { growthFactor } from './growth.js';
+import { ENDLESS_CONTRACT_ID } from './week.js';
 import {
   DAY_START_S,
   weekdayOf,
@@ -678,6 +679,19 @@ function streakLineFor(allMet: boolean, streak: number): string {
 
 function contractLineFor(contract: ScenarioContract | undefined, week: WeekState): string {
   if (contract === undefined) {
+    /*
+     * Two ways to have no contract, and they are not the same sentence.
+     *
+     * *No contract* has meant one thing since the shift layer landed — a building no scenario runs,
+     * which a reader drew or restored — and the endless week deliberately reuses that path
+     * (`shift/week.ts`'s `ENDLESS_CONTRACT_ID`, a sentinel rather than a type change). Reusing the
+     * path is right; reusing the *wording* would tell a player who pressed **Keep going** on Midtown
+     * Office that they are on their own building, which is false in the one way a reader would act
+     * on: they would go looking for the scenario they think they lost.
+     */
+    if (week.contractId === ENDLESS_CONTRACT_ID) {
+      return 'Endless — no assignment, so nothing is banked and nothing clears. The building grows anyway.';
+    }
     return 'Your own building — nothing is being banked, and the goals are still read from what happened.';
   }
   // SC-05/DR-09 (§ D198): `cleanRun` keeps counting on a contract already cleared, so the raw

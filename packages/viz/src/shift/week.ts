@@ -50,6 +50,55 @@ import {
 /** How many days the sparkline holds (`design.html` :1973). Oldest falls off the left. */
 export const HISTORY_DAYS = 7;
 
+/**
+ * The contract id an endless week carries — one no contract has, deliberately.
+ *
+ * ## Why a sentinel rather than an optional field
+ *
+ * `WeekState.contractId` is a `string` and every consumer already handles an id that resolves to
+ * nothing: `contractById` returns `undefined` *"rather than a throw: a stale id in restored state is
+ * a recoverable condition"*, `closeDay` banks the day and clears nothing, and the report says *your
+ * own building — nothing is being banked*. That path exists because a reader can draw a building no
+ * scenario runs, and it has been exercised since the shift layer landed.
+ *
+ * So an endless week needs no new branch anywhere — it needs an id that resolves to nothing, which
+ * is a value rather than a type change. Making `contractId` optional would have added a `| undefined`
+ * to every consumer to express a state four of them already express.
+ *
+ * Named rather than `''`, because an empty string is what a *broken* restore looks like and the two
+ * must not be the same value.
+ */
+export const ENDLESS_CONTRACT_ID = 'endless';
+
+/**
+ * A week with no assignment — the *endless mode* `c5` and `c8` name in their rewards.
+ *
+ * ## What it is, and what it deliberately is not
+ *
+ * It is the day loop with nothing to bank: the same days, the same 11 %/day growth, the same event
+ * schedule and the same goals that harden. What it drops is the contract, so no clean shift is
+ * banked, nothing clears, and the sheet says so through the path it already had.
+ *
+ * It is **not gated**. `contractStatus` has three answers and none of them is `locked`, because
+ * `design.html`'s own `algoUnlocked` returns `true` unconditionally — *"scenarios teach, they do not
+ * gate"* — and `contracts.ts` records that the completion-based unlock ladder beneath that early
+ * return was deliberately not ported, *"because porting a branch the design disabled is how a gate
+ * arrives by accident"*. Two rewards naming endless mode is the design describing what clearing a
+ * scenario gets you conceptually; reading it as a lock would build the ladder by the back door.
+ *
+ * ## Where it stops
+ *
+ * Nowhere, and that is measured rather than asserted. `growth.test.ts` runs a deep day and finds the
+ * building saturates — at which point `awtIsValid` refuses the mean and prints the reason, which is
+ * machinery that predates this mode by a phase. A day cap would be a number somebody chose; the
+ * suppression is a fact about the run. The first real wall is **compute**: Midtown Office at ×7.5
+ * population does not simulate a 900-second run in a few seconds, and that is recorded in the same
+ * test rather than guessed at here.
+ */
+export function openEndless(): WeekState {
+  return openWeek(ENDLESS_CONTRACT_ID);
+}
+
 /** A fresh week on a scenario, at day 1. Nothing banked, nothing cleared, no history. */
 export function openWeek(contractId: string = FIRST_CONTRACT_ID): WeekState {
   return {
