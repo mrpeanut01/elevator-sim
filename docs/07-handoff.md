@@ -411,7 +411,7 @@ copy did not exist and the sentence was read as though it did.
 **The sixth copy landed with the package it audits, and that is the point of it.** `server/` was
 written and audited in the same change — 61 exports scanned, 0 uncalled — four commits after
 `viz/src/menu` shipped **eight exports with eight uncalled callers** and was caught by the viz audit
-on the very next run ([§ D215 § 8](../DECISIONS.md)). Writing the audit with the code is what turns
+on the very next run ([§ D215 § 9](../DECISIONS.md)). Writing the audit with the code is what turns
 this section from a thing to remember into a thing that cannot be forgotten. The scanner is now
 **inlined in four places**, which is past the point where duplication is cheaper than consolidation;
 the named fix is a small `dev-audit` workspace package, deferred with its four sites recorded. *A standing requirement stated in

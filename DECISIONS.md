@@ -13574,7 +13574,20 @@ response carries the sentence — *"Ranked on the named metric alone. The others
 and never combined."* — on the wire, so a client cannot draw a composite with nothing on screen
 saying it should not.
 
-### 7. Free Play's axes all reach the run, and finding that out cost a template
+### 7. A verification is a whole simulation, so the authenticated side is bounded too
+
+`submissionIssues` already keeps an *unauthenticated* shape error from commanding a run. The
+authenticated counterpart is needed for the same reason at a larger size: at the longest accepted
+length a verification is a **7 200-second simulation**, so one confirmed account submitting in a
+loop is a CPU denial of service wearing a valid session. `MIN_SUBMIT_INTERVAL_MS` is five seconds —
+far below any honest play rate, since a player has to watch a run before posting it, and far above
+the cost of one replay. Held in memory rather than in the database: it bounds *this process*, which
+is the thing being protected, and a restart resetting it costs one extra replay.
+
+It is checked **after** the cheap shape gate, so a player whose submission is malformed is told
+that, rather than told to wait and then told it was malformed anyway.
+
+### 8. Free Play's axes all reach the run, and finding that out cost a template
 
 `ViewerState` gains `freePlay` — the demand template and the arrival rate, applied in
 `shiftRunConfigOf` over whatever the pattern select left. It is there because the menu was offering
@@ -13597,7 +13610,7 @@ combination with the template's minimum and the player's choice both in the sent
 shipped and fitted none of them would be listed in the menu and unstartable at all of them, which is
 § D213's shape again — the hand-maintained list that stopped tracking the data it was built from.
 
-### 8. The dead-code audit landed with the package, and the scanner is now four copies
+### 9. The dead-code audit landed with the package, and the scanner is now four copies
 
 `server/src/deadCode.test.ts` was written in the same change as the code: **61 exports scanned, 0
 uncalled**, and the wiring from `main.ts` down to the security model pinned link by link — including

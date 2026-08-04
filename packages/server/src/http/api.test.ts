@@ -69,7 +69,13 @@ async function call(
     body: options.body,
     token: options.token,
   };
-  return server.api(request);
+  const response = await server.api(request);
+  // Ten seconds per call, which is what a real client's clock does between two actions and what
+  // `MIN_SUBMIT_INTERVAL_MS` is measured against. Without it every test after the first submission
+  // would be rate-limited — the limiter would be untestable *and* would make everything else red,
+  // which is the worst of both.
+  clock += 10_000;
+  return response;
 }
 
 function bodyOf(response: ApiResponse): Record<string, unknown> {
@@ -313,6 +319,25 @@ describe('posting a score', () => {
     // Equal here because the claim was honest. What matters is the path: `verification.measured`
     // is what `recordEntry` is handed, so a claim can never be what ranks.
     expect(measured['awtS']).toBeCloseTo(truth.claimed.awtS, 9);
+  }, 60_000);
+
+  it('refuses a second submission inside the interval, and allows one after it', async () => {
+    const account = await registerConfirmed();
+    const truth = honest();
+    // The clock is frozen across these two, so the second lands inside the interval. A verification
+    // is a whole simulation, so a confirmed account submitting in a loop is a CPU denial of service
+    // wearing a valid session.
+    const at = clock;
+    const first = await call('POST', '/api/scores', { token: account.token, body: truth });
+    clock = at;
+    const second = await call('POST', '/api/scores', { token: account.token, body: truth });
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(429);
+    expect(bodyOf(second)['error']).toBe('too-many-submissions');
+
+    clock = at + 10_000;
+    const third = await call('POST', '/api/scores', { token: account.token, body: truth });
+    expect(third.status, JSON.stringify(third.body)).toBe(201);
   }, 60_000);
 
   it('needs a session at all', async () => {

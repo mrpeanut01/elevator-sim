@@ -77,7 +77,23 @@ export type Api = (request: ApiRequest) => Promise<ApiResponse>;
 
 const MAX_DISPLAY_NAME = 32;
 
+/**
+ * The shortest gap between two verifications from one account.
+ *
+ * `submissionIssues` already keeps an *unauthenticated* shape error from commanding a simulation.
+ * This is the authenticated counterpart, and it is needed for the same reason at a larger size: a
+ * verification is a **whole 7 200-second run** at the longest accepted length, so one confirmed
+ * account submitting in a loop is a CPU denial of service wearing a valid session.
+ *
+ * Five seconds, which is far below any honest play rate — a player has to watch a run before they
+ * can post it — and far above the cost of one replay. In memory rather than in the database: it
+ * bounds *this process*, which is the thing being protected, and a restart resetting it costs one
+ * extra replay.
+ */
+const MIN_SUBMIT_INTERVAL_MS = 5_000;
+
 export function createApi(deps: ApiDeps): Api {
+  const lastSubmitMs = new Map<string, number>();
   return async function handle(request: ApiRequest): Promise<ApiResponse> {
     const route = `${request.method} ${request.path}`;
     switch (route) {
@@ -92,7 +108,7 @@ export function createApi(deps: ApiDeps): Api {
       case 'GET /api/me':
         return me(deps, request);
       case 'POST /api/scores':
-        return submit(deps, request);
+        return submit(deps, request, lastSubmitMs);
       case 'GET /api/boards':
         return { status: 200, body: { boards: deps.store.boards() } };
       case 'GET /api/board':
@@ -210,7 +226,11 @@ function me(deps: ApiDeps, request: ApiRequest): ApiResponse {
 
 /* --------------------------------------------------------------- leaderboard */
 
-function submit(deps: ApiDeps, request: ApiRequest): ApiResponse {
+function submit(
+  deps: ApiDeps,
+  request: ApiRequest,
+  lastSubmitMs: Map<string, number>,
+): ApiResponse {
   const user = authenticate(deps, request);
   if (user === undefined) {
     return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to post a score.' } };
@@ -235,6 +255,21 @@ function submit(deps: ApiDeps, request: ApiRequest): ApiResponse {
   // able to command one.
   const issues = submissionIssues(submission);
   if (issues.length > 0) return { status: 400, body: { error: 'invalid-submission', issues } };
+
+  // After the cheap gate and before the expensive one. Checked here rather than at the top so a
+  // player whose submission is malformed is told that, rather than being told to wait and then
+  // told it was malformed anyway.
+  const since = deps.now() - (lastSubmitMs.get(user.id) ?? Number.NEGATIVE_INFINITY);
+  if (since < MIN_SUBMIT_INTERVAL_MS) {
+    return {
+      status: 429,
+      body: {
+        error: 'too-many-submissions',
+        detail: 'One score at a time — verifying a run means re-simulating it. Try again in a moment.',
+      },
+    };
+  }
+  lastSubmitMs.set(user.id, deps.now());
 
   const facts = deps.factsFor(submission.run);
   if (facts === undefined) {
