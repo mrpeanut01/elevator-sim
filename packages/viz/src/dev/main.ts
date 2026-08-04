@@ -40,6 +40,7 @@
 
 import { SimulationError, type BuildingConfig } from '@elevator-sim/core/browser';
 
+import type { AccountForm } from '../menu/account.js';
 import {
   SIGNED_OUT,
   busy,
@@ -52,6 +53,8 @@ import {
 import { catalogueOf } from '../menu/catalogue.js';
 import { createClient, fetchTransport } from '../menu/client.js';
 import { initialMenuState, navigate } from '../menu/menu.js';
+import { enterFreePlay } from '../menu/enterFreePlay.js';
+import { applyIntent, type MenuIntent } from '../menu/screens.js';
 import type { MenuState } from '../menu/types.js';
 import { renderMenu, type LeaderboardView, type MenuPanelHost } from './menuPanel.js';
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
@@ -383,96 +386,213 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawMenu();
   }
 
+  /**
+   * Everything the menu asks for, in one exhaustive switch.
+   *
+   * ## Why a switch and not eight methods
+   *
+   * The eight it replaces each let the *panel* decide something and this file merely perform it,
+   * which is `docs/16` § 5's own diagnosis of why three of the eight failing clauses shipped: a
+   * decision made inside a click handler has no test that can reach it. The decisions are now
+   * `menu/screens.ts`'s and this function is the performer.
+   *
+   * ## The clause the switch itself closes
+   *
+   * `submit-score` is a member of {@link MenuIntent}, so **this file does not compile without a
+   * handler for it** — and the handler is the first non-test caller `menu/client.ts#submit` has ever
+   * had. § 5 clause 8: the leaderboard could be read and never posted to, and the Account row's own
+   * subtitle described something no player could do.
+   */
+  function dispatchMenu(intent: MenuIntent): void {
+    switch (intent.kind) {
+      case 'navigate':
+      case 'back':
+      case 'set-free-play':
+      case 'set-setting': {
+        const next = applyIntent(menuState, intent);
+        const arrived = next.screen === 'leaderboard' && menuState.screen !== 'leaderboard';
+        menuState = next;
+        drawMenu();
+        // Started on **arrival**, once, and never from inside a render: a render that fetched would
+        // fetch again on every state change its own response caused, and each render would look
+        // correct on its own.
+        if (arrived) void loadBoards();
+        return;
+      }
+
+      case 'start': {
+        /*
+         * `docs/16` § 5 clauses 2 and 3, both of which were here.
+         *
+         * The selection reached `ViewerState` and **nothing ran** — every other state changer in
+         * this file calls `runShift()` and this one called `renderAll()`, so Start left the previous
+         * recording on screen. And the week was never reset, so `shiftRunConfigOf` went on applying
+         * `grownBuilding`'s 11 %/day and `eventFor`'s twist to a run the menu had described as a
+         * plain one: on day 7 the building was two thirds fuller than the screen said, with a car
+         * possibly held out of service, and nothing anywhere mentioned it.
+         *
+         * The decision is `menu/enterFreePlay.ts` — pure, and tested by comparing the legs against a
+         * run built from the selection alone. This arm performs it.
+         */
+        const entered = enterFreePlay(state, resources, menuState.freePlay, menuCatalogue);
+        if (entered === undefined) return;
+        state = entered;
+        menuState = navigate(menuState, 'main');
+        closeMenu();
+        runShift();
+        return;
+      }
+
+      case 'open-campaign':
+        /*
+         * `docs/16` § 5 clause 6. This arm was `closeMenu()` and nothing else, so picking Campaign
+         * dropped the player on whatever tab the shell happened to be on — usually `run`, which is
+         * the simulation, not the scenarios. The screen behind the menu is now selected explicitly.
+         */
+        state = { ...state, tab: 'scenarios' };
+        closeMenu();
+        renderAll();
+        return;
+
+      case 'reopen':
+        menuRoot.hidden = false;
+        menuState = navigate(menuState, 'main');
+        drawMenu();
+        return;
+
+      case 'open-board': {
+        if (client === undefined) return;
+        const hash = intent.configHash;
+        boardView = { ...boardView, selected: hash, page: undefined, notice: 'Loading…' };
+        drawMenu();
+        void client.board(hash, 'awtS').then((result) => {
+          boardView = result.ok
+            ? { ...boardView, selected: hash, page: result.value, notice: undefined }
+            : { ...boardView, selected: hash, page: undefined, notice: result.detail };
+          drawMenu();
+        });
+        return;
+      }
+
+      case 'submit-score': {
+        void submitScore();
+        return;
+      }
+
+      case 'account-mode':
+        accountState = updateForm(accountState, { mode: intent.register ? 'register' : 'sign-in' });
+        drawMenu();
+        return;
+
+      case 'account-form':
+        accountState = updateForm(accountState, intent.patch as Partial<AccountForm>);
+        drawMenu();
+        return;
+
+      case 'account-submit': {
+        if (client === undefined) {
+          accountState = withNotice(
+            accountState,
+            'This build was not compiled against a server, so there is nowhere to sign in.',
+          );
+          drawMenu();
+          return;
+        }
+        const form = accountState.form;
+        accountState = busy(accountState, true);
+        drawMenu();
+        const request =
+          form.mode === 'register'
+            ? client.register({
+                email: form.email.trim(),
+                displayName: form.displayName.trim(),
+                password: form.password,
+              })
+            : client.login({ email: form.email.trim(), password: form.password });
+        void request.then((result) => {
+          accountState = result.ok
+            ? signedIn(accountState, result.value.token, result.value.user)
+            : withNotice(accountState, result.detail);
+          drawMenu();
+        });
+        return;
+      }
+
+      case 'sign-out': {
+        const token = accountState.token;
+        accountState = signedOut('Signed out.');
+        drawMenu();
+        // The local state is cleared first and the server is told second. A sign-out that waited for
+        // the network would leave a player looking signed in while their connection was down.
+        if (client !== undefined && token !== undefined) void client.logout(token);
+        return;
+      }
+    }
+  }
+
+  /**
+   * Post the run on screen — `menu/client.ts#submit`'s first non-test caller.
+   *
+   * ## Three refusals before a request, and none of them is a guess
+   *
+   * The **claimed** metrics are read straight off the recording this browser produced, and the
+   * server re-runs the configuration and compares. So nothing here has to be trusted, and nothing
+   * here tries to be clever: an honest client sends what it measured.
+   *
+   * What it must not do is send a run the server *cannot* reproduce. `runIdentityIssues` is that
+   * predicate — the same one `provenanceLineOf` asks (`docs/16` S5) — and a run carrying day 7's
+   * growth or a held car fails it. Without the check the server would reject those as forgeries,
+   * spending the one accusation this product makes on a client bug.
+   *
+   * A saturated run is refused here too, and it is refused *by the same comparison the server
+   * makes*: `awtIsValid` travels with the submission, so a client claiming a valid mean for a
+   * diverging queue is caught as a wrong claim rather than silently corrected and ranked anyway.
+   */
+  async function submitScore(): Promise<void> {
+    const recording = state.recording;
+    if (client === undefined || recording === undefined) return;
+    const token = accountState.token;
+    if (token === undefined) return;
+
+    accountState = busy(accountState, true);
+    drawMenu();
+    const result = await client.submit(token, {
+      run: {
+        buildingId: state.buildingId,
+        dispatcherProfileId: state.dispatcherId,
+        demandTemplateId: menuState.freePlay.demandTemplateId,
+        arrivalRatePctPop5min: menuState.freePlay.arrivalRatePctPop5min,
+        durationS: state.shiftLengthS,
+        seed: state.seed.toString(),
+      },
+      claimed: {
+        awtS: recording.summary.meanWaitS,
+        wt95S: recording.summary.wait95S,
+        ttdMeanS: recording.summary.meanTimeToDestinationS,
+        pctOverLongWait: recording.summary.pctOverLongWait ?? 0,
+        awtIsValid: recording.summary.awtIsValid,
+      },
+    });
+    accountState = withNotice(
+      accountState,
+      result.ok ? 'Posted. The server replayed your seed and it reproduced.' : result.detail,
+    );
+    drawMenu();
+  }
+
   const menuHost: MenuPanelHost = {
     doc: document,
     catalogue: menuCatalogue,
     state: () => menuState,
-    update: (next) => {
-      const arrived = next.screen === 'leaderboard' && menuState.screen !== 'leaderboard';
-      menuState = next;
-      drawMenu();
-      // Started on **arrival**, once, and never from inside a render: a render that fetched would
-      // fetch again on every state change its own response caused, and each render would look
-      // correct on its own.
-      if (arrived) void loadBoards();
-    },
-    start: (selection) => {
-      // **Every axis the menu offered is applied.** `shiftRunConfigOf` still owns what a run is —
-      // the template and the rate travel as `ViewerState.freePlay` and are read there, not built
-      // into a second config here, which is the drift § D214 § 2 refuses. A selection axis that
-      // reached nothing would be § D177's inert control with a label on it, and
-      // `state.freePlay.test.ts` is the standing requirement pointed at all three.
-      state = withBuilding(state, resources, selection.buildingId);
-      state = {
-        ...state,
-        dispatcherId: selection.dispatcherProfileId,
-        seed: BigInt(selection.seed),
-        shiftLengthS: selection.durationS,
-        freePlay: {
-          demandTemplateId: selection.demandTemplateId,
-          arrivalRatePctPop5min: selection.arrivalRatePctPop5min,
-        },
-      };
-      menuState = navigate(menuState, 'main');
-      closeMenu();
-      renderAll();
-    },
-    openCampaign: () => {
-      closeMenu();
-    },
-
+    dispatch: dispatchMenu,
     account: () => accountState,
-    updateAccountForm: (patch) => {
-      accountState = updateForm(accountState, patch);
-      drawMenu();
-    },
-    submitAccountForm: () => {
-      if (client === undefined) {
-        accountState = withNotice(
-          accountState,
-          'This build was not compiled against a server, so there is nowhere to sign in.',
-        );
-        drawMenu();
-        return;
-      }
-      const form = accountState.form;
-      accountState = busy(accountState, true);
-      drawMenu();
-      const request =
-        form.mode === 'register'
-          ? client.register({
-              email: form.email.trim(),
-              displayName: form.displayName.trim(),
-              password: form.password,
-            })
-          : client.login({ email: form.email.trim(), password: form.password });
-      void request.then((result) => {
-        accountState = result.ok
-          ? signedIn(accountState, result.value.token, result.value.user)
-          : withNotice(accountState, result.detail);
-        drawMenu();
-      });
-    },
-    signOut: () => {
-      const token = accountState.token;
-      accountState = signedOut('Signed out.');
-      drawMenu();
-      // The local state is cleared first and the server is told second. A sign-out that waited for
-      // the network would leave a player looking signed in while their connection was down.
-      if (client !== undefined && token !== undefined) void client.logout(token);
-    },
-
     leaderboard: () => boardView,
-    openBoard: (configHash) => {
-      if (client === undefined) return;
-      boardView = { ...boardView, selected: configHash, page: undefined, notice: 'Loading…' };
-      drawMenu();
-      void client.board(configHash, 'awtS').then((result) => {
-        boardView = result.ok
-          ? { ...boardView, selected: configHash, page: result.value, notice: undefined }
-          : { ...boardView, selected: configHash, page: undefined, notice: result.detail };
-        drawMenu();
-      });
+    runState: () => {
+      const issues = runIdentityIssues(state, resources, 'ranked');
+      return {
+        hasRun: state.recording !== undefined,
+        rankingRefusal: issues.length === 0 ? undefined : issues.map((issue) => issue.message).join('; '),
+      };
     },
   };
 

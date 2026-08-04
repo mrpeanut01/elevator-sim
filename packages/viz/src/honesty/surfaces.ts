@@ -58,6 +58,8 @@ import { disclosureItems } from '../mode/disclosure.js';
 import { parityRefusal, parityViolations } from '../mode/parity.js';
 import { SIGNED_OUT, formIssues, postingRefusal, signedIn, updateForm } from '../menu/account.js';
 import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
+import { screenOf } from '../menu/screens.js';
+import { DEFAULT_SETTINGS, MENU_SCREENS } from '../menu/types.js';
 import { CLIENT_FAILURES } from '../menu/client.js';
 import { canStart, freePlayIssues } from '../menu/menu.js';
 import { itemsIn, VIEW_MODES, type DisclosureOrigin } from '../mode/types.js';
@@ -3167,6 +3169,9 @@ const MENU: SurfaceAdapter = {
     'menu/account.ts#postingRefusal',
     'menu/account.ts#signedIn',
     'menu/client.ts#CLIENT_FAILURES',
+    'menu/screens.ts#screenOf',
+    'menu/screens.ts#titleOf',
+    'menu/screens.ts#applyIntent',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -3267,6 +3272,62 @@ const MENU: SurfaceAdapter = {
     // rather than `prose`: each one explains a refusal a player is looking at.
     for (const [code, text] of Object.entries(CLIENT_FAILURES)) {
       seeds.push({ field: `client.${code}`, text, role: 'reason' });
+    }
+
+    /*
+     * Every screen, driven — and driven in the states where the prose is hardest.
+     *
+     * `screenOf` is the decision half of the menu panel, so every title, every row label, every
+     * `detail` under a row and every `disabledWhy` reaches a player through it. The axis that
+     * matters is not *which screen* but *what is wrong*: a Start that is enabled says one word, and
+     * a Start that is refused says a sentence with two numbers in it. So the sweep drives the whole
+     * screen set against a whole selection **and** a broken one, and against a signed-out player as
+     * well as a signed-in one.
+     *
+     * `rankingRefusal` is seeded with a real one — `scope/runIdentity.ts`'s wording for a run on a
+     * grown building. That sentence is shown beside a disabled **Post this run**, which is a claim
+     * about why somebody's score is not going up, and is exactly the shape R2 exists to police.
+     */
+    const menuStates = [
+      { label: 'whole', selection: whole, canPost: true, hasRun: true, refusal: undefined },
+      { label: 'broken', selection: broken, canPost: false, hasRun: false, refusal: undefined },
+      {
+        label: 'unrankable',
+        selection: whole,
+        canPost: true,
+        hasRun: true,
+        refusal:
+          'day 7 grows the building by 66 % and schedules \u201cMove-in day\u201d, and neither travels with a selection',
+      },
+    ] as const;
+    for (const arm of menuStates) {
+      for (const screen of MENU_SCREENS) {
+        const view = screenOf({
+          state: { screen, history: [], settings: DEFAULT_SETTINGS, freePlay: arm.selection },
+          catalogue,
+          canPost: arm.canPost,
+          hasRun: arm.hasRun,
+          ...(arm.refusal === undefined ? {} : { rankingRefusal: arm.refusal }),
+          boards: [{ configHash: 'abcdef0123456789', entries: 3 }],
+        });
+        const at = `screen.${arm.label}.${screen}`;
+        seeds.push({ field: `${at}.title`, text: view.title, role: 'label' });
+        for (const [index, notice] of view.notices.entries()) {
+          seeds.push({ field: `${at}.notice.${String(index)}`, text: notice, role: 'prose' });
+        }
+        for (const [index, issue] of view.issues.entries()) {
+          seeds.push({ field: `${at}.issue.${String(index)}`, text: issue, role: 'reason' });
+        }
+        for (const row of view.rows) {
+          seeds.push({ field: `${at}.${row.id}.label`, text: row.label, role: 'label' });
+          if (row.detail !== undefined) {
+            seeds.push({ field: `${at}.${row.id}.detail`, text: row.detail, role: 'prose' });
+          }
+          if (row.disabledWhy !== undefined) {
+            seeds.push({ field: `${at}.${row.id}.why`, text: row.disabledWhy, role: 'reason' });
+          }
+        }
+      }
     }
 
     return singleRun(this.id, seeds);
