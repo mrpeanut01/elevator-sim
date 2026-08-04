@@ -98,15 +98,10 @@ describe('the missing-sink register is a finding and not an exemption', () => {
     }
   });
 
-  it('is the four settings, and says so out loud', () => {
-    // Pinned rather than merely non-empty, so closing three of the four cannot leave the register
-    // looking healthy. § D216 § 3: this is the row worth the most, because it is already promised in
-    // prose and the prose is currently protecting a claim with no way to be true or false.
-    expect(Object.keys(SINK_MISSING).sort()).toEqual([
-      'settings.playbackSpeed',
-      'settings.reduceMotion',
-      'settings.showEnergyAxis',
-      'settings.theme',
-    ]);
+  it('is the two settings still unwired, and says which', () => {
+    // Pinned rather than merely non-empty, so closing one of the two cannot leave the register
+    // looking healthy — and so the count in docs/16, GAPS.md and § D217 has something to disagree
+    // with. It was four; `reduceMotion` and `playbackSpeed` have sinks now.
+    expect(Object.keys(SINK_MISSING).sort()).toEqual(['settings.showEnergyAxis', 'settings.theme']);
   });
 });

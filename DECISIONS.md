@@ -13737,9 +13737,23 @@ Closed: a contract could be cleared without advancing a day; Start did not run t
 did not reset the week; nothing reopened the menu; the campaign screen had no content; the menu had
 no stylesheet; `client.submit` had no non-test caller.
 
-**Open:** the four `Settings` still reach nothing. They are in `scope/probes.test-helper.ts`'s
-`SINK_MISSING` with a reason each and a **staleness assertion** — a registered control that acquires
-a sink turns the suite red until the entry is deleted, so this cannot quietly become permanent. That
+**Open, and narrowed while this section was being written:** two of the four `Settings` still reach
+nothing. `reduceMotion` and `playbackSpeed` acquired real sinks — `dev/motion.ts` now owns both
+decisions and `dev/main.ts` calls them, so moving the setting and moving the thing the viewer
+consults are the same event. `showEnergyAxis` and `theme` remain, and `theme` is the one whose sink
+would have to be **built** rather than connected: the stylesheet has one palette.
+
+They are in `scope/probes.test-helper.ts`'s `SINK_MISSING` with a reason each and a **staleness
+assertion** — a registered control that acquires a sink turns the suite red until its entry is
+deleted, so this cannot quietly become permanent. The register's contents are pinned exactly, so
+closing one of the two cannot leave it looking healthy.
+
+**A false sink was written and caught in the same pass, and it is the more useful half.** The first
+version of the `playbackSpeed` probe computed `60 * multiplier` in the test helper and asserted it
+differed from `60 * 1`. That passes whether or not the control is connected to anything — a sink
+that tests its own arithmetic. The fix is that the arithmetic has exactly one home and the shipped
+path calls it, which is the same rule the rest of this repository applies to a second source of
+truth. That
 is `deadCode.test.ts`'s `DEAD_CANDIDATES` idiom, and it is used here for the same reason: the suite
 stays green while the register carries the defect, and the register is the thing somebody has to
 answer for.

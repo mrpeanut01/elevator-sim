@@ -57,6 +57,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/motion.ts#REDUCED_MOTION_QUERY',
         'dev/motion.ts#prefersReducedMotion',
         'dev/motion.ts#shouldAutoplay',
+        'dev/motion.ts#shouldAutoplayWith',
         /*
          * The design refactor's three mounts. Each is the DOM half of a split whose **pure** half
          * is driven: `RAIL_VIEW` renders everything `mountLeftRail` writes, `REPORT_PANEL`

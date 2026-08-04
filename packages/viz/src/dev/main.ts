@@ -129,7 +129,7 @@ import { mountReport } from './reportPanel.js';
 import { mountRightRail } from './rightRail.js';
 import { mountScenarios } from './scenariosPanel.js';
 import { mountTrafficEditor } from './trafficEditor.js';
-import { shouldAutoplay } from './motion.js';
+import { playbackRateFor, shouldAutoplayWith } from './motion.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
 import {
   DEFAULT_SHIFT_LENGTH_S,
@@ -412,6 +412,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
         const next = applyIntent(menuState, intent);
         const arrived = next.screen === 'leaderboard' && menuState.screen !== 'leaderboard';
         menuState = next;
+        /*
+         * Applied **now**, not at the next `adopt`. A setting that only took effect on the next run
+         * would be indistinguishable from an inert one for as long as a player stayed on this
+         * screen, which is exactly how the four of them went unnoticed.
+         */
+        if (intent.kind === 'set-setting') {
+          applyPlaybackSpeed();
+          if (menuState.settings.reduceMotion) playback?.pause();
+          drawTransportChrome(viewAt());
+        }
         drawMenu();
         // Started on **arrival**, once, and never from inside a render: a render that fetched would
         // fetch again on every state change its own response caused, and each render would look
@@ -1196,12 +1206,43 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ui.transport.error.focus();
   }
 
+  /**
+   * The transport chip's own speed, in simulated seconds per real second.
+   *
+   * Held separately from `playback.speed` because `settings.playbackSpeed` multiplies it — see
+   * {@link applyPlaybackSpeed}. Without the split, a reader on ×2 would find their chip selection
+   * jump to whichever chip happened to equal `60 × 2`, and the two controls would fight.
+   */
+  let baseSpeed = 60;
+
+  /**
+   * Apply the transport chip and the player's own multiplier together — `docs/16` § 5 clause 4.
+   *
+   * `settings.playbackSpeed` reached **nothing** before this: `menu/types.ts` declared it, the menu
+   * drew it, and the viewer had its own `SPEEDS` ladder that never consulted it. That is a control
+   * a player can move in a shipped menu that changes no pixel, which is `docs/12` § 5 clause 9's
+   * violation, and it is the one `scope.test.ts` catches structurally now.
+   *
+   * A **multiplier** rather than a replacement, because the two controls answer different
+   * questions. The chip is *how much simulated time passes per real second* — a property of the
+   * run being watched, and the thing `×900` means. The setting is *how fast this player likes to
+   * watch*, and it should survive changing the chip.
+   */
+  function applyPlaybackSpeed(): void {
+    playback?.setSpeed(playbackRateFor(baseSpeed, menuState.settings.playbackSpeed));
+  }
+
   function adopt(recording: VizRecording): void {
     playback = new Playback(recording, clock, {
-      speed: playback?.speed ?? 60,
+      speed: playbackRateFor(baseSpeed, menuState.settings.playbackSpeed),
       loop: looping,
-      // KB-14: a reader who asked for less motion gets a paused first frame.
-      autoplay: shouldAutoplay(window.matchMedia.bind(window)),
+      /*
+       * KB-14: a reader who asked for less motion gets a paused first frame — and `docs/16` § 5
+       * clause 4, because *asked* now includes the menu's own switch and not only the operating
+       * system's. `shouldAutoplay` reads `prefers-reduced-motion`; a player who set the setting has
+       * asked for the same thing by a different route and was being ignored.
+       */
+      autoplay: shouldAutoplayWith(window.matchMedia.bind(window), menuState.settings.reduceMotion),
     });
     disableTransport(ui, false);
     filedRunId = undefined;
@@ -1500,10 +1541,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
       ...SPEEDS.map((speed) =>
         chip(document, {
           label: `×${String(speed)}`,
-          selected: playback?.speed === speed,
+          // Against `baseSpeed`, not `playback.speed` — the player's own multiplier is applied on
+          // top, so comparing the product would leave no chip lit at any setting but ×1.
+          selected: baseSpeed === speed,
           title: `${String(speed)} simulated seconds per real second`,
           onPick: () => {
-            playback?.setSpeed(speed);
+            baseSpeed = speed;
+            applyPlaybackSpeed();
             drawTransportChrome(viewAt());
           },
         }),
@@ -1685,9 +1729,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
           break;
         case '[':
         case ']': {
-          const index = SPEEDS.indexOf((playback?.speed ?? 60) as (typeof SPEEDS)[number]);
+          const index = SPEEDS.indexOf(baseSpeed as (typeof SPEEDS)[number]);
           const next = SPEEDS[Math.min(SPEEDS.length - 1, Math.max(0, index + (event.key === ']' ? 1 : -1)))];
-          if (next !== undefined) playback?.setSpeed(next);
+          if (next !== undefined) {
+            baseSpeed = next;
+            applyPlaybackSpeed();
+          }
           drawTransportChrome(viewAt());
           break;
         }

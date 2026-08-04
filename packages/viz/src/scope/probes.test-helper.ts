@@ -48,6 +48,7 @@ import { classesFromSpecs, type MachineClass } from '../authoring/machineSpec.js
 import type { BrowserResources } from '../dev/data.js';
 import { disclosureOf, initialState, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import { mathsDisclosureOf } from '../dev/leftRail.js';
+import { playbackRateFor, shouldAutoplayWith } from '../dev/motion.js';
 import { drawerStateFor, railStateFor, surfaceStateFor } from '../dev/surfaces.js';
 import type { TabName } from '../dev/elementMap.js';
 import type { HonestyCard } from '../live/types.js';
@@ -155,6 +156,20 @@ const card = (hasMaths: boolean): HonestyCard => ({
 });
 
 const CATALOGUE = catalogueOf(RESOURCES);
+
+/*
+ * Both sinks call the **shipped** decision rather than restating it.
+ *
+ * A first draft wrote `60 * multiplier` here and asserted it differed from `60 * 1`. That is a
+ * sink that tests its own arithmetic and says nothing about the product — a control could be
+ * disconnected entirely and the assertion would still pass. `dev/motion.ts` now owns both
+ * decisions and `dev/main.ts` calls them, so moving one of these settings and moving the thing
+ * the viewer actually consults are the same event.
+ */
+const autoplayFor = (reduceMotion: boolean): boolean =>
+  shouldAutoplayWith(() => ({ matches: false }), reduceMotion);
+
+const playbackSpeedFor = (multiplier: number): number => playbackRateFor(60, multiplier);
 
 /**
  * `hydraulic` re-saved with a gentler acceleration — and the field is chosen rather than convenient.
@@ -302,9 +317,26 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
   },
 
   /* ------------------------------------------------------------------- settings */
-  'settings.reduceMotion': {},
+  /*
+   * Two of the four have sinks and two do not, and the difference is visible here rather than
+   * argued anywhere.
+   *
+   * There is no `states` arm on any of them, and that is structural rather than an omission:
+   * `shiftRunConfigOf` takes a `ViewerState`, `Settings` is not one of its inputs, and no arm could
+   * be written that reached a leg. The half worth checking is the other one — that the control
+   * reaches *something*.
+   */
+  'settings.reduceMotion': {
+    // The sink is the same predicate `adopt` asks. A reader who set the switch has asked for the
+    // same thing `prefers-reduced-motion` asks for, by a different route.
+    sink: [() => autoplayFor(false), () => autoplayFor(true)],
+  },
+  'settings.playbackSpeed': {
+    // A multiplier over the transport chip's own speed, which is why the sink is the product and
+    // not the setting echoed back.
+    sink: [() => playbackSpeedFor(1), () => playbackSpeedFor(4)],
+  },
   'settings.showEnergyAxis': {},
-  'settings.playbackSpeed': {},
   'settings.theme': {},
 
   /* ------------------------------------------------------------------ free play */
@@ -371,8 +403,7 @@ export const SINK_IS_A_MOUNT: Readonly<Record<string, string>> = Object.freeze({
  * `DEAD_CANDIDATES` idiom — and `scope.test.ts` asserts an entry cannot outlive its bug.
  */
 export const SINK_MISSING: Readonly<Record<string, string>> = Object.freeze({
-  'settings.reduceMotion': 'dev/motion.ts answers prefers-reduced-motion from matchMedia and never consults this field',
   'settings.showEnergyAxis': 'render/runSummary.ts draws the energy figures unconditionally; nothing reads this field',
-  'settings.playbackSpeed': 'dev/main.ts has its own SPEEDS ladder and Playback is constructed from it, not from this',
-  'settings.theme': 'no theme switch exists anywhere in the package; the stylesheet has one palette',
+  'settings.theme': 'no theme switch exists anywhere in the package; the stylesheet has one palette, so this is the ' +
+    'one of the four whose sink would have to be built rather than merely connected',
 });

@@ -124,7 +124,9 @@ that no longer exists is red. A field the shell writes and no player controls is
 **output**, with its reason, rather than left absent; an absence is indistinguishable from an
 oversight, which is § D106's argument about `measured: false` versus `0`, applied to a control.
 
-**S2 — A `presentation` control must reach a sink and must not reach the legs.** Both halves, and the
+**S2 — A `presentation` control must reach a sink and must not reach the legs.** The sink must be
+the **shipped** decision, not a restatement of it: a probe that recomputes the arithmetic asserts its
+own correctness and passes whether or not the control is connected to anything. Both halves, and the
 second is the inverse of § D177's rule. One clause catches a setting that secretly moves a run — which
 would silently break `configHashOf`'s replay guarantee while both players' scores looked valid — and
 the other catches a setting that reaches nothing at all.
