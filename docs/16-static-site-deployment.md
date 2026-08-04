@@ -493,6 +493,14 @@ differ by exactly this work.
 **Both legs agree on both sides**, which is the property the two-OS matrix exists to measure
 (`ci.yml`'s header, § D196/§ D201). Only the durations differ, and duration is not a pin.
 
+**Re-confirmed at `e91db73`** — 283 files, 5 194 passed, 11 skipped, both legs
+([run 30926989525](https://github.com/mrpeanut01/elevator-sim/actions/runs/30926989525)) — so the
+figures hold at the branch head and not only at the commit they were taken on. A table like this
+cannot name the commit that contains it, which is why it names the run that produced each figure
+instead; every commit after `bd76872` on this branch touches only documentation and a provisioning
+shell script, neither of which is compiled or tested, so the counts are expected to hold through
+the merge.
+
 Two notes on how these numbers were obtained, because this repository has been bitten by the
 alternative:
 
