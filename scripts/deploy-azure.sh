@@ -23,7 +23,20 @@
 set -euo pipefail
 
 GROUP="${ELEVSIM_GROUP:-elevator-sim}"
-LOCATION="${ELEVSIM_LOCATION:-eastus}"
+
+# **One region for everything, and it is not East US.**
+#
+# `eastus` is restricted for PostgreSQL flexible server on this subscription — the API reports
+# "Provisioning is restricted in this region", and the symptom is an unhelpful
+# `ParameterOutOfRange` on `Version` with an empty list of allowed values, because a blocked region
+# offers no versions. `eastus2` is the nearest region that allows it and supports PostgreSQL 17.
+#
+# Registry, logs, environment, app and database all take this one value. The app talks to the
+# database on every request, so a split would put a region hop in the hot path; the registry is
+# here too so that nothing in the deployment crosses a region at all. Azure Communication Services
+# is the sole exception and is not a choice — it is a `global` resource by design, and it is not on
+# any request path.
+LOCATION="${ELEVSIM_LOCATION:-eastus2}"
 DEPLOYMENT_NAME="app"
 APPLY=false
 ALLOW_DIRTY=false
@@ -150,6 +163,10 @@ ARGS=(
     containerRegistryServer="$REGISTRY"
     appSecret="$APP_SECRET"
     databaseAdminPassword="$DB_PASSWORD"
+    # Passed explicitly. The template defaults to `resourceGroup().location`, and a resource group
+    # created in one region would otherwise silently place every resource there — which is how the
+    # app and its database end up a region apart without anybody choosing it.
+    location="$LOCATION"
 )
 
 if [ "$APPLY" = false ]; then

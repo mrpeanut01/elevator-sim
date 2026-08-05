@@ -121,6 +121,8 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' existing =
   name: split(containerRegistryServer, '.')[0]
 }
 
+// Likewise confirmed with `az role definition list --name AcrPull`, rather than trusted because it
+// looked familiar.
 var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
 
 resource registryPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(containerRegistryServer)) {
@@ -200,7 +202,12 @@ resource sender 'Microsoft.Communication/emailServices/domains/senderUsernames@2
 // `Communication and Email Service Owner`. This is what lets the container send mail with **no
 // secret at all** — no connection string in the image, in the environment, or in a vault, and
 // revocation is deleting this assignment rather than rotating a key.
-var emailSenderRoleId = '09976791-48a7-449e-bb21-39d1b281fd1a'
+//
+// Confirmed against the subscription, not remembered:
+//   az role definition list --name "Communication and Email Service Owner" --query "[0].name" -o tsv
+// The first deploy failed on `RoleDefinitionDoesNotExist` because this constant was wrong in its
+// last segment. A built-in role id is a fact to look up, not one to recall.
+var emailSenderRoleId = '09976791-48a7-449e-bb21-39d1a415f350'
 
 resource commsRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: comms
