@@ -145,7 +145,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Blocked on W7. The recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — docs/10 § 10.4, which is the statement that matches the code. § 5.2’s goal table says the opposite and is wrong about it."
+          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -292,7 +292,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Blocked on W7. The recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — docs/10 § 10.4, which is the statement that matches the code. § 5.2’s goal table says the opposite and is wrong about it."
+          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -439,7 +439,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Blocked on W7. The recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — docs/10 § 10.4, which is the statement that matches the code. § 5.2’s goal table says the opposite and is wrong about it."
+          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -586,7 +586,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Blocked on W7. The recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — docs/10 § 10.4, which is the statement that matches the code. § 5.2’s goal table says the opposite and is wrong about it."
+          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -733,7 +733,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Blocked on W7. The recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — docs/10 § 10.4, which is the statement that matches the code. § 5.2’s goal table says the opposite and is wrong about it."
+          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -880,7 +880,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Blocked on W7. The recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — docs/10 § 10.4, which is the statement that matches the code. § 5.2’s goal table says the opposite and is wrong about it."
+          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -1027,7 +1027,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Blocked on W7. The recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — docs/10 § 10.4, which is the statement that matches the code. § 5.2’s goal table says the opposite and is wrong about it."
+          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -1174,7 +1174,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Blocked on W7. The recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — docs/10 § 10.4, which is the statement that matches the code. § 5.2’s goal table says the opposite and is wrong about it."
+          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -1321,7 +1321,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Blocked on W7. The recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — docs/10 § 10.4, which is the statement that matches the code. § 5.2’s goal table says the opposite and is wrong about it."
+          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -1468,7 +1468,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Blocked on W7. The recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — docs/10 § 10.4, which is the statement that matches the code. § 5.2’s goal table says the opposite and is wrong about it."
+          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     }

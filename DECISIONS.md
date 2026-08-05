@@ -16166,3 +16166,36 @@ skips itself where there is no Chromium, which is most machines: **a tier that s
 also fail silently the first time somebody gives it a browser.** Both files now read `resolvedUrls`,
 which is Vite's own answer to *where am I*, and both pass — including § D220's *draws the stage*,
 which is what confirms § D232's paused first frame still paints.
+
+### Two more the same rule settles, handed over from the Compare/Lab lane
+
+Both were found by an agent that could not reach the files. They are the same defect as #37 in a
+different directory: a surface saying something that is not for the reader in front of it.
+
+**#25 — internal cross-references printed to players.** `GOAL_BLOCKER['everyone-can-get-there']`
+read *"Blocked on W7 … docs/10 § 10.4 … § 5.2's goal table says the opposite"*, verbatim, on the
+Compare and Lab goal rows. A player has no `docs/`, no W7 and no § 5.2. The honest content — *this
+cannot be judged from what a run records, because a recording carries no credential on a leg* — was
+in the middle of it and survives the rewrite unchanged; the claim was never the problem.
+
+**Changed at the constant rather than paraphrased at the render site**, which is the part worth
+recording: `honesty/surfaces.ts` seeds this by *reference* — it iterates `GOAL_BLOCKER` and pushes
+each non-null value — so the string the sweep checks and the string a player reads are the same
+object. A tidier copy at the surface would have left the sweep checking a sentence nobody sees.
+
+`data/scenario-goals.json` pins the same text through `measureScenario`'s `reason`, so the table was
+**regenerated** rather than hand-edited (`regenerate.test-helper.ts`), and the diff is the assurance:
+**ten string replacements and not one moved count.**
+
+**#58's second half — goal rows named their arms by a slug.** `goalReport.ts` printed
+`arm.dispatcherProfileId` — `eta:`, `collective:` — where the rest of the product prints *Minimum
+estimated wait* and *Conventional collective*. `BatchArmResult.dispatcherProfileName` now exists on
+the arm (that lane's work), so the fix is the substitution. `armId` and `dispatcherProfileId` stay on
+the row: a caller keying off them needs them, and only the sentence is read by a person.
+
+**A third piece was offered and is deliberately not built.** Pre-selecting the running dispatcher as
+Compare's baseline needs `dev/main.ts`'s `inherit()` to supply `dispatcherId`, and the batch panel to
+read it. `dev/batchPanel.ts` is outside this lane, so adding the field here would ship a
+`ViewerState` value carried into a mount that cannot consume it — **an unwritable seam, which is this
+repository's signature defect and has shipped eleven times.** Left unbuilt and named, rather than
+half-built and plausible.

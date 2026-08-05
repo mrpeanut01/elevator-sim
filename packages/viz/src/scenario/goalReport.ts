@@ -102,7 +102,16 @@ export function goalReport(
         label: goalLabel(spec),
         disposition: rate.disposition,
         rateClass: rate.rateClass,
-        sentence: `${arm.dispatcherProfileId}: ${rate.sentence}`,
+        /*
+         * The profile's **name**, not its id — § D234, issue #58's second half.
+         *
+         * This row printed `eta:` and `collective:` where every other surface in the product prints
+         * *Minimum estimated wait* and *Conventional collective*. `armId` and `dispatcherProfileId`
+         * stay on the row because a caller keying off them needs them; what a player reads is the
+         * name. `BatchArmResult.dispatcherProfileName` is `runBatch`'s own, copied off the profile
+         * the arm actually ran, so this cannot drift from what the run used.
+         */
+        sentence: `${arm.dispatcherProfileName}: ${rate.sentence}`,
       });
     }
   }
