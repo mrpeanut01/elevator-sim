@@ -51,11 +51,16 @@ import {
   type AccountState,
 } from '../menu/account.js';
 import { catalogueOf } from '../menu/catalogue.js';
-import { createClient, fetchTransport } from '../menu/client.js';
+import {
+  challengeNotOpenOf,
+  challengeRunConfigs,
+  challengeSubmissionOf,
+} from '../menu/challenge.js';
+import { claimedMetricsOf, createClient, fetchTransport } from '../menu/client.js';
 import { initialMenuState, navigate } from '../menu/menu.js';
 import { enterEndless } from '../menu/enterEndless.js';
 import { enterFreePlay } from '../menu/enterFreePlay.js';
-import { applyIntent, type MenuIntent } from '../menu/screens.js';
+import { applyIntent, type ChallengeScreenInput, type MenuIntent } from '../menu/screens.js';
 import type { MenuState } from '../menu/types.js';
 import { renderMenu, type LeaderboardView, type MenuPanelHost } from './menuPanel.js';
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
@@ -84,10 +89,12 @@ import { Playback } from '../playback/playback.js';
 import { readRecordingDocument, verifyReplay, writeRecordingDocument } from '../record/document.js';
 import { recordRun } from '../record/recordRun.js';
 import {
+  DEFAULT_THEME,
   drawScene,
   type Canvas2DLike,
   type CarBadgeHit,
   type SceneSelection,
+  type Theme,
 } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
 import { buildLayout } from '../render/layout.js';
@@ -376,6 +383,142 @@ function boot(ui: Elements, resources: BrowserResources): void {
   /** Requests are started here and never from a render — a render that fetched would loop. */
   let boardsRequested = false;
 
+  /* ---------------------------------------------------------------------- *
+   * This week's challenge
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * What the server said, and how far this browser has got with it.
+   *
+   * **Nothing here is computed from a local clock.** § D218 § 3: the challenge's state, the time
+   * until it opens and the time until it closes are the server's measurements, held and drawn. A
+   * countdown built by differencing two clocks would be the client answering a question the server
+   * has already answered, one subtraction later.
+   */
+  let challengeView: ChallengeScreenInput = { runsDone: 0 };
+  let challengeRequested = false;
+  /**
+   * The seed set this browser has simulated, paired with the seed each recording is *of*.
+   *
+   * Paired rather than read back off the recording: `SimulationResult.seed` is `String(config.seed)`,
+   * so a challenge naming `007` yields a recording saying `7` and an honest set would be refused as
+   * `unknown-seed`. Every shipped challenge spells its seeds canonically, so this is latent — and a
+   * latent wrong refusal is one `data/` edit away from being a live one.
+   */
+  let challengeRecordings: { readonly seed: string; readonly recording: VizRecording }[] = [];
+  /** Which dispatcher the runs above are of. Changing it discards them — they are of another run. */
+  let challengeRanWith = '';
+
+  async function loadChallenge(): Promise<void> {
+    if (client === undefined || challengeRequested) return;
+    challengeRequested = true;
+    challengeView = { ...challengeView, notice: 'Loading this week’s challenge…' };
+    drawMenu();
+    const result = await client.challenges();
+    challengeView = result.ok
+      ? { ...challengeView, view: result.value.current, notice: undefined }
+      : { ...challengeView, notice: result.detail };
+    drawMenu();
+    if (result.ok) void loadChallengeBoard();
+  }
+
+  async function loadChallengeBoard(): Promise<void> {
+    const view = challengeView.view;
+    if (client === undefined || view === undefined) return;
+    const result = await client.challengeBoard(view.challenge.id, menuState.challenge.metric);
+    challengeView = result.ok
+      ? { ...challengeView, board: result.value }
+      : { ...challengeView, notice: result.detail };
+    drawMenu();
+  }
+
+  /**
+   * Simulate every seed the challenge names, in the order it names them.
+   *
+   * Synchronous and blocking, deliberately: five 900-second runs are a few hundred milliseconds in
+   * this kernel, and a progress bar over something that fast is a lie about how long it took. If the
+   * seed count ever rises far enough for that to stop being true, the count is the thing to look at
+   * — `MAX_CHALLENGE_SEEDS` is 8 and the server's cooldown already scales with it.
+   */
+  function runChallenge(): void {
+    const view = challengeView.view;
+    if (view === undefined) return;
+    const dispatcherProfileId = menuState.challenge.dispatcherProfileId;
+    const built = challengeRunConfigs(view, resources, dispatcherProfileId);
+    if (!built.ok) {
+      challengeView = { ...challengeView, notice: built.detail, runsDone: 0 };
+      challengeRecordings = [];
+      drawMenu();
+      return;
+    }
+    /*
+     * The previous set is dropped **before** the first run rather than replaced after the last. A
+     * throw partway through would otherwise leave three runs of the new dispatcher beside two of the
+     * old one, and `challengeSubmissionOf` would accept that as a complete set of five.
+     */
+    challengeRecordings = [];
+    challengeRanWith = dispatcherProfileId;
+    for (const run of built.runs) {
+      const recorded = recordRun(run.config, { recordDecisions: false });
+      challengeRecordings.push({ seed: run.seed, recording: recorded.recording });
+    }
+    challengeView = {
+      ...challengeView,
+      runsDone: challengeRecordings.length,
+      notice: undefined,
+      postRefusal: undefined,
+    };
+    drawMenu();
+  }
+
+  /**
+   * Post the whole set, or none of it.
+   *
+   * `challengeSubmissionOf` refuses **before** the network for a missing or duplicated seed, and
+   * that ordering is the point: the server's rejection is an accusation, and spending it on a client
+   * bug is the defect `submitScore` already argues about one board over.
+   */
+  async function postChallenge(): Promise<void> {
+    const view = challengeView.view;
+    if (client === undefined || view === undefined) return;
+    const token = accountState.token;
+    if (token === undefined) return;
+
+    const body = challengeSubmissionOf(
+      view,
+      challengeRanWith,
+      challengeRecordings.map((entry) => ({ ...entry.recording, seed: entry.seed })),
+    );
+    if (!body.ok) {
+      challengeView = { ...challengeView, postRefusal: body.detail };
+      drawMenu();
+      return;
+    }
+
+    const posted = await client.submitChallenge(token, body.submission);
+    if (posted.ok) {
+      challengeView = { ...challengeView, postRefusal: undefined, notice: undefined };
+      accountState = withNotice(accountState, 'Posted. The server replayed every seed and they reproduced.');
+      drawMenu();
+      void loadChallengeBoard();
+      return;
+    }
+    /*
+     * The 409 is the one refusal with somewhere to send the player: it names the challenge that *is*
+     * open. Carried from the server's own `detail` and widened with that id rather than rewritten —
+     * two answers to *which challenge is current* is the failure § D218 § 3 is about.
+     */
+    const shut = challengeNotOpenOf(posted);
+    challengeView = {
+      ...challengeView,
+      postRefusal:
+        shut === undefined
+          ? posted.detail
+          : `${shut.detail} (open now: ${shut.currentChallengeId})`,
+    };
+    drawMenu();
+  }
+
   async function loadBoards(): Promise<void> {
     if (client === undefined || boardsRequested) return;
     boardsRequested = true;
@@ -503,6 +646,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       case 'set-setting': {
         const next = applyIntent(menuState, intent);
         const arrived = next.screen === 'leaderboard' && menuState.screen !== 'leaderboard';
+        const menuStateBefore = menuState.screen;
         menuState = next;
         /*
          * Applied **now**, not at the next `adopt`. A setting that only took effect on the next run
@@ -516,6 +660,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
           // The energy axis is a figure on a panel, so the panel has to be redrawn rather than
           // nudged — `renderAll` is the chokepoint every state change already goes through.
           if (intent.field === 'showEnergyAxis') renderAll();
+          /*
+           * The canvas is not part of `renderAll`'s panel sweep, and the playback tick only redraws
+           * on a frame change — so without this a theme flip repainted the shell and left the stage
+           * on the previous palette until the reader scrubbed. Exactly the half-repaint this feature
+           * exists to end, arriving through the render path instead of the palette.
+           */
+          if (intent.field === 'theme') drawStage();
           drawTransportChrome(viewAt());
           saveSessionNow();
         }
@@ -524,6 +675,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
         // fetch again on every state change its own response caused, and each render would look
         // correct on its own.
         if (arrived) void loadBoards();
+        if (next.screen === 'challenge' && menuStateBefore !== 'challenge') void loadChallenge();
         return;
       }
 
@@ -602,6 +754,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
         return;
       }
 
+      case 'set-challenge': {
+        menuState = applyIntent(menuState, intent);
+        /*
+         * Picking a different dispatcher **discards the runs**. They are simulations of a different
+         * configuration, and keeping them would let a player run five seeds on one dispatcher, pick
+         * another, and post the first one's figures under the second one's name.
+         */
+        if (intent.field === 'dispatcherProfileId') {
+          challengeRecordings = [];
+          challengeView = { ...challengeView, runsDone: 0, postRefusal: undefined };
+        }
+        drawMenu();
+        // The board is ordered by the server, so a new metric is a new request rather than a re-sort.
+        if (intent.field === 'metric') void loadChallengeBoard();
+        return;
+      }
+
+      case 'run-challenge':
+        runChallenge();
+        return;
+
+      case 'post-challenge':
+        void postChallenge();
+        return;
+
       case 'account-mode':
         accountState = updateForm(accountState, { mode: intent.register ? 'register' : 'sign-in' });
         drawMenu();
@@ -677,6 +854,18 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const token = accountState.token;
     if (token === undefined) return;
 
+    /*
+     * The fourth refusal, and the one that used to be a `?? 0`. See `claimedMetricsOf`: an
+     * unmeasured long-wait share written as zero is a wrong claim, and the server answers a wrong
+     * claim by refusing the submission as a forgery.
+     */
+    const claim = claimedMetricsOf(recording.summary);
+    if (!claim.ok) {
+      accountState = withNotice(accountState, claim.detail);
+      drawMenu();
+      return;
+    }
+
     accountState = busy(accountState, true);
     drawMenu();
     const result = await client.submit(token, {
@@ -688,13 +877,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
         durationS: state.shiftLengthS,
         seed: state.seed.toString(),
       },
-      claimed: {
-        awtS: recording.summary.meanWaitS,
-        wt95S: recording.summary.wait95S,
-        ttdMeanS: recording.summary.meanTimeToDestinationS,
-        pctOverLongWait: recording.summary.pctOverLongWait ?? 0,
-        awtIsValid: recording.summary.awtIsValid,
-      },
+      claimed: claim.claimed,
     });
     accountState = withNotice(
       accountState,
@@ -711,6 +894,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     account: () => accountState,
     leaderboard: () => boardView,
     viewMode: () => state.mode,
+    challenge: () => (client === undefined ? undefined : challengeView),
     runState: () => {
       const issues = runIdentityIssues(state, resources, 'ranked');
       return {
@@ -814,6 +998,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   const editor = mountEditor({
     resources,
+    // Asked for at draw time, so a theme flipped while the editor is open reaches its preview too.
+    theme: () => stageTheme,
     onRun: (config: BuildingConfig) => {
       adoptEditedBuilding(config);
     },
@@ -1377,17 +1563,28 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * scrollbars and `<select>` popups, and no token assertion would catch that because no token is
    * involved.
    *
-   * **A stated limitation.** `render/canvas.ts`'s own `DEFAULT_THEME` derives from
-   * `render/tokens.ts`, which is dark-only, so a reader on `light` currently gets a light shell
-   * around a dark stage. Named here rather than discovered: repainting the canvas is a separate
-   * seam and this control is honest about reaching the shell and not the stage.
+   * **The stage follows.** `themeFor` now resolves a `stage` palette as well as the shell's tokens,
+   * so the limitation this docstring used to name — a light shell around a dark stage — is closed.
+   * `data-theme` is stamped on the root for the same reason the tokens are written: it is what makes
+   * `index.html`'s `:root[data-theme='light']` block live, and without it the block is dead CSS.
    */
   function applyTheme(): void {
     const theme = themeFor(menuState.settings.theme, (query) => window.matchMedia(query));
     const root = document.documentElement;
     for (const [name, value] of Object.entries(theme.tokens)) root.style.setProperty(name, value);
     root.style.setProperty('color-scheme', theme.colorScheme);
+    root.dataset['theme'] = theme.name;
+    stageTheme = theme.stage;
   }
+
+  /**
+   * The palette the canvas draws in — the stage half of {@link applyTheme}'s answer.
+   *
+   * Held rather than resolved per frame: `themeFor` reads `matchMedia`, and a draw loop that asked
+   * the browser for the colour scheme sixty times a second would be doing work whose answer changes
+   * about twice a year.
+   */
+  let stageTheme: Theme = DEFAULT_THEME;
 
   function applyPlaybackSpeed(): void {
     playback?.setSpeed(playbackRateFor(baseSpeed, menuState.settings.playbackSpeed));
@@ -1523,6 +1720,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const assignments: readonly LandingAssignment[] = landingAssignmentsAt(recording, frame.simTimeS);
     const lockedOut: readonly LockedOutLanding[] = lockedOutAt(recording, frame.simTimeS);
     const hits = drawScene(context2d as unknown as Canvas2DLike, {
+      theme: stageTheme,
       recording,
       frame,
       layout,

@@ -19,6 +19,7 @@ import {
   FREE_PLAY_DURATIONS_S,
   PLAYBACK_SPEEDS,
   ROOT_SCREEN,
+  type ChallengeSelection,
   type FreePlaySelection,
   type MenuCatalogue,
   type MenuScreen,
@@ -53,6 +54,17 @@ export function initialMenuState(catalogue: MenuCatalogue, seed = '20260804'): M
       arrivalRatePctPop5min: null,
       durationS: FREE_PLAY_DURATIONS_S[1] ?? 900,
       seed,
+    }),
+    challenge: Object.freeze({
+      /*
+       * The first shipped dispatcher, and **only** as an opening position. A challenge fixes
+       * everything else; this is the axis the player competes on, so a default that looked like a
+       * recommendation would be the product picking the answer.
+       */
+      dispatcherProfileId: catalogue.dispatchers[0]?.id ?? '',
+      // The board's own default ordering. Named here rather than assumed by the panel, so a client
+      // that never touched the control still sends a metric the server declares.
+      metric: 'awtS',
     }),
   });
 }
@@ -130,6 +142,11 @@ export function updateSettings(state: MenuState, patch: Partial<Settings>): Menu
 /** Apply a partial change to the Free Play selection. Validation is {@link freePlayIssues}. */
 export function updateFreePlay(state: MenuState, patch: Partial<FreePlaySelection>): MenuState {
   return Object.freeze({ ...state, freePlay: Object.freeze({ ...state.freePlay, ...patch }) });
+}
+
+/** The same, for the one axis a challenge leaves open. See {@link ChallengeSelection}. */
+export function updateChallenge(state: MenuState, patch: Partial<ChallengeSelection>): MenuState {
+  return Object.freeze({ ...state, challenge: Object.freeze({ ...state.challenge, ...patch }) });
 }
 
 /**

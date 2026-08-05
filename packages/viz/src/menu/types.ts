@@ -25,6 +25,7 @@ export const MENU_SCREENS = [
   'free-play',
   'settings',
   'leaderboard',
+  'challenge',
   'account',
 ] as const;
 
@@ -160,6 +161,23 @@ export interface MenuState {
   readonly history: readonly MenuScreen[];
   readonly settings: Settings;
   readonly freePlay: FreePlaySelection;
+  readonly challenge: ChallengeSelection;
+}
+
+/**
+ * The one thing a player chooses about a challenge — and the whole of the design in one field.
+ *
+ * A challenge fixes the building, the traffic, the run length and the seed set; **the dispatcher is
+ * what varies**, which is what makes the board a board about dispatch rather than about seed luck.
+ * `docs/17` § 4.3, and § D218.
+ *
+ * There is no seed here and there must not be. The seeds are the server's, issued with the
+ * challenge, and a client that could choose one would be choosing which run to be judged on.
+ */
+export interface ChallengeSelection {
+  readonly dispatcherProfileId: string;
+  /** Which metric the board is ordered on. One of the server's four; never a blend (§ D106). */
+  readonly metric: string;
 }
 
 /** A reason a selection cannot be started, in words a player can act on. */

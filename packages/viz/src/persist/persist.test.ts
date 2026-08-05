@@ -314,6 +314,8 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = Object.freeze({
     'which screen was showing, which is navigation rather than progress — restoring a player onto the leaderboard is not where they left the game',
   'menu.history':
     'the back stack, which only means anything relative to the screen that is not restored either; a stack pointing at screens nobody visited is worse than an empty one',
+  'menu.challenge':
+    'the dispatcher a challenge is being attempted with and the metric its board is ordered on. Not persisted, and the dispatcher is the interesting half: a challenge rotates weekly, so a restored choice would be a choice about a challenge that has since closed — and the runs it was made for are not persisted either (they are recordings, and rule 1 above). Restoring the axis without the runs would show a set half-attempted that this browser cannot post',
 });
 
 const derivedKeys = (): readonly string[] =>

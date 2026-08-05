@@ -26,6 +26,7 @@ import type { BoardPage } from '../menu/client.js';
 
 import {
   screenOf,
+  type ChallengeScreenInput,
   type MenuAffordance,
   type MenuIntent,
 } from '../menu/screens.js';
@@ -69,6 +70,13 @@ export interface MenuPanelHost {
   runState(): { readonly hasRun: boolean; readonly rankingRefusal: string | undefined };
   /** The reader's disclosure level, for the one settings row Basic cannot honour — `docs/16` S7. */
   viewMode(): 'basic' | 'advanced';
+  /**
+   * This week's challenge, as the server answered — never as this browser worked out (§ D218 § 3).
+   *
+   * `undefined` when there is no server. The screen has a row for that case rather than an empty
+   * panel, which is `docs/16` § 5 clause 6's rule applied to an absence rather than to an oversight.
+   */
+  challenge(): ChallengeScreenInput | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -98,6 +106,7 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
     rankingRefusal: run.rankingRefusal,
     boards: board.boards,
     viewMode: host.viewMode(),
+    challenge: host.challenge(),
   });
 
   const children: Node[] = [];

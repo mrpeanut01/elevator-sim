@@ -19,12 +19,11 @@
  *
  * ## Its caller, stated the way § D192 taught this repository to state it
  *
- * **The intended non-test caller is `dev/main.ts`, and at the time of writing the wiring has not
- * landed** — the shell mounts this in the same wave, in a lane this file's author does not own.
- * Until it does, every export here is an unwired export and `deadCode.test.ts` is *right* to say
- * so. Wave 12's audit found two docstrings naming callers that do not call (§ D192); this sentence
- * exists so this file is not the third. When the wiring lands, delete the qualifier and not the
- * sentence.
+ * **The non-test caller is `dev/main.ts#applyTheme`**, which calls {@link themeFor} and writes what
+ * it returns. The qualifier this paragraph used to carry — *"at the time of writing the wiring has
+ * not landed"* — is deleted because the wiring landed, which is what its own last sentence
+ * instructed. Wave 12's audit found two docstrings naming callers that do not call (§ D192); this
+ * sentence exists so this file is not the third.
  *
  * ## Why it returns tokens instead of applying them
  *
@@ -33,6 +32,17 @@
  * and `dev/main.ts` does the writing — the same split `render/runSummary.ts`, `render/canvas.ts`
  * and `dev/motion.ts` already use. {@link ResolvedTheme.tokens} is a record of CSS custom-property
  * name → value, exactly the shape `element.style.setProperty` takes one pair at a time.
+ *
+ * ## The stage travels with the shell — the second half, and the reason this file was half a
+ * feature until it did
+ *
+ * {@link ResolvedTheme.stage} is the same decision projected onto the canvas: the `Theme`
+ * `render/canvas.ts` draws with, built by `themeFromPalette` from the same `Palette` the tokens
+ * came from. Before it existed this module resolved twenty-seven custom properties and the canvas
+ * kept a module-level dark constant, so a player on `light` got *a light shell around a dark
+ * stage* — named in this docstring at the time, which is better than being discovered, and still a
+ * half-repainted page. One resolution, two surfaces: the shell writes `tokens`, the viewer hands
+ * `stage` to `drawScene`, and there is no second place a mode is decided.
  *
  * ## Why `'system'` takes a probe
  *
@@ -45,51 +55,35 @@
  *
  * ## What is authored here, and what is quoted
  *
- * The **dark** palette is the shipped one. It is not re-typed: the seventeen tokens that
- * `render/tokens.ts` already names are imported from it, because that file is this repository's
- * one palette source (§ 2.2 of the handoff: *"three copies of a palette is the same defect class
- * this repository has closed ten times"*), and the ten that only `index.html` declares are quoted
- * as literals. `theme.test.ts` derives the token **names** from `index.html`'s `:root` block and
+ * **Neither palette is authored here, and this module holds no colour of its own.** Both are
+ * `render/tokens.ts`'s — the dark one through `render/canvas.ts`'s `DARK_PALETTE`, which assembles
+ * that file's own exports — because it is this repository's one palette source (§ 2.2 of the
+ * handoff: *"three copies of a palette is the same defect class this repository has closed ten
+ * times"*). Ten of the twenty-seven used to be literals *here*, quoted from `index.html` because
+ * nothing else named them; they are constants in the palette file now, which is what made a second
+ * mode a table lookup rather than a second hand-typed palette.
+ * `theme.test.ts` derives the token **names** from `index.html`'s `:root` block and
  * asserts them against this module **in both directions**, so a token added to the stylesheet with
  * no palette entry is red, and a palette entry naming a property the stylesheet dropped is red
  * too. § D213: a hand-maintained list stops tracking the thing it was built from, and this
  * repository has been caught by that five times.
  *
- * The **light** palette is authored here and is new. Two things must be said about it plainly:
+ * The **light** palette is `render/tokens.ts`'s `LIGHT_PALETTE`, and it is authored rather than
+ * quoted. One thing must be said about it plainly, and it is the same sentence that file carries:
+ * **it has never been driven in a browser.** This repository has none — `docs/05-roadmap.md`:
+ * *"no Playwright, no Puppeteer, no jsdom"* — so under `docs/16` S9's evidence tiers
+ * (`static sweep < model walk < document recorder < browser`) nothing here earns better than a
+ * model walk, and no claim that it *looks* right may be made anywhere. What is checked is
+ * arithmetic and structure: every token differs from its dark counterpart, every token that
+ * carries content clears a contrast floor against the surface it is drawn on, and the light
+ * palette collides exactly where the dark one does and nowhere else.
  *
- * 1. **It has never been driven in a browser.** This repository has none — `docs/05-roadmap.md`:
- *    *"no Playwright, no Puppeteer, no jsdom"* — so under `docs/16` S9's evidence tiers
- *    (`static sweep < model walk < document recorder < browser`) nothing here earns better than a
- *    model walk, and no claim that it *looks* right may be made anywhere. What is checked is
- *    arithmetic: every token differs from its dark counterpart, and every token that carries
- *    content clears a contrast floor against the surface it is drawn on.
- * 2. **It does not repaint the stage.** `render/canvas.ts`'s `DEFAULT_THEME` is derived from
- *    `render/tokens.ts`, which is the dark palette and only the dark palette, and this module has
- *    no way to reach it without becoming the canvas's palette source as well. So a player on
- *    `'light'` gets a light shell around a dark stage until that seam is built. Named here rather
- *    than discovered later, on the footing `docs/16` S9 requires: a partial mechanism that says so
- *    is evidence; one that does not is a claim.
+ * The second caveat this paragraph used to carry — *"it does not repaint the stage"* — is gone
+ * because the seam it named is built. See {@link ResolvedTheme.stage}.
  */
 
-import {
-  ACCENT,
-  BAND_ABANDONED,
-  BAND_LONG,
-  BAND_SETTLING,
-  BAND_WAITING,
-  CARD,
-  CARD_RAISED,
-  EDGE,
-  FLOOR_LABEL,
-  FLOOR_LABEL_ENTRANCE,
-  FLOOR_LABEL_RESTRICTED,
-  FLOOR_LABEL_TRANSFER,
-  PAGE,
-  RAIL,
-  TEXT,
-  TEXT_DIM,
-  TEXT_MUTED,
-} from './tokens.js';
+import { themeFromPalette, DARK_PALETTE, type Theme } from './canvas.js';
+import { LIGHT_PALETTE, type Palette } from './tokens.js';
 
 /* -------------------------------------------------------------------------- *
  * The shape
@@ -138,6 +132,22 @@ export interface ResolvedTheme {
    * theme that restated them would be a second place `--rail-left` has to change.
    */
   readonly tokens: Readonly<Record<string, string>>;
+  /**
+   * The palette the **canvas** draws this mode with — `render/canvas.ts`'s `Theme`.
+   *
+   * Handed to `drawScene` (and `drawPreview`) in place of its `DEFAULT_THEME` default, which is
+   * what makes the stage repaint with the shell. It is a projection of the *same* `Palette` the
+   * {@link ResolvedTheme.tokens} above came from, through the one function that performs that
+   * projection, so the two halves of a mode cannot disagree: there is no arrangement of this type
+   * in which a reader gets light tokens and a dark stage, which is precisely the arrangement that
+   * shipped before it existed.
+   *
+   * Not a `Record<string, string>` like `tokens`, and the difference is the point. The shell's
+   * half is *data for the DOM* — names the stylesheet declares, written one `setProperty` at a
+   * time. The canvas's half is a typed set of **claims**, and a claim the renderer draws with no
+   * field for is a compile error rather than an undefined lookup.
+   */
+  readonly stage: Theme;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -164,110 +174,79 @@ const DARK_SCHEME_QUERY = '(prefers-color-scheme: dark)';
  * -------------------------------------------------------------------------- */
 
 /**
- * The shipped palette — `index.html`'s `:root`, § 1.1 S6/S7 of the handoff.
+ * Which CSS custom property carries which colour — **one table, both modes.**
  *
- * Seventeen values come from `render/tokens.ts`, which is the palette's one source. The ten
- * literals below exist only in the stylesheet today; `theme.test.ts` pins every one of the
- * twenty-seven to `index.html` in both directions, so this object cannot drift away from the
- * stylesheet in silence — which is the whole failure `dev/tokens.test.ts` was written for one
- * layer down.
+ * It used to be two objects, and that was the shape of the bug: the dark record quoted seventeen
+ * names from `render/tokens.ts` and spelled ten literals of its own, the light record spelled all
+ * twenty-seven, and nothing structural said the two had the same *keys* — a mode could have gained
+ * a token, or lost one, and only the derived-from-the-stylesheet assertion in `theme.test.ts`
+ * would have caught it. Now the mode is a `Palette` and this is a projection of it, so both modes
+ * declare exactly these twenty-seven properties by construction, and the ten that only
+ * `index.html` used to declare are constants in the palette file like every other colour.
+ *
+ * The stylesheet's type and geometry tokens are still deliberately absent — see
+ * {@link ResolvedTheme.tokens}.
  */
-const DARK_TOKENS: Readonly<Record<string, string>> = Object.freeze({
-  '--bg': PAGE,
-  '--rail': RAIL,
-  '--panel': CARD,
-  '--card': CARD_RAISED,
-  '--raised': '#16212f',
-  '--edge': EDGE,
-  '--edge-mid': '#26303d',
-  '--edge-strong': '#2f3a49',
-  '--hairline': '#1a212c',
-  '--hint-underline': '#3f4b5c',
-  '--text': TEXT,
-  '--dim': TEXT_MUTED,
-  '--dimmer': TEXT_DIM,
-  '--faint': FLOOR_LABEL,
-  '--fainter': '#3d4956',
-  '--accent': ACCENT,
-  '--accent-soft': '#7fb6f0',
-  '--accent-ink': '#08131f',
-  '--band-0': BAND_SETTLING,
-  '--band-1': BAND_WAITING,
-  '--band-2': BAND_LONG,
-  '--band-3': BAND_ABANDONED,
-  '--over': '#e0563a',
-  '--transfer': FLOOR_LABEL_TRANSFER,
-  '--entrance': FLOOR_LABEL_ENTRANCE,
-  '--secure': FLOOR_LABEL_RESTRICTED,
-  '--measured': '#9fc48a',
-});
+function shellTokensOf(palette: Palette): Readonly<Record<string, string>> {
+  return Object.freeze({
+    '--bg': palette.page,
+    '--rail': palette.rail,
+    '--panel': palette.card,
+    '--card': palette.cardRaised,
+    '--raised': palette.raised,
+    '--edge': palette.edge,
+    '--edge-mid': palette.edgeMid,
+    '--edge-strong': palette.edgeStrong,
+    '--hairline': palette.hairline,
+    '--hint-underline': palette.hintUnderline,
+    '--text': palette.text,
+    '--dim': palette.textMuted,
+    '--dimmer': palette.textDim,
+    '--faint': palette.floorLabel,
+    '--fainter': palette.fainter,
+    '--accent': palette.accent,
+    '--accent-soft': palette.accentSoft,
+    '--accent-ink': palette.accentInk,
+    '--band-0': palette.bandSettling,
+    '--band-1': palette.bandWaiting,
+    '--band-2': palette.bandLong,
+    '--band-3': palette.bandAbandoned,
+    '--over': palette.over,
+    '--transfer': palette.floorLabelTransfer,
+    '--entrance': palette.floorLabelEntrance,
+    '--secure': palette.floorLabelRestricted,
+    '--measured': palette.measured,
+  });
+}
 
 /**
- * The light palette — **authored here, and never seen in a browser.**
+ * The two modes, each resolved **once** at module load — the shell's tokens and the canvas's theme
+ * out of the same `Palette`, so the pair cannot be assembled inconsistently by a caller.
  *
- * Built by mirroring the dark palette's own structure rather than by inverting its numbers, which
- * is a different and worse thing: a channel-inverted `#0b0e14` is a lilac, and an inverted amber is
- * a blue that would make `--band-1` disagree with every other surface's amber.
- *
- * The three ladders the dark palette declares are each kept monotone, in the direction that reads
- * as *elevation* in the mode concerned:
- *
- * - **Surfaces** run ground → raised, so they *lighten* in both palettes. In dark that is
- *   `#0b0e14 → #16212f`; in light it is a grey ground rising to white, which is the light-mode
- *   convention and not a mirror of the dark one. A "raised" plate that was darker than its card
- *   would read as a hole.
- * - **Lines** run faint → strong, so they move *away* from the surface in both: lighter than the
- *   card in dark, darker than it in light.
- * - **Ink** runs `--text` → `--fainter`, losing contrast at each step. `--dim` is deliberately the
- *   *higher*-contrast secondary and `--dimmer` the lower one, which is the order the dark palette
- *   already uses and the opposite of what the two names suggest.
- *
- * The coloured tokens keep their hue and take a darker, more saturated value, because the same hue
- * at the same lightness that reads on `#10151e` does not read on `#f5f7fa`. `theme.test.ts` checks
- * the arithmetic that follows from that — a contrast floor per token against the surface it is
- * drawn on, and no token equal to its dark counterpart — and checks nothing about how it looks,
- * because nothing here can.
+ * The dark side is `index.html`'s `:root`, § 1.1 S6/S7 of the handoff, reached through
+ * `render/canvas.ts`'s `DARK_PALETTE` (which is assembled from `render/tokens.ts`'s own exports —
+ * that file's header says why the assembly lives there). The light side is
+ * `render/tokens.ts`'s `LIGHT_PALETTE`. `theme.test.ts` pins all twenty-seven dark values to
+ * `index.html` in both directions, and `dev/tokens.test.ts` pins the light twenty-seven to
+ * `:root[data-theme="light"]` the same way, so neither mode can drift away from the stylesheet in
+ * silence.
  */
-const LIGHT_TOKENS: Readonly<Record<string, string>> = Object.freeze({
-  // Surfaces: a grey ground rising to white.
-  '--bg': '#e7ebf2',
-  '--rail': '#eef1f6',
-  '--panel': '#f5f7fa',
-  '--card': '#fbfcfe',
-  '--raised': '#ffffff',
-  // Lines: darker than the surface, strengthening.
-  '--hairline': '#e0e5ee',
-  '--edge': '#ccd4e0',
-  '--edge-mid': '#bac4d3',
-  '--edge-strong': '#9aa7b9',
-  '--hint-underline': '#8593a7',
-  // Ink: darkest first, losing contrast.
-  '--text': '#101720',
-  '--dim': '#4a5666',
-  '--dimmer': '#64707f',
-  '--faint': '#7e8998',
-  '--fainter': '#99a3b0',
-  // Accent. `--accent-soft` is the link colour, so in light it is *darker* than the accent and in
-  // dark it is lighter — in both cases the direction that separates it from the page.
-  '--accent': '#1c6fc4',
-  '--accent-soft': '#15528f',
-  // Text drawn *on* an accent fill, so it inverts with the accent rather than with the page.
-  '--accent-ink': '#f2f8ff',
-  // The wait-age bands, in ladder order and in their own hues.
-  '--band-0': '#1c7a55',
-  '--band-1': '#8a6212',
-  '--band-2': '#b04a14',
-  '--band-3': '#bf2a1c',
-  '--over': '#bc3a20',
-  '--transfer': '#7b3f96',
-  '--entrance': '#37599f',
-  '--secure': '#86612a',
-  '--measured': '#3d7a2e',
+const PALETTE: Readonly<Record<ThemeName, Palette>> = Object.freeze({
+  dark: DARK_PALETTE,
+  light: LIGHT_PALETTE,
 });
 
-const PALETTE: Readonly<Record<ThemeName, Readonly<Record<string, string>>>> = Object.freeze({
-  dark: DARK_TOKENS,
-  light: LIGHT_TOKENS,
+const RESOLVED: Readonly<
+  Record<ThemeName, { readonly tokens: Readonly<Record<string, string>>; readonly stage: Theme }>
+> = Object.freeze({
+  dark: Object.freeze({
+    tokens: shellTokensOf(PALETTE.dark),
+    stage: themeFromPalette(PALETTE.dark),
+  }),
+  light: Object.freeze({
+    tokens: shellTokensOf(PALETTE.light),
+    stage: themeFromPalette(PALETTE.light),
+  }),
 });
 
 /* -------------------------------------------------------------------------- *
@@ -275,7 +254,8 @@ const PALETTE: Readonly<Record<ThemeName, Readonly<Record<string, string>>>> = O
  * -------------------------------------------------------------------------- */
 
 function themeOf(choice: ThemeChoice, name: ThemeName): ResolvedTheme {
-  return { choice, name, colorScheme: name, tokens: PALETTE[name] };
+  const resolved = RESOLVED[name];
+  return { choice, name, colorScheme: name, tokens: resolved.tokens, stage: resolved.stage };
 }
 
 /**

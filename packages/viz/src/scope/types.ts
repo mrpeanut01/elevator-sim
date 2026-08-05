@@ -94,6 +94,7 @@ export type SurfaceKey =
   | `viewer.${string}`
   | `settings.${string}`
   | `free-play.${string}`
+  | `challenge.${string}`
   | `menu.${string}`;
 
 /**

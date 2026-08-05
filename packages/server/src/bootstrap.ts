@@ -14,11 +14,23 @@
  * production server configured with it would be publishing account-takeover links to disk. That
  * combination is refused here rather than trusted to be noticed — the mailer module's own docstring
  * promises this refusal exists, and this is it.
+ *
+ * **No server ships a challenge it cannot run.** § D218's rotation names buildings, templates and
+ * durations, and a challenge naming an id this server does not ship would fail at the moment a
+ * player submitted to it — the one moment with no words for it. {@link assertChallengesAreRunnable}
+ * resolves every rotation entry against the `data/` that was just loaded, at boot, where the
+ * failure is a configuration mistake with an obvious fix.
  */
 
 import { TRAFFIC_DEFAULTS, loadConfig, type LoadedConfig } from '@elevator-sim/core';
 
 import { requireSecret } from './accounts/credentials.js';
+import {
+  CHALLENGE_ROTATION,
+  challengeDefinitionIssues,
+  type ChallengeConfig,
+} from './challenge/schedule.js';
+import type { ChallengeDataFacts } from './challenge/submission.js';
 import { createApi, type Api, type ApiDeps } from './http/api.js';
 import { OutboxMailer, type Mailer } from './mail/mailer.js';
 import { digestOf, type ResolvedDataFacts, type SubmittedRun } from './leaderboard/submission.js';
@@ -69,6 +81,8 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
     );
   }
 
+  assertChallengesAreRunnable(config);
+
   const store = new Store({ path: options.databasePath, now });
   const resources: VerificationResources = {
     buildingsById: config.buildingsById,
@@ -83,6 +97,7 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
     mailer,
     resources,
     factsFor: factsResolver(config),
+    challengeFactsFor: challengeFactsResolver(config),
     secret,
     now,
     confirmUrl: (token) => `${options.publicOrigin.replace(/\/$/u, '')}/api/confirm?token=${encodeURIComponent(token)}`,
@@ -127,4 +142,69 @@ export function factsResolver(config: LoadedConfig): (run: SubmittedRun) => Reso
       trafficModel: TRAFFIC_DEFAULTS.trafficModel,
     });
   };
+}
+
+/**
+ * Digest the server's own `data/` for a **challenge** — the board identity of § D218 § 2.
+ *
+ * Three differences from {@link factsResolver}, all forced by the fact that a challenge leaves the
+ * dispatcher free. There is no per-profile digest, because there is no single profile; there is a
+ * digest of the **whole profile library**, so an edit to any profile forks the whole board at once
+ * rather than invalidating one row; and `elevatorSpecs` is digested, because `SimulationConfig`
+ * takes it alongside the building and a spec change moves a result without moving the building
+ * document. `challenge/submission.ts`'s {@link ChallengeDataFacts} carries the argument in full.
+ */
+export function challengeFactsResolver(
+  config: LoadedConfig,
+): (challengeConfig: ChallengeConfig) => ChallengeDataFacts | undefined {
+  return (challengeConfig) => {
+    const building = config.buildingsById.get(challengeConfig.buildingId);
+    const template = config.trafficProfiles.demandTemplates.find(
+      (entry) => entry.id === challengeConfig.demandTemplateId,
+    );
+    if (building === undefined || template === undefined) return undefined;
+    return Object.freeze({
+      buildingDigest: digestOf(building),
+      templateDigest: digestOf(template),
+      dispatcherLibraryDigest: digestOf(config.dispatcherProfiles),
+      elevatorSpecsDigest: digestOf(config.elevatorSpecs),
+      trafficModel: TRAFFIC_DEFAULTS.trafficModel,
+    });
+  };
+}
+
+/**
+ * Refuse to boot on a rotation this server cannot run.
+ *
+ * Two classes of problem, and the second is the one a reviewer would miss: a definition can be
+ * perfectly well-formed — a legal duration, five distinct decimal seeds — and still name a building
+ * or a demand template that this `data/` directory does not contain. `challengeDefinitionIssues`
+ * catches the first class without loading anything; only the loaded configuration can catch the
+ * second. Both are boot failures for the same reason the missing secret is: the alternative is a
+ * runtime failure at the moment a player commits five simulations' worth of work to a submission.
+ */
+export function assertChallengesAreRunnable(config: LoadedConfig): void {
+  const issues: string[] = [];
+  for (const definition of CHALLENGE_ROTATION) {
+    issues.push(...challengeDefinitionIssues(definition));
+    if (!config.buildingsById.has(definition.config.buildingId)) {
+      issues.push(`${definition.slug}: this server does not ship a building "${definition.config.buildingId}"`);
+    }
+    const template = config.trafficProfiles.demandTemplates.find(
+      (entry) => entry.id === definition.config.demandTemplateId,
+    );
+    if (template === undefined) {
+      issues.push(
+        `${definition.slug}: this server does not ship a demand template "${definition.config.demandTemplateId}"`,
+      );
+    }
+  }
+  if (CHALLENGE_ROTATION.length === 0) issues.push('the challenge rotation is empty');
+  if (issues.length > 0) {
+    throw new UnsafeConfigurationError(
+      `This server ships a challenge rotation it cannot run:\n  ${issues.join('\n  ')}\n` +
+        'A challenge is issued to players as data; one that does not resolve would fail at the ' +
+        'moment somebody posted to it.',
+    );
+  }
 }

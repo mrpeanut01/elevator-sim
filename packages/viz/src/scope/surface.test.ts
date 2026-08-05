@@ -36,6 +36,7 @@ function derivedKeys(): readonly SurfaceKey[] {
     ...Object.keys(initialState(RESOURCES, 1n)).map((key) => `viewer.${key}` as SurfaceKey),
     ...Object.keys(DEFAULT_SETTINGS).map((key) => `settings.${key}` as SurfaceKey),
     ...Object.keys(menu.freePlay).map((key) => `free-play.${key}` as SurfaceKey),
+    ...Object.keys(menu.challenge).map((key) => `challenge.${key}` as SurfaceKey),
     ...Object.keys(menu).map((key) => `menu.${key}` as SurfaceKey),
   ];
   return [...new Set(keys)].sort((a, b) => a.localeCompare(b));

@@ -62,6 +62,8 @@ import type { HonestyCard } from '../live/types.js';
 import { navigate } from '../menu/menu.js';
 import { initialMenuState } from '../menu/menu.js';
 import { catalogueOf } from '../menu/catalogue.js';
+import { challengeRunConfigs, type ChallengeView } from '../menu/challenge.js';
+import { createClient } from '../menu/client.js';
 import { recordRun } from '../record/recordRun.js';
 import { nextDay } from '../shift/week.js';
 
@@ -147,6 +149,19 @@ export interface ScopeProbe {
   readonly states?: readonly [(s: ViewerState) => ViewerState, (s: ViewerState) => ViewerState];
   /** Two calls into what the control is for. Their results must differ. */
   readonly sink?: readonly [() => unknown, () => unknown];
+  /**
+   * The legs, for a control whose run is **not** built by `shiftRunConfigOf`.
+   *
+   * Exactly one control needs this today and it is not an escape hatch: a challenge run is assembled
+   * by `menu/challenge.ts#challengeRunConfigs` against the server's issued configuration, which is a
+   * different path through the same kernel. § D177's rule is unchanged — move the control, require
+   * the legs to differ — and what moves is which function is asked for them.
+   *
+   * A probe that instead pointed `states` at `viewer.dispatcherId` would be comparing the legs of a
+   * *different* control that happens to share a value, which is `docs/16` S2's amendment: the sink
+   * must be the shipped decision, not a restatement of it.
+   */
+  readonly legs?: readonly [() => string, () => string];
 }
 
 const card = (hasMaths: boolean): HonestyCard => ({
@@ -196,6 +211,73 @@ const GENTLER_HYDRAULIC: MachineClass = Object.freeze({
   ...(classesFromSpecs(RESOURCES.elevatorSpecs).find((entry) => entry.id === 'hydraulic') as MachineClass),
   accelerationMps2: 0.4,
   yours: true,
+});
+
+/**
+ * The legs of one challenge seed, built the way the shell builds them.
+ *
+ * `challengeRunConfigs` is asked for the configuration and `recordRun` runs it, which is exactly the
+ * pair `dev/main.ts#runChallenge` performs — so this measures the shipped path rather than a
+ * reconstruction of it. One seed rather than five: the assertion is that the dispatcher moves the
+ * run, and four more runs would measure the same fact four more times at four times the cost.
+ */
+function challengeLegsWith(dispatcherProfileId: string): string {
+  const built = challengeRunConfigs(PROBE_CHALLENGE, RESOURCES, dispatcherProfileId);
+  if (!built.ok) throw new Error(`the probe challenge does not run here: ${built.detail}`);
+  const first = built.runs[0];
+  if (first === undefined) throw new Error('the probe challenge names no seeds');
+  return JSON.stringify(
+    recordRun(first.config, { recordDecisions: false }).recording.legs.map((leg) => [
+      leg.passengerId,
+      leg.carId ?? '',
+      leg.boardedAt ?? -1,
+    ]),
+  );
+}
+
+/** The request the shipped client builds for a board on this metric. The URL is the whole sink. */
+function boardRequestFor(metric: string): string {
+  let seen = '';
+  const client = createClient('https://example.invalid', (request) => {
+    seen = `${request.method} ${request.url}`;
+    return Promise.resolve({ status: 200, body: { entries: [] } });
+  });
+  void client.challengeBoard('midtown-morning-4', metric);
+  return seen;
+}
+
+/**
+ * A challenge as the server issues one — constructed, because `viz` ships no challenge and must
+ * build with `packages/server` absent. The configuration is the shipped rotation's first cell.
+ */
+const PROBE_CHALLENGE: ChallengeView = Object.freeze({
+  challenge: Object.freeze({
+    id: 'midtown-morning-4',
+    name: 'Midtown morning',
+    brief: 'Five seeds on Midtown Office at the morning peak.',
+    config: Object.freeze({
+      buildingId: 'midtown-office',
+      demandTemplateId: 'rise-and-fall',
+      arrivalRatePctPop5min: 3,
+      durationS: 900,
+    }),
+    seeds: Object.freeze(['1001']),
+    opensAtMs: 0,
+    closesAtMs: 0,
+  }),
+  state: 'open',
+  seedCount: 1,
+  opensInMs: null,
+  closesInMs: 3_600_000,
+  clockNote: 'The server decides which challenge is open.',
+  dataHash: 'abcdef0123456789',
+  compare: Object.freeze({
+    note: 'Compare answers the question a board cannot.',
+    buildingId: 'midtown-office',
+    demandTemplateId: 'rise-and-fall',
+    arrivalRatePctPop5min: 3,
+    durationS: 900,
+  }),
 });
 
 /**
@@ -410,6 +492,32 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
   },
   'free-play.seed': {
     states: [(s) => ({ ...s, seed: 1n }), (s) => ({ ...s, seed: 999n })],
+  },
+
+  /* ------------------------------------------------------------------ challenge */
+  'challenge.dispatcherProfileId': {
+    /*
+     * The one control whose run is built by `challengeRunConfigs` rather than `shiftRunConfigOf`,
+     * so the legs come from there — see `ScopeProbe.legs`.
+     *
+     * Midtown Office at 3 %/900 s is the shipped rotation's own first cell, and `collective` against
+     * `nearest-car` is the widest pair the library has: `nearest-car` is the weakest shipped
+     * dispatcher and was the viewer's default until § D134, so if any two profiles move the legs,
+     * these do. A pair that did not move them would be measuring the probe rather than the control.
+     */
+    legs: [() => challengeLegsWith('collective'), () => challengeLegsWith('nearest-car')],
+  },
+  'challenge.metric': {
+    /*
+     * Presentation, and the sink is the **request**. The board is ordered by the server, so a
+     * different metric is a different fetch rather than a re-sort of rows already in hand — which is
+     * also why it may not move a leg: the runs it orders were simulated by somebody else, hours ago.
+     *
+     * Driven through `createClient` with a recording transport, so what is compared is the URL the
+     * shipped client actually builds. A helper that formatted the same query string here would pass
+     * whether or not the control was connected — S2's amendment, and the defect it was written for.
+     */
+    sink: [() => boardRequestFor('awtS'), () => boardRequestFor('wt95S')],
   },
 
   /* ----------------------------------------------------------------- menu shell */

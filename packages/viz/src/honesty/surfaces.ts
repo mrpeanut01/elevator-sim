@@ -228,6 +228,13 @@ import {
   scalarRowsOf,
   selectorAvailability,
 } from '../dev/selectorEditor.js';
+import {
+  challengeNotOpenOf,
+  challengeRunConfigs,
+  challengeSubmissionOf,
+  type ChallengeView,
+} from '../menu/challenge.js';
+import { claimedMetricsOf } from '../menu/client.js';
 import { restoreNoticeFor } from '../persist/notice.js';
 import { loadSession } from '../persist/session.js';
 import { SESSION_SCHEMA_VERSION, type SessionRestoreFailure, type SessionStore } from '../persist/types.js';
@@ -3269,6 +3276,56 @@ const EDITOR_PANELS: SurfaceAdapter = {
  * ever driven with valid input has left its error path unswept, which is where careless prose
  * actually lives.
  */
+/**
+ * A challenge as the server issues one — **constructed**, and that is stated rather than smoothed.
+ *
+ * No `data/` in this package ships a challenge: the rotation lives in `packages/server`, which `viz`
+ * must build and test without (invariant 6's argument, one package over). So this is the shape the
+ * wire carries, written here, and the honest consequence is that a change to the server's shape does
+ * not redden this file — `menu/challenge.test.ts` is where that parity is pinned.
+ *
+ * The arm chosen is **upcoming**, because it carries the most prose: the window sentence, the
+ * partial-set refusal and the board note at once. Those three are where careless wording on this
+ * screen would be — a countdown implying the client measured it, or a refusal implying a partial set
+ * is a smaller score rather than a different question.
+ */
+const CHALLENGE_VIEW: ChallengeView = Object.freeze({
+  challenge: Object.freeze({
+    id: 'midtown-morning-4',
+    name: 'Midtown morning',
+    brief:
+      'Five seeds on Midtown Office at the morning peak. Everybody runs the same passengers; ' +
+      'the dispatcher is yours.',
+    config: Object.freeze({
+      buildingId: 'midtown-office',
+      demandTemplateId: 'rise-and-fall',
+      arrivalRatePctPop5min: 3,
+      durationS: 900,
+    }),
+    seeds: Object.freeze(['1001', '1002', '1003', '1004', '1005']),
+    opensAtMs: 0,
+    closesAtMs: 0,
+  }),
+  state: 'upcoming',
+  seedCount: 5,
+  opensInMs: 7_200_000,
+  closesInMs: null,
+  clockNote:
+    'Which challenge is open is decided by the server. The window below is issued with the ' +
+    'challenge, and the remaining time is measured on the server’s clock, not on yours.',
+  dataHash: 'abcdef0123456789',
+  compare: Object.freeze({
+    note:
+      'Compare answers the question a board cannot. It replays two dispatchers on the same ' +
+      'passenger traces at a replication budget large enough to resolve a difference, and ' +
+      'reports an interval that can contain zero.',
+    buildingId: 'midtown-office',
+    demandTemplateId: 'rise-and-fall',
+    arrivalRatePctPop5min: 3,
+    durationS: 900,
+  }),
+});
+
 const MENU: SurfaceAdapter = {
   id: 'menu/menu.ts#freePlayIssues',
   covers: [
@@ -3309,6 +3366,11 @@ const MENU: SurfaceAdapter = {
       seeds.push({ field: `template.${entry.id}.detail`, text: entry.detail ?? '', role: 'label' });
     }
 
+    const challengeSelection = {
+      dispatcherProfileId: catalogue.dispatchers[0]?.id ?? '',
+      metric: 'awtS',
+    };
+    const challengeInput = { view: CHALLENGE_VIEW, runsDone: 3 };
     const whole = {
       buildingId: catalogue.buildings[0]?.id ?? '',
       dispatcherProfileId: catalogue.dispatchers[0]?.id ?? '',
@@ -3414,12 +3476,19 @@ const MENU: SurfaceAdapter = {
     for (const arm of menuStates) {
       for (const screen of MENU_SCREENS) {
         const view = screenOf({
-          state: { screen, history: [], settings: DEFAULT_SETTINGS, freePlay: arm.selection },
+          state: {
+            screen,
+            history: [],
+            settings: DEFAULT_SETTINGS,
+            freePlay: arm.selection,
+            challenge: challengeSelection,
+          },
           catalogue,
           canPost: arm.canPost,
           hasRun: arm.hasRun,
           ...(arm.refusal === undefined ? {} : { rankingRefusal: arm.refusal }),
           boards: [{ configHash: 'abcdef0123456789', entries: 3 }],
+          challenge: challengeInput,
         });
         const at = `screen.${arm.label}.${screen}`;
         seeds.push({ field: `${at}.title`, text: view.title, role: 'label' });
@@ -3685,6 +3754,122 @@ const SELECTOR: SurfaceAdapter = {
   },
 };
 
+/**
+ * The challenge board's client half — four producers, and every one of them a refusal.
+ *
+ * ## Why these strings are the client's own, unusually
+ *
+ * Everywhere else on this surface the rule is *carry the server's wording unrewritten*, because a
+ * second place that decides what a rejection means is a second place that can be wrong. These are
+ * the exception, and deliberately: each fires **before the request is made**, so there is no server
+ * wording to carry. A challenge that names a building this build does not ship, a seed set with a
+ * gap in it, a long-wait share that was never measured — none of those reach the server, which is
+ * the whole point, since the server's rejection is an accusation and spending it on a client bug is
+ * the defect `submitScore` argues about one board over.
+ *
+ * ## The one they must not become
+ *
+ * `docs/10` § 5.5 bans a leaderboard that ranks dispatchers from single runs, and this board's whole
+ * design points at that ban — the dispatcher is the axis. So a refusal that said *"post a better
+ * dispatcher"* or *"this one came out ahead"* would be the ban arriving through a refusal, which is
+ * the one place nobody reads for comparative claims. `challenge.test.ts` scans them lexically; this
+ * adapter is the generic half, and puts them through R2 with everything else.
+ */
+const CHALLENGE: SurfaceAdapter = {
+  id: 'menu/challenge.ts#challengeRunConfigs',
+  covers: [
+    'menu/challenge.ts#challengeRunConfigs',
+    'menu/challenge.ts#challengeSubmissionOf',
+    'menu/challenge.ts#challengeNotOpenOf',
+    'menu/client.ts#claimedMetricsOf',
+  ],
+  render(this: SurfaceAdapter, context) {
+    const seeds: TextSeed[] = [];
+    const view = CHALLENGE_VIEW;
+
+    /* ---- the run-config refusals: one per thing `data/` might not ship ---- */
+    const resources = {
+      buildings: context.buildings,
+      dispatcherProfiles: context.dispatcherProfiles,
+      trafficProfiles: context.trafficProfiles,
+      elevatorSpecs: context.elevatorSpecs,
+    } as unknown as Parameters<typeof challengeRunConfigs>[1];
+
+    const configArms: readonly (readonly [string, ChallengeView, string])[] = [
+      ['unknown-dispatcher', view, 'no-such-dispatcher'],
+      [
+        'unknown-building',
+        { ...view, challenge: { ...view.challenge, config: { ...view.challenge.config, buildingId: 'demolished' } } },
+        'collective',
+      ],
+      [
+        'unknown-template',
+        {
+          ...view,
+          challenge: {
+            ...view.challenge,
+            config: { ...view.challenge.config, demandTemplateId: 'no-such-template' },
+          },
+        },
+        'collective',
+      ],
+    ];
+    for (const [name, arm, dispatcherId] of configArms) {
+      const built = challengeRunConfigs(arm, resources, dispatcherId);
+      if (!built.ok) {
+        seeds.push({ field: `runConfigs.${name}`, text: built.detail, role: 'reason' });
+      }
+    }
+
+    /* ---- the submission refusals: a gap in the set, and a seed nobody asked for ---- */
+    const recording = context.recording;
+    const paired = (seed: string): { readonly seed: string } & VizRecording => ({
+      ...recording,
+      seed,
+    });
+    const submissionArms: readonly (readonly [string, readonly ({ readonly seed: string } & VizRecording)[]])[] = [
+      ['missing-seed', [paired('1001'), paired('1002')]],
+      ['duplicate-seed', view.challenge.seeds.map(() => paired('1001'))],
+      ['foreign-seed', [...view.challenge.seeds.slice(1).map(paired), paired('9999')]],
+    ];
+    for (const [name, recordings] of submissionArms) {
+      const body = challengeSubmissionOf(view, 'collective', recordings);
+      if (!body.ok) {
+        seeds.push({ field: `submission.${name}`, text: body.detail, role: 'reason' });
+      }
+    }
+
+    /* ---- the 409, carried rather than authored ---- */
+    const shut = challengeNotOpenOf({
+      ok: false,
+      code: 'challenge-not-open',
+      detail: 'That challenge is not taking entries.',
+      issues: [],
+      body: {
+        error: 'challenge-not-open',
+        state: 'closed',
+        challengeId: view.challenge.id,
+        opensAtMs: 0,
+        closesAtMs: 0,
+        currentChallengeId: 'midtown-morning-5',
+        detail: 'That challenge is not taking entries.',
+      },
+    });
+    if (shut !== undefined) {
+      // The server's sentence, and the assertion that this module did not rewrite it.
+      seeds.push({ field: 'notOpen.detail', text: shut.detail, role: 'reason' });
+    }
+
+    /* ---- the claim a client makes about its own run ---- */
+    const unmeasured = claimedMetricsOf({ ...recording.summary, pctOverLongWait: null });
+    if (!unmeasured.ok) {
+      seeds.push({ field: 'claimedMetrics.unmeasured', text: unmeasured.detail, role: 'reason' });
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -3718,6 +3903,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   MENU,
   RESTORE_NOTICE,
   SELECTOR,
+  CHALLENGE,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

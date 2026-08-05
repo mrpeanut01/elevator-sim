@@ -14,7 +14,8 @@
  *
  * ```
  * main.ts → serve.ts → http/api.ts → { accounts/credentials.ts, mail/mailer.ts,
- *                                      leaderboard/{submission,verify}.ts, store/store.ts }
+ *                                      leaderboard/{submission,verify}.ts, store/store.ts,
+ *                                      challenge/{schedule,submission,verify,board}.ts }
  *          bootstrap.ts ─┘
  * ```
  *
@@ -29,6 +30,13 @@
  * wave later. An empty allowlist is also the strongest possible state for the staleness assertion
  * below — there is nothing exempted, so nothing can quietly become an exemption that outlived its
  * reason.
+ *
+ * **§ D218's challenge board took it to 96 exports, still 0 uncalled**, and the allowlist is still
+ * empty. Same reason and the same discipline: `challenge/` was written with its routes rather than
+ * ahead of them, so `http/api.ts` is the non-test caller of every player-facing piece and
+ * `bootstrap.ts` is the non-test caller of the two that decide whether the server may start at all.
+ * The three intra-module links that no importer query can see are named in {@link WIRING} rather
+ * than assumed.
  */
 
 import { readdirSync } from 'node:fs';
@@ -50,6 +58,7 @@ import { auditModules, code, corpus } from './deadCode.test-helper.js';
 const AUDITED_MODULES = [
   'server/src',
   'server/src/accounts',
+  'server/src/challenge',
   'server/src/http',
   'server/src/leaderboard',
   'server/src/mail',
@@ -92,6 +101,27 @@ const WIRING: readonly (readonly [string, string, 'import' | 'same file'])[] = O
   ['newSessionToken', 'server/src/http/api.ts', 'import'],
   ['confirmationMessage', 'server/src/http/api.ts', 'import'],
   ['bearerOf', 'server/src/http/serve.ts', 'same file'],
+  // § D218's challenge board. The same chain one level down: `api.ts` is the non-test caller of
+  // every player-facing piece, and `bootstrap.ts` is the non-test caller of the two that decide
+  // whether the server may start at all.
+  ['issuedChallengeAt', 'server/src/http/api.ts', 'import'],
+  ['challengeStateAt', 'server/src/http/api.ts', 'import'],
+  ['challengeSubmissionIssues', 'server/src/http/api.ts', 'import'],
+  ['challengeDataHashOf', 'server/src/http/api.ts', 'import'],
+  ['verifyChallengeSubmission', 'server/src/http/api.ts', 'import'],
+  ['challengeBoardNote', 'server/src/http/api.ts', 'import'],
+  ['comparePointerFor', 'server/src/http/api.ts', 'import'],
+  ['windowRefusalDetail', 'server/src/http/api.ts', 'import'],
+  ['CHALLENGE_CLOCK_NOTE', 'server/src/http/api.ts', 'import'],
+  ['CHALLENGE_ROTATION', 'server/src/bootstrap.ts', 'import'],
+  ['challengeDefinitionIssues', 'server/src/bootstrap.ts', 'import'],
+  ['assertChallengesAreRunnable', 'server/src/bootstrap.ts', 'same file'],
+  ['challengeFactsResolver', 'server/src/bootstrap.ts', 'same file'],
+  // The two intra-module links no importer query can see: the schedule's own arithmetic, and the
+  // aggregate the verifier builds. `tuning/` sat dead behind a docstring that claimed exactly this
+  // shape of caller, so it is pinned rather than assumed.
+  ['issuedChallengeFor', 'server/src/challenge/schedule.ts', 'same file'],
+  ['challengeScoreOf', 'server/src/challenge/verify.ts', 'import'],
 ]);
 
 /* -------------------------------------------------------------------------- *
@@ -116,6 +146,10 @@ describe('every export of server/ has a caller or a stated reason', () => {
       'accounts/signConfirmation',
       'mail/OutboxMailer',
       'src/main',
+      'challenge/issuedChallengeAt',
+      'challenge/verifyChallengeSubmission',
+      'challenge/challengeDataHashOf',
+      'challenge/challengeBoardNote',
     ]) {
       expect(symbols.map((symbol) => symbol.key)).toContain(key);
     }

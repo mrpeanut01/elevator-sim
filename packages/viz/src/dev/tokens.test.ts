@@ -12,6 +12,15 @@
  * again. It reads `index.html` as text — the same technique `elementMap.test.ts` uses on the same
  * file, for the same reason: no jsdom, and the markup is the contract.
  *
+ * ## Two blocks now, and the second one is the point
+ *
+ * The stylesheet declares the palette twice: `:root` is the dark mode and
+ * `:root[data-theme="light"]` is the light one, which `dev/main.ts` selects by stamping the
+ * attribute on the document element. The second block is pinned here by exactly the same argument
+ * as the first, and it is pinned to the **resolver's** answer rather than to a list — `themeFor`
+ * is the function `applyTheme` calls, so what is checked is the thing the page will actually be
+ * painted with.
+ *
  * ## What it does not check
  *
  * That every token is *used*. A custom property nobody references is dead weight and not a defect,
@@ -24,24 +33,45 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { themeFor } from '../render/theme.js';
 import * as tokens from '../render/tokens.js';
 
 async function indexHtml(): Promise<string> {
   return readFile(fileURLToPath(new URL('../../index.html', import.meta.url)), 'utf8');
 }
 
-/** Every `--name: value;` inside the `:root` block. */
-async function rootTokens(): Promise<ReadonlyMap<string, string>> {
-  const html = await indexHtml();
-  const block = /:root\s*\{([\s\S]*?)\}/.exec(html);
-  if (block === null) throw new Error('index.html has no :root block');
+/** Every `--name: value;` in a block, given the text between its braces. */
+function declarationsIn(body: string): ReadonlyMap<string, string> {
   const found = new Map<string, string>();
-  for (const line of (block[1] ?? '').split('\n')) {
+  for (const line of body.split('\n')) {
     const match = /^\s*(--[a-z0-9-]+)\s*:\s*([^;]+);/.exec(line);
     if (match === null) continue;
     found.set(match[1] as string, (match[2] as string).trim());
   }
   return found;
+}
+
+/** Every `--name: value;` inside the `:root` block — the dark mode. */
+async function rootTokens(): Promise<ReadonlyMap<string, string>> {
+  const html = await indexHtml();
+  const block = /:root\s*\{([\s\S]*?)\}/.exec(html);
+  if (block === null) throw new Error('index.html has no :root block');
+  return declarationsIn(block[1] ?? '');
+}
+
+/** The same for `:root[data-theme="light"]`, plus whatever else that block declares. */
+async function lightBlock(): Promise<{ body: string; tokens: ReadonlyMap<string, string> }> {
+  const html = await indexHtml();
+  const block = /:root\[data-theme=['"]light['"]\]\s*\{([\s\S]*?)\}/.exec(html);
+  if (block === null) {
+    throw new Error(
+      'index.html declares no `:root[data-theme="light"]` block. The light palette exists in ' +
+        '`render/tokens.ts` (LIGHT_PALETTE) and is resolved by `render/theme.ts#themeFor`; the ' +
+        'stylesheet is the half that has to declare it, and this test is what says so.',
+    );
+  }
+  const body = block[1] ?? '';
+  return { body, tokens: declarationsIn(body) };
 }
 
 /**
@@ -57,11 +87,25 @@ const PAIRS: readonly (readonly [string, string])[] = Object.freeze([
   ['--rail', tokens.RAIL],
   ['--panel', tokens.CARD],
   ['--card', tokens.CARD_RAISED],
+  ['--raised', tokens.RAISED],
   ['--edge', tokens.EDGE],
+  ['--edge-mid', tokens.EDGE_MID],
+  ['--edge-strong', tokens.EDGE_STRONG],
+  ['--hairline', tokens.HAIRLINE],
+  ['--hint-underline', tokens.HINT_UNDERLINE],
   ['--text', tokens.TEXT],
   ['--dimmer', tokens.TEXT_DIM],
   ['--dim', tokens.TEXT_MUTED],
+  ['--faint', tokens.FLOOR_LABEL],
+  ['--fainter', tokens.TEXT_FAINTER],
   ['--accent', tokens.ACCENT],
+  ['--accent-soft', tokens.ACCENT_SOFT],
+  ['--accent-ink', tokens.ACCENT_INK],
+  ['--over', tokens.OVER],
+  ['--transfer', tokens.FLOOR_LABEL_TRANSFER],
+  ['--entrance', tokens.FLOOR_LABEL_ENTRANCE],
+  ['--secure', tokens.FLOOR_LABEL_RESTRICTED],
+  ['--measured', tokens.MEASURED],
   ['--band-0', tokens.BAND_SETTLING],
   ['--band-1', tokens.BAND_WAITING],
   ['--band-2', tokens.BAND_LONG],
@@ -110,5 +154,70 @@ describe('the stylesheet and the renderer share one palette', () => {
       void value;
       expect(root.get(property), `${property} must be a literal`).toMatch(/^#[0-9a-f]{3,8}$/i);
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The light mode — `GAPS.md`'s half-repainted page, from the stylesheet's side
+ * -------------------------------------------------------------------------- */
+
+describe('the stylesheet declares the light mode too, and agrees with the resolver', () => {
+  /**
+   * The light palette the shipped decision resolves to.
+   *
+   * `themeFor` and not `LIGHT_PALETTE`, deliberately: the record below is what `applyTheme` writes
+   * onto the document, so a projection that dropped a property, or named one the stylesheet does
+   * not, fails here rather than in a browser nobody in this repository has. The probe is never
+   * consulted for an explicit choice — `render/theme.test.ts` asserts that separately — so a
+   * throwing one would be equally correct and a fixed one reads better.
+   */
+  const resolved = (): Readonly<Record<string, string>> =>
+    themeFor('light', () => ({ matches: false })).tokens;
+
+  it('declares every token the light palette resolves, at the resolver’s own value', async () => {
+    const { tokens: declared } = await lightBlock();
+    for (const [property, value] of Object.entries(resolved())) {
+      expect(declared.get(property), `${property} in :root[data-theme="light"]`).toBe(
+        value.toLowerCase(),
+      );
+    }
+  });
+
+  it('declares nothing the light palette does not resolve — the other direction', async () => {
+    // § D213's rule, in the direction that rots quietly: a custom property left in this block
+    // after the palette dropped it is a colour the page keeps applying and nothing decides.
+    const { tokens: declared } = await lightBlock();
+    const palette = resolved();
+    const orphans = [...declared.keys()].filter((property) => palette[property] === undefined);
+    expect(orphans, 'declared in the light block and resolved by nothing').toEqual([]);
+  });
+
+  it('covers the whole dark block: a mode may not simply omit a token', async () => {
+    // The failure this catches is the one the gap was: a light palette that repaints *some* of the
+    // page. Every colour `:root` declares must be answered here — the aliases and the type and
+    // geometry tokens are mode-independent and are excluded by being non-hex, which is the same
+    // filter `render/theme.test.ts` derives its names with.
+    const dark = [...(await rootTokens())]
+      .filter(([, value]) => /^#[0-9a-f]{3,8}$/i.test(value))
+      .map(([property]) => property)
+      .sort();
+    const { tokens: declared } = await lightBlock();
+    expect([...declared.keys()].sort()).toEqual(dark);
+  });
+
+  it('sets `color-scheme: light`, which no token assertion could catch', async () => {
+    // `:root` hard-codes `color-scheme: dark`. Left alone, a light page keeps dark scrollbars and
+    // dark `<select>` popups — the one failure mode of this feature that involves no token at all.
+    const { body } = await lightBlock();
+    expect(body).toMatch(/color-scheme\s*:\s*light\s*;/);
+  });
+
+  it('differs from the dark block at every single token', async () => {
+    // The inert-control check, at the stylesheet layer: a light block that copied eleven of the
+    // dark values would satisfy every structural assertion above.
+    const dark = await rootTokens();
+    const { tokens: declared } = await lightBlock();
+    const shared = [...declared].filter(([property, value]) => dark.get(property) === value);
+    expect(shared.map(([property]) => property)).toEqual([]);
   });
 });

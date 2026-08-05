@@ -34,6 +34,18 @@ describe('a control that is not presentation reaches the run', () => {
     if (entry.scope === 'presentation') continue;
     it(`${key} moves the legs`, () => {
       const probe = PROBES[key];
+      /*
+       * A control whose run is not `shiftRunConfigOf`'s brings its own pair — see `ScopeProbe.legs`.
+       * The assertion is the same one either way: move the control, require the legs to differ.
+       */
+      if (probe?.legs !== undefined) {
+        const [left, right] = probe.legs;
+        expect(
+          left(),
+          `${key} is declared ${entry.scope} and changes no leg — an inert control (docs/12 § 5 clause 9)`,
+        ).not.toBe(right());
+        return;
+      }
       expect(probe?.states, `${key} has no states probe`).toBeDefined();
       const [a, b] = probe?.states ?? [];
       if (a === undefined || b === undefined) throw new Error(`${key}: no states probe`);

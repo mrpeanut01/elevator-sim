@@ -301,4 +301,26 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
   ),
   'menu.settings': output('A container. Its members are scoped under the settings. prefix.'),
   'menu.freePlay': output('A container. Its members are scoped under the free-play. prefix.'),
+  /*
+   * A **container with no prefix of its own**, and that difference from `menu.freePlay` is the
+   * whole shape of a challenge: the run is the server's, so there is no `challenge.building`,
+   * `challenge.seed` or `challenge.duration` for the table to scope. What a player writes is one
+   * competitive axis and one way of ordering a published board, and both are declared below.
+   */
+  'menu.challenge': output(
+    'A container. Its two members are the dispatcher a challenge is attempted with and the metric ' +
+      'its board is ordered on; everything else about a challenge run is issued by the server.',
+  ),
+  'challenge.dispatcherProfileId': control(
+    'between-games',
+    'The one axis a challenge leaves open, and the reason its board is about dispatch rather than ' +
+      'seed luck. Between-games because it is the run’s identity: changing it does not adjust a ' +
+      'figure, it means the seeds already run on this browser are of a different configuration.',
+  ),
+  'challenge.metric': control(
+    'presentation',
+    'Which of the server’s four metrics the board is ordered on. It re-orders rows that are ' +
+      'already published and changes no figure on any of them — and the four sit beside one ' +
+      'another rather than being blended, which is § D106 at the board.',
+  ),
 });

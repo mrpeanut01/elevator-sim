@@ -42,14 +42,17 @@ import {
   canStart,
   freePlayIssues,
   navigate,
+  updateChallenge,
   updateFreePlay,
   updateSettings,
 } from './menu.js';
+import type { ChallengeBoardPage, ChallengeView } from './challenge.js';
 import {
   FREE_PLAY_DURATIONS_S,
   MENU_SCREENS,
   PLAYBACK_SPEEDS,
   type CatalogueEntry,
+  type ChallengeSelection,
   type FreePlaySelection,
   type MenuCatalogue,
   type MenuScreen,
@@ -100,7 +103,19 @@ export type MenuIntent =
   | { readonly kind: 'account-mode'; readonly register: boolean }
   | { readonly kind: 'sign-out' }
   /** Post the run on screen to the leaderboard. The member with no handler until this wave. */
-  | { readonly kind: 'submit-score' };
+  | { readonly kind: 'submit-score' }
+  /* ---------------------------------------------------------------- challenge */
+  /**
+   * The one axis a challenge leaves open. Everything else about the run is the server's.
+   *
+   * A `field` and a value, like the other two setters — see the note on `set-free-play` for why a
+   * prepared patch would be the answer to a question the player has not asked yet.
+   */
+  | { readonly kind: 'set-challenge'; readonly field: keyof ChallengeSelection; readonly value: string }
+  /** Simulate every seed the challenge names, in the order it names them. */
+  | { readonly kind: 'run-challenge' }
+  /** Post the whole seed set. Never a partial one — see `challengeSubmissionOf`. */
+  | { readonly kind: 'post-challenge' };
 
 /* -------------------------------------------------------------------------- *
  * Affordances
@@ -162,6 +177,16 @@ export interface MenuViewInput {
   readonly rankingRefusal?: string | undefined;
   readonly boards?: readonly { readonly configHash: string; readonly entries: number }[] | undefined;
   /**
+   * Everything the challenge screen needs, and **nothing it could decide with**.
+   *
+   * § D218 § 3 is the rule this shape enforces: *the client never decides which challenge is
+   * current*. So there is no clock here, no window arithmetic and no `state` this module computes —
+   * `view.state`, `view.opensInMs` and `view.closesInMs` are the server's answers, carried. A
+   * countdown built by differencing two clocks would be that decision arriving one subtraction
+   * later.
+   */
+  readonly challenge?: ChallengeScreenInput | undefined;
+  /**
    * The reader's disclosure level — `mode/types.ts`'s `ViewMode`, taken as a string so this module
    * does not depend on the disclosure layer to draw a menu.
    *
@@ -175,6 +200,19 @@ export interface MenuViewInput {
    * to `advanced`, so a caller that does not care gets the whole settings screen.
    */
   readonly viewMode?: 'basic' | 'advanced' | undefined;
+}
+
+/** What the shell knows about this week's challenge, and how far the player has got with it. */
+export interface ChallengeScreenInput {
+  /** The server's answer, or `undefined` before it has answered — or when there is no server. */
+  readonly view?: ChallengeView | undefined;
+  /** Loading, or the server's own refusal, carried unrewritten. */
+  readonly notice?: string | undefined;
+  /** How many of the challenge's seeds this browser has simulated. Never a fraction of one. */
+  readonly runsDone: number;
+  /** Why the seed set cannot be posted, when it cannot. `runIdentity`'s idiom, one layer over. */
+  readonly postRefusal?: string | undefined;
+  readonly board?: ChallengeBoardPage | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -193,6 +231,8 @@ export function titleOf(screen: MenuScreen): string {
       return 'Settings';
     case 'leaderboard':
       return 'Leaderboard';
+    case 'challenge':
+      return 'This week’s challenge';
     case 'account':
       return 'Account';
   }
@@ -254,6 +294,8 @@ function bodyOf(input: MenuViewInput, screen: MenuScreen): Body {
       return { ...empty, rows: campaignRows(), notices: [CAMPAIGN_NOTE] };
     case 'leaderboard':
       return leaderboardBody(input);
+    case 'challenge':
+      return challengeBody(input);
     case 'account':
       return { ...empty, rows: accountRows(input) };
   }
@@ -279,6 +321,12 @@ function mainRows(): readonly MenuAffordance[] {
   return Object.freeze([
     to('main.campaign', 'Campaign', 'A week on one building — it grows, and the bar rises', 'campaign'),
     to('main.free-play', 'Free play', 'Any building, any dispatcher, any traffic', 'free-play'),
+    to(
+      'main.challenge',
+      'This week’s challenge',
+      'Everyone on the same seeds — the dispatcher is what varies',
+      'challenge',
+    ),
     to('main.leaderboard', 'Leaderboard', 'Verified scores, by configuration', 'leaderboard'),
     to('main.account', 'Account', 'Sign in to post a score', 'account'),
     to('main.settings', 'Settings', 'Presentation only — nothing here changes a run', 'settings'),
@@ -483,6 +531,211 @@ function campaignRows(): readonly MenuAffordance[] {
   ]);
 }
 
+/* --------------------------------------------------------------- challenge */
+
+/**
+ * This week's challenge — the surface that makes the leaderboard's competitive axis the dispatcher.
+ *
+ * ## What this screen is allowed to say, and what it may not
+ *
+ * `docs/10` § 5.5 bans *"a leaderboard ranking dispatchers from single runs"*, and this screen
+ * points straight at that ban: the whole design is that the dispatcher varies. § D218's answer is
+ * that a challenge is scored over a **seed set** with its `n` shown, and that Compare remains the
+ * only surface allowed to say one dispatcher beat another. Both halves arrive from the server in the
+ * response body — `note` and `compare` — rather than being something this module is trusted to
+ * remember, and they are rendered rather than paraphrased.
+ *
+ * ## The window is drawn and never computed
+ *
+ * § D218 § 3. Every sentence about when the challenge opens and closes comes from `view.state`,
+ * `view.opensInMs`, `view.closesInMs` and `view.clockNote`, all of which the server measured on its
+ * own clock. This module has no `Date`, and the shape it is handed gives it nothing to make one out
+ * of — which is the point: a client that worked out which challenge was current would be a second
+ * answer to a question the server has already answered.
+ */
+function challengeBody(input: MenuViewInput): Body {
+  const challenge = input.challenge;
+  const view = challenge?.view;
+
+  if (view === undefined) {
+    /*
+     * No server, or no answer yet. A row is still offered — `docs/16` § 5 clause 6 is a screen that
+     * offered nothing but Back — and it is the one row that is always honest here: go and read the
+     * boards that do exist.
+     */
+    return {
+      rows: Object.freeze([
+        {
+          id: 'challenge.leaderboard',
+          label: 'Open the leaderboard',
+          detail: 'The boards that do not need this week’s challenge',
+          kind: 'navigate' as const,
+          scope: 'presentation' as const,
+          enabled: true,
+          intent: { kind: 'navigate' as const, to: 'leaderboard' as const },
+        },
+      ]),
+      notices: Object.freeze([
+        challenge?.notice ??
+          'This build was not compiled against a server, so there is no challenge to fetch. ' +
+            'Everything else on this menu works without one.',
+      ]),
+      issues: Object.freeze([]),
+    };
+  }
+
+  const seeds = view.seedCount;
+  const ran = challenge?.runsDone ?? 0;
+  const complete = ran >= seeds;
+  const open = view.state === 'open';
+
+  const rows: MenuAffordance[] = [
+    {
+      id: 'challenge.dispatcher',
+      label: 'Dispatcher',
+      /*
+       * The only axis, and it is `between-games` for the same reason every Free Play axis is: it is
+       * the run's identity, fixed when the attempt starts and hashed into what the score is a score
+       * of. Changing it after running the seeds does not adjust a figure — it means the runs on this
+       * browser are of a different configuration, which is why picking one resets the count.
+       */
+      kind: 'select',
+      scope: 'between-games',
+      enabled: true,
+      options: input.catalogue.dispatchers,
+      value: input.state.challenge.dispatcherProfileId,
+      intent: {
+        kind: 'set-challenge',
+        field: 'dispatcherProfileId',
+        value: input.state.challenge.dispatcherProfileId,
+      },
+    },
+    {
+      id: 'challenge.run',
+      label: `Run all ${String(seeds)} seeds`,
+      detail:
+        ran === 0
+          ? 'The same passengers everybody else gets'
+          : `${String(ran)} of ${String(seeds)} run on this browser`,
+      kind: 'commit',
+      scope: 'between-games',
+      enabled: true,
+      intent: { kind: 'run-challenge' },
+    },
+    {
+      id: 'challenge.post',
+      label: 'Post the set',
+      kind: 'commit',
+      scope: 'between-games',
+      enabled: open && complete && input.canPost && challenge?.postRefusal === undefined,
+      ...postRefusalFor(input, view, ran, seeds),
+      intent: { kind: 'post-challenge' },
+    },
+    {
+      id: 'challenge.metric',
+      label: 'Order the board on',
+      // Presentation: it re-orders rows that are already published and changes no figure on any of
+      // them. § D106 — the four metrics sit beside one another and are never combined.
+      kind: 'select',
+      scope: 'presentation',
+      enabled: true,
+      options: BOARD_METRIC_OPTIONS,
+      value: input.state.challenge.metric,
+      intent: { kind: 'set-challenge', field: 'metric', value: input.state.challenge.metric },
+    },
+  ];
+
+  /*
+   * The board's honesty obligations, carried from the body rather than composed here. `note` is
+   * § D218 § 5 clause 2 — the count each row was computed over, the four metrics never blended, and
+   * the statement that an order here is a fact about submissions. `compare.note` is clause 5.
+   */
+  const board = challenge?.board;
+  const notices = [
+    view.challenge.brief,
+    windowLineFor(view),
+    view.clockNote,
+    ...(board === undefined ? [] : [board.note]),
+    ...(board?.otherDataNote === undefined ? [] : [board.otherDataNote]),
+    view.compare.note,
+  ];
+
+  return {
+    rows: Object.freeze(rows),
+    notices: Object.freeze(notices),
+    issues: Object.freeze(challenge?.notice === undefined ? [] : [challenge.notice]),
+  };
+}
+
+/**
+ * The four the server declares, and no fifth.
+ *
+ * Written out because they are a **wire vocabulary** rather than a catalogue: `/api/challenge-board`
+ * 400s `no-such-metric` on anything else, so a fifth invented here would be a control that always
+ * fails. The names are the player's, the ids are the server's.
+ */
+const BOARD_METRIC_OPTIONS: readonly CatalogueEntry[] = Object.freeze([
+  { id: 'awtS', name: 'Average wait' },
+  { id: 'wt95S', name: '95th-percentile wait' },
+  { id: 'ttdMeanS', name: 'Mean time to destination' },
+  { id: 'pctOverLongWait', name: 'Share waiting over a minute' },
+]);
+
+/**
+ * When the window opens or closes, in the server's own measurement of *how long from now*.
+ *
+ * Rounded to whole hours and never to a date. A date would be rendered in the reader's timezone from
+ * a timestamp, which is the client doing clock arithmetic about a window it does not own — and a
+ * player two timezones away would read a different sentence about the same instant.
+ */
+function windowLineFor(view: ChallengeView): string {
+  const hours = (ms: number): string => {
+    const whole = Math.max(0, Math.round(ms / 3_600_000));
+    return whole === 1 ? '1 hour' : `${String(whole)} hours`;
+  };
+  switch (view.state) {
+    case 'open':
+      return view.closesInMs === null
+        ? 'Open now.'
+        : `Open now — about ${hours(view.closesInMs)} left to post.`;
+    case 'upcoming':
+      return view.opensInMs === null
+        ? 'Not open yet.'
+        : `Opens in about ${hours(view.opensInMs)}. You can run it now; you cannot post it yet.`;
+    case 'closed':
+      return 'Closed. The board stays readable, and nothing further can be posted to it.';
+  }
+}
+
+/**
+ * Why the set cannot be posted — one reason at a time, in the order a player would hit them.
+ *
+ * Four distinct refusals and never a collapsed one. *Nobody is signed in* is about the player;
+ * *the window is shut* is about the challenge; *you have run three of five* is about this browser;
+ * and the server's own refusal is about the submission. Showing one sentence for all four would tell
+ * a signed-in player to sign in, which is the failure `leaderboardBody` already argues about.
+ */
+function postRefusalFor(
+  input: MenuViewInput,
+  view: ChallengeView,
+  ran: number,
+  seeds: number,
+): { readonly disabledWhy?: string } {
+  const supplied = input.challenge?.postRefusal;
+  if (supplied !== undefined) return { disabledWhy: supplied };
+  if (view.state !== 'open') return { disabledWhy: windowLineFor(view) };
+  if (ran < seeds) {
+    return {
+      disabledWhy:
+        `A challenge is scored over all ${String(seeds)} seeds, and this browser has run ` +
+        `${String(ran)}. Run the set — a partial one is not a smaller score, it is a different ` +
+        'question.',
+    };
+  }
+  if (!input.canPost) return { disabledWhy: input.postingRefusal ?? 'Sign in to post a score.' };
+  return {};
+}
+
 /* ------------------------------------------------------------- leaderboard */
 
 function leaderboardBody(input: MenuViewInput): Body {
@@ -599,6 +852,8 @@ export function applyIntent(state: MenuState, intent: MenuIntent): MenuState {
       return updateFreePlay(state, freePlayPatch(intent.field, intent.value));
     case 'set-setting':
       return updateSettings(state, settingsPatch(intent.field, intent.value));
+    case 'set-challenge':
+      return updateChallenge(state, { [intent.field]: intent.value });
     case 'reopen':
     case 'start':
     case 'open-campaign':
@@ -609,6 +864,8 @@ export function applyIntent(state: MenuState, intent: MenuIntent): MenuState {
     case 'account-mode':
     case 'sign-out':
     case 'submit-score':
+    case 'run-challenge':
+    case 'post-challenge':
       // Not the menu's to answer. Returned unchanged rather than thrown: a render path that threw
       // on an intent it did not own would turn a mis-wired button into a blank screen.
       return state;

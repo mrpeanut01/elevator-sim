@@ -34,6 +34,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { DARK_PALETTE, themeFromPalette } from './canvas.js';
+import * as tokens from './tokens.js';
 import { themeFor, type ColorSchemeProbe, type ThemeName } from './theme.js';
 
 /* -------------------------------------------------------------------------- *
@@ -183,6 +185,180 @@ describe('light and dark are different palettes', () => {
 });
 
 /* -------------------------------------------------------------------------- *
+ * 2b — the palettes behind the tokens: coverage, and the distinctness property
+ * -------------------------------------------------------------------------- */
+
+/**
+ * One comparable string per palette field. A sky ramp is a pair, and a pair that differs in either
+ * stop is a different colour, so it joins rather than collapsing to its first stop.
+ */
+function valueOf(value: string | readonly string[]): string {
+  return typeof value === 'string' ? value : value.join('|');
+}
+
+function valuesOf(palette: tokens.Palette): ReadonlyMap<string, string> {
+  return new Map(
+    Object.entries(palette).map(([field, value]) => [
+      field,
+      valueOf(value as string | readonly string[]),
+    ]),
+  );
+}
+
+/** Every runtime colour `render/tokens.ts` exports — strings and sky ramps, nothing else. */
+function exportedColours(): ReadonlyMap<string, string> {
+  const found = new Map<string, string>();
+  for (const [name, value] of Object.entries(tokens)) {
+    if (typeof value === 'string') found.set(name, value);
+    else if (Array.isArray(value)) found.set(name, (value as readonly string[]).join('|'));
+  }
+  return found;
+}
+
+/** Every colour a resolved theme actually hands to a surface: the shell's, and the stage's. */
+function drawnValues(name: ThemeName): ReadonlySet<string> {
+  const resolved = themeFor(name, NEVER_ASKED);
+  const out = new Set<string>(Object.values(resolved.tokens));
+  const walk = (value: unknown): void => {
+    if (typeof value === 'string') out.add(value);
+    else if (Array.isArray(value)) out.add((value as readonly string[]).join('|'));
+    else if (typeof value === 'object' && value !== null) Object.values(value).forEach(walk);
+  };
+  // A ramp joins to one string on both sides of the comparison, so a mode that changed one stop
+  // and not the other reads as a different colour rather than as the same one.
+  walk(resolved.stage);
+  return out;
+}
+
+describe('the palette behind the tokens covers the file it is assembled from', () => {
+  it('gives every colour `render/tokens.ts` exports a field in the dark palette', () => {
+    // The derivation, in the direction § D213 cares about: a constant added to the palette file
+    // and forgotten in the assembly is a colour the light mode has no counterpart for, and the
+    // half-repainted page is exactly what that produces. Derived from the module's own exports —
+    // not from a list beside them.
+    const exported = [...exportedColours().values()].sort();
+    const assembled = [...valuesOf(DARK_PALETTE).values()].sort();
+    expect(assembled).toEqual(exported);
+  });
+
+  it('names no colour `render/tokens.ts` does not export — the other direction', () => {
+    const exported = new Set(exportedColours().values());
+    const orphans = [...valuesOf(DARK_PALETTE)]
+      .filter(([, value]) => !exported.has(value))
+      .map(([field]) => field);
+    expect(orphans, 'these palette fields hold a literal of their own').toEqual([]);
+  });
+
+  it('positive control: the derivation reads real values, and would notice a missing one', () => {
+    // Without this the two assertions above pass on two empty lists. Both sides are non-trivial
+    // and the count is the palette's, so a scanner that matched nothing is loud.
+    const exported = exportedColours();
+    expect(exported.get('PAGE')).toBe(tokens.PAGE);
+    expect(exported.get('SKY_NIGHT')).toBe(tokens.SKY_NIGHT.join('|'));
+    expect(exported.size).toBeGreaterThan(50);
+    expect(Object.keys(DARK_PALETTE).length).toBe(exported.size);
+  });
+
+  it('draws every colour it declares — no field that nothing consumes', () => {
+    // A palette field neither the shell nor the stage reads is a colour a mode can differ in with
+    // no pixel following, which is the inert-control shape `docs/12` § 5 clause 9 forbids wearing
+    // a palette's clothes. Checked on the light palette, whose fields are distinct wherever the
+    // dark ones are (asserted below), so value-presence is not laundered through a collision.
+    for (const name of ['dark', 'light'] as const) {
+      const drawn = drawnValues(name);
+      const unread = [...valuesOf(name === 'dark' ? DARK_PALETTE : tokens.LIGHT_PALETTE)]
+        .filter(([, value]) => !drawn.has(value))
+        .map(([field]) => field);
+      expect(unread, `${name}: declared and never drawn`).toEqual([]);
+    }
+  });
+});
+
+describe('two different claims never share a colour — in both palettes, or in neither', () => {
+  /**
+   * **The property this whole file exists to protect, stated once.**
+   *
+   * `render/`'s tests identify a mark *by its fill*: `canvas.test.ts` counts *"the rider glyphs
+   * drawn in the settling band's colour"*, `stageRender.test.ts` picks the slabs out of the
+   * transcript by `DEFAULT_THEME.floorSlab`. So a palette in which two claims collide does not
+   * merely look wrong — it makes those counts measure something else, silently, and the suite
+   * stays green while doing it.
+   *
+   * The dark palette's collisions are deliberate and are argued at their constants: a car with
+   * room in it *is* the freshest band's green, one red means *this is the thing that is wrong*,
+   * a warning *is* the second band's amber. So the assertion is not "everything differs" — that
+   * would be false of the shipped design — but **the partition is the same**: equal in dark if and
+   * only if equal in light. That catches both directions of the failure, a light palette that
+   * merges two claims the dark one keeps apart, and one that splits a pair the design ties
+   * together.
+   */
+  it('repeats the dark palette’s collisions exactly, and invents none of its own', () => {
+    const dark = valuesOf(DARK_PALETTE);
+    const light = valuesOf(tokens.LIGHT_PALETTE);
+    expect([...light.keys()].sort()).toEqual([...dark.keys()].sort());
+
+    const disagreements: string[] = [];
+    const fields = [...dark.keys()].sort();
+    for (const [index, a] of fields.entries()) {
+      for (const b of fields.slice(index + 1)) {
+        const sameInDark = dark.get(a) === dark.get(b);
+        const sameInLight = light.get(a) === light.get(b);
+        if (sameInDark === sameInLight) continue;
+        disagreements.push(
+          sameInDark
+            ? `${a} and ${b} are one colour in dark and two in light`
+            : `${a} and ${b} are two colours in dark and one in light (${light.get(a) ?? ''})`,
+        );
+      }
+    }
+    expect(disagreements).toEqual([]);
+  });
+
+  it('positive control: the pairing really is checked — the dark palette does collide', () => {
+    // If the dark palette had no collisions the assertion above would degenerate into "all
+    // distinct", which is a different and weaker claim than the one its name makes. It has six
+    // classes with more than one member, each argued at its constant.
+    const dark = valuesOf(DARK_PALETTE);
+    expect(dark.get('carLight')).toBe(dark.get('bandSettling'));
+    expect(dark.get('carMid')).toBe(dark.get('accent'));
+    expect(dark.get('alarm')).toBe(dark.get('bandAbandoned'));
+    expect(dark.get('warning')).toBe(dark.get('bandWaiting'));
+    expect(dark.get('waitingDown')).toBe(dark.get('carDown'));
+    expect(new Set(dark.values()).size).toBeLessThan(dark.size);
+  });
+
+  it('moves every colour, so the stage cannot half-repaint', () => {
+    // The `tokens` half of this was already asserted above for the twenty-seven shell properties.
+    // This is the other thirty: a stage field left at its dark value is the gap this palette was
+    // written to close, one constant at a time instead of all at once.
+    const dark = valuesOf(DARK_PALETTE);
+    const light = valuesOf(tokens.LIGHT_PALETTE);
+    const shared = [...dark].filter(([field, value]) => light.get(field) === value).map(([f]) => f);
+    expect(shared, 'these palette fields are the same colour in both modes').toEqual([]);
+  });
+
+  it('paints a stage whose fills share nothing with the dark one', () => {
+    // The claim-level restatement: the projection through `themeFromPalette` preserves it, so a
+    // fill-identified test written against one mode cannot match a mark drawn in the other.
+    const collapse = (theme: Readonly<Record<string, unknown>>): ReadonlySet<string> => {
+      const out = new Set<string>();
+      const walk = (value: unknown): void => {
+        if (typeof value === 'string') out.add(value);
+        else if (typeof value === 'object' && value !== null) Object.values(value).forEach(walk);
+      };
+      walk(theme);
+      return out;
+    };
+    const dark = collapse(themeFromPalette(DARK_PALETTE) as unknown as Record<string, unknown>);
+    const light = collapse(
+      themeFromPalette(tokens.LIGHT_PALETTE) as unknown as Record<string, unknown>,
+    );
+    expect([...dark].filter((colour) => light.has(colour))).toEqual([]);
+    expect(dark.size).toBeGreaterThan(30);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
  * Contrast — arithmetic, and nothing more than arithmetic
  * -------------------------------------------------------------------------- */
 
@@ -269,6 +445,48 @@ describe('contrast — a no-regression bound, never a claim about how it looks',
     }
   });
 
+  it('reads the occupant count on every car, in both modes', () => {
+    /*
+     * The one arithmetic claim `render/tokens.ts` makes about the *stage* rather than the shell,
+     * and therefore the one that has to be checked rather than believed: a single label colour is
+     * drawn inside four differently loaded cars, so it is legible on all four or on none.
+     *
+     * It is the claim most likely to be got wrong by a light palette, because it is the one that
+     * **inverts** — near-black ink on four bright cars in dark, near-white ink on four dark ones
+     * here — and a mode that carried the dark label across would fail here rather than in a
+     * browser this repository does not have. The label is translucent, so it is composited over
+     * the fill first; the floor is 3:1, the bound for a large glyph, and it is a no-regression
+     * bound like `FLOOR` above rather than a verdict.
+     */
+    const composite = (ink: string, over: string): string => {
+      const rgba = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(ink);
+      if (rgba === null) return ink;
+      const alpha = Number(rgba[4] ?? '1');
+      const base = [1, 3, 5].map((offset) => parseInt(over.slice(offset, offset + 2), 16));
+      const mixed = [1, 2, 3].map((channel, index) =>
+        Math.round(Number(rgba[channel]) * alpha + (base[index] ?? 0) * (1 - alpha)),
+      );
+      return `#${mixed.map((value) => value.toString(16).padStart(2, '0')).join('')}`;
+    };
+
+    for (const [name, palette] of [
+      ['dark', DARK_PALETTE],
+      ['light', tokens.LIGHT_PALETTE],
+    ] as const) {
+      const label = palette.carOccupantText;
+      for (const fill of [
+        palette.carLight,
+        palette.carMid,
+        palette.carHeavy,
+        palette.carOverload,
+      ]) {
+        expect(contrast(composite(label, fill), fill), `${name} label on ${fill}`).toBeGreaterThan(
+          3,
+        );
+      }
+    }
+  });
+
   it('negative control: the floor is a real bound, and would catch a token that failed it', () => {
     // A test whose assertion cannot fail is a description. `--panel` against itself is 1:1.
     const tokens = tokensOf('light');
@@ -318,6 +536,35 @@ describe('the choice resolves through the shipped decision', () => {
     for (const choice of ['system', 'dark', 'light'] as const) {
       const resolved = themeFor(choice, answering(true));
       expect(resolved.colorScheme, choice).toBe(resolved.name);
+    }
+  });
+
+  it('resolves the stage from the same palette as the shell, through the one projection', () => {
+    // The half that did not exist: a resolved theme now carries what the *canvas* draws with, and
+    // it is `themeFromPalette` of the same palette the tokens came from — not a second table, and
+    // not `DEFAULT_THEME` with a light page bolted onto it. Asserted by identity of value against
+    // the shipped projection, so a resolver that assembled its own stage would be red here.
+    expect(themeFor('dark', NEVER_ASKED).stage).toEqual(themeFromPalette(DARK_PALETTE));
+    expect(themeFor('light', NEVER_ASKED).stage).toEqual(themeFromPalette(tokens.LIGHT_PALETTE));
+    expect(themeFor('system', answering(true)).stage).toEqual(themeFor('dark', NEVER_ASKED).stage);
+    expect(themeFor('system', answering(false)).stage).toEqual(themeFor('light', NEVER_ASKED).stage);
+  });
+
+  it('never hands out a light shell around a dark stage', () => {
+    // The gap this feature closed, as a property rather than as a docstring: the two halves of a
+    // resolved theme are read by two different surfaces, and nothing but this stops one of them
+    // being resolved for the other mode. `--bg` and the stage's background are the same claim in
+    // two vocabularies, so they are the pair to check.
+    for (const choice of ['system', 'dark', 'light'] as const) {
+      for (const prefersDark of [true, false]) {
+        const resolved = themeFor(choice, answering(prefersDark));
+        expect(resolved.stage.background, `${choice}/${String(prefersDark)}`).toBe(
+          resolved.tokens['--bg'],
+        );
+        expect(resolved.stage.panel).toBe(resolved.tokens['--panel']);
+        expect(resolved.stage.queueBands.settling).toBe(resolved.tokens['--band-0']);
+        expect(resolved.stage.text).toBe(resolved.tokens['--text']);
+      }
     }
   });
 

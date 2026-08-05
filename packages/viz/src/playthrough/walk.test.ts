@@ -245,6 +245,13 @@ function modeOf(screen: MenuScreen): PlayMode {
     case 'campaign':
       return 'shift-week';
     case 'leaderboard':
+    case 'challenge':
+      /*
+       * Both are `ranked`: what a player may move on either is what survives the server's replay,
+       * which is the whole of that row's argument in `permits.ts`. The challenge screen offers one
+       * `between-games` axis (the dispatcher) and one `presentation` one (the board's ordering), and
+       * `ranked` permits exactly those two scopes.
+       */
       return 'ranked';
     case 'main':
     case 'settings':

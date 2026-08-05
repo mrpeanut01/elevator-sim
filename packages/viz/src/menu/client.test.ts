@@ -15,7 +15,13 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { createClient, type Transport, type TransportRequest, type TransportResponse } from './client.js';
+import {
+  claimedMetricsOf,
+  createClient,
+  type Transport,
+  type TransportRequest,
+  type TransportResponse,
+} from './client.js';
 import {
   EMPTY_FORM,
   MAX_DISPLAY_NAME,
@@ -256,5 +262,61 @@ describe('the client’s rules are the server’s rules', () => {
     const source = serverSource('http/api.ts');
     expect(source).toContain(`MAX_DISPLAY_NAME = ${String(MAX_DISPLAY_NAME)}`);
     expect(source).toContain(`displayName.length < ${String(MIN_DISPLAY_NAME)}`);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The claim a client makes about its own run
+ * -------------------------------------------------------------------------- */
+
+describe('claimedMetricsOf', () => {
+  const WHOLE = Object.freeze({
+    meanWaitS: 31.4,
+    wait95S: 88.2,
+    meanTimeToDestinationS: 60.1,
+    pctOverLongWait: 2.5,
+    awtIsValid: true,
+  });
+
+  it('passes every figure through untouched', () => {
+    const result = claimedMetricsOf(WHOLE);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.claimed).toEqual({
+      awtS: 31.4,
+      wt95S: 88.2,
+      ttdMeanS: 60.1,
+      pctOverLongWait: 2.5,
+      awtIsValid: true,
+    });
+  });
+
+  it('refuses an unmeasured long-wait share rather than calling it zero', () => {
+    /*
+     * The defect. `dev/main.ts` wrote `pctOverLongWait ?? 0`, so a share that was never measured —
+     * `core` produces `NaN` for a share with no denominator and the recording stores `null` —
+     * reached the server as `0`. The server measures the same run, gets `NaN`, and refuses the
+     * submission as metrics-that-do-not-reproduce: this product's one accusation, spent on a client
+     * fallback.
+     */
+    const result = claimedMetricsOf({ ...WHOLE, pctOverLongWait: null });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.detail).toContain('never measured');
+  });
+
+  it('does not refuse a genuine zero', () => {
+    // The distinction the `??` collapsed: nobody waited long is a measurement, and it posts.
+    const result = claimedMetricsOf({ ...WHOLE, pctOverLongWait: 0 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.claimed.pctOverLongWait).toBe(0);
+  });
+
+  it('carries a false awtIsValid rather than hiding it', () => {
+    // A saturated run may be submitted; it simply will not be ranked, and the server is the one
+    // that says so. Suppressing the flag here would be the client deciding quotability.
+    const result = claimedMetricsOf({ ...WHOLE, awtIsValid: false });
+    expect(result.ok && result.claimed.awtIsValid).toBe(false);
   });
 });

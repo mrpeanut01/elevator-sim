@@ -20,6 +20,14 @@
  * module's job is to carry the claim, not to believe it.
  */
 
+import type {
+  ChallengeBoardPage,
+  ChallengeBoardRow,
+  ChallengeEntryAccepted,
+  ChallengeIndex,
+  ChallengeSubmission,
+} from './challenge.js';
+
 /* -------------------------------------------------------------------------- *
  * The wire types
  * -------------------------------------------------------------------------- */
@@ -49,6 +57,61 @@ export interface ClaimedMetrics {
   readonly ttdMeanS: number;
   readonly pctOverLongWait: number;
   readonly awtIsValid: boolean;
+}
+
+/**
+ * The claim a client makes about its own run, or the reason it cannot make one.
+ *
+ * ## The fallback this replaces, and why it was an accusation waiting to happen
+ *
+ * `dev/main.ts` built this literal inline and wrote `pctOverLongWait: summary.pctOverLongWait ?? 0`.
+ * The figure is `null` when it was **never measured** — `core` produces `NaN` for a share with no
+ * denominator and the recording stores `null` — so that `?? 0` turns *unmeasured* into *zero per
+ * cent*, and the server, which measures the same run and gets `NaN`, compares `NaN` against `0` and
+ * refuses the submission as `metrics-do-not-reproduce`.
+ *
+ * That is this product's **one accusation**, spent on a client fallback. Today the run in question
+ * usually fails `awtIsValid` and the quotability refusal fires first, so the bug is masked rather
+ * than harmless — a masked wrong accusation is exactly the kind that surfaces after the mask moves.
+ *
+ * ## Why the answer is a refusal rather than a better substitute
+ *
+ * There is no number that works. `NaN` is what the server will measure, and `JSON.stringify(NaN)`
+ * is `null`, so it does not survive the wire as `NaN` either. The only honest submission of an
+ * unmeasured figure is **not submitting**, with a sentence saying which figure and why — the same
+ * argument `runIdentityIssues` makes for a run the server could not reproduce.
+ */
+export type ClaimedMetricsResult =
+  | { readonly ok: true; readonly claimed: ClaimedMetrics }
+  | { readonly ok: false; readonly detail: string };
+
+/** What a summary claims, or why it cannot claim it. */
+export function claimedMetricsOf(summary: {
+  readonly meanWaitS: number;
+  readonly wait95S: number;
+  readonly meanTimeToDestinationS: number;
+  readonly pctOverLongWait: number | null;
+  readonly awtIsValid: boolean;
+}): ClaimedMetricsResult {
+  if (summary.pctOverLongWait === null) {
+    return {
+      ok: false,
+      detail:
+        'This run has no long-wait share to post — nothing waited long enough for the figure to ' +
+        'have a denominator, so it was never measured. A score is a claim about every figure it ' +
+        'carries, and there is no number that would be true here.',
+    };
+  }
+  return {
+    ok: true,
+    claimed: {
+      awtS: summary.meanWaitS,
+      wt95S: summary.wait95S,
+      ttdMeanS: summary.meanTimeToDestinationS,
+      pctOverLongWait: summary.pctOverLongWait,
+      awtIsValid: summary.awtIsValid,
+    },
+  };
 }
 
 export interface BoardEntry {
@@ -95,6 +158,19 @@ export interface Failure {
   readonly detail: string;
   /** Field-level problems, when the server reported a list of them. */
   readonly issues: readonly string[];
+  /**
+   * The server's whole error body, verbatim, when there was one. Absent for transport failures.
+   *
+   * `code`, `detail` and `issues` are what almost every refusal is, and reducing a body to those
+   * three is what keeps a panel from having to understand the server. One refusal carries more:
+   * `challenge-not-open` (409) states the requested challenge's window, which state it is in, and
+   * **which challenge is open now** — and a screen that could not reach that could only say
+   * *"closed"*, which is a dead end rather than *"a reason a player can act on"* (§ D218 § 5).
+   *
+   * Deliberately `unknown` and deliberately not parsed here. `menu/challenge.ts#challengeNotOpenOf`
+   * is where it is read and checked, so this module keeps its one job: carry, do not interpret.
+   */
+  readonly body?: unknown;
 }
 
 export type Result<T> = Success<T> | Failure;
@@ -197,6 +273,25 @@ export interface LeaderboardClient {
   ): Promise<Result<{ configHash: string; entry: BoardEntry }>>;
   boards(): Promise<Result<readonly BoardSummary[]>>;
   board(configHash: string, metric: string): Promise<Result<BoardPage>>;
+  /**
+   * The challenge index — **the only answer** to *"which challenge is it today"*.
+   *
+   * § D218 § 3. There is no parameter, and that is the mechanical form of the guarantee: there is
+   * nothing a caller could pass to move the answer, and nothing in this client reads a clock, so a
+   * browser whose clock is a week out still renders the challenge the server says is open.
+   */
+  challenges(): Promise<Result<ChallengeIndex>>;
+  /**
+   * Post one dispatcher's figures for **every** seed of a challenge.
+   *
+   * Build the body with `menu/challenge.ts#challengeSubmissionOf`, which refuses a short or
+   * duplicated set before it costs the player a round trip and the server one replay per seed.
+   *
+   * The refusal to word carefully is the 409: `challenge-not-open` carries the window, the state
+   * and the challenge that *is* open, reachable through `challengeNotOpenOf`.
+   */
+  submitChallenge(token: string, submission: ChallengeSubmission): Promise<Result<ChallengeEntryAccepted>>;
+  challengeBoard(challengeId: string, metric: string): Promise<Result<ChallengeBoardPage>>;
 }
 
 /**
@@ -225,6 +320,10 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
         // here would be a second place that decides what a rejection means.
         detail: typeof body['detail'] === 'string' ? body['detail'] : CLIENT_FAILURES.refused,
         issues: Array.isArray(body['issues']) ? (body['issues'] as string[]) : [],
+        // Whole and unread. The three fields above are what a panel usually needs; the body is what
+        // the one refusal that carries a window needs, and dropping it here would mean adding a
+        // field to this type every time the server had more to say.
+        body: response.body,
       };
     }
     const value = expect(response.body);
@@ -281,6 +380,42 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
         (body) => {
           const record = body as Record<string, unknown> | null;
           return Array.isArray(record?.['entries']) ? (record as unknown as BoardPage) : undefined;
+        },
+      ),
+    challenges: () =>
+      call({ method: 'GET', url: `${base}/api/challenges`, token: undefined, body: undefined }, (body) => {
+        const record = body as Record<string, unknown> | null;
+        // Whatever the server said, unrecomputed. Nothing here compares a window to a local clock:
+        // `state`, `opensInMs` and `closesInMs` are the server's arithmetic and are rendered as
+        // given, because a second answer to "which one is current" is the § D218 § 3 defect.
+        return typeof record?.['currentId'] === 'string' && Array.isArray(record['recent'])
+          ? (record as unknown as ChallengeIndex)
+          : undefined;
+      }),
+    submitChallenge: (token, submission) =>
+      call({ method: 'POST', url: `${base}/api/challenge-scores`, token, body: submission }, (body) => {
+        const record = body as Record<string, unknown> | null;
+        return typeof record?.['challengeId'] === 'string' && typeof record['dataHash'] === 'string'
+          ? {
+              challengeId: record['challengeId'],
+              dataHash: record['dataHash'],
+              entry: record['entry'] as ChallengeBoardRow,
+            }
+          : undefined;
+      }),
+    challengeBoard: (challengeId, metric) =>
+      call(
+        {
+          method: 'GET',
+          url:
+            `${base}/api/challenge-board?challengeId=${encodeURIComponent(challengeId)}` +
+            `&metric=${encodeURIComponent(metric)}`,
+          token: undefined,
+          body: undefined,
+        },
+        (body) => {
+          const record = body as Record<string, unknown> | null;
+          return Array.isArray(record?.['entries']) ? (record as unknown as ChallengeBoardPage) : undefined;
         },
       ),
   };
