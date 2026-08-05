@@ -16669,6 +16669,16 @@ producer of a structural access refusal. `sim/simulation.test.ts` asserts the re
 sides: an unauthorised destination is refused from an unrestricted pickup, from a restricted one,
 and unbadged.
 
+**That argument is not left as an argument, because the failure mode it rules out is worse than the
+defect.** A version of this fix that deleted one check while wrongly believing the other covered the
+case would produce runs that look perfect and quietly walk an unbadged visitor onto floor 45 — the
+defect stranded people loudly, and a hole here would be silent. So it is measured, in
+`sim/accessZoning.test.ts`, over the **record** rather than a summary, because a statistic cannot
+say which floor somebody got out at: five access-zoned buildings × three conventional dispatchers ×
+two seeds, **31 431 legs ridden to their end, 7 047 of them alighting on a restricted floor, and
+zero carrying a credential that floor does not permit.** Both counts carry floors under them, so a
+run that stopped delivering anybody to a restricted floor could not satisfy it vacuously.
+
 ### The measurement
 
 60 cells — five shipped buildings × four dispatchers × three seeds — run before and after, on the
@@ -16853,6 +16863,36 @@ The experiments suite is **red at exactly these points and green everywhere else
 red on purpose. `CLAUDE.md`'s working agreement is that a criterion which now fails *is the finding*;
 a suite made green by re-pinning a refuted hypothesis would have destroyed the only evidence that it
 was refuted.
+
+The full list, from `npx vitest run --project experiments` — **12 failures in 7 files, out of 1 300
+tests**, and every one of them asserts some form of *"conventional dispatch cannot serve an
+access-zoned building"*:
+
+| file | n | what it asserts, and why it fails |
+|---|---|---|
+| `benchmark/accessControl.test.ts` | 5 | H-ACCESS-1's verdict and its two `secure-tower` coverage rows. **Refuted**, above. |
+| `benchmark/mixedUseHighRise.test.ts` | 2 | § 1's *"unserved fraction RISES as the load falls"* and *"every baseline without a quotable AWT at every rate"*. Both were the defect's signature. |
+| `benchmark/destinationLiveness.test.ts` | 1 | `eligibility.byReason.accessDenied > 0` on the conventional arm. The reason no longer exists, and the refusals it counted were the defect. |
+| `benchmark/doubleDeck.test.ts` | 1 | *"the building's own mixed scenario is structurally closed to a paired comparison"*, on `vertical-city`. Same mechanism, third building. |
+| `benchmark/saturationCensus.test.ts` | 1 | *"the conventional arms are invalid from replication zero on Secure Tower interfloor-mix"*. |
+| `validation/adversarial.test.ts` | 1 | the `access lockout` fixture. Its conservation claim — *never silently dropped* — is worth keeping; its **fixture** needs to become the bare kiosk, which is the surviving lockout. |
+| `validation/goldenRuns.test.ts` | 1 | the negative control needs *a* golden that times out, and the golden that used to was one of these runs. A fixture question, not a result. |
+
+The bottom two are the cheapest and least contentious to re-point, and they are fixtures rather than
+findings. The top five are the finding.
+
+One failure was fixed rather than left, because it was caused by this commit and not by the
+measurement: `validation/documentation.test.ts` asserts that `estimateCost.ts` still carries the
+*descriptive* sentence *"authorize and optimize in one step"*, which § D60's exclusion depends on
+being present and true. Rewriting the header dropped it. It is restored, on the destination check
+where it now belongs — the guard caught a real thing in the exact direction it was written for.
+
+**One failure is not ours and is recorded so nobody re-derives it.**
+`benchmark/weightSetSelection.test.ts` (Phase 6c) failed on one run at **658 099 ms** against its own
+`TIMEOUT_MS = 600_000`, on a machine at load average 595 with several agents' suites in flight. It
+passed on the run before. It also **cannot** be affected: `SELECTION_BUILDING` is `midtown-office`
+and `DEADBAND_BUILDING` is `garden-apartments`, the two buildings that declare no `accessZones` and
+that this change leaves byte-identical. Phase 6c's NOT ACCEPTED verdict is untouched.
 
 ### The lesson, in the form this repository already keeps
 
