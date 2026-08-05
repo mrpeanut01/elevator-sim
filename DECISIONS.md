@@ -16896,18 +16896,27 @@ that this change leaves byte-identical. Phase 6c's NOT ACCEPTED verdict is untou
 
 ### The consequence for `packages/viz`, which this lane may not edit but measured anyway
 
-Ten viz tests fail on this branch, and they fall into two kinds. Neither is a defect in the viewer,
-and both are handed over rather than fixed here.
+The viz suite fails on this branch — **at least 24 tests across 13 files**, counted from a run that
+had not finished when this was written, so treat that as a floor and not a total. They fall into two
+kinds. Neither is a defect in the viewer, and both are handed over rather than fixed here.
 
-**Nine are a stale *fixture*.** `dev/leftRail`, `dev/rightRail`, `frame/overlay` and
-`mode/disclosure` all need a run whose AWT is *suppressed*, and each of them reaches for an
-access-zoned building because those reliably saturated. They no longer do. The tests say so
-themselves — *"really is suppressed, or the rest of this proves nothing"* — which is the precondition
-check doing exactly its job. They need a genuinely saturated fixture, and one is easy: `midtown-office`
-at its default rate is unzoned, untouched by this change, and reports `awtIsValid: false` on every
-seed measured.
+**All but two are a stale *fixture*.** `live/honesty`, `mode/disclosure`, `dev/leftRail`,
+`dev/rightRail`, `frame/overlay`, `live/noMeans`, `render/describeFrame`, `record/document`,
+`campaign/*` and `access/lockedOut` all need a run that is *suppressed*, *saturated* or *locked
+out*, and each of them reaches for an access-zoned building because those reliably were. They no
+longer are. The tests say so themselves — *"really is suppressed, or the rest of this proves
+nothing"* — which is the precondition check doing exactly its job, and `access/lockedOut` is the
+honest one of the group: there are no locked-out landings any more, which is the whole point of
+§ D254. They need a genuinely suppressed fixture, and one is easy: `midtown-office` at its default
+rate is unzoned, untouched by this change, and reports `awtIsValid: false` on every seed measured.
 
-**One is a real question, and it is worth stating precisely.** `authoring/authoring.test.ts` asserts
+**`campaign/campaign.test.ts` is where this meets issue #86 and should be read with it.** Its stage-5
+case is titled *"the credential is named, and the lesson is that it is not congestion"* — the viewer
+teaching the player the very lesson that was an artefact. The lesson is now wrong in the other
+direction, and what the player should be told is nothing at all, because the stage is clearable on
+the dispatcher the game selected for them.
+
+**Two are a real question, and it is worth stating precisely.** `authoring/authoring.test.ts` asserts
 the standing requirement against the building editor — *"an access zone changes the run"*, *"one more
 floor inside the zone"*. Both now fail, and **the control is not unwired**. The reason is
 `traffic/generator.ts`: `credentialGroupFor` issues each rider a credential drawn from the zones the
