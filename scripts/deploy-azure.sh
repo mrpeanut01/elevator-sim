@@ -90,7 +90,16 @@ echo
 # is created, and a registry declared in the same template would not exist until that same
 # deployment. So it is created here, filled here, and only then handed to the template.
 az group create --name "$GROUP" --location "$LOCATION" --output none
-az acr create --resource-group "$GROUP" --name "$ACR" --sku Basic --admin-enabled false --output none 2>/dev/null || true
+
+# Created only when absent, rather than created-and-ignore-the-error. An earlier version wrapped
+# this in `2>/dev/null || true`, which swallowed a genuine failure and let the script run on to a
+# push against a registry that did not exist — where it failed with an authentication error that
+# said nothing about the real cause.
+if ! az acr show --name "$ACR" --resource-group "$GROUP" --output none 2>/dev/null; then
+  echo "creating registry ${ACR}"
+  az acr create --resource-group "$GROUP" --name "$ACR" --location "$LOCATION" \
+    --sku Basic --admin-enabled false --output none
+fi
 
 # --------------------------------------------------------------------------- build and push
 
@@ -104,7 +113,15 @@ docker build --platform linux/amd64 -t "$IMAGE" . >/dev/null 2>&1
 ARCH="$(docker image inspect "$IMAGE" --format '{{.Architecture}}')"
 [ "$ARCH" = "amd64" ] || { echo "built ${ARCH}, expected amd64" >&2; exit 1; }
 
-az acr login --name "$ACR" --output none
+# Retried for the same reason the push is, and for one of its own: a registry created moments ago
+# does not answer its token endpoint immediately, and the failure is a
+# `CONNECTIVITY_CHALLENGE_ERROR` that reads like a network fault rather than "not ready yet".
+for attempt in 1 2 3 4 5; do
+  az acr login --name "$ACR" --output none 2>/dev/null && break
+  [ "$attempt" = 5 ] && { echo "could not authenticate to ${REGISTRY} after 5 attempts" >&2; exit 1; }
+  echo "registry login attempt ${attempt} failed, retrying"
+  sleep 10
+done
 
 # Retried, because a registry push is a long transfer over somebody else's network and a single
 # `EOF` mid-blob is a fact of life rather than a reason to abandon a deploy. Three attempts, and
