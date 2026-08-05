@@ -614,6 +614,17 @@ const HOW_TO_PLAY: MenuGuide = Object.freeze({
     Object.freeze({
       heading: 'What the numbers will and will not say',
       body: Object.freeze([
+        /*
+         * Three states, because § D223 made it three the day before this landed. Saying *two* here
+         * would have been the shape of staleness this whole section is written against, so the
+         * pair of titles is pinned to `dev/reportPanel.ts` in `howToPlay.test.ts`.
+         */
+        'The Day report is a statement about a whole day, so it waits for one. Before anything has ' +
+          'run it says nothing has been filed. While the playhead is short of the end of the run ' +
+          'it says the day is still running and names the clock time you are watching, because a ' +
+          'finished day’s figures beside a clock reading half past nine would be two answers to ' +
+          'one question. Play the day through and the sheet fills in. The surface that reads a ' +
+          'shift while it runs is the left rail.',
         'Average wait is withheld rather than printed whenever the run cannot support one, on ' +
           'five grounds: an empty measurement window, a queue still growing when the run ends, ' +
           'too many arrivals never served, a wait past the 15-minute abandonment horizon, and ' +

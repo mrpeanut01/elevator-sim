@@ -482,6 +482,25 @@ describe('the guide keeps energy an axis', () => {
     expect(text).toMatch(/work per served leg/i);
   });
 
+  it('describes the day report as three states, and names them as the panel does', async () => {
+    /*
+     * § D223 made this three states the day before the guide landed — *nothing filed*, *still
+     * running*, and the filed sheet — and a guide that said two would have been stale on arrival.
+     * Both titles are read out of the panel's own source rather than restated here, so a fourth
+     * state or a re-worded one is red in this file rather than discovered by a reader.
+     */
+    const text = proseOf(await guide());
+    expect(text).toMatch(/nothing has been filed/i);
+    expect(text).toMatch(/the day is still running/i);
+    expect(text).toMatch(/the left rail/i);
+
+    const panel = readFileSync(new URL('../dev/reportPanel.ts', import.meta.url), 'utf8');
+    expect(panel, 'the empty report state was renamed').toContain("title: 'Nothing filed yet'");
+    expect(panel, 'the running report state was renamed').toContain(
+      "title: 'The day is still running'",
+    );
+  });
+
   it('describes a withheld mean as a refusal rather than as a penalty', async () => {
     const text = proseOf(await guide());
     expect(text).toMatch(/withheld rather than printed/i);
