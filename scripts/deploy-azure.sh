@@ -116,24 +116,28 @@ APP_SECRET="$(az containerapp secret show --name elevsim-app --resource-group "$
 DB_PASSWORD="$(az containerapp show --name elevsim-app --resource-group "$GROUP" \
   --query "properties.template.containers[0].env[?name=='ELEVATOR_SIM_DB']" -o tsv 2>/dev/null || true)"
 
+# The **database password is regenerated every deploy, and that is safe** — deliberately, rather
+# than for want of a way to read the old one back. The template resets the server's administrator
+# password and builds the connection string from the same parameter in the same deployment, so the
+# two cannot drift: whatever is generated here becomes both the password and the string the app
+# connects with. Nothing else uses that credential.
+#
+# An earlier version tried to recover the old password by regex out of the stored connection string.
+# It was fragile, it was unnecessary, and it had an unbalanced quote that took the whole script out
+# after the image had already been pushed.
+DB_PASSWORD="$(openssl rand -base64 24)"
+
 FIRST_DEPLOY=false
 if [ -z "$APP_SECRET" ]; then
   FIRST_DEPLOY=true
   APP_SECRET="$(openssl rand -base64 48)"
-  DB_PASSWORD="$(openssl rand -base64 24)"
-  echo "First deploy: generated a signing secret and a database password."
-  echo "Keep the signing secret. Rotating it invalidates confirmation links already sent:"
+  echo "First deploy: generated a signing secret."
+  echo "Keep it. Rotating it invalidates every confirmation link already sent:"
   echo
   echo "  ELEVATOR_SIM_SECRET=${APP_SECRET}"
   echo
 else
-  # The database password is only ever needed at deploy time and lives inside the connection string
-  # the template builds, so it is re-derived rather than stored: an existing server keeps the
-  # password it already has, and passing the same one again is a no-op.
-  DB_PASSWORD="$(az containerapp secret show --name elevsim-app --resource-group "$GROUP" \
-    --secret-name database-url --query value -o tsv 2>/dev/null \
-    | sed -E 's|^postgres://[^:]+:([^@]+)@.*$|\1|' | python3 -c 'import sys,urllib.parse; print(urllib.parse.unquote(sys.stdin.read().strip()))')
-  echo "Re-deploy: reusing the existing signing secret and database password."
+  echo "Re-deploy: reusing the existing signing secret, rotating the database password."
 fi
 
 # --------------------------------------------------------------------------- deploy
