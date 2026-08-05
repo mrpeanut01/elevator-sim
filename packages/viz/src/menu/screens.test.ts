@@ -358,6 +358,129 @@ describe('the repaired controls change the run, compared on the legs', () => {
 });
 
 /* -------------------------------------------------------------------------- *
+ * The root says which rows need a server — GitHub issue #28
+ * -------------------------------------------------------------------------- */
+
+const rootWith = (hasServer: boolean | undefined): readonly MenuAffordance[] =>
+  screenOf({ ...ARM, hasServer, state: stateAt('main') }).rows;
+
+/** The three that dead-end without one, and the three that do not. `docs/16`'s own split. */
+const SOCIAL = ['main.challenge', 'main.leaderboard', 'main.account'];
+const LOCAL = ['main.campaign', 'main.free-play', 'main.settings'];
+
+describe('the root menu says which rows need a server', () => {
+  it('marks the three social rows and leaves the other three alone', () => {
+    /*
+     * Issue #28: *"all three dead-end … The main menu gives no hint of this. The rows are styled
+     * exactly like the working ones and carry confident subtitles."* The signal belongs on the root
+     * because that is where the choice is made, and the root is the one screen that knows nothing
+     * about any of them — so it has to be told.
+     */
+    const rows = rootWith(false);
+    for (const id of SOCIAL) {
+      const row = rows.find((entry) => entry.id === id);
+      expect(row?.detail ?? '', `${id} dead-ends and says nothing about why`).toContain('needs a server');
+    }
+    for (const id of LOCAL) {
+      const row = rows.find((entry) => entry.id === id);
+      expect(row?.detail ?? '', `${id} does not need a server and claims it does`).not.toContain(
+        'needs a server',
+      );
+    }
+  });
+
+  it('leaves every row alone when there is a server', () => {
+    for (const row of rootWith(true)) {
+      expect(row.detail ?? '', `${row.id} warns about a server this build has`).not.toContain(
+        'needs a server',
+      );
+    }
+  });
+
+  it('says nothing at all when nobody has said — the honest default', () => {
+    /*
+     * `undefined` is *nobody has answered*, not *no server*. Only the shell can answer it: the origin
+     * is a `<meta>` tag read at run time, so the same bytes are a connected build behind a server and
+     * an unconnected one behind a CDN. A menu that guessed would put a false refusal on a working
+     * deployment, which is worse than the silence it replaced.
+     */
+    expect(rootWith(undefined).map((row) => row.detail ?? '')).toEqual(
+      rootWith(true).map((row) => row.detail ?? ''),
+    );
+  });
+
+  it('keeps every row reachable — the signal is a sentence, never a locked door', () => {
+    // #28 offers three remedies and this is the third with the second's honesty. All three screens
+    // teach their subject with the server off, so disabling them would hide the only thing they can
+    // still do — and a player who cannot open the challenge screen cannot read what a challenge is.
+    for (const row of rootWith(false)) expect(row.enabled, row.id).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * One door, and one question at a time — issues #30 and #31
+ * -------------------------------------------------------------------------- */
+
+const accountRowsWith = (
+  overrides: Partial<MenuViewInput>,
+): readonly MenuAffordance[] =>
+  screenOf({ ...ARM, canPost: false, ...overrides, state: stateAt('account') }).rows;
+
+describe('the account screen asks one thing at a time', () => {
+  it('offers a link and never a credential when signed out', () => {
+    const rows = accountRowsWith({});
+    const submit = rows.find((row) => row.id === 'account.submit');
+    /*
+     * *Sign in* named a mechanism that no longer exists. § D241 made the way in an emailed link, and
+     * the label now names what pressing it does — on the one screen where somebody is deciding
+     * whether to hand over an address at all.
+     */
+    expect(submit?.label).toBe('Email me a link');
+    expect(rows.map((row) => row.id)).not.toContain('account.sign-out');
+  });
+
+  it('asks for a name once the link has been redeemed, and never before', () => {
+    /*
+     * § D241 § 7. Asking for a display name *beside* the address — only when the address is new —
+     * would tell the person filling in the form whether the address is new, which is the
+     * account-enumeration oracle the server's identical-bytes 202 exists to close. So the question
+     * moves to after the redemption, where the address is already proved.
+     */
+    const signedOut = accountRowsWith({});
+    expect(signedOut.map((row) => row.label)).not.toContain('Save this name');
+
+    const naming = accountRowsWith({ canPost: true, naming: true });
+    expect(naming.map((row) => row.label)).toContain('Save this name');
+    // And it is asked rather than demanded: a player who would rather not answer can leave.
+    expect(naming.map((row) => row.id), 'a naming prompt with no way past it is a gate').toContain(
+      'account.sign-out',
+    );
+  });
+
+  it('has nothing left to ask once a name has been chosen', () => {
+    const rows = accountRowsWith({ canPost: true, naming: false });
+    expect(rows.map((row) => row.id).filter((id) => id !== 'back')).toEqual(['account.sign-out']);
+  });
+
+  it('says why the name is being asked for now, on the screen that asks', () => {
+    // A form that appears after somebody thought they were finished reads as a bait-and-switch
+    // unless it says why it waited.
+    const view = screenOf({ ...ARM, canPost: true, naming: true, state: stateAt('account') });
+    expect(view.notices.join(' ')).toContain('without telling anyone whether your address was');
+  });
+
+  it('never puts the word for a credential on this screen, in any of its three states', () => {
+    // The model half of the account lane's lexical sweep, driven rather than scanned: every string
+    // this screen can produce, in all three states, over both arms of `canPost`.
+    for (const overrides of [{}, { canPost: true, naming: true }, { canPost: true, naming: false }]) {
+      const view = screenOf({ ...ARM, canPost: false, ...overrides, state: stateAt('account') });
+      const said = [...view.notices, ...view.issues, ...view.rows.flatMap((row) => [row.label, row.detail ?? ''])];
+      expect(said.join(' ').toLowerCase(), JSON.stringify(overrides)).not.toContain('password');
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
  * The reducer still agrees with the transport
  * -------------------------------------------------------------------------- */
 

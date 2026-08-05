@@ -69,6 +69,7 @@ import { asBuiltChoices, shaftChoices, speedChoices } from '../commissioning/cho
 import { reviewCommissioning } from '../commissioning/refusals.js';
 import { CONSTRAINTS, commissionableClasses, constraintById } from '../commissioning/types.js';
 import { SIGNED_OUT } from '../menu/account.js';
+import type { BoardPage } from '../menu/client.js';
 import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
 import { initialMenuState } from '../menu/menu.js';
 import type { CommissioningScreenInput, MenuIntent } from '../menu/screens.js';
@@ -653,6 +654,114 @@ describe('the overlay behaves like the dialog it looks like', () => {
     const start = byClass(root, 'menu-start')[0];
     expect(start?.attrs.get('disabled'), 'this case no longer renders a refused Start').toBe('disabled');
     expect(start?.attrs.has('data-menu-control'), 'a disabled Start is in the focus ring').toBe(false);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The account screen — GitHub issues #30 and #31
+ * -------------------------------------------------------------------------- */
+
+/** Every control the panel registered, in the order Tab would reach them. */
+const controlKeys = (root: Recorded): readonly string[] =>
+  walk(root)
+    .map((node) => node.attrs.get('data-menu-control'))
+    .filter((key): key is string => key !== undefined);
+
+describe('the account screen collects one thing, and never a credential', () => {
+  it('renders no password input, label or field anywhere in the tree', async () => {
+    /*
+     * The document half of § D241's deletion. `menu/client.test.ts` sweeps every shipped module for
+     * the literal; this drives the screen and reads what came out, which is the tier that would have
+     * caught issue #30 — the reporter's field was in a **panel**, not in the model that fed it.
+     */
+    const loaded = await catalogue();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'account' }, loaded);
+    const inputs = walk(root).filter((node) => node.tag === 'input');
+    expect(inputs.length, 'the account screen renders no inputs at all').toBeGreaterThan(0);
+    for (const input of inputs) {
+      expect(input.attrs.get('type'), 'a credential box is on the account screen').not.toBe('password');
+    }
+    expect(textUnder(root).toLowerCase()).not.toContain('password');
+  });
+
+  it('puts the field above the button that submits it — issue #30(a)', async () => {
+    /*
+     * The reported order was: **Sign in** (primary, filled), **Back**, **Create an account**, then
+     * the two live inputs. *"The player reads a call to action, then two navigation buttons, and
+     * only then discovers there was a form. Tab order matches the visual order, so a keyboard user
+     * hits the submit button first as well."*
+     *
+     * Read off the focus ring rather than off the markup, because the ring **is** the tab order, so
+     * this asserts the half the reporter actually measured rather than a proxy for it.
+     */
+    const loaded = await catalogue();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'account' }, loaded);
+    const keys = controlKeys(root);
+    const field = keys.findIndex((key) => key.startsWith('account.') && key !== 'account.submit');
+    const submit = keys.indexOf('account.submit');
+    expect(field, 'the account screen registered no field').toBeGreaterThanOrEqual(0);
+    expect(submit, 'the account screen registered no submit').toBeGreaterThanOrEqual(0);
+    expect(field, 'Tab reaches the submit before the field it submits').toBeLessThan(submit);
+    // …and Back is last, so the ordering is label, input, submit, out — #30's own suggestion.
+    expect(keys.indexOf('back')).toBeGreaterThan(submit);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The leaderboard teaches its shape when it is empty — GitHub issue #34
+ * -------------------------------------------------------------------------- */
+
+describe('an empty leaderboard shows what a board is', () => {
+  it('draws an example board, and says in words that it is one', async () => {
+    /*
+     * *"An empty leaderboard should still teach me the shape of the thing … Empty is not the same as
+     * blank."* The reporter had just finished a run they were pleased with and found *"no picture of
+     * what measuring it against someone would even look like."*
+     *
+     * The *says so in words* half is not decoration: a greyed row is a signal carried by colour,
+     * which KB-15 forbids on its own — and a plausible figure a reader might take for a measurement
+     * is the one thing this repository will not ship.
+     */
+    const loaded = await catalogue();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'leaderboard' }, loaded);
+    const text = textUnder(root);
+
+    expect(byClass(root, 'menu-board').length, 'nothing board-shaped was drawn').toBeGreaterThan(0);
+    expect(text).toContain('An example of a board');
+    expect(text, 'the example does not say nobody posted it').toContain('nobody posted them');
+    // Where the reader would appear, which is the picture #34 says is missing.
+    expect(text).toContain('You, if you post this run');
+    // All four metrics, and the sentence that stops them being added up (§ D106).
+    for (const metric of ['AWT', 'WT95', 'TTD', 'over-long']) expect(text).toContain(metric);
+    expect(text).toContain('never added together');
+    // The seed, because a row that hid it would teach a shape that cannot be checked (invariant 5).
+    expect(text).toContain('seed');
+  });
+
+  it('does not draw one over a real board', async () => {
+    // The negative control. An example beside somebody's actual run would be two boards on one
+    // screen, and the reader has no way to tell which figures are real.
+    const loaded = await catalogue();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'leaderboard' }, loaded, {
+      leaderboard: () => ({
+        boards: [{ configHash: 'abcdef0123456789', entries: 1 }],
+        selected: 'abcdef0123456789',
+        page: {
+          configHash: 'abcdef0123456789',
+          metric: 'awtS',
+          note: 'One configuration across seeds.',
+          entries: [
+            {
+              displayName: 'Somebody real',
+              measured: { awtS: 21.5, wt95S: 44.2, ttdMeanS: 60.1, pctOverLongWait: 6.4 },
+              run: { seed: '20260101' },
+            },
+          ],
+        } as unknown as BoardPage,
+        notice: undefined,
+      }),
+    });
+    expect(textUnder(root)).not.toContain('An example of a board');
   });
 });
 
