@@ -294,8 +294,13 @@ Each is a real thing found by walking the product, left with an owner rather tha
 1. **The Day report is shaped like a day of a week even in free play.** It names a scenario and a
    banked count on a run banking nothing. The lines are individually honest; the sheet is the wrong
    shape.
-2. **Two surfaces called Campaign, and a third called Scenarios.** The scope model separates them;
-   the words on screen do not. § 3.3.
+2. **Two surfaces called Campaign, and a third called Scenarios** — **half closed, and the half that
+   is left is a judgement rather than a bug.** The batch tab is relabelled **Lab** with its id
+   unchanged, so the two unrelated *modes* no longer wear one word, and the whole deviation is now
+   recorded where handoff disagreements belong ([`docs/12` § 4.8](12-design-handoff.md)). What
+   remains is that the *Scenarios* tab and the *Campaign* menu row name the same mode from two
+   angles — the mode and its assignment picker — which is a naming judgement about a surface the
+   handoff drew, and the handoff wins those. § 3.3.
 3. ~~**The leaderboard's competitive axis is the seed.**~~ **Closed.** § 4.3's challenge board is
    built and wired end to end ([§ D218](../DECISIONS.md) is the criterion, dated before the code):
    the server fixes the building, the traffic, the run length and a seed set, and the dispatcher is
