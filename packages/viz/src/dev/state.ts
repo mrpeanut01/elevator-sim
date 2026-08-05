@@ -74,7 +74,7 @@ import {
 import type { VizRecording } from '../contract/types.js';
 import type { DisclosureMode } from '../live/types.js';
 import type { ViewMode } from '../mode/types.js';
-import { contractForBuilding, CONTRACTS } from '../shift/contracts.js';
+import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts.js';
 import { SHIFT_EVENTS, eventFor, shiftRunPatch, baseDemandOf } from '../shift/events.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
@@ -85,8 +85,8 @@ import {
   commissionableClasses,
   type CommissioningChoices,
 } from '../commissioning/types.js';
-import { SANDBOX_CONTRACT_ID, openWeek, takeContract, withContract } from '../shift/week.js';
-import type { ShiftEvent, WeekState } from '../shift/types.js';
+import { SANDBOX_CONTRACT_ID, closeDay, openWeek, takeContract, withContract } from '../shift/week.js';
+import type { DayOutcome, ShiftEvent, WeekState } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
 import type { PlayMode } from '../scope/types.js';
 
@@ -116,6 +116,26 @@ export const SHIFT_LENGTHS: readonly { readonly seconds: number; readonly label:
   ]);
 
 export const DEFAULT_SHIFT_LENGTH_S = 1800;
+
+/**
+ * The shift a scenario opens on — its own, when it authors one, else the shipped default.
+ * § D234, issue #27.
+ *
+ * Called from exactly two places, and the pair is the decision: {@link initialState}, because the
+ * page opens on `CONTRACTS[0]`, and `scenariosPanel`'s `take`, because taking an assignment
+ * restarts the week and is the one moment a player has asked for this scenario rather than for
+ * this shift length.
+ *
+ * It is deliberately **not** called from `withBuilding`. Changing building from the coach select is
+ * not taking an assignment — the player is on day 4 with a streak and they still are — and
+ * re-seeding there would throw away a length they had chosen, which is the inert-control failure
+ * with the sign flipped: the control would move and then move back on its own.
+ *
+ * `ScenarioContract.shiftLengthS` says why one building needs this at all, with the measurement.
+ */
+export function shiftLengthForContract(contractId: string): number {
+  return contractById(contractId)?.shiftLengthS ?? DEFAULT_SHIFT_LENGTH_S;
+}
 
 /** A dispatcher the reader saved. */
 export interface SavedDispatcher {
@@ -296,6 +316,92 @@ export interface ViewerState {
   readonly withheld: readonly string[];
 }
 
+/* -------------------------------------------------------------------------- *
+ * Whose progress is this? — § D231
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Whether a run in this play mode may write {@link ViewerState.week} — § D231.
+ *
+ * ## The defect this exists to end, which was data loss rather than a wrong caption
+ *
+ * `dev/main.ts`'s `closeShift` shaped the report sheet's `subject` on `playMode` and called
+ * `closeDay(state.week, outcome)` **above that branch, unconditionally**. So a Free Play run — the
+ * one whose own sheet prints *"one run, not part of a week — nothing is banked"* — closed a day
+ * into the week, and `saveSessionNow()` on the next line wrote it to `localStorage`. A player who
+ * had banked clean shifts on a scenario and then pressed **Free play** to try a silly dispatcher
+ * came back to a week whose Day-1 history entry was the free-play run's, and it survived a reload
+ * (issue #64).
+ *
+ * It is the same class as `closeShift`'s own *"three panels, two answers"* comment one layer down:
+ * there, the sheet said *your own building* while the rail counted the shift as banked; here, the
+ * sheet says *nothing is banked* while the week is being overwritten. The comment fixed what the
+ * sheet **said**. This fixes what the run **does**.
+ *
+ * ## Why an exhaustive switch and not `mode === 'free-play'`
+ *
+ * A ninth {@link PlayMode} must be a compile error here rather than a silent `false` — or, worse,
+ * a silent `true`, which is the direction that loses somebody's week. `scope/types.ts` makes the
+ * same argument for the union itself: *a named category is a compile error when a fifth one
+ * appears.*
+ *
+ * ## Endless banks nothing and still advances the week, which is not a contradiction
+ *
+ * `week.ts`'s `ENDLESS_CONTRACT_ID` is a sentinel that resolves to no contract, so
+ * `closeDay` already banks nothing and clears nothing there. What endless *does* have is a week —
+ * days, growth, a streak, a seven-day history — and *"the same week with no assignment: it grows"*
+ * is the menu row's own promise. A mode that stopped closing days would stop growing the building,
+ * which is the whole of what a player pressed **Keep going** for.
+ *
+ * Free Play is the opposite: `enterFreePlay` opens a *fresh* week at day 1 precisely so the run is
+ * reproducible from its own selection and postable to a leaderboard. That week is scaffolding for
+ * one run, and writing it over the campaign's is the bug.
+ */
+export function advancesTheWeek(mode: PlayMode): boolean {
+  switch (mode) {
+    case 'shift-week':
+    case 'endless':
+      return true;
+    case 'free-play':
+    case 'ranked':
+    case 'stage-campaign':
+    case 'incidents':
+    case 'calendar':
+    case 'commissioning':
+      return false;
+  }
+}
+
+/**
+ * The week a closed day produces — the whole of {@link advancesTheWeek}'s consequence, in one
+ * place a test can reach.
+ *
+ * Returns {@link ViewerState.week} **unchanged, by identity** when the mode does not advance it, so
+ * *"the scenario week is untouched"* is checkable with `toBe` rather than with a deep compare that
+ * a future field could slip past.
+ */
+export function closedWeekOf(state: ViewerState, outcome: DayOutcome): WeekState {
+  if (!advancesTheWeek(state.playMode)) return state.week;
+  return closeDay(state.week, outcome);
+}
+
+/**
+ * The week that belongs in the saved session — § D231, and the other half of the same guard.
+ *
+ * `saveSessionNow` writes the whole of `ViewerState`, and `closeShift` is not its only caller:
+ * changing a setting saves too. So a guard on `closeDay` alone still lost the week the moment a
+ * free-play player flipped the theme, because `enterFreePlay` has *already* replaced
+ * `state.week` in memory by then. The week on disk is the campaign's and stays the campaign's
+ * until a mode that owns one closes a day.
+ *
+ * `stored` is what `loadSession` last read back, or `undefined` on a first visit — in which case
+ * there is nothing to protect and the current week is written, which is the ordinary path.
+ */
+export function weekForSession(state: ViewerState, stored: WeekState | undefined): WeekState {
+  if (advancesTheWeek(state.playMode)) return state.week;
+  return stored ?? state.week;
+}
+
 /**
  * Change which building is running, taking the editor's working copy with it **when it is
  * untouched**.
@@ -391,7 +497,9 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
     buildingId,
     dispatcherId,
     pattern: 'building',
-    shiftLengthS: DEFAULT_SHIFT_LENGTH_S,
+    // The opening scenario's own shift, which for `c1` is an hour — § D234. The page opens on
+    // `CONTRACTS[0]`, so the length the tutorial is graded over is the length it opens on.
+    shiftLengthS: shiftLengthForContract(contractForBuilding(buildingId)?.id ?? ''),
     // `undefined`, not a default template. The campaign owns the run until Free Play says
     // otherwise, and every published figure in this repository was measured with no override.
     freePlay: undefined,
@@ -479,6 +587,46 @@ export function buildingConfigOf(
   const mine = saved.find((entry) => entry.id === id);
   if (mine !== undefined) return mine.config;
   return resources.entries.find((entry) => entry.config.id === id)?.config;
+}
+
+/**
+ * The building the state is *pointing at*, resolved — for the chrome to describe before a run
+ * exists. § D234, issue #36.
+ *
+ * ## What this is not, and why the distinction is the whole of the fix
+ *
+ * `ShiftRunConfig.building` is the building a run **resolved to**: grown to the day, commissioned,
+ * with the day's incidents written onto it. That is the right thing for the header to describe
+ * while a recording is on screen, and `dev/main.ts` holds it from the last `runShift`.
+ *
+ * It is the wrong thing to describe when there is **no** recording, and the shell had nothing else.
+ * Pressing *Take the next assignment* moves `buildingId` and clears the recording without running,
+ * so the header drew the new building's **name** — read from `state.buildingId` — beside the
+ * previous building's **specs**, held from the last run: `Midtown Office · 6 floors · 2 cars ·
+ * 0.63 m/s · 135 people`, where Midtown Office is 21 floors, 4 cars, 2.5 m/s and 1,710 people. A
+ * player reading that is told the next challenge is the size of the tutorial.
+ *
+ * So: the **shipped** building, not a grown one. Nothing has been run, so there is no day to have
+ * grown it to, and quoting today's population against a run that has not happened would be the
+ * caption-that-does-not-describe-the-picture failure in the other direction.
+ *
+ * `undefined` when the id resolves to nothing, which is the same answer `buildingConfigOf` gives
+ * and the same one the chrome already handles.
+ */
+export function resolvedBuildingOf(
+  resources: BrowserResources,
+  state: ViewerState,
+): ResolvedBuilding | undefined {
+  // The shipped set first and by identity, so the ordinary case costs no parse: `resources.entries`
+  // already carries each one resolved against the shipped specs.
+  const shipped = resources.entries.find((entry) => entry.config.id === state.buildingId);
+  if (shipped !== undefined) return shipped.resolved;
+  const saved = state.savedBuildings.find((entry) => entry.id === state.buildingId);
+  if (saved === undefined) return undefined;
+  return resolveBuilding(
+    parseBuilding(saved.config as unknown),
+    specsWithSaved(resources, state.savedClasses),
+  );
 }
 
 /** The building's display name, without loading the whole document to read it. */

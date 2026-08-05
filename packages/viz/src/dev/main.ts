@@ -97,6 +97,7 @@ import {
   phaseAt,
   playheadPctOf,
   tickLabelsOf,
+  timeOfDayAt,
   timelineOf,
 } from '../live/timeline.js';
 import { systemClock } from '../playback/clock.js';
@@ -124,7 +125,7 @@ import { eventFor } from '../shift/events.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { dayReportOf } from '../shift/report.js';
-import { HISTORY_DAYS, closeDay, outcomeOf } from '../shift/week.js';
+import { HISTORY_DAYS, outcomeOf } from '../shift/week.js';
 import { coachWeekLines } from '../shift/weekLabel.js';
 import { weekdayOf } from '../shift/types.js';
 
@@ -150,7 +151,7 @@ import { mountSelectorEditor } from './selectorEditor.js';
 import { mountLeftRail } from './leftRail.js';
 import { mountMachinesEditor } from './machinesEditor.js';
 import { mountParameterForm } from './parameterForm.js';
-import { mountReport } from './reportPanel.js';
+import { mountReport, runProgressOf } from './reportPanel.js';
 import { mountRightRail } from './rightRail.js';
 import { mountScenarios } from './scenariosPanel.js';
 import { mountTrafficEditor } from './trafficEditor.js';
@@ -161,16 +162,18 @@ import { clearSession, loadLibrary, loadSession, saveSession } from '../persist/
 import type { SessionStore } from '../persist/types.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
 import {
-  DEFAULT_SHIFT_LENGTH_S,
   SHIFT_LENGTHS,
   allBuildingIds,
   buildingConfigOf,
+  closedWeekOf,
   specsWithSaved,
   buildingNameOf,
   disclosureOf,
   initialState,
   profileById,
+  resolvedBuildingOf,
   shiftRunConfigOf,
+  weekForSession,
   withBuilding,
   type ViewerState,
 } from './state.js';
@@ -407,6 +410,30 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * fired.
    */
   let calendarCaption = '';
+  /**
+   * Whether the player has entered a play mode — § D232, and the guard on every progression write.
+   *
+   * `false` for exactly as long as the menu overlay has never been dismissed. The shell opens **on
+   * the menu**, over a viewer that is already loaded and running, and boot's own `runShift()` sits
+   * below that overlay: a play-tester opened the deployed app, read the menu for two minutes,
+   * pressed nothing, and came back to `376 carried today`, all four goals ticked, `1 clean days
+   * running` and `1/3 banked this scenario` (issue #39). A full shift had run to completion and
+   * banked a clean day behind an opaque overlay.
+   *
+   * Two things follow from this flag and they are separate:
+   *
+   * 1. **The boot run does not play itself.** {@link adopt} hands `autoplay: false` while this is
+   *    false, so the stage is drawn at 06:00 and stays there. The picture survives — the browser
+   *    tier reads the bitmap and § D220's *draws the stage* is a claim about a frame, not about a
+   *    moving one — and the footer says `paused` rather than `running`, which is what a cold load
+   *    is.
+   * 2. **Nothing files.** {@link closeShift} returns early, so no day is closed, no attempt is
+   *    counted and no contract is cleared before the player has chosen anything.
+   *
+   * It is **not** the same question as *"is the menu hidden right now?"*. Re-opening the menu
+   * mid-week must not un-choose the mode the player is in; this latches once and never goes back.
+   */
+  let playerHasChosen = false;
 
   /*
    * **Both of the two below are here for `carBadgeHits`' reason, and both were not.**
@@ -759,7 +786,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   /** Write the session back. Cheap, total, and never throws — a refusing browser is not an error. */
   function saveSessionNow(): void {
-    const written = saveSession(sessionStore, state, menuState);
+    /*
+     * **A mode that does not own a week does not write one** — § D231, issue #64's other half.
+     *
+     * Guarding `closeDay` alone was not enough. `enterFreePlay` replaces `state.week` with a fresh
+     * day-one week *the moment Free Play starts*, so any later save — and changing a setting saves
+     * — would have written that scaffolding over the campaign's banked days. The settings and the
+     * Free Play selection still persist, because those belong to the player rather than to the
+     * week; only the week itself is held back, and what is held back is whatever the slot already
+     * has.
+     */
+    const stored = loadSession(sessionStore);
+    const written = saveSession(
+      sessionStore,
+      { ...state, week: weekForSession(state, stored.ok ? stored.snapshot.week : undefined) },
+      menuState,
+    );
     /*
      * The refusal reaches the player, which is the whole reason the budget exists. A library that
      * outgrew the slot and stopped being written **in silence** would be the gap this closed,
@@ -1147,8 +1189,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
     renderMenu(menuRoot, menuHost);
   }
 
+  /**
+   * Leave the menu — and the one place {@link playerHasChosen} is latched.
+   *
+   * Every arm that closes the overlay is a mode being entered: **Start** (free play), **Open the
+   * doors** (the campaign) and **Keep going** (endless). There is no fourth way out, so this is the
+   * complete set of moments at which a run stops being scenery and starts being somebody's day.
+   */
   function closeMenu(): void {
     menuRoot.hidden = true;
+    playerHasChosen = true;
   }
 
   drawMenu();
@@ -1196,7 +1246,29 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const revealed = new Set(state.revealedTabs);
       revealed.add(tab);
       state = { ...state, tab, revealedTabs: revealed };
-      if (tab === 'report') closeShift();
+      /*
+       * **A navigation files a day only when the day has been played out** — § D232, closing the
+       * half § D223 named and could not reach from its own lane.
+       *
+       * This arm was `if (tab === 'report') closeShift();` at any playhead. § D223 is precise about
+       * why that is wrong and about why it is *not* a lie: the simulator runs a day to its end and
+       * then plays it back, so what got banked was the true outcome of a day that really was
+       * simulated in full. What was wrong is that **a navigation had a progression side effect the
+       * reader did not ask for** — it incremented `week.attempt`, and it could bank a clean shift
+       * and clear a contract, on a run nobody had watched a second of.
+       *
+       * The guard is § D223's own: file only when the playhead has reached `endedAt`. That is the
+       * same instant the sheet itself agrees to be a whole-day account at, so the tab can no longer
+       * bank a day the sheet is simultaneously declining to report — the running sheet and the
+       * filed one now cover exactly the two sides of one condition.
+       *
+       * `tick` still files the ordinary way, from the transport reaching the end on the run tab.
+       * This arm remains reachable and necessary: a run that ended while the reader was on another
+       * surface never met `tick`'s `state.tab === 'run'`, and `Playback` advances off the injected
+       * clock rather than off the frame loop — so its playhead *is* at `endedAt` by the time the
+       * reader opens the sheet, and the day files then.
+       */
+      if (tab === 'report' && playheadHasRunOut()) closeShift();
       renderAll();
       ui.tabs[tab].focus();
     },
@@ -1378,7 +1450,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
       resources,
       recording,
       simTimeS,
-      building,
+      /*
+       * The **last run's** building while a run is on screen, and the building the state is
+       * pointing at when there is not — § D234, issue #36.
+       *
+       * `building` is `shiftRunConfigOf`'s: grown to the day, commissioned, with the day's
+       * incidents on it, and therefore the right thing to describe the recording beside it. It is
+       * the wrong thing to describe when the recording has been cleared and nothing has re-run,
+       * which is exactly what *Take the next assignment* does — it moves `buildingId`, drops the
+       * recording, and does not run. The header then drew the new building's name against the old
+       * building's specs, and the picture underneath was the old building's frame stretched over
+       * the new one's box.
+       */
+      building: recording === undefined ? resolvedBuildingOf(resources, state) : building,
       playing: playback?.state === 'playing',
     };
   }
@@ -1614,9 +1698,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     if (ui.header.viewMode.value !== state.mode) ui.header.viewMode.value = state.mode;
     setText(ui.header.buildingName, buildingNameOf(resources, state.savedBuildings, state.buildingId));
+    // `view.building`, not the boot-scope binding: the two differ exactly when there is no
+    // recording, which is the case § D234 is about. Reading the binding here is what put the
+    // tutorial's geometry under the next scenario's name.
     setText(
       ui.header.buildingSub,
-      building === undefined ? '' : statLineOf(building),
+      view.building === undefined ? '' : statLineOf(view.building),
     );
     setText(ui.header.clock, view.recording === undefined ? '06:00' : clockAt(view.simTimeS));
     const phase = view.recording === undefined ? undefined : phaseAt(view.recording, view.simTimeS);
@@ -1625,7 +1712,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       ui.header.dayLabel,
       `Day ${String(state.week.day)} · ${weekdayOf(state.week.dayIdx)}`,
     );
-    const population = building?.floors.reduce((total, floor) => total + floor.population, 0) ?? 0;
+    const population =
+      view.building?.floors.reduce((total, floor) => total + floor.population, 0) ?? 0;
     setText(ui.header.tenantsLine, `${population.toLocaleString('en-GB')} tenants`);
   }
 
@@ -1900,8 +1988,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * clause 4, because *asked* now includes the menu's own switch and not only the operating
        * system's. `shouldAutoplay` reads `prefers-reduced-motion`; a player who set the setting has
        * asked for the same thing by a different route and was being ignored.
+       *
+       * **And nothing plays until a mode has been chosen** — § D232, issue #39. Boot's own
+       * `runShift()` lands under the menu overlay, so a page nobody had touched read
+       * `running · 0 arrived, 0 carried` on load and had carried 376 people by the time the reader
+       * finished the menu. The recording is still made and still drawn — the stage shows the
+       * building at 06:00, which is the start state a cold load should sit at — it simply does not
+       * start moving on its own behind a screen the player has not left yet.
        */
-      autoplay: shouldAutoplayWith(window.matchMedia.bind(window), menuState.settings.reduceMotion),
+      autoplay:
+        playerHasChosen &&
+        shouldAutoplayWith(window.matchMedia.bind(window), menuState.settings.reduceMotion),
     });
     disableTransport(ui, false);
     filedRunId = undefined;
@@ -1922,9 +2019,55 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * The report is built from the **whole** recording rather than from the playhead: a day's account
    * is the day's, and a reader who paused at 09:00 has not made the afternoon not happen.
    */
+  /**
+   * Whether the caret is somewhere a navigation would throw work away.
+   *
+   * The DOM read, kept apart from {@link reportOpensItself}'s decision for the reason every panel
+   * in `dev/` states: a decision that needs a `document` cannot be tested. A `<select>` counts —
+   * an open dropdown unmounted underneath the reader is the same interruption as an unmounted
+   * textbox, minus the lost characters.
+   */
+  /** The focused element as a `(tagName, role)` pair — the DOM half of {@link spaceBelongsToFocus}. */
+  function activationRoleOf(active: Element | null): ActivationRole {
+    return {
+      tagName: active?.tagName ?? '',
+      role: active?.getAttribute('role')?.trim().toLowerCase() ?? '',
+    };
+  }
+
+  function focusIsInAControl(): boolean {
+    const active = document.activeElement;
+    return (
+      active instanceof HTMLInputElement ||
+      active instanceof HTMLTextAreaElement ||
+      active instanceof HTMLSelectElement
+    );
+  }
+
+  /**
+   * Whether the run on screen has been played to its end — the one test, asked in one place.
+   *
+   * `runProgressOf` is `dev/reportPanel.ts`'s and is imported rather than re-derived. It is the
+   * predicate that decides whether the sheet is allowed to be a whole-day account (§ D223), and
+   * *"may this day be filed"* has to be the same question or the tab banks a day the sheet on it is
+   * declining to report. Two answers to that is § D223's own two-answers screen, one layer down.
+   */
+  function playheadHasRunOut(): boolean {
+    return runProgressOf(viewAt()).kind === 'played-out';
+  }
+
   function closeShift(): void {
     const recording = state.recording;
     if (recording === undefined || filedRunId === recording.runId) return;
+    /*
+     * Nothing is filed before the player has entered a mode — § D232, issue #39.
+     *
+     * The shell opens on the menu over a viewer that has already run boot's shift. Without this, a
+     * cold load with the overlay still up reached `tick`, found `playback.state === 'ended'`, and
+     * closed a day: `1 clean days running` and `1/3 banked this scenario` on a page nobody had
+     * touched. The run itself is real and stays on screen; what it may not do is count.
+     */
+    if (!playerHasChosen) return;
     filedRunId = recording.runId;
     const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
     const goals = goalsForDay(state.week.day);
@@ -1939,7 +2082,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
       carried: observations.carried,
       arrived: observations.arrived,
     });
-    const week = closeDay(state.week, outcome);
+    /*
+     * **The week is written only by a mode that owns one** — § D231, issue #64.
+     *
+     * This line was `closeDay(state.week, outcome)`, unconditional, *above* the `playMode` branch
+     * forty lines down that shapes the sheet's `subject`. So a Free Play run advanced and wrote the
+     * scenario week while the sheet it produced printed *"one run, not part of a week — nothing is
+     * banked"* — and `saveSessionNow()` below put it in `localStorage`, where it survived a reload
+     * and took the player's banked shifts with it.
+     *
+     * The decision is `dev/state.ts`'s and is asserted there against a week with a banked day in
+     * it, because a decision made inside this closure needs a document, a canvas and a click to
+     * reach — which is why this one went four modes without a test.
+     */
+    const week = closedWeekOf(state, outcome);
     const report = dayReportOf({
       recording,
       observations,
@@ -1977,7 +2133,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * navigation ends up fighting itself.
      */
     state = { ...state, week, report };
-    if (state.tab !== 'report') state = { ...state, tab: 'report' };
+    /*
+     * **The sheet opens itself only over a reader who is not doing something else** — § D233,
+     * issue #67.
+     *
+     * This was `if (state.tab !== 'report') state = { ...state, tab: 'report' };`, unconditional.
+     * At ×60 a shift ends about every thirty real seconds, so on the Simulation tab the pane was
+     * yanked to the Day report on that cadence: a play-tester typing in the **Seed** field had the
+     * textbox unmounted mid-word with the characters going nowhere and nothing to undo, and a click
+     * on the **Dispatcher** tab was overridden a moment later by a navigation they had not asked
+     * for.
+     *
+     * The auto-open is the handoff's own behaviour (`closeDay` fires at the end of the day and
+     * opens the sheet) and is kept, because the handoff wins disagreements about what the screen
+     * does. What it never described is a reader who has already gone somewhere else. So the two
+     * cases the issue reports are exactly the two the predicate refuses, and the ordinary case —
+     * watching the run, hands off — is unchanged.
+     */
+    if (reportOpensItself({ tab: state.tab, focusIsInAControl: focusIsInAControl() })) {
+      state = { ...state, tab: 'report' };
+    }
     // A closed day is the thing a player would most mind losing to a reload, so it is the moment
     // the session is written. `nextDay` goes through here on its way to the next sheet.
     saveSessionNow();
@@ -1992,7 +2167,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const recording = state.recording;
     const canvas = ui.stage.canvas;
     const context2d = canvas.getContext('2d');
-    if (recording === undefined || playback === undefined || context2d === null) return;
+    if (context2d === null) return;
 
     const box = canvas.parentElement?.getBoundingClientRect();
     const width = Math.max(360, Math.floor(box?.width ?? 800));
@@ -2003,6 +2178,28 @@ function boot(ui: Elements, resources: BrowserResources): void {
       canvas.height = Math.floor(height * ratio);
     }
     context2d.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+    /*
+     * **No run, no picture** — § D234, issue #36's second half, and the reason the early return
+     * moved below the resize rather than being deleted.
+     *
+     * This function used to return before touching the canvas at all when there was no recording,
+     * so the last frame stayed painted at the backing size it was painted at. Pressing *Take the
+     * next assignment* left a 360×260 bitmap of Garden Apartments stretched across a 750×405 box —
+     * measured by the reporter — with its title, its shafts and its overflowing status strip still
+     * legible under the next scenario's name. Every other surface was already in the correct *no
+     * run yet* empty state; only the canvas was lying.
+     *
+     * The buffer is resized first and *then* cleared, in that order: clearing a stale-sized buffer
+     * and leaving it stale would fix the picture and keep the blur the moment anything drew again.
+     * The alt text goes with it, because a screen reader was being told about the previous run too.
+     */
+    if (recording === undefined || playback === undefined) {
+      context2d.clearRect(0, 0, width, height);
+      setHidden(ui.stage.alarm, true);
+      canvas.setAttribute('aria-label', 'No shift has been run yet, so the stage is empty.');
+      return;
+    }
 
     const frame = playback.frame();
     const wantsOverlay = width >= OVERLAY_MIN_VIEWPORT_PX;
@@ -2296,7 +2493,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const pct = playheadPctOf(recording, view.simTimeS);
     ui.transport.playhead.style.left = `${pct.toFixed(2)}%`;
     ui.transport.timeline.setAttribute('aria-valuenow', String(Math.round(pct * 10)));
-    ui.transport.timeline.setAttribute('aria-valuetext', clockAt(view.simTimeS));
+    /*
+     * **Seconds, and the frame step is why** — § D234, issue #69.
+     *
+     * The play-tester pressed the `,` advertised on the step button's own tooltip five times and
+     * reported that it does nothing. Driven in the browser tier, it does exactly what it promises:
+     * the playhead moved `5.15 % → 5.10 %`, the same distance the button's own click moves it. What
+     * is true is that **nothing on the page could show it**. One display frame at the default ×60
+     * is one simulated second — 0.06 % of a 1 800 s run, under half a pixel of timeline, and this
+     * slider's `aria-valuetext` was `hh:mm`. So the one reader the tooltip makes a promise to, and
+     * the only reader with no pixels to check it against, was told the shortcut exists and given a
+     * readout that could not move under it.
+     *
+     * `hh:mm:ss` here rather than a wider `aria-valuenow` scale, because `valuemax` lives in
+     * `index.html` and because a time is what this slider is *of*: `aria-valuetext` exists exactly
+     * so a slider announces its own units instead of a percentage. The header clock stays `hh:mm` —
+     * it is a caption on a day, not a readout on a control.
+     */
+    ui.transport.timeline.setAttribute('aria-valuetext', clockWithSecondsAt(view.simTimeS));
   }
 
   function fillLandingSelect(recording: VizRecording): void {
@@ -2418,6 +2632,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
       }
       switch (event.key) {
         case ' ':
+          /*
+           * **Space belongs to a focused control first** — § D234, found while driving issue #69.
+           *
+           * This arm was an unconditional `event.preventDefault()`, and that is not a spare
+           * keystroke: `preventDefault` on a `keydown` of Space over a focused `<button>`
+           * **suppresses the button's own activation**. Measured in the browser tier — Space with
+           * `#step-back` focused toggled play/pause and did **not** step back — so the two controls
+           * the play-tester was alternating between were fighting each other for one key, and the
+           * one that lost is the one the platform promises.
+           *
+           * The timeline is deliberately *not* in the exempt set: `role="slider"` does not activate
+           * on Space in any platform convention, so a reader who has tabbed to the transport bar
+           * still gets play/pause from it. `KX-04`'s three `instanceof` guards above already
+           * excused inputs, textareas and selects; this is the fourth kind of control that owns the
+           * key, and the first one that owns it by *activation* rather than by typing.
+           */
+          if (spaceBelongsToFocus(activationRoleOf(document.activeElement))) break;
           event.preventDefault();
           playback?.toggle();
           drawTransportChrome(viewAt());
@@ -2488,6 +2719,136 @@ function boot(ui: Elements, resources: BrowserResources): void {
 }
 
 const MODE_KEY = 'elevator-sim.viewMode';
+
+/* ========================================================================== *
+ * Space, and who owns it — § D234, issue #69
+ * ========================================================================== */
+
+/** What the focused element is, as far as *does Space activate this?* is concerned. */
+export interface ActivationRole {
+  /** Upper-case, as `Element.tagName` gives it. `''` when nothing is focused. */
+  readonly tagName: string;
+  /** An explicit `role`, lower-cased, or `''`. An author's `role` outranks the tag. */
+  readonly role: string;
+}
+
+/**
+ * The ARIA roles whose platform contract is *Space activates me*.
+ *
+ * `slider` is deliberately absent and is the one worth naming: the transport timeline carries
+ * `role="slider"`, sliders are driven by arrows in every platform convention, and a reader who has
+ * tabbed onto the bar should still get play/pause from the space bar. `link` is absent too —
+ * a link is <kbd>Enter</kbd>.
+ */
+const SPACE_ACTIVATES_ROLES: ReadonlySet<string> = new Set([
+  'button',
+  'checkbox',
+  'menuitem',
+  'menuitemcheckbox',
+  'menuitemradio',
+  'option',
+  'radio',
+  'switch',
+  'tab',
+]);
+
+/**
+ * Whether <kbd>Space</kbd> belongs to whatever is focused rather than to the transport — issue #69.
+ *
+ * ## The defect, found by driving rather than by reading
+ *
+ * `wireKeyboard`'s Space arm called `event.preventDefault()` unconditionally. On a focused
+ * `<button>` that **cancels the button's own activation** — the browser synthesises the click from
+ * the default action, and the default action had been prevented. Measured in the browser tier:
+ * Space with `#step-back` focused toggled play/pause and did not step a frame. So a reader
+ * alternating between the two transport controls the issue is about had them fighting for one key,
+ * and the loser was the one the platform guarantees.
+ *
+ * ## Why the answer is a role and not an `instanceof`
+ *
+ * The three guards above this in the handler are `instanceof HTMLInputElement` and friends, which
+ * is right for *typing*: a textarea owns every printable key by being a textarea. Activation is not
+ * a fact about a constructor — a `<div role="button">` owns Space and an `<a>` does not, and both
+ * are `HTMLElement`. Keeping the question as a `(tagName, role)` pair also keeps this decision
+ * testable without a document, which is the split the rest of `dev/` keeps.
+ *
+ * An `<input>` reaches this predicate as `INPUT` and would answer `true` for a checkbox — but it
+ * never gets here, because `KX-04`'s guard has already returned. Answering correctly anyway costs
+ * nothing and means the predicate is true on its own terms rather than only in context.
+ */
+export function spaceBelongsToFocus(focus: ActivationRole): boolean {
+  if (focus.role !== '') return SPACE_ACTIVATES_ROLES.has(focus.role);
+  return focus.tagName === 'BUTTON' || focus.tagName === 'SUMMARY' || focus.tagName === 'INPUT';
+}
+
+/* ========================================================================== *
+ * The transport clock — § D234, issue #69
+ * ========================================================================== */
+
+/**
+ * `hh:mm:ss` at a playhead position — the timeline slider's `aria-valuetext`, and the only place
+ * in the product that prints a second.
+ *
+ * `live/timeline.ts`'s `clockAt` is `hh:mm` and stays `hh:mm`: it is the header's *caption on a
+ * day*, and putting seconds on it would make a chrome line tick sixty times a minute for no
+ * reader's benefit. This is a *readout on a control*, and the control advertises a shortcut that
+ * moves the playhead by one simulated second at the shipped speed. A readout that could not
+ * resolve its own control's smallest move is what made the shortcut look dead.
+ *
+ * Built from `timeOfDayAt` rather than from a second copy of the day-start offset, so the two
+ * clocks cannot come to disagree about what 06:00 means.
+ */
+export function clockWithSecondsAt(simTimeS: number): string {
+  const wrapped = ((timeOfDayAt(simTimeS) % 86_400) + 86_400) % 86_400;
+  const hours = Math.floor(wrapped / 3600);
+  const minutes = Math.floor((wrapped % 3600) / 60);
+  const seconds = Math.floor(wrapped % 60);
+  return (
+    `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:` +
+    String(seconds).padStart(2, '0')
+  );
+}
+
+/* ========================================================================== *
+ * When the report is allowed to open itself — § D233
+ * ========================================================================== */
+
+/** What decides whether a finished run may move the pane. Both facts are about the *reader*. */
+export interface ReportOpenInput {
+  /** The surface the reader is on when the run ends. */
+  readonly tab: TabName;
+  /** Whether the caret is inside an input, a textarea or a select. */
+  readonly focusIsInAControl: boolean;
+}
+
+/**
+ * Whether a run reaching its end may switch the pane to the Day report — `issue #67`.
+ *
+ * Two refusals, and each is one of the two the issue reports:
+ *
+ * - **The reader is not on the run.** They clicked *Dispatcher* while the shift was finishing, and
+ *   a moment later the selected tab was *Day report* — a click overridden by a timer they do not
+ *   control. A reader who has navigated has answered *where should I be* more recently than the
+ *   transport has.
+ * - **The reader is typing.** The Seed textbox was unmounted mid-word and the characters went
+ *   nowhere, with no error and nothing to undo. Silently discarding input is the worst class of
+ *   interruption, and it is the one a fixed cadence guarantees: at ×60 a shift ends roughly every
+ *   thirty real seconds, and with the loop chip on it never stops.
+ *
+ * Everything else is unchanged, deliberately. The design's own behaviour is that the day ending
+ * opens the sheet, and `docs/12`'s standing rule is that the handoff wins disagreements about what
+ * the screen does — so a reader watching the run, hands off the keyboard, still gets taken to the
+ * report the moment it is worth reading. What the handoff never described is a reader who is
+ * already somewhere else, and that is the whole of what this refuses.
+ *
+ * Being on the report tab already is *not* a refusal case: it is a no-op the caller skips anyway,
+ * and answering `true` there keeps the predicate a statement about the destination rather than
+ * about whether a write is redundant.
+ */
+export function reportOpensItself(input: ReportOpenInput): boolean {
+  if (input.focusIsInAControl) return false;
+  return input.tab === 'run' || input.tab === 'report';
+}
 
 /* ========================================================================== *
  * The bank filter — SG-15
@@ -2668,7 +3029,22 @@ export function deepLinkStateOf(
   if (isRailSegment(segment)) patch.railSegment = segment;
   const mode = params.get('mode');
   if (isViewMode(mode)) patch.mode = mode;
-  return { ...state, ...patch, shiftLengthS: patch.shiftLengthS ?? DEFAULT_SHIFT_LENGTH_S };
+  /*
+   * The **state's** opening length when the link names none, not the module constant — § D234.
+   *
+   * These two were `DEFAULT_SHIFT_LENGTH_S` and `deepLinkDefaultsOf(...).shiftLengthS`, two
+   * constants that happened to be equal, and `deepLinkSearchOf` omits `duration` whenever it equals
+   * the second. The moment `c1` gained an authored shift (issue #27) they stopped agreeing, and the
+   * round trip broke in the direction that is hardest to see: a link produced from an untouched page
+   * omitted `duration`, and applying it silently ran a 1 800 s shift where the page had run 3 600 —
+   * *"a different run wearing the same address"*, which is the failure this pair exists to prevent
+   * and which `main.test.ts` caught.
+   *
+   * `state` here is `initialState`'s, and `deepLinkDefaultsOf` reads the same function, so the
+   * writer's *default* and the reader's *fallback* are now one value by construction rather than by
+   * two literals staying in step.
+   */
+  return { ...state, ...patch, shiftLengthS: patch.shiftLengthS ?? state.shiftLengthS };
 }
 
 /**

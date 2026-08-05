@@ -102,7 +102,7 @@ import type { VizRecording, VizSummary } from '../contract/types.js';
 import { eventFor } from './events.js';
 import { readGoals } from './goals.js';
 import { growthFactor } from './growth.js';
-import { ENDLESS_CONTRACT_ID } from './week.js';
+import { ENDLESS_CONTRACT_ID, wasGraded } from './week.js';
 import {
   DAY_START_S,
   WAKE_UP_ARRIVALS,
@@ -486,6 +486,16 @@ interface ShiftJudgement {
  * `Record<ShiftVerdict, …>` rather than an `if`, so a third verdict is a compile error at this table
  * rather than a silently un-worded sheet — and so the three strings for one verdict sit on one line
  * of source, where a reader can see that they agree.
+ *
+ * **That compile error has now fired once, which is the point of it.** § D234 made *ungraded* a
+ * verdict of its own (issue #27), and adding the member to `DayReport['verdict']` broke this table
+ * until the key existed. The alternative — an `if (!graded)` branch outside the lookup — is exactly
+ * the defect § D237 closed, arriving through a new door: a day could then reach a cleared or missed
+ * headline without having been decided cleared or missed.
+ *
+ * **The three sentence sets are disjoint by construction.** No arm of {@link missedLede} says *too
+ * quiet to grade* any more — it cannot be reached on an ungraded day at all — and
+ * {@link ungradedLede} names no goal and makes no claim about how the day went.
  */
 const VERDICT_VOICE: Readonly<
   Record<
@@ -514,6 +524,17 @@ const VERDICT_VOICE: Readonly<
     heading: 'Where it went wrong',
     lede: missedLede,
   }),
+  ungraded: Object.freeze({
+    line: 'Too quiet to grade',
+    /*
+     * Neither of the other two headings, and for the reason that made this a third verdict at all.
+     * *Where it went wrong* asserts something went wrong; *the tightest moment* implies a bar was
+     * approached. Nothing was read, so the rows underneath are observations about a morning rather
+     * than evidence for or against anything — which is what this heading says instead.
+     */
+    heading: 'What the morning did',
+    lede: ungradedLede,
+  }),
 });
 
 /**
@@ -522,14 +543,33 @@ const VERDICT_VOICE: Readonly<
  * The verdict itself is unchanged — *every goal met*, read from {@link readGoals} against the same
  * observations the left rail reads, so the sheet and the rail cannot disagree either. What changed
  * is that nothing else on the sheet decides the same question a second time.
+ *
+ * **Three answers rather than two, since § D234.** *Missed* used to mean two different days: one
+ * that was asked for 87 % and carried 61 %, and one whose building never woke up. A play-tester
+ * carried 18 of 18 people with 100 % away inside a minute and a 36 s worst wait, and read
+ * *"Shift missed. Streak reset."* across the top of it — twice, on the tutorial, which is where a
+ * new player decides whether the feedback on this screen is worth believing.
+ *
+ * `wasGraded` is `week.ts`'s predicate and not a second copy of it: this verdict and `closeDay`'s
+ * streak arithmetic have to turn on the same test, or the sheet says *the streak is untouched*
+ * about a week that lost one. *Unjudged is not passed* is untouched — an ungraded day is still not
+ * clean, banks nothing and clears nothing. What it no longer does is **cost** anything.
  */
 function judgementOf(
   readings: readonly GoalReading[],
   summary: VizSummary,
   observations: Observations,
 ): ShiftJudgement {
-  const verdict: ShiftVerdict =
-    readings.length > 0 && readings.every((reading) => reading.state === 'met')
+  /*
+   * `wasGraded` is asked first, and that ordering is load-bearing rather than tidy. It already
+   * requires a non-empty list, so a day with **no goals** cannot reach `cleared` through `every`'s
+   * vacuous truth — it lands on `ungraded`, which is what a day nobody set a bar for is. The old
+   * two-way expression guarded that with its own `readings.length > 0`; the guard now lives in the
+   * predicate the week reads, where there is one of it.
+   */
+  const verdict: ShiftVerdict = !wasGraded(readings)
+    ? 'ungraded'
+    : readings.every((reading) => reading.state === 'met')
       ? 'cleared'
       : 'missed';
   const voice = VERDICT_VOICE[verdict];
@@ -574,12 +614,54 @@ function clearedLede(summary: VizSummary, observations: Observations): string {
 }
 
 /**
- * The three ways a day fails to clear, and none of them opens with praise.
+ * The day nobody looked at — § D234, issue #27.
  *
- * The ungraded branch is the one worth naming. Under {@link WAKE_UP_ARRIVALS} arrivals every reading
- * is `pending`, so `verdict` is `missed` — `week.ts` counts unjudged as not passed — and a sentence
- * saying which goals went unmet would be false, because none was read at all. Saying *too quiet to
- * grade* is the R3 shape one layer up: the absence gets a reason rather than a blank or a fiction.
+ * ## Why this is a voice of its own and not a branch inside {@link missedLede}
+ *
+ * It was one, and it had the words right and the verdict wrong: the sheet said *too quiet to grade*
+ * under a banner reading **Shift missed**, and `closeDay` reset the streak underneath. So the
+ * sentence and the banner disagreed about the same day — § D237's own defect, surviving inside the
+ * one arm that had already noticed the problem.
+ *
+ * ## What it may say, and what it deliberately may not
+ *
+ * **Two counts and a remedy, and no goal.** The arrivals and the threshold are both observations
+ * this sheet already carries, so neither is a new claim; naming a goal would be false, because none
+ * was read. The remedy is on it because the rule *"nothing is graded before the building wakes up"*
+ * lived on the **Simulation tab**, in a coach hint the reader left two clicks ago — and the control
+ * that fixes it is offered as a convenience about how long you want to sit and watch, when it is in
+ * fact the entry condition.
+ *
+ * *"The streak is untouched"* is a statement about what `closeDay` did rather than a consolation:
+ * `wasGraded` is the predicate on both sides, so the sentence is true exactly when the arithmetic
+ * is.
+ *
+ * The two unread parameters are in the signature because {@link VERDICT_VOICE} types all three
+ * ledes alike, and that uniformity is what keeps the table a lookup instead of three special cases
+ * — which is the property § D237 bought and this arm must not spend.
+ */
+function ungradedLede(
+  _summary: VizSummary,
+  observations: Observations,
+  _readings: readonly GoalReading[],
+): string {
+  return (
+    `Too quiet to grade. ${String(observations.arrived)} people called and the goals need ` +
+    `${String(WAKE_UP_ARRIVALS)}, so nothing on this sheet was judged — the day is not a miss, ` +
+    'and the streak is untouched. Run a longer shift and the same building will have something ' +
+    'to be graded on.'
+  );
+}
+
+/**
+ * The two ways a **judged** day fails to clear, and neither of them opens with praise.
+ *
+ * The ungraded case is no longer here and can no longer arrive: since § D234 a day carrying a
+ * `pending` reading is `ungraded`, so this function only ever sees a day where every goal was read
+ * and at least one was not met. `unmet` is therefore never empty. The guard below is a total
+ * function's belt rather than a reachable branch, and it **drops the clause instead of inventing a
+ * sentence** — so the missed arm can never print the ungraded voice, which is the disjointness
+ * § D237 asks of this table.
  */
 function missedLede(
   summary: VizSummary,
@@ -595,17 +677,20 @@ function missedLede(
     );
   }
   const unmet = readings.filter((reading) => reading.state === 'missed');
-  if (unmet.length === 0) {
-    return (
-      `Too quiet to grade. ${String(observations.arrived)} legs arrived, under the ` +
-      `${String(WAKE_UP_ARRIVALS)} this sheet reads a day from, so no goal was met and none was ` +
-      'missed. Nothing here is banked, and nothing here is a verdict on the building.'
-    );
-  }
-  const named = listOf(unmet.map((reading) => `“${reading.goal.label}”`));
+  /*
+   * The empty case **drops the clause** rather than taking a branch of its own — § D234.
+   *
+   * It used to be an `if` returning *"Too quiet to grade …"*, and that was this arm answering a
+   * question it does not own: an ungraded day now has its own verdict, its own banner and its own
+   * lede, and a second copy of the sentence here would let the missed banner sit over the ungraded
+   * words again. `judgementOf` cannot route an ungraded day here at all, so this is unreachable;
+   * what it must never do is become *reachable and wrong*, and a dropped clause is the only shape
+   * with no sentence to be wrong with.
+   */
+  const clause = unmet.length === 0 ? '' : ` — and ${listOf(unmet.map((reading) => `“${reading.goal.label}”`))} still went unmet`;
   return (
-    `Short of what the shift asked for. ${countsClause(observations)} — and ${named} still went ` +
-    'unmet. The banner below is counting the same thing this sentence is.'
+    `Short of what the shift asked for. ${countsClause(observations)}${clause}. The banner below ` +
+    'is counting the same thing this sentence is.'
   );
 }
 
@@ -1065,16 +1150,36 @@ function leverPointersFor(
 const DEEP_QUEUE = 24;
 
 /**
- * The design's streak sentences (`design.html` :3499), unchanged.
+ * The design's streak sentences (`design.html` :3499), with a third for the day nobody judged.
  *
  * Takes the {@link ShiftJudgement}'s verdict rather than a second `allMet` boolean, so the streak
- * cannot reset on a day the banner above it calls cleared.
+ * cannot reset on a day the banner above it calls cleared — § D237 — and, since § D234, so the
+ * ungraded arm is reached through the **same** value the banner is. A `graded` boolean beside the
+ * verdict would have been a second answer to a question the verdict already contains, which is the
+ * shape both decisions exist to refuse.
+ *
+ * The ungraded sentence is § D234's, and it is a statement about the week rather than a kindness:
+ * *"Streak reset"* names something taken away, and the play-tester had nothing to take — two
+ * perfect-but-ungraded days, each announced as a loss. `closeDay` now leaves the streak alone on
+ * an ungraded day, keyed on the same `wasGraded` this verdict is, so the sheet and the arithmetic
+ * move together or neither does.
+ *
+ * Exhaustive over the verdict rather than an `if` chain with a fallthrough: a fourth verdict must be
+ * a compile error here, for {@link VERDICT_VOICE}'s reason.
  */
 function streakLineFor(verdict: ShiftVerdict, streak: number): string {
-  if (verdict === 'missed') {
-    return 'Streak reset. The building keeps growing either way — nothing here is a game over.';
+  switch (verdict) {
+    case 'missed':
+      return 'Streak reset. The building keeps growing either way — nothing here is a game over.';
+    case 'ungraded':
+      return streak > 0
+        ? `Nothing was graded, so your streak of ${String(streak)} stands. The building keeps growing either way.`
+        : 'Nothing was graded, so nothing was lost. The building keeps growing either way — nothing here is a game over.';
+    case 'cleared':
+      return streak === 1
+        ? 'First clean day. Streak started.'
+        : `${String(streak)} clean days in a row.`;
   }
-  return streak === 1 ? 'First clean day. Streak started.' : `${String(streak)} clean days in a row.`;
 }
 
 function contractLineFor(contract: ScenarioContract | undefined, week: WeekState): string {

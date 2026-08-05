@@ -15881,3 +15881,366 @@ lane's files:
 2. `src/live/timeline.ts` holds a sixth copy — `{ bg: '#161e2a', fg: '#6d7b8d' }` per phase — so the
    timeline's segment labels are 3.15:1 in both modes.
 3. `--band-3` at 4.47:1 on `--panel`, which § D235 measured and deliberately did not move.
+## D231 — a free-play run may not write the week, and the sheet saying so was not enough
+
+**Date: 2026-08-05 · Written after the code, and says so.** Play-test issue #64, reproduced from the
+source and then pinned by a test that is red without the fix.
+
+### What was reported, and what was actually happening
+
+A player banks a clean shift on Scenario 1, presses **Free play** to try a silly dispatcher, and
+comes back to a week whose Day-1 history entry is the free-play run's. The reporter's own
+`localStorage` dump is the evidence: `history: [{ arrived: 355, carried: 355, minutePct: 100 }]`
+before, `history: [{ arrived: 523, carried: 523, minutePct: 93 }]` after. **It survives a reload.**
+The Day report sheet on screen at that moment reads *"one run, not part of a week — nothing is
+banked"*.
+
+The mechanism is two lines of `dev/main.ts`'s `closeShift`, forty lines apart:
+
+```ts
+const week = closeDay(state.week, outcome);        // unconditional
+…
+subject: state.playMode === 'free-play' ? { kind: 'single-run' } : { kind: 'week-day' },
+```
+
+So the **sheet's shape** branched on the mode and the **week's arithmetic** did not, and
+`saveSessionNow()` two lines below `closeDay` put the result on disk. This is the same defect as the
+comment already standing in that function — *"three panels, two answers"*, where the sheet said *your
+own building* while the rail counted the shift as banked. That fix corrected what the sheet **said**.
+This corrects what the run **does**, which is the layer the earlier fix stopped one short of.
+
+### The rule
+
+**A run writes `ViewerState.week` only if its play mode owns one.** `advancesTheWeek` is that
+predicate, in `dev/state.ts`, as an exhaustive `switch` over `PLAY_MODES` — so a ninth mode is a
+compile error rather than a silent `false`, or worse a silent `true`, which is the direction that
+loses somebody's week. `scope/types.ts` makes the same argument for the union itself.
+
+`shift-week` and `endless` advance; `free-play` does not. **Endless banking nothing and still
+advancing the week is not a contradiction**: `ENDLESS_CONTRACT_ID` is a sentinel that resolves to no
+contract, so `closeDay` already banks nothing and clears nothing there — what endless *has* is a
+week, with days and 11 %/day growth and a seven-day history, and *"the same week with no assignment:
+it grows"* is the menu row's own promise. A mode that stopped closing days would stop growing the
+building, which is the whole of what **Keep going** is for.
+
+### Why a guard on `closeDay` alone was not the fix
+
+Measured rather than assumed, by reading the other callers. `enterFreePlay` replaces `state.week`
+with a fresh day-one week **the moment Free Play starts** — deliberately, because that is what makes
+a free-play run reproducible from its own selection and postable to a leaderboard. So *any* later
+save would have written that scaffolding over the campaign's banked days, and `closeShift` is not
+`saveSessionNow`'s only caller: **changing a setting saves too.** A player who entered Free Play and
+flipped the theme lost the week without a single run finishing.
+
+So there are two functions and they are both necessary: `closedWeekOf` decides what a closed day
+produces, and `weekForSession` decides what the slot is written with — *whatever the slot already
+has*, when the mode does not own a week. The settings and the Free Play selection still persist,
+because those belong to the player rather than to the week.
+
+### The evidence
+
+`dev/state.progression.test.ts`, built on the issue's own numbers. The central assertion is an
+**identity** check — `expect(closedWeekOf(state, outcome)).toBe(week)` — rather than a deep compare,
+so a `WeekState` that grows an eighth counter cannot quietly start being rebuilt on a free-play
+close. It is watched failing: with the guard removed, *leaves the banked week untouched* and *keeps
+every field the issue watched* go red and the other seven stay green.
+
+## D232 — the game may not play itself, and a navigation is not a progression event
+
+**Date: 2026-08-05 · Written after the code.** Play-test issue #39, and the half
+[§ D223](DECISIONS.md) named as *"the next thing to do here"* and could not reach from its own lane.
+
+### Two mechanisms, one symptom
+
+The reporter opened the deployed app cold, read the menu, pressed nothing, and came back to
+`376 carried today`, all four goals ticked, `1 clean days running` and `1/3 banked this scenario`.
+
+1. **`boot()` ends `restoreSession(); applyTheme(); renderAll(); runShift();`**, and the shell opens
+   **on the menu overlay** over a viewer that is already loaded. So the run started under the
+   overlay, `adopt` autoplayed it, `tick` found `playback.state === 'ended'` — `state.tab` opens on
+   `'run'`, so the guard there did not stop it — and `closeShift` banked a clean day. The footer read
+   `running` on a page nobody had touched.
+2. **`openTab` was `if (tab === 'report') closeShift();`** at any playhead, so merely navigating to
+   the sheet filed the day, incremented `week.attempt`, and could clear a contract.
+
+### What was decided, and what was deliberately not
+
+**`playerHasChosen`, latched in `closeMenu`.** Three arms close the overlay — **Start**, **Open the
+doors**, **Keep going** — and each is a mode being entered, so latching in `closeMenu` makes the set
+complete by construction rather than by a list somebody maintains. Until it latches, `adopt` hands
+`autoplay: false` and `closeShift` returns early.
+
+**Boot still runs its shift, and that is a choice against the issue's own suggestion.** Deleting the
+boot run would empty the stage, and § D220's browser tier reads the *bitmap* — *draws the stage*,
+`distinctColours > 8` — as the only thing a caught boot failure cannot fake. A blank canvas would
+make that assertion unable to tell *no run yet* from *dead product*, which is the exact property the
+tier was built for. A deep link would also arrive at an empty page, and a deep link is somebody
+sending a finding to somebody else. So the run is made and drawn, paused at 06:00, and the footer
+says `paused` — which is what a cold load *is*, and is the issue's own "start state until the player
+chooses something".
+
+**The `openTab` guard is § D223's, verbatim: file only when the playhead has reached `endedAt`.** It
+asks `reportPanel.ts`'s exported `runProgressOf` rather than deriving a second answer, because that
+is the predicate deciding whether the sheet may be a whole-day account — two answers to it would let
+the tab bank a day the sheet on it is simultaneously declining to report, which is § D223's
+two-answers screen one layer down.
+
+The arm stays reachable and is not dead: a run that ended while the reader was on another surface
+never met `tick`'s `state.tab === 'run'`, and `Playback` advances off the injected clock rather than
+off the frame loop — so its playhead *is* at `endedAt` when the reader opens the sheet, and the day
+files then.
+
+### What this does not close
+
+A player who chooses **Campaign** lands on the scenarios tab with boot's recording still loaded, and
+if they then open the run tab and play it, it files. That is correct rather than residual: they have
+entered the campaign, the run on screen is that campaign's day 1 on `CONTRACTS[0]`'s building, and
+they watched it. Nothing files unwatched.
+
+## D233 — a finished run may open the sheet, and may not move the page out from under a reader
+
+**Date: 2026-08-05 · Written after the code.** Play-test issue #67.
+
+`closeShift` ended with `if (state.tab !== 'report') state = { ...state, tab: 'report' };`,
+unconditional. At ×60 a 30-minute shift ends about every thirty real seconds, and with the loop chip
+on it never stops — so on the Simulation tab the pane was yanked to the Day report on that cadence.
+Two reported consequences, and the second is the serious one: a click on the **Dispatcher** tab was
+overridden a moment later and had to be made twice, and a reader typing in the **Seed** field had the
+textbox unmounted mid-word with the characters going nowhere, no error, and nothing to undo.
+
+**The auto-open is kept.** It is the design's own behaviour — the day ending opens the sheet — and
+`docs/12`'s standing rule is that the handoff wins disagreements about what the screen does. What the
+handoff never described is a reader who is already somewhere else, so `reportOpensItself` refuses
+exactly the two cases the issue reports and nothing else: **the reader is not on the run**, and **the
+caret is inside an input, a textarea or a select**. A reader watching the run with their hands off
+the keyboard is taken to the report exactly as before.
+
+Being on the report tab already is deliberately **not** a refusal case. It is a no-op the caller
+skips anyway, and answering `true` there keeps the predicate a statement about the destination rather
+than about whether a write would be redundant.
+
+The DOM read is a three-`instanceof` helper beside the decision, which stays pure — the split every
+panel in `dev/` keeps, and the reason this file's other navigation decisions were testable and this
+one was not.
+
+## D234 — four things the product said about itself that were not true, and one it could not show
+
+**Date: 2026-08-05 · Written after the code.** Play-test issues #27, #36, #37 and #69. They arrived
+as four unrelated reports and are one entry because the same rule settles all four: **a surface may
+not make a claim the run underneath it does not keep** — and the fourth adds a corollary the others
+did not need: *a claim nothing on screen can resolve is not kept either.*
+
+### #27 — the tutorial was unwinnable on its own defaults, and said the wrong word about it
+
+**Measured before it was fixed, and the measurement is the reason the obvious repair was refused.**
+Garden Apartments, day 1, `collective`, the building's own demand, the shipped 1 800 s shift, twelve
+seeds:
+
+```
+arrivals: 8, 13, 14, 17, 17, 18, 18, 19, 20, 20, 26, 35     median 18
+```
+
+`WAKE_UP_ARRIVALS` is 20, so **seven of twelve fall below the line at which anything is graded**. At
+3 600 s the same twelve give `20, 24, 28, 32, 36, 38, 40, 42, 45, 48, 49, 51` — every one graded. The
+play-tester's report is exactly this: two days, 18/18 and 15/15 carried, 100 % away inside a minute,
+three em dashes and **"Shift missed. Streak reset."** on the scenario whose own brief says *nothing
+here is hard*.
+
+Two fixes, and the second matters more than the first.
+
+**The shift, not the threshold.** `ScenarioContract` gains an optional `shiftLengthS` and `c1` is the
+only contract that names one. Lowering `WAKE_UP_ARRIVALS` was the obvious alternative and is the
+wrong repair *in this project's own terms*: the bars are a carried **share** and a served-inside-a-
+minute **share**, and grading those over eight legs is the thin sample `awtIsValid` exists to refuse,
+one layer up. Moving `DEFAULT_SHIFT_LENGTH_S` was rejected too — 1 800 s is `rise-and-fall`'s own
+horizon and the horizon every published figure in `docs/05` was measured over. It **seeds** rather
+than pins: the select stays live, and the player may still shorten the day.
+
+**Ungraded is a third state, and it costs nothing.** `DayOutcome.allMet` collapsed *you were asked
+for 87 % and carried 61 %* and *the building never woke up* into one `false`. `goals.ts` already
+models the distinction — `pending` is its own state, because *"a `carryPct` of 100 % over three
+riders is arithmetic, not competence"* — and the week threw it away. Now: `week.ts`'s `wasGraded`
+leaves the streak untouched on an ungraded day, the sheet's verdict is a third value
+(**"Too quiet to grade"**), the streak line says *nothing was lost*, and the lede names the two
+numbers and the remedy. *Unjudged is not passed* is untouched; this is its other half — **unjudged
+is not failed either.**
+
+`wasGraded` is **derived from `DayOutcome.readings` rather than stored beside `allMet`**, and that is
+the decision rather than the implementation: `readings` is already persisted, so a session written by
+an older build answers correctly with no schema change, and no restored day can carry a flag that
+disagrees with the readings under it.
+
+### How #27's third verdict composes with § D237, resolved on the rebase
+
+§ D237 landed while this lane was open, and the two changes meet in one expression. It made the
+verdict, the banner line, the headline and the diagnosis heading reachable **only** through
+`VERDICT_VOICE`, a `Record` keyed by the verdict, so that no expression can produce a cleared
+headline without having decided the day cleared. This lane adds a third verdict.
+
+**The third verdict is a third key in that record, not a branch outside it.** An `if (!graded)`
+alongside the lookup would have reopened § D237's defect through a new door — an ungraded day able
+to reach a cleared or missed headline — and the whole value of the table is that a future edit
+cannot reintroduce the disagreement without deleting the key it would have to go through. Adding
+`ungraded` to `DayReport['verdict']` broke `VERDICT_VOICE` at compile time, which is the behaviour
+its own docstring promised and had never had to demonstrate.
+
+Three things fell out of composing rather than merging:
+
+1. **§ D237 had already found this case and could only fix the words.** `missedLede` carried an
+   `unmet.length === 0` arm printing *"Too quiet to grade …"* — the right sentence under a banner
+   reading **Shift missed**, with the streak resetting underneath. The sentence and the banner
+   disagreed about the same day, which is § D237's own defect surviving inside the arm that had
+   noticed it. That arm is gone; `judgementOf` cannot route an ungraded day to `missedLede` at all.
+2. **`missedLede`'s empty case drops a clause rather than taking a branch.** It is now unreachable,
+   and the guard is a total function's belt. It must never become *reachable and wrong*, and a
+   dropped clause is the only shape with no sentence to be wrong with — a second copy of the
+   ungraded words there is exactly what was just removed.
+3. **`streakLineFor` takes the verdict and is exhaustive over it.** § D237 had already replaced its
+   `allMet` boolean with the verdict so the streak could not reset on a day the banner called
+   cleared; this lane's first draft added a `graded` boolean beside it, which would have been a
+   second answer to a question the verdict already contains. A `switch` with no default makes a
+   fourth verdict a compile error here too.
+
+**The deciding test was widened, not relaxed.** § D237's sweep — *no sentence used to say a day
+cleared may appear on a sheet saying it did not* — now runs over three verdicts × two saturation
+states × three real runs × four goal sets, with the ungraded arm reached by moving **the
+observations** while the recording, the week and the contract are held fixed. The check is pairwise
+across all three buckets, each asserted non-empty first so no arm is vacuous. `report.test.ts`'s
+*does not claim a goal was missed on a day nothing was graded at all* keeps the property it was
+written for — no goal named, no blank — and its `verdict === 'missed'` expectation is now
+`'ungraded'`, because that expectation **was** the bug.
+
+**One residual, named rather than fixed.** `dev/reportPanel.ts` draws `verdictColour` as
+`verdict === 'cleared' ? 'var(--ok)' : 'var(--warn)'`, so an ungraded day is amber — a warning
+colour on a day that is not a warning, which the same file already spells `var(--dim)` in its empty
+state. It is one line in a file outside this lane's ownership.
+
+### #36 — the new building's name over the old building's specs, and a stretched stale canvas
+
+`reportPanel.ts`'s *Take the next assignment* moves `buildingId`, clears the recording, and — unlike
+*Open the doors on tomorrow* beside it — **does not run**. The shell had nothing to describe a
+building with: `drawHeader` read the boot-scope `building`, which is `shiftRunConfigOf`'s and is only
+assigned by `runShift`. So the header drew `Midtown Office · 6 floors · 2 cars · 0.63 m/s · 135
+people` — the name from the state, the geometry from the tutorial — at the campaign's one reward
+moment, telling the player the 1 710-person tower is the size of the building they just left.
+
+`resolvedBuildingOf` is the missing answer, and `viewAt` uses it **exactly when there is no
+recording**. The **shipped** building, not a grown one: nothing has run, so there is no day to have
+grown it to.
+
+The canvas was the same defect in paint. `drawStage` returned before touching the context when there
+was no recording, so the previous frame stayed at the backing size it was painted at — a 360×260
+bitmap of Garden Apartments stretched across a 750×405 box. It now resizes **and then** clears; that
+order matters, because clearing a stale-sized buffer fixes the picture and keeps the blur.
+
+The fix is in `dev/main.ts` rather than in the button, and that is ownership rather than preference:
+the honest empty stage is the better answer anyway, because § D232 has just decided that a run
+nobody asked for should not appear.
+
+### #37 — four cards quoted a figure the building file contradicts
+
+`docs/12` § 4.4's rule is *where a handoff stat line disagrees with the file, **the file wins***, and
+`statLineOf` has generated the stat line from the building since this module was written. That is
+exactly why the drift was visible: the card's prose and the file's numbers sit two lines apart.
+
+| card | prose said | the file says |
+|---|---|---|
+| `c4` | *Forty floors … a transfer level at 20* | 60 expanded floors; two `isTransferFloor` floors, `G` and **31** |
+| `c3` | *Thirty-one floors* | 30 |
+| `c5` | *A hundred and one floors* | 100 |
+| `c1` | *the next four* | seven others |
+
+`c4` is the one that could not be a convention: twenty floors apart, beside a stat line reading
+`60 floors`. All four are corrected at source with the file's own figure. **This is § 4.4 applied to
+the prose for the first time** — it had only ever been applied to the stat line.
+
+**Two halves of #37 are not closed here and are not mine to close.** The section heading
+*"Scenarios — five buildings, any order"*, the intro's *"the other four"* and the footnote *"All five
+ship with the simulator in `data/buildings/`"* — including the repo path leaking to a player — are
+all in `packages/viz/index.html`.
+
+### #69 — the shortcut worked, and nothing on the page could show it
+
+**Driven in the browser tier, and the issue's central claim does not reproduce.** On a paused run,
+with focus on the body:
+
+```
+','          playhead 5.15 %  ->  5.10 %
+'.'                    5.10 %  ->  5.15 %
+#step-back click       5.15 %  ->  5.10 %      (the same distance)
+'['          speed chip ×60 -> ×10
+ArrowRight             5.10 %  ->  5.38 %
+Space while running    Pause -> Play
+```
+
+So `,`/`.`, `[`/`]`, the arrows and Space are all wired, and *"the entire playback layer is
+mouse-only"* is false. **What is true is that the reader could not tell.** One display frame at the
+shipped ×60 is **one simulated second** — 0.06 % of a 1 800 s run, under half a pixel of timeline —
+and every clock the page prints is `hh:mm`. A careful tester pressed the advertised key five times,
+saw nothing anywhere change, and concluded the binding was dead. That is the product's fault and not
+theirs.
+
+The fix is where the promise is made: the timeline slider's `aria-valuetext` becomes `hh:mm:ss`. It
+is a **readout on a control** and `aria-valuetext` exists precisely so a slider announces its own
+units — and the reader the tooltip makes the promise to is the one with no pixels to check it
+against. The header clock stays `hh:mm`; it is a caption on a day, not a readout on a control.
+
+**Driving also found a real defect the issue did not report.** The Space arm called
+`event.preventDefault()` unconditionally, which on a focused `<button>` **cancels that button's own
+activation** — Space over `#step-back` toggled playback and did not step a frame, so the two controls
+the issue is about were fighting for one key and the platform's contract lost.
+`spaceBelongsToFocus` is the guard, keyed on `(tagName, role)` rather than on a constructor: a
+`<div role="button">` owns Space and an `<a>` does not, and both are `HTMLElement`. `role="slider"`
+is deliberately **not** in the set — sliders are driven by arrows everywhere, so a reader who has
+tabbed to the transport bar still gets play/pause from it.
+
+**No `UX.md` row was stale.** `KX-05`'s *"✅ run — one display frame each way, pausing first"* and
+`TP-06`'s *"shares one handler with `KX-05`"* are both **true**, and re-verified by driving rather
+than by reading. What no row covered was Space over a focused button, and there is one now.
+
+`dev/keyboard.browser.test.ts` is the evidence, and it asserts the **playhead**, not a registered
+handler — the issue's whole claim was that a handler existed and did nothing.
+
+### One thing found in passing, and it had hidden itself
+
+`boot.browser.test.ts` read its origin from `httpServer.address().port`, which reported **5173**
+while Vite was serving **5174** — `vite.config.ts` declares `{ port: 5174, strictPort: true }` and
+the suite's `port: 0` override does not survive the merge. Every navigation got
+`ERR_CONNECTION_REFUSED` and the whole tier died in `beforeAll`. It went unseen because the tier
+skips itself where there is no Chromium, which is most machines: **a tier that skips silently can
+also fail silently the first time somebody gives it a browser.** Both files now read `resolvedUrls`,
+which is Vite's own answer to *where am I*, and both pass — including § D220's *draws the stage*,
+which is what confirms § D232's paused first frame still paints.
+
+### Two more the same rule settles, handed over from the Compare/Lab lane
+
+Both were found by an agent that could not reach the files. They are the same defect as #37 in a
+different directory: a surface saying something that is not for the reader in front of it.
+
+**#25 — internal cross-references printed to players.** `GOAL_BLOCKER['everyone-can-get-there']`
+read *"Blocked on W7 … docs/10 § 10.4 … § 5.2's goal table says the opposite"*, verbatim, on the
+Compare and Lab goal rows. A player has no `docs/`, no W7 and no § 5.2. The honest content — *this
+cannot be judged from what a run records, because a recording carries no credential on a leg* — was
+in the middle of it and survives the rewrite unchanged; the claim was never the problem.
+
+**Changed at the constant rather than paraphrased at the render site**, which is the part worth
+recording: `honesty/surfaces.ts` seeds this by *reference* — it iterates `GOAL_BLOCKER` and pushes
+each non-null value — so the string the sweep checks and the string a player reads are the same
+object. A tidier copy at the surface would have left the sweep checking a sentence nobody sees.
+
+`data/scenario-goals.json` pins the same text through `measureScenario`'s `reason`, so the table was
+**regenerated** rather than hand-edited (`regenerate.test-helper.ts`), and the diff is the assurance:
+**ten string replacements and not one moved count.**
+
+**#58's second half — goal rows named their arms by a slug.** `goalReport.ts` printed
+`arm.dispatcherProfileId` — `eta:`, `collective:` — where the rest of the product prints *Minimum
+estimated wait* and *Conventional collective*. `BatchArmResult.dispatcherProfileName` now exists on
+the arm (that lane's work), so the fix is the substitution. `armId` and `dispatcherProfileId` stay on
+the row: a caller keying off them needs them, and only the sentence is read by a person.
+
+**A third piece was offered and is deliberately not built.** Pre-selecting the running dispatcher as
+Compare's baseline needs `dev/main.ts`'s `inherit()` to supply `dispatcherId`, and the batch panel to
+read it. `dev/batchPanel.ts` is outside this lane, so adding the field here would ship a
+`ViewerState` value carried into a mount that cannot consume it — **an unwritable seam, which is this
+repository's signature defect and has shipped eleven times.** Left unbuilt and named, rather than
+half-built and plausible.
