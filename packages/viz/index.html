@@ -1053,14 +1053,33 @@
           <!-- docs/10 § 4 / U2 — the disclosure mode. `mode/` calls the two levels
                `basic` and `advanced`; the handoff calls them Casual and Engineer
                (§ 1.5 B1). The *values* are the model's and the *labels* are the
-               handoff's, so `mode/parity.ts` keeps working unchanged. -->
-          <label class="dim" data-hide-narrow style="font: 500 10px var(--mono)">
-            view
-            <select id="view-mode">
-              <option value="basic" selected>Casual</option>
-              <option value="advanced">Engineer</option>
-            </select>
-          </label>
+               handoff's, so `mode/parity.ts` keeps working unchanged.
+
+               Two corrections here, both from play-testing.
+
+               1. The `<select>` used to be **wrapped** in this label. A wrapped labelable
+                  control is an *embedded control* to the accessible-name algorithm, so the
+                  computed name was `view` plus the selected option's own text — it read
+                  "view Casual" and then "view Engineer", changing as the reader used it.
+                  `for=`/`id=` associates the same visible word without putting the control
+                  inside it, so the name is exactly `view` in both states.
+               2. `Casual` and `Engineer` said nothing about what they change, and the
+                  difference is not guessable. The clause after each is **permanently
+                  visible in the control itself** rather than hidden behind hover, because a
+                  tooltip a reader never hovers is a tooltip that does not exist. The full
+                  sentence stays on `title` for whoever wants it, and it is sourced from
+                  `scope/surface.ts`'s own `viewer.mode` entry — presentation only, proved
+                  by `scope.test.ts` requiring the legs byte-identical across the two. -->
+          <label class="dim" data-hide-narrow for="view-mode" style="font: 500 10px var(--mono)"
+                 title="Casual and Engineer change how much of a run is shown and nothing it computes — same shift, same seed, same result. Casual states every figure in plain language and leaves out the interval spread, the energy proxy and the measurement window's exact bounds. Engineer adds those three, the machines nameplate, and the rule behind an average this run refuses to publish. Neither mode hides a warning, a failure, or the seed.">view</label>
+          <!-- The font is stated rather than inherited, and that is a consequence of the fix above
+               rather than a preference: `select { font-family: inherit }` used to reach `var(--mono)`
+               through the label that wrapped this control, and unwrapping it left the select
+               inheriting the body's sans. 11 px is the header's own chrome size (`.phase-pill`). -->
+          <select id="view-mode" data-hide-narrow style="font: 500 11px var(--mono)">
+            <option value="basic" selected>Casual — plain language</option>
+            <option value="advanced">Engineer — technical detail</option>
+          </select>
           <span id="mode-parity" role="alert" class="dim"></span>
           <span class="dim" id="banner" data-hide-narrow></span>
         </div>
