@@ -14419,6 +14419,122 @@ re-running one selection produces the same id. What re-arms the guard is `adopt`
 reason was not, which is the failure mode CLAUDE.md's *"either measure it or say it is unmeasured"*
 paragraph exists for.
 
+---
+
+## D224 — the menu explains the game, and the explanation is checked against the game
+
+**Date: 2026-08-05 · Written after the code, and says so.** GitHub issue #13 — *"New user
+onboarding: no tutorial, welcome screen, or 'how to play' guidance."*
+
+### The issue's repro is wrong, and correcting it makes the job smaller
+
+The issue says a cold load at the root URL *"immediately places the user in Shift Mode on Garden
+Apartments with no context."* It does not. A cold load draws the menu — six destinations, each with
+a line saying what it is (`docs/12` § 4.8). So this is a **missing entry in an existing menu**, not a
+rescue from a running simulation, and nothing about the boot flow moves. The substance of the issue
+stands: there was no *how to play* anywhere in the product, and every word explaining what a
+dispatcher is lived in `docs/` or in a docstring.
+
+### Why the guide is not a seventh screen, and not a button either
+
+Three shapes were available and two of them cost more than they bought.
+
+A seventh `MenuScreen` is the obvious fit — it is exactly what Settings is. It is not built because
+`playthrough/walk.test.ts#modeOf` is an **exhaustive switch over `MenuScreen`** whose own docstring
+says *"a seventh screen has to be given a home instead of defaulting into one"*. Widening
+`MENU_SCREENS` is therefore a compile error in a file this lane did not own, and the correct fix is
+three lines there — recorded below as the thing to do if the guide ever needs its own route.
+
+A **button plus panel state** would have needed a new `MenuIntent`, and `dev/main.ts`'s
+`dispatchMenu` switch is `void`-returning with no `never` arm, so a member nothing handles compiles
+and does nothing. That is the dead control this package has shipped eleven times in code, arriving
+by the one route the type system does not close.
+
+`details` needs neither. The browser owns the open state, `summary` is focusable and operable from
+the keyboard with no handler, it starts closed so it blocks nothing, and the guide is inert to the
+state machine — which is the honest description of a page that only explains. It is the seventh
+entry in the existing list, built from the menu's own row card so it reads as a peer of the six
+above it.
+
+**One consequence, handled in words rather than in CSS.** `.menu-row` sets `display: grid` on the
+`summary`, which removes the disclosure triangle a browser would otherwise draw, and `index.html`
+was outside this lane. So the entry's own subtitle says *"Opens here, and starts nothing"* — KB-15
+forbids a signal carried by shape alone, and a sentence the reader is already reading is cheaper
+than a glyph.
+
+### The copy lives in `menu/screens.ts`, and that is a constraint rather than a preference
+
+A `menu/guide.ts` exporting these sentences would be a new **player-facing text producer** in
+neither a surface adapter nor a stated exclusion, and `honesty/derive.test.ts` is built to fail on
+exactly that: *"a new surface is red, not skipped."* Authored inside `screens.ts` as a
+non-exported constant, the prose leaves through `screenOf`, which the `MENU` adapter already covers,
+and the static R10 sweep reads it like every other literal in the package.
+
+**Named limitation, stated rather than discovered later:** `honesty/surfaces.ts`'s `MENU` adapter
+seeds `view.title`, `view.notices`, `view.issues` and each row's label, detail and `disabledWhy`. It
+does **not** seed `view.guide`, so the guide's sentences reach the static literal sweep and not the
+generated honesty search. That is the same tier `dev/menuPanel.ts`'s own row copy sits at and it is
+weaker than driving them. Closing it is one `seeds.push` loop in a file this lane did not own.
+
+### What the copy is not allowed to say, and what enforces it
+
+**No dispatcher is ranked.** CLAUDE.md forbids declaring one better than another without a paired-t
+interval excluding zero, and a game that says it anyway has taught a player a falsehood they carry
+out of the game — which is the same failure this repository refused its own learned control for,
+three times (§ D145, § D156, and the `lunch-two-way` re-measurement). So all thirteen shipped
+profiles are described by **what they do**: which terms they weight, which constraint they hold,
+where they park. `nearest-car` is called a baseline because `data/dispatcher-profiles.json` gives it
+`role: "baseline"` and because § D106 has it on the Pareto front at six of eight cells — a
+description, never a verdict. The paragraph that would have recommended one says instead that a
+single run cannot answer it, and names Compare, which `docs/12` § 2.3 makes the only surface allowed
+to.
+
+The rule is enforced in `documentation.test.ts`'s own shape rather than by banning the vocabulary,
+because the guide's most important sentence needs the verb: a ranking word is permitted only within
+160 characters of a refusal, the checker is shown to catch an unrefuted comparative, and the
+refusing sentence itself is asserted to still be there. A blanket ban would have been satisfied by
+deleting the paragraph.
+
+**No unmeasured mechanism.** Every statement of mechanism is a statement about what the code does —
+a car does not reverse direction to take a call; a term is normalised before it is weighted — never
+about what that buys. **No figure is graded**: energy sits beside the wait figures with § D106's
+reason stated, and the withheld mean is described as the run declining to be summarised, on the five
+grounds `AWT_INVALID_GROUNDS` declares.
+
+### Every list and every number is derived, because both go stale in silence
+
+Onboarding copy is read once per player, by the reader least able to tell it is out of date. So
+`menu/howToPlay.test.ts` holds it against the product rather than against a literal: the dispatchers
+it names come from the loaded configuration in both directions, the six axes it explains come from
+the free-play screen's own affordances, the destinations it introduces come from the root screen's
+own rows, and the traffic shapes come from the template ids. The goal ceilings, the wake-up
+threshold, the run-length ladder, the seed bound, the count of suppression grounds and the
+replication budget are each asserted against the constant that produces them, and the worked first
+run is required to be a selection `canStart` accepts.
+
+That last one was not decoration. **The default Free Play selection does not start.**
+`initialMenuState` opens at 15 minutes and the catalogue's first template, `rise-and-fall`, declares
+a 30-minute period, so a new player's first sight of Free Play is a disabled **Start** under a
+refusal. The guide's worked example was drafted at 15 minutes for the same reason and the derived
+check caught it. The copy moved; the default did not, because `menu.ts` is a decision about the
+product rather than about a sentence, and it is filed as the next thing to do.
+
+The Day report is described as **three** states — nothing filed, still running, filed — because
+§ D223 made it three the day before this landed, and both titles are read out of
+`dev/reportPanel.ts`'s source rather than restated.
+
+### What this does not close
+
+The issue's own strongest claim is that *the purpose of controls like dispatcher weighting and
+parking strategy is opaque*, and those controls are in `dev/dispatcherEditor.ts` and the right rail,
+which this lane did not own. They are in better shape than the issue implies — the editor already
+tooltips each cost term with `terms[].measures` and `serves`, and each flag with the field it
+writes — so what was missing at that surface was the **concept** rather than the per-control text,
+and the guide supplies the concept. A first-visit hint that opened the entry once would need a
+persisted *seen* flag in `persist/` and a read in `dev/main.ts`; the entry is discoverable without
+one, and an auto-opening panel a player did not ask for is the thing the issue's own repro was
+wrong about.
+
 ## D225 — a batch that resolved to nothing, and the two sentences it was missing
 
 **Date: 2026-08-05.** Play-testers with no knowledge of this project's rules were given the shipped
