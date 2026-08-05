@@ -15322,3 +15322,230 @@ be folded into it. Its vocabulary — *paired difference*, *Student-t*, *degrees
 `dev/parameterForm.ts` and `dev/menuPanel.ts`, four lanes wide and none of them here. What this
 change contributes to it is the pattern: a lead sentence that explains the term, carried beside the
 run's own words, never replacing them, and asserted never to become a ranking.
+---
+
+## D241 — sign-in is an emailed link, and the password path is deleted rather than disabled
+
+**Date: 2026-08-05 · Written with the code, and says so.** The product owner chose email
+magic-link over passwords for the leaderboard's accounts. This records what that replaced, the
+security properties it has to hold, and the two things it let us **delete** — because the deletions
+are the part a reader would otherwise assume were oversights.
+
+### 1. What was there, and why almost none of it was thrown away
+
+`accounts/credentials.ts` already had the primitive. `signConfirmation`/`verifyConfirmation` were
+signed, expiring tokens with the email **inside the HMAC**, so a token could not be replayed against
+a different address; `newSessionToken` and `constantTimeEquals` were beside them. A magic link is
+that construction pointed at *login* instead of at *confirmation*, so this change is mostly rewiring
+and deleting. What is genuinely new is one field and one table.
+
+The field is a `jti`. The table is `login_tokens`.
+
+### 2. Single use is server-side state, because a signature cannot express it
+
+This is the one claim that is easy to get wrong by reasoning about cryptography instead of about
+time. **Nothing about an HMAC changes when a token is used.** A signature that verifies now verifies
+an hour from now, and will verify for whoever else has the mail — a forwarded message, a synced
+phone, a shared inbox, a backup.
+
+So `signLoginToken` puts a random `jti` inside the signed payload, the request that issues it writes
+that `jti` into `login_tokens`, and redemption is **one `DELETE` whose `rowCount` is the answer**.
+One statement rather than a `SELECT` then a `DELETE`, because two is a check-then-act and the race
+on this surface is two concurrent redemptions both finding the row and both being handed a session.
+
+`credentials.test.ts` states the negative result out loud — *"verifies a spent token exactly as
+happily as an unspent one"* — rather than leaving it as an absence. A module that only tested the
+things it does get right would have left the reader to infer which half of the guarantee it owns.
+
+### 3. Fifteen minutes, and the reason it is not twenty-four hours
+
+`CONFIRMATION_TTL_MS` was a day. That was right for what it did and would be badly wrong here, and
+the difference is what the token *grants*. A confirmation link grants **one bit** — this address is
+real. A sign-in link grants **a session**, so its blast radius is the whole account, and every extra
+minute is a minute an account key sits in a mailbox.
+
+Fifteen rather than five, on two measured facts rather than a feeling. The container runs at
+`minReplicas: 0`, and a cold `GET /api/challenges` against the live app took **28.7 s**; a player who
+opens the mail after the app has scaled back down pays that again on redemption. Mail delivery is
+seconds until a receiving server greylists, which is common and retried on a timer nobody here
+controls. Five minutes would refuse honest players on a slow path. An hour would buy them nothing
+they would notice.
+
+### 4. Prefetch safety, twice over, because one of the two depends on somebody else behaving
+
+Mail clients prefetch. Scanners, corporate link-rewriting appliances and "safe links" services fetch
+every URL in a message before a human sees it. A `GET` that consumed a token would therefore fail
+for exactly the people whose employer is careful about links — a failure that is invisible in
+testing and unfixable by the person hitting it.
+
+Two independent mechanisms:
+
+1. **The mailed link points at the viewer, not at the API, with the token in the URL fragment.** A
+   fragment is never transmitted, so *fetching* the link cannot carry the token anywhere, let alone
+   spend it. It also keeps the token out of access logs, ingress traces and `Referer`.
+2. **`POST /api/auth/redeem` is a POST with a JSON body.** Nothing that follows links issues one.
+
+`GET /api/auth/redeem` answers **405** with a sentence saying it consumed nothing, rather than
+falling through to the generic 404. That is not politeness: it is the statement that stops the next
+person adding a `GET` alias "for convenience".
+
+### 5. Two deletions that are load-bearing, not tidying
+
+**`postingGate` and `confirmed` are gone.** § D214 § 5 let an unconfirmed account log in and play and
+gated exactly one privilege — posting a score. That gate existed because **a password issues a
+session to somebody who has not proved they can read the address**. A magic link cannot: the session
+in the caller's hand was minted by redeeming a token that was mailed there. Every signed-in account
+has proved it, so the flag would have been true for everyone who could ever observe it and the check
+would have been an authorization gate that cannot fire — which this repository has shipped enough
+times to have a standing rule about. `api.test.ts` asserts the replacement property directly: no
+route issues a session without a mailed token, and `/api/register`, `/api/login` and `/api/confirm`
+all 404.
+
+**The password path is deleted, not deprecated.** `passwordIssues`, `hashPassword`,
+`passwordMatches`, `PasswordHash` and `SCRYPT_PARAMS` are removed, along with `users.salt_hex` and
+`users.hash_hex`. `deadCode.test.ts` would have caught them as uncalled exports and an allowlist
+entry would have been the wrong answer: an unreachable-but-exported login is this repository's worst
+case for its own most-repeated defect.
+
+### 6. There is no migration, and here is what one would have had to do
+
+The claim that no accounts exist was checked rather than assumed: the deployed server has never held
+one, because the shipped viewer could not find its own API (§ D243), so the password form it drew was
+never able to create anything. The schema is applied by `CREATE TABLE IF NOT EXISTS` against an empty
+database.
+
+That is a claim about a specific database and it will stop being true, so `store.ts` writes down what
+a migration would need instead of assuming it away: `salt_hex` and `hash_hex` are `NOT NULL` with no
+default, so an existing `users` table would refuse every insert this code now writes, and the
+migration is `ALTER TABLE users DROP COLUMN salt_hex, DROP COLUMN hash_hex, DROP COLUMN confirmed,
+ADD COLUMN display_name_chosen BOOLEAN NOT NULL DEFAULT TRUE` — `TRUE` for existing rows, because a
+name a person typed at registration is a chosen one. It does **not** go in `Store.open`; that
+module's own rule is that when there is something to migrate, the honest thing is a versioned
+migration table.
+
+### 7. The display name, and the oracle that forced it to be a second request
+
+Registration used to take an address and a name together. A link request cannot, because asking for
+a name **only when the address is new** tells the person filling in the form whether the address is
+new — the account-enumeration oracle the uniform response exists to close, rebuilt in the UI.
+
+So an account is created with `player-<12 hex>` and `display_name_chosen = false`, and
+`POST /api/me/display-name` renames it over a session that already proves the address. The flag is on
+the wire so the viewer prompts exactly once; without it the client would have to recognise a
+generated name by its shape, which is a second place deciding what one looks like.
+
+A taken **name** is reported as taken and a taken **address** is not, and the asymmetry is the same
+one § D214 § 5 drew: a display name is printed on every board, so it is already public.
+
+---
+
+## D242 — the link endpoint is an email-bombing gadget unless it is rate-limited
+
+**Date: 2026-08-05 · Written with the code.** `POST /api/auth/request-link` is unauthenticated, takes
+an address from anybody, and **sends mail to it**. Unlimited, that is not a login form. It is a way
+to make this server deliver mail to a stranger who has never used the product, as fast as it will go
+— and the way an Azure Communication Services quota is spent in an afternoon by somebody who thought
+they were testing.
+
+### 1. Two budgets, because neither stops the other's attack
+
+- **Per address**, three per fifteen minutes. This is the one that decides whether the endpoint can
+  be pointed at a third party. It holds however many machines the sender has.
+- **Per caller**, thirty per fifteen minutes. The per-address budget does not touch this attack at
+  all: a hundred addresses asked for twice each is a hundred people mailed and no address's budget
+  exceeded.
+
+The window is deliberately `LOGIN_TTL_MS`, so the per-address rule reads as a fact rather than as a
+tuned number: an address may have three *unexpired* links outstanding.
+
+### 2. The caller's key cannot be chosen by the caller
+
+`x-forwarded-for` is a request header. Believing it unconditionally does not weaken a per-caller
+budget, it **removes** it, because a sender who varies the header gets a fresh budget per request
+while looking like a hundred people. So `ServeOptions.trustProxy` defaults to **false** and only an
+operator setting `ELEVATOR_SIM_TRUST_PROXY=true` makes the header readable — and then only its
+left-most entry, the address the first trusted hop saw. An unattributable caller shares one bucket
+rather than escaping the budget.
+
+### 3. The order of the gates, and the memory bound
+
+Shape, then both budgets, then the account, then the mail. The budgets are charged **before the
+account is created**, because a limiter that ran after the write would still let unlimited rows and
+unlimited sends through, which is the entire thing it exists to stop. The shape check is first
+because it has no side effect, so a typo costs nobody a mail.
+
+The limiter is keyed by attacker-chosen strings, so it is itself a memory target. Expired windows are
+swept at `MAX_TRACKED_KEYS`, and a limiter still full of live windows after a sweep **refuses** rather
+than growing — choosing a recoverable availability failure over an unrecoverable heap one, and saying
+so where the choice is made.
+
+### 4. What is not claimed
+
+Fixed windows, not sliding. A determined sender gets `2 × maxRequests` across a boundary — six mails
+rather than three — which changes nothing about whether the endpoint is a weapon, and a sliding
+window costs a timestamp list per key on a surface whose whole problem is attacker-chosen keys.
+
+The refusal names a duration and does **not** name which budget was spent, because saying *"this
+address has had too many"* would be the enumeration oracle by a longer route.
+
+---
+
+## D243 — the viewer could not find an API that was answering on its own origin
+
+**Date: 2026-08-05 · Written after the measurement, and the measurement is the point.** Two facts
+about the live deployment, checked rather than reasoned about:
+
+- `GET https://elevsim-app.…azurecontainerapps.io/api/challenges` answers **200**, with real
+  challenge JSON out of Azure PostgreSQL. **The server is deployed and working.**
+- The `index.html` it serves from that same origin contains **no `<meta name="elevator-sim-api">`
+  tag.**
+
+`viz/src/dev/main.ts` builds its API client from that tag and has **no default origin** — § D215 § 4,
+deliberately, because a client falling back to the page's own origin would work in development and
+fail in a build served from a CDN. With no tag the client is `undefined`, so every account,
+leaderboard and challenge screen dead-ends against an API that is running underneath it. That is the
+root cause behind play-tester issues **#21, #28, #29, #30, #32 and #34**, and it would have made
+§ D241's magic-link routes unreachable however carefully they were built.
+
+### 1. The fix belongs to the server, because the fact belongs to the server
+
+A bundle does not know whether an API is beside it. **This process does** — it is serving both. So
+`loadStaticBundle` injects the tag into `index.html` as it reads it, and a bundle served from a CDN
+with no server never passes through that function, never gets a tag, and keeps exactly today's
+behaviour. § D215 § 4's property is preserved rather than traded away.
+
+Hard-coding the origin into `packages/viz/index.html` was rejected for the reason § D215 § 4 gives
+and one more: it would point a local development build at production.
+
+### 2. The value is `"/"`, and it is relative on purpose
+
+The client builds `` `${origin.replace(/\/$/, '')}/api/…` ``, so `"/"` becomes the empty string and
+requests become `/api/challenges` — absolute-path, same-origin, resolved by the browser against
+whatever host actually served the page.
+
+An absolute origin would have to be **kept** correct and has two failure modes this has none of. It
+goes stale the moment a custom domain is put in front — `infra/azure/main.bicep` emits an output
+specifically warning about that — and any mismatch at all, down to `http` versus `https`, turns a
+same-origin call into a cross-origin one that `ELEVATOR_SIM_ALLOW_ORIGIN`'s deliberately restrictive
+default then refuses.
+
+Deriving it per request from the `Host` header would also be configuration-free, and is **rejected**:
+a request with a forged `Host` would produce a page pointing its API at somebody else's server, and a
+shared cache in front turns that from self-inflicted into an attack.
+
+### 3. What the injection is not allowed to move
+
+Only `/index.html`, only at the root, and every other byte of the build is passed through untouched —
+a rewrite reaching a hashed asset would change content whose *name* promises it never changes.
+Caching is unchanged: `index.html` was already `no-cache` because it keeps its name across deploys,
+and a per-deploy rewrite makes that more important rather than less. The injection is idempotent: a
+bundle that already declares a tag keeps its own, because two tags would leave `querySelector`
+picking whichever came first.
+
+### 4. One thing this does not fix, named rather than left to be discovered
+
+The Container App is `minReplicas: 0`, and the `/api/challenges` call above took **28.7 seconds** —
+a full cold start. That is infrastructure and out of this lane, but it shapes what the client must
+do: a sign-in request may hang for around half a minute, and the emailed link may land on an app that
+has scaled back to zero. § D241's fifteen-minute TTL is sized with that in it, and a client that
+assumes a fast response will look broken on the first request after an idle period.

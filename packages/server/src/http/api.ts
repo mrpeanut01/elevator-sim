@@ -7,19 +7,33 @@
  * `dev/state.ts` makes against a click handler, and it is made here for the same reason: a decision
  * that needs a listening socket to reach is a decision no test will drive.
  *
- * So every route below is exercised over an in-memory store with no port bound — register, receive
- * the mail, confirm, log in, submit a forged score and watch it refused.
+ * So every route below is exercised over an in-memory store with no port bound — ask for a link,
+ * receive the mail, redeem it, submit a forged score and watch it refused.
+ *
+ * ## Signing in is an emailed link, and there is no password anywhere
+ *
+ * § D241. Two routes: {@link requestLink} takes an address and mails a signed, expiring, single-use
+ * token; {@link redeemLink} takes that token and issues a session. There is no password to be
+ * checked, no digest to be stored and no *"that address and password do not match"* to word
+ * carefully, because the whole class of question is gone.
+ *
+ * It also dissolves play-tester issue #30 rather than patching it. The complaint was a live email
+ * and password form that only admitted there was no server *after* it was submitted; a form with no
+ * password field cannot make that particular promise, and § D243 fixes the underlying reason the
+ * client could not find the server at all.
  *
  * ## What is deliberately uniform
  *
- * **Nothing in a response distinguishes "no such account" from "wrong password".** A login endpoint
- * that says which one is an account-enumeration oracle, and the address is the thing an attacker
- * does not have. The same applies to registration, where the refusal is a *fact about the form*
- * (`this address cannot be registered`) rather than about the database.
+ * **Nothing in a response says whether an address has an account.** {@link requestLink} answers
+ * `202` with a byte-identical body whether it created an account, mailed an existing one, or was
+ * handed an address that will never read the mail. A response that differed by a word, a code or a
+ * status would be an account-enumeration oracle, and the address is the thing an attacker does not
+ * have. `api.test.ts` compares the two bodies byte for byte rather than by inspection.
  *
- * **No response ever carries a password, a digest, a salt, or a confirmation token.** The token
- * goes into the mail and nowhere else — a registration response that echoed it would make the
- * mailbox round trip decorative and confirm any address anyone typed.
+ * **No response ever carries a sign-in token.** Not in a body, not in an error, not in the detail of
+ * a `4xx`. The token exists in the mail and in the request that spends it; a response that echoed
+ * one would make the mailbox round trip decorative and hand an account to anybody who could name an
+ * address.
  *
  * ## Two boards, and they answer different questions
  *
@@ -35,14 +49,16 @@
  * because a client cannot be trusted to remember it and a reader cannot be expected to know it.
  */
 
+import { randomBytes } from 'node:crypto';
+
 import {
-  hashPassword,
+  LOGIN_TTL_MS,
+  constantTimeEquals,
   newSessionToken,
-  passwordIssues,
-  passwordMatches,
-  signConfirmation,
-  verifyConfirmation,
+  signLoginToken,
+  verifyLoginToken,
 } from '../accounts/credentials.js';
+import { FixedWindowLimiter } from '../accounts/rateLimit.js';
 import {
   CHALLENGE_CLOCK_NOTE,
   challengeBoardNote,
@@ -62,11 +78,12 @@ import {
   type ChallengeSubmission,
 } from '../challenge/submission.js';
 import { verifyChallengeSubmission } from '../challenge/verify.js';
-import { confirmationMessage, type Mailer } from '../mail/mailer.js';
+import { signInMessage, type Mailer } from '../mail/mailer.js';
 import { configHashOf, submissionIssues, type ResolvedDataFacts, type Submission } from '../leaderboard/submission.js';
 import { verifySubmission, type VerificationResources } from '../leaderboard/verify.js';
 import {
   BOARD_METRICS,
+  normaliseEmail,
   type BoardMetric,
   type ChallengeEntryRow,
   type EntryRow,
@@ -87,6 +104,17 @@ export interface ApiRequest {
   readonly body: unknown;
   /** The bearer token, if the caller sent one. */
   readonly token: string | undefined;
+  /**
+   * Who is asking, for the per-caller half of § D242's rate limit.
+   *
+   * `undefined` when the transport could not say — and the limiter treats that as **one shared
+   * bucket** rather than as no limit, so an unattributable caller cannot opt out of the budget by
+   * being unattributable. Required rather than optional so that a new caller constructing an
+   * `ApiRequest` has to decide, which is the compile error that stops this quietly becoming
+   * `undefined` everywhere. `serve.ts` fills it, and says there why it does not trust
+   * `x-forwarded-for` unless it is told to.
+   */
+  readonly clientIp: string | undefined;
 }
 
 export interface ApiResponse {
@@ -109,8 +137,15 @@ export interface ApiDeps {
   /** The signing secret. Read from the environment by `requireSecret`; never defaulted. */
   readonly secret: string;
   readonly now: () => number;
-  /** Where a confirmation link points. The mail contains this and nothing else clickable. */
-  readonly confirmUrl: (token: string) => string;
+  /**
+   * Where a sign-in link points. The mail contains this and nothing else clickable.
+   *
+   * It points at the **viewer**, with the token in the URL fragment, and `bootstrap.ts` explains
+   * both halves of why. What matters here is what it is not: it is not this API, so nothing a mail
+   * client, a link scanner or a corporate security appliance does by *fetching* the link can spend
+   * the token.
+   */
+  readonly signInUrl: (token: string) => string;
 }
 
 export type Api = (request: ApiRequest) => Promise<ApiResponse>;
@@ -126,7 +161,7 @@ const MAX_DISPLAY_NAME = 32;
  *
  * `submissionIssues` already keeps an *unauthenticated* shape error from commanding a simulation.
  * This is the authenticated counterpart, and it is needed for the same reason at a larger size: a
- * verification is a **whole 7 200-second run** at the longest accepted length, so one confirmed
+ * verification is a **whole 7 200-second run** at the longest accepted length, so one signed-in
  * account submitting in a loop is a CPU denial of service wearing a valid session.
  *
  * Five seconds, which is far below any honest play rate — a player has to watch a run before they
@@ -151,6 +186,30 @@ function cooldownForSeeds(seedCount: number): number {
   return MIN_SUBMIT_INTERVAL_MS * Math.max(1, seedCount);
 }
 
+/**
+ * How many live sign-in links one **address** may have at a time.
+ *
+ * The window is deliberately {@link LOGIN_TTL_MS}, so the rule reads as a fact about the world
+ * rather than as a tuned number: an address may have three unexpired links outstanding, and asking
+ * for a fourth while three still work is not a thing an honest player needs to do.
+ *
+ * This is the budget that decides whether the endpoint is a weapon. Without it, anyone who can type
+ * an address can make this server mail a stranger as fast as it will go — an email-bombing gadget
+ * aimed at somebody who has never used the product, and an Azure Communication Services quota spent
+ * in an afternoon.
+ */
+const LINKS_PER_EMAIL = { maxRequests: 3, windowMs: LOGIN_TTL_MS } as const;
+
+/**
+ * How many sign-in links one **caller** may ask for, for any addresses at all.
+ *
+ * The per-address budget does not touch the attack this stops: a hundred addresses asked for twice
+ * each is a hundred people mailed and no address's budget exceeded. Thirty per quarter hour is far
+ * above a shared office or campus NAT signing itself in and far below anything that looks like a
+ * run through a list.
+ */
+const LINKS_PER_CALLER = { maxRequests: 30, windowMs: LOGIN_TTL_MS } as const;
+
 export function createApi(deps: ApiDeps): Api {
   /**
    * Per account, the earliest moment the next verification may start.
@@ -160,19 +219,23 @@ export function createApi(deps: ApiDeps): Api {
    * between routes must not be able to double the load by doing so.
    */
   const nextSubmitMs = new Map<string, number>();
+  const linksPerEmail = new FixedWindowLimiter(LINKS_PER_EMAIL);
+  const linksPerCaller = new FixedWindowLimiter(LINKS_PER_CALLER);
   return async function handle(request: ApiRequest): Promise<ApiResponse> {
     const route = `${request.method} ${request.path}`;
     switch (route) {
-      case 'POST /api/register':
-        return register(deps, request);
-      case 'GET /api/confirm':
-        return confirm(deps, request);
-      case 'POST /api/login':
-        return login(deps, request);
+      case 'POST /api/auth/request-link':
+        return requestLink(deps, request, { perEmail: linksPerEmail, perCaller: linksPerCaller });
+      case 'POST /api/auth/redeem':
+        return redeemLink(deps, request);
+      case 'GET /api/auth/redeem':
+        return redeemIsNotAGet();
       case 'POST /api/logout':
         return logout(deps, request);
       case 'GET /api/me':
         return me(deps, request);
+      case 'POST /api/me/display-name':
+        return setDisplayName(deps, request);
       case 'POST /api/scores':
         return submit(deps, request, nextSubmitMs);
       case 'GET /api/boards':
@@ -195,93 +258,228 @@ export function createApi(deps: ApiDeps): Api {
 
 /* ------------------------------------------------------------------ accounts */
 
-async function register(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
-  const body = request.body as Partial<Record<'email' | 'displayName' | 'password', unknown>>;
+/**
+ * Ask for a sign-in link.
+ *
+ * The whole route is four steps in an order that is itself a decision: **shape, budget, account,
+ * mail**.
+ *
+ * The shape check is first because it costs nothing and has no side effect, so a typo is answered
+ * without spending anybody's budget. The two budgets come next and, crucially, **before the account
+ * is created** — a limiter that ran after the write would still let an unlimited number of rows and
+ * an unlimited number of sends through, which is the whole thing it exists to stop. The account is
+ * created if it does not exist, because asking for a display name only when the address is new is
+ * precisely the oracle the uniform response is for. The mail is last and is **awaited**.
+ *
+ * ## The response says nothing about the account
+ *
+ * `202`, one body, every time: created, existing, or an address that will never read it. Not a
+ * different status, not a different code, not a longer sentence. `api.test.ts` compares the two
+ * bodies byte for byte, because a difference of a word is a difference an attacker can read.
+ *
+ * The one thing it will not claim is that the mail *arrived* — nothing here can know that — so the
+ * wording is about what was done rather than about what will happen.
+ */
+async function requestLink(
+  deps: ApiDeps,
+  request: ApiRequest,
+  limiters: { readonly perEmail: FixedWindowLimiter; readonly perCaller: FixedWindowLimiter },
+): Promise<ApiResponse> {
+  const body = request.body as Partial<Record<'email', unknown>>;
   const email = typeof body?.email === 'string' ? body.email : '';
-  const displayName = typeof body?.displayName === 'string' ? body.displayName.trim() : '';
-  const password = typeof body?.password === 'string' ? body.password : '';
+  const issues = emailIssues(email);
+  if (issues.length > 0) return { status: 400, body: { error: 'invalid-address', issues } };
 
-  const issues = [...emailIssues(email), ...displayNameIssues(displayName), ...passwordIssues(password)];
-  if (issues.length > 0) return { status: 400, body: { error: 'invalid-registration', issues } };
+  const nowMs = deps.now();
+  // The caller's budget first: it is the one that bounds how many *different* people can be mailed,
+  // and it must be charged even when the address has plenty of budget left.
+  const perCaller = limiters.perCaller.charge(request.clientIp ?? 'unattributed', nowMs);
+  if (perCaller !== undefined) return tooManyLinks(perCaller);
+  const perEmail = limiters.perEmail.charge(normaliseEmail(email), nowMs);
+  if (perEmail !== undefined) return tooManyLinks(perEmail);
 
-  const created = await deps.store.createUser({ email, displayName, password: hashPassword(password) });
-  if (!created.ok) {
-    // Uniform on purpose for the address, specific for the name. A taken *display name* is public
-    // — it is printed on every board — so saying so leaks nothing. A taken *address* is not, and
-    // saying so would turn this endpoint into an account-existence oracle.
-    return created.reason === 'name-taken'
-      ? { status: 409, body: { error: 'name-taken', detail: 'That display name is already in use on a board.' } }
-      : {
-          status: 409,
-          body: {
-            error: 'cannot-register',
-            detail: 'That address cannot be registered. If it is yours, try signing in or resetting it.',
-          },
-        };
-  }
-
-  const token = signConfirmation({
-    userId: created.user.id,
-    email: created.user.email,
-    secret: deps.secret,
-    nowMs: deps.now(),
-  });
-  // Awaited, and a failure fails the request: an account whose confirmation mail was silently
-  // dropped is an account the player can never finish and will never be told why.
-  await deps.mailer.send(confirmationMessage(created.user.email, deps.confirmUrl(token)));
-
-  const session = await deps.store.createSession(newSessionToken(), created.user.id);
-  // The session is issued **unconfirmed**: § D214 § 5 lets an unconfirmed account log in and play,
-  // and gates only the one privilege that needs gating — posting a score.
-  return { status: 201, body: { token: session.token, user: publicUser(created.user) } };
-}
-
-async function confirm(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
-  const token = request.query.get('token') ?? '';
-  const claims = verifyConfirmation(token, deps.secret, deps.now());
-  if (typeof claims === 'string') {
-    return {
-      status: 400,
-      body: {
-        error: claims,
-        detail:
-          claims === 'expired'
-            ? 'That confirmation link has expired. Sign in and ask for a new one.'
-            : 'That confirmation link is not valid.',
-      },
-    };
-  }
-  // Both halves, and the store checks both: a token carries the address it was mailed to, so it
-  // cannot confirm whatever address the account happens to hold now.
-  const done = await deps.store.confirmUser(claims.userId, claims.email);
-  return done
-    ? { status: 200, body: { confirmed: true } }
-    : { status: 400, body: { error: 'bad-signature', detail: 'That confirmation link is not valid.' } };
-}
-
-async function login(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
-  const body = request.body as Partial<Record<'email' | 'password', unknown>>;
-  const email = typeof body?.email === 'string' ? body.email : '';
-  const password = typeof body?.password === 'string' ? body.password : '';
-
-  const user = await deps.store.userByEmail(email);
-  // One refusal, one wording, for both arms. Telling the caller which of the two was wrong hands
-  // them the half they did not have.
-  const refused: ApiResponse = {
-    status: 401,
-    body: { error: 'bad-credentials', detail: 'That address and password do not match an account.' },
-  };
+  const user = (await deps.store.userByEmail(email)) ?? (await createPlayer(deps, email));
   if (user === undefined) {
-    // Hashed anyway, against a throwaway record, so a missing account costs the same ~100 ms a
-    // present one does. Without this the response time is an account-existence oracle regardless
-    // of how carefully the wording is matched.
-    passwordMatches(password, hashPassword('a placeholder of adequate length'));
-    return refused;
+    // Every generated name collided, which is a fifty-bit coincidence and therefore a bug. It is
+    // reported as a server failure rather than as anything about the address.
+    return { status: 500, body: { error: 'internal-error', detail: 'That could not be set up. Try again.' } };
   }
-  if (!passwordMatches(password, user.password)) return refused;
+
+  const link = signLoginToken({
+    userId: user.id,
+    email: user.email,
+    secret: deps.secret,
+    nowMs,
+  });
+  // Recorded **before** it is mailed. The other order has a window in which a link is in somebody's
+  // inbox and is not redeemable, which is indistinguishable from a broken server.
+  await deps.store.createLoginToken({ jti: link.jti, userId: user.id, expiresAtMs: link.expiresAtMs });
+  // Awaited, and a failure fails the request. Since § D241 the mail is not a courtesy at the start
+  // of an account's life, it is the only door: a send that was dropped silently would be a player
+  // staring at "check your email" forever.
+  await deps.mailer.send(
+    signInMessage(user.email, deps.signInUrl(link.token), Math.round(LOGIN_TTL_MS / 60_000)),
+  );
+
+  return {
+    status: 202,
+    body: {
+      ok: true,
+      // No token, no account id, no statement about whether this address was already known. The
+      // only number here is a duration, which is a fact about the server and not about the player.
+      detail: `If that address can receive mail, a sign-in link is on its way. It works once and expires in ${String(Math.round(LOGIN_TTL_MS / 60_000))} minutes.`,
+      expiresInMs: LOGIN_TTL_MS,
+    },
+  };
+}
+
+/**
+ * Redeem a sign-in link: verify it, **spend it**, hand back a session.
+ *
+ * ## Single use is the `DELETE`, not the signature
+ *
+ * `verifyLoginToken` proves the token was signed here and has not expired, and it will prove that
+ * every time it is asked, for a token that was spent an hour ago — nothing about an HMAC changes
+ * when it is used. So the second step is `consumeLoginToken`, one `DELETE` whose `rowCount` is the
+ * answer, and a token whose row is gone is refused however perfect its signature.
+ *
+ * ## Why this is a POST, and why the mail does not point at it
+ *
+ * Mail clients prefetch. Scanners, corporate link-rewriting appliances and "safe links" services
+ * fetch every URL in a message before a human sees it, and a `GET` that consumed a token would burn
+ * it before the recipient clicked — a login that fails for exactly the people whose employer is
+ * careful. Two independent things stop that here:
+ *
+ * 1. **The mailed link points at the viewer, not at this API**, with the token in the URL
+ *    **fragment**. A fragment is never sent to any server, so fetching the link cannot transmit the
+ *    token, let alone spend it. It also keeps the token out of access logs and out of `Referer`.
+ * 2. **This route is `POST` with a JSON body.** Nothing that follows links issues one.
+ *
+ * Either alone would do. Both, because the first depends on the client behaving and the second does
+ * not. {@link redeemIsNotAGet} answers the `GET` explicitly rather than through the generic 404, so
+ * that "a fetch of this path does not consume anything" is a statement the surface makes out loud.
+ */
+async function redeemLink(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
+  const body = request.body as Partial<Record<'token', unknown>>;
+  const token = typeof body?.token === 'string' ? body.token : '';
+
+  const claims = verifyLoginToken(token, deps.secret, deps.now());
+  if (typeof claims === 'string') return badLink(claims === 'expired' ? 'expired' : 'invalid');
+
+  // Spent here, and only here. Anything after this point that fails leaves the link used, which is
+  // the safe direction: a player asks for another one, and a stolen link is not waiting to be
+  // replayed against whatever the failure was.
+  if (!(await deps.store.consumeLoginToken(claims.jti))) return badLink('spent');
+
+  const user = await deps.store.userById(claims.userId);
+  // The email is inside the signature and is checked against the account rather than trusted from
+  // the payload, so a token cannot authenticate an address other than the one it was mailed to.
+  // Compared in constant time for no reason stronger than that this file compares every value that
+  // gates a session that way, and an exception is a thing that gets copied.
+  if (user === undefined || !constantTimeEquals(normaliseEmail(user.email), normaliseEmail(claims.email))) {
+    return badLink('invalid');
+  }
 
   const session = await deps.store.createSession(newSessionToken(), user.id);
   return { status: 200, body: { token: session.token, user: publicUser(user) } };
+}
+
+/**
+ * The `GET` on the redeem path, answered on purpose.
+ *
+ * A `405` rather than the generic `no-such-route`, and it exists to make one guarantee legible: a
+ * thing that merely *fetched* this URL has not spent anything. That matters because the population
+ * fetching URLs out of mail is machines, and the sentence is here so the next person reading the
+ * route table does not "helpfully" add a `GET` alias for it.
+ */
+function redeemIsNotAGet(): ApiResponse {
+  return {
+    status: 405,
+    body: {
+      error: 'method-not-allowed',
+      detail:
+        'Sign-in links are redeemed with a POST. A GET here does nothing and consumes nothing, ' +
+        'which is deliberate: mail clients and link scanners fetch every URL in a message.',
+    },
+  };
+}
+
+/** One wording per reason, and none of them contains the token. */
+function badLink(reason: 'expired' | 'spent' | 'invalid'): ApiResponse {
+  const detail = {
+    expired: 'That sign-in link has expired. Ask for a new one — they are good for a few minutes.',
+    spent: 'That sign-in link has already been used. Each one works once; ask for a new one.',
+    invalid: 'That sign-in link is not valid. Ask for a new one.',
+  }[reason];
+  // 400 for all three. The distinction is *for the person holding the link* — whether asking again
+  // will help — and it leaks nothing, because learning "already used" requires presenting a token
+  // this server signed, which only its recipient has.
+  return { status: 400, body: { error: `link-${reason}`, detail } };
+}
+
+function tooManyLinks(retryInMs: number): ApiResponse {
+  return {
+    status: 429,
+    body: {
+      error: 'too-many-link-requests',
+      // A duration, so the refusal is one a player can act on rather than wait out blindly. It says
+      // nothing about which of the two budgets was spent, because that would say whether anyone
+      // else has been asking about this address.
+      detail: 'Too many sign-in links have been asked for. Try again shortly, and check your inbox meanwhile.',
+      retryInMs,
+    },
+  };
+}
+
+/**
+ * Create the account behind an address nobody has signed in with yet.
+ *
+ * The display name is generated because this route cannot ask for one — see {@link UserRow}. Six
+ * random bytes is a collision every few million accounts, so the retry is for correctness rather
+ * than because it is expected to run; `undefined` after five attempts is a bug, not a name clash.
+ */
+async function createPlayer(deps: ApiDeps, email: string): Promise<UserRow | undefined> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const created = await deps.store.createUser({
+      email,
+      displayName: `player-${randomBytes(6).toString('hex')}`,
+      displayNameChosen: false,
+    });
+    if (created.ok) return created.user;
+    // Lost a race to another request for the same address: that account is the right answer.
+    if (created.reason === 'email-taken') return deps.store.userByEmail(email);
+  }
+  return undefined;
+}
+
+/**
+ * Choose a display name.
+ *
+ * It is a route rather than a field on the sign-in request for the reason {@link requestLink}
+ * states: a form that asks for a name only when the address is new tells the person filling it in
+ * whether the address is new. So every account starts with a placeholder and every player renames
+ * themselves afterwards, signed in, over a session that already proves they own the address.
+ *
+ * A taken name is reported **as such**, unlike a taken address. A display name is printed on every
+ * board, so it is already public and saying it is taken leaks nothing.
+ */
+async function setDisplayName(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
+  const user = await authenticate(deps, request);
+  if (user === undefined) {
+    return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to change your name.' } };
+  }
+  const body = request.body as Partial<Record<'displayName', unknown>>;
+  const displayName = typeof body?.displayName === 'string' ? body.displayName.trim() : '';
+  const issues = displayNameIssues(displayName);
+  if (issues.length > 0) return { status: 400, body: { error: 'invalid-display-name', issues } };
+
+  const renamed = await deps.store.setDisplayName(user.id, displayName);
+  if (!renamed.ok) {
+    return renamed.reason === 'name-taken'
+      ? { status: 409, body: { error: 'name-taken', detail: 'That display name is already in use on a board.' } }
+      : { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to change your name.' } };
+  }
+  return { status: 200, body: { user: publicUser(renamed.user) } };
 }
 
 async function logout(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
@@ -309,8 +507,6 @@ async function submit(
   if (user === undefined) {
     return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to post a score.' } };
   }
-  const gate = postingGate(user);
-  if (gate !== undefined) return gate;
 
   const submission = request.body as Submission;
   if (typeof submission?.run !== 'object' || typeof submission?.claimed !== 'object') {
@@ -441,8 +637,6 @@ async function submitChallenge(
   if (user === undefined) {
     return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to post a challenge entry.' } };
   }
-  const gate = postingGate(user);
-  if (gate !== undefined) return gate;
 
   const submission = request.body as ChallengeSubmission;
   if (typeof submission?.challengeId !== 'string' || typeof submission?.dispatcherProfileId !== 'string') {
@@ -579,23 +773,6 @@ async function authenticate(deps: ApiDeps, request: ApiRequest): Promise<UserRow
 }
 
 /**
- * § D214 § 5's one gated privilege, applied identically to both submission routes.
- *
- * Factored rather than repeated: two copies of an authorization check are two things that can
- * disagree, and the one that disagrees quietly is the one that lets a post through.
- */
-function postingGate(user: UserRow): ApiResponse | undefined {
-  if (user.confirmed) return undefined;
-  return {
-    status: 403,
-    body: {
-      error: 'not-confirmed',
-      detail: 'Confirm your email address before posting a score. You can keep playing meanwhile.',
-    },
-  };
-}
-
-/**
  * Charge a submission's replays against the account's cooldown, or refuse.
  *
  * Returns the 429 when the account is inside its window, and otherwise records the next moment it
@@ -701,12 +878,25 @@ function publicChallengeEntry(entry: ChallengeEntryRow): Record<string, unknown>
 /**
  * A user, as anything outside this process may see them.
  *
- * The digest and salt are not here, and `credentials.test.ts` asserts the record never contains the
- * password. `api.test.ts` asserts this **projection** never contains either, over every route, so
- * a field added to `UserRow` later cannot leak by being forgotten about.
+ * `confirmed` is gone with the password, and its absence is a claim rather than a tidy-up. It meant
+ * *this account has proved it can read its address*, and it existed because a password let somebody
+ * sign in **without** proving that. A magic link cannot: the session in the caller's hand was issued
+ * by redeeming a token that was mailed to the address, so every signed-in account has proved it, and
+ * a flag that is true for everybody who can ever read it is a gate that has stopped gating. § D241
+ * deletes the flag and `postingGate` with it rather than leaving an authorization check that cannot
+ * fire — which this repository has shipped enough times to have a rule about.
+ *
+ * `api.test.ts` asserts this **projection** never carries a sign-in token or a session token it was
+ * not asked for, over every route, so a field added to `UserRow` later cannot leak by being
+ * forgotten about.
  */
 function publicUser(user: UserRow): Record<string, unknown> {
-  return { id: user.id, email: user.email, displayName: user.displayName, confirmed: user.confirmed };
+  return {
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    displayNameChosen: user.displayNameChosen,
+  };
 }
 
 function publicEntry(entry: EntryRow): Record<string, unknown> {
@@ -723,8 +913,8 @@ function publicEntry(entry: EntryRow): Record<string, unknown> {
  * Whether an address is shaped like one.
  *
  * Deliberately minimal — one `@`, something either side, no spaces. A regex claiming to implement
- * RFC 5321 rejects addresses that work; the confirmation mail is the real check, and it either
- * arrives or it does not.
+ * RFC 5321 rejects addresses that work; the sign-in mail is the real check, and it either arrives
+ * or it does not.
  */
 function emailIssues(email: string): readonly string[] {
   const trimmed = email.trim();

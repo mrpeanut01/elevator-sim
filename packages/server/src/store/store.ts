@@ -12,9 +12,11 @@
  * real clock is a test that fails at midnight, so the clock arrives as a function and the tests pass
  * a counter. That is invariant 3's spirit applied where its letter does not reach.
  *
- * **A password never crosses this boundary.** The store takes and returns a `PasswordHash` —
- * salt and digest — and has no method that accepts a plaintext one. Hashing is
- * `accounts/credentials.ts`'s job, and a store that could hash would be a store that could log.
+ * **No credential crosses this boundary, and since § D241 there is no credential to cross it.**
+ * `users` used to carry a `scrypt` salt and digest; the password path is gone, so those two columns
+ * are gone with it. What the store holds instead is a `login_tokens` row per outstanding sign-in
+ * link, and that row is the token's **identity**, never the token: the mailed string is signed by
+ * `accounts/credentials.ts` and is readable in exactly one place, the mailbox it was sent to.
  *
  * **The database arrives as a {@link Sql}, and every method is async.** It was `node:sqlite` and
  * synchronous until the server needed somewhere to live that outlives a container filesystem. The
@@ -28,13 +30,29 @@
  * first row rather than degrading slowly. `REAL` became **`DOUBLE PRECISION`** for the same class
  * of reason: PostgreSQL's `REAL` is a four-byte float, and rounding a measured AWT to seven
  * significant figures to save four bytes is how a leaderboard starts disagreeing with the run it
- * came from. `confirmed` became a real `BOOLEAN` rather than an integer holding 0 or 1, and
+ * came from. The boolean columns are real `BOOLEAN`s rather than integers holding 0 or 1, and
  * SQLite's `COLLATE NOCASE` became an index and a predicate over `LOWER(display_name)`.
+ *
+ * ## What § D241 removed, and what a migration would have had to do
+ *
+ * `users` lost `salt_hex`, `hash_hex` and `confirmed`, and gained `display_name_chosen`. There is
+ * **no migration**, because there is nothing to migrate: the deployed database has never held an
+ * account — the password path was never reachable from a viewer that could not find its own API
+ * (§ D243) — and this schema is applied by `CREATE TABLE IF NOT EXISTS` against an empty one.
+ *
+ * That is a claim about a specific database and it will stop being true, so what a migration would
+ * need is written down here rather than assumed away. `salt_hex` and `hash_hex` are `NOT NULL` with
+ * no default, so an existing `users` table would refuse every insert this code now writes: the
+ * migration is `ALTER TABLE users DROP COLUMN salt_hex, DROP COLUMN hash_hex, DROP COLUMN
+ * confirmed, ADD COLUMN display_name_chosen BOOLEAN NOT NULL DEFAULT TRUE` — `TRUE` for existing
+ * rows, because a name a person actually typed at registration is a chosen one and re-prompting
+ * everybody would be the migration lying about them. It does **not** belong hidden in
+ * {@link Store.open}; this module's own rule is that when there is something to migrate, the honest
+ * thing is a versioned migration table.
  */
 
 import { randomUUID } from 'node:crypto';
 
-import type { PasswordHash } from '../accounts/credentials.js';
 import type { IssuedChallenge } from '../challenge/schedule.js';
 import type { ChallengeScore, SeedResult } from '../challenge/submission.js';
 import type { ClaimedMetrics, SubmittedRun } from '../leaderboard/submission.js';
@@ -50,13 +68,35 @@ export interface UserRow {
   readonly email: string;
   /** What a leaderboard shows. Never the email — an address is not a display name. */
   readonly displayName: string;
-  readonly password: PasswordHash;
-  readonly confirmed: boolean;
+  /**
+   * Whether {@link displayName} is one the player chose, or the placeholder they were given.
+   *
+   * § D241 creates the account when a sign-in link is *asked for*, and that request carries an
+   * address and nothing else — it cannot carry a name, because asking for one only when the account
+   * is new is exactly the account-existence oracle the uniform response exists to close. So a new
+   * account gets `player-<random>` and this flag says so, and the viewer prompts once. Without the
+   * flag the client would have to recognise the placeholder by its shape, which is a second place
+   * that decides what a generated name looks like.
+   */
+  readonly displayNameChosen: boolean;
   readonly createdAtMs: number;
 }
 
 export interface SessionRow {
   readonly token: string;
+  readonly userId: string;
+  readonly expiresAtMs: number;
+}
+
+/**
+ * One outstanding sign-in link, by the identity inside it.
+ *
+ * The row **is** the single-use guarantee. `accounts/credentials.ts` can prove a token was signed
+ * here and has not expired, and it can prove that a thousand times over for a token that was spent
+ * on the first — so "used once" is a fact about this table or it is not a fact.
+ */
+export interface LoginTokenRow {
+  readonly jti: string;
   readonly userId: string;
   readonly expiresAtMs: number;
 }
@@ -168,7 +208,8 @@ export class Store {
   async createUser(input: {
     readonly email: string;
     readonly displayName: string;
-    readonly password: PasswordHash;
+    /** False for the generated placeholder of § D241, true when a person typed it. */
+    readonly displayNameChosen: boolean;
   }): Promise<
     { readonly ok: true; readonly user: UserRow } | { readonly ok: false; readonly reason: 'email-taken' | 'name-taken' }
   > {
@@ -180,14 +221,13 @@ export class Store {
       id: randomUUID(),
       email,
       displayName: input.displayName,
-      password: input.password,
-      confirmed: false,
+      displayNameChosen: input.displayNameChosen,
       createdAtMs: this.#now(),
     };
     await this.#sql.query(
-      'INSERT INTO users (id, email, display_name, salt_hex, hash_hex, confirmed, created_at_ms) ' +
-        'VALUES ($1, $2, $3, $4, $5, FALSE, $6)',
-      [user.id, user.email, user.displayName, user.password.saltHex, user.password.hashHex, user.createdAtMs],
+      'INSERT INTO users (id, email, display_name, display_name_chosen, created_at_ms) ' +
+        'VALUES ($1, $2, $3, $4, $5)',
+      [user.id, user.email, user.displayName, user.displayNameChosen, user.createdAtMs],
     );
     return { ok: true, user };
   }
@@ -213,18 +253,66 @@ export class Store {
   }
 
   /**
-   * Mark an address confirmed.
+   * Rename a player, or report the name is taken.
    *
-   * Takes the **address as well as the id** and updates only when both match, because the token
-   * that authorises this carries both and a confirmation that ignored the address would confirm
-   * whatever address the account had *now* rather than the one that was mailed. `credentials.ts`
-   * puts the email inside the signature for the same reason; this is the other half of it.
+   * The only writer of `display_name_chosen`, and it sets it in the same statement — a rename that
+   * left the flag alone would leave the viewer prompting forever, and two statements would leave a
+   * window where it is neither.
+   *
+   * Checked with {@link #userByName} before the write **and** guarded by the unique index behind it.
+   * The check gives the caller a civil refusal; the index is what makes the guarantee true under two
+   * players renaming to the same thing at once, which the check alone cannot promise.
    */
-  async confirmUser(id: string, email: string): Promise<boolean> {
-    const result = await this.#sql.query('UPDATE users SET confirmed = TRUE WHERE id = $1 AND email = $2', [
-      id,
-      normaliseEmail(email),
+  async setDisplayName(
+    id: string,
+    displayName: string,
+  ): Promise<{ readonly ok: true; readonly user: UserRow } | { readonly ok: false; readonly reason: 'name-taken' | 'no-such-user' }> {
+    const clash = await this.#userByName(displayName);
+    if (clash !== undefined && clash.id !== id) return { ok: false, reason: 'name-taken' };
+    const result = await this.#sql.query(
+      'UPDATE users SET display_name = $2, display_name_chosen = TRUE WHERE id = $1',
+      [id, displayName],
+    );
+    if (result.rowCount === 0) return { ok: false, reason: 'no-such-user' };
+    const user = await this.userById(id);
+    return user === undefined ? { ok: false, reason: 'no-such-user' } : { ok: true, user };
+  }
+
+  /* -------------------------------------------------------- sign-in links */
+
+  /**
+   * Record an outstanding sign-in link, so that redeeming it can consume it.
+   *
+   * Takes the token's `jti` and never the token. The distinction is the whole point: a database that
+   * held the mailed string would be a database whose backup is a pile of working account keys.
+   */
+  async createLoginToken(input: LoginTokenRow): Promise<void> {
+    await this.#sql.query('INSERT INTO login_tokens (jti, user_id, expires_at_ms) VALUES ($1, $2, $3)', [
+      input.jti,
+      input.userId,
+      input.expiresAtMs,
     ]);
+  }
+
+  /**
+   * Spend a sign-in link, once.
+   *
+   * **A single `DELETE` whose `rowCount` is the answer.** Not a `SELECT` then a `DELETE`: two
+   * statements are a check-then-act, and the version of that race on this surface is two concurrent
+   * redemptions of one link both finding the row and both being handed a session. One statement
+   * makes the database the arbiter, and exactly one caller can see `rowCount > 0`.
+   *
+   * Expired rows are swept on the way past, for the reason {@link Store.userForSession} sweeps
+   * expired sessions: a table of tokens that can never authenticate anything is a table that only
+   * grows. The sweep is a second statement and does not need to be atomic with the first — it
+   * deletes only rows the first could not have accepted anyway.
+   */
+  async consumeLoginToken(jti: string): Promise<boolean> {
+    const result = await this.#sql.query('DELETE FROM login_tokens WHERE jti = $1 AND expires_at_ms > $2', [
+      jti,
+      this.#now(),
+    ]);
+    await this.#sql.query('DELETE FROM login_tokens WHERE expires_at_ms <= $1', [this.#now()]);
     return result.rowCount > 0;
   }
 
@@ -519,11 +607,10 @@ export class Store {
       id: String(row['id']),
       email: String(row['email']),
       displayName: String(row['display_name']),
-      password: { saltHex: String(row['salt_hex']), hashHex: String(row['hash_hex']) },
-      // A real `BOOLEAN` now, so this is the column's own value rather than a comparison against
-      // the integer 1. Coerced rather than cast because the two drivers are entitled to disagree
-      // about whether that arrives as `true` or as `'t'`.
-      confirmed: row['confirmed'] === true || row['confirmed'] === 't',
+      // A real `BOOLEAN`, so this is the column's own value rather than a comparison against the
+      // integer 1. Coerced rather than cast because the two drivers are entitled to disagree about
+      // whether that arrives as `true` or as `'t'`.
+      displayNameChosen: row['display_name_chosen'] === true || row['display_name_chosen'] === 't',
       createdAtMs: Number(row['created_at_ms']),
     });
   }
@@ -606,13 +693,14 @@ function entryOf(row: Record<string, unknown>): EntryRow {
  */
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
-  id            TEXT PRIMARY KEY,
-  email         TEXT NOT NULL UNIQUE,
-  display_name  TEXT NOT NULL,
-  salt_hex      TEXT NOT NULL,
-  hash_hex      TEXT NOT NULL,
-  confirmed     BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at_ms BIGINT NOT NULL
+  id                  TEXT PRIMARY KEY,
+  email               TEXT NOT NULL UNIQUE,
+  display_name        TEXT NOT NULL,
+  -- § D241. False while the name is the placeholder an account gets before its owner has ever
+  -- signed in; true once a person has typed one. There is no password column and there never will
+  -- be another one: the only credential this product has is an emailed link.
+  display_name_chosen BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at_ms       BIGINT NOT NULL
 );
 -- SQLite spelled this \`display_name COLLATE NOCASE\`. The expression index is PostgreSQL's
 -- equivalent, and \`#userByName\` folds with the same \`LOWER\` so the lookup and the constraint
@@ -624,6 +712,16 @@ CREATE TABLE IF NOT EXISTS sessions (
   user_id        TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   expires_at_ms  BIGINT NOT NULL
 );
+
+-- One row per outstanding sign-in link, holding the token's identity and never the token. This
+-- table is what makes a magic link single-use: the signature stays valid forever, so the row being
+-- gone is the only thing that can say a link has been spent.
+CREATE TABLE IF NOT EXISTS login_tokens (
+  jti            TEXT PRIMARY KEY,
+  user_id        TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  expires_at_ms  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS login_tokens_expiry ON login_tokens (expires_at_ms);
 
 CREATE TABLE IF NOT EXISTS entries (
   id                  TEXT PRIMARY KEY,

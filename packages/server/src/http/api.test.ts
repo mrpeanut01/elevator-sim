@@ -1,14 +1,21 @@
 /**
- * The whole flow, driven end to end with no socket: register, read the mail, click the link, sign
- * in, forge a score and watch it refused, submit an honest one and watch it ranked.
+ * The whole flow, driven end to end with no socket: ask for a sign-in link, read the mail, redeem
+ * it, forge a score and watch it refused, submit an honest one and watch it ranked.
  *
  * Against the **real `data/`** and the **real kernel**. A leaderboard test that stubbed the
  * simulation would prove the stub agrees with itself; the entire anti-cheat design is that the
  * shipped engine is deterministic enough to catch a lie, and the only way to test that is to tell
  * one.
  *
- * Every security claim in `DECISIONS.md` § D214 § 5 has a test here that **breaks** it on purpose:
- * an unconfirmed account posting, a wrong password, a bad token, a session logged out and reused.
+ * Every security claim in `DECISIONS.md` § D214 § 5 as amended by § D241 has a test here that
+ * **breaks** it on purpose: a tampered link, an expired one, a link redeemed twice, a link for one
+ * address presented for another, a session logged out and reused, and an address asked about often
+ * enough to be mail-bombed.
+ *
+ * **The two that only exist here** are the two a unit test structurally cannot make. Single use is a
+ * fact about the store, not about a signature — `credentials.test.ts` says out loud that verifying
+ * twice succeeds twice — and account non-enumeration is a fact about two whole responses being the
+ * same bytes, which needs both branches driven through the same route.
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -19,6 +26,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { runSimulation } from '@elevator-sim/core';
 
+import { LOGIN_TTL_MS, signLoginToken } from '../accounts/credentials.js';
 import { bootstrap, UnsafeConfigurationError, type Server } from '../bootstrap.js';
 import { configFor, metricsOf } from '../leaderboard/verify.js';
 import { OutboxMailer } from '../mail/mailer.js';
@@ -28,7 +36,6 @@ import type { Submission, SubmittedRun } from '../leaderboard/submission.js';
 
 const DATA_DIR = new URL('../../../../data/', import.meta.url).pathname;
 const SECRET = 'a'.repeat(48);
-const PASSWORD = 'a passphrase of adequate length';
 
 let server: Server;
 let outbox: OutboxMailer;
@@ -61,7 +68,7 @@ afterAll(async () => {
 async function call(
   method: string,
   path: string,
-  options: { body?: unknown; token?: string; query?: Record<string, string> } = {},
+  options: { body?: unknown; token?: string; query?: Record<string, string>; ip?: string } = {},
 ): Promise<ApiResponse> {
   const request: ApiRequest = {
     method,
@@ -69,6 +76,11 @@ async function call(
     query: new Map(Object.entries(options.query ?? {})),
     body: options.body,
     token: options.token,
+    // A fresh caller unless a test says otherwise. § D242's two budgets are driven deliberately
+    // below, each with its own fixed address; sharing one address across the whole file would put
+    // every other test into the same bucket, and the first symptom would be an unrelated 429
+    // halfway down the file rather than the thing that test was about.
+    clientIp: options.ip ?? `198.51.100.${String((callsMade += 1) % 250)}`,
   };
   const response = await server.api(request);
   // Ten seconds per call, which is what a real client's clock does between two actions and what
@@ -83,16 +95,37 @@ function bodyOf(response: ApiResponse): Record<string, unknown> {
   return response.body as Record<string, unknown>;
 }
 
+let callsMade = 0;
 let accounts = 0;
-/** A fresh, unconfirmed account and its session token. */
-async function register(): Promise<{ token: string; id: string; email: string }> {
+
+/** The most recently delivered message's link, and the token in its fragment. */
+async function lastLink(): Promise<{ to: string; url: string; token: string }> {
+  const message = (await outbox.delivered()).at(-1);
+  const url = /https:\/\/\S+/u.exec(message?.body ?? '')?.[0] ?? '';
+  // Out of the **fragment**, which is where `bootstrap.ts` puts it and is the whole point: a
+  // fragment is never sent to a server, so the token cannot reach an access log or a `Referer`.
+  const token = new URLSearchParams(new URL(url).hash.slice(1)).get('sign-in') ?? '';
+  return { to: message?.to ?? '', url, token };
+}
+
+/**
+ * A signed-in account, through the mailbox rather than around it.
+ *
+ * There is no shortcut past the mail any more and that is the point: a session can only be obtained
+ * by reading a message sent to the address, which is what makes a separate confirmation step — and
+ * the `postingGate` that enforced it — unnecessary rather than merely removed.
+ */
+async function signIn(): Promise<{ token: string; id: string; email: string }> {
   accounts += 1;
   const email = `player${String(accounts)}@example.test`;
-  const response = await call('POST', '/api/register', {
-    body: { email, displayName: `Player ${String(accounts)}`, password: PASSWORD },
-  });
-  expect(response.status, JSON.stringify(response.body)).toBe(201);
-  const body = bodyOf(response);
+  const asked = await call('POST', '/api/auth/request-link', { body: { email } });
+  expect(asked.status, JSON.stringify(asked.body)).toBe(202);
+
+  const mail = await lastLink();
+  expect(mail.to).toBe(email);
+  const redeemed = await call('POST', '/api/auth/redeem', { body: { token: mail.token } });
+  expect(redeemed.status, JSON.stringify(redeemed.body)).toBe(200);
+  const body = bodyOf(redeemed);
   return {
     token: String(body['token']),
     id: String((body['user'] as Record<string, unknown>)['id']),
@@ -100,130 +133,320 @@ async function register(): Promise<{ token: string; id: string; email: string }>
   };
 }
 
-/** Register, then follow the link out of the outbox. This is the flow, not a shortcut past it. */
-async function registerConfirmed(): Promise<{ token: string; id: string; email: string }> {
-  const account = await register();
-  const delivered = await outbox.delivered();
-  const message = delivered.at(-1);
-  expect(message?.to).toBe(account.email);
-  const link = /https:\/\/\S+/u.exec(message?.body ?? '')?.[0] ?? '';
-  const confirmToken = new URL(link).searchParams.get('token') ?? '';
-  const confirmed = await call('GET', '/api/confirm', { query: { token: confirmToken } });
-  expect(confirmed.status, JSON.stringify(confirmed.body)).toBe(200);
-  return account;
-}
-
 /* -------------------------------------------------------------------------- *
- * Registration and confirmation
+ * Asking for a sign-in link
  * -------------------------------------------------------------------------- */
 
-describe('registration', () => {
-  it('mails a link, and the link is the only place the token appears', async () => {
+describe('asking for a sign-in link', () => {
+  it('mails one, and the token appears nowhere but the mail', async () => {
     const before = (await outbox.delivered()).length;
-    const account = await register();
-    const delivered = await outbox.delivered();
-    expect(delivered.length).toBe(before + 1);
+    const asked = await call('POST', '/api/auth/request-link', { body: { email: 'mailed@example.test' } });
+    expect(asked.status).toBe(202);
+    expect((await outbox.delivered()).length).toBe(before + 1);
 
-    // The response must not carry the confirmation token. If it did, a client could confirm an
-    // address it never proved it could read, and the mailbox round trip would be decorative.
-    const serialised = JSON.stringify(bodyOf(await call('GET', '/api/me', { token: account.token })));
-    const link = /https:\/\/\S+/u.exec(delivered.at(-1)?.body ?? '')?.[0] ?? '';
-    const confirmToken = new URL(link).searchParams.get('token') ?? '';
-    expect(confirmToken.length).toBeGreaterThan(20);
-    expect(serialised).not.toContain(confirmToken);
+    const mail = await lastLink();
+    expect(mail.token.length).toBeGreaterThan(20);
+    // Not in the accepting response. A body that echoed the token would hand an account to anybody
+    // who could name an address, and would make the mailbox round trip decorative.
+    expect(JSON.stringify(asked.body)).not.toContain(mail.token);
   });
 
-  it('never returns a password, a digest or a salt — on any route', async () => {
-    const account = await registerConfirmed();
-    for (const response of [
-      await call('POST', '/api/login', { body: { email: account.email, password: PASSWORD } }),
-      await call('GET', '/api/me', { token: account.token }),
-    ]) {
-      const text = JSON.stringify(response.body);
-      expect(text).not.toContain(PASSWORD);
-      expect(text).not.toContain('hashHex');
-      expect(text).not.toContain('saltHex');
+  it('puts the token in the fragment, so it is never sent to a server', async () => {
+    await call('POST', '/api/auth/request-link', { body: { email: 'fragment@example.test' } });
+    const mail = await lastLink();
+    const url = new URL(mail.url);
+    // Nothing in the path and nothing in the query — those travel in the request line and reach
+    // access logs, proxies and `Referer`. The fragment does not travel at all.
+    expect(url.search).toBe('');
+    expect(url.pathname).toBe('/');
+    expect(url.hash).toContain('sign-in=');
+    expect(`${url.origin}${url.pathname}${url.search}`).not.toContain(mail.token);
+  });
+
+  it('answers a new address and a known one with the same bytes', async () => {
+    const account = await signIn();
+    const known = await call('POST', '/api/auth/request-link', { body: { email: account.email } });
+    const unknown = await call('POST', '/api/auth/request-link', { body: { email: 'never-seen@example.test' } });
+    expect(known.status).toBe(202);
+    expect(unknown.status).toBe(202);
+    // Byte for byte, status included. A difference of a word, a code or a status is a difference an
+    // attacker can read, and the address is the thing they do not have.
+    expect(JSON.stringify(known.body)).toBe(JSON.stringify(unknown.body));
+    expect(String(bodyOf(known)['detail'])).not.toMatch(/exists|already|new account|welcome/iu);
+  });
+
+  it('refuses an address that is not one, without mailing anything', async () => {
+    const before = (await outbox.delivered()).length;
+    for (const email of ['', 'not-an-address', 'a b@example.test', 'x'.repeat(300)]) {
+      const response = await call('POST', '/api/auth/request-link', { body: { email } });
+      expect(response.status, email).toBe(400);
+      expect(bodyOf(response)['error']).toBe('invalid-address');
     }
+    // The shape gate is first and has no side effect, so a typo costs nobody a mail and nobody a
+    // budget.
+    expect((await outbox.delivered()).length).toBe(before);
   });
 
-  it('refuses a short password, a bad address and a blank name, and says all of it at once', async () => {
-    const response = await call('POST', '/api/register', {
-      body: { email: 'not-an-address', displayName: '', password: 'short' },
-    });
-    expect(response.status).toBe(400);
-    // Three problems, three issues. A form that reports the first is a form that makes a player
-    // guess how many there are — the rule `freePlayIssues` follows on the client.
-    expect((bodyOf(response)['issues'] as string[]).length).toBeGreaterThanOrEqual(3);
+  it('folds case and whitespace, so one person has one account', async () => {
+    const account = await signIn();
+    await call('POST', '/api/auth/request-link', { body: { email: `  ${account.email.toUpperCase()} ` } });
+    const mail = await lastLink();
+    const redeemed = await call('POST', '/api/auth/redeem', { body: { token: mail.token } });
+    expect(redeemed.status).toBe(200);
+    // The same account, not a second one wearing different capitals.
+    expect((bodyOf(redeemed)['user'] as Record<string, unknown>)['id']).toBe(account.id);
   });
 
-  it('does not say whether an address already has an account', async () => {
-    const account = await registerConfirmed();
-    const again = await call('POST', '/api/register', {
-      body: { email: account.email, displayName: 'Somebody Else', password: PASSWORD },
-    });
-    expect(again.status).toBe(409);
-    // The wording is about the form, not about the database. `email-taken` as a code would be an
-    // account-enumeration oracle in a field a client can read.
-    expect(bodyOf(again)['error']).toBe('cannot-register');
-    expect(String(bodyOf(again)['detail'])).not.toMatch(/exists|already registered|taken/u);
+  it('rate-limits one address, so the endpoint is not an email bomb', async () => {
+    const victim = 'victim@example.test';
+    const statuses: number[] = [];
+    // Six in a row from six different callers — the per-caller budget cannot be what stops this, so
+    // what stops it is the per-address budget, which is the one that decides whether this endpoint
+    // can be pointed at a stranger.
+    for (let index = 0; index < 6; index += 1) {
+      statuses.push((await call('POST', '/api/auth/request-link', { body: { email: victim } })).status);
+    }
+    expect(statuses).toContain(429);
+    expect(statuses.filter((status) => status === 202).length).toBeLessThanOrEqual(3);
+
+    const refused = statuses.lastIndexOf(429);
+    expect(refused).toBeGreaterThanOrEqual(0);
   });
 
-  it('does say when a display name is taken, because a display name is public', async () => {
-    await call('POST', '/api/register', {
-      body: { email: 'first@example.test', displayName: 'Contested', password: PASSWORD },
-    });
-    const clash = await call('POST', '/api/register', {
-      body: { email: 'second@example.test', displayName: 'contested', password: PASSWORD },
-    });
-    // Case-insensitively, so two names that render identically on a board cannot both exist.
-    expect(clash.status).toBe(409);
-    expect(bodyOf(clash)['error']).toBe('name-taken');
+  it('rate-limits one caller across many addresses, which the per-address budget cannot', async () => {
+    const attacker = '203.0.113.7';
+    let refusals = 0;
+    // A hundred addresses asked for once each: no address exceeds its own budget, and the run is
+    // still a run through a list.
+    for (let index = 0; index < 40; index += 1) {
+      const response = await call('POST', '/api/auth/request-link', {
+        body: { email: `sweep${String(index)}@example.test` },
+        ip: attacker,
+      });
+      if (response.status === 429) refusals += 1;
+    }
+    expect(refusals).toBeGreaterThan(0);
   });
 
-  it('refuses a tampered, foreign or expired confirmation link', async () => {
-    const account = await register();
-    const link = /https:\/\/\S+/u.exec((await outbox.delivered()).at(-1)?.body ?? '')?.[0] ?? '';
-    const token = new URL(link).searchParams.get('token') ?? '';
+  it('says how long to wait, and does not say which budget was spent', async () => {
+    const shared = '203.0.113.8';
+    let limited: ApiResponse | undefined;
+    for (let index = 0; index < 8 && limited === undefined; index += 1) {
+      const response = await call('POST', '/api/auth/request-link', {
+        body: { email: 'repeat@example.test' },
+        ip: shared,
+      });
+      if (response.status === 429) limited = response;
+    }
+    expect(limited).toBeDefined();
+    if (limited === undefined) return;
+    expect(bodyOf(limited)['error']).toBe('too-many-link-requests');
+    expect(Number(bodyOf(limited)['retryInMs'])).toBeGreaterThan(0);
+    // Naming which budget was exhausted would say whether anybody else has been asking about this
+    // address, which is the enumeration oracle by a longer route.
+    expect(JSON.stringify(limited.body)).not.toMatch(/address budget|per-email|per-ip|this address has/iu);
+  });
 
-    for (const bad of ['', 'nonsense', `${token}x`, token.slice(0, -4)]) {
-      const response = await call('GET', '/api/confirm', { query: { token: bad } });
+  it('fails the request when the mail cannot be sent, rather than pretending', async () => {
+    // Since § D241 the mail is the only door. A send that was dropped silently would leave a player
+    // waiting for a message that is never coming, with a 202 on screen saying it is on its way.
+    const broken = await bootstrap({
+      dataDir: DATA_DIR,
+      sql: new PgliteSql(),
+      env: { ELEVATOR_SIM_SECRET: SECRET },
+      publicOrigin: 'https://elevator.example',
+      now: () => clock,
+      mailer: {
+        send: () => Promise.reject(new Error('the mail service refused it')),
+      },
+    });
+    await expect(
+      broken.api({
+        method: 'POST',
+        path: '/api/auth/request-link',
+        query: new Map(),
+        body: { email: 'undeliverable@example.test' },
+        token: undefined,
+        clientIp: '203.0.113.10',
+      }),
+    ).rejects.toThrow();
+    await broken.close();
+  }, 120_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * Redeeming one
+ * -------------------------------------------------------------------------- */
+
+describe('redeeming a sign-in link', () => {
+  it('works once, and the second attempt is refused', async () => {
+    await call('POST', '/api/auth/request-link', { body: { email: 'once@example.test' } });
+    const mail = await lastLink();
+
+    const first = await call('POST', '/api/auth/redeem', { body: { token: mail.token } });
+    expect(first.status).toBe(200);
+    // The claim `credentials.test.ts` says a signature cannot make. The token still verifies — it is
+    // the same bytes, signed by the same secret, inside its expiry — and the row behind it is gone.
+    const second = await call('POST', '/api/auth/redeem', { body: { token: mail.token } });
+    expect(second.status).toBe(400);
+    expect(bodyOf(second)['error']).toBe('link-spent');
+  });
+
+  it('refuses a tampered, truncated or invented link, and does not spend the real one', async () => {
+    await call('POST', '/api/auth/request-link', { body: { email: 'tampered@example.test' } });
+    const mail = await lastLink();
+
+    for (const bad of ['', 'nonsense', `${mail.token}x`, mail.token.slice(0, -4), mail.token.replace('.', '..')]) {
+      const response = await call('POST', '/api/auth/redeem', { body: { token: bad } });
       expect(response.status, bad).toBe(400);
+      expect(String(bodyOf(response)['error'])).toMatch(/^link-/u);
     }
-    // The real one still works afterwards — the refusals above did not consume it.
-    expect((await call('GET', '/api/confirm', { query: { token } })).status).toBe(200);
-    expect(account.id.length).toBeGreaterThan(0);
+    // The real one still works afterwards. A refusal that consumed the token would let anyone who
+    // could guess *at* a link lock its owner out of the account.
+    expect((await call('POST', '/api/auth/redeem', { body: { token: mail.token } })).status).toBe(200);
+  });
+
+  it('refuses an expired link', async () => {
+    await call('POST', '/api/auth/request-link', { body: { email: 'stale@example.test' } });
+    const mail = await lastLink();
+    const wasAt = clock;
+    clock += LOGIN_TTL_MS + 1;
+    const response = await call('POST', '/api/auth/redeem', { body: { token: mail.token } });
+    clock = wasAt;
+    expect(response.status).toBe(400);
+    expect(bodyOf(response)['error']).toBe('link-expired');
+    // The wording says what to do about it, because "invalid" and "expired" are the same screen to
+    // a reader and only one of them is fixed by asking again.
+    expect(String(bodyOf(response)['detail'])).toMatch(/new one/u);
+  });
+
+  it('refuses a link whose signed address is not the account’s', async () => {
+    const account = await signIn();
+    // Signed by this server, inside its expiry, naming a real account id — and a different address.
+    // The email is inside the signature so that this cannot be a login; without the check the token
+    // would authenticate whatever address the account happened to hold.
+    const forged = signLoginToken({
+      userId: account.id,
+      email: 'attacker@example.test',
+      secret: SECRET,
+      nowMs: clock,
+    });
+    await server.store.createLoginToken({
+      jti: forged.jti,
+      userId: account.id,
+      expiresAtMs: forged.expiresAtMs,
+    });
+    const response = await call('POST', '/api/auth/redeem', { body: { token: forged.token } });
+    expect(response.status).toBe(400);
+    expect(bodyOf(response)['error']).toBe('link-invalid');
+  });
+
+  it('never echoes the token back, on any refusal', async () => {
+    await call('POST', '/api/auth/request-link', { body: { email: 'noecho@example.test' } });
+    const mail = await lastLink();
+    await call('POST', '/api/auth/redeem', { body: { token: mail.token } });
+    for (const body of [{ token: mail.token }, { token: `${mail.token}x` }, {}]) {
+      const response = await call('POST', '/api/auth/redeem', { body });
+      expect(JSON.stringify(response.body)).not.toContain(mail.token.slice(0, 24));
+    }
+  });
+
+  it('is not a GET, and a GET consumes nothing', async () => {
+    await call('POST', '/api/auth/request-link', { body: { email: 'prefetched@example.test' } });
+    const mail = await lastLink();
+
+    // What a mail scanner, a link-rewriting appliance or an over-eager client does. The link in the
+    // message does not point here at all — it points at the viewer, with the token in a fragment
+    // that is never transmitted — and even a caller that reconstructed this URL gets a 405.
+    const prefetched = await call('GET', '/api/auth/redeem', { query: { token: mail.token } });
+    expect(prefetched.status).toBe(405);
+    expect(String(bodyOf(prefetched)['detail'])).toMatch(/consumes nothing|POST/u);
+
+    // ...and the human who clicks afterwards still signs in.
+    expect((await call('POST', '/api/auth/redeem', { body: { token: mail.token } })).status).toBe(200);
+  });
+
+  it('gives a new player a placeholder name and says it is one', async () => {
+    const account = await signIn();
+    const me = await call('GET', '/api/me', { token: account.token });
+    const user = bodyOf(me)['user'] as Record<string, unknown>;
+    expect(user['displayNameChosen']).toBe(false);
+    // A generated name, not the address. An address is not a display name and a board is public.
+    expect(String(user['displayName'])).not.toContain('@');
   });
 });
 
 /* -------------------------------------------------------------------------- *
- * Signing in
+ * Choosing a name
  * -------------------------------------------------------------------------- */
 
-describe('signing in', () => {
-  it('gives the same refusal for a wrong password and an unknown address', async () => {
-    const account = await registerConfirmed();
-    const wrongPassword = await call('POST', '/api/login', {
-      body: { email: account.email, password: 'a completely different passphrase' },
+describe('choosing a display name', () => {
+  it('renames the player and marks the name chosen', async () => {
+    const account = await signIn();
+    const response = await call('POST', '/api/me/display-name', {
+      token: account.token,
+      body: { displayName: 'Grace' },
     });
-    const unknownAddress = await call('POST', '/api/login', {
-      body: { email: 'nobody@example.test', password: PASSWORD },
-    });
-    expect(wrongPassword.status).toBe(401);
-    expect(unknownAddress.status).toBe(401);
-    // Byte for byte. A difference of a word is a difference an attacker can read.
-    expect(JSON.stringify(wrongPassword.body)).toBe(JSON.stringify(unknownAddress.body));
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    const user = bodyOf(response)['user'] as Record<string, unknown>;
+    expect(user['displayName']).toBe('Grace');
+    expect(user['displayNameChosen']).toBe(true);
   });
 
-  it('folds case and whitespace, so one person has one account', async () => {
-    const account = await registerConfirmed();
-    const response = await call('POST', '/api/login', {
-      body: { email: `  ${account.email.toUpperCase()} `, password: PASSWORD },
-    });
-    expect(response.status).toBe(200);
+  it('needs a session', async () => {
+    expect((await call('POST', '/api/me/display-name', { body: { displayName: 'Nobody' } })).status).toBe(401);
   });
 
-  it('a logged-out token stops working, immediately', async () => {
-    const account = await registerConfirmed();
+  it('refuses a blank, an over-long or a control-carrying name', async () => {
+    const account = await signIn();
+    for (const displayName of ['', 'x', 'x'.repeat(33), 'two\nlines']) {
+      const response = await call('POST', '/api/me/display-name', {
+        token: account.token,
+        body: { displayName },
+      });
+      expect(response.status, displayName).toBe(400);
+    }
+  });
+
+  it('does say when a name is taken, because a display name is public', async () => {
+    const first = await signIn();
+    const second = await signIn();
+    await call('POST', '/api/me/display-name', { token: first.token, body: { displayName: 'Contested' } });
+    const clash = await call('POST', '/api/me/display-name', {
+      token: second.token,
+      body: { displayName: 'contested' },
+    });
+    // Case-insensitively, so two names that render identically on a board cannot both exist. Saying
+    // so leaks nothing: the name is printed on every board already, unlike an address.
+    expect(clash.status).toBe(409);
+    expect(bodyOf(clash)['error']).toBe('name-taken');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Holding a session
+ * -------------------------------------------------------------------------- */
+
+describe('a session', () => {
+  it('can only be got by reading the mail', async () => {
+    // The property that makes a separate confirmation step unnecessary rather than merely absent:
+    // there is no route that issues a session without a token that was mailed to the address.
+    const routes: readonly (readonly [string, string])[] = [
+      ['POST', '/api/register'],
+      ['POST', '/api/login'],
+      ['GET', '/api/confirm'],
+    ];
+    for (const [method, path] of routes) {
+      const response = await call(method, path, {
+        body: { email: 'nobody@example.test', password: 'a passphrase of adequate length' },
+        query: { token: 'anything' },
+      });
+      expect(response.status, `${method} ${path}`).toBe(404);
+    }
+  });
+
+  it('stops working the moment it is logged out', async () => {
+    const account = await signIn();
     expect((await call('GET', '/api/me', { token: account.token })).status).toBe(200);
     expect((await call('POST', '/api/logout', { token: account.token })).status).toBe(200);
     // This is why sessions are a table and not a JWT (§ D214 § 5): revocation is a DELETE, and a
@@ -231,8 +454,8 @@ describe('signing in', () => {
     expect((await call('GET', '/api/me', { token: account.token })).status).toBe(401);
   });
 
-  it('a session expires', async () => {
-    const account = await registerConfirmed();
+  it('expires', async () => {
+    const account = await signIn();
     const wasAt = clock;
     clock += 31 * 24 * 60 * 60 * 1000;
     expect((await call('GET', '/api/me', { token: account.token })).status).toBe(401);
@@ -273,25 +496,19 @@ function honest(run: SubmittedRun = RUN): Submission {
 }
 
 describe('posting a score', () => {
-  it('is refused before the address is confirmed, and allowed after', async () => {
-    const account = await register();
-    const submission = honest();
-    const before = await call('POST', '/api/scores', { token: account.token, body: submission });
-    expect(before.status).toBe(403);
-    expect(bodyOf(before)['error']).toBe('not-confirmed');
-    // ...and the refusal says the player may keep playing. An unconfirmed account is not a locked
-    // one; § D214 § 5 gates exactly one privilege.
-    expect(String(bodyOf(before)['detail'])).toMatch(/keep playing/u);
-
-    const link = /https:\/\/\S+/u.exec((await outbox.delivered()).at(-1)?.body ?? '')?.[0] ?? '';
-    await call('GET', '/api/confirm', { query: { token: new URL(link).searchParams.get('token') ?? '' } });
-
-    const after = await call('POST', '/api/scores', { token: account.token, body: submission });
-    expect(after.status, JSON.stringify(after.body)).toBe(201);
+  it('is allowed by the session alone, because the session is proof of the address', async () => {
+    // § D241 deleted `postingGate` with the password, and this is why that is not a weakening. The
+    // gate existed because a password let somebody sign in *without* proving they could read the
+    // address, so posting needed a second check. A magic link cannot: the session in hand was
+    // issued by redeeming a token that was mailed to the address. Every signed-in account has
+    // proved it, and a check that is true for everybody who can reach it is not a check.
+    const account = await signIn();
+    const posted = await call('POST', '/api/scores', { token: account.token, body: honest() });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(201);
   }, 60_000);
 
   it('rejects a forged score, and the honest one it was forged from is accepted', async () => {
-    const account = await registerConfirmed();
+    const account = await signIn();
     const truth = honest();
 
     // A quarter of a second better. Small enough that no plausibility bound would catch it — which
@@ -311,7 +528,7 @@ describe('posting a score', () => {
   }, 60_000);
 
   it('stores the server’s figures, not the claim', async () => {
-    const account = await registerConfirmed();
+    const account = await signIn();
     const truth = honest();
     const response = await call('POST', '/api/scores', { token: account.token, body: truth });
     expect(response.status).toBe(201);
@@ -323,7 +540,7 @@ describe('posting a score', () => {
   }, 60_000);
 
   it('refuses a second submission inside the interval, and allows one after it', async () => {
-    const account = await registerConfirmed();
+    const account = await signIn();
     const truth = honest();
     // The clock is frozen across these two, so the second lands inside the interval. A verification
     // is a whole simulation, so a confirmed account submitting in a loop is a CPU denial of service
@@ -347,7 +564,7 @@ describe('posting a score', () => {
   }, 60_000);
 
   it('refuses a malformed submission without simulating anything', async () => {
-    const account = await registerConfirmed();
+    const account = await signIn();
     for (const run of [
       { ...RUN, seed: 'not-a-seed' },
       { ...RUN, durationS: 7 },
@@ -363,7 +580,7 @@ describe('posting a score', () => {
   }, 60_000);
 
   it('refuses ids this server does not ship', async () => {
-    const account = await registerConfirmed();
+    const account = await signIn();
     const response = await call('POST', '/api/scores', {
       token: account.token,
       body: {
@@ -384,7 +601,7 @@ describe('posting a score', () => {
 
 describe('a board', () => {
   it('ranks on the metric it was asked for, and says so on the wire', async () => {
-    const account = await registerConfirmed();
+    const account = await signIn();
     const posted = await call('POST', '/api/scores', { token: account.token, body: honest() });
     const configHash = String(bodyOf(posted)['configHash']);
 
@@ -404,7 +621,7 @@ describe('a board', () => {
   });
 
   it('puts a different arrival rate on a different board', async () => {
-    const account = await registerConfirmed();
+    const account = await signIn();
     const first = await call('POST', '/api/scores', { token: account.token, body: honest() });
     const second = await call('POST', '/api/scores', {
       token: account.token,

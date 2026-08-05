@@ -1,13 +1,22 @@
 /**
- * Passwords, confirmation tokens and session tokens — the parts that must not be got wrong quietly.
+ * Sign-in tokens and session tokens — the parts that must not be got wrong quietly.
  *
- * `DECISIONS.md` § D214 § 5. Everything here is `node:crypto`; there is no dependency to audit and
- * no hand-rolled primitive. What *is* hand-written is the policy around them, and each choice is
- * stated where it is made rather than left to be inferred from the code.
+ * `DECISIONS.md` § D214 § 5 as amended by § D241. Everything here is `node:crypto`; there is no
+ * dependency to audit and no hand-rolled primitive. What *is* hand-written is the policy around
+ * them, and each choice is stated where it is made rather than left to be inferred from the code.
+ *
+ * ## There are no passwords here any more
+ *
+ * § D241 replaced them with an emailed magic link. The `scrypt` parameters, the digest, the salt and
+ * the two functions either side of them are **deleted, not deprecated** — a password path that is
+ * unreachable but still exported is a login this repository's own standing requirement says nothing
+ * calls and nobody notices, on the one surface where that is worst.
  *
  * ## The rules this module keeps
  *
- * - A password is **never** stored, logged, echoed or returned. Only a `scrypt` digest and its salt.
+ * - A sign-in token is **never** stored, logged, echoed or returned. It exists in the mail body and
+ *   in the redeeming request, and nowhere else. What the database holds is its {@link LoginToken.jti}
+ *   — an identifier that authorises nothing on its own, because the signature is the authorisation.
  * - Comparisons of secrets are **constant-time**. A fast `===` on a token leaks its prefix to
  *   anyone willing to time the response.
  * - The signing secret comes from the environment and **has no default**. A placeholder default is
@@ -15,80 +24,7 @@
  *   than signing with something guessable.
  */
 
-import { randomBytes, scryptSync, timingSafeEqual, createHmac } from 'node:crypto';
-
-/* -------------------------------------------------------------------------- *
- * Passwords
- * -------------------------------------------------------------------------- */
-
-/**
- * `scrypt` parameters.
- *
- * `N = 2^15` with `r = 8, p = 1` is the interactive-login end of the range the algorithm's own
- * author recommends: roughly 100 ms and 32 MB per hash on a modern core. That cost is the point —
- * it is paid once per login by a legitimate user and once per guess by an attacker with the
- * database, and it is what makes an offline dictionary attack expensive rather than instant.
- */
-export const SCRYPT_PARAMS = Object.freeze({ N: 32_768, r: 8, p: 1, keyLength: 64, saltBytes: 16 });
-
-/** A stored password: the digest and the salt it was derived with. Never the password. */
-export interface PasswordHash {
-  readonly saltHex: string;
-  readonly hashHex: string;
-}
-
-/**
- * The rules a password must satisfy, as a list of what is wrong with it.
- *
- * **Length is the only hard requirement**, deliberately. Composition rules — a digit, a symbol, a
- * capital — measurably push people towards `Password1!` and are not what makes a secret strong; a
- * long passphrase is stronger than a short mangled word and this refuses to pretend otherwise. The
- * upper bound exists because `scrypt` will happily spend a second hashing a megabyte, which is a
- * denial-of-service an unauthenticated endpoint must not offer.
- */
-export function passwordIssues(password: string): readonly string[] {
-  const issues: string[] = [];
-  if (password.length < 12) issues.push('a password must be at least 12 characters');
-  if (password.length > 200) issues.push('a password must be at most 200 characters');
-  return Object.freeze(issues);
-}
-
-/** Hash a password with a fresh random salt. */
-export function hashPassword(password: string): PasswordHash {
-  const salt = randomBytes(SCRYPT_PARAMS.saltBytes);
-  const hash = scryptSync(password, salt, SCRYPT_PARAMS.keyLength, {
-    N: SCRYPT_PARAMS.N,
-    r: SCRYPT_PARAMS.r,
-    p: SCRYPT_PARAMS.p,
-    // Node's default `maxmem` is 32 MB, which `N = 2^15` sits exactly on and intermittently
-    // exceeds. Raised explicitly so the cost is the cost that was chosen rather than whatever fits.
-    maxmem: 128 * 1024 * 1024,
-  });
-  return Object.freeze({ saltHex: salt.toString('hex'), hashHex: hash.toString('hex') });
-}
-
-/**
- * Whether a password matches a stored hash, in constant time.
- *
- * Returns `false` for a malformed stored record rather than throwing: a corrupt row must fail the
- * login, not crash the endpoint and tell the caller which rows are corrupt.
- */
-export function passwordMatches(password: string, stored: PasswordHash): boolean {
-  let expected: Buffer;
-  try {
-    expected = Buffer.from(stored.hashHex, 'hex');
-    if (expected.length !== SCRYPT_PARAMS.keyLength) return false;
-  } catch {
-    return false;
-  }
-  const actual = scryptSync(password, Buffer.from(stored.saltHex, 'hex'), SCRYPT_PARAMS.keyLength, {
-    N: SCRYPT_PARAMS.N,
-    r: SCRYPT_PARAMS.r,
-    p: SCRYPT_PARAMS.p,
-    maxmem: 128 * 1024 * 1024,
-  });
-  return timingSafeEqual(actual, expected);
-}
+import { randomBytes, timingSafeEqual, createHmac } from 'node:crypto';
 
 /* -------------------------------------------------------------------------- *
  * The signing secret
@@ -98,9 +34,9 @@ export function passwordMatches(password: string, stored: PasswordHash): boolean
 export class MissingSecretError extends Error {
   constructor() {
     super(
-      'ELEVATOR_SIM_SECRET is not set. It signs email-confirmation tokens, so a server without ' +
-        'one would issue tokens anybody could forge. There is deliberately no default: a ' +
-        'placeholder is how a development secret reaches production.',
+      'ELEVATOR_SIM_SECRET is not set. It signs the emailed sign-in links that are the only way ' +
+        'into an account, so a server without one would issue tokens anybody could forge. There ' +
+        'is deliberately no default: a placeholder is how a development secret reaches production.',
     );
     this.name = 'MissingSecretError';
   }
@@ -120,59 +56,101 @@ export function requireSecret(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 /* -------------------------------------------------------------------------- *
- * Confirmation tokens
+ * Sign-in tokens
  * -------------------------------------------------------------------------- */
 
-/** How long a confirmation link is good for. Long enough to reach an inbox, short enough to expire. */
-export const CONFIRMATION_TTL_MS = 24 * 60 * 60 * 1000;
+/**
+ * How long an emailed sign-in link is good for: **fifteen minutes**.
+ *
+ * The confirmation link it replaces was good for 24 hours, and that was right for what it did and
+ * badly wrong for what this does. A confirmation link grants **one bit** — *this address is real*.
+ * A sign-in link grants **a session**, so its blast radius is the whole account, and every minute it
+ * stays valid is a minute it is an account key sitting in a mailbox: forwarded, synced to a phone
+ * left on a desk, or read by whoever inherits a shared inbox.
+ *
+ * Fifteen minutes rather than five, because of two measured facts about this deployment rather than
+ * a feeling. The container runs at `minReplicas: 0`, so a request that arrives cold pays a full
+ * start — **28.7 s** was observed on `/api/challenges` — and the redeeming request pays it again if
+ * the player opens the mail after the app has scaled back down. Delivery itself is seconds when it
+ * is seconds and minutes when a receiving server greylists, which is common and retried on a timer
+ * outside anyone's control. Five minutes would refuse honest players on a slow mail path; an hour
+ * would buy them nothing they notice.
+ *
+ * The window is also the only period a `login_tokens` row exists, so this bounds the table as well
+ * as the risk.
+ */
+export const LOGIN_TTL_MS = 15 * 60 * 1000;
 
 /**
- * A signed, expiring confirmation token.
+ * A signed sign-in token, and the two things the server must remember about it.
  *
- * `base64url(payload).base64url(hmac)` where the payload is the user id, the email being confirmed
- * and an expiry. The email is **inside the signature** so a token cannot be replayed against a
- * different address after the account's email is changed, which is the mistake that turns a
- * confirmation flow into an account-takeover flow.
- *
- * The clock is passed in rather than read, so the expiry is testable without waiting a day.
+ * The token goes in the mail. The {@link jti} goes in the database, and is what makes redemption
+ * **single-use**: a signature can be checked a thousand times and will pass a thousand times, so
+ * single use is a fact about server-side state or it is not a fact at all.
  */
-export function signConfirmation(input: {
+export interface LoginToken {
+  /** `base64url(payload).base64url(hmac)`. Mailed, never stored, never logged, never returned. */
+  readonly token: string;
+  /** The token's identity. Stored, and deleted by the redemption that consumes it. */
+  readonly jti: string;
+  readonly expiresAtMs: number;
+}
+
+/**
+ * Sign a sign-in token.
+ *
+ * The construction is `signConfirmation`'s, which this replaces, plus one field. The payload is the
+ * user id, **the email being signed in**, a random `jti` and an expiry, all inside the HMAC.
+ *
+ * The email is inside the signature for the reason it was in the confirmation token: a token must
+ * not be replayable against a different address than the one it was mailed to. Under a magic link
+ * that reason is stronger, not weaker — the token *is* the credential, so a token that authenticated
+ * whatever address an account happened to hold at redemption time would be an account-takeover
+ * primitive rather than a login.
+ *
+ * The `jti` is 16 bytes from the CSPRNG. It is not a secret — anyone holding the token can read the
+ * payload — and it is not asked to be one: it names a row, and the signature is what authorises.
+ *
+ * The clock is passed in rather than read, so the expiry is testable without waiting.
+ */
+export function signLoginToken(input: {
   readonly userId: string;
   readonly email: string;
   readonly secret: string;
   readonly nowMs: number;
   readonly ttlMs?: number;
-}): string {
-  const payload = JSON.stringify({
-    u: input.userId,
-    e: input.email,
-    x: input.nowMs + (input.ttlMs ?? CONFIRMATION_TTL_MS),
-  });
+}): LoginToken {
+  const jti = randomBytes(16).toString('base64url');
+  const expiresAtMs = input.nowMs + (input.ttlMs ?? LOGIN_TTL_MS);
+  const payload = JSON.stringify({ u: input.userId, e: input.email, j: jti, x: expiresAtMs });
   const body = Buffer.from(payload, 'utf8').toString('base64url');
-  return `${body}.${hmac(body, input.secret)}`;
+  return Object.freeze({ token: `${body}.${hmac(body, input.secret)}`, jti, expiresAtMs });
 }
 
 /** Why a token was refused. Never surfaced verbatim to the user; the caller decides the wording. */
 export type TokenFailure = 'malformed' | 'bad-signature' | 'expired';
 
-export interface ConfirmationClaims {
+export interface LoginClaims {
   readonly userId: string;
   readonly email: string;
+  readonly jti: string;
   readonly expiresAtMs: number;
 }
 
 /**
- * Verify a confirmation token.
+ * Verify a sign-in token's signature and expiry.
+ *
+ * **This is half of a redemption and never the whole of it.** It says the token was signed by this
+ * server and has not expired; it cannot say the token has not already been used, because nothing
+ * about a signature changes when it is spent. The caller consumes {@link LoginClaims.jti} against
+ * the store, and `http/api.ts` is the one place that does both.
  *
  * **Signature first, expiry second.** Checking expiry first would let an attacker learn whether a
  * forged token's payload happened to parse, which is information they should not get from a token
- * they did not sign.
+ * they did not sign. The signature comparison is {@link constantTimeEquals}, so a near-miss forgery
+ * cannot be walked forwards a byte at a time.
  */
-export function verifyConfirmation(
-  token: string,
-  secret: string,
-  nowMs: number,
-): ConfirmationClaims | TokenFailure {
+export function verifyLoginToken(token: string, secret: string, nowMs: number): LoginClaims | TokenFailure {
   const dot = token.lastIndexOf('.');
   if (dot <= 0) return 'malformed';
   const body = token.slice(0, dot);
@@ -180,17 +158,22 @@ export function verifyConfirmation(
 
   if (!constantTimeEquals(signature, hmac(body, secret))) return 'bad-signature';
 
-  let claims: { u?: unknown; e?: unknown; x?: unknown };
+  let claims: { u?: unknown; e?: unknown; j?: unknown; x?: unknown };
   try {
     claims = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as typeof claims;
   } catch {
     return 'malformed';
   }
-  if (typeof claims.u !== 'string' || typeof claims.e !== 'string' || typeof claims.x !== 'number') {
+  if (
+    typeof claims.u !== 'string' ||
+    typeof claims.e !== 'string' ||
+    typeof claims.j !== 'string' ||
+    typeof claims.x !== 'number'
+  ) {
     return 'malformed';
   }
   if (claims.x <= nowMs) return 'expired';
-  return Object.freeze({ userId: claims.u, email: claims.e, expiresAtMs: claims.x });
+  return Object.freeze({ userId: claims.u, email: claims.e, jti: claims.j, expiresAtMs: claims.x });
 }
 
 /* -------------------------------------------------------------------------- *
