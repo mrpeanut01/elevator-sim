@@ -331,6 +331,38 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let carBadgeHits: readonly CarBadgeHit[] = [];
   let bankFilter = '';
 
+  /*
+   * **Both of the two below are here for `carBadgeHits`' reason, and both were not.**
+   *
+   * `boot()`'s sequence — `restoreSession(); applyTheme(); renderAll(); runShift();` — runs before
+   * the body reaches either declaration, and `applyTheme` **assigns** `stageTheme`. Function
+   * declarations hoist; `let` does not, so the page threw `Cannot access 'stageTheme' before
+   * initialization` on the second statement of boot, and the last-resort handler reported *The
+   * viewer did not start.* over a blank shell. `baseSpeed` was one statement behind it, in
+   * `drawTransportChrome`.
+   *
+   * **The third and fourth occurrences of the same mistake in this closure**, after `started` in
+   * `bootstrap.ts` and `carBadgeHits` above — and the first two are written up in prose directly
+   * overhead. Prose that has been ignored twice is not a control, so `main.test.ts` now reads this
+   * file as text and requires every `let` at this indentation to sit above the boot sequence.
+   */
+/**
+   * The palette the canvas draws in — the stage half of {@link applyTheme}'s answer.
+   *
+   * Held rather than resolved per frame: `themeFor` reads `matchMedia`, and a draw loop that asked
+   * the browser for the colour scheme sixty times a second would be doing work whose answer changes
+   * about twice a year.
+   */
+  let stageTheme: Theme = DEFAULT_THEME;
+/**
+   * The transport chip's own speed, in simulated seconds per real second.
+   *
+   * Held separately from `playback.speed` because `settings.playbackSpeed` multiplies it — see
+   * {@link applyPlaybackSpeed}. Without the split, a reader on ×2 would find their chip selection
+   * jump to whichever chip happened to equal `60 × 2`, and the two controls would fight.
+   */
+  let baseSpeed = 60;
+
   /* ---------------------------------------------------------------------- *
    * The menu — § D214 § 2, and the non-test caller of `menu/`
    * ---------------------------------------------------------------------- */
@@ -1533,14 +1565,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ui.transport.error.focus();
   }
 
-  /**
-   * The transport chip's own speed, in simulated seconds per real second.
-   *
-   * Held separately from `playback.speed` because `settings.playbackSpeed` multiplies it — see
-   * {@link applyPlaybackSpeed}. Without the split, a reader on ×2 would find their chip selection
-   * jump to whichever chip happened to equal `60 × 2`, and the two controls would fight.
-   */
-  let baseSpeed = 60;
+  
 
   /**
    * Apply the transport chip and the player's own multiplier together — `docs/16` § 5 clause 4.
@@ -1577,14 +1602,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     stageTheme = theme.stage;
   }
 
-  /**
-   * The palette the canvas draws in — the stage half of {@link applyTheme}'s answer.
-   *
-   * Held rather than resolved per frame: `themeFor` reads `matchMedia`, and a draw loop that asked
-   * the browser for the colour scheme sixty times a second would be doing work whose answer changes
-   * about twice a year.
-   */
-  let stageTheme: Theme = DEFAULT_THEME;
+  
 
   function applyPlaybackSpeed(): void {
     playback?.setSpeed(playbackRateFor(baseSpeed, menuState.settings.playbackSpeed));
