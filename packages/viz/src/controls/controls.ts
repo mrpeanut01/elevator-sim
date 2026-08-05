@@ -162,6 +162,57 @@ function reasonFor(
 }
 
 /* -------------------------------------------------------------------------- *
+ * The other end of every gate — § D252
+ * -------------------------------------------------------------------------- */
+
+/** One gate id to the dependants it holds shut and the dependants it keeps live, at a point. */
+interface Dependants {
+  readonly shut: string[];
+  readonly open: string[];
+}
+
+/**
+ * For every parameter that gates something, which dependants it is holding shut and which it is
+ * keeping live — the reverse of the `activeWhen` graph, built once per form.
+ *
+ * **Derived, in one pass, from the same declarations {@link unmetGatesOf} reads.** The alternative
+ * — a list of *"controls that gate others"* maintained beside the schema — is the shape of thing
+ * this repository has been caught by five times, and it would be worse here than usual: the two
+ * ends of one edge, in two places, with nothing comparing them.
+ *
+ * The partition is total and that is what makes the badge stable. A dependant `Q` declares a
+ * condition on `P`; at any point that condition either holds or it does not, so `Q` lands in
+ * exactly one of `P`'s two lists and `shut.length + open.length` is `P`'s dependant count, which
+ * does not move as the reader edits. A badge keyed on *"gates anything"* is therefore keyed on a
+ * structural fact, while the words it prints follow the state — which is the behaviour the issue
+ * asks for: a reader who throws a switch must still be able to see what the switch governs.
+ *
+ * A gate id that is not itself a dimension of the space is skipped, not invented. All ten in the
+ * shipped dispatcher space are dimensions — the reverse edges point at controls on the same tab,
+ * which is what makes the badge actionable — but `SearchParameter.activeWhen` is a plain record and
+ * a schema may legitimately gate on something the form does not draw.
+ */
+function dependantsByGate(
+  space: SearchSpace,
+  read: (id: string) => ParameterValue | undefined,
+): ReadonlyMap<string, Dependants> {
+  const ids = new Set(space.parameters.map((parameter) => parameter.id));
+  const byGate = new Map<string, Dependants>();
+  for (const parameter of space.parameters) {
+    for (const [gate, condition] of Object.entries(parameter.activeWhen ?? {})) {
+      if (condition === undefined || !ids.has(gate)) continue;
+      let entry = byGate.get(gate);
+      if (entry === undefined) {
+        entry = { shut: [], open: [] };
+        byGate.set(gate, entry);
+      }
+      (activeWhenSatisfied(condition, read(gate)) ? entry.open : entry.shut).push(parameter.id);
+    }
+  }
+  return byGate;
+}
+
+/* -------------------------------------------------------------------------- *
  * The form
  * -------------------------------------------------------------------------- */
 
@@ -176,12 +227,20 @@ function reasonFor(
  * Gate order matters for more than tidiness: a dimension appears after the dimension that gates
  * it, so a reader who turns a gate on finds the control it unlocked *below* the switch they threw
  * rather than somewhere above it.
+ *
+ * **That ordering is also why this function carries the reverse edge and no graph does** (§ D252).
+ * The layout already encodes the dependency structure — gate above, gated below — so a second
+ * navigation model over the same information would be a second thing to keep in step with the
+ * first. What the layout cannot say is *how many* controls are waiting below, and that is what
+ * {@link ControlCommon.unlocks} and {@link ControlCommon.holdsOpen} add.
  */
 export function controlsFor(space: SearchSpace, values: ControlValues): readonly Control[] {
   const read = readerFor(space, values);
+  const dependants = dependantsByGate(space, read);
   return space.parameters.map((parameter) => {
     const enabled = isActive(parameter, read);
     const unmet = enabled ? [] : unmetGatesOf(parameter, read);
+    const governed = dependants.get(parameter.id);
     const common = {
       id: parameter.id,
       section: parameter.section,
@@ -189,6 +248,8 @@ export function controlsFor(space: SearchSpace, values: ControlValues): readonly
       help: parameter.description,
       enabled,
       unmetGates: unmet.map(({ gate }) => gate),
+      unlocks: governed?.shut ?? [],
+      holdsOpen: governed?.open ?? [],
       ...(parameter.unit === undefined ? {} : { unit: parameter.unit }),
       ...(enabled ? {} : { inactiveReason: reasonFor(unmet) }),
     };

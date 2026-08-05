@@ -16760,3 +16760,102 @@ Recommended, and **not applied here**: `LIGHT_PALETTE.bandSettling` `#1c7a55` �
 mirror is that the four bands belong in a group measured against `--bg` rather than `--panel`, since
 `#legend` is the surface they are actually drawn on. Both are `render/`'s, and § D235's own rule —
 *do not weaken a criterion, raise it* — says the group moves rather than the bound.
+
+---
+
+## D252 — the dependency had one end drawn, and the badge is the other end rather than a graph
+
+**Date: 2026-08-05 · Written after the code, and says so.** Play-tester issue #79, split out of #17.
+§ D222 shipped the *gated* end — an inactive control's label line reads `needs dispatch.callType`,
+so a reader looking at a dead knob can see which switch to move. The mirror was missing: a control
+that **gates** others said nothing, so `selection.policy`, which governs six other rows, looked
+exactly like a control that governs none, and moving it produced a cascade with no warning and no
+account of itself.
+
+### The graph is refused on design grounds, and § D222 already wrote the reason
+
+#17 asked for *an expandable section showing which settings unlock which others*, and § D222 left
+it open as *"a product call and not this lane's"*. The call is: **no.** `controlsFor` emits the
+space's own gate order, so **the tab already places a gated control below its gate** — the layout
+*is* the dependency structure, drawn. A graph would be a second navigation model over information
+the page already carries, and the two would then have to be kept in step. This repository has a
+long record of what happens to two sources of one truth, and § D251 landed four hours earlier for
+exactly that reason.
+
+What the layout cannot say is **how many** controls are waiting below a switch. That is what the
+badge adds, and it is the whole of what it adds: the ids go on `data-unlocks` / `data-holds-open`,
+where a test and a mount read them, and *which* remains the layout's answer. A badge naming six
+dotted ids would be longer than the control it sits beside.
+
+### Derived from the declarations, in one pass, and never listed
+
+`dependantsByGate` inverts the `activeWhen` graph from `space.parameters` — the same declarations
+`unmetGatesOf` reads for the other end. A list of *"controls that gate others"* maintained beside
+the schema would be the § D213 defect with an aggravating factor: the two ends of one edge, in two
+places, with nothing comparing them. `controls.test.ts` builds its expectation the same way, off
+`ORCHARD_PARAMETERS`, so a sixth fictional row with a gate on it moves the test rather than passing
+under it.
+
+A gate id that is not itself a dimension is skipped rather than invented. All ten in the shipped
+dispatcher space *are* dimensions — which is what makes the badge actionable, since the thing it
+counts is always a control on the same tab — but `activeWhen` is a plain record and a schema may
+gate on something the form does not draw.
+
+### Two fields, because one would vanish at the moment it is being read
+
+The obvious model is a single `unlocks: string[]` — the dependants this control is currently
+holding shut. It has a defect the issue names in its first sentence: *a player moving a switch
+cannot see what they just unlocked.* A badge derived from that list alone reads `unlocks 6` before
+the switch is thrown and **disappears** after, at exactly the instant the reader is looking for
+confirmation.
+
+So the model carries both halves and they **partition** the dependants: a declared condition on
+this control is either satisfied at the current point or it is not, so every dependant is in
+`unlocks` or in `holdsOpen`, exactly once. Their total is the dependant count, which does not move
+as the reader edits. Presence of the badge is therefore **structural** — emitted for a control that
+gates something and for no control that gates nothing, whatever the point — while its words follow
+the state:
+
+| state | badge |
+|---|---|
+| holding dependants shut | `unlocks 6` |
+| keeping them all live | `holds 6 open` |
+| both, under different conditions | `unlocks N` — the actionable half; both data attributes carry the whole partition |
+
+The split is per **gate**, not per dependant, and the fictional schema has the case that proves it:
+`orchard.lanternCount` is a conjunction of two gates, and at the defaults the crew of six satisfies
+`{ min: 4 }` while `nightHarvest: false` does not satisfy `['true']`. So `pickersOnShift` reads
+`holds 1 open` and `nightHarvest` reads `unlocks 1`, about the same row. A reverse edge computed
+from *"is the dependant live"* rather than from *"is my own condition satisfied"* would put both in
+the same half and tell a reader that hiring people unlocks lanterns.
+
+### § D222's two constraints, and one measurement that moved a colour
+
+The reason text is untouched — it is still an element in the flow, above the help, referenced first
+by `aria-describedby`. Nothing became a tooltip and nothing became a disclosure. The badge's content
+is **words and a number**, so KB-15 holds by construction: a reader who separates neither hue still
+reads `needs dispatch.callType` on one badge and `unlocks 6` on the other.
+
+`.control-gate` was drawn in `--accent` and is drawn in `--accent-soft`, because the first was
+measured rather than assumed. `--accent` is **4.26:1 on `--bg` in light** — § D235 measured that and
+left it deliberately, since its group carries a no-regression floor of 4 rather than the standard —
+and this badge is 10.5 px text, which AA asks 4.5:1 of. In `--accent` it would have been the only
+sub-AA element on the Parameters tab that is not an inactive control. `--accent-soft` is 7.62 dark
+and 6.66 light against the worst of the five surfaces.
+
+### Measured on the shipped page, in a browser, both themes
+
+Ten gating controls, ten badges, in both modes: `unlocks 6` on `selection.policy`, `3` on
+`dispatch.reassignmentPolicy`, `2` on four more, `1` on four. `auction.rounds` carries **both**
+badges — it is gated by `auction.aggregation` and gates `auction.reserveMarginalDelayS` — which is
+why the two are independent elements rather than a three-state one, and why the lock badge is
+emitted first: what a reader needs first from a dead control is why it is dead.
+
+The standing requirement, pointed at a badge rather than at a slider: **move the control and require
+the screen to change.** Driving `#param-dispatch-callType` from `up-down-buttons` to
+`destination-entry` in a real browser turns `unlocks 2` into `holds 2 open`, with
+`data-holds-open="weights.rideTime dispatch.passengerAssignment"` — the two rows that became live.
+
+Measured after, on the Parameters tab: **the badge adds no contrast failure in either mode** (9.06
+dark, 6.66 light), and the tab's 44 remaining failures in each mode are unchanged and are all text
+inside `.control-disabled` rows, which WCAG 2.2 1.4.3 exempts as inactive user-interface components.

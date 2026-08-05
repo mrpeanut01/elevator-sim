@@ -1207,6 +1207,31 @@
         font: 500 10.5px var(--mono); line-height: 16px; color: var(--warn);
         vertical-align: 1px; white-space: nowrap;
       }
+      /* § D252 — the other end of the same edge. `controls/render.ts` emits `.control-gate` for
+         every control that gates another and for no control that gates none, so this rule is
+         keyed on the structure and never on a parameter id, exactly as `.control-lock` is.
+
+         The accent family rather than `--warn`: a control that governs others is not in trouble,
+         and `.control-lock`'s amber means *this one is waiting on something*. Two states, two
+         hues — and, KB-15, two different sets of **words**, so a reader who separates neither
+         still reads `needs dispatch.callType` on one and `unlocks 6` on the other. The badge is
+         never dimmed by `.control-disabled` below, for the reason the lock badge is not: a
+         control can be inactive and still gate others, and the sentence explaining a dead row is
+         the thing a reader of a dead row is here for.
+
+         `--accent-soft` and **not** `--accent`, measured rather than chosen: `--accent` is
+         4.26:1 on `--bg` in light — § D235 measured that and left it, because its group carries a
+         no-regression floor of 4 rather than the standard — and this badge is 10.5 px text, which
+         AA asks 4.5:1 of. Drawn in `--accent` it was the one sub-AA element on the tab that was
+         not an inactive control. `--accent-soft` is 7.62 dark and 6.66 light against the worst of
+         the five surfaces, and it is the token whose declared job is to sit away from the page in
+         both modes. */
+      .control-gate {
+        display: inline-block; margin-right: 8px; padding: 0 6px;
+        border: 1px solid var(--accent-soft); border-radius: 9px;
+        font: 500 10.5px var(--mono); line-height: 16px; color: var(--accent-soft);
+        vertical-align: 1px; white-space: nowrap;
+      }
       /* The dimming moves off the row and onto the parts of it that are actually dead.
          `.control-disabled { opacity: 0.65 }` above dims the whole control — including the
          badge and the reason, the two things a reader of a dead control is here for — and

@@ -204,6 +204,92 @@ describe('the shared frame — help, unit, reset, and the reason', () => {
     }
   });
 
+  it('badges a gating control with what it governs, in words and a number', () => {
+    /*
+     * Issue #79 / § D252 — the mirror of the badge above. `orchard.nightHarvest` is `false`, which
+     * does not satisfy the lanterns' `['true']`, so it is holding one control shut and the badge
+     * says so in the actionable direction. The ids go on a data attribute rather than into the
+     * words: the tab already orders a gated control *below* its gate, so *which* is answered by
+     * the layout and *how many to look for* is what the badge adds.
+     */
+    const badgeOf = (id: string, values?: ReturnType<typeof defaultValues>): ControlNode | undefined => {
+      const control = controlsFor(space, values ?? defaultValues(space)).find((c) => c.id === id);
+      if (control === undefined) throw new Error(`no control for ${id}`);
+      return flatten(renderControl(control)).find((e) => e.attrs['class'] === 'control-gate');
+    };
+
+    const shut = badgeOf('orchard.nightHarvest');
+    expect(shut?.text).toBe('unlocks 1');
+    expect(shut?.attrs['data-unlocks']).toBe('orchard.lanternCount');
+    expect(shut?.attrs['data-holds-open']).toBeUndefined();
+
+    // Thrown on, the badge does not vanish — it changes tense. That is the whole reason the model
+    // carries both halves: it would otherwise disappear at the moment somebody is watching to see
+    // what they just did.
+    const open = badgeOf(
+      'orchard.nightHarvest',
+      new Map(defaultValues(space)).set('orchard.nightHarvest', true),
+    );
+    expect(open?.text).toBe('holds 1 open');
+    expect(open?.attrs['data-holds-open']).toBe('orchard.lanternCount');
+    expect(open?.attrs['data-unlocks']).toBeUndefined();
+  });
+
+  it('badges exactly the controls that gate something, and no control that gates nothing', () => {
+    /*
+     * Both directions over the whole space and at two points, for the reason the lock badge's own
+     * pair of cases gives: a badge that appeared on everything would read as a success on the one
+     * row the case above looks at. Presence is keyed on the structure — a control that gates
+     * something is badged whether its dependants are currently shut or open.
+     */
+    for (const values of [
+      defaultValues(space),
+      new Map(defaultValues(space)).set('orchard.nightHarvest', true),
+    ]) {
+      for (const control of controlsFor(space, values)) {
+        const badge = flatten(renderControl(control)).find(
+          (e) => e.attrs['class'] === 'control-gate',
+        );
+        const governs = control.unlocks.length + control.holdsOpen.length > 0;
+        expect(badge !== undefined, `${control.id} governs ${String(governs)}`).toBe(governs);
+      }
+    }
+  });
+
+  it('carries both badges when a control is gated and gates, without either replacing the other', () => {
+    /*
+     * The case that makes the two badges independent rather than a three-state one. There is no
+     * such row in the orchard — its gates are all top-level — so it is built here from the
+     * declared type, which is also the point: a `Control` is a plain interface, and the renderer
+     * may not assume the two conditions are exclusive. `auction.rounds` in the shipped schema is
+     * exactly this shape: gated by `auction.aggregation` and gating `auction.reserveMarginalDelayS`.
+     */
+    const both: Control = {
+      ...controlNamed(space, 'orchard.lanternCount'),
+      unlocks: ['orchard.litresPerTree'],
+    };
+    const emitted = flatten(renderControl(both));
+    expect(emitted.find((e) => e.attrs['class'] === 'control-lock')?.text).toBe(
+      'needs orchard.nightHarvest',
+    );
+    expect(emitted.find((e) => e.attrs['class'] === 'control-gate')?.text).toBe('unlocks 1');
+  });
+
+  it('names the actionable half when a gate is holding some shut and others open', () => {
+    // A categorical gate can have dependants under different conditions. The badge names the ones
+    // a reader can do something about; the two data attributes carry the whole partition, so
+    // nothing is dropped — it is summarised.
+    const mixed: Control = {
+      ...controlNamed(space, 'orchard.irrigation'),
+      unlocks: ['orchard.a', 'orchard.b'],
+      holdsOpen: ['orchard.c'],
+    };
+    const badge = flatten(renderControl(mixed)).find((e) => e.attrs['class'] === 'control-gate');
+    expect(badge?.text).toBe('unlocks 2');
+    expect(badge?.attrs['data-unlocks']).toBe('orchard.a orchard.b');
+    expect(badge?.attrs['data-holds-open']).toBe('orchard.c');
+  });
+
   it('puts the reason above the description, not below it', () => {
     /*
      * The ordering is the fix, not a detail: `control-help` is a median of 318 characters on the
