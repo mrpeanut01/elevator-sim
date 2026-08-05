@@ -7,10 +7,36 @@ behind it, and Communication Services for the one mail this product sends.
 
 ## 0. Read this first: what has and has not been verified
 
-This directory has **never been deployed**. Say that before anything else on the page, because the
-last `infra/` in this repository published a cost figure that did not reproduce from its own
-template, and the reason it survived review is that its untested parts read exactly like its tested
-ones.
+**Deployed 2026-08-05** to `Rene Family` / `elevator-sim` / **eastus2**, serving at
+`https://elevsim-app.salmonstone-4576d6f7.eastus2.azurecontainerapps.io`.
+
+That sentence replaces an earlier one saying this had never been deployed. It is worth keeping the
+distinction sharp, because the last `infra/` in this repository published a figure that did not
+reproduce from its own template, and what let that survive review was that its untested parts read
+exactly like its tested ones. **One thing on this page is still in that category and it is named in
+§ 0.2.**
+
+### 0.1 What the first deployment cost, in findings
+
+Four failures, none of which the `az bicep build` that "compiled clean" could have caught. They are
+recorded because each one is a class, not an incident:
+
+| Failure | What it actually was |
+|---|---|
+| `RoleDefinitionDoesNotExist` | The Communication and Email Service Owner role id was wrong in its last segment. A built-in role id is a fact to look up — both are now confirmed with `az role definition list`, and the command sits in the comment beside each |
+| `ParameterOutOfRange` on `Version`, allowed list `[]` | **PostgreSQL flexible server is restricted in East US on this subscription.** An empty list of allowed versions is what a blocked region looks like; the capability API says so outright. Hence `eastus2` |
+| `did not issue a challenge` from `az acr login` | The registry name was derived from the subscription id, so tearing the group down and redeploying recreated the *same* name. ARM said `Succeeded`, DNS resolved, and the data plane answered `GET /v2/` with a bare 404 instead of a 401 challenge. Registry names are now discovered, or created fresh and random |
+| `ResourceNotFound` on resources the template creates | ARM racing its own creates on a first pass. The resources existed on completion and a re-run converged — which is why the script is safe to re-run and says so |
+
+### 0.2 Still not verified
+
+**No mail has ever been sent.** `AcsMailer` is unit-tested for *selection* — which credential it
+picks and what it refuses — and has never reached Azure. `linkedDomains` on the Communication
+Service is the line most likely to be wrong, and its failure mode is a deployment that succeeds and
+a send that fails at run time. Registering an account is the test; § 4 has it.
+
+Also unverified: **scaling past one replica**. The store is PostgreSQL so concurrent replicas are
+sound in principle, but nothing has run two.
 
 **Verified, by running it:**
 
@@ -22,17 +48,12 @@ ones.
 | The dialect port is right | `bigint` for every `_ms` column — the row written holds `1785715200000`, which `integer` could not — `double precision` for metrics, `boolean` for `confirmed`, and the unique index on `lower(display_name)` |
 | The viewer builds and runs | `npm run build:web`, served by the server, driven in a browser: all 8 buildings and 5 traffic profiles load, and a 30-minute shift simulates |
 | Viewer and API share one origin | `/` serves HTML, `/api/*` serves JSON, `/no/such/page` is a 404 and **not** a rewrite to `index.html` |
-| The template compiles | `az bicep build`, clean, no warnings |
+| The template compiles | `az bicep build`, clean, no warnings — and § 0.1 is the list of things that passed this and still failed |
+| **The deployed app serves** | Live over TLS: `/` returns HTML, `/api/*` JSON, `http://` 301s to `https://`, `/no/such/page` is a 404. The viewer renders and its console is clean |
+| **Azure PostgreSQL is reached and written** | `/api/challenges` issues a challenge, which is an insert followed by a read, against the flexible server |
+| **Nothing crosses a region** | Registry, identity, logs, environment, app and database are all `eastus2`. Communication Services is `global`, which is inherent to it and not on any request path |
 
-**Not verified, because nothing has been provisioned:**
-
-1. **No Azure resource has ever been created from this template.** Everything in § 3 onward is a
-   prediction. This is the most important limitation on the page.
-2. **No mail has been sent.** `AcsMailer` is unit-tested for *selection* — which credential it
-   picks and what it refuses — and has never reached Azure. The `linkedDomains` property on the
-   Communication Service is the line most likely to be wrong, and its failure mode is a deployment
-   that succeeds and a send that fails authorization at run time.
-3. **The cost figures in § 5 are derived from published list prices, not from a bill.**
+**The cost figures in § 5 remain derived from published list prices, not from a bill.**
 
 ---
 
