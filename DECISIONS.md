@@ -16070,6 +16070,51 @@ the decision rather than the implementation: `readings` is already persisted, so
 an older build answers correctly with no schema change, and no restored day can carry a flag that
 disagrees with the readings under it.
 
+### How #27's third verdict composes with § D237, resolved on the rebase
+
+§ D237 landed while this lane was open, and the two changes meet in one expression. It made the
+verdict, the banner line, the headline and the diagnosis heading reachable **only** through
+`VERDICT_VOICE`, a `Record` keyed by the verdict, so that no expression can produce a cleared
+headline without having decided the day cleared. This lane adds a third verdict.
+
+**The third verdict is a third key in that record, not a branch outside it.** An `if (!graded)`
+alongside the lookup would have reopened § D237's defect through a new door — an ungraded day able
+to reach a cleared or missed headline — and the whole value of the table is that a future edit
+cannot reintroduce the disagreement without deleting the key it would have to go through. Adding
+`ungraded` to `DayReport['verdict']` broke `VERDICT_VOICE` at compile time, which is the behaviour
+its own docstring promised and had never had to demonstrate.
+
+Three things fell out of composing rather than merging:
+
+1. **§ D237 had already found this case and could only fix the words.** `missedLede` carried an
+   `unmet.length === 0` arm printing *"Too quiet to grade …"* — the right sentence under a banner
+   reading **Shift missed**, with the streak resetting underneath. The sentence and the banner
+   disagreed about the same day, which is § D237's own defect surviving inside the arm that had
+   noticed it. That arm is gone; `judgementOf` cannot route an ungraded day to `missedLede` at all.
+2. **`missedLede`'s empty case drops a clause rather than taking a branch.** It is now unreachable,
+   and the guard is a total function's belt. It must never become *reachable and wrong*, and a
+   dropped clause is the only shape with no sentence to be wrong with — a second copy of the
+   ungraded words there is exactly what was just removed.
+3. **`streakLineFor` takes the verdict and is exhaustive over it.** § D237 had already replaced its
+   `allMet` boolean with the verdict so the streak could not reset on a day the banner called
+   cleared; this lane's first draft added a `graded` boolean beside it, which would have been a
+   second answer to a question the verdict already contains. A `switch` with no default makes a
+   fourth verdict a compile error here too.
+
+**The deciding test was widened, not relaxed.** § D237's sweep — *no sentence used to say a day
+cleared may appear on a sheet saying it did not* — now runs over three verdicts × two saturation
+states × three real runs × four goal sets, with the ungraded arm reached by moving **the
+observations** while the recording, the week and the contract are held fixed. The check is pairwise
+across all three buckets, each asserted non-empty first so no arm is vacuous. `report.test.ts`'s
+*does not claim a goal was missed on a day nothing was graded at all* keeps the property it was
+written for — no goal named, no blank — and its `verdict === 'missed'` expectation is now
+`'ungraded'`, because that expectation **was** the bug.
+
+**One residual, named rather than fixed.** `dev/reportPanel.ts` draws `verdictColour` as
+`verdict === 'cleared' ? 'var(--ok)' : 'var(--warn)'`, so an ungraded day is amber — a warning
+colour on a day that is not a warning, which the same file already spells `var(--dim)` in its empty
+state. It is one line in a file outside this lane's ownership.
+
 ### #36 — the new building's name over the old building's specs, and a stretched stale canvas
 
 `reportPanel.ts`'s *Take the next assignment* moves `buildingId`, clears the recording, and — unlike
