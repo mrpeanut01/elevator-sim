@@ -157,6 +157,15 @@ export function infeasibilityOf(
   // 3. The destination, when the call type discloses one — service zoning and access zoning
   //    on it, kept as two answers. See the header: this is the only place access zoning is
   //    asked, and the pickup floor is deliberately not asked about.
+  //
+  //    Checking it here is what lets a destination dispatcher
+  //    authorize and optimize in one step.
+  //
+  //    **That is a description of this function and it is true. It is not a claim that the one
+  //    step is why destination dispatch performs better**, which is false — measured, the
+  //    destination buys *less* where access is controlled (DECISIONS.md § D30, § D60). The
+  //    distinction is asserted in both directions by
+  //    `experiments/validation/documentation.test.ts`.
   const destinationFloorId = request.destinationFloorId;
   if (destinationFloorId !== undefined) {
     if (shaftFloor(snapshot.shaft, destinationFloorId) === undefined) {
