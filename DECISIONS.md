@@ -14329,7 +14329,8 @@ counts as confirmation rather than discovery:
 2. **The dependency graph** #17 also floats — *an expandable section showing which settings unlock
    which others* — is not built. `unmetGates` and `activeWhen` already carry the edges, so the data
    exists; whether the tab should draw them is a product call and not this lane's.
-## D222 — a report is a statement about a whole day, so it waits for the whole day
+
+## D223 — a report is a statement about a whole day, so it waits for the whole day
 
 **Date: 2026-08-05 · Written after the code, and says so.** Play-tester issue #16, reproduced on the
 deployed viewer and then re-diagnosed, because the issue's own account of the mechanism is wrong in

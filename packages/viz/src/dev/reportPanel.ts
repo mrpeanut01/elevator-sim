@@ -56,7 +56,7 @@
  * field alone would leave the words *Tomorrow* and *What this taught* standing over nothing. Until
  * the markup carries an id of its own, {@link cardOf} climbs one level, and it climbs exactly one.
  *
- * ## A sheet is a statement about a whole day, so it waits for the whole day — § D222
+ * ## A sheet is a statement about a whole day, so it waits for the whole day — § D223
  *
  * The simulator runs a day to its end and then plays it back, so `main.ts`'s `closeShift` can file a
  * complete account of a run the reader is four minutes into — and it does, because opening this tab
@@ -480,7 +480,7 @@ export function runProgressOf(view: Pick<ViewAt, 'recording' | 'simTimeS'>): Run
 }
 
 /**
- * The sheet a day still being watched gets — issue #16's fix, and § D222.
+ * The sheet a day still being watched gets — issue #16's fix, and § D223.
  *
  * Built on {@link emptyReportView} rather than beside it, because the half these two share is the
  * half that must not drift: *no figure, no goal, no verdict, nothing to advance to*. What differs is
@@ -770,7 +770,7 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
       /*
        * The playhead is read off the same `ViewAt` that `drawHeader` and `drawFooter` are given in
        * the same `renderAll`, so the sheet and the chrome cannot be describing different instants —
-       * issue #16, § D222.
+       * issue #16, § D223.
        */
       const drawn = reportViewOf(view.state.report, runProgressOf(view));
       /*

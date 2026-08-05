@@ -2623,7 +2623,7 @@ const REPORT_PANEL: SurfaceAdapter = {
     }
 
     /*
-     * The third sheet — issue #16, § D222.
+     * The third sheet — issue #16, § D223.
      *
      * A filed report drawn while the playhead is short of `endedAt` is replaced by a sheet that
      * says the day is not over, because the header, the footer and the rail are all describing an

@@ -436,7 +436,7 @@ describe('the empty state, which is drawn rather than hidden', () => {
   });
 });
 
-describe('a filed sheet may not describe a day the screen has not reached — issue #16, § D222', () => {
+describe('a filed sheet may not describe a day the screen has not reached — issue #16, § D223', () => {
   /*
    * Driven on the deployed viewer 2026-08-05. A Free Play day was run and filed; *Run this shift*
    * was pressed again with nothing changed; the Day Report tab was opened at once. The chrome read

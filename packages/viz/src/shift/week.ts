@@ -202,7 +202,7 @@ export function closeDay(week: WeekState, outcome: DayOutcome): WeekState {
    * *Run this shift* re-arms it, which is exactly what every control in the shell does when it is
    * moved. (This sentence used to say a re-run's *recording id* is new by construction. It is not:
    * `runId` is `building-profile-seed`, so re-running one selection produces the same id and the
-   * same recording. What re-arms the guard is `adopt`, not a fresh id — issue #16, § D222.)
+   * same recording. What re-arms the guard is `adopt`, not a fresh id — issue #16, § D223.)
    *
    * The fix is not to refuse the second close. A player who misses a day and re-runs it **should**
    * be able to recover — the design is explicit that *"nothing here is a game over"* — and refusing
