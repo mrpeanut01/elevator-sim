@@ -59,6 +59,31 @@ export interface Settings {
    * Off by default, and it shows energy **beside** AWT and WT95 rather than folded into a grade —
    * `DECISIONS.md` § D106: a dispatcher that drives less carries fewer people, so a configuration
    * that spends less by serving fewer people has not saved anything.
+   *
+   * ## What it actually reaches today, which is less than that sentence promises
+   *
+   * **This is the one field of the four whose promise is not yet true, and it is said here rather
+   * than left for a player to discover** — `CLAUDE.md`'s rule that a stated mechanism goes stale the
+   * same way a number does, pointed at a control instead of at a claim about performance.
+   *
+   * `render/runSummary.ts#summaryFigureIds` honours it, and that function's only shipped caller is
+   * `mode/disclosure.ts#disclosureItems`, whose only shipped caller is `dev/main.ts#drawParity` —
+   * which turns the item list into `parityRefusal`, a string that is **empty whenever mode parity
+   * holds**, which is the shipped state. So the switch changes the parity checker's input and no
+   * pixel. Measured in a browser at 1280×720 with a run on screen: the whole shell's text is
+   * **byte-identical** with it on and off (GitHub issue #70).
+   *
+   * The two energy cells a player actually reads are `shift/report.ts#energyFigures`, which emits
+   * both unconditionally; `DayReportInput` has no field for this preference, so the Day report
+   * **cannot** honour it. That is where the fix goes, and it is one required field plus one caller
+   * — filed in `GAPS.md` § 3 rather than closed here, because `shift/` and `dev/main.ts` are not
+   * this lane's.
+   *
+   * It is left **offered rather than withdrawn**. `docs/16` S7's rule — *a control that cannot be
+   * honoured is not offered* — is about a control that is structurally unhonourable (Basic hides
+   * the energy figures anyway, which is why {@link Settings} `showEnergyAxis` has no row there).
+   * This one is honourable and unwired, and withdrawing it would delete the only surface § D106's
+   * axis has. Do not weaken the criterion; wire the report.
    */
   readonly showEnergyAxis: boolean;
   /** Playback rate for the viewer, as a multiple of simulated time. Drawing only. */
