@@ -153,6 +153,14 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
       'between-games and the mode says so: you choose the building and then live with it for the ' +
       'week, which is the whole difference between commissioning and the shift week.',
   ),
+  'viewer.commissioningConstraintId': control(
+    'presentation',
+    'Which capital constraint the fabric is judged against. Presentation, and the distinction is the ' +
+      'whole of what a constraint is: it decides which choices the screen offers and what it ' +
+      'refuses, and it moves no leg by itself. What moves the run is the choice a player then makes ' +
+      'under it — a constraint that changed a run directly would be a difficulty setting, which ' +
+      'docs/10 § 5.5 bans.',
+  ),
   'viewer.seed': control(
     'between-games',
     'The seed names the run. It is between-games rather than within-day because it travels with a ' +

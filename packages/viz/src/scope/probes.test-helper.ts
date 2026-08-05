@@ -64,7 +64,8 @@ import { initialMenuState } from '../menu/menu.js';
 import { catalogueOf } from '../menu/catalogue.js';
 import { CALENDAR_PERIODS, periodOnDays } from '../shift/calendar.js';
 import { asBuiltChoices, withBankChoice } from '../commissioning/choices.js';
-import { commissionableClasses } from '../commissioning/types.js';
+import { RETROFIT_CONSTRAINT_ID, commissionableClasses, constraintById } from '../commissioning/types.js';
+import { reviewCommissioning } from '../commissioning/refusals.js';
 import { challengeRunConfigs, type ChallengeView } from '../menu/challenge.js';
 import { createClient } from '../menu/client.js';
 import { recordRun } from '../record/recordRun.js';
@@ -283,6 +284,30 @@ const PROBE_CHALLENGE: ChallengeView = Object.freeze({
   }),
 });
 
+/**
+ * What a constraint says about a moved bank — the sink for `viewer.commissioningConstraintId`.
+ *
+ * The **shipped decision**, not a restatement of it: `reviewCommissioning` is what the screen draws
+ * from and what refuses a choice. A helper that compared two constraints' `editable` lists here
+ * would pass whether or not the control reached the review, which is `docs/16` S2's amendment and
+ * the defect it was written for.
+ */
+function reviewUnder(constraintId: string): unknown {
+  const building = RESOURCES.buildings.find((entry) => entry.id === 'midtown-office')?.config;
+  if (building === undefined) throw new Error('midtown-office is not loaded');
+  const classes = commissionableClasses(RESOURCES.elevatorSpecs);
+  const constraint = constraintById(constraintId);
+  if (constraint === undefined) throw new Error(`no constraint "${constraintId}"`);
+  const review = reviewCommissioning({
+    base: building,
+    choices: fiveShaftMain(),
+    classes,
+    specs: RESOURCES.elevatorSpecs,
+    constraint,
+  });
+  return { admissible: review.admissible, refusals: review.refusals.map((entry) => entry.code) };
+}
+
 /** Midtown's main bank with one more shaft than it ships — the commissioning probe's second arm. */
 function fiveShaftMain(): ReturnType<typeof asBuiltChoices> {
   const building = RESOURCES.buildings.find((entry) => entry.id === 'midtown-office')?.config;
@@ -397,6 +422,19 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
         calendar: periodOnDays(CALENDAR_PERIODS['quarter-end'], 1, 7),
       }),
     ],
+  },
+  'viewer.commissioningConstraintId': {
+    /*
+     * Presentation, so the two arms must leave the legs **byte-identical** — and the sink is the
+     * review, which is what a constraint is actually for. `retrofit` opens nothing and `new-build`
+     * opens everything, so the same choice set is admissible under one and refused under the other:
+     * two different verdicts about one configuration, which is a constraint doing its whole job.
+     */
+    states: [
+      (s) => ({ ...s, commissioningConstraintId: RETROFIT_CONSTRAINT_ID }),
+      (s) => ({ ...s, commissioningConstraintId: 'new-build' }),
+    ],
+    sink: [() => reviewUnder(RETROFIT_CONSTRAINT_ID), () => reviewUnder('new-build')],
   },
   'viewer.commissioning': {
     /*
