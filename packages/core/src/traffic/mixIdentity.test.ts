@@ -326,7 +326,7 @@ describe('the template that does vary the mix moved, and the flat control did no
       directionalSplit: { incoming: 0.45, outgoing: 0.45, interfloor: 0.1 },
     });
     /*
-     * Three kinds of field are excluded, each named and each asserted separately below rather
+     * Four kinds of field are excluded, each named and each asserted separately below rather
      * than waved away — the difference between excluding a field and hiding one.
      *
      * - `template` and `sources` describe the *configuration*, and the two configurations are
@@ -334,10 +334,17 @@ describe('the template that does vary the mix moved, and the flat control did no
      * - the report window and `inReportWindow` differ because `lunch-two-way` reports the whole
      *   run and `rise-and-fall` reports its peak 5 minutes. That is a reporting choice, not a
      *   passenger; the passengers are what this assertion is about.
+     * - `startOfDayS` differs because the two templates are at different times of day — 12:15 and
+     *   08:30 (`DECISIONS.md` § D244). It is the same kind of exclusion as `template`, and for the
+     *   same reason: it *is* a field of the template, copied onto the trace. It cannot be the
+     *   reason the passengers below agree or disagree, because no evaluator reads it —
+     *   `dayStartIdentity.test.ts` holds every shipped trace byte-identical with the hour stripped,
+     *   which is what makes this exclusion a statement about configuration rather than a hole.
      */
     const EXCLUDED = new Set([
       'template',
       'sources',
+      'startOfDayS',
       'reportWindowStartS',
       'reportWindowEndS',
       'passengersInReportWindow',
@@ -352,6 +359,9 @@ describe('the template that does vary the mix moved, and the flat control did no
     expect([flatByTemplate.reportWindowStartS, flatByTemplate.reportWindowEndS]).toEqual([0, 1800]);
     expect([flatBySplit.reportWindowStartS, flatBySplit.reportWindowEndS]).toEqual([750, 1050]);
     expect(flatByTemplate.sources).not.toEqual(flatBySplit.sources);
+    // Lunch at 12:15, the morning peak at 08:30 — the excluded hour, named rather than skipped.
+    expect(flatByTemplate.startOfDayS).toBe(12 * 3600 + 15 * 60);
+    expect(flatBySplit.startOfDayS).toBe(8 * 3600 + 30 * 60);
   });
 
   /*

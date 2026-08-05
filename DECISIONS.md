@@ -14895,3 +14895,182 @@ something to scroll. That is `index.html`, reported rather than edited, with the
 lane's report. It also means the grid has **two sources of truth for one set of column widths** — the
 static head and the JS-built rows — which is the underlying defect and wants the head built from the
 same constants.
+
+---
+
+## D244 — a demand template is a period, and a period has an hour
+
+**Date: 2026-08-05 · Written after the code, before the viewer half.** Play-tester issues #78, #80,
+#81, #82 and #83 are five reports of one fact: the viewer pins the clock to 06:00, so
+`evening-egress` — an end-of-day down-peak — and `lunch-two-way` are both drawn at dawn, and the
+calendar's `quarter-end` period (*"the whole building leaves at once when the numbers are filed"*)
+already selects `evening-egress` and runs it before breakfast.
+
+**Context, and the structural fact that made this small.** The traffic model was already
+multi-phase: `DemandPhase` carries per-phase intensity *and* optional directional-split endpoints,
+`intensityAt` and `splitAt` are one piecewise-linear evaluator over one knot list, and
+`shift-change` already ships six phases with two interior peaks. Nothing about "a day has parts"
+was missing. What was missing was a **field**: no template said what time it was.
+
+**Decision.** `DemandTemplate.startOfDayMin?: number` in `config/types.ts` and in
+`config/schema.ts`'s `strictObject`, bounded `[0, 1440)`; `ResolvedDemandTemplate.startOfDayS?:
+number` carried through `finish()`, all five `*Template()` builders, `fromRecord` and
+`shiftTemplatePeak`; and `PassengerTrace.startOfDayS?: number` beside `durationS`. Four of the five
+shipped templates author an hour. `constant-iso` does not.
+
+### The three rules that make it safe
+
+**1. `intensityAt`, `splitAt` and `integratedIntensityS` are untouched.** That is the whole
+argument. Those three are the template's entire evaluation surface, every arrival instant is drawn
+against `intensityAt` over `[0, durationS]`, and none of them takes a template's hour into account —
+so a run's passengers, batches, routes, masses, legs and metrics are *bit-for-bit* what they were
+before the field existed. This is what makes byte-identity **provable** rather than hoped for, and
+it is why `sim/oracle.test.ts` stays green by construction: the closed-form Barney/CIBSE comparison
+is a statement about elapsed seconds within a run, and no second moved. That coupling is now written
+into the oracle's own preamble rather than left implicit, because it is exactly the kind of
+dependency that goes stale silently.
+
+**2. Omitted means "no hour", never "midnight".** `constant-iso` declares none: ISO 8100-32's
+constant demand is a rate held long enough to cross-check an analytical baseline, not a time of day,
+and a `0` there would put a two-hour run at 00:00 on any screen that read it. The field is spread-or-
+omitted at every hop — `finish`, the builders, `shiftTemplatePeak`, the trace — so a template
+without an hour carries **no key**, not a key valued `undefined`. `'startOfDayS' in template` and
+`JSON.stringify` disagree about that distinction, and the identity guards read the first.
+
+**3. It is not a tunable.** Deliberately absent from `TRAFFIC_PARAMETERS` and from
+`DemandTemplateOverrides`. An optimizer sampling *what hour it is* would be searching a dimension
+that cannot change a cost — which is precisely the `destination-eta` `rideTime: 0` defect
+([§ D112](DECISIONS.md)) with a different key name, and this repository has already paid for that
+once. It is also why there is no `TRAFFIC_DEFAULTS.startOfDayS`: the hour is data and nothing else,
+so a shape resolved with no record to read is a shape without a clock rather than one at some
+invented default.
+
+A fourth, smaller: **`shiftTemplatePeak` carries the hour unchanged.** A peak shift moves the busy
+part *within* the period, and both endpoints are pinned, so a `rise-and-fall` that started at 08:30
+and peaked ten minutes late is a late morning peak — not a period that started at 08:40. Moving both
+would make the same claim twice.
+
+### The hours, and what each one is worth
+
+CIBSE Guide D and ISO 8100-32 tabulate **design peaks, not clocks**. Guide D gives the up-peak, the
+lunch two-way and the down-peak as design cases with arrival rates in %pop/5 min; it publishes no
+hour of day for any of them. So what is cited here is *that the period exists and how heavy it is*,
+and the hour is derived or assumed. **No citation was invented.**
+
+Every hour is derived by placing the template's **hold** — the part the report is taken on — rather
+than its start, which is why three of the four read as odd numbers. That is the intended reading: an
+odd start is the visible cost of anchoring the peak.
+
+| template | `startOfDayMin` | clock | what is placed, and where | status |
+|---|---|---|---|---|
+| `rise-and-fall` | 510 | 08:30 | hold centre → 08:45; reported peak 08:42:30–08:47:30 | period CITED, hour DERIVED |
+| `constant-iso` | *absent* | — | — | not a time of day |
+| `lunch-two-way` | 735 | 12:15 | period midpoint → 12:30, the mix crossover at the cited 45/45/10 | period and mix CITED, hour DERIVED |
+| `shift-change` | 885 | 14:45 | changeover (the trough) → 15:00 | **NOT CITED — an assumption** |
+| `evening-egress` | 1044 | 17:24 | full flow → 17:30; reported window 17:30–17:35 | period CITED, hour and 17:30 DERIVED/assumed |
+
+`shift-change` is the weak one and is labelled as such in its own `$comment`: no source in this
+project's reference set publishes changeover hours, they vary by industry and by site, and 15:00 is
+simply the boundary of the conventional 07:00–15:00 / 15:00–23:00 pair. It is the first hour a
+site-specific configuration should override.
+
+**The assumption is free today and will not stay free.** Nothing statistical reads the hour — that
+is rule 1 — so an hour that is wrong currently costs a label and nothing else. The moment a phase
+boundary becomes a **measurement** boundary, or a report slices a day at a wall-clock time, these
+four numbers stop being labels and become inputs, and `shift-change`'s 15:00 stops being harmless.
+That is recorded now, in the `$comment`s and here, rather than discovered then.
+
+**A second staleness, named because it is invisible:** each derivation is a function of the
+template's own geometry. Change `durationMin`, or the 5-minute hold, and 08:30 no longer centres the
+hold on 08:45 — and no code will say so. The `$comment`s state the derivation so a reader can redo
+it; nothing mechanises it, because mechanising it would mean the simulator reading the hour, which
+rule 1 forbids.
+
+### What is deliberately not in this stage
+
+The viewer. The clock is pinned at 06:00 in `packages/viz` and this change does not touch it; the
+contract exposed is exactly `trace.startOfDayS` (seconds after local midnight, absent when the
+template has none) and `trace.template.startOfDayS` beside it. Wiring the display is a separate
+piece of work against a stable field.
+
+---
+
+## D245 — two consequences of adding one field, both handled rather than discovered
+
+**Date: 2026-08-05 · Written after the code.** [§ D244](DECISIONS.md) adds `startOfDayMin` to
+`data/traffic-profiles.json`. Two things follow from that which are not optional and not bugs, and
+both are recorded here so the next reader does not have to rediscover them.
+
+### 1. All five leaderboard config boards fork, and that is the mechanism working
+
+`server/leaderboard/submission.ts#configHashOf` digests the **fully resolved inputs a run depended
+on**, and the demand template record is one of them — *as loaded*, not as a curated subset. So
+adding any field to a template record forks every board keyed on that template. All five fork.
+
+**The obvious avoidance is the wrong move and was rejected on purpose.** Keeping the hour outside
+the digested record — a side table, a viewer-only constant, a lookup by template id — would avoid
+the fork and create a **second place a template is defined**, which is the defect class this
+repository counts. `submission.ts` already states the intended reading: *"A `data/` change does not
+corrupt an old board — it starts a new one."* Stored rows stay readable, no honest submission is
+rejected, and the fork costs a board reset rather than a correctness problem. The alternative costs
+a divergence nobody would notice until two definitions disagreed.
+
+Worth stating plainly because it looks paradoxical: **the field is invisible to the simulation and
+still forks the board.** Both are true, and they are answers to different questions.
+`configHashOf` asks *"were these two runs configured from the same inputs?"*, and after this change
+they were not — the input file differs. It does not ask, and must not ask, whether the difference
+could have changed an outcome; a hash that tried to would need to know which fields are inert, which
+is exactly the knowledge that goes stale.
+
+### 2. Fifteen pinned result digests moved, by one key, proved rather than asserted
+
+`traffic/transportIdentity.test.ts` pins `structuralDigestOfResult(runSimulation(...))` for fifteen
+(building, dispatcher) cells. That digest hashes **every key** of the whole result, and a
+`SimulationResult` carries its `PassengerTrace`. So all fifteen moved on the new key alone — the
+same thing that happened to them for `stageActivity.diversions` ([§ D205](DECISIONS.md)).
+
+Two ways to handle it, and the choice matters more than it looks:
+
+- **(a) Exclude the key before hashing.** The file already does this for
+  `conservation.transportHops` and `summary.awtInvalidGround`. Cheap, keeps the pins' provenance —
+  and it is a *weakening*: the digest stops covering a key.
+- **(b) Re-pin, and prove the delta.** § D205's route. Not a weakening — a re-measurement — but a
+  re-pin is exactly what [§ D201](DECISIONS.md) records going wrong, so it is only honest if the
+  width of the delta is established rather than assumed.
+
+**(b) was taken, and the proof is mechanised for all fifteen cells rather than argued for two.**
+`traffic/dayStartIdentity.test.ts` deletes `startOfDayS` from a **current** result and requires the
+digest to equal the superseded value, for every key — so *"the fifteen results moved because the
+record grew an hour"* is a measurement. § D205 made the same claim in prose, with two examples;
+this makes it in a run, with fifteen.
+
+That file carries the superseded table, with the rule attached: if a future change moves the results
+for a real reason, these move together with `BASELINE_STRUCTURAL` and the superseded table is
+**deleted rather than carried**. A superseded pin the current code cannot reproduce is the § D201
+defect, and this table is only legitimate while it can be.
+
+### The guard itself pins nothing, and that is why it is the stronger one
+
+`mixIdentity.test.ts` — the precedent this work followed — compares against digests pinned from an
+earlier tree, because a mix arc genuinely changes a trace when it is used, so *"unchanged"* can only
+mean *"unchanged from what was measured before"*. The hour changes a trace **never**, used or
+unused, so the new guard asks a stricter question that needs no pin: run the same seed against the
+shipped `data/` and against the same `data/` with every `startOfDayMin` stripped, **in the same
+process**, and require the two outputs to be equal *byte for byte* with the hour keys removed. No
+tolerance, no digest, no cross-platform caveat — `toBe` on two strings, at three layers:
+
+1. **the evaluator** — `intensityAt`, `splitAt` and `integratedIntensityS` on a 441-point grid
+   spanning and overhanging each of the five templates;
+2. **the trace** — five buildings × five templates, legs, arrivals, sources and the whole object;
+3. **the run** — the same fifteen cells `transportIdentity` pins, whole-result.
+
+Layer 3 is not implied by layer 2: a trace is an *input* to a run, and a run that read the hour
+anywhere downstream would pass layer 2 and fail layer 3. Fifty tests, all green — and the run is
+what this entry rests on: byte-identity here is a measurement, not an argument from which functions
+read which field.
+
+One existing guard was adjusted rather than re-pinned: `mixIdentity`'s flat-mix control compares a
+`lunch-two-way` trace against a `rise-and-fall` one, and those are now at 12:15 and 08:30. The hour
+joined that test's named exclusion set — beside `template` and `sources`, which it is a copy of —
+and, following the file's own discipline, both values are asserted explicitly below the comparison
+rather than waved away.

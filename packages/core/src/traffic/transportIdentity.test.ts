@@ -90,23 +90,38 @@ import {
  * to `3bd0fa8bc0a8…`. `headlineDrift` below is the standing check on the same question in units an
  * engineer can read, and it is empty for all fifteen. So these buildings still run exactly as they
  * did; the record describing the run is one key wider.
+ *
+ * ## And re-pinned again for `startOfDayS`, with the delta proved for all fifteen rather than two
+ *
+ * `DECISIONS.md` § D244 gave four of the five shipped demand templates a time of day. The hour is
+ * invisible to `intensityAt`, `splitAt` and `integratedIntensityS`, so **no arrival, leg, stop or
+ * statistic moved** — but `PassengerTrace` is part of a `SimulationResult` and
+ * `structuralDigestOfResult` hashes every key, so all fifteen digests below moved on the key alone,
+ * exactly as they did for `stageActivity.diversions`.
+ *
+ * The claim is again checked rather than asserted, and this time mechanically and for every cell:
+ * `traffic/dayStartIdentity.test.ts` deletes `startOfDayS` from a **current** result and requires
+ * the digest to equal the superseded value, for all fifteen keys, in the same run that requires the
+ * whole result — byte for byte, not by digest — to equal one produced against `data/` with every
+ * `startOfDayMin` stripped out. So the delta here is one key wide, and that is a measurement.
+ * `headlineDrift` is empty for all fifteen, as before.
  */
 const BASELINE_STRUCTURAL: Readonly<Record<string, string>> = {
   'garden-apartments|nearest-car':
-    '63a070bcc4e255ff0034744cb11f633e5c8b4fb55f1bb87efd4f5fce11ef4706',
-  'garden-apartments|eta': '515017af532ab0927f67718044c9d1b822c448bc4bb3e53ebeb93301fd05e444',
-  'garden-apartments|collective': '954516d3e35e14e306852fb30a53d1e091f01c7f08c387a11be2d8213c0bfb1d',
-  'midtown-office|nearest-car': '726a75c4127cefaaa755de5be9f76445230d3cb109c60e9d7bc1090d80c16add',
-  'midtown-office|eta': '7a26950af349e3f7573bfc0a63ff11efac034fbbfdf617a822dbc4500c9b852c',
-  'midtown-office|collective': '1387235946badd1db220427c45e166a6aa4b1c6bc241696fad602e9000f13b71',
+    'a721ea412cb91990a2cc85f2d4aa48f45b1ce516b771d52b5969f359ed0f4458',
+  'garden-apartments|eta': 'ddc08973567c2379f201cfc290986d80d34368cda0289d0c86bd3719e618b94d',
+  'garden-apartments|collective': 'ccfe134d70b873a0fa6a8007a63216402ead003b670026939263d20d8062b3bc',
+  'midtown-office|nearest-car': 'b1330d5f6ff9c942a9474bddac18947a83c64db3fb3ec548abb26c09e100aed8',
+  'midtown-office|eta': 'eddb3f97da5dbd23457c3b2fe2ee95c9476f354d44c09ef0bfa1fda44c0ec412',
+  'midtown-office|collective': '434a08434d9d1c1e2197e9e0efe7926680b5ea9e11614ed5f556b6281d48d6ba',
   'mixed-use-high-rise|nearest-car':
-    'faa196eed76f6dce35c66cb5fcd558013434444d5edef6592b3c7ba2545a8160',
-  'mixed-use-high-rise|eta': 'de9175e1234aa8b59147d4d9a7a1cbf50377eb3e8589c590af1f8a5b25b77dae',
+    '8545af3acd905fa8c64632575c87e174b3818860f229d5cf57e07d85d73a0c42',
+  'mixed-use-high-rise|eta': '7d4b6c4ab0187392d74e364c6c5bf1129181e0cc32a7b616163280f568310a2b',
   'mixed-use-high-rise|collective':
-    '475da70ec7d63c70e6c295613a5bcf5c84f6aa2b6b75bc12fe9b4ec3bb4c9029',
-  'secure-tower|nearest-car': 'b9e84186667c2d36b66ad5f0780cd8c5182a54ac50e55c0a042160de5127b133',
-  'secure-tower|eta': '80355745cc6cf5f44b0f76c644ec79ef2777ce4308418cc11ef1a6570bc80e28',
-  'secure-tower|collective': '6cc88ec607ffddaac4d923aa177794147d7a7bfd19a59cac99c83644ca8d590e',
+    'a681df6762f89072a8f126b734e4ba3b0bf9351fdaed13ee2a0ed9870668da4d',
+  'secure-tower|nearest-car': 'e6fea58f3032fe0f3309d339e964e07ce211e14dd672005b9d3981221dbb14bd',
+  'secure-tower|eta': 'fd4d6196669f4e090a2e40a8fa5a4d01eb8181996994a60d02e4646b0925d135',
+  'secure-tower|collective': 'e04832994728d3e68fe78366884e102ded086dbdc05bb8af11999f5d85f1f88e',
 };
 
 /**
@@ -116,11 +131,16 @@ const BASELINE_STRUCTURAL: Readonly<Record<string, string>> = {
  * Pinned rather than omitted. The moved figure is the finding, and a guard that simply stopped
  * looking at the building the change was made for would be the fourth entry in this repository's
  * list of tests that cannot fail.
+ *
+ * These three re-pinned alongside the twelve above for `startOfDayS`, on the same one key and with
+ * the same delta proof — see {@link BASELINE_STRUCTURAL}. `vertical-city` runs `rise-and-fall`,
+ * which now declares 08:30; its escalator routing is untouched and its `transportHops` count below
+ * is unchanged.
  */
 const MOVED_STRUCTURAL: Readonly<Record<string, string>> = {
-  'vertical-city|nearest-car': '7be18e22844a6e82588f3949b302b21610a0fd5ce299734f8ff682f36f780055',
-  'vertical-city|eta': 'db9695ba7c6e35976101fda19bf1a337b496afc4a8f683f9106b258f2be0be02',
-  'vertical-city|collective': '611deab45802ff9cbef16f611a07b0ccfcbe4844b454af95f37b8aeddb8a3078',
+  'vertical-city|nearest-car': '00d85222f14b0dc8b76c84ad7db560269c8fc61f29cb811bcb46862dc6c3f2fd',
+  'vertical-city|eta': '695da40fa92c2b38ce1050e857e23d901f37419fccf4b8055680849c655748f0',
+  'vertical-city|collective': '7632fd8ac6e489bd2523bb46246b165d8225ee26a71ca432f8e49cfd79b4a655',
 };
 
 /**

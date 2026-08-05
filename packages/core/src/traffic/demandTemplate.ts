@@ -42,6 +42,32 @@
  * every floor on its own traffic profile's split, which is what every published figure in this
  * repository was measured under, and `traffic/mixIdentity.test.ts` holds the two shipped templates
  * to that byte for byte.
+ *
+ * ## The hour, and why it moves nothing (`DECISIONS.md` § D244)
+ *
+ * A template may also declare **when it is**: `ResolvedDemandTemplate.startOfDayS`, resolved from
+ * `data/traffic-profiles.json → demandTemplates[].startOfDayMin`. Four of the five shipped
+ * templates declare one; `constant-iso` declares none, because ISO's constant demand is a rate held
+ * to cross-check an analytical baseline and not a time of day.
+ *
+ * **{@link intensityAt}, {@link splitAt} and {@link integratedIntensityS} do not read it, and that
+ * is the property the whole feature rests on.** Every arrival instant is drawn against `intensityAt`
+ * over `[0, durationS]`, so a run's passengers, batches, routes, masses and metrics are exactly what
+ * they were before the field existed — at every seed, in every building, under every template.
+ * `traffic/dayStartIdentity.test.ts` proves that with a run rather than with this paragraph: the
+ * shipped records are compared, leg for leg and byte for byte, against the same records with the
+ * hour stripped. It is also what keeps `sim/oracle.test.ts` green by construction, since the
+ * closed-form Barney/CIBSE comparison is a statement about the same unmoved arrivals.
+ *
+ * So the hour is a **label on the period**, in the way `id` and `name` are, and it is deliberately
+ * absent from `TRAFFIC_PARAMETERS`: an optimizer sampling *what hour it is* would be searching a
+ * dimension that cannot change a cost. That is the `destination-eta` `rideTime: 0` defect (§ D112)
+ * with a different key name, and this is the note that stops it recurring.
+ *
+ * The invisibility is what makes it free **today**. It stops being free the moment anything
+ * statistical reads it — a phase boundary that becomes a measurement boundary, a report that slices
+ * a day at 12:00 — and at that moment the authored hours below stop being labels and become inputs.
+ * See each template's `$comment` for what is cited and what is assumed.
  */
 
 import type { DemandTemplate, DirectionalSplit } from '../config/types.js';
@@ -57,6 +83,30 @@ import {
 } from './types.js';
 
 const SECONDS_PER_MINUTE = 60;
+
+/** Seconds in a day. The half-open upper bound on {@link requireTimeOfDay}. */
+const SECONDS_PER_DAY = 86_400;
+
+/**
+ * A time of day in `[0, 86400)`, or `undefined` passed straight through.
+ *
+ * Half-open at the top for the reason `config/schema.ts` gives about `startOfDayMin`: 86 400 is the
+ * next midnight, which is 0, and two records meaning the same instant must not compare unequal.
+ *
+ * Validated here as well as in the schema, and that is not belt-and-braces. `resolveDemandTemplate`
+ * accepts a hand-built `ResolvedDemandTemplate` and every `*Template()` builder is exported, so a
+ * caller can reach these shapes without passing through `config/`; the schema guards the *data*
+ * path only.
+ */
+function requireTimeOfDay(value: number | undefined, label: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (!Number.isFinite(value) || value < 0 || value >= SECONDS_PER_DAY) {
+    throw new TrafficError(
+      `Demand template ${label} must be seconds after local midnight in [0, ${SECONDS_PER_DAY}); received ${value}. It is when the run begins, not how long it lasts.`,
+    );
+  }
+  return value;
+}
 
 function requirePositive(value: number, label: string): number {
   if (!Number.isFinite(value) || value <= 0) {
@@ -155,22 +205,29 @@ function finish(
     'peakIntensity' | 'intensityIntegralS' | 'meanDirectionalSplit'
   >,
 ): ResolvedDemandTemplate {
+  // Destructured out rather than carried in the spread, so that a template with no hour has **no
+  // key** rather than one whose value is `undefined`. `JSON.stringify` erases the difference and
+  // `'startOfDayS' in template` does not, and the second is what the identity guards read.
+  const { startOfDayS, ...rest } = parts;
+  const hourS = requireTimeOfDay(startOfDayS, 'startOfDayS');
   let peak = 0;
   let integral = 0;
-  for (const phase of parts.phases) {
+  for (const phase of rest.phases) {
     peak = Math.max(peak, phase.startIntensity, phase.endIntensity);
     integral += phaseIntegral(phase);
   }
-  requireCoherentMix(parts.phases);
-  const meanDirectionalSplit = meanSplitOf(parts.phases, parts.durationS);
+  requireCoherentMix(rest.phases);
+  const meanDirectionalSplit = meanSplitOf(rest.phases, rest.durationS);
   return Object.freeze({
-    ...parts,
-    phases: Object.freeze(parts.phases.map((phase) => Object.freeze({ ...phase }))),
+    ...rest,
+    phases: Object.freeze(rest.phases.map((phase) => Object.freeze({ ...phase }))),
     peakIntensity: peak,
     intensityIntegralS: integral,
     // Omitted, not undefined-valued, when no phase declares a mix: a template from a run that does
     // not use the feature must serialize as the object it was before the feature existed.
     ...(meanDirectionalSplit === undefined ? {} : { meanDirectionalSplit }),
+    // The same rule, for the same reason. `constant-iso` has no hour and must carry no key.
+    ...(hourS === undefined ? {} : { startOfDayS: hourS }),
   });
 }
 
@@ -259,6 +316,12 @@ export function requirePeakShiftFits(
  * part of a `lunch-two-way` arc. That is what a late lunch is. It is recomputed by {@link finish}
  * from the shifted phases rather than carried over, so the template cannot disagree with itself.
  *
+ * **`startOfDayS` is carried unchanged, and that is the modelled answer rather than an omission.**
+ * The two endpoints are pinned, so the run still begins when it began; what moved is the busy part
+ * *within* the period. A `rise-and-fall` that starts at 08:30 and peaks ten minutes late is a late
+ * morning peak, not a period that started at 08:40 — and a shift that also moved the hour would be
+ * making the same claim twice.
+ *
  * @throws TrafficError for a template with no interior phase boundary, or a shift larger than
  *   {@link maxPeakShiftS}.
  */
@@ -287,6 +350,9 @@ export function shiftTemplatePeak(
     })),
     reportWindowStartS: move(template.reportWindowStartS),
     reportWindowEndS: move(template.reportWindowEndS),
+    // Spread-or-omit rather than `startOfDayS: template.startOfDayS`, so a shifted `constant-iso`
+    // — which has no hour — does not acquire an `undefined`-valued key the original lacked.
+    ...(template.startOfDayS === undefined ? {} : { startOfDayS: template.startOfDayS }),
   });
 }
 
@@ -294,7 +360,10 @@ export function shiftTemplatePeak(
  * Rise and fall (CIBSE Guide D) — the recommended template
  * -------------------------------------------------------------------------- */
 
-/** Overrides for {@link riseAndFallTemplate}. Every one is declared in `TRAFFIC_PARAMETERS`. */
+/**
+ * Overrides for {@link riseAndFallTemplate}. Every **geometric** one is declared in
+ * `TRAFFIC_PARAMETERS`; {@link RiseAndFallOptions.startOfDayS} deliberately is not — see its note.
+ */
 export interface RiseAndFallOptions {
   /** Length of one replication, seconds. Default 1800 (30 min). */
   readonly durationS?: number | undefined;
@@ -302,6 +371,14 @@ export interface RiseAndFallOptions {
   readonly peakWindowS?: number | undefined;
   /** Intensity at both ends, as a fraction of peak. Default 0 — the CIBSE shape. */
   readonly baselineFraction?: number | undefined;
+  /**
+   * When the run begins, seconds after local midnight, `[0, 86400)`. Omitted means no hour.
+   *
+   * The one field here that is **not** a tunable and not in `TRAFFIC_PARAMETERS`: it is invisible
+   * to {@link intensityAt}, so it cannot move a cost, and a declared knob that cannot move a cost
+   * is a search dimension nobody can spend. See {@link ResolvedDemandTemplate.startOfDayS}.
+   */
+  readonly startOfDayS?: number | undefined;
   readonly id?: string | undefined;
   readonly name?: string | undefined;
 }
@@ -359,6 +436,7 @@ export function riseAndFallTemplate(options: RiseAndFallOptions = {}): ResolvedD
     phases,
     reportWindowStartS: holdStartS,
     reportWindowEndS: holdEndS,
+    ...(options.startOfDayS === undefined ? {} : { startOfDayS: options.startOfDayS }),
   });
 }
 
@@ -374,6 +452,16 @@ export interface ConstantDemandOptions {
   readonly discardFirstS?: number | undefined;
   /** Cool-down discarded at the end, seconds. Default 300 (5 min). */
   readonly discardLastS?: number | undefined;
+  /**
+   * When the run begins, seconds after local midnight. See {@link RiseAndFallOptions.startOfDayS}.
+   *
+   * **The shipped `constant-iso` record declares none, and that is the point of the field being
+   * optional.** ISO 8100-32's constant demand is a rate held long enough to cross-check an
+   * analytical baseline; it is not an hour of the day, and inventing one for it would put a clock
+   * on the page next to a run that has no claim to one. The parameter exists so a caller building
+   * a *different* constant period can say when it is — not so the shipped one can be given a time.
+   */
+  readonly startOfDayS?: number | undefined;
   readonly id?: string | undefined;
   readonly name?: string | undefined;
 }
@@ -412,6 +500,7 @@ export function constantDemandTemplate(options: ConstantDemandOptions = {}): Res
     phases: [{ startS: 0, endS: durationS, startIntensity: 1, endIntensity: 1 }],
     reportWindowStartS: discardFirstS,
     reportWindowEndS: durationS - discardLastS,
+    ...(options.startOfDayS === undefined ? {} : { startOfDayS: options.startOfDayS }),
   });
 }
 
@@ -462,7 +551,11 @@ export const LUNCH_TWO_WAY_SPLIT_AT_END: DirectionalSplit = Object.freeze({
   interfloor: 0.1,
 });
 
-/** Overrides for {@link lunchTwoWayTemplate}. Every one is declared in `TRAFFIC_PARAMETERS`. */
+/**
+ * Overrides for {@link lunchTwoWayTemplate}. Every **geometric and mix** one is declared in
+ * `TRAFFIC_PARAMETERS`; {@link LunchTwoWayOptions.startOfDayS} deliberately is not — see
+ * {@link RiseAndFallOptions.startOfDayS}.
+ */
 export interface LunchTwoWayOptions {
   /** Length of the period, seconds. Default 1800, inherited from the rise-and-fall run length. */
   readonly durationS?: number | undefined;
@@ -476,6 +569,12 @@ export interface LunchTwoWayOptions {
   readonly endSplit?: DirectionalSplit | undefined;
   /** How much of the arc to keep, `[0, 1]`. Default 1; 0 is the flat-mix control. */
   readonly mixAmplitude?: number | undefined;
+  /**
+   * When the period begins, seconds after local midnight. See
+   * {@link RiseAndFallOptions.startOfDayS}. The arc's crossover — the instant the mix is 45/45/10 —
+   * lands at the period's midpoint, so the hour and the crossover move together.
+   */
+  readonly startOfDayS?: number | undefined;
   readonly id?: string | undefined;
   readonly name?: string | undefined;
 }
@@ -587,6 +686,7 @@ export function lunchTwoWayTemplate(options: LunchTwoWayOptions = {}): ResolvedD
     // point of the arc and calls it the period.
     reportWindowStartS: 0,
     reportWindowEndS: durationS,
+    ...(options.startOfDayS === undefined ? {} : { startOfDayS: options.startOfDayS }),
   });
 }
 
@@ -601,6 +701,12 @@ export interface ShiftChangeOptions {
   readonly peakWindowS?: number | undefined;
   /** Intensity between the two peaks, as a fraction of peak. Must lie in `(0, 1)` — see below. */
   readonly troughFraction?: number | undefined;
+  /**
+   * When the period begins, seconds after local midnight. See
+   * {@link RiseAndFallOptions.startOfDayS}. The changeover instant — the trough between the two
+   * peaks — is the period's midpoint, so it is the point an authored hour is derived from.
+   */
+  readonly startOfDayS?: number | undefined;
   readonly id?: string | undefined;
   readonly name?: string | undefined;
 }
@@ -672,6 +778,7 @@ export function shiftChangeTemplate(options: ShiftChangeOptions = {}): ResolvedD
     phases,
     reportWindowStartS: 0,
     reportWindowEndS: durationS,
+    ...(options.startOfDayS === undefined ? {} : { startOfDayS: options.startOfDayS }),
   });
 }
 
@@ -688,6 +795,13 @@ export interface EveningEgressOptions {
   readonly holdS?: number | undefined;
   /** Intensity before the doors open, as a fraction of peak. */
   readonly baselineFraction?: number | undefined;
+  /**
+   * When the run begins, seconds after local midnight. See {@link RiseAndFallOptions.startOfDayS}.
+   *
+   * The run *begins* on the quiet trickle, so this is not the hour the doors open: full flow is
+   * reached at `durationS / 4 + stepS`, which is the instant an authored hour is derived from.
+   */
+  readonly startOfDayS?: number | undefined;
   readonly id?: string | undefined;
   readonly name?: string | undefined;
 }
@@ -746,6 +860,7 @@ export function eveningEgressTemplate(options: EveningEgressOptions = {}): Resol
     phases,
     reportWindowStartS: stepEndS,
     reportWindowEndS: holdEndS,
+    ...(options.startOfDayS === undefined ? {} : { startOfDayS: options.startOfDayS }),
   });
 }
 
@@ -790,6 +905,10 @@ export function resolveDemandTemplate(
     if (isResolved(spec)) {
       requireNoOverrides(overrides, `the already-resolved template "${spec.id}"`);
       requireCoherentMix(spec.phases);
+      // The resolved path returns the object untouched, so this is the only place a hand-built
+      // template's hour is checked at all — the same reasoning `requireCoherentMix` is applied here
+      // for. An hour outside the day would otherwise surface on a clock three layers away.
+      requireTimeOfDay(spec.startOfDayS, 'startOfDayS');
       if ((spec.meanDirectionalSplit === undefined) !== (spec.phases[0]?.startSplit === undefined)) {
         throw new TrafficError(
           `The already-resolved template "${spec.id}" disagrees with itself about whether it varies the directional mix: meanDirectionalSplit is ${spec.meanDirectionalSplit === undefined ? 'absent' : 'present'} while its first phase ${spec.phases[0]?.startSplit === undefined ? 'declares no mix' : 'declares one'}. The generator branches on meanDirectionalSplit, so the disagreement would resolve silently in its favour.`,
@@ -825,12 +944,21 @@ function requireNoOverrides(overrides: DemandTemplateOverrides | undefined, what
   }
 }
 
-/** The rise-and-fall shape, with `overrides` beating the record value and then the default. */
+/**
+ * The rise-and-fall shape, with `overrides` beating the record value and then the default.
+ *
+ * `recordStartOfDayS` has **no `TRAFFIC_DEFAULTS` fallback and no override**, unlike every other
+ * argument here, and both absences are deliberate. There is no default because the hour is data and
+ * nothing else: a template selected by id with no record to read is a shape without a clock, and a
+ * number invented here would put one on it. There is no override because the hour is not a tunable
+ * — see {@link RiseAndFallOptions.startOfDayS}.
+ */
 function riseAndFall(
   overrides: DemandTemplateOverrides | undefined,
   recordDurationS?: number,
   id?: string,
   name?: string,
+  recordStartOfDayS?: number,
 ): ResolvedDemandTemplate {
   return riseAndFallTemplate({
     durationS: overrides?.durationS ?? recordDurationS ?? TRAFFIC_DEFAULTS.riseAndFallDurationS,
@@ -838,6 +966,7 @@ function riseAndFall(
     baselineFraction: overrides?.baselineFraction ?? TRAFFIC_DEFAULTS.baselineFraction,
     ...(id === undefined ? {} : { id }),
     ...(name === undefined ? {} : { name }),
+    ...(recordStartOfDayS === undefined ? {} : { startOfDayS: recordStartOfDayS }),
   });
 }
 
@@ -849,6 +978,7 @@ function constant(
   recordDiscardLastS?: number,
   id?: string,
   name?: string,
+  recordStartOfDayS?: number,
 ): ResolvedDemandTemplate {
   return constantDemandTemplate({
     durationS: overrides?.durationS ?? recordDurationS ?? TRAFFIC_DEFAULTS.constantDurationS,
@@ -858,6 +988,10 @@ function constant(
       overrides?.discardLastS ?? recordDiscardLastS ?? TRAFFIC_DEFAULTS.constantDiscardLastS,
     ...(id === undefined ? {} : { id }),
     ...(name === undefined ? {} : { name }),
+    // Threaded even though the shipped record declares no hour: the resolver must not be the reason
+    // a template has none. `constant-iso` has no hour because ISO's constant demand is not a time of
+    // day, and that has to be visible in `data/` rather than enforced by a missing argument here.
+    ...(recordStartOfDayS === undefined ? {} : { startOfDayS: recordStartOfDayS }),
   });
 }
 
@@ -869,6 +1003,7 @@ function lunchTwoWay(
   recordEndSplit?: DirectionalSplit,
   id?: string,
   name?: string,
+  recordStartOfDayS?: number,
 ): ResolvedDemandTemplate {
   return lunchTwoWayTemplate({
     durationS: overrides?.durationS ?? recordDurationS ?? TRAFFIC_DEFAULTS.lunchTwoWayDurationS,
@@ -879,6 +1014,7 @@ function lunchTwoWay(
     ...(recordEndSplit === undefined ? {} : { endSplit: recordEndSplit }),
     ...(id === undefined ? {} : { id }),
     ...(name === undefined ? {} : { name }),
+    ...(recordStartOfDayS === undefined ? {} : { startOfDayS: recordStartOfDayS }),
   });
 }
 
@@ -888,6 +1024,7 @@ function shiftChange(
   recordDurationS?: number,
   id?: string,
   name?: string,
+  recordStartOfDayS?: number,
 ): ResolvedDemandTemplate {
   return shiftChangeTemplate({
     durationS: overrides?.durationS ?? recordDurationS ?? TRAFFIC_DEFAULTS.shiftChangeDurationS,
@@ -898,6 +1035,7 @@ function shiftChange(
     troughFraction: overrides?.troughFraction ?? TRAFFIC_DEFAULTS.shiftChangeTroughFraction,
     ...(id === undefined ? {} : { id }),
     ...(name === undefined ? {} : { name }),
+    ...(recordStartOfDayS === undefined ? {} : { startOfDayS: recordStartOfDayS }),
   });
 }
 
@@ -907,6 +1045,7 @@ function eveningEgress(
   recordDurationS?: number,
   id?: string,
   name?: string,
+  recordStartOfDayS?: number,
 ): ResolvedDemandTemplate {
   return eveningEgressTemplate({
     durationS: overrides?.durationS ?? recordDurationS ?? TRAFFIC_DEFAULTS.eveningEgressDurationS,
@@ -916,6 +1055,7 @@ function eveningEgress(
       overrides?.baselineFraction ?? TRAFFIC_DEFAULTS.eveningEgressBaselineFraction,
     ...(id === undefined ? {} : { id }),
     ...(name === undefined ? {} : { name }),
+    ...(recordStartOfDayS === undefined ? {} : { startOfDayS: recordStartOfDayS }),
   });
 }
 
@@ -926,9 +1066,16 @@ function fromRecord(
   // Validated even when an override replaces it: a record with a nonsense duration is a data
   // error, and an override that happens to be present must not hide it.
   const durationS = requirePositive(record.durationMin, 'durationMin') * SECONDS_PER_MINUTE;
+  // Human units in the reference file, SI in the code — `startOfDayMin` beside `durationMin`, the
+  // same conversion, at the same point. Conditional rather than `?? 0`, because a record with no
+  // hour must produce a template with no key rather than one that claims to start at midnight.
+  const startOfDayS =
+    record.startOfDayMin === undefined
+      ? undefined
+      : requireTimeOfDay(record.startOfDayMin * SECONDS_PER_MINUTE, 'startOfDayMin');
 
   if (record.id === 'rise-and-fall') {
-    return riseAndFall(overrides, durationS, record.id, record.name);
+    return riseAndFall(overrides, durationS, record.id, record.name, startOfDayS);
   }
   if (record.id === 'constant-iso') {
     return constant(
@@ -938,6 +1085,7 @@ function fromRecord(
       (record.discardLastMin ?? 0) * SECONDS_PER_MINUTE,
       record.id,
       record.name,
+      startOfDayS,
     );
   }
   if (record.id === 'lunch-two-way') {
@@ -948,13 +1096,14 @@ function fromRecord(
       record.directionalSplitAtEnd,
       record.id,
       record.name,
+      startOfDayS,
     );
   }
   if (record.id === 'shift-change') {
-    return shiftChange(overrides, durationS, record.id, record.name);
+    return shiftChange(overrides, durationS, record.id, record.name, startOfDayS);
   }
   if (record.id === 'evening-egress') {
-    return eveningEgress(overrides, durationS, record.id, record.name);
+    return eveningEgress(overrides, durationS, record.id, record.name, startOfDayS);
   }
   throw new TrafficError(
     `Demand template "${record.id}" has no shape in this module. Supported: ${DEMAND_TEMPLATE_IDS.join(', ')}. Adding one is a new shape in traffic/demandTemplate.ts, not a new branch at a call site.`,
@@ -970,6 +1119,11 @@ function fromRecord(
  *
  * Times outside `[0, durationS]` return 0: nothing arrives before the run starts or after it
  * ends. Pure, and cheap enough to call once per proposed arrival.
+ *
+ * **`timeS` is seconds since the start of the run, never seconds since midnight**, and this
+ * function does not read {@link ResolvedDemandTemplate.startOfDayS} at all. That is what makes the
+ * hour provably invisible to every trace — see the module note, and `dayStartIdentity.test.ts` for
+ * the run that holds it.
  */
 export function intensityAt(template: ResolvedDemandTemplate, timeS: number): number {
   if (!Number.isFinite(timeS) || timeS < 0 || timeS > template.durationS) return 0;

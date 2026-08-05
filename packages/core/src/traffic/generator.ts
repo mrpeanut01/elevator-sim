@@ -1391,6 +1391,11 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
     buildingId: building.id,
     template,
     durationS: template.durationS,
+    // The run's clock, beside its length — spread-or-omit, so a trace under a template with no hour
+    // (`constant-iso`) is the object it was before templates could carry one. Copied from the
+    // template at the same point `durationS` is, so the two cannot go out of step; nothing between
+    // here and the metrics reads it. `DECISIONS.md` § D244.
+    ...(template.startOfDayS === undefined ? {} : { startOfDayS: template.startOfDayS }),
     reportWindowStartS: template.reportWindowStartS,
     reportWindowEndS: template.reportWindowEndS,
     arrivals: Object.freeze(arrivals),

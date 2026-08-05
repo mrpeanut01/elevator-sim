@@ -54,6 +54,27 @@
  * Nothing here widens a band to make a phase pass (CLAUDE.md § Working agreements). It replaces
  * a ±25 % band around an arbitrary 0.83× demand factor with a term-by-term reconciliation whose
  * residual is a few percent, and it fails if any term drifts.
+ *
+ * ## What this oracle depends on in the traffic model, said rather than left implicit
+ *
+ * The closed form is a statement about **elapsed seconds within a run**, and every quantity here
+ * — `RTT`, `INT`, `HC`, the plateau, the report window — is measured from `t = 0` of the
+ * replication. It is therefore *independent of when the run is*, and since `DECISIONS.md` § D244
+ * a demand template also carries a time of day (`ResolvedDemandTemplate.startOfDayS`,
+ * `data/traffic-profiles.json → demandTemplates[].startOfDayMin`; `rise-and-fall`, the template
+ * this oracle runs, declares 08:30).
+ *
+ * **This test stays green under that field by construction, not by luck, and the construction is
+ * one sentence: `intensityAt` does not read the hour.** Every arrival instant is drawn against
+ * `intensityAt` over `[0, durationS]`, so the passenger set this oracle measures is bit-for-bit the
+ * one it measured before templates had clocks. The dependency is stated here because it is the kind
+ * that goes stale silently: the day the hour becomes an *input* to anything statistical — a phase
+ * boundary that is also a measurement boundary, a window sliced at a wall-clock time — this
+ * paragraph stops being true and the oracle's assumptions gain a fifth row.
+ *
+ * It is not asserted here. `traffic/dayStartIdentity.test.ts` is the run that proves it, across
+ * every building and every shipped template, byte for byte; duplicating a weaker version of that
+ * check inside the oracle would add a test that cannot fail independently.
  */
 
 import { beforeAll, describe, expect, it } from 'vitest';
