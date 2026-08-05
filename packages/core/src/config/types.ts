@@ -277,6 +277,28 @@ export interface DemandTemplate extends Commented {
   readonly directionalSplitAtStart?: DirectionalSplit | undefined;
   /** Directional mix at the **end** of the period. See {@link directionalSplitAtStart}. */
   readonly directionalSplitAtEnd?: DirectionalSplit | undefined;
+  /**
+   * Minutes after local midnight at which this template's run **begins**, `[0, 1440)`.
+   *
+   * Human units with the unit in the identifier, matching {@link durationMin}; the runtime view
+   * converts to `ResolvedDemandTemplate.startOfDayS`.
+   *
+   * **Absent means the template has no hour, and that is a statement rather than a gap.** ISO
+   * 8100-32's constant demand is a steady rate held for two hours to cross-check an analytical
+   * baseline — it is not a time of day, and giving it one would invent a clock no source supports.
+   * Omitted rather than `null`, following the omitted-not-undefined discipline the mix endpoints
+   * above already keep.
+   *
+   * **Nothing in the simulation reads it.** `intensityAt`, `splitAt` and `integratedIntensityS`
+   * never see it, so a template's arrivals, batches, routes and metrics are exactly what they were
+   * before the field existed — `traffic/dayStartIdentity.test.ts` holds every shipped template to
+   * that byte for byte. It is carried so a *presentation* layer can put a clock on the run; see
+   * `DECISIONS.md` § D244 for why it is deliberately not a tunable.
+   *
+   * The authored values are **derived by placing each template's hold**, not its start, and each
+   * one's citation status is in that template's own `$comment` in `data/traffic-profiles.json`.
+   */
+  readonly startOfDayMin?: number | undefined;
 }
 
 /** Body-mass distribution. Must be a distribution: the load sensor measures it. */

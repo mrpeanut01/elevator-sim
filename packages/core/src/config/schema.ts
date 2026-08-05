@@ -511,6 +511,20 @@ export const trafficProfilesSchema = z
         discardLastMin: nonNegative.optional(),
         directionalSplitAtStart: directionalSplitSchema.optional(),
         directionalSplitAtEnd: directionalSplitSchema.optional(),
+        // The template's hour, minutes after local midnight. Declared here because this is a
+        // `strictObject`: a `data/` author cannot give a template a clock without the schema
+        // admitting one, which is the property that keeps the field from being a second, unvalidated
+        // place a template is defined. Half-open at 1440 rather than closed — 1440 is 00:00 of the
+        // next day, which is 0, and admitting both spellings of one instant is how two records that
+        // mean the same thing compare unequal.
+        startOfDayMin: z
+          .number()
+          .min(0, 'startOfDayMin is minutes after local midnight and cannot be negative')
+          .lt(
+            1440,
+            'startOfDayMin must be below 1440: it is minutes after local midnight, and 1440 is the next midnight, which is 0',
+          )
+          .optional(),
       }),
     ),
     passengerMass: z

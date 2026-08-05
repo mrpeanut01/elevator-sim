@@ -168,6 +168,35 @@ export interface ResolvedDemandTemplate {
    *    variation of the mix and in nothing else — not in the mean mix, and not in total demand.
    */
   readonly meanDirectionalSplit?: DirectionalSplit | undefined;
+  /**
+   * Seconds after local midnight at which `t = 0` of this run falls — **absent when the template
+   * has no hour**. `DECISIONS.md` § D244.
+   *
+   * The runtime view of `DemandTemplate.startOfDayMin`, converted at resolution the way
+   * `durationMin` becomes {@link durationS}. `constant-iso` declares none, and absent means *"this
+   * template has no hour"* rather than *"its hour is midnight"* — omitted, not `undefined`-valued,
+   * for the reason {@link meanDirectionalSplit} is.
+   *
+   * ## Invisible to the simulation, and that is the load-bearing property
+   *
+   * `intensityAt`, `splitAt` and `integratedIntensityS` are the whole of this module's evaluation
+   * surface, and **none of them reads this field**. A run's arrivals, batches, destinations, masses
+   * and metrics are therefore exactly what they were before the field existed, at every seed and
+   * every template — proved by a run in `traffic/dayStartIdentity.test.ts` rather than argued here,
+   * and the same property is what keeps `sim/oracle.test.ts`'s closed-form comparison green by
+   * construction.
+   *
+   * It travels with the template rather than beside it because a template *is* the period: the
+   * hour and the shape go stale together or not at all. {@link shiftTemplatePeak} carries it
+   * unchanged — a peak shift moves the busy part *within* the period, and a period that started at
+   * 08:30 still started at 08:30 when its peak ran ten minutes late.
+   *
+   * **Not a tunable, deliberately.** It is absent from {@link TRAFFIC_PARAMETERS} and from
+   * {@link DemandTemplateOverrides}: an optimizer sampling *what hour it is* would add a search
+   * dimension that cannot move a cost, which is the `destination-eta` `rideTime: 0` defect
+   * (`DECISIONS.md` § D112) with a different key name.
+   */
+  readonly startOfDayS?: number | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -388,6 +417,25 @@ export interface PassengerTrace {
   readonly buildingId: string;
   readonly template: ResolvedDemandTemplate;
   readonly durationS: number;
+  /**
+   * Seconds after local midnight at which `arrivalTimeS === 0` falls — **present only when the
+   * template declares an hour**. `DECISIONS.md` § D244.
+   *
+   * Copied from {@link ResolvedDemandTemplate.startOfDayS}, and beside {@link durationS} for the
+   * reason {@link reportWindowStartS} is beside it: a reader with the trace in hand should not have
+   * to reach into `template` to learn when the run is and how long it lasts. The template remains
+   * the single authority — the copy is made in one place, at the same moment `durationS` is, so the
+   * two cannot disagree.
+   *
+   * Spread-or-omit, never `?? 0`: a trace under `constant-iso`, which has no hour, must be the
+   * object it was before templates could carry one, and `structuralDigestOfResult` hashes a key's
+   * presence as well as its value.
+   *
+   * **Nothing downstream of the generator reads it to decide anything.** It is a label on the run,
+   * like {@link buildingId}; adding it moved no arrival, no leg and no metric, which
+   * `traffic/dayStartIdentity.test.ts` holds byte for byte.
+   */
+  readonly startOfDayS?: number;
   readonly reportWindowStartS: number;
   readonly reportWindowEndS: number;
   /** Batches in `(time, generation sequence)` order. */
