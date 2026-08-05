@@ -14211,7 +14211,31 @@ works:
   limit on how cleanly commissioning can teach, and it is a fact about `data/` rather than about the
   panel.
 
-### 4. What is still open, and it is short
+### 4. What this cost, measured rather than absorbed
+
+§ D216 § 5's rule — *a wave that quietly slows the suite is how the suite stops being run* — so the
+seconds are here rather than left for somebody to notice.
+
+| | |
+|---|---|
+| `--project viz`, all three waves in | **234 s**, 101 files, 2 264 tests |
+| the always-on honesty tier, inside that | 80 s |
+| **this wave's four honesty adapters** | **no measurable cost** — 81.2 s without them against 79.7 s with, which is noise |
+| the browser tier | ~4 s, and it skips where there is no Chromium rather than failing |
+| the deep honesty tier | 1 010 s, opt-in, unchanged in kind |
+
+**The adapters were the suspect and are not the cause**, which is worth stating because it was the
+cheap thing to blame: four surfaces driven over 5 periods × 2 days, 3 constraints × 2 choice sets and
+six restore failures cost nothing next to the simulation already in that tier.
+
+Where the seconds actually went is the § D177 rule doing its job: `calendar.test.ts`,
+`commissioning/`, `selectorEditor.test.ts` and the library suite each **simulate**, because comparing
+on the legs is the only comparison that rule accepts. That is the cost § D216 § 5 anticipated when it
+bounded the walk to two buildings, and it is the cost of the modes being checked at all rather than
+asserted. The lever if it ever needs pulling is the same one the honesty tiers use — an opt-in switch
+— and nothing has been put behind one yet, because 234 s is still a suite somebody runs.
+
+### 5. What is still open, and it is short
 
 - **Sandbox as a *mode*.** The defect is closed and the label is true; whether it should also have a
   screen is undecided, and nobody has needed one.
