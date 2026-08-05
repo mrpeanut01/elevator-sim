@@ -88,9 +88,22 @@ interface Recorded {
   className: string;
   textContent: string;
   value: string;
+  hidden: boolean;
   readonly attrs: Map<string, string>;
   readonly children: Recorded[];
-  readonly listeners: Map<string, () => void>;
+  readonly listeners: Map<string, (event?: unknown) => void>;
+}
+
+/** What a recorder hands back: the document, its root, and the focus a browser would be tracking. */
+interface Recorder {
+  readonly doc: Document;
+  readonly root: Recorded;
+  /** Where focus is, as the panel's own `.focus()` calls have moved it. */
+  focused: () => Recorded | null;
+  /** Put focus somewhere, the way a click or a Tab into the overlay would. */
+  focus: (node: Recorded | null) => void;
+  /** Send a key to whatever has focus, bubbling to the root. Returns whether it was defaulted. */
+  press: (key: string, shiftKey?: boolean) => { readonly prevented: boolean };
 }
 
 /**
@@ -99,14 +112,24 @@ interface Recorded {
  * Every member below is one `dev/dom.ts` or `dev/menuPanel.ts` actually calls, and the set is
  * small on purpose: a recorder that grew a member nobody uses would be a second, unasserted
  * implementation of the DOM sitting in a test directory.
+ *
+ * **Four members arrived with the modal** — `hidden`, `contains`, `focus` and the document's
+ * `activeElement` — and they arrived because `renderMenu` started calling them, which is the rule
+ * this recorder has always been grown by. It is still not a browser: `focus` moves a variable, and
+ * `press` calls the root's own handler rather than dispatching through a capture and bubble phase.
+ * What it can therefore prove is that **the panel's trap decides correctly given where focus is**,
+ * and not that a browser routes the key there. The browser tier is where that second claim lives.
  */
-function recorder(): { readonly doc: Document; readonly root: Recorded } {
+function recorder(): Recorder {
+  let active: Recorded | null = null;
+
   const make = (tag: string): Recorded => {
     const node: Recorded = {
       tag,
       className: '',
       textContent: '',
       value: '',
+      hidden: false,
       attrs: new Map(),
       children: [],
       listeners: new Map(),
@@ -125,8 +148,14 @@ function recorder(): { readonly doc: Document; readonly root: Recorded } {
         node.children.length = 0;
         node.children.push(...kids);
       },
-      addEventListener(type: string, handler: () => void) {
+      addEventListener(type: string, handler: (event?: unknown) => void) {
         node.listeners.set(type, handler);
+      },
+      contains(other: Recorded | null) {
+        return other !== null && walk(node).includes(other);
+      },
+      focus() {
+        active = node;
       },
       style: {
         setProperty() {
@@ -138,8 +167,32 @@ function recorder(): { readonly doc: Document; readonly root: Recorded } {
   };
 
   const root = make('div');
-  const doc = { createElement: (tag: string) => make(tag) } as unknown as Document;
-  return { doc, root };
+  const doc = {
+    createElement: (tag: string) => make(tag),
+    get activeElement() {
+      return active;
+    },
+  } as unknown as Document;
+
+  return {
+    doc,
+    root,
+    focused: () => active,
+    focus: (node) => {
+      active = node;
+    },
+    press: (key, shiftKey = false) => {
+      let prevented = false;
+      root.listeners.get('keydown')?.({
+        key,
+        shiftKey,
+        preventDefault: () => {
+          prevented = true;
+        },
+      });
+      return { prevented };
+    },
+  };
 }
 
 /** Every node in the tree, root first. */
@@ -177,8 +230,9 @@ function render(
   state: MenuState,
   loaded: MenuCatalogue,
   overrides: Partial<MenuPanelHost> = {},
-): { readonly root: Recorded; readonly asked: MenuIntent[] } {
-  const { doc, root } = recorder();
+): Recorder & { readonly asked: MenuIntent[]; readonly draw: () => void } {
+  const made = recorder();
+  const { doc, root } = made;
   const asked: MenuIntent[] = [];
   const host: MenuPanelHost = {
     doc,
@@ -194,8 +248,11 @@ function render(
     calendarPeriodId: () => '',
     ...overrides,
   };
-  renderMenu(root as unknown as HTMLElement, host);
-  return { root, asked };
+  const draw = (): void => {
+    renderMenu(root as unknown as HTMLElement, host);
+  };
+  draw();
+  return { ...made, asked, draw };
 }
 
 /** The Free play screen, with the seed deliberately broken so `canStart` refuses. */
@@ -481,6 +538,121 @@ describe('a select dispatches an intent about the option that was chosen', () =>
     const wanted = options.find((value) => value !== showing);
     choose(select as Recorded, wanted ?? '');
     expect(asked).toEqual([{ kind: 'set-free-play', field: 'buildingId', value: wanted }]);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The overlay is a modal — GitHub issues #33 and #68
+ * -------------------------------------------------------------------------- */
+
+describe('the overlay behaves like the dialog it looks like', () => {
+  it('says it is a modal dialog, and says which one', async () => {
+    /*
+     * Measured on the shipped page before the change, with the Leaderboard overlay covering the
+     * screen: `role: null`, `aria-modal: null`, `body[inert]: false`, and the shell's own tabs and
+     * comboboxes still exposed. Issue #33's own words: *"There is no `dialog` role, no `aria-modal`,
+     * and no `inert`/`aria-hidden` on the background."* Two of those three are this file's; the
+     * third is `dev/main.ts`'s and is filed rather than faked here.
+     */
+    const loaded = await catalogue();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'leaderboard' }, loaded);
+    expect(root.attrs.get('role')).toBe('dialog');
+    expect(root.attrs.get('aria-modal')).toBe('true');
+    // Named, and named by the screen — so a reader's dialog list says *Leaderboard* rather than
+    // repeating whatever the first button happens to be called.
+    expect(root.attrs.get('aria-label')).toBe('Leaderboard');
+  });
+
+  it('holds Tab at the end of the menu instead of dropping the player behind it — issue #68', async () => {
+    /*
+     * The functional half, and the more serious one. #68 is #33's mechanism with a consequence: the
+     * reporter tabbed out of the *Settings* screen — *"These change how the simulation is drawn,
+     * never what it computes"* — reached the seed field behind the overlay, typed `424242`, and
+     * re-seeded the run. Measured before the change, six Tab presses from the first row landed on
+     * `BODY`, then a link, then a button, then a `<select>`, every one of them outside the overlay.
+     */
+    const loaded = await catalogue();
+    const { root, focused, focus, press } = render(
+      { ...initialMenuState(loaded), screen: 'settings' },
+      loaded,
+    );
+    const controls = walk(root).filter((node) => node.attrs.has('data-menu-control'));
+    expect(controls.length, 'the Settings screen registered no controls at all').toBeGreaterThan(2);
+
+    const last = controls[controls.length - 1];
+    focus(last ?? null);
+    expect(press('Tab').prevented, 'Tab past the last control was allowed to leave the dialog').toBe(
+      true,
+    );
+    expect(focused(), 'Tab from the last control did not wrap to the first').toBe(controls[0]);
+
+    focus(controls[0] ?? null);
+    expect(press('Tab', true).prevented, 'Shift+Tab off the first control was allowed to leave').toBe(
+      true,
+    );
+    expect(focused()).toBe(last);
+  });
+
+  it('lets Tab move normally in the middle of the ring', async () => {
+    // The other direction, and what stops the trap above passing as *Tab never works*. A dialog
+    // that swallowed every Tab would be a worse cage than the one that leaked.
+    const loaded = await catalogue();
+    const { root, focus, press } = render({ ...initialMenuState(loaded), screen: 'settings' }, loaded);
+    const controls = walk(root).filter((node) => node.attrs.has('data-menu-control'));
+    focus(controls[0] ?? null);
+    expect(press('Tab').prevented, 'the first control refused an ordinary forward Tab').toBe(false);
+    expect(press('Escape').prevented, 'the trap is reacting to keys that are not Tab').toBe(false);
+  });
+
+  it('brings focus into the overlay, and puts it back on the same control after a redraw', async () => {
+    /*
+     * The half without which the trap is decorative. `fill` replaces every child on every redraw,
+     * so the focused element is destroyed by each state change — and the overlay is appended last
+     * to `document.body`, so the next Tab from `<body>` walks into the shell *behind* the menu.
+     * That is how #68's reporter reached the seed field: by tabbing forward from nowhere, not by
+     * tabbing past the end of a short list.
+     */
+    const loaded = await catalogue();
+    const { root, focused, focus, draw } = render(initialMenuState(loaded), loaded);
+    const controls = walk(root).filter((node) => node.attrs.has('data-menu-control'));
+    expect(focused(), 'opening the dialog left focus outside it').toBe(controls[0]);
+
+    const third = controls[2];
+    expect(third).toBeDefined();
+    focus(third ?? null);
+    const key = third?.attrs.get('data-menu-control');
+    draw();
+
+    const after = walk(root).filter((node) => node.attrs.has('data-menu-control'));
+    expect(after[2], 'the redraw did not rebuild the tree').not.toBe(third);
+    expect(
+      focused()?.attrs.get('data-menu-control'),
+      'a redraw moved the reader off the control they were standing on',
+    ).toBe(key);
+  });
+
+  it('does not reach into a hidden menu for the focus', async () => {
+    /*
+     * `dev/main.ts#closeMenu` hides the overlay and later draws still run, so without the guard
+     * leaving the menu would immediately pull focus back into a screen nobody can see — the same
+     * defect as #68 with the sign flipped.
+     */
+    const loaded = await catalogue();
+    const { root, focused, focus, draw } = render(initialMenuState(loaded), loaded);
+    focus(null);
+    root.hidden = true;
+    draw();
+    expect(focused(), 'a hidden menu took the focus').toBeNull();
+  });
+
+  it('keeps a refused control out of the ring', async () => {
+    // A disabled button is not focusable, so a ring that contained one would end on a control Tab
+    // never reaches — and Tab would walk straight past it into the shell.
+    const loaded = await catalogue();
+    const { root } = render(brokenFreePlay(loaded), loaded);
+    const start = byClass(root, 'menu-start')[0];
+    expect(start?.attrs.get('disabled'), 'this case no longer renders a refused Start').toBe('disabled');
+    expect(start?.attrs.has('data-menu-control'), 'a disabled Start is in the focus ring').toBe(false);
   });
 });
 
