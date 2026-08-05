@@ -302,6 +302,31 @@ export function fetchTransport(fetchLike: typeof fetch): Transport {
 
 export interface LeaderboardClient {
   /**
+   * Start the container, and do not wait for it.
+   *
+   * The app runs at `minReplicas: 0`. A request to a sleeping container was measured at **32.2 s**
+   * against **0.13 s** warm — a 240× gap, essentially all time-to-first-byte, so it is the process
+   * starting rather than anything on the wire. That cost is not removed by asking for it sooner,
+   * but the *player's* share of it is: a wake fired when somebody opens the Account screen is
+   * usually finished by the time they have typed an address.
+   *
+   * ## Three things a caller must not do with it
+   *
+   * **Do not branch on the result.** The route answers from memory with no store call, precisely so
+   * a 200 means *the process is running* and nothing else; a caller that treated a failure as
+   * meaningful would have turned a courtesy into a dependency, and a database outage would read as
+   * a server that is merely asleep.
+   *
+   * **Do not block a render on it.** Nothing on any screen is waiting for this, and a panel that
+   * awaited it would have made the cold start visible in the one place it currently is not.
+   *
+   * **Do not fire it in a loop.** Once per screen entry — not per keystroke, not per render.
+   *
+   * It returns a `Result` like everything else here rather than `void`, so it is testable and so a
+   * caller cannot be surprised by a rejection; the contract is that the value is ignored.
+   */
+  wake(): Promise<Result<null>>;
+  /**
    * Ask for a sign-in link. **There is no second door** — no register, no login, no password.
    *
    * `/api/register`, `/api/login` and `/api/confirm` are gone (§ D241 § 5), and this method is not
@@ -429,6 +454,9 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
     (body as Record<string, unknown> | null)?.['user'] as AccountSummary | undefined;
 
   return {
+    // `() => null` rather than a shape check: there is nothing in the body a caller is allowed to
+    // read, so a "wrong shape" refusal would be a distinction with nothing behind it.
+    wake: () => call({ method: 'GET', url: `${base}/api/wake`, token: undefined, body: undefined }, () => null),
     requestLink: (email) =>
       call({ method: 'POST', url: `${base}/api/auth/request-link`, token: undefined, body: { email } }, (body) => {
         const record = body as Record<string, unknown> | null;

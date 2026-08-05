@@ -494,6 +494,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   const menuRoot = el(document, 'div', { className: 'menu-overlay' });
   document.body.append(menuRoot);
+  /**
+   * Where a wait is announced to a screen reader — see {@link announceWait}.
+   *
+   * Built here rather than declared in `index.html` for `menuRoot`'s own reason: `elementMap.ts`
+   * asserts that page's required shape, and a new required container would be a change to that
+   * contract for something that is chrome. Hidden by inline style rather than by a class, because
+   * the stylesheet is not this lane's to edit and a region hidden with `display:none` or
+   * `visibility:hidden` is a region assistive technology does not read at all.
+   */
+  const waitLiveRegion = el(document, 'div', {
+    className: 'menu-wait-live',
+    attrs: { role: 'status', 'aria-live': 'polite' },
+    style: {
+      position: 'absolute',
+      width: '1px',
+      height: '1px',
+      margin: '-1px',
+      padding: '0',
+      border: '0',
+      overflow: 'hidden',
+      'clip-path': 'inset(50%)',
+      'white-space': 'nowrap',
+    },
+  });
+  document.body.append(waitLiveRegion);
   // Derived once. Two calls would be two catalogues, and a panel drawing one while the reducer
   // validated against the other is the kind of disagreement that only shows up as a Start button
   // that refuses something the list offered.
@@ -605,18 +630,68 @@ function boot(ui: Elements, resources: BrowserResources): void {
   /**
    * What is said while a request is in flight, and what is said once it has been a while.
    *
-   * § D243 § 4: the Container App runs at `minReplicas: 0` and a cold `/api/challenges` against the
-   * live app was measured at **28.7 s**. So the first request after a quiet spell is slow *and
-   * correct*, and the two failures available are giving up (which reports `unreachable` about a
-   * server that is starting) and saying nothing (which is indistinguishable from a hang). Neither
-   * is taken: nothing is cancelled, and the wording escalates on a timer beside the request.
+   * § D243 § 4 and § D247: the Container App runs at `minReplicas: 0`, and a request to a sleeping
+   * one was measured at **32.2 s** against **0.13 s** warm. So a wait of half a minute here is a
+   * *correct* answer arriving slowly, and the two failures available are giving up — which reports
+   * `unreachable` about a server that is starting — and saying nothing, which is indistinguishable
+   * from a hang. Neither is taken: nothing is cancelled, and the wording escalates on a timer.
+   *
+   * ## The ladder is graded in the product's own vocabulary, and the grading is checked
+   *
+   * This is an app about waiting for lifts, and the player is now the one waiting. So the rungs
+   * name the band a **tenant** would be in at the same elapsed time — the four the mood bar uses.
+   * That is a joke and it is also a teaching device: a player learns what *breezy* and *checking
+   * watch* mean by being in them.
+   *
+   * **It is prose about the player's wait and never a statistic about a run.** Nothing here imports
+   * `live/bands.ts`, nothing routes through a surface that publishes run figures, and no rung
+   * carries a number about a simulation. What it must not do is *misname* a band, because a screen
+   * that called 20 s *tapping foot* would be teaching the reader the product's own vocabulary
+   * wrongly — so `main.test.ts` reads these rungs out of this file's source and checks each band
+   * word against `WAIT_BANDS`' real boundaries, which are 30 s, 60 s and 120 s.
+   *
+   * There is deliberately **no progress bar and no percentage.** There is no progress to report — a
+   * container is starting and it will not say how far — and inventing one is the same class of
+   * defect as a figure a run does not support.
    */
-  const WAKING_UP =
-    'Still going. This site’s server shuts down when nobody is using it and takes about half ' +
-    'a minute to start again, so the first request after a quiet spell is slow. Nothing has ' +
-    'failed — leave this open.';
-  /** Late enough that an awake server never shows it, early enough to beat a player's patience. */
-  const WAKING_UP_AFTER_MS = 4_000;
+  const WAIT_LADDER: readonly { readonly afterMs: number; readonly text: string }[] = Object.freeze([
+    {
+      afterMs: 4_000,
+      text:
+        'Summoning the car. This site’s server shuts down when nobody is playing, which is what ' +
+        'keeps it free to leave running — so the first request after a quiet spell is starting it.',
+    },
+    {
+      // 10 s. Under 30 s, which is `breezy` — checked against WAIT_BANDS rather than asserted here.
+      afterMs: 10_000,
+      text: 'Still on its way. A tenant waiting this long is one your mood bar calls breezy.',
+    },
+    {
+      // 30 s: the breezy → tapping foot boundary, and about where the measured cold start lands.
+      afterMs: 30_000,
+      text:
+        'Thirty seconds — the exact point where your own mood bar stops calling a wait breezy and ' +
+        'starts calling it tapping foot. We are aware of the irony.',
+    },
+    {
+      // 60 s: tapping foot gives way to checking watch.
+      afterMs: 60_000,
+      text: 'A minute — long enough that your own mood bar has moved a tenant into checking watch.',
+    },
+    {
+      /*
+       * 120 s: checking watch → taking the stairs, and the rung that stops blaming the cold start.
+       * A sleeping container was measured at 32.2 s; four times that is not a cold start any more,
+       * and going on saying *it is just waking up* would be a reassurance that had stopped being
+       * true — which this repository has a standing rule about.
+       */
+      afterMs: 120_000,
+      text:
+        'Two minutes — your mood bar’s last band, taking the stairs, where a tenant gives up. You ' +
+        'do not have that option, and a cold start was measured at about half a minute, so this is ' +
+        'no longer a sleeping server. Nothing you typed is lost.',
+    },
+  ]);
 
   /*
    * The unavailability is said **on mount**, which is issue #30's own stated fix ordering.
@@ -635,6 +710,50 @@ function boot(ui: Elements, resources: BrowserResources): void {
   };
   /** Requests are started here and never from a render — a render that fetched would loop. */
   let boardsRequested = false;
+
+  /* ---------------------------------------------------------------------- *
+   * Waking the container before the player needs it — § D247 § 5
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * The three screens that talk to a server, and therefore the three that are worth waking for.
+   *
+   * Entering one is **intent**, and intent is minutes ahead of the request on the account screen
+   * (an address has to be typed) and seconds ahead on the other two. Waking on *submit* would be
+   * waking at the moment the wait starts, which buys nothing at all.
+   */
+  const WAKING_SCREENS: ReadonlySet<string> = new Set(['account', 'leaderboard', 'challenge']);
+  /**
+   * The floor between two wakes, so bouncing between **Back** and **Account** is not one request
+   * per bounce.
+   *
+   * Far below any scale-to-zero window, so it can never suppress a wake that was needed: a
+   * container that went to sleep did so after minutes of idleness, not inside thirty seconds.
+   */
+  const WAKE_MIN_INTERVAL_MS = 30_000;
+  let lastWakeMs = Number.NEGATIVE_INFINITY;
+
+  /**
+   * Fire and forget. **Nothing branches on the answer and nothing waits for it.**
+   *
+   * `/api/wake` answers from memory with no store call, so a 200 means *the process is running* and
+   * nothing more; treating a failure as meaningful would turn a courtesy into a dependency and make
+   * a database outage read as a server that is merely asleep. So the result is discarded here, in
+   * one place, rather than at each call site where somebody would eventually be tempted by it.
+   *
+   * The throttle reads `clock`, the shell's one `DisplayClock`, rather than `Date.now()`.
+   * `boundaries.test.ts` gives the wall clock exactly one home — `playback/clock.ts` — and it caught
+   * this: a second reader in `dev/main.ts` is precisely the drift that rule exists to stop, and it
+   * is not excused by the reading being *only a throttle*. The instant here is a real one and it is
+   * not a simulated second; invariant 3 is about `core/`, and this is the shell.
+   */
+  function wakeServer(): void {
+    if (client === undefined) return;
+    const nowMs = clock.now();
+    if (nowMs - lastWakeMs < WAKE_MIN_INTERVAL_MS) return;
+    lastWakeMs = nowMs;
+    void client.wake();
+  }
 
   /* ---------------------------------------------------------------------- *
    * This week's challenge
@@ -986,6 +1105,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
         // correct on its own.
         if (arrived) void loadBoards();
         if (next.screen === 'challenge' && menuStateBefore !== 'challenge') void loadChallenge();
+        /*
+         * Woken on arrival, on the same rule and for a different reason. `loadBoards` and
+         * `loadChallenge` are requests whose answers are drawn; this is a request whose answer is
+         * discarded, and it is here because *arriving* is the earliest honest signal that a player
+         * is about to need the server. The Account screen is the one that pays off: it fires when
+         * the screen opens and the request that matters is sent after an address has been typed.
+         */
+        if (next.screen !== menuStateBefore && WAKING_SCREENS.has(next.screen)) wakeServer();
         return;
       }
 
@@ -1043,6 +1170,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
         menuRoot.hidden = false;
         menuState = navigate(menuState, 'main');
         drawMenu();
+        /*
+         * Opening the Menu is the earliest intent there is, and it is the one that catches the case
+         * the screen-entry wake cannot: a player who has been running shifts for twenty minutes has
+         * touched no API at all, so the container that served the page has had time to scale back
+         * to zero underneath them. Boot is deliberately **not** a wake — `serve.ts` serves this page
+         * from the same container, so a page that loaded came out of a process that is awake.
+         */
+        wakeServer();
         return;
 
       case 'open-board': {
@@ -1206,14 +1341,43 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   function startWaiting(first: string): () => void {
     accountState = pending(accountState, first);
+    announceWait(first);
     drawMenu();
-    const timer = window.setTimeout(() => {
-      accountState = pending(accountState, WAKING_UP);
-      drawMenu();
-    }, WAKING_UP_AFTER_MS);
+    /*
+     * One timer per rung rather than one repeating tick, so a rung is announced exactly when it is
+     * reached and never re-announced. `aria-live` re-reads on every write, and a polite region
+     * rewritten every second is a screen reader talking over the player for half a minute.
+     */
+    const timers = WAIT_LADDER.map((rung) =>
+      window.setTimeout(() => {
+        accountState = pending(accountState, rung.text);
+        announceWait(rung.text);
+        drawMenu();
+      }, rung.afterMs),
+    );
     return () => {
-      window.clearTimeout(timer);
+      for (const timer of timers) window.clearTimeout(timer);
+      announceWait('');
     };
+  }
+
+  /**
+   * Say it to a screen reader as well as to the screen.
+   *
+   * A **visually hidden** region rather than a second visible line: the words are already on the
+   * panel, and printing them twice would be two copies for a sighted reader to reconcile. The
+   * `role="status"` plus `aria-live="polite"` pair is deliberate belt and braces — some readers key
+   * off the role and some off the attribute — and *polite* rather than *assertive* because a wait
+   * is not an alert and must not interrupt whatever the player is reading.
+   *
+   * It is written **only on a band change**, which is what one-timer-per-rung buys: a region
+   * rewritten on a tick would be read out again on every tick.
+   *
+   * Nothing here animates, so there is nothing for `settings.reduceMotion` to suppress — the
+   * escalation is a change of words, which a reader who has asked for less motion still wants.
+   */
+  function announceWait(text: string): void {
+    waitLiveRegion.textContent = text;
   }
 
   /**

@@ -16717,10 +16717,16 @@ because the rule applies to a four-line reducer in `menu/` exactly as it applied
 
 ## D247 — a cold start is a correct answer that takes half a minute, and a link token is cleared before it is spent
 
-**Date: 2026-08-05 · Written with the code.** Two client-side consequences of facts measured
-elsewhere: § D243 § 4's **28.7 s** cold `GET /api/challenges` against the live app, and § D241 § 4's
-fragment-borne link token. Both are cases where the obvious implementation is wrong in a way that
-only shows up in the deployment.
+**Date: 2026-08-05 · Written with the code.** Client-side consequences of facts measured elsewhere:
+§ D243 § 4's **28.7 s** cold `GET /api/challenges`, the sharper pair behind `GET /api/wake` —
+**32.2 s** asleep against **0.13 s** warm, a 240× gap that is essentially all time-to-first-byte —
+and § D241 § 4's fragment-borne link token. Every one of them is a case where the obvious
+implementation is wrong in a way that only shows up in the deployment.
+
+The order of the answers matters and is worth stating once. **Waking on intent is the fix; the
+wording is what is left when it does not land in time.** § 5 is the first, §§ 1 and 6 are the
+second, and a reader who implements only the second has built a nicer way to wait rather than a
+shorter one.
 
 ### 1. Nothing is cancelled, because the failure it would report is a lie
 
@@ -16802,3 +16808,76 @@ fallback here would be a second answer to *how long have I got*, drifting the fi
 fifteen minutes moved. `client.test.ts` asserts the notice contains no *welcome back*, *account
 created* or *already have*: the server went to some trouble to close the oracle on the wire, and
 prose is a perfectly good place to reopen it.
+
+### 5. The wake is fired on intent, and the three things a caller may not do with it
+
+`GET /api/wake` answers from memory with **no store call**, so a 200 means *the process is running*
+and nothing else. The client half is three lines and three prohibitions, and the prohibitions are
+the part worth writing down, because each one is a thing the next person will reasonably want.
+
+**Nothing branches on the answer.** A caller that treated a failure as meaningful would have turned
+a courtesy into a dependency, and — the specific damage — a database outage would start reading as a
+server that is merely asleep. The result is discarded in one place, `wakeServer`, rather than at each
+call site where somebody would eventually be tempted by it.
+
+**Nothing waits for it.** No render awaits it, no screen shows an error for it. It is the one request
+in this file whose latency is invisible by construction.
+
+**It is not fired in a loop.** Once per entry to Account, Leaderboard or Challenge — the three
+screens that talk to a server — with a thirty-second floor so bouncing between **Back** and
+**Account** is not one request per bounce. The floor is far below any scale-to-zero window, so it
+cannot suppress a wake that was needed: a container that went to sleep did so after minutes of
+idleness.
+
+**Intent, not submit**, and the Account screen is why it pays. Typing an address takes several
+seconds; a wake fired when the screen opens is usually finished before the request that matters is
+sent. Waking on submit would be waking at the instant the wait starts, which buys nothing.
+
+**Boot is deliberately not a wake.** `serve.ts` serves everything outside `/api/` from the static
+bundle, so the same container serves the page — a page that loaded came out of a process that is
+already awake. What that also means is that a cold **first page load** is itself around half a minute
+of blank screen, before any app exists to apologise, and no in-app copy can reach it. That is
+infrastructure — serving the viewer from always-on static hosting while the API stays scale-to-zero —
+it is out of this lane, and it is recorded here so the next reader does not assume the page is warm.
+
+### 6. The wait is graded in the product's own vocabulary, and the grading is checked against the bands
+
+This is an app about waiting for lifts, and during a cold start the player is the one waiting. So the
+escalation names the band a **tenant** would be in at the same elapsed time — the four the mood bar
+already uses. It is a joke, and it is also the cheapest teaching device available: a reader learns
+what *breezy* and *checking watch* mean by being in them.
+
+**The joke only works if it is true, and the drafted copy was not.** It put *tapping foot* at 20 s
+and *taking the stairs* at 45 s. `live/bands.ts` says those bands begin at **30 s** and **120 s** —
+so the second was wrong by a factor of nearly three, and both would have taught a reader this
+product's own vocabulary incorrectly on the one surface where they are paying attention to it. The
+shipped ladder is 4 s, 10 s, 30 s, 60 s and 120 s, which are the boundaries themselves.
+
+`WAIT_LADDER` is **not derived** from `WAIT_BANDS`, and that is deliberate: it is chrome about a
+person staring at a browser, not a statistic about a run, and routing it through anything that
+publishes run figures would make it one. What it may not do is misname a band, so `main.test.ts`
+reads the rungs out of `dev/main.ts`'s source and asserts two rules — a rung may only name a band the
+elapsed time has reached, and a rung that names any band must name the one the reader is in. That
+test found a defect in itself on its first run, which is worth admitting: the ladder's own **type
+annotation** spells `afterMs`, so splitting on that token produced a phantom first rung with no
+sentence in it.
+
+Three constraints on the copy, all of them this repository's existing rules pointed at chrome:
+
+- **No progress bar and no percentage.** There is no progress to report — a container is starting and
+  will not say how far — and inventing one is the same class of defect as a figure a run does not
+  support. Asserted over every rung.
+- **The last rung stops blaming the cold start.** At two minutes, *it is just waking up* has stopped
+  being true against a 32.2 s measurement, and a reassurance that has gone stale is the failure
+  § D227 is about. So it says so, and says nothing typed is lost.
+- **The first rung is honest about the cause.** *"The server shuts down when nobody is playing, which
+  is what keeps it free to leave running"* is what is actually happening, said before the jokes.
+
+It is announced as well as shown. A **visually hidden** `role="status"` / `aria-live="polite"` region
+carries the same words — hidden by inline style, because a region hidden with `display:none` is one
+assistive technology does not read, and hidden at all because the words are already on the panel and
+two visible copies is one for a sighted reader to reconcile. One timer **per rung** rather than one
+repeating tick, so a band change is announced exactly once: a polite region rewritten every second is
+a screen reader talking over the player for half a minute. Nothing animates, so there is nothing for
+`settings.reduceMotion` to suppress — a change of words is what a reader who asked for less motion
+still wants.

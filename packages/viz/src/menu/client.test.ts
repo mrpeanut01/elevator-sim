@@ -354,6 +354,51 @@ describe('choosing a display name', () => {
 });
 
 /* -------------------------------------------------------------------------- *
+ * Waking the container before the player needs it
+ * -------------------------------------------------------------------------- */
+
+describe('the wake call', () => {
+  it('is an unauthenticated GET and carries no body', async () => {
+    const { transport, seen } = scripted({ status: 200, body: { awake: true } });
+    const result = await createClient('https://x/', transport).wake();
+    expect(result.ok).toBe(true);
+    expect(seen[0]?.method).toBe('GET');
+    expect(seen[0]?.url).toBe('https://x/api/wake');
+    // No session, because a wake is fired on screen entry and a player who is not signed in needs
+    // the container up exactly as much as one who is.
+    expect(seen[0]?.token).toBeUndefined();
+    expect(seen[0]?.body).toBeUndefined();
+  });
+
+  it('answers with a Result rather than throwing, whatever comes back', async () => {
+    /*
+     * The route answers from memory with no store call, so nothing in it can fail — but a caller
+     * fires it and discards the value, and an unhandled rejection would surface as a console error
+     * on a screen the player is looking at. Every failure shape lands as an ordinary refusal.
+     */
+    const down = scripted(() => {
+      throw new Error('ECONNREFUSED');
+    });
+    const wrong = scripted({ status: 503, body: undefined });
+    for (const { transport } of [down, wrong]) {
+      const result = await createClient('https://x', transport).wake();
+      expect(result.ok).toBe(false);
+    }
+  });
+
+  it('reads nothing out of the body, so it cannot become a health check', async () => {
+    // A 200 means *the process is running* and nothing else. A client that refused an unexpected
+    // shape would have given callers something to branch on, and a wake that can fail is a
+    // dependency — which is how a database outage starts reading as a server that is asleep.
+    const { transport } = scripted({ status: 200, body: { awake: false, database: 'down' } });
+    const result = await createClient('https://x', transport).wake();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toBeNull();
+  });
+});
+
+/* -------------------------------------------------------------------------- *
  * The cold start — half a minute is a healthy response, not a failure
  * -------------------------------------------------------------------------- */
 
