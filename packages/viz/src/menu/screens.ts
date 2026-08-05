@@ -138,6 +138,99 @@ export type MenuIntent =
   | { readonly kind: 'post-challenge' };
 
 /* -------------------------------------------------------------------------- *
+ * Choosing an option — the transport, and the one line that broke three screens
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The intent a control dispatches **once the player has chosen** — {@link MenuAffordance.intent}
+ * rewritten to carry the option they picked instead of the one already showing.
+ *
+ * ## Why an affordance's own intent is not the one to dispatch
+ *
+ * A `select` is built before anybody picks anything, so its intent has to be built out of the value
+ * the row is *currently* showing — that is what puts the right option in the box. Dispatching that
+ * same intent on `change` therefore writes back the value that was already there: **a no-op by
+ * construction**, and a control the player can move that changes nothing.
+ *
+ * `dev/menuPanel.ts` did that rewrite itself, in one expression, for exactly two of the six intents
+ * that carry a chosen value:
+ *
+ * ```ts
+ * row.intent.kind === 'set-free-play' || row.intent.kind === 'set-setting'
+ *   ? { ...row.intent, value }
+ *   : row.intent
+ * ```
+ *
+ * The other four were dispatched unrewritten. That is GitHub issue #44 (the Calendar dropdown
+ * "reverts to An ordinary week" — measured: `''` before the pick and `''` after it), issue #42
+ * (**every** Commissioning dropdown inert — measured: `main — shafts` at 2, picked 1, back at 2),
+ * and it was latent on `set-challenge` and `set-constraint` besides. Nothing downstream of the
+ * transport was broken: `state.calendar` reaches `shiftRunConfigOf`, `calendarDayFor` and
+ * `calendarPatch`, and the shell's arm calls `runShift()`. **One line in the middle of a live chain
+ * is not a dead seam — it is a live chain with a rewrite missing from it.**
+ *
+ * ## Why this is a function here rather than an expression there
+ *
+ * Two reasons, and the second is the load-bearing one.
+ *
+ * It is a **decision** — *where does the chosen value go on this intent* — and a decision written
+ * inside a render call needs a document and a click to reach, which is § D214 § 2's founding
+ * argument for this whole directory and the reason `menu.ts` and this file are separate from the
+ * panel at all.
+ *
+ * And it is **exhaustive over {@link MenuIntent}**, which the expression it replaces could not be. A
+ * seventh intent carrying a chosen value cannot be added without an arm here, because the switch has
+ * no `default` and this function returns a `MenuIntent`: `noImplicitReturns` refuses it. The
+ * expression's `: row.intent` fallback was a silent default over the same union, which is why four
+ * members could join it without anything noticing.
+ *
+ * The pass-through list below is still hand-written, and that is the shape of list this repository
+ * keeps finding stale — so it is not what the tests trust. `menu/screens.test.ts` derives every
+ * `select`, `toggle` and `text` row from `screenOf` over the whole graph and requires that choosing
+ * a *different* option produces a *different* intent. A new row filed into the pass-through arm
+ * fails there, on the screen it was added to.
+ */
+export function withChosenValue(intent: MenuIntent, value: string): MenuIntent {
+  switch (intent.kind) {
+    case 'set-free-play':
+      return { ...intent, value };
+    case 'set-setting':
+      return { ...intent, value };
+    case 'set-challenge':
+      return { ...intent, value };
+    case 'set-commissioning':
+      return { ...intent, value };
+    // The two whose value field is named after what it is rather than `value`. Spelled out rather
+    // than reached through a shared key, because `periodId` and `constraintId` are the ids of two
+    // different vocabularies and a generic `value` would have made them look interchangeable.
+    case 'set-calendar':
+      return { ...intent, periodId: value };
+    case 'set-constraint':
+      return { ...intent, constraintId: value };
+    /*
+     * Everything a button presses. None of these is built from a value a player picks, so the
+     * chosen string has nowhere to go and the intent travels as it was authored — a `navigate` that
+     * quietly acquired the label of whatever row was beside it would be worse than an inert one.
+     */
+    case 'navigate':
+    case 'back':
+    case 'reopen':
+    case 'start':
+    case 'open-campaign':
+    case 'start-endless':
+    case 'open-board':
+    case 'account-form':
+    case 'account-submit':
+    case 'account-mode':
+    case 'sign-out':
+    case 'submit-score':
+    case 'run-challenge':
+    case 'post-challenge':
+      return intent;
+  }
+}
+
+/* -------------------------------------------------------------------------- *
  * Affordances
  * -------------------------------------------------------------------------- */
 

@@ -484,6 +484,18 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'asserts its wording directly — the count, the total, every id, and the file to look in.',
       ids: ['dev/elementMap.ts#ELEMENT_IDS', 'dev/elementMap.ts#MissingElementsError'],
     },
+    {
+      reason:
+        'Moves a string the player chose from one field of a `MenuIntent` to another, and authors ' +
+        'none of its own. **The id/key case a third time**: every literal in it is a `case` tag of ' +
+        'a discriminated union — `set-free-play`, `set-commissioning` — which the two-adjacent-' +
+        'words scanner reads as a phrase because the tags are hyphenated. Nothing it returns is ' +
+        'shown; what it returns is an intent, whose *value* is an option id `menu/screens.ts#screenOf` ' +
+        'produced and the `MENU` adapter already sweeps, and whose effect on the screen arrives ' +
+        'through `applyIntent` — driven, and covered there. Putting it in an adapter instead would ' +
+        'have been a coverage claim for prose that does not exist.',
+      ids: ['menu/screens.ts#withChosenValue'],
+    },
   ]);
 
 const excludedIds = new Set(NOT_PLAYER_FACING.flatMap((group) => group.ids));

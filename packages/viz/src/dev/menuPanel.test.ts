@@ -65,11 +65,15 @@ import { describe, expect, it } from 'vitest';
 
 import { loadConfig } from '@elevator-sim/core';
 
+import { asBuiltChoices, shaftChoices, speedChoices } from '../commissioning/choices.js';
+import { reviewCommissioning } from '../commissioning/refusals.js';
+import { CONSTRAINTS, commissionableClasses, constraintById } from '../commissioning/types.js';
 import { SIGNED_OUT } from '../menu/account.js';
 import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
 import { initialMenuState } from '../menu/menu.js';
-import type { MenuIntent } from '../menu/screens.js';
+import type { CommissioningScreenInput, MenuIntent } from '../menu/screens.js';
 import type { MenuCatalogue, MenuState } from '../menu/types.js';
+import { RESOURCES } from '../scope/probes.test-helper.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 
 import { renderMenu, type MenuPanelHost } from './menuPanel.js';
@@ -169,7 +173,11 @@ async function catalogue(): Promise<MenuCatalogue> {
  * are the arms where the interesting refusals live, which is `playthrough/walk.test.ts`'s own
  * argument for driving the unhappy states rather than the happy one.
  */
-function render(state: MenuState, loaded: MenuCatalogue): { readonly root: Recorded; readonly asked: MenuIntent[] } {
+function render(
+  state: MenuState,
+  loaded: MenuCatalogue,
+  overrides: Partial<MenuPanelHost> = {},
+): { readonly root: Recorded; readonly asked: MenuIntent[] } {
   const { doc, root } = recorder();
   const asked: MenuIntent[] = [];
   const host: MenuPanelHost = {
@@ -184,6 +192,7 @@ function render(state: MenuState, loaded: MenuCatalogue): { readonly root: Recor
     challenge: () => undefined,
     commissioning: () => undefined,
     calendarPeriodId: () => '',
+    ...overrides,
   };
   renderMenu(root as unknown as HTMLElement, host);
   return { root, asked };
@@ -199,6 +208,47 @@ const wholeFreePlay = (loaded: MenuCatalogue): MenuState => ({
   ...initialMenuState(loaded),
   screen: 'free-play',
 });
+
+/**
+ * The fabric screen's input, from the shipped `midtown-office` under `new-build`.
+ *
+ * `MenuPanelHost.commissioning` is allowed to be `undefined` and every case above leaves it so, in
+ * which case the screen draws its *no building loaded* fallback: one navigate row, no selects, and
+ * nothing for issue #42 to be about. That optionality is how the newest screen came to have no
+ * document-tier coverage at all.
+ */
+const COMMISSIONING: CommissioningScreenInput = (() => {
+  const building = RESOURCES.buildings.find((entry) => entry.id === 'midtown-office')?.config;
+  if (building === undefined) throw new Error('midtown-office is not loaded');
+  const classes = commissionableClasses(RESOURCES.elevatorSpecs);
+  const choices = asBuiltChoices(building, classes);
+  const constraint = constraintById('new-build') ?? CONSTRAINTS[0];
+  if (constraint === undefined) throw new Error('no constraints ship');
+  return {
+    buildingName: building.name,
+    constraintId: constraint.id,
+    choices,
+    review: reviewCommissioning({
+      base: building,
+      choices,
+      classes,
+      specs: RESOURCES.elevatorSpecs,
+      constraint,
+    }),
+    optionsFor: (bankId) => {
+      const choice = choices.find((entry) => entry.bankId === bankId);
+      const machineClass = classes.find((entry) => entry.id === choice?.machineClassId);
+      return {
+        shafts: shaftChoices(choice?.shafts ?? 1).map((n) => ({ id: String(n), name: String(n) })),
+        machineClass: classes.map((entry) => ({ id: entry.id, name: entry.name })),
+        ratedSpeed: speedChoices(machineClass).map((speed) => ({
+          id: String(speed),
+          name: `${speed.toFixed(2)} m/s`,
+        })),
+      };
+    },
+  };
+})();
 
 /* -------------------------------------------------------------------------- *
  * Issue #20's second half
@@ -335,6 +385,102 @@ describe('the how-to-play entry reaches the page', () => {
     const loaded = await catalogue();
     const elsewhere = render({ ...initialMenuState(loaded), screen: 'settings' }, loaded);
     expect(walk(elsewhere.root).some((node) => node.tag === 'details')).toBe(false);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The transport — GitHub issues #44 and #42
+ * -------------------------------------------------------------------------- */
+
+/** Every `<select>` the panel drew, in the order it drew them. */
+const selectsIn = (root: Recorded): readonly Recorded[] =>
+  walk(root).filter((node) => node.tag === 'select');
+
+/** Choose an option the way a browser does: set the value, then fire the change. */
+function choose(select: Recorded, value: string): void {
+  select.value = value;
+  select.listeners.get('change')?.();
+}
+
+describe('a select dispatches an intent about the option that was chosen', () => {
+  /**
+   * The tier that would have caught it, and the reason the two below it did not.
+   *
+   * `playthrough/walk.test.ts` presses every option of every select — and it builds the intent it
+   * presses with the *same* condition the panel used, so it skipped the four intents that were
+   * broken and asserted nothing about them. A model walk that reproduces the transport cannot
+   * measure it. Here the panel builds the element, the element's own listener runs, and what the
+   * host receives is read back — so the rewrite is observed rather than restated.
+   */
+  it('carries the calendar period the player picked — issue #44', async () => {
+    const loaded = await catalogue();
+    const { root, asked } = render({ ...initialMenuState(loaded), screen: 'campaign' }, loaded);
+
+    const select = selectsIn(root)[0];
+    expect(select, 'the Scenarios screen renders no Calendar select').toBeDefined();
+    const options = (select?.children ?? []).map((child) => child.attrs.get('value') ?? '');
+    const wanted = options.find((value) => value !== '');
+    expect(wanted, 'the Calendar offers nothing but an ordinary week').toBeDefined();
+
+    choose(select as Recorded, wanted ?? '');
+    expect(
+      asked,
+      'the Calendar dispatched an intent naming the period that was already on. Measured in a ' +
+        'browser before the fix: the select read "" before choosing Vacation week and "" after it.',
+    ).toEqual([{ kind: 'set-calendar', periodId: wanted }]);
+  });
+
+  it('carries every fabric dimension the player picked — issue #42', async () => {
+    const loaded = await catalogue();
+    const { root, asked } = render(
+      { ...initialMenuState(loaded), screen: 'commissioning' },
+      loaded,
+      { commissioning: () => COMMISSIONING },
+    );
+
+    const selects = selectsIn(root);
+    expect(selects.length, 'the fabric screen renders no selects').toBeGreaterThan(1);
+
+    const picked: string[] = [];
+    for (const select of selects) {
+      const options = select.children.map((child) => child.attrs.get('value') ?? '');
+      const showing = select.children.find((child) => child.attrs.has('selected'))?.attrs.get('value');
+      const wanted = options.find((value) => value !== showing);
+      if (wanted === undefined) continue;
+      picked.push(wanted);
+      choose(select, wanted);
+    }
+
+    expect(picked.length, 'every fabric select offered only the value already built').toBeGreaterThan(1);
+    expect(asked.length, 'a dimension was chosen and nothing was dispatched').toBe(picked.length);
+    for (const [index, intent] of asked.entries()) {
+      /*
+       * The chosen string has to be **on** the intent. Read structurally rather than through a table
+       * of *which field this kind puts its value in*: such a table would be a second copy of
+       * `withChosenValue`'s own, so a wrong entry would be wrong in both and the check would agree
+       * with the defect it exists to find.
+       */
+      expect(
+        Object.values(intent).some((field) => field === picked[index]),
+        `${intent.kind} reached the host without "${picked[index] ?? ''}" on it — the player chose ` +
+          'one option and the menu asked for the one already showing',
+      ).toBe(true);
+    }
+    // The `Under` row is the constraint, and it was one of the four the old ternary dropped.
+    expect(asked.map((intent) => intent.kind)).toContain('set-constraint');
+    expect(asked.map((intent) => intent.kind)).toContain('set-commissioning');
+  });
+
+  it('still carries the two the old rewrite already handled', async () => {
+    // The control case. If this fails alongside the two above, the fault is not in the rewrite.
+    const loaded = await catalogue();
+    const { root, asked } = render(wholeFreePlay(loaded), loaded);
+    const select = selectsIn(root)[0];
+    const options = (select?.children ?? []).map((child) => child.attrs.get('value') ?? '');
+    const showing = (select?.children ?? []).find((child) => child.attrs.has('selected'))?.attrs.get('value');
+    const wanted = options.find((value) => value !== showing);
+    choose(select as Recorded, wanted ?? '');
+    expect(asked).toEqual([{ kind: 'set-free-play', field: 'buildingId', value: wanted }]);
   });
 });
 

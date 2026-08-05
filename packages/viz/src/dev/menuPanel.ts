@@ -26,6 +26,7 @@ import type { BoardPage } from '../menu/client.js';
 
 import {
   screenOf,
+  withChosenValue,
   type ChallengeScreenInput,
   type CommissioningScreenInput,
   type MenuAffordance,
@@ -153,16 +154,20 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
 /**
  * Turn one {@link MenuAffordance} into an element.
  *
- * The `select` and `toggle` arms rebuild their intent from the chosen option — which is why
- * {@link MenuIntent} `set-free-play` and `set-setting` carry a **field and a value** rather than a
- * prepared patch. A prepared patch would have been the answer to a question nobody had asked yet,
+ * The `select`, `toggle` and `text` arms rebuild their intent from what the player chose — which is
+ * why {@link MenuIntent} `set-free-play` and `set-setting` carry a **field and a value** rather than
+ * a prepared patch. A prepared patch would have been the answer to a question nobody had asked yet,
  * since the affordance is built before anybody picks anything.
+ *
+ * **The rewrite is `menu/screens.ts#withChosenValue` and is not written here.** It used to be, as a
+ * ternary naming two of the six intents that carry a chosen value, and the other four therefore
+ * dispatched the value that was already showing — issues #44 and #42, and latent on `set-challenge`
+ * and `set-constraint`. A conditional over a union with a fallback arm is a silent default; that
+ * function is an exhaustive switch, so the seventh such intent cannot be added without an arm. See
+ * its docstring for the whole of the argument.
  */
 function affordance(doc: Document, host: MenuPanelHost, row: MenuAffordance): HTMLElement {
-  const withValue = (value: string): MenuIntent =>
-    row.intent.kind === 'set-free-play' || row.intent.kind === 'set-setting'
-      ? { ...row.intent, value }
-      : row.intent;
+  const withValue = (value: string): MenuIntent => withChosenValue(row.intent, value);
 
   if (row.kind === 'select') {
     return selectRow(doc, row.label, row.value ?? '', row.options ?? [], (id) => {
