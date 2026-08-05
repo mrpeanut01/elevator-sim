@@ -18,6 +18,11 @@
  *    lines are present under `week-day` and *absent as keys* under `single-run` — because either
  *    half alone proves nothing: a suite that only checked the absences would pass against a sheet
  *    that had lost those lines everywhere.
+ * 6. **It may not say two things about one day.** Issue #53: the headline branched on
+ *    `summary.saturated` and the banner on the goal readings, so a run that missed a bar without
+ *    saturating got *"A day it could handle"* over *"Shift missed"*. The suite that pins this is
+ *    *one judgement, four sentences*, and its central test holds the run fixed and moves only the
+ *    goals — which is the assertion the old code fails and copy that merely lines up would pass.
  */
 
 import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
@@ -54,7 +59,7 @@ import {
   type WeekDayReport,
 } from './report.js';
 import { closeDay, openEndless, openWeek, outcomeOf } from './week.js';
-import { DAY_START_S, WEEKDAYS, type Observations } from './types.js';
+import { DAY_START_S, WEEKDAYS, type Observations, type ShiftGoal } from './types.js';
 import { readGoals } from './goals.js';
 
 /**
@@ -84,6 +89,18 @@ const SELECTION = {
 let config: LoadedConfig;
 let clean: VizRecording;
 let saturated: VizRecording;
+/**
+ * The run issue #53 was reported on, in the shape that produces it.
+ *
+ * Chancery House at 22 %pop/5min for thirty minutes files `saturated: false` and
+ * `awtIsValid: true` — no refusal anywhere on the sheet — and still stacks a landing 43 deep
+ * against day 4's bar of 26. It is the state the old code could not describe: not saturated, so the
+ * headline took its healthy branch; a goal missed, so the banner said the shift was not cleared.
+ *
+ * A **real shipped configuration** rather than a hand-built summary, for the reason the saturation
+ * fixture is one: the interesting failure is a run the simulator actually produces.
+ */
+let missedWithoutSaturating: VizRecording;
 
 function runOf(buildingId: string, arrivalRatePctPop5min: number, durationS: number): VizRecording {
   const base: SimulationConfig = fixtureConfig(config, {
@@ -138,7 +155,8 @@ beforeAll(async () => {
   config = await loadConfig(DATA_DIR);
   clean = runOf('garden-apartments', 12, 900);
   saturated = runOf('midtown-office', 25, 900);
-}, 120_000);
+  missedWithoutSaturating = runOf('chancery-house', 22, 1800);
+}, 180_000);
 
 describe('the premises this suite rests on', () => {
   it('has one run whose mean is publishable and one whose is not', () => {
@@ -424,16 +442,49 @@ describe('where it went wrong is derived from the run', () => {
     expect(phaseRow?.what).toContain('no demand schedule');
   });
 
-  it('names the reporting window the cohort figures were computed over', () => {
-    const report = reportOf(clean);
-    const windowRow = report.diagnosis.find((row) => row.id === 'report-window');
-    expect(windowRow?.what).toContain(clean.summary.reportWindow.id);
-    expect(windowRow?.what).toContain(clockOf(clean.summary.reportWindow.startS));
+  it('names the reporting window in the small print, and not as an incident — issue #56', () => {
+    /*
+     * The row was word-for-word identical on a flawless day and a collapsed one, only the timestamps
+     * moved, and nothing happened at the clock time it carried. Both halves are asserted: it is gone
+     * from the timeline, and it is *still said*, because the scope of every cohort figure is not
+     * optional information. Moving a caveat out of sight would be the R3 failure this sheet is about.
+     */
+    for (const recording of [clean, saturated, missedWithoutSaturating]) {
+      const report = reportOf(recording);
+      expect(report.diagnosis.map((row) => row.id)).not.toContain('report-window');
+      expect(report.smallPrint).toContain(recording.summary.reportWindow.id);
+      expect(report.smallPrint).toContain(clockOf(recording.summary.reportWindow.startS));
+      expect(report.smallPrint).toContain('during the busiest five minutes');
+    }
   });
 
-  it('always files three rows, whatever the run did', () => {
-    expect(reportOf(clean).diagnosis).toHaveLength(3);
-    expect(reportOf(saturated).diagnosis).toHaveLength(3);
+  it('files only rows that are events, on every run', () => {
+    // Two, and both of them a moment: where the deepest queue stood, and the phase it stood in.
+    for (const recording of [clean, saturated, missedWithoutSaturating]) {
+      expect(reportOf(recording).diagnosis.map((row) => row.id)).toEqual([
+        'peak-queue',
+        'peak-phase',
+      ]);
+    }
+  });
+
+  it('flags nothing on a day the sheet says nothing went wrong — issue #56', () => {
+    /*
+     * `diagnosisRowsOf` in the panel draws a row's left rule from its tone, so an unconditional
+     * `bad` painted a nine-deep landing on a cleared day in the same red as an 892-deep one on a
+     * collapsed day. The tone follows the verdict, which is the value the banner and the heading
+     * come from — so the section cannot flag a fault on a sheet that says there was none.
+     */
+    const cleared = reportOf(clean);
+    expect(cleared.verdict).toBe('cleared');
+    expect(cleared.diagnosisHeading).toBe('The tightest moment');
+    expect(cleared.diagnosisHeading.toLowerCase()).not.toContain('wrong');
+    for (const row of cleared.diagnosis) expect(row.tone, row.id).toBe('plain');
+
+    const missed = reportOf(missedWithoutSaturating);
+    expect(missed.verdict).toBe('missed');
+    expect(missed.diagnosisHeading).toBe('Where it went wrong');
+    expect(missed.diagnosis.some((row) => row.tone === 'bad')).toBe(true);
   });
 });
 
@@ -504,14 +555,21 @@ describe('the rest of the sheet', () => {
     expect(report.streakLine).toContain('nothing here is a game over');
   });
 
-  it('carries the four levers, verbatim', () => {
+  it('carries the four levers verbatim on a day that points at none of them', () => {
+    // The handoff's own four, in the handoff's own order, with the handoff's own sentences. That is
+    // what a run with nothing to point at gets, and it is the control the run-derived cases below
+    // are measured against.
     const report = reportOf(clean);
+    expect(report.verdict).toBe('cleared');
     expect(report.levers.map((lever) => lever.title)).toEqual([
       'Add a car',
       'Zone the tower',
       'Weight fairness up',
       'Ask where they’re going',
     ]);
+    for (const lever of report.levers) {
+      expect(lever.body, lever.id).not.toContain('Today points here');
+    }
   });
 
   it('forecasts tomorrow’s event and the growth it really applies', () => {
@@ -598,6 +656,271 @@ describe('the rest of the sheet', () => {
     expect(report.contractLine).toContain('Endless');
     expect(report.contractLine).toContain('nothing is banked');
     expect(report.contractLine).not.toContain('Your own building');
+  });
+});
+
+describe('one judgement, four sentences — issue #53', () => {
+  /*
+   * ## What was reported
+   *
+   * > **A day it could handle.** 3108 journeys of 3217 offered, and 88% of riders away inside a
+   * > minute.
+   * >
+   * > THE SHIFT ASKED FOR — **Shift missed** — "Streak reset."
+   *
+   * ## What was actually happening
+   *
+   * Two independent tests of one question. `verdict` was *every goal met*; the lede branched on
+   * `summary.saturated` and on nothing else. Those agree only by luck, and they disagree on any run
+   * that misses a bar without the queues diverging — which the reporter's Vertical City run was,
+   * and which `missedWithoutSaturating` is here.
+   *
+   * ## Why the tests below are shaped the way they are
+   *
+   * The fix that would pass a weak suite is copy that happens to line up today. So the central test
+   * holds the recording, the observations, the week and the contract **completely fixed** and moves
+   * only the goals: the headline must move with the verdict, because the headline is looked up
+   * *under* the verdict. Under the old code that test fails — same run, same lede, opposite banner.
+   */
+  /** A bar nothing can miss and a bar nothing can meet, on the same reading. */
+  function barrier(bar: number, compare: 'at-least' | 'at-most'): readonly ShiftGoal[] {
+    return [
+      {
+        id: 'carry',
+        label: `Carry ${String(bar)}% of the people who turn up`,
+        unit: '%',
+        bar,
+        compare,
+        reads: 'carryPct',
+      },
+    ];
+  }
+
+  const ALWAYS_MET = barrier(0, 'at-least');
+  const NEVER_MET = barrier(101, 'at-least');
+
+  function sheetWith(recording: VizRecording, goals: readonly ShiftGoal[]): WeekDayReport {
+    return weekDay(
+      dayReportOf({
+        recording,
+        observations: observationsOfRun(recording),
+        goals,
+        week: { ...openWeek('c2'), day: 4, dayIdx: 3, streak: 2 },
+        contract: contractById('c2'),
+        event: SHIFT_EVENTS.ordinary,
+        subject: { kind: 'week-day' },
+      }),
+    );
+  }
+
+  /** Up to the first sentence break — the words a reader takes in before anything else. */
+  const headlineOf = (report: WeekDayReport): string => report.lede.split('. ')[0] ?? report.lede;
+
+  it('the premise: a run can miss a bar without saturating, and the shipped set has one', () => {
+    // Stated rather than assumed. If `core`'s saturation detector moves, this fails as a premise
+    // rather than leaving the suite below quietly asserting against the saturated branch.
+    const summary = missedWithoutSaturating.summary;
+    expect(summary.saturated).toBe(false);
+    expect(summary.awtIsValid).toBe(true);
+    const report = reportOf(missedWithoutSaturating);
+    expect(report.verdict).toBe('missed');
+    expect(report.goals.some((reading) => reading.state === 'missed')).toBe(true);
+  });
+
+  it('cannot congratulate a day the banner says was missed — the reported defect', () => {
+    const report = reportOf(missedWithoutSaturating);
+    expect(report.verdictLine).toBe('Shift missed');
+    // The exact sentence that shipped over "Shift missed". It is the cleared branch's, and the
+    // cleared branch is now unreachable from a missed verdict.
+    expect(report.lede).not.toContain('A day it could handle');
+    // The headline the run gets is the missed arm's, whichever bar it was that went unmet.
+    expect(headlineOf(report)).toBe(
+      headlineOf(sheetWith(missedWithoutSaturating, NEVER_MET)),
+    );
+    expect(report.diagnosisHeading).toBe('Where it went wrong');
+  });
+
+  it('moves the headline when the verdict moves, on one unchanged run', () => {
+    /*
+     * The assertion the old code fails. Everything about the day is identical — the same recording,
+     * the same folded observations, the same week — and only what was *asked* of it differs. A
+     * headline computed from the run alone cannot notice; a headline looked up under the verdict
+     * cannot fail to.
+     */
+    for (const recording of [clean, saturated, missedWithoutSaturating]) {
+      const met = sheetWith(recording, ALWAYS_MET);
+      const missed = sheetWith(recording, NEVER_MET);
+      expect(met.verdict, recording.buildingName).toBe('cleared');
+      expect(missed.verdict, recording.buildingName).toBe('missed');
+      expect(met.figures, 'the run itself did not change').toEqual(missed.figures);
+      expect(missed.lede, recording.buildingName).not.toBe(met.lede);
+      expect(missed.lede).not.toContain(headlineOf(met));
+      expect(met.lede).not.toContain(headlineOf(missed));
+    }
+  });
+
+  it('keeps every sentence about the day on the same side of the verdict', () => {
+    /*
+     * The general form, swept over both verdicts × both saturation states × three real runs. The
+     * property is **disjointness**: no sentence the sheet uses to say a day cleared may ever appear
+     * on a sheet that says it did not, and vice versa. A single shared string is the defect.
+     */
+    const said: Record<'cleared' | 'missed', Set<string>> = { cleared: new Set(), missed: new Set() };
+    for (const recording of [clean, saturated, missedWithoutSaturating]) {
+      for (const goals of [ALWAYS_MET, NEVER_MET, goalsForDay(4), goalsForDay(12)]) {
+        const report = sheetWith(recording, goals);
+        expect(report.verdictLine).toBe(
+          report.verdict === 'cleared' ? 'Shift cleared' : 'Shift missed',
+        );
+        for (const sentence of [
+          headlineOf(report),
+          report.verdictLine,
+          report.diagnosisHeading,
+          report.streakLine,
+        ]) {
+          said[report.verdict].add(sentence);
+        }
+      }
+    }
+    // Both halves were reached, so the disjointness below is not vacuous.
+    expect(said.cleared.size).toBeGreaterThan(0);
+    expect(said.missed.size).toBeGreaterThan(0);
+    for (const sentence of said.cleared) {
+      expect(said.missed.has(sentence), `"${sentence}" is said on both verdicts`).toBe(false);
+    }
+  });
+
+  it('says the day did not cope, and that the goals were met, when both are true', () => {
+    // Saturation did not stop mattering; it moved inside the arm. A saturated day that met every
+    // bar **is** cleared, and the headline says both rather than picking one.
+    const report = sheetWith(saturated, ALWAYS_MET);
+    expect(report.verdict).toBe('cleared');
+    expect(report.lede).toContain('Every goal met');
+    expect(report.lede).toContain('never settled');
+    // It points at the cell that refused rather than restating a figure the run withholds.
+    expect(report.lede).toContain('withheld');
+    expect(report.lede).not.toContain(saturated.summary.meanWaitS.toFixed(1));
+  });
+
+  it('names the bars that went unmet rather than only that some did', () => {
+    const report = reportOf(missedWithoutSaturating);
+    const unmet = report.goals.filter((reading) => reading.state === 'missed');
+    expect(unmet.length).toBeGreaterThan(0);
+    for (const reading of unmet) expect(report.lede).toContain(reading.goal.label);
+    for (const reading of report.goals.filter((r) => r.state === 'met')) {
+      expect(report.lede, reading.goal.label).not.toContain(`“${reading.goal.label}”`);
+    }
+  });
+
+  it('does not claim a goal was missed on a day nothing was graded at all', () => {
+    /*
+     * Under `WAKE_UP_ARRIVALS` legs every reading is `pending`, and `week.ts` counts unjudged as not
+     * passed — so the verdict is `missed` with nothing to have missed. Saying which bars went unmet
+     * would be false; saying nothing would be `docs/10` R3's blank. It says why.
+     */
+    const quiet: Observations = { ...observationsOfRun(clean), arrived: 4, carried: 4 };
+    const report = weekDay(
+      dayReportOf({
+        recording: clean,
+        observations: quiet,
+        goals: goalsForDay(4),
+        week: openWeek('c2'),
+        contract: contractById('c2'),
+        event: SHIFT_EVENTS.ordinary,
+        subject: { kind: 'week-day' },
+      }),
+    );
+    expect(report.goals.every((reading) => reading.state === 'pending')).toBe(true);
+    expect(report.verdict).toBe('missed');
+    expect(report.lede).toContain('Too quiet to grade');
+    expect(report.lede).toContain('no goal was met and none was missed');
+    expect(report.lede).not.toContain('A day it could handle');
+  });
+
+  it('resets the streak from the same verdict the banner prints', () => {
+    expect(sheetWith(clean, NEVER_MET).streakLine).toContain('Streak reset');
+    expect(sheetWith(clean, ALWAYS_MET).streakLine).not.toContain('Streak reset');
+  });
+});
+
+describe('the levers point at what this run showed — issue #55', () => {
+  /*
+   * The section is captioned as advice for *this* day and shipped as a frozen constant: four cards,
+   * same order, same words, on a flawless day and on one where 74 people took the stairs. It sits
+   * directly under a diagnosis that interpolates real values, so it reads as a diagnosis, and a
+   * player who acts on it once and then notices it never moves stops trusting the section.
+   *
+   * The line these tests hold: a card may name **what today showed**, never what the lever is worth.
+   * One replication cannot support the second, which is CLAUDE.md's first statistical rule and the
+   * small print's own sentence.
+   */
+  function leverBody(report: ShapedDayReport, id: string): string {
+    const found = report.levers.find((lever) => lever.id === id);
+    if (found === undefined) throw new Error(`no lever "${id}" on the sheet`);
+    return found.body;
+  }
+
+  it('reorders and annotates on a day that was outrun, and leaves the glossary alone otherwise', () => {
+    const outrun = reportOf(saturated);
+    const quiet = reportOf(clean);
+    expect(outrun.levers.map((lever) => lever.id)).not.toEqual(
+      quiet.levers.map((lever) => lever.id),
+    );
+    // The lever a day the building was outrun points at leads, and says why in the run's own counts.
+    expect(outrun.levers[0]?.id).toBe('add-a-car');
+    expect(leverBody(outrun, 'add-a-car')).toContain('Today points here');
+    expect(leverBody(outrun, 'add-a-car')).toContain('backlog was still growing');
+  });
+
+  it('quotes counts, and never a figure the run refuses', () => {
+    /*
+     * Every pointer is a count or a ratio of counts. None of the three quantities `awtIsValid`
+     * speaks for may reach a card — a lever that appeared on a suppressed mean, or quoted one,
+     * would be that mean published through the back door (`docs/10` R9).
+     */
+    const { summary } = saturated;
+    expect(summary.awtIsValid).toBe(false);
+    const refused = [summary.meanWaitS, summary.wait95S, summary.meanTimeToDestinationS];
+    for (const lever of reportOf(saturated).levers) {
+      for (const value of refused) {
+        for (const places of [0, 1, 2]) {
+          expect(lever.body, lever.id).not.toContain(value.toFixed(places));
+        }
+      }
+    }
+  });
+
+  it('names the landing the queue stood on, on a day one landing carried it', () => {
+    const report = reportOf(missedWithoutSaturating);
+    const observations = observationsOfRun(missedWithoutSaturating);
+    expect(observations.peakQueueFloorId).not.toBeNull();
+    const body = leverBody(report, 'zone-the-tower');
+    expect(body).toContain(`floor ${String(observations.peakQueueFloorId)}`);
+    expect(body).toContain(String(observations.peakQueue));
+    // The handoff's own sentence survives underneath the clause this run added.
+    expect(body).toContain('Split the floors between cars during the peak only');
+  });
+
+  it('drops the lever the run has already pulled', () => {
+    // `passengerModel` is `core`'s answer, computed from the resolved dispatch stage. A run already
+    // on destination dispatch is not offered destination dispatch.
+    const already: VizRecording = { ...clean, passengerModel: 'destination-dispatch' };
+    const report = reportOf(already);
+    expect(report.levers.map((lever) => lever.id)).not.toContain('ask-destination');
+    expect(reportOf(clean).levers.map((lever) => lever.id)).toContain('ask-destination');
+  });
+
+  it('claims nothing about what a lever buys, on any run', () => {
+    for (const recording of [clean, saturated, missedWithoutSaturating]) {
+      const report = reportOf(recording);
+      for (const lever of report.levers) {
+        // R2's own words. A card may say what happened; it may not order two settings.
+        expect(lever.body, lever.id).not.toMatch(/\bbetter than\b|\bbeats?\b|\boutperform/i);
+      }
+      // And the refusal is published under the cards rather than left to the reader.
+      expect(report.smallPrint).toContain('ordered by what today showed');
+      expect(report.smallPrint).toContain('needs the paired runs');
+    }
   });
 });
 

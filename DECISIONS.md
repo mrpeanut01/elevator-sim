@@ -14896,6 +14896,213 @@ lane's report. It also means the grid has **two sources of truth for one set of 
 static head and the JS-built rows — which is the underlying defect and wants the head built from the
 same constants.
 
+## D237 — one judgement, four sentences: the report may not say two things about one day
+
+**Date: 2026-08-05 · Written after the code, and says so.** Play-tester issues #53, #56 and #55, all
+three reproduced against real shipped configurations before anything was changed.
+
+### What was reported
+
+> **A day it could handle.** 3108 journeys of 3217 offered, and 88% of riders away inside a minute.
+>
+> THE SHIFT ASKED FOR — **Shift missed** — *"Streak reset."*
+
+One screen, two answers to *how did today go?* — § D223's defect in words rather than in numbers.
+Two neighbouring sections were reported in the same pass: **WHERE IT WENT WRONG** fires on a shift
+where nothing did, and one of its three rows is a methodology footnote rather than an event; and
+**LEVERS YOU ACTUALLY HAVE** is byte-identical on a flawless day and a collapsed one.
+
+### Reproduced, and the mechanism is simpler than the report
+
+`chancery-house` at 22 %pop/5min for thirty minutes files `saturated: false`, `awtIsValid: true` —
+no refusal anywhere on the sheet — and stacks a landing 43 deep against day 4's bar of 26. It prints
+*"A day it could handle. 440 journeys of 440 offered, and 80% of riders away inside a minute"* over
+**Shift missed**. At 30 %pop/5min the same building prints the same praise over a 41 % minute share
+and two missed bars.
+
+There is no copy bug. `dayReportOf` tested one question twice: `verdict` was *every goal met*, read
+from `readGoals`; `ledeFor` branched on `summary.saturated` **and nothing else**. Those agree only by
+luck, and they disagree on every run that misses a bar without the queues diverging. The reported
+Vertical City run was one; so is every Crown Hotel run at 16 %pop/5min.
+
+### The rule, and why it is a lookup rather than two functions that agree
+
+**Every sentence that states how the day went is looked up under the verdict.** `judgementOf` returns
+the verdict, the banner line, the headline and the diagnosis heading together, through
+`VERDICT_VOICE` — a `Record<'cleared' | 'missed', …>`. There is now no expression in the module that
+produces the cleared headline without having first decided the day cleared, so the disagreement is
+unconstructible rather than merely fixed. The streak line takes the same verdict instead of a second
+`allMet` boolean.
+
+Fixing the copy so the two happen to line up was the other option and is the weaker one: it passes a
+suite that pins strings and fails the day somebody adds a third state. The test that decides this
+holds the recording, the observations, the week and the contract **completely fixed** and moves only
+the goals — the headline must move with the verdict, because it is reached through it. That
+assertion fails against the old code on all three fixture runs.
+
+Saturation did not stop mattering; it moved **inside** each arm, where it is a clause rather than a
+verdict. A saturated day that met every bar is cleared, and its headline says both — and points at
+the cell that refused rather than restating the figure, with no word from `ESTIMATE_CUES` near a
+numeral, because `honesty/properties.ts#checkSuppressedMean` reads that string.
+
+### The two neighbours, which are the same defect one section over
+
+**A section that fires unconditionally says nothing.** *Where it went wrong* is authored in
+`index.html` as a fixed `<h3>`, so a player who had just scored 100 % on every goal was told
+immediately, under a green banner, where their day went wrong — and learns that the heading means
+nothing on the day it would have mattered. The heading is now the fourth string out of the
+judgement (*The tightest moment* when the shift cleared), and the panel writes it. The diagnosis
+rows' **tones** follow the same verdict: a nine-deep landing on a cleared day was drawn in the same
+red as an 892-deep one, and `diagnosisRowsOf`'s own comment already said why that is wrong — *"a row
+with nothing to flag gets the ordinary edge, not a colour that implies a verdict"*.
+
+**The third row was never an event.** *"Every cohort figure above is the peak-5min window"* carried a
+clock time, sat in a timeline and was styled exactly like the two incidents above it, and is
+word-for-word identical on every run. It is genuinely load-bearing, so it moved rather than went:
+`smallPrintFor` now carries it, beside the other statement about what one day may be read to mean.
+The numeral in it stays a **word** for the reason it always was — the honesty search caught the
+sentence printing `25` under a cell reading `AVERAGE WAIT: withheld` on a run whose refused mean
+rounds to 25.
+
+**Four fixed cards are a glossary, not advice.** `LEVERS` was a frozen constant, and the section is
+captioned as advice for *this* day directly under a diagnosis that interpolates real values — so it
+reads as a diagnosis, and a player who acts on it once and then notices it never moves stops
+trusting the section. `leversFor` now matches each card against an **observation**: capacity against
+`saturated`, `unservedCount` and `abandoned`; concentration against **today's own** queue bar where
+the day set one; the forgotten-floor shape against a worst wait past the threshold the WORST WAIT
+cell is already coloured by, on a day whose minute goal was met; and the lobby card against
+`VizFloor.isEntrance` at the deepest queue. A card the run points at leads and opens with the
+observation that pointed there; a card it does not keeps the handoff's sentence exactly. *Ask where
+they're going* is **dropped** when `recording.passengerModel` is already `destination-dispatch` — a
+lever you have pulled is not a lever you have.
+
+**The line none of that crosses.** A clause says *what this day showed*, never *what the lever will
+buy*. Ordering four pieces of advice by which observation fired is not a performance claim, and one
+replication could not support one; the small print now says so under the cards, in the same breath
+as the refusal it belongs to. No pointer reads `meanWaitS`, `wait95S` or `meanTimeToDestinationS` —
+a card that appeared or disappeared on a suppressed figure would be that figure published through
+the back door (`docs/10` R9), and the suite asserts no printed form of any of the three reaches a
+card on the saturated fixture.
+
+### Two magic numbers became one constant each, and one docstring was wrong
+
+`120` was written twice (the WORST WAIT tone, and now the fairness pointer) and `24` twice (the
+DEEPEST QUEUE tone, and the queue pointer where a day sets no queue bar). Both are named. And the
+module docstring said `awtIsValid` *"already has four grounds"*: `core`'s
+`AWT_INVALID_GROUND_SPECS` has had **five** since riders could leave, and the sheet's own gate was
+never wrong — only its description of it. Corrected in both files that repeated it.
+
+### What this did not close
+
+`index.html` authors both section headings as unaddressed siblings of `#report-diagnosis` and
+`#report-levers`, so `headingOf` climbs one element to reach them — the same reach `cardOf` already
+makes for *Tomorrow* and *What this taught*, and for the same reason. **The fix is an id on each
+heading**, in a file this lane did not own. It degrades safely: a markup change that moves the
+`<h3>` leaves the words `index.html` authored rather than throwing inside a render loop.
+
+`honesty/surfaces.ts` does not seed `diagnosisHeading`, and it seeds the diagnosis rows by index, so
+the heading is outside the honesty corpus. That is a hole of exactly the shape § D223 left and
+§ D186 corrected, and it is one `seeds.push` in a file this lane did not own.
+
+## D238 — a delta is two sheets side by side, and it is not a result
+
+**Date: 2026-08-05 · Written after the code.** Play-tester issues #38 and #62, which are the same
+surface at two scales: the report cannot show you what changed, and it will not even show you the
+top of what it has.
+
+### What was reported
+
+Clicking a dispatcher in the right rail re-simulates the whole shift on the same seed instantly,
+which is the game loop working. The second Day report is then a fresh sheet with no reference to the
+first. The reporter swapped `collective` for `capacity-aware` on one seed and had **288 fewer riders
+take the stairs** and made the unluckiest rider **642 s worse** — the exact tradeoff the product
+exists to teach — and had to screenshot both sheets and diff them by hand. The only string on the
+page referring to the earlier run is the grey `attempt 2 at this day`. Meanwhile the rail's *best day
+so far* moved 18 % → 20 %, so the single lesson the app volunteered was *capacity-aware is simply
+better*, which is the one thing it most wants not to teach.
+
+Separately: the report auto-opens when a run plays out, at the offset the reader left the *previous*
+sheet at — two thirds down, on the lever cards, with the verdict, the eight stat tiles and the goal
+list above the fold and nothing indicating they were there. Because `runId` is
+`building-profile-seed`, a re-run of one selection is bit-identical (§ D223), so the visible region
+genuinely is the same between runs and it reads as a sheet that failed to update.
+
+### The rule
+
+**A delta may state what the two sheets printed. It may not order them.** *Took the stairs: 483, was
+771* is not an inferential claim about dispatchers; it is a statement about two runs that already
+happened, of exactly the kind every other number on the sheet is. R2 forbids the **verdict**, and the
+block never renders one: no direction, no colour, no sum, no ordering word. Its note carries the
+refusal in the same visual unit as the rows, and *Take it to Compare* already sits under the small
+print.
+
+**Every value in the block is a string one of the two sheets already published.** There is no
+subtraction anywhere in it, which is not squeamishness about arithmetic — it is what makes R3 hold
+for free. A suppressed cell pairs as the literal word: `withheld → 58.3 s` is the shift layer's own
+refusal, copied, rather than a hole where a difference could not be taken. It also keeps
+`dev/reportPanel.ts`'s standing property true — *a renderer that cannot compute a mean cannot compute
+one wrongly* — which `reportPanel.test.ts` asserts by scanning the source.
+
+**And it names what was run, not only what came out.** The trap this block could set is worse than
+the silence it replaces: six numbers moving, with no word about the seed, invites a reader to credit
+the one thing they touched. So the identity rows pair the building and dispatcher, the seed and span,
+and which day the sheet is of, and a reader can see whether the two runs were even asked the same
+question.
+
+**When nothing moved it says so.** An unchanged selection reproduces bit-identically, so the block
+that would otherwise be empty is where *"the report did not update"* finally gets answered — the
+§ D223 finding, said to a player rather than filed in a decision log.
+
+### Where the earlier sheet comes from, and why that is the right relation
+
+`ViewerState` carries no history and `dev/state.ts` is not this lane's file, so `mountReport` holds
+the previous filed sheet in its own closure. That is not only a constraint: continuity of the
+**drawn** sheet is the relation the issue is about — the earlier run in the delta is the one the
+reader actually read. It is lost on reload, which is honest, because so is their memory of it.
+
+Two things about the rotation were got wrong first and are pinned at the source:
+
+1. It happens **before** the view is built. Rotating after would make every sheet its own predecessor
+   on the next frame — `renderAll` runs sixty times a second — and every delta would read *nothing
+   moved* one frame after appearing.
+2. Only a **filed** identity moves it. Pressing *Run this shift* clears the report, so an unfiled
+   sheet stands between every pair of filed ones; rotating on that hands the next delta an
+   `undefined` predecessor and loses the run the reader just read.
+
+The delta is `null` on both sheets that are not an account of a played-out run. § D223's rule is that
+a sheet reporting a whole day waits for the whole day, and a delta is made of that sheet's figures,
+so it waits too.
+
+### The scroll, and the one clause that makes it work
+
+`sheetIdentityOf` is the same signal: a new filed sheet is owed its own top. The identity is the
+sheet's **words** — title plus meta block — and not `runId`, because `runId` is unchanged by exactly
+the retry the reader is trying to compare; the meta block carries `attempt 2 at this selection`,
+which is what separates them.
+
+The write is deferred until the panel is actually on screen. `index.html` hides a tabpanel with
+`display: none`, where `scrollTop` is not writable, and `main.ts`'s `closeShift` files the sheet and
+moves the tab in one patch — so a write at the instant the identity changed lands on an element with
+no layout and is dropped. The debt is cleared on the **write**, not on the change, so a reader who
+scrolls this sheet keeps their place until a different one arrives.
+
+### What this did not close
+
+`index.html` has no slot for the delta, so the block is built in the panel and inserted after the
+lede — the idiom the *Take it to Compare* box already uses, and for the same reason: the markup is
+the handoff's, and the handoff drew one sheet at a time. A lane that owns `index.html` should give it
+an id and a stylesheet rule.
+
+`honesty/surfaces.ts` does not seed the delta's strings, so the one block on this sheet that names
+two runs at once is outside the honesty corpus — the same hole § D223 named for the running sheet's
+lede, and the one most worth closing next, because a comparison surface is what
+`checkSingleRunComparative` exists for. It is one `seeds.push` group in a file this lane did not own.
+
+The cards in *Levers you actually have* still are not clickable: *"the Building tab will let you feel
+how much it buys"* names a tab and does not take you there (issue #55's closing note). That needs a
+navigation seam in `dev/main.ts`.
+
+
 ## D239 — the mood card was reading the one instant whose answer is always calm
 
 ### The report, and what it turned out to be
