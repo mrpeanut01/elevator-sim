@@ -218,16 +218,18 @@ export interface CallLifecycle {
 /**
  * Why a car may not take a call. Hard filters, never costs.
  *
- * The first seven mirror {@link InfeasibilityReason} and come straight from
- * `Car.estimateCost()`: service mode, service zoning, access zoning and the load cell are the
- * car's own answers and the dispatcher does not second-guess them. The rest are the group
- * controller's own, and each maps to exactly one declared tunable — which is what keeps them
- * filters rather than opinions.
+ * The first six mirror {@link InfeasibilityReason} and come straight from
+ * `Car.estimateCost()`: service mode, service zoning, access zoning on the destination and the
+ * load cell are the car's own answers and the dispatcher does not second-guess them. The rest
+ * are the group controller's own, and each maps to exactly one declared tunable — which is what
+ * keeps them filters rather than opinions.
+ *
+ * There is no `accessDenied` here for the reason `INFEASIBILITY_REASONS` gives: access zoning
+ * is a question about the destination, and `destinationAccessDenied` is its name (§ D254).
  */
 export const INELIGIBILITY_REASONS = [
   'serviceMode',
   'serviceZone',
-  'accessDenied',
   'destinationServiceZone',
   'destinationAccessDenied',
   'overload',

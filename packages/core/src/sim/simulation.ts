@@ -256,7 +256,6 @@ interface ActiveCall {
  */
 const STRUCTURAL_INELIGIBILITY: ReadonlySet<string> = new Set([
   'serviceZone',
-  'accessDenied',
   'destinationServiceZone',
   'destinationAccessDenied',
 ]);
@@ -1920,20 +1919,25 @@ export class Simulation {
   /**
    * Note that a landing cannot be collected as things stand, and stop asking on a timer.
    *
-   * The overwhelmingly common cause is an **access-restricted pickup floor under
-   * `up-down-buttons`**. `Car.estimateCost` applies access zoning to the floor named in the
-   * request, and a conventional landing call carries no credential by construction, so every
-   * car in the bank reports `accessDenied` and the call is unassignable. On Secure Tower that
-   * is every down and interfloor trip from floors 2–30; the same shape appears on Mixed-Use
-   * High-Rise and Vertical City.
+   * **This docstring used to describe an access-restricted *pickup* floor as the overwhelmingly
+   * common cause, and it was describing a defect it had mistaken for a design.** `estimateCost`
+   * applied access zoning to the floor named in the request; under `up-down-buttons` a landing
+   * call carries no credential by construction, so every car refused every landing call raised
+   * on a restricted floor and no access-zoned building could be operated by any conventional
+   * dispatcher at any budget. That is fixed — the credential question is asked about the
+   * destination and not about the pickup (§ D254) — so the cause named here no longer exists,
+   * and the sentence is kept as a correction rather than deleted, because the claim it made is
+   * repeated across this repository and a reader who meets it elsewhere needs to find its
+   * refutation.
+   *
+   * What remains reachable is the genuine article: a `destinationServiceZone` or
+   * `destinationAccessDenied` refusal — a disclosed destination this bank does not serve, or one
+   * the disclosed credential may not reach. `#kioskAllows` is the shipped instance.
    *
    * The runner does not paper over it. The passengers stay on the landing, are counted in
    * {@link SimulationResult.undelivered}, the run is reported `timed-out`, and a warning names
    * the call — because a quietly-shortened run of a system that cannot serve a tenth of its
-   * traffic is exactly the "confident nonsense" CLAUDE.md exists to prevent. A credential-aware
-   * profile (`dispatch.callType: 'mobile-credential'`) serves these landings, which is the
-   * documented advantage of moving authorization earlier rather than an accident of this
-   * module.
+   * traffic is exactly the "confident nonsense" CLAUDE.md exists to prevent.
    *
    * The warning is emitted at the end rather than here, and only for calls that were still
    * stuck when the run finished: a landing can be freed by a car that stopped for some other
@@ -3191,11 +3195,18 @@ export class Simulation {
    * the policy is *allowed* to use it is `dispatch.callType`'s decision, not the runner's:
    * `costRequestFor` forwards it only under `mobile-credential` and drops it under
    * `up-down-buttons`, so a conventional run cannot accidentally benefit from information the
-   * passenger never gave it. Supplying it here is what lets a credential-aware profile serve an
-   * access-controlled building at all — which conventional dispatch measurably cannot, at any
-   * budget, because a landing call carries no credential and every car answers `accessDenied`.
+   * passenger never gave it.
    *
-   * **That is a claim about authorization, and it is the only one the measurements support.** This
+   * **This paragraph used to end by saying conventional dispatch cannot serve an
+   * access-controlled building at any budget, because every car answers `accessDenied`. That was
+   * true of the code and false of the world, and § D254 removed the cause.** The credential was
+   * being checked against the *pickup* floor, which is not a question a lift is asked; with it
+   * asked about the destination instead, `collective` delivers 725 of 725 on
+   * `mixed-use-high-rise` where it previously delivered 642. What the credential still buys is
+   * real and much smaller — see § D256 for the measured figure — and it is no longer the
+   * difference between operable and inoperable.
+   *
+   * **The surviving claim is about authorization, and it is the only one the measurements support.** This
    * docstring used to say the credential makes access control *cheaper* because authorization and
    * optimization happen in the same step; measured at n = 150 per building under CRN, the
    * destination's contribution to optimization is **smaller** on the access-controlled building

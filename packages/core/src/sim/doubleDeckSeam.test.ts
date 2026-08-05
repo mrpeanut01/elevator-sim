@@ -208,11 +208,20 @@ describe('a stop at a floor pair serves both floors, and a run can see it', () =
         sample.carId.startsWith(`${bankId}-`),
       ).length;
 
-    /** Shuttle moves, `[paired, single]`, measured at {@link SEED} on the shipped configuration. */
+    /**
+     * Shuttle moves, `[paired, single]`, measured at {@link SEED} on the shipped configuration.
+     *
+     * **Re-measured for § D254**, which is the change that let this building be served at all:
+     * `vertical-city` declares access zones over floors 53–75 and 78–100, and access zoning was
+     * being applied to a hall call's *pickup* floor, so every conventional arm was refusing
+     * landings raised inside those zones. All three arms now deliver 1 976 of 1 976 where they
+     * previously delivered 1 759–1 855, so the shuttle is carrying more people and driving more
+     * moves on both sides of the comparison. The counts below are that run.
+     */
     const CENSUS: Readonly<Record<string, readonly [number, number]>> = {
-      'nearest-car': [199, 226],
-      eta: [245, 245],
-      collective: [259, 294],
+      'nearest-car': [251, 261],
+      eta: [273, 296],
+      collective: [301, 303],
     };
 
     let saved = 0;
@@ -228,9 +237,20 @@ describe('a stop at a floor pair serves both floors, and a run can see it', () =
       expect(single.stageActivity.doubleDeckPairedStops, profileId).toBe(0);
     }
 
-    // Pinned rather than asserted as a rule: two of the three shipped dispatchers save moves here
-    // and one draws. If a change makes this three, that is a result and it should be read as one.
-    expect(saved).toBe(2);
+    // Pinned rather than asserted as a rule. This said *two* of the three shipped dispatchers save
+    // moves and one draws, and added: "if a change makes this three, that is a result and it should
+    // be read as one."
+    //
+    // **A change made it three, and this is that reading.** The draw was `eta` at 245/245, measured
+    // on a run in which the shuttle was starved: § D254's pickup-floor access check meant
+    // `vertical-city` never delivered more than 1 855 of its 1 976 journeys under any conventional
+    // arm, and a bank with too little to do has too little to save. Served properly, `eta` saves 23
+    // moves (273 against 296) and every shipped dispatcher is now better off paired than single.
+    //
+    // It is still pinned rather than promoted to a rule. Three of three is a stronger result than
+    // two of three, and it is exactly the kind of result that would be worth nothing if the count
+    // were allowed to drift.
+    expect(saved).toBe(3);
   }, 300_000);
 
   it('leaves every building without a double-deck car untouched, byte for byte', async () => {

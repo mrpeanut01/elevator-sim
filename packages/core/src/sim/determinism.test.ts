@@ -216,22 +216,35 @@ describe('common random numbers survive a change of dispatcher', () => {
     }
   }, 120_000);
 
+  /**
+   * **The pair here used to be `eta` against itself at `mobile-credential`, and § D254 made that
+   * pair identical.** The old comment read: *"one of these delivers everybody and the other cannot
+   * collect half the building"* — which was true only because access zoning was being applied to
+   * the hall call's pickup floor, so a conventional landing call (which carries no credential by
+   * construction) was refused everywhere inside a zone. With the credential question asked about
+   * the destination instead, the two runs are byte-identical on `secure-tower`: `eta` weights
+   * `rideTime` at 0, so a disclosed destination changes no score, and there is nothing else left
+   * for the credential to change. That identity is asserted directly, as a finding, in
+   * `simulation.test.ts`.
+   *
+   * So the "behaves completely differently" half needs a pair that genuinely does. Two shipped
+   * dispatchers on the same building and seed is the honest version of the same claim, and it is
+   * the one this `describe` is actually about: the trace is a function of the seed alone.
+   */
   it('gives the identical population to a profile that behaves completely differently', () => {
-    const profile = config.dispatcherProfilesById.get('eta');
-    expect(profile).toBeDefined();
-    if (profile === undefined) return;
+    const patient = runSimulation(run('secure-tower', 'collective', 11));
+    const greedy = runSimulation(run('secure-tower', 'nearest-car', 11));
 
-    const conventional = runSimulation(run('secure-tower', 'eta', 11));
-    const credentialed = runSimulation(
-      run('secure-tower', 'eta', 11, {
-        dispatcherProfile: withCallType(profile, 'mobile-credential'),
-      }),
-    );
-
-    // One of these delivers everybody and the other cannot collect half the building, so their
-    // event sequences share almost nothing. The passengers are still the same passengers.
-    expect(traceFingerprint(credentialed)).toBe(traceFingerprint(conventional));
-    expect(fingerprint(credentialed)).not.toBe(fingerprint(conventional));
+    // Same people, same arrival times, same destinations.
+    expect(traceFingerprint(greedy)).toBe(traceFingerprint(patient));
+    // And genuinely different runs, so the identity above is not vacuous. `nearest-car` is the
+    // weakest shipped dispatcher and `collective` sweeps; on this building they are 111.99 s and
+    // 31.11 s of mean wait for the very same passengers.
+    expect(fingerprint(greedy)).not.toBe(fingerprint(patient));
+    expect(greedy.summary.waiting.meanS).not.toBe(patient.summary.waiting.meanS);
+    // Both serve the whole building, which is the half that was never true before § D254.
+    expect(patient.undelivered).toEqual([]);
+    expect(greedy.undelivered).toEqual([]);
   }, 60_000);
 
   it('leaves the input streams exactly where trace generation left them', () => {

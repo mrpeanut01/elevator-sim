@@ -633,13 +633,26 @@ describe('the drain deadline is a reported failure, never a silent truncation', 
     expect(cut?.message).toMatch(/drain deadline \(t=600s = end of demand \+ sim\.drainGraceS\)/);
     expect(cut?.message).toMatch(/raise sim\.drainGraceS/);
 
-    // Secure Tower under `up-down-buttons` stops for a completely different reason: the queue
-    // runs dry with people still on access-restricted landings, thousands of seconds before the
-    // deadline. Advising a longer drain tail there sends its owner to a knob that had nothing
-    // to do with it — the exact misdirection this diagnosis exists to prevent.
+    // Secure Tower stops for a completely different reason: the queue runs dry with people still
+    // on landings the system will not serve, thousands of seconds before the deadline. Advising a
+    // longer drain tail there sends its owner to a knob that had nothing to do with it — the exact
+    // misdirection this diagnosis exists to prevent.
+    //
+    // **The case used to be bare `up-down-buttons`, and that was the § D254 defect.** Every
+    // landing call on a zoned floor was refused because the *pickup* was restricted, which is not
+    // a question a lift asks; that arm now delivers 420 of 420. The live case is a bare
+    // `destination-entry` kiosk, which is the genuine article: the kiosk has nothing to identify
+    // anybody with, so the group is asked "may an unbadged passenger reach floor 27?" and answers
+    // `destinationAccessDenied` for every car. Same diagnosis, real access control behind it.
+    const profile = config.dispatcherProfilesById.get('eta');
+    expect(profile).toBeDefined();
+    if (profile === undefined) return;
     let dry: SimulationError | undefined;
     try {
-      runSimulation(baseConfig('secure-tower', 'eta', { seed: 11 }));
+      runSimulation({
+        ...baseConfig('secure-tower', 'eta', { seed: 11 }),
+        dispatcherProfile: withCallType(profile, 'destination-entry'),
+      });
     } catch (error) {
       dry = error instanceof SimulationError ? error : undefined;
     }
@@ -898,30 +911,101 @@ describe('a call the car it was given to will not answer', () => {
  * Structural infeasibility is diagnosed, not retried
  * -------------------------------------------------------------------------- */
 
-describe('a landing no car may collect', () => {
+/**
+ * **This block used to assert the defect § D254 removed, and it is the reason the defect
+ * survived four phases.** It read: Secure Tower under `eta` is `timed-out` with passengers
+ * stranded, every car answering `accessDenied`, and the failure "cured" by a credential. Every
+ * one of those assertions passed, and all of them were describing a simulator that refused to
+ * collect people from the floor they were standing on.
+ *
+ * What replaces it is the opposite claim, asserted on the legs rather than on a window
+ * statistic: an access-zoned building under bare up/down buttons delivers everybody.
+ */
+describe('an access-zoned building is serviceable by a conventional dispatcher', () => {
+  /** Every shipped building that declares a non-empty `accessZones`, with its conventional arms. */
+  const ZONED: readonly (readonly [string, string, number, number])[] = [
+    ['secure-tower', 'eta', 11, 420],
+    ['secure-tower', 'collective', 424242, 473],
+    ['mixed-use-high-rise', 'collective', 424242, 725],
+    ['mixed-use-high-rise', 'nearest-car', 424242, 725],
+    ['vertical-city', 'eta', 424242, 1976],
+  ];
+
+  it.each(ZONED)(
+    '%s under %s at seed %d delivers all %d legs on bare up/down buttons',
+    (buildingId, profileId, seed, expected) => {
+      const result = runSimulation(
+        baseConfig(buildingId, profileId, { seed, onTimeout: 'report' }),
+      );
+
+      // The legs, not the wait. A window statistic can be flattered by the passengers a
+      // dispatcher never collected; `undelivered` cannot.
+      expect(result.undelivered).toEqual([]);
+      expect(result.conservation.delivered).toBe(expected);
+      expect(result.conservation.delivered).toBe(result.conservation.generated);
+      expect(result.conservation.balanced).toBe(true);
+      expect(result.status).toBe('completed');
+
+      // And nothing was refused as structurally unservable, which is the mechanism rather than
+      // the symptom.
+      expect(result.warnings.filter((warning) => /never collected/.test(warning))).toEqual([]);
+    },
+    120_000,
+  );
+
   /**
-   * Secure Tower puts every floor above the lobby in an access zone. A conventional landing
-   * call carries no credential — `costRequestFor` drops it under `up-down-buttons` — so
-   * `Car.estimateCost` reports `accessDenied` for every car in the bank and the call can never
-   * be allocated. The loop must say so rather than retrying it for the rest of the run, and the
-   * passengers must be reported rather than lost.
+   * The counterpart, and the assertion a careless fix breaks: the credential model is intact.
+   *
+   * A bare `destination-entry` kiosk has nothing to identify anybody with, so it asks *"may an
+   * unbadged passenger reach floor 27?"* and every car answers `destinationAccessDenied`. That
+   * refusal is real access control and must survive — it is the one thing on this building that
+   * a credential genuinely buys, and it is now the only live producer of a structural refusal.
    */
-  it('names the call, keeps the passengers, and reports the run as failed', () => {
-    const result = runSimulation(
-      baseConfig('secure-tower', 'eta', { seed: 11, onTimeout: 'report' }),
-    );
+  it('still refuses an unauthorised destination, and still says so', () => {
+    const profile = config.dispatcherProfilesById.get('eta');
+    expect(profile).toBeDefined();
+    if (profile === undefined) return;
 
-    expect(result.status).toBe('timed-out');
-    expect(result.conservation.balanced).toBe(true);
-    expect(result.undelivered.length).toBeGreaterThan(0);
-    expect(result.undelivered.every((journey) => journey.reason === 'waiting')).toBe(true);
+    const bareKiosk = runSimulation({
+      ...baseConfig('secure-tower', 'eta', { seed: 11, onTimeout: 'report' }),
+      dispatcherProfile: withCallType(profile, 'destination-entry'),
+    });
 
-    const diagnosed = result.warnings.filter((warning) => warning.includes('accessDenied'));
-    expect(diagnosed.length).toBeGreaterThan(0);
-    expect(diagnosed[0]).toMatch(/never collected/);
+    // Nobody's badge reached the kiosk, so the zoned floors are refused rather than served.
+    expect(bareKiosk.stageActivity.kioskRefusedLegs).toBeGreaterThan(0);
+    expect(bareKiosk.undelivered.length).toBeGreaterThan(0);
+    expect(bareKiosk.conservation.balanced).toBe(true);
+    // The refusal is reported as access control, not as slowness.
+    expect(
+      bareKiosk.warnings.some((warning) => warning.includes('refused by the destination kiosk')),
+      'the run does not name the kiosk refusal',
+    ).toBe(true);
+
+    // And the same building, same seed, same trace, with a credential on the call: everybody
+    // travels. So the refusal is a property of what the call discloses, not of the fabric — which
+    // is the claim the pickup check was destroying by refusing both arms' landings equally.
+    const credentialled = runSimulation({
+      ...baseConfig('secure-tower', 'eta', { seed: 11, onTimeout: 'report' }),
+      dispatcherProfile: withCallType(profile, 'mobile-credential'),
+    });
+    expect(credentialled.stageActivity.kioskRefusedLegs).toBe(0);
+    expect(credentialled.undelivered).toEqual([]);
   }, 60_000);
 
-  it('is cured by moving authorization to call time — a config change and nothing else', () => {
+  /**
+   * **The measured size of what the credential now buys, and it is nothing at all.**
+   *
+   * Before § D254 this comparison was the difference between 420 of 420 delivered and a
+   * timed-out run; the repository built H-ACCESS-1 on it and stated in seven places that
+   * conventional dispatch cannot serve an access-controlled building at any budget. With the
+   * pickup check gone the two runs are *identical* — same status, same legs, same wait to the
+   * last significant figure — because `eta` weights `rideTime` at 0, so a disclosed destination
+   * changes no score, and the credential now has nothing left to authorize that the runner was
+   * not already authorizing per passenger.
+   *
+   * Asserted rather than narrated, because it is the finding that withdrew a published result.
+   */
+  it('is not changed at all by moving authorization to call time, under a profile that cannot price a destination', () => {
     const profile = config.dispatcherProfilesById.get('eta');
     expect(profile).toBeDefined();
     if (profile === undefined) return;
@@ -934,13 +1018,16 @@ describe('a landing no car may collect', () => {
       dispatcherProfile: withCallType(profile, 'mobile-credential'),
     });
 
-    // Identical passengers — the trace is a function of the seed alone — so this is a paired
-    // comparison of two dispatchers, not of two buildings.
     expect(credentialed.trace.passengerCount).toBe(conventional.trace.passengerCount);
-    expect(credentialed.status).toBe('completed');
+    expect(credentialed.status).toBe(conventional.status);
+    expect(credentialed.conservation.delivered).toBe(conventional.conservation.delivered);
+    expect(credentialed.summary.waiting.meanS).toBe(conventional.summary.waiting.meanS);
+    expect(credentialed.summary.timeToDestination.meanS).toBe(
+      conventional.summary.timeToDestination.meanS,
+    );
+    // Both serve the whole building, which is the half of H-ACCESS-1 that was never true.
+    expect(conventional.undelivered).toEqual([]);
     expect(credentialed.undelivered).toEqual([]);
-    expect(credentialed.conservation.delivered).toBe(credentialed.conservation.generated);
-    expect(credentialed.summary.waiting.meanS).toBeLessThan(conventional.summary.waiting.meanS);
   }, 60_000);
 });
 

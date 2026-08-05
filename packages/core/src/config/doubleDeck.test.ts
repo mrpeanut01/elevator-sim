@@ -152,16 +152,36 @@ describe('double-deck operation is simulated, and counted on the building that d
       // The dwell projection and the boarding loop must agree per deck, for the same reason
       // `lateArrivalHoldsProjected` is compared with `lateArrivalHoldsBoarded`: a stop sized for
       // a cohort it does not take is a stop of the wrong length, and dwell dominates the round
-      // trip. They need not be *equal* — the projection is taken when the doors are commanded
-      // open and a passenger may reach the landing during the dwell — so this bounds the
-      // disagreement rather than forbidding it. Measured at 700 vs 701 and 339 vs 338.
+      // trip.
+      //
+      // **This was a flat 5 % on the absolute difference, and § D254 broke it honestly.** The
+      // bound was calibrated on 700 vs 701 and 339 vs 338 — near-exact agreement, measured on a
+      // `vertical-city` that was barely being served: access zoning was applied to the hall
+      // call's *pickup* floor, so the shuttle's landings inside floors 53–75 and 78–100 were
+      // refused and its queues never grew. Served properly the lower deck now **fills**, 72 times
+      // at this seed, and the projection reads 839 against 794 boarded — 5.67 %.
+      //
+      // So the bound is re-pointed at the mechanism instead of widened past it, and the result is
+      // stricter in the case that matters. Two claims:
+      //
+      // 1. The projection may never be **short** of the cohort that boarded by more than 5 %. That
+      //    is the direction nothing legitimate produces and the one that under-sizes a stop.
+      // 2. Any **overshoot** must be accounted for by a deck that filled. `doubleDeckDeckFullRefusals`
+      //    counts boarding loops stopped by the per-deck 80 % rule, so it is an upper bound on the
+      //    passengers a correct projection could have counted and the loop then declined to take.
+      //    With no refusals at all this collapses to `projected <= boarded`, which is tighter than
+      //    the 5 % it replaces.
       for (const slot of [0, 1] as const) {
         const projected = activity.doubleDeckBoardingsProjected[slot];
         const boarded = activity.doubleDeckBoardings[slot];
+        const where = `${id}: deck ${slot} was sized for ${projected} boarders and took ${boarded}`;
+        expect((boarded - projected) / Math.max(1, boarded), `${where} — under-sized`).toBeLessThan(
+          0.05,
+        );
         expect(
-          Math.abs(projected - boarded) / Math.max(1, boarded),
-          `${id}: deck ${slot} was sized for ${projected} boarders and took ${boarded}`,
-        ).toBeLessThan(0.05);
+          projected - boarded,
+          `${where}, and only ${activity.doubleDeckDeckFullRefusals} boarding loops were stopped by a full deck`,
+        ).toBeLessThanOrEqual(activity.doubleDeckDeckFullRefusals);
       }
     }
   }, 180_000);
