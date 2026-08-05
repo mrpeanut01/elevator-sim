@@ -224,6 +224,28 @@ export function createApi(deps: ApiDeps): Api {
   return async function handle(request: ApiRequest): Promise<ApiResponse> {
     const route = `${request.method} ${request.path}`;
     switch (route) {
+      /*
+       * The wake call, and the cheapest thing this server can answer.
+       *
+       * The app runs at `minReplicas: 0`, which is what makes it free to leave running. The cost is
+       * a cold start, and it is not small: measured against the deployment, a request to a sleeping
+       * container took **32.2 s** against **0.13 s** warm — a 240× gap, all of it time-to-first-byte,
+       * so it is the container starting rather than anything on the wire.
+       *
+       * A player does not have to *wait* for that if the wake begins when they show intent rather
+       * than when they submit. Opening the account or leaderboard screen fires this; typing an
+       * email takes longer than nothing, so the container is usually up by the time it matters.
+       *
+       * Deliberately **no store call**. A wake that touched PostgreSQL would make the pool's own
+       * first connection part of the thing being waited on, and would let a database outage read as
+       * a server that is merely asleep. This answers from memory, so a 200 means exactly *the
+       * process is running* — which is the whole of what a caller is asking.
+       *
+       * It is not a health check and must not grow into one: nothing here may fail, or callers will
+       * start branching on it and the wake will have become a dependency.
+       */
+      case 'GET /api/wake':
+        return { status: 200, body: { awake: true } };
       case 'POST /api/auth/request-link':
         return requestLink(deps, request, { perEmail: linksPerEmail, perCaller: linksPerCaller });
       case 'POST /api/auth/redeem':

@@ -700,3 +700,36 @@ describe('the bootstrap refuses two configurations', () => {
     await server.close();
   }, 120_000);
 });
+
+/* -------------------------------------------------------------------------- *
+ * The wake call
+ * -------------------------------------------------------------------------- */
+
+describe('GET /api/wake', () => {
+  /*
+   * The whole point of this route is that it costs nothing, so the tests are about what it does
+   * *not* do. It exists because the app runs at `minReplicas: 0` and a sleeping container answered
+   * in 32.2 s against 0.13 s warm — a wake fired on intent turns that into a background wait.
+   */
+  it('answers without touching the store', async () => {
+    const response = await call('GET', '/api/wake');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ awake: true });
+  });
+
+  it('needs no session, and is not a health check', async () => {
+    // No token, and no arm that can fail: a caller that could branch on this would have made the
+    // wake a dependency, and a database outage would then read as a server that is merely asleep.
+    const anonymous = await call('GET', '/api/wake');
+    const withToken = await call('GET', '/api/wake', { token: 'not-a-real-session' });
+    expect(anonymous.status).toBe(200);
+    expect(withToken.status).toBe(200);
+  });
+
+  it('is not rate limited, because a wake that refuses has defeated itself', async () => {
+    const caller = '203.0.113.77';
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      expect((await call('GET', '/api/wake', { ip: caller })).status).toBe(200);
+    }
+  });
+});
