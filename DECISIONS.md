@@ -16896,8 +16896,7 @@ that this change leaves byte-identical. Phase 6c's NOT ACCEPTED verdict is untou
 
 ### The consequence for `packages/viz`, which this lane may not edit but measured anyway
 
-The viz suite fails on this branch — **at least 24 tests across 13 files**, counted from a run that
-had not finished when this was written, so treat that as a floor and not a total. They fall into two
+The viz suite fails on this branch — **27 tests across 13 files, out of 2 493**. They fall into two
 kinds. Neither is a defect in the viewer, and both are handed over rather than fixed here.
 
 **All but two are a stale *fixture*.** `live/honesty`, `mode/disclosure`, `dev/leftRail`,
