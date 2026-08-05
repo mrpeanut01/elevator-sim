@@ -2220,7 +2220,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       ui.transport.speedChips,
       ...SPEEDS.map((speed) => {
         const label = `×${String(speed)}`;
-        const title = `${String(speed)} simulated seconds per real second`;
+        // `1 simulated seconds` was already on the tooltip; promoting the same sentence to the
+        // accessible name would have put the disagreement in a second place rather than fixing it.
+        const unit = speed === 1 ? 'second' : 'seconds';
+        const title = `${String(speed)} simulated ${unit} per real second`;
         const node = chip(document, {
           label,
           // Against `baseSpeed`, not `playback.speed` — the player's own multiplier is applied on

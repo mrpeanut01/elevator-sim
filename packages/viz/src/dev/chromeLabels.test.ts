@@ -426,10 +426,13 @@ describe('the speed row reads as a speed row without a hover', () => {
     expect(start, 'main.ts no longer builds the speed chips from SPEEDS').toBeGreaterThan(-1);
     const block = source.slice(start, source.indexOf('const recording = view.recording', start));
     expect(block).toContain('const label = `×${String(speed)}`');
-    expect(block).toContain('const title = `${String(speed)} simulated seconds per real second`');
+    expect(block).toContain('const title = `${String(speed)} simulated ${unit} per real second`');
     expect(block).toContain("node.setAttribute('aria-label', `${label} — ${title}`)");
     // The tooltip is still passed to the chip: the name is an addition, not a replacement.
     expect(block).toMatch(/\btitle,/);
+    // …and the ×1 chip says "second". The plural was wrong on the tooltip before this, which is
+    // the kind of thing promoting a sentence to a second channel doubles rather than reveals.
+    expect(block).toContain("speed === 1 ? 'second' : 'seconds'");
   });
 
   it('covers the whole ladder, so no chip is left unnamed', () => {
