@@ -653,6 +653,80 @@ placeholder rows waiting for exactly this. **Every scenario below carries an id*
 `PB-…`, `ED-…`); copy the id into the test matrix so a scenario and its test can be traced to
 each other in both directions.
 
+## 27. The main menu — `MU-`, `FP-`, `LB-`, `AC-`
+
+**Added 2026-08-04 ([§ D217](../../DECISIONS.md)).** The menu, Free Play, the leaderboard and the
+account screens shipped in § D214 and were in **no ledger section at all** — 220 rows over 24
+surfaces, and none of them covered the screen a player now meets first.
+
+**Marks discipline for this whole section, amended 2026-08-05.** There *is* a browser now
+([§ D220](../../DECISIONS.md)), and **`BT-01` is the first `✅ run` mark in this file**. It is also
+the only one, and that is the point rather than a gap: the tier is deliberately one assertion wide.
+Everything else here stays `⚠️ mount`, because § D220 § 2's *document* tier — the rung that closes
+wiring claims — is not built. A mark may not become `✅ run` by being adjacent to one that is
+([`docs/16`](../../docs/16-change-scope-contract.md) S10). The *decisions* are driven through `menu/screens.ts#screenOf`, which is a **model walk** —
+stronger than the static sweep, weaker than a drive, and S9 forbids citing it as either. The
+*mounts* are `⚠️` and say so.
+
+| # | Surface | Requirement | State |
+|---|---|---|---|
+| MU-01 | Main menu | Six destinations, each with a line saying what it is | ✅ test (`screenOf`, driven per screen in the honesty sweep) · ⚠️ mount |
+| MU-02 | Main menu | Every screen offers a way back, and `back` from anywhere reaches the root | ✅ test (`menu.test.ts`, and the reducer's history is a stack) |
+| MU-03 | Main menu | The menu can be **re-entered** after Start or Campaign | ✅ test (`#open-menu` exists and `ELEMENT_IDS` requires it) · ⚠️ the click path |
+| MU-04 | Main menu | It is drawn as an overlay above the drawer, and scrolls on a short viewport | ✅ test (every emitted class has a rule; `z-index` > the drawer's) · ⚠️ appearance |
+| MU-05 | Campaign screen | Says which of the two things called Campaign this is, and selects the surface | ✅ test · ⚠️ mount |
+| MU-06 | Campaign screen | **Keep going** opens an endless week: day one, the same growth and events, nothing banked | ✅ test (`enterEndless.test.ts` — the day loop measured on the legs, and `closeDay` banking nothing) · ⚠️ mount |
+| MU-07 | Coach ribbon | Names which of the three kinds of week it is over — a scenario, endless, or a building the reader drew | ✅ test (`weekLabel.test.ts`; two of the three branches were **unreachable** before it) · ⚠️ mount |
+| MU-08 | Coach ribbon | A saved week that could not be restored is explained, and a first visit is not | ✅ test (`persist/notice.test.ts`, driven by the honesty sweep through the real loader) · ⚠️ placement, and see `GAPS.md` § 3 |
+| FP-01 | Free play | Six axes, every one derived from `data/` rather than listed | ✅ test (`catalogue.test.ts`, both directions) |
+| FP-02 | Free play | Start is disabled **and explained** on a broken selection, with every reason at once | ✅ test (`freePlayIssues`, driven whole and broken in the honesty sweep) |
+| FP-03 | Free play | Start actually runs the selection | ✅ test (`enterFreePlay.test.ts`, compared on the legs) |
+| FP-04 | Free play | The run is day one — no tenant growth, no scheduled event, no inherited held car | ✅ test (legs identical whatever week it was entered from, with the negative control) |
+| FP-05 | Free play | The screen says so, rather than leaving a reader to assume it | ✅ test (the notice is driven by the honesty sweep) |
+| FP-06 | Free play | Every axis moves the legs | ✅ test (`state.freePlay.test.ts`, `scope.test.ts`) |
+| LB-01 | Leaderboard | All four metrics on every row, never combined, with the seed | ✅ test · ⚠️ mount |
+| LB-02 | Leaderboard | The server's own ranking note is printed **verbatim** | ✅ test |
+| LB-03 | Leaderboard | The screen says what a board *is* — one configuration across seeds | ✅ test (driven) · **⚠️ and see `GAPS.md` § 3: this is a mitigation, not a fix** |
+| LB-04 | Leaderboard | *Post this run* is refused with a reason, and the reason distinguishes *not signed in* from *this run cannot be ranked* | ✅ test (`runIdentity.test.ts`; the two are never collapsed) · ⚠️ mount |
+| LB-05 | Leaderboard | An empty board says so in words rather than drawing an empty table | ✅ test |
+| AC-01 | Account | A wrong password and an unknown address give the **same** sentence | ✅ test (`client.test.ts`, against the server's own source text) |
+| AC-02 | Account | An unconfirmed account is shown as playable, with what is still gated | ✅ test (`postingRefusal`, both arms driven) |
+| AC-03 | Account | The password is a real `password` input, cleared on mode change, never in `localStorage` | ✅ test (`account.ts`) · ⚠️ the input type |
+| AC-04 | Account | With no server configured, the screen says there is none rather than drawing a dead form | ✅ test |
+| CH-01 | Challenge | One axis — the dispatcher — and the screen says the rest is the server's | ✅ test (`screenOf`, driven in the honesty sweep on the arm that carries the most prose) · ⚠️ mount |
+| CH-02 | Challenge | The window is **drawn, never computed**: state and both durations come from the server | ✅ test (`challenge.test.ts` asserts no clock is read, lexically over the module's own source) |
+| CH-03 | Challenge | Every seed is run before anything is posted, and a partial set is refused with a reason | ✅ test (`challengeSubmissionOf`, one refusal per branch) |
+| CH-04 | Challenge | Posting is refused for four distinct reasons and never a collapsed one | ✅ test (`screenOf`, each arm driven) · ⚠️ mount |
+| CH-05 | Challenge | Every row shows the count it was computed over, and the four metrics are never blended | ✅ test (server-side, `challenge.test.ts`; the note travels in the body and is rendered unrewritten) · ⚠️ mount |
+| CH-06 | Challenge | Compare is reachable from the board, with the sentence saying why it answers what the board cannot | ✅ test (the `compare` pointer is on every board response) · ⚠️ mount |
+| SE-01 | Selector | The three policies, the six scalars and the five arms, each refused **beside the control** when the run will not read it | ✅ test (`selectorEditor.test.ts`, `selectorSpec.test.ts`) · ⚠️ mount |
+| SE-02 | Selector | Every control moves the legs, and the ones that do not at the default cell name their own cell and the reason | ✅ test (§ D177, `selectorEditor.test.ts`; three are findings about the shipped calibration) |
+| SE-03 | Selector | The panel is **not offered** when the library declares no patterns, with the reason in its place | ✅ test (`selectorAvailability`, both arms driven) · ⚠️ mount |
+| SE-04 | Selector | No string implies switching helps — the learned selector was refused three times | ✅ test (lexical scan in `selectorSpec.test.ts`, plus the generic honesty sweep) |
+| CL-01 | Calendar | Five periods, each moving the legs at a named cell — including the quiet one, in the other direction | ✅ test (`calendar.test.ts`, § D177 on the legs; a public holiday produces fewer than half the legs and more than zero) |
+| CL-02 | Calendar | A period outside its own window changes nothing, byte-identically | ✅ test (asserted on the legs **and** on object identity of the building — inside by day number, outside by weekday) |
+| CL-03 | Calendar | A template the run is too short for is refused in words, not by a kernel throw | ✅ test (`evening-egress` at 300 s makes `core` throw outright; refused with the sentence `menu.ts` already uses) |
+| CL-04 | Calendar | The caption states what was **applied**, never what was asked for | ✅ test (a withheld template never appears; the population is what `expandFloors` counted on the edited building) · ⚠️ mount |
+| CM-01 | Commissioning | Three dimensions per bank, each moving the legs at a named cell | ✅ test (`commissioning/`; two cells where a control is inert are named with the reason — see CM-05) |
+| CM-02 | Commissioning | The capital figure is a limit and never a metric | ✅ test (four ways, including an import scan denying this module its own reporting layer, and a 22-pattern lexicon over every sentence 24 real reviews generate) |
+| CM-03 | Commissioning | Retrofit is the same mechanism with an empty editable set, not a second path | ✅ test (three scope refusals, each naming its bank and dimension; legs byte-identical to the shipped building) |
+| CM-04 | Commissioning | A refusal sits beside the control it refuses | ✅ test (`refusalsBeside` makes it a property of the model rather than a layout convention) · ⚠️ mount |
+| CM-05 | Commissioning | A control that is inert at a cell says so, rather than the suite moving to a cell where everything works | ✅ test (a third shaft at Garden Apartments is inert at 900 s and 1 800 s and live at 3 600 s, with the leg counts 5/20/48 pinned) |
+| PR-01 | Persistence | The saved library survives a reload, and an entry this build cannot read is dropped **by name** | ✅ test (`library.test.ts`, per shelf, with the shipped documents as positive controls) |
+| PR-02 | Persistence | A version-1 envelope still restores its week | ✅ test (nothing migrated, nothing defaulted; refusing would take a week away over a feature that build never had) |
+| PR-03 | Persistence | An over-budget save refuses with the size rather than silently stopping | ✅ test · ⚠️ mount |
+| BT-01 | Boot | The page loads and the stage draws | ✅ **run** (`boot.browser.test.ts` — the first test here that executes the shell; watched failing against the commit where it did not boot) |
+
+**What this section does not yet cover, said rather than left to be noticed:** focus order within a
+screen, the appearance of a disabled row's reason, whether the overlay traps focus, and — added with
+the light mode — whether the two palettes are *legible* rather than merely distinct. The first three
+need a browser. The fourth needs an eye: `render/theme.test.ts` asserts a contrast floor and
+partition preservation arithmetically, which is what can be checked without one, and nothing in this
+repository has seen the light palette rendered. All four belong to § 26's list the day a browser
+exists.
+
+---
+
 ## How the marks are used — read this before trusting one *(retired copy; the live one is at the top of this file)*
 
 Wave 1 shipped three `✅` marks that were false and a reviewer caught them (`DECISIONS.md` D18).

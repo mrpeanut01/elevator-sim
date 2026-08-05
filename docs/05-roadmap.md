@@ -14,11 +14,24 @@ revisited before Phase 0 starts.
 
 **Read this before planning any phase.** The most expensive defect this project has produced is
 not a wrong number. It is a behaviour that is *configurable, unit-tested in isolation, and dead in
-the shipped path* — and it has now happened **ten times in code, plus once in `data/`**. Four were
+the shipped path* — and it has now happened **eleven times in code, plus twice in `data/`**. Four were
 in Phase 5, all four
 simultaneously: `prepositionPlan`, `CapacityReassignmentMonitor`, `createAuctionPolicy` and the
 whole arrival-model predictor were built correctly, exported, weighted by a shipped profile, and
 called by nothing outside their own module.
+
+> **Two more since the count above was last written (2026-08-04/05), and they are the same shape at
+> two different layers.** `BuildingConfig.serviceEvents` — a working mid-run service-mode scheduler,
+> resolved in `config/parse.ts`, applied in `sim/`, tested, and called by **no shipped building** —
+> got its first caller from `shift/incidents.ts`. And `patternSwitching`, the whole weight-set
+> selector library, was **loaded, carried into `SimulationConfig`, resolved by `resolveWeightSets`,
+> and writable by nothing in the viewer**; mounting a five-select editor over it would have been the
+> defect with a control on top of it. Closed by `dispatcherProfilesWithSelector`
+> ([§ D219](../DECISIONS.md)).
+>
+> **The existing ordinals do not move.** *The ninth*, *the eleventh* and the rest name specific
+> instances elsewhere in these documents, and renumbering them would break every reference for the
+> sake of a running total. The total is the sentence above; the ordinals are names.
 
 **The fifth was Phase 7's `tuning/report`, and it is the instructive one** — because it happened
 *after* both guards below were installed, in a module those guards do not audit. Every function in
@@ -1922,6 +1935,59 @@ which is exactly the distinction the standing requirement above exists to keep v
 | **The editor's ⇧/⇩ buttons reorder the JSON declaration and not the building** | the retired T29 lane record § T29-4, and [§ D111](../DECISIONS.md). Relabelled honestly rather than repurposed; the scope call — give the declaration its own view, or drop `moveFloor` and let `index` be the only ordering control — is **handed back to the owner** |
 | **No test asserts any phase's *status*** | [`docs/07` § 8](07-handoff.md). The guards assert the four documents **agree**, not that they are **true** |
 | Open items C4, C5, C24, C27, C30, C32 | **All six closed** ([§ D116](../DECISIONS.md)–[§ D122](../DECISIONS.md), plus [§ D125](../DECISIONS.md)); **C33** and **C34** opened in their place, and five smaller findings besides. `C4` took **two** decisions — § D119 on the budget, § D125 on the port's disposition — and § D125 also added the **third dead-code guard**, over `runner/`, which neither `core`'s scanner nor `tuning/`'s could reach. Current list: [`docs/07`](07-handoff.md) § 8 § *Still open, in one place*. **C7 is closed** — see below |
+
+### Since 2026-08-04 — the play experience, and what it found
+
+**No phase verdict moved.** This is viewer and server work above the phases, and it is recorded here
+for the reason the stale rows above are: a register that does not know what the tree contains is the
+same failure as an undated one.
+
+The contract is [`docs/16`](16-change-scope-contract.md) ([§ D216](../DECISIONS.md), dated before any
+code), the audit is [`docs/17`](17-play-experience-audit.md), and the verdicts are
+[§ D217](../DECISIONS.md) and [§ D219](../DECISIONS.md). **Five of the audit's seven findings are
+closed.** What is worth a roadmap reader's attention is not the features but the three things
+mounting them found, because each is this repository's standing defect in a new place:
+
+- **`patternSwitching` had no writer at all.** The block is authored in `data/`, its ramps are
+  calibrated against eight measured operating points, the loader carries it and `resolveWeightSets`
+  resolves it — and **nothing in the viewer could change it**. That is the twelfth instance of the
+  standing requirement's defect, and it would have shipped with five selects on top of it. Closed by
+  `dispatcherProfilesWithSelector`, which is a caller rather than an allowlist entry.
+- **Two of six selector sliders are inert at the cell the product opens on**, and the reason is the
+  shipped calibration rather than the panel: Midtown's lobby rate is already past `up-peak`'s ramp,
+  so *raising* the lobby gain saturates a membership already at 1. Each row names its own operating
+  point in the test rather than the suite quietly moving to a cell where everything moves.
+- **A `?? 0` in the leaderboard's submission** turned an unmeasured long-wait share into *zero per
+  cent*, so the server — measuring `NaN` — would have refused an honest submission as a forgery.
+  This product makes one accusation and it was pointed at a client fallback.
+
+Also closed: two **unreachable** branches in the coach ribbon (`week.contractId === undefined` on a
+field typed `string`, which TypeScript permits), `DayReportInput.event` having no reader while the
+sheet named tomorrow's event and never today's, endless mode, the light palette reaching the stage,
+and the whole menu finally being recorded as a deviation from a handoff that has no concept of it
+([`docs/12`](12-design-handoff.md) § 4.8).
+
+**All four designed modes are built** — incidents, calendar, the daily challenge and commissioning —
+and each reaches a run through `shiftRunConfigOf` with a § D177 test on its own control. The saved
+library survives a reload at schema version 2. `docs/17` § 5's ledger stands at **five of seven closed
+outright**, with clause 2 settled by applying the handoff's own rule and clause 5 closed as a defect
+while staying open as a mode.
+
+**And the wave found the thing none of the checks above could see.** `dev/main.ts` ends with
+`if (typeof document !== 'undefined') void main();`, so under vitest **`main()` had never run in this
+repository's history**. A `let` declared below the `boot()` sequence that assigns it threw on boot's
+second statement, and **2 100 tests were green over a dead page**. Fourth occurrence of that exact
+mistake; two of the four are written up in prose in the file that carries them. It is now guarded
+twice — a text assertion over `boot()`'s body, and a browser tier whose first test loads the page and
+requires the stage to have been drawn ([§ D220](../DECISIONS.md), [§ D221](../DECISIONS.md)).
+
+Still open and named: **Sandbox as a mode** — the defect is closed and the label is finally
+printable and true, but whether it deserves a screen is undecided; **§ D220's document tier**, which
+is what closes the rest of `UX.md` § 27's `⚠️ mount` marks; and — **not a defect, and named because it looked like one** — `midtown-office`'s
+`rise-exceeds-class` advisory, 76.9 m against a reference rating of 76. `core` says in the warning
+itself that the envelope is guidance rather than a limit, so the building is legal; what it cost is
+that commissioning's diagnostic key had to include the **message** rather than only the code and
+path, or commissioning that bank as a class rated for 18 m would have been forgiven as pre-existing.
 
 **Closed since this table was last written:** **Phase 8's full experiment matrix and Pareto front at
 a real budget, and with it Phase 7's acceptance interval at 50–200 replications** — both landed in

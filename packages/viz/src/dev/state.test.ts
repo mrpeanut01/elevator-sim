@@ -21,7 +21,10 @@ import { describe, expect, it } from 'vitest';
 import { specFromBuilding } from '../authoring/buildingSpec.js';
 import { DEFAULT_LEVERS, DWELL_SETTINGS, type DwellChoice } from '../authoring/dispatcherSpec.js';
 import { recordRun } from '../record/recordRun.js';
-import { contractForBuilding } from '../shift/contracts.js';
+import { contractById, contractForBuilding } from '../shift/contracts.js';
+import { goalsForDay } from '../shift/goals.js';
+import { SANDBOX_CONTRACT_ID, closeDay, outcomeOf } from '../shift/week.js';
+import type { GoalReading, WeekState } from '../shift/types.js';
 
 import type { BrowserResources } from './data.js';
 import { initialState, shiftRunConfigOf, withBuilding, type ViewerState } from './state.js';
@@ -162,16 +165,87 @@ describe('withBuilding', () => {
     expect(next.buildingId).toBe('midtown-office');
   });
 
-  it('leaves the week alone for a building the reader drew', () => {
-    const state = base();
-    const drawn: ViewerState = {
+  /**
+   * A building the reader drew, with the week already deep in a scenario — the state the defect
+   * below needed, and the one a player reaches by opening the editor mid-week.
+   */
+  function drawnBuildingOnScenarioTwo(): ViewerState {
+    const state = withBuilding(base(), resources, 'midtown-office');
+    return {
       ...state,
+      week: { ...state.week, day: 4, dayIdx: 3, cleanRun: 1, streak: 2 },
       savedBuildings: [
         { id: 'bld-1', config: { ...parseBuilding(read('buildings/garden-apartments.json')), id: 'bld-1' } },
       ],
     };
-    const next = withBuilding(drawn, resources, 'bld-1');
-    expect(next.week.contractId).toBe(state.week.contractId);
+  }
+
+  it('takes the week *out* of a scenario for a building the reader drew', () => {
+    /*
+     * This assertion was the inverse — *leaves the week alone* — and it encoded a defect.
+     *
+     * Keeping the week meant keeping its `contractId`, and that id resolves: a tower drawn while on
+     * Scenario 2 inherited `c2`, so the ribbon read *Scenario · day 4 · 1 clean shift banked* on a
+     * building Scenario 2 has nothing to do with. The next test is the half that matters.
+     */
+    const next = withBuilding(drawnBuildingOnScenarioTwo(), resources, 'bld-1');
+    expect(next.week.contractId).toBe(SANDBOX_CONTRACT_ID);
+    expect(contractById(next.week.contractId)).toBeUndefined();
+  });
+
+  it('does not confiscate the week to do it', () => {
+    // Changing building is not taking an assignment. The player is on day 4 with a streak of two
+    // and still is; what changed is that there is nothing to bank toward.
+    const before = drawnBuildingOnScenarioTwo();
+    const next = withBuilding(before, resources, 'bld-1');
+    expect(next.week.day).toBe(4);
+    expect(next.week.streak).toBe(2);
+    expect(next.week.cleanRun).toBe(before.week.cleanRun);
+  });
+
+  it('stops a drawn building from clearing somebody else’s scenario', () => {
+    /*
+     * The defect, driven. Before this, two clean days on an invented tower **cleared Scenario 2** —
+     * `closeDay` reads `contractById(week.contractId)`, the inherited `c2` resolved, and the
+     * arithmetic ran. That is the forgery the leaderboard's replay apparatus exists to refuse,
+     * arriving through the campaign's front door: draw a two-floor tower with sixteen cars, run
+     * clean days, clear the scenarios.
+     *
+     * The negative control is the same three days on the scenario's **own** building, which must
+     * still clear — otherwise this test would pass against a `closeDay` that had stopped banking.
+     */
+    const readings = (day: number): readonly GoalReading[] =>
+      goalsForDay(day).map((goal) => ({
+        goal,
+        state: 'met' as const,
+        observed: goal.bar,
+        display: String(goal.bar),
+        progressPct: 100,
+        glyph: '✓',
+      }));
+    const cleanDay = (week: WeekState, day: number): WeekState =>
+      closeDay(
+        { ...week, day, dayIdx: (day - 1) % 7 },
+        outcomeOf({
+          day,
+          dayIdx: (day - 1) % 7,
+          eventId: 'ordinary',
+          arrived: 40,
+          carried: 40,
+          minutePct: 100,
+          readings: readings(day),
+        }),
+      );
+
+    let sandbox = withBuilding(drawnBuildingOnScenarioTwo(), resources, 'bld-1').week;
+    for (let day = 1; day <= 3; day += 1) sandbox = cleanDay(sandbox, day);
+    expect(sandbox.cleared).toBeNull();
+    expect(sandbox.completed).toEqual([]);
+
+    let real = withBuilding(base(), resources, 'midtown-office').week;
+    const contractId = real.contractId;
+    for (let day = 1; day <= 3; day += 1) real = cleanDay(real, day);
+    expect(real.completed).toContain(contractId);
   });
 
   it('re-seeds the editor’s working copy while it is untouched', () => {

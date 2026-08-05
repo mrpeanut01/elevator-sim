@@ -58,6 +58,8 @@ import { disclosureItems } from '../mode/disclosure.js';
 import { parityRefusal, parityViolations } from '../mode/parity.js';
 import { SIGNED_OUT, formIssues, postingRefusal, signedIn, updateForm } from '../menu/account.js';
 import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
+import { screenOf } from '../menu/screens.js';
+import { DEFAULT_SETTINGS, MENU_SCREENS } from '../menu/types.js';
 import { CLIENT_FAILURES } from '../menu/client.js';
 import { canStart, freePlayIssues } from '../menu/menu.js';
 import { itemsIn, VIEW_MODES, type DisclosureOrigin } from '../mode/types.js';
@@ -191,7 +193,14 @@ import { CONTRACTS, contractById, contractForBuilding, nextContract, statLineOf 
 import { baseDemandOf, eventFor, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
 import { bestLineFor, goalsForDay, readGoal, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
-import { averageWaitFigure, clockRange, dayReportOf, NOT_RECORDED } from '../shift/report.js';
+import {
+  averageWaitFigure,
+  clockRange,
+  dayReportOf,
+  NOT_RECORDED,
+  type SingleRunReport,
+  type WeekDayReport,
+} from '../shift/report.js';
 import {
   DAY_START_S,
   type DayReport,
@@ -203,7 +212,46 @@ import {
   type ShiftGoal,
   type WeekState,
 } from '../shift/types.js';
-import { closeDay, openWeek, outcomeOf } from '../shift/week.js';
+import {
+  patternLine,
+  policyLine,
+  selectorContextFrom,
+  selectorIssues,
+  specFromProfile as selectorSpecFromProfile,
+  type SelectorSpec,
+} from '../authoring/selectorSpec.js';
+import {
+  armOptionsOf,
+  armRowsOf,
+  changedNoteOf,
+  policyChipsOf,
+  scalarRowsOf,
+  selectorAvailability,
+} from '../dev/selectorEditor.js';
+import {
+  challengeNotOpenOf,
+  challengeRunConfigs,
+  challengeSubmissionOf,
+  type ChallengeView,
+} from '../menu/challenge.js';
+import { claimedMetricsOf } from '../menu/client.js';
+import {
+  CALENDAR_PERIODS,
+  CALENDAR_PERIOD_IDS,
+  calendarDayFor,
+  calendarLine,
+  calendarPatch,
+  periodOnDays,
+} from '../shift/calendar.js';
+import { asBuiltChoices, movedChoiceText, movedChoices, withBankChoice } from '../commissioning/choices.js';
+import { reviewCommissioning } from '../commissioning/refusals.js';
+import { CONSTRAINTS, DIMENSION_LABELS, commissionableClasses } from '../commissioning/types.js';
+import { libraryNoticeFor, restoreNoticeFor, saveNoticeFor } from '../persist/notice.js';
+import { LIBRARY_BUDGET_CHARACTERS, type DroppedEntry } from '../persist/types.js';
+import { loadSession } from '../persist/session.js';
+import { SESSION_SCHEMA_VERSION, type SessionRestoreFailure, type SessionStore } from '../persist/types.js';
+import { closeDay, openEndless, openWeek, outcomeOf } from '../shift/week.js';
+import { coachWeekLines } from '../shift/weekLabel.js';
 
 import type { HonestyCase, RenderedText, TextProvenance, TextRole } from './types.js';
 
@@ -1613,7 +1661,10 @@ interface ShiftDay {
   readonly week: WeekState;
   /** The same day closed on a week already at `needClean`, so the award banner renders. */
   readonly banked: WeekState;
-  readonly report: DayReport;
+  /** The week-day sheet. */
+  readonly report: WeekDayReport;
+  /** The same day shaped as a single run — `docs/17` § 3.2. Both shapes ship; both are swept. */
+  readonly singleRunReport: SingleRunReport;
 }
 
 interface ShiftBundle {
@@ -1667,7 +1718,7 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       { ...opened, cleanRun: contractById(contractId)?.needClean ?? 1 },
       outcome,
     );
-    const report = dayReportOf({
+    const common = {
       recording,
       observations,
       goals,
@@ -1677,8 +1728,25 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       event,
       dispatcherName,
       dayStartS: DAY_START_S,
-    });
-    return { day, dayIdx, contract, event, goals, readings, week, banked, report };
+    };
+    const report = dayReportOf({ ...common, subject: { kind: 'week-day' } }) as WeekDayReport;
+    /*
+     * The **same day, shaped as a single run** — driven beside the week-day sheet rather than
+     * instead of it.
+     *
+     * A Free Play sheet is not a week-day sheet with six lines removed: it has a title of its own,
+     * two meta lines the week never prints, an attempt line worded *at this selection*, and a
+     * pointer at Compare. None of those strings entered the honesty sweep at all until this arm,
+     * because the adapter drove one shape and the product ships two.
+     */
+    const singleRunReport = dayReportOf({
+      ...common,
+      subject: {
+        kind: 'single-run',
+        selection: { demandTemplateId: 'rise-and-fall', arrivalRatePctPop5min: null, durationS: 1800 },
+      },
+    }) as SingleRunReport;
+    return { day, dayIdx, contract, event, goals, readings, week, banked, report, singleRunReport };
   });
 
   const bundle: ShiftBundle = { observations, dispatcherName, days };
@@ -1754,6 +1822,7 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/contracts.ts#contractForBuilding',
     'shift/contracts.ts#nextContract',
     'shift/contracts.ts#statLineOf',
+    'shift/weekLabel.ts#coachWeekLines',
   ],
   render(context) {
     const { recording } = context;
@@ -1901,6 +1970,35 @@ const SHIFT_REPORT: SurfaceAdapter = {
       countShown: /(\d[\d,]*)/.test(wait.note),
       gated: true,
     });
+    /* ---- the coach ribbon's two lines, on all three kinds of week ---- */
+    /*
+     * Driven over the three cases rather than one, because the defect `weekLabel.ts` closes was that
+     * **two of the three branches were unreachable** — the predicate tested a `string` against
+     * `undefined`, so *Sandbox* and *free play* had never been printed at all. A sweep that drove
+     * the common case would have swept the one branch that worked.
+     *
+     * `openWeek('no-such-contract')` is the reader's own building, and it is spelled as an id no
+     * contract answers to rather than as a flag, because that is exactly how the shell reaches it.
+     */
+    for (const [name, week] of [
+      ['scenario', { ...openWeek('c2'), day: 4, cleanRun: 1 }],
+      ['endless', { ...openEndless(), day: 12, cleanRun: 5 }],
+      ['sandbox', openWeek('no-such-contract')],
+    ] as const) {
+      const lines = coachWeekLines(week, 1800);
+      seeds.push({ field: `coachWeekLines(${name}).label`, text: lines.label, role: 'label' });
+      /*
+       * `observation` rather than `label`: two of the three progress lines carry a **count** — clean
+       * shifts banked, clean days run — and a count on a surface is the thing R13's clauses are
+       * about. Classifying it `label` would exempt exactly the half of the line worth checking.
+       */
+      seeds.push({
+        field: `coachWeekLines(${name}).progress`,
+        text: lines.progress,
+        role: 'observation',
+      });
+    }
+
     seeds.push({ field: 'NOT_RECORDED', text: NOT_RECORDED, role: 'label' });
     seeds.push({
       field: 'clockRange',
@@ -2403,8 +2501,15 @@ const REPORT_PANEL: SurfaceAdapter = {
     const bundle = shiftBundleOf(context);
 
     for (const entry of bundle.days) {
-      const at = `day${String(entry.day)}`;
-      const view = reportViewOf(entry.report);
+      /*
+       * Both shapes of the sheet, per day. `docs/17` § 3.2: a Free Play sheet is not a week-day
+       * sheet with six lines deleted — it has its own title, two meta lines the week never prints,
+       * and a pointer at Compare — and until this loop the adapter drove one shape while the
+       * product shipped two.
+       */
+      for (const shaped of [entry.report, entry.singleRunReport]) {
+      const at = `day${String(entry.day)}.${shaped.of}`;
+      const view = reportViewOf(shaped);
       seeds.push({ field: `${at}.title`, text: view.title, role: 'label' });
       seeds.push({ field: `${at}.lede`, text: view.lede, role: 'observation' });
       for (const [index, cell] of view.figures.entries()) {
@@ -2449,14 +2554,38 @@ const REPORT_PANEL: SurfaceAdapter = {
         seeds.push({ field: `${at}.levers(${lever.title})`, text: lever.body, role: 'prose' });
       }
       seeds.push({ field: `${at}.verdictLine`, text: view.verdictLine, role: 'observation' });
-      seeds.push({ field: `${at}.streakLine`, text: view.streakLine, role: 'prose' });
-      seeds.push({ field: `${at}.contractLine`, text: view.contractLine, role: 'label' });
-      if (view.cleared !== null) {
-        seeds.push({ field: `${at}.cleared.note`, text: view.cleared.note, role: 'label' });
+      /*
+       * The meta block, swept for the first time.
+       *
+       * Found while reshaping the sheet: the adapter drove the title, the lede, the figures, the
+       * goals, the diagnosis, the levers, the verdict, the streak, the contract line, the banner,
+       * *what this taught*, the small print and the next-day label — and never `metaLines`. So the
+       * seed, the clock span, the replication count and the attempt line have never been in the
+       * corpus, on a block whose whole job is to say what the figures above it are figures *of*.
+       */
+      for (const [index, line] of view.metaLines.entries()) {
+        seeds.push({ field: `${at}.metaLines[${String(index)}]`, text: line, role: 'observation' });
       }
-      seeds.push({ field: `${at}.taught`, text: view.taught, role: 'prose' });
+      if (view.framing.kind === 'week-day') {
+        seeds.push({ field: `${at}.streakLine`, text: view.framing.streakLine, role: 'prose' });
+        seeds.push({ field: `${at}.contractLine`, text: view.framing.contractLine, role: 'label' });
+        if (view.framing.cleared !== null) {
+          seeds.push({ field: `${at}.cleared.note`, text: view.framing.cleared.note, role: 'label' });
+        }
+        seeds.push({ field: `${at}.taught`, text: view.framing.taught, role: 'prose' });
+        seeds.push({ field: `${at}.nextDayLabel`, text: view.framing.nextDayLabel, role: 'label' });
+      }
+      /*
+       * Driven on **both** shapes, because both now carry it. `why` is the sentence that sends a
+       * reader to the one surface allowed to answer *"is this better?"*, so it is `prose` a property
+       * can judge — and it is the sentence most at risk of drifting into a claim that Compare will
+       * find a winner.
+       */
+      if (view.nextStep !== undefined) {
+        seeds.push({ field: `${at}.nextStep.label`, text: view.nextStep.label, role: 'label' });
+        seeds.push({ field: `${at}.nextStep.why`, text: view.nextStep.why, role: 'prose' });
+      }
       seeds.push({ field: `${at}.smallPrint`, text: view.smallPrint, role: 'reason' });
-      seeds.push({ field: `${at}.nextDayLabel`, text: view.nextDayLabel, role: 'label' });
 
       /* The two row builders, driven on their own so the coverage claim names what it calls. */
       const firstReading = entry.readings[0];
@@ -2480,13 +2609,16 @@ const REPORT_PANEL: SurfaceAdapter = {
           role: 'observation',
         });
       }
+      }
     }
 
     /* The empty sheet, which is drawn rather than hidden — § 2.2. */
     const empty = emptyReportView();
     seeds.push({ field: 'emptyReportView.title', text: empty.title, role: 'label' });
     seeds.push({ field: 'emptyReportView.lede', text: empty.lede, role: 'prose' });
-    seeds.push({ field: 'emptyReportView.nextDayLabel', text: empty.nextDayLabel, role: 'label' });
+    if (empty.framing.kind === 'week-day') {
+      seeds.push({ field: 'emptyReportView.nextDayLabel', text: empty.framing.nextDayLabel, role: 'label' });
+    }
 
     return singleRun(this.id, seeds);
   },
@@ -3156,6 +3288,56 @@ const EDITOR_PANELS: SurfaceAdapter = {
  * ever driven with valid input has left its error path unswept, which is where careless prose
  * actually lives.
  */
+/**
+ * A challenge as the server issues one — **constructed**, and that is stated rather than smoothed.
+ *
+ * No `data/` in this package ships a challenge: the rotation lives in `packages/server`, which `viz`
+ * must build and test without (invariant 6's argument, one package over). So this is the shape the
+ * wire carries, written here, and the honest consequence is that a change to the server's shape does
+ * not redden this file — `menu/challenge.test.ts` is where that parity is pinned.
+ *
+ * The arm chosen is **upcoming**, because it carries the most prose: the window sentence, the
+ * partial-set refusal and the board note at once. Those three are where careless wording on this
+ * screen would be — a countdown implying the client measured it, or a refusal implying a partial set
+ * is a smaller score rather than a different question.
+ */
+const CHALLENGE_VIEW: ChallengeView = Object.freeze({
+  challenge: Object.freeze({
+    id: 'midtown-morning-4',
+    name: 'Midtown morning',
+    brief:
+      'Five seeds on Midtown Office at the morning peak. Everybody runs the same passengers; ' +
+      'the dispatcher is yours.',
+    config: Object.freeze({
+      buildingId: 'midtown-office',
+      demandTemplateId: 'rise-and-fall',
+      arrivalRatePctPop5min: 3,
+      durationS: 900,
+    }),
+    seeds: Object.freeze(['1001', '1002', '1003', '1004', '1005']),
+    opensAtMs: 0,
+    closesAtMs: 0,
+  }),
+  state: 'upcoming',
+  seedCount: 5,
+  opensInMs: 7_200_000,
+  closesInMs: null,
+  clockNote:
+    'Which challenge is open is decided by the server. The window below is issued with the ' +
+    'challenge, and the remaining time is measured on the server’s clock, not on yours.',
+  dataHash: 'abcdef0123456789',
+  compare: Object.freeze({
+    note:
+      'Compare answers the question a board cannot. It replays two dispatchers on the same ' +
+      'passenger traces at a replication budget large enough to resolve a difference, and ' +
+      'reports an interval that can contain zero.',
+    buildingId: 'midtown-office',
+    demandTemplateId: 'rise-and-fall',
+    arrivalRatePctPop5min: 3,
+    durationS: 900,
+  }),
+});
+
 const MENU: SurfaceAdapter = {
   id: 'menu/menu.ts#freePlayIssues',
   covers: [
@@ -3167,6 +3349,9 @@ const MENU: SurfaceAdapter = {
     'menu/account.ts#postingRefusal',
     'menu/account.ts#signedIn',
     'menu/client.ts#CLIENT_FAILURES',
+    'menu/screens.ts#screenOf',
+    'menu/screens.ts#titleOf',
+    'menu/screens.ts#applyIntent',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -3193,6 +3378,11 @@ const MENU: SurfaceAdapter = {
       seeds.push({ field: `template.${entry.id}.detail`, text: entry.detail ?? '', role: 'label' });
     }
 
+    const challengeSelection = {
+      dispatcherProfileId: catalogue.dispatchers[0]?.id ?? '',
+      metric: 'awtS',
+    };
+    const challengeInput = { view: CHALLENGE_VIEW, runsDone: 3 };
     const whole = {
       buildingId: catalogue.buildings[0]?.id ?? '',
       dispatcherProfileId: catalogue.dispatchers[0]?.id ?? '',
@@ -3269,6 +3459,584 @@ const MENU: SurfaceAdapter = {
       seeds.push({ field: `client.${code}`, text, role: 'reason' });
     }
 
+    /*
+     * Every screen, driven — and driven in the states where the prose is hardest.
+     *
+     * `screenOf` is the decision half of the menu panel, so every title, every row label, every
+     * `detail` under a row and every `disabledWhy` reaches a player through it. The axis that
+     * matters is not *which screen* but *what is wrong*: a Start that is enabled says one word, and
+     * a Start that is refused says a sentence with two numbers in it. So the sweep drives the whole
+     * screen set against a whole selection **and** a broken one, and against a signed-out player as
+     * well as a signed-in one.
+     *
+     * `rankingRefusal` is seeded with a real one — `scope/runIdentity.ts`'s wording for a run on a
+     * grown building. That sentence is shown beside a disabled **Post this run**, which is a claim
+     * about why somebody's score is not going up, and is exactly the shape R2 exists to police.
+     */
+    const menuStates = [
+      { label: 'whole', selection: whole, canPost: true, hasRun: true, refusal: undefined },
+      { label: 'broken', selection: broken, canPost: false, hasRun: false, refusal: undefined },
+      {
+        label: 'unrankable',
+        selection: whole,
+        canPost: true,
+        hasRun: true,
+        refusal:
+          'day 7 grows the building by 66 % and schedules \u201cMove-in day\u201d, and neither travels with a selection',
+      },
+    ] as const;
+    for (const arm of menuStates) {
+      for (const screen of MENU_SCREENS) {
+        const view = screenOf({
+          state: {
+            screen,
+            history: [],
+            settings: DEFAULT_SETTINGS,
+            freePlay: arm.selection,
+            challenge: challengeSelection,
+          },
+          catalogue,
+          canPost: arm.canPost,
+          hasRun: arm.hasRun,
+          ...(arm.refusal === undefined ? {} : { rankingRefusal: arm.refusal }),
+          boards: [{ configHash: 'abcdef0123456789', entries: 3 }],
+          challenge: challengeInput,
+        });
+        const at = `screen.${arm.label}.${screen}`;
+        seeds.push({ field: `${at}.title`, text: view.title, role: 'label' });
+        for (const [index, notice] of view.notices.entries()) {
+          seeds.push({ field: `${at}.notice.${String(index)}`, text: notice, role: 'prose' });
+        }
+        for (const [index, issue] of view.issues.entries()) {
+          seeds.push({ field: `${at}.issue.${String(index)}`, text: issue, role: 'reason' });
+        }
+        for (const row of view.rows) {
+          seeds.push({ field: `${at}.${row.id}.label`, text: row.label, role: 'label' });
+          if (row.detail !== undefined) {
+            seeds.push({ field: `${at}.${row.id}.detail`, text: row.detail, role: 'prose' });
+          }
+          if (row.disabledWhy !== undefined) {
+            seeds.push({ field: `${at}.${row.id}.why`, text: row.disabledWhy, role: 'reason' });
+          }
+        }
+      }
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The one persistence string a player ever reads — and the reason it stopped being excludable.
+ *
+ * `derive.test.ts` used to exclude the whole of `persist/` with a reason that ended: *"The day that
+ * sentence reaches a screen it stops being excludable, and this reason stops being true."* That day
+ * is this adapter. `persist/notice.ts#restoreNoticeFor` turns a discriminated restore failure into a
+ * line the coach ribbon shows, so it is a player-facing claim about what happened to their week.
+ *
+ * ## Driven through `loadSession`, not around it
+ *
+ * Two of the six arms **quote the diagnostic** — the `parse` and `shape` messages name a field and
+ * are worth carrying — so a sweep that invented those messages would check wording nobody ships.
+ * The three broken stores below are read through the real `loadSession`, which is why it moves out
+ * of the exclusion list and into `covers`: its sentences now reach a screen, through this quotation
+ * and only through it.
+ *
+ * The remaining three arms cannot be produced from bytes — `unavailable` needs a throwing store,
+ * `version` needs an envelope from another build, `stale` needs `data/` to have lost something — so
+ * they are seeded from constructed failures, and that difference is stated rather than smoothed
+ * over.
+ *
+ * ## Roles
+ *
+ * `reason`, all of them. Each is a refusal that names what it refused and what happens instead,
+ * which is exactly what that role is for — and it is the role that exempts a string from being read
+ * as a claim about a *run*, which none of these is.
+ */
+const RESTORE_NOTICE: SurfaceAdapter = {
+  id: 'persist/notice.ts#restoreNoticeFor',
+  covers: ['persist/notice.ts#restoreNoticeFor', 'persist/session.ts#loadSession'],
+  render(this: SurfaceAdapter) {
+    const seeds: TextSeed[] = [];
+
+    /* ---- the arms a real store can produce, read through the real loader ---- */
+    const stored = (value: string | null): SessionStore => ({
+      read: () => value,
+      write: () => undefined,
+      remove: () => undefined,
+    });
+    const bytes: readonly (readonly [string, string | null])[] = [
+      ['absent', null],
+      ['parse', '{not json'],
+      ['shape', JSON.stringify({ version: SESSION_SCHEMA_VERSION, week: { day: 'Tuesday' } })],
+    ];
+    for (const [name, value] of bytes) {
+      const restored = loadSession(stored(value));
+      if (restored.ok) continue;
+      seeds.push({
+        field: `loadSession(${name}).message`,
+        text: restored.failure.message,
+        role: 'reason',
+      });
+      const notice = restoreNoticeFor(restored.failure);
+      if (notice !== undefined) {
+        seeds.push({ field: `restoreNoticeFor(${name})`, text: notice, role: 'reason' });
+      }
+    }
+
+    /* ---- the three a store cannot reach from bytes alone ---- */
+    const constructed: readonly SessionRestoreFailure[] = [
+      { kind: 'unavailable', message: 'The browser refused to read site data.' },
+      {
+        kind: 'version',
+        message: 'Written by a different build.',
+        found: SESSION_SCHEMA_VERSION + 1,
+        supported: SESSION_SCHEMA_VERSION,
+      },
+      { kind: 'stale', message: 'Names things this build no longer ships.', missing: ['c9'] },
+    ];
+    for (const failure of constructed) {
+      const notice = restoreNoticeFor(failure);
+      if (notice !== undefined) {
+        seeds.push({ field: `restoreNoticeFor(${failure.kind})`, text: notice, role: 'reason' });
+      }
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The weight-set selector — the product's one genuine mid-run mechanism, and its first surface.
+ *
+ * ## Why every string here needs the sweep more than most
+ *
+ * The learned selector has been refused **three times** — § D145, § D156, § D169 — and the last
+ * refusal closed the mix-varying question in the refusing direction. The hand-authored selector is
+ * shipped and works; what nobody has measured is that switching *helps* on any configuration a
+ * player will run. So a label reading *"switches to the faster weights during the morning peak"*
+ * would be an unmeasured comparative on the exact question three studies declined to answer, and it
+ * would read as a finding because it sits on a control.
+ *
+ * The authoring module already scans its own prose for a comparative vocabulary. This adapter is the
+ * generic half: the same strings go through R2, R3, R10 and R13 with everything else.
+ *
+ * ## Driven on four contexts, because the refusals are where the prose is
+ *
+ * The shipped library with a policy on; the same with the policy `off` (six refusals plus the map);
+ * a spec bound to a pattern the detector does not declare — § D112's shape in a new field, resolved
+ * cleanly and read by nobody; and a **library with no `patternSwitching` at all**, which is the one
+ * that produces `selectorAvailability`'s note. The last is not reachable from `data/` today and is
+ * constructed, which is stated rather than smoothed over.
+ */
+const SELECTOR: SurfaceAdapter = {
+  id: 'dev/selectorEditor.ts#mountSelectorEditor',
+  covers: [
+    'dev/selectorEditor.ts#mountSelectorEditor',
+    'dev/selectorEditor.ts#selectorAvailability',
+    'dev/selectorEditor.ts#POLICY_HINTS',
+    'dev/selectorEditor.ts#policyChipsOf',
+    'dev/selectorEditor.ts#SCALAR_LABELS',
+    'dev/selectorEditor.ts#scalarRowsOf',
+    'dev/selectorEditor.ts#armRowsOf',
+    'dev/selectorEditor.ts#armOptionsOf',
+    'dev/selectorEditor.ts#changedNoteOf',
+    'authoring/selectorSpec.ts#PATTERN_LINES',
+    'authoring/selectorSpec.ts#INPUT_PHRASES',
+    'authoring/selectorSpec.ts#patternLine',
+    'authoring/selectorSpec.ts#signatureLine',
+    'authoring/selectorSpec.ts#policyLine',
+    'authoring/selectorSpec.ts#patternCards',
+    'authoring/selectorSpec.ts#selectorIssues',
+    'authoring/selectorSpec.ts#helpFor',
+    'authoring/selectorSpec.ts#rangeFor',
+    'authoring/selectorSpec.ts#defaultSelectorSpec',
+    'authoring/selectorSpec.ts#specFromProfile',
+    'authoring/selectorSpec.ts#specIsDirty',
+    'authoring/selectorSpec.ts#profileWithSelector',
+  ],
+  render(this: SurfaceAdapter, context) {
+    const seeds: TextSeed[] = [];
+    const file = context.dispatcherProfiles;
+    if (file === undefined) return singleRun(this.id, seeds);
+
+    const selectorContext = selectorContextFrom(file, 900);
+    const profile = file.profiles[0];
+    if (profile === undefined) return singleRun(this.id, seeds);
+
+    const base = selectorSpecFromProfile(profile, selectorContext);
+    const patterns = file.patternSwitching?.patternDetector.patterns ?? [];
+    const firstPattern = patterns[0] ?? 'up-peak';
+
+    const arms: readonly (readonly [string, SelectorSpec])[] = [
+      ['on', { ...base, policy: 'fuzzy' }],
+      // Every control refused at once — the arm that carries six sentences and the map's own.
+      ['off', { ...base, policy: 'off' }],
+      /*
+       * A binding for a pattern the detector does not declare. The resolver iterates the detector's
+       * own patterns, so this entry resolves cleanly and is read by nobody — § D112's defect in a
+       * new field, and the refusal is the only thing that makes it visible.
+       */
+      [
+        'stray-binding',
+        {
+          ...base,
+          policy: 'fuzzy',
+          weightSetsByPattern: { ...base.weightSetsByPattern, 'no-such-pattern': profile.id },
+        },
+      ],
+    ];
+
+    for (const [name, spec] of arms) {
+      const issues = selectorIssues(spec, selectorContext);
+      seeds.push({
+        field: `${name}.policyLine`,
+        text: policyLine(spec, selectorContext),
+        role: 'label',
+      });
+      seeds.push({
+        field: `${name}.changedNote`,
+        text: changedNoteOf(spec, profile, selectorContext),
+        role: 'label',
+      });
+      for (const [index, issue] of issues.entries()) {
+        seeds.push({ field: `${name}.issue[${String(index)}]`, text: issue.message, role: 'reason' });
+      }
+      for (const chip of policyChipsOf(spec)) {
+        seeds.push({ field: `${name}.policy.${chip.policy}.label`, text: chip.label, role: 'label' });
+        seeds.push({ field: `${name}.policy.${chip.policy}.hint`, text: chip.hint, role: 'prose' });
+      }
+      for (const row of scalarRowsOf(spec, issues)) {
+        seeds.push({ field: `${name}.scalar.${row.field}.label`, text: row.label, role: 'label' });
+        seeds.push({ field: `${name}.scalar.${row.field}.help`, text: row.help, role: 'prose' });
+        // The number beside the thumb. An `observation` because it is a value the run will read.
+        seeds.push({
+          field: `${name}.scalar.${row.field}.value`,
+          text: `${row.label}: ${row.valueText}`,
+          role: 'observation',
+        });
+        seeds.push({ field: `${name}.scalar.${row.field}.refusal`, text: row.refusal, role: 'reason' });
+      }
+      for (const row of armRowsOf(spec, selectorContext, issues)) {
+        seeds.push({ field: `${name}.arm.${row.patternId}.line`, text: row.line, role: 'prose' });
+        /*
+         * The derived one. `signatureLine` reads the authored membership ramps and says what the
+         * detector matches on — so it is a **claim about the configuration**, and a wrong one would
+         * describe a regime the run never enters.
+         */
+        seeds.push({
+          field: `${name}.arm.${row.patternId}.signature`,
+          text: row.signature,
+          role: 'observation',
+        });
+        seeds.push({
+          field: `${name}.arm.${row.patternId}.weightSet`,
+          text: row.weightSetName,
+          role: 'label',
+        });
+        seeds.push({ field: `${name}.arm.${row.patternId}.refusal`, text: row.refusal, role: 'reason' });
+      }
+    }
+
+    for (const option of armOptionsOf(selectorContext, profile.id)) {
+      seeds.push({ field: `option.${option.value}`, text: option.label, role: 'label' });
+    }
+    seeds.push({
+      field: 'availability.offered',
+      text: selectorAvailability(selectorContext).note,
+      role: 'reason',
+    });
+    /*
+     * The unavailable note, on a library that declares no patterns. No shipped `data/` reaches it —
+     * so it is constructed here rather than left unswept, and that difference is said rather than
+     * hidden behind an arm that looks driven.
+     */
+    seeds.push({
+      field: 'availability.absent',
+      text: selectorAvailability({ profiles: file.profiles, patternSwitching: undefined }).note,
+      role: 'reason',
+    });
+    seeds.push({
+      field: `patternLine(${firstPattern})`,
+      text: patternLine(firstPattern) ?? '',
+      role: 'prose',
+    });
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The challenge board's client half — four producers, and every one of them a refusal.
+ *
+ * ## Why these strings are the client's own, unusually
+ *
+ * Everywhere else on this surface the rule is *carry the server's wording unrewritten*, because a
+ * second place that decides what a rejection means is a second place that can be wrong. These are
+ * the exception, and deliberately: each fires **before the request is made**, so there is no server
+ * wording to carry. A challenge that names a building this build does not ship, a seed set with a
+ * gap in it, a long-wait share that was never measured — none of those reach the server, which is
+ * the whole point, since the server's rejection is an accusation and spending it on a client bug is
+ * the defect `submitScore` argues about one board over.
+ *
+ * ## The one they must not become
+ *
+ * `docs/10` § 5.5 bans a leaderboard that ranks dispatchers from single runs, and this board's whole
+ * design points at that ban — the dispatcher is the axis. So a refusal that said *"post a better
+ * dispatcher"* or *"this one came out ahead"* would be the ban arriving through a refusal, which is
+ * the one place nobody reads for comparative claims. `challenge.test.ts` scans them lexically; this
+ * adapter is the generic half, and puts them through R2 with everything else.
+ */
+const CHALLENGE: SurfaceAdapter = {
+  id: 'menu/challenge.ts#challengeRunConfigs',
+  covers: [
+    'menu/challenge.ts#challengeRunConfigs',
+    'menu/challenge.ts#challengeSubmissionOf',
+    'menu/challenge.ts#challengeNotOpenOf',
+    'menu/client.ts#claimedMetricsOf',
+  ],
+  render(this: SurfaceAdapter, context) {
+    const seeds: TextSeed[] = [];
+    const view = CHALLENGE_VIEW;
+
+    /* ---- the run-config refusals: one per thing `data/` might not ship ---- */
+    const resources = {
+      buildings: context.buildings,
+      dispatcherProfiles: context.dispatcherProfiles,
+      trafficProfiles: context.trafficProfiles,
+      elevatorSpecs: context.elevatorSpecs,
+    } as unknown as Parameters<typeof challengeRunConfigs>[1];
+
+    const configArms: readonly (readonly [string, ChallengeView, string])[] = [
+      ['unknown-dispatcher', view, 'no-such-dispatcher'],
+      [
+        'unknown-building',
+        { ...view, challenge: { ...view.challenge, config: { ...view.challenge.config, buildingId: 'demolished' } } },
+        'collective',
+      ],
+      [
+        'unknown-template',
+        {
+          ...view,
+          challenge: {
+            ...view.challenge,
+            config: { ...view.challenge.config, demandTemplateId: 'no-such-template' },
+          },
+        },
+        'collective',
+      ],
+    ];
+    for (const [name, arm, dispatcherId] of configArms) {
+      const built = challengeRunConfigs(arm, resources, dispatcherId);
+      if (!built.ok) {
+        seeds.push({ field: `runConfigs.${name}`, text: built.detail, role: 'reason' });
+      }
+    }
+
+    /* ---- the submission refusals: a gap in the set, and a seed nobody asked for ---- */
+    const recording = context.recording;
+    const paired = (seed: string): { readonly seed: string } & VizRecording => ({
+      ...recording,
+      seed,
+    });
+    const submissionArms: readonly (readonly [string, readonly ({ readonly seed: string } & VizRecording)[]])[] = [
+      ['missing-seed', [paired('1001'), paired('1002')]],
+      ['duplicate-seed', view.challenge.seeds.map(() => paired('1001'))],
+      ['foreign-seed', [...view.challenge.seeds.slice(1).map(paired), paired('9999')]],
+    ];
+    for (const [name, recordings] of submissionArms) {
+      const body = challengeSubmissionOf(view, 'collective', recordings);
+      if (!body.ok) {
+        seeds.push({ field: `submission.${name}`, text: body.detail, role: 'reason' });
+      }
+    }
+
+    /* ---- the 409, carried rather than authored ---- */
+    const shut = challengeNotOpenOf({
+      ok: false,
+      code: 'challenge-not-open',
+      detail: 'That challenge is not taking entries.',
+      issues: [],
+      body: {
+        error: 'challenge-not-open',
+        state: 'closed',
+        challengeId: view.challenge.id,
+        opensAtMs: 0,
+        closesAtMs: 0,
+        currentChallengeId: 'midtown-morning-5',
+        detail: 'That challenge is not taking entries.',
+      },
+    });
+    if (shut !== undefined) {
+      // The server's sentence, and the assertion that this module did not rewrite it.
+      seeds.push({ field: 'notOpen.detail', text: shut.detail, role: 'reason' });
+    }
+
+    /* ---- the claim a client makes about its own run ---- */
+    const unmeasured = claimedMetricsOf({ ...recording.summary, pctOverLongWait: null });
+    if (!unmeasured.ok) {
+      seeds.push({ field: 'claimedMetrics.unmeasured', text: unmeasured.detail, role: 'reason' });
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The calendar, the fabric, and the two persistence sentences that reach a ribbon.
+ *
+ * Three lanes in one adapter because they share the property that matters here: **each says what it
+ * did to a run, and each has a way of saying more than it did.** A calendar line that named a
+ * template the run length refused; a constraint sentence whose capital figure drifted toward
+ * reading like a score; a library notice that put a validator's JSON path on a coach ribbon. All
+ * three are prose about a run, and all three are driven on the arm where the refusal fires rather
+ * than only on the happy one.
+ *
+ * ## What the fabric's sentence must never become
+ *
+ * `docs/10` § 5.5 bans grade letters, efficiency scores and energy scores. A capital figure is a
+ * limit and not a metric — `commissioning/types.ts` argues it with the § D106 precedent, and the
+ * reason it needs arguing is that the cheapest building is the one with the fewest shafts, so a
+ * capital *score* would rank the towers serving fewest people highest. `commissioning/`'s own suite
+ * scans its literals for a 22-pattern lexicon; this adapter is the generic half, putting the same
+ * sentences through R2 and R11 with everything else.
+ */
+const CALENDAR_AND_FABRIC: SurfaceAdapter = {
+  id: 'shift/calendar.ts#calendarLine',
+  covers: [
+    'shift/calendar.ts#calendarLine',
+    'shift/calendar.ts#calendarPatch',
+    'shift/calendar.ts#CALENDAR_PERIODS',
+    'shift/calendar.ts#CALENDAR_PERIOD_IDS',
+    'commissioning/types.ts#CONSTRAINTS',
+    'commissioning/types.ts#constraintById',
+    'commissioning/types.ts#DIMENSION_LABELS',
+    'commissioning/refusals.ts#reviewCommissioning',
+    'commissioning/building.ts#commissionedBuilding',
+    'commissioning/choices.ts#movedChoices',
+    'commissioning/choices.ts#movedChoiceText',
+    'persist/notice.ts#libraryNoticeFor',
+    'persist/notice.ts#saveNoticeFor',
+    'persist/session.ts#loadLibrary',
+    'persist/types.ts#LIBRARY_BUDGET_CHARACTERS',
+    'persist/validate.ts#libraryFrameIssue',
+    'persist/validate.ts#restoreLibrary',
+  ],
+  render(this: SurfaceAdapter, context) {
+    const seeds: TextSeed[] = [];
+    const building = context.building;
+
+    /* ---- the calendar: every period, and the day each one shapes ---- */
+    for (const id of CALENDAR_PERIOD_IDS) {
+      const period = CALENDAR_PERIODS[id];
+      seeds.push({ field: `period.${id}.name`, text: period.name, role: 'label' });
+      seeds.push({ field: `period.${id}.note`, text: period.note, role: 'prose' });
+
+      const placed = periodOnDays(period, 1, 7);
+      for (const day of [1, 6]) {
+        const today = calendarDayFor(placed, day, (day - 1) % 7);
+        const patch = calendarPatch({
+          day: today,
+          building,
+          split: { incoming: 0.85, outgoing: 0.05, interfloor: 0.1 },
+          demandTemplateId: 'rise-and-fall',
+          demandTemplates: context.trafficProfiles.demandTemplates,
+          runLengthS: 1800,
+        });
+        /*
+         * `observation`, not `label`: the line carries a **population count** taken off the edited
+         * building, and a count on a surface is what R13's clauses are about. Driven at day 1 and
+         * day 6 because two of the shipped periods gate on the weekday, so a Saturday is a
+         * different sentence — and on one of them, no sentence at all.
+         */
+        seeds.push({
+          field: `period.${id}.day${String(day)}.line`,
+          text: today === null ? '' : calendarLine(patch),
+          role: 'observation',
+        });
+        for (const [index, withheld] of patch.withheld.entries()) {
+          seeds.push({
+            field: `period.${id}.day${String(day)}.withheld[${String(index)}]`,
+            text: withheld,
+            role: 'reason',
+          });
+        }
+      }
+    }
+
+    /* ---- the fabric: every constraint, against as-built and against a moved bank ---- */
+    const classes = commissionableClasses(context.elevatorSpecs);
+    const asBuilt = asBuiltChoices(building, classes);
+    const first = asBuilt[0];
+    const moved =
+      first === undefined ? asBuilt : withBankChoice(asBuilt, { ...first, shafts: first.shafts + 3 });
+    for (const label of Object.values(DIMENSION_LABELS)) {
+      seeds.push({ field: `dimension.${label}`, text: label, role: 'label' });
+    }
+    for (const constraint of CONSTRAINTS) {
+      seeds.push({ field: `constraint.${constraint.id}.label`, text: constraint.label, role: 'label' });
+      seeds.push({ field: `constraint.${constraint.id}.note`, text: constraint.note, role: 'prose' });
+      for (const [name, choices] of [
+        ['as-built', asBuilt],
+        ['moved', moved],
+      ] as const) {
+        const review = reviewCommissioning({
+          base: building,
+          choices,
+          classes,
+          specs: context.elevatorSpecs,
+          constraint,
+        });
+        /*
+         * The one sentence the capital figure appears in, on both arms — because the arm that
+         * refuses is the one whose wording could slip into ranking, and the arm that does not is
+         * where an unearned superlative would sit unchallenged.
+         */
+        seeds.push({
+          field: `constraint.${constraint.id}.${name}.sentence`,
+          text: review.sentence,
+          role: 'observation',
+        });
+        for (const refusal of review.refusals) {
+          seeds.push({
+            field: `constraint.${constraint.id}.${name}.refusal(${refusal.code})`,
+            text: refusal.message,
+            role: 'reason',
+          });
+        }
+      }
+    }
+    for (const change of movedChoices(asBuilt, moved)) {
+      seeds.push({ field: `moved.${change.bankId}.${change.dimension}`, text: movedChoiceText(change), role: 'label' });
+    }
+
+    /* ---- the two persistence sentences a ribbon shows ---- */
+    const dropped: readonly DroppedEntry[] = [
+      { shelf: 'building', index: 0, label: 'Tower B', reason: 'banks[0].cars[0].spec is unknown' },
+      { shelf: 'dispatcher', index: 1, label: 'Mine', reason: 'weights.rideTime is not a number' },
+      { shelf: 'pattern', index: 2, label: 'Lunch', reason: 'batchMean is out of range' },
+      { shelf: 'class', index: 3, label: 'Fast', reason: 'ratedSpeedMps.min is negative' },
+    ];
+    for (const count of [1, dropped.length]) {
+      const notice = libraryNoticeFor(dropped.slice(0, count));
+      if (notice !== undefined) {
+        // Both shapes: the singular names the one thing, the plural names three and counts the rest.
+        seeds.push({ field: `library.dropped.${String(count)}`, text: notice, role: 'reason' });
+      }
+    }
+    seeds.push({
+      field: 'library.overBudget',
+      text:
+        saveNoticeFor({
+          kind: 'library-too-large',
+          message: '',
+          characters: 640_000,
+          limit: LIBRARY_BUDGET_CHARACTERS,
+          entries: 28,
+        }) ?? '',
+      role: 'reason',
+    });
+
     return singleRun(this.id, seeds);
   },
 };
@@ -3304,6 +4072,10 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   SCENARIOS,
   EDITOR_PANELS,
   MENU,
+  RESTORE_NOTICE,
+  SELECTOR,
+  CHALLENGE,
+  CALENDAR_AND_FABRIC,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

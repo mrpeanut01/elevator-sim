@@ -20,11 +20,57 @@ export {
 
 export {
   UnsafeConfigurationError,
+  assertChallengesAreRunnable,
   bootstrap,
+  challengeFactsResolver,
   factsResolver,
   type BootstrapOptions,
   type Server,
 } from './bootstrap.js';
+
+export {
+  CHALLENGE_EPOCH_MS,
+  CHALLENGE_PERIOD_MS,
+  CHALLENGE_ROTATION,
+  MAX_CHALLENGE_SEEDS,
+  MIN_CHALLENGE_SEEDS,
+  challengeCycleIndex,
+  challengeDefinitionIssues,
+  challengeStateAt,
+  issuedChallengeAt,
+  issuedChallengeFor,
+  type ChallengeConfig,
+  type ChallengeDefinition,
+  type ChallengeState,
+  type IssuedChallenge,
+} from './challenge/schedule.js';
+
+export {
+  challengeDataHashOf,
+  challengeScoreOf,
+  challengeSubmissionIssues,
+  type ChallengeDataFacts,
+  type ChallengeScore,
+  type ChallengeSubmission,
+  type ClaimedSeedMetrics,
+  type SeedResult,
+} from './challenge/submission.js';
+
+export {
+  verifyChallengeSubmission,
+  type ChallengeVerification,
+  type ChallengeVerificationAccepted,
+  type ChallengeVerificationRejected,
+} from './challenge/verify.js';
+
+export {
+  CHALLENGE_CLOCK_NOTE,
+  COMPARE_NOTE,
+  challengeBoardNote,
+  comparePointerFor,
+  windowRefusalDetail,
+  type ComparePointer,
+} from './challenge/board.js';
 
 export {
   CONFIRMATION_TTL_MS,
@@ -49,6 +95,7 @@ export {
   Store,
   normaliseEmail,
   type BoardMetric,
+  type ChallengeEntryRow,
   type EntryRow,
   type SessionRow,
   type StoreOptions,

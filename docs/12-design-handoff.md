@@ -414,6 +414,51 @@ control and carry different facts. `#status-line` is S4 and says where the *play
 where the second would overwrite the first, on the one screen whose whole discipline is that a
 refused mean stays refused and visible.
 
+
+### 4.8 A whole shell the handoff has no concept of — the menu, and the four screens under it
+
+**The handoff has no title screen, no mode select, no settings screen, no accounts and no
+leaderboard.** `docs/design/` contains none of them, so every one of those decisions is a deviation,
+and until this section none of them was recorded as one. That is the § 4.7 failure repeated at a
+larger radius: not two documents disagreeing, but a whole surface neither of them mentions, which is
+what a *both documents agree* check cannot see.
+
+**What the handoff still settles, and these must not contradict.** It is canonical for what the
+screen looks like: the chip-and-plate visual language, the two rails, the tab strip, the report
+sheet's shape, and every requirement row in § 1. The menu is drawn in that language rather than in
+one of its own, it is an overlay above the drawer rather than a route that replaces the shell, and
+**nothing on it may state a figure** — the simulator wins every disagreement about what a number
+means, and the menu states no numbers at all except a board's, which come from the server with their
+own count attached.
+
+**The six screens, and what each is for.**
+
+| Screen | Why the handoff has no row for it | The constraint it is built under |
+|---|---|---|
+| Main | The prototype has one mode and opens straight into it | Six destinations, each with a line saying what it is; never a bare list of nouns |
+| Campaign | The prototype's week has no way in or out — it simply is | Says which of the two things called Campaign this is, and selects the surface rather than dropping the reader on whatever tab was last open |
+| Free play | The prototype has no configuration a player chooses | Six axes, all derived from `data/`; Start disabled **and explained**; the run is day one and the screen says so |
+| Settings | The prototype has no presentation controls at all | Presentation only, and that claim is **measured** — `scope.test.ts` moves each and requires the legs byte-identical |
+| Leaderboard | There is no server in the prototype | Says what a board *is* rather than letting the word imply a skill ranking |
+| Challenge | Neither is there a competition | The window is drawn and never computed; the dispatcher is the only axis; every row carries its `n` |
+
+**One rename, and it is the one disagreement with the handoff's own vocabulary.** The prototype uses
+*Campaign* for its batch-judged stage list. This implementation also has a contract week, which the
+scenarios card and the shift layer both call a campaign — so two unrelated modes wore one word.
+**The batch tab is relabelled `Lab`; the id is unchanged**, so every deep link, every test and every
+`ELEMENT_IDS` row still names `campaign`. The week keeps the handoff's word because the week is what
+a player spends their time in, and the surface that moved is the one a reader reaches least.
+
+`docs/17` § 5 clause 2 is the residue: the *Scenarios* tab and the *Campaign* menu row still name the
+same mode from two angles — the mode and its assignment picker. That is a naming judgement about a
+surface the handoff drew, so it is recorded here rather than settled unilaterally.
+
+**Two panels, added inside the shell rather than beside it.** The weight-set selector sits beneath
+the dispatcher's own controls in `#panel-dispatcher`, and the challenge board is a menu screen rather
+than a tab. Both follow § 4.7's rule for a control the handoff has no row for: it is drawn in the
+design's language, it is refused **beside itself** when the run will not read it, and it is recorded
+here.
+
 ---
 
 ## 5 — Definition of done

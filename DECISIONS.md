@@ -13624,3 +13624,621 @@ The scanner is now inlined in **four** places — `experiments/src/tuning/`, `co
 consolidation, and the fix is a small `dev-audit` workspace package every audit devDepends on. Not
 done here, because this branch is already adding one package and a second one to hold a scanner is
 scope this change did not ask for. Recorded so a consolidation knows all four sites.
+
+
+## D216 — change scope: what a control is allowed to move, and when
+
+**Date: 2026-08-04 · Architecture, written before the code.** The product has a main menu (§ D214),
+a day loop, a batch campaign and a leaderboard, and no statement anywhere of **which controls may
+move at which point in a game**. This section records the model before it is built, and names the
+clauses the shipped product fails, so it cannot later be read as a description of whatever got
+written. [`docs/16-change-scope-contract.md`](docs/16-change-scope-contract.md) is the contract; this
+is why it exists and what it is allowed to cost.
+
+### 1. The structural fact, because every other decision here follows from it
+
+`Simulation.run()` returns when the replication is over, and CLAUDE.md invariant 3 keeps the wall
+clock out of `core/`, so there is no instant inside a run at which a player could intervene. The
+viewer runs the day first and plays the recording back.
+
+**So a control does not steer a day. It discards one and simulates a different one.** `dev/main.ts`
+already behaves that way — every state changer calls `runShift()` — and no surface says so. The
+product's most-used verb is an unlimited, free, unrecorded retry, and nothing in the tree models it.
+That is not a bug to fix; it is the mechanic to name.
+
+The one genuine mid-run adaptation the simulator has is the weight-set selector — `selection.policy`
+over `patternSwitching`'s five patterns. Which means the player's real within-day lever is
+*configuring an automatic policy in advance*, and that is a better game idea than a slider. It is
+currently reachable from no mode's own surface.
+
+### 2. Four scopes, named; the controls under them, derived
+
+`presentation`, `within-day`, `between-days`, `between-games`. The **categories** are named by the
+criterion, so a fifth is a compile error at every exhaustive switch; the **members** are derived from
+the state's own keys and asserted in both directions, so a new field with no scope is a red suite
+rather than a silent omission. That split is `mode/types.ts`'s, restated for a different quantity,
+and it is § D213's rule: five hand-written lists in one branch had to be widened by hand when three
+buildings landed, and two of them were guards that could no longer see what they were guarding.
+
+A field the shell writes and no player controls — `recording`, `report`, `withheld` — is declared an
+**output** with its reason rather than left out. An absence is indistinguishable from an oversight,
+which is § D106's argument about `measured: false` against `0`, pointed at a control instead of a
+quantity.
+
+### 3. `presentation` is the row worth the most, because it is already promised in prose
+
+`menu/types.ts` states it today: *"a setting that altered the simulation would make two players'
+scores incomparable while both looked valid, and the leaderboard verifies a submission by replaying
+its seed."* A promise with no test is how this repository shipped ten dead seams, and the four
+settings that promise covers reach **nothing at all** — so the prose is currently protecting a claim
+that has no way to be false and no way to be true.
+
+The rule is therefore two-sided and both sides are asserted: a presentation control must leave the
+legs **byte-identical**, and must observably move a declared sink. The first clause is the inverse of
+§ D177 and catches a setting that secretly changes a run; the second is § D177 itself and catches a
+setting that is decoration. One of them is red today on all four settings.
+
+### 4. The `ranked` row already exists, written by hand, and that is the argument for deriving it
+
+`dev/main.ts#provenanceLineOf` refuses to emit a CLI line for a run whose building, dispatcher or
+pattern is not shipped, whose `week.day !== 1`, whose event changes anything, which holds a car out
+of service, or whose group levers have moved. **That is the set of state a run may not carry if
+somebody else is to reproduce it from its selection** — which is exactly what the leaderboard's
+server does when it replays a submission, and exactly what a `ranked` play mode must forbid.
+
+So it is derived once, in `scope/runIdentity.ts`, and consumed twice: by the copy-a-CLI-line control
+and by the submit path. Two implementations of *"can this run be reproduced elsewhere?"* is how the
+client and the server come to disagree about what a selection meant, and a board verified by replay
+cannot survive that disagreement — it would reject honest entries as forgeries, which is the failure
+mode the design is least able to detect from the outside.
+
+### 5. What this is allowed to cost, stated before it is spent
+
+The suite is 262 files and roughly 1 918 s, and the deep honesty tier alone is 398.7 s. The
+play-through walk simulates, because comparing on the legs is the only comparison § D177 accepts. So
+the always-on walk is bounded to the two buildings `dev/state.freePlay.test.ts` already uses, the
+exhaustive walk sits behind the same opt-in switch the honesty tiers use, and **the added seconds are
+measured and published in § D217 rather than absorbed**. A wave that quietly slows the suite is how
+the suite stops being run.
+
+### 6. Evidence tiers, named, because this one is easy to overclaim
+
+`static sweep < model walk < document recorder < browser`. This repository has no browser and
+[`docs/05`](docs/05-roadmap.md) says so in terms. The walk introduced here drives the **decisions** —
+navigation, affordances, scope, the run a selection produces — and does not drive a document, so it
+earns `✅ test` on a decision and `⚠️` on a mount, and `UX.md` gains no `✅ run` row from it. The
+ledger has three false green marks in its history and says so at its own head; a fourth earned by
+calling a model walk a drive would be worse than the gap it papered over.
+
+### 7. The clauses the product fails today
+
+Eight, listed in `docs/16` § 5 and each reducible to a run: a contract clears without advancing a day;
+Start does not run the selection; Start does not reset the week, so growth and today's event ride
+along unnamed; four settings reach nothing; nothing reopens the menu; the campaign screen has no
+content; the menu has no stylesheet; and `client.submit` has no non-test caller.
+
+They are named here because § D163's defence of a criterion is structural: *the clauses that decide
+this must be ones the shipped product does not currently satisfy.* Seven of the eight were found by
+walking the seam rather than by reading it, which is the same method that produced the two honesty
+violations § D186 calls the most valuable result its phase could have had.
+
+
+## D217 — what the walk found, and what it did not close
+
+**Date: 2026-08-04 · Written after the code, and says so.** § D216 is the contract, dated before any
+of it existed and naming eight clauses the shipped product failed. This section records which of them
+closed, what closing them cost, and — the useful half — the things the walk found that the contract
+did not anticipate. [`docs/17-play-experience-audit.md`](docs/17-play-experience-audit.md) is the
+mode-by-mode analysis; this is the verdict.
+
+### 1. Seven of the eight closed. The eighth is registered, not absorbed
+
+Closed: a contract could be cleared without advancing a day; Start did not run the selection; Start
+did not reset the week; nothing reopened the menu; the campaign screen had no content; the menu had
+no stylesheet; `client.submit` had no non-test caller.
+
+**Open, and narrowed while this section was being written:** two of the four `Settings` still reach
+nothing. `reduceMotion` and `playbackSpeed` acquired real sinks — `dev/motion.ts` now owns both
+decisions and `dev/main.ts` calls them, so moving the setting and moving the thing the viewer
+consults are the same event. `showEnergyAxis` and `theme` remain, and `theme` is the one whose sink
+would have to be **built** rather than connected: the stylesheet has one palette.
+
+They are in `scope/probes.test-helper.ts`'s `SINK_MISSING` with a reason each and a **staleness
+assertion** — a registered control that acquires a sink turns the suite red until its entry is
+deleted, so this cannot quietly become permanent. The register's contents are pinned exactly, so
+closing one of the two cannot leave it looking healthy.
+
+**A false sink was written and caught in the same pass, and it is the more useful half.** The first
+version of the `playbackSpeed` probe computed `60 * multiplier` in the test helper and asserted it
+differed from `60 * 1`. That passes whether or not the control is connected to anything — a sink
+that tests its own arithmetic. The fix is that the arithmetic has exactly one home and the shipped
+path calls it, which is the same rule the rest of this repository applies to a second source of
+truth. That
+is `deadCode.test.ts`'s `DEAD_CANDIDATES` idiom, and it is used here for the same reason: the suite
+stays green while the register carries the defect, and the register is the thing somebody has to
+answer for.
+
+### 2. The worst finding was a game rule, not a bug
+
+A contract could be cleared **without the doors ever opening on the next day**. `closeDay` had no
+same-day guard and `closeShift`'s only guard is the recording's id — which a re-run defeats by
+construction, and re-running is what every control in the shell does when it is moved. Move a slider,
+re-close, repeat: `needClean: 3` cleared on Monday.
+
+It survived because nothing modelled the retry, and nothing modelled the retry because the retry is
+invisible in the architecture. `Simulation.run()` returns when the replication is over, so a control
+cannot steer a day — it discards one and simulates a different one. That is the product's most-used
+verb and it had no name.
+
+**The fix refuses the exploit without refusing the recovery.** A retry replays the day from a snapshot
+taken before it was first closed, so missed → clean banks one, clean → clean changes nothing, and
+clean → missed takes the credit back. The third row is why the snapshot has to exist: a rule that
+could only ever add would let a player bank a clean run and keep the credit while re-running until
+the picture was prettier.
+
+### 3. The instrument found three bugs in itself and none in the product, and one of them matters
+
+Writing `scope.test.ts` produced three failures, all mine. `GroupLevers.parking` is a boolean and not
+a strategy name. Garden Apartments at a residential trickle has `main-A` answer everything, so
+holding `main-B` genuinely is byte-identical there and the probe had to move to a building where four
+cars carry 1 710 people.
+
+The third is the one worth recording: **`legsOf` dropped `outOfServiceCarIds`**, because
+`shiftRunConfigOf` returns it *beside* `config` and `runShift` passes the two to `recordRun`
+separately. So the instrument reported a live seam dead. An instrument that does not reproduce the
+shipped call path measures the instrument, and the failure mode is the worst available here — a false
+accusation of inertness against a control that works, in a suite whose whole purpose is finding
+controls that do not.
+
+### 4. The dead-code audit caught this wave's own directory on its first run
+
+`viz/deadCode.test.ts` reported three exports of `scope/` with no non-test caller — in the directory
+whose entire subject is that defect, on the run it landed. `refusalFor`, `permittedScopes` and
+`reproducesFromSelection` were **deleted rather than allowlisted**, which is the roadmap's own
+prescription: the fix is a caller. They arrive with theirs.
+
+The fourth, `runIdentityIssues`, got its caller immediately and that is the more interesting one —
+see § 5.
+
+### 5. `provenanceLineOf` had already written the `ranked` scope out by hand
+
+The predicate *"can this run be reproduced elsewhere from its own selection?"* existed in
+`dev/main.ts` as six refusals: an unshipped building, an unshipped dispatcher, a saved pattern, a
+`week.day` that is not 1, a held car, a moved lever. The leaderboard's submit path was about to
+enumerate it a second time.
+
+Two answers to that question is the one disagreement a replay-verified board cannot survive, and it
+is asymmetric in an ugly way. A client **stricter** than the server refuses a run the server would
+have taken and nobody finds out. A client **looser** posts a run the server cannot reproduce, and the
+server rejects it **as a forgery** — spending the one accusation this product makes on a client bug,
+against an honest player.
+
+Derived once in `scope/runIdentity.ts`, consumed by both. The matrix test asserts the two agree on
+every state *and on the number of reasons*, because a predicate that collapsed three refusals into
+one would agree on every boolean and still tell a player less than the control beside it does.
+
+### 6. Two clauses were one usability failure
+
+The menu had **no stylesheet** — twenty-nine class names, zero rules, on markup appended after a
+`100vh` shell that does not scroll — and **no way back into it** once left. Neither is visible in a
+screenshot of the game, which is why both survived: the game looked right, and the menu was below the
+fold.
+
+The class-coverage test derives the class list by reading `menuPanel.ts`. A listed one would have
+been the sixth hand-maintained list in this branch and would have failed in the worst direction, by
+quietly checking fewer names than the panel emits.
+
+### 7. What the contract did not anticipate
+
+- **`free-play` permits `within-day`, so S6 does not require the levers or held cars to be reset.**
+  What requires it is the *selection*: neither is one of the six axes the menu offered, so inheriting
+  Thursday's held car makes the run not the run the screen described. The rule that applies is about
+  the selection, not the scope, and § D216 § 2 did not distinguish them.
+- **A third entry kind was needed.** `control` and `output` could not describe the four editor working
+  copies: `dispatcherSpec` is written by a slider a player drags, so it is not an output, and moving
+  it changes no leg because `shiftRunConfigOf` never reads it. Declaring it `presentation` would have
+  been false in the way that matters — it is not that it *cannot* change a run, it is that it changes
+  one later, through a save and a select. `latent` carries the field that realises it, so the claim is
+  checkable rather than a shrug.
+- **The honesty sweep gained the menu's whole screen set for no simulations.** The menu's strings need
+  no run, so the adapter enumerates every screen per existing case rather than widening `HonestySpace`
+  with a fifth axis, which would have multiplied the case count. Three arms — whole, broken, and a run
+  that cannot be ranked — because the sentence beside a disabled *Post this run* is a claim about why
+  somebody's score is not going up.
+
+### 8. The walk, and the one assertion that was mutation-checked
+
+`playthrough/walk.test.ts` drives `screenOf` and `applyIntent` over the whole reachable graph, in
+three arms — signed in with a postable run, signed out with nothing run, and signed in with a run
+that cannot be ranked — because the interesting refusals live in the states where something is
+wrong, and a walk driven only on the happy path leaves every error path unvisited.
+
+**A test that has never been red proves nothing**, and this one passed on its first run because the
+defect it is for had already been fixed. So it was mutation-checked: `campaignRows()` returning `[]`
+turns *"offers a way forward from every screen, not only a way back"* red with the message
+*"campaign (signed in, a postable run on screen) offers nothing but Back"*, which is § 5 clause 6
+exactly. Recorded because the alternative — a green walk nobody has seen fail — is a suite that
+covers less than it claims.
+
+**What it deliberately does not claim.** Clauses 2 and 3 are `enterFreePlay.test.ts`'s, compared on
+the legs, because *what a run is* is not a question a navigation walk can answer. Clauses 5 and 7 are
+DOM facts and are asserted by reading `index.html`. Saying which instrument caught which clause is
+the whole of S9's discipline.
+
+### 9. Evidence tier, stated rather than implied
+
+This wave earned `✅ test` and nothing above it. There is still no browser — `docs/05` says *"no
+Playwright, no Puppeteer, no jsdom"* — so the decisions are driven and the mounts are not, and the
+class-coverage assertion reads `index.html` as text rather than rendering it. § D216 § 6's ladder
+applies: `static sweep < model walk < document recorder < browser`, and no `UX.md` row gains `✅ run`
+from anything here.
+
+The four modes `docs/17` § 4 designs — incidents and maintenance, the calendar, the daily challenge,
+commissioning — are **designed and not built**, and the seven open findings in § 5 of that document
+are open. Naming them is the point of writing them down.
+
+
+## D218 — a challenge board, and the prohibition it has to survive
+
+**Date: 2026-08-04 · Architecture, written before the code.** § D217 left the leaderboard's central
+defect described and unfixed: a board is keyed by a digest that **includes the dispatcher and
+excludes the seed**, so every entry on one board is the same configuration on a different seed, and
+choosing a better dispatcher does not beat anybody — it moves you to a different board. The
+competitive axis is luck and the skill axis forks the leaderboard.
+
+This records what would fix it and, more importantly, the rule it has to survive. It is written
+before the server changes because the rule is the hard part and a fix that quietly broke it would be
+worse than the defect.
+
+### 1. The prohibition, quoted rather than paraphrased
+
+[`docs/10`](docs/10-experience-layer-contract.md) § 5.5, *What must never be built*:
+
+> A leaderboard ranking dispatchers from single runs (R2).
+
+R2 is *"a score is a property of a run, never of a dispatcher"*, and § 5.2's evidence is **M7**: a
+single-run saturation verdict on Secure Tower flips 6 of 20. So the obvious fix — take the dispatcher
+out of the board key so players compete on it — walks straight into the ban. It would produce
+precisely the surface § 5.5 names.
+
+### 2. What a challenge is, so that it does not
+
+**A fixed set of seeds, not one.** The server already re-runs a submission to verify it (§ D214 § 3),
+so running the five seeds a challenge names instead of the one a player picked costs a little CPU and
+buys the difference between a run and a sample. Every row carries its `n`, per R13, and the four
+metrics stay unblended beside each other, per § D106.
+
+**It still does not say a dispatcher is better.** A challenge board says *"these players, on these
+five seeds, in this order"*. That is a fact about submissions. It is not a paired comparison, it has
+no interval, and it may not be worded as though it had one — **Compare remains the only surface in
+this product allowed to say one dispatcher beats another**, because it is the only one that runs
+common random numbers and reports an interval that can contain zero.
+
+The distinction is thin enough to be worth a mechanism rather than a promise: the challenge board's
+own copy is driven by the honesty search like every other player-facing string, and R2's
+`unresolved-comparison` property is what would catch a sentence that crossed the line.
+
+### 3. The clock is the server's, and that is not a detail
+
+`core/` may not read a wall clock (invariant 3) and a client's clock is not trustworthy in a
+competition. The server is already this repository's first wall clock (§ D214), so a challenge is
+**issued as data** — an id, a resolved configuration, a seed set, an opens-at and a closes-at — and
+the client never computes which challenge today is. A client that did would be a second answer to a
+question the server has already answered, which is the failure § D217 § 5 describes with a victim.
+
+### 4. What this does not do
+
+It does not remove the existing config board. That board is a real thing — *one configuration across
+seeds* — and it is now labelled as one on screen. What it was never entitled to be is the product's
+answer to *"who is best at this"*, and the challenge board is that answer instead.
+
+### 5. The criterion
+
+Written before the code, and chosen so the shipped product fails it today:
+
+1. A challenge board's rows are a **sample**, and every row shows the count it was computed over.
+2. No string on that surface orders two dispatchers. The honesty search drives the surface, and
+   `unresolved-comparison` is red if one does.
+3. The client never decides which challenge is current, and a test proves it by advancing the
+   client's clock and requiring the answer not to move.
+4. A submission is verified by replaying **every** seed in the set, and a score that reproduces on
+   four of five is rejected — partial reproduction is not reproduction.
+5. `Compare` is reachable from the challenge surface, because the honest answer to *"is my dispatcher
+   better"* lives there and nowhere else.
+
+---
+
+## D219 — what the second wave built, and the three things mounting it found
+
+**Date: 2026-08-05 · Written after the code, and says so.** § D216 is the contract and § D217 is the
+first wave's verdict. This entry is the second wave's, and it exists for the reason § D217 gives:
+*"an entry written before the code is a criterion; one written after is a report, and the two must
+not be confused."*
+
+Six of `docs/17` § 5's seven findings are now closed. What follows is the three that were closed by
+building something the audit did not know was missing, because those are the ones worth reading.
+
+### 1. `patternSwitching` had no seam, and the surface would have hidden it
+
+`docs/17` § 5 clause 6 is *the weight-set selector has no surface*. The obvious reading is that the
+model was fine and the panel was absent. Half of it was.
+
+A profile's `selection` block already reached a run: `shiftRunConfigOf` builds the driving profile
+with `profileFromSpec(…, {base})`, which spreads the base. **`patternSwitching` did not.** The block
+was loaded, carried through to `SimulationConfig.dispatcherProfiles`, resolved by `resolveWeightSets`
+— and **nothing in the viewer could write it**. An arm-map editor over that would have been the
+twelfth instance of this repository's signature defect, with a slider on it: five selects that a
+player moves, an authored library they appear to bind, and a run that never reads the binding.
+
+It is instructive for the same reason the eleventh (the deck API) was: nothing about it looked
+neglected. The block is authored in `data/`, the detector's ramps are calibrated against eight
+measured operating points, the resolver is tested, and the loader carries it correctly. **The
+configuration was right, the resolution was right, and nothing could change either.**
+
+Closed by `dispatcherProfilesWithSelector`, which writes the file the arms resolve from and returns
+the file object *by identity* when the map is unchanged — so `viewerSelector.test.ts`'s existing
+`expect(config.dispatcherProfiles).toBe(file)` stays true rather than being relaxed to accommodate
+the new writer.
+
+### 2. Two of six sliders are inert at the default cell, and that is a finding about `data/`
+
+The § D177 test moves each control and requires the legs to differ, at `midtown-office` 900 s on
+`collective`. Four sliders move the legs there. Two do not, and neither is a broken control:
+
+- **`lobbyArrivalRateGain`** — *raising* it moves nothing, because Midtown's lobby rate is already
+  past `up-peak`'s ramp `oneAt` of 0.012, so a larger gain saturates a membership already at 1. The
+  contrast that works is **lowering** it to 0.
+- **`interfloorRateGain`** — needs a hospital directional split *and* a 60 s observation window
+  before the `interfloor` arm outscores `two-way` at all.
+- **`switchMargin`** — only bites after the dwell expires, and nothing on a 900 s run reaches a
+  120 s dwell's expiry often enough to matter; the contrast needs `hysteresisS: 0`.
+
+Each row names its own operating point and its reason in the test. **The alternative was to pick a
+cell where all six move and say nothing**, which would have passed the same assertion while hiding
+that three of the six knobs do nothing a player would notice on the building the product opens on.
+
+Also pinned there: `contextual` at its defaults is **legs-identical** to `fuzzy`. That is what
+`selection.policy`'s own declaration claims, and it is what makes the gain contrasts mean anything.
+
+### 3. A `?? 0` in the config board was a wrong accusation waiting for its mask to move
+
+Found while building the challenge board's claim, not by looking for it. `dev/main.ts#submitScore`
+sent `pctOverLongWait: recording.summary.pctOverLongWait ?? 0`. The figure is `null` when it was
+**never measured** — `core` produces `NaN` for a share with no denominator — so the fallback turned
+*unmeasured* into *zero per cent*, and the server, which measures the same run and gets `NaN`,
+compares `NaN` against `0` and refuses the submission as `metrics-do-not-reproduce`.
+
+That is this product's **one accusation**, spent on a client fallback, telling an honest player their
+figures did not replay — true, and useless. Today the run in question usually fails `awtIsValid` and
+the quotability refusal fires first, so the bug is masked. A masked wrong accusation is exactly the
+kind that surfaces after the mask moves.
+
+There is no number that fixes it: `NaN` is what the server measures, and `JSON.stringify(NaN)` is
+`null`, so it does not survive the wire either. `claimedMetricsOf` refuses instead, naming the
+figure. A genuine zero still posts — that is the distinction the `??` collapsed.
+
+### 4. Endless, and the sentence reusing a path cost
+
+`c5` and `c8` both promise *endless mode* and nothing implemented one. It is now nine lines, because
+`openEndless` opens a week carrying a contract id no contract answers to and every consumer already
+handled that. The mode needed a **value**, not a branch.
+
+Reusing the path was right. Reusing the *wording* was not: the no-contract report line read *"Your
+own building — nothing is being banked"*, so pressing **Keep going** on Midtown Office would have
+told a player they were on their own building — false in the one way a reader acts on, since they
+would go looking for the scenario they think they lost. The two sentences are now separate, and the
+rule generalises: **a sentinel that reuses a code path does not inherit that path's prose.**
+
+The same wave found the coach ribbon's `Sandbox` eyebrow and its *free play* progress line were
+**unreachable** — both tested `week.contractId === undefined` on a field typed `string`. TypeScript
+does not object to that comparison, which is why a strict build carried it. `GAPS.md` had filed
+Sandbox as a label with no feature behind it and missed the sharper fact: the label was not merely
+unbacked, it could not be printed.
+
+### 5. What is still open
+
+- **Sandbox**, which is a missing *meaning* rather than a missing mode. Nobody has decided what it
+  is, and building the wrong thing is worse than the label.
+- **Two surfaces called Campaign, and a third called Scenarios** (§ 5 clause 2). The Campaign tab is
+  relabelled **Lab** and the campaign screen says which one it is, but renaming a surface the handoff
+  drew is a disagreement the handoff should settle.
+- **Calendar and commissioning**, two of the four modes § 4 designs. Incidents is built and calendar
+  is the next one, because it attaches at the same `growth.ts` seam incidents proved.
+- **The saved library does not survive a reload**, which is a schema-version decision rather than an
+  omission.
+
+---
+
+## D220 — a browser tier, and the three claims it is allowed to make
+
+**Date: 2026-08-05 · Architecture, written before the code.** [`docs/05`](docs/05-roadmap.md) states
+the convention this reverses in terms: *"There is **no browser automation in this repository** — no
+Playwright, no Puppeteer, no jsdom, and all four `vitest.config.ts` projects are
+`environment: 'node'`."* Reversing a stated convention needs an argument rather than a capability, so
+here is the argument, the boundary, and the criterion — before any of it is built.
+
+### 1. What changed: the suite has never executed the shell, and that is now measured
+
+`dev/main.ts` ends with `if (typeof document !== 'undefined') void main();`. Under vitest there is no
+`document`, so **`main()` has never once run in this repository's history.** Every test of the viewer
+imports the module for its pure exports and stops there.
+
+On 2026-08-05 that stopped being a theoretical gap. `boot()`'s sequence assigns `stageTheme`, whose
+`let` was declared ~500 lines below it, so the page threw
+`Cannot access 'stageTheme' before initialization` on boot's **second statement** and rendered
+nothing. **2 100 tests were green over a dead product.** It is the fourth occurrence of that exact
+mistake in this package — `started`, `carBadgeHits`, then `stageTheme` and `baseSpeed` — and two of
+the four are written up in prose in the file that carries them.
+
+That is the evidence. Not *"a browser would be nice"*: a specific class of defect, four instances, a
+100 % miss rate, and a suite whose greenness is uninformative about whether the page exists.
+
+### 2. Three kinds of claim, and only one of them needs a browser
+
+`UX.md` § 27 carries its unmade claims as one mark, `⚠️ mount`, and that conflates three things:
+
+| Kind | Example | Needs |
+|---|---|---|
+| **Wiring** | the affordance list renders; a click dispatches the intent the model named; `hidden` flips both ways; focus lands on the first row | a **document** |
+| **Paint** | the overlay covers the drawer in a real stacking context; nothing overflows at 320 px; the light palette's contrast measured from pixels rather than from hex arithmetic | a **browser** |
+| **Judgement** | *"the report reads as an account of a day"* | a **human**, permanently |
+
+S9's ladder already names the first two — *document recorder* and *browser* — and this decision is
+what makes them exist rather than being tiers nothing occupies.
+
+### 3. The boundary, mechanised rather than promised
+
+*"No jsdom"* was never arbitrary, and the narrow version must not quietly become the broad one. The
+reason is that **a fake-DOM test of a decision is worse than a node test of a pure function**, and a
+fake DOM invites a suite to test the fake. So:
+
+- decisions stay in pure modules and stay tested under `node`;
+- the document tier asserts **only that a mount writes what the model already decided**;
+- and that boundary is checked rather than remembered: the document-tier project **may not import
+  from `menu/`, `shift/`, `scope/`, `authoring/`, `honesty/` or `core`** — only from `dev/` and
+  `render/`. A test that reached a decision module would be re-testing a decision through a slower
+  and less honest instrument, which is the thing the convention was protecting.
+
+### 4. What the browser tier may claim, and what it may not
+
+It may claim **the page exists and drew**. It may claim things about **layout and paint** that no
+model can answer.
+
+It may **not** become the place run behaviour is checked. § D163 already refuses *"a test that
+renders to a canvas mock and never opens a browser"* as a substitute for driving; the inverse refusal
+is added here — **a browser test may not assert a metric, a mean, or any figure the honesty search or
+the replay harness already owns.** A screenshot diff is not evidence about a simulator, and a browser
+tier that grew into one would be slower, flakier and less able to say why.
+
+**No screenshots in the first tier.** A pixel diff fails on a font hint and is repaired by
+re-baselining, which is a control that trains its owner to override it.
+
+### 5. The criterion, chosen so the shipped product fails it today
+
+1. **A test loads the built page and requires the stage canvas to have been drawn to.** It fails
+   against `882dedd` — the commit where the viewer did not boot — and passes against its fix. That
+   regression is the whole justification, so it is the first thing asserted and the first thing
+   watched failing.
+2. **The document tier closes at least half of § 27's `⚠️ mount` marks**, and each closed mark says
+   which tier closed it. A mark that changes from `⚠️` to `✅ test` without naming its instrument is
+   the mark discipline § D18 exists for.
+3. **The import boundary in § 3 is asserted by a test**, not by review — in the idiom
+   `boundaries.test.ts` already uses for `node:` imports in browser code.
+4. **The browser tier runs in CI and is allowed to be slow, but not to be flaky.** A tier that is
+   retried to green is a tier that reports nothing; if it flakes twice it comes out, and the removal
+   is recorded here rather than being a quiet `.skip`.
+5. **`UX.md` § 27 keeps a permanently-open row** for the judgement kind. Closing the first two tiers
+   must not make the third look closed.
+
+### 6. What this does not do
+
+It does not make the browser the primary instrument. The order of value is measured, not assumed:
+one boot test is worth more than the whole of the rest of the tier, because it is the one that would
+have caught a defect that actually shipped. Everything after it is worth less per line, and the tier
+should stay small enough that its cost is obviously paid for.
+
+---
+
+## D221 — the last two modes, and the three things wiring them found
+
+**Date: 2026-08-05 · Written after the code, and says so.** § D216 is the contract, § D217 the first
+wave's verdict, § D219 the second's. This is the third and last of the play-experience waves.
+
+**All four modes `docs/17` § 4 designed are built**: incidents, calendar, the daily challenge and
+commissioning. Each reaches a run through `shiftRunConfigOf`, and each has a § D177 test that moves
+its control and requires the legs to change. What follows is the three findings, because the modes
+themselves are described in `docs/17` and the findings are not described anywhere else.
+
+### 1. The shell had never been executed, and that is why four boot bugs shipped
+
+`dev/main.ts` ends with `if (typeof document !== 'undefined') void main();`. Under vitest there is no
+`document`, so **`main()` has never run in this repository's history** — every viewer test imports
+the module for its pure exports and stops.
+
+The light-palette wiring in § D219 declared `let stageTheme` ~500 lines below the `boot()` sequence
+that assigns it. The page threw on boot's **second statement** and drew nothing, and **2 100 tests
+were green**. Fourth occurrence: `started`, `carBadgeHits`, then `stageTheme` and `baseSpeed`. Two of
+the four are written up in prose inside the file that carries them, one of them directly above the
+anchor the fix moved them to.
+
+Two controls now, because one was not enough for three attempts. A **text assertion** over `boot()`'s
+body requires every `let` at that indentation to sit above the sequence, in the idiom
+`main.test.ts`'s `urlWritable = true; syncUrl();` check already uses. And a **browser tier**
+(§ D220), whose first test loads the page and requires the stage canvas to have been drawn to.
+
+**The measurement worth keeping from that:** watched failing, the browser test's *throws nothing on
+the load path* assertion **still passed**. The `ReferenceError` never reaches the page — `main()`'s
+own last-resort handler catches it and writes a sentence into `#status`. A browser tier built around
+uncaught errors would have been green over the same dead product the node suite was green over. The
+error handling is *good*, and that is exactly what hides the failure from an error-shaped check. The
+load-bearing assertion reads the bitmap: **the only thing a caught boot failure cannot fake is a
+drawn frame.**
+
+### 2. A building the reader drew was banking somebody else's scenario
+
+`GAPS.md` had *Sandbox is a string with no feature behind it* and asked what the label should mean.
+The question was wrong. `withBuilding` moved the week **into** a building's scenario and never **out
+of** one, so a tower drawn while on Scenario 2 kept `contractId: 'c2'` — which resolves. The ribbon
+read *Scenario · day 4 · 1 clean shift banked* on a building Scenario 2 has nothing to do with, and
+`closeDay` banked against it: **two clean days on an invented tower cleared Scenario 2**, driven in
+`dev/state.test.ts` with the negative control beside it.
+
+That is the shape of forgery the leaderboard's whole replay apparatus refuses, arriving through the
+campaign's front door: draw a two-floor tower with sixteen cars, run clean days, clear the scenarios.
+`withBuilding`'s own docstring says it exists to prevent exactly this and then waved the case through
+on the grounds that *"the sheet says the shift is not being banked"* — true only when the contract is
+`undefined`, and it was not.
+
+Closed with `SANDBOX_CONTRACT_ID`, a third sentinel. Deliberately **not** `ENDLESS_CONTRACT_ID`: same
+mechanics, different events. Endless is *chosen* and the sandbox is *arrived at*, and telling
+somebody who opened the editor that they had started an endless run is a claim about an intention
+they did not have.
+
+### 3. Two modes' controls are inert at the cell the product opens on, and the cells are the finding
+
+Both lanes hit it, independently, and both named the cell rather than moving to one where everything
+works:
+
+- **A third shaft at Garden Apartments changes nothing** at 900 s or 1 800 s. The building produces
+  5 and 20 legs at those lengths, and two hydraulic cars answer every one — the group never assigns a
+  third. At 3 600 s it reaches 48 legs and the same control is live. Pinned with the leg counts
+  asserted, so a change to the shipped calibration reddens the file rather than quietly making the
+  prose false. This is `docs/10` § 0's M1 measurement — *one building where nothing you change makes
+  any difference* — arriving at a control instead of at a slider.
+- **A machine class cannot be moved on its own** at almost any shipped cell, because
+  `data/elevator-specs.json`'s six speed bands are laid **end to end and never overlap**. The only
+  place a class moves alone is 2.5 m/s, the shared endpoint of geared and gearless. That is a real
+  limit on how cleanly commissioning can teach, and it is a fact about `data/` rather than about the
+  panel.
+
+### 4. What this cost, measured rather than absorbed
+
+§ D216 § 5's rule — *a wave that quietly slows the suite is how the suite stops being run* — so the
+seconds are here rather than left for somebody to notice.
+
+| | |
+|---|---|
+| `--project viz`, all three waves in | **234 s**, 101 files, 2 264 tests |
+| the always-on honesty tier, inside that | 80 s |
+| **this wave's four honesty adapters** | **no measurable cost** — 81.2 s without them against 79.7 s with, which is noise |
+| the browser tier | ~4 s, and it skips where there is no Chromium rather than failing |
+| the deep honesty tier | 1 010 s, opt-in, unchanged in kind |
+
+**The adapters were the suspect and are not the cause**, which is worth stating because it was the
+cheap thing to blame: four surfaces driven over 5 periods × 2 days, 3 constraints × 2 choice sets and
+six restore failures cost nothing next to the simulation already in that tier.
+
+Where the seconds actually went is the § D177 rule doing its job: `calendar.test.ts`,
+`commissioning/`, `selectorEditor.test.ts` and the library suite each **simulate**, because comparing
+on the legs is the only comparison that rule accepts. That is the cost § D216 § 5 anticipated when it
+bounded the walk to two buildings, and it is the cost of the modes being checked at all rather than
+asserted. The lever if it ever needs pulling is the same one the honesty tiers use — an opt-in switch
+— and nothing has been put behind one yet, because 234 s is still a suite somebody runs.
+
+### 5. What is still open, and it is short
+
+- **Sandbox as a *mode*.** The defect is closed and the label is true; whether it should also have a
+  screen is undecided, and nobody has needed one.
+- **The document tier** — § D220 § 2's middle rung. It is what closes the rest of `UX.md` § 27's
+  `⚠️ mount` marks, and it is not built.
+- **`midtown-office` trips a `rise-exceeds-class` advisory** — 76.9 m of rise (a −3.5 m garage to a 73.4 m top floor) against `geared-traction`'s reference rating of 76 m. Worth someone's attention and **not a defect**: `core` states in the warning itself that *the reference envelope is application guidance, not a hard limit*, so the building is legal and deliberately so. What it costs is that commissioning cannot blame a player for a warning the shipped building already raises, which is why its diagnostic key had to include the **message** and not just the code and path — keyed on code+path, commissioning that bank as `hydraulic`, rated for 18 m, raised the same code at the same path and was silently forgiven as pre-existing.

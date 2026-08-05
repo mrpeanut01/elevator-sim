@@ -21,6 +21,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 
 import type { PasswordHash } from '../accounts/credentials.js';
+import type { IssuedChallenge } from '../challenge/schedule.js';
+import type { ChallengeScore, SeedResult } from '../challenge/submission.js';
 import type { ClaimedMetrics, SubmittedRun } from '../leaderboard/submission.js';
 
 /* -------------------------------------------------------------------------- *
@@ -52,6 +54,26 @@ export interface EntryRow {
   readonly displayName: string;
   readonly run: SubmittedRun;
   readonly measured: ClaimedMetrics;
+  readonly submittedAtMs: number;
+}
+
+/**
+ * One player's standing on one challenge: their dispatcher, and the server's aggregate over the
+ * whole seed set.
+ *
+ * `dataHash` is part of the identity and not a decoration — see `challenge/submission.ts`'s
+ * {@link ChallengeScore} neighbours. A `data/` change inside a running challenge starts a second
+ * board under the same challenge id rather than corrupting the first.
+ */
+export interface ChallengeEntryRow {
+  readonly id: string;
+  readonly challengeId: string;
+  readonly dataHash: string;
+  readonly userId: string;
+  readonly displayName: string;
+  /** The one axis a challenge leaves free. Stored so a row can be replayed and so it can be read. */
+  readonly dispatcherProfileId: string;
+  readonly score: ChallengeScore;
   readonly submittedAtMs: number;
 }
 
@@ -303,6 +325,155 @@ export class Store {
     );
   }
 
+  /* ------------------------------------------------------------ challenges */
+
+  /**
+   * Put a challenge on the record — **insert if absent, never overwrite**.
+   *
+   * The asymmetry is the decision. A challenge is issued by arithmetic over a rotation
+   * (`challenge/schedule.ts`), so a re-issue produces the same row and an upsert would be
+   * harmless — until the rotation's copy is edited, at which point an overwriting upsert would
+   * silently move the window or the seed set of a challenge players are **currently posting to**.
+   * That is § D214 § 4's defect with a competition on it: the entries would stop describing the
+   * challenge they name. So the first issue wins, and a rotation edit takes effect on the next
+   * cycle rather than under the feet of the current one.
+   *
+   * Returns the row as it now stands, which is the stored one and not necessarily the argument.
+   */
+  issueChallenge(challenge: IssuedChallenge): IssuedChallenge {
+    this.#db
+      .prepare(
+        'INSERT INTO challenges (id, opens_at_ms, closes_at_ms, issued_json) VALUES (?, ?, ?, ?) ' +
+          'ON CONFLICT(id) DO NOTHING',
+      )
+      .run(challenge.id, challenge.opensAtMs, challenge.closesAtMs, JSON.stringify(challenge));
+    return this.challengeById(challenge.id) ?? challenge;
+  }
+
+  challengeById(id: string): IssuedChallenge | undefined {
+    const row = this.#db.prepare('SELECT issued_json FROM challenges WHERE id = ?').get(id) as
+      | { issued_json: string }
+      | undefined;
+    return row === undefined ? undefined : (JSON.parse(String(row.issued_json)) as IssuedChallenge);
+  }
+
+  /** Challenges the server has issued, most recently opened first. For the challenge index. */
+  recentChallenges(limit: number): readonly IssuedChallenge[] {
+    const rows = this.#db
+      .prepare('SELECT issued_json FROM challenges ORDER BY opens_at_ms DESC LIMIT ?')
+      .all(limit) as readonly Record<string, unknown>[];
+    return Object.freeze(rows.map((row) => JSON.parse(String(row['issued_json'])) as IssuedChallenge));
+  }
+
+  /**
+   * Record a verified challenge entry.
+   *
+   * **One row per (challenge, data, player), and a re-submission replaces it.** Not best-per-metric,
+   * which is what the config board does and what would be wrong here: a board that kept each
+   * player's best row *per column* would show a different player's dispatcher depending on which
+   * metric a reader sorted by, so four readers would be looking at four different boards. Latest
+   * wins instead — a challenge entry is the run a player currently stands behind, and switching
+   * dispatcher is the move the whole surface exists to make possible.
+   */
+  recordChallengeEntry(input: {
+    readonly challengeId: string;
+    readonly dataHash: string;
+    readonly userId: string;
+    readonly dispatcherProfileId: string;
+    readonly score: ChallengeScore;
+  }): ChallengeEntryRow {
+    const user = this.userById(input.userId);
+    if (user === undefined) throw new Error('recordChallengeEntry: no such user');
+    const existing = this.#db
+      .prepare(
+        'SELECT id FROM challenge_entries WHERE challenge_id = ? AND data_hash = ? AND user_id = ?',
+      )
+      .get(input.challengeId, input.dataHash, input.userId) as { id: string } | undefined;
+
+    const row: ChallengeEntryRow = {
+      id: existing === undefined ? randomUUID() : String(existing.id),
+      challengeId: input.challengeId,
+      dataHash: input.dataHash,
+      userId: input.userId,
+      displayName: user.displayName,
+      dispatcherProfileId: input.dispatcherProfileId,
+      score: input.score,
+      submittedAtMs: this.#now(),
+    };
+    this.#db
+      .prepare(
+        'INSERT INTO challenge_entries (id, challenge_id, data_hash, user_id, dispatcher_profile_id, ' +
+          'runs, legs, mean_awt_s, mean_wt95_s, mean_ttd_mean_s, mean_pct_over_long_wait, ' +
+          'per_seed_json, submitted_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ' +
+          'ON CONFLICT(id) DO UPDATE SET dispatcher_profile_id = excluded.dispatcher_profile_id, ' +
+          'runs = excluded.runs, legs = excluded.legs, mean_awt_s = excluded.mean_awt_s, ' +
+          'mean_wt95_s = excluded.mean_wt95_s, mean_ttd_mean_s = excluded.mean_ttd_mean_s, ' +
+          'mean_pct_over_long_wait = excluded.mean_pct_over_long_wait, ' +
+          'per_seed_json = excluded.per_seed_json, submitted_at_ms = excluded.submitted_at_ms',
+      )
+      .run(
+        row.id,
+        row.challengeId,
+        row.dataHash,
+        row.userId,
+        row.dispatcherProfileId,
+        row.score.runs,
+        row.score.legs,
+        row.score.meanAwtS,
+        row.score.meanWt95S,
+        row.score.meanTtdMeanS,
+        row.score.meanPctOverLongWait,
+        JSON.stringify(row.score.perSeed),
+        row.submittedAtMs,
+      );
+    return row;
+  }
+
+  /**
+   * One challenge board, ordered by the mean of `metric`, ascending.
+   *
+   * Every ranked metric is a cost, so lower is better for all four and there is no direction to get
+   * wrong. No best-per-player clause is needed here and its absence is not an oversight: the
+   * uniqueness constraint already gives each player exactly one row, so this cannot rank
+   * persistence the way an unfiltered config board would.
+   */
+  challengeBoard(
+    challengeId: string,
+    dataHash: string,
+    metric: BoardMetric,
+    limit: number,
+  ): readonly ChallengeEntryRow[] {
+    const rows = this.#db
+      .prepare(
+        'SELECT e.*, u.display_name AS display_name FROM challenge_entries e ' +
+          'JOIN users u ON u.id = e.user_id WHERE e.challenge_id = ? AND e.data_hash = ? ' +
+          `ORDER BY e.${CHALLENGE_COLUMN_OF[metric]} ASC, e.submitted_at_ms ASC LIMIT ?`,
+      )
+      .all(challengeId, dataHash, limit) as readonly Record<string, unknown>[];
+    return Object.freeze(rows.map((row) => challengeEntryOf(row)));
+  }
+
+  /**
+   * Every `data/` generation a challenge has entries under, largest first.
+   *
+   * So the API can say *how many* entries sit on a board other than the one being shown. Entries
+   * set before a mid-challenge `data/` change are not deleted and are not merged; they are counted,
+   * and a surface that did neither would be quietly losing rows.
+   */
+  challengeDataHashes(
+    challengeId: string,
+  ): readonly { readonly dataHash: string; readonly entries: number }[] {
+    const rows = this.#db
+      .prepare(
+        'SELECT data_hash, COUNT(*) AS entries FROM challenge_entries WHERE challenge_id = ? ' +
+          'GROUP BY data_hash ORDER BY entries DESC',
+      )
+      .all(challengeId) as readonly Record<string, unknown>[];
+    return Object.freeze(
+      rows.map((row) => ({ dataHash: String(row['data_hash']), entries: Number(row['entries']) })),
+    );
+  }
+
   /* --------------------------------------------------------------- shared */
 
   #userRow(sql: string, parameter: string): UserRow | undefined {
@@ -325,6 +496,44 @@ const COLUMN_OF: Readonly<Record<BoardMetric, string>> = Object.freeze({
   ttdMeanS: 'ttd_mean_s',
   pctOverLongWait: 'pct_over_long_wait',
 });
+
+/**
+ * The same four metric ids, over the challenge table's mean columns.
+ *
+ * The **ids are deliberately the same** as the config board's, so a client's metric selector is one
+ * control and not two, and so `BOARD_METRICS` remains the single list of what this product will
+ * order a board on. Only the column differs, because a challenge row's `awtS` is a mean over the
+ * seed set rather than one run's figure.
+ */
+const CHALLENGE_COLUMN_OF: Readonly<Record<BoardMetric, string>> = Object.freeze({
+  awtS: 'mean_awt_s',
+  wt95S: 'mean_wt95_s',
+  ttdMeanS: 'mean_ttd_mean_s',
+  pctOverLongWait: 'mean_pct_over_long_wait',
+});
+
+function challengeEntryOf(row: Record<string, unknown>): ChallengeEntryRow {
+  return Object.freeze({
+    id: String(row['id']),
+    challengeId: String(row['challenge_id']),
+    dataHash: String(row['data_hash']),
+    userId: String(row['user_id']),
+    displayName: String(row['display_name']),
+    dispatcherProfileId: String(row['dispatcher_profile_id']),
+    score: Object.freeze({
+      runs: Number(row['runs']),
+      legs: Number(row['legs']),
+      meanAwtS: Number(row['mean_awt_s']),
+      meanWt95S: Number(row['mean_wt95_s']),
+      meanTtdMeanS: Number(row['mean_ttd_mean_s']),
+      meanPctOverLongWait: Number(row['mean_pct_over_long_wait']),
+      // Kept whole, not summarised. The mean above is small enough that a reader is entitled to
+      // see every run behind it, and a row that could not be taken apart could not be audited.
+      perSeed: JSON.parse(String(row['per_seed_json'])) as readonly SeedResult[],
+    }),
+    submittedAtMs: Number(row['submitted_at_ms']),
+  });
+}
 
 function entryOf(row: Record<string, unknown>): EntryRow {
   return Object.freeze({
@@ -384,4 +593,33 @@ CREATE TABLE IF NOT EXISTS entries (
   UNIQUE (config_hash, user_id, seed)
 );
 CREATE INDEX IF NOT EXISTS entries_board ON entries (config_hash, awt_s);
+
+CREATE TABLE IF NOT EXISTS challenges (
+  id            TEXT PRIMARY KEY,
+  opens_at_ms   INTEGER NOT NULL,
+  closes_at_ms  INTEGER NOT NULL,
+  issued_json   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS challenges_window ON challenges (opens_at_ms);
+
+CREATE TABLE IF NOT EXISTS challenge_entries (
+  id                       TEXT PRIMARY KEY,
+  -- A real reference, not a loose id: an entry for a challenge that was never issued would be a row
+  -- nobody could ever replay, because the seeds and the configuration live on the challenge.
+  challenge_id             TEXT NOT NULL REFERENCES challenges (id),
+  data_hash                TEXT NOT NULL,
+  user_id                  TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  dispatcher_profile_id    TEXT NOT NULL,
+  runs                     INTEGER NOT NULL,
+  legs                     INTEGER NOT NULL,
+  mean_awt_s               REAL NOT NULL,
+  mean_wt95_s              REAL NOT NULL,
+  mean_ttd_mean_s          REAL NOT NULL,
+  mean_pct_over_long_wait  REAL NOT NULL,
+  per_seed_json            TEXT NOT NULL,
+  submitted_at_ms          INTEGER NOT NULL,
+  UNIQUE (challenge_id, data_hash, user_id)
+);
+CREATE INDEX IF NOT EXISTS challenge_entries_board
+  ON challenge_entries (challenge_id, data_hash, mean_awt_s);
 `;

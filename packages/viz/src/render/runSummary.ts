@@ -42,7 +42,9 @@
  * - **R11 — energy is an axis, never a score.** {@link ENERGY_ID} sits between {@link WT95_ID}
  *   and nothing else, `workPerServedLegKJ` is in the same figure as `workKJ`, and no figure's
  *   text combines an energy quantity with a wait quantity. `measured: false` prints
- *   **"not recorded"**, never `0 kJ`.
+ *   **"not recorded"**, never `0 kJ`. The axis may be *withheld* — see
+ *   {@link RunSummaryOptions.showEnergyAxis} — and withholding it takes the whole row or none of
+ *   it, for the same reason the row has five numbers in it rather than five rows.
  * - **R13 — no estimate without its `n`, and no invented denominator.** Every estimate carries
  *   {@link SummaryFigure.count}, and a natural-frequency restatement (*"1 in 20 rides…"*) is
  *   emitted **only** when the sample is at least as large as the denominator it names. Measured:
@@ -137,6 +139,95 @@ export const FIGURE_ORDER = [
   INTERVAL_ID,
   SERVICE_LEVEL_ID,
 ] as const;
+
+/* -------------------------------------------------------------------------- *
+ * What the reader asked to be shown
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The player's presentation choices, as they reach this panel.
+ *
+ * ## Why there is a parameter here at all
+ *
+ * `menu/types.ts` declares `Settings.showEnergyAxis` — *"show the energy proxy beside the wait
+ * figures"*, off by default — and promises the whole `Settings` type is **presentation only**:
+ * *"a setting that altered the simulation would make two players' scores incomparable while both
+ * looked valid, and the leaderboard verifies a submission by replaying its seed."*
+ * `scope/scope.test.ts` makes that promise falsifiable in two halves — the legs must be
+ * byte-identical **and** a declared sink must observably move — because identical legs alone
+ * cannot tell *"this cannot change a run"* from *"this does nothing at all"*. This field was the
+ * second: it was carried in `scope/probes.test-helper.ts`'s `SINK_MISSING` register with the
+ * reason *"render/runSummary.ts draws the energy figures unconditionally; nothing reads this
+ * field."* This is the field it now reads.
+ *
+ * **The intended non-test caller is `dev/main.ts`**, through `mode/disclosure.ts#disclosureItems`,
+ * and at the time of writing that threading has not landed — it is a lane this file's author does
+ * not own. § D192 found two docstrings naming callers that do not call; this qualifier is here so
+ * this is not the third, and it should be deleted when the wiring is, and not before.
+ */
+export interface RunSummaryOptions {
+  /**
+   * Whether to draw the energy row at all.
+   *
+   * **Three constraints, none of them negotiable, and all three are about R11 / § D106 rather
+   * than about layout:**
+   *
+   * 1. **The row is withheld whole or not at all.** `workPerServedLegKJ`, its denominator and the
+   *    raw `workKJ` are one figure precisely so a reader cannot see the total without the per-ride
+   *    figure — *a configuration that spends less by serving fewer people has not saved
+   *    anything*. A gate that hid one and kept the other would be worse than hiding both, so
+   *    there is exactly one flag and it governs the whole row.
+   * 2. **Hiding is not a third way of saying "not recorded".** `VizEnergy.measured: false` means
+   *    nobody wrote down how far the cars moved, and it renders as **"not recorded"** with
+   *    `kind: 'absent'` — never `0 kJ`, because zeroing it would make every arm tie on energy.
+   *    When the axis is off the row is **absent from the output entirely**: no placeholder, no
+   *    `absent` figure, nothing for a reader to mistake for a measurement the run refused to make.
+   *    A player's preference and a run's silence are different facts and they do not share a
+   *    rendering.
+   * 3. **Off does not mean "energy is unimportant", and on does not make it a score.** The axis
+   *    is still drawn *between* the wait figures and nowhere else when it is on, and it is still
+   *    never aggregated into a grade. `nearest-car` — the weakest shipped dispatcher — is on the
+   *    Pareto front at six of eight matrix cells *because* it is best on energy and worst on wait
+   *    (§ D106), so a reader who has energy on and the waits hidden would be looking at a ranking
+   *    that puts the worst dispatcher first. That is why this flag can hide the energy row and
+   *    there is no flag that hides AWT or WT95.
+   */
+  readonly showEnergyAxis: boolean;
+}
+
+/**
+ * What every existing caller gets — the axis **shown**.
+ *
+ * `DEFAULT_SETTINGS.showEnergyAxis` is `false`, and this default is `true`, and that is deliberate
+ * rather than an oversight: this constant is not the player's default, it is *the behaviour of a
+ * caller that has no player*. `mode/disclosure.ts`, `honesty/surfaces.ts` and the acceptance tests
+ * are describing a run rather than serving a preference, and a run description that silently
+ * dropped an axis because a menu somewhere defaults it off would be the honesty sweep measuring a
+ * surface the product does not show. The shell passes the player's own value; everything else
+ * keeps drawing what it drew before this parameter existed.
+ */
+export const DEFAULT_RUN_SUMMARY_OPTIONS: RunSummaryOptions = Object.freeze({
+  showEnergyAxis: true,
+});
+
+/**
+ * The figure ids this panel will draw, in order — the **decision**, with one home.
+ *
+ * Separated from {@link runSummaryFigures} for the reason `dev/motion.ts#playbackRateFor` gives
+ * about itself: a probe that recomputes a decision *"asserts its own arithmetic and says nothing
+ * about the product — a control could be disconnected entirely and the assertion would still
+ * pass."* So the question *"does this setting change what the panel draws?"* is answerable by
+ * calling this, cheaply and without a simulation, and the answer is the one the renderer itself
+ * uses rather than a restatement of it.
+ *
+ * {@link FIGURE_ORDER} stays the full order and this is the filter over it, so R11's adjacency
+ * claim — the energy axis is drawn only beside AWT and WT95 — keeps its single source.
+ */
+export function summaryFigureIds(
+  options: RunSummaryOptions = DEFAULT_RUN_SUMMARY_OPTIONS,
+): readonly string[] {
+  return FIGURE_ORDER.filter((id) => id !== ENERGY_ID || options.showEnergyAxis);
+}
 
 /* -------------------------------------------------------------------------- *
  * Formatting
@@ -497,10 +588,18 @@ function serviceLevelFigure(summary: VizSummary): SummaryFigure {
  *
  * The ordering is applied here rather than left to the order the array happens to be written in,
  * because R11's *"only beside AWT and WT95"* is a claim about adjacency and a claim nothing
- * enforces is a comment. A figure missing from {@link FIGURE_ORDER}, or an id in it that no
+ * enforces is a comment. A figure missing from {@link summaryFigureIds}, or an id in it that no
  * figure produces, throws — the mount would otherwise silently drop the row.
+ *
+ * `options` is presentation and only presentation: it selects **which figures are drawn** and it
+ * touches no value in any of them. Nothing here reads the recording differently because of it,
+ * which is the property `scope/scope.test.ts` requires of every `presentation` control and the
+ * reason a hidden axis removes a row rather than blanking one.
  */
-export function runSummaryFigures(recording: VizRecording): readonly SummaryFigure[] {
+export function runSummaryFigures(
+  recording: VizRecording,
+  options: RunSummaryOptions = DEFAULT_RUN_SUMMARY_OPTIONS,
+): readonly SummaryFigure[] {
   const { summary } = recording;
   // Asked once. `docs/10` R9: a module that re-derives saturation from queue samples is a defect,
   // not an optimization, and there were three copies of this expression before § D111.
@@ -528,7 +627,9 @@ export function runSummaryFigures(recording: VizRecording): readonly SummaryFigu
       suppressed,
       summary,
     ),
-    energyFigure(summary),
+    // Withheld whole, or built whole. Not built-and-blanked: a blank row is a claim about the
+    // run, and this is a claim about the reader. See {@link RunSummaryOptions.showEnergyAxis}.
+    ...(options.showEnergyAxis ? [energyFigure(summary)] : []),
     gatedFigure(
       TTD_ID,
       'door to door',
@@ -548,7 +649,7 @@ export function runSummaryFigures(recording: VizRecording): readonly SummaryFigu
   if (byId.size !== built.length) {
     throw new Error('runSummaryFigures: two figures share an id, so one of them would be lost.');
   }
-  const ordered = FIGURE_ORDER.map((id) => {
+  const ordered = summaryFigureIds(options).map((id) => {
     const item = byId.get(id);
     if (item === undefined) {
       throw new Error(`runSummaryFigures: FIGURE_ORDER names "${id}" and no figure produced it.`);
@@ -559,8 +660,9 @@ export function runSummaryFigures(recording: VizRecording): readonly SummaryFigu
   const orphan = [...byId.keys()][0];
   if (orphan !== undefined) {
     throw new Error(
-      `runSummaryFigures: figure "${orphan}" is not in FIGURE_ORDER, so nothing decides where ` +
-        'it is drawn relative to the energy axis. See R11.',
+      `runSummaryFigures: figure "${orphan}" is not drawn, so nothing decides where it is drawn ` +
+        'relative to the energy axis. Either it is missing from FIGURE_ORDER, or it was built ' +
+        'while summaryFigureIds withheld it. See R11.',
     );
   }
   return ordered;

@@ -85,8 +85,13 @@ What has moved is what the phases are *true of*: `destination-eta` weights `ride
 ([§ D112](DECISIONS.md)); the viewer and `elevator-sim watch` no longer print a mean the same run
 says is suppressed ([§ D111](DECISIONS.md)); the ninth dead seam and the two holes in `core`'s
 dead-code scanner are closed ([§ D114](DECISIONS.md)); and the eleventh dead seam — the whole deck
-API — is closed by simulating it ([§ D131](DECISIONS.md)). None of that was allowed to round a
-verdict up.
+API — is closed by simulating it ([§ D131](DECISIONS.md)). **Two more have been found and closed
+since** — `serviceEvents`, a mid-run service scheduler no shipped building called, and
+`patternSwitching`, the weight-set selector library that was loaded, carried into `SimulationConfig`,
+resolved, and **writable by nothing in the viewer** ([§ D219](DECISIONS.md)) — which takes the count
+to **eleven in code plus two in `data/`**. The existing ordinals do not move: *the ninth* and *the
+eleventh* name specific instances, and renumbering them would break every reference for a running
+total. None of that was allowed to round a verdict up.
 
 **Energy is an axis, never a score.** The matrix that closed Phase 8 measured `nearest-car` — the
 weakest shipped dispatcher, and the viewer's default until § D134 — **on the Pareto front at six of
@@ -119,6 +124,15 @@ code — plus, once, in `data/`. The instructive one is the sixth: the whole of 
 from nothing outside its own tests, the module said so in its own docstring, and the roadmap asserted
 the phase green anyway. So the rule is not "is it reachable?" but **"name the non-test caller"**. A
 barrel re-export and a `{@link}` tag look exactly like a caller and are not one.
+
+**And the most recent one is the one to read if you are about to build a surface.**
+`patternSwitching` was authored in `data/`, calibrated against eight measured operating points,
+loaded correctly, carried into `SimulationConfig`, and resolved by `resolveWeightSets` — everything
+about it worked except that **no code in the viewer could write it**. A five-select editor over that
+would have passed every check this repository runs while binding nothing: the player moves a
+control, the run does not change, and the screen looks right. The rule that caught it is the one
+below — *move the control and require the run to change, compared on the legs* — applied before the
+panel was written rather than after ([§ D219](DECISIONS.md)).
 
 **The eleventh is the most recent and the most instructive, and it is the one to read first.** The
 whole deck API on `model/bank.ts` — `isDoubleDeck`, `deckAt`, `deckAssignmentFor`, `pairedFloorOf`,

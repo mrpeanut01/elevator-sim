@@ -85,7 +85,7 @@ import {
 } from '../editor/editorValidate.js';
 import { buildLayout } from '../render/layout.js';
 import { describePreview, drawPreview } from '../render/preview.js';
-import type { Canvas2DLike } from '../render/canvas.js';
+import type { Canvas2DLike, Theme } from '../render/canvas.js';
 import type { BrowserResources } from './data.js';
 
 const OVERLAY_NONE = 0;
@@ -134,6 +134,15 @@ export interface EditorHandle {
 
 export interface EditorOptions {
   readonly resources: BrowserResources;
+  /**
+   * The palette the preview draws in, asked for at draw time.
+   *
+   * A function rather than a value, because the reader can change the theme while this editor is
+   * mounted and a captured palette would leave the preview on whichever mode the page opened in.
+   * Optional and defaulting to the dark palette, so a caller that has no theme layer is unchanged —
+   * which is exactly what the preview did before the light mode existed.
+   */
+  readonly theme?: (() => Theme) | undefined;
   /** `ED-04`/`ED-T8` — one control from a valid edit to a run in the viewer. */
   readonly onRun: (building: BuildingConfig) => void;
   /**
@@ -686,6 +695,9 @@ export function mountEditor(options: EditorOptions): EditorHandle {
       title: `${building.name} — preview (no run)`,
       caption: summariseReport(report),
       lens,
+      // The second stage surface. Without this the building preview stays dark on a light page,
+      // which is the same half-repaint the canvas had, one panel over.
+      ...(options.theme === undefined ? {} : { theme: options.theme() }),
     });
     previewCanvas.setAttribute('aria-label', describePreview(geometry, lens));
   }

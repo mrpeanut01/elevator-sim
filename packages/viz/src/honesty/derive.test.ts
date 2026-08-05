@@ -57,6 +57,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/motion.ts#REDUCED_MOTION_QUERY',
         'dev/motion.ts#prefersReducedMotion',
         'dev/motion.ts#shouldAutoplay',
+        'dev/motion.ts#shouldAutoplayWith',
         /*
          * The design refactor's three mounts. Each is the DOM half of a split whose **pure** half
          * is driven: `RAIL_VIEW` renders everything `mountLeftRail` writes, `REPORT_PANEL`
@@ -92,6 +93,25 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Diagnostics for a failed **save**, and for the shape check beneath a failed restore — ' +
+        'developer strings on the same footing as `SCOPE_OF`’s `why`. Nothing puts one on a screen: ' +
+        '`saveSession` refuses in a value the shell drops, `jsonRoundTripIssue` and `snapshotIssue` ' +
+        'name a path inside an envelope, and `SESSION_KEY` is a storage key. ' +
+        '**`loadSession` is deliberately no longer in this list.** Its sentences now reach a player, ' +
+        'quoted by `persist/notice.ts#restoreNoticeFor` on the `parse` and `shape` arms, and the ' +
+        '`RESTORE_NOTICE` adapter drives it through three broken stores for exactly that reason. ' +
+        'This entry’s previous reason ended *“the day that sentence reaches a screen it stops being ' +
+        'excludable, and this reason stops being true”* — that day arrived with the notice, and the ' +
+        'narrowing above is what it cost.',
+      ids: [
+        'persist/jsonSafety.ts#jsonRoundTripIssue',
+        'persist/session.ts#saveSession',
+        'persist/types.ts#SESSION_KEY',
+        'persist/validate.ts#snapshotIssue',
+      ],
+    },
+    {
+      reason:
         'A component factory. `dev/dom.ts` produces no sentence of its own — every string it puts ' +
         'on the page is one it was handed by a caller, and every one of those callers is either ' +
         'driven here or excluded above. Its own literals are class names, ARIA attribute values ' +
@@ -123,6 +143,39 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'are derived only because the two-adjacent-words scanner reads hyphenated ids ' +
         '(`garden-apartments`, `lunch-two-way`) as prose.',
       ids: [
+        /*
+         * `shift/incidents.ts` is the same false positive one directory over. It returns
+         * `ServiceEventConfig` values — an `atS`, a car id and a `mode` — and authors no sentence at
+         * all; it is derived only because `'out-of-service'` and `'in-service'` are hyphenated ids
+         * that the two-adjacent-words scanner reads as prose. The *player-facing* half of an
+         * incident is its event's `note`, which `SHIFT_EVENTS` owns and `RAIL_VIEW` drives, and the
+         * refusals it can produce are `ShiftRunPatch.withheld`'s, authored in `events.ts`.
+         */
+        'shift/incidents.ts#serviceEventsFor',
+        'shift/incidents.ts#withIncidents',
+        /*
+         * `render/theme.ts` is the same false positive again, and the most clear-cut instance of it:
+         * it returns a record of CSS custom-property names to hex values — `--edge-mid` to
+         * `#26303d` — and the scanner reads the hyphenated token names as adjacent words. There is
+         * no sentence in the module and no figure; the palette is asserted against `index.html`'s
+         * own `:root` in both directions by `theme.test.ts`, which is a stronger check than a string
+         * search over something no reader reads.
+         */
+        'render/theme.ts#themeFor',
+        /*
+         * `summaryFigureIds` is the *order* the figures are drawn in, not the figures. It returns an
+         * array of ids — `long-waits`, `energy` — and is derived only because those ids are
+         * hyphenated. Its sibling `runSummaryFigures`, which produces the labels, values and notes a
+         * reader actually sees, is driven by the `RUN_SUMMARY` adapter as it always has been.
+         */
+        'render/runSummary.ts#summaryFigureIds',
+        /*
+         * `menu/enterFreePlay.ts` joined this list the moment it gained `playMode: 'free-play'` —
+         * a hyphenated id, read by the two-adjacent-words scanner as prose. It returns a
+         * `ViewerState` and authors no sentence; the refusal a player actually sees when a
+         * selection cannot start is `freePlayIssues`', which `MENU` drives on a broken selection.
+         */
+        'menu/enterFreePlay.ts#enterFreePlay',
         'dev/surfaces.ts#applyDrawerState',
         'dev/surfaces.ts#applyRailState',
         'dev/surfaces.ts#applySurfaceState',
@@ -162,6 +215,33 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'An adapter driving the refusal per campaign case belongs to the honesty lane, not to a ' +
         'hand-edit here.',
       ids: ['dev/main.ts#seedEntryOf'],
+    },
+    {
+      reason:
+        'The change-scope model (`docs/16`, § D216). `CHANGE_SCOPES` and `PLAY_MODES` are the two ' +
+        'id tuples every exhaustive switch in `scope/` walks — the same id-table case as ' +
+        '`campaign/types.ts#FAIL_STATES`. `SCOPE_OF`’s `why` field is **developer** prose: it is ' +
+        'the argument for a field’s scope, addressed to whoever changes that field, and it reaches ' +
+        'no screen — `surface.test.ts` asserts every row carries one and `scope.test.ts` decides ' +
+        'whether the row is true by running both arms, which is a stronger check than a string ' +
+        'search over a sentence no player reads. `permits` returns a boolean and authors nothing.',
+      ids: [
+        'scope/types.ts#CHANGE_SCOPES',
+        'scope/types.ts#PLAY_MODES',
+        'scope/surface.ts#SCOPE_OF',
+        'scope/permits.ts#permits',
+      ],
+    },
+    {
+      reason:
+        'The refusal sentences `provenanceLineOf` used to author itself, moved one layer down by ' +
+        '`docs/16` S5 so the leaderboard’s submit path cannot grow a second copy of them. They ' +
+        'reach `#status` through `copyProvenance` exactly as before, so this inherits the exclusion ' +
+        'directly above it and inherits its limitation too: swept statically, not driven, which is ' +
+        'weaker and is said rather than dressed up. What changed is that the better fix got ' +
+        'cheaper — these sentences are now produced by a pure function of a state and the loaded ' +
+        'resources, so the adapter that exclusion has been asking for no longer needs a document.',
+      ids: ['scope/runIdentity.ts#runIdentityIssues'],
     },
     {
       reason:

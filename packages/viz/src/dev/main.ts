@@ -40,6 +40,7 @@
 
 import { SimulationError, type BuildingConfig } from '@elevator-sim/core/browser';
 
+import type { AccountForm } from '../menu/account.js';
 import {
   SIGNED_OUT,
   busy,
@@ -50,8 +51,30 @@ import {
   type AccountState,
 } from '../menu/account.js';
 import { catalogueOf } from '../menu/catalogue.js';
-import { createClient, fetchTransport } from '../menu/client.js';
+import {
+  challengeNotOpenOf,
+  challengeRunConfigs,
+  challengeSubmissionOf,
+} from '../menu/challenge.js';
+import { claimedMetricsOf, createClient, fetchTransport } from '../menu/client.js';
 import { initialMenuState, navigate } from '../menu/menu.js';
+import { enterEndless } from '../menu/enterEndless.js';
+import { enterFreePlay } from '../menu/enterFreePlay.js';
+import {
+  applyIntent,
+  type ChallengeScreenInput,
+  type CommissioningScreenInput,
+  type MenuIntent,
+} from '../menu/screens.js';
+import {
+  CALENDAR_PERIODS,
+  periodOnDays,
+  type CalendarPeriod,
+  type CalendarPeriodId,
+} from '../shift/calendar.js';
+import { asBuiltChoices, shaftChoices, speedChoices, withBankChoice } from '../commissioning/choices.js';
+import { CONSTRAINTS, commissionableClasses, constraintById } from '../commissioning/types.js';
+import { reviewCommissioning } from '../commissioning/refusals.js';
 import type { MenuState } from '../menu/types.js';
 import { renderMenu, type LeaderboardView, type MenuPanelHost } from './menuPanel.js';
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
@@ -80,10 +103,12 @@ import { Playback } from '../playback/playback.js';
 import { readRecordingDocument, verifyReplay, writeRecordingDocument } from '../record/document.js';
 import { recordRun } from '../record/recordRun.js';
 import {
+  DEFAULT_THEME,
   drawScene,
   type Canvas2DLike,
   type CarBadgeHit,
   type SceneSelection,
+  type Theme,
 } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
 import { buildLayout } from '../render/layout.js';
@@ -91,13 +116,15 @@ import { disclosureItems } from '../mode/disclosure.js';
 import { parityRefusal } from '../mode/parity.js';
 import { isViewMode, itemsIn, type DisclosureItem, type ViewMode } from '../mode/types.js';
 import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
+import { runIdentityIssues } from '../scope/runIdentity.js';
 import { demandFromSpec, specFromTrafficProfile } from '../authoring/patternSpec.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
 import { eventFor } from '../shift/events.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { dayReportOf } from '../shift/report.js';
-import { closeDay, outcomeOf } from '../shift/week.js';
+import { HISTORY_DAYS, closeDay, outcomeOf } from '../shift/week.js';
+import { coachWeekLines } from '../shift/weekLabel.js';
 import { weekdayOf } from '../shift/types.js';
 
 import { mountBatchPanel } from './batchPanel.js';
@@ -118,6 +145,7 @@ import {
 import { mountEditor } from './editor.js';
 import { mountBuildingEditor } from './buildingEditor.js';
 import { mountDispatcherEditor } from './dispatcherEditor.js';
+import { mountSelectorEditor } from './selectorEditor.js';
 import { mountLeftRail } from './leftRail.js';
 import { mountMachinesEditor } from './machinesEditor.js';
 import { mountParameterForm } from './parameterForm.js';
@@ -125,13 +153,18 @@ import { mountReport } from './reportPanel.js';
 import { mountRightRail } from './rightRail.js';
 import { mountScenarios } from './scenariosPanel.js';
 import { mountTrafficEditor } from './trafficEditor.js';
-import { shouldAutoplay } from './motion.js';
+import { playbackRateFor, shouldAutoplayWith } from './motion.js';
+import { themeFor } from '../render/theme.js';
+import { libraryNoticeFor, restoreNoticeFor, saveNoticeFor } from '../persist/notice.js';
+import { clearSession, loadLibrary, loadSession, saveSession } from '../persist/session.js';
+import type { SessionStore } from '../persist/types.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
 import {
   DEFAULT_SHIFT_LENGTH_S,
   SHIFT_LENGTHS,
   allBuildingIds,
   buildingConfigOf,
+  specsWithSaved,
   buildingNameOf,
   disclosureOf,
   initialState,
@@ -312,6 +345,48 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   let carBadgeHits: readonly CarBadgeHit[] = [];
   let bankFilter = '';
+  /**
+   * The line the calendar produced for the day on screen, or `''` on an ordinary one.
+   *
+   * Held rather than recomputed, and that is `docs/16` S5: `shiftRunConfigOf` is the only thing that
+   * knows what the calendar actually **applied** — a template the run length refused never reaches
+   * it, and a population is what `expandFloors` counted rather than the factor asked for. A ribbon
+   * that re-derived it would be a second answer, and the wrong one on exactly the days a refusal
+   * fired.
+   */
+  let calendarCaption = '';
+
+  /*
+   * **Both of the two below are here for `carBadgeHits`' reason, and both were not.**
+   *
+   * `boot()`'s sequence — `restoreSession(); applyTheme(); renderAll(); runShift();` — runs before
+   * the body reaches either declaration, and `applyTheme` **assigns** `stageTheme`. Function
+   * declarations hoist; `let` does not, so the page threw `Cannot access 'stageTheme' before
+   * initialization` on the second statement of boot, and the last-resort handler reported *The
+   * viewer did not start.* over a blank shell. `baseSpeed` was one statement behind it, in
+   * `drawTransportChrome`.
+   *
+   * **The third and fourth occurrences of the same mistake in this closure**, after `started` in
+   * `bootstrap.ts` and `carBadgeHits` above — and the first two are written up in prose directly
+   * overhead. Prose that has been ignored twice is not a control, so `main.test.ts` now reads this
+   * file as text and requires every `let` at this indentation to sit above the boot sequence.
+   */
+/**
+   * The palette the canvas draws in — the stage half of {@link applyTheme}'s answer.
+   *
+   * Held rather than resolved per frame: `themeFor` reads `matchMedia`, and a draw loop that asked
+   * the browser for the colour scheme sixty times a second would be doing work whose answer changes
+   * about twice a year.
+   */
+  let stageTheme: Theme = DEFAULT_THEME;
+/**
+   * The transport chip's own speed, in simulated seconds per real second.
+   *
+   * Held separately from `playback.speed` because `settings.playbackSpeed` multiplies it — see
+   * {@link applyPlaybackSpeed}. Without the split, a reader on ×2 would find their chip selection
+   * jump to whichever chip happened to equal `60 × 2`, and the two controls would fight.
+   */
+  let baseSpeed = 60;
 
   /* ---------------------------------------------------------------------- *
    * The menu — § D214 § 2, and the non-test caller of `menu/`
@@ -365,6 +440,142 @@ function boot(ui: Elements, resources: BrowserResources): void {
   /** Requests are started here and never from a render — a render that fetched would loop. */
   let boardsRequested = false;
 
+  /* ---------------------------------------------------------------------- *
+   * This week's challenge
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * What the server said, and how far this browser has got with it.
+   *
+   * **Nothing here is computed from a local clock.** § D218 § 3: the challenge's state, the time
+   * until it opens and the time until it closes are the server's measurements, held and drawn. A
+   * countdown built by differencing two clocks would be the client answering a question the server
+   * has already answered, one subtraction later.
+   */
+  let challengeView: ChallengeScreenInput = { runsDone: 0 };
+  let challengeRequested = false;
+  /**
+   * The seed set this browser has simulated, paired with the seed each recording is *of*.
+   *
+   * Paired rather than read back off the recording: `SimulationResult.seed` is `String(config.seed)`,
+   * so a challenge naming `007` yields a recording saying `7` and an honest set would be refused as
+   * `unknown-seed`. Every shipped challenge spells its seeds canonically, so this is latent — and a
+   * latent wrong refusal is one `data/` edit away from being a live one.
+   */
+  let challengeRecordings: { readonly seed: string; readonly recording: VizRecording }[] = [];
+  /** Which dispatcher the runs above are of. Changing it discards them — they are of another run. */
+  let challengeRanWith = '';
+
+  async function loadChallenge(): Promise<void> {
+    if (client === undefined || challengeRequested) return;
+    challengeRequested = true;
+    challengeView = { ...challengeView, notice: 'Loading this week’s challenge…' };
+    drawMenu();
+    const result = await client.challenges();
+    challengeView = result.ok
+      ? { ...challengeView, view: result.value.current, notice: undefined }
+      : { ...challengeView, notice: result.detail };
+    drawMenu();
+    if (result.ok) void loadChallengeBoard();
+  }
+
+  async function loadChallengeBoard(): Promise<void> {
+    const view = challengeView.view;
+    if (client === undefined || view === undefined) return;
+    const result = await client.challengeBoard(view.challenge.id, menuState.challenge.metric);
+    challengeView = result.ok
+      ? { ...challengeView, board: result.value }
+      : { ...challengeView, notice: result.detail };
+    drawMenu();
+  }
+
+  /**
+   * Simulate every seed the challenge names, in the order it names them.
+   *
+   * Synchronous and blocking, deliberately: five 900-second runs are a few hundred milliseconds in
+   * this kernel, and a progress bar over something that fast is a lie about how long it took. If the
+   * seed count ever rises far enough for that to stop being true, the count is the thing to look at
+   * — `MAX_CHALLENGE_SEEDS` is 8 and the server's cooldown already scales with it.
+   */
+  function runChallenge(): void {
+    const view = challengeView.view;
+    if (view === undefined) return;
+    const dispatcherProfileId = menuState.challenge.dispatcherProfileId;
+    const built = challengeRunConfigs(view, resources, dispatcherProfileId);
+    if (!built.ok) {
+      challengeView = { ...challengeView, notice: built.detail, runsDone: 0 };
+      challengeRecordings = [];
+      drawMenu();
+      return;
+    }
+    /*
+     * The previous set is dropped **before** the first run rather than replaced after the last. A
+     * throw partway through would otherwise leave three runs of the new dispatcher beside two of the
+     * old one, and `challengeSubmissionOf` would accept that as a complete set of five.
+     */
+    challengeRecordings = [];
+    challengeRanWith = dispatcherProfileId;
+    for (const run of built.runs) {
+      const recorded = recordRun(run.config, { recordDecisions: false });
+      challengeRecordings.push({ seed: run.seed, recording: recorded.recording });
+    }
+    challengeView = {
+      ...challengeView,
+      runsDone: challengeRecordings.length,
+      notice: undefined,
+      postRefusal: undefined,
+    };
+    drawMenu();
+  }
+
+  /**
+   * Post the whole set, or none of it.
+   *
+   * `challengeSubmissionOf` refuses **before** the network for a missing or duplicated seed, and
+   * that ordering is the point: the server's rejection is an accusation, and spending it on a client
+   * bug is the defect `submitScore` already argues about one board over.
+   */
+  async function postChallenge(): Promise<void> {
+    const view = challengeView.view;
+    if (client === undefined || view === undefined) return;
+    const token = accountState.token;
+    if (token === undefined) return;
+
+    const body = challengeSubmissionOf(
+      view,
+      challengeRanWith,
+      challengeRecordings.map((entry) => ({ ...entry.recording, seed: entry.seed })),
+    );
+    if (!body.ok) {
+      challengeView = { ...challengeView, postRefusal: body.detail };
+      drawMenu();
+      return;
+    }
+
+    const posted = await client.submitChallenge(token, body.submission);
+    if (posted.ok) {
+      challengeView = { ...challengeView, postRefusal: undefined, notice: undefined };
+      accountState = withNotice(accountState, 'Posted. The server replayed every seed and they reproduced.');
+      drawMenu();
+      void loadChallengeBoard();
+      return;
+    }
+    /*
+     * The 409 is the one refusal with somewhere to send the player: it names the challenge that *is*
+     * open. Carried from the server's own `detail` and widened with that id rather than rewritten —
+     * two answers to *which challenge is current* is the failure § D218 § 3 is about.
+     */
+    const shut = challengeNotOpenOf(posted);
+    challengeView = {
+      ...challengeView,
+      postRefusal:
+        shut === undefined
+          ? posted.detail
+          : `${shut.detail} (open now: ${shut.currentChallengeId})`,
+    };
+    drawMenu();
+  }
+
   async function loadBoards(): Promise<void> {
     if (client === undefined || boardsRequested) return;
     boardsRequested = true;
@@ -382,98 +593,503 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawMenu();
   }
 
+  /**
+   * The one place this build touches `localStorage` for a session — `persist/` decides, this reads.
+   *
+   * The account token is deliberately **not** here and never will be: `menu/account.ts` holds it in
+   * memory on purpose, and a persistence layer that quietly widened that decision would be
+   * overruling a security choice from a directory that does not own it.
+   */
+  const sessionStore: SessionStore = {
+    read: (key) => window.localStorage.getItem(key),
+    write: (key, value) => {
+      window.localStorage.setItem(key, value);
+    },
+    remove: (key) => {
+      window.localStorage.removeItem(key);
+    },
+  };
+
+  /**
+   * Bring back the week, the settings and the Free Play selection.
+   *
+   * ## Why a failed restore *clears* the slot
+   *
+   * `clearSession`'s only caller, and it is a necessary one rather than a tidy one. A snapshot that
+   * fails validation fails **deterministically** — a version this build cannot read, a shape it does
+   * not recognise, a contract `data/` no longer ships — so leaving it in place means re-reading and
+   * re-rejecting the same bytes on every load, forever, while every subsequent save is written over
+   * a slot the player can never get value from again. Clearing it costs a week that was already
+   * unreadable and gives the next save somewhere to live.
+   *
+   * `absent` is not a failure and is not cleared: it is an ordinary first visit.
+   *
+   * ## What a player is not told, stated rather than hidden
+   *
+   * The failure carries a reason and **nothing shows it**. A player whose week is dropped sees a
+   * fresh one and no explanation, which is a real gap and is filed as one in `GAPS.md` § 3 rather
+   * than papered over here — putting the sentence on screen makes it a player-facing string, and it
+   * would then owe the honesty sweep an adapter, which is a lane of its own.
+   */
+  /**
+   * A one-time line about a session that could not be restored — `undefined` when there is nothing
+   * to say, which is the ordinary case and the whole of a first visit.
+   *
+   * It lives in the coach ribbon's hint, and that is a **compromise stated rather than hidden**: the
+   * hint is advice about the run, and this is news about the save. It goes there because the ribbon
+   * already gives refusals priority over advice (`state.withheld` does exactly this), and because a
+   * slot of its own is markup this lane does not own. A dedicated line is the better home.
+   *
+   * It is cleared the moment the player does anything, because by then it is describing something
+   * two actions ago and the hint has advice to give again.
+   */
+  let restoreNotice: string | undefined;
+
+  function restoreSession(): void {
+    /*
+     * **The library first, and on both paths.**
+     *
+     * A library is a set of independent documents and a week is one state whose parts constrain
+     * each other — `persist/types.ts` argues the distinction at length — so a week this build
+     * cannot read does not make the buildings the reader drew unreadable. Restoring the library
+     * even when the session is refused is the whole benefit of that split, and skipping it here
+     * would quietly throw away the thing the gap called *the most valuable thing a player creates*.
+     *
+     * It also has to precede `withBuilding` below, which reads `state.savedBuildings`.
+     */
+    const restoredLibrary = loadLibrary(sessionStore, resources);
+    state = {
+      ...state,
+      savedBuildings: restoredLibrary.library.buildings,
+      savedDispatchers: restoredLibrary.library.dispatchers,
+      savedPatterns: restoredLibrary.library.patterns,
+      savedClasses: restoredLibrary.library.classes,
+    };
+    libraryNotice = libraryNoticeFor(restoredLibrary.dropped);
+
+    const restored = loadSession(sessionStore);
+    if (!restored.ok) {
+      /*
+       * Told, not swallowed. This branch cleared the unreadable slot and started fresh in silence,
+       * so a player who lost a week got a new one and no explanation — and the failure carried a
+       * precise reason the whole way here before being dropped on the floor.
+       */
+      restoreNotice = restoreNoticeFor(restored.failure);
+      if (restored.failure.kind !== 'absent') clearSession(sessionStore);
+      return;
+    }
+    menuState = {
+      ...menuState,
+      settings: restored.snapshot.settings,
+      freePlay: restored.snapshot.freePlay,
+    };
+    state = { ...state, week: restored.snapshot.week };
+    /*
+     * The building follows the week rather than being persisted beside it. `persist/` excludes
+     * `buildingId` deliberately: a contract names its building, so storing both would be two
+     * sources of truth for exactly the mismatch `withBuilding` exists to prevent — a sheet headed
+     * one building and footed another, which this repository has already shipped once.
+     */
+    const contract = contractById(restored.snapshot.week.contractId);
+    if (contract !== undefined) state = withBuilding(state, resources, contract.buildingId);
+  }
+
+  /**
+   * A second line, for the two pieces of news that are not about the week.
+   *
+   * `libraryNotice` is *some of what you saved could not be reopened*; `saveNotice` is *nothing new
+   * is being kept*. Held apart from `restoreNotice` because they can be true at the same time and
+   * one slot cannot say both — and because the save one is about the **future**, so unlike the
+   * other two it must not be cleared by the next run.
+   */
+  let libraryNotice: string | undefined;
+  let saveNotice: string | undefined;
+
+  /** Write the session back. Cheap, total, and never throws — a refusing browser is not an error. */
+  function saveSessionNow(): void {
+    const written = saveSession(sessionStore, state, menuState);
+    /*
+     * The refusal reaches the player, which is the whole reason the budget exists. A library that
+     * outgrew the slot and stopped being written **in silence** would be the gap this closed,
+     * reopened one layer down: the failure a player needs to know about is precisely the one they
+     * cannot see, because the symptom is a reload that lost something.
+     */
+    saveNotice = written.ok ? undefined : saveNoticeFor(written.failure);
+  }
+
+  /**
+   * Everything the menu asks for, in one exhaustive switch.
+   *
+   * ## Why a switch and not eight methods
+   *
+   * The eight it replaces each let the *panel* decide something and this file merely perform it,
+   * which is `docs/16` § 5's own diagnosis of why three of the eight failing clauses shipped: a
+   * decision made inside a click handler has no test that can reach it. The decisions are now
+   * `menu/screens.ts`'s and this function is the performer.
+   *
+   * ## The clause the switch itself closes
+   *
+   * `submit-score` is a member of {@link MenuIntent}, so **this file does not compile without a
+   * handler for it** — and the handler is the first non-test caller `menu/client.ts#submit` has ever
+   * had. § 5 clause 8: the leaderboard could be read and never posted to, and the Account row's own
+   * subtitle described something no player could do.
+   */
+  function dispatchMenu(intent: MenuIntent): void {
+    switch (intent.kind) {
+      case 'navigate':
+      case 'back':
+      case 'set-free-play':
+      case 'set-setting': {
+        const next = applyIntent(menuState, intent);
+        const arrived = next.screen === 'leaderboard' && menuState.screen !== 'leaderboard';
+        const menuStateBefore = menuState.screen;
+        menuState = next;
+        /*
+         * Applied **now**, not at the next `adopt`. A setting that only took effect on the next run
+         * would be indistinguishable from an inert one for as long as a player stayed on this
+         * screen, which is exactly how the four of them went unnoticed.
+         */
+        if (intent.kind === 'set-setting') {
+          applyPlaybackSpeed();
+          applyTheme();
+          if (menuState.settings.reduceMotion) playback?.pause();
+          // The energy axis is a figure on a panel, so the panel has to be redrawn rather than
+          // nudged — `renderAll` is the chokepoint every state change already goes through.
+          if (intent.field === 'showEnergyAxis') renderAll();
+          /*
+           * The canvas is not part of `renderAll`'s panel sweep, and the playback tick only redraws
+           * on a frame change — so without this a theme flip repainted the shell and left the stage
+           * on the previous palette until the reader scrubbed. Exactly the half-repaint this feature
+           * exists to end, arriving through the render path instead of the palette.
+           */
+          if (intent.field === 'theme') drawStage();
+          drawTransportChrome(viewAt());
+          saveSessionNow();
+        }
+        drawMenu();
+        // Started on **arrival**, once, and never from inside a render: a render that fetched would
+        // fetch again on every state change its own response caused, and each render would look
+        // correct on its own.
+        if (arrived) void loadBoards();
+        if (next.screen === 'challenge' && menuStateBefore !== 'challenge') void loadChallenge();
+        return;
+      }
+
+      case 'start': {
+        /*
+         * `docs/16` § 5 clauses 2 and 3, both of which were here.
+         *
+         * The selection reached `ViewerState` and **nothing ran** — every other state changer in
+         * this file calls `runShift()` and this one called `renderAll()`, so Start left the previous
+         * recording on screen. And the week was never reset, so `shiftRunConfigOf` went on applying
+         * `grownBuilding`'s 11 %/day and `eventFor`'s twist to a run the menu had described as a
+         * plain one: on day 7 the building was two thirds fuller than the screen said, with a car
+         * possibly held out of service, and nothing anywhere mentioned it.
+         *
+         * The decision is `menu/enterFreePlay.ts` — pure, and tested by comparing the legs against a
+         * run built from the selection alone. This arm performs it.
+         */
+        const entered = enterFreePlay(state, resources, menuState.freePlay, menuCatalogue);
+        if (entered === undefined) return;
+        state = entered;
+        menuState = navigate(menuState, 'main');
+        closeMenu();
+        runShift();
+        return;
+      }
+
+      case 'open-campaign':
+        /*
+         * `docs/16` § 5 clause 6. This arm was `closeMenu()` and nothing else, so picking Campaign
+         * dropped the player on whatever tab the shell happened to be on — usually `run`, which is
+         * the simulation, not the scenarios. The screen behind the menu is now selected explicitly.
+         */
+        state = { ...state, tab: 'scenarios' };
+        closeMenu();
+        renderAll();
+        return;
+
+      case 'start-endless':
+        /*
+         * The one arm that both closes the menu **and** runs, because *keep going* is an answer
+         * about the week rather than about a screen: `openEndless` puts the player on day one of a
+         * building they are already looking at, and leaving the previous day's recording up would
+         * show a sheet headed day 1 over legs simulated on some other day.
+         *
+         * `runShift` is what every state changer in this file calls, and § 5 clause 2 is what
+         * happens when one of them forgets.
+         */
+        state = enterEndless(state);
+        menuState = navigate(menuState, 'main');
+        closeMenu();
+        runShift();
+        return;
+
+      case 'reopen':
+        menuRoot.hidden = false;
+        menuState = navigate(menuState, 'main');
+        drawMenu();
+        return;
+
+      case 'open-board': {
+        if (client === undefined) return;
+        const hash = intent.configHash;
+        boardView = { ...boardView, selected: hash, page: undefined, notice: 'Loading…' };
+        drawMenu();
+        void client.board(hash, 'awtS').then((result) => {
+          boardView = result.ok
+            ? { ...boardView, selected: hash, page: result.value, notice: undefined }
+            : { ...boardView, selected: hash, page: undefined, notice: result.detail };
+          drawMenu();
+        });
+        return;
+      }
+
+      case 'submit-score': {
+        void submitScore();
+        return;
+      }
+
+      case 'set-challenge': {
+        menuState = applyIntent(menuState, intent);
+        /*
+         * Picking a different dispatcher **discards the runs**. They are simulations of a different
+         * configuration, and keeping them would let a player run five seeds on one dispatcher, pick
+         * another, and post the first one's figures under the second one's name.
+         */
+        if (intent.field === 'dispatcherProfileId') {
+          challengeRecordings = [];
+          challengeView = { ...challengeView, runsDone: 0, postRefusal: undefined };
+        }
+        drawMenu();
+        // The board is ordered by the server, so a new metric is a new request rather than a re-sort.
+        if (intent.field === 'metric') void loadChallengeBoard();
+        return;
+      }
+
+      case 'set-calendar': {
+        /*
+         * The period is placed over **this week's own days** rather than over absolute dates, which
+         * is what `periodOnDays` is for: the shift layer has no calendar but `WEEKDAYS`, and a
+         * period pinned to day numbers a week has already passed would be on and doing nothing.
+         */
+        const period = CALENDAR_PERIODS[intent.periodId as CalendarPeriodId] as
+          | CalendarPeriod
+          | undefined;
+        state = {
+          ...state,
+          calendar: period === undefined ? null : periodOnDays(period, 1, HISTORY_DAYS),
+        };
+        drawMenu();
+        runShift();
+        return;
+      }
+
+      case 'set-constraint':
+        state = { ...state, commissioningConstraintId: intent.constraintId };
+        drawMenu();
+        return;
+
+      case 'set-commissioning': {
+        const authored = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
+        if (authored === undefined) return;
+        const classes = commissionableClasses(specsWithSaved(resources, state.savedClasses));
+        const choices = state.commissioning.length === 0 ? asBuiltChoices(authored, classes) : state.commissioning;
+        const current = choices.find((choice) => choice.bankId === intent.bankId);
+        if (current === undefined) return;
+        const next =
+          intent.dimension === 'machineClass'
+            ? { ...current, machineClassId: intent.value }
+            : intent.dimension === 'shafts'
+              ? { ...current, shafts: Number(intent.value) }
+              : { ...current, ratedSpeedMps: Number(intent.value) };
+        state = { ...state, commissioning: withBankChoice(choices, next) };
+        drawMenu();
+        /*
+         * The fabric is `between-games`, so it takes effect on the next run rather than re-running
+         * under the reader — the same rule the dispatcher editor beside it keeps, and the one the
+         * mode's whole premise rests on: you choose, and then you live with it.
+         */
+        return;
+      }
+
+      case 'run-challenge':
+        runChallenge();
+        return;
+
+      case 'post-challenge':
+        void postChallenge();
+        return;
+
+      case 'account-mode':
+        accountState = updateForm(accountState, { mode: intent.register ? 'register' : 'sign-in' });
+        drawMenu();
+        return;
+
+      case 'account-form':
+        accountState = updateForm(accountState, intent.patch as Partial<AccountForm>);
+        drawMenu();
+        return;
+
+      case 'account-submit': {
+        if (client === undefined) {
+          accountState = withNotice(
+            accountState,
+            'This build was not compiled against a server, so there is nowhere to sign in.',
+          );
+          drawMenu();
+          return;
+        }
+        const form = accountState.form;
+        accountState = busy(accountState, true);
+        drawMenu();
+        const request =
+          form.mode === 'register'
+            ? client.register({
+                email: form.email.trim(),
+                displayName: form.displayName.trim(),
+                password: form.password,
+              })
+            : client.login({ email: form.email.trim(), password: form.password });
+        void request.then((result) => {
+          accountState = result.ok
+            ? signedIn(accountState, result.value.token, result.value.user)
+            : withNotice(accountState, result.detail);
+          drawMenu();
+        });
+        return;
+      }
+
+      case 'sign-out': {
+        const token = accountState.token;
+        accountState = signedOut('Signed out.');
+        drawMenu();
+        // The local state is cleared first and the server is told second. A sign-out that waited for
+        // the network would leave a player looking signed in while their connection was down.
+        if (client !== undefined && token !== undefined) void client.logout(token);
+        return;
+      }
+    }
+  }
+
+  /**
+   * Post the run on screen — `menu/client.ts#submit`'s first non-test caller.
+   *
+   * ## Three refusals before a request, and none of them is a guess
+   *
+   * The **claimed** metrics are read straight off the recording this browser produced, and the
+   * server re-runs the configuration and compares. So nothing here has to be trusted, and nothing
+   * here tries to be clever: an honest client sends what it measured.
+   *
+   * What it must not do is send a run the server *cannot* reproduce. `runIdentityIssues` is that
+   * predicate — the same one `provenanceLineOf` asks (`docs/16` S5) — and a run carrying day 7's
+   * growth or a held car fails it. Without the check the server would reject those as forgeries,
+   * spending the one accusation this product makes on a client bug.
+   *
+   * A saturated run is refused here too, and it is refused *by the same comparison the server
+   * makes*: `awtIsValid` travels with the submission, so a client claiming a valid mean for a
+   * diverging queue is caught as a wrong claim rather than silently corrected and ranked anyway.
+   */
+  async function submitScore(): Promise<void> {
+    const recording = state.recording;
+    if (client === undefined || recording === undefined) return;
+    const token = accountState.token;
+    if (token === undefined) return;
+
+    /*
+     * The fourth refusal, and the one that used to be a `?? 0`. See `claimedMetricsOf`: an
+     * unmeasured long-wait share written as zero is a wrong claim, and the server answers a wrong
+     * claim by refusing the submission as a forgery.
+     */
+    const claim = claimedMetricsOf(recording.summary);
+    if (!claim.ok) {
+      accountState = withNotice(accountState, claim.detail);
+      drawMenu();
+      return;
+    }
+
+    accountState = busy(accountState, true);
+    drawMenu();
+    const result = await client.submit(token, {
+      run: {
+        buildingId: state.buildingId,
+        dispatcherProfileId: state.dispatcherId,
+        demandTemplateId: menuState.freePlay.demandTemplateId,
+        arrivalRatePctPop5min: menuState.freePlay.arrivalRatePctPop5min,
+        durationS: state.shiftLengthS,
+        seed: state.seed.toString(),
+      },
+      claimed: claim.claimed,
+    });
+    accountState = withNotice(
+      accountState,
+      result.ok ? 'Posted. The server replayed your seed and it reproduced.' : result.detail,
+    );
+    drawMenu();
+  }
+
   const menuHost: MenuPanelHost = {
     doc: document,
     catalogue: menuCatalogue,
     state: () => menuState,
-    update: (next) => {
-      const arrived = next.screen === 'leaderboard' && menuState.screen !== 'leaderboard';
-      menuState = next;
-      drawMenu();
-      // Started on **arrival**, once, and never from inside a render: a render that fetched would
-      // fetch again on every state change its own response caused, and each render would look
-      // correct on its own.
-      if (arrived) void loadBoards();
-    },
-    start: (selection) => {
-      // **Every axis the menu offered is applied.** `shiftRunConfigOf` still owns what a run is —
-      // the template and the rate travel as `ViewerState.freePlay` and are read there, not built
-      // into a second config here, which is the drift § D214 § 2 refuses. A selection axis that
-      // reached nothing would be § D177's inert control with a label on it, and
-      // `state.freePlay.test.ts` is the standing requirement pointed at all three.
-      state = withBuilding(state, resources, selection.buildingId);
-      state = {
-        ...state,
-        dispatcherId: selection.dispatcherProfileId,
-        seed: BigInt(selection.seed),
-        shiftLengthS: selection.durationS,
-        freePlay: {
-          demandTemplateId: selection.demandTemplateId,
-          arrivalRatePctPop5min: selection.arrivalRatePctPop5min,
-        },
-      };
-      menuState = navigate(menuState, 'main');
-      closeMenu();
-      renderAll();
-    },
-    openCampaign: () => {
-      closeMenu();
-    },
-
+    dispatch: dispatchMenu,
     account: () => accountState,
-    updateAccountForm: (patch) => {
-      accountState = updateForm(accountState, patch);
-      drawMenu();
-    },
-    submitAccountForm: () => {
-      if (client === undefined) {
-        accountState = withNotice(
-          accountState,
-          'This build was not compiled against a server, so there is nowhere to sign in.',
-        );
-        drawMenu();
-        return;
-      }
-      const form = accountState.form;
-      accountState = busy(accountState, true);
-      drawMenu();
-      const request =
-        form.mode === 'register'
-          ? client.register({
-              email: form.email.trim(),
-              displayName: form.displayName.trim(),
-              password: form.password,
-            })
-          : client.login({ email: form.email.trim(), password: form.password });
-      void request.then((result) => {
-        accountState = result.ok
-          ? signedIn(accountState, result.value.token, result.value.user)
-          : withNotice(accountState, result.detail);
-        drawMenu();
-      });
-    },
-    signOut: () => {
-      const token = accountState.token;
-      accountState = signedOut('Signed out.');
-      drawMenu();
-      // The local state is cleared first and the server is told second. A sign-out that waited for
-      // the network would leave a player looking signed in while their connection was down.
-      if (client !== undefined && token !== undefined) void client.logout(token);
-    },
-
     leaderboard: () => boardView,
-    openBoard: (configHash) => {
-      if (client === undefined) return;
-      boardView = { ...boardView, selected: configHash, page: undefined, notice: 'Loading…' };
-      drawMenu();
-      void client.board(configHash, 'awtS').then((result) => {
-        boardView = result.ok
-          ? { ...boardView, selected: configHash, page: result.value, notice: undefined }
-          : { ...boardView, selected: configHash, page: undefined, notice: result.detail };
-        drawMenu();
-      });
+    viewMode: () => state.mode,
+    challenge: () => (client === undefined ? undefined : challengeView),
+    calendarPeriodId: () => state.calendar?.id ?? '',
+    commissioning: () => commissioningInput(),
+    runState: () => {
+      const issues = runIdentityIssues(state, resources, 'ranked');
+      return {
+        hasRun: state.recording !== undefined,
+        rankingRefusal: issues.length === 0 ? undefined : issues.map((issue) => issue.message).join('; '),
+      };
     },
   };
+
+  /**
+   * The fabric screen's whole input, derived from the same three things the run derives from.
+   *
+   * Built fresh on every draw rather than held: it is a pure function of the building, the saved
+   * classes and the choices, and a cached copy would be a second answer to *what may this bank
+   * take* — which is precisely the question a stale one would get wrong after the reader saved a
+   * machine class.
+   */
+  function commissioningInput(): CommissioningScreenInput | undefined {
+    const authored = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
+    if (authored === undefined) return undefined;
+    const specs = specsWithSaved(resources, state.savedClasses);
+    const classes = commissionableClasses(specs);
+    const choices = state.commissioning.length === 0 ? asBuiltChoices(authored, classes) : state.commissioning;
+    const constraint = constraintById(state.commissioningConstraintId) ?? CONSTRAINTS[0];
+    if (constraint === undefined) return undefined;
+    const review = reviewCommissioning({ base: authored, choices, classes, specs, constraint });
+    return {
+      buildingName: authored.name,
+      constraintId: constraint.id,
+      choices,
+      review,
+      optionsFor: (bankId) => {
+        const choice = choices.find((entry) => entry.bankId === bankId);
+        const machineClass = classes.find((entry) => entry.id === choice?.machineClassId);
+        return {
+          /*
+           * Derived from the building and the class rather than listed. The shaft ladder spans one
+           * fewer than the bank has to four more, because those are the moves a player actually
+           * makes; the speed ladder is the **class's own declared band**, so a speed outside it is
+           * not offered rather than offered and refused (`docs/16` S7).
+           */
+          shafts: shaftChoices(choice?.shafts ?? 1).map((n) => ({ id: String(n), name: String(n) })),
+          machineClass: classes.map((entry) => ({ id: entry.id, name: entry.name })),
+          ratedSpeed: speedChoices(machineClass).map((speed) => ({
+            id: String(speed),
+            name: `${speed.toFixed(2)} m/s`,
+          })),
+        };
+      },
+    };
+  }
 
   function drawMenu(): void {
     renderMenu(menuRoot, menuHost);
@@ -539,6 +1155,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
   const reportPanel = mountReport(ui.report, context);
   const scenariosPanel = mountScenarios(ui.scenarioList, context);
   const dispatcherEditor = mountDispatcherEditor(ui.dispatcherEditor, context);
+  /*
+   * The weight-set selector, mounted beneath the dispatcher's own controls — `docs/17` § 5 clause 6.
+   *
+   * `selection.policy` over `patternSwitching` is the simulator's **one genuine mid-run adaptation**,
+   * and it was reachable from no screen: the product's only real within-day mechanism was invisible
+   * to the player it was built for. It follows `dispatcherEditor` in every respect, including that
+   * an edit takes effect on the next Run rather than re-running under the reader.
+   */
+  const selectorEditor = mountSelectorEditor(ui.selectorEditor, context);
   const trafficEditor = mountTrafficEditor(ui.trafficEditor, context);
   const machinesEditor = mountMachinesEditor(ui.machinesEditor, context);
   const buildingEditor = mountBuildingEditor(ui.buildingEditor, context);
@@ -547,6 +1172,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     reportPanel,
     scenariosPanel,
     dispatcherEditor,
+    selectorEditor,
     trafficEditor,
     machinesEditor,
     buildingEditor,
@@ -559,6 +1185,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   const editor = mountEditor({
     resources,
+    // Asked for at draw time, so a theme flipped while the editor is open reaches its preview too.
+    theme: () => stageTheme,
     onRun: (config: BuildingConfig) => {
       adoptEditedBuilding(config);
     },
@@ -637,6 +1265,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       applyNavigation();
     });
 
+  restoreSession();
+  applyTheme();
   renderAll();
   runShift();
   urlWritable = true;
@@ -831,6 +1461,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * ---------------------------------------------------------------------- */
 
   function wireHeaderAndFooter(): void {
+    /*
+     * `docs/16` § 5 clause 5 — the way back in.
+     *
+     * The menu is a place the player leaves and has reason to return to: to change building, to
+     * read a board, to sign in. It had no way back at all, so every one of those meant reloading
+     * the page and losing the week. One button, and the `reopen` intent it dispatches is the same
+     * one `?screen=` uses, so there is one answer to *what does re-opening the menu do*.
+     */
+    ui.header.openMenu.addEventListener('click', () => {
+      dispatchMenu({ kind: 'reopen' });
+    });
     ui.header.viewMode.addEventListener('change', () => {
       const value = ui.header.viewMode.value;
       if (!isViewMode(value)) return;
@@ -942,6 +1583,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       recording,
       dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
       lockedOut: lockedOutAt(recording, recording.endedAt),
+      showEnergyAxis: menuState.settings.showEnergyAxis,
     });
     setText(ui.header.modeParity, parityRefusal(items) ?? '');
     void itemsIn;
@@ -997,21 +1639,40 @@ function boot(ui: Elements, resources: BrowserResources): void {
       String(state.shiftLengthS),
     );
 
-    const contract = state.week.contractId;
-    setText(ui.coach.label, contract === undefined ? 'Sandbox' : `Scenario · day ${String(state.week.day)}`);
+    /*
+     * Both lines from one decision, and the decision is not here — see `shift/weekLabel.ts`.
+     *
+     * What was here tested `state.week.contractId === undefined` on a field typed `string`, so the
+     * *Sandbox* eyebrow and the *free play* progress line were **unreachable**: a reader's own
+     * building was labelled *Scenario · day 4* and told how many clean shifts it had banked toward
+     * nothing. TypeScript does not object to `string === undefined`, which is why a strict build
+     * carried it.
+     */
+    const coach = coachWeekLines(state.week, state.shiftLengthS);
+    /*
+     * The calendar's own caption wins the eyebrow when a period is running, because it is the more
+     * specific true thing: *Vacation week · Monday* says both what day it is and what kind of week,
+     * where *Scenario · day 1* says only the second. Built from **what was applied** rather than
+     * from what was asked for — a withheld template never appears in it.
+     */
+    setText(ui.coach.label, calendarCaption === '' ? coach.label : calendarCaption);
     setText(ui.coach.title, buildingNameOf(resources, state.savedBuildings, state.buildingId));
-    setText(ui.coach.progress, coachProgress());
+    setText(ui.coach.progress, coach.progress);
     setText(ui.coach.hint, coachHint(view));
   }
 
-  function coachProgress(): string {
-    if (state.week.contractId === undefined) {
-      return `${String(Math.round(state.shiftLengthS / 60))} min of demand · free play`;
-    }
-    return `${String(state.week.cleanRun)} clean shift${state.week.cleanRun === 1 ? '' : 's'} banked`;
-  }
-
   function coachHint(view: ViewAt): string {
+    // Ahead of the withheld refusals: those are about the run on screen, and this is about whether
+    // the run on screen is the one the player left. Both outrank advice.
+    /*
+     * Precedence, and it is decided rather than incidental. `saveNotice` outranks everything because
+     * it is the only one about the future — a player who is no longer being saved needs to know
+     * before they spend another twenty minutes. Then the week that could not be read, then what was
+     * dropped out of the library, then the run's own refusals, then advice.
+     */
+    if (saveNotice !== undefined) return saveNotice;
+    if (restoreNotice !== undefined) return restoreNotice;
+    if (libraryNotice !== undefined) return libraryNotice;
     if (state.withheld.length > 0) return state.withheld.join(' ');
     if (view.recording === undefined) {
       return 'Press play and watch a call appear, a car answer it, and the wait end. That is the whole simulator in one move.';
@@ -1032,9 +1693,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   function runShift(): void {
     setText(ui.transport.error, '');
+    /*
+     * The restore notice survives boot's own run and nothing after it.
+     *
+     * `urlWritable` is `false` for exactly the boot sequence and `true` from the first real state
+     * change onward, which is the same *"is this the reader doing something?"* question this needs —
+     * so it is reused rather than answered twice. A second flag would be a second thing to keep in
+     * step with the boot order.
+     */
+    /*
+     * The two backward-looking notices are spent once the player does something; `saveNotice` is
+     * not, because it describes a condition that is still true and will still be true next time.
+     */
+    if (urlWritable) {
+      restoreNotice = undefined;
+      libraryNotice = undefined;
+    }
     try {
       const plan = shiftRunConfigOf(resources, state);
       building = plan.building;
+      calendarCaption = plan.calendarLine;
       const recorded = recordRun(plan.config, {
         outOfServiceCarIds: plan.outOfServiceCarIds,
       });
@@ -1064,12 +1742,60 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ui.transport.error.focus();
   }
 
+  
+
+  /**
+   * Apply the transport chip and the player's own multiplier together — `docs/16` § 5 clause 4.
+   *
+   * `settings.playbackSpeed` reached **nothing** before this: `menu/types.ts` declared it, the menu
+   * drew it, and the viewer had its own `SPEEDS` ladder that never consulted it. That is a control
+   * a player can move in a shipped menu that changes no pixel, which is `docs/12` § 5 clause 9's
+   * violation, and it is the one `scope.test.ts` catches structurally now.
+   *
+   * A **multiplier** rather than a replacement, because the two controls answer different
+   * questions. The chip is *how much simulated time passes per real second* — a property of the
+   * run being watched, and the thing `×900` means. The setting is *how fast this player likes to
+   * watch*, and it should survive changing the chip.
+   */
+  /**
+   * Paint the player's chosen palette onto the document — `docs/16` § 5 clause 4's last setting.
+   *
+   * `themeFor` decides and this writes, which is the split the rest of `dev/` keeps. `color-scheme`
+   * is set alongside the tokens and is not polish: without it a light palette gets dark native
+   * scrollbars and `<select>` popups, and no token assertion would catch that because no token is
+   * involved.
+   *
+   * **The stage follows.** `themeFor` now resolves a `stage` palette as well as the shell's tokens,
+   * so the limitation this docstring used to name — a light shell around a dark stage — is closed.
+   * `data-theme` is stamped on the root for the same reason the tokens are written: it is what makes
+   * `index.html`'s `:root[data-theme='light']` block live, and without it the block is dead CSS.
+   */
+  function applyTheme(): void {
+    const theme = themeFor(menuState.settings.theme, (query) => window.matchMedia(query));
+    const root = document.documentElement;
+    for (const [name, value] of Object.entries(theme.tokens)) root.style.setProperty(name, value);
+    root.style.setProperty('color-scheme', theme.colorScheme);
+    root.dataset['theme'] = theme.name;
+    stageTheme = theme.stage;
+  }
+
+  
+
+  function applyPlaybackSpeed(): void {
+    playback?.setSpeed(playbackRateFor(baseSpeed, menuState.settings.playbackSpeed));
+  }
+
   function adopt(recording: VizRecording): void {
     playback = new Playback(recording, clock, {
-      speed: playback?.speed ?? 60,
+      speed: playbackRateFor(baseSpeed, menuState.settings.playbackSpeed),
       loop: looping,
-      // KB-14: a reader who asked for less motion gets a paused first frame.
-      autoplay: shouldAutoplay(window.matchMedia.bind(window)),
+      /*
+       * KB-14: a reader who asked for less motion gets a paused first frame — and `docs/16` § 5
+       * clause 4, because *asked* now includes the menu's own switch and not only the operating
+       * system's. `shouldAutoplay` reads `prefers-reduced-motion`; a player who set the setting has
+       * asked for the same thing by a different route and was being ignored.
+       */
+      autoplay: shouldAutoplayWith(window.matchMedia.bind(window), menuState.settings.reduceMotion),
     });
     disableTransport(ui, false);
     filedRunId = undefined;
@@ -1117,6 +1843,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
       // *your own building — nothing is being banked* on the same day the banner cleared a
       // scenario and the rail counted the shift as banked: three panels, two answers.
       contract: contractById(state.week.contractId),
+      /*
+       * The sheet's shape follows the mode, and the mode is a field rather than a guess — see
+       * `ViewerState.playMode`. A Free Play run's sheet drops the week-shaped lines entirely
+       * (streak, banked count, tomorrow's forecast) rather than blanking them, because an empty slot
+       * the layout still reserves is `docs/10` R3's "blank where a number should be", one layer up.
+       */
+      subject:
+        state.playMode === 'free-play'
+          ? {
+              kind: 'single-run' as const,
+              selection: {
+                demandTemplateId: menuState.freePlay.demandTemplateId,
+                arrivalRatePctPop5min: menuState.freePlay.arrivalRatePctPop5min,
+                durationS: state.shiftLengthS,
+              },
+            }
+          : { kind: 'week-day' as const },
       event,
       dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
       dayStartS: DAY_START_S,
@@ -1129,6 +1872,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     state = { ...state, week, report };
     if (state.tab !== 'report') state = { ...state, tab: 'report' };
+    // A closed day is the thing a player would most mind losing to a reload, so it is the moment
+    // the session is written. `nextDay` goes through here on its way to the next sheet.
+    saveSessionNow();
     renderAll();
   }
 
@@ -1169,6 +1915,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const assignments: readonly LandingAssignment[] = landingAssignmentsAt(recording, frame.simTimeS);
     const lockedOut: readonly LockedOutLanding[] = lockedOutAt(recording, frame.simTimeS);
     const hits = drawScene(context2d as unknown as Canvas2DLike, {
+      theme: stageTheme,
       recording,
       frame,
       layout,
@@ -1368,10 +2115,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
       ...SPEEDS.map((speed) =>
         chip(document, {
           label: `×${String(speed)}`,
-          selected: playback?.speed === speed,
+          // Against `baseSpeed`, not `playback.speed` — the player's own multiplier is applied on
+          // top, so comparing the product would leave no chip lit at any setting but ×1.
+          selected: baseSpeed === speed,
           title: `${String(speed)} simulated seconds per real second`,
           onPick: () => {
-            playback?.setSpeed(speed);
+            baseSpeed = speed;
+            applyPlaybackSpeed();
             drawTransportChrome(viewAt());
           },
         }),
@@ -1553,9 +2303,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
           break;
         case '[':
         case ']': {
-          const index = SPEEDS.indexOf((playback?.speed ?? 60) as (typeof SPEEDS)[number]);
+          const index = SPEEDS.indexOf(baseSpeed as (typeof SPEEDS)[number]);
           const next = SPEEDS[Math.min(SPEEDS.length - 1, Math.max(0, index + (event.key === ']' ? 1 : -1)))];
-          if (next !== undefined) playback?.setSpeed(next);
+          if (next !== undefined) {
+            baseSpeed = next;
+            applyPlaybackSpeed();
+          }
           drawTransportChrome(viewAt());
           break;
         }
@@ -1677,47 +2430,29 @@ export type Provenance =
  * Pure, so the claim *this line is this run* is testable without a clipboard.
  */
 export function provenanceLineOf(state: ViewerState, resources: BrowserResources): Provenance {
-  const reasons: string[] = [];
+  /*
+   * The refusals are `scope/runIdentity.ts`'s, not this function's — `docs/16` S5.
+   *
+   * They were written out here, and the leaderboard's submit path was about to write them out
+   * again. *"Can this run be reproduced elsewhere from its own selection?"* is one question, and two
+   * answers to it is the single disagreement a replay-verified board cannot survive: a client
+   * stricter than the server refuses a run the server would have taken, and a client looser than it
+   * posts a run the server rejects **as a forgery** — the one place this product accuses somebody of
+   * cheating, spending that accusation on a client bug.
+   *
+   * What stays here is the half that is genuinely about the CLI: which flags spell this run.
+   */
+  const reasons = runIdentityIssues(state, resources, 'ranked').map((issue) => issue.message);
   const flags: string[] = [`--building ${state.buildingId}`, `--dispatcher ${state.dispatcherId}`];
-
-  if (!resources.entries.some((entry) => entry.config.id === state.buildingId)) {
-    reasons.push(`the building “${state.buildingId}” is yours alone and data/buildings/ does not ship it`);
-  }
-  if (!resources.dispatcherProfiles.profiles.some((profile) => profile.id === state.dispatcherId)) {
-    reasons.push(
-      `the dispatcher “${state.dispatcherId}” is yours alone and data/dispatcher-profiles.json does not ship it`,
-    );
-  }
 
   let template: string | undefined;
   if (state.pattern !== 'building') {
     const shipped = resources.trafficProfiles.profiles.find((profile) => profile.id === state.pattern);
-    if (shipped === undefined) {
-      reasons.push(`the pattern “${state.pattern}” is yours alone and the CLI has no flag that loads a saved pattern`);
-    } else {
+    if (shipped !== undefined) {
       flags.push(`--traffic ${shipped.id}`);
       const demand = demandFromSpec(specFromTrafficProfile(resources.trafficProfiles, shipped.id));
       if (demand.demandTemplate !== 'rise-and-fall') template = demand.demandTemplate;
     }
-  }
-
-  const event = eventFor(state.week.day, state.week.dayIdx);
-  if (state.week.day !== 1 || !event.effect.changesNothing) {
-    reasons.push(
-      `day ${String(state.week.day)} grows the building and schedules “${event.name}”, and the CLI has no --day`,
-    );
-  }
-  if (state.outOfServiceCarIds.length > 0) {
-    reasons.push(
-      `${String(state.outOfServiceCarIds.length)} car(s) are held out of service and the CLI has no flag to hold one`,
-    );
-  }
-  if (
-    state.levers.parking !== DEFAULT_LEVERS.parking ||
-    state.levers.express !== DEFAULT_LEVERS.express ||
-    state.levers.dwell !== DEFAULT_LEVERS.dwell
-  ) {
-    reasons.push('the group levers are moved off their defaults and the CLI has no lever flags');
   }
 
   if (reasons.length > 0) return { ok: false, reasons };

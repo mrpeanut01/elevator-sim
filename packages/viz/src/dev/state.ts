@@ -27,6 +27,7 @@ import {
   resolveBuilding,
   type BuildingConfig,
   type DispatcherProfile,
+  type DispatcherProfiles,
   type ElevatorSpecs,
   type ResolvedBuilding,
   type SimulationConfig,
@@ -61,14 +62,33 @@ import {
   trafficProfilesWithPattern,
   type PatternSpec,
 } from '../authoring/patternSpec.js';
+import {
+  patternSwitchingWithSelector,
+  profileWithSelector,
+  selectorContextFrom,
+  // `dispatcherSpec.ts` exports a `specFromProfile` over a different shape, imported above. The
+  // two are aliased at every site that needs both — see `selectorSpec.ts`'s own naming hazard.
+  specFromProfile as selectorSpecFromProfile,
+  type SelectorSpec,
+} from '../authoring/selectorSpec.js';
 import type { VizRecording } from '../contract/types.js';
 import type { DisclosureMode } from '../live/types.js';
 import type { ViewMode } from '../mode/types.js';
 import { contractForBuilding, CONTRACTS } from '../shift/contracts.js';
-import { eventFor, shiftRunPatch, baseDemandOf } from '../shift/events.js';
+import { SHIFT_EVENTS, eventFor, shiftRunPatch, baseDemandOf } from '../shift/events.js';
 import { grownBuilding } from '../shift/growth.js';
-import { openWeek, takeContract } from '../shift/week.js';
-import type { DayReport, ShiftEvent, WeekState } from '../shift/types.js';
+import { withIncidents } from '../shift/incidents.js';
+import { calendarDayFor, calendarLine, calendarPatch, type CalendarPeriod } from '../shift/calendar.js';
+import { commissionedBuilding } from '../commissioning/building.js';
+import {
+  RETROFIT_CONSTRAINT_ID,
+  commissionableClasses,
+  type CommissioningChoices,
+} from '../commissioning/types.js';
+import { SANDBOX_CONTRACT_ID, openWeek, takeContract, withContract } from '../shift/week.js';
+import type { ShiftEvent, WeekState } from '../shift/types.js';
+import type { ShapedDayReport } from '../shift/report.js';
+import type { PlayMode } from '../scope/types.js';
 
 import type { BrowserResources } from './data.js';
 import { PREFERRED_VIEWER_DISPATCHERS, preferredDispatcherId } from './defaults.js';
@@ -132,6 +152,55 @@ export interface FreePlayOverride {
 }
 
 export interface ViewerState {
+  /* --- which game is being played ----------------------------------------- */
+  /**
+   * Which play mode this state belongs to — `docs/16` § 3, and `scope/types.ts`'s `PlayMode`.
+   *
+   * ## Why this is a field and not an inference
+   *
+   * The shell had exactly one signal for *"is this a week or a single run?"*: `freePlay !==
+   * undefined`. That happens to be true today, because `enterFreePlay` is the only writer of
+   * `freePlay` and the campaign never sets it — and it is the shape of fact that stops being true
+   * the day somebody adds a second writer, silently, in a sheet that has already been wrong about
+   * this once.
+   *
+   * It also could not be inferred the obvious other way. A Free Play run on `midtown-office` keeps
+   * that building's **contract id** on its fresh week, because `enterFreePlay` calls
+   * `openWeek(contractForBuilding(id)?.id)` to keep the scenario label honest — so *"no contract"*
+   * never meant *"no week"*, and that is precisely the mechanism by which the report came to print
+   * *"Scenario 2 · 1 of 2 clean shifts banked"* over a run banking nothing.
+   *
+   * `docs/16` S1: an absence indistinguishable from an oversight is not a declaration. So the mode
+   * is named.
+   */
+  readonly playMode: PlayMode;
+  /**
+   * The calendar period in force, or `null` for an ordinary week.
+   *
+   * `between-games` — a period is chosen above the week and holds for a stretch of days, which is
+   * what makes it a different *game* rather than a different day. `calendarDayFor` decides whether
+   * today is inside it; this field is only the placement.
+   */
+  readonly calendar: CalendarPeriod | null;
+  /**
+   * What the reader commissioned, per bank. Empty is *as built*, and byte-identical to it.
+   *
+   * `between-games` and nothing else: `scope/permits.ts` forbids `within-day` for `commissioning`
+   * with the reason that a commissioning screen letting a player move a dispatcher weight would be
+   * the shift week with a different title. The fabric is chosen, and then you live with it.
+   */
+  readonly commissioning: CommissioningChoices;
+  /**
+   * Which capital constraint the fabric is judged against — *retrofit*, *refurbishment*, *new build*.
+   *
+   * `presentation` rather than `between-games`, and the distinction is the whole of what a
+   * constraint is: it decides which choices the **screen** offers and what it refuses, and it moves
+   * no leg by itself. What moves the run is the choice a player then makes under it, which is
+   * `viewer.commissioning`. A constraint that changed a run directly would be a difficulty setting,
+   * which `docs/10` § 5.5 bans.
+   */
+  readonly commissioningConstraintId: string;
+
   /* --- disclosure --------------------------------------------------------- */
   readonly mode: ViewMode;
   /**
@@ -175,6 +244,31 @@ export interface ViewerState {
   /** Cars the reader took out of service by clicking a badge under a shaft. § 1.5 B7. */
   readonly outOfServiceCarIds: readonly string[];
   readonly levers: GroupLevers;
+  /**
+   * The weight-set selector's configuration — `docs/17` § 5 finding 6, given a surface.
+   *
+   * ## Why it sits beside {@link ViewerState.levers} rather than inside `dispatcherSpec`
+   *
+   * For the reason `GroupLevers` sits there: it is applied **on top of whichever dispatcher is
+   * driving**, including a shipped one nobody has edited, so folding it into the dispatcher's
+   * working copy would mean that switching the selector on silently forked the profile named in
+   * the rail. `dispatcherSpec` is a document being edited and saved; this is a lever being pulled.
+   *
+   * ## Why one field and not two, when the write side is two documents
+   *
+   * `selection` is per profile and `patternSwitching` is file-level (`selectorSpec.ts`'s *"two
+   * documents, not one"*), and {@link shiftRunConfigOf} writes both — through
+   * `profileWithSelector` and {@link dispatcherProfilesWithSelector} respectively. But they are
+   * one *decision*: a player who binds `up-peak` to `capacity-aware` and never chooses a policy has
+   * configured nothing, and a state that could hold half of that is a state two panels can
+   * disagree about. The split belongs to the loader, not to the reader.
+   *
+   * At its seeded value — every scalar at `DISPATCH_PARAMETERS`' default, `policy: 'off'`, and the
+   * file's own arm map copied verbatim — the run it produces is **byte-identical** to the run built
+   * before this field existed. That is asserted rather than asserted-in-prose; see
+   * `selectorEditor.test.ts`.
+   */
+  readonly selectorSpec: SelectorSpec;
 
   /* --- the week ----------------------------------------------------------- */
   readonly week: WeekState;
@@ -197,7 +291,7 @@ export interface ViewerState {
 
   /* --- the run ------------------------------------------------------------ */
   readonly recording: VizRecording | undefined;
-  readonly report: DayReport | undefined;
+  readonly report: ShapedDayReport | undefined;
   /** What the last run refused to configure, from `shiftRunPatch`. Shown, never swallowed. */
   readonly withheld: readonly string[];
 }
@@ -221,22 +315,36 @@ export function withBuilding(
   buildingId: string,
 ): ViewerState {
   /*
-   * The week follows the building into its scenario.
+   * The week follows the building into its scenario — **and out of one, which is the half that was
+   * missing.**
    *
-   * Each of the five shipped buildings *is* a scenario, so picking Midtown Office while the week
-   * sits on Scenario 1 produced a sheet headed *Midtown Office* and footed *Scenario 1 — Learn the
-   * ropes*, banking a Garden Apartments shift against a run that never touched it. The handoff's
-   * own `pickPreset` restarts the week for exactly this reason.
+   * Each shipped building *is* a scenario, so picking Midtown Office while the week sits on
+   * Scenario 1 produced a sheet headed *Midtown Office* and footed *Scenario 1 — Learn the ropes*,
+   * banking a Garden Apartments shift against a run that never touched it. The handoff's own
+   * `pickPreset` restarts the week for exactly this reason.
    *
-   * A building the reader drew belongs to no scenario, and then the week keeps the one it had and
-   * the sheet says the shift is not being banked — which is `contractStatus`'s own answer and the
-   * honest one.
+   * This paragraph used to continue: *"a building the reader drew belongs to no scenario, and then
+   * the week keeps the one it had and the sheet says the shift is not being banked — which is
+   * `contractStatus`'s own answer and the honest one."* **It was wrong, and it was wrong in the
+   * direction this function exists to prevent.** Keeping the week meant keeping its `contractId`,
+   * which `contractById` resolves perfectly — so a drawn tower inherited Scenario 2, the ribbon read
+   * *Scenario · day 4 · 1 clean shift banked*, and `closeDay` banked against it. Two clean days on
+   * an invented building cleared Scenario 2, which is measured in `state.test.ts` rather than
+   * argued: it is the forgery the leaderboard's replay apparatus refuses, arriving through the
+   * campaign's front door.
+   *
+   * So a building with no scenario takes {@link SANDBOX_CONTRACT_ID}. The week keeps its day, its
+   * streak and its history — the player has not left the week, they have changed what it is *of* —
+   * and it stops claiming to be an assignment. `contractById` returns `undefined`, which is the
+   * answer the old comment claimed and did not produce.
    */
   const contract = contractForBuilding(buildingId);
   const week =
-    contract === undefined || contract.id === state.week.contractId
-      ? state.week
-      : takeContract(state.week, contract.id);
+    contract === undefined
+      ? withContract(state.week, SANDBOX_CONTRACT_ID)
+      : contract.id === state.week.contractId
+        ? state.week
+        : takeContract(state.week, contract.id);
   const next: ViewerState = { ...state, buildingId, week };
   const source = buildingConfigOf(resources, state.savedBuildings, state.editingBuildingId);
   const pristine =
@@ -268,6 +376,12 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
   const classes = classesFromSpecs(resources.elevatorSpecs);
   const building = buildingConfigOf(resources, [], buildingId);
   return {
+    playMode: 'shift-week',
+    calendar: null,
+    commissioning: [],
+    // Retrofit: the fabric is what the building already has. The opening position is the one that
+    // takes nothing away and adds nothing — a player has not asked to rebuild anything yet.
+    commissioningConstraintId: RETROFIT_CONSTRAINT_ID,
     mode: 'basic',
     showMaths: true,
     tab: 'run',
@@ -284,6 +398,14 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
     seed,
     outOfServiceCarIds: [],
     levers: DEFAULT_LEVERS,
+    /*
+     * Seeded from the opening dispatcher and the loaded file, not from a blank: every shipped
+     * profile authors no `selection` at all, so this is the declared defaults plus the file's own
+     * five bindings — the configuration a reader is already running, drawn rather than invented.
+     * An editor that opened on an empty arm map would make a player author five bindings before
+     * they could see what the mechanism is.
+     */
+    selectorSpec: selectorSpecFromProfile(profile, selectorContextFrom(resources.dispatcherProfiles)),
     week: openWeek(contractForBuilding(buildingId)?.id),
     savedDispatchers: [],
     savedPatterns: [],
@@ -388,6 +510,8 @@ export function classById(
  * -------------------------------------------------------------------------- */
 
 export interface ShiftRunConfig {
+  /** What the calendar did to today, in one line, or `''` on an ordinary day. */
+  readonly calendarLine: string;
   readonly config: SimulationConfig;
   readonly building: ResolvedBuilding;
   readonly event: ShiftEvent;
@@ -426,24 +550,71 @@ export function shiftRunConfigOf(
   }
 
   // 2 — the specs the building resolves against, widened by anything the reader saved.
-  let specs: ElevatorSpecs = resources.elevatorSpecs;
-  for (const machineClass of state.savedClasses) specs = specsWithClass(specs, machineClass);
+  const specs = specsWithSaved(resources, state.savedClasses);
+
+  /*
+   * 2b — the fabric the reader commissioned, **before growth and before the resolve**.
+   *
+   * Ordering is forced rather than stylistic. `shiftRunPatch` calls `carsToDerate` on the *resolved*
+   * building, and `withIncidents` writes `serviceEvents` naming `(bankId, carId)` pairs — so a
+   * commissioning applied later would derate a car that no longer exists, or miss the shaft that
+   * was added. It follows the specs widening so a machine class the reader saved is commissionable.
+   *
+   * Against growth the order is free (disjoint fields — commissioning writes `banks`, growth writes
+   * `floors`) and chosen for what it says: **the fabric is decided before the week opens, and
+   * growth is a thing that happens to the fabric.** That is the mode's whole premise — you choose,
+   * then you live with it — expressed in the sequence rather than only in prose.
+   *
+   * `commissionedBuilding` is total: an unknown class leaves the bank alone, `shafts < 1` clamps,
+   * and a double-deck class in an unpaired bank commissions single-deck. So there is no guard here;
+   * the screen gates with `reviewCommissioning`, and a run is never unloadable.
+   */
+  const classes = commissionableClasses(specs);
+  const fabric = commissionedBuilding(authored, state.commissioning, classes);
 
   // 1 — grown to the day, then the dwell lever written onto the cars, then re-parsed so a grown
   // building is validated like any other.
-  const grown = withDoorTiming(grownBuilding(authored, state.week.day), doorTimingFor(state.levers));
+  const grown = withDoorTiming(grownBuilding(fabric, state.week.day), doorTimingFor(state.levers));
   const building = resolveBuilding(parseBuilding(grown as unknown), specs);
 
-  // 3 — the dispatcher, plus the levers.
+  // 3 — the dispatcher, plus the levers, plus the weight-set selector.
   const base = profileById(resources, state.savedDispatchers, state.dispatcherId);
-  const dispatcherProfile = profileFromSpec(specFromProfile(base, base.name), {
-    id: base.id,
-    base,
-    levers: state.levers,
-  });
+  /*
+   * The selector is written **last**, over the profile the levers already produced, because it is
+   * the reader's most explicit statement about how the dispatcher should behave *during* the run
+   * and because `profileFromSpec` carries the base profile's own `selection` through its spread —
+   * so writing it first would leave the working copy losing to a field it was seeded from.
+   *
+   * Both halves of the selector are written here, and it has to be both: `selection` is a fact
+   * about the profile and `patternSwitching` is a fact about the file, and a run carrying one
+   * without the other is either a dispatcher declaring a rule with no arms (refused by name in
+   * `resolveWeightSets`) or an arm map nothing consults.
+   */
+  const dispatcherProfile = profileWithSelector(
+    profileFromSpec(specFromProfile(base, base.name), {
+      id: base.id,
+      base,
+      levers: state.levers,
+    }),
+    state.selectorSpec,
+  );
+  const dispatcherProfiles = dispatcherProfilesWithSelector(
+    resources.dispatcherProfiles,
+    state.selectorSpec,
+  );
 
-  // 4 — the demand, then the day's event over it.
-  const event = eventFor(state.week.day, state.week.dayIdx);
+  /*
+   * 4 — the calendar's day, then the demand, then the day's event over it.
+   *
+   * `calendarDayFor` runs **before `eventFor`** because a period may name today's event —
+   * `moving-week` is *`move-in` every day* — and `shiftRunPatch` has to be handed the event the run
+   * is actually under, not the one the ordinary schedule would have produced.
+   */
+  const calendarDay = calendarDayFor(state.calendar, state.week.day, state.week.dayIdx);
+  const event =
+    calendarDay?.shift.eventId == null
+      ? eventFor(state.week.day, state.week.dayIdx)
+      : SHIFT_EVENTS[calendarDay.shift.eventId];
   const spec = selectedPatternSpec(resources, state, authored);
   const pattern = spec === undefined ? { demandTemplate: 'rise-and-fall' as const, demand: {} } : demandFromSpec(spec);
   /*
@@ -476,25 +647,77 @@ export function shiftRunConfigOf(
     templateVariesMix: demandTemplate === 'lunch-two-way',
   });
 
+  /*
+   * 4b — the calendar's edit to the building and the demand, **after the event patch and before the
+   * incidents**.
+   *
+   * After the patch because its `split` input must be the mix the run actually has: a fire drill
+   * inside a vacation week is still a drill, pulled flatter. And because `spokenForCarIds` is what
+   * stops a reserved goods car being the same car the move-in derate already took — which the
+   * incident's own return event would otherwise hand back to passengers mid-shift.
+   *
+   * Before the incidents because the schedule has to be written onto the building the calendar
+   * returns, so one parse-and-resolve covers both edits rather than two.
+   */
+  const calendar = calendarPatch({
+    day: calendarDay,
+    building: grown,
+    split: patch.demand.directionalSplit ?? baseOf(resources, authored, demand).split,
+    demandTemplateId: demandTemplate,
+    demandTemplates: resources.trafficProfiles.demandTemplates,
+    runLengthS: state.shiftLengthS,
+    templateChosenByPlayer: state.freePlay?.demandTemplateId !== undefined,
+    spokenForCarIds: patch.outOfServiceCarIds,
+  });
+
   const outOfServiceCarIds = [
-    ...new Set([...state.outOfServiceCarIds, ...patch.outOfServiceCarIds]),
+    ...new Set([
+      ...state.outOfServiceCarIds,
+      ...patch.outOfServiceCarIds,
+      ...calendar.outOfServiceCarIds,
+    ]),
   ].sort((a, b) => a.localeCompare(b));
 
+  /*
+   * 5 — the day's incidents, written onto the building as `serviceEvents`.
+   *
+   * **After** the patch and before the second resolve, because the incident has to be part of the
+   * building document the kernel is handed: `serviceEvents` is read by `sim/events.ts` during the
+   * run, not by `recordRun` before it, so unlike `outOfServiceCarIds` it cannot travel beside the
+   * config. This is `BuildingConfig.serviceEvents`' first non-test caller anywhere in the repository
+   * — see `shift/incidents.ts` for what it was and why that mattered.
+   *
+   * The building is re-parsed and re-resolved rather than patched in place, so an incident naming a
+   * car no bank declares is refused by `core`'s own four service-event issue codes rather than by a
+   * check written here. `grownBuilding` already established that pattern: a building edit goes back
+   * through the loader like any other.
+   */
+  const withEvents = withIncidents(calendar.building, patch.incidents, state.shiftLengthS);
+  const finalBuilding =
+    withEvents === grown ? building : resolveBuilding(parseBuilding(withEvents as unknown), specs);
+
   return {
-    building,
+    building: finalBuilding,
     event,
+    /*
+     * The calendar's caption, built here rather than by the ribbon — `docs/16` S5's rule. It is a
+     * statement about **what was applied**, and only this function knows that: a template the run
+     * length refused never reaches it, and a population is the one `expandFloors` counted on the
+     * edited building rather than the factor that was asked for.
+     */
+    calendarLine: calendarDay === null ? '' : calendarLine(calendar),
     outOfServiceCarIds,
-    withheld: patch.withheld,
+    withheld: [...patch.withheld, ...calendar.withheld],
     config: {
-      building,
+      building: finalBuilding,
       dispatcherProfile,
       trafficProfiles,
       elevatorSpecs: specs,
-      dispatcherProfiles: resources.dispatcherProfiles,
+      dispatcherProfiles,
       seed: state.seed,
       durationS: state.shiftLengthS,
-      demandTemplate,
-      demand: { ...demand, ...patch.demand },
+      demandTemplate: (calendar.demandTemplateId ?? demandTemplate) as typeof demandTemplate,
+      demand: { ...demand, ...patch.demand, ...calendar.demand },
       /*
        * `report`, not the kernel's default `throw`. At the shipped traffic rates three of the five
        * buildings routinely end a run with people still in the system, and `Simulation` treats
@@ -507,6 +730,53 @@ export function shiftRunConfigOf(
       onTimeout: 'report',
     },
   };
+}
+
+/**
+ * The dispatcher-profile **file** the run resolves its weight-set arms from, with the reader's arm
+ * map written into it.
+ *
+ * `SimulationConfig.dispatcherProfiles` is what `weightSetSourceFrom` turns into the arm library,
+ * and the block it reads is file-level — so an editor that bound `up-peak` to a different weight
+ * set and wrote it only onto a profile would have edited a field the loader has nowhere to put.
+ * This is the other half of `selectorSpec.ts`'s *"two documents, not one"*, and it is the half that
+ * had **no seam at all** before this lane: `shiftRunConfigOf` passed `resources.dispatcherProfiles`
+ * straight through, so `patternSwitching` was loadable (§ D153's limitation, closed) and
+ * unwritable.
+ *
+ * ## The identity return is the point, not an optimisation
+ *
+ * When the reader's map is the file's own map, **the file object itself comes back** — not a copy
+ * that happens to be equal. `viewerSelector.test.ts`'s § D153 acceptance evidence asserts
+ * `configFrom(shipped).dispatcherProfiles` **is** the loaded file, and the criterion behind that
+ * assertion is the one worth keeping: closing a seam must cost nothing while nothing opts in.
+ *
+ * Arms may only name profiles the **file** declares, because that is the set
+ * `weightSetSourceFrom` builds `weightsByProfileId` from; a dispatcher the reader saved is not in
+ * it. The editor therefore offers only those (`docs/16` S7 — a control that cannot be honoured is
+ * not offered), rather than offering a saved dispatcher and refusing it at Run.
+ */
+export function dispatcherProfilesWithSelector(
+  file: DispatcherProfiles,
+  spec: SelectorSpec,
+): DispatcherProfiles {
+  const next = patternSwitchingWithSelector(spec, selectorContextFrom(file));
+  const before = file.patternSwitching;
+  if (next === undefined || before === undefined) return file;
+  if (sameArmMap(before.weightSetsByPattern, next.weightSetsByPattern)) return file;
+  return { ...file, patternSwitching: next };
+}
+
+/** Two arm maps binding the same patterns to the same weight sets. Key order is not a difference. */
+function sameArmMap(
+  a: Readonly<Record<string, string>>,
+  b: Readonly<Record<string, string>>,
+): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of keys) {
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
 }
 
 /**
@@ -544,6 +814,22 @@ function selectedPatternSpec(
  * than inside `shift/`: a fire drill means five times the demand *this building normally sees*, and
  * five times a residential trickle is not five times an office up-peak.
  */
+/**
+ * The shipped specs widened by every class the reader saved.
+ *
+ * Exported because the commissioning screen has to offer the **same** class list the run will
+ * resolve against: a screen built from the shipped six while the run uses seven would refuse a
+ * choice the week then honours, which is a refusal a player cannot act on.
+ */
+export function specsWithSaved(
+  resources: BrowserResources,
+  saved: readonly MachineClass[],
+): ElevatorSpecs {
+  let specs: ElevatorSpecs = resources.elevatorSpecs;
+  for (const machineClass of saved) specs = specsWithClass(specs, machineClass);
+  return specs;
+}
+
 function baseOf(
   resources: BrowserResources,
   building: BuildingConfig,

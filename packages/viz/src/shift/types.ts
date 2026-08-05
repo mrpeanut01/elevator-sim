@@ -189,6 +189,26 @@ export interface EventEffect {
   /** How many cars stand out of service for the whole shift. `0` on four of the five. */
   readonly carsOutOfService: number;
   /**
+   * A car away for **part** of the run, and back before it ends — or `null`.
+   *
+   * The distinction from {@link carsOutOfService} is the whole of what an incident is. A car held for
+   * the whole shift is *not in the building today*; a car that leaves and returns is a loss the group
+   * has to absorb and then re-balance around, which is a different problem to dispatch and the one a
+   * player can actually plan for.
+   *
+   * Expressed as fractions of the run rather than as a clock time, because a shift is 15 to 120
+   * minutes from a 06:00 start and the design's own *"until 11:30"* names an hour no shipped shift
+   * length contains — the same correction § D175 made to the fire drill's *"14:00"*.
+   *
+   * Reaches the engine as `BuildingConfig.serviceEvents` through `shift/incidents.ts`, which is that
+   * field's first non-test caller anywhere in this repository.
+   */
+  readonly derate: {
+    readonly cars: number;
+    readonly fromFraction: number;
+    readonly toFraction: number;
+  } | null;
+  /**
    * The engine fields this effect writes, by name, for the tooltip the coach ribbon shows and for
    * `events.test.ts`'s cross-check that the struct and the patch agree. Empty for `ordinary`.
    */
@@ -361,6 +381,42 @@ export interface WeekState {
   readonly bestMinutePct: number;
   /** Clean shifts banked toward the current contract's `needClean`. */
   readonly cleanRun: number;
+  /**
+   * How many times the current day has been closed. `0` before it has been closed at all.
+   *
+   * ## Why a week has to count attempts
+   *
+   * The simulator runs a whole day in milliseconds and plays the recording back, so **there is no
+   * mid-day change** — moving any control discards today and simulates a different one
+   * ([`docs/16`](../../../../docs/16-change-scope-contract.md) § 1). The retry is therefore the
+   * product's most-used verb, and until this field nothing modelled it.
+   *
+   * What that cost was not cosmetic. `closeDay` had no same-day guard and `closeShift`'s only guard
+   * was the recording's id, which a re-run defeats by construction — so a player could move a
+   * slider, re-run, re-close, and bank a **second** clean shift against the same Monday. A contract
+   * needing three cleared without the doors ever opening on Tuesday.
+   *
+   * Published beside the day's figures and never folded into them, on exactly the footing
+   * abandonment sits beside AWT and `workPerServedLegKJ` beside raw energy (§ D106): a day cleared
+   * on the fourth attempt **is cleared**, and the sheet says which attempt it was.
+   */
+  readonly attempt: number;
+  /** The day {@link attempt} counts, or `null` before any day has been closed. */
+  readonly closedDay: number | null;
+  /**
+   * What {@link streak}, {@link cleanRun} and {@link completed} were **before** the current day was
+   * first closed, or `null` when no day is open for re-closing.
+   *
+   * Carried so a retry is *replayed* rather than *added*: re-closing recomputes the day's
+   * contribution from this snapshot instead of compounding on top of the previous attempt's. That is
+   * what lets a missed day be recovered by a better run — which the design's *"nothing here is a
+   * game over"* asks for — without letting a clean day be banked twice, which is the exploit.
+   */
+  readonly banked: {
+    readonly streak: number;
+    readonly cleanRun: number;
+    readonly completed: readonly string[];
+  } | null;
   /** Contract ids cleared, in the order they were cleared. */
   readonly completed: readonly string[];
   /** The last seven closed days, oldest first. The sparkline reads it directly. */
@@ -434,9 +490,30 @@ export interface ReportForecast {
 }
 
 /** The whole observation sheet, as one value. `design.html` :237–381. */
+/**
+ * Where a reader goes when this sheet cannot answer their question — as a value, not as prose.
+ *
+ * `surface` is a named member so a shell can navigate on it; `label` and `why` are the words. The
+ * pointer exists because the question a run provokes — *is this better?* — is the one question this
+ * sheet is forbidden to answer, and `docs/17` § 5 clause 7 found the only surface that may answer it
+ * reachable from nowhere the player is standing when they ask.
+ *
+ * It lives on {@link DayReport} rather than on the single-run shape alone, which is a correction: a
+ * player finishes a *campaign day*, reads the levers card saying **try a different dispatcher — a
+ * smarter one is free**, and is standing in exactly the spot the finding describes. Restricting the
+ * pointer to Free Play answered the finding for the mode that provokes the question least.
+ */
+export interface ReportNextStep {
+  readonly surface: 'compare';
+  readonly label: string;
+  readonly why: string;
+}
+
 export interface DayReport {
   /** `Tuesday — day 2`. */
   readonly title: string;
+  /** Where the question this sheet may not answer is answered. See {@link ReportNextStep}. */
+  readonly nextStep: ReportNextStep;
   /** The right-aligned meta block, one string per line. */
   readonly metaLines: readonly string[];
   readonly lede: string;

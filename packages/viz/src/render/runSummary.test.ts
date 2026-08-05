@@ -37,6 +37,7 @@ import { VIZ_SCHEMA_VERSION, type VizRecording, type VizSummary } from '../contr
 import { recordRun } from '../record/recordRun.js';
 import {
   AWT_ID,
+  DEFAULT_RUN_SUMMARY_OPTIONS,
   DEMAND_ID,
   ENERGY_ID,
   FIGURE_ORDER,
@@ -48,6 +49,7 @@ import {
   WINDOW_ID,
   WT95_ID,
   runSummaryFigures,
+  summaryFigureIds,
   windowClause,
   type SummaryFigure,
 } from './runSummary.js';
@@ -421,6 +423,122 @@ describe('R11 — energy is an axis, never a score', () => {
       if (!textOf(item).includes('kJ')) continue;
       for (const wait of waitNumbers) {
         expect(textOf(item), `${item.id} mixes energy with a wait`).not.toContain(`${wait} s`);
+      }
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * `Settings.showEnergyAxis` — the gate, and the three things it may not become
+ * -------------------------------------------------------------------------- */
+
+describe('showEnergyAxis is a presentation gate over the whole energy row', () => {
+  const UNMEASURED = recordingWith(
+    fixtureSummary({
+      energy: {
+        measured: false,
+        workKJ: null,
+        workPerServedLegKJ: null,
+        deliveredLegCount: 0,
+        distanceM: null,
+        starts: null,
+      },
+    }),
+  );
+
+  const idsOf = (recording: VizRecording, showEnergyAxis: boolean): readonly string[] =>
+    runSummaryFigures(recording, { showEnergyAxis }).map((item) => item.id);
+
+  it('defaults to drawing it, so every caller that predates the parameter is unchanged', () => {
+    // `DEFAULT_SETTINGS.showEnergyAxis` is `false` and this default is `true`, deliberately: the
+    // default here is the behaviour of a caller with no player — `mode/disclosure.ts` and
+    // `honesty/surfaces.ts` describe a run rather than serve a preference.
+    expect(DEFAULT_RUN_SUMMARY_OPTIONS.showEnergyAxis).toBe(true);
+    expect(runSummaryFigures(BASE)).toEqual(runSummaryFigures(BASE, { showEnergyAxis: true }));
+    expect(summaryFigureIds()).toEqual([...FIGURE_ORDER]);
+  });
+
+  it('draws the row when on and drops it when off, and moves nothing else', () => {
+    expect(idsOf(BASE, true)).toContain(ENERGY_ID);
+    expect(idsOf(BASE, false)).not.toContain(ENERGY_ID);
+    // The rest of the panel is byte-identical: this gate selects rows and touches no value in one.
+    const without = (show: boolean): readonly SummaryFigure[] =>
+      runSummaryFigures(BASE, { showEnergyAxis: show }).filter((item) => item.id !== ENERGY_ID);
+    expect(without(false)).toEqual(without(true));
+    expect(idsOf(BASE, false)).toEqual([...FIGURE_ORDER].filter((id) => id !== ENERGY_ID));
+  });
+
+  it('is the decision the renderer itself uses — the sink moves, and it moves the panel', () => {
+    // `docs/16` S2: the sink must be the *shipped* decision. `summaryFigureIds` is what
+    // `runSummaryFigures` orders its own output by, so a probe calling it cannot pass while the
+    // setting is disconnected — the failure `dev/motion.ts` records a first draft of.
+    expect(summaryFigureIds({ showEnergyAxis: true })).not.toEqual(
+      summaryFigureIds({ showEnergyAxis: false }),
+    );
+    for (const show of [true, false]) {
+      expect(idsOf(BASE, show)).toEqual([...summaryFigureIds({ showEnergyAxis: show })]);
+    }
+  });
+
+  it('never shows `workPerServedLegKJ` without the raw figure, in either state', () => {
+    // § D106, and the clause that decides this gate's shape: *a configuration that spends less by
+    // serving fewer people has not saved anything*, so the per-ride figure and the total are one
+    // figure. Hiding one and keeping the other is worse than hiding both, and there is exactly one
+    // flag so that it cannot be done.
+    for (const show of [true, false]) {
+      for (const item of runSummaryFigures(BASE, { showEnergyAxis: show })) {
+        const text = textOf(item);
+        if (!text.includes('per ride delivered')) continue;
+        expect(text, `${item.id} carries the per-ride figure alone`).toContain('1234.5 kJ');
+      }
+    }
+    const shown = figureOf(BASE, ENERGY_ID);
+    expect(shown.value).toContain('1234.5 kJ');
+    expect(shown.value).toContain('30.80 kJ per ride delivered');
+    // …and with the axis off, neither half reaches the reader by any other row.
+    for (const item of runSummaryFigures(BASE, { showEnergyAxis: false })) {
+      expect(textOf(item), item.id).not.toContain('kJ');
+    }
+  });
+
+  it('is not a third way of saying "not recorded"', () => {
+    // `measured: false` means nobody wrote down how far the cars moved; it prints "not recorded"
+    // with `kind: 'absent'`, and never `0 kJ`. A hidden axis is a fact about the *reader*, so it
+    // leaves no row at all — no placeholder, and nothing an `absent` row could be confused with.
+    const visible = runSummaryFigures(UNMEASURED, { showEnergyAxis: true });
+    const unmeasured = visible.find((item) => item.id === ENERGY_ID);
+    expect(unmeasured?.value).toBe('not recorded');
+    expect(unmeasured?.kind).toBe('absent');
+
+    const hidden = runSummaryFigures(UNMEASURED, { showEnergyAxis: false });
+    expect(hidden.some((item) => item.id === ENERGY_ID)).toBe(false);
+    for (const item of hidden) {
+      expect(textOf(item), item.id).not.toContain('not recorded');
+      expect(textOf(item), item.id).not.toMatch(/\bkJ\b/);
+    }
+    // The two hidden panels are identical whether or not the run measured energy, which is the
+    // whole point: with the axis off, the reader is told nothing about energy either way.
+    expect(hidden).toEqual(runSummaryFigures(BASE, { showEnergyAxis: false }));
+  });
+
+  it('keeps R11 adjacency when the axis is on, and claims nothing about it when it is off', () => {
+    const order = [...FIGURE_ORDER];
+    expect(order.indexOf(ENERGY_ID)).toBe(order.indexOf(WT95_ID) + 1);
+    // With the axis off, WT95 is still followed by the journey figure and by nothing invented.
+    const off = idsOf(BASE, false);
+    expect(off[off.indexOf(WT95_ID) + 1]).toBe(TTD_ID);
+  });
+
+  it('hides no wait figure, because there is no flag that could', () => {
+    // R11 clause 1 in its load-bearing direction. `nearest-car` is on the Pareto front at six of
+    // eight matrix cells *because* it is best on energy and worst on wait, so a reader with the
+    // energy axis on and the waits off would be reading a ranking that puts the weakest shipped
+    // dispatcher first. The type has one flag; this asserts the panel has no other way to lose a
+    // wait figure.
+    for (const show of [true, false]) {
+      const ids = idsOf(BASE, show);
+      for (const required of [AWT_ID, WT95_ID, TTD_ID, DEMAND_ID, SERVICE_LEVEL_ID]) {
+        expect(ids, `${String(show)} dropped ${required}`).toContain(required);
       }
     }
   });

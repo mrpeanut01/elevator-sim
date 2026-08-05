@@ -39,7 +39,7 @@ import {
   planQueueRow,
   type QueueRowPlan,
 } from './riderQueue.js';
-import { DAY_START_S, DEFAULT_SKY, drawSky, isNight, type SkyBand, type SkyRamp } from './sky.js';
+import { DAY_START_S, drawSky, isNight, type SkyBand, type SkyRamp } from './sky.js';
 import { drawAlarmRule, drawRiderLane, figureClearancePx } from './riderFigures.js';
 import { fillRoundedRect } from './shapes.js';
 import * as tokens from './tokens.js';
@@ -91,6 +91,13 @@ export interface Canvas2DLike {
  * `docs/12` § 2.2 counted three hand-maintained copies of this project's palette and named the
  * defect class: *"one source, derived everywhere."* Two of the three are now the same file; the
  * stylesheet lane imports the same names. A hex literal appearing below is a regression.
+ *
+ * There are now **two** modes behind this one interface, and the interface is deliberately
+ * unchanged by that: a `Theme` is what the renderer draws with, and which palette it was projected
+ * from — {@link DARK_PALETTE} or `tokens.LIGHT_PALETTE`, through {@link themeFromPalette} — is the
+ * resolver's business and never a branch inside a drawing function. `drawScene` has no idea which
+ * mode it is in, which is the property that keeps *"equal frames draw equal call sequences"* true
+ * of both.
  *
  * ## The rule this type has kept since wave 2
  *
@@ -188,75 +195,183 @@ export interface Theme {
 }
 
 /**
- * Readable on a projector and in a screenshot, which is the whole specification — now in the
- * handoff's palette.
+ * The dark mode's colours, as a {@link tokens.Palette} — assembled from `render/tokens.ts`'s own
+ * exports, one field per constant, **no literal of its own**.
  *
- * Every value comes from `render/tokens.ts`. Where a name here and a name there differ, the
- * token is the design's word for the colour and this is the renderer's word for the claim; the
- * indirection is the point, because a claim can be re-pointed at a different token without the
- * design's vocabulary moving.
+ * ## Why the assembly is here and the light one is there
+ *
+ * `render/tokens.ts` declares both modes' colours; this file names the *claims* and projects a
+ * palette onto them. The dark record is assembled here rather than beside `LIGHT_PALETTE` for a
+ * mechanical reason worth stating, because it looks asymmetric and is not arbitrary:
+ * `deadCode.test.ts`'s *"carries the palette on the namespace rule"* pin reads `tokens.PAGE` in
+ * **this file**, and the fifty-seven constants stay live under the fifth audit because this file
+ * namespace-imports them and reads every one by name. Assembling the dark record inside
+ * `tokens.ts` would move them onto the weaker self-use rule and quietly make that pin false.
+ *
+ * `theme.test.ts` asserts this record against `tokens.ts`'s exports in both directions, so a
+ * constant added there and forgotten here is red, and so is a field here naming nothing there.
  */
-export const DEFAULT_THEME: Theme = Object.freeze({
-  background: tokens.PAGE,
-  shaft: tokens.RAIL,
-  shaftEdge: tokens.EDGE,
-  floorLine: tokens.PREVIEW_FLOOR_LINE,
+export const DARK_PALETTE: tokens.Palette = Object.freeze({
+  page: tokens.PAGE,
+  rail: tokens.RAIL,
+  card: tokens.CARD,
+  cardRaised: tokens.CARD_RAISED,
+  raised: tokens.RAISED,
+  edge: tokens.EDGE,
+  edgeMid: tokens.EDGE_MID,
+  edgeStrong: tokens.EDGE_STRONG,
+  hairline: tokens.HAIRLINE,
+  hintUnderline: tokens.HINT_UNDERLINE,
   text: tokens.TEXT,
   textDim: tokens.TEXT_DIM,
-  car: tokens.CAR_MID,
+  textMuted: tokens.TEXT_MUTED,
+  fainter: tokens.TEXT_FAINTER,
+  accent: tokens.ACCENT,
+  accentSoft: tokens.ACCENT_SOFT,
+  accentInk: tokens.ACCENT_INK,
+  over: tokens.OVER,
+  measured: tokens.MEASURED,
+
+  bandSettling: tokens.BAND_SETTLING,
+  bandWaiting: tokens.BAND_WAITING,
+  bandLong: tokens.BAND_LONG,
+  bandAbandoned: tokens.BAND_ABANDONED,
+
+  skyDawn: tokens.SKY_DAWN,
+  skyDay: tokens.SKY_DAY,
+  skyDusk: tokens.SKY_DUSK,
+  skyNight: tokens.SKY_NIGHT,
+  stageMass: tokens.STAGE_MASS,
+  stageSlab: tokens.STAGE_SLAB,
+  stageShaftRecess: tokens.STAGE_SHAFT_RECESS,
+  stageShaftHairline: tokens.STAGE_SHAFT_HAIRLINE,
+  stageCable: tokens.STAGE_CABLE,
+  stageGround: tokens.STAGE_GROUND,
+  stageWindowNight: tokens.STAGE_WINDOW_NIGHT,
+  stageWindowDay: tokens.STAGE_WINDOW_DAY,
+  doorGap: tokens.DOOR_GAP,
+
+  floorLabel: tokens.FLOOR_LABEL,
+  floorLabelEntrance: tokens.FLOOR_LABEL_ENTRANCE,
+  floorLabelTransfer: tokens.FLOOR_LABEL_TRANSFER,
+  floorLabelRestricted: tokens.FLOOR_LABEL_RESTRICTED,
+
   carLight: tokens.CAR_LIGHT,
+  carMid: tokens.CAR_MID,
   carHeavy: tokens.CAR_HEAVY,
   carOverload: tokens.CAR_OVERLOAD,
-  // Distinct from `background` on purpose, and the reason is unchanged by the repalette: they
-  // would look the same on screen, but a test that identifies the door seam by its fill would
-  // then also match the background wash, and it did. The design's own door gap
-  // (`rgba(5,8,13,.92)`) happens to keep the two apart, which is luck rather than design, so the
-  // property is asserted in `stageRender.test.ts` rather than left to it.
-  doorSeam: tokens.DOOR_GAP,
-  // The design paints *up* and *the freshest wait band* the same green. They are two claims on
-  // one row and `canvas.test.ts` counts one of them by its fill, so the direction pair moves and
-  // the band palette keeps § S7's value. See `render/tokens.ts`'s `WAITING_UP`.
+  carDown: tokens.CAR_DOWN,
+  carOccupantText: tokens.CAR_OCCUPANT_TEXT,
   waitingUp: tokens.WAITING_UP,
   waitingDown: tokens.WAITING_DOWN,
-  warning: tokens.WARNING,
-  panel: tokens.CARD,
-  highlight: tokens.HIGHLIGHT,
-  badge: tokens.FLOOR_LABEL_ENTRANCE,
-  restricted: tokens.FLOOR_LABEL_RESTRICTED,
-  queueBands: Object.freeze({
-    // § S7's four, verbatim. The note this comment replaced said `settling` had to avoid
-    // `textDim`'s grey because a test identifying a settling rider by its fill also matched every
-    // floor label; that collision is closed from the other side now — the floor label has its own
-    // token (`FLOOR_LABEL`) and the band is the design's green. The *rule* has not changed, only
-    // which of the two claims moved to satisfy it.
-    settling: tokens.BAND_SETTLING,
-    waiting: tokens.BAND_WAITING,
-    long: tokens.BAND_LONG,
-    abandoned: tokens.BAND_ABANDONED,
-  }),
-  // Distinct from `waitingUp` and `carLight`, which are the other two greens. They would read the
-  // same on screen, and a test that identified the relief mark by its fill would then also match
-  // every up-call badge and every lightly-loaded car — which it did.
-  queueRelief: tokens.RELIEF,
 
-  sky: DEFAULT_SKY,
-  mass: tokens.STAGE_MASS,
-  floorSlab: tokens.STAGE_SLAB,
-  shaftRecess: tokens.STAGE_SHAFT_RECESS,
-  shaftHairline: tokens.STAGE_SHAFT_HAIRLINE,
-  cable: tokens.STAGE_CABLE,
-  windowNight: tokens.STAGE_WINDOW_NIGHT,
-  windowDay: tokens.STAGE_WINDOW_DAY,
-  floorLabel: tokens.FLOOR_LABEL,
-  badgeTransfer: tokens.FLOOR_LABEL_TRANSFER,
-  ground: tokens.STAGE_GROUND,
-  carLabel: tokens.CAR_OCCUPANT_TEXT,
-  outOfServiceOn: tokens.OOS_ON,
-  outOfServiceOnText: tokens.OOS_ON_TEXT,
-  outOfServiceOff: tokens.OOS_OFF,
-  outOfServiceOffText: tokens.OOS_OFF_TEXT,
+  oosOn: tokens.OOS_ON,
+  oosOnText: tokens.OOS_ON_TEXT,
+  oosOff: tokens.OOS_OFF,
+  oosOffText: tokens.OOS_OFF_TEXT,
+
   alarm: tokens.ALARM,
+  relief: tokens.RELIEF,
+  highlight: tokens.HIGHLIGHT,
+  warning: tokens.WARNING,
+  previewFloorLine: tokens.PREVIEW_FLOOR_LINE,
 });
+
+/**
+ * A palette, projected onto the claims this renderer makes — the **one** place that projection
+ * happens, for either mode.
+ *
+ * Where a name here and a name in `render/tokens.ts` differ, the token is the design's word for
+ * the colour and this is the renderer's word for the claim; the indirection is the point, because
+ * a claim can be re-pointed at a different token without the design's vocabulary moving. It is
+ * also what makes a second mode a palette rather than a second renderer: `render/theme.ts` resolves
+ * `system`/`dark`/`light` to a `Palette` and hands the result through here, so the stage repaints
+ * with the shell instead of staying dark under a light page.
+ *
+ * The comments below are the divergences and the collisions — every one of them a property of the
+ * *claims*, so every one of them true of both modes, which is why they live here and not in either
+ * palette.
+ */
+export function themeFromPalette(palette: tokens.Palette): Theme {
+  return Object.freeze({
+    background: palette.page,
+    shaft: palette.rail,
+    shaftEdge: palette.edge,
+    floorLine: palette.previewFloorLine,
+    text: palette.text,
+    textDim: palette.textDim,
+    car: palette.carMid,
+    carLight: palette.carLight,
+    carHeavy: palette.carHeavy,
+    carOverload: palette.carOverload,
+    // Distinct from `background` on purpose, and the reason is unchanged by the repalette: they
+    // would look the same on screen, but a test that identifies the door seam by its fill would
+    // then also match the background wash, and it did. The design's own door gap
+    // (`rgba(5,8,13,.92)`) happens to keep the two apart, which is luck rather than design, so the
+    // property is asserted in `stageRender.test.ts` rather than left to it.
+    doorSeam: palette.doorGap,
+    // The design paints *up* and *the freshest wait band* the same green. They are two claims on
+    // one row and `canvas.test.ts` counts one of them by its fill, so the direction pair moves and
+    // the band palette keeps § S7's value. See `render/tokens.ts`'s `WAITING_UP`.
+    waitingUp: palette.waitingUp,
+    waitingDown: palette.waitingDown,
+    warning: palette.warning,
+    panel: palette.card,
+    highlight: palette.highlight,
+    badge: palette.floorLabelEntrance,
+    restricted: palette.floorLabelRestricted,
+    queueBands: Object.freeze({
+      // § S7's four, verbatim. The note this comment replaced said `settling` had to avoid
+      // `textDim`'s grey because a test identifying a settling rider by its fill also matched every
+      // floor label; that collision is closed from the other side now — the floor label has its own
+      // token (`FLOOR_LABEL`) and the band is the design's green. The *rule* has not changed, only
+      // which of the two claims moved to satisfy it.
+      settling: palette.bandSettling,
+      waiting: palette.bandWaiting,
+      long: palette.bandLong,
+      abandoned: palette.bandAbandoned,
+    }),
+    // Distinct from `waitingUp` and `carLight`, which are the other two greens. They would read the
+    // same on screen, and a test that identified the relief mark by its fill would then also match
+    // every up-call badge and every lightly-loaded car — which it did.
+    queueRelief: palette.relief,
+
+    sky: Object.freeze({
+      dawn: palette.skyDawn,
+      day: palette.skyDay,
+      dusk: palette.skyDusk,
+      night: palette.skyNight,
+    }),
+    mass: palette.stageMass,
+    floorSlab: palette.stageSlab,
+    shaftRecess: palette.stageShaftRecess,
+    shaftHairline: palette.stageShaftHairline,
+    cable: palette.stageCable,
+    windowNight: palette.stageWindowNight,
+    windowDay: palette.stageWindowDay,
+    floorLabel: palette.floorLabel,
+    badgeTransfer: palette.floorLabelTransfer,
+    ground: palette.stageGround,
+    carLabel: palette.carOccupantText,
+    outOfServiceOn: palette.oosOn,
+    outOfServiceOnText: palette.oosOnText,
+    outOfServiceOff: palette.oosOff,
+    outOfServiceOffText: palette.oosOffText,
+    alarm: palette.alarm,
+  });
+}
+
+/**
+ * Readable on a projector and in a screenshot, which is the whole specification — the dark mode,
+ * and the theme every caller that names no other one still gets.
+ *
+ * It is now *derived* rather than spelled: `themeFromPalette(DARK_PALETTE)`. Nothing about its
+ * values moved, and `drawScene`'s `input.theme ?? DEFAULT_THEME` is unchanged, so a caller that
+ * hands no theme is exactly where it was. A caller that has resolved a player's `theme` setting —
+ * `dev/main.ts`, through `render/theme.ts#themeFor` — hands `resolved.stage` instead, and the
+ * stage repaints with the shell rather than staying dark under a light page.
+ */
+export const DEFAULT_THEME: Theme = themeFromPalette(DARK_PALETTE);
 
 export interface SceneInput {
   readonly recording: VizRecording;

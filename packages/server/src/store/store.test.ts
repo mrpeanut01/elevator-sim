@@ -11,6 +11,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { hashPassword } from '../accounts/credentials.js';
+import { issuedChallengeFor } from '../challenge/schedule.js';
+import { challengeScoreOf, type SeedResult } from '../challenge/submission.js';
 import type { ClaimedMetrics, SubmittedRun } from '../leaderboard/submission.js';
 import { SESSION_TTL_MS, Store, normaliseEmail } from './store.js';
 
@@ -211,5 +213,143 @@ describe('a board', () => {
     // ever re-verify, which is the one property the whole design rests on.
     store.recordEntry({ configHash: 'board-8', userId: ada, run: RUN, measured: metrics(10) });
     expect(store.board('board-8', 'awtS', 25)[0]?.run).toEqual(RUN);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Challenges
+ * -------------------------------------------------------------------------- */
+
+/** A five-run set whose mean AWT is `awtS`, so a test can state an expected order in one number. */
+function challengeScore(awtS: number) {
+  const perSeed: SeedResult[] = ['1', '2', '3', '4', '5'].map((seed) => ({
+    seed,
+    awtS,
+    wt95S: awtS * 2,
+    ttdMeanS: awtS * 3,
+    pctOverLongWait: 0,
+    legs: 20,
+  }));
+  return challengeScoreOf(perSeed);
+}
+
+describe('a challenge board', () => {
+  const CHALLENGE = issuedChallengeFor(0);
+
+  it('issues a challenge once and never overwrites it', () => {
+    const { store } = fixture();
+    store.issueChallenge(CHALLENGE);
+    // A rotation edit must not move the window or the seed set of a challenge people are currently
+    // posting to — that is § D214 § 4's defect with a competition on it, where the stored entries
+    // would stop describing the challenge they name. First issue wins; an edit takes effect next
+    // cycle.
+    const rewritten = store.issueChallenge({ ...CHALLENGE, seeds: ['9'], closesAtMs: 0 });
+    expect(rewritten.seeds).toEqual([...CHALLENGE.seeds]);
+    expect(store.challengeById(CHALLENGE.id)?.closesAtMs).toBe(CHALLENGE.closesAtMs);
+  });
+
+  it('gives each player one row, and a re-submission replaces it', () => {
+    const { store, ada } = fixture();
+    store.issueChallenge(CHALLENGE);
+    const first = store.recordChallengeEntry({
+      challengeId: CHALLENGE.id,
+      dataHash: 'data-1',
+      userId: ada,
+      dispatcherProfileId: 'collective',
+      score: challengeScore(40),
+    });
+    const again = store.recordChallengeEntry({
+      challengeId: CHALLENGE.id,
+      dataHash: 'data-1',
+      userId: ada,
+      dispatcherProfileId: 'eta',
+      score: challengeScore(30),
+    });
+    // Latest wins, not best-per-metric. A board that kept each player's best row *per column* would
+    // show a different player's dispatcher depending on which metric a reader sorted by, so four
+    // readers would be looking at four different boards.
+    expect(again.id).toBe(first.id);
+    const board = store.challengeBoard(CHALLENGE.id, 'data-1', 'awtS', 25);
+    expect(board).toHaveLength(1);
+    expect(board[0]?.dispatcherProfileId).toBe('eta');
+    expect(board[0]?.score.meanAwtS).toBe(30);
+  });
+
+  it('orders two dispatchers against each other on one board — the defect § D218 fixes', () => {
+    const { store, ada, bo } = fixture();
+    store.issueChallenge(CHALLENGE);
+    for (const [userId, dispatcherProfileId, awtS] of [
+      [ada, 'collective', 25],
+      [bo, 'destination-eta', 20],
+    ] as const) {
+      store.recordChallengeEntry({
+        challengeId: CHALLENGE.id,
+        dataHash: 'data-1',
+        userId,
+        dispatcherProfileId,
+        score: challengeScore(awtS),
+      });
+    }
+    const board = store.challengeBoard(CHALLENGE.id, 'data-1', 'awtS', 25);
+    expect(board.map((entry) => entry.displayName)).toEqual(['Bo', 'Ada']);
+    // Both rows carry the count they were computed over, at both levels. R13 is a property of the
+    // row, so it survives the round trip through SQLite or it is not a property of the row.
+    expect(board[0]?.score.runs).toBe(5);
+    expect(board[0]?.score.legs).toBe(100);
+    expect(board[0]?.score.perSeed).toHaveLength(5);
+  });
+
+  it('forks a board when the reference data changes, and counts what is on the other one', () => {
+    const { store, ada, bo } = fixture();
+    store.issueChallenge(CHALLENGE);
+    store.recordChallengeEntry({
+      challengeId: CHALLENGE.id,
+      dataHash: 'data-1',
+      userId: ada,
+      dispatcherProfileId: 'collective',
+      score: challengeScore(25),
+    });
+    store.recordChallengeEntry({
+      challengeId: CHALLENGE.id,
+      dataHash: 'data-2',
+      userId: bo,
+      dispatcherProfileId: 'collective',
+      score: challengeScore(15),
+    });
+    // Not merged — a run this server can no longer reproduce cannot sit in the same order as one it
+    // can — and not dropped either, because a surface that silently omitted them would be losing
+    // rows without saying so.
+    expect(store.challengeBoard(CHALLENGE.id, 'data-1', 'awtS', 25)).toHaveLength(1);
+    expect(store.challengeDataHashes(CHALLENGE.id).map((group) => group.dataHash).sort()).toEqual([
+      'data-1',
+      'data-2',
+    ]);
+  });
+
+  it('refuses an entry for a challenge that was never issued', () => {
+    const { store, ada } = fixture();
+    // A foreign key, not a loose id: an entry whose challenge does not exist is a row nobody could
+    // ever replay, because the seeds and the configuration live on the challenge.
+    expect(() =>
+      store.recordChallengeEntry({
+        challengeId: 'never-issued-0',
+        dataHash: 'data-1',
+        userId: ada,
+        dispatcherProfileId: 'collective',
+        score: challengeScore(25),
+      }),
+    ).toThrow();
+  });
+
+  it('lists issued challenges, most recently opened first', () => {
+    const { store } = fixture();
+    store.issueChallenge(issuedChallengeFor(0));
+    store.issueChallenge(issuedChallengeFor(2));
+    store.issueChallenge(issuedChallengeFor(1));
+    expect(store.recentChallenges(10).map((issued) => issued.id)).toEqual([
+      issuedChallengeFor(2).id,
+      issuedChallengeFor(1).id,
+      issuedChallengeFor(0).id,
+    ]);
   });
 });

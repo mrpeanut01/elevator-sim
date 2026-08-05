@@ -29,21 +29,33 @@
  *
  * | event | effect | engine field |
  * |---|---|---|
- * | `move-in` | one car out of service all shift | `RecordRunOptions.outOfServiceCarIds` |
+ * | `move-in` | one car away for the first two thirds, then back | `BuildingConfig.serviceEvents` |
  * | `fire-drill` | mix swung outgoing-dominant, rate raised | `directionalSplit`, `arrivalRatePctPop5min` |
  * | `conference` | interfloor share raised | `directionalSplit` |
  * | `ordinary` | **nothing, and it says so** | none |
  * | `weekend` | rate reduced | `arrivalRatePctPop5min` |
  *
- * `move-in` is the one the design describes as *"one car is effectively half a car"*.
- * A time-boxed derate is expressible — `BuildingConfig.serviceEvents` is a real schedule with a
- * real resolver — but it is a **building edit**, and the building the shift layer hands the runner
- * is `grownBuilding`'s output, which this module does not own. Taking the car out for the whole
- * shift is the stronger, simpler version of the same fact and it goes through
- * `RecordRunOptions.outOfServiceCarIds`, which sets `Car.setMode('out-of-service')` before the run
- * so `estimateCost` refuses the car with `infeasibleReason: 'serviceMode'` and the group dispatches
- * around it with no new branch anywhere. The narrowing is stated rather than smoothed over: the
- * note now says *for the whole shift*, which is what the run does.
+ * ## `move-in` changed mechanism, and the old reasoning is kept because it was the narrowing
+ *
+ * The design describes it as *"one car is effectively half a car"* and its note ends *"until
+ * 11:30"*. This module used to answer that with `RecordRunOptions.outOfServiceCarIds`, which holds a
+ * car for the **whole** run — and said so, because a time-boxed derate is a
+ * `BuildingConfig.serviceEvents` schedule and *"the building the shift layer hands the runner is
+ * `grownBuilding`'s output, which this module does not own."* That was true, and the note was
+ * rewritten to *"for the whole shift"* rather than left promising a return that never came.
+ *
+ * `shift/incidents.ts` owns that seam now — it is `serviceEvents`' first non-test caller anywhere in
+ * the repository — so the car goes out and comes back, and the note describes it. The window is a
+ * **fraction of the run** and not an hour: 11:30 is outside every shipped shift length, and § D175
+ * dropped the fire drill's *"14:00"* for the same reason.
+ *
+ * The mechanism is also the more interesting one, which is why this is not merely a duration change.
+ * A car that never returns is a smaller building for a day; a car that rejoins two thirds of the way
+ * through is a group that has to absorb a loss and then re-balance around the return.
+ *
+ * `carsOutOfService` remains, is `0` on all five events, and is **not** dead: it is the right
+ * instrument for *"this car is not in the building today"*, `shiftRunPatch` still maps it, and
+ * `events.test.ts` still drives it. An event that wants a whole-shift hold declares one.
  */
 
 import type {
@@ -54,6 +66,7 @@ import type {
   TrafficProfile,
 } from '@elevator-sim/core/browser';
 
+import { carsToDerate, type Incident } from './incidents.js';
 import type { EventEffect, ShiftEvent, ShiftEventId } from './types.js';
 
 /**
@@ -105,6 +118,7 @@ const NO_EFFECT: EventEffect = Object.freeze({
   arrivalRateMultiplier: null,
   directionalSplit: null,
   carsOutOfService: 0,
+  derate: null,
   writes: Object.freeze([]),
 });
 
@@ -120,19 +134,32 @@ export const SHIFT_EVENTS: Readonly<Record<ShiftEventId, ShiftEvent>> = Object.f
     id: 'move-in',
     name: 'Move-in day',
     /*
-      * The design's note ends *"until 11:30"*. The effect this shift applies holds the car for the
-      * **whole** run, because a time-boxed derate is a `BuildingConfig.serviceEvents` schedule and
-      * `shift/` does not own the building the runner receives. A note promising a return at 11:30
-      * beside a car that never returns is a false statement about a mechanism — the defect
-      * `documentation.test.ts` guards one level up — so the note says what happens.
-      */
-    note: 'A tenant is hauling boxes up all day — one car is out of service for the whole shift.',
+     * The design's note ends *"until 11:30"*, and this event could not say *until* anything: a
+     * time-boxed derate is a `BuildingConfig.serviceEvents` schedule, `shift/` did not own the
+     * building the runner receives, and `outOfServiceCarIds` holds a car for the whole run. So the
+     * note was rewritten to *"for the whole shift"*, which was true and was a narrowing.
+     *
+     * `incidents.ts` owns that seam now, so the car genuinely returns and the note can say so. It
+     * says it as a **fraction of the shift** rather than as an hour, because 11:30 is outside every
+     * shipped shift length — a shift is 15 to 120 minutes from 06:00 — and a caption naming an hour
+     * the run does not contain is the defect § D175 corrected on the fire drill.
+     */
+    note: 'A tenant is hauling boxes up — one car is tied up for the first two thirds of the shift, then rejoins.',
     effect: Object.freeze({
       changesNothing: false,
       arrivalRateMultiplier: null,
       directionalSplit: null,
-      carsOutOfService: 1,
-      writes: Object.freeze(['outOfServiceCarIds']),
+      /*
+       * `0` here and a derate instead, which is a change of mechanism rather than of duration.
+       *
+       * A car that never comes back is a smaller building for a day. A car that rejoins two thirds
+       * of the way through is a group that has to absorb a loss and then re-balance around the
+       * return — which is the thing a player is being asked to plan for, and the thing the design's
+       * *"until"* was describing.
+       */
+      carsOutOfService: 0,
+      derate: Object.freeze({ cars: 1, fromFraction: 0, toFraction: 2 / 3 }),
+      writes: Object.freeze(['serviceEvents']),
     }),
   }),
   'fire-drill': Object.freeze({
@@ -149,6 +176,7 @@ export const SHIFT_EVENTS: Readonly<Record<ShiftEventId, ShiftEvent>> = Object.f
       arrivalRateMultiplier: 1.6,
       directionalSplit: DRILL_SPLIT,
       carsOutOfService: 0,
+      derate: null,
       writes: Object.freeze(['demand.arrivalRatePctPop5min', 'demand.directionalSplit']),
     }),
   }),
@@ -161,6 +189,7 @@ export const SHIFT_EVENTS: Readonly<Record<ShiftEventId, ShiftEvent>> = Object.f
       arrivalRateMultiplier: null,
       directionalSplit: CONFERENCE_SPLIT,
       carsOutOfService: 0,
+      derate: null,
       writes: Object.freeze(['demand.directionalSplit']),
     }),
   }),
@@ -179,6 +208,7 @@ export const SHIFT_EVENTS: Readonly<Record<ShiftEventId, ShiftEvent>> = Object.f
       arrivalRateMultiplier: 0.45,
       directionalSplit: null,
       carsOutOfService: 0,
+      derate: null,
       writes: Object.freeze(['demand.arrivalRatePctPop5min']),
     }),
   }),
@@ -257,6 +287,16 @@ export interface ShiftRunPatch {
   /** Passed to `recordRun`'s `outOfServiceCarIds`. Sorted, so the run is reproducible. */
   readonly outOfServiceCarIds: readonly string[];
   /**
+   * Cars away for **part** of the run, for `shift/incidents.ts#withIncidents` to write onto the
+   * building as `serviceEvents`.
+   *
+   * A third value rather than a second use of {@link outOfServiceCarIds}, because the two go to
+   * different places: a whole-shift hold is a `recordRun` option applied to a car before the run,
+   * and a window is a schedule the kernel reads *during* it. Collapsing them would mean the run
+   * builder could not tell which it had been handed.
+   */
+  readonly incidents: readonly Incident[];
+  /**
    * Parts of the effect that could not be applied, each with the reason.
    *
    * Empty in every shipped combination. Non-empty is not a failure — it is the honest form of a
@@ -275,7 +315,7 @@ export function shiftRunPatch(input: ShiftRunPatchInput): ShiftRunPatch {
   const withheld: string[] = [];
 
   if (effect.changesNothing) {
-    return { demand: {}, outOfServiceCarIds: [], withheld: [] };
+    return { demand: {}, outOfServiceCarIds: [], incidents: [], withheld: [] };
   }
 
   const demand: {
@@ -307,30 +347,54 @@ export function shiftRunPatch(input: ShiftRunPatchInput): ShiftRunPatch {
       ? carsToHold(input.building, effect.carsOutOfService, withheld, input.event.name)
       : [];
 
-  return { demand, outOfServiceCarIds, withheld };
+  /*
+   * The derate picks its cars by the **same** total order the whole-shift hold uses, and it picks
+   * them from the same building. An event declaring both would therefore take the same car out
+   * twice — no shipped event does, and the refusal below says so rather than letting the two
+   * quietly overlap and produce a car that is held and also scheduled to return.
+   */
+  const incidents: Incident[] = [];
+  if (effect.derate !== null) {
+    if (outOfServiceCarIds.length > 0) {
+      withheld.push(
+        `${input.event.name}: this event both holds a car for the whole shift and schedules one to ` +
+          'return, and the two would pick the same car. The window was not applied.',
+      );
+    } else {
+      const choice = carsToDerate(input.building, effect.derate.cars);
+      if (choice.shortfall > 0) {
+        withheld.push(
+          `${input.event.name}: asked to stand ${String(effect.derate.cars)} car(s) down for part of ` +
+            `the shift and could stand ${String(effect.derate.cars - choice.shortfall)}. Every bank ` +
+            'keeps at least one car in service — a bank with none is a set of floors nobody can reach.',
+        );
+      }
+      for (const car of choice.held) {
+        incidents.push({
+          kind: 'maintenance',
+          car,
+          fromFraction: effect.derate.fromFraction,
+          toFraction: effect.derate.toFraction,
+        });
+      }
+    }
+  }
+
+  return { demand, outOfServiceCarIds, incidents, withheld };
 }
 
 /**
- * Pick which cars stand idle — deterministically, and never the last one in a bank.
+ * Pick which cars stand idle — **the rule now lives in `incidents.ts`, and this maps it**.
  *
- * ## Deterministic, because the alternative is unreproducible
+ * The order and its two reasons are unchanged and are stated there: deterministic because a random
+ * draw outside the injected `StreamSet` breaks common random numbers (invariant 2) and would make
+ * two shifts of the same day incomparable; and never the last car in a bank, because a bank with
+ * none is a set of floors nobody can reach, which is a different scenario rather than a busier one.
  *
- * A random pick would be a random draw outside the injected `StreamSet`, which CLAUDE.md invariant
- * 2 forbids for the reason it gives: a shared source of randomness desynchronises common random
- * numbers and destroys comparison power. Two shifts of the same day would also hold different cars
- * and be incomparable. So the rule is a total order: the **last** runtime car id, ascending, of the
- * bank with the most cars — ties on car count broken by bank id, which is `core`'s own tie-break
- * discipline (invariant 4) applied to a display decision.
- *
- * ## Never the last car in a bank
- *
- * A bank with no in-service car is a bank whose floors nobody can reach, which is a different
- * scenario from a busy morning and is not what the design's note describes. So a bank keeps at
- * least one car, and an event that cannot be applied in full says what it could not do.
- *
- * Runtime car ids are `${bankId}-${carId}`, which is what `Simulation` constructs and therefore
- * what `recordRun` matches against. Built here rather than read off a recording, because the
- * decision is made *before* the run.
+ * What changed is that `incidents.ts` needs the *same* choice expressed as `(bankId, carId)` for a
+ * `serviceEvents` entry, while `recordRun` matches on the runtime id `${bankId}-${carId}` that
+ * `Simulation` constructs. Two implementations of "which car goes out today" would let the
+ * whole-shift hold and the time-boxed derate disagree about it, on the same day, in the same run.
  */
 function carsToHold(
   building: ResolvedBuilding,
@@ -338,29 +402,14 @@ function carsToHold(
   withheld: string[],
   eventName: string,
 ): readonly string[] {
-  const banks = [...building.banks].sort((a, b) =>
-    b.cars.length - a.cars.length !== 0
-      ? b.cars.length - a.cars.length
-      : a.id.localeCompare(b.id),
-  );
-  const held: string[] = [];
-  for (const bank of banks) {
-    if (held.length >= wanted) break;
-    const ids = bank.cars.map((car) => `${bank.id}-${car.id}`).sort((a, b) => a.localeCompare(b));
-    // One car stays. See the docstring.
-    const spare = ids.slice(1).reverse();
-    for (const id of spare) {
-      if (held.length >= wanted) break;
-      held.push(id);
-    }
-  }
-  if (held.length < wanted) {
+  const choice = carsToDerate(building, wanted);
+  if (choice.shortfall > 0) {
     withheld.push(
       `${eventName}: asked for ${String(wanted)} car(s) out of service and could hold ` +
-        `${String(held.length)}. Every bank keeps at least one car in service — a bank with none ` +
-        'is a set of floors nobody can reach, which is a different scenario rather than a busier one.',
+        `${String(wanted - choice.shortfall)}. Every bank keeps at least one car in service — a bank ` +
+        'with none is a set of floors nobody can reach, which is a different scenario rather than a ' +
+        'busier one.',
     );
   }
-  held.sort((a, b) => a.localeCompare(b));
-  return held;
+  return choice.held.map((car) => `${car.bankId}-${car.carId}`);
 }

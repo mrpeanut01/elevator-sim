@@ -20,6 +20,19 @@
  * **No response ever carries a password, a digest, a salt, or a confirmation token.** The token
  * goes into the mail and nowhere else — a registration response that echoed it would make the
  * mailbox round trip decorative and confirm any address anyone typed.
+ *
+ * ## Two boards, and they answer different questions
+ *
+ * `/api/board` is the **configuration** board of § D214 § 4: one configuration — dispatcher
+ * included — across seeds. It is a real thing and it is not the product's answer to *"who is best
+ * at this"*, because the dispatcher is in its key, so choosing a different one moves a player to a
+ * different board rather than up the one they are on.
+ *
+ * `/api/challenge-board` is § D218's answer instead: a **fixed seed set**, the dispatcher left
+ * free, and a row that is a mean over the whole set with the count it was computed over. Everything
+ * that keeps it on the legal side of `docs/10` § 5.5's prohibition — no interval, no composite, no
+ * string ordering two dispatchers, and a pointer at Compare — travels **in the response body**,
+ * because a client cannot be trusted to remember it and a reader cannot be expected to know it.
  */
 
 import {
@@ -30,10 +43,36 @@ import {
   signConfirmation,
   verifyConfirmation,
 } from '../accounts/credentials.js';
+import {
+  CHALLENGE_CLOCK_NOTE,
+  challengeBoardNote,
+  comparePointerFor,
+  windowRefusalDetail,
+} from '../challenge/board.js';
+import {
+  challengeStateAt,
+  issuedChallengeAt,
+  type ChallengeConfig,
+  type IssuedChallenge,
+} from '../challenge/schedule.js';
+import {
+  challengeDataHashOf,
+  challengeSubmissionIssues,
+  type ChallengeDataFacts,
+  type ChallengeSubmission,
+} from '../challenge/submission.js';
+import { verifyChallengeSubmission } from '../challenge/verify.js';
 import { confirmationMessage, type Mailer } from '../mail/mailer.js';
 import { configHashOf, submissionIssues, type ResolvedDataFacts, type Submission } from '../leaderboard/submission.js';
 import { verifySubmission, type VerificationResources } from '../leaderboard/verify.js';
-import { BOARD_METRICS, type BoardMetric, type EntryRow, type Store, type UserRow } from '../store/store.js';
+import {
+  BOARD_METRICS,
+  type BoardMetric,
+  type ChallengeEntryRow,
+  type EntryRow,
+  type Store,
+  type UserRow,
+} from '../store/store.js';
 
 /* -------------------------------------------------------------------------- *
  * The transport-shaped types
@@ -62,6 +101,11 @@ export interface ApiDeps {
   readonly resources: VerificationResources;
   /** How to digest the server's own `data/` for a run. Built once at boot; see `bootstrap.ts`. */
   readonly factsFor: (run: Submission['run']) => ResolvedDataFacts | undefined;
+  /**
+   * The same, for a challenge — which has no single dispatcher, so it cannot use `factsFor`.
+   * `bootstrap.ts`'s `challengeFactsResolver` says what differs and why.
+   */
+  readonly challengeFactsFor: (config: ChallengeConfig) => ChallengeDataFacts | undefined;
   /** The signing secret. Read from the environment by `requireSecret`; never defaulted. */
   readonly secret: string;
   readonly now: () => number;
@@ -78,7 +122,7 @@ export type Api = (request: ApiRequest) => Promise<ApiResponse>;
 const MAX_DISPLAY_NAME = 32;
 
 /**
- * The shortest gap between two verifications from one account.
+ * The shortest gap one account may command **one replay** in.
  *
  * `submissionIssues` already keeps an *unauthenticated* shape error from commanding a simulation.
  * This is the authenticated counterpart, and it is needed for the same reason at a larger size: a
@@ -86,14 +130,36 @@ const MAX_DISPLAY_NAME = 32;
  * account submitting in a loop is a CPU denial of service wearing a valid session.
  *
  * Five seconds, which is far below any honest play rate — a player has to watch a run before they
- * can post it — and far above the cost of one replay. In memory rather than in the database: it
- * bounds *this process*, which is the thing being protected, and a restart resetting it costs one
- * extra replay.
+ * can post it — and far above the cost of one replay. Since § D218 a submission can be worth more
+ * than one replay, so this is the **unit** rather than the whole interval; {@link cooldownForSeeds}
+ * is what a route actually charges.
  */
 const MIN_SUBMIT_INTERVAL_MS = 5_000;
 
+/**
+ * The cooldown a submission costs, in milliseconds — **one replay's worth per seed**.
+ *
+ * A single-run submission is one simulation and a challenge submission is one *per seed*, so a flat
+ * interval sized for the first would let the second command five times the CPU at the same rate.
+ * Derived from the seed count rather than written down twice, so `MAX_CHALLENGE_SEEDS` cannot be
+ * raised without the cooldown rising with it.
+ *
+ * Twenty-five seconds for a five-seed challenge. Still far below any honest play rate — a player
+ * has to watch five runs before they can post them — and still far above the cost of the replays.
+ */
+function cooldownForSeeds(seedCount: number): number {
+  return MIN_SUBMIT_INTERVAL_MS * Math.max(1, seedCount);
+}
+
 export function createApi(deps: ApiDeps): Api {
-  const lastSubmitMs = new Map<string, number>();
+  /**
+   * Per account, the earliest moment the next verification may start.
+   *
+   * A *next-allowed* moment rather than a *last-submitted* one, so the two submission routes can
+   * charge different amounts into one budget. Sharing the budget is deliberate: a player alternating
+   * between routes must not be able to double the load by doing so.
+   */
+  const nextSubmitMs = new Map<string, number>();
   return async function handle(request: ApiRequest): Promise<ApiResponse> {
     const route = `${request.method} ${request.path}`;
     switch (route) {
@@ -108,11 +174,19 @@ export function createApi(deps: ApiDeps): Api {
       case 'GET /api/me':
         return me(deps, request);
       case 'POST /api/scores':
-        return submit(deps, request, lastSubmitMs);
+        return submit(deps, request, nextSubmitMs);
       case 'GET /api/boards':
         return { status: 200, body: { boards: deps.store.boards() } };
       case 'GET /api/board':
         return board(deps, request);
+      case 'GET /api/challenges':
+        return challenges(deps);
+      case 'GET /api/challenge':
+        return challenge(deps, request);
+      case 'POST /api/challenge-scores':
+        return submitChallenge(deps, request, nextSubmitMs);
+      case 'GET /api/challenge-board':
+        return challengeBoard(deps, request);
       default:
         return { status: 404, body: { error: 'no-such-route', detail: `Nothing is served at ${route}.` } };
     }
@@ -229,23 +303,14 @@ function me(deps: ApiDeps, request: ApiRequest): ApiResponse {
 function submit(
   deps: ApiDeps,
   request: ApiRequest,
-  lastSubmitMs: Map<string, number>,
+  nextSubmitMs: Map<string, number>,
 ): ApiResponse {
   const user = authenticate(deps, request);
   if (user === undefined) {
     return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to post a score.' } };
   }
-  if (!user.confirmed) {
-    // § D214 § 5's one gated privilege, and the reason it is gated: an unconfirmed address makes a
-    // board farmable with throwaway accounts.
-    return {
-      status: 403,
-      body: {
-        error: 'not-confirmed',
-        detail: 'Confirm your email address before posting a score. You can keep playing meanwhile.',
-      },
-    };
-  }
+  const gate = postingGate(user);
+  if (gate !== undefined) return gate;
 
   const submission = request.body as Submission;
   if (typeof submission?.run !== 'object' || typeof submission?.claimed !== 'object') {
@@ -259,17 +324,8 @@ function submit(
   // After the cheap gate and before the expensive one. Checked here rather than at the top so a
   // player whose submission is malformed is told that, rather than being told to wait and then
   // told it was malformed anyway.
-  const since = deps.now() - (lastSubmitMs.get(user.id) ?? Number.NEGATIVE_INFINITY);
-  if (since < MIN_SUBMIT_INTERVAL_MS) {
-    return {
-      status: 429,
-      body: {
-        error: 'too-many-submissions',
-        detail: 'One score at a time — verifying a run means re-simulating it. Try again in a moment.',
-      },
-    };
-  }
-  lastSubmitMs.set(user.id, deps.now());
+  const limited = chargeCooldown(deps, user.id, nextSubmitMs, 1);
+  if (limited !== undefined) return limited;
 
   const facts = deps.factsFor(submission.run);
   if (facts === undefined) {
@@ -325,12 +381,317 @@ function board(deps: ApiDeps, request: ApiRequest): ApiResponse {
   };
 }
 
+/* ----------------------------------------------------------------- challenges */
+
+/**
+ * The challenge index — and the only place *"which challenge is it today"* is answered.
+ *
+ * § D218 § 3. The server issues the current challenge from its own clock and hands the client an
+ * id; a client that worked it out for itself would be a second answer to a question already
+ * answered, and the two would disagree at exactly the moment it mattered — the minute either side
+ * of a window boundary. Nothing in this handler reads the request, which is the mechanical form of
+ * that guarantee: there is no parameter a caller could pass to move the answer.
+ */
+function challenges(deps: ApiDeps): ApiResponse {
+  const nowMs = deps.now();
+  const current = deps.store.issueChallenge(issuedChallengeAt(nowMs));
+  return {
+    status: 200,
+    body: {
+      currentId: current.id,
+      current: challengeView(deps, current, nowMs),
+      clockNote: CHALLENGE_CLOCK_NOTE,
+      recent: deps.store.recentChallenges(12).map((issued) => ({
+        id: issued.id,
+        name: issued.name,
+        opensAtMs: issued.opensAtMs,
+        closesAtMs: issued.closesAtMs,
+        state: challengeStateAt(issued, nowMs),
+      })),
+    },
+  };
+}
+
+/**
+ * One challenge, in full. `?id=` is optional and omitting it means *the current one* — which is
+ * the shortest correct way for a client to ask, because it never names a cycle at all.
+ */
+function challenge(deps: ApiDeps, request: ApiRequest): ApiResponse {
+  const nowMs = deps.now();
+  const resolved = resolveChallenge(deps, request.query.get('id') ?? '', nowMs);
+  if (resolved === undefined) return noSuchChallenge(request.query.get('id') ?? '');
+  return { status: 200, body: challengeView(deps, resolved, nowMs) };
+}
+
+/**
+ * Post a challenge entry: one dispatcher, one claim per seed, verified by replaying all of them.
+ *
+ * The order of the gates is the same as `submit`'s and is deliberate in one further place. The
+ * **window** is checked after the shape gate and *before* the cooldown, so a player who posts to a
+ * challenge that closed while they were running it is told that — and is not also made to wait
+ * before being told it again.
+ */
+function submitChallenge(
+  deps: ApiDeps,
+  request: ApiRequest,
+  nextSubmitMs: Map<string, number>,
+): ApiResponse {
+  const user = authenticate(deps, request);
+  if (user === undefined) {
+    return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to post a challenge entry.' } };
+  }
+  const gate = postingGate(user);
+  if (gate !== undefined) return gate;
+
+  const submission = request.body as ChallengeSubmission;
+  if (typeof submission?.challengeId !== 'string' || typeof submission?.dispatcherProfileId !== 'string') {
+    return {
+      status: 400,
+      body: {
+        error: 'invalid-submission',
+        issues: ['a challenge entry names a challengeId, a dispatcherProfileId and one set of figures per seed'],
+      },
+    };
+  }
+
+  const nowMs = deps.now();
+  const target = resolveChallenge(deps, submission.challengeId, nowMs);
+  if (target === undefined) return noSuchChallenge(submission.challengeId);
+
+  // The cheap gate first, and it is worth more here than on the single-run route: a shape error
+  // that reached the verifier would command one simulation per seed rather than one.
+  const issues = challengeSubmissionIssues(submission, target);
+  if (issues.length > 0) return { status: 400, body: { error: 'invalid-submission', issues } };
+
+  const state = challengeStateAt(target, nowMs);
+  if (state !== 'open') {
+    const current = deps.store.issueChallenge(issuedChallengeAt(nowMs));
+    // 409 and not 403: nothing is wrong with the request or the requester, the world has moved.
+    // The detail names a date and names what to do instead — § D218 § 5's "a reason a player can
+    // act on" is two things, and a refusal with only the first is a dead end.
+    return {
+      status: 409,
+      body: {
+        error: 'challenge-not-open',
+        state,
+        challengeId: target.id,
+        opensAtMs: target.opensAtMs,
+        closesAtMs: target.closesAtMs,
+        currentChallengeId: current.id,
+        detail: windowRefusalDetail(target, state, current, challengeStateAt(current, nowMs)),
+      },
+    };
+  }
+
+  const limited = chargeCooldown(deps, user.id, nextSubmitMs, target.seeds.length);
+  if (limited !== undefined) return limited;
+
+  const facts = deps.challengeFactsFor(target.config);
+  if (facts === undefined) return unresolvableChallenge(target);
+
+  const verification = verifyChallengeSubmission(submission, target, deps.resources);
+  if (!verification.ok) {
+    // 422, for `submit`'s reason: the request was well-formed and the content did not check out. A
+    // rejection is not an accusation — a player on an older build lands here too.
+    return { status: 422, body: { error: verification.code, detail: verification.detail } };
+  }
+
+  const dataHash = challengeDataHashOf(target, facts);
+  const entry = deps.store.recordChallengeEntry({
+    challengeId: target.id,
+    dataHash,
+    userId: user.id,
+    dispatcherProfileId: submission.dispatcherProfileId,
+    // The **server's** aggregate over the **server's** runs. The claim is compared and discarded.
+    score: verification.score,
+  });
+  return { status: 201, body: { challengeId: target.id, dataHash, entry: publicChallengeEntry(entry) } };
+}
+
+/**
+ * A challenge board: these players, on these seeds, in this order.
+ *
+ * Every honesty obligation this surface carries travels in the body rather than in a docstring,
+ * because a client cannot be trusted to remember them and a reader cannot be expected to know them:
+ * `seedCount` and each row's own `runs`/`legs` (R13), `note` (§ D106 and § D218 § 5 clause 2), and
+ * `compare` (clause 5) — the pointer at the one surface allowed to answer *"is my dispatcher
+ * better"*.
+ */
+function challengeBoard(deps: ApiDeps, request: ApiRequest): ApiResponse {
+  const nowMs = deps.now();
+  const asked = request.query.get('challengeId') ?? '';
+  const target = resolveChallenge(deps, asked, nowMs);
+  if (target === undefined) return noSuchChallenge(asked);
+
+  const metric = request.query.get('metric') ?? 'awtS';
+  if (!BOARD_METRICS.includes(metric as BoardMetric)) {
+    return {
+      status: 400,
+      body: { error: 'no-such-metric', detail: `A board is ordered on one of ${BOARD_METRICS.join(', ')}.` },
+    };
+  }
+  const limit = Math.min(Math.max(Number(request.query.get('limit') ?? '25') || 25, 1), 100);
+
+  const facts = deps.challengeFactsFor(target.config);
+  if (facts === undefined) return unresolvableChallenge(target);
+  const dataHash = challengeDataHashOf(target, facts);
+
+  const entries = deps.store.challengeBoard(target.id, dataHash, metric as BoardMetric, limit);
+  const elsewhere = deps.store
+    .challengeDataHashes(target.id)
+    .filter((group) => group.dataHash !== dataHash)
+    .reduce((total, group) => total + group.entries, 0);
+
+  return {
+    status: 200,
+    body: {
+      challengeId: target.id,
+      challenge: target,
+      state: challengeStateAt(target, nowMs),
+      dataHash,
+      metric,
+      seedCount: target.seeds.length,
+      note: challengeBoardNote(target.seeds.length, metric),
+      compare: comparePointerFor(target),
+      entries: entries.map((entry) => publicChallengeEntry(entry)),
+      // Counted, never merged and never dropped. Entries set before a mid-challenge `data/` change
+      // describe runs this server can no longer reproduce, so they are on their own board — and a
+      // surface that silently omitted them would be losing rows without saying so.
+      entriesOnOtherData: elsewhere,
+      ...(elsewhere === 0
+        ? {}
+        : {
+            otherDataNote:
+              `${String(elsewhere)} entries on this challenge were set against different reference ` +
+              'data and are on a separate board. They are not shown here, because a run this ' +
+              'server can no longer reproduce cannot sit in the same order as one it can.',
+          }),
+    },
+  };
+}
+
 /* -------------------------------------------------------------------------- *
  * Shared
  * -------------------------------------------------------------------------- */
 
 function authenticate(deps: ApiDeps, request: ApiRequest): UserRow | undefined {
   return request.token === undefined ? undefined : deps.store.userForSession(request.token);
+}
+
+/**
+ * § D214 § 5's one gated privilege, applied identically to both submission routes.
+ *
+ * Factored rather than repeated: two copies of an authorization check are two things that can
+ * disagree, and the one that disagrees quietly is the one that lets a post through.
+ */
+function postingGate(user: UserRow): ApiResponse | undefined {
+  if (user.confirmed) return undefined;
+  return {
+    status: 403,
+    body: {
+      error: 'not-confirmed',
+      detail: 'Confirm your email address before posting a score. You can keep playing meanwhile.',
+    },
+  };
+}
+
+/**
+ * Charge a submission's replays against the account's cooldown, or refuse.
+ *
+ * Returns the 429 when the account is inside its window, and otherwise records the next moment it
+ * may submit and returns `undefined`. In memory rather than in the database: it bounds *this
+ * process*, which is the thing being protected, and a restart resetting it costs one extra replay.
+ */
+function chargeCooldown(
+  deps: ApiDeps,
+  userId: string,
+  nextSubmitMs: Map<string, number>,
+  seedCount: number,
+): ApiResponse | undefined {
+  const nowMs = deps.now();
+  if (nowMs < (nextSubmitMs.get(userId) ?? Number.NEGATIVE_INFINITY)) {
+    return {
+      status: 429,
+      body: {
+        error: 'too-many-submissions',
+        detail: 'One entry at a time — verifying a run means re-simulating it. Try again in a moment.',
+      },
+    };
+  }
+  nextSubmitMs.set(userId, nowMs + cooldownForSeeds(seedCount));
+  return undefined;
+}
+
+/**
+ * The challenge a request means: the one it named, or — when it named none — the current one.
+ *
+ * The current one is **issued** on the way past, which is the only write a `GET` on this surface
+ * performs and is worth stating. It is an insert-if-absent of a record the arithmetic already
+ * determines, so it adds no information; what it buys is that a challenge is on the record from the
+ * first moment anybody could have played it, rather than from the first moment somebody posted.
+ */
+function resolveChallenge(deps: ApiDeps, id: string, nowMs: number): IssuedChallenge | undefined {
+  const current = deps.store.issueChallenge(issuedChallengeAt(nowMs));
+  if (id.length === 0 || id === current.id) return current;
+  return deps.store.challengeById(id);
+}
+
+function noSuchChallenge(id: string): ApiResponse {
+  return {
+    status: 404,
+    body: {
+      error: 'no-such-challenge',
+      detail: `This server has not issued a challenge "${id}". Ask /api/challenges for the one that is open.`,
+    },
+  };
+}
+
+/** A challenge whose own configuration this server can no longer resolve against its `data/`. */
+function unresolvableChallenge(target: IssuedChallenge): ApiResponse {
+  return {
+    status: 409,
+    body: {
+      error: 'unknown-configuration',
+      detail:
+        `This server can no longer resolve “${target.name}” against its own reference data, so its ` +
+        'board cannot be read and nothing can be posted to it. Existing entries are kept.',
+    },
+  };
+}
+
+/**
+ * A challenge, plus the two things only the server can say about it: which state it is in, and how
+ * long is left.
+ *
+ * `closesInMs` is a **duration**, not a timestamp to subtract a client clock from. A countdown
+ * built by differencing two clocks is the client computing currency one subtraction later, which is
+ * the thing § D218 § 3 forbids.
+ */
+function challengeView(deps: ApiDeps, target: IssuedChallenge, nowMs: number): Record<string, unknown> {
+  const state = challengeStateAt(target, nowMs);
+  const facts = deps.challengeFactsFor(target.config);
+  return {
+    challenge: target,
+    state,
+    seedCount: target.seeds.length,
+    opensInMs: state === 'upcoming' ? target.opensAtMs - nowMs : null,
+    closesInMs: state === 'open' ? target.closesAtMs - nowMs : null,
+    clockNote: CHALLENGE_CLOCK_NOTE,
+    dataHash: facts === undefined ? null : challengeDataHashOf(target, facts),
+    compare: comparePointerFor(target),
+  };
+}
+
+function publicChallengeEntry(entry: ChallengeEntryRow): Record<string, unknown> {
+  return {
+    id: entry.id,
+    displayName: entry.displayName,
+    dispatcherProfileId: entry.dispatcherProfileId,
+    // Whole: the four means, both counts, and every run behind them. R13's clause one is that the
+    // count travels in the same unit as the figure — here it travels in the same object.
+    score: entry.score,
+    submittedAtMs: entry.submittedAtMs,
+  };
 }
 
 /**

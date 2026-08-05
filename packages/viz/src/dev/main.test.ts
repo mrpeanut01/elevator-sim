@@ -343,6 +343,69 @@ describe('the URL round-trips — SH-09', () => {
     expect(shell).toMatch(/urlWritable = true;(?:\s|\/\*[\s\S]*?\*\/|\/\/[^\n]*)*syncUrl\(\);/);
   });
 
+  it('declares every boot-scope binding above the boot sequence — the TDZ guard', async () => {
+    /*
+     * **The fourth occurrence of one mistake, and the first mechanised check for it.**
+     *
+     * `boot()` ends with `restoreSession(); applyTheme(); renderAll(); runShift();`. Function
+     * declarations hoist, so those four resolve wherever they are written — but a `let` in the same
+     * body does not, and `applyTheme` **assigns** `stageTheme`. Declared below the sequence, it
+     * threw `Cannot access 'stageTheme' before initialization` on boot's second statement, and the
+     * last-resort handler reported *The viewer did not start.* over a blank shell. `baseSpeed` sat
+     * one statement behind it.
+     *
+     * `tsc` permits use-before-declaration through a closure, and this suite imports the module for
+     * its pure exports only — the module guard means `main()` never runs under vitest — so the whole
+     * suite stayed green with the page dead.
+     *
+     * This has now happened four times in this package: `started` in `bootstrap.ts`, `carBadgeHits`
+     * here, and `stageTheme` and `baseSpeed` together. Two of them are written up in prose inside
+     * this very file. **Prose that has been ignored twice is not a control**, so the ordering is
+     * pinned at the source, in the idiom the assertion above already uses.
+     *
+     * The body is bounded at the first column-0 `}` so a `let` inside a later module-level function
+     * is not mistaken for one of boot's — which is a real case: `provenanceLineOf` has one.
+     */
+    const shell = await readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+    const start = shell.indexOf('function boot(');
+    expect(start, 'boot() has been renamed — this guard is now watching nothing').toBeGreaterThan(0);
+    const body = shell.slice(start, shell.indexOf('\n}\n', start));
+
+    const sequence = body.indexOf('\n  restoreSession();');
+    expect(sequence, 'boot’s sequence no longer starts with restoreSession()').toBeGreaterThan(0);
+
+    const late = [...body.matchAll(/^ {2}let (\w+)/gmu)]
+      .filter((match) => (match.index ?? 0) > sequence)
+      .map((match) => match[1]);
+    expect(
+      late,
+      'these boot-scope bindings are declared after boot’s own sequence runs, so any of the four ' +
+        'calls that touches one throws before the first frame — see the TDZ note beside carBadgeHits',
+    ).toEqual([]);
+  });
+
+  it('is not a vacuous guard — boot really does declare bindings and really does run a sequence', async () => {
+    // Without this, the assertion above would pass on a `boot()` that had been renamed away, or on
+    // a regex that had stopped matching anything.
+    const shell = await readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+    const body = shell.slice(shell.indexOf('function boot('), shell.indexOf('\n}\n', shell.indexOf('function boot(')));
+    expect([...body.matchAll(/^ {2}let (\w+)/gmu)].length).toBeGreaterThan(10);
+  });
+
+  it('keeps the browser tier registered — it may be absent, it may not be deleted', async () => {
+    /*
+     * `boot.browser.test.ts` skips itself on a machine with no Chromium, which is right: a missing
+     * browser is not a defect in this repository. But a tier that can skip is a tier that can be
+     * quietly removed and never noticed, and § D220 § 4 names that failure beside flake.
+     *
+     * So the *registration* is asserted from a test that always runs. If somebody deletes the
+     * project, this goes red and names what went with it.
+     */
+    const config = await readFile(fileURLToPath(new URL('../../../../vitest.config.ts', import.meta.url)), 'utf8');
+    expect(config, 'the viz-browser project is gone from vitest.config.ts').toContain("name: 'viz-browser'");
+    expect(config).toContain('*.browser.test.ts');
+  });
+
   it('derives the defaults from initialState rather than restating them', () => {
     const opening = initialState(resources, 0n);
     expect(defaults).toStrictEqual({

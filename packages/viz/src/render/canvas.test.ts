@@ -21,6 +21,7 @@ import { VIZ_SCHEMA_VERSION, type Frame, type VizRecording } from '../contract/t
 import { DEFAULT_FOOTER_PX, MIN_HEADER_PX, buildLayout } from './layout.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import { DEFAULT_THEME, drawScene, formatClock, type Canvas2DLike, type Theme } from './canvas.js';
+import { themeFor } from './theme.js';
 import type { FloorQueue, QueuedRider, WaitBand } from '../frame/overlay.js';
 import { MOOD_GLYPH, type BuildingMood } from './mood.js';
 import { BAND_GLYPH } from './riderQueue.js';
@@ -1148,5 +1149,127 @@ describe('the bank-filter caption', () => {
     expect(
       ctx.calls.some((call) => call.op === 'fillText' && String(call.args[0]).startsWith('bank ')),
     ).toBe(false);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The resolved palette — `GAPS.md`'s *"the light palette repaints the shell and not the stage"*
+ * -------------------------------------------------------------------------- */
+
+describe('the stage is drawn in whichever palette was resolved', () => {
+  /**
+   * The gap this closes, stated once: `render/theme.ts` resolved twenty-seven custom properties
+   * for the shell while this renderer held a module-level dark constant, so a reader on `light`
+   * got a light shell around a dark stage. The fix is not a second renderer and not a `mode`
+   * branch inside one — it is that `drawScene` takes the theme it is given, and the resolver now
+   * has one to give. Which is testable here precisely because the theme is a *parameter*.
+   */
+  const stageFor = (choice: 'dark' | 'light'): Theme =>
+    themeFor(choice, (query) => {
+      throw new Error(`an explicit choice asked the probe "${query}"`);
+    }).stage;
+
+  /** Every colour a transcript actually painted with, by the argument each op records it in. */
+  function coloursOf(ctx: RecordingContext): ReadonlySet<string> {
+    const at: Readonly<Record<string, number>> = {
+      fillRect: 4,
+      strokeRect: 4,
+      arc: 6,
+      fill: 0,
+      stroke: 0,
+      fillText: 3,
+    };
+    const out = new Set<string>();
+    for (const call of ctx.calls) {
+      const index = at[call.op];
+      if (index === undefined) continue;
+      const value = call.args[index];
+      if (typeof value === 'string' && value !== '') out.add(value);
+    }
+    return out;
+  }
+
+  /** The transcript with every colour argument dropped: the geometry, and nothing else. */
+  function shapeOf(ctx: RecordingContext): string {
+    const at: Readonly<Record<string, number>> = {
+      fillRect: 4,
+      strokeRect: 4,
+      arc: 6,
+      fill: 0,
+      stroke: 0,
+      fillText: 3,
+    };
+    return ctx.calls
+      .map((call) => {
+        const index = at[call.op];
+        const args = index === undefined ? call.args : call.args.filter((_, i) => i !== index);
+        return `${call.op}(${args.join(',')})`;
+      })
+      .join('\n');
+  }
+
+  function drawWith(theme: Theme): RecordingContext {
+    const ctx = new RecordingContext();
+    // 20:00, so the windows are lit and the night sky is the one being painted — the two stage
+    // colours a light mode is most likely to get wrong, and the two `render/tokens.ts` argues
+    // hardest about.
+    drawScene(ctx, { recording: RECORDING, frame: frame({ simTimeS: 14 * 3600 }), layout, theme });
+    return ctx;
+  }
+
+  it('draws the same picture in both modes — same marks, same places', () => {
+    // A palette may not move a pixel. If this ever fails, the light mode has become a second
+    // layout rather than a second palette, and every geometric assertion in this directory is
+    // being made about only one of the two pictures the viewer can now draw.
+    expect(shapeOf(drawWith(stageFor('light')))).toBe(shapeOf(drawWith(stageFor('dark'))));
+  });
+
+  it('shares no fill between the two modes — the stage repaints, whole', () => {
+    // The gap, as an assertion. A partial repaint shows up here as a colour common to both
+    // transcripts: it would be a mark still being drawn in the dark palette on a light page.
+    const dark = coloursOf(drawWith(stageFor('dark')));
+    const light = coloursOf(drawWith(stageFor('light')));
+    expect(dark.size).toBeGreaterThan(10);
+    expect([...dark].filter((colour) => light.has(colour))).toEqual([]);
+  });
+
+  it('keeps `DEFAULT_THEME` the dark default, so a caller that names no theme is where it was', () => {
+    // The other half of the requirement: existing callers — `honesty/surfaces.ts`, the editor
+    // preview, every test in this directory — hand no theme and must be unaffected.
+    const named = new RecordingContext();
+    drawScene(named, {
+      recording: RECORDING,
+      frame: frame({ simTimeS: 14 * 3600 }),
+      layout,
+      theme: DEFAULT_THEME,
+    });
+    const defaulted = new RecordingContext();
+    drawScene(defaulted, { recording: RECORDING, frame: frame({ simTimeS: 14 * 3600 }), layout });
+    expect(defaulted.transcript).toBe(named.transcript);
+    expect(drawWith(stageFor('dark')).transcript).toBe(named.transcript);
+  });
+
+  it('lights its windows and paints its sky from the palette, not from a constant', () => {
+    // The two stage claims `render/sky.ts` and the window pass read out of the theme rather than
+    // out of a module-level default. Both were the shape of the original defect — a drawing
+    // function reaching past its parameter — so both are checked on the light mode by value.
+    const light = coloursOf(drawWith(stageFor('light')));
+    expect(light.has(stageFor('light').windowNight)).toBe(true);
+    expect(light.has(stageFor('dark').windowNight)).toBe(false);
+    // The sky is painted as interpolated strips, so the ramp's own stops need not appear; what
+    // must is that every strip lies between the light ramp's two stops rather than the dark one's.
+    const skyStrips = [...light].filter((colour) => /^#[0-9a-f]{6}$/.test(colour));
+    const luminance = (hex: string): number =>
+      [1, 3, 5].reduce((sum, offset) => sum + parseInt(hex.slice(offset, offset + 2), 16), 0) / 3;
+    const darkest = Math.min(...skyStrips.map(luminance));
+    // The darkest hex fill on a light stage is still ink (`--text`, near-black); the *sky* strips
+    // are the ones above 0x80, and on the dark stage there are none.
+    expect(skyStrips.filter((colour) => luminance(colour) > 0x80).length).toBeGreaterThan(20);
+    expect(
+      [...coloursOf(drawWith(stageFor('dark')))].filter(
+        (colour) => /^#[0-9a-f]{6}$/.test(colour) && luminance(colour) > 0x80,
+      ).length,
+    ).toBeLessThan(6);
+    expect(darkest).toBeLessThan(0x80);
   });
 });

@@ -36,7 +36,7 @@
          Three copies of a palette is this repository's signature defect wearing a
          different hat. The canvas now derives its theme from `render/tokens.ts`,
          and the values below are the same numbers. If you change one, change both
-         — `render/tokens.test.ts` is what notices if you do not.
+         — `src/dev/tokens.test.ts` is what notices if you do not.
 
          Values are the handoff's, § 1.1 S6 / S7.
          ====================================================================== */
@@ -108,6 +108,73 @@
         --r-chip: 6px;
         --rail-left: 296px;
         --rail-right: 364px;
+      }
+
+      /* ======================================================================
+         The light mode — the same twenty-seven tokens, resolved for a bright page.
+
+         Values are `src/render/tokens.ts`'s `LIGHT_PALETTE`, projected onto these
+         property names by `src/render/theme.ts#shellTokensOf`, and pinned to this
+         block in both directions by `src/dev/tokens.test.ts`. Authored rather than
+         quoted from the handoff: the artefact has one mode. Nothing here has been
+         seen in a browser — `docs/16` S9's evidence tiers — so the checks on it
+         are arithmetic (a contrast floor, no token equal to its dark counterpart,
+         and the same collisions the dark palette has and no others).
+
+         Type and geometry tokens are deliberately absent: they are mode-
+         independent, and restating them would be a second place `--rail-left` has
+         to change. The three aliases (`--ok`/`--warn`/`--bad`) follow their bands
+         and need no restatement either.
+
+         `color-scheme` is not decoration. Without it the browser draws its own
+         surfaces — scrollbars, `<select>` popups, form controls — in dark, which
+         is the one failure of this feature no token assertion would catch.
+         ====================================================================== */
+      :root[data-theme='light'] {
+        color-scheme: light;
+
+        /* Surfaces: a grey ground rising to white, so a raised plate is never a hole. */
+        --bg: #e7ebf2;
+        --rail: #eef1f6;
+        --panel: #f5f7fa;
+        --card: #fbfcfe;
+        --raised: #ffffff;
+
+        /* Lines: away from the surface, as in dark — darker than the card here, lighter there. */
+        --hairline: #e0e5ee;
+        --edge: #ccd4e0;
+        --edge-mid: #bac4d3;
+        --edge-strong: #9aa7b9;
+        --hint-underline: #8593a7;
+
+        /* Ink: losing contrast from `--text` down. `--dim` is the *higher*-contrast secondary,
+           which is the order the dark palette already uses. */
+        --text: #101720;
+        --dim: #4a5666;
+        --dimmer: #64707f;
+        --faint: #7e8998;
+        --fainter: #99a3b0;
+
+        /* Accent. `--accent-soft` is the link colour, so it is darker than the accent here and
+           lighter than it in dark — in both cases away from the page. `--accent-ink` is drawn on
+           the accent fill and inverts with it rather than with the page. */
+        --accent: #1c6fc4;
+        --accent-soft: #15528f;
+        --accent-ink: #f2f8ff;
+
+        /* The wait-age bands. § 1.1 S7's four are a dark-mode specification — `#3fb27f` on
+           `#f5f7fa` is 2.3:1 — so the light mode keeps the four hues and the ladder order and
+           takes the value each needs to be legible ink on a pale card. */
+        --band-0: #1c7a55;
+        --band-1: #8a6212;
+        --band-2: #b04a14;
+        --band-3: #bf2a1c;
+
+        --over: #bc3a20;
+        --transfer: #7b3f96;
+        --entrance: #37599f;
+        --secure: #86612a;
+        --measured: #3d7a2e;
       }
 
       * { box-sizing: border-box; }
@@ -682,6 +749,24 @@
       .toggle-label { font-size: 12.5px; font-weight: 600; flex: 1; }
       .toggle-state { font: 600 10px var(--mono); flex: none; }
       .toggle-hint { font-size: 11.5px; color: var(--dim); line-height: 1.4; margin-top: 2px; }
+      /* The weight-set selector's arm rows — docs/17 § 5 finding 6. One card per traffic pattern,
+         in the detector's own declaration order, which is the order selectWeightSet breaks a tie
+         in. `data-live` rather than a class: the panel writes it from the model's own `live`, and
+         the dimming is the second signal beside the refusal, never the only one (KB-15). */
+      .selector-line { font: 500 11px var(--mono); color: var(--accent-soft); line-height: 1.6; margin-top: 8px; }
+      .selector-note { font-size: 12px; color: #a6b2c1; line-height: 1.5; margin: 0; }
+      .selector-refusal { font: 500 10.5px var(--mono); color: var(--warn); line-height: 1.5; margin-top: 6px; }
+      .selector-refusal[hidden] { display: none; }
+      .selector-arm { border: 1px solid var(--edge); border-radius: var(--r-card); background: var(--panel); padding: 9px 11px; }
+      .selector-arm + .selector-arm { margin-top: 7px; }
+      .selector-arm-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+      .selector-arm-name { font: 600 11px var(--mono); letter-spacing: 0.06em; }
+      .selector-arm[data-live='false'] .selector-arm-name { color: var(--dimmer); }
+      .selector-arm-line { font-size: 11.5px; color: var(--dim); line-height: 1.45; margin-top: 3px; }
+      .selector-arm-signature { font: 500 10px var(--mono); color: var(--faint); line-height: 1.5; margin-top: 4px; }
+      .selector-arm-signature[hidden] { display: none; }
+      .selector-arm .field { margin-top: 7px; }
+
       .editor-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
       .dirty { font: 500 10.5px var(--mono); color: var(--warn); }
       .dirty[hidden] { display: none; }
@@ -835,6 +920,84 @@
         .sheet { padding: 16px 14px; }
         .editor-grid { grid-template-columns: minmax(0, 1fr); }
       }
+
+      /* ------------------------------------------------------------------ *
+         The main menu — DECISIONS.md § D214, and docs/16 § 5 clause 7.
+
+         The menu shipped with **no CSS at all**: twenty-nine class names emitted
+         by `dev/menuPanel.ts` and not one rule anywhere, appended after a
+         `100vh` shell that does not scroll. So it was not an overlay lying over
+         the game — it was unstyled markup below the fold, which is why nothing
+         about it looked broken in a screenshot.
+
+         It is a real overlay here: fixed, above the drawer's `z-index: 20`, and
+         scrollable in its own right, because Free Play is seven rows plus a list
+         of refusals and a phone in landscape does not have room for it.
+         `surfaces.test.ts`'s sibling assertion is what stops the class list and
+         these rules drifting apart again.
+       * ------------------------------------------------------------------ */
+      .menu-overlay {
+        position: fixed; inset: 0; z-index: 40; overflow-y: auto;
+        background: var(--bg); padding: 32px 20px 48px;
+        display: flex; flex-direction: column; align-items: center;
+      }
+      .menu-overlay[hidden] { display: none; }
+      .menu-title {
+        font: 600 26px/1.2 var(--sans); color: var(--text);
+        margin: 8px 0 18px; width: min(560px, 100%);
+      }
+      .menu-list { display: grid; gap: 10px; width: min(560px, 100%); }
+      .menu-row, .menu-start, .menu-back, .menu-signout, .menu-account-mode {
+        display: grid; gap: 3px; text-align: left; width: 100%;
+        padding: 12px 14px; border-radius: var(--r-card);
+        border: 1px solid var(--edge-strong); background: var(--card);
+        color: var(--text); font: 500 14px var(--sans); cursor: pointer;
+      }
+      .menu-row:hover, .menu-start:hover, .menu-back:hover { border-color: var(--accent); }
+      .menu-row:focus-visible, .menu-start:focus-visible, .menu-back:focus-visible,
+      .menu-select select:focus-visible, .menu-text input:focus-visible,
+      .menu-toggle input:focus-visible {
+        outline: 2px solid var(--accent); outline-offset: 2px;
+      }
+      /* Disabled **and explained** — the detail line under the label carries the
+         reason, so this must not hide it. Dimmed, never removed. */
+      .menu-row[disabled], .menu-start[disabled] { opacity: 0.55; cursor: not-allowed; }
+      .menu-row-name { font-weight: 600; }
+      .menu-row-detail { font: 400 12px/1.45 var(--sans); color: var(--dim); }
+      .menu-start { background: var(--accent); border-color: var(--accent); color: #06121f; }
+      .menu-back { background: transparent; margin-top: 4px; }
+      .menu-select, .menu-text, .menu-seed, .menu-toggle {
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        width: 100%; padding: 9px 14px; border-radius: var(--r-card);
+        border: 1px solid var(--edge); background: var(--panel);
+        font: 500 13px var(--sans); color: var(--text);
+      }
+      .menu-select select, .menu-text input, .menu-seed input {
+        min-width: 0; flex: 1 1 55%; padding: 5px 8px; border-radius: 8px;
+        border: 1px solid var(--edge-strong); background: var(--card);
+        color: var(--text); font: 500 12px var(--sans);
+      }
+      .menu-toggle input { flex: 0 0 auto; }
+      .menu-issues {
+        width: min(560px, 100%); margin: 12px 0 0; padding: 10px 14px 10px 30px;
+        border: 1px solid var(--warn, var(--edge-strong)); border-radius: var(--r-card);
+        background: var(--panel); color: var(--text);
+        font: 400 12px/1.5 var(--sans);
+      }
+      .menu-issues li { margin: 3px 0; }
+      .menu-note, .menu-notice {
+        width: min(560px, 100%); margin: 10px 0 6px;
+        font: 400 12px/1.55 var(--sans); color: var(--dim);
+      }
+      .menu-account, .menu-leaderboard, .menu-freeplay, .menu-settings, .menu-placeholder {
+        display: grid; gap: 10px; width: min(560px, 100%);
+      }
+      .menu-account-who { font: 500 14px var(--sans); color: var(--text); }
+      .menu-board { display: grid; gap: 6px; width: 100%; margin: 6px 0 0; padding-left: 22px; }
+      .menu-board-row { display: grid; gap: 2px; padding: 6px 0; border-bottom: 1px solid var(--edge); }
+      .menu-board-name { font: 600 13px var(--sans); color: var(--text); }
+      .menu-board-figures { font: 400 11px var(--mono); color: var(--dim); }
+      .menu-board-seed { font: 400 11px var(--mono); color: var(--dim); }
     </style>
   </head>
   <body>
@@ -851,6 +1014,11 @@
             <div class="brand-name">Elevator Sim</div>
             <div class="brand-mode">SHIFT MODE</div>
           </div>
+          <!-- docs/16 § 5 clause 5. `closeMenu()` only ever wrote `hidden = true`
+               and nothing anywhere wrote `false`, so once a player pressed Start
+               or Campaign the menu was gone for the session: no button, no key,
+               and no `screen` among the seven fields `applyDeepLink` reads. -->
+          <button id="open-menu" class="chip" type="button" title="Main menu">Menu</button>
         </div>
 
         <div class="topbar-building">
@@ -986,7 +1154,14 @@
             <div class="tabs-right">
               <button type="button" id="drawer-toggle" aria-expanded="false" aria-controls="rail-right">Controls ▸</button>
               <button role="tab" class="tab-secondary" id="tab-compare" aria-selected="false" aria-controls="panel-compare" tabindex="-1">Compare</button>
-              <button role="tab" class="tab-secondary" id="tab-campaign" aria-selected="false" aria-controls="panel-campaign" tabindex="-1">Campaign</button>
+              <!-- Labelled "Lab", not "Campaign" — docs/17 § 3.3. Two unrelated modes wore that
+                   word: the contract week in shift/ (days, growth, events, banked shifts) and
+                   these batch-judged stages from data/campaign.json, which are the only surface
+                   in the product where docs/10 R2 can be discharged at all because they are the
+                   only one that runs a replication batch. The element id stays `tab-campaign`
+                   so every deep link, every ELEMENT_IDS entry and every test that names the
+                   surface keeps working; what changed is the word a player reads. -->
+              <button role="tab" class="tab-secondary" id="tab-campaign" aria-selected="false" aria-controls="panel-campaign" tabindex="-1">Lab</button>
               <button role="tab" class="tab-secondary" id="tab-parameters" aria-selected="false" aria-controls="panel-parameters" tabindex="-1">Parameters</button>
             </div>
           </div>
@@ -1229,6 +1404,27 @@
                                style="font-size: 12.5px; font-weight: 600; display: inline-block">Door dwell</div>
                           <div class="chip-row" style="margin-top: 6px" id="dwell-chips"></div>
                           <div style="font-size: 11.5px; color: var(--dim); line-height: 1.4; margin-top: 4px" id="dwell-hint"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- The weight-set selector — docs/17 § 5 finding 6. Beside the group levers
+                         because it is one: applied to whoever is driving, never a fork of them.
+                         Every node below is written by dev/selectorEditor.ts; the only static text
+                         is the heading and the button, because everything else is either core's own
+                         parameter copy or a refusal the model raised. -->
+                    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #1c2532">
+                      <div class="eyebrow" style="margin-bottom: 9px">Traffic-pattern switching — the one thing that changes mid-shift</div>
+                      <p class="selector-note" id="selector-unavailable" hidden></p>
+                      <div id="selector-controls">
+                        <div class="chip-row" id="selector-policy"></div>
+                        <div class="selector-line" id="selector-line"></div>
+                        <div class="selector-refusal" id="selector-policy-issue" hidden></div>
+                        <div style="display: grid; gap: 9px; margin-top: 12px" id="selector-scalars"></div>
+                        <div style="margin-top: 12px" id="selector-patterns"></div>
+                        <div class="selector-refusal" id="selector-map-issue" hidden></div>
+                        <div class="editor-actions">
+                          <button type="button" class="chip" id="selector-reset">Back to the shipped switching</button>
+                          <span class="dirty" id="selector-changed" hidden></span>
                         </div>
                       </div>
                     </div>

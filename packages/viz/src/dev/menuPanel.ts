@@ -21,32 +21,17 @@
  */
 
 import { el, fill, setText } from './dom.js';
-import {
-  canSubmitForm,
-  formIssues,
-  postingRefusal,
-  type AccountForm,
-  type AccountState,
-} from '../menu/account.js';
+import { canSubmitForm, formIssues, postingRefusal, type AccountState } from '../menu/account.js';
 import type { BoardPage } from '../menu/client.js';
+
 import {
-  FREE_PLAY_RATES,
-  back,
-  canStart,
-  freePlayIssues,
-  navigate,
-  updateFreePlay,
-  updateSettings,
-} from '../menu/menu.js';
-import {
-  FREE_PLAY_DURATIONS_S,
-  PLAYBACK_SPEEDS,
-  type FreePlaySelection,
-  type MenuCatalogue,
-  type MenuScreen,
-  type MenuState,
-  type Settings,
-} from '../menu/types.js';
+  screenOf,
+  type ChallengeScreenInput,
+  type CommissioningScreenInput,
+  type MenuAffordance,
+  type MenuIntent,
+} from '../menu/screens.js';
+import type { MenuCatalogue, MenuState } from '../menu/types.js';
 
 /**
  * What the leaderboard screen has to draw, as data.
@@ -68,419 +53,259 @@ export interface MenuPanelHost {
   readonly doc: Document;
   readonly catalogue: MenuCatalogue;
   state(): MenuState;
-  update(next: MenuState): void;
-  /** Called when the player commits a Free Play selection that {@link canStart} accepts. */
-  start(selection: FreePlaySelection): void;
-  /** Called when the player picks Campaign. The campaign surface owns everything after that. */
-  openCampaign(): void;
-  /* ------------------------------------------------------------- accounts */
+  /**
+   * Everything a player asks for, as one call.
+   *
+   * Eight methods before this — `start`, `openCampaign`, `submitAccountForm`, `signOut`,
+   * `openBoard` and three more — each of which was a decision the panel made and the shell merely
+   * performed. Collapsed to one, so the *decisions* live in `menu/screens.ts` where a test can
+   * reach them and the shell's handler is an **exhaustive switch** over {@link MenuIntent}.
+   *
+   * That switch is the mechanism that ends `docs/16` § 5 clause 8: `client.submit` had no caller at
+   * all, and `submit-score` is a member of the union, so the shell does not compile without one.
+   */
+  dispatch(intent: MenuIntent): void;
   account(): AccountState;
-  updateAccountForm(patch: Partial<AccountForm>): void;
-  /** Sign in or register, according to the form's own mode. The host owns the request. */
-  submitAccountForm(): void;
-  signOut(): void;
-  /* ---------------------------------------------------------- leaderboard */
   leaderboard(): LeaderboardView;
-  openBoard(configHash: string): void;
+  /** What only the shell knows: whether a run is on screen, and whether it may be ranked. */
+  runState(): { readonly hasRun: boolean; readonly rankingRefusal: string | undefined };
+  /** The reader's disclosure level, for the one settings row Basic cannot honour — `docs/16` S7. */
+  viewMode(): 'basic' | 'advanced';
+  /**
+   * This week's challenge, as the server answered — never as this browser worked out (§ D218 § 3).
+   *
+   * `undefined` when there is no server. The screen has a row for that case rather than an empty
+   * panel, which is `docs/16` § 5 clause 6's rule applied to an absence rather than to an oversight.
+   */
+  challenge(): ChallengeScreenInput | undefined;
+  /** The fabric, its constraint's verdict, and what each bank may take. `undefined` with no building. */
+  commissioning(): CommissioningScreenInput | undefined;
+  /** Which calendar period is over the week, or `''`. */
+  calendarPeriodId(): string;
 }
 
 /* -------------------------------------------------------------------------- *
  * Rendering
  * -------------------------------------------------------------------------- */
 
-/** Draw the current screen into `host`. Called on every state change; cheap enough to do so. */
+/**
+ * Draw the current screen. **Decides nothing.**
+ *
+ * Every row, its label, whether it is enabled and what pressing it asks for come from
+ * `menu/screens.ts#screenOf`. This file turns that into elements and turns a click into
+ * {@link MenuPanelHost.dispatch}. The split is `dev/surfaces.ts`'s and `controls/render.ts`'s, and
+ * the reason is `docs/16` § 5: three of the eight clauses the product failed were decisions taken
+ * inside a click handler, where nothing could reach them.
+ */
 export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
-  const state = host.state();
   const doc = host.doc;
-  const screen = state.screen;
+  const account = host.account();
+  const board = host.leaderboard();
+  const run = host.runState();
+  const view = screenOf({
+    state: host.state(),
+    catalogue: host.catalogue,
+    canPost: account.user !== undefined,
+    postingRefusal: postingRefusal(account),
+    hasRun: run.hasRun,
+    rankingRefusal: run.rankingRefusal,
+    boards: board.boards,
+    viewMode: host.viewMode(),
+    challenge: host.challenge(),
+    commissioning: host.commissioning(),
+    calendarPeriodId: host.calendarPeriodId(),
+  });
 
+  const children: Node[] = [];
   const heading = el(doc, 'h1', { className: 'menu-title' });
-  setText(heading, titleOf(screen));
+  setText(heading, view.title);
+  children.push(heading);
 
-  const body =
-    screen === 'main'
-      ? mainScreen(doc, host)
-      : screen === 'free-play'
-        ? freePlayScreen(doc, host)
-        : screen === 'settings'
-          ? settingsScreen(doc, host)
-          : screen === 'account'
-            ? accountScreen(doc, host)
-            : screen === 'leaderboard'
-              ? leaderboardScreen(doc, host)
-              : placeholderScreen(doc, screen);
+  for (const notice of view.notices) children.push(noticeLine(doc, notice));
 
-  const children: Node[] = [heading, body];
-  if (screen !== 'main') children.push(backButton(doc, host));
+  const list = el(doc, 'div', { className: 'menu-list' });
+  for (const row of view.rows) list.append(affordance(doc, host, row));
+  children.push(list);
+
+  if (view.issues.length > 0) children.push(issueList(doc, view.issues));
+
+  // The two screens with content an affordance cannot express: a credential form, and a table of
+  // somebody else's runs. Both are drawn below the rows the model does own.
+  if (view.screen === 'account' && account.user === undefined) {
+    children.push(accountForm(doc, host, account));
+  }
+  if (view.screen === 'account' && account.notice !== undefined) {
+    children.push(noticeLine(doc, account.notice));
+  }
+  if (view.screen === 'leaderboard') children.push(boardTable(doc, board));
+
   fill(root, ...children);
 }
 
-function titleOf(screen: MenuScreen): string {
-  switch (screen) {
-    case 'main':
-      return 'Elevator Sim';
-    case 'campaign':
-      return 'Campaign';
-    case 'free-play':
-      return 'Free play';
-    case 'settings':
-      return 'Settings';
-    case 'leaderboard':
-      return 'Leaderboard';
-    case 'account':
-      return 'Account';
-  }
-}
+/* -------------------------------------------------------------------------- *
+ * One affordance
+ * -------------------------------------------------------------------------- */
 
-function backButton(doc: Document, host: MenuPanelHost): HTMLElement {
-  const button = el(doc, 'button', { className: 'menu-back', attrs: { type: 'button' } });
-  setText(button, 'Back');
+/**
+ * Turn one {@link MenuAffordance} into an element.
+ *
+ * The `select` and `toggle` arms rebuild their intent from the chosen option — which is why
+ * {@link MenuIntent} `set-free-play` and `set-setting` carry a **field and a value** rather than a
+ * prepared patch. A prepared patch would have been the answer to a question nobody had asked yet,
+ * since the affordance is built before anybody picks anything.
+ */
+function affordance(doc: Document, host: MenuPanelHost, row: MenuAffordance): HTMLElement {
+  const withValue = (value: string): MenuIntent =>
+    row.intent.kind === 'set-free-play' || row.intent.kind === 'set-setting'
+      ? { ...row.intent, value }
+      : row.intent;
+
+  if (row.kind === 'select') {
+    return selectRow(doc, row.label, row.value ?? '', row.options ?? [], (id) => {
+      host.dispatch(withValue(id));
+    });
+  }
+  if (row.kind === 'toggle') {
+    return toggleRow(doc, row.label, row.value === 'on', (value) => {
+      host.dispatch(withValue(value ? 'on' : 'off'));
+    });
+  }
+  if (row.kind === 'text') {
+    return textRow(doc, row.label, 'text', row.value ?? '', (value) => {
+      host.dispatch(withValue(value));
+    });
+  }
+
+  const button = el(doc, 'button', {
+    className: row.kind === 'back' ? 'menu-back' : row.kind === 'commit' ? 'menu-start' : 'menu-row',
+    attrs: { type: 'button' },
+  });
+  const name = el(doc, 'span', { className: 'menu-row-name' });
+  setText(name, row.label);
+  const kids: Node[] = [name];
+  // Disabled **and** explained, always. A control that refuses in silence moves an explainable
+  // error to the one moment with no words for it.
+  const detail = row.enabled ? row.detail : (row.disabledWhy ?? row.detail);
+  if (detail !== undefined && detail.length > 0) {
+    const help = el(doc, 'span', { className: 'menu-row-detail' });
+    setText(help, detail);
+    kids.push(help);
+  }
+  fill(button, ...kids);
+  if (!row.enabled) button.setAttribute('disabled', 'disabled');
   button.addEventListener('click', () => {
-    host.update(back(host.state()));
+    host.dispatch(row.intent);
   });
   return button;
 }
 
-/* -------------------------------------------------------------------------- *
- * The screens
- * -------------------------------------------------------------------------- */
-
-/** The root: one row per destination, in the order a new player should meet them. */
-function mainScreen(doc: Document, host: MenuPanelHost): HTMLElement {
-  const list = el(doc, 'div', { className: 'menu-list' });
-  const rows: readonly (readonly [string, string, () => void])[] = [
-    [
-      'Campaign',
-      'The scenarios in order, each teaching one thing',
-      () => {
-        host.openCampaign();
-        host.update(navigate(host.state(), 'campaign'));
-      },
-    ],
-    [
-      'Free play',
-      'Any building, any dispatcher, any traffic',
-      () => {
-        host.update(navigate(host.state(), 'free-play'));
-      },
-    ],
-    [
-      'Leaderboard',
-      'Verified scores, by configuration',
-      () => {
-        host.update(navigate(host.state(), 'leaderboard'));
-      },
-    ],
-    [
-      'Account',
-      'Sign in to post a score',
-      () => {
-        host.update(navigate(host.state(), 'account'));
-      },
-    ],
-    [
-      'Settings',
-      'Presentation only — nothing here changes a run',
-      () => {
-        host.update(navigate(host.state(), 'settings'));
-      },
-    ],
-  ];
-
-  for (const [label, detail, onClick] of rows) {
-    const button = el(doc, 'button', { className: 'menu-row', attrs: { type: 'button' } });
-    const name = el(doc, 'span', { className: 'menu-row-name' });
-    setText(name, label);
-    const help = el(doc, 'span', { className: 'menu-row-detail' });
-    setText(help, detail);
-    fill(button, name, help);
-    button.addEventListener('click', onClick);
-    list.append(button);
+function issueList(doc: Document, issues: readonly string[]): HTMLElement {
+  const list = el(doc, 'ul', { className: 'menu-issues' });
+  for (const issue of issues) {
+    const item = el(doc, 'li', {});
+    setText(item, issue);
+    list.append(item);
   }
   return list;
 }
 
-/** Free play: one select per axis, the issues, and a Start that refuses a broken selection. */
-function freePlayScreen(doc: Document, host: MenuPanelHost): HTMLElement {
-  const state = host.state();
-  const selection = state.freePlay;
-  const wrap = el(doc, 'div', { className: 'menu-freeplay' });
-
-  wrap.append(
-    selectRow(doc, 'Building', selection.buildingId, host.catalogue.buildings, (id) => {
-      host.update(updateFreePlay(host.state(), { buildingId: id }));
-    }),
-    selectRow(doc, 'Dispatcher', selection.dispatcherProfileId, host.catalogue.dispatchers, (id) => {
-      host.update(updateFreePlay(host.state(), { dispatcherProfileId: id }));
-    }),
-    selectRow(doc, 'Traffic shape', selection.demandTemplateId, host.catalogue.demandTemplates, (id) => {
-      host.update(updateFreePlay(host.state(), { demandTemplateId: id }));
-    }),
-    // `null` is the building's own profile and is offered first: it is a real selection, not an
-    // absent one, and resolving it here would pin a rate `data/` is free to change.
-    selectRow(
-      doc,
-      'Arrival rate',
-      String(selection.arrivalRatePctPop5min),
-      FREE_PLAY_RATES.map((rate) => ({
-        id: String(rate),
-        name: rate === null ? 'This building’s own profile' : `${String(rate)} % of population / 5 min`,
-      })),
-      (value) => {
-        host.update(
-          updateFreePlay(host.state(), {
-            arrivalRatePctPop5min: value === 'null' ? null : Number(value),
-          }),
-        );
-      },
-    ),
-    selectRow(
-      doc,
-      'Run length',
-      String(selection.durationS),
-      FREE_PLAY_DURATIONS_S.map((seconds) => ({
-        id: String(seconds),
-        name: `${String(Math.round(seconds / 60))} minutes`,
-      })),
-      (value) => {
-        host.update(updateFreePlay(host.state(), { durationS: Number(value) }));
-      },
-    ),
-    seedRow(doc, host),
-  );
-
-  const issues = freePlayIssues(selection, host.catalogue);
-  if (issues.length > 0) {
-    const list = el(doc, 'ul', { className: 'menu-issues' });
-    for (const issue of issues) {
-      const item = el(doc, 'li', {});
-      setText(item, issue.message);
-      list.append(item);
-    }
-    wrap.append(list);
-  }
-
-  const start = el(doc, 'button', { className: 'menu-start', attrs: { type: 'button' } });
-  setText(start, 'Start');
-  const ready = canStart(selection, host.catalogue);
-  // Disabled AND explained. A Start that fails silently moves an explainable error somewhere with
-  // no words for it.
-  if (!ready) start.setAttribute('disabled', 'disabled');
-  start.addEventListener('click', () => {
-    if (canStart(host.state().freePlay, host.catalogue)) host.start(host.state().freePlay);
-  });
-  wrap.append(start);
-
-  return wrap;
-}
-
-/** Settings. Every control here is presentation; none of them may change a run (§ D214 § 2). */
-function settingsScreen(doc: Document, host: MenuPanelHost): HTMLElement {
-  const wrap = el(doc, 'div', { className: 'menu-settings' });
-  const settings = host.state().settings;
-
-  wrap.append(
-    toggleRow(doc, 'Reduce motion', settings.reduceMotion, (value) => {
-      host.update(updateSettings(host.state(), { reduceMotion: value }));
-    }),
-    toggleRow(doc, 'Show the energy axis', settings.showEnergyAxis, (value) => {
-      host.update(updateSettings(host.state(), { showEnergyAxis: value }));
-    }),
-    selectRow(
-      doc,
-      'Playback speed',
-      String(settings.playbackSpeed),
-      PLAYBACK_SPEEDS.map((speed) => ({ id: String(speed), name: `${String(speed)}×` })),
-      (value) => {
-        host.update(updateSettings(host.state(), { playbackSpeed: Number(value) }));
-      },
-    ),
-    selectRow(
-      doc,
-      'Theme',
-      settings.theme,
-      (['system', 'dark', 'light'] as const).map((id) => ({ id, name: id })),
-      (value) => {
-        host.update(updateSettings(host.state(), { theme: value as Settings['theme'] }));
-      },
-    ),
-  );
-
-  // Said on the surface, not only in a docstring: a player choosing a setting should know it cannot
-  // move their score, and § D214 § 2 is why nothing here is allowed to.
-  const note = el(doc, 'p', { className: 'menu-note' });
-  setText(
-    note,
-    'These change how the simulation is drawn, never what it computes — so they cannot move a ' +
-      'score or make two runs incomparable.',
-  );
-  wrap.append(note);
-  return wrap;
-}
-
 /* -------------------------------------------------------------------------- *
- * Account
+ * Account — the credential form, which is not an affordance
  * -------------------------------------------------------------------------- */
 
 /**
  * Sign in, or create an account.
  *
- * Two things this screen must get right, both of which are about what it does *not* say. The
- * refusal for a wrong password and the refusal for an unknown address are the same sentence,
- * because the server deliberately makes them identical and a client that split them would put the
- * account-enumeration oracle back. And an **unconfirmed** account is shown as playable — the notice
- * says what is still gated rather than presenting the account as broken.
+ * Two things this screen must get right, both about what it does *not* say. The refusal for a wrong
+ * password and the refusal for an unknown address are the same sentence, because the server
+ * deliberately makes them identical and a client that split them would put the account-enumeration
+ * oracle back. And an **unconfirmed** account is shown as playable — the notice says what is still
+ * gated rather than presenting the account as broken.
  */
-function accountScreen(doc: Document, host: MenuPanelHost): HTMLElement {
+function accountForm(doc: Document, host: MenuPanelHost, state: AccountState): HTMLElement {
   const wrap = el(doc, 'div', { className: 'menu-account' });
-  const state = host.account();
-
-  if (state.user !== undefined) {
-    const who = el(doc, 'p', { className: 'menu-account-who' });
-    setText(who, `Signed in as ${state.user.displayName}.`);
-    wrap.append(who);
-
-    const refusal = postingRefusal(state);
-    if (refusal !== undefined) {
-      const note = el(doc, 'p', { className: 'menu-note' });
-      setText(note, refusal);
-      wrap.append(note);
-    }
-    const out = el(doc, 'button', { className: 'menu-signout', attrs: { type: 'button' } });
-    setText(out, 'Sign out');
-    out.addEventListener('click', () => {
-      host.signOut();
-    });
-    wrap.append(out);
-    if (state.notice !== undefined) wrap.append(noticeLine(doc, state.notice));
-    return wrap;
-  }
-
   const registering = state.form.mode === 'register';
+
   const toggle = el(doc, 'button', { className: 'menu-account-mode', attrs: { type: 'button' } });
   setText(toggle, registering ? 'I already have an account' : 'Create an account');
   toggle.addEventListener('click', () => {
-    host.updateAccountForm({ mode: registering ? 'sign-in' : 'register' });
+    host.dispatch({ kind: 'account-mode', register: !registering });
   });
   wrap.append(toggle);
 
-  wrap.append(
-    textRow(doc, 'Email', 'email', state.form.email, (value) => {
-      host.updateAccountForm({ email: value });
-    }),
-  );
-  if (registering) {
+  const field = (label: string, type: 'text' | 'email' | 'password', key: string, value: string): void => {
     wrap.append(
-      textRow(doc, 'Display name', 'text', state.form.displayName, (value) => {
-        host.updateAccountForm({ displayName: value });
+      textRow(doc, label, type, value, (next) => {
+        host.dispatch({ kind: 'account-form', patch: { [key]: next } });
       }),
     );
-  }
-  wrap.append(
-    textRow(doc, 'Password', 'password', state.form.password, (value) => {
-      host.updateAccountForm({ password: value });
-    }),
-  );
+  };
+  field('Email', 'email', 'email', state.form.email);
+  if (registering) field('Display name', 'text', 'displayName', state.form.displayName);
+  field('Password', 'password', 'password', state.form.password);
 
   // Shown, not merely counted. `formIssues` reports all of them at once so a player is not made to
-  // guess how many there are.
+  // guess how many there are — and only once they have typed something, so an untouched form is not
+  // a wall of complaints.
   const issues = formIssues(state.form);
   if (issues.length > 0 && state.form.password.length + state.form.email.length > 0) {
-    const list = el(doc, 'ul', { className: 'menu-issues' });
-    for (const issue of issues) {
-      const item = el(doc, 'li', {});
-      setText(item, issue.message);
-      list.append(item);
-    }
-    wrap.append(list);
+    wrap.append(issueList(doc, issues.map((issue) => issue.message)));
   }
-
-  const submit = el(doc, 'button', { className: 'menu-account-submit', attrs: { type: 'button' } });
-  setText(submit, registering ? 'Create account' : 'Sign in');
-  if (!canSubmitForm(state)) submit.setAttribute('disabled', 'disabled');
-  submit.addEventListener('click', () => {
-    host.submitAccountForm();
-  });
-  wrap.append(submit);
-
-  if (state.notice !== undefined) wrap.append(noticeLine(doc, state.notice));
+  void canSubmitForm;
   return wrap;
 }
 
 /* -------------------------------------------------------------------------- *
- * Leaderboard
+ * Leaderboard — one board's rows
  * -------------------------------------------------------------------------- */
 
 /**
- * The boards, and one board's rows.
+ * The selected board's entries.
  *
- * Two rules from elsewhere in the project land on this screen and neither is negotiable. **The
- * server's own note about the ranking is printed verbatim** — § D106's *energy is an axis, never a
- * score*, generalised: one metric orders the rows and the others sit beside it, never combined.
- * And a board with nothing in it says so in words, rather than drawing an empty table that reads
- * like a failure.
+ * Two rules from elsewhere land here and neither is negotiable. **The server's own note about the
+ * ranking is printed verbatim** — § D106's *energy is an axis, never a score*, generalised: one
+ * metric orders the rows and the others sit beside it, never combined. And a board with nothing in
+ * it says so in words rather than drawing an empty table that reads like a failure.
  */
-function leaderboardScreen(doc: Document, host: MenuPanelHost): HTMLElement {
+function boardTable(doc: Document, view: LeaderboardView): HTMLElement {
   const wrap = el(doc, 'div', { className: 'menu-leaderboard' });
-  const view = host.leaderboard();
-
   if (view.notice !== undefined) wrap.append(noticeLine(doc, view.notice));
 
-  if (view.boards.length > 0) {
-    wrap.append(
-      selectRow(
-        doc,
-        'Board',
-        view.selected ?? '',
-        view.boards.map((board) => ({
-          id: board.configHash,
-          // The hash is shortened for the eye and never for the request: `openBoard` gets the whole
-          // one, because a truncated board id is a board id that matches the wrong board.
-          name: `${board.configHash.slice(0, 8)}…`,
-          detail: `${String(board.entries)} ${board.entries === 1 ? 'entry' : 'entries'}`,
-        })),
-        (configHash) => {
-          host.openBoard(configHash);
-        },
-      ),
-    );
-  }
-
   const page = view.page;
-  if (page !== undefined) {
-    const note = el(doc, 'p', { className: 'menu-note' });
-    setText(note, page.note);
-    wrap.append(note);
+  if (page === undefined) return wrap;
 
-    if (page.entries.length === 0) {
-      const empty = el(doc, 'p', {});
-      setText(empty, 'Nothing has been posted to this board yet.');
-      wrap.append(empty);
-    } else {
-      const table = el(doc, 'ol', { className: 'menu-board' });
-      for (const entry of page.entries) {
-        const row = el(doc, 'li', { className: 'menu-board-row' });
-        const name = el(doc, 'span', { className: 'menu-board-name' });
-        setText(name, entry.displayName);
-        const figures = el(doc, 'span', { className: 'menu-board-figures' });
-        // All four, always. Showing only the ranked one would let a reader infer the others moved
-        // with it, which is the claim the note exists to refuse.
-        setText(
-          figures,
-          `AWT ${entry.measured.awtS.toFixed(1)} s · WT95 ${entry.measured.wt95S.toFixed(1)} s · ` +
-            `TTD ${entry.measured.ttdMeanS.toFixed(1)} s · over-long ${entry.measured.pctOverLongWait.toFixed(1)} %`,
-        );
-        const seed = el(doc, 'span', { className: 'menu-board-seed' });
-        // Printed because it is what makes the row checkable: invariant 5 says a run replays from
-        // its seed, and a leaderboard that hid the seed would be asking to be taken on trust.
-        setText(seed, `seed ${entry.run.seed}`);
-        fill(row, name, figures, seed);
-        table.append(row);
-      }
-      wrap.append(table);
-    }
+  const note = el(doc, 'p', { className: 'menu-note' });
+  setText(note, page.note);
+  wrap.append(note);
+
+  if (page.entries.length === 0) {
+    const empty = el(doc, 'p', {});
+    setText(empty, 'Nothing has been posted to this board yet.');
+    wrap.append(empty);
+    return wrap;
   }
 
+  const table = el(doc, 'ol', { className: 'menu-board' });
+  for (const entry of page.entries) {
+    const row = el(doc, 'li', { className: 'menu-board-row' });
+    const name = el(doc, 'span', { className: 'menu-board-name' });
+    setText(name, entry.displayName);
+    const figures = el(doc, 'span', { className: 'menu-board-figures' });
+    // All four, always. Showing only the ranked one would let a reader infer the others moved with
+    // it, which is the claim the note exists to refuse.
+    setText(
+      figures,
+      `AWT ${entry.measured.awtS.toFixed(1)} s \u00b7 WT95 ${entry.measured.wt95S.toFixed(1)} s \u00b7 ` +
+        `TTD ${entry.measured.ttdMeanS.toFixed(1)} s \u00b7 over-long ${entry.measured.pctOverLongWait.toFixed(1)} %`,
+    );
+    const seed = el(doc, 'span', { className: 'menu-board-seed' });
+    // Printed because it is what makes the row checkable: invariant 5 says a run replays from its
+    // seed, and a leaderboard that hid the seed would be asking to be taken on trust.
+    setText(seed, `seed ${entry.run.seed} \u00b7 one run`);
+    fill(row, name, figures, seed);
+    table.append(row);
+  }
+  wrap.append(table);
   return wrap;
 }
 
@@ -488,21 +313,6 @@ function noticeLine(doc: Document, text: string): HTMLElement {
   const line = el(doc, 'p', { className: 'menu-notice' });
   setText(line, text);
   return line;
-}
-
-/** A screen whose surface has not landed yet, said plainly rather than drawn as though it had. */
-function placeholderScreen(doc: Document, screen: MenuScreen): HTMLElement {
-  const wrap = el(doc, 'div', { className: 'menu-placeholder' });
-  const text = el(doc, 'p', {});
-  setText(
-    text,
-    screen === 'campaign'
-      ? 'The campaign surface is open behind this menu.'
-      : 'This screen is not built yet. Nothing here is a placeholder for a number — it is empty ' +
-          'because the surface has not landed.',
-  );
-  fill(wrap, text);
-  return wrap;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -533,19 +343,6 @@ function selectRow(
   return row;
 }
 
-function seedRow(doc: Document, host: MenuPanelHost): HTMLElement {
-  const row = el(doc, 'label', { className: 'menu-seed' });
-  const text = el(doc, 'span', {});
-  setText(text, 'Seed');
-  const input = el(doc, 'input', {
-    attrs: { type: 'text', inputmode: 'numeric', value: host.state().freePlay.seed },
-  });
-  input.addEventListener('change', () => {
-    host.update(updateFreePlay(host.state(), { seed: (input as HTMLInputElement).value }));
-  });
-  fill(row, text, input);
-  return row;
-}
 
 /**
  * A labelled text input.
