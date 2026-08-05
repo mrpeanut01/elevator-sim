@@ -52,6 +52,7 @@ import {
   goalRowViewOf,
   leverRowsOf,
   reportViewOf,
+  runProgressOf,
   toneColourOf,
   type FigureView,
   type ReportView,
@@ -61,6 +62,8 @@ import {
 let config: LoadedConfig;
 let clean: VizRecording;
 let saturated: VizRecording;
+/** `clean`'s selection, run a second time — the same run, not a second one. See the #16 suite. */
+let again: VizRecording;
 
 function runOf(buildingId: string, arrivalRatePctPop5min: number, durationS: number): VizRecording {
   const base: SimulationConfig = fixtureConfig(config, {
@@ -140,6 +143,58 @@ function cell(view: ReportView, label: string): FigureView {
 }
 
 /**
+ * The two sheets `main.ts`'s `closeShift` files when one selection is run, filed, and run again.
+ *
+ * The week is carried from the first close into the second, which is the whole of what makes the
+ * second sheet say *attempt 2 at this selection* — `week.ts`'s `retry` branch keys on `closedDay`.
+ * A pair of independently opened weeks would both say *attempt 1* and the suite below would be
+ * asserting against a sequence the shell cannot produce.
+ */
+function attemptsOf(
+  first: VizRecording,
+  second: VizRecording,
+  day = 4,
+): readonly [ShapedDayReport, ShapedDayReport] {
+  const goals = goalsForDay(day);
+  let week = { ...openWeek('c2'), day, dayIdx: (day - 1) % 7 };
+  const filed: ShapedDayReport[] = [];
+  for (const recording of [first, second]) {
+    const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+    week = closeDay(
+      week,
+      outcomeOf({
+        day,
+        dayIdx: week.dayIdx,
+        eventId: 'ordinary',
+        arrived: observations.arrived,
+        carried: observations.carried,
+        minutePct: observations.minutePct,
+        readings: readGoals(goals, observations),
+      }),
+    );
+    filed.push(
+      dayReportOf({
+        recording,
+        observations,
+        goals,
+        week,
+        contract: contractById('c2'),
+        event: SHIFT_EVENTS.ordinary,
+        subject: { kind: 'week-day' },
+      }),
+    );
+  }
+  const [one, two] = filed;
+  if (one === undefined || two === undefined) throw new Error('two closes produced fewer sheets');
+  return [one, two];
+}
+
+/** The sheet as `mountReport` would draw it with the playhead at `simTimeS`. */
+function drawnAt(report: ShapedDayReport, recording: VizRecording, simTimeS: number): ReportView {
+  return reportViewOf(report, runProgressOf({ recording, simTimeS }));
+}
+
+/**
  * Every string the sheet will put on the page **that is a reading off this recording**.
  *
  * Two families of string are excluded, and neither exclusion is hidden here — the suite below pins
@@ -189,7 +244,9 @@ beforeAll(async () => {
   clean = runOf('garden-apartments', 12, 900);
   // `shift/report.test.ts`'s own saturating fixture: Midtown Office at 25 %pop/5 min.
   saturated = runOf('midtown-office', 25, 900);
-}, 120_000);
+  // The same three arguments, a second time. Nothing about the call differs, which is the point.
+  again = runOf('garden-apartments', 12, 900);
+}, 180_000);
 
 describe('the premises this suite rests on', () => {
   it('has one run whose mean is publishable and one whose is not', () => {
@@ -369,6 +426,130 @@ describe('the empty state, which is drawn rather than hidden', () => {
 
   it('names no weekday it has not earned', () => {
     expect(weekFraming(emptyReportView()).nextDayLabel).toBe('Open the doors on tomorrow');
+  });
+
+  it('is still the empty sheet while a run nothing has been filed for is playing', () => {
+    // The path issue #16 did *not* break, pinned so the fix above cannot quietly take it over: with
+    // no report there is no account to be premature about, and the design's own empty case stands.
+    expect(reportViewOf(undefined, runProgressOf({ recording: again, simTimeS: again.startedAt })))
+      .toEqual(emptyReportView());
+  });
+});
+
+describe('a filed sheet may not describe a day the screen has not reached — issue #16, § D222', () => {
+  /*
+   * Driven on the deployed viewer 2026-08-05. A Free Play day was run and filed; *Run this shift*
+   * was pressed again with nothing changed; the Day Report tab was opened at once. The chrome read
+   * `06:00 FILLING` and `running · 0 arrived, 0 carried` and the rail read `carried today 0`, while
+   * the sheet read `CARRIED 360` and `AVERAGE WAIT 146.7 s`. One screen, two answers.
+   *
+   * The issue filed it as stale figures held over from the previous run. It is not: `runId` is
+   * `building-profile-seed`, `main.ts`'s `runShift` writes `report: undefined`, and `openTab`
+   * re-files from the new recording — which is bit-identical, because the selection did not change.
+   * The sheet was a true account of the recording and the wrong thing to draw, because every other
+   * surface was describing the playhead. The first test below is that premise, asserted rather than
+   * assumed, so a future reader does not go looking for a cache that was never there.
+   */
+  it('the premise: re-running one selection is the same run again, not a stale one', () => {
+    expect(again.runId).toBe(clean.runId);
+    expect(again.summary.meanWaitS).toBe(clean.summary.meanWaitS);
+    expect(observationsAt(again, again.endedAt).carried).toBe(
+      observationsAt(clean, clean.endedAt).carried,
+    );
+  });
+
+  it('puts no count on the sheet that the chrome’s own clock contradicts', () => {
+    const [, second] = attemptsOf(clean, again);
+    // The two numbers that were on the screen together. The footer folds at the playhead; the sheet
+    // folds at `endedAt`, and at the start of a re-run those are 0 and the whole day.
+    const atStart = observationsAt(again, again.startedAt);
+    const wholeDay = observationsAt(again, again.endedAt);
+    expect(atStart.carried).toBe(0);
+    expect(wholeDay.carried).toBeGreaterThan(0);
+
+    const watching = drawnAt(second, again, again.startedAt);
+    // No cell can carry it, because there is no cell: every figure on this grid is a whole-run
+    // quantity and none of them can be honestly re-derived at a playhead.
+    expect(watching.figures).toEqual([]);
+    expect(everyString(watching).join('\n')).not.toMatch(
+      new RegExp(`\\b${String(wholeDay.carried)}\\b`),
+    );
+    // The refusal is the mean's too — the figure the issue named beside `CARRIED`.
+    expect(everyString(watching).join('\n')).not.toContain(again.summary.meanWaitS.toFixed(1));
+  });
+
+  it('says the day is still running, and does not repeat advice the reader has already taken', () => {
+    const [, second] = attemptsOf(clean, again);
+    const watching = drawnAt(second, again, again.startedAt);
+    expect(watching.filed).toBe(false);
+    expect(watching.title).toBe('The day is still running');
+    expect(watching.title).not.toBe(second.title);
+    // The empty sheet's lede tells a reader to press *Run this shift*. This reader just did.
+    expect(watching.lede).not.toContain('Run this shift');
+    expect(watching.lede).not.toBe(emptyReportView().lede);
+    // It names where the playhead is and where the day ends, and both are clock times this run has.
+    expect(watching.lede).toContain(clockOf(again.startedAt));
+    expect(watching.lede).toContain(clockOf(again.endedAt));
+  });
+
+  it('offers nothing to advance to, and no award to take, while the day is unfinished', () => {
+    const [, second] = attemptsOf(clean, again);
+    const framing = weekFraming(drawnAt(second, again, again.startedAt));
+    expect(framing.canAdvance).toBe(false);
+    expect(framing.cleared).toBeNull();
+    expect(drawnAt(second, again, again.startedAt).goals).toEqual([]);
+    expect(drawnAt(second, again, again.startedAt).verdictLine).toBe('');
+  });
+
+  it('draws the filed sheet whole, and unchanged, once the playhead reaches the end', () => {
+    const [, second] = attemptsOf(clean, again);
+    const done = drawnAt(second, again, again.endedAt);
+    expect(done).toEqual(reportViewOf(second));
+    expect(cell(done, 'CARRIED').value).toBe(
+      String(observationsAt(again, again.endedAt).carried),
+    );
+  });
+
+  it('keeps the attempt line coherent — the filed sheet numbers it, the running one claims nothing', () => {
+    const [first, second] = attemptsOf(clean, again);
+    // `shift/report.ts` prints no attempt line on the first, by design; the second is the one the
+    // player saw. Neither number moves because of anything this panel does.
+    expect(first.metaLines.some((line) => line.includes('attempt'))).toBe(false);
+    expect(second.metaLines.some((line) => line.includes('attempt 2'))).toBe(true);
+    expect(drawnAt(second, again, again.startedAt).metaLines).toEqual([]);
+    expect(drawnAt(second, again, again.endedAt).metaLines).toEqual(second.metaLines);
+  });
+
+  it('prints no clock time the run did not have, at any playhead', () => {
+    const [, second] = attemptsOf(clean, again);
+    const inside = new Set<string>();
+    for (let t = again.startedAt; t <= again.endedAt; t += 30) inside.add(clockOf(t));
+    inside.add(clockOf(again.endedAt));
+    const playheads = [
+      again.startedAt,
+      (again.startedAt + again.endedAt) / 2,
+      again.endedAt - 1,
+    ];
+    for (const at of playheads) {
+      for (const text of everyString(drawnAt(second, again, at))) {
+        for (const found of text.match(/\d{2}:\d{2}/g) ?? []) {
+          expect(inside.has(found), `${found} in "${text}" is outside the run`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('reads the playhead against the run, and calls the last instant played out', () => {
+    expect(runProgressOf({ recording: again, simTimeS: again.endedAt })).toEqual({
+      kind: 'played-out',
+    });
+    expect(runProgressOf({ recording: again, simTimeS: again.endedAt - 1 })).toEqual({
+      kind: 'watching',
+      atClock: clockOf(again.endedAt - 1),
+      endsAtClock: clockOf(again.endedAt),
+    });
+    // No run on screen is no clock to disagree with. `reportViewOf` has already answered that case.
+    expect(runProgressOf({ recording: undefined, simTimeS: 0 })).toEqual({ kind: 'played-out' });
   });
 });
 
