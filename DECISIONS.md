@@ -14329,3 +14329,91 @@ counts as confirmation rather than discovery:
 2. **The dependency graph** #17 also floats — *an expandable section showing which settings unlock
    which others* — is not built. `unmetGates` and `activeWhen` already carry the edges, so the data
    exists; whether the tab should draw them is a product call and not this lane's.
+## D222 — a report is a statement about a whole day, so it waits for the whole day
+
+**Date: 2026-08-05 · Written after the code, and says so.** Play-tester issue #16, reproduced on the
+deployed viewer and then re-diagnosed, because the issue's own account of the mechanism is wrong in
+a way that would have sent the fix to the wrong file.
+
+### What was reported, and what was actually happening
+
+The issue reads *"when a new shift is started, the Day Report tab still displays metric summaries
+from the previously completed run … these are not cleared until the new run accumulates enough
+data."* The reproduction: run a Free Play day (Chancery House, `nearest-car`, seed 20260804) to the
+end and let it file; press **Run this shift** again with nothing changed; open Day Report at once.
+The chrome reads `06:00 FILLING` and `running · 0 arrived, 0 carried`, the rail reads `carried today
+0`, and the sheet reads `CARRIED 360`, `AVERAGE WAIT 146.7 s` and `attempt 2 at this selection`.
+**One screen, two answers to *how did today go?***
+
+There is no stale report. Three things are true at once and none of them is a cache:
+
+1. `dev/main.ts`'s `runShift` writes `report: undefined` on every run, and `dev/state.ts` initialises
+   the field to `undefined`. `dev/reportPanel.ts` reads `view.state.report` and nothing else — there
+   is no per-selection bank for it to fall back to.
+2. `openTab` is `if (tab === 'report') closeShift();`, so **opening the tab files the sheet**, from
+   the recording, at whatever instant the playhead happens to be at. The simulator runs a day to its
+   end and *then* plays it back, so a complete account exists from the moment **Run this shift**
+   returns.
+3. `Simulation`'s `runId` is `` `${building}-${profile}-${masterSeed}` ``. Re-running one selection
+   produces the **same id and a bit-identical recording**, so the second sheet's figures equal the
+   first's exactly. That is what read as staleness.
+
+So the sheet was a true account **of the recording** and the wrong thing to draw, because every
+other surface on the screen — header clock, footer counts, rail goals — reads the **playhead**. The
+seed-change case the reporter used as a control was not the empty-state path working; it was the
+player already standing on the report tab, where `openTab` never fires and `runShift`'s
+`report: undefined` is left standing.
+
+### The rule, and why it is a third state rather than either existing one
+
+**A sheet that reports a whole day is drawn only when the run it reports has been played out.**
+While the playhead is short of `endedAt`, a filed sheet is replaced by one that says the day is
+still running and names the time it has reached. `reportPanel.ts`'s `runProgressOf` reads the
+playhead off the **same `ViewAt` that `drawHeader` and `drawFooter` are given in the same
+`renderAll`**, which is what makes the two-answers screen unconstructible rather than unlikely.
+
+Neither documented state was right. *Nothing filed yet — press "Run this shift"* is advice for
+something this reader has already done. The filed sheet is the defect. `docs/12` § 2.2 specifies the
+empty case and did not anticipate this one, so the third state extends the handoff rather than
+contradicting it; the empty state itself is untouched and still owns the no-run case.
+
+**It carries no figure, and that is the statistical discipline rather than timidity.** Every cell on
+this grid is a whole-run quantity: `CARRIED`, `DEEPEST QUEUE` and `TOOK THE STAIRS` are observations
+folded at `endedAt`, and `AVERAGE WAIT`, `WORST WAIT` and the energy pair come from `VizSummary`,
+summarised once over the whole run. None can be re-derived at a playhead. A part-day mean is exactly
+the thin sample `awtIsValid` exists to refuse, and printing one to avoid an empty box would be
+`docs/10` R3 with extra steps. The surface that *does* read a shift while it runs is the left rail,
+and the copy points there.
+
+Two consequences, accepted rather than overlooked. Scrubbing back after a day is filed and
+re-opening the tab shows the running sheet again — the screen is at 09:14, so the sheet declines to
+be at 18:00. And with the transport looping, the playhead reaches `endedAt` only in passing: a run on
+repeat has no *finished* instant for a sheet to agree with.
+
+Attempt numbering is unchanged and stays coherent. `shift/report.ts` prints the attempt from
+`week.attempt`, `week.ts`'s `retry` branch keys on `closedDay`, and nothing in this change touches
+either. `reportPanel.test.ts` pins it both ways: the filed sheet still says `attempt 2`, and the
+running sheet carries no meta line at all, because it makes no claim to number.
+
+### What this change did **not** close
+
+`openTab` still calls `closeShift` at any playhead, so **opening the tab on a run you have not
+watched still banks the day** — it increments `week.attempt`, and it can bank a clean shift and clear
+a contract. What it banks is the true outcome of a day that really was simulated in full, so nothing
+false is stored; what is wrong is that a navigation has a state effect the reader did not ask for,
+and the rail's banked count can move while this sheet says the day is still running. The fix is a
+guard at `dev/main.ts`'s `openTab`/`closeShift` seam — file only when the playhead is at `endedAt` —
+and it was out of this lane's file ownership. It is the next thing to do here.
+
+`honesty/surfaces.ts` sweeps `emptyReportView`'s title and lede by name and does **not** yet sweep
+the running sheet's. That is a hole in Phase 9's honesty property of exactly the shape § D186
+corrected, and it is one `seeds.push` pair in a file this lane did not own.
+
+### One stale mechanism claim, corrected in passing
+
+`shift/week.ts`'s `closeDay` docstring said `closeShift`'s guard re-arms because *"a re-run has a new
+[recording id] by construction"*. It does not: `runId` is derived from building, profile and seed, so
+re-running one selection produces the same id. What re-arms the guard is `adopt` clearing
+`filedRunId` on every recording it takes on. The conclusion the docstring draws was right and its
+reason was not, which is the failure mode CLAUDE.md's *"either measure it or say it is unmeasured"*
+paragraph exists for.
