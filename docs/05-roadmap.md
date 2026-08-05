@@ -1923,6 +1923,41 @@ which is exactly the distinction the standing requirement above exists to keep v
 | **No test asserts any phase's *status*** | [`docs/07` § 8](07-handoff.md). The guards assert the four documents **agree**, not that they are **true** |
 | Open items C4, C5, C24, C27, C30, C32 | **All six closed** ([§ D116](../DECISIONS.md)–[§ D122](../DECISIONS.md), plus [§ D125](../DECISIONS.md)); **C33** and **C34** opened in their place, and five smaller findings besides. `C4` took **two** decisions — § D119 on the budget, § D125 on the port's disposition — and § D125 also added the **third dead-code guard**, over `runner/`, which neither `core`'s scanner nor `tuning/`'s could reach. Current list: [`docs/07`](07-handoff.md) § 8 § *Still open, in one place*. **C7 is closed** — see below |
 
+### Since 2026-08-04 — the play experience, and what it found
+
+**No phase verdict moved.** This is viewer and server work above the phases, and it is recorded here
+for the reason the stale rows above are: a register that does not know what the tree contains is the
+same failure as an undated one.
+
+The contract is [`docs/16`](16-change-scope-contract.md) ([§ D216](../DECISIONS.md), dated before any
+code), the audit is [`docs/17`](17-play-experience-audit.md), and the verdicts are
+[§ D217](../DECISIONS.md) and [§ D219](../DECISIONS.md). **Five of the audit's seven findings are
+closed.** What is worth a roadmap reader's attention is not the features but the three things
+mounting them found, because each is this repository's standing defect in a new place:
+
+- **`patternSwitching` had no writer at all.** The block is authored in `data/`, its ramps are
+  calibrated against eight measured operating points, the loader carries it and `resolveWeightSets`
+  resolves it — and **nothing in the viewer could change it**. That is the twelfth instance of the
+  standing requirement's defect, and it would have shipped with five selects on top of it. Closed by
+  `dispatcherProfilesWithSelector`, which is a caller rather than an allowlist entry.
+- **Two of six selector sliders are inert at the cell the product opens on**, and the reason is the
+  shipped calibration rather than the panel: Midtown's lobby rate is already past `up-peak`'s ramp,
+  so *raising* the lobby gain saturates a membership already at 1. Each row names its own operating
+  point in the test rather than the suite quietly moving to a cell where everything moves.
+- **A `?? 0` in the leaderboard's submission** turned an unmeasured long-wait share into *zero per
+  cent*, so the server — measuring `NaN` — would have refused an honest submission as a forgery.
+  This product makes one accusation and it was pointed at a client fallback.
+
+Also closed: two **unreachable** branches in the coach ribbon (`week.contractId === undefined` on a
+field typed `string`, which TypeScript permits), `DayReportInput.event` having no reader while the
+sheet named tomorrow's event and never today's, endless mode, the light palette reaching the stage,
+and the whole menu finally being recorded as a deviation from a handoff that has no concept of it
+([`docs/12`](12-design-handoff.md) § 4.8).
+
+Still open and named: **Sandbox**, which is a missing *meaning* rather than a missing mode; the
+*Scenarios* / *Campaign* naming, which is a judgement about a surface the handoff drew; and two of
+the four designed modes — calendar and commissioning.
+
 **Closed since this table was last written:** **Phase 8's full experiment matrix and Pareto front at
 a real budget, and with it Phase 7's acceptance interval at 50–200 replications** — both landed in
 `f895a16`, and Phase 8 is accepted ([`DECISIONS.md` § D108](../DECISIONS.md)). Since then:
