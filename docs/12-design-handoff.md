@@ -204,13 +204,34 @@ Every one of these is also a row in [`DECISIONS.md`](../DECISIONS.md) § D174–
 
 **The constraint.** This simulator does not step in real time. `core/` has no clock (invariant 3):
 `Simulation.run()` returns a whole result and `frameAt(recording, t)` samples it, which is what
-makes scrubbing backwards free and replay bit-identical. A sixteen-hour day of Midtown Office at
-its shipped demand is roughly 39 000 passengers; recording it synchronously in a browser tab is
-tens of seconds and hundreds of megabytes, and Vertical City is four times that. More important:
-**the shipped demand templates do not describe a sixteen-hour day.** `rise-and-fall` is thirty
-minutes; `constant-iso` is two hours. Drawing seven office phases over a thirty-minute
-rise-and-fall run would be a label that does not describe the demand underneath it — the exact
-failure the honesty card exists to prevent.
+makes scrubbing backwards free and replay bit-identical.
+
+> **Correction, 2026-08-05 — the cost figure this paragraph used to carry did not reproduce.**
+> It read: *"A sixteen-hour day of Midtown Office at its shipped demand is roughly 39 000
+> passengers; recording it synchronously in a browser tab is tens of seconds and hundreds of
+> megabytes, and Vertical City is four times that."*
+>
+> That is `1712 occupants × 12 %pop/5 min × 192 five-minute blocks = 39 444` — **the morning peak
+> rate held for sixteen hours.** No CIBSE day profile has that shape, and it is the same mistake
+> play-tester issue #81 reports in the product: treating the peak as if it were the day. Measured
+> instead at a realistic daily average of 2.2 %pop/5 min, a sixteen-hour Midtown day is about
+> **7 200 passengers**, and a full shaped day costs roughly **3.4×** a thirty-minute replication at
+> Midtown Office and **5.8×** at Vertical City — four to six times, not ten, and not *tens of
+> seconds*. CLAUDE.md's rule applies to this document too: if you publish a number, pin it to the
+> run that produced it.
+>
+> **One part of the original claim is not refuted and is still open.** The CLI measurements above
+> build no `VizRecording`. The viewer holds the whole recording in memory so scrubbing stays free,
+> and the size of that structure for a twenty-thousand-passenger day is **unmeasured**. Measure it
+> before offering a full day on Vertical City.
+
+The remaining constraint is real and unchanged: **the shipped demand templates do not describe a
+sixteen-hour day.** `rise-and-fall` is thirty minutes; `constant-iso` is two hours. Drawing seven
+office phases over a thirty-minute rise-and-fall run would be a label that does not describe the
+demand underneath it — the exact failure the honesty card exists to prevent. That is a missing
+*record*, not a missing model: `DemandPhase` already carries per-phase intensity and directional
+split, `intensityAt` is already one piecewise-linear evaluator over one knot list, and
+`shift-change` already ships six phases with two interior peaks.
 
 **What is implemented.** The timeline's segments are the **resolved demand template's own phases**,
 named and rated from the template (`ramp up`, `peak hold`, `ramp down`, `drain`), with their real
