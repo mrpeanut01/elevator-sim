@@ -15,6 +15,24 @@
  * both were wrong in the same way. It compares two **presentations of one datum**, and the datum is
  * carried verbatim.
  *
+ * ## What parity does **not** check, and the measurement that made it matter
+ *
+ * `parity.ts` is one-directional by construction. Every one of its three rules fires when Basic
+ * *drops* something Advanced showed; not one of them fires when Basic shows exactly what Advanced
+ * showed. A Basic rendering that is a byte-for-byte copy of Advanced therefore returns **zero
+ * violations** — driven, not reasoned: `mode/disclosure.test.ts` builds that copy and watches
+ * parity pass it. That is correct for what parity is for (*Basic may never hide a failure*) and it
+ * is silent about the other half (*Basic is supposed to hide complexity*).
+ *
+ * Which is how this module came to have a Basic mode that barely was one. `itemForFigure` ended
+ * `basic: BASIC_HIDES.has(figure.id) ? null : advanced`, so of twelve items on a real
+ * `chancery-house` run, **seven were byte-identical** and the seven were the jargon: *95th-percentile
+ * wait*, *door to door*, *rides over 60 s*, *the unluckiest rider*, `n = 44 rides`. See
+ * {@link CASUAL_LEAD_BY_FIGURE}, and [`DECISIONS.md` § D240](../../../../DECISIONS.md) for the
+ * measurement and for the second, larger half of the same finding: **on the Simulation and Day
+ * report tabs nothing mounts these renderings at all**, so improving them is necessary and is not
+ * sufficient.
+ *
  * ## The three sets § D163 names, and where each one's members come from
  *
  * | set | derived from | a ninth member arrives by |
@@ -73,10 +91,16 @@ import type { LockedOutLanding } from '../access/lockedOut.js';
 import type { FailStateReport } from '../campaign/failStates.js';
 import type { VizRecording } from '../contract/types.js';
 import {
+  AWT_ID,
+  DEMAND_ID,
   ENERGY_ID,
   INTERVAL_ID,
+  LONG_WAITS_ID,
   RUN_ID,
+  SERVICE_LEVEL_ID,
+  TTD_ID,
   WINDOW_ID,
+  WT95_ID,
   runSummaryFigures,
   type SummaryFigure,
 } from '../render/runSummary.js';
@@ -89,8 +113,15 @@ import type { DisclosureItem, Rendering, Severity } from './types.js';
 /**
  * Run-summary figures Basic leaves out, by id.
  *
- * This *is* a list, and it is the only one in the module. It is the negotiable half of § 4 — the
- * complexity, not the failures — and it is guarded from both sides:
+ * This *is* a list. It is one of **two** keyed on figure ids here — the other is
+ * {@link CASUAL_LEAD_BY_FIGURE}, added with the plain-language layer — and both are the negotiable
+ * half of § 4: they name figures, never failures. Nothing on § 4's never-hide list is reachable
+ * from either, because a suppressed figure becomes a `suppression` item before it gets here and a
+ * fail state, a warning and the seed never pass through this function at all. That is the property
+ * that matters, and it is structural rather than a promise: `mode/parity.ts` reads
+ * `disclosureClassOf` and would refuse a Basic mode that hid a must-show item however it got hidden.
+ *
+ * It is guarded from both sides:
  *
  * - a figure named here that {@link runSummaryFigures} does not produce is caught by
  *   `mode/parity.test.ts`, which checks every id against `FIGURE_ORDER` — this pointer said
@@ -481,13 +512,116 @@ function itemForFigure(figure: SummaryFigure, input: DisclosureInput): Disclosur
     };
   }
 
+  if (BASIC_HIDES.has(figure.id)) {
+    return { id: figure.id, label: figure.label, origin, advanced, basic: null, mustCarry: [] };
+  }
+
   return {
     id: figure.id,
     label: figure.label,
     origin,
     advanced,
-    basic: BASIC_HIDES.has(figure.id) ? null : advanced,
+    basic: casualRendering(figure, severity),
     mustCarry: [],
+  };
+}
+
+/* -------------------------------------------------------------------------- *
+ * The plain-language layer — § 2.2's *"`mode/disclosure.ts` already holds the
+ * vocabulary that has to move"*
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The lead sentence Basic puts in front of a figure's own note, by figure id.
+ *
+ * ## Why this exists, and what it is not allowed to be
+ *
+ * This line used to read `basic: BASIC_HIDES.has(figure.id) ? null : advanced` — so every figure
+ * Basic kept, it kept **verbatim**. Measured on a real `chancery-house` run: of twelve items,
+ * two were hidden, three differed and **seven were byte-identical**, and the seven were the ones
+ * carrying the vocabulary — *95th-percentile wait*, *door to door*, *rides over 60 s*, *the
+ * unluckiest rider*, `n = 44 rides`. A reader who chose the mode named for them met all of it
+ * anyway ([`DECISIONS.md` § D240](../../../../DECISIONS.md), issue #71).
+ *
+ * Three rules the entries obey, each one a way this could have been worse than doing nothing:
+ *
+ * 1. **It never restates a figure.** `Rendering.value` is carried through untouched. A plain
+ *    retelling of `13.1 s` would be a second copy of a figure, which is a second figure — the
+ *    failure this module's own docstring is built around.
+ * 2. **It never simplifies a statistical claim into a false one.** *"An interval containing zero
+ *    means this run cannot tell them apart"* is plain language; *"A is better"* is a different
+ *    claim, and no wording here may become one. Nothing in this table compares two things at all.
+ * 3. **It leads, it does not replace.** `core`'s and `runSummary`'s own sentence follows verbatim,
+ *    for exactly the reason {@link SUPPRESSION_LEAD} gives about a refusal: a shortened lead is a
+ *    lead, and a paraphrase that replaced the source sentence would be a second account of it.
+ *
+ * Not exported, and that is load-bearing rather than tidy: a new exported prose declaration is an
+ * unclassified surface to `honesty/derive.test.ts`, and this reaches the honesty search through
+ * {@link disclosureItems}, which `honesty/surfaces.ts` already drives — in **both** modes, so every
+ * sentence below is searched.
+ *
+ * A figure with no entry keeps its own note unchanged. That is the honest default: a missing
+ * translation shows the engineer's words rather than nothing, and it is visible to the divergence
+ * assertion in `mode/disclosure.test.ts` rather than silent.
+ */
+const CASUAL_LEAD_BY_FIGURE: Readonly<Record<string, string>> = Object.freeze({
+  [DEMAND_ID]:
+    'How many people turned up against how many the lifts got away — the two bars beside each ' +
+    'other are the whole story, and when the first is longer than the second the building is ' +
+    'losing ground.',
+  [AWT_ID]:
+    'How long a wait came to on average — from the moment somebody pressed the button to the ' +
+    'moment they stepped into a car.',
+  [WT95_ID]:
+    'The wait that all but the unluckiest one ride in twenty came in under. It is here because ' +
+    'an average hides the bad end, and the bad end is what people complain about.',
+  [TTD_ID]:
+    'The whole journey, front door to floor — including any change of lifts. Longer than the ' +
+    'waits above, and counting something different, so the two are not comparable.',
+  [LONG_WAITS_ID]:
+    'The share of rides that took longer than this building calls acceptable. A minute is the ' +
+    'usual line between a wait people accept and one they notice.',
+  [SERVICE_LEVEL_ID]:
+    'The single worst wait anybody had. One person, not an average — this is the one somebody ' +
+    'tells their colleagues about.',
+});
+
+/**
+ * How a count reads in Basic: the same number, without the notation.
+ *
+ * `n = 44 rides` is the sample size and R13 says it may never leave the figure's side, so it does
+ * not leave — it changes notation. *"over 44 rides"* is the same datum and one less thing to have
+ * been taught. The number is lifted out of the engineer's string rather than recomputed, so the two
+ * cannot come to disagree about the sample.
+ *
+ * Falls through to the engineer's own text when the shape is not the one this build writes, which
+ * keeps `honesty/properties.ts`'s R13 clause one true whatever `runSummary.ts` does next: the count
+ * is present either way, and never invented.
+ */
+function casualCount(count: string | undefined): string | undefined {
+  if (count === undefined) return undefined;
+  const found = /^n\s*=\s*(\d[\d\s,]*)\s*(.*)$/.exec(count);
+  const digits = found?.[1];
+  const unit = found?.[2];
+  if (digits === undefined || unit === undefined || unit === '') return count;
+  return `over ${digits.trim()} ${unit.trim()}`;
+}
+
+/** A figure as Basic draws it: same value, same bars, plainer count, and its note led into. */
+function casualRendering(figure: SummaryFigure, severity: Severity): Rendering {
+  const lead = CASUAL_LEAD_BY_FIGURE[figure.id];
+  const note =
+    lead === undefined
+      ? figure.note
+      : figure.note === undefined
+        ? lead
+        : `${lead} ${figure.note}`;
+  return {
+    value: figure.value,
+    ...(casualCount(figure.count) === undefined ? {} : { count: casualCount(figure.count) }),
+    ...(note === undefined ? {} : { note }),
+    bars: figure.bars,
+    severity,
   };
 }
 
