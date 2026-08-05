@@ -45,6 +45,19 @@
  * total is the sum of what the floors actually say rather than the rounded sum of an unrounded
  * total. Those differ by up to half a person per floor, which on Vertical City is fifty people and
  * is exactly the size of drift the `population-mismatch` warning exists to notice.
+ *
+ * ## Why {@link scaledBuilding} is exported, and it is a widening rather than a convenience
+ *
+ * Growth is not the only thing that scales a building's population: `shift/calendar.ts` puts a
+ * vacation, a public holiday or a quarter-end over the week, and every one of them is *the same
+ * building edit at a different factor*. Re-deriving that edit there would be a second
+ * implementation of the four rules this file argues for above — round per floor and per range,
+ * never negative, recompute the declared total through `core`'s own `expandFloors`, and leave an
+ * undeclared total undeclared — and the two would agree until somebody changed one, which is the
+ * failure the `totalPopulationOf` docstring is already written about.
+ *
+ * So the factor is the seam. {@link growthFactor} still owns *what day 5 means*; only the arithmetic
+ * of applying a factor is shared, and `growth.test.ts` pins the delegation so the two cannot drift.
  */
 
 import { expandFloors, type BuildingConfig, type FloorConfig, type FloorRange } from '@elevator-sim/core/browser';
@@ -75,8 +88,23 @@ export function growthFactor(day: number): number {
  * published figure.
  */
 export function grownBuilding(config: BuildingConfig, day: number): BuildingConfig {
-  const factor = growthFactor(day);
+  return scaledBuilding(config, growthFactor(day));
+}
 
+/**
+ * The same building with every floor's population multiplied by `factor`.
+ *
+ * The whole of {@link grownBuilding}, with the day taken out — see the module docstring for why
+ * that is a seam rather than a helper. `factor` is anything non-negative and finite: above 1 the
+ * building fills up, below 1 it empties, and `1` returns a structurally identical config because
+ * `Math.round` is the identity on the integers `data/` declares.
+ *
+ * Returns a **new** `BuildingConfig` at every factor, including `1`. It does not return its input:
+ * a caller that needs *nothing happened today* to be observable as object identity has to decide
+ * that for itself and not call this, which is what `calendar.ts` does — an identity shortcut here
+ * would silently change what `grownBuilding(config, 1)` returns.
+ */
+export function scaledBuilding(config: BuildingConfig, factor: number): BuildingConfig {
   const floors: readonly FloorConfig[] | undefined =
     config.floors === undefined
       ? undefined

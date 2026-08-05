@@ -235,7 +235,19 @@ import {
   type ChallengeView,
 } from '../menu/challenge.js';
 import { claimedMetricsOf } from '../menu/client.js';
-import { restoreNoticeFor } from '../persist/notice.js';
+import {
+  CALENDAR_PERIODS,
+  CALENDAR_PERIOD_IDS,
+  calendarDayFor,
+  calendarLine,
+  calendarPatch,
+  periodOnDays,
+} from '../shift/calendar.js';
+import { asBuiltChoices, movedChoiceText, movedChoices, withBankChoice } from '../commissioning/choices.js';
+import { reviewCommissioning } from '../commissioning/refusals.js';
+import { CONSTRAINTS, DIMENSION_LABELS, commissionableClasses } from '../commissioning/types.js';
+import { libraryNoticeFor, restoreNoticeFor, saveNoticeFor } from '../persist/notice.js';
+import { LIBRARY_BUDGET_CHARACTERS, type DroppedEntry } from '../persist/types.js';
 import { loadSession } from '../persist/session.js';
 import { SESSION_SCHEMA_VERSION, type SessionRestoreFailure, type SessionStore } from '../persist/types.js';
 import { closeDay, openEndless, openWeek, outcomeOf } from '../shift/week.js';
@@ -3870,6 +3882,165 @@ const CHALLENGE: SurfaceAdapter = {
   },
 };
 
+/**
+ * The calendar, the fabric, and the two persistence sentences that reach a ribbon.
+ *
+ * Three lanes in one adapter because they share the property that matters here: **each says what it
+ * did to a run, and each has a way of saying more than it did.** A calendar line that named a
+ * template the run length refused; a constraint sentence whose capital figure drifted toward
+ * reading like a score; a library notice that put a validator's JSON path on a coach ribbon. All
+ * three are prose about a run, and all three are driven on the arm where the refusal fires rather
+ * than only on the happy one.
+ *
+ * ## What the fabric's sentence must never become
+ *
+ * `docs/10` § 5.5 bans grade letters, efficiency scores and energy scores. A capital figure is a
+ * limit and not a metric — `commissioning/types.ts` argues it with the § D106 precedent, and the
+ * reason it needs arguing is that the cheapest building is the one with the fewest shafts, so a
+ * capital *score* would rank the towers serving fewest people highest. `commissioning/`'s own suite
+ * scans its literals for a 22-pattern lexicon; this adapter is the generic half, putting the same
+ * sentences through R2 and R11 with everything else.
+ */
+const CALENDAR_AND_FABRIC: SurfaceAdapter = {
+  id: 'shift/calendar.ts#calendarLine',
+  covers: [
+    'shift/calendar.ts#calendarLine',
+    'shift/calendar.ts#calendarPatch',
+    'shift/calendar.ts#CALENDAR_PERIODS',
+    'shift/calendar.ts#CALENDAR_PERIOD_IDS',
+    'commissioning/types.ts#CONSTRAINTS',
+    'commissioning/types.ts#constraintById',
+    'commissioning/types.ts#DIMENSION_LABELS',
+    'commissioning/refusals.ts#reviewCommissioning',
+    'commissioning/building.ts#commissionedBuilding',
+    'commissioning/choices.ts#movedChoices',
+    'commissioning/choices.ts#movedChoiceText',
+    'persist/notice.ts#libraryNoticeFor',
+    'persist/notice.ts#saveNoticeFor',
+    'persist/session.ts#loadLibrary',
+    'persist/types.ts#LIBRARY_BUDGET_CHARACTERS',
+    'persist/validate.ts#libraryFrameIssue',
+    'persist/validate.ts#restoreLibrary',
+  ],
+  render(this: SurfaceAdapter, context) {
+    const seeds: TextSeed[] = [];
+    const building = context.building;
+
+    /* ---- the calendar: every period, and the day each one shapes ---- */
+    for (const id of CALENDAR_PERIOD_IDS) {
+      const period = CALENDAR_PERIODS[id];
+      seeds.push({ field: `period.${id}.name`, text: period.name, role: 'label' });
+      seeds.push({ field: `period.${id}.note`, text: period.note, role: 'prose' });
+
+      const placed = periodOnDays(period, 1, 7);
+      for (const day of [1, 6]) {
+        const today = calendarDayFor(placed, day, (day - 1) % 7);
+        const patch = calendarPatch({
+          day: today,
+          building,
+          split: { incoming: 0.85, outgoing: 0.05, interfloor: 0.1 },
+          demandTemplateId: 'rise-and-fall',
+          demandTemplates: context.trafficProfiles.demandTemplates,
+          runLengthS: 1800,
+        });
+        /*
+         * `observation`, not `label`: the line carries a **population count** taken off the edited
+         * building, and a count on a surface is what R13's clauses are about. Driven at day 1 and
+         * day 6 because two of the shipped periods gate on the weekday, so a Saturday is a
+         * different sentence — and on one of them, no sentence at all.
+         */
+        seeds.push({
+          field: `period.${id}.day${String(day)}.line`,
+          text: today === null ? '' : calendarLine(patch),
+          role: 'observation',
+        });
+        for (const [index, withheld] of patch.withheld.entries()) {
+          seeds.push({
+            field: `period.${id}.day${String(day)}.withheld[${String(index)}]`,
+            text: withheld,
+            role: 'reason',
+          });
+        }
+      }
+    }
+
+    /* ---- the fabric: every constraint, against as-built and against a moved bank ---- */
+    const classes = commissionableClasses(context.elevatorSpecs);
+    const asBuilt = asBuiltChoices(building, classes);
+    const first = asBuilt[0];
+    const moved =
+      first === undefined ? asBuilt : withBankChoice(asBuilt, { ...first, shafts: first.shafts + 3 });
+    for (const label of Object.values(DIMENSION_LABELS)) {
+      seeds.push({ field: `dimension.${label}`, text: label, role: 'label' });
+    }
+    for (const constraint of CONSTRAINTS) {
+      seeds.push({ field: `constraint.${constraint.id}.label`, text: constraint.label, role: 'label' });
+      seeds.push({ field: `constraint.${constraint.id}.note`, text: constraint.note, role: 'prose' });
+      for (const [name, choices] of [
+        ['as-built', asBuilt],
+        ['moved', moved],
+      ] as const) {
+        const review = reviewCommissioning({
+          base: building,
+          choices,
+          classes,
+          specs: context.elevatorSpecs,
+          constraint,
+        });
+        /*
+         * The one sentence the capital figure appears in, on both arms — because the arm that
+         * refuses is the one whose wording could slip into ranking, and the arm that does not is
+         * where an unearned superlative would sit unchallenged.
+         */
+        seeds.push({
+          field: `constraint.${constraint.id}.${name}.sentence`,
+          text: review.sentence,
+          role: 'observation',
+        });
+        for (const refusal of review.refusals) {
+          seeds.push({
+            field: `constraint.${constraint.id}.${name}.refusal(${refusal.code})`,
+            text: refusal.message,
+            role: 'reason',
+          });
+        }
+      }
+    }
+    for (const change of movedChoices(asBuilt, moved)) {
+      seeds.push({ field: `moved.${change.bankId}.${change.dimension}`, text: movedChoiceText(change), role: 'label' });
+    }
+
+    /* ---- the two persistence sentences a ribbon shows ---- */
+    const dropped: readonly DroppedEntry[] = [
+      { shelf: 'building', index: 0, label: 'Tower B', reason: 'banks[0].cars[0].spec is unknown' },
+      { shelf: 'dispatcher', index: 1, label: 'Mine', reason: 'weights.rideTime is not a number' },
+      { shelf: 'pattern', index: 2, label: 'Lunch', reason: 'batchMean is out of range' },
+      { shelf: 'class', index: 3, label: 'Fast', reason: 'ratedSpeedMps.min is negative' },
+    ];
+    for (const count of [1, dropped.length]) {
+      const notice = libraryNoticeFor(dropped.slice(0, count));
+      if (notice !== undefined) {
+        // Both shapes: the singular names the one thing, the plural names three and counts the rest.
+        seeds.push({ field: `library.dropped.${String(count)}`, text: notice, role: 'reason' });
+      }
+    }
+    seeds.push({
+      field: 'library.overBudget',
+      text:
+        saveNoticeFor({
+          kind: 'library-too-large',
+          message: '',
+          characters: 640_000,
+          limit: LIBRARY_BUDGET_CHARACTERS,
+          entries: 28,
+        }) ?? '',
+      role: 'reason',
+    });
+
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -3904,6 +4075,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RESTORE_NOTICE,
   SELECTOR,
   CHALLENGE,
+  CALENDAR_AND_FABRIC,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

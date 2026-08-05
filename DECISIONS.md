@@ -14136,3 +14136,88 @@ It does not make the browser the primary instrument. The order of value is measu
 one boot test is worth more than the whole of the rest of the tier, because it is the one that would
 have caught a defect that actually shipped. Everything after it is worth less per line, and the tier
 should stay small enough that its cost is obviously paid for.
+
+---
+
+## D221 — the last two modes, and the three things wiring them found
+
+**Date: 2026-08-05 · Written after the code, and says so.** § D216 is the contract, § D217 the first
+wave's verdict, § D219 the second's. This is the third and last of the play-experience waves.
+
+**All four modes `docs/17` § 4 designed are built**: incidents, calendar, the daily challenge and
+commissioning. Each reaches a run through `shiftRunConfigOf`, and each has a § D177 test that moves
+its control and requires the legs to change. What follows is the three findings, because the modes
+themselves are described in `docs/17` and the findings are not described anywhere else.
+
+### 1. The shell had never been executed, and that is why four boot bugs shipped
+
+`dev/main.ts` ends with `if (typeof document !== 'undefined') void main();`. Under vitest there is no
+`document`, so **`main()` has never run in this repository's history** — every viewer test imports
+the module for its pure exports and stops.
+
+The light-palette wiring in § D219 declared `let stageTheme` ~500 lines below the `boot()` sequence
+that assigns it. The page threw on boot's **second statement** and drew nothing, and **2 100 tests
+were green**. Fourth occurrence: `started`, `carBadgeHits`, then `stageTheme` and `baseSpeed`. Two of
+the four are written up in prose inside the file that carries them, one of them directly above the
+anchor the fix moved them to.
+
+Two controls now, because one was not enough for three attempts. A **text assertion** over `boot()`'s
+body requires every `let` at that indentation to sit above the sequence, in the idiom
+`main.test.ts`'s `urlWritable = true; syncUrl();` check already uses. And a **browser tier**
+(§ D220), whose first test loads the page and requires the stage canvas to have been drawn to.
+
+**The measurement worth keeping from that:** watched failing, the browser test's *throws nothing on
+the load path* assertion **still passed**. The `ReferenceError` never reaches the page — `main()`'s
+own last-resort handler catches it and writes a sentence into `#status`. A browser tier built around
+uncaught errors would have been green over the same dead product the node suite was green over. The
+error handling is *good*, and that is exactly what hides the failure from an error-shaped check. The
+load-bearing assertion reads the bitmap: **the only thing a caught boot failure cannot fake is a
+drawn frame.**
+
+### 2. A building the reader drew was banking somebody else's scenario
+
+`GAPS.md` had *Sandbox is a string with no feature behind it* and asked what the label should mean.
+The question was wrong. `withBuilding` moved the week **into** a building's scenario and never **out
+of** one, so a tower drawn while on Scenario 2 kept `contractId: 'c2'` — which resolves. The ribbon
+read *Scenario · day 4 · 1 clean shift banked* on a building Scenario 2 has nothing to do with, and
+`closeDay` banked against it: **two clean days on an invented tower cleared Scenario 2**, driven in
+`dev/state.test.ts` with the negative control beside it.
+
+That is the shape of forgery the leaderboard's whole replay apparatus refuses, arriving through the
+campaign's front door: draw a two-floor tower with sixteen cars, run clean days, clear the scenarios.
+`withBuilding`'s own docstring says it exists to prevent exactly this and then waved the case through
+on the grounds that *"the sheet says the shift is not being banked"* — true only when the contract is
+`undefined`, and it was not.
+
+Closed with `SANDBOX_CONTRACT_ID`, a third sentinel. Deliberately **not** `ENDLESS_CONTRACT_ID`: same
+mechanics, different events. Endless is *chosen* and the sandbox is *arrived at*, and telling
+somebody who opened the editor that they had started an endless run is a claim about an intention
+they did not have.
+
+### 3. Two modes' controls are inert at the cell the product opens on, and the cells are the finding
+
+Both lanes hit it, independently, and both named the cell rather than moving to one where everything
+works:
+
+- **A third shaft at Garden Apartments changes nothing** at 900 s or 1 800 s. The building produces
+  5 and 20 legs at those lengths, and two hydraulic cars answer every one — the group never assigns a
+  third. At 3 600 s it reaches 48 legs and the same control is live. Pinned with the leg counts
+  asserted, so a change to the shipped calibration reddens the file rather than quietly making the
+  prose false. This is `docs/10` § 0's M1 measurement — *one building where nothing you change makes
+  any difference* — arriving at a control instead of at a slider.
+- **A machine class cannot be moved on its own** at almost any shipped cell, because
+  `data/elevator-specs.json`'s six speed bands are laid **end to end and never overlap**. The only
+  place a class moves alone is 2.5 m/s, the shared endpoint of geared and gearless. That is a real
+  limit on how cleanly commissioning can teach, and it is a fact about `data/` rather than about the
+  panel.
+
+### 4. What is still open, and it is short
+
+- **Sandbox as a *mode*.** The defect is closed and the label is true; whether it should also have a
+  screen is undecided, and nobody has needed one.
+- **The document tier** — § D220 § 2's middle rung. It is what closes the rest of `UX.md` § 27's
+  `⚠️ mount` marks, and it is not built.
+- **`midtown-office` ships with a `rise-exceeds-class` warning**: 76.9 m of rise against
+  `geared-traction`'s rated 76. Real, in `data/`, found by commissioning and left alone by it —
+  either the garage's −3.5 m should not count toward a bank's rise, or the building should name a
+  class rated for it.

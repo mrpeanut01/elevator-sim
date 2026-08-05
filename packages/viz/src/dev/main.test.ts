@@ -392,6 +392,20 @@ describe('the URL round-trips — SH-09', () => {
     expect([...body.matchAll(/^ {2}let (\w+)/gmu)].length).toBeGreaterThan(10);
   });
 
+  it('keeps the browser tier registered — it may be absent, it may not be deleted', async () => {
+    /*
+     * `boot.browser.test.ts` skips itself on a machine with no Chromium, which is right: a missing
+     * browser is not a defect in this repository. But a tier that can skip is a tier that can be
+     * quietly removed and never noticed, and § D220 § 4 names that failure beside flake.
+     *
+     * So the *registration* is asserted from a test that always runs. If somebody deletes the
+     * project, this goes red and names what went with it.
+     */
+    const config = await readFile(fileURLToPath(new URL('../../../../vitest.config.ts', import.meta.url)), 'utf8');
+    expect(config, 'the viz-browser project is gone from vitest.config.ts').toContain("name: 'viz-browser'");
+    expect(config).toContain('*.browser.test.ts');
+  });
+
   it('derives the defaults from initialState rather than restating them', () => {
     const opening = initialState(resources, 0n);
     expect(defaults).toStrictEqual({

@@ -30,6 +30,7 @@
  * exactly the shape of thing this repository keeps finding in its own tree.
  */
 
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { chromium, type Browser, type ConsoleMessage } from 'playwright-core';
@@ -47,11 +48,33 @@ const CHROMIUM =
   process.env['ELEVATOR_SIM_CHROMIUM'] ??
   '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
 
+/**
+ * Whether this machine has one — and what happens when it does not.
+ *
+ * **Skipped, not failed.** A missing browser is not a defect in this repository, and a CI job that
+ * went red on a machine without one would train its owner to ignore the tier. `ELEVATOR_SIM_CHROMIUM`
+ * points it somewhere else.
+ *
+ * A silently-skipping tier reports nothing, though, which § D220 § 4 warns about in the same breath
+ * as flake. Two things stop that here: the skip prints the path it looked for, and
+ * `dev/main.test.ts` — which always runs — asserts that this project is still registered in
+ * `vitest.config.ts`. So the tier can be *absent* on a given machine and cannot be *deleted*
+ * without a node-tier failure saying so.
+ */
+const HAS_BROWSER = existsSync(CHROMIUM);
+if (!HAS_BROWSER) {
+  console.warn(
+    `[viz-browser] skipped: no Chromium at ${CHROMIUM}. ` +
+      'Set ELEVATOR_SIM_CHROMIUM to run the browser tier (DECISIONS.md § D220).',
+  );
+}
+
 let server: ViteDevServer;
 let browser: Browser;
 let origin: string;
 
 beforeAll(async () => {
+  if (!HAS_BROWSER) return;
   server = await createServer({
     configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
     root: fileURLToPath(new URL('../..', import.meta.url)),
@@ -131,7 +154,7 @@ async function load(): Promise<Loaded> {
   };
 }
 
-describe('the viewer boots', () => {
+describe.skipIf(!HAS_BROWSER)('the viewer boots', () => {
   let loaded: Loaded;
 
   beforeAll(async () => {

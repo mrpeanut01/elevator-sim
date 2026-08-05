@@ -253,6 +253,12 @@ function modeOf(screen: MenuScreen): PlayMode {
        * `ranked` permits exactly those two scopes.
        */
       return 'ranked';
+    case 'commissioning':
+      /*
+       * Its own mode, and the one row of `permits.ts` that forbids `within-day` — so this is the
+       * screen that would catch a fabric control being offered beside a dispatcher weight.
+       */
+      return 'commissioning';
     case 'main':
     case 'settings':
     case 'account':

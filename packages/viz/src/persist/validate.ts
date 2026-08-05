@@ -48,11 +48,39 @@
  * The week's contract id is the one exception, and {@link unknownContractsIn} is where it is
  * argued.
  *
+ * ## The library is checked by the same machinery and refused by a different rule
+ *
+ * {@link restoreLibrary} is in this file because *"is this parsed JSON the shape this build
+ * reads?"* is one question and this is where it is answered. It is not a second validator: the
+ * entry tables below are the same `Readonly<Record<keyof T, FieldCheck>>` device the week uses, and
+ * **legality is not decided here at all** — a building goes to `editor/editorValidate.ts`, a
+ * dispatcher and a machine class go back into their own `data/` file and through `core`'s parser.
+ * `editorValidate.ts` argues the reason in the other direction: *"a second opinion about legality
+ * is how an editor comes to accept a document the loader will reject"*. Restoring is the same seam
+ * from the other side — a library check stricter than the loader would drop a building that runs
+ * perfectly, and a looser one would restore a building that cannot.
+ *
+ * What differs is the **verdict**, not the machinery. A bad field anywhere in the week refuses the
+ * whole session; a bad entry in the library drops that entry and nothing else. `types.ts`'s
+ * {@link SavedLibrary} is where that distinction is argued, and it is the reason this can be done
+ * at all.
+ *
  * ## Its non-test caller
  *
  * `./session.ts`.
  */
 
+import {
+  ConfigError,
+  parseDispatcherProfiles,
+  parseElevatorSpecs,
+  type ElevatorSpecs,
+} from '@elevator-sim/core/browser';
+
+import { specsWithClass, type MachineClass } from '../authoring/machineSpec.js';
+import { PATTERN_ROWS, PEAK_ORDERS, type PatternSpec } from '../authoring/patternSpec.js';
+import type { SavedBuilding, SavedDispatcher, SavedPattern } from '../dev/state.js';
+import { validateBuilding } from '../editor/editorValidate.js';
 import { PLAYBACK_SPEEDS, type FreePlaySelection, type Settings } from '../menu/types.js';
 import { contractById } from '../shift/contracts.js';
 import {
@@ -69,7 +97,15 @@ import {
 } from '../shift/types.js';
 import { HISTORY_DAYS } from '../shift/week.js';
 
-import type { SessionSnapshot } from './types.js';
+import {
+  EMPTY_LIBRARY,
+  type DroppedEntry,
+  type LibraryContext,
+  type LibraryRestore,
+  type LibraryShelf,
+  type SavedLibrary,
+  type SessionSnapshot,
+} from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * The vocabulary
@@ -204,6 +240,30 @@ function isObjectOf(checks: Readonly<Record<string, FieldCheck>>, what: string):
     }
     return undefined;
   };
+}
+
+/**
+ * An array, with nothing said about what is in it.
+ *
+ * The library's shelves, and only those: a shelf's *contents* are checked one at a time by
+ * {@link restoreLibrary} because a bad entry drops an entry, while a shelf that is not an array at
+ * all is a frame this build did not write. See {@link libraryFrameIssue}.
+ */
+function isArray(what: string): FieldCheck {
+  return (value, path) =>
+    Array.isArray(value) ? undefined : at(path, `is ${typeName(value)}, not a list of ${what}`);
+}
+
+/**
+ * A plain object, and deliberately nothing more — the document inside a library entry.
+ *
+ * `core`'s own schema is what decides whether a `BuildingConfig` or a `DispatcherProfile` is
+ * legal. This says only *there is something here shaped like a document to hand it*, which is what
+ * stops `parseBuilding` being handed a number and reporting it in the loader's vocabulary.
+ */
+function isDocument(what: string): FieldCheck {
+  return (value, path) =>
+    isPlainObject(value) ? undefined : at(path, `is ${typeName(value)}, not ${what}`);
 }
 
 /** An array of things, with a declared ceiling on how many. */
@@ -469,5 +529,388 @@ export function unknownContractsIn(week: WeekState): readonly string[] {
     [...new Set(named.filter((id) => contractById(id) === undefined))].sort((a, b) =>
       a.localeCompare(b),
     ),
+  );
+}
+
+/* -------------------------------------------------------------------------- *
+ * The library — entry by entry
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The library's *frame*: four keys, each an array. Nothing about what is in them.
+ *
+ * The frame is envelope structure and is therefore all-or-nothing, while the entries inside it are
+ * documents and are not. The line is drawn there deliberately, and the counter-argument is worth
+ * stating because it is not weak: refusing a session whose `library.buildings` is the number `7`
+ * costs the player their week for something that is not the week's fault, which is the outcome this
+ * whole lane exists to prevent.
+ *
+ * It is drawn there anyway. A shelf that is not an array is not a damaged document — it is bytes
+ * that cannot have been written by this program at all, and the schema version was supposed to be
+ * what vouched for that. Once the frame is in doubt, so is the week sitting beside it in the same
+ * object, and restoring one out of an envelope that is provably not ours is the guess this module
+ * refuses everywhere else. An entry, by contrast, is a document whose *contents* this build no
+ * longer understands, which is an ordinary consequence of shipping.
+ */
+const LIBRARY_SHELF_CHECKS: Readonly<Record<keyof SavedLibrary, FieldCheck>> = Object.freeze({
+  buildings: isArray('saved buildings'),
+  dispatchers: isArray('saved dispatchers'),
+  patterns: isArray('saved patterns'),
+  classes: isArray('saved machine classes'),
+});
+
+const checkLibraryFrame = isObjectOf(LIBRARY_SHELF_CHECKS, 'a saved library');
+
+/**
+ * The first thing wrong with the library's frame, or `undefined`.
+ *
+ * Deliberately not a ceiling on how many entries a shelf holds, which is where {@link isArrayOf}
+ * would have put one: the bound on a library is a **byte** budget
+ * (`types.ts#LIBRARY_BUDGET_CHARACTERS`), enforced on the save path where the thing being bounded —
+ * the quota — actually lives. A count would be the second answer to that question and the one that
+ * cannot see a single twenty-thousand-character building.
+ */
+export function libraryFrameIssue(value: unknown): ShapeIssue | undefined {
+  return checkLibraryFrame(value, 'the library');
+}
+
+/* --- the entry shapes ------------------------------------------------------ */
+
+/**
+ * A `PatternSpec`'s numeric bounds, **taken from the editor's own row table**.
+ *
+ * `PATTERN_ROWS` is what the sliders are drawn from, so a widened slider widens this check with no
+ * edit here — and a restored pattern can never be one the editor could not have produced. The three
+ * fields with no row are the three that are not sliders: the name, the peak order (a chip row, and
+ * `PEAK_ORDERS` is its published set) and the group-travel toggle, whose row exists but describes a
+ * checkbox as `0..1`.
+ *
+ * The `Readonly<Record<keyof PatternSpec, FieldCheck>>` annotation is what keeps the derivation
+ * honest in the other direction: a field added to `PatternSpec` with no row and no line here is a
+ * compile error.
+ */
+/**
+ * The range the editor's own slider allows for a field — or, if that slider is gone, any finite
+ * number.
+ *
+ * The fallback is the honest answer rather than a convenience. A `PatternSpec` field with no row
+ * has no control in this build and therefore nothing that declares a range for it; making one up
+ * here would be exactly the second opinion this module refuses to have. `persist.test.ts` asserts
+ * the fallback is not currently in use, so it cannot quietly become the check for a field whose row
+ * somebody deleted.
+ */
+function rowBound(key: keyof PatternSpec & string): FieldCheck {
+  const row = PATTERN_ROWS.find((entry) => entry.key === key);
+  return row === undefined ? isFiniteNumber : isNumberWithin(row.min, row.max);
+}
+
+const PATTERN_SPEC_CHECKS: Readonly<Record<keyof PatternSpec, FieldCheck>> = Object.freeze({
+  name: isString,
+  order: isOneOf(PEAK_ORDERS, 'peak orders'),
+  batchSharesDestination: isBoolean,
+  ratePctPop5min: rowBound('ratePctPop5min'),
+  peakWindowS: rowBound('peakWindowS'),
+  baselineFraction: rowBound('baselineFraction'),
+  interfloorShare: rowBound('interfloorShare'),
+  batchMean: rowBound('batchMean'),
+  mixAmplitude: rowBound('mixAmplitude'),
+});
+
+/**
+ * A machine class, by **type** only — every range question is `parseElevatorSpecs`'.
+ *
+ * The split is the one this module keeps everywhere: the shape is checked here because a
+ * `MachineClass` is `viz`'s own interface and no `data/` schema describes it, and the legality of
+ * the numbers is checked by putting the class back into `elevator-specs.json` and re-parsing the
+ * file. `yours` is the one field that survives neither trip — `specsWithClass` does not carry it —
+ * so it is the one field this table is load-bearing for.
+ */
+const MACHINE_CLASS_CHECKS: Readonly<Record<keyof MachineClass, FieldCheck>> = Object.freeze({
+  id: isNonEmptyString,
+  name: isString,
+  speedMinMps: isFiniteNumber,
+  speedMaxMps: isFiniteNumber,
+  speedTypicalMps: isFiniteNumber,
+  maxRiseM: isFiniteNumber,
+  maxFloors: isFiniteNumber,
+  accelerationMps2: isFiniteNumber,
+  jerkMps3: isFiniteNumber,
+  loadMinLb: isFiniteNumber,
+  loadMaxLb: isFiniteNumber,
+  application: isString,
+  yours: isBoolean,
+});
+
+/**
+ * A saved building's wrapper. `config` is checked for *being an object* and no more.
+ *
+ * Writing a `BuildingConfig` field table here would be the second opinion about legality this
+ * module refuses to have: `buildingConfigSchema` is four hundred lines of `core` and it is the one
+ * the loader consults. So the wrapper is this module's and the document is `core`'s.
+ */
+const SAVED_BUILDING_CHECKS: Readonly<Record<keyof SavedBuilding, FieldCheck>> = Object.freeze({
+  id: isNonEmptyString,
+  config: isDocument('a building config'),
+});
+
+const SAVED_DISPATCHER_CHECKS: Readonly<Record<keyof SavedDispatcher, FieldCheck>> = Object.freeze({
+  id: isNonEmptyString,
+  profile: isDocument('a dispatcher profile'),
+});
+
+const SAVED_PATTERN_CHECKS: Readonly<Record<keyof SavedPattern, FieldCheck>> = Object.freeze({
+  id: isNonEmptyString,
+  spec: isObjectOf(PATTERN_SPEC_CHECKS, 'an arrival pattern'),
+});
+
+/* --- naming what was dropped ----------------------------------------------- */
+
+/** The noun a player would use. Not the field name, and not the type name. */
+const SHELF_NOUN: Readonly<Record<LibraryShelf, string>> = Object.freeze({
+  building: 'building',
+  dispatcher: 'dispatcher',
+  pattern: 'arrival pattern',
+  class: 'machine class',
+});
+
+/** `1st`, `2nd`, `3rd`, `4th` — for an entry too damaged to have a readable name. */
+function ordinal(oneBased: number): string {
+  const tens = oneBased % 100;
+  if (tens >= 11 && tens <= 13) return `${String(oneBased)}th`;
+  const suffix = ['th', 'st', 'nd', 'rd'][oneBased % 10] ?? 'th';
+  return `${String(oneBased)}${suffix}`;
+}
+
+/** A string field of an unknown value, when it is one and is not empty. */
+function readName(value: unknown, ...path: readonly string[]): string | undefined {
+  let at: unknown = value;
+  for (const key of path) {
+    if (typeof at !== 'object' || at === null) return undefined;
+    at = (at as Record<string, unknown>)[key];
+  }
+  return typeof at === 'string' && at.trim() !== '' ? at.trim() : undefined;
+}
+
+/**
+ * What to call a dropped entry: the player's name for it, then its id, then where it sat.
+ *
+ * Three fallbacks because the input is by definition a value that failed validation, so the name is
+ * exactly as likely to be missing as anything else — and *"one of the things you saved"* sends a
+ * player looking through a library for something they cannot identify.
+ */
+function labelOf(shelf: LibraryShelf, index: number, value: unknown): string {
+  const named =
+    shelf === 'building'
+      ? readName(value, 'config', 'name')
+      : shelf === 'dispatcher'
+        ? readName(value, 'profile', 'name')
+        : shelf === 'pattern'
+          ? readName(value, 'spec', 'name')
+          : readName(value, 'name');
+  return (
+    named ??
+    readName(value, 'id') ??
+    `${ordinal(index + 1)} ${SHELF_NOUN[shelf]} you saved`
+  );
+}
+
+/** A `ConfigError`'s first issue, or whatever else came out. Developer words; see `notice.ts`. */
+function reasonOf(error: unknown): string {
+  if (error instanceof ConfigError) {
+    const first = error.issues[0];
+    return first === undefined
+      ? error.message
+      : `${first.path} ${first.message}`;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
+/* --- the four checks, each deferring to something that already exists ------- */
+
+/**
+ * A machine class, through `core`'s own `elevator-specs.json` parser.
+ *
+ * `specsWithClass` is the function the *running* build already uses to widen the spec file with a
+ * saved class, so re-parsing its output asks exactly the question that matters: *would this class
+ * still resolve if the player ran a building against it?* Anything the loader tolerates is
+ * tolerated here on purpose — a restore that were stricter than the run would drop a class that
+ * works.
+ */
+function classIssue(entry: MachineClass, specs: ElevatorSpecs): string | undefined {
+  try {
+    parseElevatorSpecs(specsWithClass(specs, entry), `your machine class “${entry.id}”`);
+    return undefined;
+  } catch (error) {
+    return reasonOf(error);
+  }
+}
+
+/**
+ * A dispatcher profile, through `core`'s own `dispatcher-profiles.json` parser.
+ *
+ * The profile is put back into the **shipped** file — its `terms`, its `normalization`, its
+ * `patternSwitching` — with the profile list replaced by this one entry. That is what makes the
+ * check worth having rather than a shape assertion: `dispatcherProfilesSchema`'s `superRefine`
+ * cross-checks every weight against the declared cost-term library, so a profile the player tuned
+ * against a term this build has since removed is caught here and nowhere else.
+ */
+function dispatcherIssue(entry: SavedDispatcher, context: LibraryContext): string | undefined {
+  try {
+    parseDispatcherProfiles(
+      { ...context.dispatcherProfiles, profiles: [entry.profile] },
+      `your dispatcher “${entry.id}”`,
+    );
+    return undefined;
+  } catch (error) {
+    return reasonOf(error);
+  }
+}
+
+/**
+ * A building, through the editor's own validator — schema, then cross-references.
+ *
+ * `validateBuilding` never throws and reports every issue of the furthest stage it reached, which
+ * is more than is needed here (one sentence is enough to say why an entry went) and is used anyway
+ * rather than reaching past it into `parseBuilding`: the editor is the thing that decides whether a
+ * player's building is loadable, and two answers to that is one too many.
+ *
+ * `specs` is the file **as widened by the classes that were just accepted**, which is why the
+ * classes are restored first. A building drawn against a machine class the player also saved would
+ * otherwise be dropped for naming a spec that this build does have.
+ */
+function buildingIssue(
+  entry: SavedBuilding,
+  specs: ElevatorSpecs,
+  trafficProfileIds: ReadonlySet<string>,
+): string | undefined {
+  const report = validateBuilding(entry.config, specs, {
+    file: `your building “${entry.id}”`,
+    trafficProfileIds,
+  });
+  if (report.valid) return undefined;
+  const first = report.issues[0];
+  return first === undefined
+    ? 'is not a building this build can load'
+    : `${first.path} ${first.message}`;
+}
+
+/* --- the restore itself ---------------------------------------------------- */
+
+/** Walk one shelf, keeping what validates and naming what does not. */
+function restoreShelf<T>(
+  shelf: LibraryShelf,
+  raw: unknown,
+  shape: FieldCheck,
+  legality: (entry: T) => string | undefined,
+  dropped: DroppedEntry[],
+): readonly T[] {
+  // Narrowing, not a second check: {@link libraryFrameIssue} has already refused anything whose
+  // shelves are not arrays, and it did so by refusing the whole envelope. This is what lets the
+  // loop below read `raw` without a cast.
+  if (!Array.isArray(raw)) return [];
+  const kept: T[] = [];
+  for (const [index, entry] of raw.entries()) {
+    const drop = (reason: string): void => {
+      dropped.push({ shelf, index, label: labelOf(shelf, index, entry), reason });
+    };
+    const issue = shape(entry, SHELF_NOUN[shelf]);
+    if (issue !== undefined) {
+      drop(`${issue.field} ${issue.message}`);
+      continue;
+    }
+    const illegal = legality(entry as T);
+    if (illegal !== undefined) {
+      drop(illegal);
+      continue;
+    }
+    kept.push(entry as T);
+  }
+  return kept;
+}
+
+/**
+ * Restore the library entry by entry: what this build can still read, and what it could not.
+ *
+ * Total on `unknown` and never throws, like everything else on this path. A value whose *frame* is
+ * wrong yields an empty library and **no drops** — not because that is nothing to report, but
+ * because `session.ts` has already refused the whole envelope for it and reporting it twice would
+ * put a *"some of your saved things were dropped"* sentence beside a *"your week could not be
+ * read"* one, describing the same bytes.
+ *
+ * ## The order is load-bearing
+ *
+ * Classes first, then buildings against the specs those classes widened. A player who drew a
+ * building around a machine class they invented has two entries that are only jointly meaningful,
+ * and validating the building against the shipped specs alone would drop it for naming a spec that
+ * is sitting three lines above it in the same library. It is the one place where the *"independent
+ * documents"* premise is not quite true, and it is handled by ordering rather than by pretending.
+ *
+ * A class that is itself dropped takes any building that depended on it with it, which is correct
+ * and is the only cascade in here.
+ *
+ * ## Its non-test caller
+ *
+ * `./session.ts#loadLibrary`.
+ */
+export function restoreLibrary(value: unknown, context: LibraryContext): LibraryRestore {
+  if (libraryFrameIssue(value) !== undefined) return { library: EMPTY_LIBRARY, dropped: [] };
+  const shelves = value as Record<keyof SavedLibrary, unknown>;
+  const dropped: DroppedEntry[] = [];
+
+  const classes = restoreShelf<MachineClass>(
+    'class',
+    shelves.classes,
+    isObjectOf(MACHINE_CLASS_CHECKS, 'a machine class'),
+    (entry) => classIssue(entry, context.elevatorSpecs),
+    dropped,
+  );
+
+  let specs = context.elevatorSpecs;
+  for (const machineClass of classes) specs = specsWithClass(specs, machineClass);
+
+  const buildings = restoreShelf<SavedBuilding>(
+    'building',
+    shelves.buildings,
+    isObjectOf(SAVED_BUILDING_CHECKS, 'a saved building'),
+    (entry) => buildingIssue(entry, specs, context.trafficProfileIds),
+    dropped,
+  );
+
+  const dispatchers = restoreShelf<SavedDispatcher>(
+    'dispatcher',
+    shelves.dispatchers,
+    isObjectOf(SAVED_DISPATCHER_CHECKS, 'a saved dispatcher'),
+    (entry) => dispatcherIssue(entry, context),
+    dropped,
+  );
+
+  /*
+   * The one shelf whose shape check *is* the whole check, so its legality step is empty rather than
+   * duplicating it. A `PatternSpec` is not a `data/` document — it is the traffic editor's state,
+   * and `demandFromSpec` turns it into `SimulationDemandOptions` at run time — so there is no
+   * `core` parser to defer to. `PATTERN_SPEC_CHECKS` is derived from `PATTERN_ROWS` for exactly
+   * that reason: the editor's own bounds, rather than a second set of them written here.
+   */
+  const patterns = restoreShelf<SavedPattern>(
+    'pattern',
+    shelves.patterns,
+    isObjectOf(SAVED_PATTERN_CHECKS, 'a saved pattern'),
+    () => undefined,
+    dropped,
+  );
+
+  return {
+    library: { buildings, dispatchers, patterns, classes },
+    dropped: Object.freeze(dropped),
+  };
+}
+
+/** How many things are in a library, for a sentence that has to say so. */
+export function librarySize(library: SavedLibrary): number {
+  return (
+    library.buildings.length +
+    library.dispatchers.length +
+    library.patterns.length +
+    library.classes.length
   );
 }

@@ -95,6 +95,7 @@ const AUDITED_MODULES = [
   'viz/src/authoring',
   'viz/src/batch',
   'viz/src/campaign',
+  'viz/src/commissioning',
   'viz/src/contract',
   'viz/src/controls',
   'viz/src/dev',

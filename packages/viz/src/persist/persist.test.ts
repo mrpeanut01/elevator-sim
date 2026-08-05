@@ -36,8 +36,21 @@ import {
 } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
+import {
+  classFromSpec,
+  classesFromSpecs,
+  specFromClass,
+  type MachineClass,
+} from '../authoring/machineSpec.js';
+import { DEFAULT_PATTERN } from '../authoring/patternSpec.js';
 import type { BrowserResources } from '../dev/data.js';
-import { initialState, type ViewerState } from '../dev/state.js';
+import {
+  initialState,
+  type SavedBuilding,
+  type SavedDispatcher,
+  type SavedPattern,
+  type ViewerState,
+} from '../dev/state.js';
 import { catalogueOf } from '../menu/catalogue.js';
 import { initialMenuState, updateFreePlay, updateSettings } from '../menu/menu.js';
 import { DEFAULT_SETTINGS, PLAYBACK_SPEEDS, type MenuState } from '../menu/types.js';
@@ -47,8 +60,14 @@ import type { WeekState } from '../shift/types.js';
 import { HISTORY_DAYS, closeDay, nextDay, openWeek, outcomeOf } from '../shift/week.js';
 
 import { jsonRoundTripIssue } from './jsonSafety.js';
-import { clearSession, loadSession, saveSession } from './session.js';
-import { SESSION_KEY, SESSION_SCHEMA_VERSION, type SessionStore } from './types.js';
+import { clearSession, loadLibrary, loadSession, saveSession } from './session.js';
+import {
+  SESSION_KEY,
+  SESSION_SCHEMA_VERSION,
+  SESSION_SCHEMA_VERSIONS_READ,
+  type SavedLibrary,
+  type SessionStore,
+} from './types.js';
 import { snapshotIssue, unknownContractsIn } from './validate.js';
 
 /* -------------------------------------------------------------------------- *
@@ -134,8 +153,52 @@ function playedWeek(): WeekState {
   return closeDay(nextDay(closeDay(openWeek(FIRST_CONTRACT), day1)), day2);
 }
 
+/**
+ * One of each thing a player can author, so *"the library survived"* is a claim about four shelves.
+ *
+ * The building is a **real** one straight out of `data/` rather than something assembled here: the
+ * byte-identity assertion below is only worth having against a document that is as complicated as
+ * the ones players actually save, and `midtown-office` carries banks, floor ranges and a traffic
+ * profile reference. `initialState` opens with all four shelves empty, which is what makes this
+ * fixture the negative control the round trip needs — see the *was empty before* assertion.
+ */
+const SAVED_BUILDING: SavedBuilding = Object.freeze({
+  id: 'bld-1',
+  config: parseBuilding(read('buildings/midtown-office.json'), 'midtown-office.json'),
+});
+
+const SAVED_DISPATCHER: SavedDispatcher = Object.freeze({
+  id: 'disp-1',
+  // A shipped profile, saved under the player's own id. Every weight in it names a cost term the
+  // library declares, which is the cross-reference the restore check exists to make.
+  profile: resources.dispatcherProfiles.profiles[1] ?? resources.dispatcherProfiles.profiles[0]!,
+});
+
+const SAVED_PATTERN: SavedPattern = Object.freeze({
+  id: 'pat-1',
+  spec: { ...DEFAULT_PATTERN, name: 'My lunch rush', order: 'two-way' as const, ratePctPop5min: 9 },
+});
+
+const SAVED_CLASS: MachineClass = Object.freeze(
+  classFromSpec(specFromClass(classesFromSpecs(resources.elevatorSpecs)[2]!), 'cls-1'),
+);
+
+const library = (): SavedLibrary => ({
+  buildings: [SAVED_BUILDING],
+  dispatchers: [SAVED_DISPATCHER],
+  patterns: [SAVED_PATTERN],
+  classes: [SAVED_CLASS],
+});
+
 function viewerState(): ViewerState {
-  return { ...initialState(resources, VIEWER_SEED), week: playedWeek() };
+  return {
+    ...initialState(resources, VIEWER_SEED),
+    week: playedWeek(),
+    savedBuildings: library().buildings,
+    savedDispatchers: library().dispatchers,
+    savedPatterns: library().patterns,
+    savedClasses: library().classes,
+  };
 }
 
 /** Settings and a selection that are all off their defaults, for the same reason. */
@@ -221,6 +284,9 @@ const sessionOf = (envelope: Record<string, unknown>): Record<string, unknown> =
 const weekOf = (envelope: Record<string, unknown>): Record<string, unknown> =>
   sessionOf(envelope)['week'] as Record<string, unknown>;
 
+const libraryOf = (envelope: Record<string, unknown>): Record<string, unknown> =>
+  envelope['library'] as Record<string, unknown>;
+
 /* -------------------------------------------------------------------------- *
  * The ledger — every field of both states is persisted or has a reason
  * -------------------------------------------------------------------------- */
@@ -233,6 +299,21 @@ const PERSISTED_FROM: Readonly<Record<string, 'viewer' | 'menu'>> = Object.freez
   week: 'viewer',
   settings: 'menu',
   freePlay: 'menu',
+});
+
+/**
+ * The library's four shelves, and which `ViewerState` field each is.
+ *
+ * A second table rather than four more rows in {@link PERSISTED_FROM} because the library is a
+ * **sibling** of the session in the envelope and not a section of it — the rename is the whole
+ * point of the placement, so a ledger that flattened the two would be describing a shape the bytes
+ * do not have. `Record<keyof SavedLibrary, keyof ViewerState>` keeps both ends compiler-checked.
+ */
+const LIBRARY_FROM: Readonly<Record<keyof SavedLibrary, keyof ViewerState>> = Object.freeze({
+  buildings: 'savedBuildings',
+  dispatchers: 'savedDispatchers',
+  patterns: 'savedPatterns',
+  classes: 'savedClasses',
 });
 
 /**
@@ -280,15 +361,6 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = Object.freeze({
   'viewer.selectorSpec':
     'the weight-set selector is a group lever by another name — applied on top of whoever is driving — and off its seeded value it writes a selection block and an arm map no shipped profile carries, so a restored one would be a run nobody selected wearing the shipped dispatcher’s name',
 
-  /* --- the reader’s library ---------------------------------------------- */
-  'viewer.savedDispatchers':
-    'a DispatcherProfile is core’s shape, not this envelope’s, so a core schema change would silently invalidate a stored one — the strongest candidate for envelope version 2, and deliberately not smuggled into version 1',
-  'viewer.savedPatterns': 'the reader’s authored patterns, excluded on the same ground as savedDispatchers',
-  'viewer.savedClasses':
-    'a saved machine class widens the specs a building resolves against, so restoring one changes what a shipped building means; same ground, same follow-up',
-  'viewer.savedBuildings':
-    'an authored BuildingConfig is unbounded in size and would put the whole quota at the mercy of one drawing; same ground as savedDispatchers',
-
   /* --- the four editors’ working copies ---------------------------------- */
   'viewer.dispatcherSpec':
     'a working copy is a diff against something in data/, and data/ is free to change between the save and the load — a restored draft of a different profile is worse than no draft',
@@ -306,6 +378,10 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = Object.freeze({
     'megabytes of step series, and a pure function of the seed and the configuration — replay.test.ts asserts a seed reproduces it bit for bit, so a stored copy is the one that can drift',
   'viewer.report':
     'a DayReport is a function of the week that is restored and the recording that is not, so a stored one would describe a run no longer loaded',
+  'viewer.calendar':
+    'the calendar period the week is under. Not persisted **yet**, and this is the row most likely to move: it is between-games, it is small, and it is exactly the kind of thing a player would expect a reload to keep. It is out because a period is a placement over specific day numbers, and restoring one beside a week whose day it no longer covers would show a period that is on and doing nothing — a caption about a run underneath it that is not there',
+  'viewer.commissioning':
+    'the fabric the reader commissioned. Same shape of decision as the saved library and a stronger case for persisting than the calendar — but it is a set of choices *against a specific building*, and `viewer.buildingId` is deliberately derived rather than stored, so restoring it would mean restoring the pair or restoring a mismatch. It is out until the library work above decides how a building-bound draft travels',
   'viewer.withheld':
     'what the last run refused to configure; it belongs to that run and printing it beside a different one would be a caption about a run underneath it that is not there',
 
@@ -327,6 +403,7 @@ const derivedKeys = (): readonly string[] =>
 const ledgerKeys = (): readonly string[] =>
   [
     ...Object.entries(PERSISTED_FROM).map(([key, source]) => `${source}.${key}`),
+    ...Object.values(LIBRARY_FROM).map((key) => `viewer.${key}`),
     ...Object.keys(NOT_PERSISTED),
   ].sort((a, b) => a.localeCompare(b));
 
@@ -366,6 +443,27 @@ describe('what is persisted is accounted for in both directions', () => {
     const slots = saved();
     const envelope = JSON.parse(slots.written.get(slotKey(slots)) ?? '') as Record<string, unknown>;
     expect(Object.keys(sessionOf(envelope)).sort()).toEqual(Object.keys(PERSISTED_FROM).sort());
+  });
+
+  it('keeps the library beside the session rather than inside it', () => {
+    // The placement is the design's hinge — `session` is all-or-nothing and `library` is
+    // entry-by-entry — so it is asserted against the bytes rather than left to a docstring. It is
+    // also what makes a version-1 envelope readable: `session` is unchanged by version 2.
+    const slots = saved();
+    const envelope = JSON.parse(slots.written.get(slotKey(slots)) ?? '') as Record<string, unknown>;
+    expect(Object.keys(envelope).sort()).toEqual(['library', 'schemaVersion', 'session']);
+    expect(Object.keys(libraryOf(envelope)).sort()).toEqual(Object.keys(LIBRARY_FROM).sort());
+  });
+
+  it('stores each shelf from the viewer field the ledger names', () => {
+    const slots = saved();
+    const envelope = JSON.parse(slots.written.get(slotKey(slots)) ?? '') as Record<string, unknown>;
+    const viewer = viewerState() as unknown as Record<string, unknown>;
+    for (const [shelf, field] of Object.entries(LIBRARY_FROM)) {
+      expect(libraryOf(envelope)[shelf], `library.${shelf} came from viewer.${field}`).toEqual(
+        viewer[field],
+      );
+    }
   });
 
   it('stores the value the ledger says it came from, not a lookalike', () => {
@@ -590,7 +688,10 @@ describe('a payload this build cannot read is refused, with the reason', () => {
   });
 
   it('refuses a newer envelope and an older one, differently', () => {
-    for (const version of [SESSION_SCHEMA_VERSION + 1, SESSION_SCHEMA_VERSION - 1]) {
+    // Outside `SESSION_SCHEMA_VERSIONS_READ` in both directions. Version 1 is deliberately absent
+    // from this list — it is *read*, and the block below is where that is asserted.
+    const older = Math.min(...SESSION_SCHEMA_VERSIONS_READ) - 1;
+    for (const version of [SESSION_SCHEMA_VERSION + 1, older]) {
       const slots = saved();
       tamper(slots, (envelope) => {
         envelope['schemaVersion'] = version;
@@ -616,6 +717,20 @@ describe('a payload this build cannot read is refused, with the reason', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.failure.kind).toBe('shape');
+  });
+
+  it('refuses an envelope missing a key its own version has', () => {
+    // The other half of the both-directions rule on the envelope. A version-2 envelope without a
+    // `library` is as suspect as one with a `savedAt`: the version is what vouches for the key set.
+    const slots = saved();
+    tamper(slots, (envelope) => {
+      delete envelope['library'];
+    });
+    const result = loadSession(slots.store);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.kind).toBe('shape');
+    expect(result.failure.message).toContain('library');
   });
 
   it('refuses an envelope carrying a key this build does not know', () => {
@@ -961,8 +1076,17 @@ describe('what the bytes must not contain', () => {
   });
 
   it('stays small enough that a quota is not the interesting failure', () => {
-    // A full week of history, a cleared award and every setting off its default. If this ever
-    // approaches a megabyte, something unbounded has been added to the snapshot.
-    expect((saved().written.get(SESSION_KEY) ?? '').length).toBeLessThan(64_000);
+    /*
+     * A full week of history, a cleared award and every setting off its default. If this ever
+     * approaches a megabyte, something unbounded has been added to the snapshot.
+     *
+     * Measured on the **session** rather than on the whole envelope, and that narrowing is what
+     * `types.ts#LIBRARY_BUDGET_CHARACTERS` cites: the library is unbounded by design and bounded by
+     * a budget, so folding it in here would turn this assertion into a second, quieter budget that
+     * fires at a different number. Everything outside the library is what this bounds.
+     */
+    const slots = saved();
+    const envelope = JSON.parse(slots.written.get(slotKey(slots)) ?? '') as Record<string, unknown>;
+    expect(JSON.stringify(sessionOf(envelope)).length).toBeLessThan(64_000);
   });
 });

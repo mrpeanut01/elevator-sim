@@ -27,6 +27,7 @@ import type { BoardPage } from '../menu/client.js';
 import {
   screenOf,
   type ChallengeScreenInput,
+  type CommissioningScreenInput,
   type MenuAffordance,
   type MenuIntent,
 } from '../menu/screens.js';
@@ -77,6 +78,10 @@ export interface MenuPanelHost {
    * panel, which is `docs/16` § 5 clause 6's rule applied to an absence rather than to an oversight.
    */
   challenge(): ChallengeScreenInput | undefined;
+  /** The fabric, its constraint's verdict, and what each bank may take. `undefined` with no building. */
+  commissioning(): CommissioningScreenInput | undefined;
+  /** Which calendar period is over the week, or `''`. */
+  calendarPeriodId(): string;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -107,6 +112,8 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
     boards: board.boards,
     viewMode: host.viewMode(),
     challenge: host.challenge(),
+    commissioning: host.commissioning(),
+    calendarPeriodId: host.calendarPeriodId(),
   });
 
   const children: Node[] = [];

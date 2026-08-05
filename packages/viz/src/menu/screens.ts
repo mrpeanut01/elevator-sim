@@ -46,6 +46,15 @@ import {
   updateFreePlay,
   updateSettings,
 } from './menu.js';
+import { CALENDAR_PERIODS, CALENDAR_PERIOD_IDS } from '../shift/calendar.js';
+import {
+  CONSTRAINTS,
+  DIMENSION_LABELS,
+  constraintById,
+  type CommissioningChoices,
+} from '../commissioning/types.js';
+import { refusalsBeside, type CommissioningReview } from '../commissioning/refusals.js';
+
 import type { ChallengeBoardPage, ChallengeView } from './challenge.js';
 import {
   FREE_PLAY_DURATIONS_S,
@@ -114,6 +123,17 @@ export type MenuIntent =
   | { readonly kind: 'set-challenge'; readonly field: keyof ChallengeSelection; readonly value: string }
   /** Simulate every seed the challenge names, in the order it names them. */
   | { readonly kind: 'run-challenge' }
+  /** Put a calendar period over the week, or take it off. `''` is *an ordinary week*. */
+  | { readonly kind: 'set-calendar'; readonly periodId: string }
+  /** Move one dimension of one bank's fabric. The value is the option's own id. */
+  | {
+      readonly kind: 'set-commissioning';
+      readonly bankId: string;
+      readonly dimension: 'shafts' | 'machineClass' | 'ratedSpeed';
+      readonly value: string;
+    }
+  /** Choose which capital constraint the week is commissioned under. */
+  | { readonly kind: 'set-constraint'; readonly constraintId: string }
   /** Post the whole seed set. Never a partial one — see `challengeSubmissionOf`. */
   | { readonly kind: 'post-challenge' };
 
@@ -187,6 +207,14 @@ export interface MenuViewInput {
    */
   readonly challenge?: ChallengeScreenInput | undefined;
   /**
+   * The fabric screen's state — the choices, the constraint's verdict, and the options each bank
+   * may take. Supplied rather than computed: deciding it needs a `BuildingConfig` and the loaded
+   * `ElevatorSpecs`, and this module has neither. One derivation, two consumers (`docs/16` S5).
+   */
+  readonly commissioning?: CommissioningScreenInput | undefined;
+  /** Which calendar period is over the week, or `''` for an ordinary one. */
+  readonly calendarPeriodId?: string | undefined;
+  /**
    * The reader's disclosure level — `mode/types.ts`'s `ViewMode`, taken as a string so this module
    * does not depend on the disclosure layer to draw a menu.
    *
@@ -215,6 +243,20 @@ export interface ChallengeScreenInput {
   readonly board?: ChallengeBoardPage | undefined;
 }
 
+/** What the shell knows about the fabric, and what the constraint says about it. */
+export interface CommissioningScreenInput {
+  readonly buildingName: string;
+  readonly constraintId: string;
+  readonly choices: CommissioningChoices;
+  readonly review: CommissioningReview;
+  /** Per bank, what each dimension may be set to. Derived from the loaded specs, never listed. */
+  readonly optionsFor: (bankId: string) => {
+    readonly shafts: readonly CatalogueEntry[];
+    readonly machineClass: readonly CatalogueEntry[];
+    readonly ratedSpeed: readonly CatalogueEntry[];
+  };
+}
+
 /* -------------------------------------------------------------------------- *
  * Titles
  * -------------------------------------------------------------------------- */
@@ -235,6 +277,8 @@ export function titleOf(screen: MenuScreen): string {
       return 'Leaderboard';
     case 'challenge':
       return 'This week’s challenge';
+    case 'commissioning':
+      return 'Commissioning';
     case 'account':
       return 'Account';
   }
@@ -293,11 +337,17 @@ function bodyOf(input: MenuViewInput, screen: MenuScreen): Body {
         notices: [SETTINGS_NOTE],
       };
     case 'campaign':
-      return { ...empty, rows: campaignRows(), notices: [CAMPAIGN_NOTE] };
+      return {
+        ...empty,
+        rows: campaignRows(input.calendarPeriodId ?? ''),
+        notices: [CAMPAIGN_NOTE],
+      };
     case 'leaderboard':
       return leaderboardBody(input);
     case 'challenge':
       return challengeBody(input);
+    case 'commissioning':
+      return commissioningBody(input);
     case 'account':
       return { ...empty, rows: accountRows(input) };
   }
@@ -524,7 +574,24 @@ const CAMPAIGN_NOTE =
  * needs telling once. What it no longer has to explain is which Campaign this is.
  */
 
-function campaignRows(): readonly MenuAffordance[] {
+/**
+ * The periods, plus *an ordinary week*.
+ *
+ * Derived from `CALENDAR_PERIODS` rather than listed — § D213's rule — so a sixth period is on the
+ * menu the day it lands rather than the day somebody remembers this file. The empty id is the
+ * no-period selection and is offered **first**, because it is what the week is unless somebody
+ * chooses otherwise.
+ */
+const CALENDAR_OPTIONS: readonly CatalogueEntry[] = Object.freeze([
+  { id: '', name: 'An ordinary week' },
+  ...CALENDAR_PERIOD_IDS.map((id) => ({
+    id,
+    name: CALENDAR_PERIODS[id].name,
+    detail: CALENDAR_PERIODS[id].note,
+  })),
+]);
+
+function campaignRows(calendarPeriodId: string): readonly MenuAffordance[] {
   return Object.freeze([
     {
       id: 'campaign.open',
@@ -534,6 +601,31 @@ function campaignRows(): readonly MenuAffordance[] {
       scope: 'between-games',
       enabled: true,
       intent: { kind: 'open-campaign' },
+    },
+    {
+      id: 'campaign.calendar',
+      label: 'Calendar',
+      detail: 'A season over the week — it changes who is in the building, not how you are judged',
+      kind: 'select',
+      /*
+       * `between-games`. A period holds across a stretch of days and sets the premise the days
+       * already closed were judged against, so moving it mid-week would rewrite what those days
+       * meant — which is the difference between a different *game* and a different *day*.
+       */
+      scope: 'between-games',
+      enabled: true,
+      value: calendarPeriodId,
+      options: CALENDAR_OPTIONS,
+      intent: { kind: 'set-calendar', periodId: calendarPeriodId },
+    },
+    {
+      id: 'campaign.commissioning',
+      label: 'Commission the building',
+      detail: 'Choose the shafts, the machines and their speeds — then live with them',
+      kind: 'navigate',
+      scope: 'presentation',
+      enabled: true,
+      intent: { kind: 'navigate', to: 'commissioning' },
     },
     {
       id: 'campaign.endless',
@@ -757,6 +849,125 @@ function postRefusalFor(
   return {};
 }
 
+/* ---------------------------------------------------------------- commissioning */
+
+/**
+ * The pre-week design phase — `docs/17` § 4.4.
+ *
+ * ## What this screen is, and the one thing it is careful about
+ *
+ * Three dimensions per bank: shafts, machine class, rated speed. All `between-games`, and
+ * `scope/permits.ts` forbids `within-day` for this mode outright, with the reason that a
+ * commissioning screen letting a player move a dispatcher weight would be the shift week with a
+ * different title.
+ *
+ * **The capital figure is a limit and never a metric.** `docs/10` § 5.5 bans grade letters,
+ * efficiency scores and energy scores; it does not ban a budget you build against. The distinction
+ * matters because the failure mode is a currency that quietly becomes a score — and it would be a
+ * bad one, in the § D106 way: the cheapest building is the one with the fewest shafts, so a capital
+ * score would rank the towers that serve fewest people highest. So the number appears in exactly
+ * one sentence, the constraint's own, and it never travels to a report — `commissioning/`'s own
+ * suite asserts that four ways, including an import scan denying this module's own reporting layer.
+ *
+ * Refusals go **beside the control**, which is why the input carries `refusalsBeside` rather than a
+ * flat list: a sentence about `main`'s machine class shown under `service`'s speed is a sentence a
+ * player cannot act on.
+ */
+function commissioningBody(input: MenuViewInput): Body {
+  const state = input.commissioning;
+  if (state === undefined) {
+    return {
+      rows: Object.freeze([
+        {
+          id: 'commissioning.back-to-campaign',
+          label: 'Open the scenarios',
+          kind: 'navigate' as const,
+          scope: 'presentation' as const,
+          enabled: true,
+          intent: { kind: 'navigate' as const, to: 'campaign' as const },
+        },
+      ]),
+      notices: Object.freeze(['There is no building loaded to commission yet.']),
+      issues: Object.freeze([]),
+    };
+  }
+
+  const rows: MenuAffordance[] = [
+    {
+      id: 'commissioning.constraint',
+      label: 'Under',
+      detail: constraintById(state.constraintId)?.note ?? '',
+      kind: 'select',
+      scope: 'between-games',
+      enabled: true,
+      value: state.constraintId,
+      options: CONSTRAINTS.map((entry) => ({ id: entry.id, name: entry.label, detail: entry.note })),
+      intent: { kind: 'set-constraint', constraintId: state.constraintId },
+    },
+  ];
+
+  for (const choice of state.choices) {
+    const options = state.optionsFor(choice.bankId);
+    const dimension = (
+      id: 'shafts' | 'machineClass' | 'ratedSpeed',
+      label: string,
+      value: string,
+      list: readonly CatalogueEntry[],
+    ): MenuAffordance => {
+      // The refusal site *is* the dimension — `RefusalSite` is `CommissioningDimension | 'constraint'`.
+      // Naming a second vocabulary here would be a second place a dimension has to be spelled.
+      const refusals = refusalsBeside(state.review, choice.bankId, id);
+      const enabled = refusals.length === 0;
+      return {
+        id: `commissioning.${choice.bankId}.${id}`,
+        label: `${choice.bankId} — ${label}`,
+        kind: 'select',
+        scope: 'between-games',
+        enabled,
+        ...(enabled ? {} : { disabledWhy: refusals.map((refusal) => refusal.message).join(' ') }),
+        value,
+        options: list,
+        intent: { kind: 'set-commissioning', bankId: choice.bankId, dimension: id, value },
+      };
+    };
+    rows.push(dimension('shafts', DIMENSION_LABELS.shafts, String(choice.shafts), options.shafts));
+    rows.push(
+      dimension('machineClass', DIMENSION_LABELS.machineClass, choice.machineClassId, options.machineClass),
+    );
+    rows.push(
+      dimension('ratedSpeed', DIMENSION_LABELS.ratedSpeed, String(choice.ratedSpeedMps), options.ratedSpeed),
+    );
+  }
+
+  /*
+   * The whole-configuration refusals — the ones with no bank to sit beside. They are `issues`
+   * rather than a disabled row's `disabledWhy` for the reason `freePlayIssues` is: a refusal about
+   * the configuration is not about any one control, and attaching it to one would send a player to
+   * change the axis that was already right.
+   */
+  const whole = state.review.refusals
+    .filter((refusal) => refusal.bankId === null)
+    .map((refusal) => refusal.message);
+
+  return {
+    rows: Object.freeze(rows),
+    notices: Object.freeze([COMMISSIONING_NOTE, state.buildingName, state.review.sentence]),
+    issues: Object.freeze(whole),
+  };
+}
+
+/**
+ * Said on the screen, because the alternative is a player inferring it from a number.
+ *
+ * The second sentence is the one that earns its place: it names what the capital figure is **not**,
+ * in a product whose whole discipline is that a figure beside a wait figure gets read as comparable
+ * to it.
+ */
+const COMMISSIONING_NOTE =
+  'Choose the fabric before the week opens, then live with it — nothing here moves once the doors ' +
+  'do. The capital figure is a limit on what you may build, not a score: it is never compared ' +
+  'between players, never shown beside a wait, and never enters a verdict.';
+
 /* ------------------------------------------------------------- leaderboard */
 
 function leaderboardBody(input: MenuViewInput): Body {
@@ -875,6 +1086,12 @@ export function applyIntent(state: MenuState, intent: MenuIntent): MenuState {
       return updateSettings(state, settingsPatch(intent.field, intent.value));
     case 'set-challenge':
       return updateChallenge(state, { [intent.field]: intent.value });
+    case 'set-calendar':
+    case 'set-commissioning':
+    case 'set-constraint':
+      // The shell's, because each writes `ViewerState` rather than `MenuState` — the fabric and the
+      // calendar are facts about the run, not about which screen is showing.
+      return state;
     case 'reopen':
     case 'start':
     case 'open-campaign':

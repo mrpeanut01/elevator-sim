@@ -236,7 +236,10 @@ bias across a stretch of days, with per-day overrides.
 - **Public holiday** — one day at a fraction of demand.
 - **Moving week** — `move-in` every day plus a reserved goods car; needs § 4.1 to be expressible.
 - **Quarter-end** — demand up and a sustained evening egress, which is what `evening-egress` was
-  authored for and has never been paired with a caller.
+  authored for. **The clause that followed — *"and has never been paired with a caller"* — was true
+  when this section was written and is not now**: `packages/server/src/challenge/schedule.ts` ships
+  it in the challenge rotation. Corrected rather than deleted, because the sentence is the kind that
+  goes stale silently and a reader deserves to see that it did.
 
 It attaches at exactly `growth.ts`'s seam — a real edit to a real `BuildingConfig` put back through
 `parseBuilding`/`resolveBuilding`, never a multiplier on a header. And it finally makes `WEEKDAYS`

@@ -304,6 +304,7 @@ packages/
 │   ├── scope/             — § D216: what a control may move and when, derived from the state's own keys
 │   ├── playthrough/       — § D217: the walk over the menu graph — every screen, every affordance
 │   ├── persist/          — § D217: the session a reload survives — the week, the settings, the selection
+│   ├── commissioning/    — § D219: the pre-week design phase — shafts, machine classes and rated speeds under a declared capital constraint, put back through the loader; retrofit is the constraint whose editable set is empty
 │   └── dev/               — the Vite dev entry points, viewer and editor (dev-only)
 ├── server/                — § D214: accounts, email confirmation, and a verified leaderboard
 │   ├── accounts/          — password hashing, signed confirmation tokens, session tokens

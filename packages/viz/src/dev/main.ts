@@ -60,7 +60,21 @@ import { claimedMetricsOf, createClient, fetchTransport } from '../menu/client.j
 import { initialMenuState, navigate } from '../menu/menu.js';
 import { enterEndless } from '../menu/enterEndless.js';
 import { enterFreePlay } from '../menu/enterFreePlay.js';
-import { applyIntent, type ChallengeScreenInput, type MenuIntent } from '../menu/screens.js';
+import {
+  applyIntent,
+  type ChallengeScreenInput,
+  type CommissioningScreenInput,
+  type MenuIntent,
+} from '../menu/screens.js';
+import {
+  CALENDAR_PERIODS,
+  periodOnDays,
+  type CalendarPeriod,
+  type CalendarPeriodId,
+} from '../shift/calendar.js';
+import { asBuiltChoices, shaftChoices, speedChoices, withBankChoice } from '../commissioning/choices.js';
+import { CONSTRAINTS, commissionableClasses, constraintById } from '../commissioning/types.js';
+import { reviewCommissioning } from '../commissioning/refusals.js';
 import type { MenuState } from '../menu/types.js';
 import { renderMenu, type LeaderboardView, type MenuPanelHost } from './menuPanel.js';
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
@@ -109,7 +123,7 @@ import { eventFor } from '../shift/events.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { dayReportOf } from '../shift/report.js';
-import { closeDay, outcomeOf } from '../shift/week.js';
+import { HISTORY_DAYS, closeDay, outcomeOf } from '../shift/week.js';
 import { coachWeekLines } from '../shift/weekLabel.js';
 import { weekdayOf } from '../shift/types.js';
 
@@ -141,8 +155,8 @@ import { mountScenarios } from './scenariosPanel.js';
 import { mountTrafficEditor } from './trafficEditor.js';
 import { playbackRateFor, shouldAutoplayWith } from './motion.js';
 import { themeFor } from '../render/theme.js';
-import { restoreNoticeFor } from '../persist/notice.js';
-import { clearSession, loadSession, saveSession } from '../persist/session.js';
+import { libraryNoticeFor, restoreNoticeFor, saveNoticeFor } from '../persist/notice.js';
+import { clearSession, loadLibrary, loadSession, saveSession } from '../persist/session.js';
 import type { SessionStore } from '../persist/types.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
 import {
@@ -150,6 +164,7 @@ import {
   SHIFT_LENGTHS,
   allBuildingIds,
   buildingConfigOf,
+  specsWithSaved,
   buildingNameOf,
   disclosureOf,
   initialState,
@@ -330,6 +345,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   let carBadgeHits: readonly CarBadgeHit[] = [];
   let bankFilter = '';
+  /**
+   * The line the calendar produced for the day on screen, or `''` on an ordinary one.
+   *
+   * Held rather than recomputed, and that is `docs/16` S5: `shiftRunConfigOf` is the only thing that
+   * knows what the calendar actually **applied** — a template the run length refused never reaches
+   * it, and a population is what `expandFloors` counted rather than the factor asked for. A ribbon
+   * that re-derived it would be a second answer, and the wrong one on exactly the days a refusal
+   * fired.
+   */
+  let calendarCaption = '';
 
   /*
    * **Both of the two below are here for `carBadgeHits`' reason, and both were not.**
@@ -621,6 +646,27 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let restoreNotice: string | undefined;
 
   function restoreSession(): void {
+    /*
+     * **The library first, and on both paths.**
+     *
+     * A library is a set of independent documents and a week is one state whose parts constrain
+     * each other — `persist/types.ts` argues the distinction at length — so a week this build
+     * cannot read does not make the buildings the reader drew unreadable. Restoring the library
+     * even when the session is refused is the whole benefit of that split, and skipping it here
+     * would quietly throw away the thing the gap called *the most valuable thing a player creates*.
+     *
+     * It also has to precede `withBuilding` below, which reads `state.savedBuildings`.
+     */
+    const restoredLibrary = loadLibrary(sessionStore, resources);
+    state = {
+      ...state,
+      savedBuildings: restoredLibrary.library.buildings,
+      savedDispatchers: restoredLibrary.library.dispatchers,
+      savedPatterns: restoredLibrary.library.patterns,
+      savedClasses: restoredLibrary.library.classes,
+    };
+    libraryNotice = libraryNoticeFor(restoredLibrary.dropped);
+
     const restored = loadSession(sessionStore);
     if (!restored.ok) {
       /*
@@ -648,9 +694,27 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (contract !== undefined) state = withBuilding(state, resources, contract.buildingId);
   }
 
+  /**
+   * A second line, for the two pieces of news that are not about the week.
+   *
+   * `libraryNotice` is *some of what you saved could not be reopened*; `saveNotice` is *nothing new
+   * is being kept*. Held apart from `restoreNotice` because they can be true at the same time and
+   * one slot cannot say both — and because the save one is about the **future**, so unlike the
+   * other two it must not be cleared by the next run.
+   */
+  let libraryNotice: string | undefined;
+  let saveNotice: string | undefined;
+
   /** Write the session back. Cheap, total, and never throws — a refusing browser is not an error. */
   function saveSessionNow(): void {
-    saveSession(sessionStore, state, menuState);
+    const written = saveSession(sessionStore, state, menuState);
+    /*
+     * The refusal reaches the player, which is the whole reason the budget exists. A library that
+     * outgrew the slot and stopped being written **in silence** would be the gap this closed,
+     * reopened one layer down: the failure a player needs to know about is precisely the one they
+     * cannot see, because the symptom is a reload that lost something.
+     */
+    saveNotice = written.ok ? undefined : saveNoticeFor(written.failure);
   }
 
   /**
@@ -803,6 +867,52 @@ function boot(ui: Elements, resources: BrowserResources): void {
         return;
       }
 
+      case 'set-calendar': {
+        /*
+         * The period is placed over **this week's own days** rather than over absolute dates, which
+         * is what `periodOnDays` is for: the shift layer has no calendar but `WEEKDAYS`, and a
+         * period pinned to day numbers a week has already passed would be on and doing nothing.
+         */
+        const period = CALENDAR_PERIODS[intent.periodId as CalendarPeriodId] as
+          | CalendarPeriod
+          | undefined;
+        state = {
+          ...state,
+          calendar: period === undefined ? null : periodOnDays(period, 1, HISTORY_DAYS),
+        };
+        drawMenu();
+        runShift();
+        return;
+      }
+
+      case 'set-constraint':
+        state = { ...state, commissioningConstraintId: intent.constraintId };
+        drawMenu();
+        return;
+
+      case 'set-commissioning': {
+        const authored = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
+        if (authored === undefined) return;
+        const classes = commissionableClasses(specsWithSaved(resources, state.savedClasses));
+        const choices = state.commissioning.length === 0 ? asBuiltChoices(authored, classes) : state.commissioning;
+        const current = choices.find((choice) => choice.bankId === intent.bankId);
+        if (current === undefined) return;
+        const next =
+          intent.dimension === 'machineClass'
+            ? { ...current, machineClassId: intent.value }
+            : intent.dimension === 'shafts'
+              ? { ...current, shafts: Number(intent.value) }
+              : { ...current, ratedSpeedMps: Number(intent.value) };
+        state = { ...state, commissioning: withBankChoice(choices, next) };
+        drawMenu();
+        /*
+         * The fabric is `between-games`, so it takes effect on the next run rather than re-running
+         * under the reader — the same rule the dispatcher editor beside it keeps, and the one the
+         * mode's whole premise rests on: you choose, and then you live with it.
+         */
+        return;
+      }
+
       case 'run-challenge':
         runChallenge();
         return;
@@ -927,6 +1037,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     leaderboard: () => boardView,
     viewMode: () => state.mode,
     challenge: () => (client === undefined ? undefined : challengeView),
+    calendarPeriodId: () => state.calendar?.id ?? '',
+    commissioning: () => commissioningInput(),
     runState: () => {
       const issues = runIdentityIssues(state, resources, 'ranked');
       return {
@@ -935,6 +1047,49 @@ function boot(ui: Elements, resources: BrowserResources): void {
       };
     },
   };
+
+  /**
+   * The fabric screen's whole input, derived from the same three things the run derives from.
+   *
+   * Built fresh on every draw rather than held: it is a pure function of the building, the saved
+   * classes and the choices, and a cached copy would be a second answer to *what may this bank
+   * take* — which is precisely the question a stale one would get wrong after the reader saved a
+   * machine class.
+   */
+  function commissioningInput(): CommissioningScreenInput | undefined {
+    const authored = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
+    if (authored === undefined) return undefined;
+    const specs = specsWithSaved(resources, state.savedClasses);
+    const classes = commissionableClasses(specs);
+    const choices = state.commissioning.length === 0 ? asBuiltChoices(authored, classes) : state.commissioning;
+    const constraint = constraintById(state.commissioningConstraintId) ?? CONSTRAINTS[0];
+    if (constraint === undefined) return undefined;
+    const review = reviewCommissioning({ base: authored, choices, classes, specs, constraint });
+    return {
+      buildingName: authored.name,
+      constraintId: constraint.id,
+      choices,
+      review,
+      optionsFor: (bankId) => {
+        const choice = choices.find((entry) => entry.bankId === bankId);
+        const machineClass = classes.find((entry) => entry.id === choice?.machineClassId);
+        return {
+          /*
+           * Derived from the building and the class rather than listed. The shaft ladder spans one
+           * fewer than the bank has to four more, because those are the moves a player actually
+           * makes; the speed ladder is the **class's own declared band**, so a speed outside it is
+           * not offered rather than offered and refused (`docs/16` S7).
+           */
+          shafts: shaftChoices(choice?.shafts ?? 1).map((n) => ({ id: String(n), name: String(n) })),
+          machineClass: classes.map((entry) => ({ id: entry.id, name: entry.name })),
+          ratedSpeed: speedChoices(machineClass).map((speed) => ({
+            id: String(speed),
+            name: `${speed.toFixed(2)} m/s`,
+          })),
+        };
+      },
+    };
+  }
 
   function drawMenu(): void {
     renderMenu(menuRoot, menuHost);
@@ -1494,7 +1649,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * carried it.
      */
     const coach = coachWeekLines(state.week, state.shiftLengthS);
-    setText(ui.coach.label, coach.label);
+    /*
+     * The calendar's own caption wins the eyebrow when a period is running, because it is the more
+     * specific true thing: *Vacation week · Monday* says both what day it is and what kind of week,
+     * where *Scenario · day 1* says only the second. Built from **what was applied** rather than
+     * from what was asked for — a withheld template never appears in it.
+     */
+    setText(ui.coach.label, calendarCaption === '' ? coach.label : calendarCaption);
     setText(ui.coach.title, buildingNameOf(resources, state.savedBuildings, state.buildingId));
     setText(ui.coach.progress, coach.progress);
     setText(ui.coach.hint, coachHint(view));
@@ -1503,7 +1664,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function coachHint(view: ViewAt): string {
     // Ahead of the withheld refusals: those are about the run on screen, and this is about whether
     // the run on screen is the one the player left. Both outrank advice.
+    /*
+     * Precedence, and it is decided rather than incidental. `saveNotice` outranks everything because
+     * it is the only one about the future — a player who is no longer being saved needs to know
+     * before they spend another twenty minutes. Then the week that could not be read, then what was
+     * dropped out of the library, then the run's own refusals, then advice.
+     */
+    if (saveNotice !== undefined) return saveNotice;
     if (restoreNotice !== undefined) return restoreNotice;
+    if (libraryNotice !== undefined) return libraryNotice;
     if (state.withheld.length > 0) return state.withheld.join(' ');
     if (view.recording === undefined) {
       return 'Press play and watch a call appear, a car answer it, and the wait end. That is the whole simulator in one move.';
@@ -1532,10 +1701,18 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * so it is reused rather than answered twice. A second flag would be a second thing to keep in
      * step with the boot order.
      */
-    if (urlWritable) restoreNotice = undefined;
+    /*
+     * The two backward-looking notices are spent once the player does something; `saveNotice` is
+     * not, because it describes a condition that is still true and will still be true next time.
+     */
+    if (urlWritable) {
+      restoreNotice = undefined;
+      libraryNotice = undefined;
+    }
     try {
       const plan = shiftRunConfigOf(resources, state);
       building = plan.building;
+      calendarCaption = plan.calendarLine;
       const recorded = recordRun(plan.config, {
         outOfServiceCarIds: plan.outOfServiceCarIds,
       });

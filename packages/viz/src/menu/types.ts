@@ -26,6 +26,7 @@ export const MENU_SCREENS = [
   'settings',
   'leaderboard',
   'challenge',
+  'commissioning',
   'account',
 ] as const;
 

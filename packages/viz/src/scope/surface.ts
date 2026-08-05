@@ -140,6 +140,19 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
     'The demand template and arrival rate Free Play asked for, over the pattern select. Both are ' +
       'hashed into the leaderboard board a score belongs to, so both are fixed when a game starts.',
   ),
+  'viewer.calendar': control(
+    'between-games',
+    'Which calendar period the week is under — a vacation, a public holiday, a moving week. It sets ' +
+      'a population factor and a mix bias across a stretch of days, so it is a different game rather ' +
+      'than a different day: moving it mid-week would rewrite the premise the days already closed ' +
+      'were judged against.',
+  ),
+  'viewer.commissioning': control(
+    'between-games',
+    'The fabric the reader commissioned — shafts, machine class and rated speed, per bank. Pure ' +
+      'between-games and the mode says so: you choose the building and then live with it for the ' +
+      'week, which is the whole difference between commissioning and the shift week.',
+  ),
   'viewer.seed': control(
     'between-games',
     'The seed names the run. It is between-games rather than within-day because it travels with a ' +

@@ -62,6 +62,9 @@ import type { HonestyCard } from '../live/types.js';
 import { navigate } from '../menu/menu.js';
 import { initialMenuState } from '../menu/menu.js';
 import { catalogueOf } from '../menu/catalogue.js';
+import { CALENDAR_PERIODS, periodOnDays } from '../shift/calendar.js';
+import { asBuiltChoices, withBankChoice } from '../commissioning/choices.js';
+import { commissionableClasses } from '../commissioning/types.js';
 import { challengeRunConfigs, type ChallengeView } from '../menu/challenge.js';
 import { createClient } from '../menu/client.js';
 import { recordRun } from '../record/recordRun.js';
@@ -280,6 +283,17 @@ const PROBE_CHALLENGE: ChallengeView = Object.freeze({
   }),
 });
 
+/** Midtown's main bank with one more shaft than it ships — the commissioning probe's second arm. */
+function fiveShaftMain(): ReturnType<typeof asBuiltChoices> {
+  const building = RESOURCES.buildings.find((entry) => entry.id === 'midtown-office')?.config;
+  if (building === undefined) throw new Error('midtown-office is not loaded');
+  const classes = commissionableClasses(RESOURCES.elevatorSpecs);
+  const asBuilt = asBuiltChoices(building, classes);
+  const main = asBuilt[0];
+  if (main === undefined) throw new Error('midtown-office declares no bank');
+  return withBankChoice(asBuilt, { ...main, shafts: main.shafts + 1 });
+}
+
 /**
  * A probe for every `control` row in `SCOPE_OF`. `surface.test.ts` asserts that in both directions,
  * so a control added without one is red rather than unscoped-in-practice.
@@ -365,6 +379,42 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
   },
   'viewer.seed': {
     states: [(s) => ({ ...s, seed: 1n }), (s) => ({ ...s, seed: 999n })],
+  },
+  'viewer.calendar': {
+    /*
+     * `quarter-end` rather than `vacation`, and Midtown rather than Garden Apartments, because both
+     * choices are about the probe having something to measure: quarter-end raises the population
+     * *and* names `evening-egress`, so it moves the legs through two independent routes, and a
+     * probe that could only fail if both were broken at once is a better guard than one that
+     * depends on a single field.
+     */
+    states: [
+      (s) => ({ ...s, buildingId: 'midtown-office', shiftLengthS: 1800, calendar: null }),
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        shiftLengthS: 1800,
+        calendar: periodOnDays(CALENDAR_PERIODS['quarter-end'], 1, 7),
+      }),
+    ],
+  },
+  'viewer.commissioning': {
+    /*
+     * A fifth shaft at Midtown, at 1 800 s. Both halves of that cell are measured rather than
+     * convenient: Garden Apartments produces 20 legs at that length and two hydraulic cars answer
+     * every one, so a third car is never assigned and the probe would report a live control dead —
+     * which is `docs/10` § 0's M1 measurement (*"one building where nothing you change makes any
+     * difference"*) arriving at a control instead of at a slider.
+     */
+    states: [
+      (s) => ({ ...s, buildingId: 'midtown-office', shiftLengthS: 1800, commissioning: [] }),
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        shiftLengthS: 1800,
+        commissioning: fiveShaftMain(),
+      }),
+    ],
   },
 
   /* ------------------------------------------------------- within-day: re-runs today */

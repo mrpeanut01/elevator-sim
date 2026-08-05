@@ -25,7 +25,7 @@ import { loadConfig, parseBuilding, resolveBuilding, type LoadedConfig } from '@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { BUILDING_IDS, DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
-import { grownBuilding, growthFactor } from './growth.js';
+import { grownBuilding, growthFactor, scaledBuilding } from './growth.js';
 import { recordRun } from '../record/recordRun.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 import { shiftRunConfigOf } from '../dev/state.js';
@@ -96,6 +96,37 @@ describe('a grown building still loads, on every shipped building', () => {
       const shipped = requireBuilding(config, buildingId);
       expect(grownBuilding(shipped.config, 1), buildingId).toEqual(shipped.config);
     }
+  });
+
+  it('is exactly scaledBuilding at the day’s factor, on every shipped building', () => {
+    /*
+     * The delegation, pinned. `shift/calendar.ts` scales the same building by a period's own factor
+     * through `scaledBuilding`, and the whole reason that function is exported is that a second
+     * implementation of the rounding and of the `expandFloors` total would agree with this one until
+     * somebody changed one of them. If these two ever stop being the same edit, a vacation and a
+     * growth day would round populations differently and nothing else would say so.
+     */
+    for (const buildingId of BUILDING_IDS) {
+      const shipped = requireBuilding(config, buildingId);
+      for (const day of DAYS) {
+        expect(grownBuilding(shipped.config, day), `${buildingId} day ${String(day)}`).toEqual(
+          scaledBuilding(shipped.config, growthFactor(day)),
+        );
+      }
+    }
+  });
+
+  it('scales downward as readily as up, and keeps the declared total honest', () => {
+    // A calendar period is a factor below 1 — a vacation, a public holiday — and the same four rules
+    // have to hold there: whole people, never negative, the declared total recomputed from the
+    // rounded floors, and an undeclared total left undeclared.
+    const shipped = requireBuilding(config, 'midtown-office');
+    const half = scaledBuilding(shipped.config, 0.5);
+    const parsed = parseBuilding(half, 'midtown-office@half');
+    const resolved = resolveBuilding(parsed, config.elevatorSpecs, { file: 'midtown-office@half' });
+    expect(half.totalPopulation).toBe(resolved.totalPopulation);
+    expect(resolved.totalPopulation ?? 0).toBeLessThan(shipped.totalPopulation ?? 0);
+    expect(warningCodes(resolved.warnings)).toEqual(warningCodes(shipped.warnings));
   });
 
   it('does not mutate the config it was given', () => {
