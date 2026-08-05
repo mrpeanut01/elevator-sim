@@ -78,7 +78,7 @@ import { contractForBuilding, CONTRACTS } from '../shift/contracts.js';
 import { eventFor, shiftRunPatch, baseDemandOf } from '../shift/events.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
-import { openWeek, takeContract } from '../shift/week.js';
+import { SANDBOX_CONTRACT_ID, openWeek, takeContract, withContract } from '../shift/week.js';
 import type { ShiftEvent, WeekState } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
 import type { PlayMode } from '../scope/types.js';
@@ -282,22 +282,36 @@ export function withBuilding(
   buildingId: string,
 ): ViewerState {
   /*
-   * The week follows the building into its scenario.
+   * The week follows the building into its scenario — **and out of one, which is the half that was
+   * missing.**
    *
-   * Each of the five shipped buildings *is* a scenario, so picking Midtown Office while the week
-   * sits on Scenario 1 produced a sheet headed *Midtown Office* and footed *Scenario 1 — Learn the
-   * ropes*, banking a Garden Apartments shift against a run that never touched it. The handoff's
-   * own `pickPreset` restarts the week for exactly this reason.
+   * Each shipped building *is* a scenario, so picking Midtown Office while the week sits on
+   * Scenario 1 produced a sheet headed *Midtown Office* and footed *Scenario 1 — Learn the ropes*,
+   * banking a Garden Apartments shift against a run that never touched it. The handoff's own
+   * `pickPreset` restarts the week for exactly this reason.
    *
-   * A building the reader drew belongs to no scenario, and then the week keeps the one it had and
-   * the sheet says the shift is not being banked — which is `contractStatus`'s own answer and the
-   * honest one.
+   * This paragraph used to continue: *"a building the reader drew belongs to no scenario, and then
+   * the week keeps the one it had and the sheet says the shift is not being banked — which is
+   * `contractStatus`'s own answer and the honest one."* **It was wrong, and it was wrong in the
+   * direction this function exists to prevent.** Keeping the week meant keeping its `contractId`,
+   * which `contractById` resolves perfectly — so a drawn tower inherited Scenario 2, the ribbon read
+   * *Scenario · day 4 · 1 clean shift banked*, and `closeDay` banked against it. Two clean days on
+   * an invented building cleared Scenario 2, which is measured in `state.test.ts` rather than
+   * argued: it is the forgery the leaderboard's replay apparatus refuses, arriving through the
+   * campaign's front door.
+   *
+   * So a building with no scenario takes {@link SANDBOX_CONTRACT_ID}. The week keeps its day, its
+   * streak and its history — the player has not left the week, they have changed what it is *of* —
+   * and it stops claiming to be an assignment. `contractById` returns `undefined`, which is the
+   * answer the old comment claimed and did not produce.
    */
   const contract = contractForBuilding(buildingId);
   const week =
-    contract === undefined || contract.id === state.week.contractId
-      ? state.week
-      : takeContract(state.week, contract.id);
+    contract === undefined
+      ? withContract(state.week, SANDBOX_CONTRACT_ID)
+      : contract.id === state.week.contractId
+        ? state.week
+        : takeContract(state.week, contract.id);
   const next: ViewerState = { ...state, buildingId, week };
   const source = buildingConfigOf(resources, state.savedBuildings, state.editingBuildingId);
   const pristine =

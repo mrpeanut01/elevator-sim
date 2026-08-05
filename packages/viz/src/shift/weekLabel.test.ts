@@ -12,7 +12,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { contractById } from './contracts.js';
-import { ENDLESS_CONTRACT_ID, openEndless, openWeek } from './week.js';
+import { ENDLESS_CONTRACT_ID, SANDBOX_CONTRACT_ID, openEndless, openWeek } from './week.js';
 import { coachWeekLines } from './weekLabel.js';
 
 const HALF_HOUR_S = 1800;
@@ -61,9 +61,25 @@ describe('an endless week', () => {
 
 describe('a building the reader drew', () => {
   it('gets the sandbox label and a line about the run rather than the week', () => {
-    const lines = coachWeekLines(openWeek('no-such-contract'), HALF_HOUR_S);
+    const lines = coachWeekLines(openWeek(SANDBOX_CONTRACT_ID), HALF_HOUR_S);
     expect(lines.label).toBe('Sandbox');
-    expect(lines.progress).toBe('30 min of demand · free play');
+    expect(lines.progress).toBe('30 min of demand · nothing to bank');
+  });
+
+  it('does not call it free play, because Free Play is a mode and this is not it', () => {
+    /*
+     * The line said *free play* and that named the one thing a sandbox run is not. Free Play resets
+     * the week — no growth, no scheduled event — which is what makes its runs reproducible on the
+     * server and therefore postable. A sandbox run has a week, its growth and its events.
+     */
+    expect(coachWeekLines(openWeek(SANDBOX_CONTRACT_ID), HALF_HOUR_S).progress).not.toContain('free play');
+  });
+
+  it('is a state the product can actually reach, which it could not before', () => {
+    // `withBuilding` used to leave a drawn building on whatever contract the week already had, and
+    // that id resolved — so this branch was unreachable and the ribbon claimed a scenario.
+    // `dev/state.test.ts` drives the whole path; this pins the sentinel the path produces.
+    expect(contractById(SANDBOX_CONTRACT_ID)).toBeUndefined();
   });
 
   it('was unreachable before this module existed — the regression guard', () => {

@@ -224,7 +224,9 @@ export function titleOf(screen: MenuScreen): string {
     case 'main':
       return 'Elevator Sim';
     case 'campaign':
-      return 'Campaign';
+      // The screen's title follows the row that reaches it and the tab it selects. The `campaign`
+      // *id* is unchanged, so every deep link, test and `MENU_SCREENS` row still names it.
+      return 'Scenarios';
     case 'free-play':
       return 'Free play';
     case 'settings':
@@ -319,7 +321,20 @@ function mainRows(): readonly MenuAffordance[] {
     intent: { kind: 'navigate', to: target },
   });
   return Object.freeze([
-    to('main.campaign', 'Campaign', 'A week on one building — it grows, and the bar rises', 'campaign'),
+    /*
+     * **Scenarios**, not *Campaign* — `docs/17` § 5 clause 2's residue, settled by the handoff's own
+     * rule rather than by taste.
+     *
+     * Pressing a word and landing somewhere with a different word on it was the one concrete
+     * confusion left after the batch tab became **Lab**. Two names, one destination, and the rule
+     * that decides which moves is `docs/12`'s: *the handoff wins every disagreement about what the
+     * screen looks like.* It drew the **Scenarios** tab; it drew no menu at all (§ 4.8). So the tab
+     * keeps its word and the row — ours entirely — takes it.
+     *
+     * *Campaign* survives in exactly one place now: the shift layer's own prose, where it means the
+     * contract week and nothing competes for it.
+     */
+    to('main.campaign', 'Scenarios', 'A week on one building — it grows, and the bar rises', 'campaign'),
     to('main.free-play', 'Free play', 'Any building, any dispatcher, any traffic', 'free-play'),
     to(
       'main.challenge',
@@ -502,6 +517,12 @@ const CAMPAIGN_NOTE =
   'A week on one building: each day the tenants grow, something is booked against you, and the ' +
   'bars rise. Clean shifts bank toward clearing the scenario. The Lab tab is a different thing — ' +
   'it judges a dispatcher over a batch of replications rather than over a day.';
+
+/*
+ * The note stays even though the row and the tab now share a word, because it disambiguates the
+ * thing that is still ambiguous: **Lab** is a different mode with a different verb, and a reader
+ * needs telling once. What it no longer has to explain is which Campaign this is.
+ */
 
 function campaignRows(): readonly MenuAffordance[] {
   return Object.freeze([

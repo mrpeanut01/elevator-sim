@@ -71,6 +71,37 @@ export const HISTORY_DAYS = 7;
 export const ENDLESS_CONTRACT_ID = 'endless';
 
 /**
+ * The contract id a week carries on a building **no scenario runs** — the sandbox.
+ *
+ * ## The defect this closes, which is not a naming one
+ *
+ * `Sandbox` was a label in the coach ribbon and `GAPS.md` filed it as *a string with no feature
+ * behind it*. Driving it showed something worse: the state it names was **never entered**, and what
+ * happened instead was a run banking somebody else's assignment.
+ *
+ * `withBuilding` moved the week to a building's own scenario and, for a building with none, *kept
+ * the week it had* — so drawing a tower while on Scenario 2 left `contractId: 'c2'`, which
+ * `contractById` resolves perfectly. The ribbon read **Scenario · day 4 · 1 clean shift banked** on
+ * a building Scenario 2 has nothing to do with, and `closeDay` banked against it: **two clean days
+ * on an invented tower cleared Scenario 2**, measured. That is the shape of forgery the leaderboard's
+ * whole replay apparatus exists to refuse, arriving through the campaign's front door — and
+ * `withBuilding`'s own docstring says it exists to prevent exactly this, then waved the case through
+ * on the grounds that *"the sheet says the shift is not being banked"*, which is true only when the
+ * contract is `undefined` and it was not.
+ *
+ * ## Why a third sentinel rather than reusing `ENDLESS_CONTRACT_ID`
+ *
+ * They are the same *mechanics* — no contract, nothing banked, nothing cleared — and different
+ * *events*. Endless is chosen: a player pressed **Keep going** and asked for a week that never ends.
+ * The sandbox is arrived at: a player drew a building, and there is no assignment for it because
+ * nobody wrote one. Collapsing them would tell a reader who opened the editor that they had started
+ * an endless run, which is a claim about an intention they did not have.
+ *
+ * That distinction costs one string and buys back the label: `Sandbox` is now printable, and true.
+ */
+export const SANDBOX_CONTRACT_ID = 'sandbox';
+
+/**
  * A week with no assignment — the *endless mode* `c5` and `c8` name in their rewards.
  *
  * ## What it is, and what it deliberately is not
@@ -250,6 +281,22 @@ export function nextDay(week: WeekState): WeekState {
     closedDay: null,
     banked: null,
   };
+}
+
+/**
+ * Change what the week is *of*, keeping everything about how it has gone.
+ *
+ * The difference from {@link takeContract} is the whole of the distinction between *taking an
+ * assignment* and *changing building*: taking one restarts the week, because a scenario is a fresh
+ * seven days on a new tower. Moving to a building **no scenario runs** is not a new week — the
+ * player is on day 4 with a streak of two and they still are; what has changed is that there is now
+ * nothing to bank toward. Restarting there would confiscate a week for opening the editor.
+ *
+ * Used with {@link SANDBOX_CONTRACT_ID} by `withBuilding`, and it is deliberately narrow: it moves
+ * one field and nothing else, so it cannot become a second way of taking a contract.
+ */
+export function withContract(week: WeekState, contractId: string): WeekState {
+  return { ...week, contractId };
 }
 
 /**

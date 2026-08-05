@@ -37,15 +37,21 @@
  *    *label* still needs one, because a player who pressed **Keep going** is in a week, counting
  *    days, with nothing to bank; telling them *Sandbox* would be as wrong as telling them
  *    *Scenario*.
- * 3. **A building the reader drew.** `contractById` does not answer either, and here there is no
- *    week worth naming — the run is a run.
+ * 3. **A building the reader drew**, carrying {@link SANDBOX_CONTRACT_ID}. `contractById` does not
+ *    answer either, and here there is no assignment worth naming — though there is still a week, and
+ *    the day count is still true, which is why this branch names the run rather than the week.
+ *
+ * A fourth value reaches case 3 and is not the same thing: an id `data/` no longer ships, from a
+ * restored session. It is deliberately **not** given a branch of its own — `persist/notice.ts`
+ * already tells that player what happened, in a sentence naming the missing scenario, and a second
+ * message on the ribbon would be the same news twice in two voices.
  *
  * Cases 2 and 3 are the same value of `contractById` and different situations, which is the whole
  * reason this is a function over the week rather than a ternary over one field.
  */
 
 import { contractById } from './contracts.js';
-import { ENDLESS_CONTRACT_ID } from './week.js';
+import { ENDLESS_CONTRACT_ID, SANDBOX_CONTRACT_ID } from './week.js';
 import type { WeekState } from './types.js';
 
 /** The ribbon's two lines, decided together because they answer the same question. */
@@ -88,6 +94,11 @@ export function coachWeekLines(week: WeekState, shiftLengthS: number): CoachWeek
 
   return {
     label: 'Sandbox',
-    progress: `${String(Math.round(shiftLengthS / 60))} min of demand · free play`,
+    /*
+     * *free play* is deleted from this line, and the reason is not style: **Free Play is a mode**,
+     * with a screen, a selection and a week reset that makes its runs postable. A sandbox run has a
+     * week, and its growth and its events — so calling it free play named the one thing it is not.
+     */
+    progress: `${String(Math.round(shiftLengthS / 60))} min of demand · nothing to bank`,
   };
 }
