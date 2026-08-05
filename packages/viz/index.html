@@ -526,6 +526,14 @@
          colour is per-instance and is the only thing written inline, because it comes from
          `live/bands.ts` and there is no fifth copy of that palette. */
       .legend-entry { display: inline-flex; align-items: baseline; gap: 5px; }
+      /* The live head count beside each key, and the scale it is a part of.
+         The legend was a colour key with nothing to read off it: four words and four dots that
+         said what amber *means* and never how many people amber currently is. The counts are
+         `live/bands.ts`'s own tally at the playhead, over the same `queueAt` membership the stage
+         draws its rider glyphs from, so the row now answers "how many" as well as "what" and cannot
+         disagree with the picture above it. `tabular-nums` keeps the entries from shuffling
+         sideways as the digits change at 60 Hz. */
+      .legend-count { color: var(--text); font-variant-numeric: tabular-nums; }
 
       /* The transport, § 1.3 M5. */
       .transport {
@@ -558,6 +566,13 @@
       }
       .transport-tail { display: flex; gap: 4px; flex: none; align-items: center; flex-wrap: wrap; }
       .transport-tail .chip { padding: 6px 9px; }
+      /* The speed row's visible caption. Borrowed wholesale from `.legend-title` directly above it
+         — same size, same tracking, same `--faint` ink — because it is the same component doing the
+         same job: an eyebrow that says what a row of short items is. */
+      .transport-caption {
+        font: 600 9.5px var(--mono); letter-spacing: 0.1em; text-transform: uppercase;
+        color: var(--faint); margin-left: 6px; white-space: nowrap;
+      }
       #status { color: var(--dim); font: 500 11px var(--mono); }
 
       /* § 4.7 — the provenance block. A row of the shared vocabulary, nothing new: chips, a ghost
@@ -1067,14 +1082,33 @@
           <!-- docs/10 § 4 / U2 — the disclosure mode. `mode/` calls the two levels
                `basic` and `advanced`; the handoff calls them Casual and Engineer
                (§ 1.5 B1). The *values* are the model's and the *labels* are the
-               handoff's, so `mode/parity.ts` keeps working unchanged. -->
-          <label class="dim" data-hide-narrow style="font: 500 10px var(--mono)">
-            view
-            <select id="view-mode">
-              <option value="basic" selected>Casual</option>
-              <option value="advanced">Engineer</option>
-            </select>
-          </label>
+               handoff's, so `mode/parity.ts` keeps working unchanged.
+
+               Two corrections here, both from play-testing.
+
+               1. The `<select>` used to be **wrapped** in this label. A wrapped labelable
+                  control is an *embedded control* to the accessible-name algorithm, so the
+                  computed name was `view` plus the selected option's own text — it read
+                  "view Casual" and then "view Engineer", changing as the reader used it.
+                  `for=`/`id=` associates the same visible word without putting the control
+                  inside it, so the name is exactly `view` in both states.
+               2. `Casual` and `Engineer` said nothing about what they change, and the
+                  difference is not guessable. The clause after each is **permanently
+                  visible in the control itself** rather than hidden behind hover, because a
+                  tooltip a reader never hovers is a tooltip that does not exist. The full
+                  sentence stays on `title` for whoever wants it, and it is sourced from
+                  `scope/surface.ts`'s own `viewer.mode` entry — presentation only, proved
+                  by `scope.test.ts` requiring the legs byte-identical across the two. -->
+          <label class="dim" data-hide-narrow for="view-mode" style="font: 500 10px var(--mono)"
+                 title="Casual and Engineer change how much of a run is shown and nothing it computes — same shift, same seed, same result. Casual states every figure in plain language and leaves out the interval spread, the energy proxy and the measurement window's exact bounds. Engineer adds those three, the machines nameplate, and the rule behind an average this run refuses to publish. Neither mode hides a warning, a failure, or the seed.">view</label>
+          <!-- The font is stated rather than inherited, and that is a consequence of the fix above
+               rather than a preference: `select { font-family: inherit }` used to reach `var(--mono)`
+               through the label that wrapped this control, and unwrapping it left the select
+               inheriting the body's sans. 11 px is the header's own chrome size (`.phase-pill`). -->
+          <select id="view-mode" data-hide-narrow style="font: 500 11px var(--mono)">
+            <option value="basic" selected>Casual — plain language</option>
+            <option value="advanced">Engineer — technical detail</option>
+          </select>
           <span id="mode-parity" role="alert" class="dim"></span>
           <span class="dim" id="banner" data-hide-narrow></span>
         </div>
@@ -1264,14 +1298,38 @@
                   </div>
                   <div class="ticks" id="timeline-ticks"></div>
                 </div>
+                <!-- Every control here already carried a `title`, and a play-tester still reported
+                     the row as unlabelled. Both halves of that are true and neither cancels the
+                     other, so both are fixed:
+
+                     * `title` is hover-only. It waits about a second, it cannot be reached from the
+                       keyboard, and it does not exist on a touch device. The tooltips stay — they
+                       are the long form — but nothing may depend on them alone.
+                     * `◀|` and `|▶` are punctuation. A button whose whole content is a glyph has an
+                       accessible name made of that glyph, which is no name at all, so each gets an
+                       `aria-label`. Where a control has visible words (`loop`, and the `×N` chips
+                       `main.ts` builds) the label *contains* them — WCAG 2.5.3, so speech input
+                       still reaches the control by what a reader can see.
+                     * The chip row gets a **visible** caption. The handoff draws these five chips
+                       bare (`:823–827`) with no caption and no tooltip, so it settles nothing here;
+                       what it does settle is the vocabulary, and an uppercase tracked eyebrow over a
+                       row of short items is its own — it is exactly how M4 captions the wait-age
+                       legend directly above. Without it the row reads as five unexplained numbers,
+                       and a reader who never finds ×900 cannot get to the end of a long shift.
+                       `aria-hidden`, because `#speed-chips` is already a named group and a screen
+                       reader should not hear "speed playback speed". -->
                 <div class="transport-tail">
-                  <button type="button" class="chip" id="step-back" title="one display frame back (,)">◀|</button>
-                  <button type="button" class="chip" id="step-forward" title="one display frame forward (.)">|▶</button>
+                  <button type="button" class="chip" id="step-back" aria-label="Step back one frame"
+                          title="one display frame back (,)">◀|</button>
+                  <button type="button" class="chip" id="step-forward" aria-label="Step forward one frame"
+                          title="one display frame forward (.)">|▶</button>
+                  <span class="transport-caption" aria-hidden="true">speed</span>
                   <span id="speed-chips" class="chip-row" role="group" aria-label="playback speed"></span>
                   <!-- § 4.7 — loop is the handoff's own toggle pattern, not a native checkbox. It
                        sits with the speed chips because it is the same kind of claim: how the
                        transport behaves, not what the run contains. -->
                   <button type="button" class="chip" id="loop" aria-pressed="false"
+                          aria-label="loop the shift when it ends"
                           title="when the shift ends, start it again from the beginning">loop</button>
                 </div>
               </div>

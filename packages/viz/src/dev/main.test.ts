@@ -41,7 +41,8 @@ import {
 } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
-import { WAIT_BANDS } from '../live/bands.js';
+import { WAIT_BANDS, waitBandsAt } from '../live/bands.js';
+import type { VizRecording } from '../contract/types.js';
 import { buildLayout, type ShaftGeometry } from '../render/layout.js';
 import type { VizFloor } from '../contract/types.js';
 
@@ -89,6 +90,21 @@ describe('the legend is the wait bands, not a copy of them', () => {
       WAIT_BANDS.map((band) => band.legendLabel),
     );
     expect(entries.map((entry) => entry.color)).toEqual(WAIT_BANDS.map((band) => band.color));
+  });
+
+  it('states each band’s own boundary, derived from its two numbers and nothing else', () => {
+    // The fourth entry is the one that needs it: `gave up` is the handoff's word for a band that
+    // counts people **still standing** past two minutes, and `bands.ts` says so at length. A bare
+    // label could carry that; a label with a head count on it is a figure.
+    const entries = waitLegendEntries();
+    expect(entries.map((entry) => entry.rangeLabel)).toEqual(['0–30 s', '30–60 s', '60–120 s', '120 s+']);
+    // …and the same claim the other way round, so a band whose boundary moves takes the words with
+    // it rather than leaving four hand-typed ranges describing the old ones.
+    for (const [index, band] of WAIT_BANDS.entries()) {
+      const entry = entries[index];
+      expect(entry?.rangeLabel).toContain(String(band.fromS));
+      if (band.toS !== undefined) expect(entry?.rangeLabel).toContain(String(band.toS));
+    }
   });
 
   it('has one entry per band and four distinct colours', () => {
@@ -642,6 +658,138 @@ describe('the words and the colours are the handoff’s', () => {
       expect(design.toLowerCase(), `the handoff does not use ${band.color}`).toContain(
         band.color.toLowerCase(),
       );
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The legend is a reading, not only a key — play-test issue #19
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The stage legend named the four colours and never said how many people were in any of them, so
+ * the one surface that keys the stage could not tell a reader one person from thirty. The counts
+ * come from `live/bands.ts`'s own tally at the playhead — the same scan the stage draws from — so
+ * this is a restatement of a figure rather than a second one, and the assertions below are written
+ * against `waitBandsAt` rather than against a remembered number.
+ *
+ * The left rail's mood bar (L2) already carried its counts and is deliberately untouched: it is a
+ * different instrument on a different card, and `leftRail.ts` documents its KB-15 compliance.
+ */
+describe('every legend key carries its live head count', () => {
+  /**
+   * A run with queues in it.
+   *
+   * `midtown-office` rather than the opening building: Garden Apartments at the viewer's defaults
+   * is six floors of almost nobody, and eleven samples of it found no instant with a single person
+   * standing — which the vacuity guard below caught rather than passing quietly.
+   */
+  const recordingOf = (): VizRecording => {
+    const state: ViewerState = { ...initialState(resources, 424242n), buildingId: 'midtown-office' };
+    return recordRun(shiftRunConfigOf(resources, state).config, { recordDecisions: false })
+      .recording;
+  };
+
+  it('reports no count at all before there is a run, rather than reporting zero', () => {
+    // `—` and `0` are two different states: *nothing has happened* and *nobody is waiting*. The
+    // second is a result, and a legend that printed `0` for the first would be claiming it.
+    for (const entry of waitLegendEntries()) expect(entry.count).toBeUndefined();
+    for (const entry of waitLegendEntries(undefined)) expect(entry.count).toBeUndefined();
+  });
+
+  it('takes every count from waitBandsAt, at the playhead, and never recomputes one', () => {
+    const recording = recordingOf();
+    const span = recording.endedAt - recording.startedAt;
+    let sawSomebody = false;
+    for (let step = 0; step <= 10; step += 1) {
+      const at = recording.startedAt + (span * step) / 10;
+      const bands = waitBandsAt(recording, at);
+      const entries = waitLegendEntries(bands);
+      expect(entries.map((entry) => entry.count)).toEqual(bands.counts.map((count) => count.count));
+      // The row is a partition of the people standing right now, so it has to sum to the number
+      // standing. `bands.ts` guarantees that against `frameAt(...).totalWaiting` by construction.
+      const total = entries.reduce((sum, entry) => sum + (entry.count ?? 0), 0);
+      expect(total).toBe(bands.total);
+      if (bands.total > 0) sawSomebody = true;
+    }
+    // A run in which nobody ever waits would make every assertion above vacuously true.
+    expect(sawSomebody, 'no sampled instant had anybody standing — the test proves nothing').toBe(
+      true,
+    );
+  });
+
+  it('moves when the playhead moves — the counts are not a boot-time snapshot', () => {
+    /*
+     * The defect this guards is the one the wiring below fixes: `drawLegend` used to run only from
+     * `renderAll`, which fires when the *state* changes. Counts drawn there would freeze at
+     * whichever frame last changed the state while the playhead ran on underneath them.
+     */
+    const recording = recordingOf();
+    const span = recording.endedAt - recording.startedAt;
+    const readings = new Set<string>();
+    for (let step = 0; step <= 20; step += 1) {
+      const at = recording.startedAt + (span * step) / 20;
+      readings.add(
+        waitLegendEntries(waitBandsAt(recording, at))
+          .map((entry) => String(entry.count))
+          .join('·'),
+      );
+    }
+    expect(readings.size).toBeGreaterThan(1);
+  });
+});
+
+describe('the legend’s counts are wired to the 60 Hz path', () => {
+  /** `main.ts` as text. The wiring is inside `boot()`, which no Node test can call. */
+  async function mainSource(): Promise<string> {
+    return readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+  }
+
+  /** One nested function's body, from its declaration to the first close at its own indent. */
+  async function bodyOf(name: string): Promise<string> {
+    const source = await mainSource();
+    const start = source.indexOf(`function ${name}(`);
+    expect(start, `main.ts has no ${name}`).toBeGreaterThan(-1);
+    const end = source.indexOf('\n  }', start);
+    expect(end).toBeGreaterThan(start);
+    return source.slice(start, end);
+  }
+
+  it('redraws the legend from renderLive, which is what the playhead runs', async () => {
+    expect(
+      await bodyOf('renderLive'),
+      'renderLive does not call drawLegend, so the counts would state whichever frame last ' +
+        'changed the state rather than the frame on screen',
+    ).toContain('drawLegend(view)');
+  });
+
+  it('still redraws it from renderAll, so a state change is not the only trigger either', async () => {
+    expect(await bodyOf('renderAll')).toContain('drawLegend(view)');
+  });
+
+  it('keys the row on the bands and not on the counts, so 60 Hz does not rebuild it', async () => {
+    /*
+     * `keyedFill` rebuilds whenever its key changes. A key carrying the counts would therefore
+     * replace four entries sixty times a second, churning the accessibility tree and dropping a
+     * hover mid-read — the exact cost `fillLegend`'s own docstring exists to avoid.
+     */
+    const body = await bodyOf('drawLegend');
+    const key = /fillLegend\(\s*(.+?),\s*\(\) =>/s.exec(body)?.[1] ?? '';
+    expect(key, 'drawLegend no longer calls fillLegend with a key').not.toBe('');
+    expect(key).toContain('entry.label');
+    expect(key).toContain('entry.color');
+    expect(key, 'the fill key carries a figure that moves every frame').not.toContain('count');
+  });
+});
+
+describe('index.html styles the count without restating a band', () => {
+  it('declares .legend-count once, and still spells no band word or colour', async () => {
+    const html = await indexHtml();
+    expect(html.split('.legend-count {')).toHaveLength(2);
+    const markup = await legendMarkup();
+    for (const band of WAIT_BANDS) {
+      expect(markup).not.toContain(band.legendLabel);
+      expect(markup).not.toContain(band.color);
     }
   });
 });
