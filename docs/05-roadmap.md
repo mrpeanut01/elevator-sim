@@ -1969,8 +1969,9 @@ and the whole menu finally being recorded as a deviation from a handoff that has
 
 **All four designed modes are built** — incidents, calendar, the daily challenge and commissioning —
 and each reaches a run through `shiftRunConfigOf` with a § D177 test on its own control. The saved
-library survives a reload at schema version 2. `docs/17` § 5's ledger stands at **six of seven
-closed**.
+library survives a reload at schema version 2. `docs/17` § 5's ledger stands at **five of seven closed
+outright**, with clause 2 settled by applying the handoff's own rule and clause 5 closed as a defect
+while staying open as a mode.
 
 **And the wave found the thing none of the checks above could see.** `dev/main.ts` ends with
 `if (typeof document !== 'undefined') void main();`, so under vitest **`main()` had never run in this

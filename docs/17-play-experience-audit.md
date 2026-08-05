@@ -292,10 +292,16 @@ avoid it is that the number is spent before the week and never displayed as an o
 
 ## 5. Findings, and where each stands
 
-**Five of the seven are closed** — 1, 3, 4, 6 and 7 — and each is struck through with what closed it
-rather than deleted, because a finding that quietly disappears is indistinguishable from one nobody
-looked at again. What is left is a naming judgement the handoff should settle (2) and a label whose
-*meaning* nobody has decided (5).
+**All seven are answered, and the arithmetic is worth being exact about because two of the answers
+are not *closed*.** Five are closed outright — 1, 3, 4, 6 and 7. Clause 2 is **settled rather than
+closed**: the two unrelated modes no longer share a word, and what remains is a mode/picker
+distinction the handoff's own rule decided (the tab keeps the word it drew; the menu row took it).
+Clause 5 is **closed as a defect and open as a mode**: *Sandbox* turned out to name a state the
+product never entered, and what it was doing instead — banking a scenario the run had nothing to do
+with — is fixed; whether the state also deserves a *screen* is undecided, and nobody has needed one.
+
+Each is struck through with what closed it rather than deleted, because a finding that quietly
+disappears is indistinguishable from one nobody looked at again.
 
 Each is a real thing found by walking the product, left with an owner rather than absorbed.
 
@@ -329,7 +335,15 @@ Each is a real thing found by walking the product, left with an owner rather tha
    pinned empty rather than deleted — an empty list nothing checks is how a list stops being read.
    `theme` took two waves: the shell first, then the stage, because a light shell around a dark
    stage is the same defect wearing a smaller radius.
-5. **Sandbox is a string with no feature behind it.** Endless is built — § 3.6.
+5. ~~**Sandbox is a string with no feature behind it.**~~ **Closed as a defect; open as a mode, and
+   the question was wrong.** The label named a state the product **never entered**: `withBuilding`
+   moved the week into a building's scenario and never out of one, so a tower the reader drew kept
+   the previous contract's id — which resolves. The ribbon claimed *Scenario · day 4 · 1 clean shift
+   banked* on a building that scenario has nothing to do with, and `closeDay` banked against it:
+   **two clean days on an invented tower cleared Scenario 2**, driven with the negative control
+   beside it. Closed with a third sentinel, deliberately not the endless one — endless is *chosen*
+   and the sandbox is *arrived at*. What is still undecided is whether the state deserves a screen.
+   Endless is built — § 3.6.
 6. ~~**The weight-set selector has no surface**~~ — **closed, and mounting it found that half the
    seam did not exist.** A profile's `selection` block already reached a run; `patternSwitching` was
    loaded, carried, and writable by nothing in the viewer, so an arm-map editor over it would have
