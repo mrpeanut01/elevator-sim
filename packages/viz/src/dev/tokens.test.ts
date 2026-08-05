@@ -110,6 +110,11 @@ const PAIRS: readonly (readonly [string, string])[] = Object.freeze([
   ['--band-1', tokens.BAND_WAITING],
   ['--band-2', tokens.BAND_LONG],
   ['--band-3', tokens.BAND_ABANDONED],
+  // § D236 — the stage key's swatches. Pinned here for the reason every row above is: a legend
+  // drawn in a colour the canvas does not use is a legend that lies about the picture.
+  ['--car-heavy', tokens.CAR_HEAVY],
+  ['--waiting-up', tokens.WAITING_UP],
+  ['--waiting-down', tokens.WAITING_DOWN],
 ]);
 
 describe('the stylesheet and the renderer share one palette', () => {

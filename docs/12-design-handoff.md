@@ -480,6 +480,39 @@ than a tab. Both follow § 4.7's rule for a control the handoff has no row for: 
 design's language, it is refused **beside itself** when the run will not read it, and it is recorded
 here.
 
+### 4.9 Two S5 rows the artefact wrote for a prototype with one audience, and a key it has no row for
+
+Every one of these is [§ D236](../DECISIONS.md), and each is a change to what the design specifies
+rather than an interpretation of it.
+
+**S5's step-aside loses two of its four elements.** The artefact marks the building's spec line
+(`design.html` `:37`) and the phase pill (`:43`) with `data-hide-narrow`, and this implementation had
+added the mode select and the banner to the set. The spec line and the banner keep it. The other two
+do not:
+
+- the **phase pill** is not *secondary text*, which is what S5's own sentence steps aside. In the
+  prototype it captions a toy simulator; here `FILLING`/`PEAK`/`EASING`/`DRAIN` is the only statement
+  on the screen of what the building is doing at the playhead, and every goal, band and report is
+  read against it. Six characters;
+- the **mode select** is the deeper case, and it is the one that shows why *the handoff wins every
+  disagreement about what the screen looks like* has a boundary. § 1.5 B1's two modes are this
+  implementation's addition to a prototype that has one audience, so the artefact has no opinion
+  about where their switch goes at 800 px — and `display: none` gave it a zero-size box, which took
+  it out of the **tab order** as well as off the screen. No other surface in the product changes
+  Casual/Engineer. That is not a look, it is a lockout.
+
+**The header wraps below 768 px.** The artefact's header is a nowrap flex row with `overflow: hidden`,
+which at 375 px put 141 px of itself — the clock, the day and the tenant count — where no gesture
+reaches. `flex-wrap: wrap` is a change to a rule the artefact wrote, and the layout it produces at
+1180 px and above is byte-identical.
+
+**A key for the building drawing, which the handoff has no row for.** § 1.3 M4 specifies one legend
+strip, for the *rider* wait bands, and the artefact draws its cars in four load colours and two
+direction arrows with nothing that says so. § 4.7's rule for a control the handoff has no row for
+applies to a *caption* the same way: it is drawn in the design's own legend component, immediately
+under M4's, and it spends no hue the stage does not draw. Its swatches read `render/tokens.ts`
+through three new shell tokens, so the key and the canvas cannot disagree.
+
 ---
 
 ## 5 — Definition of done

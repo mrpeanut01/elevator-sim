@@ -15025,3 +15025,205 @@ was standing in for: every bright fill on the dark stage is a value the theme it
 and therefore none of them is a sky strip — sky strips are `mixHex` interpolations equal to no
 named token. That is strictly stronger: it fails on one dark sky strip, where the count accepted
 five.
+
+## D236 — a header that clipped, a control that was not there, and a building drawn one shaft at a time
+
+**Date: 2026-08-05 · Written after the code, and says so.** Four play-tester issues about layout —
+#72, #73, #74 and #41 — plus #63, which is a legibility issue about the same surface. Every
+dimension below was measured, on the deployed build for the *before* and on a local `vite` at
+375 / 768 / 1100 / 1180 / 1920 for the *after*. Two reported figures did not survive; they are named
+at the end.
+
+### 1 — The header deleted 141 px of itself, and called it responsive
+
+`header.topbar` is a `display: flex` row with `overflow: hidden` and no `flex-wrap`. At 375 × 812,
+on the deployed build:
+
+```
+header.topbar   scrollWidth 516   clientWidth 375   overflow-x hidden
+document.documentElement.scrollWidth === 375
+```
+
+Past the right edge: `SPAN.clock` (`right=409`), `DIV.topbar-day-name` and `DIV.topbar-day-sub`
+(`right=516`). **`overflow: hidden` on a nowrap flex row does not hide a header, it deletes one** —
+there is no gesture, scroll or tap that reaches a clipped flex item, and the page itself does not
+scroll horizontally. A phone player had no clock, no day and no tenant count.
+
+`flex-wrap: wrap` on `.topbar` and on `.topbar-right` is the whole fix, plus a 767 px block giving
+the three groups a row each. Measured after: **`scrollWidth === clientWidth === 375`, zero
+descendants past the edge**, header 134 px at 375 (three rows), 86 px at 768, 51 px — unchanged —
+at 1100 and above. The clip is kept as a last resort for a single item too wide for a whole line,
+which no shipped string is.
+
+### 2 — `display: none` is not a step-aside — issue #72, and the one to read first
+
+§ S5 says *"below 1180 px the header's secondary text steps aside"*, and `[data-hide-narrow]`
+implements it as `display: none !important`. Four elements carried it. For the **mode select** that
+was not a step-aside but a **functional lockout**:
+
+```
+width   computed display of the <label> wrapping the view <select>
+ 375    none        1024    none
+ 768    none        1100    none        1200    block
+```
+
+`display: none` gives an element a zero-size box, so the `<select>` left the **tab order** as well
+as the screen — and **no other surface in the product changes Casual/Engineer.** Not the main menu,
+not the Settings screen (Reduce motion / energy axis / playback speed / theme), not a link a reader
+can reach from inside the app. Below ~1180 px a reader was locked into whatever `localStorage` last
+held. Two of the four lost the attribute:
+
+- the **mode select and its label** — both, because hiding the label alone takes the control's
+  accessible name and leaves a nameless combobox;
+- the **phase pill**. § S5's sentence steps *secondary text* aside and `FILLING`/`PEAK`/`EASING`/
+  `DRAIN` is not secondary — it is the only statement on the screen of what the building is doing
+  at the playhead, and it is six characters in a pill.
+
+The **spec line** keeps it — it is genuinely the name's subordinate — and so does `#banner`, which
+is reported rather than repaired: `ELEMENT_IDS.header.banner` resolves an element **no module in
+the tree ever writes to**, so it is an empty span either way. That is a `dev/` matter.
+
+Measured after, at 1100 × 800: the select is 201 px wide, `document.activeElement === select` after
+`.focus()`, the phase pill is 49 px and visible, the spec line is correctly gone, and no descendant
+of the header is past the right edge.
+
+**This is a deviation from the artefact**, which marks the phase pill `data-hide-narrow="1"`
+(`design.html` `:43`). Recorded here and in `docs/12` § 4.9. The handoff wins every disagreement
+about what the screen looks like; it does not get to decide that a control is unreachable, because
+its prototype has no second audience to switch between.
+
+### 3 — Two `Math.max(1, …)` guards drew one shaft of six on every phone — issue #73
+
+`dev/main.ts` asks the layout for `gutterRightPx: 280` at **every** canvas width, and adds a 250 px
+metrics panel above 900. `drawStage` floors the canvas at 360 px, which is what a 375 px phone gets:
+
+```
+plot.width = 360 - 24 padding - 72 left gutter - 280 right gutter = -16   -> Math.max(1, ...) -> 1
+capacity   = Math.max(1, floor((1 + 10) / (18 + 10)))                     -> 1
+```
+
+So the stage drew **exactly one shaft of every building on every phone** — one of Garden
+Apartments' two, one of Chancery House's six, one of Vertical City's thirty-five — with three
+quarters of the canvas blank beside it. Both guards are locally correct; between them a caller's
+over-request became a picture that was wrong without being empty. The reporter's *"only shaft A is
+drawn… the missing cars are a rendering decision, not an overflow"* is exactly right.
+
+The clamp belongs in `buildLayout`, on the argument that file already makes about `headerPx`: *"a
+caller asking for a header too short to hold its own rows is asking for the overprint this band
+exists to prevent"*. A caller asking for gutters wider than the canvas is asking for a plot with
+nothing in it, and the layout is the one place that can see both numbers. `MIN_PLOT_SHARE` is 45 %,
+and the overlay yields first, then the right gutter, then the left, each to its own floor rather
+than to zero.
+
+Measured, at the canvas widths the shipped shell produces:
+
+| viewport | canvas | shafts drawn, before → after (2 · 6 · 35 cars) |
+|---|---|---|
+| 375 | 360 | 1 · 1 · 1 → **2 · 6 · 7** |
+| 768 | 740 | 2 · 6 · 13 → 2 · 6 · **16** |
+| 1280 | 606 | 2 · 6 · 8 → 2 · 6 · **12** |
+| 1440 | 766 | 2 · 6 · 14 → 2 · 6 · **17** |
+| 1920 | 1232 | 2 · 6 · 22 → 2 · 6 · **27** |
+| 2560 | 1872 | 2 · 6 · 35 → unchanged |
+
+At 1232 px the shipped request already leaves the plot 49 % of the canvas, so the clamp is **inert
+at desktop widths** and `plot.x` and `plot.width` are unchanged there — asserted, not assumed.
+
+The second lever is the **gap**, not the shaft: at `MIN_SHAFT_WIDTH_PX` the 10 px gap is 36 % of the
+pitch, so a third of the plot is air at exactly the moment there is not enough of it. A bank that
+does not fit at 10 px falls back to 4 px; a bank that fits keeps 10. No shaft is ever narrower than
+the legible minimum, which is asserted rather than described — this buys shafts out of the gaps and
+never out of legibility.
+
+### 4 — The notice that explains a squeezed picture inherited the squeeze
+
+`drawNotices` budgeted the notices row by `layout.plot.width`. With a one-pixel plot, `fitLabel`
+returned **`…`** — the app showed one lift of six and the only thing saying so was three dots. That
+row sits *above* `plot.y` and `layout.overlay` starts *at* `plot.y`, so nothing else is drawn on
+that line; it is budgeted by the canvas now (`Layout.paddingPx` is carried for it, for the reason
+`pitchPx` is carried).
+
+### 5 — *"widen the window"* was advice the reader could not take — issue #41
+
+Vertical City is the campaign's finale, sold on scale, and on a maximised 1080p monitor the stage
+cropped it and told the player to widen a window with nowhere left to go. Meanwhile the `bank`
+select sits six inches below the stage and gives a clean, legible view of one bank in one click,
+and the caption never mentioned it. `RS-05` permits horizontal scroll **or** a bank filter; the
+filter is what this product has.
+
+The caption names it first, and it is the **longest form that fits** rather than one form truncated,
+because the budget takes the sentence's tail and the tail was the half a phone reader cannot act on:
+
+| canvas | drawn |
+|---|---|
+| 1232 | `showing 27 of 35 shafts — pick one bank below, or widen the window` |
+| 504 | `showing 10 of 35 shafts — pick a bank below` |
+| 360 | `7 of 35 shafts — pick a bank` |
+
+The two remaining levers on #41 are **`dev/main.ts`'s** and are reported rather than taken:
+`QUEUE_GUTTER_PX` (280) and `OVERLAY_WIDTH_PX` (250) are fixed regardless of width, and defaulting
+the bank filter to a single bank when a building overflows — the reporter's own preferred fix — is a
+`main.ts` decision.
+
+### 6 — The building had no key, and its `aria-label` had one — issue #63
+
+The stage draws five hues plus a dimmed variant, and **the only legend on the tab keys the rider
+wait bands**, which are a different strip. Nothing said that a car's body colour is its *load* in
+four steps (`render/overlay.ts#loadColour`: ≤ 0.25, > 0.25, ≥ 0.80 — the design-load rule — and
+≥ 1.10), that the arrow beside it is direction, or that the dimming is `outOfServiceCarIds` at
+`globalAlpha 0.32`. The reporter watched a run for several minutes and guessed the brightness meant
+idle-versus-committed; it does not. Meanwhile `describeFrame` narrated all of it in prose, so **a
+screen-reader user was told more about the building than a sighted one.**
+
+A twelve-entry key sits under the wait-band strip, in the handoff's own legend component. It is
+**static markup with no mount**, deliberately: the car states are a fixed vocabulary, and a mount
+would be a seam with nothing on the other end. What keeps it honest is `dev/shellChrome.test.ts`,
+which derives the four car fills from `render/tokens.ts` and the six glyphs from
+`render/canvas.ts#doorGlyph` and the two service constants, and requires each to appear — so a fifth
+door phase reddens the suite on the day it lands rather than the day somebody notices the key is a
+row short. It also refuses a hue the stage does not draw, which is the reporter's other half.
+
+Three tokens came into the shell for it — `--car-heavy`, `--waiting-up`, `--waiting-down` — from the
+same `Palette` the canvas reads. The other three car states already had a shell name (`--band-0`,
+`--accent`, `--band-3`). A key drawn in a colour the canvas does not use would be a fifth copy of
+the palette, which is the defect `render/tokens.ts` exists to close.
+
+**KB-15 throughout**, and one of the pairs was only half there before: the dimming is `globalAlpha`,
+which no swatch can show, so the entry says the word — `out of service, and dimmed` — beside the
+`OOS` badge the canvas already draws at the foot of every shaft. Driving the light theme found a
+fourth thing: `waitingUp` at `#0f7a72` is **4.34:1** on `--bg`, and the `▲` is text at 10.5 px. It
+is `#0d7069` now (4.96:1), and `theme.test.ts` measures the key's marks against **`--bg`**, the
+ground the key is actually drawn on, rather than against the `--panel` where the old value passed.
+
+### What did not reproduce
+
+- **#41's count.** The report has *"showing 13 of 35 shafts"* at 1920 × 1080 and *"the count does
+  not improve at all between 1440 and 1920"*. Measured from `buildLayout` at the canvas widths the
+  shell produces, the shipped figures were **22 of 35** at 1920 and **14 of 35** at 1440 — so the
+  count did improve, and 13 is the number of shafts *hidden* at 1920, not the number drawn. The
+  headline complaint stands and is worse than the report makes it sound at 1440.
+- **#72's default.** The report says the app *"defaults to Engineer"*, from
+  `localStorage["elevator-sim.viewMode"] = "advanced"` *"on a fresh install"*. On a fresh profile
+  that key is **absent** — `Object.keys(localStorage)` is `[]` — the markup's `selected` option is
+  `basic`, and `dev/state.ts`'s `initialState` is `mode: 'basic'`. Nothing writes the key except
+  the select's own `change` handler. The reporter had switched modes earlier in their session. The
+  lockout is real and its consequence is the opposite of the one reported: a reader who tries
+  Engineer once on a wide screen is stuck in it everywhere else.
+- **#74's phase badge.** It is unreachable at 375 px, but by `display: none` (§ 2 above) rather
+  than by the clip — it has a zero-size box, so it never appears in the list of elements past the
+  right edge. Same outcome, two different causes, and they needed two different fixes.
+
+### What is left, and whose it is
+
+Every remaining WCAG AA failure on the Simulation tab after this work and § D235 — **9 elements in
+dark, 28 in light**, against 88 and 48 before — is one of three things, and none of them is in this
+lane's files:
+
+1. `src/live/bands.ts` and `src/live/decisions.ts` hold **hex copies of the dark band palette**,
+   which `dev/leftRail.ts` writes into inline `style="color:…"`. An inline style is not reached by
+   `:root[data-theme]`, so `.stat-value`, `.goal-got`, `.decision-title`, the mood legend and the
+   mood drivers stay dark-band-coloured on a light page: 1.68–3.81:1. **This is the whole of the
+   28.**
+2. `src/live/timeline.ts` holds a sixth copy — `{ bg: '#161e2a', fg: '#6d7b8d' }` per phase — so the
+   timeline's segment labels are 3.15:1 in both modes.
+3. `--band-3` at 4.47:1 on `--panel`, which § D235 measured and deliberately did not move.

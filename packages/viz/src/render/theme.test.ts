@@ -406,6 +406,12 @@ const CONTENT_ON_PANEL = [
   '--band-1',
   '--band-2',
   '--band-3',
+  // § D236 — the stage key's three swatches. Content rather than scenery: each is a mark in a
+  // legend that a reader matches against the picture, so it has to be visible on the card it is
+  // drawn on. The light mode's `--car-heavy` is the tightest at 4.50:1 on `--panel`.
+  '--car-heavy',
+  '--waiting-up',
+  '--waiting-down',
   '--over',
   '--transfer',
   '--entrance',
@@ -508,6 +514,32 @@ describe('contrast — a no-regression bound, never a claim about how it looks',
           above / here,
           `${name} ${INK_LADDER[index] ?? ''} is a visible step below the rung above it`,
         ).toBeGreaterThan(1.05);
+      }
+    }
+  });
+
+  it('reads the stage key on the ground the stage key is drawn on — § D236', () => {
+    /*
+     * The key lives in `.legend`, which sits on `.stagecol` — `--bg`, not `--panel`. That
+     * distinction is not pedantry: it is how the light mode's `--waiting-up` shipped at 4.34:1
+     * behind a green test. `CONTENT_ON_PANEL` above measures `--panel`, where the same value was
+     * 4.83, and the `▲` a reader actually looks at is on `--bg`.
+     *
+     * Two thresholds, because the key has two kinds of mark. The direction arrows are **text** at
+     * 10.5 px, so 4.5:1. The four car swatches are **UI components** — 1.4.11's 3:1 — and they
+     * carry a `--edge-strong` hairline besides, so a fill close to its ground still reads as a
+     * square.
+     */
+    for (const name of ['dark', 'light'] as const) {
+      const tokens = tokensOf(name);
+      const ground = tokens['--bg'] as string;
+      for (const arrow of ['--waiting-up', '--waiting-down']) {
+        expect(contrast(tokens[arrow] as string, ground), `${name} ${arrow} on --bg`).toBeGreaterThanOrEqual(
+          AA_BODY,
+        );
+      }
+      for (const fill of ['--band-0', '--accent', '--car-heavy', '--band-3']) {
+        expect(contrast(tokens[fill] as string, ground), `${name} ${fill} swatch on --bg`).toBeGreaterThanOrEqual(3);
       }
     }
   });

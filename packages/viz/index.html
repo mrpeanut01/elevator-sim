@@ -101,6 +101,16 @@
         --band-2: #e0773a;
         --band-3: #e0473a;
 
+        /* Three stage colours the shell draws too, since § D236 gave the stage a key. A car's
+           body says its load in four steps — `--band-0` under a quarter full, `--accent` carrying,
+           `--car-heavy` at the 80 % design load, `--band-3` past the overload alarm — and the
+           direction arrow beside it is `--waiting-up` or `--waiting-down`, the same two the
+           landing marks use. The key's swatches read these, so the key and the canvas cannot
+           disagree about what amber means. `render/tokens.ts` is still the source of all six. */
+        --car-heavy: #e0a03a;
+        --waiting-up: #57c7a6;
+        --waiting-down: #c07ad8;
+
         /* Aliases kept because the vocabulary below reads better with them, and
            because `ok`/`warn`/`bad` is what the disclosure layer already calls
            these three ideas. */
@@ -188,6 +198,12 @@
         --band-1: #8a6212;
         --band-2: #b04a14;
         --band-3: #bf2a1c;
+
+        /* `LIGHT_PALETTE`'s `carHeavy`, `waitingUp` and `carDown` — the same three the dark block
+           declares, from the same source. */
+        --car-heavy: #a5620a;
+        --waiting-up: #0d7069;
+        --waiting-down: #8438b0;
 
         --over: #bc3a20;
         --transfer: #7b3f96;
@@ -381,8 +397,15 @@
       }
 
       /* --- Header, § 1.1 S3 --- */
+      /* `flex-wrap: wrap` — § D236, and it is the whole of issue #74.
+         `overflow: hidden` on a nowrap flex row does not *hide* a header, it **deletes** it: at
+         375 px this bar measured `scrollWidth 516` against `clientWidth 375`, `document.scrollWidth
+         === 375`, and the 141 px past the edge held the clock, `Day 1 · Monday` and the tenant
+         count. There is no gesture, scroll or tap that brings a clipped flex item back. Wrapping
+         costs a row of height and loses nothing; the clip is kept below as a last resort for a
+         single item too wide for a whole line, which no shipped string is. */
       .topbar {
-        display: flex; align-items: center; gap: 14px;
+        display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
         min-width: 0; width: 100%; overflow: hidden;
         padding: 10px 16px;
         background: linear-gradient(var(--card), var(--panel));
@@ -413,7 +436,7 @@
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto;
       }
       .topbar-right {
-        display: flex; align-items: center; gap: 12px;
+        display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
         margin-left: auto; flex: 0 1 auto; min-width: 0;
       }
       .clock { font: 600 22px/1 var(--mono); letter-spacing: -0.02em; }
@@ -433,8 +456,34 @@
       .topbar-day-name { font-weight: 600; font-size: 13px; }
       .topbar-day-sub { font: 500 10px var(--mono); color: var(--dimmer); }
 
-      /* § 1.1 S5 — below 1180 px the building's name outranks its spec line. */
+      /* § 1.1 S5 — below 1180 px the building's name outranks its spec line.
+
+         **What still carries `data-hide-narrow`, and what stopped — § D236.** The artefact marks
+         the spec line and the phase pill (`design.html` `:37`, `:43`) and this file added the mode
+         select and the banner to the set. Two of those four came back out:
+
+         - the **phase pill** (`FILLING`/`PEAK`/`EASING`/`DRAIN`) is not *secondary text*, which is
+           what S5's sentence steps aside. It is the only statement on the screen of what the
+           building is doing at the playhead, and every goal, band and report is read against it.
+           Six characters in a pill, restored at every width;
+         - the **mode select** was worse than hidden: `display: none` gives it a zero-size box, so
+           it left the tab order too, and there is no other control anywhere — not the menu, not
+           Settings — that changes Casual/Engineer. Below 1180 px a reader was locked into
+           whatever `localStorage` last held, on the screens where the engineer layout is hardest
+           to read. That is a functional lockout, not a step-aside (issue #72).
+
+         The **spec line** and the **banner** stay hidden: the first is genuinely the name's
+         subordinate, and the second is written by nothing (`ELEMENT_IDS.header.banner` resolves an
+         element no module assigns to) — reported rather than repaired, since `dev/` owns it. */
       @media (max-width: 1179px) { [data-hide-narrow] { display: none !important; } }
+
+      /* The header's own narrow-viewport rules are **in the single 767 px block near the foot of
+         this stylesheet**, not here beside the rules they act on — deliberate rather than careless.
+         `dev/surfaces.test.ts` pins RX-03 by finding that breakpoint's query with `indexOf` and
+         reading to the next at-rule, so a second block at the same width anywhere above it would
+         take the name and hand that test the wrong rules. (The query is not spelled out in this
+         sentence for exactly the same reason.) One block per breakpoint is the shape this file
+         already had; keeping it is cheaper than a test that has to know how many there are. */
 
       /* --- Body, § 1.1 S2 --- */
       .body {
@@ -567,6 +616,21 @@
          disagree with the picture above it. `tabular-nums` keeps the entries from shuffling
          sideways as the digits change at 60 Hz. */
       .legend-count { color: var(--text); font-variant-numeric: tabular-nums; }
+
+      /* The stage key — § D236. The same strip one row down, at the same size and tracking,
+         because it is the same component doing the same job for the other half of the picture.
+         Tighter row gap: it is twelve entries rather than four, and it wraps. */
+      .legend-stage { gap: 4px 13px; margin-top: -2px; }
+      /* A swatch is a *component* in WCAG's sense, so it carries a hairline of its own — a fill
+         that met its ground at 3:1 would still vanish against a card that happened to be close to
+         it, and every one of these is matched against a mark on the canvas. */
+      .legend-swatch {
+        width: 10px; height: 10px; border-radius: 2px; display: inline-block;
+        align-self: center; border: 1px solid var(--edge-strong);
+      }
+      /* The glyph half of every KB-15 pair, at the canvas's own characters. `--text` unless the
+         entry tints it, so `▮ ▯ ◂▸ OOS ⏻` read as marks rather than as decoration. */
+      .legend-glyph { color: var(--text); font-weight: 600; }
 
       /* The transport, § 1.3 M5. */
       .transport {
@@ -974,6 +1038,17 @@
         .instrument-body { flex-direction: column; overflow: auto; }
         .sheet { padding: 16px 14px; }
         .editor-grid { grid-template-columns: minmax(0, 1fr); }
+
+        /* § D236, and the header half of RX-03. The three groups each take a whole row: the
+           brand, then the building, then the state. Left-aligned rather than right, because a
+           right-aligned block on a 375 px screen is a block with a ragged left edge. They live in
+           this block rather than beside `.topbar` so that this file keeps **one** 767 px block —
+           see the note up there for why a second one would break `surfaces.test.ts`. */
+        .topbar { padding: 8px 12px; }
+        .topbar-building { flex-basis: 100%; padding-left: 0; border-left: 0; }
+        .topbar-right { flex-basis: 100%; margin-left: 0; justify-content: flex-start; }
+        .topbar-day { text-align: left; }
+        .clock { font-size: 19px; }
       }
 
       /* ------------------------------------------------------------------ *
@@ -1124,7 +1199,10 @@
         <div class="topbar-right" id="topbar-right">
           <div style="display: flex; align-items: baseline; gap: 8px">
             <span class="clock" id="clock">06:00</span>
-            <span data-hide-narrow class="phase-pill" id="phase-label"></span>
+            <!-- No `data-hide-narrow` — § D236. The artefact marks this (`design.html` :43) and
+                 § S5's sentence steps *secondary text* aside; the traffic phase is not secondary,
+                 it is what the run is read against, and it is six characters wide. -->
+            <span class="phase-pill" id="phase-label"></span>
           </div>
           <div class="topbar-day">
             <div class="topbar-day-name" id="day-label">Day 1</div>
@@ -1149,14 +1227,22 @@
                   tooltip a reader never hovers is a tooltip that does not exist. The full
                   sentence stays on `title` for whoever wants it, and it is sourced from
                   `scope/surface.ts`'s own `viewer.mode` entry — presentation only, proved
-                  by `scope.test.ts` requiring the legs byte-identical across the two. -->
-          <label class="dim" data-hide-narrow for="view-mode" style="font: 500 10px var(--mono)"
+                  by `scope.test.ts` requiring the legs byte-identical across the two.
+               3. **`data-hide-narrow` is gone from both halves — § D236, issue #72.** Below
+                  1180 px the label and the select were `display: none`, which is not a
+                  step-aside: it gives the control a zero-size box, so it left the tab order as
+                  well, and **no other surface changes this setting** — not the main menu, not
+                  Settings, not a deep link a reader can reach from inside the app. On a phone, a
+                  tablet, and any laptop window under ~1180 px there was no way to leave the mode
+                  `localStorage` last held. The header wraps now (see `.topbar`), so the control
+                  costs a row rather than a reader. -->
+          <label class="dim" for="view-mode" style="font: 500 10px var(--mono)"
                  title="Casual and Engineer change how much of a run is shown and nothing it computes — same shift, same seed, same result. Casual states every figure in plain language and leaves out the interval spread, the energy proxy and the measurement window's exact bounds. Engineer adds those three, the machines nameplate, and the rule behind an average this run refuses to publish. Neither mode hides a warning, a failure, or the seed.">view</label>
           <!-- The font is stated rather than inherited, and that is a consequence of the fix above
                rather than a preference: `select { font-family: inherit }` used to reach `var(--mono)`
                through the label that wrapped this control, and unwrapping it left the select
                inheriting the body's sans. 11 px is the header's own chrome size (`.phase-pill`). -->
-          <select id="view-mode" data-hide-narrow style="font: 500 11px var(--mono)">
+          <select id="view-mode" style="font: 500 11px var(--mono)">
             <option value="basic" selected>Casual — plain language</option>
             <option value="advanced">Engineer — technical detail</option>
           </select>
@@ -1336,6 +1422,52 @@
                  `main.ts`'s `drawLegend` fills them; the title is static and stays. -->
             <div class="legend" id="legend">
               <span class="legend-title" id="legend-title">How long they have stood</span>
+            </div>
+
+            <!-- ============================================================
+                 The stage key — § D236, issue #63. An addition to the handoff,
+                 which has no row for it, so it is drawn in the handoff's own
+                 legend component (M4) rather than in a language of its own.
+
+                 The defect it closes: the strip above keys the **rider** wait
+                 bands, and it was the only key on the tab. Nothing said what a
+                 car's colour meant, what made one car dimmer than another, or
+                 what the two arrow hues were — while the canvas's own
+                 `aria-label` narrated every one of those facts in prose. A
+                 screen-reader user was told more about the building than a
+                 sighted one, on the tab a player spends the most time on.
+
+                 It is **static markup, not a mount**, and that is deliberate:
+                 the car states are a fixed vocabulary (`render/overlay.ts`'s
+                 `loadColour`, `canvas.ts`'s `doorGlyph` and the two service
+                 glyphs), not data. A mount would be a seam with nothing on the
+                 other end of it. What keeps it honest is a test rather than a
+                 promise — `dev/stageKey.test.ts` derives the colours from
+                 `render/tokens.ts` and the glyphs from `render/canvas.ts` and
+                 requires every one of them to appear here.
+
+                 KB-15 throughout: every entry pairs its swatch with a word, and
+                 the three that are glyph-only on the canvas (direction, doors,
+                 out of service) carry the glyph itself as the second signal.
+                 ============================================================ -->
+            <!-- No `id`: nothing resolves this, because there is nothing to write into it.
+                 `dev/elementMap.test.ts` freezes the set of ids the viewer never resolves, and an
+                 id added to that list for a block that is *meant* to be static would be a handle
+                 offered to a future mount that should not exist. Keyed on its class instead. -->
+            <div class="legend legend-stage">
+              <span class="legend-title">What the building is showing</span>
+              <span class="legend-entry"><span class="legend-swatch" style="background: var(--band-0)" aria-hidden="true"></span>car with room</span>
+              <span class="legend-entry"><span class="legend-swatch" style="background: var(--accent)" aria-hidden="true"></span>carrying a load</span>
+              <span class="legend-entry"><span class="legend-swatch" style="background: var(--car-heavy)" aria-hidden="true"></span>at design load</span>
+              <span class="legend-entry"><span class="legend-swatch" style="background: var(--band-3)" aria-hidden="true"></span>overloaded <span class="legend-glyph">!</span></span>
+              <span class="legend-entry"><span class="legend-glyph" style="color: var(--waiting-up)">▲</span>going up</span>
+              <span class="legend-entry"><span class="legend-glyph" style="color: var(--waiting-down)">▼</span>going down</span>
+              <span class="legend-entry"><span class="legend-glyph">▮</span>doors shut</span>
+              <span class="legend-entry"><span class="legend-glyph">◂▸</span>opening</span>
+              <span class="legend-entry"><span class="legend-glyph">▯</span>open</span>
+              <span class="legend-entry"><span class="legend-glyph">▸◂</span>closing</span>
+              <span class="legend-entry"><span class="legend-glyph">OOS</span>out of service, and dimmed</span>
+              <span class="legend-entry"><span class="legend-glyph">⏻</span>in service</span>
             </div>
 
             <!-- M5 — the transport. -->

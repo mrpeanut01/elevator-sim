@@ -560,7 +560,12 @@ export const LIGHT_PALETTE: Palette = Object.freeze({
      is there and not one inch less: the two are drawn on the same row, `canvas.test.ts` counts
      riders *by their fill*, and one string for both claims makes that count measure something
      else. The band keeps § S7's ladder value and the direction pair moves — in both modes. */
-  waitingUp: '#0f7a72',
+  // `#0d7069`, one step down from the `#0f7a72` this shipped as — § D236. The `▲` is *text* on
+  // the stage key as well as a mark on the canvas, and the key sits on `--bg`, the darkest light
+  // surface: `#0f7a72` measured 4.34:1 there, under WCAG AA's 4.5 for a 10.5 px glyph. Found by
+  // driving the light theme, not by arithmetic — `theme.test.ts` measures `--panel`, where the
+  // old value was 4.83 and passed.
+  waitingUp: '#0d7069',
   waitingDown: '#8438b0',
 
   /* -- The out-of-service badge. The filled pill is `over` at 0.9, as it is in dark, so its text

@@ -228,12 +228,16 @@ const MOOD: BuildingMood = {
  * The selection is the shaft-box case *and* the caption case; the narrow layouts below also make
  * `hiddenShaftCount` positive, so the notices row carries both of its tenants.
  */
-function drawAt(width: number, height: number): { ctx: Recorder; layout: Layout } {
+function drawAt(
+  width: number,
+  height: number,
+  shafts: readonly VizShaft[] = SHAFTS,
+): { ctx: Recorder; layout: Layout } {
   const layout = buildLayout({
     width,
     height,
     floors: RECORDING.floors,
-    shafts: SHAFTS,
+    shafts,
     gutterRightPx: 280,
   });
   const ctx = new Recorder();
@@ -388,10 +392,20 @@ describe('the header band never draws two things in the same place', () => {
   });
 
   it('puts the hidden-shaft warning and the selection caption on one row without overlap', () => {
-    // 420 px cannot lay out four shafts, so `RS-05`'s warning fires and shares the notices row
-    // with `RV-T3`'s caption. Before this unit both were drawn at `plot.y − 20`, left-aligned at
-    // `plot.x` — the same pixel — and one was written straight through the other.
-    const { ctx, layout } = drawAt(420, 400);
+    // `RS-05`'s warning fires and shares the notices row with `RV-T3`'s caption. Before this unit
+    // both were drawn at `plot.y − 20`, left-aligned at `plot.x` — the same pixel — and one was
+    // written straight through the other.
+    //
+    // The overflow used to be built by asking for a 420 px canvas with a 280 px right gutter, and
+    // § D236 made that arrangement lay out all four shafts: the gutters are clamped now, so a
+    // caller's over-request no longer collapses the plot to nothing. The claim under test is
+    // unchanged and the *building* is what overflows now — sixteen cars in the same 420 px, which
+    // is a real Mixed-Use High-Rise bank rather than an artefact of a caller asking for more
+    // gutter than there is canvas.
+    const crowded = Array.from({ length: 16 }, (_, index) =>
+      shaft(`crowd-${String(index)}`, 'low-rise', String.fromCharCode(65 + index)),
+    );
+    const { ctx, layout } = drawAt(420, 400, crowded);
     expect(layout.hiddenShaftCount).toBeGreaterThan(0);
     const notices = ctx.written
       .map(boxOf)
