@@ -22,6 +22,12 @@
  *
  * ## Accessibility, decided here rather than left to the mount
  *
+ * - **Every input has an accessible name.** The control's name is a `<label for>` bound to the
+ *   input's already-unique id, and the continuous renderer's second input — the number box beside
+ *   the slider — is pointed at that same element with `aria-labelledby`. It was a `<span>`, which
+ *   names nothing: every input on the tab announced its type, its state and its description while
+ *   never saying *which parameter*, a defect strictly larger than the § D222 one above it, since
+ *   that one left the name of the gate unspoken and this one left the name of the control unspoken.
  * - Every control's prose is a real element with an id, referenced by `aria-describedby`. A
  *   `title` attribute is not reachable by keyboard and the descriptions run to 1 167 characters.
  * - **So is the reason**, since § D222 — and it is named *first* in `aria-describedby`, because a
@@ -90,6 +96,19 @@ export const helpIdOf = (id: string): string => `${inputIdOf(id)}-help`;
  * reference, and an assertion written against this function's return value would not.
  */
 const reasonIdOf = (id: string): string => `${inputIdOf(id)}-inactive`;
+
+/**
+ * The DOM id of a control's name element, so a second input can be pointed at the same words.
+ *
+ * Only the continuous renderer needs it: a slider is *two* inputs for one parameter, and `for`
+ * names exactly one. The number box is labelled by reference rather than by a copy of
+ * `control.label`, so the two inputs cannot come to disagree about what parameter they are.
+ *
+ * Private for {@link reasonIdOf}'s reason: `render.test.ts` reads the id off the emitted label and
+ * requires the reference to resolve, which fails on a dangling idref where an assertion against
+ * this function's return value would not.
+ */
+const labelIdOf = (id: string): string => `${inputIdOf(id)}-label`;
 
 function node(
   tag: string,
@@ -214,7 +233,17 @@ function lockBadge(control: Control): ControlNode | undefined {
  */
 function frame(control: Control, input: ControlNode): ControlNode {
   const children: ControlNode[] = [
-    node('span', { class: 'control-label' }, [], control.label),
+    // A `<label for>`, not a `<span>`. As a span this was the control's name on screen and nothing
+    // at all to an accessibility tree: every input on the tab had a type, a state and a description
+    // and **no accessible name**, so a screen reader could say *slider, disabled,* and then read 300
+    // characters about a parameter it had never named. `for` also buys click-to-focus, which the
+    // span never gave a pointer either. `.control-label`'s CSS is keyed on the class, not the tag.
+    node(
+      'label',
+      { class: 'control-label', id: labelIdOf(control.id), for: inputIdOf(control.id) },
+      [],
+      control.label,
+    ),
   ];
   const badge = lockBadge(control);
   if (badge !== undefined) children.push(badge);
@@ -300,10 +329,18 @@ export function renderSlider(control: SliderControl): ControlNode {
     'data-min': String(control.min),
     'data-max': String(control.max),
   });
-  // The number input carries the id-free copy: two inputs cannot share one `id`, and the range is
-  // the one the label points at because it is the one a pointer reaches for.
+  /*
+   * The number input carries its own id: two inputs cannot share one, and the range is the one
+   * `frame`'s `<label for>` points at because it is the one a pointer reaches for.
+   *
+   * That sentence used to be written here and was not true — there was no label to point at
+   * anything, only a `<span>`. Now that there is one, the number box would be the single input on
+   * the tab still left nameless, so it is labelled **by reference** to the same element rather than
+   * by a second copy of `control.label`.
+   */
   const number = node('input', {
     ...inputAttrs(control),
+    'aria-labelledby': labelIdOf(control.id),
     id: `${inputIdOf(control.id)}-number`,
     type: 'number',
     min: String(control.min),

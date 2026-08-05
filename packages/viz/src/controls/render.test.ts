@@ -268,6 +268,61 @@ describe('the shared frame — help, unit, reset, and the reason', () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).toContain(inputIdOf('orchard.litresPerTree'));
   });
+
+  it('gives every input an accessible name, and the name resolves', () => {
+    /*
+     * A defect of the same kind as § D222's and strictly larger than it. The control's name was a
+     * `<span class="control-label">` — text on screen and nothing at all in an accessibility tree —
+     * so every input on the Parameters tab announced its type, its state and its description while
+     * never saying *which parameter*. D222 left the name of the *gate* unspoken; this left the name
+     * of the *control* unspoken.
+     *
+     * Over every control the fictional schema produces, not one hand-picked row, and each reference
+     * is resolved against the emitted tree rather than recomputed from the naming helper: a `for`
+     * pointing at an id nothing carries names exactly as much as the span did, and an assertion
+     * that rebuilt the id from `inputIdOf` could not tell the two apart.
+     */
+    const controls = controlsFor(space, defaultValues(space));
+    expect(controls.length).toBeGreaterThan(0);
+    for (const control of controls) {
+      const nodes = flatten(renderControl(control));
+      const label = nodes.find((element) => element.attrs['class'] === 'control-label');
+      expect(label?.tag, control.id).toBe('label');
+      expect(label?.text, control.id).toBe(control.label);
+
+      const target = label?.attrs['for'];
+      expect(target, control.id).toBeDefined();
+      expect(
+        nodes.some((element) => element.attrs['id'] === target),
+        `${control.id}: label points at an id nothing carries`,
+      ).toBe(true);
+
+      const inputs = nodes.filter((element) => element.attrs['data-role'] !== undefined);
+      expect(inputs.length, control.id).toBeGreaterThan(0);
+      for (const input of inputs) {
+        const named =
+          input.attrs['id'] === target ||
+          (input.attrs['aria-labelledby'] !== undefined &&
+            nodes.some((element) => element.attrs['id'] === input.attrs['aria-labelledby']));
+        expect(named, `${control.id} / ${input.attrs['data-role'] ?? ''} has no name`).toBe(true);
+      }
+    }
+  });
+
+  it("labels the slider's number box by reference, not by a second copy of the words", () => {
+    // Two inputs, one parameter, and `for` names exactly one. The number box points at the same
+    // element rather than carrying its own `aria-label`, because a copy of `control.label` is the
+    // thing that could later disagree with the label beside it.
+    const nodes = flatten(renderControl(controlNamed(space, 'orchard.litresPerTree')));
+    const label = nodes.find((element) => element.attrs['class'] === 'control-label');
+    const range = nodes.find((element) => element.attrs['data-role'] === 'slider');
+    const number = nodes.find((element) => element.attrs['data-role'] === 'number');
+
+    expect(range?.attrs['id']).toBe(label?.attrs['for']);
+    expect(number?.attrs['aria-labelledby']).toBe(label?.attrs['id']);
+    expect(number?.attrs['id']).not.toBe(range?.attrs['id']);
+    expect(label?.attrs['id']).toBeDefined();
+  });
 });
 
 describe('the whole form groups by section without enumerating one', () => {
