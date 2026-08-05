@@ -88,6 +88,7 @@ export {
 } from './accounts/credentials.js';
 
 export { OutboxMailer, confirmationMessage, type Mailer, type Message } from './mail/mailer.js';
+export { AcsMailer, MailerConfigurationError, acsMailerFrom, type AcsMailerOptions } from './mail/acsMailer.js';
 
 export {
   BOARD_METRICS,
@@ -102,8 +103,17 @@ export {
   type UserRow,
 } from './store/store.js';
 
+export { PgSql, type Sql, type SqlResult } from './store/sql.js';
+
 export { createApi, type Api, type ApiDeps, type ApiRequest, type ApiResponse } from './http/api.js';
 export { MAX_BODY_BYTES, bearerOf, serve, type ServeOptions } from './http/serve.js';
+export {
+  assetFor,
+  cacheControlFor,
+  loadStaticBundle,
+  type StaticAsset,
+  type StaticBundle,
+} from './http/static.js';
 export { main } from './main.js';
 
 export {

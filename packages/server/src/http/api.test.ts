@@ -22,6 +22,7 @@ import { runSimulation } from '@elevator-sim/core';
 import { bootstrap, UnsafeConfigurationError, type Server } from '../bootstrap.js';
 import { configFor, metricsOf } from '../leaderboard/verify.js';
 import { OutboxMailer } from '../mail/mailer.js';
+import { PgliteSql } from '../store/pglite.test-helper.js';
 import type { ApiRequest, ApiResponse } from './api.js';
 import type { Submission, SubmittedRun } from '../leaderboard/submission.js';
 
@@ -40,7 +41,7 @@ beforeAll(async () => {
   outbox = new OutboxMailer(join(scratch, 'outbox.jsonl'));
   server = await bootstrap({
     dataDir: DATA_DIR,
-    databasePath: ':memory:',
+    sql: new PgliteSql(),
     env: { ELEVATOR_SIM_SECRET: SECRET },
     publicOrigin: 'https://elevator.example',
     now: () => clock,
@@ -437,7 +438,7 @@ describe('the bootstrap refuses two configurations', () => {
     await expect(
       bootstrap({
         dataDir: DATA_DIR,
-        databasePath: ':memory:',
+        sql: new PgliteSql(),
         env: {},
         publicOrigin: 'https://elevator.example',
       }),
@@ -451,11 +452,34 @@ describe('the bootstrap refuses two configurations', () => {
     await expect(
       bootstrap({
         dataDir: DATA_DIR,
-        databasePath: ':memory:',
+        sql: new PgliteSql(),
         env: { ELEVATOR_SIM_SECRET: SECRET, NODE_ENV: 'production' },
         publicOrigin: 'https://elevator.example',
         mailer: new OutboxMailer(join(scratch, 'production.jsonl')),
       }),
     ).rejects.toThrow(UnsafeConfigurationError);
+  }, 120_000);
+
+  it('starts in production when the environment configures a real mailer', async () => {
+    // The other half of the refusal above, and the half that was missing. Until `AcsMailer`
+    // existed, the outbox driver was the only `Mailer` in the tree, so the refusal was not a gate
+    // a correct configuration could pass — it was unsatisfiable, and this server could not boot in
+    // production at all. A test that only asserted the refusal fires stayed green throughout.
+    //
+    // Nothing here reaches Azure: the endpoint is never dialled, because `bootstrap` only has to
+    // choose a mailer, not use one.
+    const server = await bootstrap({
+      dataDir: DATA_DIR,
+      sql: new PgliteSql(),
+      env: {
+        ELEVATOR_SIM_SECRET: SECRET,
+        NODE_ENV: 'production',
+        ELEVATOR_SIM_ACS_ENDPOINT: 'https://example.communication.azure.com',
+        ELEVATOR_SIM_MAIL_FROM: 'DoNotReply@example.azurecomm.net',
+      },
+      publicOrigin: 'https://elevator.example',
+    });
+    expect(server.mailer).not.toBeInstanceOf(OutboxMailer);
+    await server.close();
   }, 120_000);
 });

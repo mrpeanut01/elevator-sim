@@ -38,6 +38,7 @@ import {
 import type { ChallengeSubmission, ClaimedSeedMetrics } from '../challenge/submission.js';
 import { configFor, metricsOf } from '../leaderboard/verify.js';
 import { OutboxMailer } from '../mail/mailer.js';
+import { PgliteSql } from '../store/pglite.test-helper.js';
 import type { ApiRequest, ApiResponse } from './api.js';
 
 const DATA_DIR = new URL('../../../../data/', import.meta.url).pathname;
@@ -62,7 +63,7 @@ beforeAll(async () => {
   outbox = new OutboxMailer(join(scratch, 'outbox.jsonl'));
   server = await bootstrap({
     dataDir: DATA_DIR,
-    databasePath: ':memory:',
+    sql: new PgliteSql(),
     env: { ELEVATOR_SIM_SECRET: SECRET },
     publicOrigin: 'https://elevator.example',
     now: () => clock,

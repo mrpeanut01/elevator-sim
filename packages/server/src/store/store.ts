@@ -1,11 +1,11 @@
 /**
- * The database. `node:sqlite`, one file, no ORM, no migration framework.
+ * The database. PostgreSQL, one schema, no ORM, no migration framework.
  *
  * `DECISIONS.md` § D214 § 5 gives sessions a table rather than a JWT — *revocation is a `DELETE`* —
  * and § 4 gives every leaderboard entry a `configHash` so a `data/` change starts a new board
  * instead of corrupting an old one. Both of those are schema decisions, so they live here.
  *
- * ## Two rules this module keeps that are easy to lose
+ * ## Three rules this module keeps that are easy to lose
  *
  * **The clock is injected.** `core/` may not read a wall clock (invariant 3) and this package may —
  * it is the one that has to know whether a session has expired. But a *test* that depends on the
@@ -15,15 +15,30 @@
  * **A password never crosses this boundary.** The store takes and returns a `PasswordHash` —
  * salt and digest — and has no method that accepts a plaintext one. Hashing is
  * `accounts/credentials.ts`'s job, and a store that could hash would be a store that could log.
+ *
+ * **The database arrives as a {@link Sql}, and every method is async.** It was `node:sqlite` and
+ * synchronous until the server needed somewhere to live that outlives a container filesystem. The
+ * driver is injected rather than constructed here so that the tests can run the *same SQL* against
+ * an in-process PostgreSQL — see `sql.ts` for why that mattered enough to justify a seam.
+ *
+ * ## What changed in the dialect, since a silent difference here is a corrupted board
+ *
+ * `INTEGER` became **`BIGINT`** for every `_ms` column. PostgreSQL's `INTEGER` is four bytes and
+ * epoch milliseconds passed 2^31 in 1971, so the old declaration would have overflowed on the
+ * first row rather than degrading slowly. `REAL` became **`DOUBLE PRECISION`** for the same class
+ * of reason: PostgreSQL's `REAL` is a four-byte float, and rounding a measured AWT to seven
+ * significant figures to save four bytes is how a leaderboard starts disagreeing with the run it
+ * came from. `confirmed` became a real `BOOLEAN` rather than an integer holding 0 or 1, and
+ * SQLite's `COLLATE NOCASE` became an index and a predicate over `LOWER(display_name)`.
  */
 
-import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 
 import type { PasswordHash } from '../accounts/credentials.js';
 import type { IssuedChallenge } from '../challenge/schedule.js';
 import type { ChallengeScore, SeedResult } from '../challenge/submission.js';
 import type { ClaimedMetrics, SubmittedRun } from '../leaderboard/submission.js';
+import type { Sql } from './sql.js';
 
 /* -------------------------------------------------------------------------- *
  * Rows
@@ -108,27 +123,38 @@ export function normaliseEmail(email: string): string {
 
 /** Everything the store needs from outside itself. */
 export interface StoreOptions {
-  /** `':memory:'` in tests, a file path in a real server. */
-  readonly path: string;
+  /** The database. `PgSql` in a real server, `PgliteSql` in a test — the SQL is identical. */
+  readonly sql: Sql;
   /** Milliseconds since the epoch. Injected so a test can decide what "now" is. */
   readonly now: () => number;
 }
 
 export class Store {
-  readonly #db: DatabaseSync;
+  readonly #sql: Sql;
   readonly #now: () => number;
 
-  constructor(options: StoreOptions) {
-    this.#db = new DatabaseSync(options.path);
+  /**
+   * Private because construction has to apply the schema and applying it is asynchronous.
+   *
+   * {@link Store.open} is the only way in. A constructor that returned before the tables existed
+   * would hand back a store whose first query fails, which is a worse bargain than one `await`.
+   */
+  private constructor(options: StoreOptions) {
+    this.#sql = options.sql;
     this.#now = options.now;
-    // Foreign keys are off by default in SQLite, which makes a declared reference decoration. A
-    // session row pointing at a deleted user is exactly the orphan this catches.
-    this.#db.exec('PRAGMA foreign_keys = ON');
-    this.#db.exec(SCHEMA);
   }
 
-  close(): void {
-    this.#db.close();
+  /** Connect, apply the schema, hand back a usable store. Idempotent — see {@link SCHEMA}. */
+  static async open(options: StoreOptions): Promise<Store> {
+    // No `PRAGMA foreign_keys = ON` equivalent: SQLite left references unenforced unless asked,
+    // which is why that line existed. PostgreSQL always enforces them, so the guarantee the pragma
+    // bought is now a property of the database rather than a line that could be deleted.
+    await options.sql.exec(SCHEMA);
+    return new Store(options);
+  }
+
+  async close(): Promise<void> {
+    await this.#sql.close();
   }
 
   /* ---------------------------------------------------------------- users */
@@ -139,14 +165,16 @@ export class Store {
    * Returns a discriminated result rather than throwing, because "this address already has an
    * account" is an ordinary outcome of a registration form and not an exceptional one.
    */
-  createUser(input: {
+  async createUser(input: {
     readonly email: string;
     readonly displayName: string;
     readonly password: PasswordHash;
-  }): { readonly ok: true; readonly user: UserRow } | { readonly ok: false; readonly reason: 'email-taken' | 'name-taken' } {
+  }): Promise<
+    { readonly ok: true; readonly user: UserRow } | { readonly ok: false; readonly reason: 'email-taken' | 'name-taken' }
+  > {
     const email = normaliseEmail(input.email);
-    if (this.userByEmail(email) !== undefined) return { ok: false, reason: 'email-taken' };
-    if (this.#userByName(input.displayName) !== undefined) return { ok: false, reason: 'name-taken' };
+    if ((await this.userByEmail(email)) !== undefined) return { ok: false, reason: 'email-taken' };
+    if ((await this.#userByName(input.displayName)) !== undefined) return { ok: false, reason: 'name-taken' };
 
     const user: UserRow = {
       id: randomUUID(),
@@ -156,32 +184,32 @@ export class Store {
       confirmed: false,
       createdAtMs: this.#now(),
     };
-    this.#db
-      .prepare(
-        'INSERT INTO users (id, email, display_name, salt_hex, hash_hex, confirmed, created_at_ms) ' +
-          'VALUES (?, ?, ?, ?, ?, 0, ?)',
-      )
-      .run(
-        user.id,
-        user.email,
-        user.displayName,
-        user.password.saltHex,
-        user.password.hashHex,
-        user.createdAtMs,
-      );
+    await this.#sql.query(
+      'INSERT INTO users (id, email, display_name, salt_hex, hash_hex, confirmed, created_at_ms) ' +
+        'VALUES ($1, $2, $3, $4, $5, FALSE, $6)',
+      [user.id, user.email, user.displayName, user.password.saltHex, user.password.hashHex, user.createdAtMs],
+    );
     return { ok: true, user };
   }
 
-  userByEmail(email: string): UserRow | undefined {
-    return this.#userRow('SELECT * FROM users WHERE email = ?', normaliseEmail(email));
+  async userByEmail(email: string): Promise<UserRow | undefined> {
+    return this.#userRow('SELECT * FROM users WHERE email = $1', normaliseEmail(email));
   }
 
-  userById(id: string): UserRow | undefined {
-    return this.#userRow('SELECT * FROM users WHERE id = ?', id);
+  async userById(id: string): Promise<UserRow | undefined> {
+    return this.#userRow('SELECT * FROM users WHERE id = $1', id);
   }
 
-  #userByName(displayName: string): UserRow | undefined {
-    return this.#userRow('SELECT * FROM users WHERE display_name = ? COLLATE NOCASE', displayName);
+  /**
+   * Case-insensitively, because `ada` and `Ada` are one player.
+   *
+   * `LOWER(display_name) = LOWER($1)` rather than SQLite's `COLLATE NOCASE`, and the unique index
+   * in {@link SCHEMA} is on the same expression — the two must fold identically or the lookup
+   * would miss a duplicate the index would then refuse, turning a civil "that name is taken" into
+   * a constraint violation the caller does not handle.
+   */
+  async #userByName(displayName: string): Promise<UserRow | undefined> {
+    return this.#userRow('SELECT * FROM users WHERE LOWER(display_name) = LOWER($1)', displayName);
   }
 
   /**
@@ -192,20 +220,23 @@ export class Store {
    * whatever address the account had *now* rather than the one that was mailed. `credentials.ts`
    * puts the email inside the signature for the same reason; this is the other half of it.
    */
-  confirmUser(id: string, email: string): boolean {
-    const result = this.#db
-      .prepare('UPDATE users SET confirmed = 1 WHERE id = ? AND email = ?')
-      .run(id, normaliseEmail(email));
-    return Number(result.changes) > 0;
+  async confirmUser(id: string, email: string): Promise<boolean> {
+    const result = await this.#sql.query('UPDATE users SET confirmed = TRUE WHERE id = $1 AND email = $2', [
+      id,
+      normaliseEmail(email),
+    ]);
+    return result.rowCount > 0;
   }
 
   /* ------------------------------------------------------------- sessions */
 
-  createSession(token: string, userId: string): SessionRow {
+  async createSession(token: string, userId: string): Promise<SessionRow> {
     const row: SessionRow = { token, userId, expiresAtMs: this.#now() + SESSION_TTL_MS };
-    this.#db
-      .prepare('INSERT INTO sessions (token, user_id, expires_at_ms) VALUES (?, ?, ?)')
-      .run(row.token, row.userId, row.expiresAtMs);
+    await this.#sql.query('INSERT INTO sessions (token, user_id, expires_at_ms) VALUES ($1, $2, $3)', [
+      row.token,
+      row.userId,
+      row.expiresAtMs,
+    ]);
     return row;
   }
 
@@ -215,20 +246,19 @@ export class Store {
    * An expired session is **deleted on the way past** rather than merely refused, so the table does
    * not grow a permanent tail of tokens that can never authenticate anything.
    */
-  userForSession(token: string): UserRow | undefined {
-    const row = this.#db.prepare('SELECT user_id, expires_at_ms FROM sessions WHERE token = ?').get(token) as
-      | { user_id: string; expires_at_ms: number }
-      | undefined;
+  async userForSession(token: string): Promise<UserRow | undefined> {
+    const result = await this.#sql.query('SELECT user_id, expires_at_ms FROM sessions WHERE token = $1', [token]);
+    const row = result.rows[0];
     if (row === undefined) return undefined;
-    if (Number(row.expires_at_ms) <= this.#now()) {
-      this.deleteSession(token);
+    if (Number(row['expires_at_ms']) <= this.#now()) {
+      await this.deleteSession(token);
       return undefined;
     }
-    return this.userById(String(row.user_id));
+    return this.userById(String(row['user_id']));
   }
 
-  deleteSession(token: string): void {
-    this.#db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+  async deleteSession(token: string): Promise<void> {
+    await this.#sql.query('DELETE FROM sessions WHERE token = $1', [token]);
   }
 
   /* ---------------------------------------------------------- leaderboard */
@@ -240,20 +270,22 @@ export class Store {
    * appends, because a deterministic replay of the same seed is the same run and a board that
    * listed it twice would be counting a refresh as an achievement.
    */
-  recordEntry(input: {
+  async recordEntry(input: {
     readonly configHash: string;
     readonly userId: string;
     readonly run: SubmittedRun;
     readonly measured: ClaimedMetrics;
-  }): EntryRow {
-    const user = this.userById(input.userId);
+  }): Promise<EntryRow> {
+    const user = await this.userById(input.userId);
     if (user === undefined) throw new Error('recordEntry: no such user');
-    const existing = this.#db
-      .prepare('SELECT id FROM entries WHERE config_hash = ? AND user_id = ? AND seed = ?')
-      .get(input.configHash, input.userId, input.run.seed) as { id: string } | undefined;
+    const found = await this.#sql.query(
+      'SELECT id FROM entries WHERE config_hash = $1 AND user_id = $2 AND seed = $3',
+      [input.configHash, input.userId, input.run.seed],
+    );
+    const existing = found.rows[0];
 
     const row: EntryRow = {
-      id: existing === undefined ? randomUUID() : String(existing.id),
+      id: existing === undefined ? randomUUID() : String(existing['id']),
       configHash: input.configHash,
       userId: input.userId,
       displayName: user.displayName,
@@ -261,15 +293,13 @@ export class Store {
       measured: input.measured,
       submittedAtMs: this.#now(),
     };
-    this.#db
-      .prepare(
-        'INSERT INTO entries (id, config_hash, user_id, seed, run_json, awt_s, wt95_s, ttd_mean_s, ' +
-          'pct_over_long_wait, submitted_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ' +
-          'ON CONFLICT(id) DO UPDATE SET run_json = excluded.run_json, awt_s = excluded.awt_s, ' +
-          'wt95_s = excluded.wt95_s, ttd_mean_s = excluded.ttd_mean_s, ' +
-          'pct_over_long_wait = excluded.pct_over_long_wait, submitted_at_ms = excluded.submitted_at_ms',
-      )
-      .run(
+    await this.#sql.query(
+      'INSERT INTO entries (id, config_hash, user_id, seed, run_json, awt_s, wt95_s, ttd_mean_s, ' +
+        'pct_over_long_wait, submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ' +
+        'ON CONFLICT (id) DO UPDATE SET run_json = excluded.run_json, awt_s = excluded.awt_s, ' +
+        'wt95_s = excluded.wt95_s, ttd_mean_s = excluded.ttd_mean_s, ' +
+        'pct_over_long_wait = excluded.pct_over_long_wait, submitted_at_ms = excluded.submitted_at_ms',
+      [
         row.id,
         row.configHash,
         row.userId,
@@ -280,7 +310,8 @@ export class Store {
         row.measured.ttdMeanS,
         row.measured.pctOverLongWait,
         row.submittedAtMs,
-      );
+      ],
+    );
     return row;
   }
 
@@ -294,31 +325,39 @@ export class Store {
    *
    * Only `awtIsValid: true` runs are here at all — `verifySubmission` refuses the others on entry
    * (§ D214 § 6), so the suppression rule cannot be worked around by ranking.
+   *
+   * **`DISTINCT ON` rather than the old `GROUP BY e.user_id`.** SQLite allowed selecting `e.*`
+   * while grouping by one column and picked an arbitrary row from each group; PostgreSQL rejects
+   * that outright, and it was never what the board wanted anyway — it wanted one determinate row
+   * per player. `DISTINCT ON (e.user_id)` with the tie-break in its own `ORDER BY` says that
+   * directly, and it also retires the correlated `MIN` subquery the old query needed to find each
+   * player's best row. The inner ordering picks the row; the outer ordering ranks the board.
    */
-  board(configHash: string, metric: BoardMetric, limit: number): readonly EntryRow[] {
+  async board(configHash: string, metric: BoardMetric, limit: number): Promise<readonly EntryRow[]> {
     const column = COLUMN_OF[metric];
-    const rows = this.#db
-      .prepare(
-        `SELECT e.* , u.display_name AS display_name FROM entries e JOIN users u ON u.id = e.user_id ` +
-          `WHERE e.config_hash = ? AND e.${column} = (` +
-          `SELECT MIN(b.${column}) FROM entries b WHERE b.config_hash = e.config_hash AND b.user_id = e.user_id` +
-          `) GROUP BY e.user_id ORDER BY e.${column} ASC, e.submitted_at_ms ASC LIMIT ?`,
-      )
-      .all(configHash, limit) as readonly Record<string, unknown>[];
-    return Object.freeze(rows.map((row) => entryOf(row)));
+    const result = await this.#sql.query(
+      `SELECT * FROM (` +
+        `SELECT DISTINCT ON (e.user_id) e.*, u.display_name AS display_name ` +
+        `FROM entries e JOIN users u ON u.id = e.user_id WHERE e.config_hash = $1 ` +
+        `ORDER BY e.user_id, e.${column} ASC, e.submitted_at_ms ASC` +
+        `) best ORDER BY best.${column} ASC, best.submitted_at_ms ASC LIMIT $2`,
+      [configHash, limit],
+    );
+    return Object.freeze(result.rows.map((row) => entryOf(row)));
   }
 
   /** Every board that has an entry, most recently posted to first. For the leaderboard index. */
-  boards(): readonly { readonly configHash: string; readonly entries: number; readonly latestMs: number }[] {
-    const rows = this.#db
-      .prepare(
-        'SELECT config_hash, COUNT(*) AS entries, MAX(submitted_at_ms) AS latest FROM entries ' +
-          'GROUP BY config_hash ORDER BY latest DESC',
-      )
-      .all() as readonly Record<string, unknown>[];
+  async boards(): Promise<readonly { readonly configHash: string; readonly entries: number; readonly latestMs: number }[]> {
+    const result = await this.#sql.query(
+      'SELECT config_hash, COUNT(*) AS entries, MAX(submitted_at_ms) AS latest FROM entries ' +
+        'GROUP BY config_hash ORDER BY latest DESC',
+    );
     return Object.freeze(
-      rows.map((row) => ({
+      result.rows.map((row) => ({
         configHash: String(row['config_hash']),
+        // `COUNT(*)` and a `BIGINT` `MAX` both come back from `pg` as strings, because a 64-bit
+        // integer does not always fit a JS number. These two always do, and `Number` takes either
+        // form, so the coercion is the same one the row mappers already used.
         entries: Number(row['entries']),
         latestMs: Number(row['latest']),
       })),
@@ -340,29 +379,28 @@ export class Store {
    *
    * Returns the row as it now stands, which is the stored one and not necessarily the argument.
    */
-  issueChallenge(challenge: IssuedChallenge): IssuedChallenge {
-    this.#db
-      .prepare(
-        'INSERT INTO challenges (id, opens_at_ms, closes_at_ms, issued_json) VALUES (?, ?, ?, ?) ' +
-          'ON CONFLICT(id) DO NOTHING',
-      )
-      .run(challenge.id, challenge.opensAtMs, challenge.closesAtMs, JSON.stringify(challenge));
-    return this.challengeById(challenge.id) ?? challenge;
+  async issueChallenge(challenge: IssuedChallenge): Promise<IssuedChallenge> {
+    await this.#sql.query(
+      'INSERT INTO challenges (id, opens_at_ms, closes_at_ms, issued_json) VALUES ($1, $2, $3, $4) ' +
+        'ON CONFLICT (id) DO NOTHING',
+      [challenge.id, challenge.opensAtMs, challenge.closesAtMs, JSON.stringify(challenge)],
+    );
+    return (await this.challengeById(challenge.id)) ?? challenge;
   }
 
-  challengeById(id: string): IssuedChallenge | undefined {
-    const row = this.#db.prepare('SELECT issued_json FROM challenges WHERE id = ?').get(id) as
-      | { issued_json: string }
-      | undefined;
-    return row === undefined ? undefined : (JSON.parse(String(row.issued_json)) as IssuedChallenge);
+  async challengeById(id: string): Promise<IssuedChallenge | undefined> {
+    const result = await this.#sql.query('SELECT issued_json FROM challenges WHERE id = $1', [id]);
+    const row = result.rows[0];
+    return row === undefined ? undefined : (JSON.parse(String(row['issued_json'])) as IssuedChallenge);
   }
 
   /** Challenges the server has issued, most recently opened first. For the challenge index. */
-  recentChallenges(limit: number): readonly IssuedChallenge[] {
-    const rows = this.#db
-      .prepare('SELECT issued_json FROM challenges ORDER BY opens_at_ms DESC LIMIT ?')
-      .all(limit) as readonly Record<string, unknown>[];
-    return Object.freeze(rows.map((row) => JSON.parse(String(row['issued_json'])) as IssuedChallenge));
+  async recentChallenges(limit: number): Promise<readonly IssuedChallenge[]> {
+    const result = await this.#sql.query(
+      'SELECT issued_json FROM challenges ORDER BY opens_at_ms DESC LIMIT $1',
+      [limit],
+    );
+    return Object.freeze(result.rows.map((row) => JSON.parse(String(row['issued_json'])) as IssuedChallenge));
   }
 
   /**
@@ -375,23 +413,23 @@ export class Store {
    * wins instead — a challenge entry is the run a player currently stands behind, and switching
    * dispatcher is the move the whole surface exists to make possible.
    */
-  recordChallengeEntry(input: {
+  async recordChallengeEntry(input: {
     readonly challengeId: string;
     readonly dataHash: string;
     readonly userId: string;
     readonly dispatcherProfileId: string;
     readonly score: ChallengeScore;
-  }): ChallengeEntryRow {
-    const user = this.userById(input.userId);
+  }): Promise<ChallengeEntryRow> {
+    const user = await this.userById(input.userId);
     if (user === undefined) throw new Error('recordChallengeEntry: no such user');
-    const existing = this.#db
-      .prepare(
-        'SELECT id FROM challenge_entries WHERE challenge_id = ? AND data_hash = ? AND user_id = ?',
-      )
-      .get(input.challengeId, input.dataHash, input.userId) as { id: string } | undefined;
+    const found = await this.#sql.query(
+      'SELECT id FROM challenge_entries WHERE challenge_id = $1 AND data_hash = $2 AND user_id = $3',
+      [input.challengeId, input.dataHash, input.userId],
+    );
+    const existing = found.rows[0];
 
     const row: ChallengeEntryRow = {
-      id: existing === undefined ? randomUUID() : String(existing.id),
+      id: existing === undefined ? randomUUID() : String(existing['id']),
       challengeId: input.challengeId,
       dataHash: input.dataHash,
       userId: input.userId,
@@ -400,18 +438,16 @@ export class Store {
       score: input.score,
       submittedAtMs: this.#now(),
     };
-    this.#db
-      .prepare(
-        'INSERT INTO challenge_entries (id, challenge_id, data_hash, user_id, dispatcher_profile_id, ' +
-          'runs, legs, mean_awt_s, mean_wt95_s, mean_ttd_mean_s, mean_pct_over_long_wait, ' +
-          'per_seed_json, submitted_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ' +
-          'ON CONFLICT(id) DO UPDATE SET dispatcher_profile_id = excluded.dispatcher_profile_id, ' +
-          'runs = excluded.runs, legs = excluded.legs, mean_awt_s = excluded.mean_awt_s, ' +
-          'mean_wt95_s = excluded.mean_wt95_s, mean_ttd_mean_s = excluded.mean_ttd_mean_s, ' +
-          'mean_pct_over_long_wait = excluded.mean_pct_over_long_wait, ' +
-          'per_seed_json = excluded.per_seed_json, submitted_at_ms = excluded.submitted_at_ms',
-      )
-      .run(
+    await this.#sql.query(
+      'INSERT INTO challenge_entries (id, challenge_id, data_hash, user_id, dispatcher_profile_id, ' +
+        'runs, legs, mean_awt_s, mean_wt95_s, mean_ttd_mean_s, mean_pct_over_long_wait, ' +
+        'per_seed_json, submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ' +
+        'ON CONFLICT (id) DO UPDATE SET dispatcher_profile_id = excluded.dispatcher_profile_id, ' +
+        'runs = excluded.runs, legs = excluded.legs, mean_awt_s = excluded.mean_awt_s, ' +
+        'mean_wt95_s = excluded.mean_wt95_s, mean_ttd_mean_s = excluded.mean_ttd_mean_s, ' +
+        'mean_pct_over_long_wait = excluded.mean_pct_over_long_wait, ' +
+        'per_seed_json = excluded.per_seed_json, submitted_at_ms = excluded.submitted_at_ms',
+      [
         row.id,
         row.challengeId,
         row.dataHash,
@@ -425,7 +461,8 @@ export class Store {
         row.score.meanPctOverLongWait,
         JSON.stringify(row.score.perSeed),
         row.submittedAtMs,
-      );
+      ],
+    );
     return row;
   }
 
@@ -437,20 +474,19 @@ export class Store {
    * uniqueness constraint already gives each player exactly one row, so this cannot rank
    * persistence the way an unfiltered config board would.
    */
-  challengeBoard(
+  async challengeBoard(
     challengeId: string,
     dataHash: string,
     metric: BoardMetric,
     limit: number,
-  ): readonly ChallengeEntryRow[] {
-    const rows = this.#db
-      .prepare(
-        'SELECT e.*, u.display_name AS display_name FROM challenge_entries e ' +
-          'JOIN users u ON u.id = e.user_id WHERE e.challenge_id = ? AND e.data_hash = ? ' +
-          `ORDER BY e.${CHALLENGE_COLUMN_OF[metric]} ASC, e.submitted_at_ms ASC LIMIT ?`,
-      )
-      .all(challengeId, dataHash, limit) as readonly Record<string, unknown>[];
-    return Object.freeze(rows.map((row) => challengeEntryOf(row)));
+  ): Promise<readonly ChallengeEntryRow[]> {
+    const result = await this.#sql.query(
+      'SELECT e.*, u.display_name AS display_name FROM challenge_entries e ' +
+        'JOIN users u ON u.id = e.user_id WHERE e.challenge_id = $1 AND e.data_hash = $2 ' +
+        `ORDER BY e.${CHALLENGE_COLUMN_OF[metric]} ASC, e.submitted_at_ms ASC LIMIT $3`,
+      [challengeId, dataHash, limit],
+    );
+    return Object.freeze(result.rows.map((row) => challengeEntryOf(row)));
   }
 
   /**
@@ -460,31 +496,34 @@ export class Store {
    * set before a mid-challenge `data/` change are not deleted and are not merged; they are counted,
    * and a surface that did neither would be quietly losing rows.
    */
-  challengeDataHashes(
+  async challengeDataHashes(
     challengeId: string,
-  ): readonly { readonly dataHash: string; readonly entries: number }[] {
-    const rows = this.#db
-      .prepare(
-        'SELECT data_hash, COUNT(*) AS entries FROM challenge_entries WHERE challenge_id = ? ' +
-          'GROUP BY data_hash ORDER BY entries DESC',
-      )
-      .all(challengeId) as readonly Record<string, unknown>[];
+  ): Promise<readonly { readonly dataHash: string; readonly entries: number }[]> {
+    const result = await this.#sql.query(
+      'SELECT data_hash, COUNT(*) AS entries FROM challenge_entries WHERE challenge_id = $1 ' +
+        'GROUP BY data_hash ORDER BY entries DESC',
+      [challengeId],
+    );
     return Object.freeze(
-      rows.map((row) => ({ dataHash: String(row['data_hash']), entries: Number(row['entries']) })),
+      result.rows.map((row) => ({ dataHash: String(row['data_hash']), entries: Number(row['entries']) })),
     );
   }
 
   /* --------------------------------------------------------------- shared */
 
-  #userRow(sql: string, parameter: string): UserRow | undefined {
-    const row = this.#db.prepare(sql).get(parameter) as Record<string, unknown> | undefined;
+  async #userRow(sql: string, parameter: string): Promise<UserRow | undefined> {
+    const result = await this.#sql.query(sql, [parameter]);
+    const row = result.rows[0];
     if (row === undefined) return undefined;
     return Object.freeze({
       id: String(row['id']),
       email: String(row['email']),
       displayName: String(row['display_name']),
       password: { saltHex: String(row['salt_hex']), hashHex: String(row['hash_hex']) },
-      confirmed: Number(row['confirmed']) === 1,
+      // A real `BOOLEAN` now, so this is the column's own value rather than a comparison against
+      // the integer 1. Coerced rather than cast because the two drivers are entitled to disagree
+      // about whether that arrives as `true` or as `'t'`.
+      confirmed: row['confirmed'] === true || row['confirmed'] === 't',
       createdAtMs: Number(row['created_at_ms']),
     });
   }
@@ -560,6 +599,10 @@ function entryOf(row: Record<string, unknown>): EntryRow {
  * `IF NOT EXISTS` throughout, so opening an existing database is the same code path as creating
  * one. There is no migration framework because there is nothing to migrate yet; when there is, the
  * honest thing is a versioned migration table and not an `ALTER` hidden in a constructor.
+ *
+ * **Every `_ms` column is `BIGINT`, and that is not a style choice.** These hold epoch
+ * milliseconds — around 1.77e12 today — and PostgreSQL's `INTEGER` tops out at 2.1e9. Declaring
+ * them `INTEGER`, as the SQLite schema did harmlessly, would fail on the first row written.
  */
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -568,15 +611,18 @@ CREATE TABLE IF NOT EXISTS users (
   display_name  TEXT NOT NULL,
   salt_hex      TEXT NOT NULL,
   hash_hex      TEXT NOT NULL,
-  confirmed     INTEGER NOT NULL DEFAULT 0,
-  created_at_ms INTEGER NOT NULL
+  confirmed     BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at_ms BIGINT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS users_display_name ON users (display_name COLLATE NOCASE);
+-- SQLite spelled this \`display_name COLLATE NOCASE\`. The expression index is PostgreSQL's
+-- equivalent, and \`#userByName\` folds with the same \`LOWER\` so the lookup and the constraint
+-- cannot disagree about what counts as a duplicate.
+CREATE UNIQUE INDEX IF NOT EXISTS users_display_name ON users (LOWER(display_name));
 
 CREATE TABLE IF NOT EXISTS sessions (
   token          TEXT PRIMARY KEY,
   user_id        TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  expires_at_ms  INTEGER NOT NULL
+  expires_at_ms  BIGINT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS entries (
@@ -585,19 +631,19 @@ CREATE TABLE IF NOT EXISTS entries (
   user_id             TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   seed                TEXT NOT NULL,
   run_json            TEXT NOT NULL,
-  awt_s               REAL NOT NULL,
-  wt95_s              REAL NOT NULL,
-  ttd_mean_s          REAL NOT NULL,
-  pct_over_long_wait  REAL NOT NULL,
-  submitted_at_ms     INTEGER NOT NULL,
+  awt_s               DOUBLE PRECISION NOT NULL,
+  wt95_s              DOUBLE PRECISION NOT NULL,
+  ttd_mean_s          DOUBLE PRECISION NOT NULL,
+  pct_over_long_wait  DOUBLE PRECISION NOT NULL,
+  submitted_at_ms     BIGINT NOT NULL,
   UNIQUE (config_hash, user_id, seed)
 );
 CREATE INDEX IF NOT EXISTS entries_board ON entries (config_hash, awt_s);
 
 CREATE TABLE IF NOT EXISTS challenges (
   id            TEXT PRIMARY KEY,
-  opens_at_ms   INTEGER NOT NULL,
-  closes_at_ms  INTEGER NOT NULL,
+  opens_at_ms   BIGINT NOT NULL,
+  closes_at_ms  BIGINT NOT NULL,
   issued_json   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS challenges_window ON challenges (opens_at_ms);
@@ -612,12 +658,12 @@ CREATE TABLE IF NOT EXISTS challenge_entries (
   dispatcher_profile_id    TEXT NOT NULL,
   runs                     INTEGER NOT NULL,
   legs                     INTEGER NOT NULL,
-  mean_awt_s               REAL NOT NULL,
-  mean_wt95_s              REAL NOT NULL,
-  mean_ttd_mean_s          REAL NOT NULL,
-  mean_pct_over_long_wait  REAL NOT NULL,
+  mean_awt_s               DOUBLE PRECISION NOT NULL,
+  mean_wt95_s              DOUBLE PRECISION NOT NULL,
+  mean_ttd_mean_s          DOUBLE PRECISION NOT NULL,
+  mean_pct_over_long_wait  DOUBLE PRECISION NOT NULL,
   per_seed_json            TEXT NOT NULL,
-  submitted_at_ms          INTEGER NOT NULL,
+  submitted_at_ms          BIGINT NOT NULL,
   UNIQUE (challenge_id, data_hash, user_id)
 );
 CREATE INDEX IF NOT EXISTS challenge_entries_board

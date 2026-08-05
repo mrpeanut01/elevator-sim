@@ -10,6 +10,7 @@
 import { createServer, type IncomingMessage, type Server as NodeServer, type ServerResponse } from 'node:http';
 
 import type { Api, ApiRequest } from './api.js';
+import { assetFor, cacheControlFor, type StaticBundle } from './static.js';
 
 /**
  * The largest request body the server will read.
@@ -30,6 +31,14 @@ export interface ServeOptions {
    * anybody deciding it should be.
    */
   readonly allowOrigin: string;
+  /**
+   * The built viewer, served from this same origin. Omitted, the server is the JSON API alone.
+   *
+   * Optional because the API is useful without it — the tests drive `handle()` directly and never
+   * bind a port — and because a missing bundle must be a deployment's decision rather than a
+   * startup crash for anyone running the API on its own.
+   */
+  readonly static?: StaticBundle | undefined;
 }
 
 export function serve(options: ServeOptions): NodeServer {
@@ -58,6 +67,30 @@ async function respond(options: ServeOptions, incoming: IncomingMessage, respons
   }
 
   const url = new URL(incoming.url ?? '/', 'http://localhost');
+
+  // The viewer, before the API and only outside `/api/`. The prefix is the whole routing rule:
+  // every route `api.ts` answers begins with it, so nothing here can shadow an endpoint, and a
+  // future endpoint cannot be shadowed by someone adding a file to the bundle.
+  //
+  // A non-API path with no matching asset falls through to the API's own 404 rather than being
+  // rewritten to `index.html` — see `assetFor` on why there is deliberately no catch-all.
+  if (options.static !== undefined && !url.pathname.startsWith('/api/')) {
+    if (incoming.method === 'GET' || incoming.method === 'HEAD') {
+      const asset = assetFor(options.static, url.pathname);
+      if (asset !== undefined) {
+        response.writeHead(200, {
+          'content-type': asset.contentType,
+          'cache-control': cacheControlFor(asset),
+          // Same reason as the API's: the browser must not re-decide what it was handed.
+          'x-content-type-options': 'nosniff',
+        });
+        // A HEAD carries the headers and no body, which is what makes it a HEAD.
+        response.end(incoming.method === 'HEAD' ? undefined : asset.body);
+        return;
+      }
+    }
+  }
+
   let body: unknown;
   try {
     body = await readJson(incoming);

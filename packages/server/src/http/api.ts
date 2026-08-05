@@ -176,7 +176,7 @@ export function createApi(deps: ApiDeps): Api {
       case 'POST /api/scores':
         return submit(deps, request, nextSubmitMs);
       case 'GET /api/boards':
-        return { status: 200, body: { boards: deps.store.boards() } };
+        return { status: 200, body: { boards: await deps.store.boards() } };
       case 'GET /api/board':
         return board(deps, request);
       case 'GET /api/challenges':
@@ -204,7 +204,7 @@ async function register(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse
   const issues = [...emailIssues(email), ...displayNameIssues(displayName), ...passwordIssues(password)];
   if (issues.length > 0) return { status: 400, body: { error: 'invalid-registration', issues } };
 
-  const created = deps.store.createUser({ email, displayName, password: hashPassword(password) });
+  const created = await deps.store.createUser({ email, displayName, password: hashPassword(password) });
   if (!created.ok) {
     // Uniform on purpose for the address, specific for the name. A taken *display name* is public
     // — it is printed on every board — so saying so leaks nothing. A taken *address* is not, and
@@ -230,13 +230,13 @@ async function register(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse
   // dropped is an account the player can never finish and will never be told why.
   await deps.mailer.send(confirmationMessage(created.user.email, deps.confirmUrl(token)));
 
-  const session = deps.store.createSession(newSessionToken(), created.user.id);
+  const session = await deps.store.createSession(newSessionToken(), created.user.id);
   // The session is issued **unconfirmed**: § D214 § 5 lets an unconfirmed account log in and play,
   // and gates only the one privilege that needs gating — posting a score.
   return { status: 201, body: { token: session.token, user: publicUser(created.user) } };
 }
 
-function confirm(deps: ApiDeps, request: ApiRequest): ApiResponse {
+async function confirm(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
   const token = request.query.get('token') ?? '';
   const claims = verifyConfirmation(token, deps.secret, deps.now());
   if (typeof claims === 'string') {
@@ -253,18 +253,18 @@ function confirm(deps: ApiDeps, request: ApiRequest): ApiResponse {
   }
   // Both halves, and the store checks both: a token carries the address it was mailed to, so it
   // cannot confirm whatever address the account happens to hold now.
-  const done = deps.store.confirmUser(claims.userId, claims.email);
+  const done = await deps.store.confirmUser(claims.userId, claims.email);
   return done
     ? { status: 200, body: { confirmed: true } }
     : { status: 400, body: { error: 'bad-signature', detail: 'That confirmation link is not valid.' } };
 }
 
-function login(deps: ApiDeps, request: ApiRequest): ApiResponse {
+async function login(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
   const body = request.body as Partial<Record<'email' | 'password', unknown>>;
   const email = typeof body?.email === 'string' ? body.email : '';
   const password = typeof body?.password === 'string' ? body.password : '';
 
-  const user = deps.store.userByEmail(email);
+  const user = await deps.store.userByEmail(email);
   // One refusal, one wording, for both arms. Telling the caller which of the two was wrong hands
   // them the half they did not have.
   const refused: ApiResponse = {
@@ -280,19 +280,19 @@ function login(deps: ApiDeps, request: ApiRequest): ApiResponse {
   }
   if (!passwordMatches(password, user.password)) return refused;
 
-  const session = deps.store.createSession(newSessionToken(), user.id);
+  const session = await deps.store.createSession(newSessionToken(), user.id);
   return { status: 200, body: { token: session.token, user: publicUser(user) } };
 }
 
-function logout(deps: ApiDeps, request: ApiRequest): ApiResponse {
-  if (request.token !== undefined) deps.store.deleteSession(request.token);
+async function logout(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
+  if (request.token !== undefined) await deps.store.deleteSession(request.token);
   // 200 whether or not the token was real. A logout that reported "no such session" would say
   // whether a token existed.
   return { status: 200, body: { ok: true } };
 }
 
-function me(deps: ApiDeps, request: ApiRequest): ApiResponse {
-  const user = authenticate(deps, request);
+async function me(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
+  const user = await authenticate(deps, request);
   return user === undefined
     ? { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to see your account.' } }
     : { status: 200, body: { user: publicUser(user) } };
@@ -300,12 +300,12 @@ function me(deps: ApiDeps, request: ApiRequest): ApiResponse {
 
 /* --------------------------------------------------------------- leaderboard */
 
-function submit(
+async function submit(
   deps: ApiDeps,
   request: ApiRequest,
   nextSubmitMs: Map<string, number>,
-): ApiResponse {
-  const user = authenticate(deps, request);
+): Promise<ApiResponse> {
+  const user = await authenticate(deps, request);
   if (user === undefined) {
     return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to post a score.' } };
   }
@@ -344,7 +344,7 @@ function submit(
   }
 
   const configHash = configHashOf(submission.run, facts);
-  const entry = deps.store.recordEntry({
+  const entry = await deps.store.recordEntry({
     configHash,
     userId: user.id,
     run: submission.run,
@@ -354,7 +354,7 @@ function submit(
   return { status: 201, body: { configHash, entry: publicEntry(entry) } };
 }
 
-function board(deps: ApiDeps, request: ApiRequest): ApiResponse {
+async function board(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
   const configHash = request.query.get('configHash') ?? '';
   if (configHash.length === 0) {
     return { status: 400, body: { error: 'no-board', detail: 'Name a board with ?configHash=…' } };
@@ -367,7 +367,7 @@ function board(deps: ApiDeps, request: ApiRequest): ApiResponse {
     };
   }
   const limit = Math.min(Math.max(Number(request.query.get('limit') ?? '25') || 25, 1), 100);
-  const entries = deps.store.board(configHash, asked as BoardMetric, limit);
+  const entries = await deps.store.board(configHash, asked as BoardMetric, limit);
   return {
     status: 200,
     body: {
@@ -392,16 +392,17 @@ function board(deps: ApiDeps, request: ApiRequest): ApiResponse {
  * of a window boundary. Nothing in this handler reads the request, which is the mechanical form of
  * that guarantee: there is no parameter a caller could pass to move the answer.
  */
-function challenges(deps: ApiDeps): ApiResponse {
+async function challenges(deps: ApiDeps): Promise<ApiResponse> {
   const nowMs = deps.now();
-  const current = deps.store.issueChallenge(issuedChallengeAt(nowMs));
+  const current = await deps.store.issueChallenge(issuedChallengeAt(nowMs));
+  const recent = await deps.store.recentChallenges(12);
   return {
     status: 200,
     body: {
       currentId: current.id,
       current: challengeView(deps, current, nowMs),
       clockNote: CHALLENGE_CLOCK_NOTE,
-      recent: deps.store.recentChallenges(12).map((issued) => ({
+      recent: recent.map((issued) => ({
         id: issued.id,
         name: issued.name,
         opensAtMs: issued.opensAtMs,
@@ -416,9 +417,9 @@ function challenges(deps: ApiDeps): ApiResponse {
  * One challenge, in full. `?id=` is optional and omitting it means *the current one* — which is
  * the shortest correct way for a client to ask, because it never names a cycle at all.
  */
-function challenge(deps: ApiDeps, request: ApiRequest): ApiResponse {
+async function challenge(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
   const nowMs = deps.now();
-  const resolved = resolveChallenge(deps, request.query.get('id') ?? '', nowMs);
+  const resolved = await resolveChallenge(deps, request.query.get('id') ?? '', nowMs);
   if (resolved === undefined) return noSuchChallenge(request.query.get('id') ?? '');
   return { status: 200, body: challengeView(deps, resolved, nowMs) };
 }
@@ -431,12 +432,12 @@ function challenge(deps: ApiDeps, request: ApiRequest): ApiResponse {
  * challenge that closed while they were running it is told that — and is not also made to wait
  * before being told it again.
  */
-function submitChallenge(
+async function submitChallenge(
   deps: ApiDeps,
   request: ApiRequest,
   nextSubmitMs: Map<string, number>,
-): ApiResponse {
-  const user = authenticate(deps, request);
+): Promise<ApiResponse> {
+  const user = await authenticate(deps, request);
   if (user === undefined) {
     return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to post a challenge entry.' } };
   }
@@ -455,7 +456,7 @@ function submitChallenge(
   }
 
   const nowMs = deps.now();
-  const target = resolveChallenge(deps, submission.challengeId, nowMs);
+  const target = await resolveChallenge(deps, submission.challengeId, nowMs);
   if (target === undefined) return noSuchChallenge(submission.challengeId);
 
   // The cheap gate first, and it is worth more here than on the single-run route: a shape error
@@ -465,7 +466,7 @@ function submitChallenge(
 
   const state = challengeStateAt(target, nowMs);
   if (state !== 'open') {
-    const current = deps.store.issueChallenge(issuedChallengeAt(nowMs));
+    const current = await deps.store.issueChallenge(issuedChallengeAt(nowMs));
     // 409 and not 403: nothing is wrong with the request or the requester, the world has moved.
     // The detail names a date and names what to do instead — § D218 § 5's "a reason a player can
     // act on" is two things, and a refusal with only the first is a dead end.
@@ -497,7 +498,7 @@ function submitChallenge(
   }
 
   const dataHash = challengeDataHashOf(target, facts);
-  const entry = deps.store.recordChallengeEntry({
+  const entry = await deps.store.recordChallengeEntry({
     challengeId: target.id,
     dataHash,
     userId: user.id,
@@ -517,10 +518,10 @@ function submitChallenge(
  * `compare` (clause 5) — the pointer at the one surface allowed to answer *"is my dispatcher
  * better"*.
  */
-function challengeBoard(deps: ApiDeps, request: ApiRequest): ApiResponse {
+async function challengeBoard(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
   const nowMs = deps.now();
   const asked = request.query.get('challengeId') ?? '';
-  const target = resolveChallenge(deps, asked, nowMs);
+  const target = await resolveChallenge(deps, asked, nowMs);
   if (target === undefined) return noSuchChallenge(asked);
 
   const metric = request.query.get('metric') ?? 'awtS';
@@ -536,9 +537,8 @@ function challengeBoard(deps: ApiDeps, request: ApiRequest): ApiResponse {
   if (facts === undefined) return unresolvableChallenge(target);
   const dataHash = challengeDataHashOf(target, facts);
 
-  const entries = deps.store.challengeBoard(target.id, dataHash, metric as BoardMetric, limit);
-  const elsewhere = deps.store
-    .challengeDataHashes(target.id)
+  const entries = await deps.store.challengeBoard(target.id, dataHash, metric as BoardMetric, limit);
+  const elsewhere = (await deps.store.challengeDataHashes(target.id))
     .filter((group) => group.dataHash !== dataHash)
     .reduce((total, group) => total + group.entries, 0);
 
@@ -574,7 +574,7 @@ function challengeBoard(deps: ApiDeps, request: ApiRequest): ApiResponse {
  * Shared
  * -------------------------------------------------------------------------- */
 
-function authenticate(deps: ApiDeps, request: ApiRequest): UserRow | undefined {
+async function authenticate(deps: ApiDeps, request: ApiRequest): Promise<UserRow | undefined> {
   return request.token === undefined ? undefined : deps.store.userForSession(request.token);
 }
 
@@ -630,8 +630,12 @@ function chargeCooldown(
  * determines, so it adds no information; what it buys is that a challenge is on the record from the
  * first moment anybody could have played it, rather than from the first moment somebody posted.
  */
-function resolveChallenge(deps: ApiDeps, id: string, nowMs: number): IssuedChallenge | undefined {
-  const current = deps.store.issueChallenge(issuedChallengeAt(nowMs));
+async function resolveChallenge(
+  deps: ApiDeps,
+  id: string,
+  nowMs: number,
+): Promise<IssuedChallenge | undefined> {
+  const current = await deps.store.issueChallenge(issuedChallengeAt(nowMs));
   if (id.length === 0 || id === current.id) return current;
   return deps.store.challengeById(id);
 }

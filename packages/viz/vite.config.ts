@@ -1,21 +1,36 @@
 /**
- * Dev-only bundler configuration.
+ * The viewer's bundler configuration — for the dev server **and**, since the app acquired somewhere
+ * to be deployed, for a production build.
  *
- * Vite is a **devDependency and nothing else**: the package's own build is `tsc -b`, the tests
- * run under vitest against source, and nothing in `dist/` depends on a bundler. This file
- * exists so `npm run dev -w @elevator-sim/viz` opens a browser on a real building, which is how
- * a human checks the renderer.
+ * Vite remains a **devDependency**: the package's own library build is `tsc -b` into `dist/`, the
+ * tests run under vitest against source, and nothing in `dist/` depends on a bundler. What is new
+ * is `npm run build:web`, which bundles `index.html` into `dist-web/` for a web server to hand out.
+ * That is a separate output directory on purpose — `dist/` is `tsc`'s, and pointing a bundler at it
+ * would have the two build systems overwrite each other's work depending on which ran last.
  *
- * It is deliberately outside the TypeScript project (`tsconfig.json` includes `src/**` only), so
- * `tsc -b` never compiles it and the shipped surface cannot come to depend on it.
+ * This file is deliberately outside the TypeScript project (`tsconfig.json` includes `src/**` only),
+ * so `tsc -b` never compiles it and the shipped library surface cannot come to depend on it.
  *
- * Two things it does:
+ * ## The reference data, and why the build does not simply copy `data/`
  *
- * 1. Serves the repository's `data/` at the web root, so `dev/data.ts` can fetch the three
- *    top-level JSON files by name.
- * 2. Serves a manifest of `data/buildings/*.json` at `/__buildings.json`, because HTTP has no
- *    directory listing and hard-coding the building ids would make the viewer disagree with
- *    `data/` the moment somebody adds a building.
+ * `publicDir` is the repository's `data/`, which serves the whole directory at the web root in dev.
+ * On **build**, `copyPublicDir` is `false` and the six documents the viewer actually fetches are
+ * emitted explicitly instead.
+ *
+ * That is not a size optimisation. Copying `data/` wholesale published `data/buildings/README.md`
+ * — repository documentation, on the public web, inside the app — and `citations.test.ts` caught it
+ * by resolving the README's `../../docs/…` links from their new location and finding six of them
+ * pointing at nothing. The test was right twice over: the links were broken *and* the file should
+ * never have been there. **The bundle now contains what the viewer requests and nothing else**, and
+ * {@link WEB_DATA_FILES} is that list.
+ *
+ * The buildings are not on it, because the viewer never fetches one: HTTP has no directory listing
+ * and hard-coding the ids would make the viewer disagree with `data/` the moment somebody adds a
+ * building. So `/__buildings.json` is one document assembled from `data/buildings/*.json`, and
+ * {@link buildingsManifest} produces it **twice over**: as dev-server middleware, and as an emitted
+ * asset at build time. Both halves call the same {@link readBuildings}, because a manifest that was
+ * built one way for the developer and another way for the deployment is two implementations of one
+ * contract, and the one nobody looks at is the one that rots.
  */
 
 import { readFile, readdir } from 'node:fs/promises';
@@ -26,7 +41,36 @@ import { defineConfig } from 'vite';
 
 const DATA_DIR = fileURLToPath(new URL('../../data', import.meta.url));
 
-/** Serves `data/buildings/*.json` as one document. Dev server only; never in a build. */
+/**
+ * Every file from `data/` that the built viewer serves — derived from the `fetchJson` calls in
+ * `src/dev/data.ts`, and deliberately a list rather than a directory copy.
+ *
+ * If the viewer starts fetching a seventh document, it 404s until that name is added here. That is
+ * the intended failure: a missing entry breaks one screen loudly, where copying the directory
+ * wholesale silently published everything else in it.
+ */
+const WEB_DATA_FILES: readonly string[] = Object.freeze([
+  'elevator-specs.json',
+  'traffic-profiles.json',
+  'dispatcher-profiles.json',
+  'campaign.json',
+  'scenario-goals.json',
+]);
+
+/** The manifest body: every `data/buildings/*.json`, by name, sorted so the output is stable. */
+async function readBuildings(): Promise<string> {
+  const dir = join(DATA_DIR, 'buildings');
+  const names = (await readdir(dir)).filter((name) => name.endsWith('.json')).sort();
+  const files = await Promise.all(
+    names.map(async (name) => ({
+      name,
+      data: JSON.parse(await readFile(join(dir, name), 'utf8')),
+    })),
+  );
+  return JSON.stringify({ files });
+}
+
+/** Serves `data/buildings/*.json` as one document — from the dev server, and into the bundle. */
 function buildingsManifest() {
   return {
     name: 'elevator-sim-buildings-manifest',
@@ -34,16 +78,8 @@ function buildingsManifest() {
       server.middlewares.use('/__buildings.json', (_request, response) => {
         void (async () => {
           try {
-            const dir = join(DATA_DIR, 'buildings');
-            const names = (await readdir(dir)).filter((name) => name.endsWith('.json')).sort();
-            const files = await Promise.all(
-              names.map(async (name) => ({
-                name,
-                data: JSON.parse(await readFile(join(dir, name), 'utf8')),
-              })),
-            );
             response.setHeader('content-type', 'application/json');
-            response.end(JSON.stringify({ files }));
+            response.end(await readBuildings());
           } catch (error) {
             response.statusCode = 500;
             response.end(
@@ -52,6 +88,25 @@ function buildingsManifest() {
           }
         })();
       });
+    },
+    /**
+     * The same document, as a real file in the output.
+     *
+     * Without this the built viewer would 404 on `/__buildings.json` and show no buildings at all —
+     * and it would do so only once deployed, because the dev server answers the request from
+     * middleware that never ships.
+     */
+    async generateBundle() {
+      this.emitFile({ type: 'asset', fileName: '__buildings.json', source: await readBuildings() });
+      // And the reference data, by name. `copyPublicDir` is off, so this is the only route from
+      // `data/` into the bundle — which is what keeps the repository's own documentation out of it.
+      for (const name of WEB_DATA_FILES) {
+        this.emitFile({
+          type: 'asset',
+          fileName: name,
+          source: await readFile(join(DATA_DIR, name), 'utf8'),
+        });
+      }
     },
   };
 }
@@ -68,9 +123,21 @@ export default defineConfig({
   // barrel's transitive import graph and fails if a `node:` import returns to it, so the shim
   // cannot become necessary again without a red test first.
   //
-  // The reference data is the viewer's static content in dev. Nothing is copied on build,
-  // because there is no production build of this package.
+  // The reference data is the viewer's static content in dev. On build it is emitted file by file
+  // instead — see the header and `copyPublicDir` below.
   publicDir: DATA_DIR,
+  build: {
+    // The whole of `data/` is the dev server's to serve and **not** the bundle's to publish. With
+    // this on, `data/buildings/README.md` shipped to the web with six broken links in it.
+    copyPublicDir: false,
+    // Not `dist/`: that is `tsc -b`'s output for the library build, and two build systems writing
+    // one directory is a race decided by whichever ran last.
+    outDir: 'dist-web',
+    emptyOutDir: true,
+    // The viewer is a simulator, and a stack trace from minified code in a bug report is worth
+    // less than the bytes cost.
+    sourcemap: true,
+  },
   // docs/10 § 2.10 **M16** and § 14 item 6: `.claude/launch.json` declared 5173 and this file
   // declared 5174, so the preview tooling pointed at a port the server does not use. Reconciled
   // on **5174**, because that is the port the server was actually serving and the one any bookmark

@@ -264,7 +264,7 @@ you believe in, and each is scoped to arrive opt-in and off by default so no shi
 | [TWIN shaft contract](docs/11-twin-shaft-contract.md) | Two independently driven cars in one shaft, designed and not built: the shaft model, the speed-dependent separation constraint, the deadlock invariant and the property that catches it, and an acceptance criterion written before the implementation |
 | [Design handoff](docs/12-design-handoff.md) | The Claude Design handoff the viewer is built to, the requirements checklist extracted from it, the gap analysis against the shipped viewer, the backend changes the front end required, and every deviation with the constraint that forced it |
 | [Building behaviour contract](docs/14-building-behaviour-contract.md) | The program that makes the sim read as a building — **steps 0, 1 and 2 built, the rest designed**: an independent traffic seed, body-mass and group-size distributions you can shape, day-to-day variability, passenger patience and abandonment, lift-lobby crowding, stairs with the up/down asymmetry real people have, and the surface for teaching a learned dispatcher. Every feature opt-in and byte-identical when unused, with the acceptance criteria written before the implementation and the sequencing forced by what can move a published number — including step 2's, which measurement sent back for correction rather than met ([§ D203](DECISIONS.md)) |
-| [Compute offload contract](docs/15-compute-offload-contract.md) | Moving measurement compute off one laptop, and why that is a statistics problem before it is an infrastructure one: common random numbers pair alternatives *within one run on one machine*, so the unit of distribution is a whole paired comparison and never an arm; and a runner is a pin environment, so an x86-64 Linux fleet buys cores without buying a third one. Carries the honest ranking of what compute does and does not buy, and the criterion that raising the replication budget requires re-measuring the resolution limit rather than inheriting it |
+| [Compute offload contract](docs/15-compute-offload-contract.md) | Moving measurement compute off one laptop, and why that is a statistics problem before it is an infrastructure one: common random numbers pair alternatives *within one run on one machine*, so the unit of distribution is a whole paired comparison and never an arm; and a runner is a pin environment, so a second architecture is a third pin set rather than cheaper cores. **Phase A — self-hosted Azure CI runners — is withdrawn and its code removed**, on a cost finding: the template billed fixed capacity (≈ $212/month) while the runbook published the ~$5 of a per-job model it did not implement, which is a published number that did not reproduce from the code that produced it. Phase B, the measurement fan-out, is still only designed. Carries the honest ranking of what compute does and does not buy — two of whose four rows died with Phase A — and the criterion that raising the replication budget requires re-measuring the resolution limit rather than inheriting it |
 | [Change scope contract](docs/16-change-scope-contract.md) | What a control is allowed to move, and when. The simulator runs a whole day and plays the recording back, so there is no mid-day change — every change re-rolls the day, which makes the retry the product's most-used verb and, until it was named, one that could bank a scenario on a single Monday. Four scopes named so a fifth is a compile error, the controls under them derived from the state's own keys in both directions, and ten rules **S1–S10** — including the one that says a presentation control must reach a sink *and* must not reach the legs |
 | [Play-through audit](docs/17-play-experience-audit.md) | The product walked as a player, mode by mode: what each is for, whether it makes sense, what moves at each scope inside it, and what its results page has to say. Carries four modes that do not exist and an argument for each — incidents and maintenance over the `serviceEvents` scheduler no shipped building calls, a calendar of seasons and holidays at `growth.ts`'s own seam, a fixed-seed daily challenge that would give the leaderboard a competitive axis other than luck, and a commissioning phase over the elevator-spec table's real rise and floor-count gates |
 | [Phase 6c re-measurement handover](docs/13-phase-6c-handover.md) | The pre-registered § D162 protocol, written to be executed cold in its own session: the five conditions and which already hold, the gate itemised, the saturation census that must come first because no budget may be inherited, and what an acceptance would and would not be allowed to say. A third refusal is a permitted outcome — and is now the recorded one (`benchmark/lunchTwoWaySelection.ts`) |
@@ -278,6 +278,24 @@ vendored in [`docs/design/`](docs/design/).
 npm install && npm run build
 npm run dev -w @elevator-sim/viz     # → http://localhost:5174
 ```
+
+### Deploying it
+
+The viewer and the API ship as **one container serving one origin** — which is what lets the API's
+CORS policy stay at same-origin, because there is no cross-origin request to permit. The viewer's
+web bundle is a separate build from the library one:
+
+```bash
+npm run build:web -w @elevator-sim/viz     # → packages/viz/dist-web/
+docker build -t elevator-sim .
+```
+
+The server needs PostgreSQL (`ELEVATOR_SIM_DB`), a 32-character signing secret
+(`ELEVATOR_SIM_SECRET`, no default — a placeholder is how a development secret reaches production),
+and, in production only, a real mailer. [`infra/README.md`](infra/README.md) is the Azure runbook:
+Container App, PostgreSQL flexible server, and Communication Services for confirmation mail, with
+the cost model derived from the template's own parameters rather than asserted beside it. Its § 0
+says plainly which claims were verified by running them and which have never been deployed.
 
 ## Status
 

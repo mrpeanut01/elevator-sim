@@ -55,6 +55,15 @@ const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SKIP_DIRS: ReadonlySet<string> = new Set([
   'node_modules',
   'dist',
+  // The viewer's web bundle, for `dist/`'s reason and one of its own. Build output is not authored
+  // prose — but more than that, this directory exists only if somebody has run
+  // `npm run build:web`, so walking it made the suite pass or fail on local state rather than on
+  // the tree. It did exactly that once: `publicDir` copied `data/buildings/README.md` into the
+  // bundle, and its `../../docs/…` links resolved from `data/buildings/` and not from the copy.
+  // The copy is fixed at source — `vite.config.ts` now emits named files instead of the directory
+  // — and this entry is the second half, so a future stray document cannot make a green suite
+  // depend on whether you happened to build the viewer first.
+  'dist-web',
   '.git',
   'coverage',
   '.vite',

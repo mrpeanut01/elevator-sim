@@ -32,23 +32,36 @@ import {
 } from './challenge/schedule.js';
 import type { ChallengeDataFacts } from './challenge/submission.js';
 import { createApi, type Api, type ApiDeps } from './http/api.js';
+import { acsMailerFrom } from './mail/acsMailer.js';
 import { OutboxMailer, type Mailer } from './mail/mailer.js';
 import { digestOf, type ResolvedDataFacts, type SubmittedRun } from './leaderboard/submission.js';
 import type { VerificationResources } from './leaderboard/verify.js';
+import type { Sql } from './store/sql.js';
 import { Store } from './store/store.js';
 
 export interface BootstrapOptions {
   /** Where `data/` lives. */
   readonly dataDir: string;
-  /** SQLite path, or `':memory:'`. */
-  readonly databasePath: string;
+  /**
+   * The database, already connected.
+   *
+   * Injected rather than built here, for the reason the mailer is: this function assembles a
+   * server out of things it is handed, and a bootstrap that constructed its own connection could
+   * only ever be tested against the database it chose. `main.ts` builds the production `PgSql`
+   * from the environment and is the named non-test caller; tests hand it a `PgliteSql`, which is
+   * PostgreSQL in-process rather than a stand-in for one.
+   */
+  readonly sql: Sql;
   /** `process.env`, or whatever a test wants it to be. */
   readonly env: Readonly<Record<string, string | undefined>>;
   /** The public origin confirmation links point at, e.g. `https://elevator.example`. */
   readonly publicOrigin: string;
   /** Injected so a test is not at the mercy of the clock, and a server is. */
   readonly now?: () => number;
-  /** Overridden by tests. Defaults to the outbox driver, which production refuses. */
+  /**
+   * Overridden by tests. Otherwise the environment chooses: Azure Communication Services when it
+   * is configured, and the outbox driver — which production refuses — when it is not.
+   */
   readonly mailer?: Mailer;
 }
 
@@ -57,7 +70,7 @@ export interface Server {
   readonly store: Store;
   readonly mailer: Mailer;
   readonly config: LoadedConfig;
-  close(): void;
+  close(): Promise<void>;
 }
 
 /** Thrown when the environment asks for a combination that is not safe to run. */
@@ -73,17 +86,23 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
   const config = await loadConfig(options.dataDir);
   const now = options.now ?? ((): number => Date.now());
 
-  const mailer = options.mailer ?? new OutboxMailer(options.env['ELEVATOR_SIM_OUTBOX'] ?? '.outbox.jsonl');
+  // Three sources, most explicit first: what a test passed, what the environment configures, and
+  // the development driver. The middle one is new — until it existed, `AcsMailer`'s absence meant
+  // the refusal below could not be satisfied by *any* environment, so a production boot was not
+  // merely refused, it was impossible.
+  const mailer = options.mailer ?? acsMailerFrom(options.env) ?? new OutboxMailer(options.env['ELEVATOR_SIM_OUTBOX'] ?? '.outbox.jsonl');
   if (options.env['NODE_ENV'] === 'production' && mailer instanceof OutboxMailer) {
     throw new UnsafeConfigurationError(
       'The development mailer writes confirmation links to a file in the clear. Configure a real ' +
-        'mailer before running in production, or unset NODE_ENV=production.',
+        'mailer before running in production, or unset NODE_ENV=production. Set ' +
+        'ELEVATOR_SIM_ACS_ENDPOINT (managed identity) or ELEVATOR_SIM_ACS_CONNECTION_STRING, ' +
+        'together with ELEVATOR_SIM_MAIL_FROM.',
     );
   }
 
   assertChallengesAreRunnable(config);
 
-  const store = new Store({ path: options.databasePath, now });
+  const store = await Store.open({ sql: options.sql, now });
   const resources: VerificationResources = {
     buildingsById: config.buildingsById,
     dispatcherProfilesById: config.dispatcherProfilesById,
@@ -108,8 +127,8 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
     store,
     mailer,
     config,
-    close: () => {
-      store.close();
+    close: async () => {
+      await store.close();
     },
   };
 }

@@ -1,8 +1,7 @@
-# A filled-in parameter file carries the owner's repository URL and SSH public key. Neither is a
-# secret, and neither belongs in the repository either. `main.parameters.example.json` is the
-# committed template.
+# Your filled-in parameters. `main.parameters.example.json` is the committed one and holds no
+# secret; this is the copy that may hold two, and it must never be committed.
 azure/main.parameters.json
 
-# Compiled ARM output from `az bicep build`. The Bicep is the source; the JSON is a build artefact.
-azure/*.json
-!azure/main.parameters.example.json
+# Compiled ARM output, if you ever run `az bicep build` with `--outfile`.
+*.json.bicep
+azure/main.json
