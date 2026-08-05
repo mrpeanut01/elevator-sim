@@ -25,9 +25,7 @@ import {
 import {
   EMPTY_FORM,
   MAX_DISPLAY_NAME,
-  MAX_PASSWORD_LENGTH,
   MIN_DISPLAY_NAME,
-  MIN_PASSWORD_LENGTH,
   SIGNED_OUT,
   canSubmitForm,
   formIssues,
@@ -252,10 +250,25 @@ describe('the client’s rules are the server’s rules', () => {
   const serverSource = (relative: string): string =>
     readFileSync(fileURLToPath(new URL(`../../../server/src/${relative}`, import.meta.url)), 'utf8');
 
-  it('mirrors the server’s password bounds exactly, rather than approximately', () => {
+  /*
+   * The mirror is now an **absence**, and the direction of the risk is why it is asserted at all.
+   *
+   * § D241 deleted the password path: sign-in is an emailed link, so `passwordIssues`,
+   * `hashPassword`, `passwordMatches` and `SCRYPT_PARAMS` are gone from the server, and there are
+   * no bounds left to mirror. Deleting this case would have been the obvious move and the wrong
+   * one — it is the case that fails if a password rule ever returns to the server while the client
+   * is still an email-only form, which is the same one-directional hazard the block above
+   * describes, pointed the other way.
+   *
+   * `MIN_PASSWORD_LENGTH` and `MAX_PASSWORD_LENGTH` in `menu/account.ts` are orphaned by that
+   * deletion and are removed with the account form's own migration to the link flow; this case
+   * stops them being re-justified by a rule that no longer exists.
+   */
+  it('finds no password rule on the server, because sign-in is a link', () => {
     const source = serverSource('accounts/credentials.ts');
-    expect(source).toContain(`password.length < ${String(MIN_PASSWORD_LENGTH)}`);
-    expect(source).toContain(`password.length > ${String(MAX_PASSWORD_LENGTH)}`);
+    expect(source).not.toContain('password.length');
+    expect(source).not.toContain('hashPassword');
+    expect(source).not.toContain('SCRYPT_PARAMS');
   });
 
   it('mirrors the server’s display-name bounds exactly', () => {
