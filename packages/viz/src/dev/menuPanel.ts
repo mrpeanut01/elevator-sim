@@ -29,6 +29,7 @@ import {
   type ChallengeScreenInput,
   type CommissioningScreenInput,
   type MenuAffordance,
+  type MenuGuide,
   type MenuIntent,
 } from '../menu/screens.js';
 import type { MenuCatalogue, MenuState } from '../menu/types.js';
@@ -125,6 +126,9 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
 
   const list = el(doc, 'div', { className: 'menu-list' });
   for (const row of view.rows) list.append(affordance(doc, host, row));
+  // The seventh entry on the root, and it is an entry rather than a row: see the comment on
+  // `MenuScreenView.guide` for why the guide carries no intent and asks nothing of the shell.
+  if (view.guide !== undefined) list.append(guideEntry(doc, view.guide));
   children.push(list);
 
   if (view.issues.length > 0) children.push(issueList(doc, view.issues));
@@ -197,6 +201,63 @@ function affordance(doc: Document, host: MenuPanelHost, row: MenuAffordance): HT
     host.dispatch(row.intent);
   });
   return button;
+}
+
+/* -------------------------------------------------------------------------- *
+ * How to play — an entry that discloses rather than navigates
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The guide, as a native disclosure in the menu list — GitHub issue #13.
+ *
+ * ## Three shapes were available and this is the one that costs nothing to be wrong about
+ *
+ * A seventh **screen** would have been the obvious fit — it is what Settings is — and it is not
+ * built, for a reason outside this file: `MENU_SCREENS` is walked by an exhaustive switch in
+ * `playthrough/walk.test.ts`, which this lane does not own, so widening the union here breaks a
+ * build somewhere else. A **button plus panel state** would have needed a {@link MenuIntent} the
+ * shell's own switch performs, and an intent nothing performs is the dead control this package has
+ * shipped eleven times.
+ *
+ * `details` needs neither. The browser owns the open/closed state, it starts closed so it blocks
+ * nothing, `summary` is focusable and operable from the keyboard without a handler, and the whole
+ * thing is inert to the state machine — which is the honest description of a page that only
+ * explains.
+ *
+ * ## Every class here already has a rule
+ *
+ * `dev/surfaces.test.ts` derives the class names this file emits from its own source and requires
+ * a rule for each in `index.html`, which this lane also does not own. So the entry is built from
+ * the vocabulary the menu already ships: the row card, the row name, the row detail line, and the
+ * note paragraph. Nothing new is introduced, and the entry therefore looks like the six above it
+ * because it is made of the same parts.
+ */
+function guideEntry(doc: Document, guide: MenuGuide): HTMLElement {
+  const block = el(doc, 'details', {});
+
+  // Structured exactly as `affordance` builds a navigate row, so the closed entry is visually the
+  // seventh member of the list rather than a different kind of thing that happens to sit under it.
+  const summary = el(doc, 'summary', { className: 'menu-row' });
+  const name = el(doc, 'span', { className: 'menu-row-name' });
+  setText(name, guide.title);
+  const lead = el(doc, 'span', { className: 'menu-row-detail' });
+  setText(lead, guide.summary);
+  fill(summary, name, lead);
+
+  const body = el(doc, 'div', {});
+  for (const section of guide.sections) {
+    const heading = el(doc, 'p', { className: 'menu-row-name' });
+    setText(heading, section.heading);
+    body.append(heading);
+    for (const paragraph of section.body) {
+      const line = el(doc, 'p', { className: 'menu-note' });
+      setText(line, paragraph);
+      body.append(line);
+    }
+  }
+
+  fill(block, summary, body);
+  return block;
 }
 
 function issueList(doc: Document, issues: readonly string[]): HTMLElement {

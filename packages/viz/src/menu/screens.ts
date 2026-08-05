@@ -175,6 +175,36 @@ export interface MenuScreenView {
   /** Everything wrong with the current selection, in words a player can act on. */
   readonly issues: readonly string[];
   readonly rows: readonly MenuAffordance[];
+  /**
+   * The how-to-play guide, on the root screen and `undefined` on every other.
+   *
+   * Carried on the view rather than authored in the panel for this module's founding reason: what
+   * the product *says it is* is a decision, and a decision written inside a render call needs a
+   * document and a click to reach. Here it is a value, so `menu/howToPlay.test.ts` can hold every
+   * sentence of it against the configuration it describes — the dispatchers `data/` ships, the
+   * axes {@link freePlayBody} offers, and the bars `shift/goals.ts` computes.
+   *
+   * It is **not** a {@link MenuAffordance}, and that is deliberate rather than an omission. An
+   * affordance carries a {@link MenuIntent}, every intent is performed by the shell's switch, and
+   * a row whose intent nothing performs is the dead control this directory keeps finding. The
+   * guide asks nothing of the shell: the panel discloses it in place.
+   */
+  readonly guide: MenuGuide | undefined;
+}
+
+/** One headed run of paragraphs in {@link MenuGuide}. */
+export interface GuideSection {
+  readonly heading: string;
+  readonly body: readonly string[];
+}
+
+/** The whole of the how-to-play guide: the entry a player presses, and what is under it. */
+export interface MenuGuide {
+  /** The label on the menu entry itself. */
+  readonly title: string;
+  /** The line under the label, before anything is opened. */
+  readonly summary: string;
+  readonly sections: readonly GuideSection[];
 }
 
 /** What `screenOf` needs from the shell to answer for every screen. */
@@ -313,6 +343,12 @@ export function screenOf(input: MenuViewInput): MenuScreenView {
     notices: view.notices,
     issues: view.issues,
     rows: screen === 'main' ? view.rows : Object.freeze([...view.rows, BACK]),
+    /*
+     * The root only. A guide repeated under every screen would be six copies of one explanation
+     * competing with the screen the player already chose, and the one place a player who does not
+     * yet know what any of it means is standing is the screen they land on.
+     */
+    guide: screen === 'main' ? HOW_TO_PLAY : undefined,
   });
 }
 
@@ -397,6 +433,217 @@ function mainRows(): readonly MenuAffordance[] {
     to('main.settings', 'Settings', 'Presentation only — nothing here changes a run', 'settings'),
   ]);
 }
+
+/* ----------------------------------------------------------- how to play */
+
+/**
+ * What the game is, before it asks anybody to run it — GitHub issue #13.
+ *
+ * ## Why it is here and not in a module of its own
+ *
+ * Because of what `honesty/derive.test.ts` does with a new exported text producer: it derives the
+ * set from the source tree and fails on one that is in neither a surface adapter nor a stated
+ * exclusion. A `menu/guide.ts` exporting these sentences would be exactly that — a new surface,
+ * unchecked, and red. Authored here they travel out through `screenOf`, which the `MENU` adapter
+ * already covers, and they are held against the configuration they describe by
+ * `menu/howToPlay.test.ts` beside this file.
+ *
+ * ## The three sentences this copy is not allowed to write, and it does not
+ *
+ * 1. **No dispatcher is ranked.** CLAUDE.md: *never declare one dispatcher better than another
+ *    without a paired-t confidence interval that excludes zero*. So every dispatcher below is
+ *    described by **what it does** — which terms it weights, which constraint it holds, where it
+ *    parks — and the paragraph that would have said which to pick says instead that one run cannot
+ *    answer it and names the surface that can. `nearest-car` is called a baseline because
+ *    `data/dispatcher-profiles.json` gives it `role: "baseline"`, and because it sits on the
+ *    Pareto front at six of eight matrix cells ([§ D106](../../../../DECISIONS.md)); *baseline* is
+ *    a description here, never a verdict.
+ * 2. **No unmeasured mechanism.** No sentence explains *why* one configuration performs better
+ *    than another, because this repository has measured exactly one such sentence and found it
+ *    false — and `packages/experiments/src/validation/documentation.test.ts` is what stops it
+ *    coming back. Statements of mechanism below are statements about **what the code does** (a
+ *    car does not reverse direction; a term is normalised before it is weighted), never about what
+ *    that buys.
+ * 3. **No figure is graded.** Energy is an axis and never a score (§ D106), and the withheld mean
+ *    is described as the run declining to be summarised rather than as a penalty.
+ *
+ * Every number quoted below — the goal ceilings, the wake-up threshold, the run lengths, the seed
+ * bounds — is asserted against the code that produces it in `howToPlay.test.ts`, because a
+ * published number that nothing re-derives is how three of them went stale in this repository
+ * already.
+ */
+const HOW_TO_PLAY: MenuGuide = Object.freeze({
+  title: 'How to play',
+  /*
+   * It says that it opens **in words**, and that is not decoration.
+   *
+   * The panel draws this entry with the menu's own row card, which sets `display: grid` on the
+   * `summary` and therefore takes away the disclosure triangle a browser would otherwise draw. The
+   * six rows above it navigate; this one expands. Saying so in the line the reader is already
+   * reading is cheaper than a glyph and survives KB-15, which forbids a signal carried by shape or
+   * colour alone.
+   */
+  summary:
+    'Opens here, and starts nothing: what the game is, what a shift is, and what each control does.',
+  sections: Object.freeze([
+    Object.freeze({
+      heading: 'What you are actually doing',
+      body: Object.freeze([
+        'A building has more people wanting to move than it has cars to move them. Every time ' +
+          'somebody presses a button at a landing, something has to decide which car goes, and ' +
+          'in what order it goes there. That decision is called dispatching, and it is the thing ' +
+          'this simulator is about.',
+        'You do not drive the cars. You choose the rule that answers the calls, point a stretch ' +
+          'of real traffic at it, and read what happened to the people who turned up.',
+      ]),
+    }),
+    Object.freeze({
+      heading: 'The three ways in',
+      body: Object.freeze([
+        'Scenarios is a week on one building. Each day the tenants grow, something is booked ' +
+          'against the day, and the bars you are read against harden. A day that meets every bar ' +
+          'is a clean shift, and clean shifts bank toward clearing the scenario. Every scenario ' +
+          'is open from the start — they teach, they do not gate.',
+        'Free play is one run on day one: the building as it ships, with no tenant growth and ' +
+          'nothing scheduled against it. You set all six axes yourself, and Start opens a fresh ' +
+          'week — no streak, no banked shifts and no history carried in from a scenario. That is ' +
+          'also what makes it the run a leaderboard can replay.',
+        'This week’s challenge fixes the building, the traffic, the run length and the seeds — ' +
+          'the server issues them — and leaves the dispatcher as the one thing that varies. A ' +
+          'set is scored over all of its seeds. A partial set is not a smaller score; it is a ' +
+          'different question.',
+        'Leaderboard, Account and Settings are not modes. A board is one configuration across ' +
+          'seeds, ordered on one named metric, so picking a different dispatcher moves you to a ' +
+          'different board rather than up an existing one. An account is what lets a score be ' +
+          'posted. Settings change how a run is drawn and never what it computes.',
+      ]),
+    }),
+    Object.freeze({
+      heading: 'What a shift is',
+      body: Object.freeze([
+        'A shift is one day in one building. Passengers arrive, cars answer, and the day is read ' +
+          'against three goals: carry a share of the people who turned up, get a share of riders ' +
+          'away inside a minute, and — alternating by day — either hold the deepest landing ' +
+          'queue under a number, or let nobody wait past the 15-minute horizon.',
+        'The bars harden as the week goes on, and then they stop. Away-inside-a-minute tops out ' +
+          'at 84 %, carried tops out at 96 %, and the queue bar bottoms out at 12 people. There ' +
+          'is no losing here. There is a line you are trying to bend upward.',
+        'Nothing is graded before the building wakes up: under 20 arrivals every goal reads a ' +
+          'dash instead of a verdict, because a carried share over three riders is arithmetic ' +
+          'rather than competence. Every goal is read from counts — never from an average — so a ' +
+          'day cannot be graded on a figure the run itself declines to publish.',
+      ]),
+    }),
+    Object.freeze({
+      heading: 'The six things Free play lets you set',
+      body: Object.freeze([
+        'Building — which tower you are running. Each one ships with its own floors, its ' +
+          'population, its banks and the machines in them, and the menu prints those counts ' +
+          'beside the name. The building decides how far a car has to travel, how many people it ' +
+          'can be asked to carry, and which floors each bank is allowed to serve at all.',
+        'Dispatcher — the rule that answers a call, and the axis this whole simulator exists to ' +
+          'study. Every one of them is a set of weights rather than a program; the next section ' +
+          'takes them one at a time.',
+        'Traffic shape — which demand template the run is drawn from. The shipped set is a rise ' +
+          'and fall, a lunch two-way peak, a shift change, an evening egress, and a constant ISO ' +
+          'load. Each template declares its own period, and each is marked either recommended — ' +
+          'its shape supports a confidence interval across replications — or cross-checking, ' +
+          'which is there to test a result against a differently shaped day.',
+        'Arrival rate — how much demand, as a share of the building’s population arriving every ' +
+          'five minutes. Left at this building’s own profile it uses whatever the building ' +
+          'declares, which is the choice that does not pin a number the reference data is free ' +
+          'to change. The ladder spans the shipped buildings’ operating points, so a rate that ' +
+          'is comfortable in one building will swamp another — and a run whose queue never ' +
+          'settles has its average wait withheld rather than reported.',
+        'Run length — how long the day runs. Five are offered: 5, 15, 30, 60 and 120 minutes. It ' +
+          'has to be at least the traffic shape’s own period, and the menu refuses the ' +
+          'combination here rather than letting the run fail afterwards.',
+        'Seed — 1 to 20 digits naming the passengers. With the building and the traffic held ' +
+          'still, the same seed produces the same arrivals, the same decisions and the same ' +
+          'numbers every time. That is what lets a leaderboard verify a posted score by replaying ' +
+          'it, and what lets two dispatchers meet identical traffic instead of different luck. A ' +
+          'seed names a run rather than measuring one: changing it changes who turns up, not how ' +
+          'hard the configuration is.',
+      ]),
+    }),
+    Object.freeze({
+      heading: 'The dispatchers, and what each one does',
+      body: Object.freeze([
+        'A dispatcher here is data rather than code: a set of weights over one shared library of ' +
+          'cost terms. A term measures something about sending a particular car — the new ' +
+          'passenger’s wait, their ride time, the delay added to the people already aboard, the ' +
+          'delay added to other assigned calls, a reversal of direction, how full the car is, ' +
+          'stops added, metres travelled, how long the oldest call has stood, how far a car ' +
+          'strays from its zone, and the queue already standing at the pickup floor. Every term ' +
+          'is normalised to a common scale before it is weighted, so a weight means the same ' +
+          'kind of thing wherever it appears.',
+        'Three carry the role baseline, which means a reference every study holds fixed. Nearest ' +
+          'car weights the metres a car would travel and nothing else. Minimum estimated wait ' +
+          'weights the new passenger’s wait and nothing else. Conventional collective weights ' +
+          'that same wait and adds the constraint a collective controller actually has: a car ' +
+          'does not reverse direction to take a call, it answers in passing.',
+        'Conventional collective, en-route pickup is that controller allowed to stop for a ' +
+          'landing it passes, carrying a weight that prices what the extra stop costs the people ' +
+          'already aboard.',
+        'Energy aware spreads its weight across wait, stops added and metres travelled, holds ' +
+          'doors adaptively, and leaves an idle car where it stands. Fairness first splits its ' +
+          'weight between wait and the longest-standing call, and keeps a call reassignable for ' +
+          'as long as it can. Capacity aware weights how full the car is and how many people are ' +
+          'already waiting at the floor, and splits a heavy landing across two cars rather than ' +
+          'serving it twice with one.',
+        'Predictive balanced carries ten weighted terms at once, waits a moment before committing ' +
+          'each assignment, and parks idle cars where it forecasts the next calls.',
+        'Contract-net auction, sealed bid and Contract-net auction, multi-round let every car ' +
+          'price the call from its own estimate and let the group allocate from the bids. The ' +
+          'sealed-bid arm runs a single round; the multi-round arm runs three and lets a ' +
+          'provisional winner hand the contract back on its own reserve price.',
+        'Operational zoning, up-peak splits the bank into one contiguous band per in-service car, ' +
+          'prices how far a car strays from its band, and parks each car in the middle of its own.',
+        'Destination disclosure, credential-aware and Destination dispatch, landing panel both ' +
+          'know where the passenger is going before the car is chosen rather than after. The ' +
+          'first discloses the destination to the dispatcher and leaves boarding alone; the ' +
+          'second assigns the passenger to a named car at the landing.',
+        'Which one to run is not a question this screen answers, and it is not a question one run ' +
+          'answers either. Saying that one dispatcher beat another needs the same passengers fed ' +
+          'to both, 50 to 200 times over, and a paired interval that excludes zero — the Compare ' +
+          'tab is the one surface in this product allowed to say it. Nothing is hidden from you ' +
+          'for scoring badly: a profile that does not beat a baseline is a result about that ' +
+          'profile, and finding that out is what Free play is for.',
+      ]),
+    }),
+    Object.freeze({
+      heading: 'What the numbers will and will not say',
+      body: Object.freeze([
+        'Average wait is withheld rather than printed whenever the run cannot support one, on ' +
+          'five grounds: an empty measurement window, a queue still growing when the run ends, ' +
+          'too many arrivals never served, a wait past the 15-minute abandonment horizon, and ' +
+          'more than 2 % of riders giving up. The reason is printed where the figure would have ' +
+          'been. A withheld mean is the run declining to be summarised by one number — not a ' +
+          'fault, and not a low score.',
+        'Energy sits beside the wait figures and is never folded into them. A dispatcher that ' +
+          'drives less carries fewer people, so a configuration that spends less by serving ' +
+          'fewer people has not saved anything; the work per served leg is printed next to the ' +
+          'raw figure for that reason.',
+        'Riders who give up, and riders who take the stairs, are published beside the average ' +
+          'wait rather than inside it. They are the longest waits in the sample, so dropping ' +
+          'them moves the average down by construction.',
+      ]),
+    }),
+    Object.freeze({
+      heading: 'A first run',
+      body: Object.freeze([
+        'Open Free play and set the building to Garden Apartments, the dispatcher to Conventional ' +
+          'collective, the arrival rate to this building’s own profile and the run to 30 minutes. ' +
+          'Watch one call appear at a landing, one car answer it, and one wait end — those three ' +
+          'things are what every dispatcher here is made of.',
+        'Then move one axis and run it again, keeping the seed. With the building and the traffic ' +
+          'held still the same seed brings the same passengers, so what moved in the numbers is ' +
+          'what you moved. That is how the feel of it is learned. It is not how a difference is ' +
+          'demonstrated, which is the Compare tab’s job and takes a great many more runs.',
+      ]),
+    }),
+  ]),
+});
 
 /* -------------------------------------------------------------- free play */
 
