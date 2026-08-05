@@ -1,0 +1,357 @@
+/**
+ * The menu panel, driven through a **document recorder** — the third evidence tier, built.
+ *
+ * ## Why this file exists, and what it is answering
+ *
+ * `docs/16` S9 names four tiers of evidence — `static sweep < model walk < document recorder <
+ * browser` — and this package had the first, the second (`playthrough/walk.test.ts`) and, since
+ * § D220, a browser tier that runs only where a headless shell is provisioned. **The third had
+ * never been built**, and every module that names the ladder says so in its own docstring. So
+ * every claim about what the menu *puts on a page* was either a claim about a pure function next
+ * door or a regex over this file's source.
+ *
+ * That gap is what made GitHub issue #20's second half unanswerable. The reporter wrote:
+ *
+ * > *"The Start button is fully styled as enabled/clickable and gives no visual feedback on click.
+ * > Nothing happens — the screen doesn't navigate anywhere and there's no error toast."*
+ *
+ * Reading the source, `menu/screens.ts` sets `enabled: canStart(...)` and a `disabledWhy`, and
+ * `renderMenu` writes the `disabled` attribute and swaps the detail line for the reason. Both
+ * halves look right, and *looking right* is exactly what the eleven dead seams in this package's
+ * history also did. A recorder settles it by observation.
+ *
+ * ## What a recorder is, and the two things it deliberately is not
+ *
+ * {@link recorder} is about forty lines: `createElement` returns an object carrying a tag, a class,
+ * text, attributes and children, and the handful of members `dev/dom.ts` actually touches. Nothing
+ * is parsed, nothing is laid out, and no CSS is consulted.
+ *
+ * So it is **not a browser**, and it is not jsdom — `docs/05` rules both out and this does not
+ * smuggle one in: there is no `window`, no layout, no event dispatch and no selector engine, and
+ * the object graph is the panel's own output rather than a re-implementation of the DOM.
+ *
+ * And it is **not evidence about appearance.** It can prove the `disabled` attribute is written and
+ * the reason is on the page. It cannot prove the control *looks* disabled, because that is
+ * `index.html`'s stylesheet and this tier cannot see one. Where the two come apart — an attribute
+ * set on a control that still reads as a solid primary button — the reporter's *"styled as
+ * enabled"* is accurate and the attribute assertion below is not a refutation of it. That
+ * distinction is stated here rather than left for a reader to infer from a green test.
+ *
+ * ## And on this control the two **did** come apart — found here, fixed elsewhere, pinned here
+ *
+ * The refusal reaches the page as a `.menu-row-detail` span inside the `.menu-start` button, and
+ * that span inherited `color: var(--dim)`, a grey styled for a dark card, while the button carries
+ * `background: var(--accent)`. Measured while this file was being written, that pairing was
+ * **1.03:1**: the one sentence explaining why Start will not start, drawn invisibly on the control
+ * it explains, with nowhere else for a player to read it. The same span on an ordinary row sits on
+ * `var(--card)` at 6.01:1 and was always fine, so it was the primary button specifically.
+ *
+ * It is **fixed on the base branch** — `§ D235` / GitHub issue #26 added
+ * `.menu-start .menu-row-detail { color: var(--accent-ink) }`, arrived at independently and from
+ * the Scenarios screen rather than from this one, and its own comment quotes the same 1.03:1. So
+ * issue #20's second half is now closed by both halves: the markup was right all along, and the
+ * sentence is legible.
+ *
+ * The last test below is what stops that coming apart again. It does **not** pin a contrast number
+ * — `render/theme.test.ts` owns the ink ladder and a value somebody is tuning is the wrong thing
+ * for this file to hold — it pins the *pairing*: the detail line inside the accent-filled button
+ * must not be drawn in the colour the detail line on a card is drawn in. That is the invariant the
+ * defect broke, stated where the recorder has just proved the sentence is in there.
+ */
+
+import { readFileSync } from 'node:fs';
+
+import { describe, expect, it } from 'vitest';
+
+import { loadConfig } from '@elevator-sim/core';
+
+import { SIGNED_OUT } from '../menu/account.js';
+import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
+import { initialMenuState } from '../menu/menu.js';
+import type { MenuIntent } from '../menu/screens.js';
+import type { MenuCatalogue, MenuState } from '../menu/types.js';
+import { DATA_DIR } from '../fixtures.test-helper.js';
+
+import { renderMenu, type MenuPanelHost } from './menuPanel.js';
+
+/* -------------------------------------------------------------------------- *
+ * The recorder
+ * -------------------------------------------------------------------------- */
+
+/** One element as the panel built it. Enough to assert against; nothing a browser would add. */
+interface Recorded {
+  readonly tag: string;
+  className: string;
+  textContent: string;
+  value: string;
+  readonly attrs: Map<string, string>;
+  readonly children: Recorded[];
+  readonly listeners: Map<string, () => void>;
+}
+
+/**
+ * A document whose elements remember what was done to them.
+ *
+ * Every member below is one `dev/dom.ts` or `dev/menuPanel.ts` actually calls, and the set is
+ * small on purpose: a recorder that grew a member nobody uses would be a second, unasserted
+ * implementation of the DOM sitting in a test directory.
+ */
+function recorder(): { readonly doc: Document; readonly root: Recorded } {
+  const make = (tag: string): Recorded => {
+    const node: Recorded = {
+      tag,
+      className: '',
+      textContent: '',
+      value: '',
+      attrs: new Map(),
+      children: [],
+      listeners: new Map(),
+    };
+    return Object.assign(node, {
+      setAttribute(key: string, value: string) {
+        node.attrs.set(key, value);
+      },
+      getAttribute(key: string) {
+        return node.attrs.get(key) ?? null;
+      },
+      append(...kids: Recorded[]) {
+        node.children.push(...kids);
+      },
+      replaceChildren(...kids: Recorded[]) {
+        node.children.length = 0;
+        node.children.push(...kids);
+      },
+      addEventListener(type: string, handler: () => void) {
+        node.listeners.set(type, handler);
+      },
+      style: {
+        setProperty() {
+          /* the menu sets no computed style; recorded as a no-op rather than omitted */
+        },
+        getPropertyValue: () => '',
+      },
+    });
+  };
+
+  const root = make('div');
+  const doc = { createElement: (tag: string) => make(tag) } as unknown as Document;
+  return { doc, root };
+}
+
+/** Every node in the tree, root first. */
+function walk(node: Recorded): readonly Recorded[] {
+  return [node, ...node.children.flatMap((child) => walk(child))];
+}
+
+/** All the text under a node, in order — what a reader would actually see there. */
+function textUnder(node: Recorded): string {
+  return walk(node)
+    .map((entry) => entry.textContent)
+    .filter((text) => text !== '')
+    .join(' ');
+}
+
+const byClass = (node: Recorded, className: string): readonly Recorded[] =>
+  walk(node).filter((entry) => entry.className === className);
+
+/* -------------------------------------------------------------------------- *
+ * The host
+ * -------------------------------------------------------------------------- */
+
+async function catalogue(): Promise<MenuCatalogue> {
+  return catalogueOf((await loadConfig(DATA_DIR)) as unknown as CatalogueSource);
+}
+
+/**
+ * Render one state and hand back the tree.
+ *
+ * The host is the minimum `renderMenu` reads: no server, no run on screen, nobody signed in. Those
+ * are the arms where the interesting refusals live, which is `playthrough/walk.test.ts`'s own
+ * argument for driving the unhappy states rather than the happy one.
+ */
+function render(state: MenuState, loaded: MenuCatalogue): { readonly root: Recorded; readonly asked: MenuIntent[] } {
+  const { doc, root } = recorder();
+  const asked: MenuIntent[] = [];
+  const host: MenuPanelHost = {
+    doc,
+    catalogue: loaded,
+    state: () => state,
+    dispatch: (intent) => asked.push(intent),
+    account: () => SIGNED_OUT,
+    leaderboard: () => ({ boards: [], selected: undefined, page: undefined, notice: undefined }),
+    runState: () => ({ hasRun: false, rankingRefusal: undefined }),
+    viewMode: () => 'advanced',
+    challenge: () => undefined,
+    commissioning: () => undefined,
+    calendarPeriodId: () => '',
+  };
+  renderMenu(root as unknown as HTMLElement, host);
+  return { root, asked };
+}
+
+/** The Free play screen, with the seed deliberately broken so `canStart` refuses. */
+const brokenFreePlay = (loaded: MenuCatalogue): MenuState => {
+  const base = initialMenuState(loaded);
+  return { ...base, screen: 'free-play', freePlay: { ...base.freePlay, seed: 'not-a-seed' } };
+};
+
+const wholeFreePlay = (loaded: MenuCatalogue): MenuState => ({
+  ...initialMenuState(loaded),
+  screen: 'free-play',
+});
+
+/* -------------------------------------------------------------------------- *
+ * Issue #20's second half
+ * -------------------------------------------------------------------------- */
+
+describe('a refused Start is disabled in the markup, and says why — GitHub issue #20', () => {
+  it('writes the disabled attribute and puts the reason on the page', async () => {
+    const loaded = await catalogue();
+    const { root } = render(brokenFreePlay(loaded), loaded);
+
+    const start = byClass(root, 'menu-start')[0];
+    expect(start, 'the Free play screen no longer renders a Start control').toBeDefined();
+    expect(
+      start?.attrs.get('disabled'),
+      'Start renders without the disabled attribute on a selection the model refuses. The ' +
+        'reporter pressed it and nothing happened; this is the half of that a document can answer.',
+    ).toBe('disabled');
+
+    // Disabled **and explained** — the rule `menuPanel.ts` has carried since it landed, asserted
+    // against what reached the page rather than against the affordance that described it.
+    const detail = start?.children.find((child) => child.className === 'menu-row-detail');
+    expect(detail?.textContent ?? '', 'Start is refused in silence').not.toBe('');
+    expect(textUnder(root)).toContain('A seed is 1–20 digits');
+  });
+
+  it('leaves it enabled, and unexplained, when the selection is whole', async () => {
+    /*
+     * The other direction, and the one that stops the assertion above passing on a Start that is
+     * *always* disabled — which, until the base branch fixed the opening selection, is what a
+     * player actually met on this screen.
+     */
+    const loaded = await catalogue();
+    const { root } = render(wholeFreePlay(loaded), loaded);
+
+    const start = byClass(root, 'menu-start')[0];
+    expect(start?.attrs.has('disabled'), 'a whole selection still renders a disabled Start').toBe(
+      false,
+    );
+    expect(start?.children.some((child) => child.className === 'menu-row-detail')).toBe(false);
+  });
+
+  it('is drawn in a colour meant for the surface it sits on', async () => {
+    /*
+     * The half a document recorder cannot see, pinned as a **pairing** rather than as a number.
+     *
+     * `.menu-row-detail` is styled for a card. Inside `.menu-start` it sits on the accent fill
+     * instead, and inheriting the card colour there measured 1.03:1 — present in the DOM, invisible
+     * on the screen, at the one moment a player needs it. `§ D235` fixed it from the Scenarios
+     * screen; this asserts the override still exists and still *differs*, so a future tidy that
+     * deletes it as redundant fails here rather than on a player's screen.
+     *
+     * Deliberately no contrast figure: `render/theme.test.ts` owns the ink ladder, and a test in
+     * this file holding a value that lane is tuning would fail on their fix.
+     */
+    const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+
+    const base = /\.menu-row-detail\s*\{([^}]*)\}/.exec(html);
+    const onAccent = /\.menu-start\s+\.menu-row-detail\s*\{([^}]*)\}/.exec(html);
+    expect(base, 'the row detail line has no rule at all').not.toBeNull();
+    expect(
+      onAccent,
+      'the refusal under a disabled Start has no rule of its own, so it inherits a colour styled ' +
+        'for a card and is drawn on the accent fill. That is GitHub issue #26 and it is how issue ' +
+        '#20 came to look like "nothing happens": the reason was on the page and unreadable.',
+    ).not.toBeNull();
+
+    const colourOf = (block: string): string => /color:\s*([^;}]+)/.exec(block)?.[1]?.trim() ?? '';
+    expect(colourOf(base?.[1] ?? ''), 'the base rule declares no colour').not.toBe('');
+    expect(
+      colourOf(onAccent?.[1] ?? ''),
+      'the detail line on the accent-filled button is drawn in the same colour as the detail line ' +
+        'on a card. Those are two different surfaces and one token cannot serve both.',
+    ).not.toBe(colourOf(base?.[1] ?? ''));
+    await Promise.resolve();
+  });
+
+  it('presses it, and the intent reaches the host', async () => {
+    // The third thing the reporter described — *nothing happens* — at the tier that can see it.
+    // A click handler is attached and it dispatches `start`; what the shell does with it is
+    // `menu/enterFreePlay.test.ts`'s, compared on the legs.
+    const loaded = await catalogue();
+    const { root, asked } = render(wholeFreePlay(loaded), loaded);
+    byClass(root, 'menu-start')[0]?.listeners.get('click')?.();
+    expect(asked).toEqual([{ kind: 'start' }]);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * How to play — GitHub issue #13
+ * -------------------------------------------------------------------------- */
+
+describe('the how-to-play entry reaches the page', () => {
+  it('sits inside the menu list as a disclosure, closed and carrying its own label', async () => {
+    const loaded = await catalogue();
+    const { root } = render(initialMenuState(loaded), loaded);
+
+    const list = byClass(root, 'menu-list')[0];
+    expect(list, 'the root screen renders no menu list').toBeDefined();
+
+    const entry = list?.children.find((child) => child.tag === 'details');
+    expect(entry, 'the guide is not in the list the six destinations are in').toBeDefined();
+    // Closed on arrival: nothing writes `open`, so it blocks neither the six rows nor the screen.
+    expect(entry?.attrs.has('open')).toBe(false);
+
+    const summary = entry?.children.find((child) => child.tag === 'summary');
+    expect(summary?.className, 'the entry is drawn in the row vocabulary').toBe('menu-row');
+    expect(textUnder(summary as Recorded)).toContain('How to play');
+    // It says that it opens, in words: the row card takes the disclosure triangle away, and KB-15
+    // forbids a signal carried by shape alone.
+    expect(textUnder(summary as Recorded)).toContain('Opens here, and starts nothing');
+  });
+
+  it('puts every section of the guide on the page', async () => {
+    const loaded = await catalogue();
+    const { root } = render(initialMenuState(loaded), loaded);
+    const text = textUnder(root);
+
+    for (const heading of [
+      'What you are actually doing',
+      'The three ways in',
+      'What a shift is',
+      'The six things Free play lets you set',
+      'The dispatchers, and what each one does',
+      'What the numbers will and will not say',
+      'A first run',
+    ]) {
+      expect(text, `the guide's "${heading}" section never reached the page`).toContain(heading);
+    }
+    // Non-vacuity: the walk really is reading the guide's paragraphs and not only its headings.
+    expect(text).toContain('one dispatcher beat another');
+  });
+
+  it('offers it on the root screen only', async () => {
+    const loaded = await catalogue();
+    const elsewhere = render({ ...initialMenuState(loaded), screen: 'settings' }, loaded);
+    expect(walk(elsewhere.root).some((node) => node.tag === 'details')).toBe(false);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The recorder is worth trusting
+ * -------------------------------------------------------------------------- */
+
+describe('the recorder records', () => {
+  it('is not vacuous — it sees the six destinations and their intents', async () => {
+    // Without this, every assertion above could pass over an empty tree. The root screen's rows
+    // are the cheapest thing to count that the panel did not invent.
+    const loaded = await catalogue();
+    const { root, asked } = render(initialMenuState(loaded), loaded);
+    const rows = byClass(root, 'menu-row').filter((node) => node.tag === 'button');
+    expect(rows.length).toBe(6);
+
+    rows[0]?.listeners.get('click')?.();
+    expect(asked[0]).toEqual({ kind: 'navigate', to: 'campaign' });
+  });
+});
