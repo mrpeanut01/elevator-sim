@@ -21,7 +21,13 @@
  */
 
 import { el, fill, setText } from './dom.js';
-import { canSubmitForm, formIssues, postingRefusal, type AccountState } from '../menu/account.js';
+import {
+  canSubmitForm,
+  formIssues,
+  namingStage,
+  postingRefusal,
+  type AccountState,
+} from '../menu/account.js';
 import type { BoardPage } from '../menu/client.js';
 
 import {
@@ -84,6 +90,26 @@ export interface MenuPanelHost {
   commissioning(): CommissioningScreenInput | undefined;
   /** Which calendar period is over the week, or `''`. */
   calendarPeriodId(): string;
+  /**
+   * Whether this deployment has a server behind it — GitHub issue #28's signal on the root menu.
+   *
+   * **Optional, and that is a sequencing compromise stated rather than hidden.** Only the shell can
+   * answer it: the origin comes from a `<meta>` tag read at run time (§ D215 § 4, § D243), so the
+   * same bytes are a connected build behind a server and an unconnected one behind a CDN. This lane
+   * does not own `dev/main.ts`, and a **required** member would stop that file compiling in a branch
+   * merging beside this one.
+   *
+   * So the field is optional and its absence **says nothing** — see `MenuViewInput.hasServer` for
+   * why silence beats a guess. The shell's part is one line:
+   *
+   * ```ts
+   * hasServer: () => client !== undefined,
+   * ```
+   *
+   * Until it lands, the three social rows read exactly as they did. `menu/screens.test.ts` drives
+   * both answers, so the decision and its copy are asserted rather than waiting on the wiring.
+   */
+  hasServer?: (() => boolean) | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -132,6 +158,13 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
   const account = host.account();
   const board = host.leaderboard();
   const run = host.runState();
+  /*
+   * Asked once and handed to both halves — `docs/16` S5. The rows need it to offer *Save this name*
+   * instead of nothing, and the form needs it to ask for a name instead of an address; two calls
+   * would be two answers to *which question is being asked*, which is the split that let issue #31's
+   * screen print a sign-in error under a registration form.
+   */
+  const naming = namingStage(account);
   const view = screenOf({
     state: host.state(),
     catalogue: host.catalogue,
@@ -144,6 +177,8 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
     challenge: host.challenge(),
     commissioning: host.commissioning(),
     calendarPeriodId: host.calendarPeriodId(),
+    naming,
+    ...(host.hasServer === undefined ? {} : { hasServer: host.hasServer() }),
   });
 
   /*
@@ -169,6 +204,34 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
 
   for (const notice of view.notices) children.push(noticeLine(doc, notice));
 
+  /*
+   * **The account screen puts its form above its buttons, and that ordering is the fix** — GitHub
+   * issue #30(a). It read: *Sign in* (primary, filled), *Back*, *Create an account*, then the two
+   * live inputs. *"The player reads a call to action, then two navigation buttons, and only then
+   * discovers there was a form. Tab order matches the visual order, so a keyboard user hits the
+   * submit button first as well."*
+   *
+   * So on this one screen the fields come first and the rows — submit, then Back — come last, which
+   * is #30's own suggested ordering. It is done here rather than by moving the submit into the form,
+   * because the submit is a {@link MenuAffordance} that `menu/screens.ts` decides the label and the
+   * refusal of, and a button built inside a click-handler-adjacent form is the decision-in-a-render
+   * this whole split exists to stop.
+   *
+   * The **notice goes above the form**, which is #30(b): *"the screen only admits it cannot work
+   * after you submit."* `dev/main.ts` seeds `AccountState.notice` on mount when there is no server,
+   * so the sentence is now the first thing under the heading rather than an apology appended after
+   * a click.
+   */
+  const accountFirst = view.screen === 'account';
+  const accountBlocks: Node[] = [];
+  if (accountFirst && account.notice !== undefined) {
+    accountBlocks.push(noticeLine(doc, account.notice));
+  }
+  if (accountFirst && (account.user === undefined || naming)) {
+    accountBlocks.push(accountForm(doc, host, account, naming, keep));
+  }
+  children.push(...accountBlocks);
+
   const list = el(doc, 'div', { className: 'menu-list' });
   for (const row of view.rows) list.append(affordance(doc, host, row, keep));
   // The seventh entry on the root, and it is an entry rather than a row: see the comment on
@@ -178,14 +241,7 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
 
   if (view.issues.length > 0) children.push(issueList(doc, view.issues));
 
-  // The two screens with content an affordance cannot express: a credential form, and a table of
-  // somebody else's runs. Both are drawn below the rows the model does own.
-  if (view.screen === 'account' && account.user === undefined) {
-    children.push(accountForm(doc, host, account, keep));
-  }
-  if (view.screen === 'account' && account.notice !== undefined) {
-    children.push(noticeLine(doc, account.notice));
-  }
+  // The one screen with content an affordance cannot express: a table of somebody else's runs.
   if (view.screen === 'leaderboard') children.push(boardTable(doc, board));
 
   fill(root, ...children);
@@ -442,20 +498,38 @@ function issueList(doc: Document, issues: readonly string[]): HTMLElement {
 }
 
 /* -------------------------------------------------------------------------- *
- * Account — the credential form, which is not an affordance
+ * Account — one field at a time, and never a credential
  * -------------------------------------------------------------------------- */
 
 /**
- * Sign in, or create an account.
+ * The single question this screen is asking right now.
  *
- * Two things this screen must get right, both about what it does *not* say. The refusal for a wrong
- * password and the refusal for an unknown address are the same sentence, because the server
- * deliberately makes them identical and a client that split them would put the account-enumeration
- * oracle back. And an **unconfirmed** account is shown as playable — the notice says what is still
- * gated rather than presenting the account as broken.
+ * ## What was deleted here, and why deleting was the fix rather than disabling
+ *
+ * This function drew a mode toggle, an address, a conditional display name **and a live
+ * `<input type="password">`**. § D241 replaced the credential with a mailed link and deleted the
+ * password path from the server and the model; issue #30 is what a *half*-deleted one costs, and
+ * the reporter put it exactly right: *"a password field that is presented as functional, accepts
+ * input, and is wired to nothing is a keystroke collector by accident, and the player has no way to
+ * know that before typing."* Disabling it would have kept the box on the page. It is gone, and
+ * `menu/client.test.ts` sweeps every shipped module under `packages/viz/src` for the literal so it
+ * cannot come back through some other file.
+ *
+ * The mode toggle went with it (issue #31). There is no sign-in/register split to toggle: asking
+ * for a display name **only when the address is new** tells the person filling in the form whether
+ * the address is new, which is the account-enumeration oracle the server's identical-bytes 202
+ * exists to close (§ D241 § 7).
+ *
+ * ## One field, chosen by the session rather than by this function
+ *
+ * Signed out, the question is the address. Signed in and unnamed, it is the name — and
+ * `account.ts#namingStage` decides which, because *which field is live is a fact about the session*.
+ * That is also why `formIssues` now takes the **state**: handing it a bare form made the caller
+ * decide, which is the split that let issue #31's screen print a sign-in error under a registration
+ * form.
  *
  * **Its fields are in the focus ring, and that is the point of the ring.** Issue #33 names this
- * screen for the reason: *"Account is a form. Tabbing from the Password field is the single most
+ * screen for the reason: *"Account is a form. Tabbing from the last field is the single most
  * ordinary keyboard action on that screen, and it can drop the player onto controls behind a screen
  * they cannot see."*
  */
@@ -463,40 +537,40 @@ function accountForm(
   doc: Document,
   host: MenuPanelHost,
   state: AccountState,
+  naming: boolean,
   keep: KeepControl,
 ): HTMLElement {
   const wrap = el(doc, 'div', { className: 'menu-account' });
-  const registering = state.form.mode === 'register';
 
-  const toggle = keep(
-    el(doc, 'button', { className: 'menu-account-mode', attrs: { type: 'button' } }),
-    'account.mode',
-  );
-  setText(toggle, registering ? 'I already have an account' : 'Create an account');
-  toggle.addEventListener('click', () => {
-    host.dispatch({ kind: 'account-mode', register: !registering });
-  });
-  wrap.append(toggle);
-
-  const field = (label: string, type: 'text' | 'email' | 'password', key: string, value: string): void => {
+  const field = (label: string, type: 'text' | 'email', key: string, value: string): void => {
     wrap.append(
       textRow(doc, label, type, value, keep, `account.${key}`, (next) => {
         host.dispatch({ kind: 'account-form', patch: { [key]: next } });
       }),
     );
   };
-  field('Email', 'email', 'email', state.form.email);
-  if (registering) field('Display name', 'text', 'displayName', state.form.displayName);
-  field('Password', 'password', 'password', state.form.password);
+  if (naming) field('Display name', 'text', 'displayName', state.form.displayName);
+  else field('Email', 'email', 'email', state.form.email);
 
-  // Shown, not merely counted. `formIssues` reports all of them at once so a player is not made to
-  // guess how many there are — and only once they have typed something, so an untouched form is not
-  // a wall of complaints.
-  const issues = formIssues(state.form);
-  if (issues.length > 0 && state.form.password.length + state.form.email.length > 0) {
+  /*
+   * Shown, not merely counted. `formIssues` reports all of them at once so a player is not made to
+   * guess how many there are — and only once they have typed something, so an untouched form is not
+   * a wall of complaints. `canSubmitForm` is the same predicate one layer up and is the shell's
+   * gate; it is asked here only so this screen never shows a clean form the shell would refuse.
+   */
+  const issues = formIssues(state);
+  const typed = naming ? state.form.displayName.length : state.form.email.length;
+  if (issues.length > 0 && typed > 0) {
     wrap.append(issueList(doc, issues.map((issue) => issue.message)));
   }
-  void canSubmitForm;
+  if (!canSubmitForm(state) && state.retryInMs !== undefined) {
+    // The 429 gate, said where the form is. § D242 charges its budgets per address and per caller,
+    // so a form that stayed live after a refusal would spend a second request on somebody who did
+    // nothing wrong — and the server has already said it will refuse it.
+    wrap.append(
+      noticeLine(doc, 'That request was refused for now. Wait for the time named above before asking again.'),
+    );
+  }
   return wrap;
 }
 
@@ -517,7 +591,11 @@ function boardTable(doc: Document, view: LeaderboardView): HTMLElement {
   if (view.notice !== undefined) wrap.append(noticeLine(doc, view.notice));
 
   const page = view.page;
-  if (page === undefined) return wrap;
+  if (page === undefined) {
+    // Nothing to read, so the screen shows the **shape** of what would be read — issue #34.
+    if (view.boards.length === 0) wrap.append(exampleBoard(doc));
+    return wrap;
+  }
 
   const note = el(doc, 'p', { className: 'menu-note' });
   setText(note, page.note);
@@ -527,6 +605,9 @@ function boardTable(doc: Document, view: LeaderboardView): HTMLElement {
     const empty = el(doc, 'p', {});
     setText(empty, 'Nothing has been posted to this board yet.');
     wrap.append(empty);
+    // A board that exists and is empty is still a board whose shape is worth showing — and it is
+    // the one case where the reader is about to be the first row on it.
+    wrap.append(exampleBoard(doc));
     return wrap;
   }
 
@@ -551,6 +632,81 @@ function boardTable(doc: Document, view: LeaderboardView): HTMLElement {
     table.append(row);
   }
   wrap.append(table);
+  return wrap;
+}
+
+/**
+ * What a board looks like, drawn when there is none — GitHub issue #34.
+ *
+ * *"An empty leaderboard should still teach me the shape of the thing: what the columns are, what
+ * 'a board' is, how boards are chosen, and where I would appear. Empty is not the same as blank."*
+ * The reporter had just finished a run they were pleased with and found *"nowhere to put it and
+ * nobody to measure it against — and, more importantly, no picture of what measuring it against
+ * someone would even look like."*
+ *
+ * ## The three rules this example has to keep, and it keeps all three
+ *
+ * **It says it is an example, in words, above itself.** A greyed row is a visual signal, and KB-15
+ * forbids one carried by shape or colour alone; more to the point, a plausible-looking figure that
+ * a reader might take for a measurement is exactly the thing this repository refuses to ship. The
+ * two rows are named *Somebody else* and *You, if you post this run*, which cannot be mistaken for
+ * accounts, and the second is where the reader is being told they would appear.
+ *
+ * **All four metrics, never a fifth and never a total.** § D106: one metric orders the rows, the
+ * other three sit beside it, and none is folded into a score. A composite here would teach the one
+ * thing the whole product refuses to say.
+ *
+ * **The seed is on the row.** It is what makes a row checkable — invariant 5 — and a teaching
+ * example that hid it would teach the wrong shape.
+ *
+ * Built from the vocabulary the real table already uses, so what a reader learns here is what they
+ * will meet: `dev/surfaces.test.ts` derives this file's class names from its own source and requires
+ * a rule for each in `index.html`, which this lane does not own, and no class is invented.
+ */
+function exampleBoard(doc: Document): HTMLElement {
+  const wrap = el(doc, 'div', {});
+  const lead = el(doc, 'p', { className: 'menu-note' });
+  setText(
+    lead,
+    'An example of a board, so the shape is legible before there is one. These are not real ' +
+      'runs and nobody posted them.',
+  );
+  wrap.append(lead);
+
+  const table = el(doc, 'ol', { className: 'menu-board' });
+  const rows: readonly { readonly who: string; readonly figures: string; readonly seed: string }[] = [
+    {
+      who: 'Somebody else',
+      figures: 'AWT 24.6 s · WT95 51.2 s · TTD 63.4 s · over-long 8.1 %',
+      seed: 'seed 20260101 · one run',
+    },
+    {
+      who: 'You, if you post this run',
+      figures: 'AWT — · WT95 — · TTD — · over-long —',
+      seed: 'seed — · one run',
+    },
+  ];
+  for (const row of rows) {
+    const item = el(doc, 'li', { className: 'menu-board-row' });
+    const name = el(doc, 'span', { className: 'menu-board-name' });
+    setText(name, row.who);
+    const figures = el(doc, 'span', { className: 'menu-board-figures' });
+    setText(figures, row.figures);
+    const seed = el(doc, 'span', { className: 'menu-board-seed' });
+    setText(seed, row.seed);
+    fill(item, name, figures, seed);
+    table.append(item);
+  }
+  wrap.append(table);
+
+  const rule = el(doc, 'p', { className: 'menu-note' });
+  setText(
+    rule,
+    'One of the four figures orders the board and the other three sit beside it — they are never ' +
+      'added together, because a run that spends less by carrying fewer people has not done better. ' +
+      'The seed is printed so any row can be replayed and checked.',
+  );
+  wrap.append(rule);
   return wrap;
 }
 
@@ -594,15 +750,21 @@ function selectRow(
 /**
  * A labelled text input.
  *
- * `type` is a parameter so the password field is a real `password` input — a browser that shows a
- * passphrase in clear text on a shared screen is the one failure this screen can cause on its own.
+ * `type` carries the two the product still collects — a name and an address. It used to carry a
+ * third, and that third is the whole of GitHub issue #30: a live credential box wired to a path
+ * § D241 had deleted. The union is now the enumeration of what may be asked for, so a fourth kind
+ * of field is a deliberate edit here rather than a string somebody passed.
+ *
+ * `email` is not decoration either: it gets the right keyboard on a phone and the browser's own
+ * autofill, on the one field a player is least willing to retype.
+ *
  * The value is set as a property and not an attribute, so re-rendering does not blow away what the
  * player is mid-way through typing.
  */
 function textRow(
   doc: Document,
   label: string,
-  type: 'text' | 'email' | 'password',
+  type: 'text' | 'email',
   value: string,
   keep: KeepControl,
   key: string,

@@ -108,8 +108,21 @@ export type MenuIntent =
   | { readonly kind: 'start-endless' }
   | { readonly kind: 'open-board'; readonly configHash: string }
   | { readonly kind: 'account-form'; readonly patch: Record<string, string> }
+  /**
+   * Send the form. **One member for two questions**, because there are two and they never overlap.
+   *
+   * Signed out it asks for a link; signed in and still unnamed (`account.ts#namingStage`) it saves
+   * the display name. A second member would have needed the panel to decide which question is being
+   * asked, and *which field is live is a fact about the session* — the split that let issue #31's
+   * screen print a sign-in error under a registration form.
+   *
+   * There is no `account-mode` beside it any more. § D241 § 7 collapsed sign-in and register into
+   * one request, because asking for a display name **only when the address is new** tells the person
+   * filling in the form whether the address is new — the account-enumeration oracle the server's
+   * identical-bytes 202 exists to close. A member whose control no longer exists is a member nothing
+   * dispatches, so it is deleted rather than left with an arm explaining itself.
+   */
   | { readonly kind: 'account-submit' }
-  | { readonly kind: 'account-mode'; readonly register: boolean }
   | { readonly kind: 'sign-out' }
   /** Post the run on screen to the leaderboard. The member with no handler until this wave. */
   | { readonly kind: 'submit-score' }
@@ -221,7 +234,6 @@ export function withChosenValue(intent: MenuIntent, value: string): MenuIntent {
     case 'open-board':
     case 'account-form':
     case 'account-submit':
-    case 'account-mode':
     case 'sign-out':
     case 'submit-score':
     case 'run-challenge':
@@ -351,6 +363,35 @@ export interface MenuViewInput {
    * to `advanced`, so a caller that does not care gets the whole settings screen.
    */
   readonly viewMode?: 'basic' | 'advanced' | undefined;
+  /**
+   * Whether this player is signed in and still owes the boards a name — `account.ts#namingStage`.
+   *
+   * Supplied rather than derived, for the reason every other supplied field here is: deciding it
+   * needs an `AccountState`, and this module does not depend on the account layer to draw a menu.
+   * `docs/16` S5's one-derivation-two-consumers rule — the panel asks `namingStage` once and both
+   * the rows and the form are built from that one answer.
+   *
+   * § D241 § 7 is why it is a *stage* rather than a mode. There is one door: type an address, get a
+   * link. The name is asked for **afterwards**, over a session that already proves the address —
+   * asking for it beforehand, only when the address is new, would be the enumeration oracle.
+   */
+  readonly naming?: boolean | undefined;
+  /**
+   * Whether this deployment has a server behind it, or `undefined` for *nobody has said*.
+   *
+   * GitHub issue #28: three of the six root rows are the whole competitive offer, and in a bundle
+   * served with no server beside it all three dead-end — *"the main menu gives no hint of this. The
+   * rows are styled exactly like the working ones and carry confident subtitles."* The signal has to
+   * be on the root, because that is where the player chooses, and the root is the one screen that
+   * knows nothing about any of them.
+   *
+   * **`undefined` makes no claim**, and that is deliberate rather than a default. A menu that
+   * asserted *needs a server* on a build that has one would be a worse lie than the silence it
+   * replaced, and this module cannot tell: the origin comes from a `<meta>` tag `dev/main.ts` reads
+   * at run time (§ D215 § 4, § D243). So the shell says or nothing is said, and the shell saying it
+   * is one line — see `dev/menuPanel.ts`'s {@link MenuPanelHost.hasServer}.
+   */
+  readonly hasServer?: boolean | undefined;
 }
 
 /** What the shell knows about this week's challenge, and how far the player has got with it. */
@@ -456,7 +497,7 @@ const empty = { notices: Object.freeze([]), issues: Object.freeze([]) };
 function bodyOf(input: MenuViewInput, screen: MenuScreen): Body {
   switch (screen) {
     case 'main':
-      return { ...empty, rows: mainRows() };
+      return { ...empty, rows: mainRows(input.hasServer) };
     case 'free-play':
       return freePlayBody(input);
     case 'settings':
@@ -478,13 +519,28 @@ function bodyOf(input: MenuViewInput, screen: MenuScreen): Body {
     case 'commissioning':
       return commissioningBody(input);
     case 'account':
-      return { ...empty, rows: accountRows(input) };
+      return accountBody(input);
   }
 }
 
 /* ------------------------------------------------------------------- main */
 
-function mainRows(): readonly MenuAffordance[] {
+/**
+ * What the three social rows say when there is no server behind them — GitHub issue #28.
+ *
+ * Appended to the row's own subtitle rather than replacing it, and the rows stay **enabled**. All
+ * three screens now teach their subject with the server off — the challenge screen explains what a
+ * challenge is and what the same seeds buys, the leaderboard explains what a board is and draws an
+ * example of one — so disabling them would hide the only thing they can still do. #28 offers three
+ * remedies (hide, disable with the reason, or ship a read-only demo); this is the third with the
+ * second's honesty, which is the combination that keeps the teaching and ends the dead end.
+ */
+const NEEDS_A_SERVER = ' · needs a server, and this one has none';
+
+function mainRows(hasServer: boolean | undefined): readonly MenuAffordance[] {
+  // `undefined` says nothing. See `MenuViewInput.hasServer`: asserting *needs a server* on a build
+  // that has one would be a worse claim than the silence it replaces, and this module cannot tell.
+  const note = hasServer === false ? NEEDS_A_SERVER : '';
   const to = (
     id: string,
     label: string,
@@ -499,6 +555,8 @@ function mainRows(): readonly MenuAffordance[] {
     enabled: true,
     intent: { kind: 'navigate', to: target },
   });
+  const social = (id: string, label: string, detail: string, target: MenuScreen): MenuAffordance =>
+    to(id, label, `${detail}${note}`, target);
   return Object.freeze([
     /*
      * **Scenarios**, not *Campaign* — `docs/17` § 5 clause 2's residue, settled by the handoff's own
@@ -515,14 +573,16 @@ function mainRows(): readonly MenuAffordance[] {
      */
     to('main.campaign', 'Scenarios', 'A week on one building — it grows, and the bar rises', 'campaign'),
     to('main.free-play', 'Free play', 'Any building, any dispatcher, any traffic', 'free-play'),
-    to(
+    social(
       'main.challenge',
       'This week’s challenge',
       'Everyone on the same seeds — the dispatcher is what varies',
       'challenge',
     ),
-    to('main.leaderboard', 'Leaderboard', 'Verified scores, by configuration', 'leaderboard'),
-    to('main.account', 'Account', 'Sign in to post a score', 'account'),
+    social('main.leaderboard', 'Leaderboard', 'Verified scores, by configuration', 'leaderboard'),
+    // *Sign in to post a score* and no password — the second half is the thing a player decides on,
+    // and it is now true (§ D241): an address, a link in the inbox, and nothing to choose or forget.
+    social('main.account', 'Account', 'An emailed link, no password — sign in to post a score', 'account'),
     to('main.settings', 'Settings', 'Presentation only — nothing here changes a run', 'settings'),
   ]);
 }
@@ -1031,19 +1091,29 @@ function challengeBody(input: MenuViewInput): Body {
       rows: Object.freeze([
         {
           id: 'challenge.leaderboard',
+          /*
+           * The subtitle no longer presupposes its own distinction — GitHub issue #32: *"a sentence
+           * that presupposes the reader already understands a distinction between challenge boards
+           * and non-challenge boards that has never been introduced."* It now says what is through
+           * the door rather than what is not.
+           */
           label: 'Open the leaderboard',
-          detail: 'The boards that do not need this week’s challenge',
+          detail: 'What a posted run looks like, and what orders one board against another',
           kind: 'navigate' as const,
           scope: 'presentation' as const,
           enabled: true,
           intent: { kind: 'navigate' as const, to: 'leaderboard' as const },
         },
       ]),
-      notices: Object.freeze([
-        challenge?.notice ??
-          'This build was not compiled against a server, so there is no challenge to fetch. ' +
-            'Everything else on this menu works without one.',
-      ]),
+      /*
+       * The shell's sentence, carried. It is the shell's rather than this module's because *which*
+       * challenge is current is the server's answer (§ D218 § 3) and *whether there is a server at
+       * all* is read from a `<meta>` tag at run time — neither is knowable here. The fallback below
+       * is for a caller that supplied a challenge input and no words, and it answers issue #32's
+       * four server-independent questions rather than apologising: what is scored, what the same
+       * seeds buys, when a week ends, and how a set is submitted.
+       */
+      notices: Object.freeze([challenge?.notice ?? CHALLENGE_WITHOUT_ONE]),
       issues: Object.freeze([]),
     };
   }
@@ -1130,6 +1200,30 @@ function challengeBody(input: MenuViewInput): Body {
     issues: Object.freeze(challenge?.notice === undefined ? [] : [challenge.notice]),
   };
 }
+
+/**
+ * What a challenge is, for a screen that has none — GitHub issue #32's four other questions.
+ *
+ * *"Four of them have nothing to do with the missing server. What the scoring metric is, what
+ * 'everyone on the same seeds' means, how long a challenge week runs, and how a finished run gets
+ * submitted are all properties of the game design, not of this week's data."* So they are answered
+ * here, where the answer does not depend on anything being fetched.
+ *
+ * The comparability claim is the one to keep honest. Common random numbers make two runs comparable
+ * **as runs**; they do not license the sentence *this dispatcher is better*, which needs 50–200
+ * replications and a paired interval that excludes zero. Compare is the only surface allowed to say
+ * it, and this paragraph says so rather than implying otherwise by omission.
+ */
+const CHALLENGE_WITHOUT_ONE =
+  'There is no challenge loaded. Here is what one is. Everybody gets the same building, the same ' +
+  'run length and the same numbered seeds — a seed generates the same passengers arriving at the ' +
+  'same moments, so the only thing that differs between two players is the dispatcher they chose. ' +
+  'A set is scored over all of its seeds rather than a lucky single run, and it is submitted whole ' +
+  'or not at all: a partial set is a different question, not a smaller score. A challenge opens ' +
+  'and closes on the server’s clock, and its board stays readable afterwards. Ordering that board ' +
+  'on one metric is a fact about what was posted and never a claim that one dispatcher beats ' +
+  'another — Compare is the only screen allowed to say that, and only with an interval that ' +
+  'excludes zero.';
 
 /**
  * The four the server declares, and no fifth.
@@ -1377,35 +1471,96 @@ function leaderboardBody(input: MenuViewInput): Body {
  */
 const LEADERBOARD_NOTE =
   'Each board is one configuration across seeds, ranked on the named metric alone. A different ' +
-  'dispatcher is a different board rather than a better score.';
+  'dispatcher is a different board rather than a better score. A configuration is the building, ' +
+  'the dispatcher, the traffic template, the arrival rate and the run length together; a seed is ' +
+  'the number the passengers are generated from, so the same seed brings the same people at the ' +
+  'same moments.';
 
 /* ------------------------------------------------------------------ account */
 
-function accountRows(input: MenuViewInput): readonly MenuAffordance[] {
-  if (input.canPost) {
-    return Object.freeze([
+/**
+ * One door, and — once through it — one question.
+ *
+ * ## Three states, and the middle one is the reason this stopped being a row list
+ *
+ * **Signed out**: the address, and a button that says what pressing it does. *Sign in* was the
+ * label and it named a mechanism that no longer exists; **Email me a link** names the thing that
+ * actually happens, which matters most on the one screen where a player is deciding whether to hand
+ * over an address at all (§ D241).
+ *
+ * **Signed in and unnamed** — `account.ts#namingStage`, and § D241 § 7's whole design. The name is
+ * asked for *after* the link is redeemed rather than beside the address, because asking for it only
+ * when the address is new would tell the person filling in the form whether the address is new.
+ * Redeeming proves the address, so by this point the question costs nothing.
+ *
+ * **Signed in and named**: nothing left to ask.
+ *
+ * ## And the name is asked for, never demanded
+ *
+ * `postingRefusal` deliberately does not refuse an unnamed player — `player-a1b2c3…` on a board is
+ * ugly and honest, and a run that could not be posted until a form was filled in would be a gate.
+ * So **Sign out** stays offered beside the naming prompt: a player who does not want to be named can
+ * simply not answer, and nothing is withheld from them for it.
+ */
+function accountBody(input: MenuViewInput): Body {
+  const signOut: MenuAffordance = {
+    id: 'account.sign-out',
+    label: 'Sign out',
+    kind: 'commit',
+    scope: 'presentation',
+    enabled: true,
+    intent: { kind: 'sign-out' },
+  };
+
+  if (input.naming === true) {
+    return {
+      ...empty,
+      rows: Object.freeze([
+        {
+          id: 'account.submit',
+          label: 'Save this name',
+          detail: 'It is what appears on a board beside your figures',
+          kind: 'commit' as const,
+          scope: 'presentation' as const,
+          enabled: true,
+          intent: { kind: 'account-submit' as const },
+        },
+        signOut,
+      ]),
+      notices: Object.freeze([NAMING_NOTE]),
+    };
+  }
+
+  if (input.canPost) return { ...empty, rows: Object.freeze([signOut]) };
+
+  return {
+    ...empty,
+    rows: Object.freeze([
       {
-        id: 'account.sign-out',
-        label: 'Sign out',
+        id: 'account.submit',
+        label: 'Email me a link',
+        detail: 'Opening it signs you in. If the address is new, it creates the account.',
         kind: 'commit' as const,
         scope: 'presentation' as const,
         enabled: true,
-        intent: { kind: 'sign-out' as const },
+        ...(input.postingRefusal === undefined ? {} : { disabledWhy: input.postingRefusal }),
+        intent: { kind: 'account-submit' as const },
       },
-    ]);
-  }
-  return Object.freeze([
-    {
-      id: 'account.submit',
-      label: 'Sign in',
-      kind: 'commit' as const,
-      scope: 'presentation' as const,
-      enabled: true,
-      ...(input.postingRefusal === undefined ? {} : { disabledWhy: input.postingRefusal }),
-      intent: { kind: 'account-submit' as const },
-    },
-  ]);
+    ]),
+  };
 }
+
+/**
+ * Why the name is being asked for now and not earlier, said on the screen that asks.
+ *
+ * A form that appears *after* somebody thought they were finished reads as a bait-and-switch unless
+ * it says why it waited. It waited because asking earlier would have leaked whether the address was
+ * already known — which is the whole of § D241 § 7 — and because it is genuinely optional.
+ */
+const NAMING_NOTE =
+  'You are signed in. The boards need a name to put beside your figures, and this is the first ' +
+  'moment it can be asked for without telling anyone whether your address was already known. Skip ' +
+  'it if you would rather: a generated name works everywhere, and nothing is withheld for it.';
 
 /* -------------------------------------------------------------------------- *
  * Applying an intent — the pure half
@@ -1450,7 +1605,6 @@ export function applyIntent(state: MenuState, intent: MenuIntent): MenuState {
     case 'open-board':
     case 'account-form':
     case 'account-submit':
-    case 'account-mode':
     case 'sign-out':
     case 'submit-score':
     case 'run-challenge':
