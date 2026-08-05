@@ -16588,3 +16588,175 @@ One existing guard was adjusted rather than re-pinned: `mixIdentity`'s flat-mix 
 joined that test's named exclusion set — beside `template` and `sources`, which it is a copy of —
 and, following the file's own discipline, both values are asserted explicitly below the comparison
 rather than waved away.
+---
+
+## D251 — four modules held their own copy of the palette, and an inline style is unreachable
+
+**Date: 2026-08-05 · Written after the code, and says so.** Play-tester issue #76's residue. § D235
+raised the ink ladder and § D236 fixed the layout, and between them the Simulation tab's WCAG AA
+failures went 88 → 9 in dark and 48 → 28 in light. § D236 named what was left and whose it was:
+*"`src/live/bands.ts` and `src/live/decisions.ts` hold hex copies of the dark band palette, which
+`dev/leftRail.ts` writes into inline `style="color:…"` … **This is the whole of the 28**."* This is
+that lane.
+
+### What reproduced, measured rather than inherited
+
+The report and § D236 are both second-hand here, so the walk was re-run rather than trusted: a real
+`vite` serving the shipped `index.html`, a real Chromium at 1280 × 720, the menu left the way a
+player leaves it, a shift run and the playhead dragged to the end, then every element with its own
+visible text — effective background composited up the tree through every translucent layer,
+`font-size` and `font-weight` deciding whether AA asks 4.5:1 or 3:1. Both modes, both disclosure
+modes, driven through the shipped `themeFor('system', matchMedia)` rather than by stamping an
+attribute.
+
+| | dark | light |
+|---|---|---|
+| before | **1** | **26** |
+| after | **0** | **1** |
+
+**Two of the three inherited figures did not reproduce, and the difference matters in opposite
+directions.** Dark is **1**, not 9 — and the one is the timeline label, which § D236 lists
+separately as failing *in both* modes, so the two accounts agree about the cause and disagree about
+the count. Light is **26**, not 28. Both gaps are the walk's reach rather than a disagreement about
+a colour: this one sweeps the Simulation tab at one viewport with the drawer shut, and § D236's
+swept more of the product. Nothing in either list is outside the four files below, which is the
+claim that decides the lane.
+
+The 26 partition exactly by which module held the copy:
+
+| copy | what it painted | ratios |
+|---|---|---|
+| `live/bands.ts` (19) | the mood legend's four labels and four counts, the *served under 60 s* figure, six goal glyphs and values, the stage legend's four discs | 1.68–3.61 |
+| `live/decisions.ts` (6) | `.decision-title` — `A → Lobby`, six rows | 2.48 |
+| `live/timeline.ts` (1) | the phase strip's `DRAIN` label — **and this one fails in dark too** | 3.15 |
+
+### The fourth copy, which no walk could have found
+
+`live/honesty.ts` held `rgba(224,176,64,.07)` and `rgba(63,178,127,.06)` — the **dark** values of
+`--band-1` and `--band-0` — as the honesty card's wash and rule. A wash carries no word, so it never
+appears in a contrast walk, and it would have survived a fix that chased the reported ratios and
+stopped. It is the same defect and it is fixed the same way. **That is the argument for fixing the
+class rather than the twenty-six instances**, and it is why the deliverable is a rule.
+
+### Why the values move to the page rather than the page moving to the values
+
+The candidate fixes were: give each module a light-mode branch; hand the modules a resolved palette
+at mount; or have the modules **name** the tokens the page already declares.
+
+The first two lose to one fact about the medium. `dev/leftRail.ts` and `dev/main.ts` put these
+strings into an *inline* `style` attribute, and an inline style is not reached by
+`:root[data-theme='light']` — no stylesheet block can repaint it, however complete the palette is.
+So any fix that keeps a value in TypeScript needs the modules to learn which mode is live, which
+means a second theme resolver beside `render/theme.ts`, in the directory whose own docstring says it
+holds *no arithmetic over a recording anywhere in it* because a decision made inside a DOM write is
+a decision no test can reach.
+
+Naming the token costs nothing and needs nobody to know the mode: `style.setProperty` takes
+`var(--band-0)` happily, and CSS resolves it against whichever block is live. `dev/leftRail.ts` had
+**already made this move** for every colour that was not a band — its `INK`, `DIM`, `FAINT` and
+`TRACK` are `var(--text)`, `var(--dimmer)`, `var(--faint)`, `var(--edge-strong)`, and its own token
+comment said so. The bands were the exception, and the exception was the bug.
+
+`render/tokens.ts` keeps its literals and is untouched. The canvas cannot take a `var()` — a 2D
+context wants a colour — so the stage reads values and the DOM reads names, which is the split
+`dev/tokens.test.ts` already pins in both directions. **Nothing in `live/` may be handed to a
+canvas**, and nothing is.
+
+### The phase strip needed tokens that did not exist, and they are derived
+
+`live/timeline.ts`'s six pairs had no counterpart in the stylesheet at all, so this half is a
+declaration and not a rename. Two constraints shaped it:
+
+1. **A new *hex* token is not available to this lane.** `dev/tokens.test.ts` requires every hex in
+   `:root` to be answered in the light block, requires the light block to declare nothing
+   `themeFor` does not resolve, and `render/theme.test.ts` requires every hex token to sit in
+   exactly one of its four contrast groups. All three roads run through `render/`, which this lane
+   does not own. A **derived** token — one whose value is `var()` or `color-mix()` over tokens
+   already declared — is invisible to all three, because each derives its set with a hex filter.
+   That is not a loophole found; it is the same reason the filters exist: a derived value has no
+   independent value to check, and the tokens under it are checked already.
+2. **The handoff is canonical for the interface.** So the mapping answers to `design.html`
+   `:988–994` rather than to convenience.
+
+Two of the three hues turn out to be tokens already, at the same value: `AM PEAK`'s `#c69ad8` is
+`--transfer` and `LUNCH`'s `#9fc48a` is `--measured`. Naming them creates no shared colour the page
+did not already have — the handoff itself drew the transport strip and the floor gutter the same
+violet. `PM PEAK`'s `#dbb075` is nobody's token; `--secure` is the nearest hue the palette owns, and
+the meaning it carries — a floor behind a credential — lives on the canvas gutter, which nobody is
+comparing a 26 px transport strip against. **The word in the segment is the signal** — `FILLING`,
+`PEAK`, `EASING`, `DRAIN`, and `recordRun`'s `labelOfPhase` reserves `PEAK` for the segment holding
+the template's peak — so the hue reinforces and never carries (KB-15).
+
+The three quiet plates are surfaces rather than tints, which is what the handoff's own values
+already were: its `STEADY` `#161e2a` is `--raised` and its `QUIET` `#131a24` is `--card`, to within a
+rounding step. `--phase-unknown` sits between them, keeping the handoff's ordering — a band the
+schedule says nothing about is quieter than one holding below peak and louder than one asking for
+nothing.
+
+Two numbers, and they were chosen by measurement rather than by eye: **15 %** of the hue over
+`--raised` for the plate, **70 %** of the hue toward `--text` for the ink. The ink then clears AA on
+its own plate in both modes with room — 6.60–7.15 dark, 6.37–7.72 light — where 20 % put `--dim` at
+4.34–4.44 in dark, under the standard. The neutral segments take `--phase-ink` (`--dim`) and the two
+quiet ones `--phase-ink-quiet` (`--dimmer`), which is the handoff's own rung difference (`#6d7b8d`
+against `#5d6b7d`); **both rungs clear AA on their own plate**, 6.01 and 6.53, so this is a hierarchy
+and not the contrast-as-signal § D235 refused for `.tab-secondary`.
+
+**One value in the old strip was a fossil, and it is the reason the label failed in dark as well.**
+`flat`'s `#6d7b8d` was `--dimmer`'s value *before* § D235 raised it — copied out at some point, and
+therefore not moved when the ladder moved. A copied literal does not follow the token it was copied
+from. `live/decisions.ts` had the same fossil: its `empty` row was `#4d5a6b`, which is `--faint`'s
+pre-§ D235 value, so the *standing by* row was still being drawn in a grey the ladder had abandoned
+for failing 2.31:1.
+
+### What is asserted, so this cannot rot
+
+The four edits fix today's page. `live/palette.test.ts` is what stops the fifth copy, and it is why
+the fix is described as *one source reachable by the theme* rather than as four edits:
+`dev/tokens.test.ts` already guards the stylesheet's half — *no rule below the two blocks paints a
+literal* — and **nothing guarded this half**, which is exactly how a palette can be perfect,
+asserted in both directions, and applied to a tenth of the page.
+
+1. **No colour literal anywhere in `live/`, nor in `dev/leftRail.ts`.** The file set is read off
+   disk rather than listed (§ D213: a hand-written list stops tracking the directory it was built
+   from, and the file somebody adds next week is the one that carries the copy). Comments are
+   stripped, because `live/timeline.ts`'s docstring still tabulates the handoff's six hex pairs
+   while explaining what replaced them, and a check satisfiable by rewording a docstring is not
+   checking the code.
+2. **No dangling token.** Every `var(--x)` named is a property `index.html`'s `:root` declares.
+   This is § D222's `aria-describedby` argument in another medium: an unset custom property makes
+   `color` fall back to `inherit`, so a typo produces a plausible-looking rail rather than an error,
+   and an assertion rebuilt from the same constant would not see it.
+3. **No orphan.** Every `--phase-*` the page declares is one `live/timeline.ts` names — § D213's
+   rule in the direction that rots quietly, and the same shape as `dev/tokens.test.ts`'s orphan
+   check on the light block.
+4. **The `:root` block is read to its end.** See below.
+
+### A brace in a comment silently shortens the palette — found twice, in one sitting
+
+`dev/tokens.test.ts`, `render/theme.test.ts` and the new file all find the block with a **non-greedy**
+`:root { … }` match, which stops at the first closing brace. The comment introducing `--phase-*`
+first read *"six `{ bg, fg }` hex pairs"*; the block those three files thought they were reading then
+ended **inside a comment**, and every token below it stopped existing as far as they were concerned.
+Nothing went red — both incumbent files only ever *look names up*, and a name that is silently absent
+is a check that silently passes. The second occurrence was the comment written to warn about the
+first, which quoted the regex.
+
+Fixed by rewording, and pinned so the next one is loud: the block must contain `--rail-right`, its
+own last declaration, and must contain no brace at all. Recorded here rather than only in the file
+because the two incumbent tests are outside this lane and are the ones with something to lose.
+
+### What is left, and whose it is
+
+**One element still fails, and the fix is a token value in a file this lane does not own.** The stage
+legend's four discs are drawn on `--bg` — the *darkest* light surface — and light `--band-0`
+`#1c7a55` measures **4.43:1** there. § D235 measured that token at 4.94 and deliberately left it,
+but it measured it on `--panel`; `render/theme.test.ts`'s `CONTENT_ON_PANEL` does the same. § D236
+already found and fixed this exact shape once — `waitingUp` at 4.34:1 on `--bg`, moved to `#0d7069`,
+with the note that the key's marks are measured *"against `--bg`, the ground the key is actually
+drawn on"* — and `--band-0` was not swept with it. The other three bands clear it: 4.58, 4.58, 4.93.
+
+Recommended, and **not applied here**: `LIGHT_PALETTE.bandSettling` `#1c7a55` → `#1a7451`, which is
+4.80 on `--bg`, 5.34 on `--panel`, 5.74 on `--raised`, and leaves the ladder's order untouched. The
+mirror is that the four bands belong in a group measured against `--bg` rather than `--panel`, since
+`#legend` is the surface they are actually drawn on. Both are `render/`'s, and § D235's own rule —
+*do not weaken a criterion, raise it* — says the group moves rather than the bound.

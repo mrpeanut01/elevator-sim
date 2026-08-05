@@ -56,12 +56,23 @@ export const DEFAULT_DECISION_ROWS = 6;
 /**
  * Row colours. The design assigns a new assignment the first band colour (`:1808`) and a
  * give-up row the fourth (`:1912`); the middle two follow the same palette, requirement S7.
+ *
+ * **Token names, not values — § D251.** These were `#3fb27f` / `#e0b040` / `#e0473a` / `#4d5a6b`,
+ * and `dev/leftRail.ts` writes them into an inline `style="color:…"` on `.decision-title`, which
+ * no `:root[data-theme]` block can reach. Six decision rows therefore stayed dark-band green on a
+ * light page at **2.48:1** — the fourth-largest group in the light residue, and *"requirement S7,
+ * the same palette"* was true of the words and false of the page.
+ *
+ * The fourth entry is the one worth naming separately. `#4d5a6b` was `--faint`'s value **before
+ * § D235 raised it**, so the *standing by* row was still being drawn in a grey the ink ladder had
+ * abandoned for failing 2.31:1 on `--raised`. Nothing noticed, because a copied literal does not
+ * move when the token it was copied from does. It is `var(--faint)` now and follows the ladder.
  */
 const OUTCOME_COLORS = Object.freeze({
-  assigned: '#3fb27f',
-  reassigned: '#e0b040',
-  unassigned: '#e0473a',
-  empty: '#4d5a6b',
+  assigned: 'var(--band-0)',
+  reassigned: 'var(--band-1)',
+  unassigned: 'var(--band-3)',
+  empty: 'var(--faint)',
 });
 
 /**

@@ -41,7 +41,8 @@ import {
 } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
-import { WAIT_BANDS, waitBandsAt } from '../live/bands.js';
+import { BAND_COLORS, WAIT_BANDS, waitBandsAt } from '../live/bands.js';
+import * as tokens from '../render/tokens.js';
 import type { VizRecording } from '../contract/types.js';
 import { buildLayout, type ShaftGeometry } from '../render/layout.js';
 import type { VizFloor } from '../contract/types.js';
@@ -653,11 +654,31 @@ describe('the words and the colours are the handoff’s', () => {
   });
 
   it('finds all four band colours in the vendored prototype', async () => {
-    const design = await handoff();
-    for (const band of WAIT_BANDS) {
-      expect(design.toLowerCase(), `the handoff does not use ${band.color}`).toContain(
-        band.color.toLowerCase(),
-      );
+    /*
+     * **Read where the colour now lives — § D251.** `WaitBandDefinition.color` was `#3fb27f` and
+     * is `var(--band-0)`, because the four hexes here were a second copy of the palette that no
+     * `:root[data-theme]` block could repaint — nineteen light-mode AA failures' worth. The claim
+     * this case makes is unchanged and the chain that carries it is three links long, each pinned
+     * by its own test: `WAIT_BANDS` names `--band-0…3` (`live/palette.test.ts`), `index.html`
+     * declares them at `render/tokens.ts`'s values in both modes (`dev/tokens.test.ts`), and the
+     * dark values are the handoff's — which is what this asserts.
+     */
+    const design = (await handoff()).toLowerCase();
+    expect(BAND_COLORS).toEqual([
+      'var(--band-0)',
+      'var(--band-1)',
+      'var(--band-2)',
+      'var(--band-3)',
+    ]);
+    const values = [
+      tokens.BAND_SETTLING,
+      tokens.BAND_WAITING,
+      tokens.BAND_LONG,
+      tokens.BAND_ABANDONED,
+    ];
+    expect(values).toHaveLength(WAIT_BANDS.length);
+    for (const value of values) {
+      expect(design, `the handoff does not use ${value}`).toContain(value.toLowerCase());
     }
   });
 });

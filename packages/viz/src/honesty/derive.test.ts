@@ -289,12 +289,21 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'dev/buildingEditor.ts#specTrackOf',
         /*
-         * The transport timeline's segment palette, exported so the traffic editor's preview strip
-         * can draw the same bands rather than keep a second copy of the five hex pairs — the
-         * duplication `dev/tokens.test.ts` exists to stop. Four `{bg, fg}` pairs assert nothing; the
+         * The transport timeline's segment palettes, exported so the traffic editor's preview
+         * strip can draw the same bands rather than keep a second copy of them — the duplication
+         * `dev/tokens.test.ts` exists to stop. Six background/foreground pairs assert nothing; the
          * segment's own `label` and `title` are prose and `LIVE_RAIL` drives both.
+         *
+         * The two singles joined the group in § D251 and the reason is worth stating, because they
+         * were classified by accident before it. Every value in all three used to be a hex, and a
+         * hex is not prose to {@link PROSE}'s eye — `PHASE_PALETTE` was derived only because its
+         * *keys* are `'ramp-up'` and `'ramp-down'`. The values are `var(--phase-quiet)` and the
+         * rest now, which read as prose on the hyphen, so the two that had been silently
+         * unclassified became visibly unclassified. Their reason was always this one.
          */
         'live/timeline.ts#PHASE_PALETTE',
+        'live/timeline.ts#QUIET_PALETTE',
+        'live/timeline.ts#UNKNOWN_PALETTE',
       ],
     },
     {

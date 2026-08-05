@@ -123,6 +123,58 @@
         --secure: #c9a56a;
         --measured: #9fc48a;
 
+        /* The transport's phase strip — one plate and one ink per demand phase, § D251.
+           `src/live/timeline.ts` names these; it holds no colour of its own.
+
+           **Derived, and that is the point.** Every value here is a mix of tokens declared above,
+           so the strip follows `data-theme` with the rest of the page and there is nothing here
+           for the light block to restate — which is why it does not, and why `tokens.test.ts`'s
+           hex filter walks past this group rather than demanding a light twin of it. These were
+           six background/foreground hex pairs inside `live/timeline.ts`, written into inline
+           styles, and an inline style is not reached by `:root[data-theme='light']` however
+           complete the palette is: the `DRAIN` label measured 3.15:1 in **both** modes.
+
+           No brace in this comment, and that is load-bearing rather than style: three test files
+           find this block with a non-greedy regex that stops at the first closing brace, so one
+           written in a comment silently truncates the block they think they are reading and every
+           token below it stops existing as far as they are concerned. Twice while writing this
+           group. `src/live/palette.test.ts` asserts the block reaches its own last declaration,
+           so the next one to try gets a red test rather than a shortened palette.
+
+           The three hues are the handoff's own (`design.html` `:988–994`), and two of them are
+           already tokens at the same value: `AM PEAK`'s `#c69ad8` is `--transfer` and `LUNCH`'s
+           `#9fc48a` is `--measured`, so naming them creates no shared colour that the page did not
+           already have. `PM PEAK`'s `#dbb075` is nobody's token; `--secure` is the nearest hue the
+           palette owns and its own meaning — a floor behind a credential — lives on the canvas
+           gutter, which no reader is comparing a 26 px transport strip against. The word in the
+           segment (`FILLING` / `PEAK` / `EASING` / `DRAIN`) is the signal; the hue reinforces it
+           (KB-15).
+
+           15 % over `--raised` and 70 % toward `--text` are the two numbers, chosen so the ink
+           clears AA on its own plate in **both** modes with room: 6.60–7.15 dark, 6.37–7.72 light.
+           The three quiet plates are surfaces rather than tints, which is what the handoff's own
+           values already were — its `STEADY` `#161e2a` is `--raised` and its `QUIET` `#131a24` is
+           `--card`, to within a rounding step. */
+        --phase-ink: var(--dim);
+        /* The handoff draws `QUIET` and `TRICKLE` a rung quieter than `STEADY` (`#5d6b7d` against
+           `#6d7b8d`), which is the ink ladder doing what it is for: a segment asking for nothing
+           says less loudly than one holding below peak. Both rungs clear AA on their own plate —
+           6.01 dark, 6.53 light — so this is a hierarchy and not the contrast-as-signal § D235
+           refused for `.tab-secondary`. */
+        --phase-ink-quiet: var(--dimmer);
+        --phase-peak: color-mix(in srgb, var(--transfer) 15%, var(--raised));
+        --phase-peak-ink: color-mix(in srgb, var(--transfer) 70%, var(--text));
+        --phase-rising: color-mix(in srgb, var(--secure) 15%, var(--raised));
+        --phase-rising-ink: color-mix(in srgb, var(--secure) 70%, var(--text));
+        --phase-clearing: color-mix(in srgb, var(--measured) 15%, var(--raised));
+        --phase-clearing-ink: color-mix(in srgb, var(--measured) 70%, var(--text));
+        --phase-steady: var(--raised);
+        /* Between `--phase-quiet` and `--phase-steady`, keeping the handoff's ordering: a band the
+           schedule says nothing about is quieter than one holding below peak and louder than one
+           asking for nothing. */
+        --phase-unknown: color-mix(in srgb, var(--raised) 35%, var(--card));
+        --phase-quiet: var(--card);
+
         /* Type. Two families: prose and figures. § 1.1 S8. */
         --sans: 'Helvetica Neue', Helvetica, system-ui, -apple-system, sans-serif;
         --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
