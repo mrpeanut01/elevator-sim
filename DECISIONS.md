@@ -16859,3 +16859,141 @@ the screen to change.** Driving `#param-dispatch-callType` from `up-down-buttons
 Measured after, on the Parameters tab: **the badge adds no contrast failure in either mode** (9.06
 dark, 6.66 light), and the tab's 44 remaining failures in each mode are unchanged and are all text
 inside `.control-disabled` rows, which WCAG 2.2 1.4.3 exempts as inactive user-interface components.
+
+---
+
+## D253 — two counts nothing was checking, and a header that could not travel with its own rows
+
+**Date: 2026-08-05 · Written after the code, and says so.** Two play-tester issues about
+`packages/viz/index.html`, filed separately and closed together because they are the same shape:
+**a fact declared in two places, with nothing comparing them.** #37 is the campaign's size, written
+into prose beside a list generated from the campaign. #52 is a column width, written into a header
+beside rows generated from the same columns.
+
+## 1 — The Scenarios tab said *five* over eight cards, and pointed at a directory
+
+The heading read *"Scenarios — five buildings, any order"*, the intro *"the other four"*, and the
+footnote *"All five ship with the simulator in `data/buildings/`"*. `CONTRACTS` has **eight** — the
+handoff fixed the campaign at the five buildings shipped when it was drawn and three landed
+afterwards (`docs/12` § 4.7) — and `dev/scenariosPanel.ts` draws a card from each, so a player
+counted eight cards under a heading that said five. The cards themselves were corrected at source
+by another lane; these three sentences are static markup, and static markup cannot count.
+
+### Three routes, and why the count is pinned rather than derived or deleted
+
+- **Derive it at runtime**, by giving the three sentences ids and having the mount write the number
+  in. It is the honest shape and it needs `dev/elementMap.ts` and `dev/scenariosPanel.ts`, both
+  outside this lane. **Recorded as the better fix rather than taken** — see the end of this entry.
+- **Delete the count** — *"every building, any order"* — which cannot go stale because it says
+  nothing. Refused: *how many scenarios are there* is the first thing a player wants from the tab,
+  and this is the only sentence that answers it before the cards render.
+- **Type it and pin it.** `dev/scenarioCopy.test.ts` reads the three sentences out of the markup
+  with the number **captured**, and compares each against `CONTRACTS.length` — which is the list the
+  cards under them come from. The day a ninth contract lands, the suite goes red naming the
+  sentence to change.
+
+The defect was never the number. It was that a hand-typed count had nothing checking it, which is
+what `dev/tokens.test.ts` closes for colours and `elementMap.test.ts` closes for ids, on this same
+file, by this same technique. Reading the word out rather than searching for the right one matters
+in both directions: a page that said *five* fails with the word it said, and a page that lost a
+sentence fails because the pattern does not match at all — where a `toContain` on the correct string
+is satisfied by a page containing the wrong one too. The negative control plants #37's own defect
+back and requires the patterns to find it.
+
+Matching the *shape* rather than the bare word is also what lets *"the clean shifts **one** asks
+for"* stand. A blanket ban on number words in the panel would have to be answered by rewording
+ordinary English, which is how a check ends up being edited instead of the thing it checks.
+
+### The path, and the two more found beside it
+
+*"…in `data/buildings/`"* handed a repository directory to somebody playing a game. Sweeping the
+whole markup rather than the panel found **two more**: `data/elevator-specs.json` in two
+machine-class tooltips, and `CLAUDE.md` — this repository's agent instructions — in the batch
+panel's *replications* label. All four are gone, and the sweep is over the page rather than over the
+Scenarios tab, because scoping it to what was reported would have left the two it found. What is
+banned is a path a reader could try to open and the names of this repository's own documents; a bare
+`.json` is not, because the Lab and Parameters tabs legitimately name a *schema* and a *profile*,
+and a rule that banned the characters would be answered by rewording rather than by removing a leak.
+
+## 2 — The elevation's header was a static sibling of the scroller
+
+`.elevation-head` sat **outside** `#elevation-body`, with `min-width: 400px`, inside a container
+with no `overflow-x`. Measured at 1440 × 1100 with eight shafts, before:
+
+| box | client / scroll | `overflow-x` |
+|---|---|---|
+| `.elevation` | 339 / 412 | `visible` |
+| `.editor-grid` | 702 / 774 | `visible` |
+| `.sheet` | **750 / 798** | `auto` |
+| `#elevation-body` | 315 / 446 | `auto` |
+
+Three things follow from that table, and only the first was reported as the headline.
+
+**The SHAFTS column was unreachable.** The body scrolled and the header did not, because the header
+was not in the scroller — so a player who found the gesture watched the rows slide under a header
+that stayed put. Of eight authored shafts, **A and B were on screen and C through H were past the
+right-hand edge**, while the legend directly below listed all eight. The instruction line above it
+reads *"drag a shaft's top or bottom edge to restrict it to a band of floors"*, pointed at the part
+that was not there.
+
+**The reporter's second measurement reproduces exactly, and it is a consequence rather than a
+second bug.** They measured `.sheet` at `741 / 794` and described slider labels degrading to
+*"CUPANCY"* and *"esign capacity per floor"* once anything scrolled it. `.sheet` is the only
+ancestor with `overflow-x: auto`, so the elevation's 73 px of overflow travelled up through
+`.editor-grid` and landed there: **the form's left edge was cut off because the elevation's right
+edge was.** Measured after the fix, `.sheet` is `750 / 750` and `.editor-grid` is `702 / 702`. One
+cause, and closing it closes both.
+
+**And the fix has to be one grid, not two scrollers.** `.elevation-scroll` is the box that scrolls
+and `.elevation-grid` inside it is `min-width: max-content`, so the header and the body are sized
+together and one gesture moves both. Measured after, at 1440 with eight shafts: the scroller is
+`315 / 446`, **`#elevation-body` is `446 / 446`** — it never has anything to scroll sideways, so it
+cannot get its own scrollbar and drift out of register — and at full scroll the header's left edge
+and the first row's left edge are the same number (578), with the eighth bar's right edge at 1016
+inside a viewport edge at 1024.
+
+Two details that are decisions rather than detail:
+
+- **The scroll is on an inner box, not on `.elevation`** — which is what #52 proposed. `.elevation`
+  also holds the legend, the two notes, the add/remove buttons and the paragraph about saving.
+  Scrolling to reach shaft H would have carried all six off the left-hand edge, trading one thing a
+  reader cannot reach for six.
+- **`.elevation-body` declares no `overflow-x` at all.** The proposal was `overflow-x: visible;
+  overflow-y: auto`, and that pair does not mean what it reads as: a box with one axis `visible` and
+  the other not computes the visible one to `auto`. Written out it would have said *do not scroll
+  sideways* and given the body a second horizontal scrollbar the header does not follow — the exact
+  defect being fixed, restored by the fix for it. Confirmed by measurement: the computed
+  `overflow-x` on that element is `auto` either way.
+
+### The defect under the defect: one set of columns, three declarations
+
+Fixing the scroll and stopping would leave the next drift waiting. The four column widths were
+written **three times**: in the `.elev-*` rules, again inline on `.elevation-head`'s five spans, and
+a third time as `dev/buildingEditor.ts`'s `SHAFT_LEFT_PX = 284` — their sum plus the row padding and
+the four gaps, under a docstring that says *"if either moves, both move"* and nothing that makes it
+so. The shaft overlay is absolutely positioned at that offset; a column that widened in the
+stylesheet would have drawn bars over the PEOPLE figures.
+
+Two of the three are one now: the rules and the header both name `--elev-floor-w`, `--elev-sky-w`,
+`--elev-occ-w`, `--elev-people-w`, `--elev-col-gap`, `--elev-row-pad`, `--elev-shaft-gap` and
+`--elev-stage-min`. The third cannot be, from this lane — `elevationStageWidthPx` has to stay pure,
+because it is what § D236's half of #52 is asserted on, and `buildingEditor.ts` is not ours. So the
+duplication that remains is **pinned rather than promised**: `dev/elevationGeometry.test.ts` derives
+`SHAFT_LEFT_PX` from the page's own tokens as `pad + FLOOR + gap + SKY + gap + OCCUPIED + gap +
+PEOPLE + gap`, recovers the inter-bar gap and the right-hand inset from `elevationStageWidthPx` by
+differencing rather than by importing constants that would then be asserted against themselves, and
+requires the header to carry no bare pixel width at all. That is `dev/tokens.test.ts`'s arrangement
+applied to widths instead of to colours, and it is what a duplication that cannot be deleted gets.
+
+### What is left, and whose it is
+
+Both remainders are the same request, in two files this lane does not own:
+
+1. **`dev/buildingEditor.ts` should read the tokens rather than restate them.** `SHAFT_LEFT_PX`,
+   `SHAFT_GAP_PX`, `SHAFT_RIGHT_PX` and `STAGE_MIN_PX` are `index.html`'s numbers copied into
+   TypeScript. A mount can read a custom property off the computed style once and hand the pure
+   function its geometry, which would make the test above unnecessary rather than necessary.
+2. **The Scenarios tab's three counts should be written by the mount.** `dev/elementMap.ts` gains
+   three ids and `dev/scenariosPanel.ts` writes `CONTRACTS.length` into them, at which point the
+   count is derived and `scenarioCopy.test.ts`'s first case becomes a statement about the mount
+   rather than about the markup.
