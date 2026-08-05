@@ -14512,12 +14512,19 @@ threshold, the run-length ladder, the seed bound, the count of suppression groun
 replication budget are each asserted against the constant that produces them, and the worked first
 run is required to be a selection `canStart` accepts.
 
-That last one was not decoration. **The default Free Play selection does not start.**
-`initialMenuState` opens at 15 minutes and the catalogue's first template, `rise-and-fall`, declares
-a 30-minute period, so a new player's first sight of Free Play is a disabled **Start** under a
-refusal. The guide's worked example was drafted at 15 minutes for the same reason and the derived
-check caught it. The copy moved; the default did not, because `menu.ts` is a decision about the
-product rather than about a sentence, and it is filed as the next thing to do.
+That last one was not decoration, and it found a defect in the product rather than in the copy.
+**The Free Play screen opened on a selection it refused.** `initialMenuState` took `durationS` from
+a fixed index — 15 minutes — while the catalogue's first template, `rise-and-fall`, declares a
+30-minute period, so `freePlayIssues` returned a refusal against the state the menu had just built
+and a new player's first sight of Free Play was a disabled **Start** under an error. The guide's
+worked example was drafted at 15 minutes for exactly the same reason, and the derived check refused
+it before the copy shipped. It is fixed on the base branch as GitHub issue #20: `openingDurationS`
+picks the shortest offered length the selected template's own minimum allows, derived rather than
+indexed, which is § D213's rule applied to a default.
+
+**The worked example is still derived rather than pinned to 30.** It agrees with the new opening
+state today, and it is asserted through `canStart` rather than against it, so a template whose
+period changes moves the sentence instead of stranding it.
 
 The Day report is described as **three** states — nothing filed, still running, filed — because
 § D223 made it three the day before this landed, and both titles are read out of
@@ -14534,6 +14541,49 @@ and the guide supplies the concept. A first-visit hint that opened the entry onc
 persisted *seen* flag in `persist/` and a read in `dev/main.ts`; the entry is discoverable without
 one, and an auto-opening panel a player did not ask for is the thing the issue's own repro was
 wrong about.
+
+### The document recorder, built here because a question needed it
+
+`docs/16` S9 names four evidence tiers — `static sweep < model walk < document recorder < browser` —
+and this package had the first, the second and, since § D220, the fourth. **The third had never been
+built**, and four modules say so in their own docstrings. So the claim that `renderMenu` puts a
+thing on a page could only ever be a regex over its source, which is how this file's first version
+asserted its own entry.
+
+`dev/menuPanel.test.ts` is that tier: forty lines whose `createElement` returns an object
+remembering its tag, class, text, attributes, children and listeners, and nothing else. It is not
+jsdom and does not become one — no `window`, no layout, no selector engine, no event dispatch — and
+`docs/05`'s *"no Playwright, no Puppeteer, no jsdom"* is unbroken because the object graph is the
+panel's own output rather than a re-implementation of the DOM.
+
+It was built to answer **GitHub issue #20's second half**: *"the Start button is fully styled as
+enabled/clickable and gives no visual feedback on click. Nothing happens."* Driven, the markup is
+right in every respect a document can carry — `disabled` is written, the refusal is rendered inside
+the control, the handler dispatches `start`, and the enabled arm is asserted too so the check cannot
+pass on a Start that is always refused.
+
+**And the reporter was still right, for a reason the tier cannot see.** The refusal renders as
+`.menu-row-detail` (`color: var(--dim)`) inside `.menu-start` (`background: var(--accent)`).
+Measured while this lane was writing the recorder, that pairing was **1.03:1**: the one sentence
+explaining why Start will not start, drawn invisibly on the control it explains, with nowhere else
+for a player to read it. The same span on an ordinary row sits on `var(--card)` at 6.01:1 and was
+always fine, so it was the primary button specifically. The disabled rule is `opacity: 0.55`, which
+dims the block and leaves it the full accent-coloured primary call to action.
+
+**It is fixed, and not by this lane.** § D235 / GitHub issue #26 added
+`.menu-start .menu-row-detail { color: var(--accent-ink) }`, reached independently from the
+Scenarios screen — where the same span is the only thing distinguishing *start the scored week* from
+*sandbox the same week unscored* — and its own comment quotes the same 1.03:1. Two lanes measured
+one pairing from opposite ends and got the same number, which is the strongest thing that can be
+said for either finding. So issue #20's second half is closed by both halves at once: the markup was
+right all along, and the sentence is now legible.
+
+What this lane added is the **pairing** as an assertion rather than the number:
+`dev/menuPanel.test.ts` requires the detail line inside the accent-filled button to be drawn in a
+different colour from the detail line on a card, so a later tidy that deletes the override as
+redundant fails there rather than on a player's screen. It deliberately pins **no contrast value** —
+`render/theme.test.ts` owns the ink ladder, and a test in this lane holding a figure that lane is
+tuning is a test that fails on their fix.
 
 ## D225 — a batch that resolved to nothing, and the two sentences it was missing
 
