@@ -45,9 +45,13 @@ import {
   screenOf,
   type MenuAffordance,
   type MenuScreenView,
+  type CommissioningScreenInput,
   type MenuViewInput,
 } from '../menu/screens.js';
 import { MENU_SCREENS, type MenuScreen, type MenuState } from '../menu/types.js';
+import { asBuiltChoices, shaftChoices, speedChoices } from '../commissioning/choices.js';
+import { reviewCommissioning } from '../commissioning/refusals.js';
+import { CONSTRAINTS, commissionableClasses, constraintById } from '../commissioning/types.js';
 import { permits } from '../scope/permits.js';
 import { RESOURCES } from '../scope/probes.test-helper.js';
 import type { PlayMode } from '../scope/types.js';
@@ -75,7 +79,64 @@ const ARMS: readonly { readonly name: string; readonly input: Omit<MenuViewInput
         rankingRefusal: 'day 7 grows the building and schedules a move-in',
       },
     },
+    {
+      /*
+       * **A fourth arm, because the first three never see the fabric screen.**
+       *
+       * `MenuViewInput.commissioning` is optional, and every arm above omits it — so the walk
+       * rendered the *no building loaded* fallback for `commissioning` on every pass and asserted
+       * nothing about the screen a player actually meets. That is the coverage hole this whole
+       * directory exists to catch, in the newest screen, produced by the option being optional.
+       *
+       * The input is built from the real shipped `midtown-office` under `new-build`, which is the
+       * constraint that opens every dimension — so this is the arm where the most controls are
+       * enabled and the most options are offered, and therefore the one where a broken select or a
+       * missing refusal has somewhere to show.
+       */
+      name: 'a building on the bench, under the loosest constraint',
+      input: {
+        catalogue: CATALOGUE,
+        canPost: false,
+        hasRun: false,
+        calendarPeriodId: 'quarter-end',
+        commissioning: commissioningArm(),
+      },
+    },
   ]);
+
+/** The fabric screen's input, from the shipped building and the shipped specs. */
+function commissioningArm(): CommissioningScreenInput {
+  const building = RESOURCES.buildings.find((entry) => entry.id === 'midtown-office')?.config;
+  if (building === undefined) throw new Error('midtown-office is not loaded');
+  const classes = commissionableClasses(RESOURCES.elevatorSpecs);
+  const choices = asBuiltChoices(building, classes);
+  const constraint = constraintById('new-build') ?? CONSTRAINTS[0];
+  if (constraint === undefined) throw new Error('no constraints ship');
+  return {
+    buildingName: building.name,
+    constraintId: constraint.id,
+    choices,
+    review: reviewCommissioning({
+      base: building,
+      choices,
+      classes,
+      specs: RESOURCES.elevatorSpecs,
+      constraint,
+    }),
+    optionsFor: (bankId) => {
+      const choice = choices.find((entry) => entry.bankId === bankId);
+      const machineClass = classes.find((entry) => entry.id === choice?.machineClassId);
+      return {
+        shafts: shaftChoices(choice?.shafts ?? 1).map((n) => ({ id: String(n), name: String(n) })),
+        machineClass: classes.map((entry) => ({ id: entry.id, name: entry.name })),
+        ratedSpeed: speedChoices(machineClass).map((speed) => ({
+          id: String(speed),
+          name: `${speed.toFixed(2)} m/s`,
+        })),
+      };
+    },
+  };
+}
 
 const viewAt = (state: MenuState, arm: (typeof ARMS)[number]): MenuScreenView =>
   screenOf({ ...arm.input, state });
