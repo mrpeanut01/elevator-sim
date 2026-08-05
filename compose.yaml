@@ -50,6 +50,30 @@
 # The database password below is a development credential in a file that is committed, which is
 # exactly what it looks like. Nothing it protects leaves this machine, and the production password
 # is generated at deploy time and never written down — see `infra/README.md` § 3.
+#
+# ## This stack is same-origin, and the split-origin deployment is NOT reproduced here
+#
+# What runs here is one container serving the page and the API together — the shipped deployment,
+# and the case `ELEVATOR_SIM_ALLOW_ORIGIN`'s absence below is correct for. Since § D257 there is a
+# second, optional shape where the page is on a CDN and the API is not, and **this file does not
+# build it**. That is stated rather than left to be discovered, because the cross-origin path is
+# the one thing in that lane no browser has ever exercised (`docs/16-static-site-deployment.md`
+# § 9).
+#
+# To drive it locally you would need two origins, not two ports — `localhost:5174` and
+# `localhost:8787` are already cross-origin to a browser, which is enough:
+#
+#   1. build the viewer with the API's origin baked in, and serve it separately:
+#        ELEVATOR_SIM_API_ORIGIN=http://localhost:8787 npm run build:web -w @elevator-sim/viz
+#        npx vite preview --port 5174 --outDir dist-web   # from packages/viz
+#   2. add to the `app` service below, both of them, because the server refuses one without
+#      the other matching:
+#        ELEVATOR_SIM_ORIGIN: http://localhost:5174
+#        ELEVATOR_SIM_ALLOW_ORIGIN: http://localhost:5174
+#
+# **Written from the code, not from a run.** Nobody has done this; if you do, the interesting part
+# is the preflight on `POST /api/auth/request-link`, which carries a JSON content type and an
+# `Authorization` header and is therefore the one request CORS has a real opinion about.
 
 name: elevator-sim
 

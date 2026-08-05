@@ -63,6 +63,26 @@ template cannot do for you.
 ''')
 param senderAddress string = ''
 
+@description('''
+Where the **viewer** is served from, when that is not this app.
+
+Empty — the default and the shipped state — means the container serves the page and the API from one
+origin, which is what it has always done. Everything below is unchanged in that case: sign-in links
+point at this app, and CORS permits nobody, because there is nothing cross-origin to permit.
+
+Set it to a static host's origin (e.g. `https://elevator-sim-viz.azurestaticapps.net`, no trailing
+slash) and **two** environment variables move together: `ELEVATOR_SIM_ORIGIN`, because a sign-in link
+resolves to a page and the page is now over there (§ D241 § 4), and `ELEVATOR_SIM_ALLOW_ORIGIN`,
+because the page's `fetch` is now cross-origin. They are one parameter precisely so they cannot
+disagree — `main.ts` refuses to start if they do, and the failure mode they produce apart is a site
+that loads and a client that reports a server which is in fact fine.
+
+The static site must be built with `ELEVATOR_SIM_API_ORIGIN` set to **this app's** origin. That is
+the third value, it lives in GitHub rather than in ARM, and `docs/16-static-site-deployment.md` § 3
+is the order the three are set in.
+''')
+param viewerOrigin string = ''
+
 @description('Replicas at rest. 0 is scale-to-zero and is the reason this deployment is cheap; 1 removes cold starts and bills continuously.')
 @minValue(0)
 @maxValue(5)
@@ -350,10 +370,28 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
                 ? 'DoNotReply@${azureManagedDomain.properties.mailFromSenderDomain}'
                 : senderAddress
             }
-            // Confirmation links must point at the public origin, not at localhost. This is the
-            // one value that is wrong by default in every deployment that forgets it, and the
-            // failure is silent: mail arrives carrying a link nobody outside the container can open.
-            { name: 'ELEVATOR_SIM_ORIGIN', value: 'https://${namePrefix}-app.${environment.properties.defaultDomain}' }
+            // Sign-in links must point at the public origin of **the viewer**, not at localhost and
+            // not necessarily at this app. This is the one value that is wrong by default in every
+            // deployment that forgets it, and the failure is silent: mail arrives carrying a link
+            // nobody outside the container can open. Since § D257 it is also the value that moves
+            // when the page is hosted elsewhere — see `viewerOrigin`.
+            {
+              name: 'ELEVATOR_SIM_ORIGIN'
+              value: empty(viewerOrigin)
+                ? 'https://${namePrefix}-app.${environment.properties.defaultDomain}'
+                : viewerOrigin
+            }
+            // Which origin a browser may call this API from. Empty is "none", which is what a
+            // same-origin deployment needs and what this has always effectively had — the variable
+            // is declared unconditionally rather than added conditionally so that a reader of the
+            // deployed revision can see the answer instead of inferring it from an absence.
+            //
+            // **Never `*`.** `main.ts` refuses to start on it (§ D257): the API answers
+            // session-bearing requests, and a verification is a whole simulation, so a wildcard
+            // publishes both to every page on the web. The value here is a single exact origin, and
+            // it is the same `viewerOrigin` that set `ELEVATOR_SIM_ORIGIN` above — the server
+            // cross-checks the two and refuses a deployment where they have drifted apart.
+            { name: 'ELEVATOR_SIM_ALLOW_ORIGIN', value: viewerOrigin }
             // The identity the ACS SDK's DefaultAzureCredential must choose. Without it, a
             // container carrying exactly one user-assigned identity still has to be told which.
             { name: 'AZURE_CLIENT_ID', value: identity.properties.clientId }
@@ -393,11 +431,20 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
 
 // --------------------------------------------------------------------------- outputs
 
-@description('Open this. The viewer and the API are both here — same origin, so no CORS to configure.')
+@description('The API. Also the viewer, unless viewerOrigin is set — in which case open that instead.')
 output appUrl string = 'https://${app.properties.configuration.ingress.fqdn}'
+
+@description('Set this as the repository variable ELEVATOR_SIM_API_ORIGIN, so the static site is built knowing where the API is. docs/16-static-site-deployment.md § 3.')
+output apiOrigin string = 'https://${app.properties.configuration.ingress.fqdn}'
 
 @description('Set ELEVATOR_SIM_ORIGIN to this if you put a custom domain in front.')
 output appFqdn string = app.properties.configuration.ingress.fqdn
+
+@description('Where the page is served from, and the only origin permitted to call this API from a browser. Equal to appUrl unless viewerOrigin was set.')
+output viewerUrl string = empty(viewerOrigin) ? 'https://${app.properties.configuration.ingress.fqdn}' : viewerOrigin
+
+@description('Whether the page and the API are on one origin. False means three values have to agree — see docs/16 § 3.')
+output sameOrigin bool = empty(viewerOrigin)
 
 @description('The PostgreSQL host, for psql or a migration.')
 output postgresFqdn string = postgres.properties.fullyQualifiedDomainName

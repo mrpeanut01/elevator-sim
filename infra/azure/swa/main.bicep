@@ -1,0 +1,259 @@
+/*
+  The viewer's hosting, and the identity that deploys it.
+
+  Implements `docs/16-static-site-deployment.md`. That document is what this is judged against and
+  wins any disagreement with the comments here.
+
+  ## Scope, and the coupling this lane HAS — which an earlier draft of this file denied
+
+  This began as a separate lane from `infra/azure/main.bicep`, and the sentence it carried was
+  *"the two share a cloud and nothing else"*. That was true when it was written and is **not true
+  now**, so it is corrected here rather than quietly replaced: the resource groups and lifecycles
+  are still separate, and the two deployments now share **one value in three places** — this site's
+  origin, which the app template takes as `viewerOrigin` and the deploy workflow takes as
+  `ELEVATOR_SIM_API_ORIGIN` in the other direction. `docs/16-static-site-deployment.md` § 3 is the
+  order they are set in, and it is an order because the site's hostname does not exist until this
+  template has run.
+
+  Deleting this group still does nothing to the app's group — but it leaves the app configured to
+  mail sign-in links at a site that is gone, which § 8 says how to undo.
+
+  ## Why a Static Web App and not a server, and the premise that changed
+
+  An earlier revision of this file argued the platform from *"`packages/viz` has no server half"*.
+  That was a fact about the repository when it was written and **stopped being one**: `packages/server`
+  ships accounts, a leaderboard and a magic-link sign-in, and the viewer contacts it. Keeping the
+  old sentence would have been the stale-premise failure this repository has a standing rule about,
+  so here is the argument that survives the change.
+
+  The *bundle* still has no server half — `core` publishes an fs-free `browser` export condition,
+  the simulation runs in the page and in a Web Worker, and the reference data is JSON copied out of
+  `data/`. What moves here is the **page**, and only the page. The API stays on the Container App
+  that already runs it.
+
+  The reason to move the page is measured rather than argued. The Container App runs at
+  `minReplicas: 0`, and `serve.ts` serves everything outside `/api/` from the bundle **in that same
+  container** — so a cold first load waits for the container to start before a single byte of HTML
+  arrives. Measured on the live deployment: **32.2 s cold, 0.13 s warm.** `GET /api/wake` fixes the
+  API's cold start and cannot fix this one, because the page is the thing being waited on. A CDN
+  serves the page while the container is still asleep, for $0. See `docs/16` § 1 for the priced
+  comparison, including the two options that were not chosen and what they would have bought.
+
+  ## What this creates
+
+  | Resource | Why |
+  |---|---|
+  | Static Web App, **Free** SKU | $0. Managed TLS, global distribution, PR preview environments. |
+  | User-assigned managed identity | The identity GitHub Actions federates into. No client secret exists to leak or rotate. |
+  | 2 federated identity credentials | One for pushes to the production branch, one for pull requests. Both pinned to this repository. |
+  | Custom role + assignment, scoped to the site | Exactly `listSecrets` and `read`, on this one resource. Not Contributor, not on the group. |
+
+  Nothing here holds a secret, and nothing here writes one to the repository.
+*/
+
+targetScope = 'resourceGroup'
+
+// ---------------------------------------------------------------------------
+// Parameters
+// ---------------------------------------------------------------------------
+
+@description('''
+Region for the Static Web App. Static Web Apps is available in a SHORT list of regions and this is
+not the usual "any region" parameter — an unlisted region fails the deployment rather than falling
+back. Valid at time of writing: westus2, centralus, eastus2, westeurope, eastasia.
+The content is served from Azure's global edge regardless, so this choice is about where the
+control-plane resource lives, not about latency for readers.
+''')
+@allowed([
+  'westus2'
+  'centralus'
+  'eastus2'
+  'westeurope'
+  'eastasia'
+])
+param location string = 'eastus2'
+
+@description('Name of the Static Web App. Must be unique within the resource group.')
+@minLength(2)
+@maxLength(40)
+param siteName string = 'elevator-sim-viz'
+
+@description('''
+The repository GitHub Actions will deploy from, as `owner/repo`. This is the subject of the
+federated credential: a workflow in any OTHER repository presenting a token for this identity is
+rejected by Entra, not by anything in the workflow. Getting this wrong is the whole security
+boundary, so it has no default.
+''')
+param githubRepository string
+
+@description('Branch whose pushes deploy to production. Pull requests get preview environments regardless.')
+param productionBranch string = 'main'
+
+@description('''
+Name for the user-assigned managed identity GitHub Actions authenticates as.
+''')
+param deployIdentityName string = '${siteName}-deployer'
+
+// ---------------------------------------------------------------------------
+// The site
+// ---------------------------------------------------------------------------
+
+resource site 'Microsoft.Web/staticSites@2024-04-01' = {
+  name: siteName
+  location: location
+  sku: {
+    name: 'Free'
+    tier: 'Free'
+  }
+  properties: {
+    // `Custom` means "this app's CI/CD lives outside Azure". Without it, creating a Static Web App
+    // against a repository makes Azure generate and commit its own GitHub Actions workflow — which
+    // would be a second, unreviewed deploy path writing to this repository. The workflow this
+    // project deploys with is `.github/workflows/deploy-viz.yml`, which is in review like every
+    // other file. No `repositoryUrl` or `branch` is set here for the same reason.
+    provider: 'Custom'
+
+    // The build artifact carries its own `staticwebapp.config.json` (emitted by
+    // `packages/viz/vite.config.ts`), so routing and headers are versioned with the code that
+    // needs them rather than configured in the portal where a reviewer never sees them.
+    allowConfigFileUpdates: true
+
+    // Preview environments per pull request. Free allows 3 concurrent; see `docs/16` § 5 for what
+    // happens on the fourth.
+    stagingEnvironmentPolicy: 'Enabled'
+
+    // The paid CDN tier. Explicitly off — it is a Standard-plan feature and turning it on is the
+    // single easiest way to convert a $0 deployment into a billed one.
+    enterpriseGradeCdnStatus: 'Disabled'
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The deploying identity
+// ---------------------------------------------------------------------------
+
+resource deployIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: deployIdentityName
+  location: location
+}
+
+/*
+  Why a user-assigned managed identity rather than an Entra app registration.
+
+  Both work with GitHub's OIDC. The app registration is the more commonly documented one and it is
+  NOT what ships here, because creating it is a Microsoft Graph call — `az ad app create` — which
+  cannot be expressed in a template. Half the deployment would then live in this file and half in a
+  shell command in a runbook, and the half in the runbook is the half that drifts. A user-assigned
+  identity and its federated credentials are ARM resources, so `az deployment group create` is the
+  whole of the provisioning and `what-if` shows the whole of the change.
+*/
+
+resource pushCredential 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31' = {
+  parent: deployIdentity
+  name: 'github-${productionBranch}'
+  properties: {
+    issuer: 'https://token.actions.githubusercontent.com'
+    // The exact subject GitHub puts in the token for a push to this branch. A token from another
+    // branch, another repository, or an environment does not match and is refused at token
+    // exchange — before any Azure permission is consulted.
+    subject: 'repo:${githubRepository}:ref:refs/heads/${productionBranch}'
+    audiences: ['api://AzureADTokenExchange']
+  }
+}
+
+resource pullRequestCredential 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31' = {
+  parent: deployIdentity
+  name: 'github-pull-request'
+  properties: {
+    issuer: 'https://token.actions.githubusercontent.com'
+    // Covers every pull request against this repository, which is what a preview environment per PR
+    // requires. Read `docs/16` § 6 before enabling this on a public repository: this subject does
+    // not distinguish a fork's pull request from a branch's.
+    subject: 'repo:${githubRepository}:pull_request'
+    audiences: ['api://AzureADTokenExchange']
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Authorization — exactly one action, on exactly one resource
+// ---------------------------------------------------------------------------
+
+/*
+  The deployment token is fetched at run time (`az staticwebapp secrets list`) instead of being
+  stored as a GitHub secret, so the identity needs permission to read it. The built-in role that
+  covers this is `Website Contributor`, which also carries write access to every App Service
+  resource in scope — far more than "let a workflow publish a static site".
+
+  So the permission is spelled out instead. Two actions, on this site and nothing else. If this
+  identity's token is ever exfiltrated from a workflow run, the whole of what it can do is read
+  this app's deployment token — which is the thing the attacker would already have.
+*/
+resource deploymentTokenReader 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
+  name: guid(site.id, 'swa-deployment-token-reader')
+  scope: site
+  properties: {
+    roleName: 'SWA deployment token reader (${siteName})'
+    description: 'Read one Static Web App and list its deployment token. Nothing else, nowhere else.'
+    type: 'CustomRole'
+    permissions: [
+      {
+        actions: [
+          'Microsoft.Web/staticSites/read'
+          'Microsoft.Web/staticSites/listSecrets/action'
+        ]
+        notActions: []
+        dataActions: []
+        notDataActions: []
+      }
+    ]
+    assignableScopes: [site.id]
+  }
+}
+
+resource deploymentTokenAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(site.id, deployIdentity.id, deploymentTokenReader.id)
+  scope: site
+  properties: {
+    roleDefinitionId: deploymentTokenReader.id
+    principalId: deployIdentity.properties.principalId
+    // Stated explicitly: without it the assignment can fail on a freshly created identity whose
+    // principal has not yet replicated, and the error names neither cause nor fix.
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Outputs — every value § 3 of the runbook asks you to paste into GitHub
+// ---------------------------------------------------------------------------
+
+@description('Set as the repository variable AZURE_SWA_NAME. Its presence is what arms the deploy workflow.')
+output staticWebAppName string = site.name
+
+@description('Set as the repository variable AZURE_RESOURCE_GROUP.')
+output resourceGroupName string = resourceGroup().name
+
+@description('Set as the repository variable AZURE_CLIENT_ID. Not a secret — it is an identifier, useless without the federated trust above.')
+output deployClientId string = deployIdentity.properties.clientId
+
+@description('Set as the repository variable AZURE_TENANT_ID.')
+output tenantId string = subscription().tenantId
+
+@description('Set as the repository variable AZURE_SUBSCRIPTION_ID.')
+output subscriptionId string = subscription().subscriptionId
+
+@description('Where the site will answer once something has been deployed to it. Also the value the app template takes as `viewerOrigin`, and the origin its CORS will then permit.')
+output defaultHostname string = 'https://${site.properties.defaultHostname}'
+
+@description('''
+The three values that have to agree, named in one place so a reader does not have to reconstruct
+them. `docs/16-static-site-deployment.md` § 3 is the order; getting the order wrong is the failure
+this list exists to make obvious.
+''')
+output originsThatMustAgree object = {
+  // 1. Built into the page: where the API is. Set as the repository variable ELEVATOR_SIM_API_ORIGIN
+  //    from the app deployment's `apiOrigin` output.
+  apiOriginRepositoryVariable: 'ELEVATOR_SIM_API_ORIGIN'
+  // 2 and 3. Given to the app template as `viewerOrigin`, which sets both ELEVATOR_SIM_ORIGIN (where
+  //    sign-in links point) and ELEVATOR_SIM_ALLOW_ORIGIN (who may call the API from a browser).
+  viewerOriginForAppTemplate: 'https://${site.properties.defaultHostname}'
+}

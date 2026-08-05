@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "_comment": {
+      "value": [
+        "Copy to main.parameters.json and fill in githubRepository. That copy is gitignored.",
+        "Nothing in this file is a secret — there is no secret in this lane at all, which is the",
+        "point of the federated credential. It is gitignored because the repository owner's own",
+        "org/repo is their business, not because it is sensitive.",
+        "",
+        "This template provisions the HOSTING. It does not know where the API is, because that is",
+        "the other deployment's output and this one has no way to read it. Three values have to",
+        "agree and only one of them is here; provision.sh sets the second and prints the third.",
+        "Deployment instructions and the order: docs/16-static-site-deployment.md § 3."
+      ]
+    },
+    "githubRepository": {
+      "value": "OWNER/elevator-sim"
+    },
+    "productionBranch": {
+      "value": "main"
+    },
+    "location": {
+      "value": "eastus2"
+    },
+    "siteName": {
+      "value": "elevator-sim-viz"
+    }
+  }
+}

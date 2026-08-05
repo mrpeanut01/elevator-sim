@@ -16588,3 +16588,204 @@ One existing guard was adjusted rather than re-pinned: `mixIdentity`'s flat-mix 
 joined that test's named exclusion set — beside `template` and `sources`, which it is a copy of —
 and, following the file's own discipline, both values are asserted explicitly below the comparison
 rather than waved away.
+
+---
+
+## D257 — the page waits 32 seconds for a server it does not need, so the page moves and the API does not
+
+**Date: 2026-08-05 · Written with the code, and the measurement came first.** Two figures against
+the live deployment, checked rather than reasoned about:
+
+| | |
+|---|---|
+| Cold first page load, container asleep | **32.2 s** |
+| Warm page load | **0.13 s** |
+
+`packages/server/src/http/serve.ts` serves everything outside `/api/` from the built bundle **in the
+same container**, and `infra/azure/main.bicep` runs that container at `minReplicas: 0`. So a tester
+opening the link cold gets around half a minute of blank browser **before any app exists to
+apologise**. `GET /api/wake` — already merged — fixes the API's cold start and cannot fix this one:
+nothing can call `/api/wake` until the page that would call it has arrived.
+
+### 1. Three options, and the one that is chosen is not free of a cost
+
+| Option | Δ standing cost | What it keeps |
+|---|---|---|
+| **Static Web Apps Free + cross-origin API** ← chosen | **£0** | Scale-to-zero, unchanged |
+| Static Web Apps **Standard** + linked backend | ≈ £9 / month | One browser-visible origin; § D243's reasoning intact |
+| `minReplicas: 1` | ≈ £26 / month (≈ $34) | Everything — not one line of code changes |
+
+The case for Standard is § D243's own and it does not weaken: an absolute origin *"goes stale the
+moment a custom domain is put in front"*, and `static.ts` says outright that *"which origins may
+call this API"* is **"a question with a wrong answer that looks exactly like a working one"**.
+
+What decided it is that **two of the four moving parts move under Standard as well**, which the
+framing this work started from did not account for:
+
+1. **The tag has to be declared at build time either way.** Under Standard the page is still served
+   by the CDN and still never passes through `loadStaticBundle`, so a Standard deployment with no
+   build-time tag dead-ends every social surface exactly as a Free one does. Standard changes the
+   tag's *value* — `"/"` rather than an absolute origin — not whether it must exist.
+2. **The magic-link origin moves either way.** `ELEVATOR_SIM_ORIGIN` is where the mailed link points
+   (§ D241 § 4) and under both options the page is at the static host.
+
+So the free path's marginal cost is two values, not four, and both are written from **one** deploy
+parameter that the server refuses to boot on if they disagree. Against that, Standard adds a
+standing charge to a deployment whose entire design principle is that the app bills nothing at rest.
+
+One argument against Standard is **reasoning and is labelled as such**: a linked backend puts an
+Azure proxy in front of a request that already takes 32 s cold, and Static Web Apps documents a
+response timeout on proxied backends. Under the cross-origin design the browser waits as long as it
+likes and nothing in between can give up first. Nothing here has run a linked backend, and adopting
+Standard would need that measured rather than inherited from this paragraph.
+
+### 2. What is genuinely lost, stated rather than argued away
+
+Same-origin. With one origin a misconfiguration is *impossible*; with two it is possible and made
+loud, which is a weaker guarantee. Three mechanisms have to fail before it is silent again: the
+build refuses to run armed without an origin, the workflow asserts the artifact in both directions,
+and `provision.sh` reads the tag back off the deployed page.
+
+What is **not** lost is the set of browser origins that can call this API. It is exactly one — the
+viewer's — under both options; Standard enforces it with the same-origin policy and this enforces it
+with an allowlist naming one origin. `*` is refused at boot rather than warned about, because the
+API answers session-bearing requests and a verification is a whole simulation, so a wildcard
+publishes both to every page on the web. There is no `Access-Control-Allow-Credentials` anywhere in
+this server: the session is a bearer token in a header, never a cookie.
+
+### 3. What has not been run
+
+**No Azure resource has been created by this lane**, no page has ever been served cross-origin, and
+`provision.sh` has never been executed. `docs/16-static-site-deployment.md` § 9 itemises the verified
+and unverified halves separately, in the voice `infra/README.md` § 0 already uses. The cost figures
+are list prices, not a bill.
+
+---
+
+## D258 — one meta tag, two producers, and the comment that suppressed both
+
+**Date: 2026-08-05 · Written with the code.** § D243 closed the defect behind play-tester issues
+#21, #28, #29, #30, #32 and #34 by having the **server** inject `<meta name="elevator-sim-api">` as
+it reads the build off disk, with the value `"/"`. That fix is exactly right for the deployment it
+was written for and **cannot reach a bundle a CDN serves**, because such a bundle never passes
+through `loadStaticBundle`. § D257 moves the bundle, so a second producer is needed.
+
+### 1. Mutually exclusive by construction, not by convention
+
+| Build | `ELEVATOR_SIM_API_ORIGIN` | The build emits | The server injects |
+|---|---|---|---|
+| `vite dev` | unset | nothing | not involved |
+| the container image | unset | nothing | `"/"` — unchanged |
+| the static host | `https://…` | an absolute tag | never sees it |
+
+`packages/viz/apiOrigin.mjs` is the second producer and **§ D243's path is not touched**: the
+container still serves the page in local development and in the current deployment, and it must keep
+being right for that. `withApiOriginTag` is idempotent, so even a static bundle handed to the
+container keeps its absolute origin rather than acquiring a second, contradictory tag — verified by
+running both bundles through a real socket, not asserted.
+
+The two implementations are deliberate rather than an oversight: `server` may not depend on `viz`,
+and `viz`'s copy must load inside a bundler config `tsc -b` deliberately cannot reach.
+`static.test.ts` therefore **drives both** in one file, including their two origin validators over
+one table of fourteen cases — a shared constant would only have *looked* like that check.
+
+### 2. § D243's objection to an absolute origin is answered, not dodged
+
+It *"goes stale the moment a custom domain is put in front"*. True, and the answer is that the origin
+is a **deploy parameter** and never a committed constant: no file in this repository names a
+hostname, and a custom domain is one variable in two places (`docs/16` § 3.5). Hard-coding it into
+`packages/viz/index.html` stays rejected for § D243 § 1's reason — it would point a local development
+build at production — and `static.test.ts` now asserts that `index.html` declares none.
+
+The second objection — that any mismatch turns a same-origin call into a cross-origin one the
+restrictive CORS default refuses — is answered by making the mismatch impossible to have quietly:
+the same parameter writes the tag and the API's `ELEVATOR_SIM_ALLOW_ORIGIN`, and § D259 is the
+refusal that fires when they drift.
+
+The **CSP moves in the same decision**, which is the part that would otherwise have been discovered
+in a browser. `staticwebapp.config.json` ships `connect-src 'self'` — correct for a page that
+contacts nothing else, and forbidding exactly the request this deployment exists to make. The
+emitter widens it *iff* an origin is declared, and throws when there is no `connect-src 'self'` to
+widen rather than returning the input unchanged.
+
+### 3. The comment that broke it, which is the instructive half
+
+`index.html` gained a comment telling the next reader not to write this tag by hand. Both producers
+detected an existing tag with a regex over the whole document — and such a comment **necessarily
+contains the attribute it is warning about**. The comment matched, both producers concluded the page
+had already been told its origin, and neither emitted anything. **The prose written to prevent a
+dead-ending viewer produced one.**
+
+Two things about it are worth keeping:
+
+- It was **found by a test and not by reasoning** — the assertion that `index.html` declares no
+  origin, written in the same change as the comment, failed on the commit that added it. A fixture
+  would never have contained the comment, which is why these tests run against the real shipped
+  document.
+- The fix is not to reword the comment. Both detectors now strip HTML comments first, which is also
+  what makes them agree with `querySelector` — what the page itself runs, and which has never seen a
+  comment. The literal **stays** in `index.html` on purpose: it is the live case, and deleting
+  either strip reddens the suite against the document that actually ships.
+
+---
+
+## D259 — three values, one fact, and the two the server refuses to hold apart
+
+**Date: 2026-08-05 · Written with the code.** A split deployment needs three configured values to
+agree. They live in three different systems, which is why this is written down rather than left to a
+runbook step.
+
+| # | Value | Where | What it does |
+|---|---|---|---|
+| 1 | the **API's** origin | GitHub variable `ELEVATOR_SIM_API_ORIGIN` | baked into `index.html` and the CSP at build time |
+| 2 | the **site's** origin | `viewerOrigin` → `ELEVATOR_SIM_ORIGIN` | where sign-in links point (§ D241 § 4) |
+| 3 | the **site's** origin, again | the same `viewerOrigin` → `ELEVATOR_SIM_ALLOW_ORIGIN` | who may call the API from a browser |
+
+### 1. Two of them are one parameter, and the server checks anyway
+
+2 and 3 are set from a single Bicep parameter, so they cannot drift. `main.ts` refuses to boot when
+they differ regardless, because a rule enforced on one of two values that must match is not a rule —
+and this repository has a standing entry (§ D219) about configuration that is loaded correctly and
+writable by nothing.
+
+Three refusals, all at boot, all naming the fix:
+
+- **`ELEVATOR_SIM_ALLOW_ORIGIN=*`** — refused outright. Not defaulted-away, refused: it is the value
+  somebody reaches for when CORS is in the way, and it publishes a session-bearing API and a
+  CPU-bound verification route to every page on the web.
+- **The two disagreeing.** Their failure mode apart is the nasty one — the site loads, the page knows
+  where the API is, and `fetch` fails CORS, which surfaces as a `TypeError`, which the client reports
+  as a server that is down. The reader then debugs a server that is fine.
+- **A value that is not an exact origin.** A trailing slash, a path, a query string, an uppercase
+  scheme. `https://api.example/` and `https://api.example` are the same origin to a browser and
+  different strings to the header comparison a CORS check actually performs, so the near-miss is
+  refused where it is cheap.
+
+The startup line now names both origins, because a split deployment and a same-origin one **answer
+identically to every request you can make by hand** and disagree only in a browser.
+
+### 2. The ordering is enforced, and one step cannot be automated
+
+The site's hostname does not exist until its own template has run, so the three are set in an order.
+`infra/azure/swa/provision.sh` enforces it — `AZURE_SWA_NAME` is the arming switch and is set last,
+after `ELEVATOR_SIM_API_ORIGIN`.
+
+It **cannot** set `viewerOrigin`, and the reason is structural: `infra/azure/main.bicep` takes
+`appSecret` and `databaseAdminPassword` as required `@secure()` parameters with no defaults, so
+re-running it means re-supplying both, and this script neither has them nor should ask. So it checks
+the **deployed revision** instead and refuses to arm until the app has been pointed at the site.
+Half-armed is the worst of the three states, so it is the one state the script will not leave you
+in.
+
+### 3. Unset is the shipped state, everywhere
+
+`viewerOrigin` defaults to empty and changes nothing when it is; `ELEVATOR_SIM_ALLOW_ORIGIN` is then
+empty, meaning no page may call this API cross-origin, which is what the current deployment
+effectively has. Every deploying job is gated on `vars.AZURE_SWA_NAME`, and unset is shipped. The
+container path is verified still working by a run — the real `dist-web`, the real `loadStaticBundle`,
+`serve()` on a real socket, `GET /` answering 200 with `content="/"`.
+
+**None of the split path has been deployed.** `docs/16-static-site-deployment.md` § 9 says which
+parts were run and which were only reasoned about, and `infra/README.md` § 0.2 now carries the same
+admission beside *"No mail has ever been sent"* — which this lane makes more load-bearing rather
+than less, since it moves the origin that mail's link is built from.
