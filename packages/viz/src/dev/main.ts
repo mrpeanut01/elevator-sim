@@ -88,8 +88,9 @@ import {
   queueAt,
   type LandingAssignment,
 } from '../frame/overlay.js';
-import { WAIT_BANDS } from '../live/bands.js';
+import { WAIT_BANDS, waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
+import type { WaitBandDefinition, WaitBands } from '../live/types.js';
 import {
   clockAt,
   DAY_START_S,
@@ -209,10 +210,34 @@ const ANNOUNCE_MS = 2000;
  * The wait-age legend — § 1.3 M4
  * ========================================================================== */
 
-/** One key of the wait-age legend: a colour to draw a disc in, and the words beside it. */
+/** One key of the wait-age legend: a colour to draw a disc in, the words beside it, and — since
+ *  the legend became a reading rather than a key — how many people are standing in it right now. */
 export interface WaitLegendEntry {
   readonly label: string;
   readonly color: string;
+  /**
+   * People standing in this band at the playhead, or `undefined` before there is a run.
+   *
+   * A head count, never an estimate and never suppressible — `live/bands.ts` says so in its own
+   * words, and nothing here divides anything. `undefined` is drawn as `—` rather than as `0`,
+   * because *no run yet* and *nobody waiting* are two different states and the second is a result.
+   */
+  readonly count: number | undefined;
+  /**
+   * The band's own boundary, for the entry's tooltip — `0–30 s`, `30–60 s`, `60–120 s`, `120 s+`.
+   *
+   * It earns its place on the fourth entry. `WAIT_BANDS[3].legendLabel` is the handoff's word
+   * *gave up* (`:233`), and `bands.ts` is explicit that the band counts **people still standing**
+   * past two minutes rather than people who abandoned — that is `observationsAt(…).abandoned`, a
+   * different population on a different clock. A bare label could carry that ambiguity harmlessly;
+   * a label with a *count* on it is a figure, so the boundary goes beside it.
+   *
+   * **Two numbers and a unit, deliberately, rather than a sentence.** It restates a bound the band
+   * already publishes, so it cannot be false unless `WAIT_BANDS` moves, in which case it moves
+   * with it — which is what makes it data rather than a claim about a run, and therefore not
+   * something `honesty/`'s search has anything to be true or false about.
+   */
+  readonly rangeLabel: string;
 }
 
 /**
@@ -231,23 +256,50 @@ export interface WaitLegendEntry {
  * decision-free half that puts it on the page — the pattern `dom.ts` documents, and the only one
  * that is testable in a suite with no jsdom.
  */
-export function waitLegendEntries(): readonly WaitLegendEntry[] {
-  return WAIT_BANDS.map((band) => ({ label: band.legendLabel, color: band.color }));
+export function waitLegendEntries(bands?: WaitBands | undefined): readonly WaitLegendEntry[] {
+  return WAIT_BANDS.map((band, index) => ({
+    label: band.legendLabel,
+    color: band.color,
+    count: bands?.counts[index]?.count,
+    rangeLabel: rangeLabelOf(band),
+  }));
 }
 
-/** One entry as a node: the handoff's `●` in the band's colour, then the band's words. */
-function legendEntryNode(doc: Document, entry: WaitLegendEntry): HTMLElement {
+/** A band's boundary, as the two numbers it already publishes and the unit they are in. */
+function rangeLabelOf(band: WaitBandDefinition): string {
+  const from = String(band.fromS);
+  const to = band.toS;
+  return to === undefined ? `${from} s+` : `${from}–${String(to)} s`;
+}
+
+/**
+ * One entry as a node: the handoff's `●` in the band's colour, the band's words, and its count.
+ *
+ * `countNode` is passed in rather than created here because the four count nodes are the only part
+ * of this row that changes at 60 Hz — {@link WaitLegendEntry.count} moves every frame while the
+ * labels and the palette never move at all. The caller keeps the handles and writes them with
+ * `setText`, so the row is built exactly once and hovering an entry to read its `title` survives
+ * the playhead running underneath it.
+ */
+function legendEntryNode(
+  doc: Document,
+  entry: WaitLegendEntry,
+  countNode: HTMLElement,
+): HTMLElement {
   return el(doc, 'span', {
     className: 'legend-entry',
+    title: entry.rangeLabel,
     children: [
       el(doc, 'span', {
         text: '●',
         style: { color: entry.color },
         // The disc is the colour key; the words beside it are the claim. KB-15 — a reader who
-        // cannot separate amber from orange still reads *a minute* and *two minutes*.
+        // cannot separate amber from orange still reads *a minute* and *two minutes*, and now
+        // reads the head count too, which is a third signal that is not a colour either.
         attrs: { 'aria-hidden': 'true' },
       }),
       el(doc, 'span', { text: entry.label }),
+      countNode,
     ],
   });
 }
@@ -1119,6 +1171,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * every state change drops hover, and hover is how the reader reads a `title`.
    */
   const fillLegend = keyedFill(ui.stage.legend);
+  /**
+   * The four count cells, held from the one build `fillLegend` ever does.
+   *
+   * The counts are live and the row is not: rebuilding four entries every frame would churn the
+   * accessibility tree sixty times a second and would drop a hover mid-read, which is the exact
+   * cost `fillLegend`'s docstring above exists to avoid. So the structure is keyed on the frozen
+   * band set and built once, and the playhead only ever writes text into these four nodes.
+   */
+  let legendCountCells: readonly HTMLElement[] = [];
 
   /* ---------------------------------------------------------------------- *
    * The mount context — the only thing a panel may do to the world
@@ -1334,17 +1395,58 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawFooter(view);
     drawTransportChrome(view);
     drawParity();
-    drawLegend();
+    drawLegend(view);
     drawStage();
   }
 
-  /** § 1.3 M4 — the four wait-age keys, from `WAIT_BANDS` and from nowhere else. */
-  function drawLegend(): void {
-    const entries = waitLegendEntries();
-    fillLegend(entries.map((entry) => `${entry.label}·${entry.color}`).join('|'), () => [
-      ui.stage.legendTitle,
-      ...entries.map((entry) => legendEntryNode(document, entry)),
-    ]);
+  /**
+   * § 1.3 M4 — the four wait-age keys, from `WAIT_BANDS` and from nowhere else, each carrying its
+   * live head count.
+   *
+   * ## Why the counts are here at all
+   *
+   * The row said what amber *means* and never how many people amber currently **is**, so a reader
+   * could not tell one person from thirty from the only surface that names the four colours the
+   * stage is drawing in. The left rail's mood bar already carries counts (L2) and is a different
+   * instrument on a different card; this is the key under the stage, and it now reads rather than
+   * merely keys. The words and the palette are still `WAIT_BANDS`' and are still written nowhere
+   * else.
+   *
+   * **Four head counts and no total.** The counts *are* the scale — an exact count separates one
+   * person from thirty in a way no bar and no max-marker can — and a total would be a fifth figure
+   * whose sentence (*"12 standing now"*) is a claim about a run, which `honesty/surfaces.ts` would
+   * have to drive rather than this file assert. Left out rather than smuggled past that search.
+   *
+   * ## Why it is cheap enough to run at 60 Hz
+   *
+   * One extra `waitBandsAt` — a single early-terminating pass over `recording.legs` up to `t` —
+   * beside the several `renderLive` already makes, and *no* DOM work on a frame where the digits
+   * did not change, because the structure is built once and `setText` no-ops on equal text. The
+   * canvas render in `drawStage` dominates this by orders of magnitude.
+   */
+  function drawLegend(view: ViewAt): void {
+    const bands =
+      view.recording === undefined ? undefined : waitBandsAt(view.recording, view.simTimeS);
+    const entries = waitLegendEntries(bands);
+    /*
+     * The key is deliberately the labels and colours only, and **not** the counts: keying on a
+     * figure that moves every frame would rebuild the row every frame, which is what holding the
+     * cells below exists to prevent.
+     */
+    fillLegend(entries.map((entry) => `${entry.label}·${entry.color}`).join('|'), () => {
+      const cells: HTMLElement[] = [];
+      const nodes = entries.map((entry) => {
+        const cell = el(document, 'span', { className: 'legend-count' });
+        cells.push(cell);
+        return legendEntryNode(document, entry, cell);
+      });
+      legendCountCells = cells;
+      return [ui.stage.legendTitle, ...nodes];
+    });
+    for (const [index, entry] of entries.entries()) {
+      const cell = legendCountCells[index];
+      if (cell !== undefined) setText(cell, entry.count === undefined ? '—' : String(entry.count));
+    }
   }
 
   /** Only what the playhead moves. Runs at 60 Hz. */
@@ -1354,6 +1456,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawHeader(view);
     drawFooter(view);
     drawPlayhead(view);
+    // The legend's counts are a reading at `t`, so they belong here and not only in `renderAll`.
+    // Left out, the row would state the counts of whichever frame last changed the state — a
+    // figure that is stale in exactly the way a scrubbing reader cannot see.
+    drawLegend(view);
     drawStage();
   }
 
@@ -2112,20 +2218,38 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
     fill(
       ui.transport.speedChips,
-      ...SPEEDS.map((speed) =>
-        chip(document, {
-          label: `×${String(speed)}`,
+      ...SPEEDS.map((speed) => {
+        const label = `×${String(speed)}`;
+        const title = `${String(speed)} simulated seconds per real second`;
+        const node = chip(document, {
+          label,
           // Against `baseSpeed`, not `playback.speed` — the player's own multiplier is applied on
           // top, so comparing the product would leave no chip lit at any setting but ×1.
           selected: baseSpeed === speed,
-          title: `${String(speed)} simulated seconds per real second`,
+          title,
           onPick: () => {
             baseSpeed = speed;
             applyPlaybackSpeed();
             drawTransportChrome(viewAt());
           },
-        }),
-      ),
+        });
+        /*
+         * `×900` spoken is "times nine hundred" — a multiplier of nothing named. The sentence that
+         * says what it multiplies was on `title` alone, and a `title` waits a second for a hover,
+         * cannot be reached from a keyboard and does not exist on a touch device: a play-tester
+         * read this row as five unexplained numbers with no tooltips at all, which is what an
+         * undiscovered tooltip looks like from the outside. So **the same sentence** goes on the
+         * accessible name, from the same two locals — one wording, two channels, and no second
+         * copy to drift.
+         *
+         * It leads with the visible text, and that is WCAG 2.5.3 rather than style: a name that
+         * dropped `×900` would break speech input for a reader who can see the chip and says its
+         * label out loud. Set here rather than through `ChipSpec` because `dom.ts`'s chip is
+         * shared with rows whose visible words are already their whole claim.
+         */
+        node.setAttribute('aria-label', `${label} — ${title}`);
+        return node;
+      }),
     );
 
     const recording = view.recording;
